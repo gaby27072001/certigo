@@ -1,0 +1,28 @@
+name: ci-content
+
+# Validates content-as-code (YAML tracks & lessons) against the JSON schemas in
+# content/schema. Keeps the knowledge base structurally correct before publish.
+on:
+  push:
+    branches: [ main ]
+    paths: [ "content/**", "tools/validate_content.mjs", ".github/workflows/ci-content.yml" ]
+  pull_request:
+    paths: [ "content/**", "tools/validate_content.mjs", ".github/workflows/ci-content.yml" ]
+
+concurrency:
+  group: ci-content-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate tracks & lessons
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install validator deps
+        run: npm install --no-save ajv ajv-formats yaml glob
+      - name: Validate content
+        run: node tools/validate_content.mjs

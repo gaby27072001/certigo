@@ -1,0 +1,71 @@
+id: az900-l-cloud-models
+trackId: az-900
+unitId: az900-u-cloud-concepts
+domainId: cloud-concepts
+title: IaaS / PaaS / SaaS
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-cloud-service-models
+    body: >
+      Louer une voiture, prendre un taxi, ou utiliser le métro : trois façons de
+      se déplacer, trois niveaux de contrôle. Le cloud, c'est pareil.
+
+  - type: concept
+    conceptId: c-cloud-service-models
+    title: Trois niveaux de service gérés
+    body: >
+      Les modèles de service décrivent **ce que vous gérez vs ce que le
+      fournisseur gère**.
+
+
+      **IaaS** (Infrastructure as a Service) : vous louez des VM, du stockage,
+      du réseau. Contrôle maximal, mais vous gérez l'OS et les mises à jour.
+
+
+      **PaaS** (Platform as a Service) : vous déployez votre code, la plateforme
+      gère l'OS, le runtime et la mise à l'échelle. Vous vous concentrez sur
+      l'app.
+
+
+      **SaaS** (Software as a Service) : un logiciel prêt à l'emploi, géré de
+      bout en bout (ex. une boîte mail en ligne). Vous ne gérez que vos données
+      et vos utilisateurs.
+
+  - type: example
+    conceptId: c-cloud-service-models
+    body: >
+      Azure Virtual Machines = IaaS. Azure App Service = PaaS (vous poussez le
+      code, Azure gère le serveur). Microsoft 365 = SaaS (rien à administrer
+      côté serveur). Plus on va vers le SaaS, moins on gère — et moins on
+      personnalise.
+
+  - type: check
+    conceptId: c-cloud-service-models
+    check:
+      id: az900-l-cloud-models-check-1
+      conceptId: c-cloud-service-models
+      type: mcq
+      difficulty: 2
+      stem: >
+        Une équipe veut déployer une application web sans gérer le système
+        d'exploitation ni la mise à l'échelle des serveurs. Quel modèle choisir ?
+      options:
+        - { id: a, label: "IaaS" }
+        - { id: b, label: "PaaS" }
+        - { id: c, label: "SaaS" }
+        - { id: d, label: "On-premises" }
+      correct: [b]
+      explanation: >
+        Le PaaS (ex. Azure App Service) gère l'OS, le runtime et la mise à
+        l'échelle : l'équipe se concentre sur le code. L'IaaS demanderait de
+        gérer l'OS ; le SaaS livre un logiciel fini, pas une plateforme de
+        déploiement.
+
+  - type: recap
+    conceptId: c-cloud-service-models
+    body: >
+      IaaS = vous gérez l'OS (contrôle max). PaaS = vous gérez le code. SaaS =
+      vous gérez seulement vos données. Monter vers le SaaS = moins de gestion,
+      moins de personnalisation.

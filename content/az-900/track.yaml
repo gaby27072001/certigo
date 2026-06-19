@@ -1,0 +1,34 @@
+# Microsoft Azure Fundamentals — certification track.
+# Validated in CI against content/schema/track.schema.json.
+# Domain weights mirror the public AZ-900 exam skills outline and sum to 1.0.
+id: az-900
+code: AZ-900
+title: Microsoft Azure Fundamentals
+level: fundamentals
+summary: >
+  Comprendre les concepts du cloud, les principaux services Azure, et les notions
+  de gouvernance, sécurité, confidentialité, coûts et SLA — sans prérequis technique.
+
+domains:
+  - id: cloud-concepts
+    name: Concepts du cloud
+    weight: 0.28
+  - id: architecture-services
+    name: Architecture & services Azure
+    weight: 0.38
+  - id: management-governance
+    name: Gestion & gouvernance
+    weight: 0.34
+
+# NOTE: only fully-authored units are listed here so `ci-content` stays green.
+# The architecture-services and management-governance domains are weighted above
+# (they count toward the Readiness Score) and their units are added as lessons
+# are authored through the content pipeline.
+units:
+  - id: az900-u-cloud-concepts
+    domainId: cloud-concepts
+    title: Concepts du cloud
+    lessons:
+      - az900-l-capex-opex
+      - az900-l-shared-responsibility
+      - az900-l-cloud-models

@@ -1,0 +1,70 @@
+using System.Text.Json;
+using Azure.Core;
+using Azure.Identity;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.ApplicationInsights;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microlingo.Api.Auth;
+using Microlingo.Api.Middleware;
+using Microlingo.Application.Abstractions;
+using Microlingo.Application.Services;
+using Microlingo.Infrastructure.Cosmos;
+using Microlingo.Infrastructure.Identity;
+
+var host = new HostBuilder()
+    .ConfigureFunctionsWorkerDefaults(worker =>
+    {
+        worker.UseMiddleware<ExceptionMiddleware>();
+        worker.UseMiddleware<JwtAuthMiddleware>();
+    })
+    .ConfigureServices((context, services) =>
+    {
+        var configuration = context.Configuration;
+        services.AddApplicationInsightsTelemetryWorkerService();
+        services.ConfigureFunctionsApplicationInsights();
+
+        services.AddSingleton<TokenCredential, DefaultAzureCredential>();
+        services.AddSingleton(sp =>
+        {
+            var endpoint = configuration["COSMOS_ENDPOINT"]
+                ?? throw new InvalidOperationException("COSMOS_ENDPOINT is required.");
+            var credential = sp.GetRequiredService<TokenCredential>();
+            var serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            return new CosmosClient(endpoint, credential, new CosmosClientOptions
+            {
+                Serializer = new CosmosSystemTextJsonSerializer(serializerOptions)
+            });
+        });
+        services.AddSingleton(sp => new CosmosContext(
+            sp.GetRequiredService<CosmosClient>(),
+            configuration["COSMOS_DATABASE"] ?? CosmosContainers.DatabaseName));
+
+        services.AddSingleton<ITokenValidator>(_ => new EntraTokenValidator(
+            configuration["ENTRA_AUTHORITY"] ?? string.Empty,
+            configuration["ENTRA_AUDIENCE"] ?? string.Empty));
+
+        services.AddScoped<IUserContext, FunctionUserContext>();
+        services.AddSingleton<IClock, SystemClock>();
+        services.AddScoped<IUserRepository, CosmosUserRepository>();
+        services.AddScoped<IContentRepository, CosmosContentRepository>();
+        services.AddScoped<IProgressRepository, CosmosProgressRepository>();
+        services.AddScoped<IAttemptRepository, CosmosAttemptRepository>();
+        services.AddScoped<IEventRepository, CosmosEventRepository>();
+        services.AddScoped<ILeaderboardRepository, CosmosLeaderboardRepository>();
+        services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IContentService, ContentService>();
+        services.AddScoped<IQuizService, QuizService>();
+        services.AddScoped<ILeaderboardService, LeaderboardService>();
+        services.AddScoped<IPathService, PathService>();
+    })
+    .Build();
+
+host.Run();
+
+public sealed class SystemClock : IClock
+{
+    public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+}

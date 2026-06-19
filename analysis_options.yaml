@@ -1,0 +1,32 @@
+# Root analysis options for all Dart/Flutter code in the monorepo.
+# Individual packages can layer stricter rules by `include:`-ing this file.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true
+  errors:
+    # Treat missing awaits and dead code as build-breaking.
+    unawaited_futures: error
+    dead_code: error
+    todo: ignore
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "**/*.config.dart"
+    - "**/.dart_tool/**"
+    - "build/**"
+
+linter:
+  rules:
+    - always_declare_return_types
+    - avoid_print
+    - prefer_const_constructors
+    - prefer_const_constructors_in_immutables
+    - prefer_final_locals
+    - prefer_single_quotes
+    - require_trailing_commas
+    - sort_child_properties_last
+    - unnecessary_late
+    - use_super_parameters

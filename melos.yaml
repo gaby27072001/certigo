@@ -1,0 +1,39 @@
+# Melos — manages the Dart/Flutter side of the Microlingo monorepo.
+# https://melos.invertase.dev
+name: microlingo
+
+packages:
+  - apps/*
+  - packages/*
+
+command:
+  bootstrap:
+    # Use pub workspaces resolution for fast, consistent installs.
+    runPubGetInParallel: true
+
+scripts:
+  analyze:
+    description: Static analysis across all packages.
+    run: dart analyze --fatal-infos
+    exec:
+      concurrency: 4
+
+  test:
+    description: Run unit/widget tests in every package that has them.
+    run: flutter test
+    packageFilters:
+      dirExists: test
+
+  format:
+    description: Format all Dart sources (line length 100).
+    run: dart format --line-length 100 .
+
+  format-check:
+    description: Verify formatting in CI (fails on diff).
+    run: dart format --line-length 100 --set-exit-if-changed .
+
+  gen:
+    description: Run build_runner where codegen is used (data, app).
+    run: dart run build_runner build --delete-conflicting-outputs
+    packageFilters:
+      dependsOn: build_runner
