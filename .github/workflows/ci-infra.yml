@@ -1,0 +1,24 @@
+name: ci-infra
+
+# Lints and compiles the Bicep IaC so template errors surface on PRs.
+on:
+  push:
+    branches: [ main ]
+    paths: [ "infra/**", ".github/workflows/ci-infra.yml" ]
+  pull_request:
+    paths: [ "infra/**", ".github/workflows/ci-infra.yml" ]
+
+concurrency:
+  group: ci-infra-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bicep-build:
+    name: Bicep build (lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build main.bicep
+        run: az bicep build --file infra/main.bicep
+      - name: Lint params
+        run: az bicep build-params --file infra/params/dev.bicepparam --outfile /dev/null

@@ -1,0 +1,32 @@
+name: ci-backend
+
+# .NET 8 Azure Functions API: restore, build (warnings as errors) and test.
+on:
+  push:
+    branches: [ main ]
+    paths: [ "backend/**", ".github/workflows/ci-backend.yml" ]
+  pull_request:
+    paths: [ "backend/**", ".github/workflows/ci-backend.yml" ]
+
+concurrency:
+  group: ci-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Restore
+        working-directory: backend
+        run: dotnet restore Microlingo.sln
+      - name: Build
+        working-directory: backend
+        run: dotnet build Microlingo.sln --configuration Release --no-restore -warnaserror
+      - name: Test
+        working-directory: backend
+        run: dotnet test Microlingo.sln --configuration Release --no-build --verbosity normal

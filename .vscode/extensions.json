@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "Dart-Code.dart-code",
+    "Dart-Code.flutter",
+    "ms-dotnettools.csharp",
+    "ms-azuretools.vscode-bicep",
+    "ms-azuretools.vscode-azurefunctions",
+    "redhat.vscode-yaml",
+    "github.vscode-github-actions"
+  ]
+}

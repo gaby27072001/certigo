@@ -1,0 +1,63 @@
+id: az900-l-shared-responsibility
+trackId: az-900
+unitId: az900-u-cloud-concepts
+domainId: cloud-concepts
+title: Responsabilité partagée
+estMinutes: 5
+
+blocks:
+  - type: hook
+    conceptId: c-shared-responsibility
+    body: >
+      Dans le cloud, qui est responsable de la sécurité : vous ou Microsoft ?
+      La réponse — « ça dépend » — est au cœur de l'examen.
+
+  - type: concept
+    conceptId: c-shared-responsibility
+    title: Une frontière qui dépend du service
+    body: >
+      Le **modèle de responsabilité partagée** répartit les tâches de sécurité
+      entre le fournisseur (Microsoft) et le client (vous).
+
+
+      Règle simple : Microsoft sécurise *le cloud* (datacenters, matériel,
+      réseau physique) ; vous sécurisez *ce que vous mettez dans le cloud*
+      (données, identités, configuration). La frontière se déplace selon le
+      modèle : en **IaaS** vous gérez l'OS ; en **PaaS** la plateforme s'en
+      charge ; en **SaaS** presque tout est géré pour vous.
+
+  - type: example
+    conceptId: c-shared-responsibility
+    body: >
+      Vous déployez une VM Azure (IaaS) : Microsoft garantit l'hôte physique,
+      mais c'est à vous d'appliquer les correctifs de l'OS et de configurer le
+      pare-feu. Avec Azure SQL Database (PaaS), les correctifs du moteur sont
+      gérés par Microsoft — vous restez responsable des accès et des données.
+
+  - type: check
+    conceptId: c-shared-responsibility
+    check:
+      id: az900-l-shared-responsibility-check-1
+      conceptId: c-shared-responsibility
+      type: scenario
+      difficulty: 2
+      stem: >
+        Vous utilisez Azure SQL Database (PaaS). Quelle responsabilité reste
+        TOUJOURS la vôtre, quel que soit le modèle de service ?
+      options:
+        - { id: a, label: "Les correctifs du système d'exploitation hôte" }
+        - { id: b, label: "La sécurité physique du datacenter" }
+        - { id: c, label: "La gestion des données et des identités d'accès" }
+        - { id: d, label: "La maintenance du matériel réseau" }
+      correct: [c]
+      explanation: >
+        Les données et les identités restent toujours sous votre responsabilité,
+        dans tous les modèles (IaaS, PaaS, SaaS). Le reste se déplace vers
+        Microsoft à mesure qu'on monte vers le SaaS.
+
+  - type: recap
+    conceptId: c-shared-responsibility
+    body: >
+      Microsoft sécurise le cloud ; vous sécurisez ce que vous y placez. Données
+      et identités sont TOUJOURS de votre côté. La frontière monte vers
+      Microsoft de IaaS → PaaS → SaaS.

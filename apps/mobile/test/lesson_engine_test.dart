@@ -1,0 +1,184 @@
+import 'package:core/core.dart';
+import 'package:data/data.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:microlingo/app/providers.dart';
+import 'package:microlingo/features/lesson/application/check_outcome.dart';
+import 'package:microlingo/features/lesson/application/lesson_args.dart';
+import 'package:microlingo/features/lesson/application/lesson_controller.dart';
+import 'package:microlingo/features/lesson/application/lesson_session_state.dart';
+import 'package:microlingo/features/lesson/application/lesson_step.dart';
+import 'package:microlingo/features/lesson/application/sample_lesson.dart';
+
+/// Repositories that always fail, forcing the controller's offline path
+/// (bundled sample lesson + embedded answer key + locally computed result).
+class _OfflineLessonRepo implements LessonRepository {
+  @override
+  Future<Result<Lesson>> getLesson({
+    required String trackId,
+    required String lessonId,
+  }) async =>
+      const Err<Lesson>(NetworkFailure());
+}
+
+class _OfflineQuizRepo implements QuizRepository {
+  @override
+  Future<Result<SubmitQuizResult>> submit({
+    required String lessonId,
+    required SubmitQuizRequest request,
+  }) async =>
+      const Err<SubmitQuizResult>(NetworkFailure());
+}
+
+void main() {
+  group('buildLessonSteps', () {
+    test('flattens intro + blocks + result, checks carry their items', () {
+      final Lesson lesson = sampleLesson('l1');
+      final List<LessonStep> steps = buildLessonSteps(lesson);
+
+      expect(steps.first.kind, LessonStepKind.intro);
+      expect(steps.last.kind, LessonStepKind.result);
+      expect(steps.length, lesson.blocks.length + 2);
+
+      final List<LessonStep> checks = steps.where((LessonStep s) => s.isCheck).toList();
+      expect(checks.length, 2);
+      expect(checks.every((LessonStep s) => s.item != null), isTrue);
+      expect(
+        checks.map((LessonStep s) => s.item!.id),
+        containsAll(<String>['chk-shared-1', 'chk-shared-2']),
+      );
+
+      for (int i = 0; i < steps.length; i++) {
+        expect(steps[i].index, i);
+      }
+    });
+  });
+
+  group('EmbeddedKeyGrader', () {
+    final EmbeddedKeyGrader grader = EmbeddedKeyGrader(sampleAnswerKey());
+
+    test('marks the exact single answer correct', () {
+      final CheckOutcome o = grader.grade(itemId: 'chk-shared-1', selected: <String>['a']);
+      expect(o.correct, isTrue);
+      expect(o.correctAnswer, <String>['a']);
+      expect(o.explanation, isNotEmpty);
+    });
+
+    test('marks a wrong single answer incorrect', () {
+      final CheckOutcome o = grader.grade(itemId: 'chk-shared-1', selected: <String>['b']);
+      expect(o.correct, isFalse);
+    });
+
+    test('multi-select is order-independent', () {
+      final CheckOutcome o = grader.grade(itemId: 'chk-shared-2', selected: <String>['b', 'a']);
+      expect(o.correct, isTrue);
+    });
+
+    test('a partial multi-select answer is incorrect', () {
+      final CheckOutcome o = grader.grade(itemId: 'chk-shared-2', selected: <String>['a']);
+      expect(o.correct, isFalse);
+    });
+
+    test('an unknown item yields the empty outcome', () {
+      final CheckOutcome o = grader.grade(itemId: 'nope', selected: <String>['a']);
+      expect(o.correct, isFalse);
+      expect(o.correctAnswer, isEmpty);
+    });
+  });
+
+  group('LessonController (offline path)', () {
+    const LessonArgs args = LessonArgs(trackId: 'az-900', lessonId: 'sample');
+    late ProviderContainer container;
+
+    setUp(() {
+      container = ProviderContainer(
+        overrides: <Override>[
+          lessonRepositoryProvider.overrideWithValue(_OfflineLessonRepo()),
+          quizRepositoryProvider.overrideWithValue(_OfflineQuizRepo()),
+        ],
+      );
+      addTearDown(container.dispose);
+    });
+
+    LessonController notifier() => container.read(lessonControllerProvider(args).notifier);
+    LessonSessionState read() => container.read(lessonControllerProvider(args));
+
+    test('falls back to bundled sample content when the repo fails', () async {
+      final LessonController controller = notifier();
+      await controller.load();
+
+      final LessonSessionState state = read();
+      expect(state.status, LessonStatus.ready);
+      expect(state.lesson, isNotNull);
+      expect(state.steps.first.kind, LessonStepKind.intro);
+      expect(state.checksTotal, 2);
+    });
+
+    test('grades a check inline and reveals the outcome', () async {
+      final LessonController controller = notifier();
+      await controller.load();
+
+      while (!(read().current?.isCheck ?? false)) {
+        await controller.advance();
+      }
+      controller.toggleOption('a');
+      controller.submitCheck();
+
+      final LessonSessionState state = read();
+      expect(state.status, LessonStatus.graded);
+      expect(state.currentAnswered, isTrue);
+      expect(state.currentOutcome?.correct, isTrue);
+    });
+
+    test('completes the lesson and computes a local result offline', () async {
+      final LessonController controller = notifier();
+      await controller.load();
+      final Map<String, CheckOutcome> key = sampleAnswerKey();
+
+      var guard = 0;
+      while (read().status != LessonStatus.finished && guard++ < 50) {
+        final LessonSessionState state = read();
+        final LessonStep? step = state.current;
+        if (step != null && step.isCheck && !state.currentAnswered) {
+          for (final String id in key[step.item!.id]!.correctAnswer) {
+            controller.toggleOption(id);
+          }
+          controller.submitCheck();
+        } else {
+          await controller.advance();
+        }
+      }
+
+      final LessonSessionState state = read();
+      expect(state.status, LessonStatus.finished);
+      expect(state.result, isNotNull);
+      expect(state.result!.scorePct, 100);
+      expect(state.result!.weakConcepts, isEmpty);
+      expect(state.result!.results.length, 2);
+      expect(state.result!.rewards.xpEarned, greaterThan(0));
+    });
+
+    test('a wrong answer surfaces the concept as weak in the result', () async {
+      final LessonController controller = notifier();
+      await controller.load();
+
+      var guard = 0;
+      while (read().status != LessonStatus.finished && guard++ < 50) {
+        final LessonSessionState state = read();
+        final LessonStep? step = state.current;
+        if (step != null && step.isCheck && !state.currentAnswered) {
+          // Deliberately wrong: pick the last option only.
+          controller.toggleOption(step.item!.options.last.id);
+          controller.submitCheck();
+        } else {
+          await controller.advance();
+        }
+      }
+
+      final LessonSessionState state = read();
+      expect(state.status, LessonStatus.finished);
+      expect(state.result!.weakConcepts, isNotEmpty);
+      expect(state.result!.scorePct, lessThan(100));
+    });
+  });
+}

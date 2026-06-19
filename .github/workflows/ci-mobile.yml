@@ -1,0 +1,66 @@
+name: ci-mobile
+
+# Flutter app + Dart packages: format check, static analysis and tests.
+on:
+  push:
+    branches: [ main ]
+    paths: [ "apps/**", "packages/**", ".github/workflows/ci-mobile.yml" ]
+  pull_request:
+    paths: [ "apps/**", "packages/**", ".github/workflows/ci-mobile.yml" ]
+
+concurrency:
+  group: ci-mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.24.0"
+
+jobs:
+  packages:
+    name: Pure-Dart packages (core, cortex)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [ core, cortex ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Get dependencies
+        working-directory: packages/${{ matrix.package }}
+        run: dart pub get
+      - name: Analyze
+        working-directory: packages/${{ matrix.package }}
+        run: dart analyze --fatal-infos
+      - name: Test
+        working-directory: packages/${{ matrix.package }}
+        run: dart test
+
+  app:
+    name: Flutter app + UI packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Format check
+        run: dart format --line-length 100 --set-exit-if-changed apps packages
+      - name: Pub get (app)
+        working-directory: apps/mobile
+        run: flutter pub get
+      - name: Analyze (app)
+        working-directory: apps/mobile
+        run: flutter analyze
+      - name: Test (app)
+        working-directory: apps/mobile
+        run: flutter test --coverage
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-coverage
+          path: apps/mobile/coverage/lcov.info
+          if-no-files-found: ignore

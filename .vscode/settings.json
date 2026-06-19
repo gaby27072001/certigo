@@ -1,0 +1,57 @@
+{
+  "// Microlingo workspace settings": "Dart/Flutter + .NET, cohérents avec la CI",
+
+  "editor.formatOnSave": true,
+  "editor.rulers": [100],
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.exclude": {
+    "**/.dart_tool": true,
+    "**/build": true,
+    "**/bin": true,
+    "**/obj": true,
+    "tools/seed_output": true
+  },
+
+  "dart.lineLength": 100,
+  "dart.flutterSdkPath": null,
+  "[dart]": {
+    "editor.defaultFormatter": "Dart-Code.dart-code",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
+    },
+    "editor.selectionHighlight": false,
+    "editor.suggestSelection": "first",
+    "editor.tabCompletion": "onlySnippets"
+  },
+
+  "[csharp]": {
+    "editor.defaultFormatter": "ms-dotnettools.csharp",
+    "editor.formatOnSave": true
+  },
+  "dotnet.defaultSolution": "backend/Microlingo.sln",
+
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.tabSize": 2
+  },
+  "yaml.schemas": {
+    "content/schema/track.schema.json": ["content/**/track.yaml"],
+    "content/schema/lesson.schema.json": ["content/**/lessons/*.lesson.yaml"]
+  },
+
+  "[bicep]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-bicep"
+  },
+
+  "search.exclude": {
+    "**/.dart_tool": true,
+    "**/build": true,
+    "**/bin": true,
+    "**/obj": true,
+    "**/node_modules": true,
+    "tools/seed_output": true
+  }
+}

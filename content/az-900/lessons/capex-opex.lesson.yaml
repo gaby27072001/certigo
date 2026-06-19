@@ -1,0 +1,77 @@
+# Sample lesson — authored content-as-code, validated against
+# content/schema/lesson.schema.json in CI. The `correct` + `explanation` fields
+# are the answer key: they are stripped from the public payload and used only
+# for server-side grading.
+id: az900-l-capex-opex
+trackId: az-900
+unitId: az900-u-cloud-concepts
+domainId: cloud-concepts
+title: Capex vs Opex
+estMinutes: 4
+
+blocks:
+  - type: hook
+    conceptId: c-capex-opex
+    body: >
+      Pourquoi des entreprises migrent-elles vers le cloud pour des raisons
+      purement financières, avant même la technique ?
+
+  - type: concept
+    conceptId: c-capex-opex
+    title: Deux façons de payer l'informatique
+    body: >
+      Le **Capex** (dépense d'investissement) consiste à acheter des actifs à
+      l'avance : serveurs, datacenters, licences. Gros coût initial, amorti sur
+      plusieurs années.
+
+
+      L'**Opex** (dépense de fonctionnement) consiste à payer un service au fur
+      et à mesure de sa consommation, sans achat initial. Le cloud Azure suit ce
+      modèle : vous payez ce que vous utilisez.
+
+  - type: example
+    conceptId: c-capex-opex
+    body: >
+      Une startup lance une app. Plutôt qu'acheter 50 000 € de serveurs (Capex),
+      elle déploie des machines virtuelles Azure et paie ~800 €/mois selon la
+      charge (Opex). Si la demande explose, elle scale ; si elle baisse, la
+      facture baisse aussi.
+
+  - type: code
+    conceptId: c-capex-opex
+    language: bash
+    code: |
+      # Provisionner à la demande — facturé à l'usage (Opex)
+      az vm create \
+        --resource-group rg-demo \
+        --name vm-api \
+        --image Ubuntu2204 \
+        --size Standard_B2s
+
+  - type: check
+    conceptId: c-capex-opex
+    check:
+      id: az900-l-capex-opex-check-1
+      conceptId: c-capex-opex
+      type: mcq
+      difficulty: 2
+      stem: >
+        Une équipe paie ses serveurs Azure uniquement selon la consommation
+        mensuelle, sans achat initial. De quel modèle de coût s'agit-il ?
+      options:
+        - { id: a, label: "Capex — dépense d'investissement" }
+        - { id: b, label: "Opex — dépense de fonctionnement" }
+        - { id: c, label: "Amortissement sur 5 ans" }
+        - { id: d, label: "Licence perpétuelle" }
+      correct: [b]
+      explanation: >
+        Payer à l'usage, sans investissement initial, est la définition de
+        l'Opex. Le cloud transforme l'achat d'actifs (Capex) en charges
+        variables (Opex).
+
+  - type: recap
+    conceptId: c-capex-opex
+    body: >
+      Capex = acheter en avance (coût fixe initial). Opex = payer à l'usage
+      (coût variable). Le cloud transforme le Capex en Opex et améliore
+      l'agilité financière.
