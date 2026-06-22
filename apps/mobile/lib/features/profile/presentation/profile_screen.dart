@@ -101,12 +101,13 @@ class ProfileScreen extends ConsumerWidget {
                       mode: mode,
                       onChanged: (ThemeMode m) => ref.read(themeModeProvider.notifier).state = m),
                   Divider(color: p.border, height: 24),
-                  _PrefRow(
+                  const _PrefRow(
                       icon: Icons.notifications_rounded,
                       label: 'Rappels quotidiens',
                       trailing: 'Bientôt'),
                   Divider(color: p.border, height: 24),
-                  _PrefRow(icon: Icons.language_rounded, label: 'Langue', trailing: 'Français'),
+                  const _PrefRow(
+                      icon: Icons.language_rounded, label: 'Langue', trailing: 'Français'),
                 ],
               ),
             ),
@@ -196,7 +197,7 @@ class _ThemeRow extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(child: Text('Thème', style: t.bodyLarge)),
         SegmentedButton<ThemeMode>(
-          style: ButtonStyle(visualDensity: VisualDensity.compact),
+          style: const ButtonStyle(visualDensity: VisualDensity.compact),
           segments: const <ButtonSegment<ThemeMode>>[
             ButtonSegment<ThemeMode>(value: ThemeMode.light, icon: Icon(Icons.light_mode_rounded)),
             ButtonSegment<ThemeMode>(

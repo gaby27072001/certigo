@@ -62,7 +62,7 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // Daily goal -----------------------------------------------------
-            _DailyGoalCard(progress: 0.6, earned: 30, goal: 50),
+            const _DailyGoalCard(progress: 0.6, earned: 30, goal: 50),
             const SizedBox(height: 16),
 
             // Continue lesson ------------------------------------------------
