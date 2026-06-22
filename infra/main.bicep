@@ -23,6 +23,12 @@ param authIssuer string
 @description('Entra External ID application (audience) client id the API validates.')
 param authAudience string
 
+@description('Optional email notified on security alerts (401/403/5xx spikes). Empty = no receiver.')
+param alertEmail string = ''
+
+@description('Enable paid Microsoft Defender for Cloud plans (per-resource cost). Default false — only free CSPM stays on.')
+param enableDefenderPlans bool = false
+
 // Deterministic, collision-resistant suffix per environment/subscription.
 var suffix = uniqueString(subscription().id, appName, env)
 var rgName = 'rg-${appName}-${env}'
@@ -98,6 +104,37 @@ module api 'modules/functionApp.bicep' = {
     authIssuer: authIssuer
     authAudience: authAudience
     tags: tags
+  }
+}
+
+// Security observability: diagnostics -> Log Analytics + 401/403/5xx alerts.
+module diagnostics 'modules/diagnostics.bicep' = {
+  scope: rg
+  name: 'diagnostics'
+  params: {
+    functionAppName: api.outputs.functionAppName
+    cosmosAccountName: data.outputs.accountName
+    keyVaultName: vault.outputs.name
+    workspaceId: monitoring.outputs.workspaceId
+    alertEmail: alertEmail
+    tags: tags
+  }
+}
+
+// Microsoft Defender for Cloud (subscription scope). Free CSPM stays on; paid
+// plans are gated behind enableDefenderPlans (default false).
+module defender 'modules/defender.bicep' = {
+  name: 'defender'
+  params: {
+    enablePaidPlans: enableDefenderPlans
+  }
+}
+
+// Continuous compliance: MCSB initiative in audit-only mode (subscription scope).
+module policy 'modules/policy.bicep' = {
+  name: 'policy'
+  params: {
+    assignmentLocation: location
   }
 }
 
