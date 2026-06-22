@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
-import 'glass_surface.dart';
+import 'prism_card.dart';
 
 /// Post-answer explanatory feedback — the heart of "learning, not testing".
 ///
@@ -28,8 +28,9 @@ class AnswerFeedbackCard extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
     final Color color = correct ? p.success : p.error;
-    return GlassSurface(
-      tint: color,
+    return PrismCard(
+      variant: PrismCardVariant.tonal,
+      accent: color,
       elevation: 2,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

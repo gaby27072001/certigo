@@ -24,6 +24,7 @@ class PrismButton extends StatefulWidget {
     this.icon,
     this.loading = false,
     this.expand = true,
+    this.tone,
   });
 
   const PrismButton.secondary({
@@ -33,6 +34,7 @@ class PrismButton extends StatefulWidget {
     this.icon,
     this.loading = false,
     this.expand = true,
+    this.tone,
   }) : variant = PrismButtonVariant.secondary;
 
   const PrismButton.ghost({
@@ -42,6 +44,7 @@ class PrismButton extends StatefulWidget {
     this.icon,
     this.loading = false,
     this.expand = false,
+    this.tone,
   }) : variant = PrismButtonVariant.ghost;
 
   final String label;
@@ -50,6 +53,10 @@ class PrismButton extends StatefulWidget {
   final IconData? icon;
   final bool loading;
   final bool expand;
+
+  /// Optional accent override so a CTA can adopt a contextual hue (domain
+  /// accent, success, ember…) while keeping the same strong, rounded shape.
+  final Color? tone;
 
   @override
   State<PrismButton> createState() => _PrismButtonState();
@@ -73,7 +80,7 @@ class _PrismButtonState extends State<PrismButton> {
           fontWeight: FontWeight.w700,
         );
 
-    Widget content = Row(
+    final Widget content = Row(
       mainAxisSize: widget.expand ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
@@ -127,30 +134,48 @@ class _PrismButtonState extends State<PrismButton> {
 
   Color _foreground(PrismColorScheme p) => switch (widget.variant) {
         PrismButtonVariant.primary => Colors.white,
-        PrismButtonVariant.secondary => p.primary,
-        PrismButtonVariant.ghost => p.textSecondary,
+        PrismButtonVariant.secondary => widget.tone ?? p.primary,
+        PrismButtonVariant.ghost => widget.tone ?? p.textSecondary,
       };
 
   BoxDecoration _decoration(PrismColorScheme p) {
+    final Color tone = widget.tone ?? p.primary;
     switch (widget.variant) {
       case PrismButtonVariant.primary:
+        final Color toneDark = widget.tone == null
+            ? p.primaryDark
+            : Color.alphaBlend(Colors.black.withOpacity(0.16), tone);
         return BoxDecoration(
-          borderRadius: PrismRadii.cardLg,
+          borderRadius: PrismRadii.buttonAll,
           gradient: LinearGradient(
-            colors: <Color>[p.primary, p.primaryDark],
+            colors: <Color>[tone, toneDark],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          boxShadow: _down ? PrismElevation.level0 : PrismElevation.level3(p.brightness),
+          boxShadow: _down
+              ? PrismElevation.level0
+              : <BoxShadow>[
+                  BoxShadow(
+                    color: tone.withOpacity(
+                      p.brightness == Brightness.dark ? 0.42 : 0.32,
+                    ),
+                    blurRadius: 26,
+                    offset: const Offset(0, 12),
+                    spreadRadius: -6,
+                  ),
+                ],
         );
       case PrismButtonVariant.secondary:
         return BoxDecoration(
-          borderRadius: PrismRadii.cardLg,
-          color: p.primarySoft,
-          border: Border.all(color: p.primary.withOpacity(0.25)),
+          borderRadius: PrismRadii.buttonAll,
+          color: Color.alphaBlend(
+            tone.withOpacity(p.brightness == Brightness.dark ? 0.20 : 0.12),
+            p.surface,
+          ),
+          border: Border.all(color: tone.withOpacity(0.30)),
         );
       case PrismButtonVariant.ghost:
-        return const BoxDecoration(borderRadius: PrismRadii.cardLg);
+        return const BoxDecoration(borderRadius: PrismRadii.buttonAll);
     }
   }
 }

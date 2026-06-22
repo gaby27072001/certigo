@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
-import 'glass_surface.dart';
+import 'prism_card.dart';
 
 /// A "Hook" block — the curiosity gap that opens the Learn Loop.
 ///
@@ -16,8 +16,9 @@ class HookBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    return GlassSurface(
-      tint: p.ember,
+    return PrismCard(
+      variant: PrismCardVariant.tonal,
+      accent: p.ember,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

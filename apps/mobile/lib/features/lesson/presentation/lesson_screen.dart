@@ -59,10 +59,11 @@ class _LessonRunningView extends StatelessWidget {
     final bool isResult = step?.kind == LessonStepKind.result;
     final bool showResult = isResult && state.result != null;
 
-    final Widget body;
+    final Widget inner;
+    final Key stepKey;
     if (showResult) {
-      body = ResultFeedbackWidget(
-        key: const ValueKey<String>('result'),
+      stepKey = const ValueKey<String>('result');
+      inner = ResultFeedbackWidget(
         result: state.result!,
         lesson: state.lesson!,
         onContinue: () => context.go(Routes.home),
@@ -70,14 +71,19 @@ class _LessonRunningView extends StatelessWidget {
       );
     } else if (isResult) {
       // Result step reached but the attempt isn't back yet.
-      body = const _LessonLoadingView(key: ValueKey<String>('submitting'));
+      stepKey = const ValueKey<String>('submitting');
+      inner = const _LessonLoadingView();
     } else {
-      body = StepRenderer(
-        key: ValueKey<int>(state.index),
+      stepKey = ValueKey<int>(state.index);
+      inner = StepRenderer(
         state: state,
         onToggleOption: controller.toggleOption,
       );
     }
+
+    // Each step is an opaque page: the incoming step fully covers the outgoing
+    // one during the transition, so two questions can never superimpose.
+    final Widget body = _OpaqueStep(key: stepKey, child: inner);
 
     return Column(
       children: <Widget>[
@@ -87,12 +93,7 @@ class _LessonRunningView extends StatelessWidget {
           onClose: () => context.go(Routes.path),
         ),
         Expanded(
-          child: AnimatedSwitcher(
-            duration: PrismMotion.base,
-            switchInCurve: PrismMotion.standard,
-            switchOutCurve: PrismMotion.standard,
-            child: body,
-          ),
+          child: PrismStepSwitcher(child: body),
         ),
         if (!isResult)
           LessonDock(
@@ -102,6 +103,18 @@ class _LessonRunningView extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+/// Wraps a lesson step in a solid background so transitions never bleed through.
+class _OpaqueStep extends StatelessWidget {
+  const _OpaqueStep({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(color: context.prism.background, child: child);
   }
 }
 

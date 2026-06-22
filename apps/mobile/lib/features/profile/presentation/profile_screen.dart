@@ -23,7 +23,7 @@ class ProfileScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
           children: <Widget>[
             // Identity -------------------------------------------------------
-            GlassSurface(
+            PrismCard(
               elevation: 2,
               child: Row(
                 children: <Widget>[
@@ -94,7 +94,7 @@ class ProfileScreen extends ConsumerWidget {
 
             Text('Préférences', style: t.titleLarge),
             const SizedBox(height: 12),
-            GlassSurface(
+            PrismCard(
               child: Column(
                 children: <Widget>[
                   _ThemeRow(
@@ -130,7 +130,9 @@ class _StatTile extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
     return Expanded(
-      child: GlassSurface(
+      child: PrismCard(
+        variant: PrismCardVariant.tonal,
+        accent: color,
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         child: Column(
           children: <Widget>[
