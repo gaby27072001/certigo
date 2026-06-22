@@ -178,6 +178,12 @@ API principale :
 | `ci-content` | `content/**`, `tools/validate_content.mjs` | schémas + intégrité + somme des poids = 1.0 |
 | `ci-infra`   | `infra/**` | `az bicep build` (lint des templates) |
 
+> [!NOTE]
+> Les workflows utilisent un runner **self-hosted** avec labels
+> `[self-hosted, Linux, X64, microlingo-ci]`.
+>  
+> Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `microlingo-ci`.
+
 ---
 
 ## 🛣️ Roadmap

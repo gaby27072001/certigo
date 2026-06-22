@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build-test:
     name: Build & test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, microlingo-ci]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

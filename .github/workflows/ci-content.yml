@@ -16,7 +16,7 @@ concurrency:
 jobs:
   validate:
     name: Validate tracks & lessons
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, microlingo-ci]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
