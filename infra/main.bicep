@@ -29,12 +29,18 @@ param alertEmail string = ''
 @description('Enable paid Microsoft Defender for Cloud plans (per-resource cost). Default false — only free CSPM stays on.')
 param enableDefenderPlans bool = false
 
+@description('Force-assign the subscription-scoped MCSB policy even in dev (needs Owner / role-assignment rights at subscription scope). Default false; staging/prod assign it automatically.')
+param forcePolicyAssignment bool = false
+
 // Deterministic, collision-resistant suffix per environment/subscription.
 var suffix = uniqueString(subscription().id, appName, env)
 var rgName = 'rg-${appName}-${env}'
 // Dev token bypass is allowed ONLY in the dev environment; staging/prod enforce
 // Entra token validation.
 var authMode = env == 'dev' ? 'dev' : ''
+// Subscription-scoped MCSB policy needs Owner-level rights; skip it in dev so a
+// Contributor can run the dev smoke-test deploy without friction.
+var assignPolicy = forcePolicyAssignment || env != 'dev'
 var tags = {
   product: 'Microlingo'
   env: env
@@ -131,7 +137,7 @@ module defender 'modules/defender.bicep' = {
 }
 
 // Continuous compliance: MCSB initiative in audit-only mode (subscription scope).
-module policy 'modules/policy.bicep' = {
+module policy 'modules/policy.bicep' = if (assignPolicy) {
   name: 'policy'
   params: {
     assignmentLocation: location
