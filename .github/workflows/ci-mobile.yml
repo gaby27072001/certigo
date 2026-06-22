@@ -18,7 +18,7 @@ env:
 jobs:
   packages:
     name: Pure-Dart packages (core, cortex)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, microlingo-ci]
     strategy:
       matrix:
         package: [ core, cortex ]
@@ -39,7 +39,7 @@ jobs:
 
   app:
     name: Flutter app + UI packages
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, microlingo-ci]
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
