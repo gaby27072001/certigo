@@ -1,0 +1,62 @@
+id: ai900-l-ml-metrics
+trackId: ai-900
+unitId: ai900-u-ml
+domainId: machine-learning
+title: Évaluer un modèle de classification
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-ml-metrics
+    body: >
+      Un détecteur de maladie « précis à 99 % » peut être inutile s'il rate tous
+      les vrais malades. Pour juger un modèle, l'exactitude brute ne suffit pas.
+
+  - type: concept
+    conceptId: c-ml-metrics
+    title: Accuracy, precision, recall
+    body: >
+      L'**exactitude (accuracy)** est la part de prédictions correctes. Mais sur
+      des données déséquilibrées, elle trompe. On regarde alors :
+      la **précision (precision)** — parmi les cas prédits positifs, combien le
+      sont vraiment — et le **rappel (recall)** — parmi les vrais positifs,
+      combien le modèle a su retrouver.
+
+
+      Exemple : pour un dépistage médical, un **rappel** élevé est crucial (ne
+      pas rater de malades), quitte à sacrifier un peu de précision.
+
+  - type: example
+    conceptId: c-ml-metrics
+    body: >
+      Sur 100 patients dont 5 malades, un modèle qui prédit « sain » pour tout le
+      monde atteint 95 % d'exactitude… mais un **rappel de 0 %** : il ne détecte
+      aucun malade. La métrique choisie doit refléter l'enjeu réel.
+
+  - type: check
+    conceptId: c-ml-metrics
+    check:
+      id: ai900-l-ml-metrics-check-1
+      conceptId: c-ml-metrics
+      type: mcq
+      difficulty: 3
+      stem: >
+        Pour un test de dépistage, on veut surtout éviter de manquer de vrais
+        malades. Quelle métrique faut-il maximiser en priorité ?
+      options:
+        - { id: a, label: "Le rappel (recall)" }
+        - { id: b, label: "L'exactitude (accuracy) seule" }
+        - { id: c, label: "Le temps d'entraînement" }
+        - { id: d, label: "Le nombre de features" }
+      correct: [a]
+      explanation: >
+        Le rappel mesure la proportion de vrais positifs effectivement détectés.
+        Le maximiser réduit les malades manqués (faux négatifs). L'exactitude
+        seule est trompeuse sur des classes déséquilibrées.
+
+  - type: recap
+    conceptId: c-ml-metrics
+    body: >
+      Accuracy = prédictions correctes (trompeuse si déséquilibre). Precision =
+      justesse des positifs prédits. Recall = capacité à retrouver les vrais
+      positifs. On choisit la métrique selon le coût des erreurs.

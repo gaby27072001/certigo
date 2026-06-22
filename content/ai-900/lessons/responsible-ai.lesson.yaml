@@ -1,0 +1,62 @@
+id: ai900-l-responsible-ai
+trackId: ai-900
+unitId: ai900-u-ai-intro
+domainId: ai-workloads
+title: Les 6 principes de l'IA responsable
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-responsible-ai
+    body: >
+      Une IA qui refuse un prêt sans explication, ou qui marche mal pour
+      certaines personnes : la puissance ne suffit pas, il faut des garde-fous.
+      Microsoft en définit six.
+
+  - type: concept
+    conceptId: c-responsible-ai
+    title: Six principes pour une IA digne de confiance
+    body: >
+      Microsoft structure l'IA responsable autour de six principes.
+      **Équité** : traiter toutes les personnes équitablement, sans biais.
+      **Fiabilité et sécurité** : fonctionner de façon sûre et cohérente, même
+      dans des cas imprévus. **Confidentialité et sécurité** : protéger les
+      données. **Inclusion** : servir tout le monde, y compris en situation de
+      handicap. **Transparence** : rendre le système compréhensible.
+      **Responsabilité** : des humains restent comptables des décisions de l'IA.
+
+  - type: example
+    conceptId: c-responsible-ai
+    body: >
+      Un modèle de recrutement entraîné sur des données historiques biaisées
+      favorise un profil : c'est le principe d'**équité** qui est violé. Publier
+      une notice expliquant les limites du modèle sert la **transparence**.
+
+  - type: check
+    conceptId: c-responsible-ai
+    check:
+      id: ai900-l-responsible-ai-check-1
+      conceptId: c-responsible-ai
+      type: mcq
+      difficulty: 2
+      stem: >
+        Un modèle de scoring de crédit accorde systématiquement de moins bons
+        scores à un groupe démographique. Quel principe d'IA responsable est en
+        cause ?
+      options:
+        - { id: a, label: "Équité" }
+        - { id: b, label: "Transparence" }
+        - { id: c, label: "Confidentialité et sécurité" }
+        - { id: d, label: "Inclusion" }
+      correct: [a]
+      explanation: >
+        Un traitement défavorable et systématique d'un groupe traduit un biais :
+        c'est le principe d'équité (fairness) qui est en jeu. La transparence
+        concerne l'explicabilité, pas le biais lui-même.
+
+  - type: recap
+    conceptId: c-responsible-ai
+    body: >
+      Les 6 principes : équité, fiabilité/sécurité, confidentialité/sécurité,
+      inclusion, transparence, responsabilité. Ils encadrent toute solution IA
+      pour qu'elle soit digne de confiance.

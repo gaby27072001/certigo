@@ -1,0 +1,64 @@
+# Microsoft Azure AI Fundamentals — certification track.
+# Validated in CI against content/schema/track.schema.json.
+# Domain weights mirror the public AI-900 exam skills outline and sum to 1.0.
+id: ai-900
+code: AI-900
+title: Microsoft Azure AI Fundamentals
+level: fundamentals
+summary: >
+  Découvrir les charges de travail d'IA et l'IA responsable, les principes du
+  machine learning, et les services Azure de vision, de langage et d'IA
+  générative — sans prérequis en data science.
+
+domains:
+  - id: ai-workloads
+    name: Charges de travail IA & IA responsable
+    weight: 0.18
+  - id: machine-learning
+    name: Principes du machine learning
+    weight: 0.22
+  - id: computer-vision
+    name: Vision par ordinateur
+    weight: 0.20
+  - id: nlp
+    name: Traitement du langage naturel
+    weight: 0.20
+  - id: generative-ai
+    name: IA générative
+    weight: 0.20
+
+# NOTE: every lesson id listed here must have a matching file in lessons/
+# (enforced by ci-content), and each lesson's unitId/domainId must match.
+units:
+  - id: ai900-u-ai-intro
+    domainId: ai-workloads
+    title: Introduction à l'IA
+    lessons:
+      - ai900-l-ai-workloads
+      - ai900-l-responsible-ai
+  - id: ai900-u-ml
+    domainId: machine-learning
+    title: Machine learning
+    lessons:
+      - ai900-l-ml-types
+      - ai900-l-ml-process
+      - ai900-l-ml-metrics
+      - ai900-l-azure-ml
+  - id: ai900-u-vision
+    domainId: computer-vision
+    title: Vision par ordinateur
+    lessons:
+      - ai900-l-vision-workloads
+      - ai900-l-azure-vision
+  - id: ai900-u-nlp
+    domainId: nlp
+    title: Langage naturel
+    lessons:
+      - ai900-l-nlp-workloads
+      - ai900-l-azure-language
+  - id: ai900-u-genai
+    domainId: generative-ai
+    title: IA générative
+    lessons:
+      - ai900-l-genai-concepts
+      - ai900-l-azure-openai

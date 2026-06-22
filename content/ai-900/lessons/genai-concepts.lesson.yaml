@@ -1,0 +1,64 @@
+id: ai900-l-genai-concepts
+trackId: ai-900
+unitId: ai900-u-genai
+domainId: generative-ai
+title: Concepts de l'IA générative
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-genai-concepts
+    body: >
+      Rédiger un e-mail, résumer un rapport, générer du code ou une image à
+      partir d'une simple phrase : l'IA générative crée du contenu nouveau. Mais
+      comment « comprend »-elle la demande ?
+
+  - type: concept
+    conceptId: c-genai-concepts
+    title: Modèles de langage, prompts et tokens
+    body: >
+      L'IA générative repose sur de **grands modèles de langage (LLM)** entraînés
+      sur d'immenses corpus. On les pilote avec un **prompt** (l'instruction en
+      langage naturel) ; la qualité de la réponse dépend fortement de la
+      formulation — c'est le **prompt engineering**. Les modèles traitent le
+      texte en **tokens** (fragments de mots).
+
+
+      Limite importante : un LLM peut produire des **hallucinations** (réponses
+      plausibles mais fausses). D'où le besoin de garde-fous, de vérification
+      humaine et de techniques comme le **grounding** sur des sources fiables.
+
+  - type: example
+    conceptId: c-genai-concepts
+    body: >
+      Le prompt « Résume ce contrat en 3 puces pour un non-juriste » guide le
+      modèle vers une sortie utile. Un prompt vague (« parle du contrat ») donne
+      un résultat moins exploitable.
+
+  - type: check
+    conceptId: c-genai-concepts
+    check:
+      id: ai900-l-genai-concepts-check-1
+      conceptId: c-genai-concepts
+      type: mcq
+      difficulty: 2
+      stem: >
+        Comment appelle-t-on le fait qu'un modèle génératif produise une réponse
+        plausible mais factuellement fausse ?
+      options:
+        - { id: a, label: "Une hallucination" }
+        - { id: b, label: "Une régression" }
+        - { id: c, label: "Un cluster" }
+        - { id: d, label: "Un endpoint" }
+      correct: [a]
+      explanation: >
+        On parle d'hallucination : le modèle génère un contenu crédible mais
+        inexact. C'est pourquoi la vérification humaine et le grounding sur des
+        sources fiables sont essentiels.
+
+  - type: recap
+    conceptId: c-genai-concepts
+    body: >
+      L'IA générative s'appuie sur des LLM pilotés par des prompts (en tokens).
+      Bien formuler améliore la sortie (prompt engineering), et il faut se méfier
+      des hallucinations.
