@@ -16,7 +16,11 @@ public sealed record UserProfileDto(
     int Gems,
     string? ActiveTrackId,
     DateOnly? LastActiveDate = null,
-    DateOnly? DailyXpDate = null);
+    DateOnly? DailyXpDate = null,
+    int DailyLessonsCompleted = 0,
+    int DailyCorrectAnswers = 0,
+    int DailyPerfectLessons = 0,
+    List<string>? DailyQuestClaims = null);
 
 public sealed record SubmitQuizRequest(
     string ClientAttemptId,
@@ -126,6 +130,34 @@ public sealed record PurchaseResultDto(
     int GemsSpent,
     int GemsBalance,
     int FreezeTokens,
+    string? Error);
+
+// --- Quests ----------------------------------------------------------------
+
+public sealed record QuestDto(
+    string Id,
+    string Kind,
+    string Title,
+    int Target,
+    int Current,
+    int RewardGems,
+    bool Completed,
+    bool Claimed,
+    bool Claimable);
+
+public sealed record QuestBoardDto(
+    DateOnly Date,
+    int Gems,
+    IReadOnlyList<QuestDto> Quests);
+
+public sealed record ClaimQuestRequest(string QuestId);
+
+public sealed record ClaimQuestResultDto(
+    bool Success,
+    string QuestId,
+    int GemsAwarded,
+    int GemsBalance,
+    bool Claimed,
     string? Error);
 
 // --- Readiness -------------------------------------------------------------

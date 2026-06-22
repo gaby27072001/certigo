@@ -72,6 +72,7 @@ var host = new HostBuilder()
         services.AddScoped<ILeaderboardService, LeaderboardService>();
         services.AddScoped<IPathService, PathService>();
         services.AddScoped<IShopService, ShopService>();
+        services.AddScoped<IQuestService, QuestService>();
     })
     .Build();
 
