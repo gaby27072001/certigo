@@ -18,6 +18,13 @@ param cosmosEndpoint string
 @description('Key Vault name for RBAC secret access.')
 param keyVaultName string
 
+@description('Cosmos DB account name, for the data-plane (SQL) role assignment.')
+param cosmosAccountName string
+
+@description('Authentication mode. "dev" enables the permissive dev token validator for the dev environment only; empty enforces Entra token validation.')
+@allowed([ '', 'dev' ])
+param authMode string = ''
+
 param authIssuer string
 param authAudience string
 param tags object = {}
@@ -62,12 +69,15 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'FUNCTIONS_EXTENSION_VERSION', value: '~4' }
         { name: 'FUNCTIONS_WORKER_RUNTIME', value: 'dotnet-isolated' }
         { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
-        // App config consumed by Infrastructure layer (CosmosContext, auth).
-        { name: 'Cosmos__Endpoint', value: cosmosEndpoint }
-        { name: 'Cosmos__Database', value: 'microlingo' }
+        // App config consumed by the API. Keys are FLAT (match Program.cs /
+        // local.settings.json.example): COSMOS_ENDPOINT, ENTRA_AUTHORITY, etc.
+        { name: 'COSMOS_ENDPOINT', value: cosmosEndpoint }
+        { name: 'COSMOS_DATABASE', value: 'microlingo' }
+        // "dev" => permissive DevTokenValidator (dev env only); empty => Entra.
+        { name: 'AUTH_MODE', value: authMode }
+        { name: 'ENTRA_AUTHORITY', value: authIssuer }
+        { name: 'ENTRA_AUDIENCE', value: authAudience }
         { name: 'KeyVault__Uri', value: 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/' }
-        { name: 'Auth__Issuer', value: authIssuer }
-        { name: 'Auth__Audience', value: authAudience }
       ]
     }
   }
@@ -90,6 +100,26 @@ resource vaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     principalId: functionApp.identity.principalId
     roleDefinitionId: keyVaultSecretsUser
     principalType: 'ServicePrincipal'
+  }
+}
+
+// Grant the Function App's managed identity Cosmos DB data-plane access via the
+// built-in "Cosmos DB Built-in Data Contributor" SQL role. Required because the
+// API authenticates to Cosmos with its managed identity (DefaultAzureCredential),
+// not account keys. Without this assignment every Cosmos call returns 403.
+resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' existing = {
+  name: cosmosAccountName
+}
+
+var cosmosDataContributorRoleId = '${cosmosAccount.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+
+resource cosmosDataAccess 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-11-15' = {
+  parent: cosmosAccount
+  name: guid(cosmosAccount.id, functionApp.id, '00000000-0000-0000-0000-000000000002')
+  properties: {
+    roleDefinitionId: cosmosDataContributorRoleId
+    principalId: functionApp.identity.principalId
+    scope: cosmosAccount.id
   }
 }
 

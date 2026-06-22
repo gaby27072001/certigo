@@ -26,6 +26,9 @@ param authAudience string
 // Deterministic, collision-resistant suffix per environment/subscription.
 var suffix = uniqueString(subscription().id, appName, env)
 var rgName = 'rg-${appName}-${env}'
+// Dev token bypass is allowed ONLY in the dev environment; staging/prod enforce
+// Entra token validation.
+var authMode = env == 'dev' ? 'dev' : ''
 var tags = {
   product: 'Microlingo'
   env: env
@@ -89,7 +92,9 @@ module api 'modules/functionApp.bicep' = {
     storageAccountName: storage.outputs.accountName
     appInsightsConnectionString: monitoring.outputs.connectionString
     cosmosEndpoint: data.outputs.endpoint
+    cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
+    authMode: authMode
     authIssuer: authIssuer
     authAudience: authAudience
     tags: tags
