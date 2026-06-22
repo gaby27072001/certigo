@@ -13,6 +13,7 @@ internal sealed class QuizServiceHarness
     public InMemoryLeaderboardRepository Leaderboard { get; } = new();
     public InMemoryEventRepository Events { get; } = new();
     public InMemoryAttemptRepository Attempts { get; } = new();
+    public InMemoryLearnerModelRepository LearnerModels { get; } = new();
     public FakeClock Clock { get; } = new(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
     public string UserId { get; } = "user-1";
 
@@ -20,7 +21,7 @@ internal sealed class QuizServiceHarness
     {
         var content = TestContent.Build();
         var context = new FakeUserContext(UserId, "Tester");
-        return new QuizService(context, Clock, content, Progress, Attempts, Events, Users, Leaderboard);
+        return new QuizService(context, Clock, content, Progress, Attempts, Events, Users, Leaderboard, LearnerModels);
     }
 
     public static SubmitQuizRequest Request(string attemptId, params AnswerDto[] answers)

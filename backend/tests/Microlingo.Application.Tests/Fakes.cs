@@ -207,3 +207,41 @@ internal sealed class InMemoryFriendRepository : IFriendRepository
         return Task.CompletedTask;
     }
 }
+
+internal sealed class InMemoryLearnerModelRepository : ILearnerModelRepository
+{
+    private readonly Dictionary<string, LearnerModelRecord> _store = new(StringComparer.OrdinalIgnoreCase);
+
+    public int UpsertCount { get; private set; }
+
+    private static string Key(string userId, string trackId) => $"{userId}|{trackId}";
+
+    public Task<LearnerModelRecord?> GetAsync(string userId, string trackId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.GetValueOrDefault(Key(userId, trackId)));
+
+    public Task UpsertAsync(LearnerModelRecord model, CancellationToken cancellationToken = default)
+    {
+        _store[Key(model.UserId, model.TrackId)] = model;
+        UpsertCount++;
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeTutorCompletion : ITutorCompletion
+{
+    private readonly string? _reply;
+
+    public FakeTutorCompletion(string? reply = null) => _reply = reply;
+
+    public int CallCount { get; private set; }
+    public string? LastSystemPrompt { get; private set; }
+    public string? LastUserPrompt { get; private set; }
+
+    public Task<string?> CompleteAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default)
+    {
+        CallCount++;
+        LastSystemPrompt = systemPrompt;
+        LastUserPrompt = userPrompt;
+        return Task.FromResult(_reply);
+    }
+}

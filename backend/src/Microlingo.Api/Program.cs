@@ -12,6 +12,7 @@ using Microlingo.Api.Auth;
 using Microlingo.Api.Middleware;
 using Microlingo.Application.Abstractions;
 using Microlingo.Application.Services;
+using Microlingo.Infrastructure.Ai;
 using Microlingo.Infrastructure.Cosmos;
 using Microlingo.Infrastructure.Identity;
 
@@ -68,6 +69,8 @@ var host = new HostBuilder()
         services.AddScoped<ILeaderboardRepository, CosmosLeaderboardRepository>();
         services.AddScoped<IPurchaseRepository, CosmosPurchaseRepository>();
         services.AddScoped<IFriendRepository, CosmosFriendRepository>();
+        services.AddScoped<ILearnerModelRepository, CosmosLearnerModelRepository>();
+        services.AddSingleton<ITutorCompletion, NullTutorCompletion>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IContentService, ContentService>();
         services.AddScoped<IQuizService, QuizService>();
@@ -80,6 +83,7 @@ var host = new HostBuilder()
         services.AddScoped<IFriendService, FriendService>();
         services.AddScoped<IStreakRepairService, StreakRepairService>();
         services.AddScoped<IExamService, ExamService>();
+        services.AddScoped<ITutorService, TutorService>();
     })
     .Build();
 

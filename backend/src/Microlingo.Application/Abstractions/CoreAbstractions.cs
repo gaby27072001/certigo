@@ -3,6 +3,7 @@ using Microlingo.Application.Dtos;
 using Microlingo.Domain.Content;
 using Microlingo.Domain.Gamification;
 using Microlingo.Domain.Progress;
+using Microlingo.Domain.Tutor;
 
 namespace Microlingo.Application.Abstractions;
 
@@ -66,6 +67,25 @@ public interface IExamAttemptRepository
 public interface IEventRepository
 {
     Task AddAsync(LearningEvent learningEvent, CancellationToken cancellationToken = default);
+}
+
+// The per-(user, track) behavioural memory that makes the tutor a continuously
+// learning agent. Stored in the progress container (PK = /userId) under an
+// "learnermodel::{trackId}" id discriminator, so no new container is needed.
+public interface ILearnerModelRepository
+{
+    Task<LearnerModelRecord?> GetAsync(string userId, string trackId, CancellationToken cancellationToken = default);
+    Task UpsertAsync(LearnerModelRecord model, CancellationToken cancellationToken = default);
+}
+
+// Optional LLM upgrade for the tutor. Returns the model's raw reply (expected to
+// be the JSON object described by TutorPromptBuilder), or null when no provider
+// is configured — in which case the service serves the grounded explanation. The
+// default production binding is a Null implementation, so the tutor works for
+// free and offline; any returned text is still guardrail-validated before use.
+public interface ITutorCompletion
+{
+    Task<string?> CompleteAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default);
 }
 
 public interface ILeaderboardRepository
@@ -137,5 +157,14 @@ public sealed record LearningEvent(
     string Type,
     DateTimeOffset OccurredAt,
     object Payload);
+
+// The persisted learner model: every concept the user has touched on a track,
+// with the running per-concept stats the tutor personalises on. Carried as a
+// single document so a read/observe/upsert cycle is one point-read + one upsert.
+public sealed record LearnerModelRecord(
+    string UserId,
+    string TrackId,
+    IReadOnlyList<LearnerConceptStat> Concepts,
+    DateTimeOffset UpdatedAt);
 
 public sealed record UserGamification(UserProfileDto Profile, GamificationStats Stats);
