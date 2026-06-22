@@ -70,7 +70,7 @@ class _DomainBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    return GlassSurface(
+    return PrismCard(
       child: Column(
         children: <Widget>[
           for (final _Domain d in domains)
@@ -112,7 +112,7 @@ class _UnitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    return GlassSurface(
+    return PrismCard(
       elevation: 1,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

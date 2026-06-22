@@ -89,9 +89,10 @@ class _EntryRow extends StatelessWidget {
       3 => p.ember,
       _ => p.textSecondary,
     };
-    return GlassSurface(
+    return PrismCard(
+      variant: isMe ? PrismCardVariant.tonal : PrismCardVariant.surface,
+      accent: isMe ? p.primary : null,
       elevation: isMe ? 2 : 0,
-      tint: isMe ? p.primary : null,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: <Widget>[

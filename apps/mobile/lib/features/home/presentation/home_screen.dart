@@ -44,8 +44,9 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: 24),
 
             // Readiness hero -------------------------------------------------
-            GlassSurface(
+            PrismCard(
               elevation: 2,
+              borderRadius: PrismRadii.cardXxl,
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Column(
                 children: <Widget>[
@@ -114,7 +115,8 @@ class _DailyGoalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    return GlassSurface(
+    return PrismCard(
+      borderRadius: PrismRadii.cardXl,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -155,11 +157,12 @@ class _ContinueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    return GlassSurface(
+    return PrismCard(
+      variant: PrismCardVariant.filled,
+      accent: context.prism.primary,
       elevation: 2,
-      tint: p.primary,
+      borderRadius: PrismRadii.cardXl,
       onTap: onTap,
       child: Row(
         children: <Widget>[
@@ -167,7 +170,7 @@ class _ContinueCard extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: <Color>[p.primary, p.primaryDark]),
+              color: Colors.white.withOpacity(0.18),
               borderRadius: PrismRadii.cardMd,
             ),
             child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 30),
@@ -177,13 +180,13 @@ class _ContinueCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(unit, style: t.bodySmall?.copyWith(color: p.textSecondary)),
-                Text(lesson, style: t.titleMedium),
-                Text('$minutes min', style: t.labelSmall?.copyWith(color: p.textSecondary)),
+                Text(unit, style: t.bodySmall?.copyWith(color: Colors.white70)),
+                Text(lesson, style: t.titleMedium?.copyWith(color: Colors.white)),
+                Text('$minutes min', style: t.labelSmall?.copyWith(color: Colors.white70)),
               ],
             ),
           ),
-          Icon(Icons.chevron_right_rounded, color: p.textSecondary),
+          const Icon(Icons.chevron_right_rounded, color: Colors.white),
         ],
       ),
     );
@@ -200,8 +203,9 @@ class _ReviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    return GlassSurface(
-      tint: p.ember,
+    return PrismCard(
+      variant: PrismCardVariant.tonal,
+      accent: p.ember,
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

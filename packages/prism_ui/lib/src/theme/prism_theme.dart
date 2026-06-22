@@ -54,7 +54,7 @@ class PrismTheme {
       ),
       dividerTheme: DividerThemeData(color: p.border, thickness: 1, space: 1),
       iconTheme: IconThemeData(color: p.textPrimary, size: 22),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: p.surface,
         elevation: 0,
         shape: const RoundedRectangleBorder(borderRadius: PrismRadii.cardLg),

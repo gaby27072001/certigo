@@ -45,7 +45,9 @@ class LessonIntroView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 24),
-        GlassSurface(
+        PrismCard(
+          variant: PrismCardVariant.tonal,
+          accent: p.primary,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[

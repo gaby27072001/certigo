@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
-import 'glass_surface.dart';
+import 'prism_card.dart';
 
 /// The semantic intent of a [CalloutBlock].
 enum CalloutKind { info, warning, success }
@@ -30,8 +30,9 @@ class CalloutBlock extends StatelessWidget {
       CalloutKind.warning => (p.warning, Icons.warning_amber_rounded),
       CalloutKind.success => (p.success, Icons.check_circle_rounded),
     };
-    return GlassSurface(
-      tint: color,
+    return PrismCard(
+      variant: PrismCardVariant.tonal,
+      accent: color,
       padding: const EdgeInsets.all(14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

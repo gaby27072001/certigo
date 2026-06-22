@@ -177,8 +177,9 @@ class _FeedbackCard extends StatelessWidget {
     final TextTheme t = Theme.of(context).textTheme;
     final bool ok = item.lastAnswerCorrect;
     final Color accent = ok ? p.success : p.error;
-    return GlassSurface(
-      tint: accent,
+    return PrismCard(
+      variant: PrismCardVariant.tonal,
+      accent: accent,
       elevation: 2,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

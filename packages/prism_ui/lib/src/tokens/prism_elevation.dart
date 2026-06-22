@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'prism_colors.dart';
 
 /// Prism elevation — depth expressed with soft, colored shadows.

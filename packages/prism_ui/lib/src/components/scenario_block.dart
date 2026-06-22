@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
-import 'glass_surface.dart';
+import 'prism_card.dart';
 
 /// A "Scenario" / applied-example block — grounds an abstract concept in a
 /// realistic Microsoft/Azure situation.
@@ -22,8 +22,9 @@ class ScenarioBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    return GlassSurface(
-      tint: p.info,
+    return PrismCard(
+      variant: PrismCardVariant.tonal,
+      accent: p.info,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

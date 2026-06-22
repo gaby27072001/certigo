@@ -24,6 +24,8 @@ export 'src/theme/prism_theme.dart';
 
 // Components
 export 'src/components/glass_surface.dart';
+export 'src/components/prism_card.dart';
+export 'src/components/prism_page_transition.dart';
 export 'src/components/aurora_background.dart';
 export 'src/components/prism_button.dart';
 export 'src/components/prism_progress_bar.dart';
