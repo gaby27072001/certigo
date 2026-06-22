@@ -36,6 +36,10 @@ public interface IContentRepository
     Task<Track?> GetTrackAsync(string trackId, CancellationToken cancellationToken = default);
     Task<Lesson?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default);
     Task<LessonAnswerKey?> GetAnswerKeyAsync(string trackId, string lessonId, CancellationToken cancellationToken = default);
+
+    // All answer keys for a track — powers mock-exam composition, which draws
+    // gradable items from across every lesson rather than a single one.
+    Task<IReadOnlyList<LessonAnswerKey>> ListAnswerKeysAsync(string trackId, CancellationToken cancellationToken = default);
 }
 
 public interface IProgressRepository
@@ -49,6 +53,14 @@ public interface IAttemptRepository
 {
     Task<AttemptRecord?> GetByClientAttemptIdAsync(string userId, string clientAttemptId, CancellationToken cancellationToken = default);
     Task CreateAsync(AttemptRecord attempt, CancellationToken cancellationToken = default);
+}
+
+// Idempotency + history for graded mock exams. Stored in the attempts container
+// alongside lesson attempts, disambiguated by the record's "kind" discriminator.
+public interface IExamAttemptRepository
+{
+    Task<ExamAttemptRecord?> GetByClientAttemptIdAsync(string userId, string clientAttemptId, CancellationToken cancellationToken = default);
+    Task CreateAsync(ExamAttemptRecord attempt, CancellationToken cancellationToken = default);
 }
 
 public interface IEventRepository
@@ -102,6 +114,22 @@ public sealed record AttemptRecord(
     DateTimeOffset StartedAt,
     DateTimeOffset SubmittedAt,
     SubmitQuizResult Result);
+
+// A graded mock-exam attempt. Shares the attempts container with AttemptRecord;
+// the get-only Kind property serialises a "kind":"exam" discriminator so the two
+// shapes never cross-contaminate idempotency lookups.
+public sealed record ExamAttemptRecord(
+    string Id,
+    string UserId,
+    string ClientAttemptId,
+    string TrackId,
+    string ExamId,
+    DateTimeOffset StartedAt,
+    DateTimeOffset SubmittedAt,
+    MockExamResultDto Result)
+{
+    public string Kind => "exam";
+}
 
 public sealed record LearningEvent(
     string Id,

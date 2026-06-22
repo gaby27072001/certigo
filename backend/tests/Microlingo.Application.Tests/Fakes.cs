@@ -57,6 +57,14 @@ internal sealed class InMemoryContentRepository : IContentRepository
 
     public Task<LessonAnswerKey?> GetAnswerKeyAsync(string trackId, string lessonId, CancellationToken cancellationToken = default)
         => Task.FromResult(_answerKeys.GetValueOrDefault(lessonId));
+
+    public Task<IReadOnlyList<LessonAnswerKey>> ListAnswerKeysAsync(string trackId, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<LessonAnswerKey> result = _answerKeys.Values
+            .Where(k => string.Equals(k.TrackId, trackId, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        return Task.FromResult(result);
+    }
 }
 
 internal sealed class InMemoryProgressRepository : IProgressRepository
@@ -101,6 +109,23 @@ internal sealed class InMemoryAttemptRepository : IAttemptRepository
     public Task CreateAsync(AttemptRecord attempt, CancellationToken cancellationToken = default)
     {
         _store.Add(attempt);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class InMemoryExamAttemptRepository : IExamAttemptRepository
+{
+    private readonly List<ExamAttemptRecord> _store = new();
+
+    public int CreateCount { get; private set; }
+
+    public Task<ExamAttemptRecord?> GetByClientAttemptIdAsync(string userId, string clientAttemptId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.FirstOrDefault(a => a.UserId == userId && a.ClientAttemptId == clientAttemptId));
+
+    public Task CreateAsync(ExamAttemptRecord attempt, CancellationToken cancellationToken = default)
+    {
+        _store.Add(attempt);
+        CreateCount++;
         return Task.CompletedTask;
     }
 }

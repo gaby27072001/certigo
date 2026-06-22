@@ -49,6 +49,26 @@ public sealed class CosmosContentRepository(CosmosContext context) : IContentRep
 
     public Task<LessonAnswerKey?> GetAnswerKeyAsync(string trackId, string lessonId, CancellationToken cancellationToken = default)
         => context.Content.ReadOrDefaultAsync<LessonAnswerKey>($"answerkey::{lessonId}", new PartitionKey(trackId), cancellationToken);
+
+    public async Task<IReadOnlyList<LessonAnswerKey>> ListAnswerKeysAsync(string trackId, CancellationToken cancellationToken = default)
+    {
+        // Answer-key docs are id="answerkey::{lessonId}", PK=/trackId; STARTSWITH
+        // isolates them from the track and lesson documents in the same partition.
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.trackId = @trackId AND STARTSWITH(c.id, 'answerkey::')")
+            .WithParameter("@trackId", trackId);
+        using var iterator = context.Content.GetItemQueryIterator<LessonAnswerKey>(query, requestOptions: new QueryRequestOptions
+        {
+            PartitionKey = new PartitionKey(trackId)
+        });
+
+        var keys = new List<LessonAnswerKey>();
+        while (iterator.HasMoreResults)
+        {
+            keys.AddRange(await iterator.ReadNextAsync(cancellationToken));
+        }
+
+        return keys;
+    }
 }
 
 public sealed class CosmosProgressRepository(CosmosContext context) : IProgressRepository
@@ -135,6 +155,34 @@ public sealed class CosmosAttemptRepository(CosmosContext context) : IAttemptRep
     }
 
     public async Task CreateAsync(AttemptRecord attempt, CancellationToken cancellationToken = default)
+        => await context.Attempts.CreateItemAsync(attempt, new PartitionKey(attempt.UserId), cancellationToken: cancellationToken);
+}
+
+public sealed class CosmosExamAttemptRepository(CosmosContext context) : IExamAttemptRepository
+{
+    public async Task<ExamAttemptRecord?> GetByClientAttemptIdAsync(string userId, string clientAttemptId, CancellationToken cancellationToken = default)
+    {
+        // Shares the attempts container with lesson attempts; the kind = 'exam'
+        // filter keeps the two record shapes from colliding on idempotency lookups.
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.userId = @userId AND c.clientAttemptId = @clientAttemptId AND c.kind = 'exam'")
+            .WithParameter("@userId", userId)
+            .WithParameter("@clientAttemptId", clientAttemptId);
+        using var iterator = context.Attempts.GetItemQueryIterator<ExamAttemptRecord>(query, requestOptions: new QueryRequestOptions
+        {
+            PartitionKey = new PartitionKey(userId),
+            MaxItemCount = 1
+        });
+
+        while (iterator.HasMoreResults)
+        {
+            var page = await iterator.ReadNextAsync(cancellationToken);
+            return page.FirstOrDefault();
+        }
+
+        return null;
+    }
+
+    public async Task CreateAsync(ExamAttemptRecord attempt, CancellationToken cancellationToken = default)
         => await context.Attempts.CreateItemAsync(attempt, new PartitionKey(attempt.UserId), cancellationToken: cancellationToken);
 }
 
