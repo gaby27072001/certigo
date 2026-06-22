@@ -1,0 +1,61 @@
+id: az900-l-networking-basics
+trackId: az-900
+unitId: az900-u-compute-network
+domainId: architecture-services
+title: Bases du réseau Azure
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-networking-basics
+    body: >
+      Vos serveurs Azure doivent se parler en privé, mais rester invisibles
+      depuis Internet. Et relier votre datacenter au cloud, en sécurité. Comment ?
+
+  - type: concept
+    conceptId: c-networking-basics
+    title: VNet, sous-réseaux et connectivité hybride
+    body: >
+      Un **réseau virtuel (VNet)** est votre réseau privé isolé dans Azure,
+      découpé en **sous-réseaux**. Les **groupes de sécurité réseau (NSG)**
+      filtrent le trafic entrant/sortant.
+
+
+      Pour relier votre site au cloud : la **VPN Gateway** crée un tunnel chiffré
+      sur Internet ; **ExpressRoute** établit une liaison **privée dédiée** (sans
+      passer par l'Internet public), avec débit et latence stables.
+
+  - type: example
+    conceptId: c-networking-basics
+    body: >
+      Une banque exige que le trafic ne transite jamais par l'Internet public :
+      **ExpressRoute** fournit une connexion privée. Une PME qui veut juste un
+      tunnel sécurisé à moindre coût utilisera un **VPN site-à-site**.
+
+  - type: check
+    conceptId: c-networking-basics
+    check:
+      id: az900-l-networking-basics-check-1
+      conceptId: c-networking-basics
+      type: mcq
+      difficulty: 3
+      stem: >
+        Une entreprise veut relier son datacenter à Azure via une liaison privée
+        dédiée, sans emprunter l'Internet public. Quelle option choisir ?
+      options:
+        - { id: a, label: "Azure ExpressRoute" }
+        - { id: b, label: "VPN site-à-site sur Internet" }
+        - { id: c, label: "Un NSG" }
+        - { id: d, label: "Un compte de stockage" }
+      correct: [a]
+      explanation: >
+        ExpressRoute fournit une connexion privée dédiée vers Azure, sans transiter
+        par l'Internet public — d'où une latence et un débit plus stables et une
+        meilleure confidentialité que le VPN.
+
+  - type: recap
+    conceptId: c-networking-basics
+    body: >
+      VNet = réseau privé (avec sous-réseaux), NSG = pare-feu de trafic. VPN
+      Gateway = tunnel chiffré sur Internet ; ExpressRoute = liaison privée
+      dédiée (pas d'Internet public).

@@ -1,0 +1,63 @@
+id: az900-l-governance-policy
+trackId: az-900
+unitId: az900-u-cost-management
+domainId: management-governance
+title: Tags & Azure Policy
+estMinutes: 5
+
+blocks:
+  - type: hook
+    conceptId: c-azure-policy
+    body: >
+      Comment garantir que **toute** ressource créée porte un centre de coût, et
+      qu'aucune n'est déployée hors d'Europe — automatiquement, sans police
+      manuelle ?
+
+  - type: concept
+    conceptId: c-azure-policy
+    title: Étiquettes et stratégies
+    body: >
+      Les **étiquettes (tags)** sont des paires clé-valeur (ex. `env=prod`,
+      `costCenter=marketing`) attachées aux ressources pour organiser, filtrer
+      et **répartir les coûts**.
+
+
+      **Azure Policy** applique des règles de conformité : interdire certaines
+      régions ou SKU, **exiger un tag**, voire le corriger automatiquement
+      (effet *deployIfNotExists*). Les **verrous de ressource** empêchent quant
+      à eux la suppression ou la modification accidentelle.
+
+  - type: example
+    conceptId: c-azure-policy
+    body: >
+      Une stratégie « exiger le tag costCenter » refuse la création de toute
+      ressource sans ce tag. Résultat : chaque dépense est imputable à une
+      équipe, et le reporting de coûts par tag devient fiable.
+
+  - type: check
+    conceptId: c-azure-policy
+    check:
+      id: az900-l-governance-policy-check-1
+      conceptId: c-azure-policy
+      type: mcq
+      difficulty: 3
+      stem: >
+        Vous devez empêcher la création de ressources dans des régions non
+        autorisées, à l'échelle de l'organisation. Quel service applique cette règle ?
+      options:
+        - { id: a, label: "Azure Policy" }
+        - { id: b, label: "Les étiquettes (tags)" }
+        - { id: c, label: "Azure Monitor" }
+        - { id: d, label: "Pricing Calculator" }
+      correct: [a]
+      explanation: >
+        Azure Policy évalue et impose la conformité (régions, SKU, tags
+        obligatoires…). Les tags servent à organiser et imputer les coûts, mais
+        n'imposent rien par eux-mêmes.
+
+  - type: recap
+    conceptId: c-azure-policy
+    body: >
+      Tags = métadonnées clé-valeur (organisation, coûts). Azure Policy = règles
+      de conformité imposées (régions, SKU, tags requis). Verrous = anti-
+      suppression/modification accidentelle.

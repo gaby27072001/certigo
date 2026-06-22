@@ -1,0 +1,61 @@
+id: az900-l-management-hierarchy
+trackId: az-900
+unitId: az900-u-core-architecture
+domainId: architecture-services
+title: Hiérarchie de gestion
+estMinutes: 5
+
+blocks:
+  - type: hook
+    conceptId: c-mgmt-hierarchy
+    body: >
+      Une entreprise a 200 abonnements Azure. Comment appliquer une seule règle
+      de sécurité à tous, d'un coup, sans la répéter 200 fois ?
+
+  - type: concept
+    conceptId: c-mgmt-hierarchy
+    title: Les quatre niveaux de portée
+    body: >
+      Azure organise les ressources en quatre niveaux, du plus large au plus fin :
+      **groupes de gestion** → **abonnements** → **groupes de ressources** →
+      **ressources**.
+
+
+      Un paramètre (stratégie, contrôle d'accès) appliqué à un niveau est
+      **hérité** par les niveaux inférieurs. Un groupe de gestion regroupe
+      plusieurs abonnements ; un groupe de ressources regroupe des ressources
+      au cycle de vie commun.
+
+  - type: example
+    conceptId: c-mgmt-hierarchy
+    body: >
+      Vous interdisez la création de ressources hors d'Europe via une stratégie
+      posée sur le **groupe de gestion** racine : tous les abonnements et groupes
+      de ressources en dessous en héritent automatiquement. Pas de répétition.
+
+  - type: check
+    conceptId: c-mgmt-hierarchy
+    check:
+      id: az900-l-management-hierarchy-check-1
+      conceptId: c-mgmt-hierarchy
+      type: mcq
+      difficulty: 2
+      stem: >
+        Pour appliquer une politique de gouvernance à plusieurs abonnements en
+        une seule fois, à quel niveau l'attachez-vous ?
+      options:
+        - { id: a, label: "Groupe de gestion" }
+        - { id: b, label: "Groupe de ressources" }
+        - { id: c, label: "Une ressource individuelle" }
+        - { id: d, label: "Une machine virtuelle" }
+      correct: [a]
+      explanation: >
+        Les groupes de gestion sont au-dessus des abonnements : une stratégie
+        posée à ce niveau est héritée par tous les abonnements et ressources
+        situés en dessous.
+
+  - type: recap
+    conceptId: c-mgmt-hierarchy
+    body: >
+      Ordre des portées : groupe de gestion ⊃ abonnement ⊃ groupe de ressources
+      ⊃ ressource. L'héritage descend : appliquez haut pour couvrir large.

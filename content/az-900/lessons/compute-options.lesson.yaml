@@ -1,0 +1,70 @@
+id: az900-l-compute-options
+trackId: az-900
+unitId: az900-u-compute-network
+domainId: architecture-services
+title: Options de calcul
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-compute-options
+    body: >
+      Héberger un site, exécuter un bout de code à chaque upload de fichier,
+      faire tourner un cluster de conteneurs : faut-il toujours une VM ?
+
+  - type: concept
+    conceptId: c-compute-options
+    title: Du plus géré au plus contrôlé
+    body: >
+      Azure propose plusieurs modèles de calcul. **Machines virtuelles (IaaS)** :
+      contrôle total, vous gérez l'OS. **App Service (PaaS)** : héberge des web
+      apps/API sans gérer l'OS. **Azure Functions (serverless)** : exécute du
+      code à l'événement, facturé à l'exécution. **Conteneurs** (Container
+      Instances, AKS) : packaging portable, orchestration à l'échelle.
+
+
+      Règle : plus c'est **managé**, moins vous gérez d'infrastructure — mais
+      moins vous avez de contrôle bas niveau.
+
+  - type: example
+    conceptId: c-compute-options
+    body: >
+      Un traitement déclenché à chaque image déposée dans le stockage, qui ne
+      tourne que quelques secondes : **Azure Functions** est idéal (pas de
+      serveur à maintenir, facturé à l'usage). Un site web classique :
+      **App Service**. Un besoin d'OS personnalisé : **VM**.
+
+  - type: code
+    conceptId: c-compute-options
+    language: bash
+    code: |
+      # App Service : héberger une web app sans gérer de serveur (PaaS)
+      az webapp up --name microlingo-web --runtime "DOTNET:8" --sku B1
+
+  - type: check
+    conceptId: c-compute-options
+    check:
+      id: az900-l-compute-options-check-1
+      conceptId: c-compute-options
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous devez exécuter une petite fonction uniquement quand un fichier est
+        déposé, et ne payer que le temps d'exécution. Quel service Azure ?
+      options:
+        - { id: a, label: "Azure Functions" }
+        - { id: b, label: "Machine virtuelle" }
+        - { id: c, label: "Azure ExpressRoute" }
+        - { id: d, label: "Azure Blob Storage" }
+      correct: [a]
+      explanation: >
+        Azure Functions est le modèle serverless événementiel : le code se
+        déclenche sur événement et la facturation suit l'exécution, sans serveur
+        à maintenir.
+
+  - type: recap
+    conceptId: c-compute-options
+    body: >
+      VM = contrôle total (IaaS). App Service = web apps managées (PaaS).
+      Functions = code événementiel serverless. Conteneurs/AKS = portabilité et
+      orchestration. Plus managé ⇒ moins d'infra à gérer.

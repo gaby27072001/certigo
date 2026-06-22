@@ -20,10 +20,8 @@ domains:
     name: Gestion & gouvernance
     weight: 0.34
 
-# NOTE: only fully-authored units are listed here so `ci-content` stays green.
-# The architecture-services and management-governance domains are weighted above
-# (they count toward the Readiness Score) and their units are added as lessons
-# are authored through the content pipeline.
+# NOTE: units are authored across the three weighted domains. Every lesson id
+# listed here must have a matching file in lessons/ (enforced by ci-content).
 units:
   - id: az900-u-cloud-concepts
     domainId: cloud-concepts
@@ -32,3 +30,28 @@ units:
       - az900-l-capex-opex
       - az900-l-shared-responsibility
       - az900-l-cloud-models
+      - az900-l-cloud-benefits
+  - id: az900-u-core-architecture
+    domainId: architecture-services
+    title: Architecture Azure
+    lessons:
+      - az900-l-regions-az
+      - az900-l-management-hierarchy
+  - id: az900-u-compute-network
+    domainId: architecture-services
+    title: Compute & réseau
+    lessons:
+      - az900-l-compute-options
+      - az900-l-networking-basics
+  - id: az900-u-cost-management
+    domainId: management-governance
+    title: Coûts Azure
+    lessons:
+      - az900-l-cost-management
+      - az900-l-governance-policy
+  - id: az900-u-identity-governance
+    domainId: management-governance
+    title: Identité & gouvernance
+    lessons:
+      - az900-l-rbac
+      - az900-l-defender-overview
