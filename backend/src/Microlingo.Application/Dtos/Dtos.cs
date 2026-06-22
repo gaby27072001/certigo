@@ -231,3 +231,23 @@ public sealed record FriendActionResultDto(
 public sealed record FriendLeaderboardDto(
     string MeUserId,
     IReadOnlyList<LeaderboardEntryDto> Entries);
+
+// --- Streak repair ---------------------------------------------------------
+
+public sealed record StreakStatusDto(
+    int StreakDays,
+    DateOnly? LastActiveDate,
+    int FreezeTokens,
+    bool Repairable,
+    int RepairCostGems,
+    string? Reason);
+
+public sealed record StreakRepairRequest(string ClientRepairId);
+
+public sealed record StreakRepairResultDto(
+    bool Success,
+    int StreakDays,
+    int GemsSpent,
+    int GemsBalance,
+    DateOnly? LastActiveDate,
+    string? Error);

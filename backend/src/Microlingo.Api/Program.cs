@@ -77,6 +77,7 @@ var host = new HostBuilder()
         services.AddScoped<IAchievementService, AchievementService>();
         services.AddScoped<IShareCardService, ShareCardService>();
         services.AddScoped<IFriendService, FriendService>();
+        services.AddScoped<IStreakRepairService, StreakRepairService>();
     })
     .Build();
 
