@@ -108,6 +108,7 @@ module api 'modules/functionApp.bicep' = {
     functionAppName: 'func-${appName}-${env}-${suffix}'
     location: location
     storageAccountName: storage.outputs.accountName
+    deploymentContainerName: storage.outputs.deploymentContainerName
     appInsightsConnectionString: monitoring.outputs.connectionString
     cosmosEndpoint: data.outputs.endpoint
     cosmosAccountName: data.outputs.accountName

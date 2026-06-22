@@ -32,5 +32,16 @@ resource assets 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-
   }
 }
 
+// Deployment package container for the Flex Consumption Function App. The app's
+// managed identity reads its zip from here (identity-based, no shared key).
+resource appPackage 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = {
+  parent: blob
+  name: 'app-package'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
 output accountName string = storage.name
+output deploymentContainerName string = appPackage.name
 output primaryBlobEndpoint string = storage.properties.primaryEndpoints.blob
