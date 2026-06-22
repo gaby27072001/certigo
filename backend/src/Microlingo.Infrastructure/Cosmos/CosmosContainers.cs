@@ -10,6 +10,7 @@ public static class CosmosContainers
     public const string Events = "events";
     public const string Leaderboard = "leaderboard";
     public const string Economy = "economy";
+    public const string Friends = "friends";
 
     public static IReadOnlyList<CosmosContainerDefinition> All { get; } =
     [
@@ -19,7 +20,8 @@ public static class CosmosContainers
         new(Attempts, "/userId"),
         new(Events, "/userId"),
         new(Leaderboard, "/periodLeagueId"),
-        new(Economy, "/userId")
+        new(Economy, "/userId"),
+        new(Friends, "/userId")
     ];
 }
 

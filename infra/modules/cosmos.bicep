@@ -1,4 +1,4 @@
-// Cosmos DB (Core/SQL API, serverless) + database + the six Microlingo
+// Cosmos DB (Core/SQL API, serverless) + database + the Microlingo
 // containers with their locked partition keys.
 @description('Cosmos DB account name (globally unique).')
 param accountName string
@@ -47,6 +47,7 @@ var containers = [
   { name: 'events', pk: '/userId' }
   { name: 'leaderboard', pk: '/periodLeagueId' }
   { name: 'economy', pk: '/userId' }
+  { name: 'friends', pk: '/userId' }
 ]
 
 resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [

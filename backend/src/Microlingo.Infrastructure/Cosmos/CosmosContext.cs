@@ -15,4 +15,5 @@ public sealed class CosmosContext(CosmosClient client, string? databaseName = nu
     public Container Events => _database.GetContainer(CosmosContainers.Events);
     public Container Leaderboard => _database.GetContainer(CosmosContainers.Leaderboard);
     public Container Economy => _database.GetContainer(CosmosContainers.Economy);
+    public Container Friends => _database.GetContainer(CosmosContainers.Friends);
 }

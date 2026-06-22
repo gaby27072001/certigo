@@ -66,6 +66,7 @@ var host = new HostBuilder()
         services.AddScoped<IEventRepository, CosmosEventRepository>();
         services.AddScoped<ILeaderboardRepository, CosmosLeaderboardRepository>();
         services.AddScoped<IPurchaseRepository, CosmosPurchaseRepository>();
+        services.AddScoped<IFriendRepository, CosmosFriendRepository>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IContentService, ContentService>();
         services.AddScoped<IQuizService, QuizService>();
@@ -75,6 +76,7 @@ var host = new HostBuilder()
         services.AddScoped<IQuestService, QuestService>();
         services.AddScoped<IAchievementService, AchievementService>();
         services.AddScoped<IShareCardService, ShareCardService>();
+        services.AddScoped<IFriendService, FriendService>();
     })
     .Build();
 
