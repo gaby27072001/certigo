@@ -119,7 +119,7 @@ class _OpaqueStep extends StatelessWidget {
 }
 
 class _LessonLoadingView extends StatelessWidget {
-  const _LessonLoadingView({super.key});
+  const _LessonLoadingView();
 
   @override
   Widget build(BuildContext context) {
