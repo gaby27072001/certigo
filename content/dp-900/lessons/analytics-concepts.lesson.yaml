@@ -1,0 +1,69 @@
+id: dp900-l-analytics-concepts
+trackId: dp-900
+unitId: dp900-u-analytics
+domainId: analytics
+title: Anatomie d'une charge analytique
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-analytics-concepts
+    body: >
+      Entre la donnée brute éparpillée et le graphique qui éclaire une décision,
+      il y a une chaîne d'étapes bien identifiées. Les connaître, c'est comprendre
+      toute l'analytique moderne.
+
+  - type: concept
+    conceptId: c-analytics-concepts
+    title: Ingérer, transformer, servir
+    body: >
+      Une charge analytique enchaîne : **ingestion** (collecter depuis les
+      sources), **traitement/transformation** (nettoyer, agréger), **stockage**
+      (entrepôt ou lac de données), puis **modélisation et restitution**
+      (visualisation).
+
+
+      Deux ordres de transformation : **ETL** (Extract-Transform-Load) transforme
+      **avant** de charger ; **ELT** (Extract-Load-Transform) charge la donnée
+      brute **puis** la transforme dans le système cible — pratique pour les très
+      gros volumes et les lacs de données.
+
+
+      L'ingestion peut être **par lots** (batch, à intervalles) ou **en flux**
+      (streaming, en temps quasi réel).
+
+  - type: example
+    conceptId: c-analytics-concepts
+    body: >
+      Charger chaque nuit les ventes brutes dans un lac, puis les transformer sur
+      place pour l'analyse → **ELT** en **batch**. Analyser des clics au fil de
+      l'eau → ingestion en **streaming**.
+
+  - type: check
+    conceptId: c-analytics-concepts
+    check:
+      id: dp900-l-analytics-concepts-check-1
+      conceptId: c-analytics-concepts
+      type: mcq
+      difficulty: 2
+      stem: >
+        On charge d'abord les données brutes dans le système cible, puis on les
+        transforme à l'intérieur de celui-ci. Comment nomme-t-on cette approche ?
+      options:
+        - { id: a, label: "ETL (Extract-Transform-Load)" }
+        - { id: b, label: "ELT (Extract-Load-Transform)" }
+        - { id: c, label: "OLTP" }
+        - { id: d, label: "Normalisation" }
+      correct: [b]
+      explanation: >
+        Charger d'abord la donnée brute puis la transformer dans le système cible
+        définit l'ELT, courant avec les lacs de données et les gros volumes. L'ETL
+        transforme avant de charger ; OLTP et normalisation relèvent du
+        transactionnel.
+
+  - type: recap
+    conceptId: c-analytics-concepts
+    body: >
+      Chaîne analytique : ingestion → traitement → stockage → restitution. ETL
+      transforme avant le chargement, ELT après. L'ingestion est batch ou
+      streaming selon la fraîcheur attendue.

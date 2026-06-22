@@ -1,0 +1,67 @@
+id: dp900-l-transactional-analytical
+trackId: dp-900
+unitId: dp900-u-concepts
+domainId: core-data-concepts
+title: Transactionnel (OLTP) vs analytique (OLAP)
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-oltp-olap
+    body: >
+      Encaisser 5 000 commandes par seconde, ou répondre à « quel est le chiffre
+      d'affaires par région sur 3 ans ? ». Deux besoins opposés qu'une seule base
+      ne sait pas servir aussi bien.
+
+  - type: concept
+    conceptId: c-oltp-olap
+    title: Deux mondes, deux optimisations
+    body: >
+      Un système **OLTP** (Online Transaction Processing) gère beaucoup de
+      **petites transactions** rapides : insertions et mises à jour (commandes,
+      paiements). Il est optimisé pour l'**écriture** et la cohérence, souvent
+      **normalisé**.
+
+
+      Un système **OLAP** (Online Analytical Processing) sert l'**analyse** :
+      requêtes lourdes qui agrègent d'énormes volumes (sommes, moyennes sur des
+      années). Il est optimisé pour la **lecture** et la performance analytique.
+
+
+      On **copie** régulièrement la donnée de l'OLTP vers l'OLAP afin de ne pas
+      ralentir le système transactionnel pendant les analyses.
+
+  - type: example
+    conceptId: c-oltp-olap
+    body: >
+      La caisse d'un magasin qui valide chaque achat → **OLTP**. L'entrepôt qui
+      calcule les tendances de vente par mois et par magasin → **OLAP**.
+
+  - type: check
+    conceptId: c-oltp-olap
+    check:
+      id: dp900-l-transactional-analytical-check-1
+      conceptId: c-oltp-olap
+      type: mcq
+      difficulty: 2
+      stem: >
+        Une base traite des milliers d'insertions et de mises à jour de commandes
+        par seconde, avec une forte exigence de cohérence. Pour quel type de
+        charge est-elle optimisée ?
+      options:
+        - { id: a, label: "Analytique (OLAP)" }
+        - { id: b, label: "Transactionnelle (OLTP)" }
+        - { id: c, label: "Entrepôt de données" }
+        - { id: d, label: "Traitement par lots décisionnel" }
+      correct: [b]
+      explanation: >
+        Beaucoup de petites écritures rapides et cohérentes caractérisent une
+        charge transactionnelle OLTP. L'OLAP, l'entrepôt et le décisionnel
+        servent au contraire des analyses en lecture sur de gros volumes.
+
+  - type: recap
+    conceptId: c-oltp-olap
+    body: >
+      OLTP : beaucoup de petites écritures rapides (opérationnel). OLAP : grosses
+      lectures d'agrégation (analyse). On déplace la donnée de l'un vers l'autre
+      pour ne pas mélanger les charges.

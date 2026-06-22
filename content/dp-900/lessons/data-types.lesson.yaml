@@ -1,0 +1,67 @@
+id: dp900-l-data-types
+trackId: dp-900
+unitId: dp900-u-concepts
+domainId: core-data-concepts
+title: Données structurées, semi-structurées, non structurées
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-data-types
+    body: >
+      Un tableur de ventes, un fichier JSON d'API, une vidéo de surveillance :
+      trois données, trois formes. La façon dont une donnée est organisée décide
+      de l'endroit où on la range et de la manière dont on l'interroge.
+
+  - type: concept
+    conceptId: c-data-types
+    title: Les trois grandes formes de données
+    body: >
+      Les données **structurées** suivent un schéma fixe de lignes et colonnes :
+      elles vivent dans des **bases relationnelles** (tables SQL).
+
+
+      Les données **semi-structurées** ont une structure souple et auto-décrite
+      (**JSON**, XML, clé-valeur) : pas de schéma rigide, mais des champs
+      identifiables. Elles vont souvent dans des bases **NoSQL**.
+
+
+      Les données **non structurées** n'ont pas de modèle interne exploitable
+      tel quel : images, audio, vidéo, documents. On les stocke comme des
+      **fichiers/objets** (Azure Blob Storage).
+
+  - type: example
+    conceptId: c-data-types
+    body: >
+      Table `Clients(id, nom, ville)` → **structuré**. Un document
+      `{ "id": 1, "panier": ["a","b"] }` → **semi-structuré**. Une photo de
+      produit `produit.jpg` → **non structuré**.
+
+  - type: check
+    conceptId: c-data-types
+    check:
+      id: dp900-l-data-types-check-1
+      conceptId: c-data-types
+      type: mcq
+      difficulty: 1
+      stem: >
+        Une application reçoit des documents JSON aux champs variables d'un
+        enregistrement à l'autre. Comment qualifie-t-on ces données ?
+      options:
+        - { id: a, label: "Semi-structurées" }
+        - { id: b, label: "Structurées" }
+        - { id: c, label: "Non structurées" }
+        - { id: d, label: "Relationnelles" }
+      correct: [a]
+      explanation: >
+        Le JSON est l'exemple type de données semi-structurées : structure souple
+        et auto-décrite, sans schéma fixe en lignes/colonnes. Les données
+        structurées suivraient un schéma rigide ; les non structurées seraient des
+        fichiers binaires comme des images.
+
+  - type: recap
+    conceptId: c-data-types
+    body: >
+      Structuré = schéma fixe (tables relationnelles). Semi-structuré = structure
+      souple auto-décrite (JSON, NoSQL). Non structuré = fichiers sans modèle
+      interne (Blob). La forme guide le choix du magasin de données.

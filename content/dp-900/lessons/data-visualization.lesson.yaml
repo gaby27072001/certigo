@@ -1,0 +1,65 @@
+id: dp900-l-data-visualization
+trackId: dp-900
+unitId: dp900-u-analytics
+domainId: analytics
+title: Visualisation avec Power BI
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-data-viz
+    body: >
+      Une analyse n'a de valeur que si elle est comprise. La dernière étape — la
+      visualisation — transforme des colonnes de chiffres en histoires lisibles
+      qui guident l'action.
+
+  - type: concept
+    conceptId: c-data-viz
+    title: Le parcours Power BI
+    body: >
+      **Power BI** est la plateforme de **business intelligence** de Microsoft.
+      **Power BI Desktop** sert à se connecter aux sources, modéliser et
+      **créer** des rapports interactifs. Le **service Power BI** (cloud) permet de
+      **publier, partager** et collaborer ; **Power BI Mobile** consulte en
+      mobilité.
+
+
+      On distingue le **rapport** (plusieurs pages d'analyse détaillée) du
+      **tableau de bord** (une vue synthétique d'indicateurs clés). Bien
+      visualiser, c'est aussi **choisir le bon graphique** : barres pour comparer,
+      courbe pour une tendance, carte pour une dimension géographique.
+
+  - type: example
+    conceptId: c-data-viz
+    body: >
+      Un analyste connecte Power BI Desktop à l'entrepôt, bâtit un rapport des
+      ventes, le publie sur le service Power BI et épingle les KPI sur un tableau
+      de bord partagé à la direction.
+
+  - type: check
+    conceptId: c-data-viz
+    check:
+      id: dp900-l-data-visualization-check-1
+      conceptId: c-data-viz
+      type: mcq
+      difficulty: 1
+      stem: >
+        Quel outil Microsoft permet de créer des rapports et tableaux de bord
+        interactifs à partir de données analytiques ?
+      options:
+        - { id: a, label: "Power BI" }
+        - { id: b, label: "Azure Cosmos DB" }
+        - { id: c, label: "Azure Data Factory" }
+        - { id: d, label: "Azure Blob Storage" }
+      correct: [a]
+      explanation: >
+        Power BI est la plateforme de business intelligence pour créer, publier et
+        partager rapports et tableaux de bord interactifs. Cosmos DB est une base,
+        Data Factory orchestre des pipelines, et le Blob stocke des objets.
+
+  - type: recap
+    conceptId: c-data-viz
+    body: >
+      Power BI : Desktop pour créer, Service pour publier/partager, Mobile pour
+      consulter. Rapport = analyse détaillée, tableau de bord = synthèse de KPI.
+      Le bon graphique rend la donnée actionnable.
