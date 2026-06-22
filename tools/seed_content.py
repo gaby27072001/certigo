@@ -12,8 +12,18 @@ clients is stripped of answers — grading is authoritative server-side.
 Usage:
     python tools/seed_content.py                # write JSON to tools/seed_output/
     python tools/seed_content.py --cosmos       # also upsert to Cosmos DB
-                                                # (needs azure-cosmos + env vars
-                                                #  COSMOS_ENDPOINT / COSMOS_KEY)
+                                                # (needs azure-cosmos + env var
+                                                #  COSMOS_ENDPOINT). Auth:
+                                                #  - COSMOS_KEY set  -> key auth
+                                                #    (Cosmos emulator / local).
+                                                #  - COSMOS_KEY unset -> AAD via
+                                                #    DefaultAzureCredential
+                                                #    (required when the account
+                                                #    has disableLocalAuth=true,
+                                                #    e.g. policy-hardened Azure).
+                                                #    Needs azure-identity and a
+                                                #    Cosmos data-plane role
+                                                #    (Built-in Data Contributor).
 """
 from __future__ import annotations
 
@@ -127,8 +137,22 @@ def upsert_cosmos(docs: list[dict]) -> None:
     except ImportError:
         sys.exit("azure-cosmos required for --cosmos: pip install azure-cosmos")
     endpoint = os.environ["COSMOS_ENDPOINT"]
-    key = os.environ["COSMOS_KEY"]
-    client = CosmosClient(endpoint, credential=key)
+    key = os.environ.get("COSMOS_KEY")
+    if key:
+        credential: object = key
+    else:
+        # No key -> AAD. Required when the account has disableLocalAuth=true
+        # (key auth disabled by security policy). Uses the Azure CLI / managed
+        # identity login; the principal needs a Cosmos data-plane role.
+        try:
+            from azure.identity import DefaultAzureCredential
+        except ImportError:
+            sys.exit(
+                "azure-identity required when COSMOS_KEY is unset (AAD auth): "
+                "pip install azure-identity"
+            )
+        credential = DefaultAzureCredential()
+    client = CosmosClient(endpoint, credential=credential)
     container = client.get_database_client("microlingo").get_container_client("content")
     for doc in docs:
         container.upsert_item(doc)
