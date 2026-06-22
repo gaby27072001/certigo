@@ -1,0 +1,58 @@
+# Microsoft Security, Compliance, and Identity Fundamentals — certification track.
+# Validated in CI against content/schema/track.schema.json.
+# Domain weights mirror the public SC-900 exam skills outline and sum to 1.0.
+id: sc-900
+code: SC-900
+title: Microsoft Security, Compliance, and Identity Fundamentals
+level: fundamentals
+summary: >
+  Comprendre les concepts de sécurité, de conformité et d'identité, puis les
+  capacités de Microsoft Entra, des solutions de sécurité (Defender, Sentinel)
+  et des solutions de conformité (Purview) — du modèle Zero Trust à la
+  protection de l'information.
+
+domains:
+  - id: sci-concepts
+    name: Concepts de sécurité, conformité et identité
+    weight: 0.13
+  - id: entra-identity
+    name: Capacités de Microsoft Entra
+    weight: 0.28
+  - id: security-solutions
+    name: Solutions de sécurité Microsoft
+    weight: 0.29
+  - id: compliance-solutions
+    name: Solutions de conformité Microsoft
+    weight: 0.30
+
+# NOTE: every lesson id listed here must have a matching file in lessons/
+# (enforced by ci-content), and each lesson's unitId/domainId must match.
+units:
+  - id: sc900-u-concepts
+    domainId: sci-concepts
+    title: Concepts fondamentaux
+    lessons:
+      - sc900-l-zero-trust
+      - sc900-l-shared-responsibility
+      - sc900-l-encryption-hashing
+  - id: sc900-u-entra
+    domainId: entra-identity
+    title: Identité avec Microsoft Entra
+    lessons:
+      - sc900-l-identity-concepts
+      - sc900-l-entra-id
+      - sc900-l-authentication-access
+  - id: sc900-u-security
+    domainId: security-solutions
+    title: Solutions de sécurité
+    lessons:
+      - sc900-l-defender-cloud
+      - sc900-l-sentinel
+      - sc900-l-defender-xdr
+  - id: sc900-u-compliance
+    domainId: compliance-solutions
+    title: Solutions de conformité
+    lessons:
+      - sc900-l-purview
+      - sc900-l-information-protection
+      - sc900-l-compliance-management

@@ -1,0 +1,68 @@
+id: dp900-l-cosmos-db
+trackId: dp-900
+unitId: dp900-u-nonrelational
+domainId: non-relational-data
+title: Azure Cosmos DB
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-cosmos
+    body: >
+      Une application mondiale doit répondre en quelques millisecondes à Tokyo
+      comme à Paris, encaisser des pics imprévisibles et accepter plusieurs
+      modèles de données. Un service Azure est taillé pour ça.
+
+  - type: concept
+    conceptId: c-cosmos
+    title: Une base NoSQL distribuée mondialement
+    body: >
+      **Azure Cosmos DB** est une base **NoSQL** entièrement managée, conçue pour
+      la **distribution mondiale** : on réplique la donnée dans plusieurs régions
+      en quelques clics, avec une **latence de l'ordre de la milliseconde** et une
+      haute disponibilité.
+
+
+      Elle est **multi-modèle** via plusieurs **API** : NoSQL (Core), **MongoDB**,
+      **Cassandra**, **Gremlin** (graphe) et **Table**. On choisit l'API selon le
+      modèle ou pour migrer une application existante sans réécrire le code.
+
+
+      La capacité se mesure en **RU/s** (Request Units), avec un mode
+      **autoscale** pour suivre la charge.
+
+  - type: example
+    conceptId: c-cosmos
+    body: >
+      Un jeu mondial qui stocke les profils joueurs au plus près de chacun, avec
+      des pics de connexion → **Cosmos DB**, API NoSQL, réplication multi-régions
+      et autoscale des RU/s.
+
+  - type: check
+    conceptId: c-cosmos
+    check:
+      id: dp900-l-cosmos-db-check-1
+      conceptId: c-cosmos
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous cherchez une base distribuée à l'échelle mondiale, avec une latence
+        de quelques millisecondes et le choix entre plusieurs API (NoSQL, MongoDB,
+        Cassandra, Gremlin). Quel service ?
+      options:
+        - { id: a, label: "Azure SQL Database" }
+        - { id: b, label: "Azure Cosmos DB" }
+        - { id: c, label: "Azure Database for MySQL" }
+        - { id: d, label: "Azure Blob Storage" }
+      correct: [b]
+      explanation: >
+        Azure Cosmos DB est la base NoSQL distribuée mondialement, à faible
+        latence et multi-API. Azure SQL Database et MySQL sont relationnels et
+        régionaux ; le Blob stocke des objets, pas une base interrogeable ainsi.
+
+  - type: recap
+    conceptId: c-cosmos
+    body: >
+      Cosmos DB = NoSQL managé, distribution mondiale, latence de quelques
+      millisecondes, plusieurs API (NoSQL, MongoDB, Cassandra, Gremlin, Table),
+      capacité en RU/s. Le choix des applications globales et élastiques.

@@ -1,0 +1,72 @@
+id: sc900-l-zero-trust
+trackId: sc-900
+unitId: sc900-u-concepts
+domainId: sci-concepts
+title: Le modèle Zero Trust
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-zero-trust
+    body: >
+      Autrefois, on protégeait l'entreprise comme un château : un mur (le
+      pare-feu) et tout ce qui est à l'intérieur est de confiance. Mais avec le
+      cloud, le télétravail et le mobile, il n'y a plus de mur. Zero Trust part
+      d'un principe radical : **ne jamais faire confiance, toujours vérifier**.
+
+  - type: concept
+    conceptId: c-zero-trust
+    title: Trois principes directeurs
+    body: >
+      **Vérifier explicitement** : chaque accès est authentifié et autorisé à
+      partir de tous les signaux disponibles (identité, appareil, localisation,
+      risque), pas seulement parce qu'on est « dans le réseau ».
+
+
+      **Utiliser le privilège minimum** : on n'accorde que les droits
+      strictement nécessaires (just-enough-access), de préférence
+      juste-à-temps, pour limiter ce qu'un compte compromis peut atteindre.
+
+
+      **Supposer la violation** (assume breach) : on conçoit comme si
+      l'attaquant était déjà entré — segmentation, chiffrement de bout en bout,
+      analyse continue pour détecter et limiter la propagation.
+
+  - type: example
+    conceptId: c-zero-trust
+    body: >
+      Un employé en déplacement ouvre un fichier RH. Zero Trust évalue à la
+      volée : identité confirmée par MFA, appareil conforme, connexion à faible
+      risque → accès en lecture seule accordé. Depuis un appareil inconnu, le
+      même accès serait bloqué ou re-challengé.
+
+  - type: check
+    conceptId: c-zero-trust
+    check:
+      id: sc900-l-zero-trust-check-1
+      conceptId: c-zero-trust
+      type: mcq
+      difficulty: 2
+      stem: >
+        Une architecture Zero Trust accorde à chaque application uniquement les
+        permissions dont elle a besoin, et rien de plus. Quel principe Zero
+        Trust cela illustre-t-il ?
+      options:
+        - { id: a, label: "Vérifier explicitement" }
+        - { id: b, label: "Utiliser le privilège minimum" }
+        - { id: c, label: "Supposer la violation" }
+        - { id: d, label: "Faire confiance au réseau interne" }
+      correct: [b]
+      explanation: >
+        Limiter les permissions au strict nécessaire est le principe du
+        privilège minimum (just-enough-access). « Vérifier explicitement »
+        concerne l'authentification de chaque requête ; « supposer la
+        violation » concerne la segmentation et la détection ; la confiance au
+        réseau interne est justement ce que Zero Trust rejette.
+
+  - type: recap
+    conceptId: c-zero-trust
+    body: >
+      Zero Trust = ne jamais faire confiance, toujours vérifier. Trois
+      principes : vérifier explicitement, privilège minimum, supposer la
+      violation. L'identité devient le nouveau périmètre de sécurité.

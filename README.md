@@ -5,7 +5,7 @@
 **Apprenez, révisez et validez vos certifications Microsoft — par micro-leçons premium.**
 
 Micro-learning mobile (iOS + Android) pour maîtriser des **concepts techniques & cloud réels**
-et atteindre la *readiness* certification : AZ-900 · AZ-104 · AI-900 · DP-900.
+et atteindre la *readiness* certification : AZ-900 · AZ-104 · AI-900 · DP-900 · SC-900.
 
 `Flutter` · `.NET 8 isolated Functions` · `Cosmos DB` · `Entra External ID` · `Bicep`
 
@@ -58,7 +58,7 @@ microlingo/
 │  │  └─ Microlingo.Infrastructure/ # Cosmos DB, validation token Entra
 │  └─ tests/               # Tests de domaine (xUnit)
 ├─ infra/                  # Infrastructure as Code (Bicep) : Cosmos, Storage, Functions, KV, AI
-├─ content/                # Tracks & leçons en YAML + schémas + (AZ-900 amorcé)
+├─ content/                # Tracks & leçons en YAML + schémas (AZ-900, AI-900, DP-900, SC-900)
 ├─ tools/                  # Validateur de contenu (Node) + seed Cosmos (Python)
 ├─ docs/                   # Architecture & ADRs
 └─ .github/workflows/      # CI : mobile · backend · content · infra
@@ -166,6 +166,13 @@ API principale :
 | `GET`  | `/tracks/{trackId}/lessons/{lessonId}` | leçon (sans réponses) |
 | `POST` | `/quiz/{lessonId}/submit` | notation serveur + feedback + récompenses |
 | `GET`  | `/me/league` | classement hebdomadaire |
+| `GET`  | `/achievements` | succès & badges débloqués |
+| `GET`  | `/shop` · `POST` `/shop/purchase` | boutique gems + achat |
+| `GET`  | `/quests` · `POST` `/quests/claim` | quêtes du jour + récompense |
+| `GET`  | `/friends` · `POST` `/friends` · `DELETE` `/friends/{id}` | graphe social |
+| `GET`  | `/friends/leaderboard` | classement entre amis |
+| `GET`  | `/streak` · `POST` `/streak/repair` | statut streak + réparation (gems) |
+| `GET`  | `/share/daily` | carte de partage quotidienne |
 
 ---
 

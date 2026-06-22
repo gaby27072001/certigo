@@ -1,0 +1,71 @@
+id: sc900-l-sentinel
+trackId: sc-900
+unitId: sc900-u-security
+domainId: security-solutions
+title: Microsoft Sentinel — SIEM et SOAR
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-sentinel
+    body: >
+      Une attaque laisse des traces partout : connexions, pare-feu, e-mails,
+      cloud. Mais éparpillées, elles ne racontent rien. Sentinel rassemble tous
+      ces signaux en un seul endroit pour voir l'attaque se dessiner — et
+      réagir vite.
+
+  - type: concept
+    conceptId: c-sentinel
+    title: Collecter, détecter, investiguer, répondre
+    body: >
+      **Microsoft Sentinel** est une solution **SIEM** et **SOAR** native du
+      cloud, à l'échelle.
+
+
+      **SIEM** (Security Information and Event Management) : il **collecte** les
+      journaux de toutes vos sources via des **connecteurs de données**, puis
+      **détecte** les menaces (règles d'analyse, anomalies) et aide à les
+      **investiguer**.
+
+
+      **SOAR** (Security Orchestration, Automated Response) : il **répond**
+      automatiquement via des **playbooks** (par ex. désactiver un compte,
+      isoler une machine) pour réduire le travail manuel et le temps de réaction.
+
+  - type: example
+    conceptId: c-sentinel
+    body: >
+      Sentinel corrèle « connexion impossible » (deux pays en dix minutes) et
+      « téléchargement massif de fichiers ». Il crée un **incident**, et un
+      **playbook** SOAR désactive automatiquement le compte le temps de
+      l'enquête.
+
+  - type: check
+    conceptId: c-sentinel
+    check:
+      id: sc900-l-sentinel-check-1
+      conceptId: c-sentinel
+      type: mcq
+      difficulty: 1
+      stem: >
+        Quelle solution Microsoft collecte les journaux de sécurité de
+        l'ensemble de l'entreprise pour détecter, investiguer et répondre aux
+        menaces à l'échelle ?
+      options:
+        - { id: a, label: "Microsoft Entra ID" }
+        - { id: b, label: "Microsoft Purview" }
+        - { id: c, label: "Azure Policy" }
+        - { id: d, label: "Microsoft Sentinel" }
+      correct: [d]
+      explanation: >
+        Microsoft Sentinel est le SIEM/SOAR cloud qui agrège les journaux,
+        détecte, investigue et automatise la réponse. Entra ID gère l'identité ;
+        Purview la conformité/gouvernance des données ; Azure Policy applique
+        des règles de configuration.
+
+  - type: recap
+    conceptId: c-sentinel
+    body: >
+      Sentinel = SIEM (collecte des journaux via connecteurs + détection +
+      investigation) et SOAR (réponse automatisée par playbooks). Une vue
+      unifiée pour voir et stopper les attaques à l'échelle.

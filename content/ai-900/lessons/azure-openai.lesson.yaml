@@ -1,0 +1,66 @@
+id: ai900-l-azure-openai
+trackId: ai-900
+unitId: ai900-u-genai
+domainId: generative-ai
+title: Azure OpenAI et Foundry
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-azure-openai
+    body: >
+      Les modèles GPT sont puissants, mais une entreprise veut aussi sécurité,
+      conformité et contrôle. Azure apporte l'IA générative dans un cadre
+      d'entreprise.
+
+  - type: concept
+    conceptId: c-azure-openai
+    title: L'IA générative en mode entreprise
+    body: >
+      **Azure OpenAI Service** donne accès aux modèles d'OpenAI (GPT pour le
+      texte/chat, modèles d'**embeddings**, génération d'images) avec la
+      **sécurité, la conformité et le réseau privé** d'Azure. **Microsoft
+      Foundry** (la plateforme de développement d'IA) permet de construire,
+      tester et déployer des applications et des **agents** génératifs.
+
+
+      Pour ancrer les réponses sur ses propres données et réduire les
+      hallucinations, on utilise le **RAG** (génération augmentée par
+      récupération) : le modèle s'appuie sur des documents récupérés, souvent via
+      **Azure AI Search**.
+
+  - type: example
+    conceptId: c-azure-openai
+    body: >
+      Un assistant interne répond aux questions RH : il combine **Azure OpenAI**
+      (génération) et **Azure AI Search** (RAG) pour citer les vraies politiques
+      de l'entreprise plutôt que d'inventer.
+
+  - type: check
+    conceptId: c-azure-openai
+    check:
+      id: ai900-l-azure-openai-check-1
+      conceptId: c-azure-openai
+      type: mcq
+      difficulty: 3
+      stem: >
+        Pour qu'un assistant génératif réponde à partir des documents internes de
+        l'entreprise et limite les hallucinations, quelle approche utilise-t-on ?
+      options:
+        - { id: a, label: "Le RAG (génération augmentée par récupération)" }
+        - { id: b, label: "Le clustering non supervisé" }
+        - { id: c, label: "La détection d'objets" }
+        - { id: d, label: "La synthèse vocale" }
+      correct: [a]
+      explanation: >
+        Le RAG récupère des passages pertinents de sources fiables et les fournit
+        au modèle pour ancrer (grounding) sa réponse, réduisant les
+        hallucinations. Les autres options ne concernent pas la génération
+        ancrée.
+
+  - type: recap
+    conceptId: c-azure-openai
+    body: >
+      Azure OpenAI apporte les modèles GPT avec la conformité Azure ; Foundry
+      sert à bâtir des apps et agents ; le RAG (souvent avec Azure AI Search)
+      ancre les réponses sur vos données.

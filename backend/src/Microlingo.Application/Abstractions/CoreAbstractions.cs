@@ -27,6 +27,7 @@ public sealed record TokenValidationResult(bool Succeeded, ClaimsPrincipal? Prin
 public interface IUserRepository
 {
     Task<UserProfileDto?> GetAsync(string userId, CancellationToken cancellationToken = default);
+    Task<UserProfileDto?> FindByHandleAsync(string handle, CancellationToken cancellationToken = default);
     Task<UserProfileDto> UpsertAsync(UserProfileDto profile, CancellationToken cancellationToken = default);
 }
 
@@ -60,6 +61,37 @@ public interface ILeaderboardRepository
     Task<LeagueDto> GetLeagueAsync(string userId, CancellationToken cancellationToken = default);
     Task AddXpAsync(string userId, int xp, CancellationToken cancellationToken = default);
 }
+
+public interface IPurchaseRepository
+{
+    Task<PurchaseRecord?> GetByClientPurchaseIdAsync(string userId, string clientPurchaseId, CancellationToken cancellationToken = default);
+    Task CreateAsync(PurchaseRecord record, CancellationToken cancellationToken = default);
+}
+
+public interface IFriendRepository
+{
+    Task<IReadOnlyList<FriendEdge>> ListAsync(string userId, CancellationToken cancellationToken = default);
+    Task<FriendEdge?> GetAsync(string userId, string friendUserId, CancellationToken cancellationToken = default);
+    Task UpsertAsync(FriendEdge edge, CancellationToken cancellationToken = default);
+    Task RemoveAsync(string userId, string friendUserId, CancellationToken cancellationToken = default);
+}
+
+// One directed edge of the friend graph; a mutual friendship is two edges so
+// each side can list its friends from its own partition (PK = /userId).
+public sealed record FriendEdge(
+    string Id,
+    string UserId,
+    string FriendUserId,
+    DateTimeOffset CreatedAt);
+
+public sealed record PurchaseRecord(
+    string Id,
+    string UserId,
+    string ClientPurchaseId,
+    string ItemId,
+    int GemsSpent,
+    DateTimeOffset PurchasedAt,
+    PurchaseResultDto Result);
 
 public sealed record AttemptRecord(
     string Id,

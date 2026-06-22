@@ -1,0 +1,71 @@
+id: dp900-l-nonrelational-concepts
+trackId: dp-900
+unitId: dp900-u-nonrelational
+domainId: non-relational-data
+title: Les familles NoSQL
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-nosql
+    body: >
+      Quand le schéma rigide des tables devient un frein — données variées,
+      énormes volumes, relations complexes — on change de modèle. Bienvenue dans
+      le monde NoSQL et ses quatre familles.
+
+  - type: concept
+    conceptId: c-nosql
+    title: Clé-valeur, document, colonne, graphe
+    body: >
+      **Clé-valeur** : la donnée est un sac de paires `clé → valeur`, très rapide
+      pour récupérer un objet par sa clé (caches, sessions).
+
+
+      **Document** : chaque enregistrement est un document **JSON** auto-décrit,
+      au schéma souple (profils, catalogues).
+
+
+      **Colonnes larges** (column-family) : optimisé pour de gros volumes
+      écrits/lus par colonnes (séries temporelles, IoT).
+
+
+      **Graphe** : stocke des **nœuds** et des **arêtes** pour modéliser des
+      **relations** (réseaux sociaux, recommandations), où parcourir les liens est
+      l'opération clé.
+
+  - type: example
+    conceptId: c-nosql
+    body: >
+      Un panier d'achat par session → **clé-valeur**. Une fiche produit JSON →
+      **document**. Des relevés de capteurs → **colonnes larges**. « Qui sont les
+      amis des amis de X ? » → **graphe**.
+
+  - type: check
+    conceptId: c-nosql
+    check:
+      id: dp900-l-nonrelational-concepts-check-1
+      conceptId: c-nosql
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous modélisez un réseau social où les requêtes portent surtout sur les
+        relations entre personnes (amis d'amis). Quelle famille NoSQL est la plus
+        adaptée ?
+      options:
+        - { id: a, label: "Base clé-valeur" }
+        - { id: b, label: "Base de documents" }
+        - { id: c, label: "Base de graphe" }
+        - { id: d, label: "Base à colonnes larges" }
+      correct: [c]
+      explanation: >
+        Les bases de graphe stockent des nœuds et des arêtes et excellent au
+        parcours de relations (amis d'amis). Le clé-valeur récupère par clé, le
+        document stocke du JSON, et les colonnes larges visent les gros volumes
+        par colonnes.
+
+  - type: recap
+    conceptId: c-nosql
+    body: >
+      Quatre familles NoSQL : clé-valeur (accès par clé), document (JSON souple),
+      colonnes larges (gros volumes), graphe (relations). On choisit selon la
+      forme de la donnée et le type de requête dominant.

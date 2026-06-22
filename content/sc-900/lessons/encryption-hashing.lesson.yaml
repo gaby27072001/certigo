@@ -1,0 +1,71 @@
+id: sc900-l-encryption-hashing
+trackId: sc-900
+unitId: sc900-u-concepts
+domainId: sci-concepts
+title: Chiffrement, hachage et la triade CIA
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-encryption-hashing
+    body: >
+      Chiffrer et hacher ressemblent à « rendre illisible », mais ce sont deux
+      outils opposés. L'un se défait avec une clé pour retrouver l'original ;
+      l'autre est à sens unique et ne se défait jamais. Confondre les deux, et
+      on protège mal ses mots de passe.
+
+  - type: concept
+    conceptId: c-encryption-hashing
+    title: Réversible ou non — et pourquoi
+    body: >
+      Le **chiffrement** transforme des données en texte illisible à l'aide
+      d'une **clé** ; avec la bonne clé, on **déchiffre** pour retrouver
+      l'original. Il protège la **confidentialité** des données **au repos**
+      (stockage) et **en transit** (réseau).
+
+
+      Le **hachage** applique une fonction **à sens unique** : on ne peut pas
+      revenir à l'original. La même entrée donne toujours le même condensé. On
+      l'utilise pour **stocker des mots de passe** et vérifier l'**intégrité**.
+
+
+      Ces objectifs forment la **triade CIA** : **Confidentialité** (seuls les
+      autorisés voient), **Intégrité** (rien n'a été altéré), **Disponibilité**
+      (l'accès est assuré quand nécessaire).
+
+  - type: example
+    conceptId: c-encryption-hashing
+    body: >
+      Un site ne stocke jamais votre mot de passe en clair : il en garde le
+      **hachage**. À la connexion, il hache ce que vous tapez et compare les
+      condensés. Vos fichiers dans le cloud, eux, sont **chiffrés** pour
+      pouvoir être déchiffrés à la lecture.
+
+  - type: check
+    conceptId: c-encryption-hashing
+    check:
+      id: sc900-l-encryption-hashing-check-1
+      conceptId: c-encryption-hashing
+      type: mcq
+      difficulty: 1
+      stem: >
+        Pour stocker des mots de passe de façon sûre, on les transforme par une
+        opération à sens unique impossible à inverser. De quoi s'agit-il ?
+      options:
+        - { id: a, label: "Le hachage" }
+        - { id: b, label: "Le chiffrement symétrique" }
+        - { id: c, label: "Le chiffrement asymétrique" }
+        - { id: d, label: "La compression" }
+      correct: [a]
+      explanation: >
+        Le hachage est une fonction à sens unique : on ne peut pas retrouver
+        l'original, ce qui est idéal pour les mots de passe. Le chiffrement
+        (symétrique ou asymétrique) est réversible avec une clé ; la
+        compression ne protège rien.
+
+  - type: recap
+    conceptId: c-encryption-hashing
+    body: >
+      Chiffrement = réversible avec une clé (confidentialité, au repos et en
+      transit). Hachage = à sens unique (mots de passe, intégrité). La triade
+      CIA = Confidentialité, Intégrité, Disponibilité.

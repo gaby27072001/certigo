@@ -1,0 +1,64 @@
+id: dp900-l-azure-synapse
+trackId: dp-900
+unitId: dp900-u-analytics
+domainId: analytics
+title: Azure Synapse et l'écosystème analytique
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-synapse
+    body: >
+      Faut-il un outil pour ingérer, un autre pour l'entrepôt, un troisième pour
+      le big data ? Azure réunit ces mondes dans une plateforme analytique
+      unifiée — et quelques services complémentaires.
+
+  - type: concept
+    conceptId: c-synapse
+    title: Une plateforme analytique unifiée
+    body: >
+      **Azure Synapse Analytics** rassemble l'**entreposage de données** et le
+      **big data** : des **pools SQL dédiés** pour l'entrepôt, un **pool SQL
+      serverless** pour interroger à la demande, un moteur **Apache Spark** pour le
+      traitement distribué, et des **pipelines** d'intégration.
+
+
+      Autour de Synapse : **Azure Data Factory** orchestre l'**ingestion** et les
+      pipelines ETL/ELT sans code ; **Azure Databricks** offre Spark pour
+      l'ingénierie de données et le machine learning ; **Azure Data Lake Storage**
+      sert de lac pour les données brutes à grande échelle.
+
+  - type: example
+    conceptId: c-synapse
+    body: >
+      Une entreprise centralise ventes et logs dans un lac, les transforme avec
+      Spark et les expose via un entrepôt pour Power BI → le tout dans **Azure
+      Synapse Analytics**, alimenté par **Data Factory**.
+
+  - type: check
+    conceptId: c-synapse
+    check:
+      id: dp900-l-azure-synapse-check-1
+      conceptId: c-synapse
+      type: mcq
+      difficulty: 2
+      stem: >
+        Quel service Azure unifie l'entreposage de données et le big data en
+        combinant pools SQL, moteur Spark et pipelines d'intégration ?
+      options:
+        - { id: a, label: "Azure SQL Database" }
+        - { id: b, label: "Azure Cosmos DB" }
+        - { id: c, label: "Azure Synapse Analytics" }
+        - { id: d, label: "Azure Blob Storage" }
+      correct: [c]
+      explanation: >
+        Azure Synapse Analytics réunit entrepôt (pools SQL), big data (Spark) et
+        pipelines dans une plateforme unique. SQL Database est transactionnel,
+        Cosmos DB est NoSQL, et le Blob n'est qu'un stockage d'objets.
+
+  - type: recap
+    conceptId: c-synapse
+    body: >
+      Synapse Analytics = analytique unifiée (pools SQL + Spark + pipelines).
+      Data Factory ingère et orchestre, Databricks apporte Spark, Data Lake stocke
+      le brut. Ensemble, ils couvrent toute la chaîne analytique Azure.

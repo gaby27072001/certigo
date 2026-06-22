@@ -29,6 +29,9 @@ internal sealed class InMemoryUserRepository : IUserRepository
     public Task<UserProfileDto?> GetAsync(string userId, CancellationToken cancellationToken = default)
         => Task.FromResult(_store.GetValueOrDefault(userId));
 
+    public Task<UserProfileDto?> FindByHandleAsync(string handle, CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.Values.FirstOrDefault(p => string.Equals(p.Handle, handle, StringComparison.OrdinalIgnoreCase)));
+
     public Task<UserProfileDto> UpsertAsync(UserProfileDto profile, CancellationToken cancellationToken = default)
     {
         _store[profile.Id] = profile;
@@ -129,6 +132,53 @@ internal sealed class InMemoryLeaderboardRepository : ILeaderboardRepository
     public Task AddXpAsync(string userId, int xp, CancellationToken cancellationToken = default)
     {
         Xp[userId] = Xp.GetValueOrDefault(userId) + xp;
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class InMemoryPurchaseRepository : IPurchaseRepository
+{
+    private readonly List<PurchaseRecord> _store = new();
+
+    public int CreateCount { get; private set; }
+
+    public Task<PurchaseRecord?> GetByClientPurchaseIdAsync(string userId, string clientPurchaseId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.FirstOrDefault(p => p.UserId == userId && p.ClientPurchaseId == clientPurchaseId));
+
+    public Task CreateAsync(PurchaseRecord record, CancellationToken cancellationToken = default)
+    {
+        _store.Add(record);
+        CreateCount++;
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class InMemoryFriendRepository : IFriendRepository
+{
+    private readonly Dictionary<string, FriendEdge> _store = new(StringComparer.OrdinalIgnoreCase);
+
+    private static string Key(string userId, string friendUserId) => $"{userId}:{friendUserId}";
+
+    public Task<IReadOnlyList<FriendEdge>> ListAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<FriendEdge> result = _store.Values
+            .Where(e => string.Equals(e.UserId, userId, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        return Task.FromResult(result);
+    }
+
+    public Task<FriendEdge?> GetAsync(string userId, string friendUserId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.GetValueOrDefault(Key(userId, friendUserId)));
+
+    public Task UpsertAsync(FriendEdge edge, CancellationToken cancellationToken = default)
+    {
+        _store[Key(edge.UserId, edge.FriendUserId)] = edge;
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveAsync(string userId, string friendUserId, CancellationToken cancellationToken = default)
+    {
+        _store.Remove(Key(userId, friendUserId));
         return Task.CompletedTask;
     }
 }

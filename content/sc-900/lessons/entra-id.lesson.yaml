@@ -1,0 +1,76 @@
+id: sc900-l-entra-id
+trackId: sc-900
+unitId: sc900-u-entra
+domainId: entra-identity
+title: Microsoft Entra ID et les types d'identités
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-entra-id
+    body: >
+      Avant de protéger des accès, il faut un annuaire qui sache qui existe :
+      employés, applications, et même les services qui se parlent entre eux.
+      Microsoft Entra ID est cet annuaire cloud — et toutes ces « identités »
+      ne sont pas humaines.
+
+  - type: concept
+    conceptId: c-entra-id
+    title: Un annuaire, plusieurs types d'identités
+    body: >
+      **Microsoft Entra ID** est le service cloud de gestion des identités et
+      des accès. Une organisation y possède un **tenant** (sa propre instance
+      isolée d'annuaire).
+
+
+      Les **identités** ne sont pas que des personnes :
+
+      - **utilisateurs** (membres internes ou invités **B2B**) ;
+
+      - **principaux de service / applications** : l'identité d'une app pour
+      accéder à des ressources ;
+
+      - **identités managées** : des identités gérées automatiquement par Azure
+      pour qu'un service s'authentifie **sans secret** à stocker.
+
+
+      Les **appareils** peuvent aussi être enregistrés, fournissant un signal
+      utile pour les décisions d'accès.
+
+  - type: example
+    conceptId: c-entra-id
+    body: >
+      Une fonction Azure doit lire un coffre Key Vault. Plutôt que de coder un
+      mot de passe, on lui attribue une **identité managée** : Azure gère les
+      informations d'identification, et la fonction obtient un jeton
+      automatiquement.
+
+  - type: check
+    conceptId: c-entra-id
+    check:
+      id: sc900-l-entra-id-check-1
+      conceptId: c-entra-id
+      type: mcq
+      difficulty: 1
+      stem: >
+        Une application Azure doit accéder à une base de données sans qu'aucun
+        secret ne soit stocké dans le code. Quel type d'identité Entra
+        convient ?
+      options:
+        - { id: a, label: "Un utilisateur invité B2B" }
+        - { id: b, label: "Une identité managée" }
+        - { id: c, label: "Un compte utilisateur membre" }
+        - { id: d, label: "Un groupe de sécurité" }
+      correct: [b]
+      explanation: >
+        Une identité managée laisse Azure gérer automatiquement les
+        informations d'identification, éliminant tout secret à stocker. Un
+        utilisateur (membre ou invité B2B) représente une personne ; un groupe
+        sert à regrouper des identités pour leur attribuer des accès.
+
+  - type: recap
+    conceptId: c-entra-id
+    body: >
+      Entra ID = annuaire cloud d'identités et d'accès, organisé en tenants.
+      Identités : utilisateurs (membres/invités B2B), principaux de service/
+      apps, identités managées (sans secret), et appareils enregistrés.

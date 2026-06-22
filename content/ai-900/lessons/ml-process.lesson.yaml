@@ -1,0 +1,62 @@
+id: ai900-l-ml-process
+trackId: ai-900
+unitId: ai900-u-ml
+domainId: machine-learning
+title: Features, labels et entraînement
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-ml-process
+    body: >
+      Un modèle n'apprend pas par magie : il a besoin d'exemples, d'une cible à
+      prédire, et d'une épreuve honnête pour vérifier qu'il a vraiment appris.
+
+  - type: concept
+    conceptId: c-ml-process
+    title: Du jeu de données au modèle évalué
+    body: >
+      Les **features** (caractéristiques) sont les entrées du modèle : surface,
+      quartier, nombre de pièces. Le **label** est la réponse à prédire : le
+      prix. On **entraîne** le modèle sur un **jeu d'entraînement**, puis on le
+      teste sur un **jeu de test** qu'il n'a jamais vu, pour mesurer sa
+      performance réelle.
+
+
+      Découper les données est essentiel : un modèle qui mémorise au lieu de
+      généraliser est en **surapprentissage** (overfitting) — excellent à
+      l'entraînement, mauvais sur de nouvelles données.
+
+  - type: example
+    conceptId: c-ml-process
+    body: >
+      Pour prédire un prix immobilier : features = surface, étage, quartier ;
+      label = prix de vente. On entraîne sur 80 % des biens, on évalue sur les
+      20 % restants pour estimer l'erreur sur des cas inédits.
+
+  - type: check
+    conceptId: c-ml-process
+    check:
+      id: ai900-l-ml-process-check-1
+      conceptId: c-ml-process
+      type: mcq
+      difficulty: 2
+      stem: >
+        Dans un modèle qui prédit le prix d'une maison à partir de sa surface et
+        de son quartier, qu'est-ce que le « label » ?
+      options:
+        - { id: a, label: "Le prix à prédire" }
+        - { id: b, label: "La surface" }
+        - { id: c, label: "Le quartier" }
+        - { id: d, label: "Le jeu de test" }
+      correct: [a]
+      explanation: >
+        Le label est la valeur cible que le modèle apprend à prédire — ici le
+        prix. La surface et le quartier sont des features (entrées).
+
+  - type: recap
+    conceptId: c-ml-process
+    body: >
+      Features = entrées, label = cible. On entraîne sur un jeu d'entraînement et
+      on évalue sur un jeu de test inédit. Bien séparer les données révèle le
+      surapprentissage.

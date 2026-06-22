@@ -1,0 +1,64 @@
+id: ai900-l-vision-workloads
+trackId: ai-900
+unitId: ai900-u-vision
+domainId: computer-vision
+title: Tâches de vision par ordinateur
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-vision-workloads
+    body: >
+      « Il y a un chat sur la photo », « le chat est dans ce rectangle », « voici
+      le texte écrit sur l'image » : trois questions distinctes que la vision par
+      ordinateur sait traiter de trois façons.
+
+  - type: concept
+    conceptId: c-vision-workloads
+    title: Classification, détection, OCR, visages
+    body: >
+      La **classification d'images** attribue une étiquette à toute l'image
+      (« chien »). La **détection d'objets** localise plusieurs éléments avec des
+      **boîtes englobantes** et leurs étiquettes. La **segmentation** va plus
+      loin en délimitant les contours au pixel près. L'**OCR** (reconnaissance
+      optique de caractères) extrait du **texte** d'images. La **détection /
+      reconnaissance de visages** repère et analyse les visages.
+
+
+      Choisir la bonne tâche dépend de la question : « quoi ? » (classification),
+      « quoi et où ? » (détection), « quel texte ? » (OCR).
+
+  - type: example
+    conceptId: c-vision-workloads
+    body: >
+      Compter les voitures sur une image de parking = **détection d'objets**
+      (plusieurs boîtes). Lire une plaque d'immatriculation = **OCR**. Dire
+      simplement « c'est une scène urbaine » = **classification**.
+
+  - type: check
+    conceptId: c-vision-workloads
+    check:
+      id: ai900-l-vision-workloads-check-1
+      conceptId: c-vision-workloads
+      type: mcq
+      difficulty: 2
+      stem: >
+        Une application doit localiser et compter chaque produit présent sur une
+        photo d'étagère. Quelle tâche de vision est la plus adaptée ?
+      options:
+        - { id: a, label: "Détection d'objets" }
+        - { id: b, label: "Classification d'images" }
+        - { id: c, label: "OCR" }
+        - { id: d, label: "Synthèse vocale" }
+      correct: [a]
+      explanation: >
+        Localiser et compter plusieurs éléments nécessite des boîtes englobantes
+        par objet : c'est la détection d'objets. La classification ne donnerait
+        qu'une étiquette globale sans position.
+
+  - type: recap
+    conceptId: c-vision-workloads
+    body: >
+      Vision : classification (quoi, image entière), détection (quoi + où,
+      boîtes), segmentation (contours), OCR (texte), visages. La question posée
+      détermine la tâche.

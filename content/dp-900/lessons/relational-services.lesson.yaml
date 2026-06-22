@@ -1,0 +1,64 @@
+id: dp900-l-relational-services
+trackId: dp-900
+unitId: dp900-u-relational
+domainId: relational-data
+title: Bases open source managées sur Azure
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-oss-relational
+    body: >
+      Votre application utilise déjà PostgreSQL ou MySQL. Faut-il renoncer au
+      managé pour rester sur de l'open source ? Non : Azure propose ces moteurs
+      en service géré.
+
+  - type: concept
+    conceptId: c-oss-relational
+    title: PostgreSQL, MySQL et MariaDB managés
+    body: >
+      **Azure Database for PostgreSQL**, **for MySQL** et **for MariaDB** sont des
+      services **managés** des moteurs open source les plus répandus. Azure
+      s'occupe des correctifs, des sauvegardes, de la haute disponibilité et de la
+      mise à l'échelle.
+
+
+      Vous gardez la **compatibilité** avec l'écosystème open source (outils,
+      pilotes, requêtes SQL standard) sans administrer le serveur. C'est le choix
+      naturel pour **porter** une application existante vers le cloud.
+
+  - type: example
+    conceptId: c-oss-relational
+    body: >
+      Une application web sur MySQL veut migrer sans réécrire ses requêtes →
+      **Azure Database for MySQL**. Une équipe data sous PostgreSQL veut du managé
+      → **Azure Database for PostgreSQL**.
+
+  - type: check
+    conceptId: c-oss-relational
+    check:
+      id: dp900-l-relational-services-check-1
+      conceptId: c-oss-relational
+      type: mcq
+      difficulty: 1
+      stem: >
+        Une équipe veut exécuter PostgreSQL sur Azure sans gérer le système
+        d'exploitation ni les correctifs du moteur. Quel service choisir ?
+      options:
+        - { id: a, label: "Azure Database for PostgreSQL" }
+        - { id: b, label: "Azure Cosmos DB" }
+        - { id: c, label: "Azure Blob Storage" }
+        - { id: d, label: "PostgreSQL installé sur une VM auto-gérée" }
+      correct: [a]
+      explanation: >
+        Azure Database for PostgreSQL est le service managé du moteur PostgreSQL :
+        Azure gère l'OS, les correctifs et les sauvegardes. Cosmos DB est NoSQL,
+        le Blob n'est pas relationnel, et la VM auto-gérée imposerait tout
+        l'entretien.
+
+  - type: recap
+    conceptId: c-oss-relational
+    body: >
+      Azure Database for PostgreSQL/MySQL/MariaDB = moteurs open source en mode
+      managé. On garde la compatibilité et on abandonne l'administration. Idéal
+      pour migrer une application open source vers le cloud.

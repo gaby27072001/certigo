@@ -1,0 +1,71 @@
+id: sc900-l-shared-responsibility
+trackId: sc-900
+unitId: sc900-u-concepts
+domainId: sci-concepts
+title: Responsabilité partagée et défense en profondeur
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-shared-responsibility
+    body: >
+      Qui sécurise quoi dans le cloud ? Si on croit que « tout est géré par
+      Microsoft », on laisse des portes ouvertes. Si on croit devoir « tout
+      gérer soi-même », on réinvente la roue. La vérité est un partage clair —
+      et il dépend du modèle de service.
+
+  - type: concept
+    conceptId: c-shared-responsibility
+    title: Le curseur se déplace avec le modèle
+    body: >
+      Dans le **modèle de responsabilité partagée**, certaines tâches sont
+      **toujours au client** (données, comptes et identités, appareils), et
+      d'autres **toujours au fournisseur** (sécurité physique des datacenters,
+      hôtes, réseau physique).
+
+
+      Entre les deux, le curseur dépend du service : en **IaaS** le client gère
+      l'OS et les applications ; en **PaaS** le fournisseur gère l'OS ; en
+      **SaaS** le fournisseur gère presque tout, sauf vos **données, identités
+      et accès**.
+
+
+      La **défense en profondeur** complète cette idée : empiler plusieurs
+      couches de protection (identité, périmètre, réseau, calcul, application,
+      données) pour qu'une faille unique ne suffise pas.
+
+  - type: example
+    conceptId: c-shared-responsibility
+    body: >
+      Vous utilisez Microsoft 365 (SaaS). Microsoft sécurise l'infrastructure
+      et l'application, mais c'est **vous** qui devez activer le MFA, gérer qui
+      a accès à quels documents et classer les données sensibles.
+
+  - type: check
+    conceptId: c-shared-responsibility
+    check:
+      id: sc900-l-shared-responsibility-check-1
+      conceptId: c-shared-responsibility
+      type: mcq
+      difficulty: 2
+      stem: >
+        Quelle que soit le modèle de service (IaaS, PaaS ou SaaS), de quoi le
+        client reste-t-il TOUJOURS responsable ?
+      options:
+        - { id: a, label: "La sécurité physique des datacenters" }
+        - { id: b, label: "Les correctifs du système d'exploitation hôte" }
+        - { id: c, label: "Ses données, ses identités et ses accès" }
+        - { id: d, label: "La maintenance du réseau physique" }
+      correct: [c]
+      explanation: >
+        Les données, les identités/comptes et la gestion des accès restent
+        toujours sous la responsabilité du client, quel que soit le modèle. La
+        sécurité physique, l'hôte et le réseau physique sont assurés par le
+        fournisseur cloud.
+
+  - type: recap
+    conceptId: c-shared-responsibility
+    body: >
+      Responsabilité partagée : le client garde toujours données, identités et
+      accès ; le fournisseur garde le physique ; le reste dépend de IaaS/PaaS/
+      SaaS. La défense en profondeur empile plusieurs couches de protection.

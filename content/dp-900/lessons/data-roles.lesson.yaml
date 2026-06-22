@@ -1,0 +1,65 @@
+id: dp900-l-data-roles
+trackId: dp-900
+unitId: dp900-u-concepts
+domainId: core-data-concepts
+title: Les métiers de la donnée
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-data-roles
+    body: >
+      Qui garde la base en bonne santé, qui construit les tuyaux qui acheminent
+      la donnée, qui en tire des graphiques pour décider ? Trois métiers, trois
+      responsabilités complémentaires.
+
+  - type: concept
+    conceptId: c-data-roles
+    title: Administrateur, ingénieur, analyste
+    body: >
+      L'**administrateur de base de données** (DBA) gère la base : sécurité,
+      sauvegardes, performances, disponibilité, accès des utilisateurs.
+
+
+      L'**ingénieur de données** construit et maintient les **pipelines** :
+      il ingère, nettoie et transforme la donnée (ETL/ELT) pour la rendre
+      exploitable et la déposer là où elle servira.
+
+
+      L'**analyste de données** explore la donnée préparée, crée des **modèles
+      et des visualisations** (Power BI) pour répondre à des questions métier.
+
+  - type: example
+    conceptId: c-data-roles
+    body: >
+      Restaurer une base après une panne → **DBA**. Mettre en place un flux qui
+      charge chaque nuit les ventes vers un entrepôt → **ingénieur de données**.
+      Bâtir un tableau de bord du chiffre d'affaires → **analyste de données**.
+
+  - type: check
+    conceptId: c-data-roles
+    check:
+      id: dp900-l-data-roles-check-1
+      conceptId: c-data-roles
+      type: mcq
+      difficulty: 2
+      stem: >
+        Une équipe doit construire un flux qui ingère, nettoie et transforme des
+        données brutes vers un entrepôt. Quel rôle est principalement concerné ?
+      options:
+        - { id: a, label: "Analyste de données" }
+        - { id: b, label: "Administrateur de base de données" }
+        - { id: c, label: "Ingénieur de données" }
+        - { id: d, label: "Développeur front-end" }
+      correct: [c]
+      explanation: >
+        Construire et maintenir des pipelines d'ingestion et de transformation
+        (ETL/ELT) est le cœur du métier d'ingénieur de données. L'analyste
+        exploite la donnée préparée ; le DBA gère la base elle-même.
+
+  - type: recap
+    conceptId: c-data-roles
+    body: >
+      DBA : santé et sécurité de la base. Ingénieur de données : pipelines
+      (ingestion, transformation). Analyste : modèles et visualisations pour
+      décider. Trois rôles, une chaîne de valeur de la donnée.

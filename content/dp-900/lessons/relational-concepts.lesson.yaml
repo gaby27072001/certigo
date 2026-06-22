@@ -1,0 +1,67 @@
+id: dp900-l-relational-concepts
+trackId: dp-900
+unitId: dp900-u-relational
+domainId: relational-data
+title: Tables, clés et relations
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-relational-concepts
+    body: >
+      Comment garantir que chaque commande pointe vers un client qui existe
+      vraiment, sans recopier son nom partout ? Le modèle relationnel répond avec
+      des tables reliées par des clés.
+
+  - type: concept
+    conceptId: c-relational-concepts
+    title: Le modèle relationnel
+    body: >
+      Une **table** stocke des lignes (enregistrements) et des colonnes
+      (attributs). La **clé primaire** identifie de façon unique chaque ligne
+      (par ex. `id` client).
+
+
+      Une **clé étrangère** crée un lien : la colonne `customerId` d'une table
+      `Commandes` référence la clé primaire de `Clients`. Cela garantit
+      l'**intégrité référentielle** — pas de commande orpheline.
+
+
+      La **normalisation** évite la redondance en répartissant la donnée dans des
+      tables reliées ; on les recombine avec des **jointures** (JOIN) au moment
+      de la requête.
+
+  - type: example
+    conceptId: c-relational-concepts
+    body: >
+      `Clients(id PK, nom)` et `Commandes(id PK, customerId FK, total)`. Le nom du
+      client n'est écrit qu'une fois ; une jointure sur `customerId` relie chaque
+      commande à son client.
+
+  - type: check
+    conceptId: c-relational-concepts
+    check:
+      id: dp900-l-relational-concepts-check-1
+      conceptId: c-relational-concepts
+      type: mcq
+      difficulty: 2
+      stem: >
+        Dans une table `Commandes`, quelle structure garantit que chaque commande
+        référence un client réellement présent dans la table `Clients` ?
+      options:
+        - { id: a, label: "Une clé étrangère" }
+        - { id: b, label: "Une clé primaire" }
+        - { id: c, label: "Un index" }
+        - { id: d, label: "Une vue" }
+      correct: [a]
+      explanation: >
+        La clé étrangère relie une colonne à la clé primaire d'une autre table et
+        impose l'intégrité référentielle. La clé primaire identifie une ligne ;
+        l'index accélère les recherches ; la vue est une requête enregistrée.
+
+  - type: recap
+    conceptId: c-relational-concepts
+    body: >
+      Clé primaire = identité unique d'une ligne. Clé étrangère = lien et
+      intégrité entre tables. Normalisation = éviter la redondance, recombiner par
+      jointure. C'est la grammaire des bases relationnelles.

@@ -1,0 +1,64 @@
+id: ai900-l-azure-vision
+trackId: ai-900
+unitId: ai900-u-vision
+domainId: computer-vision
+title: Services de vision Azure
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-azure-vision
+    body: >
+      Pas besoin d'entraîner un réseau de neurones pour lire un reçu ou décrire
+      une image : Azure propose des services de vision prêts à appeler par API.
+
+  - type: concept
+    conceptId: c-azure-vision
+    title: Azure AI Vision et ses voisins
+    body: >
+      **Azure AI Vision** (anciennement Computer Vision) fournit l'analyse
+      d'images (étiquettes, description, objets) et l'**OCR** (lecture de texte).
+      **Azure AI Face** se spécialise dans la détection et la reconnaissance de
+      visages. **Azure AI Document Intelligence** (ex-Form Recognizer) extrait
+      des données structurées de documents (factures, reçus, formulaires).
+      **Custom Vision** permet d'entraîner son propre classifieur ou détecteur
+      avec ses images.
+
+
+      Ces services s'utilisent via une **clé** et un **endpoint**, souvent
+      regroupés dans une ressource **Azure AI Services** multi-service.
+
+  - type: example
+    conceptId: c-azure-vision
+    body: >
+      Automatiser la saisie de factures fournisseurs → **Document Intelligence**.
+      Décrire le contenu d'une photo pour l'accessibilité → **Azure AI Vision**.
+      Reconnaître ses propres pièces industrielles → **Custom Vision**.
+
+  - type: check
+    conceptId: c-azure-vision
+    check:
+      id: ai900-l-azure-vision-check-1
+      conceptId: c-azure-vision
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous devez extraire automatiquement le montant et la date de milliers de
+        factures scannées. Quel service Azure est le plus adapté ?
+      options:
+        - { id: a, label: "Azure AI Document Intelligence" }
+        - { id: b, label: "Azure AI Face" }
+        - { id: c, label: "Azure Machine Learning designer" }
+        - { id: d, label: "Azure Bot Service" }
+      correct: [a]
+      explanation: >
+        Document Intelligence (ex-Form Recognizer) est conçu pour extraire des
+        champs structurés (montants, dates, lignes) de documents comme les
+        factures et reçus. Face traite les visages, pas les documents.
+
+  - type: recap
+    conceptId: c-azure-vision
+    body: >
+      Azure AI Vision (analyse + OCR), Face (visages), Document Intelligence
+      (champs de documents), Custom Vision (modèles maison). On les appelle par
+      clé + endpoint, sans entraîner soi-même dans la plupart des cas.
