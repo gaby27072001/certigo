@@ -61,6 +61,8 @@ def answer_keys(lesson: dict) -> list[dict]:
             keys.append({
                 "itemId": item["id"],
                 "conceptId": item["conceptId"],
+                "type": item["type"],
+                "difficulty": item.get("difficulty", 1),
                 "correct": item["correct"],
                 "explanation": item["explanation"],
             })
@@ -72,18 +74,20 @@ def build_documents() -> list[dict]:
     for track_file in sorted(CONTENT.glob("*/track.yaml")):
         track = load_yaml(track_file)
         track_id = track["id"]
+        # The track document id is the bare track id so the domain `Track.Id`
+        # deserializes correctly (the backend point-reads by trackId).
         docs.append({
-            "id": f"track::{track_id}",
+            **track,
             "type": "track",
             "trackId": track_id,
-            **track,
         })
 
         for lesson_file in sorted((track_file.parent / "lessons").glob("*.lesson.yaml")):
             lesson = load_yaml(lesson_file)
-            # Public lesson (no answers) — sent to clients.
+            # Public lesson (no answers) — sent to clients. The document id is the
+            # bare lesson id (the backend point-reads lessons by lessonId).
             docs.append({
-                "id": f"lesson::{lesson['id']}",
+                "id": lesson["id"],
                 "type": "lesson",
                 "trackId": track_id,
                 "lessonId": lesson["id"],
@@ -93,7 +97,8 @@ def build_documents() -> list[dict]:
                 "estMinutes": lesson["estMinutes"],
                 "blocks": [public_block(b) for b in lesson["blocks"]],
             })
-            # Server-only answer key.
+            # Server-only answer key (carries item type/difficulty/domain so the
+            # grader can score XP and map concepts to exam domains).
             keys = answer_keys(lesson)
             if keys:
                 docs.append({
@@ -101,6 +106,7 @@ def build_documents() -> list[dict]:
                     "type": "answerKey",
                     "trackId": track_id,
                     "lessonId": lesson["id"],
+                    "domainId": lesson["domainId"],
                     "items": keys,
                 })
     return docs

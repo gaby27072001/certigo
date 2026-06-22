@@ -1,0 +1,62 @@
+id: az900-l-defender-overview
+trackId: az-900
+unitId: az900-u-identity-governance
+domainId: management-governance
+title: Defender & Zero Trust
+estMinutes: 5
+
+blocks:
+  - type: hook
+    conceptId: c-defender-overview
+    body: >
+      « À l'intérieur du réseau = de confiance. » Cette vieille idée a causé des
+      fuites massives. Quel principe moderne la remplace dans Azure ?
+
+  - type: concept
+    conceptId: c-defender-overview
+    title: Zero Trust et posture de sécurité
+    body: >
+      Le modèle **Zero Trust** part d'un principe simple : **ne jamais faire
+      confiance par défaut, toujours vérifier**. Chaque accès est authentifié,
+      autorisé et chiffré, où qu'il vienne. Trois piliers : *vérifier
+      explicitement*, *moindre privilège*, *supposer la compromission*.
+
+
+      **Microsoft Defender for Cloud** mesure votre **posture** (Secure Score),
+      détecte les menaces et recommande des correctifs. **Microsoft Sentinel**
+      est le SIEM/SOAR qui corrèle les signaux à l'échelle.
+
+  - type: example
+    conceptId: c-defender-overview
+    body: >
+      Defender for Cloud signale qu'une base de données est exposée à Internet
+      sans chiffrement, baisse votre Secure Score et propose la remédiation en
+      un clic. Le MFA (Entra ID) illustre le « vérifier explicitement » de Zero
+      Trust.
+
+  - type: check
+    conceptId: c-defender-overview
+    check:
+      id: az900-l-defender-overview-check-1
+      conceptId: c-defender-overview
+      type: mcq
+      difficulty: 2
+      stem: >
+        Quel principe résume le mieux le modèle de sécurité Zero Trust ?
+      options:
+        - { id: a, label: "Ne jamais faire confiance par défaut, toujours vérifier" }
+        - { id: b, label: "Tout ce qui est dans le réseau est de confiance" }
+        - { id: c, label: "Payer à l'usage" }
+        - { id: d, label: "Répliquer les données entre régions" }
+      correct: [a]
+      explanation: >
+        Zero Trust suppose qu'aucun acteur n'est fiable par défaut, même interne :
+        chaque requête est vérifiée explicitement, au moindre privilège, en
+        supposant que la compromission est possible.
+
+  - type: recap
+    conceptId: c-defender-overview
+    body: >
+      Zero Trust = vérifier explicitement, moindre privilège, supposer la
+      compromission. Defender for Cloud = posture (Secure Score) + détection.
+      Sentinel = SIEM/SOAR à l'échelle.

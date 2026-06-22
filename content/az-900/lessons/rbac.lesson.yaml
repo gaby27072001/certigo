@@ -1,0 +1,62 @@
+id: az900-l-rbac
+trackId: az-900
+unitId: az900-u-identity-governance
+domainId: management-governance
+title: Identité & RBAC
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-rbac
+    body: >
+      Un stagiaire doit lire les journaux d'un groupe de ressources — mais rien
+      supprimer, nulle part ailleurs. Comment donner *juste* ce qu'il faut ?
+
+  - type: concept
+    conceptId: c-rbac
+    title: Entra ID et contrôle d'accès basé sur les rôles
+    body: >
+      **Microsoft Entra ID** est le service d'identité : il **authentifie**
+      (prouve qui vous êtes). Le **RBAC** (contrôle d'accès basé sur les rôles)
+      **autorise** (ce que vous avez le droit de faire).
+
+
+      Une **attribution de rôle** combine trois éléments : un **principal** (qui),
+      une **définition de rôle** (quelles actions, ex. *Lecteur*, *Contributeur*,
+      *Propriétaire*) et une **portée** (où : groupe de gestion, abonnement,
+      groupe de ressources ou ressource). Principe du **moindre privilège**.
+
+  - type: example
+    conceptId: c-rbac
+    body: >
+      On attribue au stagiaire le rôle **Lecteur** avec pour **portée** le seul
+      groupe de ressources « logs-prod ». Il peut tout y consulter, rien modifier,
+      et n'a aucun accès au reste de l'abonnement.
+
+  - type: check
+    conceptId: c-rbac
+    check:
+      id: az900-l-rbac-check-1
+      conceptId: c-rbac
+      type: mcq
+      difficulty: 3
+      stem: >
+        Entra ID prouve l'identité d'un utilisateur. Qu'est-ce qui détermine
+        ensuite les actions qu'il a le droit d'effectuer sur une ressource ?
+      options:
+        - { id: a, label: "Le RBAC (attribution de rôle : principal, rôle, portée)" }
+        - { id: b, label: "Le tag de la ressource" }
+        - { id: c, label: "La région de la ressource" }
+        - { id: d, label: "La Pricing Calculator" }
+      correct: [a]
+      explanation: >
+        Entra ID gère l'authentification (qui vous êtes) ; le RBAC gère
+        l'autorisation (ce que vous pouvez faire) via une attribution de rôle =
+        principal + définition de rôle + portée.
+
+  - type: recap
+    conceptId: c-rbac
+    body: >
+      Entra ID = authentification (identité). RBAC = autorisation. Attribution =
+      principal + rôle + portée. Visez le moindre privilège : juste assez de
+      droits, au bon endroit.

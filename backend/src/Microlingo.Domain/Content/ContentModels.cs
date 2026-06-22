@@ -1,52 +1,27 @@
 namespace Microlingo.Domain.Content;
 
+/// A certification track: weighted exam domains plus the ordered units that make
+/// up the skill-path. Deserialized from the Cosmos `content` document
+/// `track::{trackId}` (compiled from content/<track>/track.yaml).
 public sealed record Track(
     string Id,
-    string Name,
-    string Exam,
-    IReadOnlyList<ExamDomain> Domains);
+    string Code,
+    string Title,
+    string Summary,
+    IReadOnlyList<ExamDomain> Domains,
+    IReadOnlyList<TrackUnit> Units);
 
 public sealed record ExamDomain(string Id, string Name, double Weight);
 
-public sealed record Unit(
+public sealed record TrackUnit(
     string Id,
-    string TrackId,
     string DomainId,
-    int Order,
     string Title,
-    IReadOnlyList<string> LessonIds);
+    IReadOnlyList<string> Lessons);
 
-public sealed record Lesson(
-    string Id,
-    string TrackId,
-    string UnitId,
-    string DomainId,
-    int Order,
-    string Title,
-    int EstMinutes,
-    IReadOnlyList<LessonBlock> Blocks,
-    IReadOnlyList<string> ItemIds);
-
-public abstract record LessonBlock(string Id, string Kind);
-
-public sealed record ConceptBlock(string Id, string ConceptId, string Title, string Body)
-    : LessonBlock(Id, "concept");
-
-public sealed record ExampleBlock(string Id, string ConceptId, string Scenario, string AppliedExample)
-    : LessonBlock(Id, "example");
-
-public sealed record CodeBlock(string Id, string Language, string Code, string Caption)
-    : LessonBlock(Id, "code");
-
-public sealed record CheckBlock(string Id, string Prompt, IReadOnlyList<string> ItemIds)
-    : LessonBlock(Id, "check");
-
-public sealed record HookBlock(string Id, string Text)
-    : LessonBlock(Id, "hook");
-
-public sealed record RecapBlock(string Id, IReadOnlyList<string> KeyPoints)
-    : LessonBlock(Id, "recap");
-
+/// The kinds of interaction a check/quiz item supports. Serialized as a
+/// camelCase string ("mcq", "matchPairs"…) so the wire contract matches the
+/// Flutter `ItemType` enum exactly.
 public enum ItemType
 {
     Mcq,
@@ -59,32 +34,55 @@ public enum ItemType
     Applied
 }
 
-public sealed record QuizItem(
+public sealed record CheckOption(string Id, string Label);
+
+/// The *public* shape of a check — what ships to the client inside a lesson
+/// block. It deliberately omits the correct answer and explanation; grading is
+/// authoritative server-side via <see cref="LessonAnswerKey"/>.
+public sealed record LessonCheck(
     string Id,
-    string TrackId,
     string ConceptId,
-    string DomainId,
-    ItemType ItemType,
-    string Bloom,
-    double Difficulty,
+    ItemType Type,
     string Stem,
-    IReadOnlyList<Option> Options,
-    IReadOnlyList<string> Correct,
-    string Explanation);
+    IReadOnlyList<CheckOption> Options);
 
-public sealed record Option(string Id, string Text);
+/// One block of a lesson. Flattened (not polymorphic) so it round-trips cleanly
+/// through System.Text.Json and matches the Flutter `LessonBlock` 1:1: consumers
+/// switch on <see cref="Type"/> (hook|concept|example|code|check|recap).
+public sealed record LessonBlock(
+    string Type,
+    string ConceptId,
+    string? Title = null,
+    string? Body = null,
+    string? Code = null,
+    string? Language = null,
+    LessonCheck? Check = null);
 
-public sealed record Concept(
+/// A public lesson: an ordered list of typed blocks driving the Learn Loop.
+/// Deserialized from the Cosmos document whose id == lessonId.
+public sealed record Lesson(
     string Id,
     string TrackId,
+    string UnitId,
     string DomainId,
     string Title,
-    string Summary,
-    IReadOnlyList<string> Prerequisites,
-    string BloomTarget)
-{
-    public string Explanation { get; init; } = string.Empty;
-    public string AppliedExample { get; init; } = string.Empty;
-    public IReadOnlyList<string> Checks { get; init; } = Array.Empty<string>();
-    public IReadOnlyList<string> ReviewCards { get; init; } = Array.Empty<string>();
-}
+    int EstMinutes,
+    IReadOnlyList<LessonBlock> Blocks);
+
+/// Server-only answer key for a lesson's checks. Stored as the Cosmos document
+/// `answerkey::{lessonId}` and never sent to clients. Carries everything the
+/// grading engine needs (correct ids, explanation, item type & difficulty for
+/// XP) so the public lesson can stay answer-free.
+public sealed record LessonAnswerKey(
+    string LessonId,
+    string TrackId,
+    string DomainId,
+    IReadOnlyList<AnswerKeyItem> Items);
+
+public sealed record AnswerKeyItem(
+    string ItemId,
+    string ConceptId,
+    ItemType Type,
+    int Difficulty,
+    IReadOnlyList<string> Correct,
+    string Explanation);

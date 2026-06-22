@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:core/core.dart';
 import 'package:data/data.dart';
 
 /// Root dependency wiring for the app, expressed as Riverpod providers.
@@ -11,10 +12,12 @@ import 'package:data/data.dart';
 
 /// Supplies the current access token to the API client.
 ///
-/// Wired to a no-op in the skeleton; the auth feature (Entra External ID) will
-/// override this with a real token source via `ProviderScope.overrides`.
+/// Until Entra External ID is wired, dev/staging builds send a non-empty bearer
+/// token that the backend's dev validator maps to a stable userId, so the app
+/// works end-to-end. Production overrides this with a real Entra access token
+/// via `ProviderScope.overrides`.
 final tokenProvider = Provider<TokenProvider>((Ref ref) {
-  return () async => null;
+  return () async => AppEnv.isProd ? null : AppEnv.devAuthToken;
 });
 
 final apiClientProvider = Provider<ApiClient>((Ref ref) {
@@ -43,3 +46,25 @@ final leaderboardRepositoryProvider = Provider<LeaderboardRepository>(
 
 /// User-controlled theme mode (persisted by settings later). System by default.
 final themeModeProvider = StateProvider<ThemeMode>((Ref ref) => ThemeMode.system);
+
+/// Unwraps a repository [Result] into a plain value, throwing the [Failure] so
+/// Riverpod surfaces it as `AsyncError` for the UI's `.when(error: …)` branch.
+T _orThrow<T>(Result<T> result) =>
+    result.when(success: (T value) => value, failure: (Failure f) => throw f);
+
+/// The signed-in learner's profile. Auto-disposed and shared by Home + Profile.
+final meProvider = FutureProvider.autoDispose<UserProfile>((Ref ref) async {
+  return _orThrow(await ref.watch(userRepositoryProvider).getMe());
+});
+
+/// A learner's path through one certification track, keyed by trackId.
+final pathProvider = FutureProvider.autoDispose.family<LearningPath, String>(
+  (Ref ref, String trackId) async {
+    return _orThrow(await ref.watch(pathRepositoryProvider).getPath(trackId));
+  },
+);
+
+/// The learner's current weekly league standings.
+final leagueProvider = FutureProvider.autoDispose<League>((Ref ref) async {
+  return _orThrow(await ref.watch(leaderboardRepositoryProvider).getMyLeague());
+});

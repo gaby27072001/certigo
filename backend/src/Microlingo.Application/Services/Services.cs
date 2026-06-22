@@ -3,6 +3,7 @@ using Microlingo.Application.Dtos;
 using Microlingo.Domain.Content;
 using Microlingo.Domain.Gamification;
 using Microlingo.Domain.Progress;
+using Microlingo.Domain.Readiness;
 
 namespace Microlingo.Application.Services;
 
@@ -21,38 +22,57 @@ public sealed class UserService(IUserContext userContext, IUserRepository users)
             return existing;
         }
 
-        var profile = new UserProfileDto(userContext.UserId, userContext.DisplayName, 0, 1, 0, 2, 50, 0);
+        var profile = ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
         return await users.UpsertAsync(profile, cancellationToken);
+    }
+}
+
+internal static class ProfileDefaults
+{
+    public const string DefaultTrackId = "az-900";
+
+    public static UserProfileDto New(string userId, string displayName)
+    {
+        var handle = Handle(displayName, userId);
+        return new UserProfileDto(
+            Id: userId,
+            DisplayName: string.IsNullOrWhiteSpace(displayName) ? "Learner" : displayName,
+            Handle: handle,
+            AvatarUrl: null,
+            Xp: 0,
+            Level: 1,
+            StreakDays: 0,
+            FreezeTokens: 2,
+            DailyGoalXp: 50,
+            DailyXpEarned: 0,
+            Gems: 0,
+            ActiveTrackId: DefaultTrackId,
+            LastActiveDate: null,
+            DailyXpDate: null);
+    }
+
+    private static string Handle(string displayName, string userId)
+    {
+        var basis = string.IsNullOrWhiteSpace(displayName) ? userId : displayName;
+        var slug = new string(basis.ToLowerInvariant().Where(char.IsLetterOrDigit).Take(12).ToArray());
+        if (slug.Length < 3)
+        {
+            slug = "learner" + new string(userId.Where(char.IsLetterOrDigit).Take(6).ToArray());
+        }
+
+        return slug;
     }
 }
 
 public interface IContentService
 {
-    Task<LessonDto?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default);
+    Task<Lesson?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default);
 }
 
 public sealed class ContentService(IContentRepository content) : IContentService
 {
-    public async Task<LessonDto?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default)
-    {
-        var lesson = await content.GetLessonAsync(trackId, lessonId, cancellationToken);
-        if (lesson is null)
-        {
-            return null;
-        }
-
-        var items = await content.GetItemsAsync(trackId, lesson.ItemIds, cancellationToken);
-        return new LessonDto(
-            lesson.Id,
-            lesson.TrackId,
-            lesson.UnitId,
-            lesson.DomainId,
-            lesson.Order,
-            lesson.Title,
-            lesson.EstMinutes,
-            lesson.Blocks,
-            items.Select(i => new QuizItemDto(i.Id, i.TrackId, i.ConceptId, i.DomainId, i.ItemType, i.Bloom, i.Difficulty, i.Stem, i.Options)).ToArray());
-    }
+    public Task<Lesson?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default)
+        => content.GetLessonAsync(trackId, lessonId, cancellationToken);
 }
 
 public interface IQuizService
@@ -67,7 +87,8 @@ public sealed class QuizService(
     IProgressRepository progress,
     IAttemptRepository attempts,
     IEventRepository events,
-    IUserRepository users) : IQuizService
+    IUserRepository users,
+    ILeaderboardRepository leaderboard) : IQuizService
 {
     public async Task<SubmitQuizResult> SubmitAsync(string lessonId, SubmitQuizRequest request, CancellationToken cancellationToken = default)
     {
@@ -77,10 +98,9 @@ public sealed class QuizService(
             return prior.Result;
         }
 
-        var lesson = await content.GetLessonAsync(request.TrackId, lessonId, cancellationToken)
-            ?? throw new InvalidOperationException($"Lesson '{lessonId}' was not found.");
-        var items = await content.GetItemsAsync(request.TrackId, lesson.ItemIds, cancellationToken);
-        var itemById = items.ToDictionary(i => i.Id, StringComparer.OrdinalIgnoreCase);
+        var answerKey = await content.GetAnswerKeyAsync(request.TrackId, lessonId, cancellationToken)
+            ?? throw new InvalidOperationException($"Answer key for lesson '{lessonId}' was not found.");
+        var itemById = answerKey.Items.ToDictionary(i => i.ItemId, StringComparer.OrdinalIgnoreCase);
         var now = clock.UtcNow;
         var itemResults = new List<ItemResultDto>();
         var updatedMasteries = new Dictionary<string, ConceptMastery>(StringComparer.OrdinalIgnoreCase);
@@ -100,15 +120,17 @@ public sealed class QuizService(
                 correctCount++;
             }
 
-            var before = await progress.GetMasteryAsync(userContext.UserId, item.TrackId, item.ConceptId, cancellationToken)
-                ?? ConceptMastery.New(userContext.UserId, item.TrackId, item.ConceptId);
+            var before = updatedMasteries.TryGetValue(item.ConceptId, out var pending)
+                ? pending
+                : await progress.GetMasteryAsync(userContext.UserId, request.TrackId, item.ConceptId, cancellationToken)
+                    ?? ConceptMastery.New(userContext.UserId, request.TrackId, item.ConceptId);
             var grade = ReviewScheduler.GradeFrom(correct, answer.LatencyMs);
             var after = ReviewScheduler.Apply(before, grade, now);
             updatedMasteries[item.ConceptId] = after;
-            xpEarned += XpEngine.ForQuizItem(item, correct, before, after);
+            xpEarned += XpEngine.ForQuizItem(item.Type, item.Difficulty, correct, before, after);
 
             itemResults.Add(new ItemResultDto(
-                item.Id,
+                item.ItemId,
                 correct,
                 item.ConceptId,
                 correct ? null : item.Correct.ToList(),
@@ -117,27 +139,56 @@ public sealed class QuizService(
         }
 
         var profile = await users.GetAsync(userContext.UserId, cancellationToken)
-            ?? new UserProfileDto(userContext.UserId, userContext.DisplayName, 0, 1, 0, 2, 50, 0);
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+
+        var scorePct = itemResults.Count == 0 ? 0 : (int)Math.Round(100d * correctCount / itemResults.Count);
+        var perfect = itemResults.Count > 0 && correctCount == itemResults.Count;
+        var gemsEarned = correctCount + (perfect ? 5 : 0);
+
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var sameDay = profile.DailyXpDate == today;
+        var newDailyXp = (sameDay ? profile.DailyXpEarned : 0) + xpEarned;
+        var goalMet = profile.DailyGoalXp > 0 && newDailyXp >= profile.DailyGoalXp;
+
+        var stats = new GamificationStats(
+            profile.Xp,
+            profile.Level,
+            profile.StreakDays,
+            profile.LastActiveDate ?? DateOnly.MinValue,
+            profile.FreezeTokens,
+            profile.DailyGoalXp,
+            sameDay ? profile.DailyXpEarned : 0);
+        var newStats = StreakService.UpdateStreak(stats, today, goalMet);
+        var streakExtended = goalMet && profile.LastActiveDate != today;
+
         var newXp = profile.Xp + xpEarned;
         var newLevel = XpEngine.LevelFromXp(newXp);
         var updatedProfile = profile with
         {
             Xp = newXp,
             Level = newLevel,
-            DailyXpEarned = profile.DailyXpEarned + xpEarned
+            StreakDays = goalMet ? newStats.StreakDays : profile.StreakDays,
+            FreezeTokens = goalMet ? newStats.FreezeTokens : profile.FreezeTokens,
+            LastActiveDate = goalMet ? newStats.LastActiveDate : profile.LastActiveDate,
+            DailyXpEarned = newDailyXp,
+            DailyXpDate = today,
+            Gems = profile.Gems + gemsEarned
         };
         await users.UpsertAsync(updatedProfile, cancellationToken);
-
         await progress.UpsertMasteryBatchAsync(userContext.UserId, updatedMasteries.Values.ToArray(), cancellationToken);
 
-        var scorePct = itemResults.Count == 0 ? 0 : (int)Math.Round(100d * correctCount / itemResults.Count);
+        if (xpEarned > 0)
+        {
+            await leaderboard.AddXpAsync(userContext.UserId, xpEarned, cancellationToken);
+        }
+
         var result = new SubmitQuizResult(
             Guid.NewGuid().ToString("n"),
             scorePct,
             itemResults,
-            new RewardsDto(xpEarned, newXp, newLevel > profile.Level, false, new List<string>()),
+            new RewardsDto(xpEarned, newXp, newLevel > profile.Level, streakExtended, gemsEarned, new List<string>()),
             updatedMasteries.Values.Where(m => m.MasteryScore < 0.5).Select(m => m.ConceptId).Distinct().ToList(),
-            updatedMasteries.Values.OrderBy(m => m.DueAt).FirstOrDefault()?.DueAt);
+            updatedMasteries.Values.OrderBy(m => m.DueAt).Select(m => (DateTimeOffset?)m.DueAt).FirstOrDefault());
 
         var attempt = new AttemptRecord(result.AttemptId, userContext.UserId, request.ClientAttemptId, request.TrackId, lessonId, request.StartedAt, now, result);
         await attempts.CreateAsync(attempt, cancellationToken);
@@ -146,7 +197,7 @@ public sealed class QuizService(
         return result;
     }
 
-    private static bool IsCorrect(QuizItem item, AnswerDto answer)
+    private static bool IsCorrect(AnswerKeyItem item, AnswerDto answer)
     {
         var expected = item.Correct.OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
         var actual = answer.Selected.OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
@@ -170,8 +221,156 @@ public interface IPathService
     Task<PathDto> GetPathAsync(string trackId, CancellationToken cancellationToken = default);
 }
 
-public sealed class PathService() : IPathService
+public sealed class PathService(
+    IUserContext userContext,
+    IContentRepository content,
+    IProgressRepository progress,
+    IClock clock) : IPathService
 {
-    public Task<PathDto> GetPathAsync(string trackId, CancellationToken cancellationToken = default)
-        => Task.FromResult(new PathDto(trackId, "Adaptive Microsoft certification path", 0, Array.Empty<string>()));
+    public async Task<PathDto> GetPathAsync(string trackId, CancellationToken cancellationToken = default)
+    {
+        var track = await content.GetTrackAsync(trackId, cancellationToken);
+        if (track is null)
+        {
+            return new PathDto(trackId, trackId, trackId, 0, 0, Array.Empty<PathUnitDto>(), Array.Empty<DomainProgressDto>());
+        }
+
+        var masteries = await progress.ListMasteriesAsync(userContext.UserId, trackId, cancellationToken);
+        var masteryByConcept = masteries
+            .GroupBy(m => m.ConceptId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        var lessonIds = track.Units.SelectMany(u => u.Lessons).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var lessons = await Task.WhenAll(lessonIds.Select(id => content.GetLessonAsync(trackId, id, cancellationToken)));
+        var lessonById = lessons
+            .Where(l => l is not null)
+            .Select(l => l!)
+            .ToDictionary(l => l.Id, StringComparer.OrdinalIgnoreCase);
+
+        var conceptDomains = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var lesson in lessonById.Values)
+        {
+            foreach (var conceptId in GradableConcepts(lesson))
+            {
+                conceptDomains[conceptId] = lesson.DomainId;
+            }
+        }
+
+        var conceptCountsByDomain = conceptDomains
+            .GroupBy(kv => kv.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+        var domainWeights = track.Domains.ToDictionary(d => d.Id, d => d.Weight);
+        var domainNames = track.Domains.ToDictionary(d => d.Id, d => d.Name);
+
+        var readiness = ReadinessCalculator.Compute(
+            trackId,
+            domainWeights,
+            conceptCountsByDomain,
+            masteries,
+            clock.UtcNow,
+            trend7d: 0,
+            conceptDomains: conceptDomains);
+
+        var domainProgress = track.Domains
+            .Select(d =>
+            {
+                var score = readiness.Domains.FirstOrDefault(rd => rd.DomainId == d.Id)?.Score ?? 0;
+                return new DomainProgressDto(d.Id, d.Name, d.Weight, score);
+            })
+            .ToArray();
+
+        var units = new List<PathUnitDto>(track.Units.Count);
+        var previousUnitCompleted = true;
+        foreach (var unit in track.Units)
+        {
+            var unitUnlocked = previousUnitCompleted;
+            var frontierConsumed = false;
+            var pathLessons = new List<PathLessonDto>(unit.Lessons.Count);
+            var allLessonsDone = true;
+
+            foreach (var lessonId in unit.Lessons)
+            {
+                lessonById.TryGetValue(lessonId, out var lesson);
+                var concepts = lesson is null ? Array.Empty<string>() : GradableConcepts(lesson).ToArray();
+                var total = concepts.Length;
+                var tracked = concepts.Count(masteryByConcept.ContainsKey);
+                var avg = total == 0
+                    ? 0d
+                    : concepts.Average(c => masteryByConcept.TryGetValue(c, out var m) ? m.MasteryScore : 0d);
+                var masteryPct = (int)Math.Round(avg * 100);
+
+                var rawDone = total > 0 && tracked == total;
+                var rawMastered = rawDone && avg >= 0.85;
+                var rawInProgress = !rawDone && tracked > 0;
+
+                string status;
+                if (!unitUnlocked)
+                {
+                    status = "locked";
+                }
+                else if (rawMastered)
+                {
+                    status = "mastered";
+                }
+                else if (rawDone)
+                {
+                    status = "completed";
+                }
+                else if (!frontierConsumed)
+                {
+                    status = rawInProgress ? "inProgress" : "available";
+                    frontierConsumed = true;
+                }
+                else
+                {
+                    status = "locked";
+                }
+
+                if (!rawDone)
+                {
+                    allLessonsDone = false;
+                }
+
+                pathLessons.Add(new PathLessonDto(
+                    lessonId,
+                    lesson?.Title ?? lessonId,
+                    status,
+                    lesson?.EstMinutes ?? 0,
+                    masteryPct));
+            }
+
+            units.Add(new PathUnitDto(unit.Id, unit.Title, unit.DomainId, UnitStatus(pathLessons, unitUnlocked), pathLessons));
+            previousUnitCompleted = unitUnlocked && allLessonsDone && unit.Lessons.Count > 0;
+        }
+
+        return new PathDto(
+            track.Id,
+            track.Title,
+            track.Code,
+            readiness.Score,
+            0,
+            units,
+            domainProgress);
+    }
+
+    private static IEnumerable<string> GradableConcepts(Lesson lesson)
+        => lesson.Blocks
+            .Where(b => b.Check is not null)
+            .Select(b => b.Check!.ConceptId)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+    private static string UnitStatus(IReadOnlyList<PathLessonDto> lessons, bool unlocked)
+    {
+        if (!unlocked)
+        {
+            return "locked";
+        }
+
+        if (lessons.Count > 0 && lessons.All(l => l.Status is "completed" or "mastered"))
+        {
+            return lessons.All(l => l.Status == "mastered") ? "mastered" : "completed";
+        }
+
+        return lessons.Any(l => l.Status is "inProgress" or "completed" or "mastered") ? "inProgress" : "available";
+    }
 }

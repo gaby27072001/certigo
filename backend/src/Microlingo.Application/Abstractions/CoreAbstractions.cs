@@ -32,13 +32,15 @@ public interface IUserRepository
 
 public interface IContentRepository
 {
+    Task<Track?> GetTrackAsync(string trackId, CancellationToken cancellationToken = default);
     Task<Lesson?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<QuizItem>> GetItemsAsync(string trackId, IReadOnlyList<string> ids, CancellationToken cancellationToken = default);
+    Task<LessonAnswerKey?> GetAnswerKeyAsync(string trackId, string lessonId, CancellationToken cancellationToken = default);
 }
 
 public interface IProgressRepository
 {
     Task<ConceptMastery?> GetMasteryAsync(string userId, string trackId, string conceptId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ConceptMastery>> ListMasteriesAsync(string userId, string trackId, CancellationToken cancellationToken = default);
     Task UpsertMasteryBatchAsync(string userId, IReadOnlyList<ConceptMastery> masteries, CancellationToken cancellationToken = default);
 }
 

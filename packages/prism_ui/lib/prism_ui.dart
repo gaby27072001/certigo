@@ -33,6 +33,7 @@ export 'src/components/readiness_gauge.dart';
 export 'src/components/stat_pill.dart';
 export 'src/components/streak_badge.dart';
 export 'src/components/xp_chip.dart';
+export 'src/components/gem_counter.dart';
 export 'src/components/lesson_tile.dart';
 export 'src/components/quiz_option_tile.dart';
 

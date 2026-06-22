@@ -16,6 +16,7 @@ class UserProfile {
     required this.level,
     required this.streakDays,
     required this.freezeTokens,
+    required this.gems,
     required this.dailyGoalXp,
     required this.dailyXpEarned,
     required this.activeTrackId,
@@ -29,6 +30,9 @@ class UserProfile {
   final int level;
   final int streakDays;
   final int freezeTokens;
+
+  /// Soft currency earned from lessons, quests and leagues; spent in the shop.
+  final int gems;
   final int dailyGoalXp;
   final int dailyXpEarned;
   final String? activeTrackId;
@@ -45,6 +49,7 @@ class UserProfile {
         level: (json['level'] as num?)?.toInt() ?? 1,
         streakDays: (json['streakDays'] as num?)?.toInt() ?? 0,
         freezeTokens: (json['freezeTokens'] as num?)?.toInt() ?? 0,
+        gems: (json['gems'] as num?)?.toInt() ?? 0,
         dailyGoalXp: (json['dailyGoalXp'] as num?)?.toInt() ?? 50,
         dailyXpEarned: (json['dailyXpEarned'] as num?)?.toInt() ?? 0,
         activeTrackId: json['activeTrackId'] as String?,
@@ -59,6 +64,7 @@ class UserProfile {
         'level': level,
         'streakDays': streakDays,
         'freezeTokens': freezeTokens,
+        'gems': gems,
         'dailyGoalXp': dailyGoalXp,
         'dailyXpEarned': dailyXpEarned,
         'activeTrackId': activeTrackId,

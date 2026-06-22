@@ -24,6 +24,15 @@ class AppEnv {
     defaultValue: 'https://dev.api.microlingo.app/api',
   );
 
+  /// Dev/staging bearer token sent until Entra External ID is wired. The backend
+  /// dev token validator resolves any non-empty value to a stable userId, so the
+  /// app works end-to-end against a dev API. Production must inject a real Entra
+  /// access token (see [tokenProvider]) and never relies on this.
+  static const String devAuthToken = String.fromEnvironment(
+    'DEV_AUTH_TOKEN',
+    defaultValue: 'dev',
+  );
+
   /// Microsoft Entra External ID — public client configuration.
   static const String entraClientId = String.fromEnvironment('ENTRA_CLIENT_ID', defaultValue: '');
   static const String entraAuthority = String.fromEnvironment('ENTRA_AUTHORITY', defaultValue: '');

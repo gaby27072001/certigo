@@ -14,15 +14,18 @@ public sealed record GamificationStats(
 
 public static class XpEngine
 {
-    public static int ForQuizItem(QuizItem item, bool correct, ConceptMastery before, ConceptMastery after)
+    public static int ForQuizItem(ItemType itemType, int difficulty, bool correct, ConceptMastery before, ConceptMastery after)
     {
         if (!correct)
         {
             return 0;
         }
 
+        // Authored difficulty is 1 (recall) · 2 (apply) · 3 (analyze). Normalize to
+        // 0..1 so the XP curve below stays continuous and tunable.
+        var d = Math.Clamp((difficulty - 1) / 2.0, 0, 1);
         var now = DateTimeOffset.UtcNow;
-        var isApplied = item.ItemType is ItemType.Scenario or ItemType.Applied;
+        var isApplied = itemType is ItemType.Scenario or ItemType.Applied;
         var xp = isApplied ? 10 : 6;
 
         if (before.MasteryScore < 0.5 && after.MasteryScore >= 0.5)
@@ -35,12 +38,12 @@ public static class XpEngine
             xp += 15;
         }
 
-        if (before.MasteryScore > 0.85 && item.Difficulty < 0.4)
+        if (before.MasteryScore > 0.85 && d < 0.4)
         {
             return 1;
         }
 
-        return (int)Math.Round(xp * (0.8 + item.Difficulty), MidpointRounding.AwayFromZero);
+        return (int)Math.Round(xp * (0.8 + d), MidpointRounding.AwayFromZero);
     }
 
     public static int SoftCap(int dailyXp, int goal)

@@ -1,0 +1,62 @@
+id: az900-l-cloud-benefits
+trackId: az-900
+unitId: az900-u-cloud-concepts
+domainId: cloud-concepts
+title: Bénéfices du cloud
+estMinutes: 5
+
+blocks:
+  - type: hook
+    conceptId: c-cloud-benefits
+    body: >
+      Une boutique en ligne explose le jour des soldes : 50× plus de trafic en
+      une heure. Sans cloud, le site tombe. Avec Azure, il tient. Pourquoi ?
+
+  - type: concept
+    conceptId: c-cloud-benefits
+    title: Les grands bénéfices du cloud
+    body: >
+      Le cloud apporte la **haute disponibilité** (services redondants, SLA),
+      la **scalabilité** (ajouter de la capacité) et l'**élasticité** (s'adapter
+      automatiquement à la charge, à la hausse comme à la baisse).
+
+
+      S'ajoutent la **fiabilité** et la **récupération après sinistre** (réplication
+      géographique), la **prévisibilité** des coûts et des performances, ainsi que
+      la **sécurité** et la **gouvernance** gérées à l'échelle.
+
+  - type: example
+    conceptId: c-cloud-benefits
+    body: >
+      Scalabilité **verticale** = une VM plus puissante (plus de CPU/RAM).
+      Scalabilité **horizontale** = plus d'instances en parallèle. L'**élasticité**
+      automatise l'horizontal : Azure ajoute des instances pendant les soldes,
+      puis les retire la nuit — vous ne payez que l'usage réel.
+
+  - type: check
+    conceptId: c-cloud-benefits
+    check:
+      id: az900-l-cloud-benefits-check-1
+      conceptId: c-cloud-benefits
+      type: mcq
+      difficulty: 2
+      stem: >
+        Un service ajoute et retire automatiquement des instances selon le trafic,
+        sans intervention humaine. Quelle caractéristique du cloud est décrite ?
+      options:
+        - { id: a, label: "Élasticité" }
+        - { id: b, label: "Capex" }
+        - { id: c, label: "Récupération après sinistre" }
+        - { id: d, label: "Responsabilité partagée" }
+      correct: [a]
+      explanation: >
+        L'élasticité, c'est l'ajustement automatique de la capacité à la charge
+        en temps réel. La scalabilité, elle, est la capacité d'ajouter des
+        ressources (souvent manuellement ou planifiée).
+
+  - type: recap
+    conceptId: c-cloud-benefits
+    body: >
+      Retenez : haute disponibilité, scalabilité (verticale/horizontale),
+      élasticité (auto), fiabilité/DR, prévisibilité, sécurité et gouvernance.
+      L'élasticité est automatique ; la scalabilité est la capacité d'évoluer.

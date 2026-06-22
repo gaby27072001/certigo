@@ -1,0 +1,62 @@
+id: az900-l-cost-management
+trackId: az-900
+unitId: az900-u-cost-management
+domainId: management-governance
+title: Gestion des coûts
+estMinutes: 5
+
+blocks:
+  - type: hook
+    conceptId: c-cost-management
+    body: >
+      Comment estimer le coût d'une architecture **avant** de la déployer, puis
+      éviter les mauvaises surprises sur la facture **après** ?
+
+  - type: concept
+    conceptId: c-cost-management
+    title: Estimer, suivre et maîtriser
+    body: >
+      Avant déploiement, la **Pricing Calculator** estime le coût d'une solution
+      et le **TCO Calculator** compare on-premises vs Azure. Après, **Microsoft
+      Cost Management** suit la dépense réelle, pose des **budgets** et des
+      **alertes**.
+
+
+      Pour réduire la facture : **réservations** (1–3 ans) et **plans d'économie**
+      pour des charges stables, **Azure Hybrid Benefit** pour réutiliser des
+      licences, et l'**arrêt** des ressources inutilisées.
+
+  - type: example
+    conceptId: c-cost-management
+    body: >
+      Une équipe fixe un budget mensuel de 2 000 € avec une alerte à 80 %. Dès
+      que la dépense projetée atteint 1 600 €, Cost Management notifie les
+      responsables — avant le dépassement, pas après.
+
+  - type: check
+    conceptId: c-cost-management
+    check:
+      id: az900-l-cost-management-check-1
+      conceptId: c-cost-management
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous voulez estimer le coût d'une nouvelle architecture Azure AVANT de
+        la déployer. Quel outil utilisez-vous ?
+      options:
+        - { id: a, label: "Pricing Calculator" }
+        - { id: b, label: "Azure Monitor" }
+        - { id: c, label: "Azure Policy" }
+        - { id: d, label: "Resource Health" }
+      correct: [a]
+      explanation: >
+        La Pricing Calculator sert à estimer le coût d'une solution avant
+        déploiement. Cost Management, lui, suit et alerte sur la dépense réelle
+        une fois les ressources en place.
+
+  - type: recap
+    conceptId: c-cost-management
+    body: >
+      Avant : Pricing Calculator (estimer) et TCO (comparer). Après : Cost
+      Management (suivre, budgets, alertes). Économiser : réservations, plans
+      d'économie, Hybrid Benefit, extinction des ressources oisives.

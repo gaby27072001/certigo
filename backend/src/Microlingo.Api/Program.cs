@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Azure.Core;
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
@@ -33,6 +34,7 @@ var host = new HostBuilder()
                 ?? throw new InvalidOperationException("COSMOS_ENDPOINT is required.");
             var credential = sp.GetRequiredService<TokenCredential>();
             var serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            serializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
             return new CosmosClient(endpoint, credential, new CosmosClientOptions
             {
                 Serializer = new CosmosSystemTextJsonSerializer(serializerOptions)
@@ -42,9 +44,18 @@ var host = new HostBuilder()
             sp.GetRequiredService<CosmosClient>(),
             configuration["COSMOS_DATABASE"] ?? CosmosContainers.DatabaseName));
 
-        services.AddSingleton<ITokenValidator>(_ => new EntraTokenValidator(
-            configuration["ENTRA_AUTHORITY"] ?? string.Empty,
-            configuration["ENTRA_AUDIENCE"] ?? string.Empty));
+        services.AddSingleton<ITokenValidator>(_ =>
+        {
+            var authMode = configuration["AUTH_MODE"];
+            if (string.Equals(authMode, "dev", StringComparison.OrdinalIgnoreCase))
+            {
+                return new DevTokenValidator();
+            }
+
+            return new EntraTokenValidator(
+                configuration["ENTRA_AUTHORITY"] ?? string.Empty,
+                configuration["ENTRA_AUDIENCE"] ?? string.Empty);
+        });
 
         services.AddScoped<IUserContext, FunctionUserContext>();
         services.AddSingleton<IClock, SystemClock>();

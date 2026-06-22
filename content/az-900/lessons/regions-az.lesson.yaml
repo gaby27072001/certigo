@@ -1,0 +1,63 @@
+id: az900-l-regions-az
+trackId: az-900
+unitId: az900-u-core-architecture
+domainId: architecture-services
+title: Régions & zones de disponibilité
+estMinutes: 5
+
+blocks:
+  - type: hook
+    conceptId: c-regions-az
+    body: >
+      Un datacenter prend feu. Votre application reste en ligne, sans perte de
+      données. Comment Azure rend-il cela possible géographiquement ?
+
+  - type: concept
+    conceptId: c-regions-az
+    title: Régions, zones et paires de régions
+    body: >
+      Une **région** Azure est un ensemble de datacenters dans une zone
+      géographique (ex. West Europe). Une **zone de disponibilité** est un ou
+      plusieurs datacenters physiquement séparés *au sein* d'une région, avec
+      alimentation, refroidissement et réseau indépendants.
+
+
+      Déployer sur **plusieurs zones** protège d'une panne de datacenter. Les
+      **paires de régions** (ex. North/West Europe) ajoutent la réplication
+      inter-région pour la reprise après sinistre à grande échelle.
+
+  - type: example
+    conceptId: c-regions-az
+    body: >
+      Une VM dans une seule zone tombe si ce datacenter tombe. La même app
+      répartie sur les zones 1, 2 et 3 de West Europe survit à la perte d'une
+      zone entière. Pour un sinistre régional, la paire West/North Europe prend
+      le relais.
+
+  - type: check
+    conceptId: c-regions-az
+    check:
+      id: az900-l-regions-az-check-1
+      conceptId: c-regions-az
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous voulez qu'une application survive à la panne complète d'un
+        datacenter tout en restant dans la même région. Que choisissez-vous ?
+      options:
+        - { id: a, label: "Déployer sur plusieurs zones de disponibilité" }
+        - { id: b, label: "Déployer une seule VM plus puissante" }
+        - { id: c, label: "Changer d'abonnement" }
+        - { id: d, label: "Acheter plus de licences" }
+      correct: [a]
+      explanation: >
+        Les zones de disponibilité sont des datacenters isolés au sein d'une
+        région : répartir l'app sur plusieurs zones la protège de la perte d'un
+        datacenter sans quitter la région.
+
+  - type: recap
+    conceptId: c-regions-az
+    body: >
+      Région = zone géographique de datacenters. Zone de disponibilité =
+      datacenter isolé dans une région (résilience locale). Paire de régions =
+      réplication inter-région (reprise après sinistre).
