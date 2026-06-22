@@ -44,6 +44,10 @@ final leaderboardRepositoryProvider = Provider<LeaderboardRepository>(
   (Ref ref) => RemoteLeaderboardRepository(ref.watch(apiClientProvider)),
 );
 
+final tutorRepositoryProvider = Provider<TutorRepository>(
+  (Ref ref) => RemoteTutorRepository(ref.watch(apiClientProvider)),
+);
+
 /// User-controlled theme mode (persisted by settings later). System by default.
 final themeModeProvider = StateProvider<ThemeMode>((Ref ref) => ThemeMode.system);
 

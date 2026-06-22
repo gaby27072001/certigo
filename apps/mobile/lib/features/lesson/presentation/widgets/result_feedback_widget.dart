@@ -2,6 +2,8 @@ import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import '../../../tutor/presentation/tutor_sheet.dart';
+
 /// End-of-lesson result: a score emblem, the rewards earned, a per-check recap
 /// and a path back into the product (continue or review weak concepts).
 class ResultFeedbackWidget extends StatelessWidget {
@@ -9,12 +11,21 @@ class ResultFeedbackWidget extends StatelessWidget {
     super.key,
     required this.result,
     required this.lesson,
+    required this.trackId,
+    required this.lessonId,
+    required this.answers,
     required this.onContinue,
     required this.onReview,
   });
 
   final SubmitQuizResult result;
   final Lesson lesson;
+  final String trackId;
+  final String lessonId;
+
+  /// The learner's locked selection per check itemId, used to ask the tutor to
+  /// explain a specific answer.
+  final Map<String, List<String>> answers;
   final VoidCallback onContinue;
   final VoidCallback onReview;
 
@@ -23,6 +34,19 @@ class ResultFeedbackWidget extends StatelessWidget {
       if (block.check?.id == itemId) return block.check!.stem;
     }
     return itemId;
+  }
+
+  void _explain(BuildContext context, ItemResult r) {
+    showTutorSheet(
+      context,
+      request: TutorExplainRequest(
+        trackId: trackId,
+        lessonId: lessonId,
+        itemId: r.itemId,
+        selected: answers[r.itemId] ?? const <String>[],
+      ),
+      correct: r.correct,
+    );
   }
 
   @override
@@ -90,6 +114,7 @@ class ResultFeedbackWidget extends StatelessWidget {
                   correct: r.correct,
                   stem: _stemFor(r.itemId),
                   tone: r.correct ? p.success : p.error,
+                  onExplain: () => _explain(context, r),
                 ),
                 if (!identical(r, result.results.last)) const SizedBox(height: 12),
               ],
@@ -213,26 +238,59 @@ class _ResultRow extends StatelessWidget {
     required this.correct,
     required this.stem,
     required this.tone,
+    required this.onExplain,
   });
 
   final bool correct;
   final String stem;
   final Color tone;
+  final VoidCallback onExplain;
 
   @override
   Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Icon(
-          correct ? Icons.check_circle_rounded : Icons.cancel_rounded,
-          color: tone,
-          size: 20,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Icon(
+              correct ? Icons.check_circle_rounded : Icons.cancel_rounded,
+              color: tone,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(stem, style: text.bodyMedium?.copyWith(height: 1.35)),
+            ),
+          ],
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(stem, style: text.bodyMedium?.copyWith(height: 1.35)),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.only(left: 30),
+          child: GestureDetector(
+            onTap: onExplain,
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(Icons.auto_awesome_rounded, size: 16, color: p.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Demander au tuteur',
+                    style: text.labelMedium?.copyWith(
+                      color: p.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
     );
