@@ -163,6 +163,24 @@ public sealed class QuizService(
 
         var newXp = profile.Xp + xpEarned;
         var newLevel = XpEngine.LevelFromXp(newXp);
+
+        // Lifetime counters and post-quiz stats feed the achievement evaluation.
+        // Achievement gems are added on top of quiz gems but kept out of
+        // RewardsDto.GemsEarned (which reports only what the lesson itself paid).
+        var lifetimeLessons = profile.LifetimeLessonsCompleted + 1;
+        var lifetimePerfect = profile.LifetimePerfectLessons + (perfect ? 1 : 0);
+        var newStreakDays = goalMet ? newStats.StreakDays : profile.StreakDays;
+        var gemsBeforeAchievements = profile.Gems + gemsEarned;
+
+        var snapshot = new AchievementSnapshot(newStreakDays, newXp, newLevel, lifetimeLessons, lifetimePerfect, gemsBeforeAchievements);
+        var alreadyUnlocked = profile.Achievements ?? new List<string>();
+        var newlyUnlocked = AchievementEngine.NewlyUnlocked(snapshot, alreadyUnlocked);
+        var achievementGems = newlyUnlocked.Sum(t => t.RewardGems);
+        var unlockedIds = newlyUnlocked.Select(t => t.Id).ToList();
+        var allAchievements = newlyUnlocked.Count == 0
+            ? profile.Achievements
+            : alreadyUnlocked.Concat(unlockedIds).ToList();
+
         var updatedProfile = profile with
         {
             Xp = newXp,
@@ -176,7 +194,10 @@ public sealed class QuizService(
             DailyCorrectAnswers = (sameDay ? profile.DailyCorrectAnswers : 0) + correctCount,
             DailyPerfectLessons = (sameDay ? profile.DailyPerfectLessons : 0) + (perfect ? 1 : 0),
             DailyQuestClaims = sameDay ? profile.DailyQuestClaims : null,
-            Gems = profile.Gems + gemsEarned
+            LifetimeLessonsCompleted = lifetimeLessons,
+            LifetimePerfectLessons = lifetimePerfect,
+            Achievements = allAchievements,
+            Gems = gemsBeforeAchievements + achievementGems
         };
         await users.UpsertAsync(updatedProfile, cancellationToken);
         await progress.UpsertMasteryBatchAsync(userContext.UserId, updatedMasteries.Values.ToArray(), cancellationToken);
@@ -190,13 +211,23 @@ public sealed class QuizService(
             Guid.NewGuid().ToString("n"),
             scorePct,
             itemResults,
-            new RewardsDto(xpEarned, newXp, newLevel > profile.Level, streakExtended, gemsEarned, new List<string>()),
+            new RewardsDto(xpEarned, newXp, newLevel > profile.Level, streakExtended, gemsEarned, unlockedIds),
             updatedMasteries.Values.Where(m => m.MasteryScore < 0.5).Select(m => m.ConceptId).Distinct().ToList(),
             updatedMasteries.Values.OrderBy(m => m.DueAt).Select(m => (DateTimeOffset?)m.DueAt).FirstOrDefault());
 
         var attempt = new AttemptRecord(result.AttemptId, userContext.UserId, request.ClientAttemptId, request.TrackId, lessonId, request.StartedAt, now, result);
         await attempts.CreateAsync(attempt, cancellationToken);
         await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "quiz.submitted", now, result), cancellationToken);
+
+        if (newlyUnlocked.Count > 0)
+        {
+            await events.AddAsync(new LearningEvent(
+                Guid.NewGuid().ToString("n"),
+                userContext.UserId,
+                "achievement.unlocked",
+                now,
+                unlockedIds), cancellationToken);
+        }
 
         return result;
     }
@@ -406,6 +437,49 @@ public sealed class QuestService(
             status.Completed,
             claimed,
             status.Completed && !claimed);
+    }
+}
+
+internal static class AchievementSnapshots
+{
+    public static AchievementSnapshot From(UserProfileDto p)
+        => new(p.StreakDays, p.Xp, p.Level, p.LifetimeLessonsCompleted, p.LifetimePerfectLessons, p.Gems);
+}
+
+public interface IAchievementService
+{
+    Task<AchievementBoardDto> GetAllAsync(CancellationToken cancellationToken = default);
+}
+
+public sealed class AchievementService(IUserContext userContext, IUserRepository users) : IAchievementService
+{
+    public async Task<AchievementBoardDto> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+
+        var snapshot = AchievementSnapshots.From(profile);
+        var unlocked = new HashSet<string>(profile.Achievements ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+
+        var dtos = AchievementEngine.Tiers.Select(t =>
+        {
+            var value = snapshot.ValueFor(t.Kind);
+            // Treat a tier as unlocked if it was persisted OR the threshold is now
+            // met (so the board is correct even before the next quiz persists it).
+            var isUnlocked = unlocked.Contains(t.Id) || value >= t.Threshold;
+            return new AchievementDto(
+                t.Id,
+                t.Kind.ToString(),
+                t.Name,
+                t.Description,
+                t.Tier,
+                t.Threshold,
+                Math.Min(value, t.Threshold),
+                t.RewardGems,
+                isUnlocked);
+        }).ToArray();
+
+        return new AchievementBoardDto(dtos.Count(d => d.Unlocked), dtos.Length, dtos);
     }
 }
 

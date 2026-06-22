@@ -73,6 +73,7 @@ var host = new HostBuilder()
         services.AddScoped<IPathService, PathService>();
         services.AddScoped<IShopService, ShopService>();
         services.AddScoped<IQuestService, QuestService>();
+        services.AddScoped<IAchievementService, AchievementService>();
     })
     .Build();
 

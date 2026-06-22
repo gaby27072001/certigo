@@ -114,4 +114,25 @@ public sealed class QuizServiceTests
         result.Rewards.StreakExtended.Should().BeFalse();
         result.WeakConcepts.Should().Contain("c1");
     }
+
+    [Fact]
+    public async Task SubmitAsync_unlocks_achievement_awarding_bonus_gems_on_top_of_lesson_gems()
+    {
+        var h = new QuizServiceHarness();
+        // Four prior flawless lessons: a fifth perfect lesson crosses the
+        // "Sans-faute · Bronze" (flawless-5) threshold.
+        h.Users.Seed(TestContent.NewProfile(h.UserId) with { LifetimePerfectLessons = 4 });
+        var service = h.Build();
+
+        var result = await service.SubmitAsync("l1", QuizServiceHarness.Request("a1", QuizServiceHarness.Answer("l1-i1", "a")));
+
+        result.Rewards.AchievementsUnlocked.Should().ContainSingle().Which.Should().Be("flawless-5");
+        result.Rewards.GemsEarned.Should().Be(6); // lesson gems only, excludes the achievement bonus
+
+        var profile = await h.Users.GetAsync(h.UserId);
+        profile!.Achievements.Should().Contain("flawless-5");
+        profile.LifetimePerfectLessons.Should().Be(5);
+        profile.LifetimeLessonsCompleted.Should().Be(1);
+        profile.Gems.Should().Be(26); // 6 lesson gems + 20 achievement reward
+    }
 }

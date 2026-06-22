@@ -20,7 +20,10 @@ public sealed record UserProfileDto(
     int DailyLessonsCompleted = 0,
     int DailyCorrectAnswers = 0,
     int DailyPerfectLessons = 0,
-    List<string>? DailyQuestClaims = null);
+    List<string>? DailyQuestClaims = null,
+    int LifetimeLessonsCompleted = 0,
+    int LifetimePerfectLessons = 0,
+    List<string>? Achievements = null);
 
 public sealed record SubmitQuizRequest(
     string ClientAttemptId,
@@ -159,6 +162,24 @@ public sealed record ClaimQuestResultDto(
     int GemsBalance,
     bool Claimed,
     string? Error);
+
+// --- Achievements / badges -------------------------------------------------
+
+public sealed record AchievementDto(
+    string Id,
+    string Kind,
+    string Name,
+    string Description,
+    string Tier,
+    int Threshold,
+    int Progress,
+    int RewardGems,
+    bool Unlocked);
+
+public sealed record AchievementBoardDto(
+    int Unlocked,
+    int Total,
+    IReadOnlyList<AchievementDto> Achievements);
 
 // --- Readiness -------------------------------------------------------------
 
