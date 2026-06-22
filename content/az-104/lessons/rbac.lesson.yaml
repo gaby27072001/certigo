@@ -1,0 +1,78 @@
+id: az104-l-rbac
+trackId: az-104
+unitId: az104-u-identity
+domainId: identity-governance
+title: Contrôle d'accès basé sur les rôles (RBAC)
+estMinutes: 8
+
+blocks:
+  - type: hook
+    conceptId: c-rbac
+    body: >
+      L'identité dit **qui** vous êtes. RBAC dit **ce que vous avez le droit de
+      faire**, et **où**. C'est le mécanisme d'autorisation d'Azure : ni trop de
+      droits (risque), ni trop peu (blocage). L'art de l'administrateur, c'est le
+      bon rôle, au bon périmètre.
+
+  - type: concept
+    conceptId: c-rbac
+    title: Principal + rôle + portée
+    body: >
+      Une **attribution de rôle** (role assignment) combine trois éléments : un
+      **principal de sécurité** (utilisateur, groupe, principal de service ou
+      identité managée), une **définition de rôle** (l'ensemble des permissions),
+      et une **portée** (scope).
+
+
+      La portée suit une hiérarchie qui **hérite vers le bas** : groupe
+      d'administration → abonnement → groupe de ressources → ressource. Un rôle
+      donné au niveau abonnement s'applique à tous les groupes de ressources en
+      dessous.
+
+
+      Quatre rôles intégrés fondamentaux : **Propriétaire** (tout, y compris
+      déléguer l'accès), **Contributeur** (tout gérer sauf déléguer l'accès),
+      **Lecteur** (lecture seule) et **Administrateur de l'accès utilisateur**
+      (gère uniquement les accès). À ne pas confondre avec les **rôles Entra**,
+      qui gouvernent l'annuaire, pas les ressources Azure.
+
+  - type: example
+    conceptId: c-rbac
+    body: >
+      Une équipe doit déployer et gérer des VM dans un seul groupe de ressources,
+      mais ne doit surtout pas pouvoir donner des accès à d'autres personnes. Vous
+      attribuez le rôle **Contributeur** au **groupe** de l'équipe, à la
+      **portée** de ce groupe de ressources. Ils gèrent tout — sauf l'octroi
+      d'accès, réservé au Propriétaire.
+
+  - type: check
+    conceptId: c-rbac
+    check:
+      id: az104-l-rbac-check-1
+      conceptId: c-rbac
+      type: mcq
+      difficulty: 3
+      stem: >
+        Un collègue doit pouvoir tout gérer dans un groupe de ressources mais ne
+        doit PAS pouvoir attribuer de rôles à d'autres. Quel rôle intégré, et à
+        quelle portée ?
+      options:
+        - { id: a, label: "Propriétaire, au niveau de l'abonnement" }
+        - { id: b, label: "Contributeur, au niveau du groupe de ressources" }
+        - { id: c, label: "Lecteur, au niveau du groupe de ressources" }
+        - { id: d, label: "Administrateur de l'accès utilisateur, au niveau de la ressource" }
+      correct: [b]
+      explanation: >
+        **Contributeur** permet de tout gérer (créer, modifier, supprimer) mais
+        **pas de déléguer l'accès** — exactement la contrainte demandée. La
+        **portée** doit être le groupe de ressources pour limiter l'effet.
+        Propriétaire pourrait attribuer des rôles ; Lecteur est en lecture seule ;
+        Administrateur de l'accès utilisateur ne gère QUE les accès.
+
+  - type: recap
+    conceptId: c-rbac
+    body: >
+      RBAC = principal + définition de rôle + portée. La portée hérite vers le
+      bas (groupe d'administration → abonnement → groupe de ressources →
+      ressource). Propriétaire ⊃ Contributeur ⊃ Lecteur ; l'octroi d'accès est
+      réservé à Propriétaire et Administrateur de l'accès utilisateur.

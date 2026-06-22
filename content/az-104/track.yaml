@@ -1,0 +1,65 @@
+# Microsoft Azure Administrator — certification track (associate).
+# Validated in CI against content/schema/track.schema.json.
+# Domain weights mirror the public AZ-104 exam skills outline and sum to 1.0.
+id: az-104
+code: AZ-104
+title: Microsoft Azure Administrator
+level: associate
+summary: >
+  Administrer Azure au quotidien : identités et gouvernance (Entra, RBAC,
+  Azure Policy), stockage, calcul (machines virtuelles, mise à l'échelle,
+  App Service/conteneurs), réseau virtuel et sécurité réseau, puis supervision
+  et sauvegarde. Le palier associate : on ne découvre plus, on opère.
+
+domains:
+  - id: identity-governance
+    name: Identités et gouvernance Azure
+    weight: 0.22
+  - id: storage
+    name: Stockage
+    weight: 0.18
+  - id: compute
+    name: Ressources de calcul
+    weight: 0.24
+  - id: networking
+    name: Réseau virtuel
+    weight: 0.20
+  - id: monitor
+    name: Supervision et maintenance
+    weight: 0.16
+
+# NOTE: every lesson id listed here must have a matching file in lessons/
+# (enforced by ci-content), and each lesson's unitId/domainId must match.
+units:
+  - id: az104-u-identity
+    domainId: identity-governance
+    title: Identités et gouvernance
+    lessons:
+      - az104-l-entra-users-groups
+      - az104-l-rbac
+      - az104-l-governance
+  - id: az104-u-storage
+    domainId: storage
+    title: Stockage
+    lessons:
+      - az104-l-storage-accounts
+      - az104-l-blob-files
+  - id: az104-u-compute
+    domainId: compute
+    title: Calcul
+    lessons:
+      - az104-l-virtual-machines
+      - az104-l-vm-availability-scale
+      - az104-l-app-service-containers
+  - id: az104-u-networking
+    domainId: networking
+    title: Réseau virtuel
+    lessons:
+      - az104-l-vnet-fundamentals
+      - az104-l-network-traffic
+  - id: az104-u-monitor
+    domainId: monitor
+    title: Supervision et sauvegarde
+    lessons:
+      - az104-l-azure-monitor
+      - az104-l-backup-recovery

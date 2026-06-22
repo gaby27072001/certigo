@@ -1,0 +1,78 @@
+id: az104-l-backup-recovery
+trackId: az-104
+unitId: az104-u-monitor
+domainId: monitor
+title: Sauvegarde et reprise d'activité
+estMinutes: 8
+
+blocks:
+  - type: hook
+    conceptId: c-backup
+    body: >
+      Une panne, une suppression accidentelle, un rançongiciel : tôt ou tard, il
+      faut **restaurer**. La maintenance d'Azure inclut donc deux filets de
+      sécurité distincts — **sauvegarder** les données et **reprendre l'activité**
+      après un sinistre régional.
+
+  - type: concept
+    conceptId: c-backup
+    title: Azure Backup et Azure Site Recovery
+    body: >
+      **Azure Backup** protège les données via un **coffre Recovery Services** (ou
+      un coffre de sauvegarde). Il sauvegarde VM, fichiers/dossiers, partages
+      Azure Files, SQL dans une VM, etc. On définit une **stratégie** : fréquence
+      et **rétention** des points de récupération. Le **soft delete** conserve les
+      sauvegardes supprimées un certain temps, contre les suppressions
+      malveillantes.
+
+
+      **Azure Site Recovery (ASR)** vise la **reprise d'activité** (disaster
+      recovery) : il **réplique** en continu des machines vers une autre région et
+      permet un **basculement** (failover) puis un retour (failback). On teste le
+      plan sans impact via un **failover de test**.
+
+
+      La distinction clé : Backup répond à « j'ai perdu/corrompu des données, je
+      restaure un point dans le temps » ; ASR répond à « une région est tombée, je
+      redémarre ailleurs ».
+
+  - type: example
+    conceptId: c-backup
+    body: >
+      Pour des VM critiques, vous activez **Azure Backup** (sauvegarde quotidienne,
+      rétention 30 jours, soft delete) afin de restaurer un fichier ou une VM
+      entière en cas d'erreur. En parallèle, **ASR** réplique ces VM vers une
+      seconde région : si la région primaire tombe, un failover relance le service
+      ailleurs.
+
+  - type: check
+    conceptId: c-backup
+    check:
+      id: az104-l-backup-recovery-check-1
+      conceptId: c-backup
+      type: mcq
+      difficulty: 3
+      stem: >
+        Votre objectif est de redémarrer des machines virtuelles dans une AUTRE
+        région Azure si la région primaire subit une panne complète. Quel service
+        est conçu pour cela ?
+      options:
+        - { id: a, label: "Azure Backup avec une rétention longue" }
+        - { id: b, label: "Le soft delete des sauvegardes" }
+        - { id: c, label: "Un groupe à haute disponibilité" }
+        - { id: d, label: "Azure Site Recovery (réplication et basculement entre régions)" }
+      correct: [d]
+      explanation: >
+        **Azure Site Recovery** réplique les machines vers une autre région et
+        orchestre le **failover/failback** — c'est la reprise d'activité
+        inter-région. Azure Backup restaure des points dans le temps mais ne
+        bascule pas une région ; le soft delete protège les sauvegardes ; un
+        availability set ne couvre qu'un datacenter.
+
+  - type: recap
+    conceptId: c-backup
+    body: >
+      Azure Backup = restauration de données (coffre Recovery Services, stratégie
+      de rétention, soft delete). Azure Site Recovery = reprise d'activité
+      inter-région (réplication, failover de test, basculement). Deux filets
+      complémentaires.

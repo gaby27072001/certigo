@@ -1,0 +1,75 @@
+id: az104-l-governance
+trackId: az-104
+unitId: az104-u-identity
+domainId: identity-governance
+title: Gouvernance — Policy, verrous et tags
+estMinutes: 8
+
+blocks:
+  - type: hook
+    conceptId: c-governance
+    body: >
+      Donner des accès ne suffit pas : il faut aussi des **garde-fous** qui
+      s'appliquent même aux administrateurs. La gouvernance Azure répond à « comment
+      garantir que rien ne dérape ? » — conformité, protection contre les erreurs,
+      et visibilité des coûts.
+
+  - type: concept
+    conceptId: c-governance
+    title: Policy, verrous, tags, budgets
+    body: >
+      **Azure Policy** évalue les ressources contre des règles et applique un
+      **effet** : `deny` (bloque la création non conforme), `audit` (signale sans
+      bloquer), `append`/`modify` (ajoute des propriétés), `deployIfNotExists`
+      (déploie une correction). On regroupe des policies en **initiatives**.
+
+
+      Les **verrous de ressource** protègent contre les modifications humaines :
+      `CanNotDelete` (on peut lire et modifier mais pas supprimer) et `ReadOnly`
+      (lecture seule). Ils s'appliquent indépendamment de RBAC — même un
+      Propriétaire est bloqué.
+
+
+      Les **tags** sont des paires clé/valeur (p. ex. `costCenter: marketing`)
+      pour organiser et ventiler les coûts ; attention, ils **ne s'héritent pas**
+      automatiquement du groupe de ressources vers les ressources. Enfin,
+      **Cost Management** + **budgets** suivent et alertent sur la dépense.
+
+  - type: example
+    conceptId: c-governance
+    body: >
+      Votre organisation impose que toute ressource porte un tag `costCenter` et
+      qu'aucune VM ne soit créée hors d'Europe. Vous déployez deux policies : une
+      en effet `deny` sur les emplacements non européens, une en `deny` (ou
+      `modify`) exigeant le tag. Résultat : les déploiements non conformes échouent
+      à la création, avant même de coûter quoi que ce soit.
+
+  - type: check
+    conceptId: c-governance
+    check:
+      id: az104-l-governance-check-1
+      conceptId: c-governance
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous voulez empêcher *toute* suppression accidentelle d'un groupe de
+        ressources critique, y compris par un Propriétaire, tout en autorisant les
+        modifications. Que mettez-vous en place ?
+      options:
+        - { id: a, label: "Une policy en effet audit" }
+        - { id: b, label: "Retirer le rôle Propriétaire à tout le monde" }
+        - { id: c, label: "Un verrou de ressource CanNotDelete" }
+        - { id: d, label: "Un tag canDelete = false" }
+      correct: [c]
+      explanation: >
+        Un **verrou CanNotDelete** empêche la suppression tout en autorisant
+        lecture et modification, et s'applique même au Propriétaire. Une policy
+        `audit` ne bloque rien ; retirer les rôles casserait l'exploitation ; un
+        tag est une simple métadonnée sans effet protecteur.
+
+  - type: recap
+    conceptId: c-governance
+    body: >
+      Gouvernance = Azure Policy (deny/audit/append/deployIfNotExists, regroupées
+      en initiatives), verrous (CanNotDelete, ReadOnly — au-dessus de RBAC), tags
+      (clé/valeur, non hérités) et Cost Management/budgets pour la dépense.
