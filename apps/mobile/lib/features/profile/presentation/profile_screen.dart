@@ -1,126 +1,165 @@
+import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
 
-/// Profile — identity, lifetime stats, earned badges and preferences.
-/// The theme toggle is wired to [themeModeProvider]; the rest is sample data
-/// pending `userRepositoryProvider` in P1.
+/// Profile — identity, lifetime stats, earned badges and preferences. Identity
+/// and stats come from `meProvider` (real profile from the API); badges are
+/// derived from those stats. The theme toggle is wired to [themeModeProvider].
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final PrismColorScheme p = context.prism;
-    final TextTheme t = Theme.of(context).textTheme;
     final ThemeMode mode = ref.watch(themeModeProvider);
+    final AsyncValue<UserProfile> async = ref.watch(meProvider);
 
     return AuroraBackground(
       child: SafeArea(
         bottom: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-          children: <Widget>[
-            // Identity -------------------------------------------------------
-            PrismCard(
-              elevation: 2,
-              child: Row(
-                children: <Widget>[
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundColor: p.primarySoft,
-                    child: Text('JD',
-                        style:
-                            t.titleLarge?.copyWith(color: p.primary, fontWeight: FontWeight.w800)),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text('Jordan Doe', style: t.titleLarge),
-                        Text('@jordan • Niveau 7 · Architecte Junior',
-                            style: t.bodySmall?.copyWith(color: p.textSecondary)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Lifetime stats -------------------------------------------------
-            Row(
-              children: <Widget>[
-                _StatTile(
-                    label: 'XP total', value: '12 480', color: p.xpGold, icon: Icons.bolt_rounded),
-                const SizedBox(width: 12),
-                _StatTile(
-                    label: 'Série',
-                    value: '7 j',
-                    color: p.ember,
-                    icon: Icons.local_fire_department_rounded),
-                const SizedBox(width: 12),
-                _StatTile(
-                    label: 'Concepts',
-                    value: '143',
-                    color: p.success,
-                    icon: Icons.lightbulb_rounded),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            Text('Badges', style: t.titleLarge),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: <Widget>[
-                _Badge(
-                    icon: Icons.rocket_launch_rounded,
-                    label: 'Premier décollage',
-                    color: p.primary),
-                _Badge(icon: Icons.bolt_rounded, label: 'Semaine parfaite', color: p.xpGold),
-                _Badge(icon: Icons.shield_rounded, label: 'Gouvernance', color: p.info),
-                _Badge(
-                    icon: Icons.lock_rounded,
-                    label: 'À débloquer',
-                    color: p.textSecondary,
-                    locked: true),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            Text('Préférences', style: t.titleLarge),
-            const SizedBox(height: 12),
-            PrismCard(
-              child: Column(
-                children: <Widget>[
-                  _ThemeRow(
-                      mode: mode,
-                      onChanged: (ThemeMode m) => ref.read(themeModeProvider.notifier).state = m),
-                  Divider(color: p.border, height: 24),
-                  const _PrefRow(
-                      icon: Icons.notifications_rounded,
-                      label: 'Rappels quotidiens',
-                      trailing: 'Bientôt'),
-                  Divider(color: p.border, height: 24),
-                  const _PrefRow(
-                      icon: Icons.language_rounded, label: 'Langue', trailing: 'Français'),
-                ],
-              ),
-            ),
-          ],
+        child: async.when(
+          data: (UserProfile me) => _ProfileContent(
+            me: me,
+            mode: mode,
+            onMode: (ThemeMode m) => ref.read(themeModeProvider.notifier).state = m,
+          ),
+          loading: () => const _ProfileLoading(),
+          error: (Object error, StackTrace _) => PrismStatusView.error(
+            onRetry: () => ref.invalidate(meProvider),
+          ),
         ),
       ),
     );
   }
 }
 
+class _ProfileContent extends StatelessWidget {
+  const _ProfileContent({required this.me, required this.mode, required this.onMode});
+
+  final UserProfile me;
+  final ThemeMode mode;
+  final ValueChanged<ThemeMode> onMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    final TextTheme t = Theme.of(context).textTheme;
+    final List<_BadgeData> badges = <_BadgeData>[
+      _BadgeData(Icons.rocket_launch_rounded, 'Premier décollage', p.primary, me.xp > 0),
+      _BadgeData(Icons.local_fire_department_rounded, 'Série de 7 j', p.ember, me.streakDays >= 7),
+      _BadgeData(Icons.bolt_rounded, '1 000 XP', p.xpGold, me.xp >= 1000),
+      _BadgeData(Icons.diamond_rounded, 'Collectionneur', p.info, me.gems >= 100),
+    ];
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+      children: <Widget>[
+        // Identity -------------------------------------------------------
+        PrismCard(
+          elevation: 2,
+          child: Row(
+            children: <Widget>[
+              CircleAvatar(
+                radius: 32,
+                backgroundColor: p.primarySoft,
+                child: Text(
+                  _initials(me.displayName),
+                  style: t.titleLarge?.copyWith(color: p.primary, fontWeight: FontWeight.w800),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(me.displayName, style: t.titleLarge),
+                    Text(
+                      _subtitle(me),
+                      style: t.bodySmall?.copyWith(color: p.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Lifetime stats -------------------------------------------------
+        Row(
+          children: <Widget>[
+            _StatTile(
+              label: 'XP total',
+              value: '${me.xp}',
+              color: p.xpGold,
+              icon: Icons.bolt_rounded,
+            ),
+            const SizedBox(width: 12),
+            _StatTile(
+              label: 'Série',
+              value: '${me.streakDays} j',
+              color: p.ember,
+              icon: Icons.local_fire_department_rounded,
+            ),
+            const SizedBox(width: 12),
+            _StatTile(
+              label: 'Gemmes',
+              value: '${me.gems}',
+              color: p.info,
+              icon: Icons.diamond_rounded,
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        Text('Badges', style: t.titleLarge),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: <Widget>[
+            for (final _BadgeData b in badges)
+              _Badge(icon: b.icon, label: b.label, color: b.color, locked: !b.unlocked),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        Text('Préférences', style: t.titleLarge),
+        const SizedBox(height: 12),
+        PrismCard(
+          child: Column(
+            children: <Widget>[
+              _ThemeRow(mode: mode, onChanged: onMode),
+              Divider(color: p.border, height: 24),
+              const _PrefRow(
+                icon: Icons.notifications_rounded,
+                label: 'Rappels quotidiens',
+                trailing: 'Bientôt',
+              ),
+              Divider(color: p.border, height: 24),
+              const _PrefRow(
+                icon: Icons.language_rounded,
+                label: 'Langue',
+                trailing: 'Français',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _StatTile extends StatelessWidget {
-  const _StatTile(
-      {required this.label, required this.value, required this.color, required this.icon});
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.icon,
+  });
+
   final String label;
   final String value;
   final Color color;
@@ -149,7 +188,13 @@ class _StatTile extends StatelessWidget {
 }
 
 class _Badge extends StatelessWidget {
-  const _Badge({required this.icon, required this.label, required this.color, this.locked = false});
+  const _Badge({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.locked = false,
+  });
+
   final IconData icon;
   final String label;
   final Color color;
@@ -174,8 +219,11 @@ class _Badge extends StatelessWidget {
             child: Icon(icon, color: locked ? p.textSecondary : color, size: 28),
           ),
           const SizedBox(height: 6),
-          Text(label,
-              textAlign: TextAlign.center, style: t.labelSmall?.copyWith(color: p.textSecondary)),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: t.labelSmall?.copyWith(color: p.textSecondary),
+          ),
         ],
       ),
     );
@@ -184,6 +232,7 @@ class _Badge extends StatelessWidget {
 
 class _ThemeRow extends StatelessWidget {
   const _ThemeRow({required this.mode, required this.onChanged});
+
   final ThemeMode mode;
   final ValueChanged<ThemeMode> onChanged;
 
@@ -201,7 +250,9 @@ class _ThemeRow extends StatelessWidget {
           segments: const <ButtonSegment<ThemeMode>>[
             ButtonSegment<ThemeMode>(value: ThemeMode.light, icon: Icon(Icons.light_mode_rounded)),
             ButtonSegment<ThemeMode>(
-                value: ThemeMode.system, icon: Icon(Icons.brightness_auto_rounded)),
+              value: ThemeMode.system,
+              icon: Icon(Icons.brightness_auto_rounded),
+            ),
             ButtonSegment<ThemeMode>(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_rounded)),
           ],
           selected: <ThemeMode>{mode},
@@ -215,6 +266,7 @@ class _ThemeRow extends StatelessWidget {
 
 class _PrefRow extends StatelessWidget {
   const _PrefRow({required this.icon, required this.label, required this.trailing});
+
   final IconData icon;
   final String label;
   final String trailing;
@@ -232,4 +284,52 @@ class _PrefRow extends StatelessWidget {
       ],
     );
   }
+}
+
+class _ProfileLoading extends StatelessWidget {
+  const _ProfileLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+      children: const <Widget>[
+        PrismSkeleton(height: 88),
+        SizedBox(height: 16),
+        PrismSkeleton(height: 96),
+        SizedBox(height: 24),
+        PrismSkeleton(width: 120, height: 20),
+        SizedBox(height: 12),
+        PrismSkeleton(height: 90),
+      ],
+    );
+  }
+}
+
+class _BadgeData {
+  const _BadgeData(this.icon, this.label, this.color, this.unlocked);
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool unlocked;
+}
+
+String _subtitle(UserProfile me) {
+  final String level = 'Niveau ${me.level}';
+  if (me.handle.isEmpty) {
+    return level;
+  }
+  return '@${me.handle} • $level';
+}
+
+String _initials(String name) {
+  final List<String> parts =
+      name.trim().split(RegExp(r'\s+')).where((String s) => s.isNotEmpty).toList();
+  if (parts.isEmpty) {
+    return '?';
+  }
+  final String a = parts.first.substring(0, 1);
+  final String b = parts.length > 1 ? parts[1].substring(0, 1) : '';
+  return (a + b).toUpperCase();
 }

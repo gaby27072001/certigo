@@ -213,6 +213,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
         newXp: 1240 + xpEarned,
         levelUp: false,
         streakExtended: true,
+        gemsEarned: 0,
         achievementsUnlocked: const <String>[],
       ),
       weakConcepts: weak,

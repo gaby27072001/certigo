@@ -133,6 +133,7 @@ class QuizRewards {
     required this.newXp,
     required this.levelUp,
     required this.streakExtended,
+    required this.gemsEarned,
     required this.achievementsUnlocked,
   });
 
@@ -140,6 +141,9 @@ class QuizRewards {
   final int newXp;
   final bool levelUp;
   final bool streakExtended;
+
+  /// Gems credited for this attempt (perfect-score and streak bonuses).
+  final int gemsEarned;
   final List<String> achievementsUnlocked;
 
   factory QuizRewards.fromJson(Map<String, dynamic> json) => QuizRewards(
@@ -147,6 +151,7 @@ class QuizRewards {
         newXp: (json['newXp'] as num?)?.toInt() ?? 0,
         levelUp: json['levelUp'] as bool? ?? false,
         streakExtended: json['streakExtended'] as bool? ?? false,
+        gemsEarned: (json['gemsEarned'] as num?)?.toInt() ?? 0,
         achievementsUnlocked: (json['achievementsUnlocked'] as List<dynamic>? ?? <dynamic>[])
             .map((e) => e as String)
             .toList(),
