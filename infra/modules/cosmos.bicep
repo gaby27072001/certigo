@@ -46,6 +46,7 @@ var containers = [
   { name: 'attempts', pk: '/userId' }
   { name: 'events', pk: '/userId' }
   { name: 'leaderboard', pk: '/periodLeagueId' }
+  { name: 'economy', pk: '/userId' }
 ]
 
 resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [

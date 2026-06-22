@@ -61,6 +61,21 @@ public interface ILeaderboardRepository
     Task AddXpAsync(string userId, int xp, CancellationToken cancellationToken = default);
 }
 
+public interface IPurchaseRepository
+{
+    Task<PurchaseRecord?> GetByClientPurchaseIdAsync(string userId, string clientPurchaseId, CancellationToken cancellationToken = default);
+    Task CreateAsync(PurchaseRecord record, CancellationToken cancellationToken = default);
+}
+
+public sealed record PurchaseRecord(
+    string Id,
+    string UserId,
+    string ClientPurchaseId,
+    string ItemId,
+    int GemsSpent,
+    DateTimeOffset PurchasedAt,
+    PurchaseResultDto Result);
+
 public sealed record AttemptRecord(
     string Id,
     string UserId,

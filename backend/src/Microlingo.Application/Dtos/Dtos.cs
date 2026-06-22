@@ -102,6 +102,32 @@ public sealed record LeaderboardEntryDto(
     int Rank,
     int WeeklyXp);
 
+// --- Shop / economy --------------------------------------------------------
+
+public sealed record ShopItemDto(
+    string Id,
+    string Name,
+    string Description,
+    int PriceGems,
+    string Kind,
+    int Amount);
+
+public sealed record ShopCatalogDto(
+    int Gems,
+    IReadOnlyList<ShopItemDto> Items);
+
+public sealed record PurchaseRequest(
+    string ItemId,
+    string ClientPurchaseId);
+
+public sealed record PurchaseResultDto(
+    bool Success,
+    string ItemId,
+    int GemsSpent,
+    int GemsBalance,
+    int FreezeTokens,
+    string? Error);
+
 // --- Readiness -------------------------------------------------------------
 
 public sealed record ReadinessDto(string TrackId, int Score, int Trend7d, IReadOnlyList<DomainReadinessDto> Domains);

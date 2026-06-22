@@ -180,3 +180,29 @@ public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeader
 
     private sealed record LeaderboardEntryDocument(string Id, string PeriodLeagueId, string UserId, string DisplayName, string? AvatarUrl, int Xp);
 }
+
+public sealed class CosmosPurchaseRepository(CosmosContext context) : IPurchaseRepository
+{
+    public async Task<PurchaseRecord?> GetByClientPurchaseIdAsync(string userId, string clientPurchaseId, CancellationToken cancellationToken = default)
+    {
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.userId = @userId AND c.clientPurchaseId = @clientPurchaseId")
+            .WithParameter("@userId", userId)
+            .WithParameter("@clientPurchaseId", clientPurchaseId);
+        using var iterator = context.Economy.GetItemQueryIterator<PurchaseRecord>(query, requestOptions: new QueryRequestOptions
+        {
+            PartitionKey = new PartitionKey(userId),
+            MaxItemCount = 1
+        });
+
+        while (iterator.HasMoreResults)
+        {
+            var page = await iterator.ReadNextAsync(cancellationToken);
+            return page.FirstOrDefault();
+        }
+
+        return null;
+    }
+
+    public async Task CreateAsync(PurchaseRecord record, CancellationToken cancellationToken = default)
+        => await context.Economy.CreateItemAsync(record, new PartitionKey(record.UserId), cancellationToken: cancellationToken);
+}

@@ -132,3 +132,20 @@ internal sealed class InMemoryLeaderboardRepository : ILeaderboardRepository
         return Task.CompletedTask;
     }
 }
+
+internal sealed class InMemoryPurchaseRepository : IPurchaseRepository
+{
+    private readonly List<PurchaseRecord> _store = new();
+
+    public int CreateCount { get; private set; }
+
+    public Task<PurchaseRecord?> GetByClientPurchaseIdAsync(string userId, string clientPurchaseId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.FirstOrDefault(p => p.UserId == userId && p.ClientPurchaseId == clientPurchaseId));
+
+    public Task CreateAsync(PurchaseRecord record, CancellationToken cancellationToken = default)
+    {
+        _store.Add(record);
+        CreateCount++;
+        return Task.CompletedTask;
+    }
+}
