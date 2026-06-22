@@ -1,0 +1,69 @@
+id: sc900-l-compliance-management
+trackId: sc-900
+unitId: sc900-u-compliance
+domainId: compliance-solutions
+title: Gérer la conformité — score et confiance
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-compliance-management
+    body: >
+      « Sommes-nous conformes au RGPD ? » Une question vague tant qu'on n'a pas
+      de mesure. Microsoft propose un score concret et des preuves d'audit pour
+      transformer la conformité en feuille de route actionnable.
+
+  - type: concept
+    conceptId: c-compliance-management
+    title: Mesurer, prouver, s'améliorer
+    body: >
+      Le **Compliance Manager** (gestionnaire de conformité) évalue les risques
+      et calcule un **Compliance Score** (degré de conformité) à partir
+      d'**actions d'amélioration** (les vôtres) et des contrôles gérés par
+      Microsoft, mappés à des réglementations (RGPD, ISO 27001…).
+
+
+      Le **portail d'approbation de services** (Service Trust Portal) publie les
+      **rapports d'audit** indépendants, certifications et documents de
+      conformité de Microsoft — utiles pour vos propres audits.
+
+
+      Ces outils relèvent de la **responsabilité partagée** : Microsoft fournit
+      les preuves de sa part, vous réalisez et documentez vos actions
+      d'amélioration.
+
+  - type: example
+    conceptId: c-compliance-management
+    body: >
+      Avant un audit RGPD, l'équipe consulte le **Compliance Score** pour voir
+      les actions restantes (par ex. « activer le chiffrement »), puis télécharge
+      les **rapports** du Service Trust Portal comme preuves côté fournisseur.
+
+  - type: check
+    conceptId: c-compliance-management
+    check:
+      id: sc900-l-compliance-management-check-1
+      conceptId: c-compliance-management
+      type: mcq
+      difficulty: 2
+      stem: >
+        Quel outil fournit un score chiffré de conformité accompagné d'actions
+        d'amélioration recommandées, mappées à des réglementations comme le RGPD ?
+      options:
+        - { id: a, label: "Le Service Trust Portal" }
+        - { id: b, label: "Microsoft Sentinel" }
+        - { id: c, label: "L'accès conditionnel" }
+        - { id: d, label: "Le Compliance Manager" }
+      correct: [d]
+      explanation: >
+        Le Compliance Manager calcule le Compliance Score et propose des actions
+        d'amélioration mappées aux réglementations. Le Service Trust Portal
+        publie les rapports d'audit de Microsoft ; Sentinel est un SIEM ;
+        l'accès conditionnel concerne l'identité.
+
+  - type: recap
+    conceptId: c-compliance-management
+    body: >
+      Compliance Manager = score de conformité + actions d'amélioration mappées
+      aux réglementations. Service Trust Portal = rapports d'audit et
+      certifications de Microsoft. La conformité reste une responsabilité partagée.

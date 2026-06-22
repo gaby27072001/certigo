@@ -1,0 +1,70 @@
+id: sc900-l-purview
+trackId: sc-900
+unitId: sc900-u-compliance
+domainId: compliance-solutions
+title: Microsoft Purview — gouvernance et conformité
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-purview
+    body: >
+      On ne peut pas protéger ce qu'on ne connaît pas. Où sont les données
+      sensibles ? Qui y touche ? Sont-elles bien gérées ? Purview répond en
+      cartographiant et en gouvernant les données de toute l'organisation.
+
+  - type: concept
+    conceptId: c-purview
+    title: Connaître, protéger et gouverner les données
+    body: >
+      **Microsoft Purview** regroupe des solutions de **gouvernance, de risque
+      et de conformité** des données, à travers le cloud, le SaaS et
+      l'on-premises.
+
+
+      Il aide à **connaître** ses données (découverte, **classification**,
+      **catalogue de données**), à les **protéger** (étiquettes de
+      confidentialité, prévention de perte de données) et à **gouverner** leur
+      cycle de vie et leur conformité réglementaire.
+
+
+      Le **portail de conformité Microsoft Purview** centralise ces outils :
+      classification des données, gestion des risques internes, conformité des
+      communications, gestion du cycle de vie, e-discovery et audit.
+
+  - type: example
+    conceptId: c-purview
+    body: >
+      Purview analyse vos sites SharePoint, **classe** automatiquement les
+      documents contenant des numéros de carte bancaire, puis applique une
+      politique pour empêcher leur partage externe.
+
+  - type: check
+    conceptId: c-purview
+    check:
+      id: sc900-l-purview-check-1
+      conceptId: c-purview
+      type: mcq
+      difficulty: 1
+      stem: >
+        Quelle famille de solutions Microsoft sert à découvrir, classer,
+        protéger et gouverner les données pour répondre aux exigences de
+        conformité ?
+      options:
+        - { id: a, label: "Microsoft Sentinel" }
+        - { id: b, label: "Microsoft Defender for Cloud" }
+        - { id: c, label: "Microsoft Purview" }
+        - { id: d, label: "Microsoft Entra ID" }
+      correct: [c]
+      explanation: >
+        Microsoft Purview couvre la gouvernance, le risque et la conformité des
+        données : découverte, classification, protection et cycle de vie.
+        Sentinel est un SIEM/SOAR ; Defender for Cloud gère la posture des
+        ressources ; Entra ID gère l'identité.
+
+  - type: recap
+    conceptId: c-purview
+    body: >
+      Purview = gouvernance, risque et conformité des données. Connaître
+      (classification, catalogue), protéger (étiquettes, DLP), gouverner (cycle
+      de vie, e-discovery). Centralisé dans le portail de conformité Purview.

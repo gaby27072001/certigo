@@ -1,0 +1,72 @@
+id: sc900-l-information-protection
+trackId: sc-900
+unitId: sc900-u-compliance
+domainId: compliance-solutions
+title: Étiquettes de confidentialité et DLP
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-information-protection
+    body: >
+      Un document confidentiel finit toujours par voyager : copié, envoyé,
+      téléchargé. Et si la protection voyageait **avec lui** ? C'est l'idée des
+      étiquettes de confidentialité, complétées par des garde-fous contre les
+      fuites.
+
+  - type: concept
+    conceptId: c-information-protection
+    title: Classer, protéger, empêcher la fuite
+    body: >
+      Les **étiquettes de confidentialité** (sensitivity labels) **classent**
+      un contenu (Public, Général, Confidentiel…) et appliquent une
+      **protection qui le suit** : chiffrement, marquage (filigrane, en-tête),
+      restrictions d'accès — même si le fichier quitte l'organisation.
+
+
+      La **prévention de perte de données** (**DLP**) définit des **politiques**
+      qui détectent et **bloquent** le partage non autorisé d'informations
+      sensibles (numéros de carte, de sécurité sociale…) dans les e-mails, Teams
+      ou SharePoint.
+
+
+      La **gestion du cycle de vie des données** automatise **rétention** et
+      **suppression** selon des règles, pour ne garder les données que le temps
+      nécessaire.
+
+  - type: example
+    conceptId: c-information-protection
+    body: >
+      Un fichier étiqueté « Confidentiel » est chiffré et marqué. Quand un
+      employé tente de l'envoyer à une adresse externe, une **politique DLP**
+      bloque l'envoi et affiche une justification.
+
+  - type: check
+    conceptId: c-information-protection
+    check:
+      id: sc900-l-information-protection-check-1
+      conceptId: c-information-protection
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous voulez qu'un document reste chiffré et à accès restreint même après
+        avoir été téléchargé hors de l'organisation. Quelle capacité Purview
+        utilisez-vous ?
+      options:
+        - { id: a, label: "Les étiquettes de confidentialité" }
+        - { id: b, label: "Le Secure Score" }
+        - { id: c, label: "Les connecteurs de données Sentinel" }
+        - { id: d, label: "L'accès conditionnel" }
+      correct: [a]
+      explanation: >
+        Les étiquettes de confidentialité attachent une protection persistante
+        (chiffrement, restrictions, marquage) qui suit le fichier où qu'il
+        aille. Le Secure Score mesure une posture ; les connecteurs alimentent
+        un SIEM ; l'accès conditionnel concerne l'identité.
+
+  - type: recap
+    conceptId: c-information-protection
+    body: >
+      Étiquettes de confidentialité = classification + protection persistante
+      (chiffrement, marquage). DLP = politiques qui bloquent les fuites de
+      données sensibles. Le cycle de vie automatise rétention et suppression.
