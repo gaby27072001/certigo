@@ -14,6 +14,9 @@ param env string
 @description('Primary Azure region for all resources.')
 param location string = 'westeurope'
 
+@description('Region for Cosmos DB. Empty = same as location. Override when the primary region lacks Cosmos capacity (e.g. AZ-capacity blocks in West Europe).')
+param cosmosLocation string = ''
+
 @description('Base name used to derive resource names. Lowercase, no spaces.')
 param appName string = 'microlingo'
 
@@ -41,6 +44,9 @@ var authMode = env == 'dev' ? 'dev' : ''
 // Subscription-scoped MCSB policy needs Owner-level rights; skip it in dev so a
 // Contributor can run the dev smoke-test deploy without friction.
 var assignPolicy = forcePolicyAssignment || env != 'dev'
+// Cosmos may live in a different region than the rest when the primary region
+// is capacity-constrained for Cosmos (cross-region Functions->Cosmos is fine).
+var cosmosRegion = empty(cosmosLocation) ? location : cosmosLocation
 var tags = {
   product: 'Microlingo'
   env: env
@@ -68,7 +74,7 @@ module data 'modules/cosmos.bicep' = {
   name: 'cosmos'
   params: {
     accountName: 'cosmos-${appName}-${env}-${suffix}'
-    location: location
+    location: cosmosRegion
     databaseName: 'microlingo'
     tags: tags
   }
