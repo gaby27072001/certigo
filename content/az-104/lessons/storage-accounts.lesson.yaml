@@ -1,0 +1,73 @@
+id: az104-l-storage-accounts
+trackId: az-104
+unitId: az104-u-storage
+domainId: storage
+title: Comptes de stockage — redondance et niveaux
+estMinutes: 8
+
+blocks:
+  - type: hook
+    conceptId: c-storage-accounts
+    body: >
+      Le **compte de stockage** est le conteneur de premier niveau de presque
+      toutes les données Azure : blobs, fichiers, files d'attente, tables. Deux
+      décisions structurantes à sa création : **où mes données sont-elles
+      répliquées** (redondance) et **combien je paie selon la fréquence d'accès**
+      (niveau).
+
+  - type: concept
+    conceptId: c-storage-accounts
+    title: Redondance et niveaux d'accès
+    body: >
+      La **redondance** décide du nombre et de l'emplacement des copies :
+      **LRS** (3 copies dans un datacenter), **ZRS** (3 copies réparties sur des
+      zones de disponibilité d'une région), **GRS** (LRS + réplication
+      asynchrone vers une région secondaire), **GZRS** (ZRS + secondaire). Les
+      variantes **RA-** (read-access) rendent le secondaire lisible.
+
+
+      Les **niveaux d'accès** des blobs optimisent le coût : **Chaud** (accès
+      fréquent, stockage cher, accès bon marché), **Froid**/**Cold** (peu
+      fréquent), **Archive** (rare, stockage très bon marché mais
+      réhydratation longue avant lecture). On choisit aussi une **performance**
+      Standard (HDD) ou Premium (SSD), et le type de compte recommandé est
+      **StorageV2** (general-purpose v2).
+
+  - type: example
+    conceptId: c-storage-accounts
+    body: >
+      Vous archivez des journaux réglementaires consultés une fois par an mais à
+      conserver dix ans. Le niveau **Archive** réduit drastiquement le coût de
+      stockage. Pour survivre à la perte d'une région entière, vous choisissez
+      **GRS** : une copie asynchrone existe dans la région secondaire.
+
+  - type: check
+    conceptId: c-storage-accounts
+    check:
+      id: az104-l-storage-accounts-check-1
+      conceptId: c-storage-accounts
+      type: mcq
+      difficulty: 3
+      stem: >
+        Vous devez survivre à la défaillance complète d'une région Azure pour des
+        données rarement consultées mais conservées des années au moindre coût.
+        Quelle combinaison ?
+      options:
+        - { id: a, label: "Redondance LRS, niveau Chaud" }
+        - { id: b, label: "Redondance ZRS, niveau Chaud" }
+        - { id: c, label: "Redondance LRS, niveau Froid" }
+        - { id: d, label: "Redondance GRS, niveau Archive" }
+      correct: [d]
+      explanation: >
+        Survivre à la perte d'une **région** impose une redondance
+        **géo-redondante** (GRS ou GZRS) — LRS et ZRS restent dans une seule
+        région. Pour des données rares conservées longtemps au coût minimal, le
+        niveau **Archive** est le bon choix. D'où GRS + Archive.
+
+  - type: recap
+    conceptId: c-storage-accounts
+    body: >
+      Compte de stockage StorageV2. Redondance : LRS/ZRS (intra-région) vs
+      GRS/GZRS (géo). Niveaux blob : Chaud, Froid/Cold, Archive (du plus
+      accessible au moins cher au stockage). On arbitre durabilité, latence et
+      coût.

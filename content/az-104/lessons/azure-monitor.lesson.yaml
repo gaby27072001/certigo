@@ -1,0 +1,77 @@
+id: az104-l-azure-monitor
+trackId: az-104
+unitId: az104-u-monitor
+domainId: monitor
+title: Supervision avec Azure Monitor
+estMinutes: 8
+
+blocks:
+  - type: hook
+    conceptId: c-monitor
+    body: >
+      « Ça marche » ne suffit pas : un administrateur doit **savoir** quand,
+      pourquoi et avant les utilisateurs. Azure Monitor est le système nerveux qui
+      collecte signaux, déclenche des alertes et permet d'enquêter.
+
+  - type: concept
+    conceptId: c-monitor
+    title: Métriques, logs, alertes
+    body: >
+      Azure Monitor distingue deux familles de données : les **métriques** (séries
+      temporelles numériques, quasi temps réel — CPU, IOPS) et les **logs**
+      (événements structurés interrogeables). Les logs sont stockés dans un
+      **espace de travail Log Analytics** et interrogés en **KQL** (Kusto Query
+      Language).
+
+
+      Pour activer la collecte au-delà des métriques de base, on configure les
+      **paramètres de diagnostic** (diagnostic settings) d'une ressource vers
+      Log Analytics, un compte de stockage ou Event Hubs.
+
+
+      Les **alertes** se déclenchent sur une métrique ou une requête de log et
+      notifient/agissent via un **groupe d'actions** (e-mail, SMS, webhook,
+      Function, runbook). Côté applicatif, **Application Insights** trace
+      performances et erreurs ; côté réseau, **Network Watcher** (journaux de flux
+      NSG, moniteur de connexion) ; et le **journal d'activité** retrace les
+      opérations de gestion (qui a fait quoi).
+
+  - type: example
+    conceptId: c-monitor
+    body: >
+      Vous voulez être prévenu si une VM dépasse 80 % de CPU pendant 15 minutes.
+      Vous créez une **alerte de métrique** sur `Percentage CPU` avec ce seuil,
+      reliée à un **groupe d'actions** qui envoie un e-mail à l'équipe. L'incident
+      est connu avant que les utilisateurs ne se plaignent.
+
+  - type: check
+    conceptId: c-monitor
+    check:
+      id: az104-l-azure-monitor-check-1
+      conceptId: c-monitor
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous devez interroger des logs collectés de plusieurs ressources avec un
+        langage de requête, depuis un emplacement central. Quel composant d'Azure
+        Monitor ?
+      options:
+        - { id: a, label: "Une alerte de métrique" }
+        - { id: b, label: "Un groupe d'actions" }
+        - { id: c, label: "Un espace de travail Log Analytics, interrogé en KQL" }
+        - { id: d, label: "Le journal d'activité, qui ne stocke que les métriques" }
+      correct: [c]
+      explanation: >
+        Les logs sont centralisés dans un **espace de travail Log Analytics** et
+        interrogés en **KQL** — exactement le besoin. Une alerte de métrique
+        réagit à un seuil ; un groupe d'actions exécute les notifications ; et le
+        journal d'activité enregistre des opérations de gestion (pas « seulement
+        des métriques »).
+
+  - type: recap
+    conceptId: c-monitor
+    body: >
+      Azure Monitor : métriques (temps réel) vs logs (Log Analytics + KQL).
+      Diagnostic settings pour collecter, alertes + groupes d'actions pour réagir.
+      Application Insights (apps), Network Watcher (réseau), journal d'activité
+      (qui a fait quoi).

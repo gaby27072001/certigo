@@ -1,0 +1,74 @@
+id: az104-l-virtual-machines
+trackId: az-104
+unitId: az104-u-compute
+domainId: compute
+title: Machines virtuelles — tailles et disques
+estMinutes: 8
+
+blocks:
+  - type: hook
+    conceptId: c-vm
+    body: >
+      La machine virtuelle reste le cheval de bataille du cloud : un serveur
+      complet, à vous, en quelques minutes. L'administrateur doit faire deux choix
+      qui pèsent sur la performance et la facture : la **taille** (le matériel) et
+      les **disques** (le stockage).
+
+  - type: concept
+    conceptId: c-vm
+    title: Séries de tailles et disques managés
+    body: >
+      Les **tailles** sont regroupées en séries selon l'usage : **B** (économique,
+      à crédits de CPU), **D** (usage général), **E** (mémoire élevée), **F**
+      (calcul intensif), **N** (GPU). On peut **redimensionner** une VM (souvent
+      avec un redémarrage).
+
+
+      Chaque VM a un **disque OS** et, en option, des **disques de données**, tous
+      en **disques managés** (Azure gère le stockage sous-jacent). Types :
+      **Standard HDD**, **Standard SSD**, **Premium SSD** (production exigeante) et
+      **Ultra Disk** (latence et débit extrêmes). Le **disque temporaire**
+      (temp/`D:`) n'est PAS persistant — il est perdu à la désallocation.
+
+
+      À l'approvisionnement, on définit aussi l'image, le réseau, et les options de
+      disponibilité ; des **extensions** (p. ex. Custom Script) et **cloud-init**
+      automatisent la configuration au démarrage.
+
+  - type: example
+    conceptId: c-vm
+    body: >
+      Une base de données transactionnelle sature en E/S sur des disques Standard.
+      Vous migrez ses disques de données vers **Premium SSD** : débit et latence
+      garantis. Vous laissez le disque OS tel quel, mais ne stockez jamais de
+      données sur le disque temporaire, qui disparaîtrait à la première
+      désallocation.
+
+  - type: check
+    conceptId: c-vm
+    check:
+      id: az104-l-virtual-machines-check-1
+      conceptId: c-vm
+      type: mcq
+      difficulty: 2
+      stem: >
+        Sur quelle affirmation concernant le disque temporaire (temporary disk)
+        d'une VM Azure peut-on compter ?
+      options:
+        - { id: a, label: "Il est répliqué en géo-redondance par défaut" }
+        - { id: b, label: "Son contenu peut être perdu lors d'une désallocation de la VM" }
+        - { id: c, label: "Il est idéal pour stocker une base de données de production" }
+        - { id: d, label: "Il est chiffré uniquement avec Ultra Disk" }
+      correct: [b]
+      explanation: >
+        Le **disque temporaire** offre un stockage rapide mais **non persistant** :
+        son contenu peut disparaître lors d'une désallocation ou d'une maintenance.
+        Il ne convient donc pas aux données durables (base de production) ; il
+        n'est ni géo-répliqué ni lié au chiffrement d'Ultra Disk.
+
+  - type: recap
+    conceptId: c-vm
+    body: >
+      VM = taille (séries B/D/E/F/N, redimensionnable) + disques managés OS et
+      données (Standard HDD/SSD, Premium SSD, Ultra). Le disque temporaire n'est
+      pas persistant. Extensions et cloud-init automatisent la configuration.

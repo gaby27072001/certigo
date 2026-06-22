@@ -1,0 +1,73 @@
+id: az104-l-entra-users-groups
+trackId: az-104
+unitId: az104-u-identity
+domainId: identity-governance
+title: Utilisateurs et groupes Entra ID
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-entra-users
+    body: >
+      Avant de donner accès à quoi que ce soit dans Azure, il faut une
+      **identité**. Microsoft Entra ID (ex-Azure AD) est l'annuaire qui répond à
+      une seule question, des milliers de fois par jour : **qui es-tu ?** Bien
+      gérer les utilisateurs et les groupes, c'est la base de tout le reste.
+
+  - type: concept
+    conceptId: c-entra-users
+    title: Membres, invités et types de groupes
+    body: >
+      Un utilisateur est soit **membre** (interne à votre organisation) soit
+      **invité** (guest, un compte externe collaborant via B2B). On peut créer
+      les comptes un par un, en **bulk** (import CSV), ou les synchroniser depuis
+      un Active Directory local via **Entra Connect**.
+
+
+      Côté regroupement, deux types de groupes : **Sécurité** (pour accorder des
+      accès à des ressources) et **Microsoft 365** (pour collaborer : boîte
+      partagée, SharePoint). L'appartenance est soit **affectée** (assigned, on
+      ajoute les membres à la main) soit **dynamique** (dynamic, une règle sur
+      les attributs — p. ex. `department eq "Finance"` — peuple le groupe
+      automatiquement).
+
+  - type: example
+    conceptId: c-entra-users
+    body: >
+      Vous voulez que tous les nouveaux arrivants du service Ventes aient
+      automatiquement accès à l'app CRM. Plutôt que d'ajouter chaque personne à
+      la main, vous créez un **groupe de sécurité dynamique** avec la règle
+      `department eq "Sales"`. Dès qu'un compte porte cet attribut, il rejoint le
+      groupe — et hérite des accès — sans intervention.
+
+  - type: check
+    conceptId: c-entra-users
+    check:
+      id: az104-l-entra-users-groups-check-1
+      conceptId: c-entra-users
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous devez accorder un accès qui se met à jour tout seul quand l'attribut
+        « department » d'un utilisateur change, sans gestion manuelle des
+        membres. Que créez-vous ?
+      options:
+        - { id: a, label: "Un groupe de sécurité à appartenance dynamique" }
+        - { id: b, label: "Un groupe de sécurité à appartenance affectée" }
+        - { id: c, label: "Un groupe Microsoft 365 affecté" }
+        - { id: d, label: "Un compte invité (guest) par utilisateur" }
+      correct: [a]
+      explanation: >
+        Une règle d'appartenance **dynamique** évalue les attributs (ici
+        department) et ajoute/retire les membres automatiquement. Un groupe
+        affecté exigerait une gestion manuelle ; un groupe Microsoft 365 sert à
+        la collaboration, pas prioritairement à l'octroi d'accès ; les invités
+        concernent la collaboration externe.
+
+  - type: recap
+    conceptId: c-entra-users
+    body: >
+      Entra ID = l'annuaire d'identités. Utilisateurs membres ou invités, créés
+      un par un, en bulk ou synchronisés. Groupes Sécurité (accès) vs Microsoft
+      365 (collaboration), à appartenance affectée ou dynamique (règle sur
+      attributs).

@@ -1,0 +1,77 @@
+id: az104-l-blob-files
+trackId: az-104
+unitId: az104-u-storage
+domainId: storage
+title: Blobs, fichiers et accès délégué (SAS)
+estMinutes: 8
+
+blocks:
+  - type: hook
+    conceptId: c-blob-files
+    body: >
+      Dans un compte de stockage, deux services dominent l'administration au
+      quotidien : **Blob** (objets non structurés — images, sauvegardes, logs) et
+      **Files** (partages de fichiers réseau). Et une question revient sans cesse :
+      comment donner un accès **temporaire et limité** sans partager la clé maître ?
+
+  - type: concept
+    conceptId: c-blob-files
+    title: Conteneurs, partages et signatures d'accès
+    body: >
+      Les **blobs** vivent dans des **conteneurs**. Trois types : **bloc** (le
+      plus courant), **ajout** (append, pour les logs) et **page** (disques). La
+      **gestion du cycle de vie** déplace ou supprime automatiquement les blobs
+      selon leur âge (p. ex. vers Archive après 90 jours).
+
+
+      **Azure Files** expose des partages **SMB**/**NFS** montables comme un
+      lecteur réseau, et **Azure File Sync** synchronise un serveur de fichiers
+      local avec le cloud.
+
+
+      Pour l'accès, trois options : les **clés d'accès** (deux clés maîtresses,
+      tout pouvoir — à éviter de diffuser), les **SAS** (Shared Access Signature :
+      un jeton avec permissions, plage horaire et portée limitées) et
+      **Microsoft Entra** (RBAC sur les données). Une **SAS de délégation
+      utilisateur**, signée par Entra plutôt que par la clé de compte, est la plus
+      sûre.
+
+  - type: example
+    conceptId: c-blob-files
+    body: >
+      Un partenaire doit téléverser des fichiers dans un conteneur pendant 48 h,
+      et seulement là. Vous générez une **SAS** en lecture/écriture, limitée à ce
+      conteneur et expirant dans deux jours. Aucune clé de compte n'est partagée ;
+      à l'expiration, l'accès disparaît de lui-même.
+
+  - type: check
+    conceptId: c-blob-files
+    check:
+      id: az104-l-blob-files-check-1
+      conceptId: c-blob-files
+      type: mcq
+      difficulty: 2
+      stem: >
+        Un fournisseur externe a besoin d'un accès en écriture à UN conteneur
+        blob, pour 7 jours seulement, sans jamais détenir d'accès permanent.
+        Qu'utilisez-vous ?
+      options:
+        - { id: a, label: "Une signature d'accès partagé (SAS) limitée en portée et dans le temps" }
+        - { id: b, label: "La clé d'accès primaire du compte de stockage" }
+        - { id: c, label: "Le rôle Propriétaire sur l'abonnement" }
+        - { id: d, label: "Un partage Azure Files public" }
+      correct: [a]
+      explanation: >
+        Une **SAS** accorde exactement les permissions voulues, sur une portée
+        (ce conteneur) et une fenêtre temporelle (7 jours) précises, puis expire.
+        Partager une **clé de compte** donnerait un accès total et permanent ; le
+        rôle Propriétaire est démesuré ; un partage public exposerait les données
+        à tous.
+
+  - type: recap
+    conceptId: c-blob-files
+    body: >
+      Blob (conteneurs ; types bloc/ajout/page ; cycle de vie) et Files
+      (SMB/NFS, File Sync). Accès : clés de compte (tout, permanent), SAS
+      (délégué, limité, expirant — préférer la SAS de délégation utilisateur),
+      ou RBAC Entra sur les données.
