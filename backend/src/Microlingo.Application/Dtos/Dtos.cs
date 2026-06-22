@@ -5,34 +5,18 @@ namespace Microlingo.Application.Dtos;
 public sealed record UserProfileDto(
     string Id,
     string DisplayName,
+    string Handle,
+    string? AvatarUrl,
     int Xp,
     int Level,
     int StreakDays,
     int FreezeTokens,
     int DailyGoalXp,
-    int DailyXpEarned);
-
-public sealed record LessonDto(
-    string Id,
-    string TrackId,
-    string UnitId,
-    string DomainId,
-    int Order,
-    string Title,
-    int EstMinutes,
-    IReadOnlyList<LessonBlock> Blocks,
-    IReadOnlyList<QuizItemDto> Items);
-
-public sealed record QuizItemDto(
-    string Id,
-    string TrackId,
-    string ConceptId,
-    string DomainId,
-    ItemType ItemType,
-    string Bloom,
-    double Difficulty,
-    string Stem,
-    IReadOnlyList<Option> Options);
+    int DailyXpEarned,
+    int Gems,
+    string? ActiveTrackId,
+    DateOnly? LastActiveDate = null,
+    DateOnly? DailyXpDate = null);
 
 public sealed record SubmitQuizRequest(
     string ClientAttemptId,
@@ -67,13 +51,58 @@ public sealed record RewardsDto(
     int NewXp,
     bool LevelUp,
     bool StreakExtended,
+    int GemsEarned,
     List<string> AchievementsUnlocked);
 
-public sealed record PathDto(string TrackId, string Title, int ReadinessScore, IReadOnlyList<string> RecommendedConceptIds);
+// --- Path (skill-path) -----------------------------------------------------
 
-public sealed record LeagueDto(string PeriodLeagueId, string Name, IReadOnlyList<LeaderboardEntryDto> Entries);
+public sealed record PathDto(
+    string TrackId,
+    string TrackName,
+    string Exam,
+    int ReadinessScore,
+    int ReadinessTrend7d,
+    IReadOnlyList<PathUnitDto> Units,
+    IReadOnlyList<DomainProgressDto> Domains);
 
-public sealed record LeaderboardEntryDto(string UserId, string DisplayName, int Xp, int Rank);
+public sealed record PathUnitDto(
+    string Id,
+    string Title,
+    string DomainId,
+    string Status,
+    IReadOnlyList<PathLessonDto> Lessons);
+
+public sealed record PathLessonDto(
+    string Id,
+    string Title,
+    string Status,
+    int EstMinutes,
+    int MasteryPct);
+
+public sealed record DomainProgressDto(
+    string Id,
+    string Name,
+    double Weight,
+    int Score);
+
+// --- League / leaderboard --------------------------------------------------
+
+public sealed record LeagueDto(
+    string PeriodLeagueId,
+    string Tier,
+    DateTimeOffset EndsAt,
+    int PromoteCount,
+    string MeUserId,
+    IReadOnlyList<LeaderboardEntryDto> Entries);
+
+public sealed record LeaderboardEntryDto(
+    string UserId,
+    string DisplayName,
+    string? AvatarUrl,
+    int Rank,
+    int WeeklyXp);
+
+// --- Readiness -------------------------------------------------------------
 
 public sealed record ReadinessDto(string TrackId, int Score, int Trend7d, IReadOnlyList<DomainReadinessDto> Domains);
 

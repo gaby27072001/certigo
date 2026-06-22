@@ -14,9 +14,13 @@ public static class ReadinessCalculator
         IReadOnlyDictionary<string, int> conceptCountsByDomain,
         IEnumerable<ConceptMastery> masteries,
         DateTimeOffset now,
-        int trend7d = 0)
+        int trend7d = 0,
+        IReadOnlyDictionary<string, string>? conceptDomains = null)
     {
-        var masteryByDomain = masteries.GroupBy(m => DomainFromConcept(m.ConceptId))
+        var masteryByDomain = masteries.GroupBy(m =>
+                conceptDomains is not null && conceptDomains.TryGetValue(m.ConceptId, out var mapped)
+                    ? mapped
+                    : DomainFromConcept(m.ConceptId))
             .ToDictionary(g => g.Key, g => g.ToArray());
 
         var domains = domainWeights.Select(domain =>

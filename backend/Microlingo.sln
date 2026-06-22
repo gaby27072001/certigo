@@ -1,4 +1,4 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
@@ -11,6 +11,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microlingo.Api", "src\Microlingo.Api\Microlingo.Api.csproj", "{B090EA79-52C2-4244-B321-4E2F6B0164D9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microlingo.Domain.Tests", "tests\Microlingo.Domain.Tests\Microlingo.Domain.Tests.csproj", "{36ADAB8F-0F68-4883-B126-26D2FB124CD9}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{32CE068C-2935-420A-A014-F5AE16FBD02C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microlingo.Application.Tests", "tests\Microlingo.Application.Tests\Microlingo.Application.Tests.csproj", "{58DC80B5-0034-41F6-98DC-29BA723E67B3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -38,5 +42,12 @@ Global
 		{36ADAB8F-0F68-4883-B126-26D2FB124CD9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{36ADAB8F-0F68-4883-B126-26D2FB124CD9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{36ADAB8F-0F68-4883-B126-26D2FB124CD9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{58DC80B5-0034-41F6-98DC-29BA723E67B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58DC80B5-0034-41F6-98DC-29BA723E67B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{58DC80B5-0034-41F6-98DC-29BA723E67B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{58DC80B5-0034-41F6-98DC-29BA723E67B3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{58DC80B5-0034-41F6-98DC-29BA723E67B3} = {32CE068C-2935-420A-A014-F5AE16FBD02C}
 	EndGlobalSection
 EndGlobal

@@ -20,15 +20,14 @@ public sealed class CosmosUserRepository(CosmosContext context) : IUserRepositor
 
 public sealed class CosmosContentRepository(CosmosContext context) : IContentRepository
 {
+    public Task<Track?> GetTrackAsync(string trackId, CancellationToken cancellationToken = default)
+        => context.Content.ReadOrDefaultAsync<Track>(trackId, new PartitionKey(trackId), cancellationToken);
+
     public Task<Lesson?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default)
         => context.Content.ReadOrDefaultAsync<Lesson>(lessonId, new PartitionKey(trackId), cancellationToken);
 
-    public async Task<IReadOnlyList<QuizItem>> GetItemsAsync(string trackId, IReadOnlyList<string> ids, CancellationToken cancellationToken = default)
-    {
-        var reads = ids.Select(id => context.Content.ReadOrDefaultAsync<QuizItem>(id, new PartitionKey(trackId), cancellationToken));
-        var items = await Task.WhenAll(reads);
-        return items.Where(i => i is not null).Cast<QuizItem>().ToArray();
-    }
+    public Task<LessonAnswerKey?> GetAnswerKeyAsync(string trackId, string lessonId, CancellationToken cancellationToken = default)
+        => context.Content.ReadOrDefaultAsync<LessonAnswerKey>($"answerkey::{lessonId}", new PartitionKey(trackId), cancellationToken);
 }
 
 public sealed class CosmosProgressRepository(CosmosContext context) : IProgressRepository
@@ -40,6 +39,31 @@ public sealed class CosmosProgressRepository(CosmosContext context) : IProgressR
             new PartitionKey(userId),
             cancellationToken);
         return doc?.Mastery;
+    }
+
+    public async Task<IReadOnlyList<ConceptMastery>> ListMasteriesAsync(string userId, string trackId, CancellationToken cancellationToken = default)
+    {
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.userId = @userId AND c.trackId = @trackId")
+            .WithParameter("@userId", userId)
+            .WithParameter("@trackId", trackId);
+        using var iterator = context.Progress.GetItemQueryIterator<ConceptMasteryDocument>(query, requestOptions: new QueryRequestOptions
+        {
+            PartitionKey = new PartitionKey(userId)
+        });
+
+        var masteries = new List<ConceptMastery>();
+        while (iterator.HasMoreResults)
+        {
+            foreach (var doc in await iterator.ReadNextAsync(cancellationToken))
+            {
+                if (doc.Mastery is not null)
+                {
+                    masteries.Add(doc.Mastery);
+                }
+            }
+        }
+
+        return masteries;
     }
 
     public async Task UpsertMasteryBatchAsync(string userId, IReadOnlyList<ConceptMastery> masteries, CancellationToken cancellationToken = default)
@@ -101,9 +125,13 @@ public sealed class CosmosEventRepository(CosmosContext context) : IEventReposit
 
 public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeaderboardRepository
 {
+    private const string Tier = "bronze";
+    private const int PromoteCount = 10;
+
     public async Task<LeagueDto> GetLeagueAsync(string userId, CancellationToken cancellationToken = default)
     {
-        var periodLeagueId = $"weekly:{DateOnly.FromDateTime(DateTime.UtcNow):yyyyMMdd}:bronze";
+        var weekStart = WeekStart(DateTime.UtcNow);
+        var periodLeagueId = PeriodLeagueId(weekStart);
         var query = new QueryDefinition("SELECT TOP 50 * FROM c WHERE c.periodLeagueId = @periodLeagueId ORDER BY c.xp DESC")
             .WithParameter("@periodLeagueId", periodLeagueId);
         using var iterator = context.Leaderboard.GetItemQueryIterator<LeaderboardEntryDocument>(query, requestOptions: new QueryRequestOptions
@@ -116,21 +144,39 @@ public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeader
         {
             foreach (var entry in await iterator.ReadNextAsync(cancellationToken))
             {
-                entries.Add(new LeaderboardEntryDto(entry.UserId, entry.DisplayName, entry.Xp, rank++));
+                entries.Add(new LeaderboardEntryDto(entry.UserId, entry.DisplayName, entry.AvatarUrl, rank++, entry.Xp));
             }
         }
 
-        return new LeagueDto(periodLeagueId, "Bronze", entries);
+        var endsAt = new DateTimeOffset(weekStart.AddDays(7), TimeSpan.Zero);
+        return new LeagueDto(periodLeagueId, Tier, endsAt, PromoteCount, userId, entries);
     }
 
     public async Task AddXpAsync(string userId, int xp, CancellationToken cancellationToken = default)
     {
-        var periodLeagueId = $"weekly:{DateOnly.FromDateTime(DateTime.UtcNow):yyyyMMdd}:bronze";
+        var periodLeagueId = PeriodLeagueId(WeekStart(DateTime.UtcNow));
         var id = $"{periodLeagueId}:{userId}";
+        var profile = await context.Users.ReadOrDefaultAsync<UserProfileDto>(userId, new PartitionKey(userId), cancellationToken);
+        var displayName = profile?.DisplayName ?? userId;
+        var avatarUrl = profile?.AvatarUrl;
         var existing = await context.Leaderboard.ReadOrDefaultAsync<LeaderboardEntryDocument>(id, new PartitionKey(periodLeagueId), cancellationToken);
-        var updated = (existing ?? new LeaderboardEntryDocument(id, periodLeagueId, userId, userId, 0)) with { Xp = (existing?.Xp ?? 0) + xp };
+        var updated = (existing ?? new LeaderboardEntryDocument(id, periodLeagueId, userId, displayName, avatarUrl, 0)) with
+        {
+            DisplayName = displayName,
+            AvatarUrl = avatarUrl,
+            Xp = (existing?.Xp ?? 0) + xp
+        };
         await context.Leaderboard.UpsertItemAsync(updated, new PartitionKey(periodLeagueId), cancellationToken: cancellationToken);
     }
 
-    private sealed record LeaderboardEntryDocument(string Id, string PeriodLeagueId, string UserId, string DisplayName, int Xp);
+    private static DateTime WeekStart(DateTime utcNow)
+    {
+        var date = utcNow.Date;
+        var offset = ((int)date.DayOfWeek + 6) % 7; // Monday = 0
+        return date.AddDays(-offset);
+    }
+
+    private static string PeriodLeagueId(DateTime weekStart) => $"weekly:{weekStart:yyyyMMdd}:{Tier}";
+
+    private sealed record LeaderboardEntryDocument(string Id, string PeriodLeagueId, string UserId, string DisplayName, string? AvatarUrl, int Xp);
 }
