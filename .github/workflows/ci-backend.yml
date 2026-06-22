@@ -2,6 +2,7 @@ name: ci-backend
 
 # .NET 8 Azure Functions API: restore, build (warnings as errors) and test.
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
     paths: [ "backend/**", ".github/workflows/ci-backend.yml" ]
