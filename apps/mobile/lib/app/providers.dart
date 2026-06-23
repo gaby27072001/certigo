@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core/core.dart';
@@ -46,8 +48,37 @@ final lessonRepositoryProvider = Provider<LessonRepository>(
   (Ref ref) => RemoteLessonRepository(ref.watch(apiClientProvider)),
 );
 
+/// Persistent queue of idempotent offline actions.
+///
+/// Defaults to an in-memory store so widget tests need no platform channels;
+/// [bootstrap] overrides it with a SharedPreferences-backed store so a queued
+/// submission survives an app restart on iOS and Android.
+final syncStoreProvider = Provider<SyncQueueStore>(
+  (Ref ref) => InMemorySyncQueueStore(),
+);
+
+/// The offline-first sync engine. Replays queued submissions through the API
+/// with idempotent keys, exponential backoff and dead-lettering. A single
+/// long-lived instance per app session, flushed on reconnect/resume/startup by
+/// `OfflineSyncScope`.
+final syncEngineProvider = Provider<SyncEngine>((Ref ref) {
+  final SyncEngine engine = SyncEngine(
+    store: ref.watch(syncStoreProvider),
+    sender: apiSyncSender(ref.watch(apiClientProvider)),
+  );
+  ref.onDispose(() => unawaited(engine.dispose()));
+  return engine;
+});
+
+/// Quiz submissions go through an offline decorator: an attempt that fails on a
+/// transient error (offline, 5xx, 429) is enqueued and replayed later, keyed by
+/// its `clientAttemptId`, so a finished lesson is never lost. Permanent
+/// failures pass straight through to the caller unchanged.
 final quizRepositoryProvider = Provider<QuizRepository>(
-  (Ref ref) => RemoteQuizRepository(ref.watch(apiClientProvider)),
+  (Ref ref) => OfflineQuizRepository(
+    RemoteQuizRepository(ref.watch(apiClientProvider)),
+    ref.watch(syncEngineProvider),
+  ),
 );
 
 final leaderboardRepositoryProvider = Provider<LeaderboardRepository>(

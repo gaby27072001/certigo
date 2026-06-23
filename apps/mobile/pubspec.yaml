@@ -36,6 +36,10 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   font_awesome_flutter: 10.7.0 # épinglé : 10.8+ exige Flutter 3.27 (Color.withValues) ; SDK CI = 3.24
 
+  # Offline-first persistence & connectivity (iOS + Android)
+  shared_preferences: ^2.3.0
+  connectivity_plus: ^6.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
