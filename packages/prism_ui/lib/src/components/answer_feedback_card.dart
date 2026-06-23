@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
 import 'prism_card.dart';
+import 'prism_rich_text.dart';
 
 /// Post-answer explanatory feedback — the heart of "learning, not testing".
 ///
@@ -52,7 +53,7 @@ class AnswerFeedbackCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(explanation, style: t.bodyMedium?.copyWith(height: 1.5)),
+          PrismRichText(explanation, style: t.bodyMedium?.copyWith(height: 1.5)),
         ],
       ),
     );

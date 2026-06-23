@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
 import 'prism_card.dart';
+import 'prism_rich_text.dart';
 
 /// A "Scenario" / applied-example block — grounds an abstract concept in a
 /// realistic Microsoft/Azure situation.
@@ -36,7 +37,7 @@ class ScenarioBlock extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Text(body, style: t.bodyLarge?.copyWith(height: 1.55)),
+          PrismRichText(body, style: t.bodyLarge?.copyWith(height: 1.55)),
         ],
       ),
     );

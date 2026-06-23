@@ -2,6 +2,7 @@ import 'package:core/core.dart';
 import '../api/api_client.dart';
 import '../models/user_profile.dart';
 import '../models/learning_path.dart';
+import '../models/track_summary.dart';
 import '../models/lesson.dart';
 import '../models/quiz.dart';
 import '../models/leaderboard.dart';
@@ -28,6 +29,19 @@ class RemotePathRepository implements PathRepository {
   @override
   Future<Result<LearningPath>> getPath(String trackId) =>
       _api.getJson('/me/paths/$trackId', LearningPath.fromJson);
+}
+
+class RemoteCatalogRepository implements CatalogRepository {
+  const RemoteCatalogRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<List<TrackSummary>>> getCatalog() => _api.getJson(
+        '/catalog/tracks',
+        (Map<String, dynamic> json) => (json['tracks'] as List<dynamic>? ?? <dynamic>[])
+            .map((dynamic e) => TrackSummary.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
 }
 
 class RemoteLessonRepository implements LessonRepository {

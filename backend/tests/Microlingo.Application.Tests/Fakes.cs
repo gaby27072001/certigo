@@ -65,6 +65,12 @@ internal sealed class InMemoryContentRepository : IContentRepository
             .ToArray();
         return Task.FromResult(result);
     }
+
+    public Task<IReadOnlyList<Track>> ListTracksAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<Track> result = _tracks.Values.ToArray();
+        return Task.FromResult(result);
+    }
 }
 
 internal sealed class InMemoryProgressRepository : IProgressRepository

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
 import 'prism_card.dart';
+import 'prism_rich_text.dart';
 
 /// The semantic intent of a [CalloutBlock].
 enum CalloutKind { info, warning, success }
@@ -47,7 +48,7 @@ class CalloutBlock extends StatelessWidget {
                   Text(title!, style: t.labelLarge?.copyWith(color: color)),
                   const SizedBox(height: 4),
                 ],
-                Text(text, style: t.bodyMedium?.copyWith(height: 1.45)),
+                PrismRichText(text, style: t.bodyMedium?.copyWith(height: 1.45)),
               ],
             ),
           ),

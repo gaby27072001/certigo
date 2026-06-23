@@ -9,6 +9,7 @@ import '../features/quiz/presentation/quiz_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/leaderboard/presentation/leaderboard_screen.dart';
 import 'app_shell.dart';
+import 'providers.dart';
 
 /// Centralized, named route table. Using constants avoids stringly-typed
 /// navigation scattered across the codebase.
@@ -47,7 +48,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
               GoRoute(
                 path: Routes.path,
                 name: 'path',
-                builder: (_, __) => const PathScreen(trackId: 'az-900'),
+                builder: (_, __) => const _ActivePathScreen(),
               ),
             ],
           ),
@@ -103,3 +104,17 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
     ],
   );
 });
+
+/// Hosts the Path screen for whichever certification the learner has selected
+/// in the course picker, so switching tracks re-points the primary tab without
+/// touching the route table. The Path screen itself stays trackId-driven (and
+/// directly constructible in tests).
+class _ActivePathScreen extends ConsumerWidget {
+  const _ActivePathScreen();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final String trackId = ref.watch(activeTrackProvider);
+    return PathScreen(trackId: trackId);
+  }
+}

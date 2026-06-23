@@ -192,7 +192,7 @@ class _FeedbackCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(item.explanation, style: t.bodyLarge?.copyWith(height: 1.5)),
+          PrismRichText(item.explanation, style: t.bodyLarge?.copyWith(height: 1.5)),
         ],
       ),
     );
