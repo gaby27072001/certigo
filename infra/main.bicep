@@ -14,6 +14,9 @@ param env string
 @description('Primary Azure region for all resources.')
 param location string = 'westeurope'
 
+@description('Region for Cosmos DB. Empty = same as location. Override when the primary region lacks Cosmos capacity (e.g. AZ-capacity blocks in West Europe).')
+param cosmosLocation string = ''
+
 @description('Base name used to derive resource names. Lowercase, no spaces.')
 param appName string = 'microlingo'
 
@@ -23,9 +26,27 @@ param authIssuer string
 @description('Entra External ID application (audience) client id the API validates.')
 param authAudience string
 
+@description('Optional email notified on security alerts (401/403/5xx spikes). Empty = no receiver.')
+param alertEmail string = ''
+
+@description('Enable paid Microsoft Defender for Cloud plans (per-resource cost). Default false — only free CSPM stays on.')
+param enableDefenderPlans bool = false
+
+@description('Force-assign the subscription-scoped MCSB policy even in dev (needs Owner / role-assignment rights at subscription scope). Default false; staging/prod assign it automatically.')
+param forcePolicyAssignment bool = false
+
 // Deterministic, collision-resistant suffix per environment/subscription.
 var suffix = uniqueString(subscription().id, appName, env)
 var rgName = 'rg-${appName}-${env}'
+// Dev token bypass is allowed ONLY in the dev environment; staging/prod enforce
+// Entra token validation.
+var authMode = env == 'dev' ? 'dev' : ''
+// Subscription-scoped MCSB policy needs Owner-level rights; skip it in dev so a
+// Contributor can run the dev smoke-test deploy without friction.
+var assignPolicy = forcePolicyAssignment || env != 'dev'
+// Cosmos may live in a different region than the rest when the primary region
+// is capacity-constrained for Cosmos (cross-region Functions->Cosmos is fine).
+var cosmosRegion = empty(cosmosLocation) ? location : cosmosLocation
 var tags = {
   product: 'Microlingo'
   env: env
@@ -53,7 +74,7 @@ module data 'modules/cosmos.bicep' = {
   name: 'cosmos'
   params: {
     accountName: 'cosmos-${appName}-${env}-${suffix}'
-    location: location
+    location: cosmosRegion
     databaseName: 'microlingo'
     tags: tags
   }
@@ -87,12 +108,46 @@ module api 'modules/functionApp.bicep' = {
     functionAppName: 'func-${appName}-${env}-${suffix}'
     location: location
     storageAccountName: storage.outputs.accountName
+    deploymentContainerName: storage.outputs.deploymentContainerName
     appInsightsConnectionString: monitoring.outputs.connectionString
     cosmosEndpoint: data.outputs.endpoint
+    cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
+    authMode: authMode
     authIssuer: authIssuer
     authAudience: authAudience
     tags: tags
+  }
+}
+
+// Security observability: diagnostics -> Log Analytics + 401/403/5xx alerts.
+module diagnostics 'modules/diagnostics.bicep' = {
+  scope: rg
+  name: 'diagnostics'
+  params: {
+    functionAppName: api.outputs.functionAppName
+    cosmosAccountName: data.outputs.accountName
+    keyVaultName: vault.outputs.name
+    workspaceId: monitoring.outputs.workspaceId
+    alertEmail: alertEmail
+    tags: tags
+  }
+}
+
+// Microsoft Defender for Cloud (subscription scope). Free CSPM stays on; paid
+// plans are gated behind enableDefenderPlans (default false).
+module defender 'modules/defender.bicep' = {
+  name: 'defender'
+  params: {
+    enablePaidPlans: enableDefenderPlans
+  }
+}
+
+// Continuous compliance: MCSB initiative in audit-only mode (subscription scope).
+module policy 'modules/policy.bicep' = if (assignPolicy) {
+  name: 'policy'
+  params: {
+    assignmentLocation: location
   }
 }
 

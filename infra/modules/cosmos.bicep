@@ -23,6 +23,9 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
       {
         locationName: location
         failoverPriority: 0
+        // Dev: no Availability-Zone redundancy (avoids AZ-capacity blocks and
+        // is unnecessary for a single-region serverless dev account).
+        isZoneRedundant: false
       }
     ]
     disableLocalAuth: false

@@ -1,0 +1,35 @@
+# Dependabot — automated dependency & GitHub Actions updates.
+# Keeps NuGet (backend), pub (Flutter/Dart) and workflow actions patched, which
+# is the first line of defence for supply-chain CVEs. Grouped to limit PR noise.
+version: 2
+updates:
+  # .NET 8 backend (Azure Functions API + domain/application/infrastructure).
+  - package-ecosystem: "nuget"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      backend-dependencies:
+        patterns: [ "*" ]
+        update-types: [ "minor", "patch" ]
+
+  # Flutter app + shared Dart packages.
+  - package-ecosystem: "pub"
+    directories:
+      - "/apps/mobile"
+      - "/packages/*"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      dart-dependencies:
+        patterns: [ "*" ]
+        update-types: [ "minor", "patch" ]
+
+  # The CI workflows themselves (pin/refresh action versions).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
