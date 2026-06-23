@@ -79,7 +79,7 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     brightness: Brightness.dark,
     primary: PrismColors.primary,
     primaryDark: PrismColors.primaryDark,
-    primarySoft: Color(0xFF1E2C52),
+    primarySoft: Color(0xFF0E2C45),
     ember: PrismColors.ember,
     xpGold: PrismColors.xpGold,
     success: PrismColors.success,

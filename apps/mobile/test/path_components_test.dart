@@ -88,7 +88,7 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(host(const MascotAvatar(mascot: AuroraMascot.nimbus)));
 
-      expect(find.bySemanticsLabel('Nimbus, guide du cloud'), findsOneWidget);
+      expect(find.bySemanticsLabel('Nimbus, la mascotte Azure'), findsOneWidget);
       expect(find.byIcon(Icons.cloud_rounded), findsOneWidget);
       handle.dispose();
     });

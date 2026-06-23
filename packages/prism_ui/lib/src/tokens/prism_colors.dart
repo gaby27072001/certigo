@@ -11,10 +11,16 @@ class PrismColors {
   const PrismColors._();
 
   // ---- Brand -------------------------------------------------------------
-  /// Primary "Prism Blue" — focus, trust, the spine of the brand.
-  static const Color primary = Color(0xFF3B6AF0);
-  static const Color primaryDark = Color(0xFF2B50C4);
-  static const Color primarySoft = Color(0xFFE5ECFF);
+  /// Primary "Azure Blue" — the signature brand color of Microlingo. This is
+  /// Microsoft's official Azure/Fluent blue (`themePrimary`), chosen so the app
+  /// instantly *reads* as Azure — the way Duolingo's green signals Duolingo.
+  static const Color primary = Color(0xFF0078D4);
+
+  /// Pressed / gradient-bottom variant (Fluent `themeDark`).
+  static const Color primaryDark = Color(0xFF005A9E);
+
+  /// Soft tint for fills, selection and chips (Fluent `themeLighter`).
+  static const Color primarySoft = Color(0xFFDEECF9);
 
   /// Ember — energy, streaks, "you're on fire" moments.
   static const Color ember = Color(0xFFFF7A45);
@@ -60,7 +66,7 @@ class PrismColors {
   /// Stable, color-blind-aware accents used to tag exam domains and mastery
   /// rings. Ordered; content maps domain index -> accent deterministically.
   static const List<Color> domainAccents = <Color>[
-    Color(0xFF3B6AF0), // blue
+    Color(0xFF0078D4), // Azure blue (brand)
     Color(0xFF1FB87A), // green
     Color(0xFFFF7A45), // ember
     Color(0xFF8C5CF6), // violet

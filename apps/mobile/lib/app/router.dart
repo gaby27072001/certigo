@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:prism_ui/prism_ui.dart';
 
 import '../features/home/presentation/home_screen.dart';
 import '../features/path/presentation/path_screen.dart';
@@ -11,7 +12,17 @@ import '../features/leaderboard/presentation/leaderboard_screen.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/application/auth_state.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
-import '../features/auth/presentation/splash_screen.dart';
+import '../features/auth/presentation/splash_screen.dart' as auth;
+import '../features/onboarding/application/onboarding_controller.dart';
+import '../features/onboarding/presentation/goal_screen.dart';
+import '../features/onboarding/presentation/login_screen.dart';
+import '../features/onboarding/presentation/onboarding_common.dart';
+import '../features/onboarding/presentation/promise_screen.dart';
+import '../features/onboarding/presentation/reasons_screen.dart';
+import '../features/onboarding/presentation/routine_screen.dart';
+import '../features/onboarding/presentation/splash_screen.dart' as onboarding;
+import '../features/onboarding/presentation/start_choice_screen.dart';
+import '../features/onboarding/presentation/welcome_screen.dart';
 import 'app_shell.dart';
 import 'providers.dart';
 
@@ -35,15 +46,49 @@ abstract class Routes {
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
-/// The app router. Exposed as a provider so the auth/redirect guard can watch
-/// session state and steer the learner between the splash, sign-in and the
-/// in-app shell without rebuilding the widget tree manually.
+CustomTransitionPage<void> _stepPage({
+  required GoRouterState state,
+  required Widget child,
+  Offset begin = const Offset(0.06, 0),
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: PrismMotion.base,
+    reverseTransitionDuration: PrismMotion.fast,
+    transitionsBuilder: (
+      BuildContext context,
+      Animation<double> animation,
+      Animation<double> secondaryAnimation,
+      Widget child,
+    ) {
+      final CurvedAnimation curved = CurvedAnimation(
+        parent: animation,
+        curve: PrismMotion.decelerate,
+        reverseCurve: PrismMotion.standard,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+/// The app router. Exposed as a provider so auth/session/onboarding guards can
+/// react to state changes without rebuilding the app shell manually.
 final routerProvider = Provider<GoRouter>((Ref ref) {
-  // Bridge auth-state changes into a [Listenable] so GoRouter re-runs its
-  // redirect guard the instant a session is restored / the user signs in or out.
-  final ValueNotifier<int> refresh = ValueNotifier<int>(0);
-  ref.listen<AuthState>(authControllerProvider, (_, __) => refresh.value++);
-  ref.onDispose(refresh.dispose);
+  // Bridge auth-state changes into a [Listenable] so GoRouter re-runs redirects
+  // as soon as session restore / sign-in / sign-out happens.
+  final ValueNotifier<int> authRefresh = ValueNotifier<int>(0);
+  ref.listen<AuthState>(authControllerProvider, (_, __) => authRefresh.value++);
+  ref.onDispose(authRefresh.dispose);
+
+  final OnboardingController onboardingCtrl = ref.read(onboardingControllerProvider);
+  final Listenable refresh = Listenable.merge(<Listenable>[authRefresh, onboardingCtrl]);
 
   return GoRouter(
     navigatorKey: _rootKey,
@@ -52,21 +97,28 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
     redirect: (BuildContext context, GoRouterState state) {
       final AuthState auth = ref.read(authControllerProvider);
       final String loc = state.matchedLocation;
-      final bool atSplash = loc == Routes.splash;
+      final bool atAuthSplash = loc == Routes.splash;
       final bool atAuth = loc == Routes.auth;
+      final bool atOnboarding = OnboardingRoutes.isStartup(loc);
 
-      // Restoring a saved session: hold on the splash until we know.
+      // Restoring session: stay on auth splash.
       if (auth is AuthLoading) {
-        return atSplash ? null : Routes.splash;
+        return atAuthSplash ? null : Routes.splash;
       }
-      // No (valid) session: force the sign-in screen.
+      // Not authenticated: force sign-in.
       if (auth is Unauthenticated) {
         return atAuth ? null : Routes.auth;
       }
-      // Signed in: never strand the learner on splash/auth.
-      if (atSplash || atAuth) {
-        return Routes.path;
+      // Authenticated: never remain on auth surfaces.
+      if (atAuthSplash || atAuth) {
+        return onboardingCtrl.completed ? Routes.path : OnboardingRoutes.splash;
       }
+      // Authenticated but onboarding not completed: force startup flow.
+      if (!onboardingCtrl.completed) {
+        return atOnboarding ? null : OnboardingRoutes.splash;
+      }
+      // Completed onboarding: startup screens should not be reachable.
+      if (atOnboarding) return Routes.path;
       return null;
     },
     routes: <RouteBase>[
@@ -75,13 +127,68 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         path: Routes.splash,
         name: 'splash',
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const SplashScreen(),
+        builder: (_, __) => const auth.SplashScreen(),
       ),
       GoRoute(
         path: Routes.auth,
         name: 'auth',
         parentNavigatorKey: _rootKey,
         builder: (_, __) => const SignInScreen(),
+      ),
+
+      // Onboarding startup flow (full-screen, above the shell).
+      GoRoute(
+        path: OnboardingRoutes.splash,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) => _stepPage(
+          state: state,
+          child: const onboarding.SplashScreen(),
+          begin: const Offset(0, 0.03),
+        ),
+      ),
+      GoRoute(
+        path: OnboardingRoutes.welcome,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const WelcomeScreen()),
+      ),
+      GoRoute(
+        path: OnboardingRoutes.start,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const StartChoiceScreen()),
+      ),
+      GoRoute(
+        path: OnboardingRoutes.reasons,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const ReasonsScreen()),
+      ),
+      GoRoute(
+        path: OnboardingRoutes.goal,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) => _stepPage(state: state, child: const GoalScreen()),
+      ),
+      GoRoute(
+        path: OnboardingRoutes.routine,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const RoutineScreen()),
+      ),
+      GoRoute(
+        path: OnboardingRoutes.promise,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const PromiseScreen()),
+      ),
+      GoRoute(
+        path: OnboardingRoutes.login,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) => _stepPage(
+          state: state,
+          child: const LoginScreen(),
+          begin: const Offset(0.03, 0),
+        ),
       ),
       // Bottom-nav shell: persistent state per tab via StatefulShellRoute.
       StatefulShellRoute.indexedStack(
@@ -136,18 +243,26 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         path: '${Routes.lesson}/:trackId/:lessonId',
         name: 'lesson',
         parentNavigatorKey: _rootKey,
-        builder: (BuildContext context, GoRouterState state) => LessonScreen(
-          trackId: state.pathParameters['trackId']!,
-          lessonId: state.pathParameters['lessonId']!,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: LessonScreen(
+            trackId: state.pathParameters['trackId']!,
+            lessonId: state.pathParameters['lessonId']!,
+          ),
         ),
       ),
       GoRoute(
         path: '${Routes.quiz}/:trackId/:lessonId',
         name: 'quiz',
         parentNavigatorKey: _rootKey,
-        builder: (BuildContext context, GoRouterState state) => QuizScreen(
-          trackId: state.pathParameters['trackId']!,
-          lessonId: state.pathParameters['lessonId']!,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: QuizScreen(
+            trackId: state.pathParameters['trackId']!,
+            lessonId: state.pathParameters['lessonId']!,
+          ),
         ),
       ),
     ],

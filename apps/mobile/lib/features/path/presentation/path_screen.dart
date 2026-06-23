@@ -25,17 +25,45 @@ class PathScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<LearningPath> async = ref.watch(pathProvider(trackId));
+    // Resource row reads the shared profile; resilient by design — if the
+    // profile is loading or unavailable, the row simply hides (never blocks the
+    // path, and keeps widget tests that only stub the path provider green).
+    final UserProfile? me = ref.watch(meProvider).asData?.value;
 
     return AuroraBackground(
       child: SafeArea(
         bottom: false,
         child: async.when(
-          data: (LearningPath path) => _PathContent(path: path, trackId: trackId),
+          data: (LearningPath path) => _PathContent(path: path, trackId: trackId, me: me),
           loading: () => const _PathLoading(),
           error: (Object error, StackTrace _) => PrismStatusView.error(
             onRetry: () => ref.invalidate(pathProvider(trackId)),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Compact, scrollaway top resource row for the path — streak / gems / XP, the
+/// Duolingo-style "your economy at a glance" header.
+class _PathResourceBar extends StatelessWidget {
+  const _PathResourceBar({required this.me});
+
+  final UserProfile me;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      child: Row(
+        children: <Widget>[
+          StreakBadge(days: me.streakDays, active: me.dailyProgress >= 1),
+          const SizedBox(width: 8),
+          GemCounter(gems: me.gems),
+          const Spacer(),
+          XpChip(xp: me.xp),
+        ],
       ),
     );
   }
@@ -52,10 +80,11 @@ const List<AuroraMascot> _guardians = <AuroraMascot>[
 ];
 
 class _PathContent extends StatelessWidget {
-  const _PathContent({required this.path, required this.trackId});
+  const _PathContent({required this.path, required this.trackId, this.me});
 
   final LearningPath path;
   final String trackId;
+  final UserProfile? me;
 
   /// Accent for [unit], keyed on its exam domain (falls back to its position).
   Color _accentFor(PrismColorScheme p, PathUnit unit, int unitIndex) {
@@ -107,6 +136,7 @@ class _PathContent extends StatelessWidget {
 
     int running = 0; // continuous sine phase across units for one flowing trail
     final List<Widget> slivers = <Widget>[
+      if (me != null) SliverToBoxAdapter(child: _PathResourceBar(me: me!)),
       SliverPersistentHeader(
         pinned: true,
         delegate: _PathBannerDelegate(
@@ -435,11 +465,24 @@ class _ContinueCtaDelegate extends SliverPersistentHeaderDelegate {
       color: p.background,
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
       alignment: Alignment.center,
-      child: PrismButton(
-        label: label,
-        icon: Icons.play_arrow_rounded,
-        tone: accent,
-        onPressed: onTap,
+      child: AnimatedSwitcher(
+        duration: PrismMotion.fast,
+        reverseDuration: PrismMotion.instant,
+        switchInCurve: PrismMotion.spring,
+        switchOutCurve: PrismMotion.standard,
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(scale: animation, child: child),
+          );
+        },
+        child: PrismButton(
+          key: ValueKey<String>('cta-$label-${accent.value}'),
+          label: label,
+          icon: Icons.play_arrow_rounded,
+          tone: accent,
+          onPressed: onTap,
+        ),
       ),
     );
   }
