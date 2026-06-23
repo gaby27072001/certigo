@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microlingo.Application.Abstractions;
 using Microlingo.Application.Dtos;
 using Microlingo.Application.Services;
 using Microlingo.Domain.Content;
@@ -135,5 +136,67 @@ public sealed class QuizServiceTests
         profile.LifetimePerfectLessons.Should().Be(5);
         profile.LifetimeLessonsCompleted.Should().Be(1);
         profile.Gems.Should().Be(26); // 6 lesson gems + 20 achievement reward
+    }
+
+    [Fact]
+    public async Task SubmitAsync_recovers_the_reward_when_the_profile_write_conflicts_once()
+    {
+        // A concurrent non-quiz writer (e.g. a shop purchase) bumps the profile
+        // between our read and our write, so the first upsert conflicts. The
+        // optimistic-concurrency retry must re-read and re-apply, crediting the
+        // reward exactly once — never lost, never doubled.
+        var inner = new InMemoryUserRepository();
+        inner.Seed(TestContent.NewProfile("user-1"));
+        var users = new ConflictOnceUserRepository(inner);
+        var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
+        var attempts = new InMemoryAttemptRepository();
+        var leaderboard = new InMemoryLeaderboardRepository();
+        var service = new QuizService(
+            new FakeUserContext("user-1", "Tester"),
+            clock,
+            TestContent.Build(),
+            new InMemoryProgressRepository(),
+            attempts,
+            new InMemoryEventRepository(),
+            users,
+            leaderboard,
+            new InMemoryLearnerModelRepository());
+
+        var result = await service.SubmitAsync(
+            "l1",
+            QuizServiceHarness.Request("a1", QuizServiceHarness.Answer("l1-i1", "a")));
+
+        users.UpsertCalls.Should().BeGreaterThanOrEqualTo(2); // conflicted once, then re-applied
+        var profile = await inner.GetAsync("user-1");
+        profile!.Xp.Should().Be(result.Rewards.XpEarned); // recovered, not lost
+        profile.Gems.Should().Be(6); // applied exactly once, not doubled
+        leaderboard.Xp["user-1"].Should().Be(result.Rewards.XpEarned);
+    }
+}
+
+/// Wraps the in-memory user repo to throw a single optimistic-concurrency conflict
+/// on the first write, simulating a competing writer. Subsequent writes delegate.
+internal sealed class ConflictOnceUserRepository(InMemoryUserRepository inner) : IUserRepository
+{
+    private bool _thrown;
+
+    public int UpsertCalls { get; private set; }
+
+    public Task<UserProfileDto?> GetAsync(string userId, CancellationToken cancellationToken = default)
+        => inner.GetAsync(userId, cancellationToken);
+
+    public Task<UserProfileDto?> FindByHandleAsync(string handle, CancellationToken cancellationToken = default)
+        => inner.FindByHandleAsync(handle, cancellationToken);
+
+    public Task<UserProfileDto> UpsertAsync(UserProfileDto profile, CancellationToken cancellationToken = default)
+    {
+        UpsertCalls++;
+        if (!_thrown)
+        {
+            _thrown = true;
+            throw new ConcurrencyConflictException("simulated concurrent write");
+        }
+
+        return inner.UpsertAsync(profile, cancellationToken);
     }
 }

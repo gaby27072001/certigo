@@ -6,6 +6,9 @@ param location string
 param databaseName string
 param tags object = {}
 
+@description('Disable Cosmos key-based (local) auth — RBAC/Entra only. Recommended for staging/prod; the API and seed use managed identity.')
+param disableLocalAuth bool = false
+
 resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   name: accountName
   location: location
@@ -28,7 +31,7 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
         isZoneRedundant: false
       }
     ]
-    disableLocalAuth: false
+    disableLocalAuth: disableLocalAuth
     minimalTlsVersion: 'Tls12'
   }
 }

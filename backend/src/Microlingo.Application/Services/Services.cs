@@ -178,77 +178,143 @@ public sealed class QuizService(
                 Math.Round(after.MasteryScore - before.MasteryScore, 4)));
         }
 
-        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
-            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
-
-        var scorePct = itemResults.Count == 0 ? 0 : (int)Math.Round(100d * correctCount / itemResults.Count);
-        var perfect = itemResults.Count > 0 && correctCount == itemResults.Count;
-        var gemsEarned = correctCount + (perfect ? 5 : 0);
-
-        var today = DateOnly.FromDateTime(now.UtcDateTime);
-        var sameDay = profile.DailyXpDate == today;
-        var newDailyXp = (sameDay ? profile.DailyXpEarned : 0) + xpEarned;
-        var goalMet = profile.DailyGoalXp > 0 && newDailyXp >= profile.DailyGoalXp;
-
-        // Monthly accumulators feed the season challenge. They roll over at the
-        // month boundary exactly like the daily counters roll over at midnight.
-        var monthAnchor = new DateOnly(today.Year, today.Month, 1);
-        var sameMonth = profile.MonthlyAnchor == monthAnchor;
-
-        var stats = new GamificationStats(
-            profile.Xp,
-            profile.Level,
-            profile.StreakDays,
-            profile.LastActiveDate ?? DateOnly.MinValue,
-            profile.FreezeTokens,
-            profile.DailyGoalXp,
-            sameDay ? profile.DailyXpEarned : 0);
-        var newStats = StreakService.UpdateStreak(stats, today, goalMet);
-        var streakExtended = goalMet && profile.LastActiveDate != today;
-
-        var newXp = profile.Xp + xpEarned;
-        var newLevel = XpEngine.LevelFromXp(newXp);
-
-        // Lifetime counters and post-quiz stats feed the achievement evaluation.
-        // Achievement gems are added on top of quiz gems but kept out of
-        // RewardsDto.GemsEarned (which reports only what the lesson itself paid).
-        var lifetimeLessons = profile.LifetimeLessonsCompleted + 1;
-        var lifetimePerfect = profile.LifetimePerfectLessons + (perfect ? 1 : 0);
-        var newStreakDays = goalMet ? newStats.StreakDays : profile.StreakDays;
-        var gemsBeforeAchievements = profile.Gems + gemsEarned;
-
-        var snapshot = new AchievementSnapshot(newStreakDays, newXp, newLevel, lifetimeLessons, lifetimePerfect, gemsBeforeAchievements);
-        var alreadyUnlocked = profile.Achievements ?? new List<string>();
-        var newlyUnlocked = AchievementEngine.NewlyUnlocked(snapshot, alreadyUnlocked);
-        var achievementGems = newlyUnlocked.Sum(t => t.RewardGems);
-        var unlockedIds = newlyUnlocked.Select(t => t.Id).ToList();
-        var allAchievements = newlyUnlocked.Count == 0
-            ? profile.Achievements
-            : alreadyUnlocked.Concat(unlockedIds).ToList();
-
-        var updatedProfile = profile with
+        // Profile-dependent outcome computed as a pure function of a profile
+        // snapshot, so it can be re-applied verbatim onto a fresher snapshot if a
+        // concurrent writer bumps the profile between our read and our write.
+        (UserProfileDto Updated, SubmitQuizResult Result, List<string> UnlockedIds) ComputeOutcome(UserProfileDto profile)
         {
-            Xp = newXp,
-            Level = newLevel,
-            StreakDays = goalMet ? newStats.StreakDays : profile.StreakDays,
-            FreezeTokens = goalMet ? newStats.FreezeTokens : profile.FreezeTokens,
-            LastActiveDate = goalMet ? newStats.LastActiveDate : profile.LastActiveDate,
-            DailyXpEarned = newDailyXp,
-            DailyXpDate = today,
-            DailyLessonsCompleted = (sameDay ? profile.DailyLessonsCompleted : 0) + 1,
-            DailyCorrectAnswers = (sameDay ? profile.DailyCorrectAnswers : 0) + correctCount,
-            DailyPerfectLessons = (sameDay ? profile.DailyPerfectLessons : 0) + (perfect ? 1 : 0),
-            DailyQuestClaims = sameDay ? profile.DailyQuestClaims : null,
-            LifetimeLessonsCompleted = lifetimeLessons,
-            LifetimePerfectLessons = lifetimePerfect,
-            Achievements = allAchievements,
-            Gems = gemsBeforeAchievements + achievementGems,
-            MonthlyAnchor = monthAnchor,
-            MonthlyXpEarned = (sameMonth ? profile.MonthlyXpEarned : 0) + xpEarned,
-            MonthlyLessonsCompleted = (sameMonth ? profile.MonthlyLessonsCompleted : 0) + 1,
-            MonthlyPerfectLessons = (sameMonth ? profile.MonthlyPerfectLessons : 0) + (perfect ? 1 : 0)
-        };
-        await users.UpsertAsync(updatedProfile, cancellationToken);
+            var scorePct = itemResults.Count == 0 ? 0 : (int)Math.Round(100d * correctCount / itemResults.Count);
+            var perfect = itemResults.Count > 0 && correctCount == itemResults.Count;
+            var gemsEarned = correctCount + (perfect ? 5 : 0);
+
+            var today = DateOnly.FromDateTime(now.UtcDateTime);
+            var sameDay = profile.DailyXpDate == today;
+            var newDailyXp = (sameDay ? profile.DailyXpEarned : 0) + xpEarned;
+            var goalMet = profile.DailyGoalXp > 0 && newDailyXp >= profile.DailyGoalXp;
+
+            // Monthly accumulators feed the season challenge. They roll over at the
+            // month boundary exactly like the daily counters roll over at midnight.
+            var monthAnchor = new DateOnly(today.Year, today.Month, 1);
+            var sameMonth = profile.MonthlyAnchor == monthAnchor;
+
+            var stats = new GamificationStats(
+                profile.Xp,
+                profile.Level,
+                profile.StreakDays,
+                profile.LastActiveDate ?? DateOnly.MinValue,
+                profile.FreezeTokens,
+                profile.DailyGoalXp,
+                sameDay ? profile.DailyXpEarned : 0);
+            var newStats = StreakService.UpdateStreak(stats, today, goalMet);
+            var streakExtended = goalMet && profile.LastActiveDate != today;
+
+            var newXp = profile.Xp + xpEarned;
+            var newLevel = XpEngine.LevelFromXp(newXp);
+
+            // Lifetime counters and post-quiz stats feed the achievement evaluation.
+            // Achievement gems are added on top of quiz gems but kept out of
+            // RewardsDto.GemsEarned (which reports only what the lesson itself paid).
+            var lifetimeLessons = profile.LifetimeLessonsCompleted + 1;
+            var lifetimePerfect = profile.LifetimePerfectLessons + (perfect ? 1 : 0);
+            var newStreakDays = goalMet ? newStats.StreakDays : profile.StreakDays;
+            var gemsBeforeAchievements = profile.Gems + gemsEarned;
+
+            var snapshot = new AchievementSnapshot(newStreakDays, newXp, newLevel, lifetimeLessons, lifetimePerfect, gemsBeforeAchievements);
+            var alreadyUnlocked = profile.Achievements ?? new List<string>();
+            var newlyUnlocked = AchievementEngine.NewlyUnlocked(snapshot, alreadyUnlocked);
+            var achievementGems = newlyUnlocked.Sum(t => t.RewardGems);
+            var unlocked = newlyUnlocked.Select(t => t.Id).ToList();
+            var allAchievements = newlyUnlocked.Count == 0
+                ? profile.Achievements
+                : alreadyUnlocked.Concat(unlocked).ToList();
+
+            var updated = profile with
+            {
+                Xp = newXp,
+                Level = newLevel,
+                StreakDays = goalMet ? newStats.StreakDays : profile.StreakDays,
+                FreezeTokens = goalMet ? newStats.FreezeTokens : profile.FreezeTokens,
+                LastActiveDate = goalMet ? newStats.LastActiveDate : profile.LastActiveDate,
+                DailyXpEarned = newDailyXp,
+                DailyXpDate = today,
+                DailyLessonsCompleted = (sameDay ? profile.DailyLessonsCompleted : 0) + 1,
+                DailyCorrectAnswers = (sameDay ? profile.DailyCorrectAnswers : 0) + correctCount,
+                DailyPerfectLessons = (sameDay ? profile.DailyPerfectLessons : 0) + (perfect ? 1 : 0),
+                DailyQuestClaims = sameDay ? profile.DailyQuestClaims : null,
+                LifetimeLessonsCompleted = lifetimeLessons,
+                LifetimePerfectLessons = lifetimePerfect,
+                Achievements = allAchievements,
+                Gems = gemsBeforeAchievements + achievementGems,
+                MonthlyAnchor = monthAnchor,
+                MonthlyXpEarned = (sameMonth ? profile.MonthlyXpEarned : 0) + xpEarned,
+                MonthlyLessonsCompleted = (sameMonth ? profile.MonthlyLessonsCompleted : 0) + 1,
+                MonthlyPerfectLessons = (sameMonth ? profile.MonthlyPerfectLessons : 0) + (perfect ? 1 : 0)
+            };
+
+            var outcomeResult = new SubmitQuizResult(
+                Guid.NewGuid().ToString("n"),
+                scorePct,
+                itemResults,
+                new RewardsDto(xpEarned, newXp, newLevel > profile.Level, streakExtended, gemsEarned, unlocked),
+                updatedMasteries.Values.Where(m => m.MasteryScore < 0.5).Select(m => m.ConceptId).Distinct().ToList(),
+                updatedMasteries.Values.OrderBy(m => m.DueAt).Select(m => (DateTimeOffset?)m.DueAt).FirstOrDefault());
+
+            return (updated, outcomeResult, unlocked);
+        }
+
+        var p0 = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+        var outcome = ComputeOutcome(p0);
+        var result = outcome.Result;
+
+        // Atomic, idempotent reservation of the attempt BEFORE crediting the
+        // profile. The id is derived from clientAttemptId, so a replayed or
+        // concurrent create loses the race and returns the winner's result — the
+        // economy is never credited twice. Recording the attempt first makes the
+        // only failure direction a rare, recoverable lost reward, never a double
+        // award (the safe direction for an economy).
+        var attempt = new AttemptRecord(
+            $"attempt::{request.ClientAttemptId}",
+            userContext.UserId,
+            request.ClientAttemptId,
+            request.TrackId,
+            lessonId,
+            request.StartedAt,
+            now,
+            result);
+        try
+        {
+            await attempts.CreateAsync(attempt, cancellationToken);
+        }
+        catch (DuplicateRecordException)
+        {
+            var winner = await attempts.GetByClientAttemptIdAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
+            if (winner is not null)
+            {
+                return winner.Result;
+            }
+
+            throw new ConcurrencyConflictException(
+                $"Attempt '{request.ClientAttemptId}' is being processed concurrently.");
+        }
+
+        // Credit the profile under optimistic concurrency. On a conflict (another
+        // writer changed the profile after our read), re-read and re-apply the same
+        // deterministic outcome so the reward is never lost.
+        try
+        {
+            await users.UpsertAsync(outcome.Updated, cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await OptimisticConcurrency.ExecuteAsync(async () =>
+            {
+                var latest = await users.GetAsync(userContext.UserId, cancellationToken)
+                    ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+                await users.UpsertAsync(ComputeOutcome(latest).Updated, cancellationToken);
+            }, cancellationToken: cancellationToken);
+        }
+
         await progress.UpsertMasteryBatchAsync(userContext.UserId, updatedMasteries.Values.ToArray(), cancellationToken);
 
         // Continuous learning: fold every answered item into the per-user learner
@@ -261,16 +327,6 @@ public sealed class QuizService(
             await leaderboard.AddXpAsync(userContext.UserId, xpEarned, cancellationToken);
         }
 
-        var result = new SubmitQuizResult(
-            Guid.NewGuid().ToString("n"),
-            scorePct,
-            itemResults,
-            new RewardsDto(xpEarned, newXp, newLevel > profile.Level, streakExtended, gemsEarned, unlockedIds),
-            updatedMasteries.Values.Where(m => m.MasteryScore < 0.5).Select(m => m.ConceptId).Distinct().ToList(),
-            updatedMasteries.Values.OrderBy(m => m.DueAt).Select(m => (DateTimeOffset?)m.DueAt).FirstOrDefault());
-
-        var attempt = new AttemptRecord(result.AttemptId, userContext.UserId, request.ClientAttemptId, request.TrackId, lessonId, request.StartedAt, now, result);
-        await attempts.CreateAsync(attempt, cancellationToken);
         await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "quiz.submitted", now, result), cancellationToken);
 
         // Anti-triche (autorité serveur, §6/§15) — mode détection : on évalue la
@@ -299,14 +355,14 @@ public sealed class QuizService(
                     integrity.Flags.Select(f => f.ToString()).ToList())), cancellationToken);
         }
 
-        if (newlyUnlocked.Count > 0)
+        if (outcome.UnlockedIds.Count > 0)
         {
             await events.AddAsync(new LearningEvent(
                 Guid.NewGuid().ToString("n"),
                 userContext.UserId,
                 "achievement.unlocked",
                 now,
-                unlockedIds), cancellationToken);
+                outcome.UnlockedIds), cancellationToken);
         }
 
         return result;
@@ -538,7 +594,7 @@ public sealed class ShopService(
         var result = new PurchaseResultDto(true, item.Id, evaluation.GemsSpent, updated.Gems, updated.FreezeTokens, null);
         var now = clock.UtcNow;
         var record = new PurchaseRecord(
-            Guid.NewGuid().ToString("n"),
+            $"purchase::{request.ClientPurchaseId}",
             userContext.UserId,
             request.ClientPurchaseId,
             item.Id,
@@ -1245,7 +1301,7 @@ public sealed class StreakRepairService(
         var now = clock.UtcNow;
         var result = new StreakRepairResultDto(true, updated.StreakDays, assessment.CostGems, updated.Gems, updated.LastActiveDate, null);
         var record = new PurchaseRecord(
-            Guid.NewGuid().ToString("n"),
+            $"streakrepair::{request.ClientRepairId}",
             userContext.UserId,
             request.ClientRepairId,
             "streak-repair",
@@ -1527,7 +1583,7 @@ public sealed class ExamService(
             weakConcepts);
 
         var attempt = new ExamAttemptRecord(
-            attemptId, userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
+            $"examattempt::{request.ClientAttemptId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
             request.StartedAt, now, result);
         await examAttempts.CreateAsync(attempt, cancellationToken);
         await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "exam.submitted", now, result), cancellationToken);

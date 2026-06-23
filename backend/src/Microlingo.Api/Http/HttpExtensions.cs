@@ -43,8 +43,16 @@ public static class HttpExtensions
     public static async Task<T> ReadJsonAsync<T>(this HttpRequestData request, CancellationToken cancellationToken = default)
         where T : notnull
     {
-        var value = await JsonSerializer.DeserializeAsync<T>(request.Body, JsonOptions, cancellationToken);
-        return value ?? throw new InvalidOperationException("Request body is required.");
+        try
+        {
+            var value = await JsonSerializer.DeserializeAsync<T>(request.Body, JsonOptions, cancellationToken);
+            return value ?? throw new BadRequestException("Request body is required.");
+        }
+        catch (JsonException ex)
+        {
+            // Malformed JSON is a client error (400), not a server fault (500).
+            throw new BadRequestException($"Invalid JSON request body: {ex.Message}");
+        }
     }
 
     public static Task<HttpResponseData> NotFound(this HttpRequestData request, string message, CancellationToken cancellationToken = default)
@@ -57,3 +65,7 @@ public static class HttpExtensions
 }
 
 public readonly record struct JsonResponseWriter(HttpResponseData Response);
+
+/// Signals a client-side error (malformed/missing body, bad parameters) so the
+/// exception middleware can answer 400 Bad Request instead of a generic 500.
+public sealed class BadRequestException(string message) : Exception(message);

@@ -35,8 +35,21 @@ public sealed class CosmosUserRepository(CosmosContext context) : IUserRepositor
 
     public async Task<UserProfileDto> UpsertAsync(UserProfileDto profile, CancellationToken cancellationToken = default)
     {
-        var response = await context.Users.UpsertItemAsync(profile, new PartitionKey(profile.Id), cancellationToken: cancellationToken);
-        return response.Resource;
+        // Honour the optimistic-concurrency token when present so two concurrent
+        // economy mutations (e.g. a quiz submit and a shop purchase) can't clobber
+        // each other; a 412 surfaces as a domain-level ConcurrencyConflictException.
+        var options = string.IsNullOrEmpty(profile.ETag)
+            ? null
+            : new ItemRequestOptions { IfMatchEtag = profile.ETag };
+        try
+        {
+            var response = await context.Users.UpsertItemAsync(profile, new PartitionKey(profile.Id), options, cancellationToken);
+            return response.Resource;
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
+        {
+            throw new ConcurrencyConflictException($"User profile '{profile.Id}' was modified concurrently.");
+        }
     }
 }
 
@@ -173,7 +186,19 @@ public sealed class CosmosAttemptRepository(CosmosContext context) : IAttemptRep
     }
 
     public async Task CreateAsync(AttemptRecord attempt, CancellationToken cancellationToken = default)
-        => await context.Attempts.CreateItemAsync(attempt, new PartitionKey(attempt.UserId), cancellationToken: cancellationToken);
+    {
+        // Atomic idempotency: the doc id is derived from the clientAttemptId, so a
+        // duplicate (replayed or concurrent) submission fails the create instead of
+        // double-applying. Surfaced as a domain-level DuplicateRecordException.
+        try
+        {
+            await context.Attempts.CreateItemAsync(attempt, new PartitionKey(attempt.UserId), cancellationToken: cancellationToken);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            throw new DuplicateRecordException($"Attempt '{attempt.Id}' already exists.");
+        }
+    }
 }
 
 public sealed class CosmosExamAttemptRepository(CosmosContext context) : IExamAttemptRepository
@@ -201,7 +226,16 @@ public sealed class CosmosExamAttemptRepository(CosmosContext context) : IExamAt
     }
 
     public async Task CreateAsync(ExamAttemptRecord attempt, CancellationToken cancellationToken = default)
-        => await context.Attempts.CreateItemAsync(attempt, new PartitionKey(attempt.UserId), cancellationToken: cancellationToken);
+    {
+        try
+        {
+            await context.Attempts.CreateItemAsync(attempt, new PartitionKey(attempt.UserId), cancellationToken: cancellationToken);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            throw new DuplicateRecordException($"Exam attempt '{attempt.Id}' already exists.");
+        }
+    }
 }
 
 public sealed class CosmosEventRepository(CosmosContext context) : IEventRepository
@@ -281,7 +315,18 @@ public sealed class CosmosPurchaseRepository(CosmosContext context) : IPurchaseR
     }
 
     public async Task CreateAsync(PurchaseRecord record, CancellationToken cancellationToken = default)
-        => await context.Economy.CreateItemAsync(record, new PartitionKey(record.UserId), cancellationToken: cancellationToken);
+    {
+        // Atomic idempotency on the clientPurchaseId-derived id so a replayed or
+        // concurrent purchase can never debit gems twice.
+        try
+        {
+            await context.Economy.CreateItemAsync(record, new PartitionKey(record.UserId), cancellationToken: cancellationToken);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            throw new DuplicateRecordException($"Purchase '{record.Id}' already exists.");
+        }
+    }
 }
 
 public sealed class CosmosFriendRepository(CosmosContext context) : IFriendRepository

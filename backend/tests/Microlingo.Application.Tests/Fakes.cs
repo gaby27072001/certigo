@@ -20,11 +20,13 @@ internal sealed class FakeUserContext(string userId, string displayName) : IUser
 internal sealed class InMemoryUserRepository : IUserRepository
 {
     private readonly Dictionary<string, UserProfileDto> _store = new(StringComparer.OrdinalIgnoreCase);
+    private long _version;
 
     public UserProfileDto? Seed(UserProfileDto profile)
     {
-        _store[profile.Id] = profile;
-        return profile;
+        var stored = profile with { ETag = NextETag() };
+        _store[stored.Id] = stored;
+        return stored;
     }
 
     public Task<UserProfileDto?> GetAsync(string userId, CancellationToken cancellationToken = default)
@@ -35,9 +37,28 @@ internal sealed class InMemoryUserRepository : IUserRepository
 
     public Task<UserProfileDto> UpsertAsync(UserProfileDto profile, CancellationToken cancellationToken = default)
     {
-        _store[profile.Id] = profile;
-        return Task.FromResult(profile);
+        // Model Cosmos optimistic concurrency: a write carrying a stale ETag loses.
+        if (_store.TryGetValue(profile.Id, out var current)
+            && !string.IsNullOrEmpty(profile.ETag)
+            && !string.Equals(profile.ETag, current.ETag, StringComparison.Ordinal))
+        {
+            throw new ConcurrencyConflictException($"User profile '{profile.Id}' was modified concurrently.");
+        }
+
+        var stored = profile with { ETag = NextETag() };
+        _store[stored.Id] = stored;
+        return Task.FromResult(stored);
     }
+
+    /// Test seam: simulate a competing writer mutating the profile out-of-band,
+    /// which bumps the stored ETag and makes the next stale-ETag upsert conflict.
+    public void ForceConcurrentWrite(string userId, Func<UserProfileDto, UserProfileDto> mutate)
+    {
+        var current = _store[userId];
+        _store[userId] = mutate(current) with { ETag = NextETag() };
+    }
+
+    private string NextETag() => $"\"{System.Threading.Interlocked.Increment(ref _version)}\"";
 }
 
 internal sealed class InMemoryContentRepository : IContentRepository
@@ -115,6 +136,11 @@ internal sealed class InMemoryAttemptRepository : IAttemptRepository
 
     public Task CreateAsync(AttemptRecord attempt, CancellationToken cancellationToken = default)
     {
+        if (_store.Any(a => string.Equals(a.Id, attempt.Id, StringComparison.Ordinal)))
+        {
+            throw new DuplicateRecordException($"Attempt '{attempt.Id}' already exists.");
+        }
+
         _store.Add(attempt);
         return Task.CompletedTask;
     }
@@ -131,6 +157,11 @@ internal sealed class InMemoryExamAttemptRepository : IExamAttemptRepository
 
     public Task CreateAsync(ExamAttemptRecord attempt, CancellationToken cancellationToken = default)
     {
+        if (_store.Any(a => string.Equals(a.Id, attempt.Id, StringComparison.Ordinal)))
+        {
+            throw new DuplicateRecordException($"Exam attempt '{attempt.Id}' already exists.");
+        }
+
         _store.Add(attempt);
         CreateCount++;
         return Task.CompletedTask;
@@ -179,6 +210,11 @@ internal sealed class InMemoryPurchaseRepository : IPurchaseRepository
 
     public Task CreateAsync(PurchaseRecord record, CancellationToken cancellationToken = default)
     {
+        if (_store.Any(p => string.Equals(p.Id, record.Id, StringComparison.Ordinal)))
+        {
+            throw new DuplicateRecordException($"Purchase '{record.Id}' already exists.");
+        }
+
         _store.Add(record);
         CreateCount++;
         return Task.CompletedTask;

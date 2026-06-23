@@ -53,6 +53,9 @@ jobs:
     name: Build IPA signé + upload TestFlight
     # ⚠️ Runner macOS requis (Xcode). Fallback hébergé (désactivé EMU) : macos-14
     runs-on: [self-hosted, macOS]
+    # Approval gate: configure required reviewers on the "beta" environment
+    # (Settings → Environments) so a human signs off before any TestFlight upload.
+    environment: beta
     steps:
       - uses: actions/checkout@v4
 

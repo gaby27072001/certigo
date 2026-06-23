@@ -12,7 +12,8 @@ public sealed class JwtAuthMiddleware(ITokenValidator tokenValidator) : IFunctio
     private static readonly HashSet<string> AnonymousFunctions = new(StringComparer.OrdinalIgnoreCase)
     {
         "GetTracks",
-        "GetTrack"
+        "GetTrack",
+        "Health"
     };
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)

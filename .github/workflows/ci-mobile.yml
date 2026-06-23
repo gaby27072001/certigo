@@ -27,7 +27,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
         with:
-          sdk: stable
+          # Pinned for reproducible CI (matches the Dart bundled with Flutter
+          # 3.24.0). Bump deliberately alongside FLUTTER_VERSION.
+          sdk: "3.5.0"
       - name: Get dependencies
         working-directory: packages/${{ matrix.package }}
         run: dart pub get
