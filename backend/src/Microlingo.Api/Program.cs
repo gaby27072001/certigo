@@ -76,6 +76,7 @@ var host = new HostBuilder()
         services.AddScoped<IQuizService, QuizService>();
         services.AddScoped<ILeaderboardService, LeaderboardService>();
         services.AddScoped<IPathService, PathService>();
+        services.AddScoped<IRecommendationService, RecommendationService>();
         services.AddScoped<IShopService, ShopService>();
         services.AddScoped<IQuestService, QuestService>();
         services.AddScoped<IAchievementService, AchievementService>();

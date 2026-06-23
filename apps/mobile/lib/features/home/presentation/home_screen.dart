@@ -6,6 +6,7 @@ import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/router.dart';
 import '../application/home_controller.dart';
+import 'coach_section.dart';
 
 /// Home — the daily landing surface. Answers "what should I do today?" in one
 /// glance: current readiness, daily goal progress, the next lesson to continue,
@@ -105,6 +106,11 @@ class _HomeContent extends StatelessWidget {
           goal: me.dailyGoalXp,
         ),
         const SizedBox(height: 16),
+
+        // AI coach — server-ranked "next best action" shelf. Self-hiding:
+        // collapses to nothing while loading, on error, or when empty, so it
+        // never blocks the rest of Home.
+        CoachSection(trackId: path.trackId),
 
         // Continue lesson ------------------------------------------------
         Text('Continuer', style: t.titleLarge),

@@ -48,6 +48,10 @@ final tutorRepositoryProvider = Provider<TutorRepository>(
   (Ref ref) => RemoteTutorRepository(ref.watch(apiClientProvider)),
 );
 
+final recommendationRepositoryProvider = Provider<RecommendationRepository>(
+  (Ref ref) => RemoteRecommendationRepository(ref.watch(apiClientProvider)),
+);
+
 /// User-controlled theme mode (persisted by settings later). System by default.
 final themeModeProvider = StateProvider<ThemeMode>((Ref ref) => ThemeMode.system);
 
@@ -65,6 +69,15 @@ final meProvider = FutureProvider.autoDispose<UserProfile>((Ref ref) async {
 final pathProvider = FutureProvider.autoDispose.family<LearningPath, String>(
   (Ref ref, String trackId) async {
     return _orThrow(await ref.watch(pathRepositoryProvider).getPath(trackId));
+  },
+);
+
+/// The "next best action" coach for one track: a server-ranked shelf of what
+/// the learner should do next. Auto-disposed and keyed by trackId so Home can
+/// surface a coaching section without recomputing anything on-device.
+final nextBestProvider = FutureProvider.autoDispose.family<NextBest, String>(
+  (Ref ref, String trackId) async {
+    return _orThrow(await ref.watch(recommendationRepositoryProvider).getNextBest(trackId));
   },
 );
 

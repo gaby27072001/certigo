@@ -187,9 +187,25 @@ API principale :
 
 > [!NOTE]
 > Les workflows utilisent un runner **self-hosted** avec labels
-> `[self-hosted, Linux, X64, microlingo-ci]`.
+> `[self-hosted, Linux, X64, microlingo-ci]` (les runners hébergés par GitHub sont
+> désactivés par la politique d'entreprise EMU sur ce dépôt).
 >  
 > Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `microlingo-ci`.
+
+> [!IMPORTANT]
+> **Accès sortant internet du runner.** Depuis le retrait de l'accès sortant par
+> défaut d'Azure (septembre 2025), une VM sans IP publique explicite n'a **aucune
+> connectivité sortante** — le runner ne peut alors ni joindre GitHub ni restaurer
+> les paquets NuGet/pub.dev, et tous les jobs échouent. La connectivité est assurée
+> par une **NAT Gateway** (`nat-microlingo`) associée au sous-réseau `snet-runners`,
+> avec une IP publique Standard dédiée. Si l'egress retombe, vérifier :
+> ```bash
+> az network nat gateway show -g rg-microlingo-ci -n nat-microlingo
+> az network vnet subnet show -g rg-microlingo-ci --vnet-name vnet-microlingo-ci \
+>   -n snet-runners --query natGateway.id
+> ```
+> La fonctionnalité `Microsoft.Network/AllowBringYourOwnPublicIpAddress` doit être
+> enregistrée sur la souscription (self-service via `az feature register`).
 
 ---
 
