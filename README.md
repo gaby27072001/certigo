@@ -66,6 +66,10 @@ microlingo/
 
 Détail complet : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
+> [!TIP]
+> 🧭 **Pour voir l'état réel et à jour du projet** (ce qui est *réellement* construit, fonctionnalité
+> par fonctionnalité), consultez le tableau de bord vivant : [`docs/ETAT_DU_PROJET.md`](docs/ETAT_DU_PROJET.md).
+
 ---
 
 ## 🧱 Stack technique
