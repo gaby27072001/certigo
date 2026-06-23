@@ -86,6 +86,7 @@ var host = new HostBuilder()
         services.AddScoped<IExamService, ExamService>();
         services.AddScoped<ITutorService, TutorService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<ISeasonService, SeasonService>();
     })
     .Build();
 
