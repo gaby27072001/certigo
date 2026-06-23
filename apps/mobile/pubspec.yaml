@@ -38,3 +38,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Mascot artwork — uncomment once you drop your characters into
+  # assets/mascots/<id>/<mood>.png (see assets/mascots/README.md), then run
+  # `flutter pub get`. Also uncomment the line in lib/app/mascots.dart.
+  # assets:
+  #   - assets/mascots/

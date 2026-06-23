@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'mascot_assets.dart';
+
 /// The **Aurora Crew** — Microlingo's cast of stylised Azure mascots, the
 /// equivalent of Duolingo's Duo & friends. Each member embodies a service or
 /// concept (cloud, compute, data, security, IaC, AI, the learner) and carries a
@@ -32,6 +34,16 @@ enum AuroraMascot {
 
 /// Expressive state of a mascot. Drives the drawn face (and, later, Rive).
 enum MascotMood { idle, happy, celebrate, sad }
+
+/// How a [MascotAvatar] is framed when custom image art is used.
+///
+/// * [disc]  — the art is clipped into the signature glossy disc (consistent
+///   with the procedural avatars; ideal for headers, path guardians, lists).
+/// * [free]  — the art is painted as-is with no disc, so a full-body character
+///   (à la Duo standing) can breathe (ideal for the welcome / hero moments).
+///
+/// Has no effect on the built-in procedural face, which is always a disc.
+enum MascotShape { disc, free }
 
 /// Per-member identity (French display name, role, signature color, icon).
 extension AuroraMascotInfo on AuroraMascot {
@@ -91,6 +103,7 @@ class MascotAvatar extends StatelessWidget {
     this.mood = MascotMood.idle,
     this.onTap,
     this.showBadge = true,
+    this.shape = MascotShape.disc,
   });
 
   final AuroraMascot mascot;
@@ -99,15 +112,102 @@ class MascotAvatar extends StatelessWidget {
   final VoidCallback? onTap;
 
   /// Whether to draw the small service-icon badge. Hidden for tiny avatars.
+  /// Ignored for [MascotShape.free] custom art.
   final bool showBadge;
+
+  /// Framing used when custom image art is registered (see [MascotShape]).
+  final MascotShape shape;
 
   @override
   Widget build(BuildContext context) {
+    final MascotArt? art = MascotRegistry.instance.resolve(mascot, mood);
+    final Widget figure = art != null ? _buildImage(art) : _buildDrawn();
+
+    final Widget labelled = Semantics(
+      label: '${mascot.displayName}, ${mascot.role}',
+      image: true,
+      button: onTap != null,
+      child: figure,
+    );
+
+    if (onTap == null) return labelled;
+    return GestureDetector(onTap: onTap, behavior: HitTestBehavior.opaque, child: labelled);
+  }
+
+  /// Custom character art, framed per [shape], with a graceful fall back to the
+  /// procedural face if the file is missing or fails to decode at runtime.
+  Widget _buildImage(MascotArt art) {
+    final Image image = Image.asset(
+      art.assetPath,
+      package: art.package,
+      width: size,
+      height: size,
+      fit: shape == MascotShape.disc ? BoxFit.cover : BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      errorBuilder: (BuildContext _, Object __, StackTrace? ___) => _buildDrawn(),
+    );
+
+    if (shape == MascotShape.free) {
+      return SizedBox(width: size, height: size, child: image);
+    }
+
+    final Color base = mascot.color;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: <Widget>[
+          DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: base.withOpacity(0.30),
+                  blurRadius: size * 0.30,
+                  offset: Offset(0, size * 0.12),
+                  spreadRadius: -size * 0.08,
+                ),
+              ],
+            ),
+            child: ClipOval(child: image),
+          ),
+          if (showBadge) _badge(_shift(base, -0.18)),
+        ],
+      ),
+    );
+  }
+
+  Widget _badge(Color dark) {
+    return Positioned(
+      right: -size * 0.02,
+      bottom: -size * 0.02,
+      child: Container(
+        width: size * 0.42,
+        height: size * 0.42,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: Colors.black.withOpacity(0.14),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: Icon(mascot.icon, size: size * 0.24, color: dark),
+      ),
+    );
+  }
+
+  Widget _buildDrawn() {
     final Color base = mascot.color;
     final Color light = _shift(base, 0.22);
     final Color dark = _shift(base, -0.18);
 
-    final Widget avatar = SizedBox(
+    return SizedBox(
       width: size,
       height: size,
       child: Stack(
@@ -152,41 +252,10 @@ class MascotAvatar extends StatelessWidget {
             child: CustomPaint(painter: _MascotFacePainter(mood)),
           ),
           // Service badge.
-          if (showBadge)
-            Positioned(
-              right: -size * 0.02,
-              bottom: -size * 0.02,
-              child: Container(
-                width: size * 0.42,
-                height: size * 0.42,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: <BoxShadow>[
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.14),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: Icon(mascot.icon, size: size * 0.24, color: dark),
-              ),
-            ),
+          if (showBadge) _badge(dark),
         ],
       ),
     );
-
-    final Widget labelled = Semantics(
-      label: '${mascot.displayName}, ${mascot.role}',
-      image: true,
-      button: onTap != null,
-      child: avatar,
-    );
-
-    if (onTap == null) return labelled;
-    return GestureDetector(onTap: onTap, behavior: HitTestBehavior.opaque, child: labelled);
   }
 
   /// Lightens (positive [amount]) or darkens (negative) a color in HSL space.
@@ -194,6 +263,55 @@ class MascotAvatar extends StatelessWidget {
     final HSLColor hsl = HSLColor.fromColor(c);
     final double l = (hsl.lightness + amount).clamp(0.0, 1.0);
     return hsl.withLightness(l).toColor();
+  }
+}
+
+/// A large, free-standing "hero" mascot for welcome / greeting moments — the
+/// equivalent of a big standing Duo. Uses full-body custom art when available
+/// ([MascotShape.free]); otherwise shows the procedural disc face resting on a
+/// soft ground shadow so the welcome screen still feels alive before art exists.
+class MascotHero extends StatelessWidget {
+  const MascotHero({
+    super.key,
+    required this.mascot,
+    this.mood = MascotMood.happy,
+    this.size = 160,
+    this.ground = true,
+  });
+
+  final AuroraMascot mascot;
+  final MascotMood mood;
+  final double size;
+
+  /// Whether to paint the little elliptical ground shadow under the figure.
+  final bool ground;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool custom = MascotRegistry.instance.hasCustomArt;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        MascotAvatar(
+          mascot: mascot,
+          mood: mood,
+          size: size,
+          showBadge: false,
+          shape: custom ? MascotShape.free : MascotShape.disc,
+        ),
+        if (ground) ...<Widget>[
+          SizedBox(height: size * 0.04),
+          Container(
+            width: size * 0.52,
+            height: size * 0.07,
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.10),
+              borderRadius: BorderRadius.all(Radius.circular(size)),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }
 

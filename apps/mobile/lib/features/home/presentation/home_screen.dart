@@ -55,29 +55,25 @@ class _HomeContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
       children: <Widget>[
-        // Greeting -------------------------------------------------------
-        Text(
-          'Bon retour, $firstName 👋',
-          style: t.bodyMedium?.copyWith(color: p.textSecondary),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          path.exam.isEmpty ? 'Prêt à progresser ?' : 'Cap sur ${path.exam}',
-          style: t.headlineMedium,
-        ),
-        const SizedBox(height: 16),
-
-        // Stats ----------------------------------------------------------
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        // Resource bar — streak / gems / XP, the at-a-glance economy, pinned at
+        // the top like a learning app's status row.
+        Row(
           children: <Widget>[
-            StreakBadge(days: me.streakDays),
+            StreakBadge(days: me.streakDays, active: me.dailyProgress >= 1),
+            const SizedBox(width: 8),
             GemCounter(gems: me.gems),
+            const Spacer(),
             XpChip(xp: me.xp),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
+
+        // Greeting — the guide welcomes you back in a speech bubble.
+        _HomeGreeting(
+          firstName: firstName,
+          subtitle: path.exam.isEmpty ? 'Prêt à progresser ?' : 'Cap sur ${path.exam}',
+        ),
+        const SizedBox(height: 22),
 
         // Readiness hero -------------------------------------------------
         PrismCard(
@@ -141,6 +137,49 @@ class _HomeContent extends StatelessWidget {
           const SizedBox(height: 12),
           _WeakDomainCard(domain: weak, onTap: () => context.go(Routes.path)),
         ],
+      ],
+    );
+  }
+}
+
+class _HomeGreeting extends StatelessWidget {
+  const _HomeGreeting({required this.firstName, required this.subtitle});
+
+  final String firstName;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme t = Theme.of(context).textTheme;
+    final PrismColorScheme p = context.prism;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const MascotAvatar(
+          mascot: AuroraMascot.nimbus,
+          mood: MascotMood.happy,
+          size: 64,
+          showBadge: false,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: SpeechBubble(
+            tail: SpeechTail.left,
+            tailAlignment: 0.34,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  'Bon retour, $firstName 👋',
+                  style: t.bodyMedium?.copyWith(color: p.textSecondary),
+                ),
+                const SizedBox(height: 2),
+                Text(subtitle, style: t.titleLarge),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }

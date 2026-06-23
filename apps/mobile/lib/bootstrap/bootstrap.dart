@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/app.dart';
+import '../app/mascots.dart';
 
 /// Centralized app bootstrap.
 ///
@@ -20,6 +21,9 @@ Future<void> bootstrap() async {
     // TODO(observability): forward to Application Insights via a Crash service.
     FlutterError.presentError(details);
   };
+
+  // Wire mascot artwork (built-in faces by default; see app/mascots.dart).
+  configureMascots();
 
   runApp(const ProviderScope(child: MicrolingoApp()));
 }
