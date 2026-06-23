@@ -77,7 +77,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: _enter,
-                child: Text('Mot de passe oublié ?', style: t.labelLarge?.copyWith(color: p.primary)),
+                child:
+                    Text('Mot de passe oublié ?', style: t.labelLarge?.copyWith(color: p.primary)),
               ),
             ),
             const SizedBox(height: 8),

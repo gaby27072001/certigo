@@ -59,7 +59,8 @@ class _ChoiceTileState extends State<ChoiceTile> {
     final Color border = sel ? accent : p.border;
     final Color lip = sel ? _shift(accent, -0.12) : _shift(p.border, -0.06);
     final Color fill = sel
-        ? Color.alphaBlend(accent.withOpacity(p.brightness == Brightness.dark ? 0.20 : 0.08), p.surface)
+        ? Color.alphaBlend(
+            accent.withOpacity(p.brightness == Brightness.dark ? 0.20 : 0.08), p.surface)
         : p.surface;
 
     return Semantics(

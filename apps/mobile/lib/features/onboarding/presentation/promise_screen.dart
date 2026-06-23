@@ -45,7 +45,8 @@ class PromiseScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 28),
-          _PromiseStat(value: '≈ ${c.weeklyNotions}', label: 'notions cette semaine', accent: p.primary),
+          _PromiseStat(
+              value: '≈ ${c.weeklyNotions}', label: 'notions cette semaine', accent: p.primary),
           const SizedBox(height: 16),
           Text(
             'À raison de ${(c.goal ?? DailyGoalOption.regular).minutes} min par jour. '

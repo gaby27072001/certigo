@@ -120,8 +120,7 @@ class MascotRegistry {
     String assetPath, {
     String? package,
   }) {
-    (_moodArt[mascot] ??= <MascotMood, MascotArt>{})[mood] =
-        MascotArt(assetPath, package: package);
+    (_moodArt[mascot] ??= <MascotMood, MascotArt>{})[mood] = MascotArt(assetPath, package: package);
   }
 
   /// Resolve the artwork for [mascot] in [mood], or `null` to use the built-in

@@ -136,8 +136,7 @@ class _PathContent extends StatelessWidget {
 
     int running = 0; // continuous sine phase across units for one flowing trail
     final List<Widget> slivers = <Widget>[
-      if (me != null)
-        SliverToBoxAdapter(child: _PathResourceBar(me: me!)),
+      if (me != null) SliverToBoxAdapter(child: _PathResourceBar(me: me!)),
       SliverPersistentHeader(
         pinned: true,
         delegate: _PathBannerDelegate(

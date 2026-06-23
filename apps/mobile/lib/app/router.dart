@@ -167,8 +167,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: OnboardingRoutes.goal,
         parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const GoalScreen()),
+        pageBuilder: (_, GoRouterState state) => _stepPage(state: state, child: const GoalScreen()),
       ),
       GoRoute(
         path: OnboardingRoutes.routine,
