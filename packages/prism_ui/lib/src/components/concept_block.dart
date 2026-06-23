@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'prism_rich_text.dart';
+
 /// A "Concept" block — the core explanation, rendered as clean reading text on
 /// the aurora canvas (no heavy surface) so comprehension stays the priority.
 ///
@@ -21,7 +23,7 @@ class ConceptBlock extends StatelessWidget {
           Text(title!, style: t.titleLarge),
           const SizedBox(height: 10),
         ],
-        Text(body, style: t.bodyLarge?.copyWith(height: 1.55)),
+        PrismRichText(body, style: t.bodyLarge?.copyWith(height: 1.55)),
       ],
     );
   }

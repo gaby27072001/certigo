@@ -6,6 +6,7 @@ library data;
 
 export 'src/models/user_profile.dart';
 export 'src/models/learning_path.dart';
+export 'src/models/track_summary.dart';
 export 'src/models/lesson.dart';
 export 'src/models/quiz.dart';
 export 'src/models/leaderboard.dart';

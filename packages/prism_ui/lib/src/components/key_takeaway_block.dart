@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_radii.dart';
+import 'prism_rich_text.dart';
 
 /// A "Key takeaway" / recap block — the single sentence the learner must retain.
 ///
@@ -59,7 +60,10 @@ class KeyTakeawayBlock extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text(body, style: t.bodyLarge?.copyWith(height: 1.5)),
+                    PrismRichText(
+                      body,
+                      style: t.bodyLarge?.copyWith(height: 1.5),
+                    ),
                   ],
                 ),
               ),

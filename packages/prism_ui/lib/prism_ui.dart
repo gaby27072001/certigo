@@ -52,6 +52,7 @@ export 'src/components/code_block.dart';
 export 'src/components/key_takeaway_block.dart';
 export 'src/components/callout_block.dart';
 export 'src/components/answer_feedback_card.dart';
+export 'src/components/prism_rich_text.dart';
 
 // Async / state surfaces
 export 'src/components/prism_skeleton.dart';

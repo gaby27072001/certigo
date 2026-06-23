@@ -36,6 +36,10 @@ final pathRepositoryProvider = Provider<PathRepository>(
   (Ref ref) => RemotePathRepository(ref.watch(apiClientProvider)),
 );
 
+final catalogRepositoryProvider = Provider<CatalogRepository>(
+  (Ref ref) => RemoteCatalogRepository(ref.watch(apiClientProvider)),
+);
+
 final lessonRepositoryProvider = Provider<LessonRepository>(
   (Ref ref) => RemoteLessonRepository(ref.watch(apiClientProvider)),
 );
@@ -110,6 +114,17 @@ final pathProvider = FutureProvider.autoDispose.family<LearningPath, String>(
     return _orThrow(await ref.watch(pathRepositoryProvider).getPath(trackId));
   },
 );
+
+/// The certification track currently shown on the Path screen. Switching it in
+/// the course picker re-points the whole primary tab, Duolingo-style. Defaults
+/// to AZ-900, the app's flagship track.
+final activeTrackProvider = StateProvider<String>((Ref ref) => 'az-900');
+
+/// The catalog of certification tracks the app offers, for the course picker.
+/// Auto-disposed: it is only loaded while the picker sheet is open.
+final catalogProvider = FutureProvider.autoDispose<List<TrackSummary>>((Ref ref) async {
+  return _orThrow(await ref.watch(catalogRepositoryProvider).getCatalog());
+});
 
 /// The "next best action" coach for one track: a server-ranked shelf of what
 /// the learner should do next. Auto-disposed and keyed by trackId so Home can

@@ -92,6 +92,19 @@ public sealed record DomainProgressDto(
     double Weight,
     int Score);
 
+// --- Catalog (certification picker) ---------------------------------------
+
+public sealed record TrackSummaryDto(
+    string Id,
+    string Code,
+    string Title,
+    string Level,
+    string Summary,
+    int UnitCount,
+    int LessonCount);
+
+public sealed record CatalogDto(IReadOnlyList<TrackSummaryDto> Tracks);
+
 // --- League / leaderboard --------------------------------------------------
 
 /// <summary>
