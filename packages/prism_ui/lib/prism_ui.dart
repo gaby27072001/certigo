@@ -37,6 +37,11 @@ export 'src/components/gem_counter.dart';
 export 'src/components/lesson_tile.dart';
 export 'src/components/quiz_option_tile.dart';
 
+// Skill-path & Aurora Crew
+export 'src/components/aurora_mascot.dart';
+export 'src/components/path_node.dart';
+export 'src/components/unit_header.dart';
+
 // Pedagogical blocks (Lesson Engine)
 export 'src/components/hook_block.dart';
 export 'src/components/concept_block.dart';

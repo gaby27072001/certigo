@@ -19,7 +19,7 @@ class PrismStatusView extends StatelessWidget {
   });
 
   /// Convenience constructor for an offline / error state with a retry CTA.
-  PrismStatusView.error({super.key, String? message, VoidCallback? onRetry})
+  const PrismStatusView.error({super.key, String? message, VoidCallback? onRetry})
       : icon = Icons.cloud_off_rounded,
         title = 'Connexion impossible',
         message = message ?? 'Vérifie ta connexion puis réessaie.',
