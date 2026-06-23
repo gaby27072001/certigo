@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/prism_color_scheme.dart';
+import '../tokens/prism_motion.dart';
 import '../tokens/prism_radii.dart';
-import '../tokens/prism_elevation.dart';
 
 /// Button hierarchy for Microlingo.
 ///
@@ -75,6 +75,11 @@ class _PrismButtonState extends State<PrismButton> {
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
+    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final Duration fast = reduceMotion ? Duration.zero : PrismMotion.fast;
+    final bool depth = widget.variant != PrismButtonVariant.ghost;
+    final double lip = depth ? 4 : 0;
+    final double sink = depth && _down ? lip : 0;
     final TextStyle labelStyle = Theme.of(context).textTheme.labelLarge!.copyWith(
           color: _foreground(p),
           fontWeight: FontWeight.w700,
@@ -112,19 +117,43 @@ class _PrismButtonState extends State<PrismButton> {
         onTapUp: _enabled ? (_) => setState(() => _down = false) : null,
         onTapCancel: _enabled ? () => setState(() => _down = false) : null,
         onTap: _enabled ? _handleTap : null,
-        child: AnimatedScale(
-          scale: _down ? 0.97 : 1.0,
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
-          child: AnimatedOpacity(
-            opacity: _enabled ? 1 : 0.5,
-            duration: const Duration(milliseconds: 160),
-            child: Container(
-              height: 54,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: _decoration(p),
-              alignment: Alignment.center,
-              child: content,
+        child: AnimatedOpacity(
+          opacity: _enabled ? 1 : 0.5,
+          duration: fast,
+          child: SizedBox(
+            height: 54 + lip,
+            child: Stack(
+              children: <Widget>[
+                if (depth)
+                  Positioned(
+                    top: lip,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 54,
+                      decoration: _baseDecoration(p),
+                    ),
+                  ),
+                AnimatedPositioned(
+                  duration: fast,
+                  curve: PrismMotion.standard,
+                  top: sink,
+                  left: 0,
+                  right: 0,
+                  child: AnimatedScale(
+                    scale: _down ? 0.995 : 1.0,
+                    duration: fast,
+                    curve: PrismMotion.standard,
+                    child: Container(
+                      height: 54,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      decoration: _topDecoration(p),
+                      alignment: Alignment.center,
+                      child: content,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -138,7 +167,7 @@ class _PrismButtonState extends State<PrismButton> {
         PrismButtonVariant.ghost => widget.tone ?? p.textSecondary,
       };
 
-  BoxDecoration _decoration(PrismColorScheme p) {
+  BoxDecoration _topDecoration(PrismColorScheme p) {
     final Color tone = widget.tone ?? p.primary;
     switch (widget.variant) {
       case PrismButtonVariant.primary:
@@ -153,7 +182,7 @@ class _PrismButtonState extends State<PrismButton> {
             end: Alignment.bottomRight,
           ),
           boxShadow: _down
-              ? PrismElevation.level0
+              ? const <BoxShadow>[]
               : <BoxShadow>[
                   BoxShadow(
                     color: tone.withOpacity(
@@ -172,6 +201,32 @@ class _PrismButtonState extends State<PrismButton> {
             tone.withOpacity(p.brightness == Brightness.dark ? 0.20 : 0.12),
             p.surface,
           ),
+          border: Border.all(color: tone.withOpacity(0.30)),
+        );
+      case PrismButtonVariant.ghost:
+        return const BoxDecoration(borderRadius: PrismRadii.buttonAll);
+    }
+  }
+
+  BoxDecoration _baseDecoration(PrismColorScheme p) {
+    final Color tone = widget.tone ?? p.primary;
+    switch (widget.variant) {
+      case PrismButtonVariant.primary:
+        final Color base = widget.tone == null
+            ? p.primaryDark
+            : Color.alphaBlend(Colors.black.withOpacity(0.24), tone);
+        return BoxDecoration(
+          borderRadius: PrismRadii.buttonAll,
+          color: base,
+        );
+      case PrismButtonVariant.secondary:
+        final Color base = Color.alphaBlend(
+          tone.withOpacity(p.brightness == Brightness.dark ? 0.34 : 0.24),
+          p.surfaceAlt,
+        );
+        return BoxDecoration(
+          borderRadius: PrismRadii.buttonAll,
+          color: base,
           border: Border.all(color: tone.withOpacity(0.30)),
         );
       case PrismButtonVariant.ghost:

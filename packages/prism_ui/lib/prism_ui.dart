@@ -41,8 +41,14 @@ export 'src/components/match_tile.dart';
 
 // Skill-path & Aurora Crew
 export 'src/components/aurora_mascot.dart';
+export 'src/components/mascot_assets.dart';
 export 'src/components/path_node.dart';
 export 'src/components/unit_header.dart';
+
+// Onboarding / playful "Duo kit"
+export 'src/components/speech_bubble.dart';
+export 'src/components/choice_tile.dart';
+export 'src/components/onboarding_scaffold.dart';
 
 // Pedagogical blocks (Lesson Engine)
 export 'src/components/hook_block.dart';
