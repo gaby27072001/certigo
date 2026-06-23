@@ -2,33 +2,35 @@ import 'package:flutter/material.dart';
 
 import 'mascot_assets.dart';
 
-/// The **Aurora Crew** — Microlingo's cast of stylised Azure mascots, the
-/// equivalent of Duolingo's Duo & friends. Each member embodies a service or
-/// concept (cloud, compute, data, security, IaC, AI, the learner) and carries a
-/// signature color, a service icon and a friendly face.
+/// The **Aurora Crew** — Microlingo's cast of mascots, each one a *gamified,
+/// cutified Azure service icon* (the equivalent of Duolingo's Duo & friends).
+/// Every member embodies a real Azure service or concept (the platform itself,
+/// Functions, Cosmos DB, Defender, Bicep, AI, Blob Storage) so the mascot doubles
+/// as a memory aid for its icon, and carries a signature color + a friendly face.
 ///
 /// Mascots are intentionally decoupled from any data model so the design system
 /// stays dependency-free; screens map their domain/unit to a crew member.
 enum AuroraMascot {
-  /// The cloud guide — the main, welcoming face of Microlingo ("the Duo").
+  /// Azure itself — the main, welcoming face of Microlingo ("the Duo").
   nimbus,
 
-  /// Serverless / Azure Functions — quick and energetic.
+  /// Azure Functions — quick and energetic (a yellow lightning bolt).
   volt,
 
-  /// Data & governance (Cosmos DB) — calm and structured.
+  /// Azure Cosmos DB — calm and dreamy (a ringed planet).
   cosmo,
 
-  /// Security (Entra / Defender) — serious and protective.
+  /// Microsoft Defender / Sentinel — protective (a little shield).
   sentinel,
 
-  /// IaC / Bicep / ARM — the methodical little builder.
+  /// Bicep / IaC — the proud, methodical little strongman (a flexed arm).
   bicky,
 
-  /// AI / Foundry / Vision — curious and creative.
+  /// Azure AI / Foundry — curious and creative (sparkles).
   pixel,
 
-  /// The learner themselves — clumsy but endearing, progresses with you.
+  /// Azure Blob Storage — a soft little blob; the learner themselves, clumsy but
+  /// endearing, who progresses with you.
   pip,
 }
 
@@ -60,13 +62,13 @@ extension AuroraMascotInfo on AuroraMascot {
 
   /// Pedagogical role, used for accessibility labels.
   String get role => switch (this) {
-        AuroraMascot.nimbus => 'guide du cloud',
-        AuroraMascot.volt => 'sprite du serverless',
-        AuroraMascot.cosmo => 'gardien des données',
-        AuroraMascot.sentinel => 'gardien de la sécurité',
-        AuroraMascot.bicky => 'bâtisseur d\'infrastructure',
-        AuroraMascot.pixel => 'esprit de l\'IA',
-        AuroraMascot.pip => 'apprenti',
+        AuroraMascot.nimbus => 'la mascotte Azure',
+        AuroraMascot.volt => 'Azure Functions',
+        AuroraMascot.cosmo => 'Azure Cosmos DB',
+        AuroraMascot.sentinel => 'Microsoft Defender',
+        AuroraMascot.bicky => 'Bicep',
+        AuroraMascot.pixel => 'Azure AI',
+        AuroraMascot.pip => 'Stockage Blob',
       };
 
   /// Signature color — stable per member, color-blind aware.
@@ -80,15 +82,16 @@ extension AuroraMascotInfo on AuroraMascot {
         AuroraMascot.pip => const Color(0xFF0078D4),
       };
 
-  /// Service / concept icon shown on the mascot's badge.
+  /// Service / concept icon shown on the mascot's badge — echoes the real Azure
+  /// service the mascot gamifies (used by the procedural fallback face).
   IconData get icon => switch (this) {
         AuroraMascot.nimbus => Icons.cloud_rounded,
         AuroraMascot.volt => Icons.bolt_rounded,
-        AuroraMascot.cosmo => Icons.storage_rounded,
+        AuroraMascot.cosmo => Icons.bubble_chart_rounded,
         AuroraMascot.sentinel => Icons.shield_rounded,
-        AuroraMascot.bicky => Icons.handyman_rounded,
+        AuroraMascot.bicky => Icons.fitness_center_rounded,
         AuroraMascot.pixel => Icons.auto_awesome_rounded,
-        AuroraMascot.pip => Icons.school_rounded,
+        AuroraMascot.pip => Icons.water_drop_rounded,
       };
 }
 

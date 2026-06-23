@@ -5,17 +5,17 @@ Une fois les images déposées ici **avec les bons noms**, elles apparaissent
 automatiquement partout : accueil, chemin, onboarding — **sans toucher au code
 des écrans**. Le rendu passe par `MascotRegistry` (dans `prism_ui`).
 
-## 1. Les 7 personnages (ids)
+## 1. Les 7 personnages (ids) — chacun = une icône Azure « cutifiée »
 
-| id         | rôle                         | où on le voit beaucoup        |
-|------------|------------------------------|-------------------------------|
-| `nimbus`   | le guide (le "Duo")          | accueil, onboarding, splash   |
-| `volt`     | serverless / Functions       | gardien d'unité (chemin)      |
-| `cosmo`    | données / Cosmos DB          | gardien d'unité (chemin)      |
-| `sentinel` | sécurité / Entra             | gardien d'unité (chemin)      |
-| `bicky`    | infra / Bicep                | gardien d'unité (chemin)      |
-| `pixel`    | IA / Foundry                 | gardien d'unité (chemin)      |
-| `pip`      | l'apprenant (toi)            | profil, récompenses           |
+| id         | basé sur l'icône Azure…        | personnalité                  | où on le voit beaucoup        |
+|------------|--------------------------------|-------------------------------|-------------------------------|
+| `nimbus`   | Azure (le logo / « A » nuage)  | le guide (le "Duo")           | accueil, onboarding, splash   |
+| `volt`     | Azure Functions (éclair)       | hyperactif, énergique         | gardien d'unité (chemin)      |
+| `cosmo`    | Azure Cosmos DB (planète)      | calme, rêveur                 | gardien d'unité (chemin)      |
+| `sentinel` | Microsoft Defender (bouclier)  | protecteur, loyal             | gardien d'unité (chemin)      |
+| `bicky`    | Bicep (bras musclé)            | costaud fier, méthodique      | gardien d'unité (chemin)      |
+| `pixel`    | Azure AI / Foundry (✨)        | curieux, créatif              | gardien d'unité (chemin)      |
+| `pip`      | Azure Blob Storage (un blob)   | l'apprenant (toi)             | profil, récompenses           |
 
 ## 2. Les 4 expressions (moods)
 
