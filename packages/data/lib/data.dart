@@ -9,6 +9,8 @@ export 'src/models/learning_path.dart';
 export 'src/models/lesson.dart';
 export 'src/models/quiz.dart';
 export 'src/models/leaderboard.dart';
+export 'src/models/tutor.dart';
+export 'src/models/recommendation.dart';
 
 export 'src/api/api_client.dart';
 

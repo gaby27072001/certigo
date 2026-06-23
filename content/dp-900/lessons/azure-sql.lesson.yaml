@@ -1,0 +1,67 @@
+id: dp900-l-azure-sql
+trackId: dp-900
+unitId: dp900-u-relational
+domainId: relational-data
+title: Les options Azure SQL
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-azure-sql
+    body: >
+      Vous voulez SQL Server sur Azure. Mais jusqu'où voulez-vous gérer vous-même
+      le serveur ? Azure propose un curseur, du « tout géré » au « tout sous votre
+      contrôle ».
+
+  - type: concept
+    conceptId: c-azure-sql
+    title: Du PaaS à l'IaaS
+    body: >
+      **Azure SQL Database** est un service **PaaS** entièrement géré : Microsoft
+      gère le système, les correctifs, les sauvegardes et la haute disponibilité.
+      Idéal pour des bases applicatives modernes, avec un minimum d'administration.
+
+
+      **Azure SQL Managed Instance** offre une **compatibilité quasi complète**
+      avec SQL Server (fonctionnalités au niveau instance), tout en restant géré —
+      parfait pour **migrer** une application existante avec peu de changements.
+
+
+      **SQL Server sur machine virtuelle** est de l'**IaaS** : vous contrôlez tout
+      le système d'exploitation et le moteur, mais vous gérez aussi les correctifs
+      et les sauvegardes vous-même.
+
+  - type: example
+    conceptId: c-azure-sql
+    body: >
+      Nouvelle appli, on veut le moins d'administration possible → **Azure SQL
+      Database**. Migration « lift-and-shift » d'un SQL Server complet → **Managed
+      Instance**. Besoin d'un accès total à l'OS → **SQL Server sur VM**.
+
+  - type: check
+    conceptId: c-azure-sql
+    check:
+      id: dp900-l-azure-sql-check-1
+      conceptId: c-azure-sql
+      type: mcq
+      difficulty: 2
+      stem: >
+        Une équipe veut une base relationnelle managée pour une nouvelle
+        application, avec le minimum de tâches d'administration. Quelle option ?
+      options:
+        - { id: a, label: "SQL Server sur machine virtuelle (IaaS)" }
+        - { id: b, label: "Une machine virtuelle Linux auto-gérée" }
+        - { id: c, label: "Azure SQL Database (PaaS)" }
+        - { id: d, label: "Azure Blob Storage" }
+      correct: [c]
+      explanation: >
+        Azure SQL Database est le service PaaS entièrement géré : correctifs,
+        sauvegardes et haute disponibilité sont pris en charge par Azure. La VM
+        IaaS imposerait de gérer l'OS et le moteur ; le Blob n'est pas relationnel.
+
+  - type: recap
+    conceptId: c-azure-sql
+    body: >
+      SQL Database = PaaS managé, administration minimale. Managed Instance =
+      compatibilité SQL Server pour migrer. SQL sur VM = IaaS, contrôle total mais
+      gestion à votre charge. Choisir selon le niveau de contrôle voulu.

@@ -1,0 +1,64 @@
+id: ai900-l-azure-language
+trackId: ai-900
+unitId: ai900-u-nlp
+domainId: nlp
+title: Services de langage Azure
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-azure-language
+    body: >
+      Analyser des milliers d'avis, traduire en 100 langues, faire parler une
+      application : Azure réunit ces capacités langagières dans quelques services
+      managés.
+
+  - type: concept
+    conceptId: c-azure-language
+    title: Language, Translator et Speech
+    body: >
+      **Azure AI Language** regroupe l'analyse de texte : sentiment, entités,
+      phrases clés, détection de langue, et la **compréhension du langage
+      conversationnel** (intentions/entités pour les bots). **Azure AI
+      Translator** assure la **traduction** automatique multilingue. **Azure AI
+      Speech** couvre la **parole** : reconnaissance vocale (speech-to-text),
+      **synthèse vocale** (text-to-speech) et traduction de la parole.
+
+
+      Pour bâtir un assistant complet, on combine souvent Speech (écouter/parler),
+      Language (comprendre) et un moteur de dialogue.
+
+  - type: example
+    conceptId: c-azure-language
+    body: >
+      Un centre d'appels transcrit les conversations avec **Speech**, en extrait
+      le sentiment et les sujets avec **Language**, et traduit les échanges
+      étrangers avec **Translator**.
+
+  - type: check
+    conceptId: c-azure-language
+    check:
+      id: ai900-l-azure-language-check-1
+      conceptId: c-azure-language
+      type: mcq
+      difficulty: 2
+      stem: >
+        Quel service Azure transforme un texte écrit en voix audible
+        (text-to-speech) ?
+      options:
+        - { id: a, label: "Azure AI Speech" }
+        - { id: b, label: "Azure AI Translator" }
+        - { id: c, label: "Azure AI Vision" }
+        - { id: d, label: "Azure Machine Learning" }
+      correct: [a]
+      explanation: >
+        La synthèse vocale (text-to-speech) ainsi que la reconnaissance vocale
+        relèvent d'Azure AI Speech. Translator traduit du texte, et Vision
+        traite des images.
+
+  - type: recap
+    conceptId: c-azure-language
+    body: >
+      Azure AI Language (analyse de texte + compréhension conversationnelle),
+      Translator (traduction), Speech (parole ↔ texte). On les assemble pour des
+      assistants vocaux complets.

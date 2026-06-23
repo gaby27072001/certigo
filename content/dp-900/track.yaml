@@ -1,0 +1,57 @@
+# Microsoft Azure Data Fundamentals — certification track.
+# Validated in CI against content/schema/track.schema.json.
+# Domain weights mirror the public DP-900 exam skills outline and sum to 1.0.
+id: dp-900
+code: DP-900
+title: Microsoft Azure Data Fundamentals
+level: fundamentals
+summary: >
+  Comprendre les concepts fondamentaux des données, les options relationnelles
+  et non relationnelles sur Azure, et les charges de travail analytiques — du
+  stockage transactionnel à la visualisation avec Power BI.
+
+domains:
+  - id: core-data-concepts
+    name: Concepts fondamentaux des données
+    weight: 0.28
+  - id: relational-data
+    name: Données relationnelles sur Azure
+    weight: 0.22
+  - id: non-relational-data
+    name: Données non relationnelles sur Azure
+    weight: 0.20
+  - id: analytics
+    name: Charges de travail analytiques
+    weight: 0.30
+
+# NOTE: every lesson id listed here must have a matching file in lessons/
+# (enforced by ci-content), and each lesson's unitId/domainId must match.
+units:
+  - id: dp900-u-concepts
+    domainId: core-data-concepts
+    title: Concepts de données
+    lessons:
+      - dp900-l-data-types
+      - dp900-l-data-roles
+      - dp900-l-transactional-analytical
+  - id: dp900-u-relational
+    domainId: relational-data
+    title: Données relationnelles
+    lessons:
+      - dp900-l-relational-concepts
+      - dp900-l-azure-sql
+      - dp900-l-relational-services
+  - id: dp900-u-nonrelational
+    domainId: non-relational-data
+    title: Données non relationnelles
+    lessons:
+      - dp900-l-nonrelational-concepts
+      - dp900-l-cosmos-db
+      - dp900-l-azure-storage
+  - id: dp900-u-analytics
+    domainId: analytics
+    title: Analytique
+    lessons:
+      - dp900-l-analytics-concepts
+      - dp900-l-azure-synapse
+      - dp900-l-data-visualization

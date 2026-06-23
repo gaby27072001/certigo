@@ -1,0 +1,260 @@
+import 'package:flutter/material.dart';
+
+/// The **Aurora Crew** — Microlingo's cast of stylised Azure mascots, the
+/// equivalent of Duolingo's Duo & friends. Each member embodies a service or
+/// concept (cloud, compute, data, security, IaC, AI, the learner) and carries a
+/// signature color, a service icon and a friendly face.
+///
+/// Mascots are intentionally decoupled from any data model so the design system
+/// stays dependency-free; screens map their domain/unit to a crew member.
+enum AuroraMascot {
+  /// The cloud guide — the main, welcoming face of Microlingo ("the Duo").
+  nimbus,
+
+  /// Serverless / Azure Functions — quick and energetic.
+  volt,
+
+  /// Data & governance (Cosmos DB) — calm and structured.
+  cosmo,
+
+  /// Security (Entra / Defender) — serious and protective.
+  sentinel,
+
+  /// IaC / Bicep / ARM — the methodical little builder.
+  bicky,
+
+  /// AI / Foundry / Vision — curious and creative.
+  pixel,
+
+  /// The learner themselves — clumsy but endearing, progresses with you.
+  pip,
+}
+
+/// Expressive state of a mascot. Drives the drawn face (and, later, Rive).
+enum MascotMood { idle, happy, celebrate, sad }
+
+/// Per-member identity (French display name, role, signature color, icon).
+extension AuroraMascotInfo on AuroraMascot {
+  /// Short display name shown on banners and headers.
+  String get displayName => switch (this) {
+        AuroraMascot.nimbus => 'Nimbus',
+        AuroraMascot.volt => 'Volt',
+        AuroraMascot.cosmo => 'Cosmo',
+        AuroraMascot.sentinel => 'Sentinel',
+        AuroraMascot.bicky => 'Bicky',
+        AuroraMascot.pixel => 'Pixel',
+        AuroraMascot.pip => 'Pip',
+      };
+
+  /// Pedagogical role, used for accessibility labels.
+  String get role => switch (this) {
+        AuroraMascot.nimbus => 'guide du cloud',
+        AuroraMascot.volt => 'sprite du serverless',
+        AuroraMascot.cosmo => 'gardien des données',
+        AuroraMascot.sentinel => 'gardien de la sécurité',
+        AuroraMascot.bicky => 'bâtisseur d\'infrastructure',
+        AuroraMascot.pixel => 'esprit de l\'IA',
+        AuroraMascot.pip => 'apprenti',
+      };
+
+  /// Signature color — stable per member, color-blind aware.
+  Color get color => switch (this) {
+        AuroraMascot.nimbus => const Color(0xFF3BA0F0),
+        AuroraMascot.volt => const Color(0xFFFFB020),
+        AuroraMascot.cosmo => const Color(0xFF8C5CF6),
+        AuroraMascot.sentinel => const Color(0xFF0EA5A5),
+        AuroraMascot.bicky => const Color(0xFFFF7A45),
+        AuroraMascot.pixel => const Color(0xFFF0476A),
+        AuroraMascot.pip => const Color(0xFF3B6AF0),
+      };
+
+  /// Service / concept icon shown on the mascot's badge.
+  IconData get icon => switch (this) {
+        AuroraMascot.nimbus => Icons.cloud_rounded,
+        AuroraMascot.volt => Icons.bolt_rounded,
+        AuroraMascot.cosmo => Icons.storage_rounded,
+        AuroraMascot.sentinel => Icons.shield_rounded,
+        AuroraMascot.bicky => Icons.handyman_rounded,
+        AuroraMascot.pixel => Icons.auto_awesome_rounded,
+        AuroraMascot.pip => Icons.school_rounded,
+      };
+}
+
+/// A stylised mascot avatar: a luminous gradient disc with a friendly face and
+/// a service badge. Purely presentational; pass [mood] to change the expression
+/// and [onTap] to make it interactive (e.g. a guardian on the path).
+class MascotAvatar extends StatelessWidget {
+  const MascotAvatar({
+    super.key,
+    required this.mascot,
+    this.size = 64,
+    this.mood = MascotMood.idle,
+    this.onTap,
+    this.showBadge = true,
+  });
+
+  final AuroraMascot mascot;
+  final double size;
+  final MascotMood mood;
+  final VoidCallback? onTap;
+
+  /// Whether to draw the small service-icon badge. Hidden for tiny avatars.
+  final bool showBadge;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color base = mascot.color;
+    final Color light = _shift(base, 0.22);
+    final Color dark = _shift(base, -0.18);
+
+    final Widget avatar = SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: <Widget>[
+          // Body — luminous gradient disc with a soft colored glow.
+          Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: <Color>[light, dark],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: base.withOpacity(0.34),
+                  blurRadius: size * 0.30,
+                  offset: Offset(0, size * 0.12),
+                  spreadRadius: -size * 0.08,
+                ),
+              ],
+            ),
+          ),
+          // Glossy highlight (top-left), the Liquid-Glass sheen.
+          Positioned(
+            left: size * 0.18,
+            top: size * 0.12,
+            child: Container(
+              width: size * 0.30,
+              height: size * 0.18,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(size),
+                color: Colors.white.withOpacity(0.32),
+              ),
+            ),
+          ),
+          // Friendly face.
+          Positioned.fill(
+            child: CustomPaint(painter: _MascotFacePainter(mood)),
+          ),
+          // Service badge.
+          if (showBadge)
+            Positioned(
+              right: -size * 0.02,
+              bottom: -size * 0.02,
+              child: Container(
+                width: size * 0.42,
+                height: size * 0.42,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: <BoxShadow>[
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.14),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: Icon(mascot.icon, size: size * 0.24, color: dark),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    final Widget labelled = Semantics(
+      label: '${mascot.displayName}, ${mascot.role}',
+      image: true,
+      button: onTap != null,
+      child: avatar,
+    );
+
+    if (onTap == null) return labelled;
+    return GestureDetector(onTap: onTap, behavior: HitTestBehavior.opaque, child: labelled);
+  }
+
+  /// Lightens (positive [amount]) or darkens (negative) a color in HSL space.
+  static Color _shift(Color c, double amount) {
+    final HSLColor hsl = HSLColor.fromColor(c);
+    final double l = (hsl.lightness + amount).clamp(0.0, 1.0);
+    return hsl.withLightness(l).toColor();
+  }
+}
+
+class _MascotFacePainter extends CustomPainter {
+  const _MascotFacePainter(this.mood);
+
+  final MascotMood mood;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    final double h = size.height;
+    const Color ink = Color(0xFF0B1120);
+
+    final Paint eye = Paint()..color = ink;
+    final Paint catchlight = Paint()..color = Colors.white.withOpacity(0.9);
+    final double eyeR = w * 0.075;
+    final Offset le = Offset(w * 0.38, h * 0.45);
+    final Offset re = Offset(w * 0.62, h * 0.45);
+
+    if (mood == MascotMood.celebrate) {
+      // Joyful closed "^ ^" eyes.
+      final Paint arc = Paint()
+        ..color = ink
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = w * 0.04
+        ..strokeCap = StrokeCap.round;
+      _drawEyeArc(canvas, le, eyeR, arc);
+      _drawEyeArc(canvas, re, eyeR, arc);
+    } else {
+      canvas.drawCircle(le, eyeR, eye);
+      canvas.drawCircle(re, eyeR, eye);
+      canvas.drawCircle(le.translate(-eyeR * 0.3, -eyeR * 0.3), eyeR * 0.32, catchlight);
+      canvas.drawCircle(re.translate(-eyeR * 0.3, -eyeR * 0.3), eyeR * 0.32, catchlight);
+    }
+
+    // Mouth — curvature encodes the mood.
+    final double curve = switch (mood) {
+      MascotMood.happy => h * 0.13,
+      MascotMood.celebrate => h * 0.14,
+      MascotMood.idle => h * 0.07,
+      MascotMood.sad => -h * 0.08,
+    };
+    final Paint mouth = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.05
+      ..strokeCap = StrokeCap.round;
+    final Path path = Path()
+      ..moveTo(w * 0.38, h * 0.62)
+      ..quadraticBezierTo(w * 0.50, h * 0.62 + curve, w * 0.62, h * 0.62);
+    canvas.drawPath(path, mouth);
+  }
+
+  void _drawEyeArc(Canvas canvas, Offset center, double r, Paint paint) {
+    final Path p = Path()
+      ..moveTo(center.dx - r, center.dy + r * 0.4)
+      ..quadraticBezierTo(center.dx, center.dy - r * 0.8, center.dx + r, center.dy + r * 0.4);
+    canvas.drawPath(p, paint);
+  }
+
+  @override
+  bool shouldRepaint(_MascotFacePainter oldDelegate) => oldDelegate.mood != mood;
+}

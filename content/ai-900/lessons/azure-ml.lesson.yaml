@@ -1,0 +1,63 @@
+id: ai900-l-azure-ml
+trackId: ai-900
+unitId: ai900-u-ml
+domainId: machine-learning
+title: Azure Machine Learning
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-azure-ml
+    body: >
+      Vous avez des données et une idée de modèle. Faut-il tout coder à la main,
+      gérer des serveurs GPU, suivre chaque expérience ? Azure ML s'en charge.
+
+  - type: concept
+    conceptId: c-azure-ml
+    title: La plateforme ML managée d'Azure
+    body: >
+      **Azure Machine Learning** est le service pour construire, entraîner et
+      déployer des modèles à l'échelle. Il offre le **designer** (pipelines
+      visuels sans code), l'**automated ML** (qui teste automatiquement
+      plusieurs algorithmes et hyperparamètres), des **notebooks** pour le code,
+      le suivi des **expériences**, et le **déploiement** des modèles en
+      points de terminaison (endpoints) temps réel ou par lot.
+
+
+      Pour un débutant, l'**automated ML** et le **designer** permettent
+      d'obtenir un modèle sans expertise approfondie en programmation.
+
+  - type: example
+    conceptId: c-azure-ml
+    body: >
+      Une équipe charge un CSV de ventes, lance l'**automated ML** en mode
+      régression, compare les modèles proposés, puis déploie le meilleur en
+      endpoint — le tout depuis le studio Azure ML, presque sans code.
+
+  - type: check
+    conceptId: c-azure-ml
+    check:
+      id: ai900-l-azure-ml-check-1
+      conceptId: c-azure-ml
+      type: mcq
+      difficulty: 2
+      stem: >
+        Quelle fonctionnalité d'Azure Machine Learning teste automatiquement
+        plusieurs algorithmes pour trouver le meilleur modèle ?
+      options:
+        - { id: a, label: "Automated machine learning (AutoML)" }
+        - { id: b, label: "Azure DevOps" }
+        - { id: c, label: "Azure Monitor" }
+        - { id: d, label: "Cosmos DB" }
+      correct: [a]
+      explanation: >
+        L'automated ML essaie de multiples algorithmes et réglages
+        d'hyperparamètres, puis classe les modèles par performance. C'est idéal
+        pour démarrer sans expertise pointue.
+
+  - type: recap
+    conceptId: c-azure-ml
+    body: >
+      Azure ML couvre tout le cycle : designer (visuel), automated ML (sans
+      expertise), notebooks (code), suivi d'expériences et déploiement en
+      endpoints. La plateforme managée pour le ML de bout en bout.

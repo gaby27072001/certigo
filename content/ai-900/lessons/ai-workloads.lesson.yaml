@@ -1,0 +1,65 @@
+id: ai900-l-ai-workloads
+trackId: ai-900
+unitId: ai900-u-ai-intro
+domainId: ai-workloads
+title: Charges de travail de l'IA
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-ai-workloads
+    body: >
+      Reconnaître un visage, prédire des ventes, traduire un texte, discuter avec
+      un assistant : ces tâches semblent très différentes. Pourtant, l'IA les
+      range en quelques grandes familles. Lesquelles ?
+
+  - type: concept
+    conceptId: c-ai-workloads
+    title: Les grandes familles de charges IA
+    body: >
+      L'IA regroupe des **charges de travail** typiques. **Machine learning** :
+      prédire une valeur à partir de données. **Vision par ordinateur** :
+      interpréter des images (classification, détection d'objet, OCR).
+      **Traitement du langage naturel (NLP)** : comprendre du texte ou de la
+      parole (sentiment, entités, traduction). **IA générative** : produire du
+      contenu nouveau (texte, image, code). **IA conversationnelle** : dialoguer
+      via bots et assistants.
+
+
+      Sur Azure, chaque famille correspond à des services prêts à l'emploi —
+      inutile de tout coder soi-même.
+
+  - type: example
+    conceptId: c-ai-workloads
+    body: >
+      Une appli qui lit le montant sur une facture photographiée fait de la
+      **vision** (OCR). Une appli qui classe un avis client en positif/négatif
+      fait du **NLP**. Une appli qui rédige un résumé fait de la **génération**.
+
+  - type: check
+    conceptId: c-ai-workloads
+    check:
+      id: ai900-l-ai-workloads-check-1
+      conceptId: c-ai-workloads
+      type: mcq
+      difficulty: 2
+      stem: >
+        Une application analyse des avis clients et indique s'ils sont positifs
+        ou négatifs. À quelle charge de travail IA cela correspond-il ?
+      options:
+        - { id: a, label: "Traitement du langage naturel (NLP)" }
+        - { id: b, label: "Vision par ordinateur" }
+        - { id: c, label: "IA générative" }
+        - { id: d, label: "Robotique" }
+      correct: [a]
+      explanation: >
+        Analyser un sentiment à partir de texte relève du NLP : la machine
+        interprète le langage humain. La vision traite des images, et la
+        génération produit du contenu nouveau.
+
+  - type: recap
+    conceptId: c-ai-workloads
+    body: >
+      Les charges IA clés : machine learning (prédire), vision (images), NLP
+      (langage), IA générative (créer du contenu), conversationnel (dialoguer).
+      Azure fournit un service managé pour chacune.

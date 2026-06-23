@@ -5,6 +5,8 @@ import '../models/learning_path.dart';
 import '../models/lesson.dart';
 import '../models/quiz.dart';
 import '../models/leaderboard.dart';
+import '../models/tutor.dart';
+import '../models/recommendation.dart';
 import 'repositories.dart';
 
 /// HTTP-backed implementations of the repository contracts. Each method maps a
@@ -62,4 +64,22 @@ class RemoteLeaderboardRepository implements LeaderboardRepository {
 
   @override
   Future<Result<League>> getMyLeague() => _api.getJson('/me/league', League.fromJson);
+}
+
+class RemoteTutorRepository implements TutorRepository {
+  const RemoteTutorRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<TutorExplanation>> explain(TutorExplainRequest request) =>
+      _api.postJson('/tutor/explain', request.toJson(), TutorExplanation.fromJson);
+}
+
+class RemoteRecommendationRepository implements RecommendationRepository {
+  const RemoteRecommendationRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<NextBest>> getNextBest(String trackId) =>
+      _api.getJson('/me/recommendations/$trackId', NextBest.fromJson);
 }

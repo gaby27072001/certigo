@@ -42,18 +42,19 @@ class CheckStepWidget extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
     final bool multi = item.type == ItemType.multi;
+    final _CheckFraming f = _framingFor(item.type, p);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Row(
           children: <Widget>[
-            Icon(Icons.psychology_rounded, color: p.primary, size: 18),
+            Icon(f.icon, color: f.color, size: 18),
             const SizedBox(width: 8),
             Text(
-              'Vérifie ta compréhension',
+              f.label,
               style: text.labelLarge?.copyWith(
-                color: p.primary,
+                color: f.color,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -87,5 +88,33 @@ class CheckStepWidget extends StatelessWidget {
         ],
       ],
     );
+  }
+}
+
+/// Type-driven header (icon + label + accent) so scenario and "spot the issue"
+/// checks read differently from a plain comprehension question, without forking
+/// the widget. The body stays identical — only the framing signals the mode.
+class _CheckFraming {
+  const _CheckFraming(this.icon, this.label, this.color);
+
+  final IconData icon;
+  final String label;
+  final Color color;
+}
+
+_CheckFraming _framingFor(ItemType type, PrismColorScheme p) {
+  switch (type) {
+    case ItemType.spotTheIssue:
+      return _CheckFraming(Icons.bug_report_rounded, 'Repère l\'erreur', p.warning);
+    case ItemType.scenario:
+      return _CheckFraming(Icons.alt_route_rounded, 'Scénario', p.info);
+    case ItemType.mcq:
+    case ItemType.multi:
+    case ItemType.cloze:
+    case ItemType.ordering:
+    case ItemType.matchPairs:
+    case ItemType.applied:
+    case ItemType.unknown:
+      return _CheckFraming(Icons.psychology_rounded, 'Vérifie ta compréhension', p.primary);
   }
 }

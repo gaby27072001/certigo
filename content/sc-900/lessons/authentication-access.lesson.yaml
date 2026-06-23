@@ -1,0 +1,72 @@
+id: sc900-l-authentication-access
+trackId: sc-900
+unitId: sc900-u-entra
+domainId: entra-identity
+title: MFA, accès conditionnel et RBAC
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-authentication-access
+    body: >
+      Un mot de passe seul est fragile. Mais tout re-vérifier en permanence
+      épuiserait les utilisateurs. L'art de l'accès moderne : exiger plus de
+      preuves **seulement quand le risque le justifie**, et n'accorder que les
+      rôles utiles.
+
+  - type: concept
+    conceptId: c-authentication-access
+    title: Plusieurs preuves, des règles, des rôles
+    body: >
+      La **MFA** (authentification multifacteur) exige au moins deux preuves de
+      catégories différentes : **ce que je sais** (mot de passe), **ce que j'ai**
+      (téléphone, clé), **ce que je suis** (biométrie). Le **passwordless**
+      (Windows Hello, FIDO2, Microsoft Authenticator) supprime le mot de passe.
+
+
+      L'**accès conditionnel** applique des **règles** : à partir de signaux
+      (utilisateur, appareil, localisation, risque), il décide d'**autoriser**,
+      **bloquer** ou **exiger la MFA**. C'est Zero Trust en action.
+
+
+      Le **RBAC** (contrôle d'accès basé sur les rôles) attribue des
+      **permissions via des rôles** (lecteur, contributeur, propriétaire) à une
+      portée donnée, appliquant le privilège minimum.
+
+  - type: example
+    conceptId: c-authentication-access
+    body: >
+      Connexion depuis le bureau sur un appareil conforme : accès direct.
+      Connexion depuis un pays inhabituel : l'accès conditionnel **exige la
+      MFA**. Une fois entré, le RBAC limite l'utilisateur au rôle « lecteur »
+      sur le groupe de ressources.
+
+  - type: check
+    conceptId: c-authentication-access
+    check:
+      id: sc900-l-authentication-access-check-1
+      conceptId: c-authentication-access
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous voulez exiger automatiquement la MFA uniquement lorsque la
+        connexion est jugée risquée ou provient d'un lieu inhabituel. Quelle
+        capacité Entra utilisez-vous ?
+      options:
+        - { id: a, label: "Le RBAC" }
+        - { id: b, label: "Le hachage des mots de passe" }
+        - { id: c, label: "L'accès conditionnel" }
+        - { id: d, label: "Le SSO" }
+      correct: [c]
+      explanation: >
+        L'accès conditionnel évalue des signaux (risque, lieu, appareil) et
+        applique une décision comme « exiger la MFA ». Le RBAC attribue des
+        rôles/permissions ; le hachage protège les mots de passe stockés ; le
+        SSO évite de se reconnecter à chaque app.
+
+  - type: recap
+    conceptId: c-authentication-access
+    body: >
+      MFA = au moins deux catégories de preuves ; passwordless supprime le mot
+      de passe. L'accès conditionnel décide selon des signaux (autoriser/
+      bloquer/MFA). Le RBAC accorde des permissions via des rôles, au plus juste.

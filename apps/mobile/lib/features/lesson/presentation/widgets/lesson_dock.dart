@@ -34,7 +34,7 @@ class LessonDock extends StatelessWidget {
     final VoidCallback? onPressed;
     if (validating) {
       label = 'Valider';
-      onPressed = state.selection.isEmpty ? null : onValidate;
+      onPressed = state.canSubmitCurrent ? onValidate : null;
     } else if (step.kind == LessonStepKind.intro) {
       label = 'Commencer';
       onPressed = onAdvance;

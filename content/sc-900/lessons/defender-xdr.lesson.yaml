@@ -1,0 +1,74 @@
+id: sc900-l-defender-xdr
+trackId: sc-900
+unitId: sc900-u-security
+domainId: security-solutions
+title: Microsoft Defender XDR
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-defender-xdr
+    body: >
+      Une attaque moderne saute d'un e-mail piégé à un poste, puis à une
+      identité, puis au cloud. Surveiller chaque domaine séparément, c'est rater
+      le fil. Defender XDR relie ces domaines pour suivre l'attaque de bout en
+      bout.
+
+  - type: concept
+    conceptId: c-defender-xdr
+    title: Une suite XDR qui couvre plusieurs domaines
+    body: >
+      **Microsoft Defender XDR** (eXtended Detection and Response) est une suite
+      de défense **avant et après la violation**, qui **corrèle** les signaux
+      entre plusieurs domaines en un seul incident :
+
+      - **Defender pour Office 365** : e-mail et outils de collaboration
+      (hameçonnage, pièces jointes) ;
+
+      - **Defender pour Endpoint** : postes et serveurs (EDR) ;
+
+      - **Defender pour Identity** : attaques sur l'identité on-premises (Active
+      Directory) ;
+
+      - **Defender for Cloud Apps** : visibilité et contrôle des applications
+      SaaS (CASB).
+
+
+      Attention à ne pas confondre **Defender XDR** (menaces multi-domaines) avec
+      **Defender for Cloud** (posture des ressources cloud).
+
+  - type: example
+    conceptId: c-defender-xdr
+    body: >
+      Un e-mail de hameçonnage (Defender pour Office 365) mène à l'exécution
+      d'un programme malveillant sur un PC (Defender pour Endpoint). XDR relie
+      les deux en **un seul incident** au lieu de deux alertes isolées.
+
+  - type: check
+    conceptId: c-defender-xdr
+    check:
+      id: sc900-l-defender-xdr-check-1
+      conceptId: c-defender-xdr
+      type: mcq
+      difficulty: 2
+      stem: >
+        Quel produit de la suite Microsoft Defender XDR protège spécifiquement
+        la messagerie et les outils de collaboration contre l'hameçonnage ?
+      options:
+        - { id: a, label: "Defender pour Endpoint" }
+        - { id: b, label: "Defender pour Office 365" }
+        - { id: c, label: "Defender pour Identity" }
+        - { id: d, label: "Defender for Cloud Apps" }
+      correct: [b]
+      explanation: >
+        Defender pour Office 365 protège la messagerie et la collaboration
+        (hameçonnage, pièces jointes, liens). Defender pour Endpoint couvre les
+        appareils ; Defender pour Identity, l'Active Directory on-premises ;
+        Defender for Cloud Apps, les applications SaaS.
+
+  - type: recap
+    conceptId: c-defender-xdr
+    body: >
+      Defender XDR corrèle les menaces entre Office 365, Endpoint, Identity et
+      Cloud Apps en incidents unifiés. À distinguer de Defender for Cloud, qui
+      gère la posture des ressources cloud.

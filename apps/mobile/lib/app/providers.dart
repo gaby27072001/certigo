@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core/core.dart';
 import 'package:data/data.dart';
 
+import '../features/lesson/application/lesson_feedback.dart';
+
 /// Root dependency wiring for the app, expressed as Riverpod providers.
 ///
 /// This is the composition layer: it constructs the [ApiClient] and the
@@ -44,8 +46,22 @@ final leaderboardRepositoryProvider = Provider<LeaderboardRepository>(
   (Ref ref) => RemoteLeaderboardRepository(ref.watch(apiClientProvider)),
 );
 
+final tutorRepositoryProvider = Provider<TutorRepository>(
+  (Ref ref) => RemoteTutorRepository(ref.watch(apiClientProvider)),
+);
+
+final recommendationRepositoryProvider = Provider<RecommendationRepository>(
+  (Ref ref) => RemoteRecommendationRepository(ref.watch(apiClientProvider)),
+);
+
 /// User-controlled theme mode (persisted by settings later). System by default.
 final themeModeProvider = StateProvider<ThemeMode>((Ref ref) => ThemeMode.system);
+
+/// Audio-haptic feedback for lesson checks (§3.14). Real haptics by default;
+/// tests / reduce-motion override this with [SilentLessonFeedback].
+final lessonFeedbackProvider = Provider<LessonFeedback>(
+  (Ref ref) => const HapticLessonFeedback(),
+);
 
 /// Unwraps a repository [Result] into a plain value, throwing the [Failure] so
 /// Riverpod surfaces it as `AsyncError` for the UI's `.when(error: …)` branch.
@@ -61,6 +77,15 @@ final meProvider = FutureProvider.autoDispose<UserProfile>((Ref ref) async {
 final pathProvider = FutureProvider.autoDispose.family<LearningPath, String>(
   (Ref ref, String trackId) async {
     return _orThrow(await ref.watch(pathRepositoryProvider).getPath(trackId));
+  },
+);
+
+/// The "next best action" coach for one track: a server-ranked shelf of what
+/// the learner should do next. Auto-disposed and keyed by trackId so Home can
+/// surface a coaching section without recomputing anything on-device.
+final nextBestProvider = FutureProvider.autoDispose.family<NextBest, String>(
+  (Ref ref, String trackId) async {
+    return _orThrow(await ref.watch(recommendationRepositoryProvider).getNextBest(trackId));
   },
 );
 

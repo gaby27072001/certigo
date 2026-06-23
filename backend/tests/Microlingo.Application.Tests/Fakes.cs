@@ -29,6 +29,9 @@ internal sealed class InMemoryUserRepository : IUserRepository
     public Task<UserProfileDto?> GetAsync(string userId, CancellationToken cancellationToken = default)
         => Task.FromResult(_store.GetValueOrDefault(userId));
 
+    public Task<UserProfileDto?> FindByHandleAsync(string handle, CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.Values.FirstOrDefault(p => string.Equals(p.Handle, handle, StringComparison.OrdinalIgnoreCase)));
+
     public Task<UserProfileDto> UpsertAsync(UserProfileDto profile, CancellationToken cancellationToken = default)
     {
         _store[profile.Id] = profile;
@@ -54,6 +57,14 @@ internal sealed class InMemoryContentRepository : IContentRepository
 
     public Task<LessonAnswerKey?> GetAnswerKeyAsync(string trackId, string lessonId, CancellationToken cancellationToken = default)
         => Task.FromResult(_answerKeys.GetValueOrDefault(lessonId));
+
+    public Task<IReadOnlyList<LessonAnswerKey>> ListAnswerKeysAsync(string trackId, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<LessonAnswerKey> result = _answerKeys.Values
+            .Where(k => string.Equals(k.TrackId, trackId, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        return Task.FromResult(result);
+    }
 }
 
 internal sealed class InMemoryProgressRepository : IProgressRepository
@@ -102,6 +113,23 @@ internal sealed class InMemoryAttemptRepository : IAttemptRepository
     }
 }
 
+internal sealed class InMemoryExamAttemptRepository : IExamAttemptRepository
+{
+    private readonly List<ExamAttemptRecord> _store = new();
+
+    public int CreateCount { get; private set; }
+
+    public Task<ExamAttemptRecord?> GetByClientAttemptIdAsync(string userId, string clientAttemptId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.FirstOrDefault(a => a.UserId == userId && a.ClientAttemptId == clientAttemptId));
+
+    public Task CreateAsync(ExamAttemptRecord attempt, CancellationToken cancellationToken = default)
+    {
+        _store.Add(attempt);
+        CreateCount++;
+        return Task.CompletedTask;
+    }
+}
+
 internal sealed class InMemoryEventRepository : IEventRepository
 {
     public List<LearningEvent> Events { get; } = new();
@@ -130,5 +158,90 @@ internal sealed class InMemoryLeaderboardRepository : ILeaderboardRepository
     {
         Xp[userId] = Xp.GetValueOrDefault(userId) + xp;
         return Task.CompletedTask;
+    }
+}
+
+internal sealed class InMemoryPurchaseRepository : IPurchaseRepository
+{
+    private readonly List<PurchaseRecord> _store = new();
+
+    public int CreateCount { get; private set; }
+
+    public Task<PurchaseRecord?> GetByClientPurchaseIdAsync(string userId, string clientPurchaseId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.FirstOrDefault(p => p.UserId == userId && p.ClientPurchaseId == clientPurchaseId));
+
+    public Task CreateAsync(PurchaseRecord record, CancellationToken cancellationToken = default)
+    {
+        _store.Add(record);
+        CreateCount++;
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class InMemoryFriendRepository : IFriendRepository
+{
+    private readonly Dictionary<string, FriendEdge> _store = new(StringComparer.OrdinalIgnoreCase);
+
+    private static string Key(string userId, string friendUserId) => $"{userId}:{friendUserId}";
+
+    public Task<IReadOnlyList<FriendEdge>> ListAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<FriendEdge> result = _store.Values
+            .Where(e => string.Equals(e.UserId, userId, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        return Task.FromResult(result);
+    }
+
+    public Task<FriendEdge?> GetAsync(string userId, string friendUserId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.GetValueOrDefault(Key(userId, friendUserId)));
+
+    public Task UpsertAsync(FriendEdge edge, CancellationToken cancellationToken = default)
+    {
+        _store[Key(edge.UserId, edge.FriendUserId)] = edge;
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveAsync(string userId, string friendUserId, CancellationToken cancellationToken = default)
+    {
+        _store.Remove(Key(userId, friendUserId));
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class InMemoryLearnerModelRepository : ILearnerModelRepository
+{
+    private readonly Dictionary<string, LearnerModelRecord> _store = new(StringComparer.OrdinalIgnoreCase);
+
+    public int UpsertCount { get; private set; }
+
+    private static string Key(string userId, string trackId) => $"{userId}|{trackId}";
+
+    public Task<LearnerModelRecord?> GetAsync(string userId, string trackId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.GetValueOrDefault(Key(userId, trackId)));
+
+    public Task UpsertAsync(LearnerModelRecord model, CancellationToken cancellationToken = default)
+    {
+        _store[Key(model.UserId, model.TrackId)] = model;
+        UpsertCount++;
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeTutorCompletion : ITutorCompletion
+{
+    private readonly string? _reply;
+
+    public FakeTutorCompletion(string? reply = null) => _reply = reply;
+
+    public int CallCount { get; private set; }
+    public string? LastSystemPrompt { get; private set; }
+    public string? LastUserPrompt { get; private set; }
+
+    public Task<string?> CompleteAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default)
+    {
+        CallCount++;
+        LastSystemPrompt = systemPrompt;
+        LastUserPrompt = userPrompt;
+        return Task.FromResult(_reply);
     }
 }

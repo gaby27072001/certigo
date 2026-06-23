@@ -1,0 +1,63 @@
+id: ai900-l-ml-types
+trackId: ai-900
+unitId: ai900-u-ml
+domainId: machine-learning
+title: Types d'apprentissage automatique
+estMinutes: 7
+
+blocks:
+  - type: hook
+    conceptId: c-ml-types
+    body: >
+      Prédire le prix d'une maison, trier des e-mails en spam/non-spam, regrouper
+      des clients qui se ressemblent : trois problèmes, trois familles de machine
+      learning. Sauriez-vous les distinguer ?
+
+  - type: concept
+    conceptId: c-ml-types
+    title: Régression, classification, clustering
+    body: >
+      En **apprentissage supervisé**, on entraîne le modèle sur des données déjà
+      étiquetées. Deux cas : la **régression** prédit une **valeur numérique**
+      continue (prix, température) ; la **classification** prédit une
+      **catégorie** (spam/non-spam, malade/sain).
+
+
+      En **apprentissage non supervisé**, les données n'ont pas d'étiquette : le
+      **clustering** regroupe les exemples similaires (segments de clients) sans
+      qu'on lui dise les groupes à l'avance.
+
+  - type: example
+    conceptId: c-ml-types
+    body: >
+      « Combien se vendra cette voiture ? » → **régression** (valeur). « Cet
+      e-mail est-il un spam ? » → **classification** (catégorie). « Quels
+      groupes naturels existent dans ma base clients ? » → **clustering**.
+
+  - type: check
+    conceptId: c-ml-types
+    check:
+      id: ai900-l-ml-types-check-1
+      conceptId: c-ml-types
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous voulez prédire le nombre exact de vélos loués demain selon la météo.
+        Quel type de machine learning convient ?
+      options:
+        - { id: a, label: "Régression" }
+        - { id: b, label: "Classification" }
+        - { id: c, label: "Clustering" }
+        - { id: d, label: "Apprentissage non supervisé" }
+      correct: [a]
+      explanation: >
+        Prédire une quantité numérique continue (un nombre de locations) est une
+        tâche de régression. La classification prédirait une catégorie, et le
+        clustering regrouperait sans étiquette.
+
+  - type: recap
+    conceptId: c-ml-types
+    body: >
+      Supervisé : régression (valeur numérique) et classification (catégorie),
+      avec données étiquetées. Non supervisé : clustering (regrouper) sans
+      étiquette. Le type de réponse attendue dicte la famille.

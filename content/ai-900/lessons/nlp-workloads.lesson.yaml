@@ -1,0 +1,63 @@
+id: ai900-l-nlp-workloads
+trackId: ai-900
+unitId: ai900-u-nlp
+domainId: nlp
+title: Tâches de traitement du langage
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-nlp-workloads
+    body: >
+      Comprendre l'intention d'un message, en extraire les noms de lieux,
+      détecter la langue, juger le ton : le langage humain est riche, et le NLP
+      le découpe en tâches précises.
+
+  - type: concept
+    conceptId: c-nlp-workloads
+    title: Les briques du NLP
+    body: >
+      Le **NLP** regroupe : l'**analyse de sentiment** (positif/négatif),
+      l'**extraction d'entités nommées** (personnes, lieux, dates), l'**extraction
+      de phrases clés**, la **détection de la langue**, la **traduction**, et la
+      **reconnaissance / synthèse vocale** (parole ↔ texte).
+
+
+      Pour l'IA conversationnelle, la **compréhension du langage** détecte
+      l'**intention** de l'utilisateur (« réserver un vol ») et les **entités**
+      associées (date, destination) afin qu'un bot réponde correctement.
+
+  - type: example
+    conceptId: c-nlp-workloads
+    body: >
+      Dans « Je veux annuler ma commande de Paris du 3 mai », un système NLP
+      détecte l'**intention** (annuler), les **entités** (Paris, 3 mai) et peut
+      mesurer un **sentiment** plutôt négatif.
+
+  - type: check
+    conceptId: c-nlp-workloads
+    check:
+      id: ai900-l-nlp-workloads-check-1
+      conceptId: c-nlp-workloads
+      type: mcq
+      difficulty: 2
+      stem: >
+        Une application repère automatiquement les noms de villes et de personnes
+        dans des articles. Quelle tâche NLP réalise-t-elle ?
+      options:
+        - { id: a, label: "Reconnaissance d'entités nommées" }
+        - { id: b, label: "Analyse de sentiment" }
+        - { id: c, label: "Synthèse vocale" }
+        - { id: d, label: "Traduction" }
+      correct: [a]
+      explanation: >
+        Identifier des personnes, lieux ou dates dans un texte est de la
+        reconnaissance d'entités nommées (NER). Le sentiment juge le ton, et la
+        synthèse vocale transforme du texte en parole.
+
+  - type: recap
+    conceptId: c-nlp-workloads
+    body: >
+      NLP : sentiment, entités nommées, phrases clés, langue, traduction, parole.
+      Pour les bots : intention + entités. Chaque besoin langagier correspond à
+      une tâche identifiable.

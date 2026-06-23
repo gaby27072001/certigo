@@ -18,11 +18,11 @@ env:
 
 jobs:
   packages:
-    name: Pure-Dart packages (core, cortex)
+    name: Pure-Dart packages (core, cortex, data)
     runs-on: [self-hosted, Linux, X64, microlingo-ci]
     strategy:
       matrix:
-        package: [ core, cortex ]
+        package: [ core, cortex, data ]
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1

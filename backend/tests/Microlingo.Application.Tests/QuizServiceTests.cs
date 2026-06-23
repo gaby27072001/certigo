@@ -13,6 +13,7 @@ internal sealed class QuizServiceHarness
     public InMemoryLeaderboardRepository Leaderboard { get; } = new();
     public InMemoryEventRepository Events { get; } = new();
     public InMemoryAttemptRepository Attempts { get; } = new();
+    public InMemoryLearnerModelRepository LearnerModels { get; } = new();
     public FakeClock Clock { get; } = new(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
     public string UserId { get; } = "user-1";
 
@@ -20,7 +21,7 @@ internal sealed class QuizServiceHarness
     {
         var content = TestContent.Build();
         var context = new FakeUserContext(UserId, "Tester");
-        return new QuizService(context, Clock, content, Progress, Attempts, Events, Users, Leaderboard);
+        return new QuizService(context, Clock, content, Progress, Attempts, Events, Users, Leaderboard, LearnerModels);
     }
 
     public static SubmitQuizRequest Request(string attemptId, params AnswerDto[] answers)
@@ -113,5 +114,26 @@ public sealed class QuizServiceTests
         result.Rewards.GemsEarned.Should().Be(0);
         result.Rewards.StreakExtended.Should().BeFalse();
         result.WeakConcepts.Should().Contain("c1");
+    }
+
+    [Fact]
+    public async Task SubmitAsync_unlocks_achievement_awarding_bonus_gems_on_top_of_lesson_gems()
+    {
+        var h = new QuizServiceHarness();
+        // Four prior flawless lessons: a fifth perfect lesson crosses the
+        // "Sans-faute · Bronze" (flawless-5) threshold.
+        h.Users.Seed(TestContent.NewProfile(h.UserId) with { LifetimePerfectLessons = 4 });
+        var service = h.Build();
+
+        var result = await service.SubmitAsync("l1", QuizServiceHarness.Request("a1", QuizServiceHarness.Answer("l1-i1", "a")));
+
+        result.Rewards.AchievementsUnlocked.Should().ContainSingle().Which.Should().Be("flawless-5");
+        result.Rewards.GemsEarned.Should().Be(6); // lesson gems only, excludes the achievement bonus
+
+        var profile = await h.Users.GetAsync(h.UserId);
+        profile!.Achievements.Should().Contain("flawless-5");
+        profile.LifetimePerfectLessons.Should().Be(5);
+        profile.LifetimeLessonsCompleted.Should().Be(1);
+        profile.Gems.Should().Be(26); // 6 lesson gems + 20 achievement reward
     }
 }

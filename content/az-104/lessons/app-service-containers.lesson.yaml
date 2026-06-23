@@ -1,0 +1,74 @@
+id: az104-l-app-service-containers
+trackId: az-104
+unitId: az104-u-compute
+domainId: compute
+title: App Service et conteneurs
+estMinutes: 8
+
+blocks:
+  - type: hook
+    conceptId: c-app-service
+    body: >
+      Toutes les charges ne méritent pas une VM à administrer (patchs, OS,
+      sécurité). Pour héberger une application web ou une API sans gérer le
+      serveur, Azure propose des services **managés** : **App Service** et les
+      options **conteneurs**.
+
+  - type: concept
+    conceptId: c-app-service
+    title: Plans, emplacements et options conteneurs
+    body: >
+      **Azure App Service** héberge des applications web/API sur un **plan App
+      Service** (le pool de calcul, facturé au tier : Free, Basic, Standard,
+      Premium). On distingue **monter en gamme** (scale up, changer de tier) et
+      **monter en charge** (scale out, ajouter des instances, possiblement en
+      autoscale). Les **emplacements de déploiement** (deployment slots — p. ex.
+      `staging`) permettent de tester puis d'**échanger** (swap) en production
+      sans interruption.
+
+
+      Pour les conteneurs : **Azure Container Instances (ACI)** exécute un
+      conteneur isolé, à la demande, sans orchestrateur ; **Azure Container Apps**
+      ajoute mise à l'échelle (jusqu'à zéro) et microservices managés ; **Azure
+      Container Registry (ACR)** stocke vos images privées. Pour un orchestrateur
+      Kubernetes complet, on passe à **AKS** — plus puissant mais plus à
+      administrer.
+
+  - type: example
+    conceptId: c-app-service
+    body: >
+      Vous publiez une nouvelle version d'API. Vous la déployez d'abord dans
+      l'emplacement **staging**, vérifiez qu'elle répond, puis effectuez un
+      **swap** avec l'emplacement de production : le basculement est instantané et
+      réversible. Aucun utilisateur ne subit de coupure.
+
+  - type: check
+    conceptId: c-app-service
+    check:
+      id: az104-l-app-service-containers-check-1
+      conceptId: c-app-service
+      type: mcq
+      difficulty: 2
+      stem: >
+        Vous voulez valider une nouvelle version d'application web en conditions
+        réelles, puis la basculer en production sans temps d'arrêt et avec
+        possibilité de revenir en arrière. Quelle fonctionnalité d'App Service ?
+      options:
+        - { id: a, label: "Le scale up (montée en gamme du plan)" }
+        - { id: b, label: "Les domaines de défaillance" }
+        - { id: c, label: "Azure Container Registry" }
+        - { id: d, label: "Les emplacements de déploiement (deployment slots) et le swap" }
+      correct: [d]
+      explanation: >
+        Les **deployment slots** hébergent une version en parallèle (staging) ;
+        le **swap** la promeut en production instantanément, et un swap inverse
+        permet le retour arrière — sans interruption. Le scale up change la
+        puissance ; les domaines de défaillance concernent les VM ; ACR stocke des
+        images.
+
+  - type: recap
+    conceptId: c-app-service
+    body: >
+      App Service : plan (tier), scale up vs scale out, deployment slots + swap
+      (mise en prod sans coupure). Conteneurs : ACI (simple), Container Apps
+      (microservices managés), ACR (images), AKS (Kubernetes complet).

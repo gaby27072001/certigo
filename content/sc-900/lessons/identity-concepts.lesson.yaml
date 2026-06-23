@@ -1,0 +1,69 @@
+id: sc900-l-identity-concepts
+trackId: sc-900
+unitId: sc900-u-entra
+domainId: entra-identity
+title: Authentification, autorisation et identité
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-identity-concepts
+    body: >
+      « Qui es-tu ? » puis « qu'as-tu le droit de faire ? » : deux questions
+      différentes que l'on confond souvent. Les distinguer est la base de toute
+      la sécurité moderne, où l'identité est devenue le vrai périmètre.
+
+  - type: concept
+    conceptId: c-identity-concepts
+    title: AuthN ≠ AuthZ
+    body: >
+      L'**authentification** (AuthN) prouve **qui** vous êtes : vous présentez
+      des preuves (mot de passe, code, empreinte). L'**autorisation** (AuthZ)
+      décide **ce que** vous pouvez faire une fois identifié.
+
+
+      Un **fournisseur d'identité** (identity provider) gère ces identités et
+      émet des **jetons** de confiance ; les applications font confiance au
+      fournisseur au lieu de gérer les mots de passe elles-mêmes.
+
+
+      Le **SSO** (authentification unique) permet de se connecter une fois et
+      d'accéder à plusieurs applications. La **fédération** étend cette
+      confiance entre organisations ou domaines distincts.
+
+  - type: example
+    conceptId: c-identity-concepts
+    body: >
+      Vous vous connectez à Microsoft Entra avec MFA (**authentification**).
+      Entra émet un jeton. Quand vous ouvrez SharePoint, l'app lit le jeton et
+      constate que vous êtes « lecteur » sur un site (**autorisation**) — sans
+      redemander vos identifiants (**SSO**).
+
+  - type: check
+    conceptId: c-identity-concepts
+    check:
+      id: sc900-l-identity-concepts-check-1
+      conceptId: c-identity-concepts
+      type: mcq
+      difficulty: 1
+      stem: >
+        Un utilisateur est déjà connecté. Le système vérifie maintenant s'il a
+        le droit de supprimer un fichier. De quel processus s'agit-il ?
+      options:
+        - { id: a, label: "Authentification" }
+        - { id: b, label: "Fédération" }
+        - { id: c, label: "Chiffrement" }
+        - { id: d, label: "Autorisation" }
+      correct: [d]
+      explanation: >
+        Décider ce qu'un utilisateur déjà identifié a le droit de faire, c'est
+        l'autorisation (AuthZ). L'authentification aurait prouvé son identité ;
+        la fédération établit la confiance entre domaines ; le chiffrement
+        protège les données.
+
+  - type: recap
+    conceptId: c-identity-concepts
+    body: >
+      Authentification = prouver qui on est ; autorisation = ce qu'on peut
+      faire. Un fournisseur d'identité émet des jetons ; le SSO connecte une
+      fois pour plusieurs apps ; la fédération étend la confiance.

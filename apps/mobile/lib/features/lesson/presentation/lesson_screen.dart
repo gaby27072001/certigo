@@ -66,6 +66,9 @@ class _LessonRunningView extends StatelessWidget {
       inner = ResultFeedbackWidget(
         result: state.result!,
         lesson: state.lesson!,
+        trackId: controller.args.trackId,
+        lessonId: controller.args.lessonId,
+        answers: state.answers,
         onContinue: () => context.go(Routes.home),
         onReview: () => context.go(Routes.path),
       );
@@ -78,6 +81,7 @@ class _LessonRunningView extends StatelessWidget {
       inner = StepRenderer(
         state: state,
         onToggleOption: controller.toggleOption,
+        onToggleMatch: controller.toggleMatch,
       );
     }
 

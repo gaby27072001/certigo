@@ -1,0 +1,69 @@
+id: sc900-l-defender-cloud
+trackId: sc-900
+unitId: sc900-u-security
+domainId: security-solutions
+title: Microsoft Defender for Cloud
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-defender-cloud
+    body: >
+      « Notre cloud est-il bien configuré ? » Sans outil, c'est l'angoisse :
+      des centaines de ressources, mille réglages possibles. Defender for Cloud
+      donne une note, pointe les failles et explique comment les corriger.
+
+  - type: concept
+    conceptId: c-defender-cloud
+    title: Posture et protection des charges de travail
+    body: >
+      **Microsoft Defender for Cloud** gère la **posture de sécurité** et
+      protège les charges de travail, y compris en **multicloud** (Azure, AWS,
+      GCP) et hybride.
+
+
+      Son **Secure Score** (degré de sécurisation) mesure votre posture et
+      propose des **recommandations** priorisées pour la renforcer — par
+      exemple « activer le chiffrement », « fermer un port exposé ».
+
+
+      Ses plans **CWPP** (Cloud Workload Protection) ajoutent des protections et
+      des **alertes** pour les serveurs, le stockage, les bases de données, les
+      conteneurs, etc. Il s'appuie sur des standards comme le **Microsoft Cloud
+      Security Benchmark**.
+
+  - type: example
+    conceptId: c-defender-cloud
+    body: >
+      Une machine virtuelle expose le port RDP à Internet. Defender for Cloud
+      fait baisser le Secure Score et recommande d'activer le **just-in-time
+      VM access** pour n'ouvrir le port que sur demande et temporairement.
+
+  - type: check
+    conceptId: c-defender-cloud
+    check:
+      id: sc900-l-defender-cloud-check-1
+      conceptId: c-defender-cloud
+      type: mcq
+      difficulty: 2
+      stem: >
+        Quel élément de Microsoft Defender for Cloud donne une mesure chiffrée
+        de votre posture de sécurité accompagnée de recommandations priorisées ?
+      options:
+        - { id: a, label: "Le Secure Score (degré de sécurisation)" }
+        - { id: b, label: "Le journal d'activité Azure" }
+        - { id: c, label: "Une règle d'accès conditionnel" }
+        - { id: d, label: "Une étiquette de confidentialité" }
+      correct: [a]
+      explanation: >
+        Le Secure Score quantifie la posture de sécurité et liste des
+        recommandations priorisées pour l'améliorer. Le journal d'activité
+        trace les opérations ; l'accès conditionnel concerne l'identité ; les
+        étiquettes de confidentialité relèvent de la protection de l'information.
+
+  - type: recap
+    conceptId: c-defender-cloud
+    body: >
+      Defender for Cloud = posture + protection des charges (CWPP), en
+      multicloud et hybride. Le Secure Score mesure la posture et guide via des
+      recommandations priorisées, alignées sur le Cloud Security Benchmark.

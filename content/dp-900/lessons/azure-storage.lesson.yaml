@@ -1,0 +1,63 @@
+id: dp900-l-azure-storage
+trackId: dp-900
+unitId: dp900-u-nonrelational
+domainId: non-relational-data
+title: Les services Azure Storage
+estMinutes: 6
+
+blocks:
+  - type: hook
+    conceptId: c-azure-storage
+    body: >
+      Des images, des partages de fichiers, des messages entre services, des
+      données clé-valeur : quatre besoins de stockage très différents, réunis
+      dans un même compte Azure Storage.
+
+  - type: concept
+    conceptId: c-azure-storage
+    title: Blob, File, Queue, Table
+    body: >
+      **Azure Blob Storage** stocke des **objets** non structurés — images,
+      vidéos, sauvegardes, journaux — à grande échelle et à faible coût, avec des
+      niveaux d'accès (chaud, froid, archive).
+
+
+      **Azure Files** offre des **partages de fichiers** réseau (SMB/NFS) montables
+      comme un lecteur. **Azure Queue Storage** stocke des **messages** pour
+      découpler des composants. **Azure Table Storage** est un magasin
+      **clé-valeur** NoSQL simple et économique.
+
+  - type: example
+    conceptId: c-azure-storage
+    body: >
+      Héberger les photos d'un site e-commerce → **Blob**. Partager des documents
+      entre VM → **Files**. Tamponner des tâches à traiter → **Queue**. Stocker
+      des métadonnées clé-valeur peu coûteuses → **Table**.
+
+  - type: check
+    conceptId: c-azure-storage
+    check:
+      id: dp900-l-azure-storage-check-1
+      conceptId: c-azure-storage
+      type: mcq
+      difficulty: 1
+      stem: >
+        Vous devez stocker de gros volumes de fichiers non structurés (images,
+        sauvegardes) comme des objets, à faible coût. Quel service Azure Storage ?
+      options:
+        - { id: a, label: "Azure Queue Storage" }
+        - { id: b, label: "Azure Table Storage" }
+        - { id: c, label: "Azure Files" }
+        - { id: d, label: "Azure Blob Storage" }
+      correct: [d]
+      explanation: >
+        Le stockage Blob est dédié aux objets non structurés (images, vidéos,
+        sauvegardes) à grande échelle et faible coût. Queue gère des messages,
+        Table des paires clé-valeur, et Files des partages de fichiers réseau.
+
+  - type: recap
+    conceptId: c-azure-storage
+    body: >
+      Azure Storage réunit Blob (objets non structurés), Files (partages réseau),
+      Queue (messages) et Table (clé-valeur NoSQL). On choisit le service selon la
+      forme de la donnée et l'usage.

@@ -1,0 +1,77 @@
+id: az104-l-vm-availability-scale
+trackId: az-104
+unitId: az104-u-compute
+domainId: compute
+title: Disponibilité et mise à l'échelle des VM
+estMinutes: 9
+
+blocks:
+  - type: hook
+    conceptId: c-vm-scale
+    body: >
+      Une seule VM est un **point de défaillance unique** : une maintenance, une
+      panne matérielle, et le service tombe. Pour tenir un SLA et absorber la
+      charge, on conçoit la **redondance** (plusieurs instances) et
+      l'**élasticité** (ajouter/retirer des instances à la demande).
+
+  - type: concept
+    conceptId: c-vm-scale
+    title: Sets, zones et groupes identiques
+    body: >
+      Un **groupe à haute disponibilité** (availability set) répartit les VM sur
+      des **domaines de défaillance** (matériel/alimentation distincts) et des
+      **domaines de mise à jour** (redémarrages échelonnés lors des maintenances).
+      Il protège **dans un même datacenter**.
+
+
+      Les **zones de disponibilité** vont plus loin : des datacenters physiquement
+      séparés dans une région. Répartir des VM sur plusieurs zones protège contre
+      la perte d'un datacenter entier (SLA jusqu'à 99,99 %).
+
+
+      Les **groupes identiques** (Virtual Machine Scale Sets, VMSS) gèrent un
+      ensemble de VM identiques et ajoutent l'**autoscale** : des règles (p. ex.
+      « CPU > 70 % pendant 10 min → +2 instances ») font varier le nombre
+      d'instances automatiquement. Modes **Uniform** (identiques) ou **Flexible**
+      (plus de souplesse).
+
+  - type: example
+    conceptId: c-vm-scale
+    body: >
+      Un site e-commerce subit des pics le soir. Vous déployez les serveurs web
+      dans un **VMSS** réparti sur **trois zones**, avec une règle d'autoscale sur
+      le CPU. Le soir, les instances montent à 12 ; la nuit, elles redescendent à
+      3. La charge est absorbée, la facture suit l'usage, et la panne d'une zone
+      ne coupe pas le service.
+
+  - type: check
+    conceptId: c-vm-scale
+    check:
+      id: az104-l-vm-availability-scale-check-1
+      conceptId: c-vm-scale
+      type: mcq
+      difficulty: 3
+      stem: >
+        Vous devez ajouter ou retirer automatiquement des instances de VM
+        identiques selon l'utilisation CPU, tout en survivant à la panne d'un
+        datacenter au sein d'une région. Quelle approche ?
+      options:
+        - { id: a, label: "Une VM unique redimensionnée manuellement" }
+        - { id: b, label: "Un groupe à haute disponibilité dans un seul datacenter" }
+        - { id: c, label: "Un groupe identique (VMSS) avec autoscale, réparti sur des zones de disponibilité" }
+        - { id: d, label: "Plusieurs VM dans le même domaine de défaillance" }
+      correct: [c]
+      explanation: >
+        Le **VMSS** apporte l'**autoscale** piloté par des métriques (CPU), et le
+        répartir sur des **zones de disponibilité** protège contre la perte d'un
+        datacenter. Une VM unique n'a pas d'élasticité ; un availability set ne
+        couvre qu'un datacenter ; un domaine de défaillance unique ne protège
+        pas.
+
+  - type: recap
+    conceptId: c-vm-scale
+    body: >
+      Disponibilité : availability set (domaines de défaillance/mise à jour, intra
+      datacenter) < zones de disponibilité (inter-datacenters). Élasticité : VMSS
+      + autoscale (Uniform/Flexible). On combine zones + VMSS pour résilience et
+      scalabilité.
