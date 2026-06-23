@@ -49,8 +49,6 @@ jobs:
     name: Build IPA signé + upload TestFlight
     # ⚠️ Runner macOS requis (Xcode). Fallback hébergé (désactivé EMU) : macos-14
     runs-on: [self-hosted, macOS]
-    env:
-      HAS_ASC: ${{ secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.ASC_KEY_P8_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -74,33 +72,77 @@ jobs:
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
           echo "### Release iOS : $BUILD_NAME (+$BUILD_NUMBER) → TestFlight" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Installer la signature (certificat + profil)
+      - name: Résoudre les secrets + installer la signature (Key Vault → repli secrets)
+        id: signing
         shell: bash
         env:
-          P12_B64: ${{ secrets.IOS_DIST_CERTIFICATE_P12_BASE64 }}
-          P12_PWD: ${{ secrets.IOS_DIST_CERTIFICATE_PASSWORD }}
-          PROFILE_B64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          KV_NAME: ${{ vars.AZURE_KEYVAULT_NAME }}
+          IOS_DIST_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_DIST_CERTIFICATE_P12_BASE64 }}
+          IOS_DIST_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DIST_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_PROVISIONING_PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
         run: |
           set -euo pipefail
+          P12_B64="$IOS_DIST_CERTIFICATE_P12_BASE64"; P12_PWD="$IOS_DIST_CERTIFICATE_PASSWORD"
+          PROFILE_B64="$IOS_PROVISIONING_PROFILE_BASE64"; PROFILE_NAME="$IOS_PROVISIONING_PROFILE_NAME"
+          TEAM_ID="$IOS_TEAM_ID"; KEY_ID="$ASC_KEY_ID"; ISSUER="$ASC_ISSUER_ID"; P8_B64="$ASC_KEY_P8_BASE64"
+
+          if [ -n "${KV_NAME:-}" ]; then
+            echo "Secrets : Azure Key Vault ($KV_NAME) via l'identité managée du runner."
+            az login --identity --output none
+            kv(){ az keyvault secret show --vault-name "$KV_NAME" --name "$1" --query value -o tsv 2>/dev/null || true; }
+            P12_B64="$(kv mobile-ios-dist-cert-p12-base64)"
+            P12_PWD="$(kv mobile-ios-dist-cert-password)"
+            PROFILE_B64="$(kv mobile-ios-provisioning-profile-base64)"
+            PROFILE_NAME="$(kv mobile-ios-provisioning-profile-name)"
+            TEAM_ID="$(kv mobile-ios-team-id)"
+            KEY_ID="$(kv mobile-asc-key-id)"
+            ISSUER="$(kv mobile-asc-issuer-id)"
+            P8_B64="$(kv mobile-asc-key-p8-base64)"
+          else
+            echo "Secrets : secrets GitHub (variable AZURE_KEYVAULT_NAME non définie)."
+          fi
+
           if [ -z "${P12_B64:-}" ] || [ -z "${PROFILE_B64:-}" ]; then
-            echo "::error::Secrets de signature iOS manquants (certificat / profil). Voir docs/RELEASE_MOBILE.md."
+            echo "::error::Certificat / profil iOS introuvables (Key Vault ou secrets GitHub). Voir docs/RELEASE_MOBILE.md."
             exit 1
           fi
+          for s in "$P12_PWD" "$P12_B64" "$P8_B64"; do [ -n "$s" ] && echo "::add-mask::$s"; done
+
+          # --- Keychain éphémère + import du certificat ---
           KEYCHAIN="$RUNNER_TEMP/app-signing.keychain-db"
           KEYCHAIN_PWD="$(openssl rand -base64 16)"
           security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
           security set-keychain-settings -lut 21600 "$KEYCHAIN"
           security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
-
           echo "$P12_B64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
           security import "$RUNNER_TEMP/dist.p12" -P "$P12_PWD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN" >/dev/null
-          # Ajoute notre keychain à la liste de recherche (en conservant les existantes).
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed 's/[\"[:space:]]//g')
 
+          # --- Profil d'approvisionnement ---
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           echo "$PROFILE_B64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/microlingo_beta.mobileprovision"
-          echo "KEYCHAIN_PATH=$KEYCHAIN" >> "$GITHUB_ENV"
+
+          # --- Scalaires exportés pour les étapes suivantes ---
+          {
+            echo "KEYCHAIN_PATH=$KEYCHAIN"
+            echo "IOS_TEAM_ID=$TEAM_ID"
+            echo "IOS_PROVISIONING_PROFILE_NAME=$PROFILE_NAME"
+            echo "ASC_KEY_ID=$KEY_ID"
+            echo "ASC_ISSUER_ID=$ISSUER"
+            echo "ASC_KEY_P8_BASE64=$(echo "$P8_B64" | tr -d '\n\r')"
+          } >> "$GITHUB_ENV"
+
+          if [ -n "${KEY_ID:-}" ] && [ -n "${ISSUER:-}" ] && [ -n "${P8_B64:-}" ]; then
+            echo "has_asc=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "has_asc=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Récupérer les dépendances
         working-directory: apps/mobile
@@ -122,14 +164,10 @@ jobs:
           --build-number=${{ steps.ver.outputs.build_number }}
 
       - name: Build IPA signé + upload TestFlight
-        if: ${{ inputs.dry_run != true && env.HAS_ASC == 'true' }}
+        if: ${{ inputs.dry_run != true && steps.signing.outputs.has_asc == 'true' }}
         working-directory: apps/mobile/ios
         env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
-          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
-          IOS_PROVISIONING_PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
+          # ASC_*, IOS_TEAM_ID et IOS_PROVISIONING_PROFILE_NAME proviennent de l'étape « signing » ($GITHUB_ENV).
           TF_EXTERNAL: ${{ inputs.external }}
           TF_CHANGELOG: "Bêta Microlingo ${{ steps.ver.outputs.build_name }} (+${{ steps.ver.outputs.build_number }})"
         run: |
@@ -138,11 +176,8 @@ jobs:
           fastlane beta
 
       - name: Build IPA signé seul (dry-run / sans clé ASC)
-        if: ${{ inputs.dry_run == true || env.HAS_ASC != 'true' }}
+        if: ${{ inputs.dry_run == true || steps.signing.outputs.has_asc != 'true' }}
         working-directory: apps/mobile/ios
-        env:
-          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
-          IOS_PROVISIONING_PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
         run: |
           set -euo pipefail
           PROFILE="${IOS_PROVISIONING_PROFILE_NAME}"
@@ -175,9 +210,9 @@ jobs:
           if-no-files-found: error
 
       - name: Note — upload sauté
-        if: ${{ env.HAS_ASC != 'true' || inputs.dry_run == true }}
+        if: ${{ steps.signing.outputs.has_asc != 'true' || inputs.dry_run == true }}
         shell: bash
-        run: echo "::warning::Upload TestFlight sauté (dry_run=${{ inputs.dry_run }}, clé ASC présente=${{ env.HAS_ASC }}). L'IPA signé reste disponible en artefact."
+        run: echo "::warning::Upload TestFlight sauté (dry_run=${{ inputs.dry_run }}, clé ASC présente=${{ steps.signing.outputs.has_asc }}). L'IPA signé reste disponible en artefact."
 
       - name: Nettoyage (keychain + matériel de signature)
         if: always()
@@ -186,4 +221,5 @@ jobs:
           security delete-keychain "${KEYCHAIN_PATH:-$RUNNER_TEMP/app-signing.keychain-db}" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/ExportOptions.plist" 2>/dev/null || true
           rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/microlingo_beta.mobileprovision" 2>/dev/null || true
+          az logout --output none 2>/dev/null || true
           echo "Matériel de signature supprimé du runner."

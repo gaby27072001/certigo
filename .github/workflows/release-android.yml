@@ -54,9 +54,6 @@ jobs:
   release:
     name: Build AAB signé + publication Play
     runs-on: [self-hosted, Linux, X64, microlingo-ci]
-    env:
-      # Permet de sauter proprement la publication tant que le compte de service Play n'est pas configuré.
-      HAS_PLAY_SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -121,26 +118,56 @@ jobs:
         working-directory: apps/mobile
         run: flutter test
 
-      - name: Déchiffrer le keystore + écrire key.properties
+      - name: Résoudre & écrire le matériel de signature (Key Vault → repli secrets)
+        id: signing
         shell: bash
         env:
+          KV_NAME: ${{ vars.AZURE_KEYVAULT_NAME }}
+          # Repli si Key Vault non configuré (sinon valeurs vides) :
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
           set -euo pipefail
-          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
-            echo "::error::Secret ANDROID_KEYSTORE_BASE64 manquant — impossible de signer la release. Voir docs/RELEASE_MOBILE.md."
+          KEYSTORE_B64="$ANDROID_KEYSTORE_BASE64"; STORE_PWD="$ANDROID_KEYSTORE_PASSWORD"
+          KEY_ALIAS="$ANDROID_KEY_ALIAS"; KEY_PWD="$ANDROID_KEY_PASSWORD"; PLAY_JSON="$PLAY_SERVICE_ACCOUNT_JSON"
+
+          if [ -n "${KV_NAME:-}" ]; then
+            echo "Secrets : Azure Key Vault ($KV_NAME) via l'identité managée du runner."
+            az login --identity --output none
+            kv(){ az keyvault secret show --vault-name "$KV_NAME" --name "$1" --query value -o tsv 2>/dev/null || true; }
+            KEYSTORE_B64="$(kv mobile-android-keystore-base64)"
+            STORE_PWD="$(kv mobile-android-keystore-password)"
+            KEY_ALIAS="$(kv mobile-android-key-alias)"
+            KEY_PWD="$(kv mobile-android-key-password)"
+            PLAY_JSON="$(kv mobile-play-service-account-json)"
+          else
+            echo "Secrets : secrets GitHub (variable AZURE_KEYVAULT_NAME non définie)."
+          fi
+
+          if [ -z "${KEYSTORE_B64:-}" ]; then
+            echo "::error::Keystore introuvable (ni Key Vault ni secret GitHub). Voir docs/RELEASE_MOBILE.md."
             exit 1
           fi
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > apps/mobile/android/app/upload-keystore.jks
+          for s in "$STORE_PWD" "$KEY_PWD" "$KEY_ALIAS"; do [ -n "$s" ] && echo "::add-mask::$s"; done
+
+          echo "$KEYSTORE_B64" | base64 -d > apps/mobile/android/app/upload-keystore.jks
           cat > apps/mobile/android/key.properties <<EOF
-          storePassword=${ANDROID_KEYSTORE_PASSWORD}
-          keyPassword=${ANDROID_KEY_PASSWORD}
-          keyAlias=${ANDROID_KEY_ALIAS}
+          storePassword=${STORE_PWD}
+          keyPassword=${KEY_PWD}
+          keyAlias=${KEY_ALIAS}
           storeFile=upload-keystore.jks
           EOF
+
+          if [ -n "${PLAY_JSON:-}" ]; then
+            printf '%s' "$PLAY_JSON" > "$RUNNER_TEMP/play-sa.json"
+            echo "PLAY_SA_FILE=$RUNNER_TEMP/play-sa.json" >> "$GITHUB_ENV"
+            echo "has_play=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "has_play=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Construire l'AAB signé
         working-directory: apps/mobile
@@ -157,10 +184,10 @@ jobs:
           if-no-files-found: error
 
       - name: Publier sur Google Play (piste ${{ steps.ver.outputs.track }})
-        if: ${{ inputs.dry_run != true && env.HAS_PLAY_SA == 'true' }}
+        if: ${{ inputs.dry_run != true && steps.signing.outputs.has_play == 'true' }}
         uses: r0adkll/upload-google-play@v1
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          serviceAccountJson: ${{ env.PLAY_SA_FILE }}
           packageName: ${{ env.PLAY_PACKAGE_NAME }}
           releaseFiles: ${{ env.AAB_PATH }}
           track: ${{ steps.ver.outputs.track }}
@@ -168,10 +195,10 @@ jobs:
           whatsNewDirectory: apps/mobile/distribution/android/whatsnew
 
       - name: Note — publication sautée
-        if: ${{ env.HAS_PLAY_SA != 'true' || inputs.dry_run == true }}
+        if: ${{ steps.signing.outputs.has_play != 'true' || inputs.dry_run == true }}
         shell: bash
         run: |
-          echo "::warning::Publication Play sautée (dry_run=${{ inputs.dry_run }}, compte de service présent=${{ env.HAS_PLAY_SA }}). L'AAB signé reste disponible en artefact."
+          echo "::warning::Publication Play sautée (dry_run=${{ inputs.dry_run }}, compte de service présent=${{ steps.signing.outputs.has_play }}). L'AAB signé reste disponible en artefact."
           echo "> ℹ️ Publication Play **sautée** — l'AAB signé est téléchargeable dans les artefacts du run." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Nettoyer le matériel de signature
@@ -179,4 +206,6 @@ jobs:
         shell: bash
         run: |
           rm -f apps/mobile/android/app/upload-keystore.jks apps/mobile/android/key.properties
+          rm -f "$RUNNER_TEMP/play-sa.json" 2>/dev/null || true
+          az logout --output none 2>/dev/null || true
           echo "Matériel de signature supprimé du workspace du runner self-hosted."

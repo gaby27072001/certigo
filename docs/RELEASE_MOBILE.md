@@ -18,7 +18,7 @@ Documentation opérationnelle pour publier les bêtas Microlingo.
   Run workflow ────▶│  release-android.yml                                │
                     │   1. JDK 17 + SDK Android + Flutter 3.24.0           │
                     │   2. gates BLOQUANTS : flutter analyze + test        │
-                    │   3. déchiffre keystore (secrets) → key.properties   │
+                    │   3. secrets via Key Vault / GitHub → key.properties │
                     │   4. flutter build appbundle (signé, versionné)      │
                     │   5. upload Google Play (piste internal/closed/…)    │
                     │   6. nettoyage du matériel de signature              │
@@ -43,8 +43,74 @@ Documentation opérationnelle pour publier les bêtas Microlingo.
 
 ---
 
-## 2. Secrets GitHub Actions (à créer une fois)
+## 2. Gestion des secrets
 
+Deux approches, **interchangeables sans modifier les workflows** : si la variable
+de dépôt `AZURE_KEYVAULT_NAME` est définie, les workflows lisent les secrets
+depuis **Azure Key Vault** (recommandé) ; sinon ils retombent automatiquement sur
+les **secrets GitHub**.
+
+### 2.1 Recommandé — Azure Key Vault (zéro secret dans GitHub) ⭐
+
+Les secrets de signature vivent dans le Key Vault `kv-microlingo-<env>-<suffixe>`
+(déjà déployé par `infra/`), lus à la volée par l'**identité managée du runner**.
+Rien n'est stocké dans GitHub ; la rotation se fait en un seul endroit.
+
+**Mise en place (une fois)**
+
+1. **Identité managée du runner** : active une identité (system-assigned) sur la
+   VM du runner et récupère son `principalId` :
+   ```bash
+   az vm identity assign -g rg-microlingo-ci -n <vm-runner>
+   az vm show -g rg-microlingo-ci -n <vm-runner> --query identity.principalId -o tsv
+   ```
+2. **Droit de lecture sur le Key Vault** — au choix :
+   - via Bicep (IaC) : redéploie `infra/main.bicep` avec
+     `--parameters ciRunnerPrincipalId=<principalId>` *(nécessite des droits
+     d'attribution de rôle au scope du Key Vault)* ; ou
+   - en direct :
+     ```bash
+     az role assignment create --assignee <principalId> \
+       --role "Key Vault Secrets User" \
+       --scope $(az keyvault show -n <kv-name> --query id -o tsv)
+     ```
+3. **Variable de dépôt** (non sensible) désignant le vault à utiliser :
+   ```bash
+   gh variable set AZURE_KEYVAULT_NAME --body 'kv-microlingo-dev-xxxxxx'
+   ```
+4. **Charger les secrets dans le Key Vault** (une seule commande) :
+   ```powershell
+   Copy-Item tools/secrets/mobile-secrets.env.example tools/secrets/mobile-secrets.env  # puis renseigne-le
+   ./tools/secrets/set-keyvault-secrets.ps1 -VaultName kv-microlingo-dev-xxxxxx
+   ```
+   *(`mobile-secrets.env` est gitignoré ; le script encode keystore / certificat /
+   profil / clé en base64 et pousse chaque valeur. `-DryRun` pour prévisualiser.)*
+
+**Noms des secrets dans le Key Vault**
+
+| Secret Key Vault | Plateforme | Contenu |
+|---|---|---|
+| `mobile-android-keystore-base64` | Android | Keystore upload (.jks) base64 |
+| `mobile-android-keystore-password` | Android | Mot de passe du keystore |
+| `mobile-android-key-alias` | Android | Alias de la clé |
+| `mobile-android-key-password` | Android | Mot de passe de la clé |
+| `mobile-play-service-account-json` | Android | JSON du compte de service Play |
+| `mobile-ios-dist-cert-p12-base64` | iOS | Certificat distribution (.p12) base64 |
+| `mobile-ios-dist-cert-password` | iOS | Mot de passe du .p12 |
+| `mobile-ios-provisioning-profile-base64` | iOS | Profil (.mobileprovision) base64 |
+| `mobile-ios-provisioning-profile-name` | iOS | Nom exact du profil |
+| `mobile-ios-team-id` | iOS | Team ID Apple |
+| `mobile-asc-key-id` | iOS | App Store Connect Key ID |
+| `mobile-asc-issuer-id` | iOS | App Store Connect Issuer ID |
+| `mobile-asc-key-p8-base64` | iOS | Clé API (.p8) base64 |
+
+> 🔐 Rotation = changer **une** valeur dans le Key Vault, rien côté GitHub. Accès
+> en lecture seule (rôle *Key Vault Secrets User*), tracé dans les logs du Key
+> Vault → Application Insights. Le runner doit avoir **Azure CLI** installé.
+
+### 2.2 Repli — Secrets GitHub Actions
+
+Utilisé automatiquement si `AZURE_KEYVAULT_NAME` n'est **pas** définie.
 `Settings → Secrets and variables → Actions → New repository secret`.
 
 | Secret | Plateforme | Usage |
@@ -93,6 +159,10 @@ keytool -genkeypair -v \
 ```
 
 ### 3.3 Encoder et enregistrer les secrets Android
+
+> 💡 Avec **Key Vault** (§2.1, recommandé), saute cette étape : charge tout via
+> `set-keyvault-secrets.ps1`. Les commandes ci-dessous concernent le **repli
+> secrets GitHub**.
 
 Encoder le keystore en base64 :
 
@@ -171,7 +241,8 @@ git push origin v0.1.0
 > ⚠️ **Pré-requis : un runner macOS self-hosted** avec Xcode + CocoaPods (les
 > runners hébergés GitHub sont désactivés par la politique EMU). Enregistrer un
 > Mac comme runner avec les labels `[self-hosted, macOS]`. Fastlane est installé
-> automatiquement par le workflow s'il est absent.
+> automatiquement par le workflow s'il est absent. **Azure CLI (`az`)** est requis
+> si le mode Key Vault (§2.1) est utilisé.
 
 ### 4.1 Pré-requis Apple (one-time)
 
@@ -183,6 +254,9 @@ git push origin v0.1.0
 5. **Clé API App Store Connect** (rôle App Manager) : Key ID, Issuer ID, fichier `.p8`.
 
 ### 4.2 Préparer les secrets iOS (depuis un Mac)
+
+> 💡 Avec **Key Vault** (§2.1, recommandé), charge ces valeurs via
+> `set-keyvault-secrets.ps1` plutôt que de créer des secrets GitHub.
 
 ```bash
 base64 -i dist.p12                 > cert.b64       # -> IOS_DIST_CERTIFICATE_P12_BASE64
