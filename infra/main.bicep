@@ -35,6 +35,9 @@ param enableDefenderPlans bool = false
 @description('Force-assign the subscription-scoped MCSB policy even in dev (needs Owner / role-assignment rights at subscription scope). Default false; staging/prod assign it automatically.')
 param forcePolicyAssignment bool = false
 
+@description('Object (principal) id of the CI release runner managed identity. When set, it is granted read access (Key Vault Secrets User) to the Key Vault so the mobile release workflows can pull signing secrets — no signing secret in GitHub. Empty = skip (needs role-assignment rights to set).')
+param ciRunnerPrincipalId string = ''
+
 // Deterministic, collision-resistant suffix per environment/subscription.
 var suffix = uniqueString(subscription().id, appName, env)
 var rgName = 'rg-${appName}-${env}'
@@ -148,6 +151,19 @@ module policy 'modules/policy.bicep' = if (assignPolicy) {
   name: 'policy'
   params: {
     assignmentLocation: location
+  }
+}
+
+// Optional: grant the CI release runner's managed identity read access to the
+// Key Vault, so the mobile release workflows pull signing secrets from KV
+// (no signing secret stored in GitHub). Opt-in: skipped when the principal id
+// is empty (and requires role-assignment rights at the Key Vault scope).
+module ciMobileSecretsAccess 'modules/keyVaultSecretsAccess.bicep' = if (!empty(ciRunnerPrincipalId)) {
+  scope: rg
+  name: 'ciMobileSecretsAccess'
+  params: {
+    keyVaultName: vault.outputs.name
+    principalId: ciRunnerPrincipalId
   }
 }
 

@@ -3,7 +3,7 @@
          Le manifeste debug ne s'applique qu'aux builds debug, d'où la déclaration ici. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="microlingo"
+        android:label="Microlingo"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

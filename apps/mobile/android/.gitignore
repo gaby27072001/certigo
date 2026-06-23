@@ -1,8 +1,8 @@
-gradle-wrapper.jar
+# NB : gradle-wrapper.jar, gradlew et gradlew.bat sont VOLONTAIREMENT versionnés
+# (retirés de ce .gitignore) pour garantir un build CI 100 % reproductible avec
+# une version de Gradle épinglée. Ne pas les ré-ignorer.
 /.gradle
 /captures/
-/gradlew
-/gradlew.bat
 /local.properties
 GeneratedPluginRegistrant.java
 

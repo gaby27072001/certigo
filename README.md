@@ -188,6 +188,12 @@ API principale :
 | `ci-backend` | `backend/**` | `dotnet build -warnaserror`, `dotnet test` |
 | `ci-content` | `content/**`, `tools/validate_content.mjs` | schémas + intégrité + somme des poids = 1.0 |
 | `ci-infra`   | `infra/**` | `az bicep build` (lint des templates) |
+| `release-android` | manuel / tag `v*` | **AAB signé** + publication Google Play (gates `analyze`/`test`) |
+| `release-ios` | manuel (runner macOS) | **IPA signé** + upload TestFlight (gates `analyze`/`test`) |
+| `sync-ios-certs` | manuel (runner macOS) | Bootstrap / renouvellement des certs iOS via `fastlane match` |
+
+> Publication des bêtas mobiles (signature, secrets, runbooks Android & iOS,
+> rollback, checklist) : voir [`docs/RELEASE_MOBILE.md`](docs/RELEASE_MOBILE.md).
 
 > [!NOTE]
 > Les workflows utilisent un runner **self-hosted** avec labels

@@ -1,0 +1,419 @@
+# Release mobile — Pipeline & runbooks
+
+Documentation opérationnelle pour publier les bêtas Microlingo.
+**Priorité : Android d'abord, puis iOS.** Pipeline reproductible :
+`code → build signée → upload beta store`.
+
+> 🔐 **Aucun secret n'est committé.** Toutes les valeurs sensibles vivent dans
+> les secrets GitHub Actions (ou en local dans des fichiers ignorés par git).
+> Ce document ne contient que des **noms** de secrets et des **commandes**.
+
+---
+
+## 1. Vue d'ensemble
+
+```
+                    ┌─────────────────────────────────────────────────────┐
+  git push / tag /  │  GitHub Actions (runner self-hosted Linux)          │
+  Run workflow ────▶│  release-android.yml                                │
+                    │   1. JDK 17 + SDK Android + Flutter 3.24.0           │
+                    │   2. gates BLOQUANTS : flutter analyze + test        │
+                    │   3. secrets via Key Vault / GitHub → key.properties │
+                    │   4. flutter build appbundle (signé, versionné)      │
+                    │   5. upload Google Play (piste internal/closed/…)    │
+                    │   6. nettoyage du matériel de signature              │
+                    └─────────────────────────────────────────────────────┘
+```
+
+| Élément | Valeur |
+|---|---|
+| App Flutter | `apps/mobile` |
+| applicationId / bundle id | `com.microlingo.app` — ⚠️ **NON modifiable après le 1er upload Play** |
+| Nom affiché | Microlingo |
+| versionName | lu depuis `apps/mobile/pubspec.yaml` (`version:` → partie avant `+`) |
+| versionCode / build number | `github.run_number` (auto-incrémenté), override possible |
+| Workflows | `release-android.yml` (prêt), `release-ios.yml` (Phase iOS) |
+| CI inchangée | `ci-mobile.yml` (format/analyze/test) — aucune régression |
+
+> ⚠️ **`com.microlingo.app` est un placeholder explicite.** Il doit être confirmé
+> **avant la toute première publication Play** : l'applicationId est définitif une
+> fois la première build uploadée. S'il change, mettre à jour :
+> `apps/mobile/android/app/build.gradle` (`applicationId`),
+> `PLAY_PACKAGE_NAME` dans `release-android.yml`, et la fiche store.
+
+---
+
+## 2. Gestion des secrets
+
+Deux approches, **interchangeables sans modifier les workflows** : si la variable
+de dépôt `AZURE_KEYVAULT_NAME` est définie, les workflows lisent les secrets
+depuis **Azure Key Vault** (recommandé) ; sinon ils retombent automatiquement sur
+les **secrets GitHub**.
+
+### 2.1 Recommandé — Azure Key Vault (zéro secret dans GitHub) ⭐
+
+Les secrets de signature vivent dans le Key Vault `kv-microlingo-<env>-<suffixe>`
+(déjà déployé par `infra/`), lus à la volée par l'**identité managée du runner**.
+Rien n'est stocké dans GitHub ; la rotation se fait en un seul endroit.
+
+**Mise en place (une fois)**
+
+1. **Identité managée du runner** : active une identité (system-assigned) sur la
+   VM du runner et récupère son `principalId` :
+   ```bash
+   az vm identity assign -g rg-microlingo-ci -n <vm-runner>
+   az vm show -g rg-microlingo-ci -n <vm-runner> --query identity.principalId -o tsv
+   ```
+2. **Droit de lecture sur le Key Vault** — au choix :
+   - via Bicep (IaC) : redéploie `infra/main.bicep` avec
+     `--parameters ciRunnerPrincipalId=<principalId>` *(nécessite des droits
+     d'attribution de rôle au scope du Key Vault)* ; ou
+   - en direct :
+     ```bash
+     az role assignment create --assignee <principalId> \
+       --role "Key Vault Secrets User" \
+       --scope $(az keyvault show -n <kv-name> --query id -o tsv)
+     ```
+3. **Variable de dépôt** (non sensible) désignant le vault à utiliser :
+   ```bash
+   gh variable set AZURE_KEYVAULT_NAME --body 'kv-microlingo-dev-xxxxxx'
+   ```
+4. **Charger les secrets dans le Key Vault** (une seule commande) :
+   ```powershell
+   Copy-Item tools/secrets/mobile-secrets.env.example tools/secrets/mobile-secrets.env  # puis renseigne-le
+   ./tools/secrets/set-keyvault-secrets.ps1 -VaultName kv-microlingo-dev-xxxxxx
+   ```
+   *(`mobile-secrets.env` est gitignoré ; le script encode keystore / certificat /
+   profil / clé en base64 et pousse chaque valeur. `-DryRun` pour prévisualiser.)*
+
+**Noms des secrets dans le Key Vault**
+
+| Secret Key Vault | Plateforme | Contenu |
+|---|---|---|
+| `mobile-android-keystore-base64` | Android | Keystore upload (.jks) base64 |
+| `mobile-android-keystore-password` | Android | Mot de passe du keystore |
+| `mobile-android-key-alias` | Android | Alias de la clé |
+| `mobile-android-key-password` | Android | Mot de passe de la clé |
+| `mobile-play-service-account-json` | Android | JSON du compte de service Play |
+| `mobile-ios-dist-cert-p12-base64` | iOS | Certificat distribution (.p12) base64 |
+| `mobile-ios-dist-cert-password` | iOS | Mot de passe du .p12 |
+| `mobile-ios-provisioning-profile-base64` | iOS | Profil (.mobileprovision) base64 |
+| `mobile-ios-provisioning-profile-name` | iOS | Nom exact du profil |
+| `mobile-ios-team-id` | iOS | Team ID Apple |
+| `mobile-asc-key-id` | iOS | App Store Connect Key ID |
+| `mobile-asc-issuer-id` | iOS | App Store Connect Issuer ID |
+| `mobile-asc-key-p8-base64` | iOS | Clé API (.p8) base64 |
+| `mobile-ios-match-password` | iOS | Passphrase fastlane match (si match utilisé) |
+| `mobile-ios-match-git-auth` | iOS | Auth git base64 du repo de certs match (si match utilisé) |
+
+> 🔐 Rotation = changer **une** valeur dans le Key Vault, rien côté GitHub. Accès
+> en lecture seule (rôle *Key Vault Secrets User*), tracé dans les logs du Key
+> Vault → Application Insights. Le runner doit avoir **Azure CLI** installé.
+
+### 2.2 Repli — Secrets GitHub Actions
+
+Utilisé automatiquement si `AZURE_KEYVAULT_NAME` n'est **pas** définie.
+`Settings → Secrets and variables → Actions → New repository secret`.
+
+| Secret | Plateforme | Usage |
+|---|---|---|
+| `ANDROID_KEYSTORE_BASE64` | Android | Keystore upload (.jks) encodé base64 |
+| `ANDROID_KEYSTORE_PASSWORD` | Android | Mot de passe du keystore |
+| `ANDROID_KEY_ALIAS` | Android | Alias de la clé (ex : `upload`) |
+| `ANDROID_KEY_PASSWORD` | Android | Mot de passe de la clé |
+| `PLAY_SERVICE_ACCOUNT_JSON` | Android | JSON du compte de service Google Play |
+| `IOS_DIST_CERTIFICATE_P12_BASE64` | iOS | Certificat de distribution (.p12) en base64 |
+| `IOS_DIST_CERTIFICATE_PASSWORD` | iOS | Mot de passe du .p12 |
+| `IOS_PROVISIONING_PROFILE_BASE64` | iOS | Profil d'approvisionnement App Store (.mobileprovision) base64 |
+| `IOS_PROVISIONING_PROFILE_NAME` | iOS | Nom EXACT du profil (ex : `Microlingo Beta App Store`) |
+| `IOS_TEAM_ID` | iOS | Team ID Apple Developer (10 caractères) |
+| `ASC_KEY_ID` | iOS | App Store Connect API Key ID |
+| `ASC_ISSUER_ID` | iOS | App Store Connect Issuer ID |
+| `ASC_KEY_P8_BASE64` | iOS | Clé API App Store Connect (.p8) en base64 |
+
+> Tant que `PLAY_SERVICE_ACCOUNT_JSON` est absent, le workflow **construit quand
+> même l'AAB signé** (téléchargeable en artefact) et **saute** proprement la
+> publication.
+
+---
+
+## 3. Android
+
+### 3.1 Pré-requis du runner self-hosted
+
+Le runner `microlingo-ci` (Linux X64) doit disposer de Flutter/Dart (déjà requis
+par la CI). Le workflow installe lui-même **JDK 17** et le **SDK Android**
+(`android-actions/setup-android` + `sdkmanager`), donc aucune action manuelle
+supplémentaire n'est nécessaire. L'egress internet passe par la NAT Gateway
+`nat-microlingo` (voir README).
+
+### 3.2 Générer le keystore upload (one-time, en local)
+
+Le keystore **upload** signe l'AAB ; Google Play le re-signe ensuite avec la clé
+d'application (Play App Signing). **Sauvegardez ce keystore et ses mots de passe
+en lieu sûr** (sa perte est irréversible).
+
+```bash
+keytool -genkeypair -v \
+  -keystore upload-keystore.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -alias upload
+```
+
+### 3.3 Encoder et enregistrer les secrets Android
+
+> 💡 Avec **Key Vault** (§2.1, recommandé), saute cette étape : charge tout via
+> `set-keyvault-secrets.ps1`. Les commandes ci-dessous concernent le **repli
+> secrets GitHub**.
+
+Encoder le keystore en base64 :
+
+```bash
+# Linux / macOS
+base64 -w0 upload-keystore.jks > keystore.b64
+```
+```powershell
+# Windows PowerShell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("upload-keystore.jks")) | Out-File keystore.b64 -NoNewline -Encoding ascii
+```
+
+Créer les secrets (via l'UI GitHub, ou `gh`) :
+
+```bash
+gh secret set ANDROID_KEYSTORE_BASE64   < keystore.b64
+gh secret set ANDROID_KEYSTORE_PASSWORD --body '<mot_de_passe_keystore>'
+gh secret set ANDROID_KEY_ALIAS         --body 'upload'
+gh secret set ANDROID_KEY_PASSWORD      --body '<mot_de_passe_cle>'
+```
+
+> Supprimez ensuite `keystore.b64` du disque. Ne committez jamais le `.jks`
+> (déjà couvert par `.gitignore`).
+
+### 3.4 Configurer Google Play (one-time)
+
+1. **Créer l'application** dans la [Google Play Console](https://play.google.com/console)
+   avec le package `com.microlingo.app`.
+2. **Activer Play App Signing** (proposé au 1er upload).
+3. **Compte de service** : dans Google Cloud, créez un compte de service, générez
+   une **clé JSON**. Dans la Play Console → *Configuration → accès à l'API* →
+   liez le compte de service et accordez-lui au minimum le rôle permettant de
+   *gérer les versions de test* (Release manager).
+4. Enregistrer la clé JSON en secret :
+   ```bash
+   gh secret set PLAY_SERVICE_ACCOUNT_JSON < service-account.json
+   ```
+5. **Créer la piste "Test interne"** et y ajouter au moins une fois une release
+   (la première peut devoir être faite manuellement depuis la console selon
+   l'état d'enrôlement ; les suivantes passent par le workflow).
+
+### 3.5 Runbook — Lancer une beta Android (manuel) ✅
+
+1. Onglet **Actions** → workflow **release-android** → **Run workflow**.
+2. Renseigner :
+   - **track** : `internal` (puis `beta`/closed plus tard),
+   - **version_name** : vide (= pubspec) ou ex. `0.1.0`,
+   - **build_number** : vide (= numéro de run, auto-incrémenté),
+   - **dry_run** : `false` (mettre `true` pour builder sans publier).
+3. Le workflow exécute les **gates** (`analyze` + `test`), construit l'**AAB
+   signé**, l'**uploade** sur la piste choisie, puis nettoie les secrets.
+4. Dans la Play Console, ajouter les testeurs (e-mails ou liste) et partager le
+   **lien d'opt-in** de la piste de test interne.
+5. Les testeurs acceptent l'invitation puis installent depuis le lien.
+
+### 3.6 Runbook — Release par tag
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+→ déclenche `release-android` qui publie automatiquement sur la piste
+**internal** (versionName = `0.1.0` déduit du tag).
+
+### 3.7 Promouvoir Internal → Closed testing (beta)
+
+- Soit relancer le workflow avec **track=`beta`** (closed),
+- soit, dans la Play Console, **promouvoir** la release de la piste interne vers
+  la piste fermée (recommandé pour réutiliser le même artefact validé).
+
+---
+
+## 4. iOS
+
+> ⚠️ **Pré-requis : un runner macOS self-hosted** avec Xcode + CocoaPods (les
+> runners hébergés GitHub sont désactivés par la politique EMU). Enregistrer un
+> Mac comme runner avec les labels `[self-hosted, macOS]`. Fastlane est installé
+> automatiquement par le workflow s'il est absent. **Azure CLI (`az`)** est requis
+> si le mode Key Vault (§2.1) est utilisé.
+
+### 4.1 Pré-requis Apple (one-time)
+
+1. Compte **Apple Developer Program** (payant) pour l'équipe.
+2. **App ID** `com.microlingo.app` (portail Apple Developer ou App Store Connect).
+3. **App** créée dans **App Store Connect** (mêmes bundle id et nom).
+4. **Certificat de distribution** (Apple Distribution) + **profil d'approvisionnement
+   App Store** pour `com.microlingo.app`.
+5. **Clé API App Store Connect** (rôle App Manager) : Key ID, Issuer ID, fichier `.p8`.
+
+### 4.2 Préparer les secrets iOS (depuis un Mac)
+
+> 💡 Avec **Key Vault** (§2.1, recommandé), charge ces valeurs via
+> `set-keyvault-secrets.ps1` plutôt que de créer des secrets GitHub.
+
+```bash
+base64 -i dist.p12                 > cert.b64       # -> IOS_DIST_CERTIFICATE_P12_BASE64
+base64 -i profile.mobileprovision  > profile.b64    # -> IOS_PROVISIONING_PROFILE_BASE64
+base64 -i AuthKey_XXXX.p8          > authkey.b64    # -> ASC_KEY_P8_BASE64
+```
+```bash
+gh secret set IOS_DIST_CERTIFICATE_P12_BASE64 < cert.b64
+gh secret set IOS_DIST_CERTIFICATE_PASSWORD   --body '<mdp_du_p12>'
+gh secret set IOS_PROVISIONING_PROFILE_BASE64 < profile.b64
+gh secret set IOS_PROVISIONING_PROFILE_NAME   --body 'Microlingo Beta App Store'
+gh secret set IOS_TEAM_ID                     --body '<TEAM_ID>'
+gh secret set ASC_KEY_ID                      --body '<KEY_ID>'
+gh secret set ASC_ISSUER_ID                   --body '<ISSUER_ID>'
+gh secret set ASC_KEY_P8_BASE64               < authkey.b64
+```
+
+> 📌 **TODO à confirmer** (non devinables, dépendent du compte Apple) :
+> `IOS_TEAM_ID`, `IOS_PROVISIONING_PROFILE_NAME` (nom **exact** du profil),
+> `ASC_KEY_ID`, `ASC_ISSUER_ID`. À renseigner avant le premier run.
+
+### 4.3 Runbook — Lancer une beta iOS (TestFlight) ✅
+
+1. Onglet **Actions** → **release-ios** → **Run workflow**.
+2. Renseigner : **version_name**/**build_number** (vides = pubspec + run number),
+   **external** (`false` = testeurs internes ; `true` = groupe externe),
+   **dry_run** (`true` = build sans upload).
+3. Le workflow : gates `analyze`/`test` → installe la signature (keychain
+   éphémère) → compile Flutter → `fastlane beta` (archive signé + export IPA +
+   upload TestFlight) → nettoyage du matériel de signature.
+4. Dans **App Store Connect → TestFlight**, la build apparaît après traitement
+   Apple (quelques minutes).
+
+### 4.4 TestFlight interne puis externe
+
+- **Interne** (immédiat, ≤ 100 testeurs internes) : ajouter les testeurs internes
+  dans App Store Connect ; ils reçoivent la build dès la fin du traitement
+  (aucune revue Apple).
+- **Externe** (≤ 10 000) : créer un **groupe externe**, soumettre la **première**
+  build à la **revue bêta Apple**, puis distribuer. Relancer le workflow avec
+  **external=`true`** (et définir le secret/variable `TF_EXTERNAL_GROUP` si le
+  groupe ne s'appelle pas « Beta »).
+
+### 4.5 Détails de signature
+
+- **Signature manuelle** : le certificat de distribution et le profil
+  d'approvisionnement sont injectés via secrets, importés dans un **keychain
+  temporaire** détruit en fin de job. `fastlane build_app` force
+  `CODE_SIGN_STYLE=Manual`, `DEVELOPMENT_TEAM` et `PROVISIONING_PROFILE_SPECIFIER`.
+- **Authentification upload** : clé **API App Store Connect** (`.p8`) → pas
+  d'Apple ID ni de 2FA en CI.
+
+### 4.6 fastlane match (recommandé) — certs & profils gérés ⭐
+
+`fastlane match` stocke les certificats et profils iOS **chiffrés dans un repo
+git privé** ; chaque runner les installe à la volée. Plus de `.p12`/profil à
+exporter/encoder à la main, renouvellement centralisé, un seul mot de passe.
+
+Le workflow `release-ios` bascule **automatiquement** en mode match dès que la
+variable de dépôt `IOS_MATCH_GIT_URL` est définie (sinon il garde le mode manuel
+§4.2). Les certs sont synchronisés par le workflow dédié **`sync-ios-certs`**.
+
+**Secrets / variables match**
+
+| Nom | Type | Contenu |
+|---|---|---|
+| `IOS_MATCH_GIT_URL` | variable de dépôt | URL du repo privé des certificats |
+| `IOS_MATCH_PASSWORD` | secret / KV `mobile-ios-match-password` | passphrase de (dé)chiffrement match |
+| `IOS_MATCH_GIT_AUTH` | secret / KV `mobile-ios-match-git-auth` | base64 de `utilisateur:token` (clone HTTPS du repo de certs) |
+
+> Avec **Key Vault** (§2.1) : charge `IOS_MATCH_PASSWORD` / `IOS_MATCH_GIT_AUTH`
+> via `set-keyvault-secrets.ps1` ; seule `IOS_MATCH_GIT_URL` reste une variable de
+> dépôt (non sensible).
+
+**Mise en place (une fois)**
+
+1. Créer un **repo git privé vide** pour les certificats (ex. `microlingo-ios-certs`).
+2. Générer un base64 d'auth de clone HTTPS :
+   ```bash
+   echo -n '<user>:<github_token_repo_certs>' | base64   # -> IOS_MATCH_GIT_AUTH
+   ```
+3. Définir la variable + les secrets (ou les charger dans Key Vault) :
+   ```bash
+   gh variable set IOS_MATCH_GIT_URL --body 'https://github.com/<org>/microlingo-ios-certs.git'
+   gh secret set IOS_MATCH_PASSWORD  --body '<passphrase>'
+   gh secret set IOS_MATCH_GIT_AUTH  < authb64.txt
+   ```
+4. **Bootstrap des certificats** : lancer le workflow **sync-ios-certs** (Actions
+   → sync-ios-certs → Run workflow). Il exécute `fastlane certificates` (lecture-
+   écriture) qui crée le certificat de distribution + le profil App Store et les
+   pousse, chiffrés, dans le repo de certs.
+5. Les releases iOS utilisent ensuite match en **lecture seule** automatiquement.
+
+> 🔁 **Renouvellement** (expiration cert/profil) : relancer **sync-ios-certs**.
+> En mode match, le profil utilisé est `match AppStore com.microlingo.app` (géré
+> par fastlane — pas besoin de renseigner `IOS_PROVISIONING_PROFILE_NAME`).
+
+---
+
+## 5. Versioning
+
+| Champ | Source | Règle |
+|---|---|---|
+| versionName | `pubspec.yaml` ou input/tag | Sémantique (`MAJEUR.MINEUR.CORRECTIF`) |
+| versionCode (Android) | `github.run_number` ou input | **Strictement croissant** (exigé par Play) |
+
+- Pour une nouvelle version publique, bumper `version:` dans
+  `apps/mobile/pubspec.yaml` (ex. `0.1.0+1` → `0.2.0+1`).
+- Le `build_number` réel en CI vient du run GitHub : il est **monotone** et évite
+  les collisions de versionCode entre deux releases.
+
+---
+
+## 6. Rollback
+
+### Android
+
+Le versionCode étant strictement croissant, on ne « réinstalle » pas un ancien
+code : on **arrête** la diffusion fautive et on **republie** une build saine.
+
+1. **Stopper la diffusion** : Play Console → piste concernée → *Arrêter le
+   déploiement* de la release problématique (la build précédente reste celle
+   servie aux testeurs).
+2. **Republier une version saine** : se placer sur le commit/tag connu-bon et
+   relancer `release-android` (le `build_number` issu du run sera supérieur, donc
+   accepté), ou promouvoir une release antérieure valide.
+3. **Communiquer** aux testeurs si l'app était déjà installée.
+
+> Astuce : conserver la correspondance `versionCode ↔ commit` via les artefacts
+> du run et les release notes (`whatsnew`).
+
+### iOS
+
+1. **TestFlight** : dans App Store Connect, **expirer** la build fautive
+   (TestFlight → build → *Expirer*) pour qu'elle ne soit plus distribuée ; la
+   build précédente reste disponible aux testeurs.
+2. **Republier** une version saine : relancer `release-ios` depuis le commit/tag
+   connu-bon (le `build_number` issu du run sera supérieur — exigé par App Store
+   Connect).
+3. Si un groupe **externe** était concerné, vérifier l'état de la revue Apple
+   avant de redistribuer.
+
+---
+
+## 7. Checklist pré-release
+
+- [ ] `ci-mobile` au vert sur la branche à publier (format/analyze/test).
+- [ ] `version:` de `pubspec.yaml` à jour si nouvelle version publique.
+- [ ] Notes de version `apps/mobile/distribution/android/whatsnew/*` actualisées.
+- [ ] Secrets présents : `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
+      `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`.
+- [ ] (1ère fois) App créée dans Play Console + piste de test interne existante.
+- [ ] applicationId `com.microlingo.app` **confirmé** (définitif après 1er upload).
+- [ ] Run de validation `dry_run=true` réussi (AAB/IPA signé produit).
+- [ ] **iOS** : runner macOS enregistré ; secrets `IOS_*` + `ASC_*` présents ;
+      `IOS_TEAM_ID` et `IOS_PROVISIONING_PROFILE_NAME` confirmés ; app créée dans
+      App Store Connect.
+- [ ] `docs/RELEASE_MOBILE.md` à jour.
