@@ -4,6 +4,7 @@ using Microlingo.Application.Dtos;
 using Microlingo.Domain.Content;
 using Microlingo.Domain.Exam;
 using Microlingo.Domain.Gamification;
+using Microlingo.Domain.Integrity;
 using Microlingo.Domain.Notifications;
 using Microlingo.Domain.Progress;
 using Microlingo.Domain.Readiness;
@@ -271,6 +272,32 @@ public sealed class QuizService(
         var attempt = new AttemptRecord(result.AttemptId, userContext.UserId, request.ClientAttemptId, request.TrackId, lessonId, request.StartedAt, now, result);
         await attempts.CreateAsync(attempt, cancellationToken);
         await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "quiz.submitted", now, result), cancellationToken);
+
+        // Anti-triche (autorité serveur, §6/§15) — mode détection : on évalue la
+        // cohérence temporelle de la tentative et, si le verdict n'est pas « Allow »,
+        // on émet un signal d'intégrité SANS jamais modifier les récompenses.
+        // L'application des sanctions et les plafonds de cadence (fenêtre Redis)
+        // viendront au lot cloud ; ici la fenêtre est volontairement nulle.
+        var integrity = AttemptIntegrityEvaluator.Evaluate(new AttemptTiming(
+            request.StartedAt,
+            now,
+            request.Answers.Select(a => a.LatencyMs).ToList(),
+            xpEarned));
+        if (!integrity.IsClean)
+        {
+            await events.AddAsync(new LearningEvent(
+                Guid.NewGuid().ToString("n"),
+                userContext.UserId,
+                "attempt.flagged",
+                now,
+                new AttemptIntegritySignal(
+                    "quiz",
+                    lessonId,
+                    result.AttemptId,
+                    integrity.Decision.ToString(),
+                    integrity.RiskScore,
+                    integrity.Flags.Select(f => f.ToString()).ToList())), cancellationToken);
+        }
 
         if (newlyUnlocked.Count > 0)
         {
@@ -1504,6 +1531,29 @@ public sealed class ExamService(
             request.StartedAt, now, result);
         await examAttempts.CreateAsync(attempt, cancellationToken);
         await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "exam.submitted", now, result), cancellationToken);
+
+        // Anti-triche (autorité serveur, §6/§15) — mode détection, comme pour le quiz :
+        // on signale une tentative d'examen incohérente sans toucher aux récompenses.
+        var integrity = AttemptIntegrityEvaluator.Evaluate(new AttemptTiming(
+            request.StartedAt,
+            now,
+            request.Answers.Select(a => a.LatencyMs).ToList(),
+            xpEarned));
+        if (!integrity.IsClean)
+        {
+            await events.AddAsync(new LearningEvent(
+                Guid.NewGuid().ToString("n"),
+                userContext.UserId,
+                "attempt.flagged",
+                now,
+                new AttemptIntegritySignal(
+                    "exam",
+                    request.ExamId,
+                    attemptId,
+                    integrity.Decision.ToString(),
+                    integrity.RiskScore,
+                    integrity.Flags.Select(f => f.ToString()).ToList())), cancellationToken);
+        }
 
         return result;
     }

@@ -67,6 +67,18 @@ public sealed record RewardsDto(
     int GemsEarned,
     List<string> AchievementsUnlocked);
 
+// Charge utile de l'événement `attempt.flagged` émis par l'anti-triche en mode
+// détection. Schéma stable et typé (plutôt qu'anonyme) pour être sérialisable,
+// testable et exploitable par l'observabilité. `ReferenceId` = lessonId (quiz)
+// ou examId (examen). Aucune récompense n'est modifiée à l'émission.
+public sealed record AttemptIntegritySignal(
+    string Kind,
+    string ReferenceId,
+    string AttemptId,
+    string Decision,
+    double RiskScore,
+    List<string> Flags);
+
 // --- Path (skill-path) -----------------------------------------------------
 
 public sealed record PathDto(
