@@ -5,6 +5,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.Logging;
 using Microlingo.Api.Http;
+using Microlingo.Application.Abstractions;
 
 namespace Microlingo.Api.Middleware;
 
@@ -12,27 +13,77 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
 {
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
     {
+        // Correlation id: honour an inbound x-correlation-id (so a request can be
+        // traced end-to-end) or mint one. Pushed into the log scope and returned on
+        // every error response so an incident can be pinned to exact log lines.
+        var correlationId = await ResolveCorrelationIdAsync(context);
+        context.Items["CorrelationId"] = correlationId;
+        using var scope = logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = correlationId });
+
         try
         {
             await next(context);
         }
+        catch (BadRequestException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.BadRequest, "Invalid request", ex.Message, correlationId);
+        }
+        catch (ConcurrencyConflictException ex)
+        {
+            logger.LogWarning(ex, "Concurrency conflict in function {FunctionName}.", context.FunctionDefinition.Name);
+            await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict",
+                "The request conflicted with a concurrent update; please retry.", correlationId);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Unhandled exception in function {FunctionName}.", context.FunctionDefinition.Name);
-            var request = await context.GetHttpRequestDataAsync();
-            if (request is null)
+            if (!await WriteProblemAsync(context, HttpStatusCode.InternalServerError, "Unexpected server error",
+                    "Microlingo could not complete the request.", correlationId))
             {
                 throw;
             }
-
-            var response = request.CreateResponse(HttpStatusCode.InternalServerError);
-            await response.JsonAsync(new ProblemDetails
-            {
-                Title = "Unexpected server error",
-                Detail = "Microlingo could not complete the request.",
-                Status = (int)HttpStatusCode.InternalServerError
-            }, context.CancellationToken);
-            context.GetInvocationResult().Value = response;
         }
+    }
+
+    private static async Task<string> ResolveCorrelationIdAsync(FunctionContext context)
+    {
+        var request = await context.GetHttpRequestDataAsync();
+        if (request is not null
+            && request.Headers.TryGetValues("x-correlation-id", out var values))
+        {
+            var inbound = values.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(inbound))
+            {
+                return inbound;
+            }
+        }
+
+        return Guid.NewGuid().ToString("n");
+    }
+
+    private static async Task<bool> WriteProblemAsync(
+        FunctionContext context,
+        HttpStatusCode status,
+        string title,
+        string detail,
+        string correlationId)
+    {
+        var request = await context.GetHttpRequestDataAsync();
+        if (request is null)
+        {
+            return false; // non-HTTP trigger: let the caller rethrow.
+        }
+
+        var response = request.CreateResponse(status);
+        response.Headers.Add("x-correlation-id", correlationId);
+        await response.JsonAsync(new ProblemDetails
+        {
+            Title = title,
+            Detail = detail,
+            Status = (int)status,
+            Extensions = { ["correlationId"] = correlationId }
+        }, context.CancellationToken);
+        context.GetInvocationResult().Value = response;
+        return true;
     }
 }

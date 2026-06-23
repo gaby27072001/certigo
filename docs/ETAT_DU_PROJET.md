@@ -18,15 +18,16 @@
 
 | Repère | Valeur |
 |---|---|
-| 📅 Rafraîchi le | **2026‑06‑23** |
-| 🔖 Reflète le commit | `527b5c5` (`feat(mobile-android)` config native Entra, #46) |
-| 🌿 Branche du doc | `gchambaud-microsoft-living-project-summary` |
-| 📈 Activité | **43 commits**, du 2026‑06‑19 au 2026‑06‑23 — rythme très soutenu |
-| 🧪 Tests | **418** au total — **256 backend** (xUnit) · **162 Dart** (unit + widget) |
-| 🧩 API | **17 groupes de Functions** · **≈ 28 endpoints** HTTP |
-| 🗄️ Données | **8 containers Cosmos DB** (serverless) |
-| 🏗️ Infra | **8 modules Bicep** — décrite, **pas encore déployée** |
-| 🤖 CI/CD | **6 workflows** GitHub Actions (runner self‑hosted Azure) |
+| 📅 Rafraîchi le | **2026‑06‑23** (post‑audit : durcissement intégrité/sécurité/infra) |
+| 🔖 Reflète | HEAD post‑audit — voir `AUDIT_MICROLINGO.md` §M (remédiation appliquée) |
+| 🌿 Branche du doc | `gchambaud-microsoft-microlingo-audit` |
+| 📈 Activité | **47+ commits**, du 2026‑06‑19 au 2026‑06‑23 — rythme très soutenu |
+| 🧪 Tests | backend **323** exécutés (xUnit, dont concurrence/auth/parité) · Dart unit + widget (dont golden Cortex) |
+| 🧩 API | **18 groupes** de Functions (+ `GET /health`) · **≈ 29 endpoints** HTTP |
+| 🗄️ Données | **8 containers Cosmos DB** (serverless ; profil avec **ETag** concurrence optimiste) |
+| 🏗️ Infra | **9 modules Bicep** + params **dev/staging/prod** — durcie par env, **pas encore déployée** |
+| 🤖 CI/CD | **9 workflows** GitHub Actions (runner self‑hosted Azure ; SBOM + gate de release) |
+| 🔒 Durcissement | Idempotence atomique · ETag · garde auth dev · `/health` + correlation id · CORS/KV/Storage par env |
 
 ---
 
@@ -279,6 +280,7 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 
 | Date | Évolution |
 |---|---|
+| 2026‑06‑23 | 🛡️ **Remédiation post‑audit** : intégrité économie (ETag + idempotence atomique), garde auth dev en prod, parité Cortex (golden tests), `/health` + correlation id, 400/409, hardening infra par env + params staging/prod, SBOM + gate de release, validateur de contenu renforcé — voir `AUDIT_MICROLINGO.md` §M |
 | 2026‑06‑23 | 🔐 **Config Android native** activant la connexion Entra (`microlingo://auth` + INTERNET) — #46 |
 | 2026‑06‑23 | 🔍 **Anti‑triche** : moteur d'intégrité de tentative + détection « shadow » (quiz/examen) — #43 |
 | 2026‑06‑23 | 🪪 **Auth multi‑fournisseurs** Microsoft / Google / Apple + session persistante — #41 |

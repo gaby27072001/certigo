@@ -47,8 +47,14 @@ var host = new HostBuilder()
 
         services.AddSingleton<ITokenValidator>(_ =>
         {
-            var authMode = configuration["AUTH_MODE"];
-            if (string.Equals(authMode, "dev", StringComparison.OrdinalIgnoreCase))
+            // Hard production guard: the dev validator accepts any bearer token as a
+            // user id, so it can never be wired in production (even if AUTH_MODE=dev
+            // leaks into config). The decision is a pure, unit-tested function.
+            var useDev = AuthValidatorSelection.ShouldUseDevValidator(
+                configuration["AUTH_MODE"],
+                context.HostingEnvironment.IsProduction(),
+                configuration["AUTH_ALLOW_DEV"]);
+            if (useDev)
             {
                 return new DevTokenValidator();
             }

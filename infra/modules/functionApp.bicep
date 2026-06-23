@@ -32,6 +32,9 @@ param authIssuer string
 param authAudience string
 param tags object = {}
 
+@description('CORS allowed origins. Native mobile clients are not subject to CORS, so this can be [] (none) for staging/prod; dev passes ["*"] for browser-based tooling.')
+param allowedCorsOrigins array = [ '*' ]
+
 resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
   name: storageAccountName
 }
@@ -82,8 +85,9 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
       cors: {
-        // Mobile clients call directly; tighten/replace with API Management later.
-        allowedOrigins: [ '*' ]
+        // Native mobile clients aren't subject to CORS; staging/prod pass [] and
+        // tighten via API Management later. Dev allows '*' for browser tooling.
+        allowedOrigins: allowedCorsOrigins
       }
       appSettings: [
         // Identity-based AzureWebJobsStorage (no key). The managed identity is

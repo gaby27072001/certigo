@@ -4,10 +4,11 @@ import 'review_grade.dart';
 
 /// Cortex scheduler — a compact FSRS-inspired spaced-repetition algorithm.
 ///
-/// This is an intentionally simple, fully deterministic model (no ML weights)
-/// that is *byte-for-byte equivalent to the backend implementation*. The client
-/// runs it for instant optimistic feedback; the server re-runs it as the source
-/// of truth. Keeping a single algorithm in two languages avoids drift.
+/// Intentionally simple and fully deterministic (no ML weights). It is the exact
+/// twin of the backend `ReviewScheduler` — same constants, same formulae and the
+/// same fractional-day scheduling — so the client's optimistic projection matches
+/// the server's authoritative result. Parity is pinned by golden vectors shared
+/// across both languages (cortex_golden_test.dart ↔ CortexParityTests.cs).
 class ReviewScheduler {
   const ReviewScheduler._();
 
@@ -33,8 +34,6 @@ class ReviewScheduler {
     // Recall probability proxy → saturates toward 1 as stability grows.
     final double mastery = (1 - math.exp(-stability / 20)).clamp(0.0, 1.0);
 
-    final int dueDays = stability.ceil();
-
     return m.copyWith(
       difficulty: difficulty,
       stability: stability,
@@ -42,7 +41,9 @@ class ReviewScheduler {
       reps: m.reps + 1,
       lapses: m.lapses + (again ? 1 : 0),
       lastReviewedAt: now,
-      dueAt: now.add(Duration(days: dueDays)),
+      // Fractional-day scheduling — identical to the backend's
+      // `now.AddDays(stability)` (was `ceil()`, which drifted from the server).
+      dueAt: now.add(Duration(microseconds: (stability * Duration.microsecondsPerDay).round())),
     );
   }
 

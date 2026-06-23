@@ -128,16 +128,18 @@ En local : `local.settings.json` (gabarit `.example` fourni, fichier réel gitig
 
 ## 5. Données — Cosmos DB
 
-Base `microlingo`, mode **serverless**. Six containers, partitionnés pour la localité des accès :
+Base `microlingo`, mode **serverless**. Huit containers, partitionnés pour la localité des accès :
 
 | Container | Partition key | Contenu |
 |---|---|---|
-| `users` | `/id` | profil, stats lifetime |
+| `users` | `/id` | profil, stats lifetime (avec ETag pour la concurrence optimiste) |
 | `content` | `/trackId` | tracks, leçons publiques, clés de réponse |
 | `progress` | `/userId` | maîtrise par concept, état FSRS |
-| `attempts` | `/userId` | tentatives de quiz (idempotence) |
+| `attempts` | `/userId` | tentatives de quiz/examen (id déterministe `attempt::{clientAttemptId}` → idempotence atomique) |
 | `events` | `/userId` | événements analytics |
 | `leaderboard` | `/periodLeagueId` | classements hebdomadaires |
+| `economy` | `/userId` | gemmes, achats boutique (id déterministe `purchase::{clientPurchaseId}`) |
+| `friends` | `/userId` | graphe social (deux arêtes dirigées par amitié) |
 
 La partition par `/userId` garde toutes les lectures d'un utilisateur dans une seule
 partition logique (progression, tentatives, événements) — requêtes mono-partition, coût maîtrisé.
@@ -147,7 +149,9 @@ partition logique (progression, tentatives, événements) — requêtes mono-par
 ## 6. Cortex — moteur pédagogique
 
 Cortex est **dupliqué à l'identique** en Dart (`packages/cortex`) et en C#
-(`Microlingo.Domain`). Mêmes constantes, mêmes formules — le client anticipe, le serveur tranche.
+(`Microlingo.Domain`). Mêmes constantes, mêmes formules, **même planification en
+jours fractionnaires** — la parité est verrouillée par des **golden tests partagés**
+(`cortex_golden_test.dart` ↔ `CortexParityTests.cs`). Le client anticipe, le serveur tranche.
 
 - **Grades de révision** : `again=1`, `hard=2`, `good=3`, `easy=4`.
 - **Dérivation depuis une réponse** : faux → `again` ; <4 s → `easy` ; <9 s → `good` ; sinon `hard`.
@@ -232,3 +236,20 @@ des retours rapides et indépendants.
 | ADR-04 | Contenu *as-code* YAML | revue par PR, validation CI, pas de CMS à maintenir au départ |
 | ADR-05 | Pas de codegen Dart au départ | fichiers auto-suffisants, squelette robuste ; migration freezed possible plus tard |
 | ADR-06 | Pas de cœurs / vies dans la gamification | éviter la frustration ; motiver la régularité, pas la punition |
+
+---
+
+## 12. Durcissement & intégrité (remédiation post-audit)
+
+Garanties ajoutées à l'issue de l'audit technique (voir `AUDIT_MICROLINGO.md`) :
+
+| Domaine | Garantie |
+|---|---|
+| **Intégrité de l'économie** | Profil utilisateur protégé par **concurrence optimiste (ETag `_etag`)** + retry (`OptimisticConcurrency`) → plus d'écritures perdues. Tentatives/achats/examens à **id déterministe** (`attempt::`, `purchase::`, `examattempt::`) → idempotence **atomique** (création qui échoue sur doublon), sens d'échec sûr (au pire récompense rejouable, jamais de double crédit). |
+| **Sécurité auth** | `DevTokenValidator` **verrouillé hors développement** (`AuthValidatorSelection`, garde de production explicite ; `AUTH_MODE=dev` rejeté en prod sauf override non-prod). |
+| **Parité Cortex** | Planification en **jours fractionnaires** alignée client/serveur, garantie par des **golden tests partagés**. |
+| **Frontière HTTP** | JSON malformé → **400** ; conflit de concurrence → **409** ; **correlation id** (`x-correlation-id`) propagé/journalisé/retourné ; endpoint **`GET /health`** (sonde Cosmos, anonyme). |
+| **Contenu** | Le validateur vérifie l'**intégrité des réponses** (chaque `correct` référence une option réelle), l'**unicité** des ids d'items, et la cohérence `ordering`/`mcq`. |
+| **Cloud** | Hardening **par environnement** (`var hardened = env != 'dev'`) : Cosmos RBAC-only, Key Vault purge protection + soft delete 90 j, Storage GRS + versioning + soft delete, CORS verrouillé ; **params `staging`/`prod`** ajoutés. |
+| **CI/CD** | SDK Dart épinglé, lockfile applicatif suivi, **SBOM** (CycloneDX) backend, **gate d'approbation** (`environment: beta`) sur les releases mobiles. |
+

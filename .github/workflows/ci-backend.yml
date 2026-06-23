@@ -31,3 +31,17 @@ jobs:
       - name: Test
         working-directory: backend
         run: dotnet test Microlingo.sln --configuration Release --no-build --verbosity normal
+
+      - name: Generate SBOM (CycloneDX)
+        working-directory: backend
+        run: |
+          dotnet tool install --global CycloneDX
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet CycloneDX Microlingo.sln --output ./sbom --json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-sbom
+          path: backend/sbom/**
+          if-no-files-found: warn
+          retention-days: 90

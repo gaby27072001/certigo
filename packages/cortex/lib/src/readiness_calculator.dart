@@ -67,9 +67,12 @@ class ReadinessCalculator {
     return (weighted / totalWeight).round();
   }
 
-  /// Recency decays from 1 to ~0 over ~30 days since last review.
+  /// Recency decays from 1 to ~0 over ~30 days since last review. Uses fractional
+  /// days (not truncated) so it matches the backend's `TotalDays`-based decay.
   static double _recencyWeight(ConceptMastery m, DateTime now) {
-    final int days = now.difference(m.lastReviewedAt).inDays;
+    final double days =
+        (now.difference(m.lastReviewedAt).inMicroseconds / Duration.microsecondsPerDay)
+            .clamp(0.0, double.infinity);
     return math.exp(-days / 30).clamp(0.0, 1.0);
   }
 }

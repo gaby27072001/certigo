@@ -44,6 +44,10 @@ var rgName = 'rg-${appName}-${env}'
 // Dev token bypass is allowed ONLY in the dev environment; staging/prod enforce
 // Entra token validation.
 var authMode = env == 'dev' ? 'dev' : ''
+// Production-grade hardening is on for every non-dev environment: Cosmos RBAC-only
+// auth, Key Vault purge protection + 90-day soft delete, geo-redundant + versioned
+// storage, and a locked-down CORS origin set.
+var hardened = env != 'dev'
 // Subscription-scoped MCSB policy needs Owner-level rights; skip it in dev so a
 // Contributor can run the dev smoke-test deploy without friction.
 var assignPolicy = forcePolicyAssignment || env != 'dev'
@@ -79,6 +83,7 @@ module data 'modules/cosmos.bicep' = {
     accountName: 'cosmos-${appName}-${env}-${suffix}'
     location: cosmosRegion
     databaseName: 'microlingo'
+    disableLocalAuth: hardened
     tags: tags
   }
 }
@@ -90,6 +95,10 @@ module storage 'modules/storage.bicep' = {
     // Storage account names: 3-24 chars, lowercase alphanumeric only.
     accountName: toLower('st${appName}${env}${take(suffix, 8)}')
     location: location
+    skuName: hardened ? 'Standard_GRS' : 'Standard_LRS'
+    enableVersioning: hardened
+    blobSoftDeleteDays: hardened ? 30 : 7
+    containerSoftDeleteDays: hardened ? 30 : 7
     tags: tags
   }
 }
@@ -100,6 +109,8 @@ module vault 'modules/keyvault.bicep' = {
   params: {
     name: 'kv-${appName}-${env}-${take(suffix, 6)}'
     location: location
+    enablePurgeProtection: hardened
+    softDeleteRetentionInDays: hardened ? 90 : 7
     tags: tags
   }
 }
@@ -119,6 +130,8 @@ module api 'modules/functionApp.bicep' = {
     authMode: authMode
     authIssuer: authIssuer
     authAudience: authAudience
+    // Native mobile clients aren't subject to CORS; only dev keeps '*' (browser tooling).
+    allowedCorsOrigins: env == 'dev' ? [ '*' ] : []
     tags: tags
   }
 }

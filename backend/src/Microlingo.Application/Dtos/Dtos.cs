@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microlingo.Domain.Content;
 
 namespace Microlingo.Application.Dtos;
@@ -29,7 +30,14 @@ public sealed record UserProfileDto(
     int MonthlyXpEarned = 0,
     int MonthlyLessonsCompleted = 0,
     int MonthlyPerfectLessons = 0,
-    List<string>? SeasonBadges = null);
+    List<string>? SeasonBadges = null)
+{
+    /// Cosmos optimistic-concurrency token (the system `_etag`). Null for freshly
+    /// constructed or in-memory profiles; populated on read and honoured on write
+    /// (If-Match) so concurrent economy mutations never silently lose an update.
+    [JsonPropertyName("_etag")]
+    public string? ETag { get; init; }
+}
 
 public sealed record SubmitQuizRequest(
     string ClientAttemptId,

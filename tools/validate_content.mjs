@@ -46,6 +46,7 @@ for (const trackFile of trackFiles) {
 
   // Load lessons and index by id.
   const lessonsById = new Map();
+  const seenItemIds = new Set();
   for (const lf of globSync('lessons/*.lesson.yaml', { cwd: trackDir, absolute: true })) {
     const lesson = readYaml(lf);
     if (!validateLesson(lesson)) {
@@ -55,6 +56,40 @@ for (const trackFile of trackFiles) {
     if (lesson.trackId !== track.id) fail(lf, `trackId "${lesson.trackId}" != "${track.id}"`);
     if (!domainIds.has(lesson.domainId)) fail(lf, `unknown domainId "${lesson.domainId}"`);
     lessonsById.set(lesson.id, lesson);
+
+    // Quiz-item integrity. The schema checks shape; these checks catch authoring
+    // mistakes the schema can't — a `correct` answer that points at a non-existent
+    // option, duplicate option/item ids, or an incomplete `ordering` — all of which
+    // would silently break server-side grading.
+    for (const block of lesson.blocks) {
+      const item = block.check;
+      if (!item) continue;
+      if (seenItemIds.has(item.id)) {
+        fail(lf, `duplicate quiz item id "${item.id}" (item ids must be unique within a track)`);
+      }
+      seenItemIds.add(item.id);
+      const optionIds = item.options.map((o) => o.id);
+      const optionIdSet = new Set(optionIds);
+      if (optionIdSet.size !== optionIds.length) {
+        fail(lf, `item "${item.id}": duplicate option ids`);
+      }
+      for (const c of item.correct) {
+        if (!optionIdSet.has(c)) {
+          fail(lf, `item "${item.id}": correct answer "${c}" is not a declared option id`);
+        }
+      }
+      if (new Set(item.correct).size !== item.correct.length) {
+        fail(lf, `item "${item.id}": duplicate ids in "correct"`);
+      }
+      // Ordering enumerates the full sequence; one-answer types (mcq/scenario)
+      // must name exactly one correct option.
+      if (item.type === 'ordering' && item.correct.length !== optionIds.length) {
+        fail(lf, `item "${item.id}": ordering must list all ${optionIds.length} options in order (got ${item.correct.length})`);
+      }
+      if ((item.type === 'mcq' || item.type === 'scenario') && item.correct.length !== 1) {
+        fail(lf, `item "${item.id}": ${item.type} must have exactly one correct option (got ${item.correct.length})`);
+      }
+    }
   }
 
   // Every lesson referenced by a unit must exist and map to the unit's domain.

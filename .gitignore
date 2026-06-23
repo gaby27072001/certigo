@@ -34,8 +34,9 @@ appsettings.Development.json
 build/
 .flutter-plugins
 .flutter-plugins-dependencies
-# Libraries ignore pubspec.lock; track it for the app only if desired.
-pubspec.lock
+# Lockfiles: libraries ignore them; the app commits its lockfile for reproducible
+# builds (run `flutter pub get` in apps/mobile and commit pubspec.lock).
+packages/*/pubspec.lock
 **/doc/api/
 coverage/
 *.iml

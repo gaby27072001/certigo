@@ -7,6 +7,16 @@ using Microlingo.Domain.Tutor;
 
 namespace Microlingo.Application.Abstractions;
 
+/// Raised when an optimistic-concurrency (ETag) precondition fails on a write —
+/// i.e. the record was modified by another writer since it was read. Callers
+/// re-read and re-apply (see <see cref="OptimisticConcurrency"/>).
+public sealed class ConcurrencyConflictException(string message) : Exception(message);
+
+/// Raised by an idempotent create when a record with the same id already exists.
+/// Used to turn the legacy "check-then-create" race into an atomic guard so a
+/// replayed or concurrent submission can never be applied twice.
+public sealed class DuplicateRecordException(string message) : Exception(message);
+
 public interface IUserContext
 {
     string UserId { get; }
