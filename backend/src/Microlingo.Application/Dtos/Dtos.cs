@@ -23,7 +23,13 @@ public sealed record UserProfileDto(
     List<string>? DailyQuestClaims = null,
     int LifetimeLessonsCompleted = 0,
     int LifetimePerfectLessons = 0,
-    List<string>? Achievements = null);
+    List<string>? Achievements = null,
+    NotificationStateDto? NotificationState = null,
+    DateOnly? MonthlyAnchor = null,
+    int MonthlyXpEarned = 0,
+    int MonthlyLessonsCompleted = 0,
+    int MonthlyPerfectLessons = 0,
+    List<string>? SeasonBadges = null);
 
 public sealed record SubmitQuizRequest(
     string ClientAttemptId,
@@ -91,6 +97,19 @@ public sealed record DomainProgressDto(
     string Name,
     double Weight,
     int Score);
+
+// --- Catalog (certification picker) ---------------------------------------
+
+public sealed record TrackSummaryDto(
+    string Id,
+    string Code,
+    string Title,
+    string Level,
+    string Summary,
+    int UnitCount,
+    int LessonCount);
+
+public sealed record CatalogDto(IReadOnlyList<TrackSummaryDto> Tracks);
 
 // --- League / leaderboard --------------------------------------------------
 
@@ -190,6 +209,43 @@ public sealed record ClaimQuestRequest(string QuestId);
 public sealed record ClaimQuestResultDto(
     bool Success,
     string QuestId,
+    int GemsAwarded,
+    int GemsBalance,
+    bool Claimed,
+    string? Error);
+
+// --- Seasons & monthly challenge -------------------------------------------
+
+public sealed record SeasonChallengeDto(
+    string Kind,
+    string Title,
+    int Target,
+    int Current,
+    int RewardGems,
+    bool Completed,
+    bool Claimed,
+    bool Claimable);
+
+public sealed record SeasonDto(
+    string Id,
+    int Year,
+    int Month,
+    string Theme,
+    string Tagline,
+    string Mascot,
+    string Accent,
+    string BadgeId,
+    string BadgeTitle,
+    int Gems,
+    int BadgesEarned,
+    SeasonChallengeDto Challenge);
+
+public sealed record ClaimSeasonRequest(string SeasonId);
+
+public sealed record ClaimSeasonResultDto(
+    bool Success,
+    string SeasonId,
+    string? BadgeId,
     int GemsAwarded,
     int GemsBalance,
     bool Claimed,
@@ -390,3 +446,65 @@ public sealed record RecommendationItemDto(
     int Priority,
     int MasteryPct,
     int ForgettingRiskPct);
+
+// --- Notifications intelligentes (§3.13) -----------------------------------
+
+/// <summary>
+/// Préférences de notification telles qu'exposées au client. Reflète
+/// <c>Microlingo.Domain.Notifications.NotificationPreferences</c> ; le serveur
+/// borne systématiquement les valeurs avant de planifier.
+/// </summary>
+public sealed record NotificationSettingsDto(
+    bool Enabled,
+    int UtcOffsetMinutes,
+    int QuietHoursStart,
+    int QuietHoursEnd,
+    int PreferredHour,
+    int MaxPerDay,
+    bool StreakAlerts,
+    bool QuestAlerts,
+    bool LeagueAlerts)
+{
+    /// <summary>Réglages par défaut : actifs, UTC, silence 22h→7h, rappel 19h, 3/jour, toutes alertes.</summary>
+    public static NotificationSettingsDto Default { get; } =
+        new(true, 0, 22, 7, 19, 3, true, true, true);
+}
+
+/// <summary>Requête de mise à jour (remplacement intégral) des préférences de notification.</summary>
+public sealed record UpdateNotificationSettingsRequest(
+    bool Enabled,
+    int UtcOffsetMinutes,
+    int QuietHoursStart,
+    int QuietHoursEnd,
+    int PreferredHour,
+    int MaxPerDay,
+    bool StreakAlerts,
+    bool QuestAlerts,
+    bool LeagueAlerts);
+
+/// <summary>
+/// État de notification persisté dans le profil : préférences + histogramme
+/// d'activité horaire appris (24 compartiments) et date du dernier renforcement,
+/// garantissant l'idempotence journalière de l'apprentissage de l'heure préférée.
+/// </summary>
+public sealed record NotificationStateDto(
+    NotificationSettingsDto Settings,
+    List<int>? ActivityHours = null,
+    DateOnly? LastActivityHourDate = null);
+
+/// <summary>Une notification planifiée, projetée pour le client (énumérations en chaînes).</summary>
+public sealed record ScheduledNotificationDto(
+    string Kind,
+    string Priority,
+    DateTimeOffset ScheduledUtc,
+    int LocalHour,
+    string Mascot,
+    string Title,
+    string Body,
+    string Deeplink,
+    string DedupeKey);
+
+/// <summary>Plan de notifications d'une journée locale, déjà trié et plafonné par le serveur.</summary>
+public sealed record NotificationPlanDto(
+    DateOnly LocalDate,
+    IReadOnlyList<ScheduledNotificationDto> Notifications);

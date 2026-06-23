@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app/app.dart';
 import '../app/mascots.dart';
+import '../app/offline/offline_sync_scope.dart';
+import '../app/offline/prefs_sync_store.dart';
+import '../app/providers.dart';
 
 /// Centralized app bootstrap.
 ///
@@ -25,5 +29,16 @@ Future<void> bootstrap() async {
   // Wire mascot artwork (built-in faces by default; see app/mascots.dart).
   configureMascots();
 
-  runApp(const ProviderScope(child: MicrolingoApp()));
+  // Restore the offline action queue from disk so a submission made while
+  // offline in a previous session is replayed as soon as the engine flushes.
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+
+  runApp(
+    ProviderScope(
+      overrides: <Override>[
+        syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
+      ],
+      child: const OfflineSyncScope(child: MicrolingoApp()),
+    ),
+  );
 }

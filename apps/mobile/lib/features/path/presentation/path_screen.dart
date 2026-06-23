@@ -9,6 +9,7 @@ import 'package:prism_ui/prism_ui.dart';
 import '../../../app/providers.dart';
 import '../../../app/router.dart';
 import '../application/path_rules.dart';
+import 'cert_picker_sheet.dart';
 
 /// Path — the certification map, reimagined as Duolingo's living winding
 /// skill-path. Each exam domain is a colored **unit** (header + guardian
@@ -97,7 +98,6 @@ class _PathContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
-    final TextTheme t = Theme.of(context).textTheme;
 
     // The learner's single "next action" across the whole path — the first
     // actionable lesson in order. Shared with Home through [currentLessonIdOf]
@@ -120,36 +120,33 @@ class _PathContent extends StatelessWidget {
     }
 
     Color ctaAccent = p.primary;
+    int chapterIndex = 0;
     if (active != null) {
       for (int i = 0; i < path.units.length; i++) {
         if (path.units[i].lessons.any((PathLesson l) => l.id == active!.id)) {
           ctaAccent = _accentFor(p, path.units[i], i);
+          chapterIndex = i;
           break;
         }
       }
     }
+    final String chapterLabel = path.units.isEmpty
+        ? ''
+        : 'Chapitre ${chapterIndex + 1} · ${path.units[chapterIndex].title}';
 
     int running = 0; // continuous sine phase across units for one flowing trail
     final List<Widget> slivers = <Widget>[
       if (me != null)
         SliverToBoxAdapter(child: _PathResourceBar(me: me!)),
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text('Parcours', style: t.bodyMedium?.copyWith(color: p.textSecondary)),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: <Widget>[
-                  Expanded(child: Text(path.trackName, style: t.headlineMedium)),
-                  _ReadinessChip(score: path.readinessScore, trend: path.readinessTrend7d),
-                ],
-              ),
-              Text(path.exam, style: t.labelLarge?.copyWith(color: p.primary)),
-            ],
-          ),
+      SliverPersistentHeader(
+        pinned: true,
+        delegate: _PathBannerDelegate(
+          trackName: path.trackName,
+          exam: path.exam,
+          chapterLabel: chapterLabel,
+          score: path.readinessScore,
+          trend: path.readinessTrend7d,
+          onTapTitle: () => showCertPickerSheet(context),
         ),
       ),
       if (active != null)
@@ -342,6 +339,110 @@ class _UnitTrail extends StatelessWidget {
       },
     );
   }
+}
+
+/// Pinned banner that keeps the active certification and current chapter in view
+/// while the long path scrolls beneath it. Tapping the title opens the course
+/// picker so the learner can switch certifications, Duolingo-style.
+class _PathBannerDelegate extends SliverPersistentHeaderDelegate {
+  _PathBannerDelegate({
+    required this.trackName,
+    required this.exam,
+    required this.chapterLabel,
+    required this.score,
+    required this.trend,
+    required this.onTapTitle,
+  });
+
+  final String trackName;
+  final String exam;
+  final String chapterLabel;
+  final int score;
+  final int trend;
+  final VoidCallback onTapTitle;
+
+  @override
+  double get minExtent => 88;
+
+  @override
+  double get maxExtent => 88;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final PrismColorScheme p = context.prism;
+    final TextTheme t = Theme.of(context).textTheme;
+    return Container(
+      color: p.background,
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onTapTitle,
+                  child: Row(
+                    children: <Widget>[
+                      Flexible(
+                        child: Text(
+                          trackName,
+                          style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.expand_more_rounded, size: 22, color: p.textSecondary),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _ReadinessChip(score: score, trend: trend),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: <Widget>[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: p.primarySoft,
+                  borderRadius: PrismRadii.pillAll,
+                ),
+                child: Text(
+                  exam,
+                  style: t.labelSmall?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  chapterLabel,
+                  style: t.bodySmall?.copyWith(color: p.textSecondary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(_PathBannerDelegate old) =>
+      old.trackName != trackName ||
+      old.exam != exam ||
+      old.chapterLabel != chapterLabel ||
+      old.score != score ||
+      old.trend != trend ||
+      old.onTapTitle != onTapTitle;
 }
 
 /// Pinned, full-width "next action" button mirroring the bouncing trail node.

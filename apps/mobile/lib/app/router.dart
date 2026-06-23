@@ -9,6 +9,10 @@ import '../features/lesson/presentation/lesson_screen.dart';
 import '../features/quiz/presentation/quiz_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/leaderboard/presentation/leaderboard_screen.dart';
+import '../features/auth/application/auth_controller.dart';
+import '../features/auth/application/auth_state.dart';
+import '../features/auth/presentation/sign_in_screen.dart';
+import '../features/auth/presentation/splash_screen.dart' as auth;
 import '../features/onboarding/application/onboarding_controller.dart';
 import '../features/onboarding/presentation/goal_screen.dart';
 import '../features/onboarding/presentation/login_screen.dart';
@@ -16,10 +20,11 @@ import '../features/onboarding/presentation/onboarding_common.dart';
 import '../features/onboarding/presentation/promise_screen.dart';
 import '../features/onboarding/presentation/reasons_screen.dart';
 import '../features/onboarding/presentation/routine_screen.dart';
-import '../features/onboarding/presentation/splash_screen.dart';
+import '../features/onboarding/presentation/splash_screen.dart' as onboarding;
 import '../features/onboarding/presentation/start_choice_screen.dart';
 import '../features/onboarding/presentation/welcome_screen.dart';
 import 'app_shell.dart';
+import 'providers.dart';
 
 /// Centralized, named route table. Using constants avoids stringly-typed
 /// navigation scattered across the codebase.
@@ -28,6 +33,10 @@ abstract class Routes {
   static const String path = '/path';
   static const String leaderboard = '/leaderboard';
   static const String profile = '/profile';
+
+  /// Auth flows (outside the shell, on the root navigator).
+  static const String splash = '/splash'; // session restore in progress
+  static const String auth = '/auth'; // sign-in (Microsoft / Google / Apple)
 
   /// Full-screen (outside the shell) flows.
   static const String lesson = '/lesson'; // /lesson/:trackId/:lessonId
@@ -69,35 +78,71 @@ CustomTransitionPage<void> _stepPage({
   );
 }
 
-/// The app router. Exposed as a provider so auth/redirect logic can later watch
-/// session state and guard routes without rebuilding the widget tree manually.
+/// The app router. Exposed as a provider so auth/session/onboarding guards can
+/// react to state changes without rebuilding the app shell manually.
 final routerProvider = Provider<GoRouter>((Ref ref) {
-  final OnboardingController onboarding = ref.read(onboardingControllerProvider);
+  // Bridge auth-state changes into a [Listenable] so GoRouter re-runs redirects
+  // as soon as session restore / sign-in / sign-out happens.
+  final ValueNotifier<int> authRefresh = ValueNotifier<int>(0);
+  ref.listen<AuthState>(authControllerProvider, (_, __) => authRefresh.value++);
+  ref.onDispose(authRefresh.dispose);
+
+  final OnboardingController onboardingCtrl = ref.read(onboardingControllerProvider);
+  final Listenable refresh = Listenable.merge(<Listenable>[authRefresh, onboardingCtrl]);
 
   return GoRouter(
     navigatorKey: _rootKey,
-    initialLocation: Routes.path,
-    refreshListenable: onboarding,
-    // Gate the app behind the startup flow: an un-onboarded learner is funnelled
-    // to the splash/welcome wizard; once finished they can no longer land back
-    // on a startup screen. Lesson/quiz and shell tabs stay reachable afterwards.
+    initialLocation: Routes.splash,
+    refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
+      final AuthState auth = ref.read(authControllerProvider);
       final String loc = state.matchedLocation;
-      final bool startup = OnboardingRoutes.isStartup(loc);
-      if (!onboarding.completed) {
-        return startup ? null : OnboardingRoutes.splash;
+      final bool atAuthSplash = loc == Routes.splash;
+      final bool atAuth = loc == Routes.auth;
+      final bool atOnboarding = OnboardingRoutes.isStartup(loc);
+
+      // Restoring session: stay on auth splash.
+      if (auth is AuthLoading) {
+        return atAuthSplash ? null : Routes.splash;
       }
-      if (startup) return Routes.path;
+      // Not authenticated: force sign-in.
+      if (auth is Unauthenticated) {
+        return atAuth ? null : Routes.auth;
+      }
+      // Authenticated: never remain on auth surfaces.
+      if (atAuthSplash || atAuth) {
+        return onboardingCtrl.completed ? Routes.path : OnboardingRoutes.splash;
+      }
+      // Authenticated but onboarding not completed: force startup flow.
+      if (!onboardingCtrl.completed) {
+        return atOnboarding ? null : OnboardingRoutes.splash;
+      }
+      // Completed onboarding: startup screens should not be reachable.
+      if (atOnboarding) return Routes.path;
       return null;
     },
     routes: <RouteBase>[
-      // ---- Startup flow (full-screen, above the shell) --------------------
+      // Auth flows, above the shell (no bottom nav).
+      GoRoute(
+        path: Routes.splash,
+        name: 'splash',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const auth.SplashScreen(),
+      ),
+      GoRoute(
+        path: Routes.auth,
+        name: 'auth',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const SignInScreen(),
+      ),
+
+      // Onboarding startup flow (full-screen, above the shell).
       GoRoute(
         path: OnboardingRoutes.splash,
         parentNavigatorKey: _rootKey,
         pageBuilder: (_, GoRouterState state) => _stepPage(
           state: state,
-          child: const SplashScreen(),
+          child: const onboarding.SplashScreen(),
           begin: const Offset(0, 0.03),
         ),
       ),
@@ -146,7 +191,6 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           begin: const Offset(0.03, 0),
         ),
       ),
-
       // Bottom-nav shell: persistent state per tab via StatefulShellRoute.
       StatefulShellRoute.indexedStack(
         builder: (BuildContext context, GoRouterState state, StatefulNavigationShell shell) {
@@ -161,7 +205,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
               GoRoute(
                 path: Routes.path,
                 name: 'path',
-                builder: (_, __) => const PathScreen(trackId: 'az-900'),
+                builder: (_, __) => const _ActivePathScreen(),
               ),
             ],
           ),
@@ -225,3 +269,17 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
     ],
   );
 });
+
+/// Hosts the Path screen for whichever certification the learner has selected
+/// in the course picker, so switching tracks re-points the primary tab without
+/// touching the route table. The Path screen itself stays trackId-driven (and
+/// directly constructible in tests).
+class _ActivePathScreen extends ConsumerWidget {
+  const _ActivePathScreen();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final String trackId = ref.watch(activeTrackProvider);
+    return PathScreen(trackId: trackId);
+  }
+}

@@ -70,6 +70,23 @@ public sealed class CosmosContentRepository(CosmosContext context) : IContentRep
 
         return keys;
     }
+
+    public async Task<IReadOnlyList<Track>> ListTracksAsync(CancellationToken cancellationToken = default)
+    {
+        // Track docs are seeded with type="track" (id == trackId), one per
+        // /trackId partition, so this is a deliberate cross-partition scan with
+        // NO PartitionKey — the catalog spans every track.
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.type = 'track'");
+        using var iterator = context.Content.GetItemQueryIterator<Track>(query);
+
+        var tracks = new List<Track>();
+        while (iterator.HasMoreResults)
+        {
+            tracks.AddRange(await iterator.ReadNextAsync(cancellationToken));
+        }
+
+        return tracks;
+    }
 }
 
 public sealed class CosmosProgressRepository(CosmosContext context) : IProgressRepository

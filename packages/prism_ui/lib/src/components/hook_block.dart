@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
 import 'prism_card.dart';
+import 'prism_rich_text.dart';
 
 /// A "Hook" block — the curiosity gap that opens the Learn Loop.
 ///
@@ -25,7 +26,10 @@ class HookBlock extends StatelessWidget {
           Icon(Icons.bolt_rounded, color: p.ember),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(text, style: t.titleMedium?.copyWith(height: 1.35)),
+            child: PrismRichText(
+              text,
+              style: t.titleMedium?.copyWith(height: 1.35),
+            ),
           ),
         ],
       ),

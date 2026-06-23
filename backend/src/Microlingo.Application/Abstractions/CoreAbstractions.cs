@@ -41,6 +41,11 @@ public interface IContentRepository
     // All answer keys for a track — powers mock-exam composition, which draws
     // gradable items from across every lesson rather than a single one.
     Task<IReadOnlyList<LessonAnswerKey>> ListAnswerKeysAsync(string trackId, CancellationToken cancellationToken = default);
+
+    // Every certification track, for the course picker. Cross-partition (one
+    // doc per track, each in its own /trackId partition), so callers should
+    // treat it as a low-frequency catalog read, not a hot path.
+    Task<IReadOnlyList<Track>> ListTracksAsync(CancellationToken cancellationToken = default);
 }
 
 public interface IProgressRepository

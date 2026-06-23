@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core/core.dart';
 import 'package:data/data.dart';
 
+import '../features/auth/application/auth_controller.dart';
 import '../features/lesson/application/lesson_feedback.dart';
 
 /// Root dependency wiring for the app, expressed as Riverpod providers.
@@ -14,16 +17,19 @@ import '../features/lesson/application/lesson_feedback.dart';
 
 /// Supplies the current access token to the API client.
 ///
-/// Until Entra External ID is wired, dev/staging builds send a non-empty bearer
-/// token that the backend's dev validator maps to a stable userId, so the app
-/// works end-to-end. Production overrides this with a real Entra access token
-/// via `ProviderScope.overrides`.
+/// Delegates to the auth controller: in dev (Entra not configured) it returns
+/// the dev bearer token so the app works end-to-end; once Entra External ID is
+/// configured it returns a real, proactively-refreshed access token.
 final tokenProvider = Provider<TokenProvider>((Ref ref) {
-  return () async => AppEnv.isProd ? null : AppEnv.devAuthToken;
+  return ref.watch(authControllerProvider.notifier).currentAccessToken;
 });
 
 final apiClientProvider = Provider<ApiClient>((Ref ref) {
-  return ApiClient(tokenProvider: ref.watch(tokenProvider));
+  final AuthController auth = ref.watch(authControllerProvider.notifier);
+  return ApiClient(
+    tokenProvider: ref.watch(tokenProvider),
+    onUnauthorized: auth.handleUnauthorized,
+  );
 });
 
 final userRepositoryProvider = Provider<UserRepository>(
@@ -34,12 +40,45 @@ final pathRepositoryProvider = Provider<PathRepository>(
   (Ref ref) => RemotePathRepository(ref.watch(apiClientProvider)),
 );
 
+final catalogRepositoryProvider = Provider<CatalogRepository>(
+  (Ref ref) => RemoteCatalogRepository(ref.watch(apiClientProvider)),
+);
+
 final lessonRepositoryProvider = Provider<LessonRepository>(
   (Ref ref) => RemoteLessonRepository(ref.watch(apiClientProvider)),
 );
 
+/// Persistent queue of idempotent offline actions.
+///
+/// Defaults to an in-memory store so widget tests need no platform channels;
+/// [bootstrap] overrides it with a SharedPreferences-backed store so a queued
+/// submission survives an app restart on iOS and Android.
+final syncStoreProvider = Provider<SyncQueueStore>(
+  (Ref ref) => InMemorySyncQueueStore(),
+);
+
+/// The offline-first sync engine. Replays queued submissions through the API
+/// with idempotent keys, exponential backoff and dead-lettering. A single
+/// long-lived instance per app session, flushed on reconnect/resume/startup by
+/// `OfflineSyncScope`.
+final syncEngineProvider = Provider<SyncEngine>((Ref ref) {
+  final SyncEngine engine = SyncEngine(
+    store: ref.watch(syncStoreProvider),
+    sender: apiSyncSender(ref.watch(apiClientProvider)),
+  );
+  ref.onDispose(() => unawaited(engine.dispose()));
+  return engine;
+});
+
+/// Quiz submissions go through an offline decorator: an attempt that fails on a
+/// transient error (offline, 5xx, 429) is enqueued and replayed later, keyed by
+/// its `clientAttemptId`, so a finished lesson is never lost. Permanent
+/// failures pass straight through to the caller unchanged.
 final quizRepositoryProvider = Provider<QuizRepository>(
-  (Ref ref) => RemoteQuizRepository(ref.watch(apiClientProvider)),
+  (Ref ref) => OfflineQuizRepository(
+    RemoteQuizRepository(ref.watch(apiClientProvider)),
+    ref.watch(syncEngineProvider),
+  ),
 );
 
 final leaderboardRepositoryProvider = Provider<LeaderboardRepository>(
@@ -79,6 +118,17 @@ final pathProvider = FutureProvider.autoDispose.family<LearningPath, String>(
     return _orThrow(await ref.watch(pathRepositoryProvider).getPath(trackId));
   },
 );
+
+/// The certification track currently shown on the Path screen. Switching it in
+/// the course picker re-points the whole primary tab, Duolingo-style. Defaults
+/// to AZ-900, the app's flagship track.
+final activeTrackProvider = StateProvider<String>((Ref ref) => 'az-900');
+
+/// The catalog of certification tracks the app offers, for the course picker.
+/// Auto-disposed: it is only loaded while the picker sheet is open.
+final catalogProvider = FutureProvider.autoDispose<List<TrackSummary>>((Ref ref) async {
+  return _orThrow(await ref.watch(catalogRepositoryProvider).getCatalog());
+});
 
 /// The "next best action" coach for one track: a server-ranked shelf of what
 /// the learner should do next. Auto-disposed and keyed by trackId so Home can

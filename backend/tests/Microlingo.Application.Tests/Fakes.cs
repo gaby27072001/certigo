@@ -1,5 +1,6 @@
 using Microlingo.Application.Abstractions;
 using Microlingo.Application.Dtos;
+using Microlingo.Application.Services;
 using Microlingo.Domain.Content;
 using Microlingo.Domain.Progress;
 
@@ -63,6 +64,12 @@ internal sealed class InMemoryContentRepository : IContentRepository
         IReadOnlyList<LessonAnswerKey> result = _answerKeys.Values
             .Where(k => string.Equals(k.TrackId, trackId, StringComparison.OrdinalIgnoreCase))
             .ToArray();
+        return Task.FromResult(result);
+    }
+
+    public Task<IReadOnlyList<Track>> ListTracksAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<Track> result = _tracks.Values.ToArray();
         return Task.FromResult(result);
     }
 }
@@ -244,4 +251,49 @@ internal sealed class FakeTutorCompletion : ITutorCompletion
         LastUserPrompt = userPrompt;
         return Task.FromResult(_reply);
     }
+}
+
+/// <summary>
+/// Service de classement contrôlable pour les tests de notifications : on règle la
+/// zone (« promotion » / « relegation » / « safe »), le rang et le nombre d'inscrits
+/// afin d'exercer le câblage entre la ligue et le plan de notifications. La résolution
+/// de fin de ligue n'est jamais sollicitée par la planification, d'où l'exception.
+/// </summary>
+internal sealed class StubLeaderboardService : ILeaderboardService
+{
+    public string MyZone { get; set; } = "safe";
+    public int MyRank { get; set; }
+    public int EntryCount { get; set; }
+
+    public Task<LeagueDto> GetMyLeagueAsync(CancellationToken cancellationToken = default)
+    {
+        var entries = new List<LeaderboardEntryDto>(EntryCount);
+        for (var i = 0; i < EntryCount; i++)
+        {
+            entries.Add(new LeaderboardEntryDto(
+                UserId: $"u{i}",
+                DisplayName: $"Apprenant {i}",
+                AvatarUrl: null,
+                Rank: i + 1,
+                WeeklyXp: (EntryCount - i) * 10));
+        }
+
+        var league = new LeagueDto(
+            PeriodLeagueId: "weekly:test:bronze",
+            Tier: "bronze",
+            EndsAt: new DateTimeOffset(2026, 6, 29, 0, 0, 0, TimeSpan.Zero),
+            PromoteCount: 10,
+            MeUserId: "u1",
+            Entries: entries)
+        {
+            MyRank = MyRank,
+            MyZone = MyZone,
+        };
+
+        return Task.FromResult(league);
+    }
+
+    public Task<LeagueResolutionDto> PreviewResolutionAsync(CancellationToken cancellationToken = default)
+        => throw new NotSupportedException(
+            "La résolution de ligue n'est pas requise pour la planification des notifications.");
 }

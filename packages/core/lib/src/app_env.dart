@@ -47,6 +47,38 @@ class AppEnv {
     'offline_access',
   ];
 
+  /// Scope d'API protégée (ex. `api://<api-client-id>/.default`). Quand il est
+  /// renseigné, Entra émet un access_token dont l'`aud` correspond à
+  /// `ENTRA_AUDIENCE` côté backend, ce qui permet de l'envoyer en Bearer.
+  static const String entraApiScope = String.fromEnvironment(
+    'ENTRA_API_SCOPE',
+    defaultValue: '',
+  );
+
+  /// Indices de domaine (`domain_hint`) pour pré-orienter Entra vers le bon
+  /// fournisseur fédéré. Configurables car le nom exact du fournisseur Google /
+  /// Apple dépend du paramétrage du locataire externe.
+  static const String microsoftDomainHint = String.fromEnvironment(
+    'ENTRA_DOMAIN_HINT_MICROSOFT',
+    defaultValue: '',
+  );
+  static const String googleDomainHint = String.fromEnvironment(
+    'ENTRA_DOMAIN_HINT_GOOGLE',
+    defaultValue: 'google.com',
+  );
+  static const String appleDomainHint = String.fromEnvironment(
+    'ENTRA_DOMAIN_HINT_APPLE',
+    defaultValue: 'apple.com',
+  );
+
+  /// Vrai quand Entra External ID est réellement configuré : l'app présente
+  /// alors le vrai écran de connexion multi-fournisseurs.
+  static bool get entraConfigured => entraClientId.isNotEmpty && entraAuthority.isNotEmpty;
+
+  /// Force l'affichage de l'écran de connexion même sans Entra configuré, pour
+  /// prévisualiser/tester l'UI en dev (`--dart-define=FORCE_AUTH_UI=true`).
+  static const bool forceAuthUi = bool.fromEnvironment('FORCE_AUTH_UI', defaultValue: false);
+
   static bool get isProd => flavor == AppFlavor.prod;
   static bool get analyticsEnabled => isProd || flavor == AppFlavor.staging;
 }

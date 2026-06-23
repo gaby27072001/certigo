@@ -4,6 +4,7 @@ using Microlingo.Application.Dtos;
 using Microlingo.Domain.Content;
 using Microlingo.Domain.Exam;
 using Microlingo.Domain.Gamification;
+using Microlingo.Domain.Notifications;
 using Microlingo.Domain.Progress;
 using Microlingo.Domain.Readiness;
 using Microlingo.Domain.Recommendation;
@@ -72,12 +73,44 @@ internal static class ProfileDefaults
 public interface IContentService
 {
     Task<Lesson?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default);
+
+    // The certification catalog for the course picker: a lightweight summary per
+    // track (counts only, no lesson bodies), ordered fundamentals → expert.
+    Task<CatalogDto> GetCatalogAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed class ContentService(IContentRepository content) : IContentService
 {
     public Task<Lesson?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default)
         => content.GetLessonAsync(trackId, lessonId, cancellationToken);
+
+    public async Task<CatalogDto> GetCatalogAsync(CancellationToken cancellationToken = default)
+    {
+        var tracks = await content.ListTracksAsync(cancellationToken);
+        var summaries = tracks
+            .Select(t => new TrackSummaryDto(
+                Id: t.Id,
+                Code: t.Code,
+                Title: t.Title,
+                Level: t.Level ?? string.Empty,
+                Summary: t.Summary,
+                UnitCount: t.Units.Count,
+                LessonCount: t.Units.Sum(u => u.Lessons.Count)))
+            .OrderBy(s => LevelRank(s.Level))
+            .ThenBy(s => s.Code, StringComparer.Ordinal)
+            .ToArray();
+        return new CatalogDto(summaries);
+    }
+
+    // Order the picker the way Microsoft tiers certifications: Fundamentals
+    // first, then Associate, then Expert, with anything unlabelled last.
+    private static int LevelRank(string level) => level.ToLowerInvariant() switch
+    {
+        "fundamentals" => 0,
+        "associate" => 1,
+        "expert" => 2,
+        _ => 3,
+    };
 }
 
 public interface IQuizService
@@ -156,6 +189,11 @@ public sealed class QuizService(
         var newDailyXp = (sameDay ? profile.DailyXpEarned : 0) + xpEarned;
         var goalMet = profile.DailyGoalXp > 0 && newDailyXp >= profile.DailyGoalXp;
 
+        // Monthly accumulators feed the season challenge. They roll over at the
+        // month boundary exactly like the daily counters roll over at midnight.
+        var monthAnchor = new DateOnly(today.Year, today.Month, 1);
+        var sameMonth = profile.MonthlyAnchor == monthAnchor;
+
         var stats = new GamificationStats(
             profile.Xp,
             profile.Level,
@@ -203,7 +241,11 @@ public sealed class QuizService(
             LifetimeLessonsCompleted = lifetimeLessons,
             LifetimePerfectLessons = lifetimePerfect,
             Achievements = allAchievements,
-            Gems = gemsBeforeAchievements + achievementGems
+            Gems = gemsBeforeAchievements + achievementGems,
+            MonthlyAnchor = monthAnchor,
+            MonthlyXpEarned = (sameMonth ? profile.MonthlyXpEarned : 0) + xpEarned,
+            MonthlyLessonsCompleted = (sameMonth ? profile.MonthlyLessonsCompleted : 0) + 1,
+            MonthlyPerfectLessons = (sameMonth ? profile.MonthlyPerfectLessons : 0) + (perfect ? 1 : 0)
         };
         await users.UpsertAsync(updatedProfile, cancellationToken);
         await progress.UpsertMasteryBatchAsync(userContext.UserId, updatedMasteries.Values.ToArray(), cancellationToken);
@@ -597,6 +639,127 @@ public sealed class QuestService(
             status.Completed,
             claimed,
             status.Completed && !claimed);
+    }
+}
+
+public interface ISeasonService
+{
+    Task<SeasonDto> GetCurrentAsync(CancellationToken cancellationToken = default);
+    Task<ClaimSeasonResultDto> ClaimAsync(ClaimSeasonRequest request, CancellationToken cancellationToken = default);
+}
+
+public sealed class SeasonService(
+    IUserContext userContext,
+    IClock clock,
+    IUserRepository users,
+    IEventRepository events) : ISeasonService
+{
+    public async Task<SeasonDto> GetCurrentAsync(CancellationToken cancellationToken = default)
+    {
+        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+
+        var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
+        var season = SeasonEngine.ForDate(today);
+        var signals = MonthlySignalsFor(profile, today);
+        var badges = profile.SeasonBadges ?? new List<string>();
+
+        return ToDto(season, signals, profile.Gems, badges);
+    }
+
+    public async Task<ClaimSeasonResultDto> ClaimAsync(ClaimSeasonRequest request, CancellationToken cancellationToken = default)
+    {
+        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+
+        var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
+        var season = SeasonEngine.ForDate(today);
+        var badgeId = season.Challenge.BadgeId;
+        var badges = profile.SeasonBadges ?? new List<string>();
+
+        // A learner can only claim the season the request actually targets, and
+        // only while it is the current month. Claiming a past or future season is
+        // rejected rather than silently redirected to the active one.
+        if (!string.Equals(request.SeasonId, season.Id, StringComparison.Ordinal))
+        {
+            return new ClaimSeasonResultDto(false, request.SeasonId, null, 0, profile.Gems, false, "wrongSeason");
+        }
+
+        // Already earned this season's badge: idempotent no-op so a retried claim
+        // never double-awards gems.
+        if (badges.Contains(badgeId))
+        {
+            return new ClaimSeasonResultDto(true, season.Id, badgeId, 0, profile.Gems, true, null);
+        }
+
+        var signals = MonthlySignalsFor(profile, today);
+        var status = SeasonEngine.Evaluate(season, signals);
+        if (!status.Completed)
+        {
+            return new ClaimSeasonResultDto(false, season.Id, null, 0, profile.Gems, false, "notCompleted");
+        }
+
+        var updatedBadges = new List<string>(badges) { badgeId };
+        var updated = profile with
+        {
+            Gems = profile.Gems + season.Challenge.RewardGems,
+            SeasonBadges = updatedBadges,
+        };
+        await users.UpsertAsync(updated, cancellationToken);
+
+        var result = new ClaimSeasonResultDto(true, season.Id, badgeId, season.Challenge.RewardGems, updated.Gems, true, null);
+        await events.AddAsync(new LearningEvent(
+            Guid.NewGuid().ToString("n"),
+            userContext.UserId,
+            "season.claimed",
+            clock.UtcNow,
+            result), cancellationToken);
+
+        return result;
+    }
+
+    // Monthly counters reset at the month boundary. When the profile's recorded
+    // month anchor is not the current month the learner has no activity yet, so
+    // signals are empty (stale values from a previous month are ignored).
+    private static SeasonSignals MonthlySignalsFor(UserProfileDto profile, DateOnly today)
+    {
+        var anchor = new DateOnly(today.Year, today.Month, 1);
+        if (profile.MonthlyAnchor != anchor)
+        {
+            return SeasonSignals.Empty;
+        }
+
+        return new SeasonSignals(
+            profile.MonthlyXpEarned,
+            profile.MonthlyLessonsCompleted,
+            profile.MonthlyPerfectLessons);
+    }
+
+    private static SeasonDto ToDto(Season season, SeasonSignals signals, int gems, IReadOnlyList<string> badges)
+    {
+        var status = SeasonEngine.Evaluate(season, signals);
+        var claimed = badges.Contains(season.Challenge.BadgeId);
+        return new SeasonDto(
+            season.Id,
+            season.Year,
+            season.Month,
+            season.Theme,
+            season.Tagline,
+            season.Mascot,
+            season.Accent,
+            season.Challenge.BadgeId,
+            season.Challenge.BadgeTitle,
+            gems,
+            badges.Count,
+            new SeasonChallengeDto(
+                season.Challenge.Kind.ToString(),
+                season.Challenge.Title,
+                season.Challenge.Target,
+                status.Current,
+                season.Challenge.RewardGems,
+                status.Completed,
+                claimed,
+                status.Completed && !claimed));
     }
 }
 
@@ -1265,6 +1428,13 @@ public sealed class ExamService(
         var newDailyXp = (sameDay ? profile.DailyXpEarned : 0) + xpEarned;
         var goalMet = profile.DailyGoalXp > 0 && newDailyXp >= profile.DailyGoalXp;
 
+        // The mock exam awards XP too, so it feeds MonthlyXpEarned. Lessons and
+        // perfect-lessons stay lesson-only, but the anchor still resets every
+        // monthly counter on the first activity of a new month, whichever flow
+        // fires first.
+        var monthAnchor = new DateOnly(today.Year, today.Month, 1);
+        var sameMonth = profile.MonthlyAnchor == monthAnchor;
+
         var stats = new GamificationStats(
             profile.Xp,
             profile.Level,
@@ -1290,6 +1460,10 @@ public sealed class ExamService(
             DailyXpEarned = newDailyXp,
             DailyXpDate = today,
             DailyCorrectAnswers = (sameDay ? profile.DailyCorrectAnswers : 0) + correctCount,
+            MonthlyAnchor = monthAnchor,
+            MonthlyXpEarned = (sameMonth ? profile.MonthlyXpEarned : 0) + xpEarned,
+            MonthlyLessonsCompleted = sameMonth ? profile.MonthlyLessonsCompleted : 0,
+            MonthlyPerfectLessons = sameMonth ? profile.MonthlyPerfectLessons : 0,
             Gems = profile.Gems + gemsEarned
         };
         await users.UpsertAsync(updatedProfile, cancellationToken);
@@ -1856,4 +2030,243 @@ public sealed class RecommendationService(
             .Where(b => b.Check is not null)
             .Select(b => b.Check!.ConceptId)
             .Distinct(StringComparer.OrdinalIgnoreCase);
+}
+
+public interface INotificationService
+{
+    /// <summary>Calcule le plan de notifications du jour (déjà trié et plafonné) pour l'utilisateur courant.</summary>
+    Task<NotificationPlanDto> GetPlanAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Renvoie les préférences de notification persistées (ou les valeurs par défaut).</summary>
+    Task<NotificationSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Remplace les préférences de notification, en bornant systématiquement les valeurs.</summary>
+    Task<NotificationSettingsDto> UpdateSettingsAsync(
+        UpdateNotificationSettingsRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Service de planification des notifications intelligentes. Il agrège l'état du
+/// profil (série, objectif, quêtes, ligue) en signaux, apprend l'heure d'activité
+/// préférée de l'apprenant de façon idempotente (un renforcement par jour), puis
+/// délègue la décision au moteur de domaine pur <see cref="NotificationScheduler"/>.
+/// Aucun transport (push) ici : on ne fait que décider quoi/quand/à qui envoyer.
+/// </summary>
+public sealed class NotificationService(
+    IUserContext userContext,
+    IClock clock,
+    IUserRepository users,
+    ILeaderboardService leaderboard,
+    IEventRepository events) : INotificationService
+{
+    public async Task<NotificationPlanDto> GetPlanAsync(CancellationToken cancellationToken = default)
+    {
+        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+
+        var now = clock.UtcNow;
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+
+        var state = profile.NotificationState ?? new NotificationStateDto(NotificationSettingsDto.Default);
+        var settings = state.Settings;
+
+        var practicedToday = profile.DailyXpDate == today && profile.DailyXpEarned > 0;
+        var dailyGoalMet = practicedToday && profile.DailyXpEarned >= profile.DailyGoalXp;
+
+        // Boucle d'apprentissage : quand l'apprenant a pratiqué aujourd'hui et que
+        // l'heure n'a pas encore été renforcée pour ce jour, on incrémente
+        // l'histogramme horaire (heure locale) puis on persiste. Le garde
+        // LastActivityHourDate garantit un seul renforcement par jour, donc un
+        // GetPlan rejoué n'introduit aucun biais.
+        IReadOnlyList<int>? histogram = state.ActivityHours;
+        if (practicedToday && state.LastActivityHourDate != today)
+        {
+            var offset = TimeSpan.FromMinutes(settings.UtcOffsetMinutes);
+            var localHour = now.ToOffset(offset).Hour;
+            var reinforced = BestHourEstimator.Reinforce(state.ActivityHours, localHour);
+
+            state = state with { ActivityHours = reinforced.ToList(), LastActivityHourDate = today };
+            profile = profile with { NotificationState = state };
+            await users.UpsertAsync(profile, cancellationToken);
+
+            await events.AddAsync(new LearningEvent(
+                Guid.NewGuid().ToString("n"),
+                userContext.UserId,
+                "notification.activityObserved",
+                now,
+                new { hour = localHour }), cancellationToken);
+
+            histogram = reinforced;
+        }
+
+        var learnedHour = BestHourEstimator.Estimate(histogram, settings.PreferredHour);
+
+        var (claimable, pending) = QuestProgress(profile, today);
+        var league = await ResolveLeagueAsync(cancellationToken);
+
+        var signals = NotificationSignals.Inactive with
+        {
+            StreakDays = profile.StreakDays,
+            LastActiveDate = profile.LastActiveDate,
+            HasFreeze = profile.FreezeTokens > 0,
+            PracticedToday = practicedToday,
+            DailyGoalMet = dailyGoalMet,
+            ClaimableQuests = claimable,
+            PendingQuests = pending,
+            League = league,
+        };
+
+        var plan = NotificationScheduler.Plan(signals, ToPreferences(settings), now, learnedHour);
+
+        var items = new ScheduledNotificationDto[plan.Notifications.Count];
+        for (var i = 0; i < plan.Notifications.Count; i++)
+        {
+            items[i] = ToDto(plan.Notifications[i]);
+        }
+
+        return new NotificationPlanDto(plan.LocalDate, items);
+    }
+
+    public async Task<NotificationSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+
+        return profile.NotificationState?.Settings ?? NotificationSettingsDto.Default;
+    }
+
+    public async Task<NotificationSettingsDto> UpdateSettingsAsync(
+        UpdateNotificationSettingsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+
+        // On normalise via le moteur de domaine pour borner les heures et le
+        // plafond quotidien avant toute persistance.
+        var normalized = new NotificationPreferences(
+            request.Enabled,
+            request.UtcOffsetMinutes,
+            request.QuietHoursStart,
+            request.QuietHoursEnd,
+            request.PreferredHour,
+            request.MaxPerDay,
+            request.StreakAlerts,
+            request.QuestAlerts,
+            request.LeagueAlerts).Normalized();
+
+        var settings = ToSettingsDto(normalized);
+
+        // L'histogramme appris et son garde de date sont préservés : changer une
+        // préférence ne doit pas effacer l'apprentissage de l'heure d'activité.
+        var existing = profile.NotificationState;
+        var state = new NotificationStateDto(settings, existing?.ActivityHours, existing?.LastActivityHourDate);
+
+        var updated = profile with { NotificationState = state };
+        await users.UpsertAsync(updated, cancellationToken);
+
+        await events.AddAsync(new LearningEvent(
+            Guid.NewGuid().ToString("n"),
+            userContext.UserId,
+            "notification.settingsUpdated",
+            clock.UtcNow,
+            settings), cancellationToken);
+
+        return settings;
+    }
+
+    private async Task<LeagueSignal> ResolveLeagueAsync(CancellationToken cancellationToken)
+    {
+        var league = await leaderboard.GetMyLeagueAsync(cancellationToken).ConfigureAwait(false);
+        if (league.Entries.Count == 0 || league.MyRank <= 0)
+        {
+            return LeagueSignal.None;
+        }
+
+        return league.MyZone switch
+        {
+            "promotion" => LeagueSignal.Promotion,
+            "relegation" => LeagueSignal.Relegation,
+            _ => LeagueSignal.Safe,
+        };
+    }
+
+    // Reproduit la règle de réinitialisation quotidienne des compteurs (cf.
+    // QuestService.DailyState) pour dénombrer les quêtes réclamables et en cours.
+    private static (int Claimable, int Pending) QuestProgress(UserProfileDto profile, DateOnly today)
+    {
+        DailySignals signals;
+        IReadOnlyList<string> claims;
+        if (profile.DailyXpDate != today)
+        {
+            signals = DailySignals.Empty;
+            claims = Array.Empty<string>();
+        }
+        else
+        {
+            signals = new DailySignals(
+                profile.DailyXpEarned,
+                profile.DailyLessonsCompleted,
+                profile.DailyCorrectAnswers,
+                profile.DailyPerfectLessons);
+            claims = profile.DailyQuestClaims ?? new List<string>();
+        }
+
+        var claimable = 0;
+        var pending = 0;
+        foreach (var template in QuestEngine.DailyQuests(today, profile.Id))
+        {
+            var status = QuestEngine.Evaluate(template, signals);
+            if (status.Completed)
+            {
+                if (!claims.Contains(template.Id))
+                {
+                    claimable++;
+                }
+            }
+            else
+            {
+                pending++;
+            }
+        }
+
+        return (claimable, pending);
+    }
+
+    private static NotificationPreferences ToPreferences(NotificationSettingsDto s)
+        => new(
+            s.Enabled,
+            s.UtcOffsetMinutes,
+            s.QuietHoursStart,
+            s.QuietHoursEnd,
+            s.PreferredHour,
+            s.MaxPerDay,
+            s.StreakAlerts,
+            s.QuestAlerts,
+            s.LeagueAlerts);
+
+    private static NotificationSettingsDto ToSettingsDto(NotificationPreferences p)
+        => new(
+            p.Enabled,
+            p.UtcOffsetMinutes,
+            p.QuietHoursStart,
+            p.QuietHoursEnd,
+            p.PreferredHour,
+            p.MaxPerDay,
+            p.StreakAlerts,
+            p.QuestAlerts,
+            p.LeagueAlerts);
+
+    private static ScheduledNotificationDto ToDto(ScheduledNotification n)
+        => new(
+            n.Kind.ToString(),
+            n.Priority.ToString(),
+            n.ScheduledUtc,
+            n.LocalHour,
+            n.Content.Mascot.ToString(),
+            n.Content.Title,
+            n.Content.Body,
+            n.Content.Deeplink,
+            n.DedupeKey);
 }

@@ -1,6 +1,7 @@
 import 'package:core/core.dart';
 import '../models/user_profile.dart';
 import '../models/learning_path.dart';
+import '../models/track_summary.dart';
 import '../models/lesson.dart';
 import '../models/quiz.dart';
 import '../models/leaderboard.dart';
@@ -19,6 +20,11 @@ abstract interface class UserRepository {
 
 abstract interface class PathRepository {
   Future<Result<LearningPath>> getPath(String trackId);
+}
+
+/// The catalog of certification tracks the app offers, for the course picker.
+abstract interface class CatalogRepository {
+  Future<Result<List<TrackSummary>>> getCatalog();
 }
 
 abstract interface class LessonRepository {
