@@ -142,41 +142,78 @@ class _HomeContent extends StatelessWidget {
   }
 }
 
-class _HomeGreeting extends StatelessWidget {
+class _HomeGreeting extends StatefulWidget {
   const _HomeGreeting({required this.firstName, required this.subtitle});
 
   final String firstName;
   final String subtitle;
 
   @override
+  State<_HomeGreeting> createState() => _HomeGreetingState();
+}
+
+class _HomeGreetingState extends State<_HomeGreeting> {
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _visible = true);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     final PrismColorScheme p = context.prism;
+    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final Duration d = reduceMotion ? Duration.zero : PrismMotion.base;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const MascotAvatar(
-          mascot: AuroraMascot.nimbus,
-          mood: MascotMood.happy,
-          size: 64,
-          showBadge: false,
+        AnimatedSlide(
+          offset: _visible ? Offset.zero : const Offset(-0.08, 0),
+          duration: d,
+          curve: PrismMotion.decelerate,
+          child: AnimatedOpacity(
+            opacity: _visible ? 1 : 0,
+            duration: d,
+            curve: PrismMotion.decelerate,
+            child: const MascotAvatar(
+              mascot: AuroraMascot.nimbus,
+              mood: MascotMood.happy,
+              size: 64,
+              showBadge: false,
+            ),
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: SpeechBubble(
-            tail: SpeechTail.left,
-            tailAlignment: 0.34,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(
-                  'Bon retour, $firstName 👋',
-                  style: t.bodyMedium?.copyWith(color: p.textSecondary),
+          child: AnimatedSlide(
+            offset: _visible ? Offset.zero : const Offset(0.08, 0),
+            duration: d,
+            curve: PrismMotion.decelerate,
+            child: AnimatedOpacity(
+              opacity: _visible ? 1 : 0,
+              duration: d,
+              curve: PrismMotion.decelerate,
+              child: SpeechBubble(
+                tail: SpeechTail.left,
+                tailAlignment: 0.34,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      'Bon retour, ${widget.firstName} 👋',
+                      style: t.bodyMedium?.copyWith(color: p.textSecondary),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(widget.subtitle, style: t.titleLarge),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(subtitle, style: t.titleLarge),
-              ],
+              ),
             ),
           ),
         ),

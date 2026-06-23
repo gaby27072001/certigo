@@ -32,7 +32,7 @@ abstract class OnboardingRoutes {
 
 /// A mascot paired with a tailed speech bubble — the recurring "the guide asks
 /// you something" header at the top of each wizard step.
-class MascotPrompt extends StatelessWidget {
+class MascotPrompt extends StatefulWidget {
   const MascotPrompt({
     super.key,
     required this.message,
@@ -47,22 +47,64 @@ class MascotPrompt extends StatelessWidget {
   final double size;
 
   @override
+  State<MascotPrompt> createState() => _MascotPromptState();
+}
+
+class _MascotPromptState extends State<MascotPrompt> {
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _visible = true);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
+    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final Duration d = reduceMotion ? Duration.zero : PrismMotion.base;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        MascotAvatar(mascot: mascot, mood: mood, size: size, showBadge: false),
+        AnimatedSlide(
+          offset: _visible ? Offset.zero : const Offset(-0.08, 0),
+          duration: d,
+          curve: PrismMotion.decelerate,
+          child: AnimatedOpacity(
+            opacity: _visible ? 1 : 0,
+            duration: d,
+            curve: PrismMotion.decelerate,
+            child: MascotAvatar(
+              mascot: widget.mascot,
+              mood: widget.mood,
+              size: widget.size,
+              showBadge: false,
+            ),
+          ),
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: SpeechBubble(
-              tail: SpeechTail.left,
-              tailAlignment: 0.32,
-              child: Text(
-                message,
-                style: t.titleMedium?.copyWith(height: 1.3, fontWeight: FontWeight.w600),
+            child: AnimatedSlide(
+              offset: _visible ? Offset.zero : const Offset(0.08, 0),
+              duration: d,
+              curve: PrismMotion.decelerate,
+              child: AnimatedOpacity(
+                opacity: _visible ? 1 : 0,
+                duration: d,
+                curve: PrismMotion.decelerate,
+                child: SpeechBubble(
+                  tail: SpeechTail.left,
+                  tailAlignment: 0.32,
+                  child: Text(
+                    widget.message,
+                    style: t.titleMedium?.copyWith(height: 1.3, fontWeight: FontWeight.w600),
+                  ),
+                ),
               ),
             ),
           ),

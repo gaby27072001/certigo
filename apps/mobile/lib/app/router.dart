@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:prism_ui/prism_ui.dart';
 
 import '../features/home/presentation/home_screen.dart';
 import '../features/path/presentation/path_screen.dart';
@@ -36,6 +37,38 @@ abstract class Routes {
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
+CustomTransitionPage<void> _stepPage({
+  required GoRouterState state,
+  required Widget child,
+  Offset begin = const Offset(0.06, 0),
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: PrismMotion.base,
+    reverseTransitionDuration: PrismMotion.fast,
+    transitionsBuilder: (
+      BuildContext context,
+      Animation<double> animation,
+      Animation<double> secondaryAnimation,
+      Widget child,
+    ) {
+      final CurvedAnimation curved = CurvedAnimation(
+        parent: animation,
+        curve: PrismMotion.decelerate,
+        reverseCurve: PrismMotion.standard,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
 /// The app router. Exposed as a provider so auth/redirect logic can later watch
 /// session state and guard routes without rebuilding the widget tree manually.
 final routerProvider = Provider<GoRouter>((Ref ref) {
@@ -62,42 +95,56 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: OnboardingRoutes.splash,
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const SplashScreen(),
+        pageBuilder: (_, GoRouterState state) => _stepPage(
+          state: state,
+          child: const SplashScreen(),
+          begin: const Offset(0, 0.03),
+        ),
       ),
       GoRoute(
         path: OnboardingRoutes.welcome,
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const WelcomeScreen(),
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const WelcomeScreen()),
       ),
       GoRoute(
         path: OnboardingRoutes.start,
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const StartChoiceScreen(),
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const StartChoiceScreen()),
       ),
       GoRoute(
         path: OnboardingRoutes.reasons,
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const ReasonsScreen(),
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const ReasonsScreen()),
       ),
       GoRoute(
         path: OnboardingRoutes.goal,
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const GoalScreen(),
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const GoalScreen()),
       ),
       GoRoute(
         path: OnboardingRoutes.routine,
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const RoutineScreen(),
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const RoutineScreen()),
       ),
       GoRoute(
         path: OnboardingRoutes.promise,
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const PromiseScreen(),
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const PromiseScreen()),
       ),
       GoRoute(
         path: OnboardingRoutes.login,
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const LoginScreen(),
+        pageBuilder: (_, GoRouterState state) => _stepPage(
+          state: state,
+          child: const LoginScreen(),
+          begin: const Offset(0.03, 0),
+        ),
       ),
 
       // Bottom-nav shell: persistent state per tab via StatefulShellRoute.
@@ -153,18 +200,26 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         path: '${Routes.lesson}/:trackId/:lessonId',
         name: 'lesson',
         parentNavigatorKey: _rootKey,
-        builder: (BuildContext context, GoRouterState state) => LessonScreen(
-          trackId: state.pathParameters['trackId']!,
-          lessonId: state.pathParameters['lessonId']!,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: LessonScreen(
+            trackId: state.pathParameters['trackId']!,
+            lessonId: state.pathParameters['lessonId']!,
+          ),
         ),
       ),
       GoRoute(
         path: '${Routes.quiz}/:trackId/:lessonId',
         name: 'quiz',
         parentNavigatorKey: _rootKey,
-        builder: (BuildContext context, GoRouterState state) => QuizScreen(
-          trackId: state.pathParameters['trackId']!,
-          lessonId: state.pathParameters['lessonId']!,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: QuizScreen(
+            trackId: state.pathParameters['trackId']!,
+            lessonId: state.pathParameters['lessonId']!,
+          ),
         ),
       ),
     ],

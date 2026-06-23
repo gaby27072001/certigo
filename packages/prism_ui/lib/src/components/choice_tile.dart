@@ -154,9 +154,25 @@ class _Checkbox extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: selected ? accent : border, width: 2),
       ),
-      child: selected
-          ? const Icon(Icons.check_rounded, size: 17, color: Colors.white)
-          : const SizedBox.shrink(),
+      child: AnimatedSwitcher(
+        duration: PrismMotion.fast,
+        switchInCurve: PrismMotion.spring,
+        switchOutCurve: PrismMotion.standard,
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(scale: animation, child: child),
+          );
+        },
+        child: selected
+            ? const Icon(
+                Icons.check_rounded,
+                key: ValueKey<String>('choice-check'),
+                size: 17,
+                color: Colors.white,
+              )
+            : const SizedBox.shrink(key: ValueKey<String>('choice-empty')),
+      ),
     );
   }
 }

@@ -205,6 +205,9 @@ class _StickyCta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
+    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final bool enabled = onPressed != null && !loading;
+    final Duration d = reduceMotion ? Duration.zero : PrismMotion.fast;
     return Container(
       decoration: BoxDecoration(
         color: p.background,
@@ -214,11 +217,16 @@ class _StickyCta extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          PrismButton(
-            label: label,
-            tone: tone,
-            loading: loading,
-            onPressed: onPressed,
+          AnimatedScale(
+            scale: enabled ? 1 : 0.985,
+            duration: d,
+            curve: PrismMotion.decelerate,
+            child: PrismButton(
+              label: label,
+              tone: tone,
+              loading: loading,
+              onPressed: onPressed,
+            ),
           ),
           if (secondary != null) ...<Widget>[
             const SizedBox(height: 6),

@@ -365,11 +365,24 @@ class _ContinueCtaDelegate extends SliverPersistentHeaderDelegate {
       color: p.background,
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
       alignment: Alignment.center,
-      child: PrismButton(
-        label: label,
-        icon: Icons.play_arrow_rounded,
-        tone: accent,
-        onPressed: onTap,
+      child: AnimatedSwitcher(
+        duration: PrismMotion.fast,
+        reverseDuration: PrismMotion.instant,
+        switchInCurve: PrismMotion.spring,
+        switchOutCurve: PrismMotion.standard,
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(scale: animation, child: child),
+          );
+        },
+        child: PrismButton(
+          key: ValueKey<String>('cta-$label-${accent.value}'),
+          label: label,
+          icon: Icons.play_arrow_rounded,
+          tone: accent,
+          onPressed: onTap,
+        ),
       ),
     );
   }
