@@ -25,14 +25,22 @@ class PrismSkeleton extends StatefulWidget {
 }
 
 class _PrismSkeletonState extends State<PrismSkeleton> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1200),
-  )..repeat(reverse: true);
+  // Created lazily, and only when motion is enabled. Constructing it eagerly (or
+  // from dispose via a `late` field) would spin up a ticker even in
+  // reduced-motion contexts and crash on teardown with an unsafe ancestor
+  // lookup. See _ensureController.
+  AnimationController? _controller;
+
+  AnimationController _ensureController() {
+    return _controller ??= AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+  }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
@@ -52,14 +60,15 @@ class _PrismSkeletonState extends State<PrismSkeleton> with SingleTickerProvider
       );
     }
 
+    final AnimationController controller = _ensureController();
     return AnimatedBuilder(
-      animation: _controller,
+      animation: controller,
       builder: (BuildContext context, Widget? child) {
         return Container(
           width: widget.width,
           height: widget.height,
           decoration: BoxDecoration(
-            color: Color.lerp(base, highlight, _controller.value),
+            color: Color.lerp(base, highlight, controller.value),
             borderRadius: radius,
           ),
         );

@@ -31,7 +31,7 @@ final _shellKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 final routerProvider = Provider<GoRouter>((Ref ref) {
   return GoRouter(
     navigatorKey: _rootKey,
-    initialLocation: Routes.home,
+    initialLocation: Routes.path,
     routes: <RouteBase>[
       // Bottom-nav shell: persistent state per tab via StatefulShellRoute.
       StatefulShellRoute.indexedStack(
@@ -39,22 +39,24 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           return AppShell(shell: shell);
         },
         branches: <StatefulShellBranch>[
+          // Primary tab: the Duolingo-style learning journey is the app's
+          // home surface, so it leads the shell and is the initial location.
           StatefulShellBranch(
             navigatorKey: _shellKey,
             routes: <RouteBase>[
               GoRoute(
-                path: Routes.home,
-                name: 'home',
-                builder: (_, __) => const HomeScreen(),
+                path: Routes.path,
+                name: 'path',
+                builder: (_, __) => const PathScreen(trackId: 'az-900'),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: Routes.path,
-                name: 'path',
-                builder: (_, __) => const PathScreen(trackId: 'az-900'),
+                path: Routes.home,
+                name: 'home',
+                builder: (_, __) => const HomeScreen(),
               ),
             ],
           ),

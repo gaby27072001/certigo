@@ -13,8 +13,8 @@ class AppShell extends StatelessWidget {
   final StatefulNavigationShell shell;
 
   static const List<_Tab> _tabs = <_Tab>[
-    _Tab('Accueil', Icons.home_rounded, Icons.home_outlined),
     _Tab('Parcours', Icons.school_rounded, Icons.school_outlined),
+    _Tab('Accueil', Icons.home_rounded, Icons.home_outlined),
     _Tab('Ligue', Icons.emoji_events_rounded, Icons.emoji_events_outlined),
     _Tab('Profil', Icons.person_rounded, Icons.person_outline_rounded),
   ];
