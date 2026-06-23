@@ -1,0 +1,182 @@
+name: release-android
+
+# Release beta Android : build AAB signé + publication Google Play.
+# Déclenchement manuel (workflow_dispatch) ou par tag de version (v*).
+# Gates bloquants avant toute release : flutter analyze + flutter test.
+#
+# Secrets requis (Settings > Secrets and variables > Actions) :
+#   ANDROID_KEYSTORE_BASE64     base64 du keystore upload (.jks)
+#   ANDROID_KEYSTORE_PASSWORD   mot de passe du keystore
+#   ANDROID_KEY_ALIAS           alias de la clé (ex: upload)
+#   ANDROID_KEY_PASSWORD        mot de passe de la clé
+#   PLAY_SERVICE_ACCOUNT_JSON   JSON du compte de service Google Play (rôle "Release manager")
+# Voir docs/RELEASE_MOBILE.md pour la génération des secrets (aucune valeur n'est committée).
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "Piste Google Play de destination"
+        type: choice
+        default: internal
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+      version_name:
+        description: "versionName (ex: 0.1.0). Vide = lue depuis pubspec.yaml"
+        type: string
+        required: false
+      build_number:
+        description: "versionCode / build number. Vide = numéro de run GitHub (auto-incrémenté)"
+        type: string
+        required: false
+      dry_run:
+        description: "Construire l'AAB signé SANS publier sur le Play Store"
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-android-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: "3.24.0"
+  # ⚠️ Doit correspondre à applicationId dans apps/mobile/android/app/build.gradle
+  PLAY_PACKAGE_NAME: "com.microlingo.app"
+  AAB_PATH: "apps/mobile/build/app/outputs/bundle/release/app-release.aab"
+
+jobs:
+  release:
+    name: Build AAB signé + publication Play
+    runs-on: [self-hosted, Linux, X64, microlingo-ci]
+    env:
+      # Permet de sauter proprement la publication tant que le compte de service Play n'est pas configuré.
+      HAS_PLAY_SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurer le JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Configurer le SDK Android
+        uses: android-actions/setup-android@v3
+
+      - name: Installer plateformes + build-tools Android
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" >/dev/null
+
+      - name: Configurer Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Résoudre la version (name + build number + track)
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          PUBSPEC_VERSION="$(grep -E '^version:' apps/mobile/pubspec.yaml | head -1 | awk '{print $2}')"
+          PUBSPEC_NAME="${PUBSPEC_VERSION%%+*}"
+
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            BUILD_NAME="${GITHUB_REF_NAME#v}"
+          else
+            BUILD_NAME="${{ inputs.version_name }}"
+          fi
+          BUILD_NAME="${BUILD_NAME:-$PUBSPEC_NAME}"
+
+          BUILD_NUMBER="${{ inputs.build_number }}"
+          BUILD_NUMBER="${BUILD_NUMBER:-${{ github.run_number }}}"
+
+          TRACK="${{ inputs.track }}"
+          TRACK="${TRACK:-internal}"
+
+          echo "build_name=$BUILD_NAME"   >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "track=$TRACK"             >> "$GITHUB_OUTPUT"
+          echo "### Release Android : $BUILD_NAME (+$BUILD_NUMBER) → piste \`$TRACK\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Récupérer les dépendances
+        working-directory: apps/mobile
+        run: flutter pub get
+
+      - name: Analyze (gate bloquant)
+        working-directory: apps/mobile
+        run: flutter analyze
+
+      - name: Test (gate bloquant)
+        working-directory: apps/mobile
+        run: flutter test
+
+      - name: Déchiffrer le keystore + écrire key.properties
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::Secret ANDROID_KEYSTORE_BASE64 manquant — impossible de signer la release. Voir docs/RELEASE_MOBILE.md."
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > apps/mobile/android/app/upload-keystore.jks
+          cat > apps/mobile/android/key.properties <<EOF
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: Construire l'AAB signé
+        working-directory: apps/mobile
+        run: >
+          flutter build appbundle --release
+          --build-name=${{ steps.ver.outputs.build_name }}
+          --build-number=${{ steps.ver.outputs.build_number }}
+
+      - name: Publier l'AAB en artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: microlingo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}-aab
+          path: ${{ env.AAB_PATH }}
+          if-no-files-found: error
+
+      - name: Publier sur Google Play (piste ${{ steps.ver.outputs.track }})
+        if: ${{ inputs.dry_run != true && env.HAS_PLAY_SA == 'true' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ env.PLAY_PACKAGE_NAME }}
+          releaseFiles: ${{ env.AAB_PATH }}
+          track: ${{ steps.ver.outputs.track }}
+          status: completed
+          whatsNewDirectory: apps/mobile/distribution/android/whatsnew
+
+      - name: Note — publication sautée
+        if: ${{ env.HAS_PLAY_SA != 'true' || inputs.dry_run == true }}
+        shell: bash
+        run: |
+          echo "::warning::Publication Play sautée (dry_run=${{ inputs.dry_run }}, compte de service présent=${{ env.HAS_PLAY_SA }}). L'AAB signé reste disponible en artefact."
+          echo "> ℹ️ Publication Play **sautée** — l'AAB signé est téléchargeable dans les artefacts du run." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Nettoyer le matériel de signature
+        if: always()
+        shell: bash
+        run: |
+          rm -f apps/mobile/android/app/upload-keystore.jks apps/mobile/android/key.properties
+          echo "Matériel de signature supprimé du workspace du runner self-hosted."
