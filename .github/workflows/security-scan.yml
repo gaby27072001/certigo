@@ -46,6 +46,9 @@ jobs:
     runs-on: [self-hosted, Linux, X64, microlingo-ci]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
       - name: Run Checkov on infra/
         shell: bash
         run: |
