@@ -267,6 +267,10 @@ public sealed class QuizService(
         var outcome = ComputeOutcome(p0);
         var result = outcome.Result;
 
+        // Recent-activity rate window (PRIOR attempts only — this one isn't recorded
+        // yet) feeds the anti-cheat XP-farming / submission-spam detectors.
+        var rateWindow = await BuildRateWindowAsync(now, cancellationToken);
+
         // Atomic, idempotent reservation of the attempt BEFORE crediting the
         // profile. The id is derived from clientAttemptId, so a replayed or
         // concurrent create loses the race and returns the winner's result — the
@@ -330,15 +334,16 @@ public sealed class QuizService(
         await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "quiz.submitted", now, result), cancellationToken);
 
         // Anti-triche (autorité serveur, §6/§15) — mode détection : on évalue la
-        // cohérence temporelle de la tentative et, si le verdict n'est pas « Allow »,
-        // on émet un signal d'intégrité SANS jamais modifier les récompenses.
-        // L'application des sanctions et les plafonds de cadence (fenêtre Redis)
-        // viendront au lot cloud ; ici la fenêtre est volontairement nulle.
-        var integrity = AttemptIntegrityEvaluator.Evaluate(new AttemptTiming(
-            request.StartedAt,
-            now,
-            request.Answers.Select(a => a.LatencyMs).ToList(),
-            xpEarned));
+        // cohérence temporelle ET la cadence récente (anti-farming d'XP / anti-spam de
+        // soumissions), et si le verdict n'est pas « Allow » on émet un signal
+        // d'intégrité SANS jamais modifier les récompenses.
+        var integrity = AttemptIntegrityEvaluator.Evaluate(
+            new AttemptTiming(
+                request.StartedAt,
+                now,
+                request.Answers.Select(a => a.LatencyMs).ToList(),
+                xpEarned),
+            rateWindow);
         if (!integrity.IsClean)
         {
             await events.AddAsync(new LearningEvent(
@@ -400,6 +405,16 @@ public sealed class QuizService(
             await learnerModels.UpsertAsync(
                 LearnerModelMap.ToRecord(userContext.UserId, request.TrackId, map, now), cancellationToken);
         }
+    }
+
+    // Anti-cheat rate window: count + XP of the learner's prior attempts (lesson and
+    // exam) over the trailing hour, sourced from the attempts container (no Redis).
+    private static readonly TimeSpan RateWindowDuration = TimeSpan.FromHours(1);
+
+    private async Task<RateWindow> BuildRateWindowAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var recent = await attempts.GetRecentActivityAsync(userContext.UserId, now - RateWindowDuration, cancellationToken);
+        return new RateWindow(RateWindowDuration, recent.Xp, recent.Attempts);
     }
 
     private static bool IsCorrect(AnswerKeyItem item, AnswerDto answer)

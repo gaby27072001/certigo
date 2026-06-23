@@ -131,6 +131,8 @@ internal sealed class InMemoryAttemptRepository : IAttemptRepository
 {
     private readonly List<AttemptRecord> _store = new();
 
+    public void Seed(AttemptRecord attempt) => _store.Add(attempt);
+
     public Task<AttemptRecord?> GetByClientAttemptIdAsync(string userId, string clientAttemptId, CancellationToken cancellationToken = default)
         => Task.FromResult(_store.FirstOrDefault(a => a.UserId == userId && a.ClientAttemptId == clientAttemptId));
 
@@ -143,6 +145,12 @@ internal sealed class InMemoryAttemptRepository : IAttemptRepository
 
         _store.Add(attempt);
         return Task.CompletedTask;
+    }
+
+    public Task<RecentActivity> GetRecentActivityAsync(string userId, DateTimeOffset since, CancellationToken cancellationToken = default)
+    {
+        var recent = _store.Where(a => a.UserId == userId && a.SubmittedAt >= since).ToList();
+        return Task.FromResult(new RecentActivity(recent.Count, recent.Sum(a => a.Result.Rewards.XpEarned)));
     }
 }
 

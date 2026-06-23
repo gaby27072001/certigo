@@ -691,6 +691,7 @@ avant d'envisager une mise à l'échelle ou une ouverture publique.
 | **D16** Observabilité | **Correlation id** (`x-correlation-id`) propagé/journalisé/retourné ; endpoint **`GET /health`** (sonde Cosmos, anonyme) | `ExceptionMiddleware.cs`, `HealthFunctions.cs`, `JwtAuthMiddleware.cs` | ✅ build + 323 tests |
 | **D17** Validateur contenu | Intégrité des réponses (`correct` ⊆ options), unicité ids d'items, cohérence `ordering`/`mcq` | `tools/validate_content.mjs` | 🧪 prouvé sur cas cassé + contenu réel ✅ |
 | **D18** Robustesse HTTP | JSON malformé → **400** (`BadRequestException`), conflit → **409** | `HttpExtensions.cs`, `ExceptionMiddleware.cs` | ✅ build |
+| **D8** Anti-triche détecteurs morts | Fenêtre de débit **réelle** (XP/tentatives sur 1 h, depuis le conteneur `attempts`, sans Redis) câblée dans `QuizService` → les détecteurs `XpRateExceeded`/`AttemptRateExceeded` s'activent | `CoreAbstractions.cs` (`RecentActivity`), `CosmosRepositories.cs`, `QuizService` | 🧪 `SubmitAsync_flags_submission_spam_via_the_rate_window` |
 | **D9** Builds reproductibles | SDK Dart épinglé (`3.5.0`), lockfile applicatif suivi (`.gitignore`) | `ci-mobile.yml`, `.gitignore` | ✅ YAML valide |
 | **D13** Release / SBOM | **SBOM** CycloneDX (backend), **gate d'approbation** `environment: beta` sur releases mobiles | `ci-backend.yml`, `release-android.yml`, `release-ios.yml` | ✅ YAML valide |
 
@@ -701,8 +702,9 @@ validateur de contenu vert, `az bicep build` vert sur toute l'infra.
 ### Restant (volontairement non fait ici — risque/coût vs valeur)
 - **D5** Éclatement de `Services.cs` (96 Ko) : refactor mécanique pur, reporté pour ne pas
   mêler un gros diff cosmétique aux corrections d'intégrité (à planifier isolément).
-- **D8** Fenêtre de débit anti-triche (Redis/Cosmos) : nécessite une source de débit + tests
-  d'intégration ; l'anti-triche reste en mode détection comme avant.
+- **D8** Fenêtre de débit anti-triche **côté examens** : `QuizService` est câblé (vecteur dominant,
+  testé) ; l'étendre à `ExamService` nécessite d'injecter `IAttemptRepository` dans son constructeur
+  (petit ripple harness) — suivi simple.
 - **D4/D5 (tests)** Tests d'intégration HTTP/Cosmos (émulateur) : nécessitent un émulateur Cosmos
   non disponible dans cet environnement.
 - **Opérationnel** : déploiement réel de l'infra, protection de branche, fusion des PR Dependabot,
