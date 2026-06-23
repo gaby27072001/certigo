@@ -24,7 +24,12 @@ public sealed record UserProfileDto(
     int LifetimeLessonsCompleted = 0,
     int LifetimePerfectLessons = 0,
     List<string>? Achievements = null,
-    NotificationStateDto? NotificationState = null);
+    NotificationStateDto? NotificationState = null,
+    DateOnly? MonthlyAnchor = null,
+    int MonthlyXpEarned = 0,
+    int MonthlyLessonsCompleted = 0,
+    int MonthlyPerfectLessons = 0,
+    List<string>? SeasonBadges = null);
 
 public sealed record SubmitQuizRequest(
     string ClientAttemptId,
@@ -204,6 +209,43 @@ public sealed record ClaimQuestRequest(string QuestId);
 public sealed record ClaimQuestResultDto(
     bool Success,
     string QuestId,
+    int GemsAwarded,
+    int GemsBalance,
+    bool Claimed,
+    string? Error);
+
+// --- Seasons & monthly challenge -------------------------------------------
+
+public sealed record SeasonChallengeDto(
+    string Kind,
+    string Title,
+    int Target,
+    int Current,
+    int RewardGems,
+    bool Completed,
+    bool Claimed,
+    bool Claimable);
+
+public sealed record SeasonDto(
+    string Id,
+    int Year,
+    int Month,
+    string Theme,
+    string Tagline,
+    string Mascot,
+    string Accent,
+    string BadgeId,
+    string BadgeTitle,
+    int Gems,
+    int BadgesEarned,
+    SeasonChallengeDto Challenge);
+
+public sealed record ClaimSeasonRequest(string SeasonId);
+
+public sealed record ClaimSeasonResultDto(
+    bool Success,
+    string SeasonId,
+    string? BadgeId,
     int GemsAwarded,
     int GemsBalance,
     bool Claimed,
