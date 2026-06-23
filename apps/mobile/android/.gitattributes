@@ -1,0 +1,6 @@
+# Garantit des fins de ligne déterministes pour le wrapper Gradle, quel que soit
+# l'OS du contributeur. Le runner CI est Linux : gradlew DOIT rester en LF,
+# sinon le script échoue (`bad interpreter`).
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+gradle/wrapper/gradle-wrapper.jar binary

@@ -1,0 +1,18 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Exemple de configuration de signature Android (release).
+#
+# COPIER ce fichier vers  android/key.properties  puis renseigner les vraies
+# valeurs. Le fichier .example est committé ; key.properties ne l'est JAMAIS
+# (il est listé dans android/.gitignore).
+#
+# En CI, key.properties est généré automatiquement à partir des secrets GitHub
+# (voir docs/RELEASE_MOBILE.md et .github/workflows/release-android.yml).
+# ─────────────────────────────────────────────────────────────────────────────
+
+storePassword=CHANGEME_mot_de_passe_du_keystore
+keyPassword=CHANGEME_mot_de_passe_de_la_cle
+keyAlias=upload
+
+# Chemin du keystore, résolu relativement au module android/app/
+# (ou chemin absolu). En CI on décode le keystore vers android/app/upload-keystore.jks.
+storeFile=upload-keystore.jks

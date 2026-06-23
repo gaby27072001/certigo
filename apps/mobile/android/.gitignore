@@ -1,0 +1,13 @@
+# NB : gradle-wrapper.jar, gradlew et gradlew.bat sont VOLONTAIREMENT versionnés
+# (retirés de ce .gitignore) pour garantir un build CI 100 % reproductible avec
+# une version de Gradle épinglée. Ne pas les ré-ignorer.
+/.gradle
+/captures/
+/local.properties
+GeneratedPluginRegistrant.java
+
+# Remember to never publicly share your keystore.
+# See https://flutter.dev/to/reference-keystore
+key.properties
+**/*.keystore
+**/*.jks
