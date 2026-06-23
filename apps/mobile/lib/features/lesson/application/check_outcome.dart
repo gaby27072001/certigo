@@ -1,3 +1,7 @@
+import 'package:data/data.dart';
+
+import 'answer_grading.dart';
+
 /// The graded result of a single inline check.
 ///
 /// In P0 this is produced locally by an [EmbeddedKeyGrader] over bundled sample
@@ -30,9 +34,15 @@ class CheckOutcome {
 /// Grades a learner's answer to an inline check.
 ///
 /// The seam that lets P0 grade locally and P1 grade on the server without
-/// touching the controller or the UI.
+/// touching the controller or the UI. [type] selects the comparison semantics
+/// (order-sensitive for ordering/cloze, set for the rest) and is optional so
+/// existing single/multi callers stay source-compatible.
 abstract interface class LessonGrader {
-  CheckOutcome grade({required String itemId, required List<String> selected});
+  CheckOutcome grade({
+    required String itemId,
+    required List<String> selected,
+    ItemType type = ItemType.mcq,
+  });
 }
 
 /// Grades against an in-memory answer key (offline P0 path).
@@ -43,24 +53,18 @@ class EmbeddedKeyGrader implements LessonGrader {
   final Map<String, CheckOutcome> key;
 
   @override
-  CheckOutcome grade({required String itemId, required List<String> selected}) {
+  CheckOutcome grade({
+    required String itemId,
+    required List<String> selected,
+    ItemType type = ItemType.mcq,
+  }) {
     final CheckOutcome? template = key[itemId];
     if (template == null) return CheckOutcome.empty;
-    final bool correct = _unorderedEquals(selected, template.correctAnswer);
+    final bool correct = gradeSelection(type, selected, template.correctAnswer);
     return CheckOutcome(
       correct: correct,
       correctAnswer: template.correctAnswer,
       explanation: template.explanation,
     );
   }
-}
-
-/// Order-independent set equality over option ids (mcq has a single element).
-bool _unorderedEquals(List<String> a, List<String> b) {
-  if (a.length != b.length) return false;
-  final Set<String> other = b.toSet();
-  for (final String id in a) {
-    if (!other.contains(id)) return false;
-  }
-  return true;
 }

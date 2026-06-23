@@ -7,8 +7,10 @@ import 'package:data/data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import 'answer_grading.dart';
 import 'check_outcome.dart';
 import 'lesson_args.dart';
+import 'lesson_feedback.dart';
 import 'lesson_session_state.dart';
 import 'lesson_step.dart';
 import 'sample_lesson.dart';
@@ -25,14 +27,17 @@ class LessonController extends StateNotifier<LessonSessionState> {
     required LessonRepository lessons,
     required QuizRepository quiz,
     required this.args,
+    LessonFeedback feedback = const HapticLessonFeedback(),
   })  : _lessons = lessons,
         _quiz = quiz,
+        _feedback = feedback,
         super(const LessonSessionState()) {
     unawaited(load());
   }
 
   final LessonRepository _lessons;
   final QuizRepository _quiz;
+  final LessonFeedback _feedback;
   final LessonArgs args;
 
   LessonGrader _grader = const EmbeddedKeyGrader(<String, CheckOutcome>{});
@@ -72,21 +77,62 @@ class LessonController extends StateNotifier<LessonSessionState> {
     _stepShownAt = DateTime.now();
   }
 
-  /// Toggle an option for the current check (single- or multi-select).
+  /// Toggle an option for the current check.
+  ///
+  /// Semantics are type-aware but all funnel into the one `selection` list:
+  /// * multi — order-free set toggle;
+  /// * ordering / applied / cloze — **ordered** place/remove (the order is the
+  ///   answer), capped at the number of slots so we never over-fill;
+  /// * mcq / scenario / spotTheIssue — single replace.
   void toggleOption(String optionId) {
     final QuizItem? item = state.currentItem;
     if (item == null || state.currentAnswered) return;
     final List<String> next = List<String>.from(state.selection);
-    if (item.type == ItemType.multi) {
-      if (next.contains(optionId)) {
-        next.remove(optionId);
-      } else {
-        next.add(optionId);
-      }
+    switch (item.type) {
+      case ItemType.multi:
+        if (next.contains(optionId)) {
+          next.remove(optionId);
+        } else {
+          next.add(optionId);
+        }
+      case ItemType.ordering:
+      case ItemType.applied:
+      case ItemType.cloze:
+        if (next.contains(optionId)) {
+          next.remove(optionId);
+        } else {
+          final int cap =
+              item.type == ItemType.cloze ? clozeBlankCount(item.stem) : item.options.length;
+          if (next.length < cap) next.add(optionId);
+        }
+      case ItemType.mcq:
+      case ItemType.scenario:
+      case ItemType.spotTheIssue:
+      case ItemType.matchPairs:
+      case ItemType.unknown:
+        next
+          ..clear()
+          ..add(optionId);
+    }
+    state = state.copyWith(selection: next);
+  }
+
+  /// Toggle a `matchPairs` connection between a left [leftId] and right
+  /// [rightId]. The selection is a set of canonical `"left:right"` tokens; each
+  /// left and each right may appear at most once, so re-pairing either side
+  /// first releases its previous link.
+  void toggleMatch(String leftId, String rightId) {
+    final QuizItem? item = state.currentItem;
+    if (item == null || state.currentAnswered) return;
+    final String token = matchToken(leftId, rightId);
+    final List<String> next = List<String>.from(state.selection);
+    if (next.contains(token)) {
+      next.remove(token);
     } else {
       next
-        ..clear()
-        ..add(optionId);
+        ..removeWhere((String t) => t.startsWith('$leftId:'))
+        ..removeWhere((String t) => t.endsWith(':$rightId'))
+        ..add(token);
     }
     state = state.copyWith(selection: next);
   }
@@ -94,14 +140,17 @@ class LessonController extends StateNotifier<LessonSessionState> {
   /// Grade the current check and reveal feedback in place.
   void submitCheck() {
     final QuizItem? item = state.currentItem;
-    if (item == null || state.currentAnswered || state.selection.isEmpty) return;
+    if (item == null || !state.canSubmitCurrent) return;
 
     final int latencyMs = DateTime.now().difference(_stepShownAt).inMilliseconds;
     final List<String> selected = List<String>.unmodifiable(state.selection);
     final CheckOutcome outcome = _grader.grade(
       itemId: item.id,
       selected: selected,
+      type: item.type,
     );
+
+    _feedback.graded(correct: outcome.correct);
 
     state = state.copyWith(
       status: LessonStatus.graded,
@@ -157,6 +206,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
     );
 
     final SubmitQuizResult result = res.valueOrNull ?? _localResult(lesson, answers);
+    _feedback.completed();
     state = state.copyWith(
       status: LessonStatus.finished,
       index: state.steps.length - 1,
@@ -244,6 +294,7 @@ final lessonControllerProvider =
       lessons: ref.watch(lessonRepositoryProvider),
       quiz: ref.watch(quizRepositoryProvider),
       args: args,
+      feedback: ref.watch(lessonFeedbackProvider),
     );
   },
 );

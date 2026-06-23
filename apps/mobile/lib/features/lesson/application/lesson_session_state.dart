@@ -1,5 +1,6 @@
 import 'package:data/data.dart';
 
+import 'answer_grading.dart';
 import 'check_outcome.dart';
 import 'lesson_step.dart';
 
@@ -52,6 +53,35 @@ class LessonSessionState {
   CheckOutcome? get currentOutcome {
     final QuizItem? item = currentItem;
     return item == null ? null : outcomes[item.id];
+  }
+
+  /// Whether the current check has enough input to be submitted.
+  ///
+  /// The single CTA is gated on this, so completeness is defined per exercise
+  /// type instead of the naive "something is selected":
+  ///
+  /// * ordering / applied / matchPairs — every slot filled (one token per item).
+  /// * cloze — every blank in the stem filled.
+  /// * select family (mcq/multi/scenario/spotTheIssue) — at least one pick.
+  bool get canSubmitCurrent {
+    final QuizItem? item = currentItem;
+    if (item == null || currentAnswered) return false;
+    switch (item.type) {
+      case ItemType.ordering:
+      case ItemType.applied:
+        return item.options.isNotEmpty && selection.length == item.options.length;
+      case ItemType.matchPairs:
+        return item.options.isNotEmpty && selection.length == item.options.length;
+      case ItemType.cloze:
+        final int blanks = clozeBlankCount(item.stem);
+        return blanks > 0 && selection.length == blanks;
+      case ItemType.mcq:
+      case ItemType.multi:
+      case ItemType.scenario:
+      case ItemType.spotTheIssue:
+      case ItemType.unknown:
+        return selection.isNotEmpty;
+    }
   }
 
   /// Whether advancing one step lands on the synthetic result step.

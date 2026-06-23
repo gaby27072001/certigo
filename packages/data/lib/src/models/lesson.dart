@@ -125,6 +125,7 @@ class QuizItem {
     required this.type,
     required this.stem,
     required this.options,
+    this.matches = const <QuizOption>[],
   });
 
   final String id;
@@ -133,7 +134,16 @@ class QuizItem {
 
   /// The question / prompt (markdown).
   final String stem;
+
+  /// The primary choices. For `matchPairs` this is the *left* column
+  /// (concepts); for `cloze`/`ordering` it is the word/step bank; for the
+  /// select family (mcq/multi/scenario/spotTheIssue) it is the answer set.
   final List<QuizOption> options;
+
+  /// The *right* column for `matchPairs` (definitions to pair with [options]).
+  /// Empty for every other item type — backward-compatible: server payloads
+  /// that omit it simply decode to `const []`.
+  final List<QuizOption> matches;
 
   factory QuizItem.fromJson(Map<String, dynamic> json) => QuizItem(
         id: json['id'] as String,
@@ -141,6 +151,9 @@ class QuizItem {
         type: itemTypeFrom(json['type'] as String?),
         stem: json['stem'] as String? ?? '',
         options: (json['options'] as List<dynamic>? ?? <dynamic>[])
+            .map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        matches: (json['matches'] as List<dynamic>? ?? <dynamic>[])
             .map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
             .toList(),
       );

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core/core.dart';
 import 'package:data/data.dart';
 
+import '../features/lesson/application/lesson_feedback.dart';
+
 /// Root dependency wiring for the app, expressed as Riverpod providers.
 ///
 /// This is the composition layer: it constructs the [ApiClient] and the
@@ -54,6 +56,12 @@ final recommendationRepositoryProvider = Provider<RecommendationRepository>(
 
 /// User-controlled theme mode (persisted by settings later). System by default.
 final themeModeProvider = StateProvider<ThemeMode>((Ref ref) => ThemeMode.system);
+
+/// Audio-haptic feedback for lesson checks (§3.14). Real haptics by default;
+/// tests / reduce-motion override this with [SilentLessonFeedback].
+final lessonFeedbackProvider = Provider<LessonFeedback>(
+  (Ref ref) => const HapticLessonFeedback(),
+);
 
 /// Unwraps a repository [Result] into a plain value, throwing the [Failure] so
 /// Riverpod surfaces it as `AsyncError` for the UI's `.when(error: …)` branch.

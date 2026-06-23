@@ -6,6 +6,7 @@ import 'package:microlingo/app/providers.dart';
 import 'package:microlingo/features/lesson/application/check_outcome.dart';
 import 'package:microlingo/features/lesson/application/lesson_args.dart';
 import 'package:microlingo/features/lesson/application/lesson_controller.dart';
+import 'package:microlingo/features/lesson/application/lesson_feedback.dart';
 import 'package:microlingo/features/lesson/application/lesson_session_state.dart';
 import 'package:microlingo/features/lesson/application/lesson_step.dart';
 import 'package:microlingo/features/lesson/application/sample_lesson.dart';
@@ -30,6 +31,67 @@ class _OfflineQuizRepo implements QuizRepository {
       const Err<SubmitQuizResult>(NetworkFailure());
 }
 
+/// Answers the current check **correctly**, dispatching by exercise type:
+/// `matchPairs` is driven by `toggleMatch(left, right)`; every other type fills
+/// its slots via `toggleOption` in the key's (ordered) sequence.
+void _answerCorrectly(
+  LessonController controller,
+  LessonSessionState state,
+  Map<String, CheckOutcome> key,
+) {
+  final QuizItem item = state.current!.item!;
+  final List<String> correct = key[item.id]!.correctAnswer;
+  if (item.type == ItemType.matchPairs) {
+    for (final String token in correct) {
+      final List<String> parts = token.split(':');
+      controller.toggleMatch(parts[0], parts[1]);
+    }
+  } else {
+    for (final String id in correct) {
+      controller.toggleOption(id);
+    }
+  }
+}
+
+/// Answers the current check **wrong but submittable** — every required slot is
+/// filled so `canSubmitCurrent` is satisfied, yet the answer still grades as
+/// incorrect. This exercises the failure path for *every* exercise type.
+void _answerWrong(
+  LessonController controller,
+  LessonSessionState state,
+  Map<String, CheckOutcome> key,
+) {
+  final QuizItem item = state.current!.item!;
+  final List<String> correct = key[item.id]!.correctAnswer;
+  switch (item.type) {
+    case ItemType.ordering:
+    case ItemType.cloze:
+    case ItemType.applied:
+      // Right ids, wrong order — order-sensitive grading marks it incorrect.
+      for (final String id in correct.reversed) {
+        controller.toggleOption(id);
+      }
+    case ItemType.matchPairs:
+      // A full but mis-matched set: each left paired with the *next* right.
+      final List<QuizOption> lefts = item.options;
+      final List<QuizOption> rights = item.matches;
+      for (int i = 0; i < lefts.length; i++) {
+        controller.toggleMatch(lefts[i].id, rights[(i + 1) % rights.length].id);
+      }
+    case ItemType.mcq:
+    case ItemType.multi:
+    case ItemType.scenario:
+    case ItemType.spotTheIssue:
+    case ItemType.unknown:
+      // A single option that is not part of the correct answer.
+      final QuizOption wrong = item.options.firstWhere(
+        (QuizOption o) => !correct.contains(o.id),
+        orElse: () => item.options.first,
+      );
+      controller.toggleOption(wrong.id);
+  }
+}
+
 void main() {
   group('buildLessonSteps', () {
     test('flattens intro + blocks + result, checks carry their items', () {
@@ -41,11 +103,19 @@ void main() {
       expect(steps.length, lesson.blocks.length + 2);
 
       final List<LessonStep> checks = steps.where((LessonStep s) => s.isCheck).toList();
-      expect(checks.length, 2);
+      expect(checks.length, 7);
       expect(checks.every((LessonStep s) => s.item != null), isTrue);
       expect(
         checks.map((LessonStep s) => s.item!.id),
-        containsAll(<String>['chk-shared-1', 'chk-shared-2']),
+        containsAll(<String>[
+          'chk-shared-1',
+          'chk-shared-2',
+          'chk-order-1',
+          'chk-cloze-1',
+          'chk-match-1',
+          'chk-scenario-1',
+          'chk-spot-1',
+        ]),
       );
 
       for (int i = 0; i < steps.length; i++) {
@@ -95,6 +165,7 @@ void main() {
         overrides: <Override>[
           lessonRepositoryProvider.overrideWithValue(_OfflineLessonRepo()),
           quizRepositoryProvider.overrideWithValue(_OfflineQuizRepo()),
+          lessonFeedbackProvider.overrideWithValue(const SilentLessonFeedback()),
         ],
       );
       addTearDown(container.dispose);
@@ -111,7 +182,7 @@ void main() {
       expect(state.status, LessonStatus.ready);
       expect(state.lesson, isNotNull);
       expect(state.steps.first.kind, LessonStepKind.intro);
-      expect(state.checksTotal, 2);
+      expect(state.checksTotal, 7);
     });
 
     test('grades a check inline and reveals the outcome', () async {
@@ -140,9 +211,7 @@ void main() {
         final LessonSessionState state = read();
         final LessonStep? step = state.current;
         if (step != null && step.isCheck && !state.currentAnswered) {
-          for (final String id in key[step.item!.id]!.correctAnswer) {
-            controller.toggleOption(id);
-          }
+          _answerCorrectly(controller, state, key);
           controller.submitCheck();
         } else {
           await controller.advance();
@@ -154,21 +223,22 @@ void main() {
       expect(state.result, isNotNull);
       expect(state.result!.scorePct, 100);
       expect(state.result!.weakConcepts, isEmpty);
-      expect(state.result!.results.length, 2);
+      expect(state.result!.results.length, 7);
       expect(state.result!.rewards.xpEarned, greaterThan(0));
     });
 
     test('a wrong answer surfaces the concept as weak in the result', () async {
       final LessonController controller = notifier();
       await controller.load();
+      final Map<String, CheckOutcome> key = sampleAnswerKey();
 
       var guard = 0;
       while (read().status != LessonStatus.finished && guard++ < 50) {
         final LessonSessionState state = read();
         final LessonStep? step = state.current;
         if (step != null && step.isCheck && !state.currentAnswered) {
-          // Deliberately wrong: pick the last option only.
-          controller.toggleOption(step.item!.options.last.id);
+          // Wrong but submittable for every exercise type.
+          _answerWrong(controller, state, key);
           controller.submitCheck();
         } else {
           await controller.advance();
