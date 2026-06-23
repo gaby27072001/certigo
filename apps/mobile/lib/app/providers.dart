@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core/core.dart';
 import 'package:data/data.dart';
 
+import '../features/auth/application/auth_controller.dart';
 import '../features/lesson/application/lesson_feedback.dart';
 
 /// Root dependency wiring for the app, expressed as Riverpod providers.
@@ -16,16 +17,19 @@ import '../features/lesson/application/lesson_feedback.dart';
 
 /// Supplies the current access token to the API client.
 ///
-/// Until Entra External ID is wired, dev/staging builds send a non-empty bearer
-/// token that the backend's dev validator maps to a stable userId, so the app
-/// works end-to-end. Production overrides this with a real Entra access token
-/// via `ProviderScope.overrides`.
+/// Delegates to the auth controller: in dev (Entra not configured) it returns
+/// the dev bearer token so the app works end-to-end; once Entra External ID is
+/// configured it returns a real, proactively-refreshed access token.
 final tokenProvider = Provider<TokenProvider>((Ref ref) {
-  return () async => AppEnv.isProd ? null : AppEnv.devAuthToken;
+  return ref.watch(authControllerProvider.notifier).currentAccessToken;
 });
 
 final apiClientProvider = Provider<ApiClient>((Ref ref) {
-  return ApiClient(tokenProvider: ref.watch(tokenProvider));
+  final AuthController auth = ref.watch(authControllerProvider.notifier);
+  return ApiClient(
+    tokenProvider: ref.watch(tokenProvider),
+    onUnauthorized: auth.handleUnauthorized,
+  );
 });
 
 final userRepositoryProvider = Provider<UserRepository>(

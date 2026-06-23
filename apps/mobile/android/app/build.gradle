@@ -39,6 +39,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Schéma de redirection OAuth/OIDC natif pour flutter_appauth.
+        // L'activité RedirectUriReceiverActivity du plugin capture microlingo://auth.
+        manifestPlaceholders += [appAuthRedirectScheme: "microlingo"]
     }
 
     signingConfigs {

@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Requis au runtime (appels API + flux OIDC Entra) pour les builds release.
+         Le manifeste debug ne s'applique qu'aux builds debug, d'où la déclaration ici. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="Microlingo"
         android:name="${applicationName}"
