@@ -16,4 +16,14 @@ public sealed class LeaderboardFunctions(ILeaderboardService leaderboard)
         var league = await leaderboard.GetMyLeagueAsync(context.CancellationToken);
         return await request.JsonAsync(league, cancellationToken: context.CancellationToken);
     }
+
+    [Function("GetMyLeagueResolution")]
+    public async Task<HttpResponseData> GetMyLeagueResolution(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "me/league/resolution")] HttpRequestData request,
+        FunctionContext context)
+    {
+        context.GetUser();
+        var resolution = await leaderboard.PreviewResolutionAsync(context.CancellationToken);
+        return await request.JsonAsync(resolution, cancellationToken: context.CancellationToken);
+    }
 }
