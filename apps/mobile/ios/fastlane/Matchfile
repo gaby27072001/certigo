@@ -1,0 +1,10 @@
+# Configuration fastlane match — certificats & profils iOS chiffrés dans un repo git.
+#
+# git_url, MATCH_PASSWORD et l'auth git proviennent de l'ENVIRONNEMENT (secrets /
+# Key Vault), jamais d'un fichier committé :
+#   MATCH_GIT_URL                    URL du repo privé des certificats
+#   MATCH_PASSWORD                   passphrase de (dé)chiffrement
+#   MATCH_GIT_BASIC_AUTHORIZATION    base64 de "utilisateur:token" (clone HTTPS)
+storage_mode("git")
+type("appstore")
+app_identifier(["com.microlingo.app"])

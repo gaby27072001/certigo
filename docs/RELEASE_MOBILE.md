@@ -103,6 +103,8 @@ Rien n'est stocké dans GitHub ; la rotation se fait en un seul endroit.
 | `mobile-asc-key-id` | iOS | App Store Connect Key ID |
 | `mobile-asc-issuer-id` | iOS | App Store Connect Issuer ID |
 | `mobile-asc-key-p8-base64` | iOS | Clé API (.p8) base64 |
+| `mobile-ios-match-password` | iOS | Passphrase fastlane match (si match utilisé) |
+| `mobile-ios-match-git-auth` | iOS | Auth git base64 du repo de certs match (si match utilisé) |
 
 > 🔐 Rotation = changer **une** valeur dans le Key Vault, rien côté GitHub. Accès
 > en lecture seule (rôle *Key Vault Secrets User*), tracé dans les logs du Key
@@ -308,9 +310,51 @@ gh secret set ASC_KEY_P8_BASE64               < authkey.b64
   `CODE_SIGN_STYLE=Manual`, `DEVELOPMENT_TEAM` et `PROVISIONING_PROFILE_SPECIFIER`.
 - **Authentification upload** : clé **API App Store Connect** (`.p8`) → pas
   d'Apple ID ni de 2FA en CI.
-- **Alternative** : `fastlane match` (certs/profils dans un dépôt privé chiffré)
-  peut remplacer les secrets cert/profil ; non retenu ici pour éviter un dépôt
-  supplémentaire, mais documenté comme option si l'équipe le préfère.
+
+### 4.6 fastlane match (recommandé) — certs & profils gérés ⭐
+
+`fastlane match` stocke les certificats et profils iOS **chiffrés dans un repo
+git privé** ; chaque runner les installe à la volée. Plus de `.p12`/profil à
+exporter/encoder à la main, renouvellement centralisé, un seul mot de passe.
+
+Le workflow `release-ios` bascule **automatiquement** en mode match dès que la
+variable de dépôt `IOS_MATCH_GIT_URL` est définie (sinon il garde le mode manuel
+§4.2). Les certs sont synchronisés par le workflow dédié **`sync-ios-certs`**.
+
+**Secrets / variables match**
+
+| Nom | Type | Contenu |
+|---|---|---|
+| `IOS_MATCH_GIT_URL` | variable de dépôt | URL du repo privé des certificats |
+| `IOS_MATCH_PASSWORD` | secret / KV `mobile-ios-match-password` | passphrase de (dé)chiffrement match |
+| `IOS_MATCH_GIT_AUTH` | secret / KV `mobile-ios-match-git-auth` | base64 de `utilisateur:token` (clone HTTPS du repo de certs) |
+
+> Avec **Key Vault** (§2.1) : charge `IOS_MATCH_PASSWORD` / `IOS_MATCH_GIT_AUTH`
+> via `set-keyvault-secrets.ps1` ; seule `IOS_MATCH_GIT_URL` reste une variable de
+> dépôt (non sensible).
+
+**Mise en place (une fois)**
+
+1. Créer un **repo git privé vide** pour les certificats (ex. `microlingo-ios-certs`).
+2. Générer un base64 d'auth de clone HTTPS :
+   ```bash
+   echo -n '<user>:<github_token_repo_certs>' | base64   # -> IOS_MATCH_GIT_AUTH
+   ```
+3. Définir la variable + les secrets (ou les charger dans Key Vault) :
+   ```bash
+   gh variable set IOS_MATCH_GIT_URL --body 'https://github.com/<org>/microlingo-ios-certs.git'
+   gh secret set IOS_MATCH_PASSWORD  --body '<passphrase>'
+   gh secret set IOS_MATCH_GIT_AUTH  < authb64.txt
+   ```
+4. **Bootstrap des certificats** : lancer le workflow **sync-ios-certs** (Actions
+   → sync-ios-certs → Run workflow). Il exécute `fastlane certificates` (lecture-
+   écriture) qui crée le certificat de distribution + le profil App Store et les
+   pousse, chiffrés, dans le repo de certs.
+5. Les releases iOS utilisent ensuite match en **lecture seule** automatiquement.
+
+> 🔁 **Renouvellement** (expiration cert/profil) : relancer **sync-ios-certs**.
+> En mode match, le profil utilisé est `match AppStore com.microlingo.app` (géré
+> par fastlane — pas besoin de renseigner `IOS_PROVISIONING_PROFILE_NAME`).
 
 ---
 

@@ -1,0 +1,78 @@
+name: sync-ios-certs
+
+# Bootstrap / renouvellement des certificats & profils iOS via fastlane match.
+# À lancer MANUELLEMENT : une fois pour initialiser le repo de certificats, puis
+# en cas de renouvellement (expiration, nouvel appareil de signature, etc.).
+#
+# ⚠️ Runner macOS requis. Mode LECTURE-ÉCRITURE : crée/renouvelle les certs et les
+# pousse (chiffrés) dans le repo défini par la variable IOS_MATCH_GIT_URL.
+#
+# Pré-requis : variable IOS_MATCH_GIT_URL + secrets IOS_MATCH_PASSWORD,
+# IOS_MATCH_GIT_AUTH, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_BASE64
+# (ou leurs équivalents dans Key Vault). Voir docs/RELEASE_MOBILE.md §4.6.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: sync-ios-certs
+  cancel-in-progress: false
+
+env:
+  BUNDLE_ID: "com.microlingo.app"
+
+jobs:
+  sync:
+    name: fastlane match (création / renouvellement)
+    runs-on: [self-hosted, macOS]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Résoudre les secrets (Key Vault → repli secrets)
+        shell: bash
+        env:
+          KV_NAME: ${{ vars.AZURE_KEYVAULT_NAME }}
+          MATCH_GIT_URL: ${{ vars.IOS_MATCH_GIT_URL }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          IOS_MATCH_PASSWORD: ${{ secrets.IOS_MATCH_PASSWORD }}
+          IOS_MATCH_GIT_AUTH: ${{ secrets.IOS_MATCH_GIT_AUTH }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MATCH_GIT_URL:-}" ]; then
+            echo "::error::Variable IOS_MATCH_GIT_URL non définie — match non configuré. Voir docs/RELEASE_MOBILE.md."
+            exit 1
+          fi
+          KEY_ID="$ASC_KEY_ID"; ISSUER="$ASC_ISSUER_ID"; P8="$ASC_KEY_P8_BASE64"
+          MPWD="$IOS_MATCH_PASSWORD"; MGA="$IOS_MATCH_GIT_AUTH"
+
+          if [ -n "${KV_NAME:-}" ]; then
+            echo "Secrets : Azure Key Vault ($KV_NAME) via l'identité managée du runner."
+            az login --identity --output none
+            kv(){ az keyvault secret show --vault-name "$KV_NAME" --name "$1" --query value -o tsv 2>/dev/null || true; }
+            KEY_ID="$(kv mobile-asc-key-id)"; ISSUER="$(kv mobile-asc-issuer-id)"; P8="$(kv mobile-asc-key-p8-base64)"
+            MPWD="$(kv mobile-ios-match-password)"; MGA="$(kv mobile-ios-match-git-auth)"
+          fi
+          for s in "$P8" "$MPWD" "$MGA"; do [ -n "$s" ] && echo "::add-mask::$s"; done
+
+          {
+            echo "ASC_KEY_ID=$KEY_ID"
+            echo "ASC_ISSUER_ID=$ISSUER"
+            echo "ASC_KEY_P8_BASE64=$(echo "$P8" | tr -d '\n\r')"
+            echo "MATCH_PASSWORD=$MPWD"
+            echo "MATCH_GIT_BASIC_AUTHORIZATION=$MGA"
+            echo "MATCH_GIT_URL=$MATCH_GIT_URL"
+          } >> "$GITHUB_ENV"
+
+      - name: Créer / renouveler les certificats (fastlane match)
+        working-directory: apps/mobile/ios
+        run: |
+          set -euo pipefail
+          which fastlane >/dev/null 2>&1 || gem install fastlane --no-document
+          fastlane certificates
+
+      - name: Nettoyage
+        if: always()
+        shell: bash
+        run: az logout --output none 2>/dev/null || true

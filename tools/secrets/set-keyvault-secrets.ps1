@@ -59,6 +59,8 @@ $map = @(
   @{ Key = 'ASC_KEY_ID';                     Kv = 'mobile-asc-key-id';                      Kind = 'value'   }
   @{ Key = 'ASC_ISSUER_ID';                  Kv = 'mobile-asc-issuer-id';                   Kind = 'value'   }
   @{ Key = 'ASC_KEY_P8_FILE';                Kv = 'mobile-asc-key-p8-base64';               Kind = 'fileB64' }
+  @{ Key = 'IOS_MATCH_PASSWORD';             Kv = 'mobile-ios-match-password';              Kind = 'value'   }
+  @{ Key = 'IOS_MATCH_GIT_AUTH';             Kv = 'mobile-ios-match-git-auth';              Kind = 'value'   }
 )
 
 function Set-KvSecret {

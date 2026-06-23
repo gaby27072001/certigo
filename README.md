@@ -186,6 +186,7 @@ API principale :
 | `ci-infra`   | `infra/**` | `az bicep build` (lint des templates) |
 | `release-android` | manuel / tag `v*` | **AAB signé** + publication Google Play (gates `analyze`/`test`) |
 | `release-ios` | manuel (runner macOS) | **IPA signé** + upload TestFlight (gates `analyze`/`test`) |
+| `sync-ios-certs` | manuel (runner macOS) | Bootstrap / renouvellement des certs iOS via `fastlane match` |
 
 > Publication des bêtas mobiles (signature, secrets, runbooks Android & iOS,
 > rollback, checklist) : voir [`docs/RELEASE_MOBILE.md`](docs/RELEASE_MOBILE.md).
