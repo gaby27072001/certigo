@@ -3,6 +3,7 @@ using System.Net;
 using Microlingo.Application.Abstractions;
 using Microlingo.Application.Dtos;
 using Microlingo.Domain.Content;
+using Microlingo.Domain.Gamification;
 using Microlingo.Domain.Progress;
 
 namespace Microlingo.Infrastructure.Cosmos;
@@ -216,8 +217,8 @@ public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeader
 
     public async Task<LeagueDto> GetLeagueAsync(string userId, CancellationToken cancellationToken = default)
     {
-        var weekStart = WeekStart(DateTime.UtcNow);
-        var periodLeagueId = PeriodLeagueId(weekStart);
+        var period = LeaguePeriods.ForInstant(DateTimeOffset.UtcNow);
+        var periodLeagueId = period.Compose(Tier);
         var query = new QueryDefinition("SELECT TOP 50 * FROM c WHERE c.periodLeagueId = @periodLeagueId ORDER BY c.xp DESC")
             .WithParameter("@periodLeagueId", periodLeagueId);
         using var iterator = context.Leaderboard.GetItemQueryIterator<LeaderboardEntryDocument>(query, requestOptions: new QueryRequestOptions
@@ -234,13 +235,12 @@ public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeader
             }
         }
 
-        var endsAt = new DateTimeOffset(weekStart.AddDays(7), TimeSpan.Zero);
-        return new LeagueDto(periodLeagueId, Tier, endsAt, PromoteCount, userId, entries);
+        return new LeagueDto(periodLeagueId, Tier, period.EndsAt, PromoteCount, userId, entries);
     }
 
     public async Task AddXpAsync(string userId, int xp, CancellationToken cancellationToken = default)
     {
-        var periodLeagueId = PeriodLeagueId(WeekStart(DateTime.UtcNow));
+        var periodLeagueId = LeaguePeriods.ForInstant(DateTimeOffset.UtcNow).Compose(Tier);
         var id = $"{periodLeagueId}:{userId}";
         var profile = await context.Users.ReadOrDefaultAsync<UserProfileDto>(userId, new PartitionKey(userId), cancellationToken);
         var displayName = profile?.DisplayName ?? userId;
@@ -254,15 +254,6 @@ public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeader
         };
         await context.Leaderboard.UpsertItemAsync(updated, new PartitionKey(periodLeagueId), cancellationToken: cancellationToken);
     }
-
-    private static DateTime WeekStart(DateTime utcNow)
-    {
-        var date = utcNow.Date;
-        var offset = ((int)date.DayOfWeek + 6) % 7; // Monday = 0
-        return date.AddDays(-offset);
-    }
-
-    private static string PeriodLeagueId(DateTime weekStart) => $"weekly:{weekStart:yyyyMMdd}:{Tier}";
 
     private sealed record LeaderboardEntryDocument(string Id, string PeriodLeagueId, string UserId, string DisplayName, string? AvatarUrl, int Xp);
 }
