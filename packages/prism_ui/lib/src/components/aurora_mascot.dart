@@ -71,13 +71,13 @@ extension AuroraMascotInfo on AuroraMascot {
 
   /// Signature color — stable per member, color-blind aware.
   Color get color => switch (this) {
-        AuroraMascot.nimbus => const Color(0xFF3BA0F0),
+        AuroraMascot.nimbus => const Color(0xFF0078D4),
         AuroraMascot.volt => const Color(0xFFFFB020),
         AuroraMascot.cosmo => const Color(0xFF8C5CF6),
         AuroraMascot.sentinel => const Color(0xFF0EA5A5),
         AuroraMascot.bicky => const Color(0xFFFF7A45),
         AuroraMascot.pixel => const Color(0xFFF0476A),
-        AuroraMascot.pip => const Color(0xFF3B6AF0),
+        AuroraMascot.pip => const Color(0xFF0078D4),
       };
 
   /// Service / concept icon shown on the mascot's badge.
