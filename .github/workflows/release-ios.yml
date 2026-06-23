@@ -1,0 +1,189 @@
+name: release-ios
+
+# Release beta iOS : build IPA signé + upload TestFlight (App Store Connect).
+#
+# ⚠️ NÉCESSITE un runner macOS avec Xcode. Les runners hébergés GitHub sont
+# désactivés par la politique EMU → enregistrer un runner macOS self-hosted
+# avec les labels [self-hosted, macOS]. Détails : docs/RELEASE_MOBILE.md.
+#
+# Secrets requis (Settings > Secrets and variables > Actions) :
+#   IOS_DIST_CERTIFICATE_P12_BASE64   certificat de distribution (.p12) en base64
+#   IOS_DIST_CERTIFICATE_PASSWORD     mot de passe du .p12
+#   IOS_PROVISIONING_PROFILE_BASE64   profil d'approvisionnement (.mobileprovision) en base64
+#   IOS_PROVISIONING_PROFILE_NAME     nom EXACT du profil (ex: "Microlingo Beta App Store")
+#   IOS_TEAM_ID                       Team ID Apple Developer (10 caractères)
+#   ASC_KEY_ID                        App Store Connect API Key ID
+#   ASC_ISSUER_ID                     App Store Connect Issuer ID
+#   ASC_KEY_P8_BASE64                 clé API .p8 encodée en base64
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "versionName (ex: 0.1.0). Vide = pubspec.yaml"
+        type: string
+        required: false
+      build_number:
+        description: "build number (CFBundleVersion). Vide = numéro de run GitHub"
+        type: string
+        required: false
+      external:
+        description: "Distribuer aussi aux testeurs EXTERNES (sinon interne uniquement)"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Construire l'IPA signé SANS uploader sur TestFlight"
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-ios-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: "3.24.0"
+  BUNDLE_ID: "com.microlingo.app"
+
+jobs:
+  release:
+    name: Build IPA signé + upload TestFlight
+    # ⚠️ Runner macOS requis (Xcode). Fallback hébergé (désactivé EMU) : macos-14
+    runs-on: [self-hosted, macOS]
+    env:
+      HAS_ASC: ${{ secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.ASC_KEY_P8_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurer Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Résoudre la version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          PUBSPEC_VERSION="$(grep -E '^version:' apps/mobile/pubspec.yaml | head -1 | awk '{print $2}')"
+          PUBSPEC_NAME="${PUBSPEC_VERSION%%+*}"
+          BUILD_NAME="${{ inputs.version_name }}"; BUILD_NAME="${BUILD_NAME:-$PUBSPEC_NAME}"
+          BUILD_NUMBER="${{ inputs.build_number }}"; BUILD_NUMBER="${BUILD_NUMBER:-${{ github.run_number }}}"
+          echo "build_name=$BUILD_NAME"     >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "### Release iOS : $BUILD_NAME (+$BUILD_NUMBER) → TestFlight" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Installer la signature (certificat + profil)
+        shell: bash
+        env:
+          P12_B64: ${{ secrets.IOS_DIST_CERTIFICATE_P12_BASE64 }}
+          P12_PWD: ${{ secrets.IOS_DIST_CERTIFICATE_PASSWORD }}
+          PROFILE_B64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${P12_B64:-}" ] || [ -z "${PROFILE_B64:-}" ]; then
+            echo "::error::Secrets de signature iOS manquants (certificat / profil). Voir docs/RELEASE_MOBILE.md."
+            exit 1
+          fi
+          KEYCHAIN="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PWD="$(openssl rand -base64 16)"
+          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
+
+          echo "$P12_B64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -P "$P12_PWD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN" >/dev/null
+          # Ajoute notre keychain à la liste de recherche (en conservant les existantes).
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed 's/[\"[:space:]]//g')
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$PROFILE_B64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/microlingo_beta.mobileprovision"
+          echo "KEYCHAIN_PATH=$KEYCHAIN" >> "$GITHUB_ENV"
+
+      - name: Récupérer les dépendances
+        working-directory: apps/mobile
+        run: flutter pub get
+
+      - name: Analyze (gate bloquant)
+        working-directory: apps/mobile
+        run: flutter analyze
+
+      - name: Test (gate bloquant)
+        working-directory: apps/mobile
+        run: flutter test
+
+      - name: Compiler Flutter (sans signature) + pods + version
+        working-directory: apps/mobile
+        run: >
+          flutter build ios --release --no-codesign
+          --build-name=${{ steps.ver.outputs.build_name }}
+          --build-number=${{ steps.ver.outputs.build_number }}
+
+      - name: Build IPA signé + upload TestFlight
+        if: ${{ inputs.dry_run != true && env.HAS_ASC == 'true' }}
+        working-directory: apps/mobile/ios
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_PROVISIONING_PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
+          TF_EXTERNAL: ${{ inputs.external }}
+          TF_CHANGELOG: "Bêta Microlingo ${{ steps.ver.outputs.build_name }} (+${{ steps.ver.outputs.build_number }})"
+        run: |
+          set -euo pipefail
+          which fastlane >/dev/null 2>&1 || gem install fastlane --no-document
+          fastlane beta
+
+      - name: Build IPA signé seul (dry-run / sans clé ASC)
+        if: ${{ inputs.dry_run == true || env.HAS_ASC != 'true' }}
+        working-directory: apps/mobile/ios
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_PROVISIONING_PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
+        run: |
+          set -euo pipefail
+          PROFILE="${IOS_PROVISIONING_PROFILE_NAME}"
+          TEAM="${IOS_TEAM_ID}"
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" archive \
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Manual \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE"
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>teamID</key><string>${TEAM}</string>
+            <key>provisioningProfiles</key><dict>
+              <key>${BUNDLE_ID}</key><string>${PROFILE}</string>
+            </dict>
+          </dict></plist>
+          EOF
+          mkdir -p ../build/ios/ipa
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -exportPath ../build/ios/ipa -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+
+      - name: Publier l'IPA en artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: microlingo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}-ipa
+          path: apps/mobile/build/ios/ipa/*.ipa
+          if-no-files-found: error
+
+      - name: Note — upload sauté
+        if: ${{ env.HAS_ASC != 'true' || inputs.dry_run == true }}
+        shell: bash
+        run: echo "::warning::Upload TestFlight sauté (dry_run=${{ inputs.dry_run }}, clé ASC présente=${{ env.HAS_ASC }}). L'IPA signé reste disponible en artefact."
+
+      - name: Nettoyage (keychain + matériel de signature)
+        if: always()
+        shell: bash
+        run: |
+          security delete-keychain "${KEYCHAIN_PATH:-$RUNNER_TEMP/app-signing.keychain-db}" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/ExportOptions.plist" 2>/dev/null || true
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/microlingo_beta.mobileprovision" 2>/dev/null || true
+          echo "Matériel de signature supprimé du runner."

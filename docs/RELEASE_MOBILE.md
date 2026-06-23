@@ -54,7 +54,14 @@ Documentation opérationnelle pour publier les bêtas Microlingo.
 | `ANDROID_KEY_ALIAS` | Android | Alias de la clé (ex : `upload`) |
 | `ANDROID_KEY_PASSWORD` | Android | Mot de passe de la clé |
 | `PLAY_SERVICE_ACCOUNT_JSON` | Android | JSON du compte de service Google Play |
-| `IOS_*` / `APP_STORE_CONNECT_*` | iOS | Voir la section iOS (Phase iOS) |
+| `IOS_DIST_CERTIFICATE_P12_BASE64` | iOS | Certificat de distribution (.p12) en base64 |
+| `IOS_DIST_CERTIFICATE_PASSWORD` | iOS | Mot de passe du .p12 |
+| `IOS_PROVISIONING_PROFILE_BASE64` | iOS | Profil d'approvisionnement App Store (.mobileprovision) base64 |
+| `IOS_PROVISIONING_PROFILE_NAME` | iOS | Nom EXACT du profil (ex : `Microlingo Beta App Store`) |
+| `IOS_TEAM_ID` | iOS | Team ID Apple Developer (10 caractères) |
+| `ASC_KEY_ID` | iOS | App Store Connect API Key ID |
+| `ASC_ISSUER_ID` | iOS | App Store Connect Issuer ID |
+| `ASC_KEY_P8_BASE64` | iOS | Clé API App Store Connect (.p8) en base64 |
 
 > Tant que `PLAY_SERVICE_ACCOUNT_JSON` est absent, le workflow **construit quand
 > même l'AAB signé** (téléchargeable en artefact) et **saute** proprement la
@@ -161,10 +168,75 @@ git push origin v0.1.0
 
 ## 4. iOS
 
-Voir la section dédiée plus bas (renseignée en **Phase iOS**). En résumé : build
-sur runner **macOS** (requis pour iOS ; les runners hébergés sont désactivés par
-la politique EMU → un runner macOS self-hosted est nécessaire), signature via
-**clé API App Store Connect**, distribution **TestFlight**.
+> ⚠️ **Pré-requis : un runner macOS self-hosted** avec Xcode + CocoaPods (les
+> runners hébergés GitHub sont désactivés par la politique EMU). Enregistrer un
+> Mac comme runner avec les labels `[self-hosted, macOS]`. Fastlane est installé
+> automatiquement par le workflow s'il est absent.
+
+### 4.1 Pré-requis Apple (one-time)
+
+1. Compte **Apple Developer Program** (payant) pour l'équipe.
+2. **App ID** `com.microlingo.app` (portail Apple Developer ou App Store Connect).
+3. **App** créée dans **App Store Connect** (mêmes bundle id et nom).
+4. **Certificat de distribution** (Apple Distribution) + **profil d'approvisionnement
+   App Store** pour `com.microlingo.app`.
+5. **Clé API App Store Connect** (rôle App Manager) : Key ID, Issuer ID, fichier `.p8`.
+
+### 4.2 Préparer les secrets iOS (depuis un Mac)
+
+```bash
+base64 -i dist.p12                 > cert.b64       # -> IOS_DIST_CERTIFICATE_P12_BASE64
+base64 -i profile.mobileprovision  > profile.b64    # -> IOS_PROVISIONING_PROFILE_BASE64
+base64 -i AuthKey_XXXX.p8          > authkey.b64    # -> ASC_KEY_P8_BASE64
+```
+```bash
+gh secret set IOS_DIST_CERTIFICATE_P12_BASE64 < cert.b64
+gh secret set IOS_DIST_CERTIFICATE_PASSWORD   --body '<mdp_du_p12>'
+gh secret set IOS_PROVISIONING_PROFILE_BASE64 < profile.b64
+gh secret set IOS_PROVISIONING_PROFILE_NAME   --body 'Microlingo Beta App Store'
+gh secret set IOS_TEAM_ID                     --body '<TEAM_ID>'
+gh secret set ASC_KEY_ID                      --body '<KEY_ID>'
+gh secret set ASC_ISSUER_ID                   --body '<ISSUER_ID>'
+gh secret set ASC_KEY_P8_BASE64               < authkey.b64
+```
+
+> 📌 **TODO à confirmer** (non devinables, dépendent du compte Apple) :
+> `IOS_TEAM_ID`, `IOS_PROVISIONING_PROFILE_NAME` (nom **exact** du profil),
+> `ASC_KEY_ID`, `ASC_ISSUER_ID`. À renseigner avant le premier run.
+
+### 4.3 Runbook — Lancer une beta iOS (TestFlight) ✅
+
+1. Onglet **Actions** → **release-ios** → **Run workflow**.
+2. Renseigner : **version_name**/**build_number** (vides = pubspec + run number),
+   **external** (`false` = testeurs internes ; `true` = groupe externe),
+   **dry_run** (`true` = build sans upload).
+3. Le workflow : gates `analyze`/`test` → installe la signature (keychain
+   éphémère) → compile Flutter → `fastlane beta` (archive signé + export IPA +
+   upload TestFlight) → nettoyage du matériel de signature.
+4. Dans **App Store Connect → TestFlight**, la build apparaît après traitement
+   Apple (quelques minutes).
+
+### 4.4 TestFlight interne puis externe
+
+- **Interne** (immédiat, ≤ 100 testeurs internes) : ajouter les testeurs internes
+  dans App Store Connect ; ils reçoivent la build dès la fin du traitement
+  (aucune revue Apple).
+- **Externe** (≤ 10 000) : créer un **groupe externe**, soumettre la **première**
+  build à la **revue bêta Apple**, puis distribuer. Relancer le workflow avec
+  **external=`true`** (et définir le secret/variable `TF_EXTERNAL_GROUP` si le
+  groupe ne s'appelle pas « Beta »).
+
+### 4.5 Détails de signature
+
+- **Signature manuelle** : le certificat de distribution et le profil
+  d'approvisionnement sont injectés via secrets, importés dans un **keychain
+  temporaire** détruit en fin de job. `fastlane build_app` force
+  `CODE_SIGN_STYLE=Manual`, `DEVELOPMENT_TEAM` et `PROVISIONING_PROFILE_SPECIFIER`.
+- **Authentification upload** : clé **API App Store Connect** (`.p8`) → pas
+  d'Apple ID ni de 2FA en CI.
+- **Alternative** : `fastlane match` (certs/profils dans un dépôt privé chiffré)
+  peut remplacer les secrets cert/profil ; non retenu ici pour éviter un dépôt
+  supplémentaire, mais documenté comme option si l'équipe le préfère.
 
 ---
 
@@ -182,7 +254,9 @@ la politique EMU → un runner macOS self-hosted est nécessaire), signature via
 
 ---
 
-## 6. Rollback (Android)
+## 6. Rollback
+
+### Android
 
 Le versionCode étant strictement croissant, on ne « réinstalle » pas un ancien
 code : on **arrête** la diffusion fautive et on **republie** une build saine.
@@ -198,6 +272,17 @@ code : on **arrête** la diffusion fautive et on **republie** une build saine.
 > Astuce : conserver la correspondance `versionCode ↔ commit` via les artefacts
 > du run et les release notes (`whatsnew`).
 
+### iOS
+
+1. **TestFlight** : dans App Store Connect, **expirer** la build fautive
+   (TestFlight → build → *Expirer*) pour qu'elle ne soit plus distribuée ; la
+   build précédente reste disponible aux testeurs.
+2. **Republier** une version saine : relancer `release-ios` depuis le commit/tag
+   connu-bon (le `build_number` issu du run sera supérieur — exigé par App Store
+   Connect).
+3. Si un groupe **externe** était concerné, vérifier l'état de la revue Apple
+   avant de redistribuer.
+
 ---
 
 ## 7. Checklist pré-release
@@ -209,5 +294,8 @@ code : on **arrête** la diffusion fautive et on **republie** une build saine.
       `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`.
 - [ ] (1ère fois) App créée dans Play Console + piste de test interne existante.
 - [ ] applicationId `com.microlingo.app` **confirmé** (définitif après 1er upload).
-- [ ] Run de validation `dry_run=true` réussi (AAB signé produit).
+- [ ] Run de validation `dry_run=true` réussi (AAB/IPA signé produit).
+- [ ] **iOS** : runner macOS enregistré ; secrets `IOS_*` + `ASC_*` présents ;
+      `IOS_TEAM_ID` et `IOS_PROVISIONING_PROFILE_NAME` confirmés ; app créée dans
+      App Store Connect.
 - [ ] `docs/RELEASE_MOBILE.md` à jour.

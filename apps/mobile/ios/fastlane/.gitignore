@@ -1,0 +1,6 @@
+# Artefacts d'exécution Fastlane (jamais committés).
+report.xml
+Preview.html
+screenshots/
+test_output/
+*.p8

@@ -1,0 +1,45 @@
+# Fastlane — pipeline beta iOS de Microlingo (TestFlight).
+# Authentification via clé API App Store Connect (.p8) → pas d'Apple ID ni de 2FA.
+# La signature (certificat + profil) est installée par le workflow avant l'appel.
+default_platform(:ios)
+
+platform :ios do
+  desc "Build l'IPA signé (signature manuelle) puis l'upload sur TestFlight"
+  lane :beta do
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: ENV.fetch("ASC_KEY_P8_BASE64"),
+      is_key_content_base64: true
+    )
+
+    bundle_id = ENV.fetch("BUNDLE_ID", "com.microlingo.app")
+    profile   = ENV.fetch("IOS_PROVISIONING_PROFILE_NAME")
+    team_id   = ENV.fetch("IOS_TEAM_ID")
+
+    build_app(
+      workspace: "Runner.xcworkspace",
+      scheme: "Runner",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "../build/ios/ipa",
+      output_name: "microlingo.ipa",
+      export_options: {
+        signingStyle: "manual",
+        teamID: team_id,
+        provisioningProfiles: { bundle_id => profile }
+      },
+      xcargs: "DEVELOPMENT_TEAM=#{team_id} CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER=\"#{profile}\""
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      ipa: "../build/ios/ipa/microlingo.ipa",
+      skip_submission: true,
+      skip_waiting_for_build_processing: true,
+      distribute_external: ENV["TF_EXTERNAL"] == "true",
+      groups: (ENV["TF_EXTERNAL"] == "true" ? [ENV.fetch("TF_EXTERNAL_GROUP", "Beta")] : nil),
+      changelog: ENV["TF_CHANGELOG"]
+    )
+  end
+end
