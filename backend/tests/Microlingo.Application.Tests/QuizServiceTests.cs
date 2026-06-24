@@ -172,6 +172,31 @@ public sealed class QuizServiceTests
         profile.Gems.Should().Be(6); // applied exactly once, not doubled
         leaderboard.Xp["user-1"].Should().Be(result.Rewards.XpEarned);
     }
+
+    [Fact]
+    public async Task SubmitAsync_flags_submission_spam_via_the_rate_window()
+    {
+        var h = new QuizServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        var at = h.Clock.UtcNow;
+        // 40 prior attempts in the trailing hour = the per-window cap; the 41st trips
+        // the (previously dormant) AttemptRateExceeded detector.
+        for (var i = 0; i < 40; i++)
+        {
+            h.Attempts.Seed(new AttemptRecord(
+                $"attempt::seed-{i}", h.UserId, $"seed-{i}", TestContent.TrackId, "l1", at, at,
+                new SubmitQuizResult($"r{i}", 100, new List<ItemResultDto>(),
+                    new RewardsDto(0, 0, false, false, 0, new List<string>()),
+                    new List<string>(), null)));
+        }
+        var service = h.Build();
+
+        await service.SubmitAsync("l1", QuizServiceHarness.Request("rate-1", QuizServiceHarness.Answer("l1-i1", "a")));
+
+        var flagged = h.Events.Events.SingleOrDefault(e => e.Type == "attempt.flagged");
+        flagged.Should().NotBeNull();
+        ((AttemptIntegritySignal)flagged!.Payload).Flags.Should().Contain("AttemptRateExceeded");
+    }
 }
 
 /// Wraps the in-memory user repo to throw a single optimistic-concurrency conflict

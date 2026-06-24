@@ -27,8 +27,8 @@ void main() {
 
   test('Readiness recency uses fractional days (golden vector)', () {
     // One fully-mastered concept last reviewed 2.9 days ago (2d 21h36m).
-    final ConceptMastery m = ConceptMastery.fresh(conceptId: 'd:c', trackId: 'az-900', now: now)
-        .copyWith(
+    final ConceptMastery m =
+        ConceptMastery.fresh(conceptId: 'd:c', trackId: 'az-900', now: now).copyWith(
       masteryScore: 1.0,
       reps: 5,
       lastReviewedAt: now.subtract(const Duration(days: 2, hours: 21, minutes: 36)),
