@@ -265,6 +265,11 @@ Forces **réelles et vérifiées**, sur lesquelles capitaliser :
 - **Gravité : Moyenne · Probabilité : Certaine (état actuel).**
 - **Reco.** Brancher une fenêtre glissante (Redis/Cosmos) pour alimenter `RateWindow` ; planifier
   le passage en mode application après calibration.
+- **✅ Résolu (ce changement + précédent).** `RateWindow` est désormais alimentée depuis le conteneur
+  `attempts` (sur 1 h, sans Redis) dans `QuizService` **et `ExamService`** ; les détecteurs
+  `XpRateExceeded`/`AttemptRateExceeded` se déclenchent pour les quiz **comme pour les examens**
+  (tests `SubmitAsync_flags_submission_spam_via_the_rate_window`, variantes quiz + examen). Le mode
+  reste « détection seule » (shadow) — le passage en mode application après calibration reste à planifier.
 
 ### D9 — Builds non reproductibles (lockfiles, canaux flottants) · *CI/CD / Supply chain*
 - **Description.** `pubspec.lock` est **gitignoré** (y compris pour l'app), dépendances en `^`
@@ -691,21 +696,30 @@ avant d'envisager une mise à l'échelle ou une ouverture publique.
 | **D16** Observabilité | **Correlation id** (`x-correlation-id`) propagé/journalisé/retourné ; endpoint **`GET /health`** (sonde Cosmos, anonyme) | `ExceptionMiddleware.cs`, `HealthFunctions.cs`, `JwtAuthMiddleware.cs` | ✅ build + 323 tests |
 | **D17** Validateur contenu | Intégrité des réponses (`correct` ⊆ options), unicité ids d'items, cohérence `ordering`/`mcq` | `tools/validate_content.mjs` | 🧪 prouvé sur cas cassé + contenu réel ✅ |
 | **D18** Robustesse HTTP | JSON malformé → **400** (`BadRequestException`), conflit → **409** | `HttpExtensions.cs`, `ExceptionMiddleware.cs` | ✅ build |
-| **D8** Anti-triche détecteurs morts | Fenêtre de débit **réelle** (XP/tentatives sur 1 h, depuis le conteneur `attempts`, sans Redis) câblée dans `QuizService` → les détecteurs `XpRateExceeded`/`AttemptRateExceeded` s'activent | `CoreAbstractions.cs` (`RecentActivity`), `CosmosRepositories.cs`, `QuizService` | 🧪 `SubmitAsync_flags_submission_spam_via_the_rate_window` |
+| **D8** Anti-triche détecteurs morts | Fenêtre de débit **réelle** (XP/tentatives sur 1 h, depuis le conteneur `attempts`, sans Redis) câblée dans `QuizService` **et `ExamService`** → les détecteurs `XpRateExceeded`/`AttemptRateExceeded` s'activent pour les quiz **comme pour les examens** | `CoreAbstractions.cs` (`RecentActivity`), `CosmosRepositories.cs`, `QuizService`, `ExamService` | 🧪 `SubmitAsync_flags_submission_spam_via_the_rate_window` (quiz **+ examen**) |
 | **D5** God-file `Services.cs` (96 Ko) | **Éclaté** en 11 fichiers par domaine (Quiz, Gamification, Social, Learning, Exam, Tutor, Notification, Leaderboard, User, Content, Misc) via **Roslyn** (réorganisation pure, formatage préservé) | `backend/src/Microlingo.Application/Services/*.cs` | ✅ build + **324 tests** (comportement identique) |
 | **D9** Builds reproductibles | SDK Dart épinglé (`3.5.0`), lockfile applicatif suivi (`.gitignore`) | `ci-mobile.yml`, `.gitignore` | ✅ YAML valide |
 | **D13** Release / SBOM | **SBOM** CycloneDX (backend), **gate d'approbation** `environment: beta` sur releases mobiles | `ci-backend.yml`, `release-android.yml`, `release-ios.yml` | ✅ YAML valide |
 
-**Suite de tests après remédiation :** backend **324** (Domain 224 + Application 100, dont
+**Suite de tests après remédiation :** backend **325** (Domain 224 + Application 101, dont
 les nouveaux tests de concurrence/auth/parité/anti-triche), Dart `cortex` **10** (dont 2 golden),
 validateur de contenu vert, `az bicep build` vert sur toute l'infra. `Services.cs` (96 Ko) **éclaté en 11 fichiers** par domaine (build + tests inchangés).
 
 ### Restant (volontairement non fait ici — risque/coût vs valeur)
-- **D8** Fenêtre de débit anti-triche **côté examens** : `QuizService` est câblé (vecteur dominant,
-  testé) ; l'étendre à `ExamService` nécessite d'injecter `IAttemptRepository` dans son constructeur
-  (petit ripple harness) — suivi simple.
-- **D4/D5 (tests)** Tests d'intégration HTTP/Cosmos (émulateur) : nécessitent un émulateur Cosmos
-  non disponible dans cet environnement.
+- ~~**D8** Fenêtre de débit anti-triche **côté examens**~~ — ✅ **fait** : `ExamService` injecte
+  désormais `IAttemptRepository`, capture la fenêtre de débit **avant** la persistance et la passe à
+  `AttemptIntegrityEvaluator.Evaluate(...)`, exactement comme `QuizService` ; couvert par
+  `SubmitAsync_flags_submission_spam_via_the_rate_window` (variante examen). Anti-triche quiz **et**
+  examen désormais alignés (mode détection/shadow inchangé).
+- **D4/D5 (tests)** Tests d'intégration Cosmos : le projet `Microlingo.Infrastructure.Tests`
+  est **désormais en place** (6 cas couvrant idempotence/ETag/fenêtre de débit sur un vrai
+  conteneur), **gated** par `MICROLINGO_COSMOS_TESTS=1` ; il **compile** et **se skippe
+  proprement** hors émulateur. Le **runtime** (émulateur Cosmos) **n'a pas été exécuté ici**.
+  Restent à écrire les tests HTTP/middleware de bout en bout (Functions SDK).
+- **Mobile (Phase 2)** Écrans de gamification **livrés** : saisons · quêtes · succès · boutique ·
+  amis · examens blancs (couche data + providers Riverpod + router/onglets) → 6 écrans + 6 tests
+  widget ; suite Dart **185** verte, `flutter analyze` propre. Reste la **validation E2E sur
+  appareil** (backend live + auth Entra) et l'écran **partage quotidien** (moteur prêt, UI absente).
 - **Opérationnel** : déploiement réel de l'infra, protection de branche, fusion des PR Dependabot,
   endpoints privés (réseau), runner CI redondant — actions hors-dépôt.
 

@@ -42,6 +42,7 @@ public sealed class ExamService(
     IContentRepository content,
     IProgressRepository progress,
     IExamAttemptRepository examAttempts,
+    IAttemptRepository attempts,
     IEventRepository events,
     IUserRepository users,
     ILeaderboardRepository leaderboard) : IExamService
@@ -281,6 +282,13 @@ public sealed class ExamService(
             new RewardsDto(xpEarned, newXp, newLevel > profile.Level, streakExtended, gemsEarned, new List<string>()),
             weakConcepts);
 
+        // Fenêtre de cadence (tentatives ANTÉRIEURES uniquement — la tentative courante
+        // n'est pas encore persistée). En prod les tentatives d'examen partagent le conteneur
+        // « attempts » avec les leçons et sont comptées par GetRecentActivityAsync ; on capture
+        // donc la fenêtre AVANT CreateAsync pour ne pas compter la soumission courante
+        // (l'évaluateur l'ajoute lui-même). Alimente les détecteurs anti-farming d'XP / anti-spam.
+        var rateWindow = await BuildRateWindowAsync(now, cancellationToken);
+
         var attempt = new ExamAttemptRecord(
             $"examattempt::{request.ClientAttemptId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
             request.StartedAt, now, result);
@@ -288,12 +296,15 @@ public sealed class ExamService(
         await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "exam.submitted", now, result), cancellationToken);
 
         // Anti-triche (autorité serveur, §6/§15) — mode détection, comme pour le quiz :
-        // on signale une tentative d'examen incohérente sans toucher aux récompenses.
-        var integrity = AttemptIntegrityEvaluator.Evaluate(new AttemptTiming(
-            request.StartedAt,
-            now,
-            request.Answers.Select(a => a.LatencyMs).ToList(),
-            xpEarned));
+        // on évalue la cohérence temporelle ET la cadence récente, et si le verdict n'est pas
+        // « Allow » on signale une tentative d'examen incohérente SANS toucher aux récompenses.
+        var integrity = AttemptIntegrityEvaluator.Evaluate(
+            new AttemptTiming(
+                request.StartedAt,
+                now,
+                request.Answers.Select(a => a.LatencyMs).ToList(),
+                xpEarned),
+            rateWindow);
         if (!integrity.IsClean)
         {
             await events.AddAsync(new LearningEvent(
@@ -311,6 +322,17 @@ public sealed class ExamService(
         }
 
         return result;
+    }
+
+    // Fenêtre de cadence anti-triche : nombre + XP des tentatives antérieures de l'apprenant
+    // (leçons ET examens) sur la dernière heure, lues depuis le conteneur « attempts » (pas de
+    // Redis). Identique à QuizService pour un comportement anti-triche uniforme entre quiz et examen.
+    private static readonly TimeSpan RateWindowDuration = TimeSpan.FromHours(1);
+
+    private async Task<RateWindow> BuildRateWindowAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var recent = await attempts.GetRecentActivityAsync(userContext.UserId, now - RateWindowDuration, cancellationToken);
+        return new RateWindow(RateWindowDuration, recent.Xp, recent.Attempts);
     }
 
     private static int StableSeed(string userId, string trackId, DateOnly date)

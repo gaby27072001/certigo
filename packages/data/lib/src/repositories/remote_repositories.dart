@@ -8,6 +8,12 @@ import '../models/quiz.dart';
 import '../models/leaderboard.dart';
 import '../models/tutor.dart';
 import '../models/recommendation.dart';
+import '../models/season.dart';
+import '../models/quest.dart';
+import '../models/achievement.dart';
+import '../models/shop.dart';
+import '../models/friend.dart';
+import '../models/exam.dart';
 import 'repositories.dart';
 
 /// HTTP-backed implementations of the repository contracts. Each method maps a
@@ -96,4 +102,82 @@ class RemoteRecommendationRepository implements RecommendationRepository {
   @override
   Future<Result<NextBest>> getNextBest(String trackId) =>
       _api.getJson('/me/recommendations/$trackId', NextBest.fromJson);
+}
+
+class RemoteSeasonRepository implements SeasonRepository {
+  const RemoteSeasonRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<Season>> getSeason() => _api.getJson('/season', Season.fromJson);
+
+  @override
+  Future<Result<ClaimSeasonResult>> claimSeason(ClaimSeasonRequest request) =>
+      _api.postJson('/season/claim', request.toJson(), ClaimSeasonResult.fromJson);
+}
+
+class RemoteQuestRepository implements QuestRepository {
+  const RemoteQuestRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<QuestBoard>> getQuests() => _api.getJson('/quests', QuestBoard.fromJson);
+
+  @override
+  Future<Result<ClaimQuestResult>> claimQuest(ClaimQuestRequest request) =>
+      _api.postJson('/quests/claim', request.toJson(), ClaimQuestResult.fromJson);
+}
+
+class RemoteAchievementRepository implements AchievementRepository {
+  const RemoteAchievementRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<AchievementBoard>> getAchievements() =>
+      _api.getJson('/achievements', AchievementBoard.fromJson);
+}
+
+class RemoteShopRepository implements ShopRepository {
+  const RemoteShopRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<ShopCatalog>> getShop() => _api.getJson('/shop', ShopCatalog.fromJson);
+
+  @override
+  Future<Result<PurchaseResult>> purchase(PurchaseRequest request) =>
+      _api.postJson('/shop/purchase', request.toJson(), PurchaseResult.fromJson);
+}
+
+class RemoteFriendRepository implements FriendRepository {
+  const RemoteFriendRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<FriendList>> getFriends() => _api.getJson('/friends', FriendList.fromJson);
+
+  @override
+  Future<Result<FriendActionResult>> addFriend(AddFriendRequest request) =>
+      _api.postJson('/friends', request.toJson(), FriendActionResult.fromJson);
+
+  @override
+  Future<Result<FriendActionResult>> removeFriend(String friendId) =>
+      _api.deleteJson('/friends/$friendId', FriendActionResult.fromJson);
+
+  @override
+  Future<Result<FriendLeaderboard>> getFriendLeaderboard() =>
+      _api.getJson('/friends/leaderboard', FriendLeaderboard.fromJson);
+}
+
+class RemoteExamRepository implements ExamRepository {
+  const RemoteExamRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<MockExam>> generateExam(MockExamRequest request) =>
+      _api.postJson('/exam/generate', request.toJson(), MockExam.fromJson);
+
+  @override
+  Future<Result<MockExamResult>> submitExam(SubmitMockExamRequest request) =>
+      _api.postJson('/exam/submit', request.toJson(), MockExamResult.fromJson);
 }

@@ -69,6 +69,16 @@ class ApiClient {
     });
   }
 
+  Future<Result<T>> deleteJson<T>(
+    String path,
+    T Function(Map<String, dynamic> json) parse,
+  ) async {
+    return _guard(() async {
+      final Response<dynamic> res = await _dio.delete<dynamic>(path);
+      return parse(_asMap(res.data));
+    });
+  }
+
   /// Runs [action], converting any exception into a typed [Failure].
   Future<Result<T>> _guard<T>(Future<T> Function() action) async {
     try {

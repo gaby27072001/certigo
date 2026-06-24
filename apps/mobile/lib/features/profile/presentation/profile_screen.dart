@@ -2,9 +2,11 @@ import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/router.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/application/auth_state.dart';
 
@@ -126,6 +128,12 @@ class _ProfileContent extends StatelessWidget {
             for (final _BadgeData b in badges)
               _Badge(icon: b.icon, label: b.label, color: b.color, locked: !b.unlocked),
           ],
+        ),
+        const SizedBox(height: 12),
+        PrismButton.secondary(
+          label: 'Tous les succès',
+          icon: Icons.chevron_right_rounded,
+          onPressed: () => context.go(Routes.achievements),
         ),
         const SizedBox(height: 24),
 

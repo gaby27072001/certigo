@@ -1,0 +1,174 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microlingo.Infrastructure.Cosmos;
+using Microsoft.Azure.Cosmos;
+using Xunit;
+
+namespace Microlingo.Infrastructure.Tests;
+
+/// <summary>
+/// Provisions a throw-away Cosmos database (one per test-class run) against a
+/// locally-running Azure Cosmos DB emulator, seeds the production container set,
+/// and tears the database down afterwards.
+///
+/// The whole suite is OPT-IN and gated behind <see cref="EnableFlag"/>: with the
+/// flag unset — the default on a developer box or CI agent without an emulator —
+/// every <see cref="CosmosEmulatorFactAttribute"/> test is reported as *skipped*
+/// and this fixture never opens a connection, so the build stays green and
+/// deterministic.
+///
+/// To run the tests for real, start the emulator and set:
+/// <code>
+///   MICROLINGO_COSMOS_TESTS=1
+///   COSMOS_EMULATOR_CONNECTION_STRING=&lt;emulator connection string&gt;
+///       — or —
+///   COSMOS_EMULATOR_ENDPOINT=https://localhost:8081   (this is the default)
+///   COSMOS_EMULATOR_KEY=&lt;emulator primary key&gt;
+/// </code>
+/// The emulator's well-known primary key is published verbatim in Microsoft's
+/// documentation; it is deliberately NOT hard-coded here so the repository carries
+/// no credential-shaped strings.
+/// </summary>
+public sealed class CosmosEmulatorFixture : IAsyncLifetime
+{
+    public const string EnableFlag = "MICROLINGO_COSMOS_TESTS";
+
+    /// <summary>True only when the opt-in flag is explicitly set to "1".</summary>
+    public static bool Enabled =>
+        string.Equals(Environment.GetEnvironmentVariable(EnableFlag), "1", StringComparison.Ordinal);
+
+    private readonly string _databaseName = $"microlingo-itests-{Guid.NewGuid():N}";
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
+    private CosmosClient? _client;
+    private Database? _database;
+    private CosmosContext? _context;
+
+    // Lazy on purpose: no network at discovery/initialise time, so a fully-skipped
+    // run (flag unset) never attempts to reach an emulator.
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    /// <summary>
+    /// Lazily creates the ephemeral database + the eight production containers on
+    /// first use and returns a <see cref="CosmosContext"/> bound to them. Only ever
+    /// reached from an executing (non-skipped) test body.
+    /// </summary>
+    public async Task<CosmosContext> GetContextAsync(CancellationToken cancellationToken = default)
+    {
+        if (_context is not null)
+        {
+            return _context;
+        }
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_context is not null)
+            {
+                return _context;
+            }
+
+            var client = CreateClient();
+            var databaseResponse = await client.CreateDatabaseIfNotExistsAsync(
+                _databaseName, cancellationToken: cancellationToken);
+            var database = databaseResponse.Database;
+
+            foreach (var definition in CosmosContainers.All)
+            {
+                await database.CreateContainerIfNotExistsAsync(
+                    definition.Name, definition.PartitionKeyPath, cancellationToken: cancellationToken);
+            }
+
+            _client = client;
+            _database = database;
+            _context = new CosmosContext(client, _databaseName);
+            return _context;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task DisposeAsync()
+    {
+        if (_database is not null)
+        {
+            try
+            {
+                await _database.DeleteAsync();
+            }
+            catch (CosmosException)
+            {
+                // Best-effort cleanup of the ephemeral database; never fail teardown.
+            }
+        }
+
+        _client?.Dispose();
+        _gate.Dispose();
+    }
+
+    private static CosmosClient CreateClient()
+    {
+        // Mirror the production serializer wiring (Program.cs) exactly so the
+        // camelCase property names and enum casing the repositories rely on
+        // (e.g. submittedAt, userId, result.rewards.xpEarned) round-trip identically.
+        var serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        serializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+
+        var options = new CosmosClientOptions
+        {
+            Serializer = new CosmosSystemTextJsonSerializer(serializerOptions),
+            // The emulator presents a self-signed certificate and is reached over the
+            // gateway; both settings are appropriate only on this local-only path.
+            ConnectionMode = ConnectionMode.Gateway,
+            HttpClientFactory = () => new HttpClient(new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback =
+                    HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            })
+        };
+
+        var connectionString = Environment.GetEnvironmentVariable("COSMOS_EMULATOR_CONNECTION_STRING");
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            return new CosmosClient(connectionString, options);
+        }
+
+        var endpoint = Environment.GetEnvironmentVariable("COSMOS_EMULATOR_ENDPOINT");
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            endpoint = "https://localhost:8081";
+        }
+
+        var key = Environment.GetEnvironmentVariable("COSMOS_EMULATOR_KEY");
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            throw new InvalidOperationException(
+                $"Cosmos emulator tests are enabled ({EnableFlag}=1) but no credentials were supplied. " +
+                "Set COSMOS_EMULATOR_CONNECTION_STRING, or COSMOS_EMULATOR_KEY (optionally with " +
+                "COSMOS_EMULATOR_ENDPOINT, default https://localhost:8081).");
+        }
+
+        return new CosmosClient(endpoint, key, options);
+    }
+}
+
+/// <summary>
+/// A <see cref="FactAttribute"/> that auto-skips unless the Cosmos emulator suite
+/// is explicitly enabled (see <see cref="CosmosEmulatorFixture.EnableFlag"/>). The
+/// skip decision is taken at construction/discovery time, so a gated-off run
+/// reports these tests as *skipped* rather than performing any emulator I/O.
+/// </summary>
+public sealed class CosmosEmulatorFactAttribute : FactAttribute
+{
+    public CosmosEmulatorFactAttribute()
+    {
+        if (!CosmosEmulatorFixture.Enabled)
+        {
+            Skip =
+                $"Cosmos emulator integration test — set {CosmosEmulatorFixture.EnableFlag}=1 " +
+                "with a running emulator and COSMOS_EMULATOR_* configured to execute.";
+        }
+    }
+}

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microlingo.Application.Abstractions;
 using Microlingo.Application.Dtos;
 using Microlingo.Application.Services;
 using Microlingo.Domain.Content;
@@ -13,6 +14,7 @@ internal sealed class ExamServiceHarness
     public InMemoryLeaderboardRepository Leaderboard { get; } = new();
     public InMemoryEventRepository Events { get; } = new();
     public InMemoryExamAttemptRepository ExamAttempts { get; } = new();
+    public InMemoryAttemptRepository Attempts { get; } = new();
     public FakeClock Clock { get; } = new(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
     public string UserId { get; } = "user-1";
 
@@ -20,7 +22,7 @@ internal sealed class ExamServiceHarness
     {
         var content = TestContent.Build();
         var context = new FakeUserContext(UserId, "Tester");
-        return new ExamService(context, Clock, content, Progress, ExamAttempts, Events, Users, Leaderboard);
+        return new ExamService(context, Clock, content, Progress, ExamAttempts, Attempts, Events, Users, Leaderboard);
     }
 
     public static SubmitMockExamRequest Submit(string attemptId, string examId, params AnswerDto[] answers)
@@ -117,5 +119,37 @@ public sealed class ExamServiceTests
 
         result.Domains.Single(d => d.DomainId == "d-governance").Correct.Should().Be(0);
         result.Domains.Single(d => d.DomainId == "d-concepts").Correct.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_flags_submission_spam_via_the_rate_window()
+    {
+        var h = new ExamServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        var at = h.Clock.UtcNow;
+        // 40 prior attempts in the trailing hour = the per-window cap; the 41st (this exam)
+        // trips the AttemptRateExceeded detector, which stayed dormant for exams until the
+        // rate window was wired into ExamService. XpEarned=0 on the seeds isolates the count
+        // flag. Exam attempts share the attempts container with lessons in production, so the
+        // detector treats lesson and exam submissions as one combined cadence budget.
+        for (var i = 0; i < 40; i++)
+        {
+            h.Attempts.Seed(new AttemptRecord(
+                $"attempt::seed-{i}", h.UserId, $"seed-{i}", TestContent.TrackId, "l1", at, at,
+                new SubmitQuizResult($"r{i}", 100, new List<ItemResultDto>(),
+                    new RewardsDto(0, 0, false, false, 0, new List<string>()),
+                    new List<string>(), null)));
+        }
+        var service = h.Build();
+
+        await service.SubmitAsync(ExamServiceHarness.Submit(
+            "rate-exam-1", "exam-1",
+            ExamServiceHarness.Answer("l1-i1", "a"),
+            ExamServiceHarness.Answer("l2-i1", "a"),
+            ExamServiceHarness.Answer("l3-i1", "a")));
+
+        var flagged = h.Events.Events.SingleOrDefault(e => e.Type == "attempt.flagged");
+        flagged.Should().NotBeNull();
+        ((AttemptIntegritySignal)flagged!.Payload).Flags.Should().Contain("AttemptRateExceeded");
     }
 }
