@@ -28,6 +28,17 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
         {
             await WriteProblemAsync(context, HttpStatusCode.BadRequest, "Invalid request", ex.Message, correlationId);
         }
+        catch (AuthFailedException ex)
+        {
+            // Authentication failures (wrong credentials, expired refresh token).
+            // Logged at information level — these are expected, not faults.
+            logger.LogInformation("Authentication failed in function {FunctionName}.", context.FunctionDefinition.Name);
+            await WriteProblemAsync(context, HttpStatusCode.Unauthorized, "Unauthorized", ex.Message, correlationId);
+        }
+        catch (DuplicateRecordException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict", ex.Message, correlationId);
+        }
         catch (ConcurrencyConflictException ex)
         {
             logger.LogWarning(ex, "Concurrency conflict in function {FunctionName}.", context.FunctionDefinition.Name);

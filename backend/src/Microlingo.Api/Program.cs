@@ -45,8 +45,29 @@ var host = new HostBuilder()
             sp.GetRequiredService<CosmosClient>(),
             configuration["COSMOS_DATABASE"] ?? CosmosContainers.DatabaseName));
 
+        // Locally-issued JWT settings shared by the issuer and the local validator.
+        // The signing key is mandatory in Production; a fixed dev key is used
+        // elsewhere so the email/password flow works out of the box locally.
+        var configuredSecret = configuration["AUTH_JWT_SIGNING_KEY"];
+        var signingSecret = !string.IsNullOrWhiteSpace(configuredSecret)
+            ? configuredSecret
+            : context.HostingEnvironment.IsProduction()
+                ? throw new InvalidOperationException(
+                    "AUTH_JWT_SIGNING_KEY is required in Production to sign email/password tokens.")
+                : "microlingo-dev-signing-key-change-me";
+        var jwtIssuer = configuration["AUTH_JWT_ISSUER"] ?? "microlingo";
+        var jwtAudience = configuration["AUTH_JWT_AUDIENCE"] ?? "microlingo";
+
         services.AddSingleton<ITokenValidator>(_ =>
         {
+            // The local email/password validator is always first; whichever
+            // environment validator follows is the fallback. The Dev validator
+            // accepts ANY token, so it can only ever be the last link in the chain.
+            var validators = new List<ITokenValidator>
+            {
+                new LocalJwtTokenValidator(signingSecret, jwtIssuer, jwtAudience)
+            };
+
             // Hard production guard: the dev validator accepts any bearer token as a
             // user id, so it can never be wired in production (even if AUTH_MODE=dev
             // leaks into config). The decision is a pure, unit-tested function.
@@ -56,13 +77,28 @@ var host = new HostBuilder()
                 configuration["AUTH_ALLOW_DEV"]);
             if (useDev)
             {
-                return new DevTokenValidator();
+                validators.Add(new DevTokenValidator());
+            }
+            else
+            {
+                // Only add Entra when it is actually configured; its ctor throws on
+                // empty authority/audience, which would otherwise break local runs
+                // that rely solely on email/password.
+                var authority = configuration["ENTRA_AUTHORITY"];
+                var audience = configuration["ENTRA_AUDIENCE"];
+                if (!string.IsNullOrWhiteSpace(authority) && !string.IsNullOrWhiteSpace(audience))
+                {
+                    validators.Add(new EntraTokenValidator(authority, audience));
+                }
             }
 
-            return new EntraTokenValidator(
-                configuration["ENTRA_AUTHORITY"] ?? string.Empty,
-                configuration["ENTRA_AUDIENCE"] ?? string.Empty);
+            return new CompositeTokenValidator(validators);
         });
+
+        services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
+        services.AddSingleton<ITokenIssuer>(_ => new JwtTokenIssuer(signingSecret, jwtIssuer, jwtAudience));
+        services.AddScoped<IUserCredentialRepository, CosmosUserCredentialRepository>();
+        services.AddScoped<IAuthService, AuthService>();
 
         services.AddScoped<IUserContext, FunctionUserContext>();
         services.AddSingleton<IClock, SystemClock>();

@@ -85,6 +85,17 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
           foreground: isDark ? Colors.black : Colors.white,
           iconColor: isDark ? Colors.black : Colors.white,
         );
+      case AuthProvider.email:
+        // L'e-mail/mot de passe a sa propre UI (champs + bouton) et n'utilise
+        // jamais ce bouton ; ce cas n'existe que pour l'exhaustivité du switch.
+        return _ProviderBrand(
+          label: 'Continuer avec un e-mail',
+          icon: FontAwesomeIcons.envelope,
+          background: isDark ? const Color(0xFF2B2B2B) : Colors.white,
+          foreground: isDark ? Colors.white : const Color(0xFF1B1B1F),
+          iconColor: context.prism.primary,
+          border: isDark ? const Color(0xFF3D3D3D) : const Color(0xFFD9D9D9),
+        );
     }
   }
 

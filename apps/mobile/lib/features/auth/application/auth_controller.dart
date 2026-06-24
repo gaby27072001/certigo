@@ -3,29 +3,46 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_gateway.dart';
 import 'auth_state.dart';
+import 'credentials_gateway.dart';
 import 'session_store.dart';
 
 /// Passerelle OIDC réelle. Surchargée par un faux dans les tests.
-final authGatewayProvider = Provider<AuthGateway>((Ref ref) => AppAuthGateway());
+final authGatewayProvider = Provider<AuthGateway>(
+  (Ref ref) => AppAuthGateway(),
+);
+
+/// Passerelle e-mail/mot de passe réelle (API HTTP). Surchargée dans les tests.
+final credentialsGatewayProvider = Provider<CredentialsGateway>(
+  (Ref ref) => HttpCredentialsGateway(),
+);
 
 /// Stockage sécurisé de la session. Surchargé par un faux dans les tests.
-final sessionStoreProvider = Provider<SessionStore>((Ref ref) => SecureSessionStore());
+final sessionStoreProvider = Provider<SessionStore>(
+  (Ref ref) => SecureSessionStore(),
+);
 
 /// Vrai quand Entra External ID est réellement configuré (clientId + autorité).
 ///
 /// Exposé comme provider — et non lu directement depuis [AppEnv] dans le
 /// contrôleur — pour pouvoir le forcer à `true` dans les tests, où les
 /// `--dart-define` ne sont pas appliqués.
-final authConfiguredProvider = Provider<bool>((Ref ref) => AppEnv.entraConfigured);
+final authConfiguredProvider = Provider<bool>(
+  (Ref ref) => AppEnv.entraConfigured,
+);
 
-/// Vrai quand l'écran de connexion doit être présenté (Entra configuré, ou
-/// aperçu forcé via `FORCE_AUTH_UI`). Faux en dev → passage direct.
-final authRequiredProvider =
-    Provider<bool>((Ref ref) => AppEnv.entraConfigured || AppEnv.forceAuthUi);
+/// Vrai quand l'écran de connexion doit être présenté. Désormais **toujours
+/// vrai** : la connexion par e-mail/mot de passe est disponible en permanence,
+/// indépendamment d'Entra. (Surchargeable à `false` dans les tests pour vérifier
+/// l'ancien passage direct en dev.)
+final authRequiredProvider = Provider<bool>(
+  (Ref ref) => true,
+);
 
 /// Contrôleur d'authentification : source de vérité synchrone de l'état de
 /// session, pilotant le garde de navigation et l'injection du jeton d'API.
-final authControllerProvider = NotifierProvider<AuthController, AuthState>(AuthController.new);
+final authControllerProvider = NotifierProvider<AuthController, AuthState>(
+  AuthController.new,
+);
 
 /// Orchestration de l'authentification multi-fournisseurs + persistance.
 ///
@@ -33,6 +50,7 @@ final authControllerProvider = NotifierProvider<AuthController, AuthState>(AuthC
 /// GoRouter puisse lire l'état immédiatement, sans `await`.
 class AuthController extends Notifier<AuthState> {
   late final AuthGateway _gateway;
+  late final CredentialsGateway _credentials;
   late final SessionStore _store;
   late final bool _required;
   late final bool _configured;
@@ -40,6 +58,7 @@ class AuthController extends Notifier<AuthState> {
   @override
   AuthState build() {
     _gateway = ref.read(authGatewayProvider);
+    _credentials = ref.read(credentialsGatewayProvider);
     _store = ref.read(sessionStoreProvider);
     _required = ref.read(authRequiredProvider);
     _configured = ref.read(authConfiguredProvider);
@@ -89,8 +108,57 @@ class AuthController extends Notifier<AuthState> {
       }
       await _store.write(session);
       state = Authenticated(session);
+    } on AuthGatewayException catch (e) {
+      state = Unauthenticated(e.message);
     } catch (_) {
       state = const Unauthenticated('La connexion a échoué. Réessayez.');
+    }
+  }
+
+  /// Connexion par e-mail + mot de passe (compte géré par notre backend).
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    state = const AuthLoading();
+    try {
+      final AuthSession session = await _credentials.login(email: email, password: password);
+      if (session.accessToken.isEmpty) {
+        state = const Unauthenticated('La connexion a échoué. Réessayez.');
+        return;
+      }
+      await _store.write(session);
+      state = Authenticated(session);
+    } on AuthGatewayException catch (e) {
+      state = Unauthenticated(e.message);
+    } catch (_) {
+      state = const Unauthenticated('La connexion a échoué. Réessayez.');
+    }
+  }
+
+  /// Création d'un compte e-mail + mot de passe, puis connexion immédiate.
+  Future<void> registerWithEmail({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    state = const AuthLoading();
+    try {
+      final AuthSession session = await _credentials.register(
+        email: email,
+        password: password,
+        displayName: displayName,
+      );
+      if (session.accessToken.isEmpty) {
+        state = const Unauthenticated('La création du compte a échoué. Réessayez.');
+        return;
+      }
+      await _store.write(session);
+      state = Authenticated(session);
+    } on AuthGatewayException catch (e) {
+      state = Unauthenticated(e.message);
+    } catch (_) {
+      state = const Unauthenticated('La création du compte a échoué. Réessayez.');
     }
   }
 
@@ -150,7 +218,11 @@ class AuthController extends Notifier<AuthState> {
     final String? refreshToken = session.refreshToken;
     if (refreshToken == null) return null;
     try {
-      final AuthSession refreshed = await _gateway.refresh(refreshToken);
+      // Les sessions e-mail/mot de passe se rafraîchissent via notre API ; les
+      // sessions Entra via le flux OIDC.
+      final AuthSession refreshed = session.provider == AuthProvider.email
+          ? await _credentials.refresh(refreshToken)
+          : await _gateway.refresh(refreshToken);
       if (refreshed.accessToken.isEmpty) return null;
       await _store.write(refreshed);
       return refreshed;

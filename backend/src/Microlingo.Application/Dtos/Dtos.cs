@@ -39,6 +39,23 @@ public sealed record UserProfileDto(
     public string? ETag { get; init; }
 }
 
+// --- Email/password authentication -----------------------------------------
+
+public sealed record RegisterRequest(string Email, string Password, string? DisplayName = null);
+
+public sealed record LoginRequest(string Email, string Password);
+
+public sealed record RefreshTokenRequest(string RefreshToken);
+
+/// The payload returned by register/login/refresh: the freshly-minted token pair
+/// plus the learner's (provisioned) profile so the client can render the home
+/// screen without a second round-trip.
+public sealed record AuthResultDto(
+    string AccessToken,
+    string RefreshToken,
+    DateTimeOffset AccessTokenExpiresAt,
+    UserProfileDto Profile);
+
 public sealed record SubmitQuizRequest(
     string ClientAttemptId,
     string TrackId,

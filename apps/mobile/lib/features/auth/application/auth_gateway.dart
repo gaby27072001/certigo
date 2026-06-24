@@ -2,8 +2,19 @@ import 'dart:convert';
 
 import 'package:core/core.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
+import 'package:flutter/services.dart';
 
 import 'auth_state.dart';
+
+/// Erreur métier remontée au contrôleur pour afficher un message clair.
+class AuthGatewayException implements Exception {
+  const AuthGatewayException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'AuthGatewayException($message)';
+}
 
 /// Abstraction du flux OIDC (Authorization Code + PKCE).
 ///
@@ -38,46 +49,90 @@ class AppAuthGateway implements AuthGateway {
 
   @override
   Future<AuthSession> signIn(AuthProvider provider) async {
-    final AuthorizationTokenResponse result = await _appAuth.authorizeAndExchangeCode(
-      AuthorizationTokenRequest(
-        AppEnv.entraClientId,
-        AppEnv.entraRedirectUri,
-        issuer: AppEnv.entraAuthority,
-        scopes: _scopes,
-        additionalParameters: _hintFor(provider),
-        // Laisse l'utilisateur choisir/ajouter un compte à chaque connexion
-        // explicite (utile après une déconnexion).
-        promptValues: const <String>['select_account'],
-      ),
-    );
-    return _toSession(
-      result.accessToken,
-      result.refreshToken,
-      result.idToken,
-      result.accessTokenExpirationDateTime,
-      provider,
-    );
+    try {
+      final AuthorizationTokenResponse result = await _appAuth.authorizeAndExchangeCode(
+        AuthorizationTokenRequest(
+          AppEnv.entraClientId,
+          AppEnv.entraRedirectUri,
+          issuer: AppEnv.entraAuthority,
+          scopes: _scopes,
+          additionalParameters: _hintFor(provider),
+          // Laisse l'utilisateur choisir/ajouter un compte à chaque connexion
+          // explicite (utile après une déconnexion).
+          promptValues: const <String>['select_account'],
+        ),
+      );
+      return _toSession(
+        result.accessToken,
+        result.refreshToken,
+        result.idToken,
+        result.accessTokenExpirationDateTime,
+        provider,
+      );
+    } on FlutterAppAuthUserCancelledException {
+      throw const AuthGatewayException('Connexion annulée.');
+    } on PlatformException catch (e) {
+      throw AuthGatewayException(_toUserMessage(e, provider));
+    } catch (_) {
+      throw AuthGatewayException(
+        'La connexion via ${provider.id} a échoué. Vérifiez la configuration Entra puis réessayez.',
+      );
+    }
+  }
+
+  String _toUserMessage(PlatformException e, AuthProvider provider) {
+    final String lowerCode = e.code.toLowerCase();
+    final String lowerMessage = (e.message ?? '').toLowerCase();
+    final String details = '${e.details ?? ''}'.toLowerCase();
+    final String haystack = '$lowerCode $lowerMessage $details';
+
+    if (haystack.contains('user_cancel')) {
+      return 'Connexion annulée.';
+    }
+    if (haystack.contains('redirect_uri') ||
+        haystack.contains('redirect uri') ||
+        haystack.contains('invalid_redirect')) {
+      return 'Configuration de redirection invalide. Vérifiez ENTRA_REDIRECT_URI (${AppEnv.entraRedirectUri}) et sa déclaration native sur iOS/Android.';
+    }
+    if (haystack.contains('invalid_client') ||
+        haystack.contains('unauthorized_client') ||
+        haystack.contains('client_id')) {
+      return 'Client Entra invalide. Vérifiez ENTRA_CLIENT_ID et l\'application Entra External ID.';
+    }
+    if (haystack.contains('domain_hint') ||
+        haystack.contains('idp') ||
+        haystack.contains('identity provider') ||
+        haystack.contains('federat')) {
+      return 'Fournisseur ${provider.id} indisponible dans Entra External ID. Vérifiez la fédération et le domain_hint.';
+    }
+    return 'La connexion via ${provider.id} a échoué. Vérifiez la configuration Entra puis réessayez.';
   }
 
   @override
   Future<AuthSession> refresh(String refreshToken) async {
-    final TokenResponse result = await _appAuth.token(
-      TokenRequest(
-        AppEnv.entraClientId,
-        AppEnv.entraRedirectUri,
-        issuer: AppEnv.entraAuthority,
-        scopes: _scopes,
-        refreshToken: refreshToken,
-        grantType: 'refresh_token',
-      ),
-    );
-    return _toSession(
-      result.accessToken,
-      result.refreshToken ?? refreshToken,
-      result.idToken,
-      result.accessTokenExpirationDateTime,
-      null,
-    );
+    try {
+      final TokenResponse result = await _appAuth.token(
+        TokenRequest(
+          AppEnv.entraClientId,
+          AppEnv.entraRedirectUri,
+          issuer: AppEnv.entraAuthority,
+          scopes: _scopes,
+          refreshToken: refreshToken,
+          grantType: 'refresh_token',
+        ),
+      );
+      return _toSession(
+        result.accessToken,
+        result.refreshToken ?? refreshToken,
+        result.idToken,
+        result.accessTokenExpirationDateTime,
+        null,
+      );
+    } on PlatformException catch (e) {
+      throw AuthGatewayException(_toUserMessage(e, AuthProvider.microsoft));
+    } catch (_) {
+      throw const AuthGatewayException('Impossible de rafraîchir la session.');
+    }
   }
 
   @override
@@ -93,6 +148,8 @@ class AppAuthGateway implements AuthGateway {
       AuthProvider.microsoft => AppEnv.microsoftDomainHint,
       AuthProvider.google => AppEnv.googleDomainHint,
       AuthProvider.apple => AppEnv.appleDomainHint,
+      // L'e-mail/mot de passe ne passe pas par Entra : aucun indice de domaine.
+      AuthProvider.email => '',
     };
     if (hint.isEmpty) return null;
     return <String, String>{'domain_hint': hint};
@@ -128,7 +185,9 @@ class AppAuthGateway implements AuthGateway {
     final List<String> parts = token.split('.');
     if (parts.length != 3) return const <String, dynamic>{};
     try {
-      final String payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      final String payload = utf8.decode(
+        base64Url.decode(base64Url.normalize(parts[1])),
+      );
       final Object? decoded = jsonDecode(payload);
       return decoded is Map<String, dynamic> ? decoded : const <String, dynamic>{};
     } catch (_) {
