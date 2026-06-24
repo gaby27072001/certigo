@@ -115,6 +115,7 @@ class HttpCredentialsGateway implements CredentialsGateway {
     }
     if (failure is ServerFailure) {
       return switch (failure.statusCode) {
+        429 => 'Trop de tentatives de connexion. Réessayez dans quelques minutes.',
         409 => 'Cette adresse e-mail est déjà utilisée.',
         400 => 'Vérifiez votre e-mail et un mot de passe d’au moins 8 caractères.',
         _ => 'Le service est momentanément indisponible. Réessayez.',

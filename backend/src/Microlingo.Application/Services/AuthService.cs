@@ -30,7 +30,7 @@ public static class AuthRules
     }
 
     public static bool IsValidPassword(string? password) =>
-        !string.IsNullOrEmpty(password)
+        !string.IsNullOrWhiteSpace(password)
         && password.Length is >= MinPasswordLength and <= MaxPasswordLength;
 }
 
@@ -51,6 +51,12 @@ public sealed class AuthService(
     IUserRepository users,
     IClock clock) : IAuthService
 {
+    /// Failed logins allowed before an account is temporarily locked.
+    private const int MaxFailedAttempts = 5;
+
+    /// How long an account stays locked after hitting <see cref="MaxFailedAttempts"/>.
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
     public async Task<AuthResultDto> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
         var email = AuthRules.NormalizeEmail(request.Email);
@@ -96,16 +102,51 @@ public sealed class AuthService(
         var email = AuthRules.NormalizeEmail(request.Email);
         var credential = await credentials.FindByEmailAsync(email, cancellationToken);
 
-        // Same generic message whether the email is unknown or the password is
-        // wrong, so the endpoint never reveals which emails are registered.
-        if (credential is null || !passwordHasher.Verify(request.Password ?? string.Empty, credential.PasswordHash))
+        // Unknown email: same generic failure (no enumeration). There is no
+        // account document to throttle against, so nothing is recorded.
+        if (credential is null)
         {
             throw new AuthFailedException("E-mail ou mot de passe incorrect.");
+        }
+
+        // Locked out by prior failures: refuse before even checking the password
+        // so a brute-force run can't keep probing.
+        if (credential.LockoutUntil is { } until && until > clock.UtcNow)
+        {
+            throw new RateLimitedException(
+                "Trop de tentatives de connexion. Réessayez dans quelques minutes.");
+        }
+
+        if (!passwordHasher.Verify(request.Password ?? string.Empty, credential.PasswordHash))
+        {
+            await RegisterFailedAttemptAsync(credential, cancellationToken);
+            throw new AuthFailedException("E-mail ou mot de passe incorrect.");
+        }
+
+        // Successful login clears any accumulated failure state.
+        if (credential.FailedAttempts != 0 || credential.LockoutUntil is not null)
+        {
+            await credentials.UpdateAsync(
+                credential with { FailedAttempts = 0, LockoutUntil = null }, cancellationToken);
         }
 
         var profile = await users.GetAsync(credential.UserId, cancellationToken)
             ?? await users.UpsertAsync(ProfileDefaults.New(credential.UserId, credential.DisplayName), cancellationToken);
         return BuildResult(profile, email);
+    }
+
+    private async Task RegisterFailedAttemptAsync(UserCredentialRecord credential, CancellationToken cancellationToken)
+    {
+        var attempts = credential.FailedAttempts + 1;
+        var locked = attempts >= MaxFailedAttempts;
+        var updated = credential with
+        {
+            // Reset the counter when locking so the account gets a fresh window of
+            // attempts once the lockout expires.
+            FailedAttempts = locked ? 0 : attempts,
+            LockoutUntil = locked ? clock.UtcNow + LockoutDuration : null,
+        };
+        await credentials.UpdateAsync(updated, cancellationToken);
     }
 
     public async Task<AuthResultDto> RefreshAsync(RefreshTokenRequest request, CancellationToken cancellationToken = default)

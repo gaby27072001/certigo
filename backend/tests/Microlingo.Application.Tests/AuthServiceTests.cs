@@ -22,6 +22,12 @@ internal sealed class InMemoryUserCredentialRepository : IUserCredentialReposito
 
         return Task.CompletedTask;
     }
+
+    public Task UpdateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
+    {
+        _store[record.Id] = record;
+        return Task.CompletedTask;
+    }
 }
 
 /// Deterministic, in-memory password hasher for fast service tests; the real
@@ -67,6 +73,7 @@ public sealed class AuthRulesTests
     [InlineData("password123", true)]
     [InlineData("12345678", true)]
     [InlineData("short", false)]
+    [InlineData("        ", false)]
     [InlineData("", false)]
     [InlineData(null, false)]
     public void IsValidPassword_enforces_minimum_length(string? password, bool expected)
@@ -200,5 +207,76 @@ public sealed class AuthServiceTests
         var act = async () => await service.RefreshAsync(new RefreshTokenRequest("garbage"));
 
         await act.Should().ThrowAsync<AuthFailedException>().WithMessage("*Session expirée*");
+    }
+
+    private static (AuthService Service, FakeClock Clock) BuildTimed()
+    {
+        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var service = new AuthService(
+            new InMemoryUserCredentialRepository(),
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new InMemoryUserRepository(),
+            clock);
+        return (service, clock);
+    }
+
+    [Fact]
+    public async Task Login_locks_the_account_after_five_failed_attempts()
+    {
+        var (service, _) = BuildTimed();
+        await service.RegisterAsync(new RegisterRequest("lock@example.com", "password123", null));
+
+        for (var i = 0; i < 5; i++)
+        {
+            var bad = async () => await service.LoginAsync(new LoginRequest("lock@example.com", "wrong-password"));
+            await bad.Should().ThrowAsync<AuthFailedException>();
+        }
+
+        // Even the CORRECT password is now refused while the lockout window holds.
+        var locked = async () => await service.LoginAsync(new LoginRequest("lock@example.com", "password123"));
+        await locked.Should().ThrowAsync<RateLimitedException>().WithMessage("*Trop de tentatives*");
+    }
+
+    [Fact]
+    public async Task Lockout_expires_after_the_window_then_login_succeeds()
+    {
+        var (service, clock) = BuildTimed();
+        await service.RegisterAsync(new RegisterRequest("expire@example.com", "password123", null));
+
+        for (var i = 0; i < 5; i++)
+        {
+            var bad = async () => await service.LoginAsync(new LoginRequest("expire@example.com", "wrong-password"));
+            await bad.Should().ThrowAsync<AuthFailedException>();
+        }
+
+        // Advance past the 15-minute lockout window.
+        clock.UtcNow = clock.UtcNow.AddMinutes(16);
+
+        var result = await service.LoginAsync(new LoginRequest("expire@example.com", "password123"));
+        result.AccessToken.Should().StartWith("access:");
+    }
+
+    [Fact]
+    public async Task A_successful_login_resets_the_failure_counter()
+    {
+        var (service, _) = BuildTimed();
+        await service.RegisterAsync(new RegisterRequest("reset@example.com", "password123", null));
+
+        // Four failures (below the threshold), then a success resets the counter.
+        for (var i = 0; i < 4; i++)
+        {
+            var bad = async () => await service.LoginAsync(new LoginRequest("reset@example.com", "wrong-password"));
+            await bad.Should().ThrowAsync<AuthFailedException>();
+        }
+
+        await service.LoginAsync(new LoginRequest("reset@example.com", "password123"));
+
+        // Four more failures must still NOT lock (the counter restarted from zero).
+        for (var i = 0; i < 4; i++)
+        {
+            var bad = async () => await service.LoginAsync(new LoginRequest("reset@example.com", "wrong-password"));
+            await bad.Should().ThrowAsync<AuthFailedException>();
+        }
     }
 }

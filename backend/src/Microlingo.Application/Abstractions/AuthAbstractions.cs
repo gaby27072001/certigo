@@ -7,6 +7,11 @@ namespace Microlingo.Application.Abstractions;
 /// is registered.
 public sealed class AuthFailedException(string message) : Exception(message);
 
+/// Raised when an account is temporarily locked after too many failed logins.
+/// Mapped to HTTP 429 (Too Many Requests) so the client can surface a distinct
+/// "try again later" message and back off.
+public sealed class RateLimitedException(string message) : Exception(message);
+
 /// One stored email/password credential. Lives in the Users container in its own
 /// partition (id = <c>credential::{emailLower}</c>, which is also the partition
 /// key) so it never collides with a profile document (whose id is the userId).
@@ -17,7 +22,9 @@ public sealed record UserCredentialRecord(
     string UserId,
     string DisplayName,
     string PasswordHash,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    int FailedAttempts = 0,
+    DateTimeOffset? LockoutUntil = null)
 {
     /// Discriminator persisted alongside the document; combined with the id
     /// prefix it keeps credential docs unambiguously separate from profiles.
@@ -38,6 +45,11 @@ public interface IUserCredentialRepository
     /// when a credential for the same email already exists (turns the legacy
     /// check-then-create race into a single guarded write).
     Task CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default);
+
+    /// Replaces an existing credential document (used to update the failed-login
+    /// counter and lockout window). Last-writer-wins, which is acceptable for a
+    /// best-effort brute-force counter.
+    Task UpdateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default);
 }
 
 /// One-way password hashing. The implementation is a salted, iterated KDF; verify

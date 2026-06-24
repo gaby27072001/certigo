@@ -28,5 +28,8 @@ public sealed class CosmosUserCredentialRepository(CosmosContext context) : IUse
         }
     }
 
+    public Task UpdateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
+        => context.Users.UpsertItemAsync(record, new PartitionKey(record.Id), cancellationToken: cancellationToken);
+
     private static string Normalize(string email) => (email ?? string.Empty).Trim().ToLowerInvariant();
 }

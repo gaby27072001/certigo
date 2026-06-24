@@ -35,6 +35,11 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
             logger.LogInformation("Authentication failed in function {FunctionName}.", context.FunctionDefinition.Name);
             await WriteProblemAsync(context, HttpStatusCode.Unauthorized, "Unauthorized", ex.Message, correlationId);
         }
+        catch (RateLimitedException ex)
+        {
+            logger.LogWarning("Rate limit hit in function {FunctionName}.", context.FunctionDefinition.Name);
+            await WriteProblemAsync(context, HttpStatusCode.TooManyRequests, "Too Many Requests", ex.Message, correlationId);
+        }
         catch (DuplicateRecordException ex)
         {
             await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict", ex.Message, correlationId);
