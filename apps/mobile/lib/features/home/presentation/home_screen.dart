@@ -122,6 +122,12 @@ class _HomeContent extends StatelessWidget {
           _AllCaughtUpCard(onTap: () => context.go(Routes.path)),
         const SizedBox(height: 24),
 
+        // Explorer — secondary destinations beyond the daily path.
+        Text('Explorer', style: t.titleLarge),
+        const SizedBox(height: 12),
+        const _ExploreSection(),
+        const SizedBox(height: 24),
+
         // Weakest domain -------------------------------------------------
         if (weak != null) ...<Widget>[
           Row(
@@ -435,6 +441,128 @@ class _HomeLoading extends StatelessWidget {
         SizedBox(height: 16),
         PrismSkeleton(height: 96),
       ],
+    );
+  }
+}
+
+/// "Explore" shelf on Home — a 2-column grid of secondary destinations
+/// (achievements, seasons, quests, shop, friends, mock exam) presented above
+/// the shell so they never compete with the bottom-nav primary tabs.
+class _ExploreSection extends StatelessWidget {
+  const _ExploreSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    final List<_ExploreItem> items = <_ExploreItem>[
+      _ExploreItem(
+        icon: Icons.emoji_events_rounded,
+        label: 'Succès',
+        tone: p.xpGold,
+        route: Routes.achievements,
+      ),
+      _ExploreItem(
+        icon: Icons.calendar_month_rounded,
+        label: 'Saisons',
+        tone: p.primary,
+        route: Routes.seasons,
+      ),
+      _ExploreItem(
+        icon: Icons.flag_rounded,
+        label: 'Quêtes',
+        tone: p.ember,
+        route: Routes.quests,
+      ),
+      _ExploreItem(
+        icon: Icons.storefront_rounded,
+        label: 'Boutique',
+        tone: p.success,
+        route: Routes.shop,
+      ),
+      _ExploreItem(
+        icon: Icons.group_rounded,
+        label: 'Amis',
+        tone: p.info,
+        route: Routes.friends,
+      ),
+      _ExploreItem(
+        icon: Icons.workspace_premium_rounded,
+        label: 'Examen blanc',
+        tone: p.warning,
+        route: Routes.exam,
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        const double spacing = 12;
+        final double tileWidth = (constraints.maxWidth - spacing) / 2;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: <Widget>[
+            for (final _ExploreItem item in items)
+              SizedBox(
+                width: tileWidth,
+                child: _ExploreCard(item: item),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ExploreItem {
+  const _ExploreItem({
+    required this.icon,
+    required this.label,
+    required this.tone,
+    required this.route,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color tone;
+  final String route;
+}
+
+class _ExploreCard extends StatelessWidget {
+  const _ExploreCard({required this.item});
+
+  final _ExploreItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme t = Theme.of(context).textTheme;
+    final PrismColorScheme p = context.prism;
+    return GestureDetector(
+      onTap: () => context.go(item.route),
+      child: PrismCard(
+        borderRadius: PrismRadii.cardLg,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: item.tone.withOpacity(0.16),
+                borderRadius: PrismRadii.cardMd,
+              ),
+              child: Icon(item.icon, color: item.tone, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                item.label,
+                style: t.titleSmall?.copyWith(color: p.textPrimary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

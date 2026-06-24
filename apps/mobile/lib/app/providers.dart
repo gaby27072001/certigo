@@ -93,6 +93,30 @@ final recommendationRepositoryProvider = Provider<RecommendationRepository>(
   (Ref ref) => RemoteRecommendationRepository(ref.watch(apiClientProvider)),
 );
 
+final seasonRepositoryProvider = Provider<SeasonRepository>(
+  (Ref ref) => RemoteSeasonRepository(ref.watch(apiClientProvider)),
+);
+
+final questRepositoryProvider = Provider<QuestRepository>(
+  (Ref ref) => RemoteQuestRepository(ref.watch(apiClientProvider)),
+);
+
+final achievementRepositoryProvider = Provider<AchievementRepository>(
+  (Ref ref) => RemoteAchievementRepository(ref.watch(apiClientProvider)),
+);
+
+final shopRepositoryProvider = Provider<ShopRepository>(
+  (Ref ref) => RemoteShopRepository(ref.watch(apiClientProvider)),
+);
+
+final friendRepositoryProvider = Provider<FriendRepository>(
+  (Ref ref) => RemoteFriendRepository(ref.watch(apiClientProvider)),
+);
+
+final examRepositoryProvider = Provider<ExamRepository>(
+  (Ref ref) => RemoteExamRepository(ref.watch(apiClientProvider)),
+);
+
 /// User-controlled theme mode (persisted by settings later). System by default.
 final themeModeProvider = StateProvider<ThemeMode>((Ref ref) => ThemeMode.system);
 
@@ -142,4 +166,51 @@ final nextBestProvider = FutureProvider.autoDispose.family<NextBest, String>(
 /// The learner's current weekly league standings.
 final leagueProvider = FutureProvider.autoDispose<League>((Ref ref) async {
   return _orThrow(await ref.watch(leaderboardRepositoryProvider).getMyLeague());
+});
+
+/// The current monthly season: theme, mascot, gem balance and the claimable
+/// challenge. Auto-disposed; refreshed after a claim via `ref.invalidate`.
+final seasonProvider = FutureProvider.autoDispose<Season>((Ref ref) async {
+  return _orThrow(await ref.watch(seasonRepositoryProvider).getSeason());
+});
+
+/// Today's daily quest board with progress and claimable rewards. Auto-disposed;
+/// refreshed after a claim via `ref.invalidate`.
+final questBoardProvider = FutureProvider.autoDispose<QuestBoard>((Ref ref) async {
+  return _orThrow(await ref.watch(questRepositoryProvider).getQuests());
+});
+
+/// The learner's achievements with per-achievement progress. Read-only.
+final achievementBoardProvider =
+    FutureProvider.autoDispose<AchievementBoard>((Ref ref) async {
+  return _orThrow(await ref.watch(achievementRepositoryProvider).getAchievements());
+});
+
+/// The gem shop catalog plus the learner's current gem balance. Auto-disposed;
+/// refreshed after a purchase via `ref.invalidate`.
+final shopCatalogProvider = FutureProvider.autoDispose<ShopCatalog>((Ref ref) async {
+  return _orThrow(await ref.watch(shopRepositoryProvider).getShop());
+});
+
+/// The learner's friends list. Auto-disposed; refreshed after add/remove.
+final friendListProvider = FutureProvider.autoDispose<FriendList>((Ref ref) async {
+  return _orThrow(await ref.watch(friendRepositoryProvider).getFriends());
+});
+
+/// The friends-only weekly leaderboard, highlighting the learner. Auto-disposed.
+final friendLeaderboardProvider =
+    FutureProvider.autoDispose<FriendLeaderboard>((Ref ref) async {
+  return _orThrow(await ref.watch(friendRepositoryProvider).getFriendLeaderboard());
+});
+
+/// A freshly generated mock exam for the [activeTrackProvider] track: blueprint,
+/// items and time limit. Auto-disposed so leaving the exam screen discards it;
+/// switching the active track regenerates a new exam.
+final examProvider = FutureProvider.autoDispose<MockExam>((Ref ref) async {
+  final String trackId = ref.watch(activeTrackProvider);
+  return _orThrow(
+    await ref
+        .watch(examRepositoryProvider)
+        .generateExam(MockExamRequest(trackId: trackId)),
+  );
 });

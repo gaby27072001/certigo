@@ -4,7 +4,7 @@
 
 **Le « Duolingo des certifications Microsoft » — apprendre Azure / IA / sécurité par micro‑leçons gamifiées.**
 
-`🟢 Backend riche` · `🟢 Contenu 5 certifs` · `🟢 Gamification` · `🟢 Tuteur IA` · `🟢 Offline‑first` · `🟡 Mobile en rattrapage` · `🟡 Infra non déployée`
+`🟢 Backend riche` · `🟢 Contenu 5 certifs` · `🟢 Gamification` · `🟢 Tuteur IA` · `🟢 Offline‑first` · `🟢 Mobile : écrans branchés` · `🟡 Infra non déployée`
 
 </div>
 
@@ -18,11 +18,11 @@
 
 | Repère | Valeur |
 |---|---|
-| 📅 Rafraîchi le | **2026‑06‑24** (anti‑triche examen : fenêtre de cadence câblée · post‑audit : durcissement intégrité/sécurité/infra) |
-| 🔖 Reflète | HEAD post‑audit + **D8 examen** — voir `AUDIT_MICROLINGO.md` §M (remédiation appliquée) |
-| 🌿 Branche du doc | `gchambaud-microsoft-cautious-carnival` |
-| 📈 Activité | **48+ commits**, du 2026‑06‑19 au 2026‑06‑24 — rythme très soutenu |
-| 🧪 Tests | backend **325** exécutés (xUnit, dont concurrence/auth/parité/anti‑triche) · Dart unit + widget (dont golden Cortex) |
+| 📅 Rafraîchi le | **2026‑06‑24** (écrans gamification mobile branchés : saisons · quêtes · succès · boutique · amis · examens · tests d'intégration Cosmos émulateur‑gated · anti‑triche examen : fenêtre de cadence câblée) |
+| 🔖 Reflète | HEAD post‑audit + **D8 examen** + **écrans mobiles gamification** — voir `AUDIT_MICROLINGO.md` §M (remédiation appliquée) |
+| 🌿 Branche du doc | `gchambaud-microsoft-finalize-project` |
+| 📈 Activité | **49+ commits**, du 2026‑06‑19 au 2026‑06‑24 — rythme très soutenu |
+| 🧪 Tests | backend **325** exécutés (xUnit, dont concurrence/auth/parité/anti‑triche) + **6** d'intégration Cosmos (émulateur‑gated) · Dart **185** (unit + widget, dont golden Cortex) |
 | 🧩 API | **18 groupes** de Functions (+ `GET /health`) · **≈ 29 endpoints** HTTP |
 | 🗄️ Données | **8 containers Cosmos DB** (serverless ; profil avec **ETag** concurrence optimiste) |
 | 🏗️ Infra | **9 modules Bicep** + params **dev/staging/prod** — durcie par env, **pas encore déployée** |
@@ -46,7 +46,7 @@
 | **Offline‑first** | 🟢 | `packages/data` (sync) + `app/offline` | File de synchro idempotente, backoff, rejouable — **câblée dans l'app**. |
 | **Authentification** | 🟢 | API `Middleware/` + mobile `features/auth` | **Microsoft / Google / Apple** fédérés derrière **Entra External ID**, JWT validé serveur. |
 | **Design system (Prism)** | 🟢 | `packages/prism_ui` | **28 composants** + tokens + thèmes (look « néon doux »). |
-| **App mobile (Flutter)** | 🟡 | `apps/mobile` | **45 fichiers Dart**, 9 features. Riche, mais plusieurs fonctions backend pas encore exposées en UI. |
+| **App mobile (Flutter)** | 🟢 | `apps/mobile` | **62 fichiers Dart**, 15 features. Tous les moteurs de gamification (saisons, quêtes, succès, boutique, amis, examens) désormais **branchés en écran** + tests widget. Reste la validation E2E sur appareil. |
 | **Cortex (algos partagés)** | 🟢 | `packages/cortex` | SRS, scoring, fil pédagogique — partagé client/serveur. |
 | **Infrastructure (Bicep)** | 🟡 | `infra/` | 8 modules (Functions, Cosmos, Key Vault, App Insights, **Defender, Policy, Diagnostics**, Storage). **Non déployée.** |
 | **CI / qualité** | 🟢 | `.github/workflows` | 6 workflows : backend, mobile, contenu, infra, **CodeQL**, **security‑scan**. |
@@ -71,14 +71,14 @@ graph TD
 
     BE --> API["Microlingo.Api<br/>17 groupes de Functions"]
     BE --> DOM["Microlingo.Domain<br/>moteurs métier purs"]
-    BE --> TST["Microlingo.Tests<br/>256 tests xUnit"]
+    BE --> TST["Microlingo.Tests<br/>325 tests (+6 Cosmos émulateur)"]
 
     PKG --> CORE["core/ — base commune"]
     PKG --> CORTEX["cortex/ — SRS & scoring"]
     PKG --> DATA["data/ — modèles, réseau, offline, reco, tutor"]
     PKG --> PRISM["prism_ui/ — 28 composants"]
 
-    APP --> FEAT["features/<br/>auth · home · path · lesson · quiz · tutor · leaderboard · profile"]
+    APP --> FEAT["features/ (15)<br/>auth · home · path · lesson · quiz · tutor · leaderboard · profile · onboarding · seasons · quests · achievements · shop · friends · exam"]
     APP --> OFF["app/offline/<br/>synchro offline-first"]
 ```
 
@@ -118,12 +118,12 @@ flowchart LR
 | **Parcours « skill‑path »** | 🟢 | 🟢 | Écran vivant façon Duolingo, règles de progression pures. |
 | **Streak (série)** | 🟢 | 🟡 | `GET /streak` + `POST /streak/repair` (réparation). |
 | **Ligues hebdo** | 🟢 | 🟡 | Tournoi XP hebdomadaire serveur‑autoritaire + `GET /me/league/resolution`. |
-| **Saisons** | 🟢 | 🔴 | Défi mensuel thématisé : `GET /season`, `POST /season/claim`. |
-| **Quêtes & succès** | 🟢 | 🔴 | `GET /quests` + `claim`, `GET /achievements`. |
-| **Boutique** | 🟢 | 🔴 | `GET /shop` + `POST /shop/purchase` (économie de gemmes). |
-| **Amis & classement** | 🟢 | 🔴 | Ajouter/retirer un ami, `GET /friends/leaderboard`. |
+| **Saisons** | 🟢 | 🟢 | Défi mensuel thématisé : `GET /season`, `POST /season/claim` — écran `seasons` (thème, paliers, réclamation). |
+| **Quêtes & succès** | 🟢 | 🟢 | `GET /quests` + `claim`, `GET /achievements` — écrans `quests` & `achievements`. |
+| **Boutique** | 🟢 | 🟢 | `GET /shop` + `POST /shop/purchase` (économie de gemmes) — écran `shop`. |
+| **Amis & classement** | 🟢 | 🟢 | Ajouter/retirer un ami, `GET /friends/leaderboard` — écran `friends`. |
 | **Partage quotidien** | 🟢 | 🔴 | `GET /share/daily` (carte de partage encodée). |
-| **Examens blancs** | 🟢 | 🔴 | Moteur adaptatif : `POST /exam/generate` + `submit`. |
+| **Examens blancs** | 🟢 | 🟢 | Moteur adaptatif : `POST /exam/generate` + `submit` — écran `exam` (génération, soumission, score). |
 | **Tuteur IA** | 🟢 | 🟢 | `POST /tutor/explain` — branché dans l'app via `tutor_sheet`. |
 | **Recommandation + coach** | 🟢 | 🟢 | `GET /me/recommendations/{trackId}` + coach IA sur l'accueil. |
 | **Notifications intelligentes** | 🟢 | 🟡 | `GET /me/notifications/plan` + réglages ; meilleure heure d'envoi estimée. |
@@ -131,8 +131,9 @@ flowchart LR
 | **Offline‑first** | 🟢 | 🟢 | Synchro idempotente rejouable, backoff. |
 | **Authentification** | 🟢 | 🟢 | Microsoft / Google / Apple via Entra External ID (Android natif câblé). |
 
-> **Lecture clé :** le **backend est très en avance** sur l'UI. Plusieurs moteurs (saisons, quêtes,
-> succès, boutique, amis, examens) sont **prêts côté serveur mais pas encore branchés en écran mobile**.
+> **Lecture clé :** l'écart backend ↔ UI est désormais **comblé pour la gamification** : saisons, quêtes,
+> succès, boutique, amis et examens disposent d'un **écran mobile + test widget**. Restent à exposer le
+> **partage quotidien** et la **validation E2E sur appareil**.
 
 ---
 
@@ -236,6 +237,11 @@ les décisions serveur‑autoritaires.
 
 > Mode **serverless** : on paie à la requête, idéal tant que la charge est faible.
 
+> Les dépôts Cosmos (`users`, `attempts`, `friends`) sont couverts par un **projet de tests
+> d'intégration** (`backend/tests/Microlingo.Infrastructure.Tests`, 6 cas) exécuté contre l'**émulateur
+> Cosmos** — gated par `MICROLINGO_COSMOS_TESTS=1`, **skippé proprement** sans émulateur (runtime réel
+> non exécuté dans cet environnement).
+
 ---
 
 ## 10 · Infrastructure (Bicep) — décrite, pas encore déployée
@@ -262,8 +268,8 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 
 | Workflow | Rôle |
 |---|---|
-| `ci-backend.yml` | Build + **256 tests** xUnit (.NET 8). |
-| `ci-mobile.yml` | Analyse + **162 tests** Dart (unit + widget). |
+| `ci-backend.yml` | Build + **325 tests** xUnit (.NET 8) + **6** d'intégration Cosmos (émulateur‑gated). |
+| `ci-mobile.yml` | Analyse + **185 tests** Dart (unit + widget). |
 | `ci-content.yml` | Validation des leçons/certifs contre les schémas JSON. |
 | `ci-infra.yml` | Lint / what‑if Bicep. |
 | `codeql.yml` | Analyse statique de sécurité. |
@@ -280,6 +286,7 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 
 | Date | Évolution |
 |---|---|
+| 2026‑06‑24 | 📱 **Écrans gamification mobile** : saisons · quêtes · succès · boutique · amis · examens blancs branchés (couche data + providers + router) → 6 écrans + 6 tests widget ; suite Dart **185** verte. 🧪 **Tests d'intégration Cosmos** (`Microlingo.Infrastructure.Tests`, 6 cas émulateur‑gated, skippés proprement hors émulateur). |
 | 2026‑06‑24 | 🛡️ **Anti‑triche examen** : fenêtre de cadence (XP/tentatives sur 1 h, conteneur `attempts`) câblée dans `ExamService` — miroir de `QuizService` → détecteurs de débit actifs aussi pour les examens blancs ; test dédié `SubmitAsync_flags_submission_spam_via_the_rate_window`. Backend **325** tests verts. |
 | 2026‑06‑23 | 🛡️ **Remédiation post‑audit** : intégrité économie (ETag + idempotence atomique), garde auth dev en prod, parité Cortex (golden tests), `/health` + correlation id, 400/409, hardening infra par env + params staging/prod, SBOM + gate de release, validateur de contenu renforcé — voir `AUDIT_MICROLINGO.md` §M |
 | 2026‑06‑23 | 🔐 **Config Android native** activant la connexion Entra (`microlingo://auth` + INTERNET) — #46 |
@@ -305,13 +312,15 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 ## 13 · Prochaines étapes & écarts
 
 **Écarts backend ↔ mobile (à brancher en UI) :**
-- 🔴 Saisons, quêtes, succès, boutique, amis, examens blancs : moteurs prêts, **écrans manquants**.
+- 🟢 Saisons, quêtes, succès, boutique, amis, examens blancs : **écrans livrés** (+ tests widget) — reste la **validation E2E sur appareil**.
+- 🔴 Partage quotidien : moteur prêt, **écran manquant**.
 - 🟡 Streak‑repair, ligues, notifications : partiellement exposés.
 
 **Chantiers techniques :**
 - 🏗️ **Déployer l'infra** Bicep sur un environnement reproductible (aujourd'hui décrite seulement).
 - 🔐 **Valider l'auth de bout en bout** sur un vrai tenant Entra External ID (E2E).
 - 🔍 **Faire passer l'anti‑triche** du mode détection au mode application des sanctions (lot suivant) — la **fenêtre de cadence** (débit XP/tentatives sur 1 h) est désormais câblée pour **quiz et examens** ; reste la calibration puis la bascule en mode sanction.
+- 🧪 **Exécuter les tests d'intégration Cosmos** sur un émulateur réel (le projet `Microlingo.Infrastructure.Tests` existe, gated `MICROLINGO_COSMOS_TESTS=1`) puis écrire les tests HTTP/middleware (Functions SDK).
 
 ---
 
@@ -324,6 +333,6 @@ le même commit / la même PR** : en‑tête (date + commit reflété), Vue d'en
 fonctionnalités, contenu, API, données et **Journal d'évolution**. Pas de workflow autonome —
 la mise à jour fait partie du travail.
 
-_Dernier rafraîchissement : 2026‑06‑23 · reflète `527b5c5`._
+_Dernier rafraîchissement : 2026‑06‑24 · écrans mobiles gamification + tests d'intégration Cosmos._
 
 </div>

@@ -7,6 +7,12 @@ import '../models/quiz.dart';
 import '../models/leaderboard.dart';
 import '../models/tutor.dart';
 import '../models/recommendation.dart';
+import '../models/season.dart';
+import '../models/quest.dart';
+import '../models/achievement.dart';
+import '../models/shop.dart';
+import '../models/friend.dart';
+import '../models/exam.dart';
 
 /// Repository contracts consumed by the app's feature controllers.
 ///
@@ -52,4 +58,42 @@ abstract interface class TutorRepository {
 /// should do next on a track (forgetting risk + struggles + path frontier).
 abstract interface class RecommendationRepository {
   Future<Result<NextBest>> getNextBest(String trackId);
+}
+
+/// The live monthly season + its claimable community challenge.
+abstract interface class SeasonRepository {
+  Future<Result<Season>> getSeason();
+  Future<Result<ClaimSeasonResult>> claimSeason(ClaimSeasonRequest request);
+}
+
+/// The learner's daily quest board + per-quest gem claims.
+abstract interface class QuestRepository {
+  Future<Result<QuestBoard>> getQuests();
+  Future<Result<ClaimQuestResult>> claimQuest(ClaimQuestRequest request);
+}
+
+/// The learner's achievements board. Read-only: unlocks are server-side.
+abstract interface class AchievementRepository {
+  Future<Result<AchievementBoard>> getAchievements();
+}
+
+/// The gem shop: catalog + idempotent purchases.
+abstract interface class ShopRepository {
+  Future<Result<ShopCatalog>> getShop();
+  Future<Result<PurchaseResult>> purchase(PurchaseRequest request);
+}
+
+/// The social graph: friends list, add/remove, and a friends-only leaderboard.
+abstract interface class FriendRepository {
+  Future<Result<FriendList>> getFriends();
+  Future<Result<FriendActionResult>> addFriend(AddFriendRequest request);
+  Future<Result<FriendActionResult>> removeFriend(String friendId);
+  Future<Result<FriendLeaderboard>> getFriendLeaderboard();
+}
+
+/// The adaptive mock exam: generate a blueprint-weighted exam, then submit it
+/// for authoritative server grading.
+abstract interface class ExamRepository {
+  Future<Result<MockExam>> generateExam(MockExamRequest request);
+  Future<Result<MockExamResult>> submitExam(SubmitMockExamRequest request);
 }

@@ -9,6 +9,12 @@ import '../features/lesson/presentation/lesson_screen.dart';
 import '../features/quiz/presentation/quiz_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/leaderboard/presentation/leaderboard_screen.dart';
+import '../features/achievements/presentation/achievements_screen.dart';
+import '../features/seasons/presentation/seasons_screen.dart';
+import '../features/quests/presentation/quests_screen.dart';
+import '../features/shop/presentation/shop_screen.dart';
+import '../features/friends/presentation/friends_screen.dart';
+import '../features/exam/presentation/exam_screen.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/application/auth_state.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
@@ -41,6 +47,14 @@ abstract class Routes {
   /// Full-screen (outside the shell) flows.
   static const String lesson = '/lesson'; // /lesson/:trackId/:lessonId
   static const String quiz = '/quiz'; // /quiz/:trackId/:lessonId
+
+  /// "Explore" destinations presented above the shell (no bottom nav).
+  static const String achievements = '/achievements';
+  static const String seasons = '/seasons';
+  static const String quests = '/quests';
+  static const String shop = '/shop';
+  static const String friends = '/friends';
+  static const String exam = '/exam';
 }
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -263,6 +277,66 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
             trackId: state.pathParameters['trackId']!,
             lessonId: state.pathParameters['lessonId']!,
           ),
+        ),
+      ),
+      GoRoute(
+        path: Routes.achievements,
+        name: 'achievements',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const AchievementsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: Routes.seasons,
+        name: 'seasons',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const SeasonsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: Routes.quests,
+        name: 'quests',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const QuestsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: Routes.shop,
+        name: 'shop',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const ShopScreen(),
+        ),
+      ),
+      GoRoute(
+        path: Routes.friends,
+        name: 'friends',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const FriendsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: Routes.exam,
+        name: 'exam',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const ExamScreen(),
         ),
       ),
     ],

@@ -12,6 +12,12 @@ export 'src/models/quiz.dart';
 export 'src/models/leaderboard.dart';
 export 'src/models/tutor.dart';
 export 'src/models/recommendation.dart';
+export 'src/models/season.dart';
+export 'src/models/quest.dart';
+export 'src/models/achievement.dart';
+export 'src/models/shop.dart';
+export 'src/models/friend.dart';
+export 'src/models/exam.dart';
 
 export 'src/api/api_client.dart';
 

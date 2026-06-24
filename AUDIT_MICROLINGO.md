@@ -711,8 +711,15 @@ validateur de contenu vert, `az bicep build` vert sur toute l'infra. `Services.c
   `AttemptIntegrityEvaluator.Evaluate(...)`, exactement comme `QuizService` ; couvert par
   `SubmitAsync_flags_submission_spam_via_the_rate_window` (variante examen). Anti-triche quiz **et**
   examen désormais alignés (mode détection/shadow inchangé).
-- **D4/D5 (tests)** Tests d'intégration HTTP/Cosmos (émulateur) : nécessitent un émulateur Cosmos
-  non disponible dans cet environnement.
+- **D4/D5 (tests)** Tests d'intégration Cosmos : le projet `Microlingo.Infrastructure.Tests`
+  est **désormais en place** (6 cas couvrant idempotence/ETag/fenêtre de débit sur un vrai
+  conteneur), **gated** par `MICROLINGO_COSMOS_TESTS=1` ; il **compile** et **se skippe
+  proprement** hors émulateur. Le **runtime** (émulateur Cosmos) **n'a pas été exécuté ici**.
+  Restent à écrire les tests HTTP/middleware de bout en bout (Functions SDK).
+- **Mobile (Phase 2)** Écrans de gamification **livrés** : saisons · quêtes · succès · boutique ·
+  amis · examens blancs (couche data + providers Riverpod + router/onglets) → 6 écrans + 6 tests
+  widget ; suite Dart **185** verte, `flutter analyze` propre. Reste la **validation E2E sur
+  appareil** (backend live + auth Entra) et l'écran **partage quotidien** (moteur prêt, UI absente).
 - **Opérationnel** : déploiement réel de l'infra, protection de branche, fusion des PR Dependabot,
   endpoints privés (réseau), runner CI redondant — actions hors-dépôt.
 
