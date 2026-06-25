@@ -1,18 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 import 'package:data/data.dart';
 
+import '../../../app/providers.dart';
 import '../../../app/router.dart';
 
-/// Quiz player — one item at a time, comprehension-first. After the learner
-/// locks an answer we reveal correctness AND the explanation (real learning,
-/// not just a score). At the end we show server-style rewards.
+/// Quiz player — one item at a time. Questions are loaded from the lesson API,
+/// answers are submitted at the end, and rewards come from server grading.
 ///
-/// Skeleton note: grading is done locally against an in-file answer key. In P1
-/// this is replaced by `lessonRepositoryProvider.submitQuiz(...)`, which posts a
-/// [SubmitQuizRequest] and renders the authoritative [SubmitQuizResult].
+/// If the API is unavailable, the screen falls back to a local sample quiz so
+/// the learning flow still works offline.
 class QuizScreen extends ConsumerStatefulWidget {
   const QuizScreen({super.key, required this.trackId, required this.lessonId});
 
@@ -24,15 +25,54 @@ class QuizScreen extends ConsumerStatefulWidget {
 }
 
 class _QuizScreenState extends ConsumerState<QuizScreen> {
-  late final List<_GradedItem> _items = _sampleItems();
+  List<_QuizEntry> _items = <_QuizEntry>[];
+  bool _loading = true;
+  bool _submitting = false;
 
   int _index = 0;
   String? _selectedId;
   bool _graded = false;
   int _correctCount = 0;
+  final DateTime _startedAt = DateTime.now().toUtc();
+  DateTime _shownAt = DateTime.now();
+  final Map<String, List<String>> _answersByItem = <String, List<String>>{};
+  final Map<String, int> _latencyByItem = <String, int>{};
 
-  _GradedItem get _current => _items[_index];
+  _QuizEntry get _current => _items[_index];
   bool get _isLast => _index == _items.length - 1;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadItems());
+  }
+
+  Future<void> _loadItems() async {
+    final LessonRepository lessons = ref.read(lessonRepositoryProvider);
+    final Result<Lesson> lesson = await lessons.getLesson(
+      trackId: widget.trackId,
+      lessonId: widget.lessonId,
+    );
+
+    final List<_QuizEntry> entries = lesson.when(
+      success: (Lesson l) {
+        final List<_QuizEntry> fromApi = l.blocks
+            .where((LessonBlock b) => b.check != null)
+            .map((LessonBlock b) => _QuizEntry(item: b.check!))
+            .toList(growable: false);
+        if (fromApi.isNotEmpty) return fromApi;
+        return _sampleItems();
+      },
+      failure: (Failure _) => _sampleItems(),
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _items = entries;
+      _loading = false;
+      _shownAt = DateTime.now();
+    });
+  }
 
   void _select(String optionId) {
     if (_graded) return;
@@ -43,35 +83,76 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     if (_selectedId == null || _graded) return;
     setState(() {
       _graded = true;
-      final bool ok = _selectedId == _current.correctOptionId;
-      _current.lastAnswerCorrect = ok;
-      if (ok) _correctCount++;
+      final String pickedId = _selectedId!;
+      _answersByItem[_current.item.id] = <String>[pickedId];
+      _latencyByItem[_current.item.id] = DateTime.now().difference(_shownAt).inMilliseconds;
+      if (_current.hasLocalCorrection) {
+        final bool ok = pickedId == _current.correctOptionId;
+        _current.lastAnswerCorrect = ok;
+        if (ok) _correctCount++;
+      }
     });
   }
 
-  void _next() {
+  Future<void> _next() async {
     if (_isLast) {
-      _showResults();
+      await _showResults();
       return;
     }
     setState(() {
       _index++;
       _selectedId = null;
       _graded = false;
+      _shownAt = DateTime.now();
     });
   }
 
-  void _showResults() {
-    final int scorePct = ((_correctCount / _items.length) * 100).round();
+  Future<void> _showResults() async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
+
+    final QuizRepository quiz = ref.read(quizRepositoryProvider);
+    final String clientAttemptId = DateTime.now().microsecondsSinceEpoch.toString();
+    final List<QuizAnswer> answers = _items
+        .map((_QuizEntry entry) => QuizAnswer(
+              itemId: entry.item.id,
+              type: entry.item.type,
+              selected: _answersByItem[entry.item.id] ?? const <String>[],
+              latencyMs: _latencyByItem[entry.item.id] ?? 0,
+            ))
+        .toList(growable: false);
+
+    final Result<SubmitQuizResult> submission = await quiz.submit(
+      lessonId: widget.lessonId,
+      request: SubmitQuizRequest(
+        clientAttemptId: clientAttemptId,
+        trackId: widget.trackId,
+        startedAt: _startedAt,
+        answers: answers,
+      ),
+    );
+
+    final bool hasLocalKey = _items.any((_QuizEntry entry) => entry.hasLocalCorrection);
+    final bool pendingSync = submission.isFailure && !hasLocalKey;
+    final SubmitQuizResult result = submission.valueOrNull ??
+        _localFallbackResult(
+          clientAttemptId: clientAttemptId,
+          total: _items.length,
+          hasLocalCorrection: hasLocalKey,
+        );
+
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
     showModalBottomSheet<void>(
       context: context,
       isDismissible: false,
       enableDrag: false,
       backgroundColor: Colors.transparent,
       builder: (_) => _ResultsSheet(
-        scorePct: scorePct,
-        correct: _correctCount,
-        total: _items.length,
+        result: result,
+        totalQuestions: _items.length,
+        pendingSync: pendingSync,
         onDone: () {
           Navigator.of(context).pop();
           context.go(Routes.home);
@@ -80,8 +161,34 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     );
   }
 
+  SubmitQuizResult _localFallbackResult({
+    required String clientAttemptId,
+    required int total,
+    required bool hasLocalCorrection,
+  }) {
+    final int scorePct = hasLocalCorrection ? (total == 0 ? 0 : ((_correctCount / total) * 100).round()) : 0;
+    final int xp = hasLocalCorrection ? (20 + _correctCount * 10) : 0;
+    return SubmitQuizResult(
+      attemptId: 'local-$clientAttemptId',
+      scorePct: scorePct,
+      results: const <ItemResult>[],
+      rewards: QuizRewards(
+        xpEarned: xp,
+        newXp: 1240 + xp,
+        levelUp: false,
+        streakExtended: false,
+        gemsEarned: 0,
+        achievementsUnlocked: const <String>[],
+      ),
+      weakConcepts: const <String>[],
+    );
+  }
+
   QuizOptionState _stateFor(String optionId) {
     if (!_graded) {
+      return optionId == _selectedId ? QuizOptionState.selected : QuizOptionState.idle;
+    }
+    if (!_current.hasLocalCorrection) {
       return optionId == _selectedId ? QuizOptionState.selected : QuizOptionState.idle;
     }
     final bool isCorrect = optionId == _current.correctOptionId;
@@ -94,9 +201,27 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_items.isEmpty) {
+      return Scaffold(
+        body: Center(
+          child: PrismCard(
+            child: Text(
+              'Aucune question disponible pour cette leçon.',
+              style: Theme.of(context).textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    final QuizItem item = _current.item;
+    final _QuizEntry entry = _current;
+    final QuizItem item = entry.item;
 
     return AuroraBackground(
       child: SafeArea(
@@ -153,11 +278,11 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   ? PrismButton(
                       label: _isLast ? 'Voir mon résultat' : 'Continuer',
                       icon: Icons.arrow_forward_rounded,
-                      onPressed: _next,
+                      onPressed: _submitting ? null : () => unawaited(_next()),
                     )
                   : PrismButton(
                       label: 'Valider',
-                      onPressed: _selectedId == null ? null : _grade,
+                      onPressed: _selectedId == null || _submitting ? null : _grade,
                     ),
             ),
           ],
@@ -169,12 +294,36 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
 class _FeedbackCard extends StatelessWidget {
   const _FeedbackCard({required this.item});
-  final _GradedItem item;
+  final _QuizEntry item;
 
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
+    if (!item.hasLocalCorrection) {
+      return PrismCard(
+        variant: PrismCardVariant.tonal,
+        accent: p.primary,
+        elevation: 2,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(Icons.info_outline_rounded, color: p.primary),
+                const SizedBox(width: 8),
+                Text('Réponse enregistrée', style: t.titleMedium?.copyWith(color: p.primary)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Le corrigé détaillé sera affiché après la soumission.',
+              style: t.bodyLarge?.copyWith(height: 1.5),
+            ),
+          ],
+        ),
+      );
+    }
     final bool ok = item.lastAnswerCorrect;
     final Color accent = ok ? p.success : p.error;
     return PrismCard(
@@ -192,7 +341,7 @@ class _FeedbackCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          PrismRichText(item.explanation, style: t.bodyLarge?.copyWith(height: 1.5)),
+          PrismRichText(item.explanation!, style: t.bodyLarge?.copyWith(height: 1.5)),
         ],
       ),
     );
@@ -201,24 +350,25 @@ class _FeedbackCard extends StatelessWidget {
 
 class _ResultsSheet extends StatelessWidget {
   const _ResultsSheet({
-    required this.scorePct,
-    required this.correct,
-    required this.total,
+    required this.result,
+    required this.totalQuestions,
+    required this.pendingSync,
     required this.onDone,
   });
 
-  final int scorePct;
-  final int correct;
-  final int total;
+  final SubmitQuizResult result;
+  final int totalQuestions;
+  final bool pendingSync;
   final VoidCallback onDone;
 
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
+    final int scorePct = result.scorePct;
+    final int correct = result.results.where((ItemResult item) => item.correct).length;
     final bool strong = scorePct >= 80;
-    // Skeleton rewards mirror QuizRewards; server returns the real values.
-    final int xp = 20 + correct * 10;
+    final int xp = result.rewards.xpEarned;
 
     return Container(
       decoration: BoxDecoration(
@@ -239,16 +389,24 @@ class _ResultsSheet extends StatelessWidget {
           Icon(strong ? Icons.celebration_rounded : Icons.trending_up_rounded,
               color: strong ? p.xpGold : p.primary, size: 56),
           const SizedBox(height: 12),
-          Text(strong ? 'Excellent !' : 'Bonne progression', style: t.headlineMedium),
-          Text('$correct / $total correct · $scorePct%',
-              style: t.bodyLarge?.copyWith(color: p.textSecondary)),
+          Text(
+            pendingSync ? 'Soumis hors ligne' : (strong ? 'Excellent !' : 'Bonne progression'),
+            style: t.headlineMedium,
+          ),
+          Text(
+            pendingSync
+                ? 'Tes réponses sont enregistrées et seront synchronisées automatiquement.'
+                : '${correct > 0 || result.results.isNotEmpty ? '$correct / $totalQuestions correct · ' : ''}$scorePct%',
+            style: t.bodyLarge?.copyWith(color: p.textSecondary),
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               XpChip(xp: xp),
               const SizedBox(width: 12),
-              const StreakBadge(days: 7),
+              StreakBadge(days: result.rewards.streakExtended ? 7 : 0),
             ],
           ),
           const SizedBox(height: 24),
@@ -261,24 +419,25 @@ class _ResultsSheet extends StatelessWidget {
 
 // --- Sample graded items (replaced by server grading in P1) ----------------
 
-/// Pairs a public [QuizItem] with the answer key + explanation that the server
-/// would normally own. Lets the skeleton give real feedback offline.
-class _GradedItem {
-  _GradedItem({
+/// Pairs a public [QuizItem] with optional local answer-key metadata used only
+/// in offline fallback mode.
+class _QuizEntry {
+  _QuizEntry({
     required this.item,
-    required this.correctOptionId,
-    required this.explanation,
+    this.correctOptionId,
+    this.explanation,
   });
 
   final QuizItem item;
-  final String correctOptionId;
-  final String explanation;
+  final String? correctOptionId;
+  final String? explanation;
 
+  bool get hasLocalCorrection => correctOptionId != null && explanation != null;
   bool lastAnswerCorrect = false;
 }
 
-List<_GradedItem> _sampleItems() => <_GradedItem>[
-      _GradedItem(
+List<_QuizEntry> _sampleItems() => <_QuizEntry>[
+      _QuizEntry(
         item: const QuizItem(
           id: 'q-capex-1',
           conceptId: 'c-capex-opex',
@@ -298,7 +457,7 @@ List<_GradedItem> _sampleItems() => <_GradedItem>[
             'définition de l\'Opex. Le cloud transforme l\'achat d\'actifs '
             '(Capex) en charges variables (Opex).',
       ),
-      _GradedItem(
+      _QuizEntry(
         item: const QuizItem(
           id: 'q-capex-2',
           conceptId: 'c-capex-opex',
@@ -317,7 +476,7 @@ List<_GradedItem> _sampleItems() => <_GradedItem>[
             'monte quand la demande monte et redescend quand elle baisse — '
             'idéal pour une charge imprévisible.',
       ),
-      _GradedItem(
+      _QuizEntry(
         item: const QuizItem(
           id: 'q-capex-3',
           conceptId: 'c-capex-opex',
