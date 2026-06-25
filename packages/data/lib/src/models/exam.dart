@@ -66,8 +66,7 @@ class MockExamBlueprintDomain {
   final double weight;
   final int itemCount;
 
-  factory MockExamBlueprintDomain.fromJson(Map<String, dynamic> json) =>
-      MockExamBlueprintDomain(
+  factory MockExamBlueprintDomain.fromJson(Map<String, dynamic> json) => MockExamBlueprintDomain(
         domainId: json['domainId'] as String? ?? '',
         name: json['name'] as String? ?? '',
         weight: (json['weight'] as num?)?.toDouble() ?? 0,

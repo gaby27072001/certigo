@@ -84,7 +84,10 @@ class OnboardingScaffold extends StatelessWidget {
                       child: progress == null
                           ? const SizedBox.shrink()
                           : _TopProgress(
-                              value: progress!.clamp(0, 1), color: p.primary, track: p.surfaceAlt),
+                              value: progress!.clamp(0, 1),
+                              color: p.primary,
+                              track: p.surfaceAlt,
+                            ),
                     ),
                   ],
                 ),

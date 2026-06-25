@@ -181,8 +181,7 @@ final questBoardProvider = FutureProvider.autoDispose<QuestBoard>((Ref ref) asyn
 });
 
 /// The learner's achievements with per-achievement progress. Read-only.
-final achievementBoardProvider =
-    FutureProvider.autoDispose<AchievementBoard>((Ref ref) async {
+final achievementBoardProvider = FutureProvider.autoDispose<AchievementBoard>((Ref ref) async {
   return _orThrow(await ref.watch(achievementRepositoryProvider).getAchievements());
 });
 
@@ -198,8 +197,7 @@ final friendListProvider = FutureProvider.autoDispose<FriendList>((Ref ref) asyn
 });
 
 /// The friends-only weekly leaderboard, highlighting the learner. Auto-disposed.
-final friendLeaderboardProvider =
-    FutureProvider.autoDispose<FriendLeaderboard>((Ref ref) async {
+final friendLeaderboardProvider = FutureProvider.autoDispose<FriendLeaderboard>((Ref ref) async {
   return _orThrow(await ref.watch(friendRepositoryProvider).getFriendLeaderboard());
 });
 
@@ -209,8 +207,6 @@ final friendLeaderboardProvider =
 final examProvider = FutureProvider.autoDispose<MockExam>((Ref ref) async {
   final String trackId = ref.watch(activeTrackProvider);
   return _orThrow(
-    await ref
-        .watch(examRepositoryProvider)
-        .generateExam(MockExamRequest(trackId: trackId)),
+    await ref.watch(examRepositoryProvider).generateExam(MockExamRequest(trackId: trackId)),
   );
 });
