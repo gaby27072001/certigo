@@ -1,4 +1,5 @@
 import 'package:core/core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_gateway.dart';
@@ -110,7 +111,8 @@ class AuthController extends Notifier<AuthState> {
       state = Authenticated(session);
     } on AuthGatewayException catch (e) {
       state = Unauthenticated(e.message);
-    } catch (_) {
+    } catch (e, st) {
+      _logAuthError('signIn(${provider.id})', e, st);
       state = const Unauthenticated('La connexion a échoué. Réessayez.');
     }
   }
@@ -131,7 +133,8 @@ class AuthController extends Notifier<AuthState> {
       state = Authenticated(session);
     } on AuthGatewayException catch (e) {
       state = Unauthenticated(e.message);
-    } catch (_) {
+    } catch (e, st) {
+      _logAuthError('signInWithEmail', e, st);
       state = const Unauthenticated('La connexion a échoué. Réessayez.');
     }
   }
@@ -157,7 +160,8 @@ class AuthController extends Notifier<AuthState> {
       state = Authenticated(session);
     } on AuthGatewayException catch (e) {
       state = Unauthenticated(e.message);
-    } catch (_) {
+    } catch (e, st) {
+      _logAuthError('registerWithEmail', e, st);
       state = const Unauthenticated('La création du compte a échoué. Réessayez.');
     }
   }
@@ -168,7 +172,8 @@ class AuthController extends Notifier<AuthState> {
     if (current is Authenticated) {
       try {
         await _gateway.signOut(current.session);
-      } catch (_) {
+      } catch (e, st) {
+        _logAuthError('signOut', e, st);
         // Déconnexion best-effort : on nettoie le stockage quoi qu'il arrive.
       }
     }
@@ -226,9 +231,15 @@ class AuthController extends Notifier<AuthState> {
       if (refreshed.accessToken.isEmpty) return null;
       await _store.write(refreshed);
       return refreshed;
-    } catch (_) {
+    } catch (e, st) {
+      _logAuthError('_tryRefresh', e, st);
       return null;
     }
+  }
+
+  void _logAuthError(String operation, Object error, StackTrace stackTrace) {
+    debugPrint('[AuthController] $operation failed: $error');
+    debugPrint('$stackTrace');
   }
 
   AuthSession _devSession() => const AuthSession(
