@@ -51,8 +51,7 @@ void main() {
       routes: <RouteBase>[
         GoRoute(
           path: '/achievements',
-          builder: (BuildContext context, GoRouterState state) =>
-              const AchievementsScreen(),
+          builder: (BuildContext context, GoRouterState state) => const AchievementsScreen(),
         ),
       ],
     );
@@ -75,8 +74,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
   }
 
-  testWidgets('renders the header, the unlocked tally and a trophy',
-      (tester) async {
+  testWidgets('renders the header, the unlocked tally and a trophy', (tester) async {
     await pumpAchievements(tester);
 
     expect(find.text('Succès'), findsOneWidget);

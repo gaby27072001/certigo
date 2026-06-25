@@ -49,8 +49,7 @@ class _AchievementsContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    final double overall =
-        board.total > 0 ? (board.unlocked / board.total).clamp(0.0, 1.0) : 0.0;
+    final double overall = board.total > 0 ? (board.unlocked / board.total).clamp(0.0, 1.0) : 0.0;
 
     if (board.achievements.isEmpty) {
       return const PrismStatusView(

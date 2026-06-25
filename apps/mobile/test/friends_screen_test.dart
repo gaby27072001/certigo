@@ -38,8 +38,7 @@ void main() {
       routes: <RouteBase>[
         GoRoute(
           path: '/friends',
-          builder: (BuildContext context, GoRouterState state) =>
-              const FriendsScreen(),
+          builder: (BuildContext context, GoRouterState state) => const FriendsScreen(),
         ),
       ],
     );
@@ -60,8 +59,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
   }
 
-  testWidgets('renders the header, the add-friend card and a friend row',
-      (tester) async {
+  testWidgets('renders the header, the add-friend card and a friend row', (tester) async {
     await pumpFriends(tester);
 
     expect(find.text('Amis'), findsOneWidget);

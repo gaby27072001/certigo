@@ -40,8 +40,7 @@ void main() {
       routes: <RouteBase>[
         GoRoute(
           path: '/quests',
-          builder: (BuildContext context, GoRouterState state) =>
-              const QuestsScreen(),
+          builder: (BuildContext context, GoRouterState state) => const QuestsScreen(),
         ),
       ],
     );
@@ -62,8 +61,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
   }
 
-  testWidgets('renders the header, the section title and a quest',
-      (tester) async {
+  testWidgets('renders the header, the section title and a quest', (tester) async {
     await pumpQuests(tester);
 
     expect(find.text('Quêtes du jour'), findsOneWidget);

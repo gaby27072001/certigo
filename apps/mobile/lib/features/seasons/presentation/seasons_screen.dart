@@ -60,10 +60,9 @@ class _SeasonContentState extends ConsumerState<_SeasonContent> {
       _claiming = true;
       _error = null;
     });
-    final Result<ClaimSeasonResult> result =
-        await ref.read(seasonRepositoryProvider).claimSeason(
-              ClaimSeasonRequest(seasonId: widget.season.id),
-            );
+    final Result<ClaimSeasonResult> result = await ref.read(seasonRepositoryProvider).claimSeason(
+          ClaimSeasonRequest(seasonId: widget.season.id),
+        );
     if (!mounted) {
       return;
     }
