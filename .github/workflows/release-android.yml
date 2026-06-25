@@ -53,7 +53,7 @@ env:
 jobs:
   release:
     name: Build AAB signé + publication Play
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, microlingo-ci]
     # Approval gate: configure required reviewers on the "beta" environment
     # (Settings → Environments) so a human signs off before any Play publish.
     environment: beta
