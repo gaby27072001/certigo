@@ -13,5 +13,5 @@ param location = 'westeurope'
 param appName = 'microlingo'
 
 // Microsoft Entra External ID (CIAM) — fill from your tenant.
-param authIssuer = 'https://microlingo.ciamlogin.com/<tenant-guid>/v2.0'
-param authAudience = '<api-client-id>'
+param authIssuer = 'https://microlingo.ciamlogin.com/00000000-0000-0000-0000-000000000000/v2.0'
+param authAudience = '00000000-0000-0000-0000-000000000000'

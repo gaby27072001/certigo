@@ -1,0 +1,97 @@
+name: cd-backend
+
+# Deploys the Microlingo Azure infrastructure (Bicep) then the .NET 8
+# Azure Functions API code.
+#
+# Required OIDC federated-identity secrets (repo/env settings):
+#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+  push:
+    branches: [ main ]
+
+env:
+  TARGET_ENV: ${{ inputs.environment || 'dev' }}
+
+# Prevent concurrent deployments to the same environment.
+concurrency:
+  group: cd-backend-${{ inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-infra:
+    name: Deploy infrastructure (${{ inputs.environment || 'dev' }})
+    runs-on: [self-hosted, Linux, X64, microlingo-ci]
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      functionAppName: ${{ steps.deploy-bicep.outputs.functionAppName }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy infrastructure and capture outputs
+        id: deploy-bicep
+        run: |
+          FUNCTION_APP_NAME=$(az deployment sub create \
+            --name microlingo-$TARGET_ENV \
+            --location westeurope \
+            --template-file infra/main.bicep \
+            --parameters infra/params/$TARGET_ENV.bicepparam \
+            --query 'properties.outputs.functionAppName.value' -o tsv)
+          echo "functionAppName=$FUNCTION_APP_NAME" >> $GITHUB_OUTPUT
+
+  deploy-backend:
+    name: Deploy backend code (${{ inputs.environment || 'dev' }})
+    runs-on: [self-hosted, Linux, X64, microlingo-ci]
+    needs: deploy-infra
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish
+        run: |
+          dotnet publish backend/src/Microlingo.Api/Microlingo.Api.csproj \
+            --configuration Release \
+            --output ./publish
+
+      - name: Zip publish artefact
+        run: cd ./publish && zip -r ../publish.zip . && cd ..
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Function App
+        run: |
+          az functionapp deployment source config-zip \
+            --resource-group rg-microlingo-$TARGET_ENV \
+            --name ${{ needs.deploy-infra.outputs.functionAppName }} \
+            --src ./publish.zip
