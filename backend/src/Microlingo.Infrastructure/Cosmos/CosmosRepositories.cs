@@ -1,5 +1,6 @@
 using Microsoft.Azure.Cosmos;
 using System.Net;
+using System.Text.Json.Serialization;
 using Microlingo.Application.Abstractions;
 using Microlingo.Application.Dtos;
 using Microlingo.Domain.Content;
@@ -309,17 +310,50 @@ public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeader
         var profile = await context.Users.ReadOrDefaultAsync<UserProfileDto>(userId, new PartitionKey(userId), cancellationToken);
         var displayName = profile?.DisplayName ?? userId;
         var avatarUrl = profile?.AvatarUrl;
-        var existing = await context.Leaderboard.ReadOrDefaultAsync<LeaderboardEntryDocument>(id, new PartitionKey(periodLeagueId), cancellationToken);
-        var updated = (existing ?? new LeaderboardEntryDocument(id, periodLeagueId, userId, displayName, avatarUrl, 0)) with
+        var partitionKey = new PartitionKey(periodLeagueId);
+
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            DisplayName = displayName,
-            AvatarUrl = avatarUrl,
-            Xp = (existing?.Xp ?? 0) + xp
-        };
-        await context.Leaderboard.UpsertItemAsync(updated, new PartitionKey(periodLeagueId), cancellationToken: cancellationToken);
+            var existing = await context.Leaderboard.ReadOrDefaultAsync<LeaderboardEntryDocument>(id, partitionKey, cancellationToken);
+            var updated = (existing ?? new LeaderboardEntryDocument(id, periodLeagueId, userId, displayName, avatarUrl, 0)) with
+            {
+                DisplayName = displayName,
+                AvatarUrl = avatarUrl,
+                Xp = (existing?.Xp ?? 0) + xp
+            };
+
+            try
+            {
+                if (existing is null)
+                {
+                    await context.Leaderboard.CreateItemAsync(updated, partitionKey, cancellationToken: cancellationToken);
+                }
+                else
+                {
+                    await context.Leaderboard.ReplaceItemAsync(
+                        updated,
+                        id,
+                        partitionKey,
+                        new ItemRequestOptions { IfMatchEtag = existing.ETag },
+                        cancellationToken);
+                }
+
+                return;
+            }
+            catch (CosmosException ex) when (attempt < 3 && ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict)
+            {
+                // Concurrent writer won this round; re-read and retry with fresh ETag.
+            }
+        }
+
+        throw new ConcurrencyConflictException($"Leaderboard entry '{id}' was modified concurrently.");
     }
 
-    private sealed record LeaderboardEntryDocument(string Id, string PeriodLeagueId, string UserId, string DisplayName, string? AvatarUrl, int Xp);
+    private sealed record LeaderboardEntryDocument(string Id, string PeriodLeagueId, string UserId, string DisplayName, string? AvatarUrl, int Xp)
+    {
+        [JsonPropertyName("_etag")]
+        public string? ETag { get; init; }
+    }
 }
 
 public sealed class CosmosPurchaseRepository(CosmosContext context) : IPurchaseRepository
