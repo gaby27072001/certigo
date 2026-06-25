@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/router.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/application/auth_state.dart';
+import '../../notifications/notification_service.dart';
 
 /// Profile — identity, lifetime stats, earned badges and preferences. Identity
 /// and stats come from `meProvider` (real profile from the API); badges are
@@ -144,11 +146,7 @@ class _ProfileContent extends StatelessWidget {
             children: <Widget>[
               _ThemeRow(mode: mode, onChanged: onMode),
               Divider(color: p.border, height: 24),
-              const _PrefRow(
-                icon: Icons.notifications_rounded,
-                label: 'Rappels quotidiens',
-                trailing: 'Bientôt',
-              ),
+              const _NotificationPrefRow(),
               Divider(color: p.border, height: 24),
               const _PrefRow(
                 icon: Icons.language_rounded,
@@ -309,6 +307,88 @@ class _ThemeRow extends StatelessWidget {
           showSelectedIcon: false,
         ),
       ],
+    );
+  }
+}
+
+/// Interactive row that lets the user schedule (or cancel) a daily reminder.
+/// The chosen time is persisted in [SharedPreferences] under [_kPrefKey].
+class _NotificationPrefRow extends StatefulWidget {
+  const _NotificationPrefRow();
+
+  @override
+  State<_NotificationPrefRow> createState() => _NotificationPrefRowState();
+}
+
+class _NotificationPrefRowState extends State<_NotificationPrefRow> {
+  static const String _kPrefKey = 'daily_reminder_time';
+
+  TimeOfDay? _time;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedTime();
+  }
+
+  Future<void> _loadSavedTime() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? stored = prefs.getString(_kPrefKey);
+    if (stored != null) {
+      final List<String> parts = stored.split(':');
+      if (parts.length == 2) {
+        final int? h = int.tryParse(parts[0]);
+        final int? m = int.tryParse(parts[1]);
+        if (h != null && m != null) {
+          setState(() => _time = TimeOfDay(hour: h, minute: m));
+        }
+      }
+    }
+    setState(() => _loaded = true);
+  }
+
+  Future<void> _pickTime() async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _time ?? const TimeOfDay(hour: 9, minute: 0),
+    );
+    if (picked == null || !mounted) return;
+
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kPrefKey, '${picked.hour}:${picked.minute}');
+    await NotificationService.scheduleDailyReminder(picked);
+    setState(() => _time = picked);
+  }
+
+  String get _trailingLabel {
+    if (!_loaded) return '…';
+    if (_time == null) return 'Désactivé';
+    final String h = _time!.hour.toString().padLeft(2, '0');
+    final String m = _time!.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    final TextTheme t = Theme.of(context).textTheme;
+    return InkWell(
+      onTap: _pickTime,
+      borderRadius: BorderRadius.circular(8),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.notifications_rounded, color: p.textSecondary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(child: Text('Rappels quotidiens', style: t.bodyLarge)),
+          Text(
+            _trailingLabel,
+            style: t.labelMedium?.copyWith(color: p.primary),
+          ),
+          const SizedBox(width: 4),
+          Icon(Icons.chevron_right_rounded, color: p.textSecondary, size: 18),
+        ],
+      ),
     );
   }
 }
