@@ -52,8 +52,7 @@ void main() {
       routes: <RouteBase>[
         GoRoute(
           path: '/exam',
-          builder: (BuildContext context, GoRouterState state) =>
-              const ExamScreen(),
+          builder: (BuildContext context, GoRouterState state) => const ExamScreen(),
         ),
       ],
     );

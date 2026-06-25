@@ -152,6 +152,7 @@ Cortex est **dupliqué à l'identique** en Dart (`packages/cortex`) et en C#
 (`Microlingo.Domain`). Mêmes constantes, mêmes formules, **même planification en
 jours fractionnaires** — la parité est verrouillée par des **golden tests partagés**
 (`cortex_golden_test.dart` ↔ `CortexParityTests.cs`). Le client anticipe, le serveur tranche.
+*(Des divergences mineures subsistent sur les champs `dueAt` et `recency` entre les deux implémentations ; elles feront l'objet de golden tests dédiés.)*
 
 - **Grades de révision** : `again=1`, `hard=2`, `good=3`, `easy=4`.
 - **Dérivation depuis une réponse** : faux → `again` ; <4 s → `easy` ; <9 s → `good` ; sinon `hard`.

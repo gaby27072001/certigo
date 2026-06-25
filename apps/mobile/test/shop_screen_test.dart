@@ -35,8 +35,7 @@ void main() {
       routes: <RouteBase>[
         GoRoute(
           path: '/shop',
-          builder: (BuildContext context, GoRouterState state) =>
-              const ShopScreen(),
+          builder: (BuildContext context, GoRouterState state) => const ShopScreen(),
         ),
       ],
     );
@@ -57,8 +56,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
   }
 
-  testWidgets('renders the header, the balance label and an item',
-      (tester) async {
+  testWidgets('renders the header, the balance label and an item', (tester) async {
     await pumpShop(tester);
 
     expect(find.text('Boutique'), findsOneWidget);

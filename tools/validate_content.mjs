@@ -65,7 +65,7 @@ for (const trackFile of trackFiles) {
       const item = block.check;
       if (!item) continue;
       if (seenItemIds.has(item.id)) {
-        fail(lf, `duplicate quiz item id "${item.id}" (item ids must be unique within a track)`);
+        fail(lf, `DUPLICATE_ITEM_ID: item "${item.id}" is not unique within the track`);
       }
       seenItemIds.add(item.id);
       const optionIds = item.options.map((o) => o.id);
@@ -75,7 +75,7 @@ for (const trackFile of trackFiles) {
       }
       for (const c of item.correct) {
         if (!optionIdSet.has(c)) {
-          fail(lf, `item "${item.id}": correct answer "${c}" is not a declared option id`);
+          fail(lf, `INVALID_CORRECT_REF: question ${item.id} has correct answer '${c}' that does not match any option id`);
         }
       }
       if (new Set(item.correct).size !== item.correct.length) {

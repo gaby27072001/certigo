@@ -55,6 +55,9 @@ jobs:
       - name: Pub get (app)
         working-directory: apps/mobile
         run: flutter pub get
+      - name: Dart pub outdated
+        working-directory: apps/mobile
+        run: flutter pub outdated --no-color || true
       - name: Analyze (app)
         working-directory: apps/mobile
         run: flutter analyze

@@ -302,7 +302,10 @@ class _FriendCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Row(
                   children: <Widget>[
-                    _Stat(icon: Icons.military_tech_rounded, label: 'Niv. ${friend.level}', color: p.primary),
+                    _Stat(
+                        icon: Icons.military_tech_rounded,
+                        label: 'Niv. ${friend.level}',
+                        color: p.primary),
                     const SizedBox(width: 10),
                     _Stat(
                       icon: Icons.local_fire_department_rounded,

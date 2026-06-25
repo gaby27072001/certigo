@@ -45,8 +45,7 @@ void main() {
       routes: <RouteBase>[
         GoRoute(
           path: '/seasons',
-          builder: (BuildContext context, GoRouterState state) =>
-              const SeasonsScreen(),
+          builder: (BuildContext context, GoRouterState state) => const SeasonsScreen(),
         ),
       ],
     );
@@ -67,8 +66,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
   }
 
-  testWidgets('renders the header, the season theme and its tagline',
-      (tester) async {
+  testWidgets('renders the header, the season theme and its tagline', (tester) async {
     await pumpSeasons(tester);
 
     expect(find.text('Saison'), findsOneWidget);

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/router.dart';
@@ -49,8 +50,7 @@ class _AchievementsContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    final double overall =
-        board.total > 0 ? (board.unlocked / board.total).clamp(0.0, 1.0) : 0.0;
+    final double overall = board.total > 0 ? (board.unlocked / board.total).clamp(0.0, 1.0) : 0.0;
 
     if (board.achievements.isEmpty) {
       return const PrismStatusView(
@@ -89,6 +89,7 @@ class _AchievementsContent extends StatelessWidget {
               PrismProgressBar(
                 value: overall,
                 semanticLabel: 'Progression globale des succès',
+                duration: const Duration(milliseconds: 800),
               ),
             ],
           ),
@@ -170,6 +171,7 @@ class _AchievementCard extends StatelessWidget {
                   value: value,
                   gradient: unlocked ? <Color>[tierColor, tierColor] : null,
                   semanticLabel: 'Progression du succès',
+                  duration: const Duration(milliseconds: 800),
                 ),
               ),
               const SizedBox(width: 12),
@@ -192,6 +194,19 @@ class _AchievementCard extends StatelessWidget {
                   style: t.labelMedium?.copyWith(color: p.textSecondary),
                 ),
               ],
+            ),
+          ],
+          if (unlocked) ...<Widget>[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton.outlined(
+                tooltip: 'Partager',
+                icon: const Icon(Icons.share_rounded, size: 18),
+                onPressed: () => Share.share(
+                  '🏆 J\'ai débloqué ${achievement.name} sur Microlingo ! #Microlingo #ApprentissageLangues',
+                ),
+              ),
             ),
           ],
         ],

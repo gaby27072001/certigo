@@ -126,17 +126,14 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
     });
 
     final MockExam exam = widget.exam;
-    final String trackId =
-        exam.trackId.isNotEmpty ? exam.trackId : ref.read(activeTrackProvider);
+    final String trackId = exam.trackId.isNotEmpty ? exam.trackId : ref.read(activeTrackProvider);
 
     final List<QuizAnswer> answers = <QuizAnswer>[
       for (final MockExamItem item in exam.items)
         QuizAnswer(
           itemId: item.itemId,
           type: item.type,
-          selected: _selected[item.itemId] == null
-              ? <String>[]
-              : <String>[_selected[item.itemId]!],
+          selected: _selected[item.itemId] == null ? <String>[] : <String>[_selected[item.itemId]!],
           latencyMs: _latencyMs[item.itemId] ?? 0,
         ),
     ];
@@ -186,11 +183,9 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
     final bool isLast = _index == total - 1;
 
     final Map<String, String> domainNames = <String, String>{
-      for (final MockExamBlueprintDomain domain in exam.blueprint)
-        domain.domainId: domain.name,
+      for (final MockExamBlueprintDomain domain in exam.blueprint) domain.domainId: domain.name,
     };
-    final String eyebrow =
-        domainNames[item.domainId] ?? 'Question ${_index + 1}';
+    final String eyebrow = domainNames[item.domainId] ?? 'Question ${_index + 1}';
 
     return Column(
       children: <Widget>[
@@ -235,8 +230,7 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
                   state: _selected[item.itemId] == item.options[i].id
                       ? QuizOptionState.selected
                       : QuizOptionState.idle,
-                  onTap:
-                      _submitting ? null : () => _select(item.options[i].id),
+                  onTap: _submitting ? null : () => _select(item.options[i].id),
                 ),
                 const SizedBox(height: 12),
               ],
@@ -333,9 +327,7 @@ class _ExamResultView extends StatelessWidget {
               Row(
                 children: <Widget>[
                   Icon(
-                    passed
-                        ? Icons.verified_rounded
-                        : Icons.replay_circle_filled_rounded,
+                    passed ? Icons.verified_rounded : Icons.replay_circle_filled_rounded,
                     color: accent,
                     size: 28,
                   ),
@@ -392,8 +384,7 @@ class _ExamResultView extends StatelessWidget {
           const SizedBox(height: 24),
           Text('Par domaine', style: t.titleMedium),
           const SizedBox(height: 8),
-          for (final ExamDomainScore domain in result.domains)
-            _DomainScoreRow(score: domain),
+          for (final ExamDomainScore domain in result.domains) _DomainScoreRow(score: domain),
         ],
         if (result.weakConcepts.isNotEmpty) ...<Widget>[
           const SizedBox(height: 24),
