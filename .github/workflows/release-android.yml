@@ -269,6 +269,23 @@ jobs:
 
           echo "> ⬆️ Artefact quota dépassé — AAB publié en **GitHub Release** \`$TAG\`." >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Fallback — GitHub Release
+        if: steps.upload_artifact.outcome == 'failure'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release delete build-aab-latest --yes 2>/dev/null || true
+          gh release create build-aab-latest \
+            --title "AAB Build $(date +%Y-%m-%d)" \
+            --notes "Auto-generated signed AAB from CI (artifact quota fallback)" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            "$AAB_PATH#microlingo-release.aab"
+          echo "> ⬆️ Artefact quota dépassé — AAB publié en **GitHub Release** \`build-aab-latest\`." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Publier sur Google Play (piste ${{ steps.ver.outputs.track }})
         if: ${{ inputs.dry_run != true && steps.signing.outputs.has_play == 'true' }}
         uses: r0adkll/upload-google-play@v1
