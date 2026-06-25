@@ -18,6 +18,7 @@ class PrismProgressBar extends StatelessWidget {
     this.gradient,
     this.trackColor,
     this.semanticLabel,
+    this.duration,
   }) : assert(value >= 0 && value <= 1, 'value must be 0..1');
 
   /// Progress in the 0..1 range.
@@ -34,6 +35,9 @@ class PrismProgressBar extends StatelessWidget {
 
   /// Optional accessibility label describing what is progressing.
   final String? semanticLabel;
+
+  /// Animation duration. Defaults to [PrismMotion.slow].
+  final Duration? duration;
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +58,7 @@ class PrismProgressBar extends StatelessWidget {
               ColoredBox(color: trackColor ?? p.surfaceAlt),
               TweenAnimationBuilder<double>(
                 tween: Tween<double>(begin: 0, end: clamped),
-                duration: PrismMotion.slow,
+                duration: duration ?? PrismMotion.slow,
                 curve: PrismMotion.standard,
                 builder: (BuildContext context, double v, _) {
                   return Align(
