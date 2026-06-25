@@ -180,11 +180,15 @@ jobs:
           --build-number=${{ steps.ver.outputs.build_number }}
 
       - name: Publier l'AAB en artefact
+        # continue-on-error: quota GitHub Actions (500 MB free) peut être dépassé.
+        # La publication Google Play se poursuit quoi qu'il arrive.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: microlingo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}-aab
           path: ${{ env.AAB_PATH }}
           if-no-files-found: error
+          retention-days: 7
 
       - name: Publier sur Google Play (piste ${{ steps.ver.outputs.track }})
         if: ${{ inputs.dry_run != true && steps.signing.outputs.has_play == 'true' }}
