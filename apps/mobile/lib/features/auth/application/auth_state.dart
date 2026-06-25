@@ -2,10 +2,12 @@ import 'dart:convert';
 
 /// Fournisseur d'identité présenté à l'utilisateur sur l'écran de connexion.
 ///
-/// Microlingo fédère ces trois fournisseurs derrière **Microsoft Entra
-/// External ID** (modèle « courtier d'identité ») : quel que soit le bouton
-/// choisi, Entra émet le même type de jeton OIDC pour notre API.
-enum AuthProvider { microsoft, google, apple }
+/// Les trois premiers ([microsoft], [google], [apple]) sont fédérés derrière
+/// **Microsoft Entra External ID** (modèle « courtier d'identité ») : quel que
+/// soit le bouton choisi, Entra émet le même type de jeton OIDC pour notre API.
+/// [email] est le mode **e-mail + mot de passe** géré directement par notre
+/// backend (jetons signés localement), toujours disponible même sans Entra.
+enum AuthProvider { microsoft, google, apple, email }
 
 /// Indice de domaine (`domain_hint`) éventuel transmis à Entra pour pré-router
 /// l'utilisateur vers le bon fournisseur fédéré.
@@ -14,12 +16,14 @@ extension AuthProviderX on AuthProvider {
         AuthProvider.microsoft => 'microsoft',
         AuthProvider.google => 'google',
         AuthProvider.apple => 'apple',
+        AuthProvider.email => 'email',
       };
 
   static AuthProvider? fromId(String? value) => switch (value) {
         'microsoft' => AuthProvider.microsoft,
         'google' => AuthProvider.google,
         'apple' => AuthProvider.apple,
+        'email' => AuthProvider.email,
         _ => null,
       };
 }

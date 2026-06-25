@@ -13,7 +13,10 @@ public sealed class JwtAuthMiddleware(ITokenValidator tokenValidator) : IFunctio
     {
         "GetTracks",
         "GetTrack",
-        "Health"
+        "Health",
+        "Register",
+        "Login",
+        "RefreshToken"
     };
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)

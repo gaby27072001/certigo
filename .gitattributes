@@ -1,0 +1,26 @@
+# Normalize line endings: text files are stored (and checked out) as LF on every
+# OS. This prevents the "whole file changed" noise that core.autocrlf produces on
+# Windows checkouts and keeps `dart format` and CI deterministic across runners.
+* text=auto eol=lf
+
+# Windows-only scripts that genuinely require CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets — never normalized or diffed as text.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.ttf   binary
+*.otf   binary
+*.woff  binary
+*.woff2 binary
+*.eot   binary
+*.jar   binary
+*.keystore binary
+*.p12   binary
+*.pfx   binary
+*.cer   binary
