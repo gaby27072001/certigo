@@ -181,6 +181,8 @@ jobs:
 
       - name: Publier l'AAB en artefact
         id: upload_artifact
+        # continue-on-error: quota GitHub Actions (500 MB free) peut être dépassé.
+        # La publication Google Play se poursuit quoi qu'il arrive.
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:

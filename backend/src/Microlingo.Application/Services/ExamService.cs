@@ -249,13 +249,6 @@ public sealed class ExamService(
             MonthlyPerfectLessons = sameMonth ? profile.MonthlyPerfectLessons : 0,
             Gems = profile.Gems + gemsEarned
         };
-        await users.UpsertAsync(updatedProfile, cancellationToken);
-        await progress.UpsertMasteryBatchAsync(userContext.UserId, updatedMasteries.Values.ToArray(), cancellationToken);
-
-        if (xpEarned > 0)
-        {
-            await leaderboard.AddXpAsync(userContext.UserId, xpEarned, cancellationToken);
-        }
 
         var weakConcepts = updatedMasteries.Values
             .Where(m => m.MasteryScore < 0.5)
@@ -292,7 +285,29 @@ public sealed class ExamService(
         var attempt = new ExamAttemptRecord(
             $"examattempt::{request.ClientAttemptId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
             request.StartedAt, now, result);
-        await examAttempts.CreateAsync(attempt, cancellationToken);
+        try
+        {
+            await examAttempts.CreateAsync(attempt, cancellationToken);
+        }
+        catch (DuplicateRecordException)
+        {
+            var existing = await examAttempts.GetByClientAttemptIdAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
+            if (existing is not null)
+            {
+                return existing.Result;
+            }
+
+            throw;
+        }
+
+        await users.UpsertAsync(updatedProfile, cancellationToken);
+        await progress.UpsertMasteryBatchAsync(userContext.UserId, updatedMasteries.Values.ToArray(), cancellationToken);
+
+        if (xpEarned > 0)
+        {
+            await leaderboard.AddXpAsync(userContext.UserId, xpEarned, cancellationToken);
+        }
+
         await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "exam.submitted", now, result), cancellationToken);
 
         // Anti-triche (autorité serveur, §6/§15) — mode détection, comme pour le quiz :

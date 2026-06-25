@@ -9,20 +9,18 @@ namespace Microlingo.Api.Middleware;
 
 public sealed class JwtAuthMiddleware(ITokenValidator tokenValidator) : IFunctionsWorkerMiddleware
 {
-    private static readonly HashSet<string> AnonymousFunctions = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> AnonymousPaths = new(StringComparer.OrdinalIgnoreCase)
     {
-        "GetTracks",
-        "GetTrack",
-        "Health",
-        "Register",
-        "Login",
-        "RefreshToken"
+        "/api/health",
+        "/api/auth/register",
+        "/api/auth/login",
+        "/api/auth/refresh"
     };
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
     {
         var request = await context.GetHttpRequestDataAsync();
-        if (request is null || AnonymousFunctions.Contains(context.FunctionDefinition.Name))
+        if (request is null || IsAnonymousPath(request))
         {
             await next(context);
             return;
@@ -62,5 +60,16 @@ public sealed class JwtAuthMiddleware(ITokenValidator tokenValidator) : IFunctio
         var response = request.CreateResponse(HttpStatusCode.Unauthorized);
         await response.WriteStringAsync("Unauthorized", context.CancellationToken);
         context.GetInvocationResult().Value = response;
+    }
+
+    private static bool IsAnonymousPath(HttpRequestData request)
+    {
+        var path = request.Url.AbsolutePath;
+        if (path.Length > 1)
+        {
+            path = path.TrimEnd('/');
+        }
+
+        return AnonymousPaths.Contains(path);
     }
 }

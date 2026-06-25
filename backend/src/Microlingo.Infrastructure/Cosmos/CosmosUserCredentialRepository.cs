@@ -28,8 +28,27 @@ public sealed class CosmosUserCredentialRepository(CosmosContext context) : IUse
         }
     }
 
-    public Task UpdateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
-        => context.Users.UpsertItemAsync(record, new PartitionKey(record.Id), cancellationToken: cancellationToken);
+    public async Task UpdateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(record.ETag))
+        {
+            throw new InvalidOperationException($"Credential '{record.Id}' update requires an ETag.");
+        }
+
+        try
+        {
+            await context.Users.ReplaceItemAsync(
+                record,
+                record.Id,
+                new PartitionKey(record.Id),
+                new ItemRequestOptions { IfMatchEtag = record.ETag },
+                cancellationToken);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
+        {
+            throw new ConcurrencyConflictException($"Credential '{record.Id}' was modified concurrently.");
+        }
+    }
 
     private static string Normalize(string email) => (email ?? string.Empty).Trim().ToLowerInvariant();
 }
