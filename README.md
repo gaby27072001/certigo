@@ -32,7 +32,7 @@ un **Readiness Score** (0–100, la métrique nord) — porté par une gamificat
 | Pilier | Décision |
 |---|---|
 | Métrique nord | **Readiness Score** (préparation par certification, 0–100) |
-| Moteur pédagogique | **Cortex** — *mastery-based* + **FSRS** (répétition espacée), code Dart **et** .NET identiques |
+| Moteur pédagogique | **Cortex** — *mastery-based* + **FSRS** (répétition espacée), code Dart **et** .NET identiques *(partagent la même logique ; des divergences mineures sur `dueAt`/`recency` feront l'objet de golden tests dédiés)* |
 | Design system | **Prism** — *Liquid-Glass-inspired* : translucidité, profondeur, matériaux lumineux |
 | Gamification | **Momentum** — XP, niveaux, streak, ligues, badges. **Pas de cœurs / vies** |
 | Contenu | **Content-as-code** — YAML versionné + schéma JSON + validation CI |
