@@ -14,8 +14,7 @@ class NotificationService {
   static const String _channelId = 'daily_reminder';
   static const String _channelName = 'Rappels quotidiens';
 
-  static final FlutterLocalNotificationsPlugin _plugin =
-      FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
 
   static Future<void> initialize() async {
     tz.initializeTimeZones();

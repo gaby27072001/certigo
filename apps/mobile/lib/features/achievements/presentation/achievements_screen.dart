@@ -205,7 +205,8 @@ class _AchievementCard extends StatelessWidget {
                 icon: const Icon(Icons.share_rounded, size: 18),
                 onPressed: () => SharePlus.instance.share(
                   ShareParams(
-                    text: '🏆 J\'ai débloqué ${achievement.name} sur Microlingo ! #Microlingo #ApprentissageLangues',
+                    text:
+                        '🏆 J\'ai débloqué ${achievement.name} sur Microlingo ! #Microlingo #ApprentissageLangues',
                   ),
                 ),
               ),

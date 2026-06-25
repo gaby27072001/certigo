@@ -247,8 +247,7 @@ class _ResultsSheetState extends ConsumerState<_ResultsSheet> {
   }
 
   String? _findNextLessonId(LearningPath path, String currentLessonId) {
-    final List<PathLesson> lessons =
-        path.units.expand((PathUnit u) => u.lessons).toList();
+    final List<PathLesson> lessons = path.units.expand((PathUnit u) => u.lessons).toList();
     final int idx = lessons.indexWhere((PathLesson l) => l.id == currentLessonId);
     if (idx == -1 || idx >= lessons.length - 1) return null;
     return lessons[idx + 1].id;
@@ -261,12 +260,10 @@ class _ResultsSheetState extends ConsumerState<_ResultsSheet> {
     final bool strong = widget.scorePct >= 80;
     final int xp = 20 + widget.correct * 10;
 
-    final AsyncValue<LearningPath> pathAsync =
-        ref.watch(pathProvider(widget.trackId));
+    final AsyncValue<LearningPath> pathAsync = ref.watch(pathProvider(widget.trackId));
     final bool pathLoaded = pathAsync.hasValue;
-    final String? nextLessonId = pathLoaded
-        ? _findNextLessonId(pathAsync.requireValue, widget.lessonId)
-        : null;
+    final String? nextLessonId =
+        pathLoaded ? _findNextLessonId(pathAsync.requireValue, widget.lessonId) : null;
 
     return Stack(
       alignment: Alignment.topCenter,
@@ -284,8 +281,7 @@ class _ResultsSheetState extends ConsumerState<_ResultsSheet> {
               Container(
                 width: 44,
                 height: 5,
-                decoration: BoxDecoration(
-                    color: p.border, borderRadius: PrismRadii.pillAll),
+                decoration: BoxDecoration(color: p.border, borderRadius: PrismRadii.pillAll),
               ),
               const SizedBox(height: 24),
               Icon(

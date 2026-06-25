@@ -380,8 +380,7 @@ class _NotificationPrefRowState extends State<_NotificationPrefRow> {
         children: <Widget>[
           Icon(Icons.notifications_rounded, color: p.textSecondary, size: 20),
           const SizedBox(width: 12),
-          Expanded(
-              child: Text('Rappels quotidiens', style: t.bodyLarge)),
+          Expanded(child: Text('Rappels quotidiens', style: t.bodyLarge)),
           Text(
             _trailingLabel,
             style: t.labelMedium?.copyWith(color: p.primary),
