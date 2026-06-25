@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Microlingo.Application.Abstractions;
 
 /// Raised when an email/password authentication attempt fails (unknown email,
@@ -33,6 +35,12 @@ public sealed record UserCredentialRecord(
     /// The canonical Cosmos id (and partition key) for a credential, derived from
     /// the already-normalised (trimmed, lower-cased) email.
     public static string IdFor(string emailLower) => $"credential::{emailLower}";
+
+    /// Cosmos optimistic-concurrency token (`_etag`). Populated on reads and used
+    /// on updates to prevent concurrent lockout/password state from being
+    /// overwritten by stale writers.
+    [JsonPropertyName("_etag")]
+    public string? ETag { get; init; }
 }
 
 /// Persists and looks up email/password credentials. Backed by the Users
@@ -47,8 +55,7 @@ public interface IUserCredentialRepository
     Task CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default);
 
     /// Replaces an existing credential document (used to update the failed-login
-    /// counter and lockout window). Last-writer-wins, which is acceptable for a
-    /// best-effort brute-force counter.
+    /// counter, lockout window, and password hash) using optimistic concurrency.
     Task UpdateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default);
 }
 
