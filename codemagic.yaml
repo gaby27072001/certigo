@@ -144,9 +144,31 @@ workflows:
       # -----------------------------------------------------------------------
       - name: Build IPA signé (flutter build ipa)
         script: |
+          # Créer ExportOptions.plist pour forcer la distribution App Store
+          cat > /tmp/ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>teamID</key>
+              <string>FFQPC7NC68</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>manageAppVersionAndBuildNumber</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
           flutter build ipa --release \
             --build-name="$BUILD_NAME" \
-            --build-number="$BUILD_NUMBER"
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/tmp/ExportOptions.plist
         working_directory: apps/mobile
 
     artifacts:
@@ -233,9 +255,31 @@ workflows:
 
       - name: Build IPA signé (flutter build ipa)
         script: |
+          # Créer ExportOptions.plist pour forcer la distribution App Store
+          cat > /tmp/ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>teamID</key>
+              <string>FFQPC7NC68</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>manageAppVersionAndBuildNumber</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
           flutter build ipa --release \
             --build-name="$BUILD_NAME" \
-            --build-number="$BUILD_NUMBER"
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/tmp/ExportOptions.plist
         working_directory: apps/mobile
 
     artifacts:
