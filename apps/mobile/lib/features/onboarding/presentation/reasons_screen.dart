@@ -29,7 +29,7 @@ class ReasonsScreen extends ConsumerWidget {
       progress: 0.4,
       onBack: () => context.go(OnboardingRoutes.start),
       primaryLabel: 'CONTINUER',
-      onPrimary: c.reasons.isEmpty ? null : () => context.go(OnboardingRoutes.goal),
+      onPrimary: c.reasons.isEmpty ? null : () => context.go(OnboardingRoutes.domains),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

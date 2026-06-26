@@ -8,6 +8,12 @@ enum StartChoice { continueTrack, switchTrack, explore }
 /// Why the learner is here (multi-select motivation).
 enum LearnReason { career, certification, upskill, curiosity, raise, time, other }
 
+/// Azure service domains the learner is interested in (multi-select).
+enum AzureDomain { compute, storage, ai, security, networking, devops, monitoring, serverless }
+
+/// Self-reported Azure knowledge level (single-select).
+enum KnowledgeLevel { beginner, intermediate, advanced, expert }
+
 /// Daily commitment options, each with a minute target, an XP goal and a mood
 /// label (the right-aligned caption on the goal selector).
 enum DailyGoalOption { chill, regular, serious, intense }
@@ -56,6 +62,12 @@ class OnboardingController extends ChangeNotifier {
   final Set<LearnReason> _reasons = <LearnReason>{};
   Set<LearnReason> get reasons => Set<LearnReason>.unmodifiable(_reasons);
 
+  final Set<AzureDomain> _domains = <AzureDomain>{};
+  Set<AzureDomain> get domains => Set<AzureDomain>.unmodifiable(_domains);
+
+  KnowledgeLevel? _level;
+  KnowledgeLevel? get level => _level;
+
   DailyGoalOption? _goal;
   DailyGoalOption? get goal => _goal;
 
@@ -71,6 +83,18 @@ class OnboardingController extends ChangeNotifier {
     if (!_reasons.remove(value)) {
       _reasons.add(value);
     }
+    notifyListeners();
+  }
+
+  void toggleDomain(AzureDomain value) {
+    if (!_domains.remove(value)) {
+      _domains.add(value);
+    }
+    notifyListeners();
+  }
+
+  void setLevel(KnowledgeLevel value) {
+    _level = value;
     notifyListeners();
   }
 
@@ -103,6 +127,8 @@ class OnboardingController extends ChangeNotifier {
     _completed = false;
     _start = StartChoice.continueTrack;
     _reasons.clear();
+    _domains.clear();
+    _level = null;
     _goal = null;
     _reminders = true;
     notifyListeners();
