@@ -165,10 +165,6 @@ workflows:
         notify:
           success: true
           failure: true
-      github:
-        notify:
-          success: true
-          failure: true
 
   # ===========================================================================
   # ios-release-dry : Build IPA signé SANS upload TestFlight (dry run)
@@ -246,12 +242,6 @@ workflows:
       - apps/mobile/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
 
-    publishing:
-      github:
-        notify:
-          success: true
-          failure: true
-
   # ===========================================================================
   # ios-refresh-signing : Refresh manuel des profils de provisioning
   # Remplace : .github/workflows/sync-ios-certs.yml
@@ -311,10 +301,6 @@ workflows:
       email:
         recipients:
           - gabriel.chambaud@gmail.com
-        notify:
-          success: true
-          failure: true
-      github:
         notify:
           success: true
           failure: true
