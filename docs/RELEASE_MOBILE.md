@@ -396,7 +396,63 @@ code : on **arrête** la diffusion fautive et on **republie** une build saine.
 
 ---
 
-## 7. Checklist pré-release
+## 7. Erreurs de build fréquentes (Android)
+
+### 7.1 `Dependency ':flutter_local_notifications' requires core library desugaring`
+
+**Symptôme** : le build Gradle échoue avec :
+```
+Dependency ':flutter_local_notifications' requires core library desugaring
+to be enabled for :app, current configuration is unsupported.
+```
+
+**Cause** : `flutter_local_notifications` utilise des API `java.time` (Android 26+)
+qui doivent être rétro-portées via la bibliothèque AGP de desugaring pour cibler
+des API Android < 26. Sans le flag, Gradle rejette la dépendance.
+
+**Solution** (déjà appliquée dans `apps/mobile/android/app/build.gradle`) :
+
+```groovy
+// dans android > compileOptions
+coreLibraryDesugaringEnabled = true
+
+// dans le bloc dependencies
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+}
+```
+
+**Si ça revient** : vérifier que les deux lignes sont présentes. Une mise à jour
+AGP ou une migration de `build.gradle` peut les effacer. Aussi s'assurer que
+`minSdk` est bien < 26 (sinon le flag est inutile mais n'est pas nuisible).
+
+---
+
+### 7.2 Warning NDK version — plugins exigent 26.x, Flutter fournit 23.x
+
+**Symptôme** : avertissement Gradle (parfois erreur de build) :
+```
+Your project is configured with Android NDK 23.1.7779620, but plugins require
+Android NDK 26.1.10909125
+```
+
+**Cause** : `flutter.ndkVersion` se résout à la version embarquée dans le SDK
+Flutter utilisé (23.x pour Flutter 3.24) alors que `flutter_local_notifications`,
+`flutter_appauth` et d'autres plugins natifs exigent NDK ≥ 26.
+
+**Solution** (déjà appliquée dans `apps/mobile/android/app/build.gradle`) :
+
+```groovy
+// Épingler explicitement dans android { }
+ndkVersion = "26.1.10909125"
+```
+
+**Mise à jour** : quand Flutter bundle un NDK ≥ 26 par défaut, supprimer la valeur
+fixe et revenir à `flutter.ndkVersion` (vérifier avec `flutter doctor -v`).
+
+---
+
+## 8. Checklist pré-release
 
 - [ ] `ci-mobile` au vert sur la branche à publier (format/analyze/test).
 - [ ] `version:` de `pubspec.yaml` à jour si nouvelle version publique.
