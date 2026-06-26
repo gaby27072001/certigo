@@ -419,8 +419,9 @@ class _ResultsSheetState extends ConsumerState<_ResultsSheet> {
 
     final AsyncValue<LearningPath> pathAsync = ref.watch(pathProvider(widget.trackId));
     final bool pathLoaded = pathAsync.hasValue;
-    final String? nextLessonId =
-        pathLoaded ? _findNextLessonId(pathAsync.requireValue, widget.lessonId) : null;
+    final String? nextLessonId = pathLoaded
+        ? _findNextLessonId(pathAsync.requireValue, widget.lessonId)
+        : null;
 
     return Stack(
       alignment: Alignment.topCenter,
@@ -477,10 +478,7 @@ class _ResultsSheetState extends ConsumerState<_ResultsSheet> {
                   onPressed: () => widget.onNextLesson(nextLessonId),
                 ),
                 const SizedBox(height: 12),
-                PrismButton.secondary(
-                  label: 'Terminer',
-                  onPressed: widget.onDone,
-                ),
+                PrismButton.secondary(label: 'Terminer', onPressed: widget.onDone),
               ] else ...<Widget>[
                 PrismButton(label: 'Terminer', onPressed: widget.onDone),
                 if (pathLoaded) ...<Widget>[
