@@ -161,7 +161,7 @@ workflows:
           - Internal Testers  # Groupe de testeurs internes dans App Store Connect
       email:
         recipients:
-          - $CM_COMMITTER_EMAIL  # Email du committer Git — notifié en cas de succès ou d'échec
+          - gchambaud@microsoft.com
         notify:
           success: true
           failure: true
@@ -302,7 +302,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - $CM_COMMITTER_EMAIL
+          - gchambaud@microsoft.com
         notify:
           success: true
           failure: true
