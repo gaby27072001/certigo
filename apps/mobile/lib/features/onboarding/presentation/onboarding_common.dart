@@ -14,6 +14,7 @@ abstract class OnboardingRoutes {
   static const String routine = '/onboarding/routine';
   static const String promise = '/onboarding/promise';
   static const String login = '/login';
+  static const String birthYear = '/onboarding/birth-year';
 
   /// Every location that belongs to the startup flow (i.e. lives *outside* the
   /// app shell). Used by the router redirect to gate entry to the app.
@@ -28,6 +29,7 @@ abstract class OnboardingRoutes {
     routine,
     promise,
     login,
+    birthYear,
   };
 
   static bool isStartup(String location) =>

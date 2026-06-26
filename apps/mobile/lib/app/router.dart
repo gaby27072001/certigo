@@ -21,6 +21,7 @@ import '../features/auth/application/auth_state.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/auth/presentation/splash_screen.dart' as auth;
 import '../features/onboarding/application/onboarding_controller.dart';
+import '../features/onboarding/presentation/birth_year_screen.dart';
 import '../features/onboarding/presentation/goal_screen.dart';
 import '../features/onboarding/presentation/domains_screen.dart';
 import '../features/onboarding/presentation/level_screen.dart';
@@ -219,6 +220,12 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           child: const LoginScreen(),
           begin: const Offset(0.03, 0),
         ),
+      ),
+      GoRoute(
+        path: OnboardingRoutes.birthYear,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const BirthYearScreen()),
       ),
       // Bottom-nav shell: persistent state per tab via StatefulShellRoute.
       StatefulShellRoute.indexedStack(

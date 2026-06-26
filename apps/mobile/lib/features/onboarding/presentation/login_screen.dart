@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
-import '../application/onboarding_controller.dart';
 import 'onboarding_common.dart';
 
 /// Sign-in screen reached from "J'ai déjà un compte". Email + password with a
@@ -12,14 +10,14 @@ import 'onboarding_common.dart';
 /// Authentication is not wired yet (dev builds use a dev token), so any of the
 /// actions simply marks onboarding complete and enters the app — the screen is
 /// here to complete the visual flow and is ready to host real auth later.
-class LoginScreen extends ConsumerStatefulWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _email = TextEditingController();
   final TextEditingController _password = TextEditingController();
   bool _obscure = true;
@@ -32,8 +30,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _enter() {
-    ref.read(onboardingControllerProvider).complete();
-    context.go('/path');
+    context.go(OnboardingRoutes.birthYear);
   }
 
   @override
