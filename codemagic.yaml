@@ -1,0 +1,308 @@
+# =============================================================================
+# codemagic.yaml — Configuration Codemagic pour Microlingo iOS CI/CD
+# =============================================================================
+#
+# Ce fichier remplace les workflows GitHub Actions iOS qui nécessitaient
+# un runner macOS (désactivé par la politique EMU sur GitHub Enterprise).
+#
+# SETUP REQUIS DANS LE DASHBOARD CODEMAGIC (à faire une fois) :
+# ----------------------------------------------------------------
+# 1. Créer un compte sur https://codemagic.io et connecter le repo GitHub.
+#
+# 2. App Store Connect API :
+#    Dashboard → Teams > Integrations > App Store Connect
+#    → Cliquer "Add integration" → saisir Key ID, Issuer ID, uploader le .p8
+#    → Nommer l'intégration exactement "AppStoreConnect"
+#
+# 3. Code signing iOS :
+#    Dashboard → App > Code signing > iOS code signing
+#    → Choisir "Automatic" (utilise l'intégration App Store Connect ci-dessus)
+#    → Codemagic gère les certificats et profils via l'API Apple ; plus besoin
+#      de fastlane match, de GitHub Secrets IOS_* ou d'Azure Key Vault pour iOS.
+#
+# 4. Déclencher un build :
+#    - Via tag git (v*) → déclenche automatiquement ios-release
+#    - Via le dashboard Codemagic → Start new build → choisir le workflow
+#
+# WORKFLOWS DISPONIBLES :
+# -----------------------
+#   ios-release         : build IPA signé + upload TestFlight (remplace release-ios.yml)
+#   ios-release-dry     : build IPA signé uniquement, sans upload (dry run)
+#   ios-refresh-signing : refresh manuel des profils (remplace sync-ios-certs.yml)
+# =============================================================================
+
+workflows:
+
+  # ===========================================================================
+  # ios-release : Build IPA signé + upload TestFlight
+  # Remplace : .github/workflows/release-ios.yml
+  # Déclencheur : tag git v* ou manuel depuis le dashboard Codemagic
+  #
+  # NOTE — Approval gate : GitHub Actions avait un environment "beta" (gate
+  # humain avant tout upload TestFlight). Codemagic ne dispose pas d'un
+  # équivalent natif. Alternatives :
+  #   - Désactiver le trigger automatique et déclencher manuellement.
+  #   - Utiliser la fonctionnalité "Build approval" disponible dans les plans
+  #     payants Codemagic (Teams plan) via les webhooks ou l'API REST.
+  # ===========================================================================
+  ios-release:
+    name: iOS — Build IPA signé + upload TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+
+    integrations:
+      app_store_connect: AppStoreConnect  # Nom de l'intégration Dashboard > Teams > Integrations
+
+    environment:
+      flutter: 3.24.0
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        # Codemagic gère les certificats et profils nativement via l'API App Store Connect.
+        # Plus besoin de fastlane match, de .p12 ou de profils encodés en secrets.
+        distribution_type: app_store
+        bundle_identifier: com.microlingo.app
+      vars:
+        BUNDLE_ID: com.microlingo.app
+        FLUTTER_APP_PATH: apps/mobile
+
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "v*"
+          include: true
+      cancel_previous_builds: false
+
+    scripts:
+      # -----------------------------------------------------------------------
+      # 1. Dépendances Flutter
+      # -----------------------------------------------------------------------
+      - name: Récupérer les dépendances Flutter
+        script: flutter pub get
+        working_directory: apps/mobile
+
+      # -----------------------------------------------------------------------
+      # 2. Analyse statique (gate bloquant)
+      # -----------------------------------------------------------------------
+      - name: Analyse statique (flutter analyze)
+        script: flutter analyze
+        working_directory: apps/mobile
+
+      # -----------------------------------------------------------------------
+      # 3. Tests unitaires (gate bloquant)
+      # -----------------------------------------------------------------------
+      - name: Tests unitaires (flutter test)
+        script: flutter test
+        working_directory: apps/mobile
+
+      # -----------------------------------------------------------------------
+      # 4. Appliquer les profils de provisioning Codemagic
+      # -----------------------------------------------------------------------
+      - name: Appliquer les profils de provisioning
+        script: xcode-project use-profiles
+
+      # -----------------------------------------------------------------------
+      # 5. Résolution de la version depuis le tag git ou pubspec.yaml
+      #    Formats de tag supportés :
+      #      v1.2.3+45  → BUILD_NAME=1.2.3,    BUILD_NUMBER=45
+      #      v1.2.3     → BUILD_NAME=1.2.3,    BUILD_NUMBER=$PROJECT_BUILD_NUMBER
+      #    Sans tag     → pubspec.yaml + $PROJECT_BUILD_NUMBER (auto-incrémenté)
+      # -----------------------------------------------------------------------
+      - name: Résoudre la version depuis le tag ou pubspec.yaml
+        script: |
+          set -euo pipefail
+
+          # Lire la version de base depuis pubspec.yaml (ex: 1.2.3+1 → 1.2.3)
+          PUBSPEC_VERSION="$(grep -E '^version:' apps/mobile/pubspec.yaml | head -1 | awk '{print $2}')"
+          PUBSPEC_NAME="${PUBSPEC_VERSION%%+*}"
+
+          if [ -n "${CM_TAG:-}" ]; then
+            # Tag git présent — extraire BUILD_NAME et BUILD_NUMBER du tag
+            TAG_WITHOUT_V="${CM_TAG#v}"
+            if echo "$TAG_WITHOUT_V" | grep -q '+'; then
+              BUILD_NAME="${TAG_WITHOUT_V%%+*}"
+              BUILD_NUMBER="${TAG_WITHOUT_V##*+}"
+            else
+              BUILD_NAME="$TAG_WITHOUT_V"
+              BUILD_NUMBER="${PROJECT_BUILD_NUMBER:-1}"
+            fi
+          else
+            # Pas de tag — utiliser pubspec.yaml + numéro de build Codemagic
+            BUILD_NAME="$PUBSPEC_NAME"
+            BUILD_NUMBER="${PROJECT_BUILD_NUMBER:-1}"
+          fi
+
+          echo "Version résolue : $BUILD_NAME (+$BUILD_NUMBER)"
+
+          # Propager les variables aux étapes suivantes via CM_ENV
+          echo "BUILD_NAME=$BUILD_NAME"     >> "$CM_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$CM_ENV"
+
+      # -----------------------------------------------------------------------
+      # 6. Build Flutter → IPA signé (utilise les profils appliqués à l'étape 4)
+      # -----------------------------------------------------------------------
+      - name: Build IPA signé (flutter build ipa)
+        script: |
+          flutter build ipa --release \
+            --build-name="$BUILD_NAME" \
+            --build-number="$BUILD_NUMBER"
+        working_directory: apps/mobile
+
+    artifacts:
+      - apps/mobile/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration  # Utilise l'intégration "AppStoreConnect" définie dans les variables
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers  # Groupe de testeurs internes dans App Store Connect
+      email:
+        recipients:
+          - $CM_COMMITTER_EMAIL  # Email du committer Git — notifié en cas de succès ou d'échec
+        notify:
+          success: true
+          failure: true
+
+  # ===========================================================================
+  # ios-release-dry : Build IPA signé SANS upload TestFlight (dry run)
+  # Identique à ios-release, mais sans section publishing.
+  # Utile pour valider la signature et le build avant un vrai release.
+  # Déclencheur : manuel uniquement depuis le dashboard Codemagic
+  # ===========================================================================
+  ios-release-dry:
+    name: iOS — Build IPA signé (dry run, sans upload TestFlight)
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+
+    integrations:
+      app_store_connect: AppStoreConnect
+
+    environment:
+      flutter: 3.24.0
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.microlingo.app
+      vars:
+        BUNDLE_ID: com.microlingo.app
+        FLUTTER_APP_PATH: apps/mobile
+
+    # Pas de triggering automatique — déclencher manuellement depuis le dashboard
+
+    scripts:
+      - name: Récupérer les dépendances Flutter
+        script: flutter pub get
+        working_directory: apps/mobile
+
+      - name: Analyse statique (flutter analyze)
+        script: flutter analyze
+        working_directory: apps/mobile
+
+      - name: Tests unitaires (flutter test)
+        script: flutter test
+        working_directory: apps/mobile
+
+      - name: Appliquer les profils de provisioning
+        script: xcode-project use-profiles
+
+      - name: Résoudre la version depuis le tag ou pubspec.yaml
+        script: |
+          set -euo pipefail
+          PUBSPEC_VERSION="$(grep -E '^version:' apps/mobile/pubspec.yaml | head -1 | awk '{print $2}')"
+          PUBSPEC_NAME="${PUBSPEC_VERSION%%+*}"
+          if [ -n "${CM_TAG:-}" ]; then
+            TAG_WITHOUT_V="${CM_TAG#v}"
+            if echo "$TAG_WITHOUT_V" | grep -q '+'; then
+              BUILD_NAME="${TAG_WITHOUT_V%%+*}"
+              BUILD_NUMBER="${TAG_WITHOUT_V##*+}"
+            else
+              BUILD_NAME="$TAG_WITHOUT_V"
+              BUILD_NUMBER="${PROJECT_BUILD_NUMBER:-1}"
+            fi
+          else
+            BUILD_NAME="$PUBSPEC_NAME"
+            BUILD_NUMBER="${PROJECT_BUILD_NUMBER:-1}"
+          fi
+          echo "Version résolue : $BUILD_NAME (+$BUILD_NUMBER)"
+          echo "BUILD_NAME=$BUILD_NAME"     >> "$CM_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$CM_ENV"
+
+      - name: Build IPA signé (flutter build ipa)
+        script: |
+          flutter build ipa --release \
+            --build-name="$BUILD_NAME" \
+            --build-number="$BUILD_NUMBER"
+        working_directory: apps/mobile
+
+    artifacts:
+      - apps/mobile/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    # Pas de section publishing — l'IPA est disponible en artefact uniquement (dry run)
+
+  # ===========================================================================
+  # ios-refresh-signing : Refresh manuel des profils de provisioning
+  # Remplace : .github/workflows/sync-ios-certs.yml
+  #
+  # Avec la signature automatique Codemagic, fastlane match n'est PLUS nécessaire.
+  # Codemagic gère les certificats nativement via l'App Store Connect API.
+  # Ce workflow force un refresh des profils quand c'est nécessaire :
+  #   - Après ajout d'un appareil de test
+  #   - En cas d'expiration imminente d'un certificat
+  #   - Après révocation manuelle dans le portail Apple Developer
+  #   - Changement de Team ID ou de bundle identifier
+  #
+  # Déclencheur : manuel uniquement depuis le dashboard Codemagic
+  # ===========================================================================
+  ios-refresh-signing:
+    name: iOS — Refresh manuel des profils de provisioning
+    instance_type: mac_mini_m2
+    max_build_duration: 15
+
+    integrations:
+      app_store_connect: AppStoreConnect
+
+    environment:
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.microlingo.app
+
+    # Pas de triggering automatique — déclencher manuellement depuis le dashboard
+
+    scripts:
+      - name: Refresh forcé des profils de provisioning via App Store Connect API
+        script: |
+          echo "============================================================"
+          echo "  Refresh des profils de provisioning Codemagic"
+          echo "============================================================"
+          echo ""
+          echo "Codemagic gère les certificats iOS nativement via l'API"
+          echo "App Store Connect. fastlane match n'est plus nécessaire."
+          echo ""
+          echo "Ce workflow force un refresh des profils et certificats."
+          echo "Cas d'usage :"
+          echo "  - Ajout d'un nouvel appareil de développement"
+          echo "  - Expiration imminente d'un certificat ou profil"
+          echo "  - Révocation manuelle d'un certificat dans le portail Apple"
+          echo "  - Changement de Team ID ou bundle identifier"
+          echo ""
+          # Force le re-téléchargement et l'installation des profils via l'API ASC
+          xcode-project use-profiles --force
+          echo ""
+          echo "✅ Profils de provisioning mis à jour avec succès."
+
+    artifacts:
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      email:
+        recipients:
+          - $CM_COMMITTER_EMAIL
+        notify:
+          success: true
+          failure: true

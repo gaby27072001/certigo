@@ -1,5 +1,9 @@
 name: release-ios
 
+# ⛔ MIGRÉ VERS CODEMAGIC — Ce workflow est désactivé.
+# Utiliser codemagic.yaml (workflow "ios-release") à la place.
+# Ce fichier est conservé uniquement comme référence historique.
+
 # Release beta iOS : build IPA signé + upload TestFlight (App Store Connect).
 #
 # ⚠️ NÉCESSITE un runner macOS avec Xcode. Les runners hébergés GitHub sont
@@ -50,6 +54,7 @@ env:
 
 jobs:
   release:
+    if: false  # Migré vers Codemagic — voir codemagic.yaml
     name: Build IPA signé + upload TestFlight
     # ⚠️ Runner macOS requis (Xcode). Fallback hébergé (désactivé EMU) : macos-14
     runs-on: [self-hosted, macOS]
