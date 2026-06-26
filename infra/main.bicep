@@ -137,7 +137,7 @@ module api 'modules/functionApp.bicep' = {
 }
 
 // Security observability: diagnostics -> Log Analytics + 401/403/5xx alerts.
-module diagnostics 'modules/diagnostics.bicep' = {
+module diagnostics 'modules/diagnostics.bicep' = if (env != 'dev') {
   scope: rg
   name: 'diagnostics'
   params: {
