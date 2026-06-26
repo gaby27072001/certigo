@@ -137,8 +137,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
     final bool hasLocalKey = _items.any((_QuizEntry entry) => entry.hasLocalCorrection);
     final bool pendingSync = submission.isFailure && !hasLocalKey;
-    final SubmitQuizResult result =
-        submission.valueOrNull ??
+    final SubmitQuizResult result = submission.valueOrNull ??
         _localFallbackResult(
           clientAttemptId: clientAttemptId,
           total: _items.length,
@@ -176,9 +175,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     required int total,
     required bool hasLocalCorrection,
   }) {
-    final int scorePct = hasLocalCorrection
-        ? (total == 0 ? 0 : ((_correctCount / total) * 100).round())
-        : 0;
+    final int scorePct =
+        hasLocalCorrection ? (total == 0 ? 0 : ((_correctCount / total) * 100).round()) : 0;
     final int xp = hasLocalCorrection ? (20 + _correctCount * 10) : 0;
     return SubmitQuizResult(
       attemptId: 'local-$clientAttemptId',
@@ -420,9 +418,8 @@ class _ResultsSheetState extends ConsumerState<_ResultsSheet> {
 
     final AsyncValue<LearningPath> pathAsync = ref.watch(pathProvider(widget.trackId));
     final bool pathLoaded = pathAsync.hasValue;
-    final String? nextLessonId = pathLoaded
-        ? _findNextLessonId(pathAsync.requireValue, widget.lessonId)
-        : null;
+    final String? nextLessonId =
+        pathLoaded ? _findNextLessonId(pathAsync.requireValue, widget.lessonId) : null;
 
     return Stack(
       alignment: Alignment.topCenter,
@@ -523,67 +520,61 @@ class _QuizEntry {
 }
 
 List<_QuizEntry> _sampleItems() => <_QuizEntry>[
-  _QuizEntry(
-    item: const QuizItem(
-      id: 'q-capex-1',
-      conceptId: 'c-capex-opex',
-      type: ItemType.mcq,
-      stem:
-          'Une équipe paie ses serveurs Azure uniquement selon la '
-          'consommation mensuelle, sans achat initial. De quel modèle de '
-          'coût s\'agit-il ?',
-      options: <QuizOption>[
-        QuizOption(id: 'a', label: 'Capex — dépense d\'investissement'),
-        QuizOption(id: 'b', label: 'Opex — dépense de fonctionnement'),
-        QuizOption(id: 'c', label: 'Amortissement sur 5 ans'),
-        QuizOption(id: 'd', label: 'Licence perpétuelle'),
-      ],
-    ),
-    correctOptionId: 'b',
-    explanation:
-        'Payer à l\'usage, sans investissement initial, est la '
-        'définition de l\'Opex. Le cloud transforme l\'achat d\'actifs '
-        '(Capex) en charges variables (Opex).',
-  ),
-  _QuizEntry(
-    item: const QuizItem(
-      id: 'q-capex-2',
-      conceptId: 'c-capex-opex',
-      type: ItemType.scenario,
-      stem:
-          'Quel est l\'avantage principal de l\'Opex pour une startup '
-          'dont la charge varie fortement ?',
-      options: <QuizOption>[
-        QuizOption(id: 'a', label: 'Elle possède physiquement ses serveurs'),
-        QuizOption(id: 'b', label: 'Ses coûts sont fixes quoi qu\'il arrive'),
-        QuizOption(id: 'c', label: 'La facture suit la demande, à la hausse comme à la baisse'),
-        QuizOption(id: 'd', label: 'Elle évite toute facturation cloud'),
-      ],
-    ),
-    correctOptionId: 'c',
-    explanation:
-        'L\'élasticité des coûts est clé : en Opex, la dépense '
-        'monte quand la demande monte et redescend quand elle baisse — '
-        'idéal pour une charge imprévisible.',
-  ),
-  _QuizEntry(
-    item: const QuizItem(
-      id: 'q-capex-3',
-      conceptId: 'c-capex-opex',
-      type: ItemType.mcq,
-      stem:
-          'Acheter 50 000 € de serveurs pour son propre datacenter '
-          'correspond à…',
-      options: <QuizOption>[
-        QuizOption(id: 'a', label: 'Du Capex'),
-        QuizOption(id: 'b', label: 'De l\'Opex'),
-        QuizOption(id: 'c', label: 'Du serverless'),
-        QuizOption(id: 'd', label: 'Du pay-as-you-go'),
-      ],
-    ),
-    correctOptionId: 'a',
-    explanation:
-        'Un gros achat d\'actifs en amont, amorti dans le temps, '
-        'est l\'archétype du Capex — l\'opposé du modèle cloud à la demande.',
-  ),
-];
+      _QuizEntry(
+        item: const QuizItem(
+          id: 'q-capex-1',
+          conceptId: 'c-capex-opex',
+          type: ItemType.mcq,
+          stem: 'Une équipe paie ses serveurs Azure uniquement selon la '
+              'consommation mensuelle, sans achat initial. De quel modèle de '
+              'coût s\'agit-il ?',
+          options: <QuizOption>[
+            QuizOption(id: 'a', label: 'Capex — dépense d\'investissement'),
+            QuizOption(id: 'b', label: 'Opex — dépense de fonctionnement'),
+            QuizOption(id: 'c', label: 'Amortissement sur 5 ans'),
+            QuizOption(id: 'd', label: 'Licence perpétuelle'),
+          ],
+        ),
+        correctOptionId: 'b',
+        explanation: 'Payer à l\'usage, sans investissement initial, est la '
+            'définition de l\'Opex. Le cloud transforme l\'achat d\'actifs '
+            '(Capex) en charges variables (Opex).',
+      ),
+      _QuizEntry(
+        item: const QuizItem(
+          id: 'q-capex-2',
+          conceptId: 'c-capex-opex',
+          type: ItemType.scenario,
+          stem: 'Quel est l\'avantage principal de l\'Opex pour une startup '
+              'dont la charge varie fortement ?',
+          options: <QuizOption>[
+            QuizOption(id: 'a', label: 'Elle possède physiquement ses serveurs'),
+            QuizOption(id: 'b', label: 'Ses coûts sont fixes quoi qu\'il arrive'),
+            QuizOption(id: 'c', label: 'La facture suit la demande, à la hausse comme à la baisse'),
+            QuizOption(id: 'd', label: 'Elle évite toute facturation cloud'),
+          ],
+        ),
+        correctOptionId: 'c',
+        explanation: 'L\'élasticité des coûts est clé : en Opex, la dépense '
+            'monte quand la demande monte et redescend quand elle baisse — '
+            'idéal pour une charge imprévisible.',
+      ),
+      _QuizEntry(
+        item: const QuizItem(
+          id: 'q-capex-3',
+          conceptId: 'c-capex-opex',
+          type: ItemType.mcq,
+          stem: 'Acheter 50 000 € de serveurs pour son propre datacenter '
+              'correspond à…',
+          options: <QuizOption>[
+            QuizOption(id: 'a', label: 'Du Capex'),
+            QuizOption(id: 'b', label: 'De l\'Opex'),
+            QuizOption(id: 'c', label: 'Du serverless'),
+            QuizOption(id: 'd', label: 'Du pay-as-you-go'),
+          ],
+        ),
+        correctOptionId: 'a',
+        explanation: 'Un gros achat d\'actifs en amont, amorti dans le temps, '
+            'est l\'archétype du Capex — l\'opposé du modèle cloud à la demande.',
+      ),
+    ];
