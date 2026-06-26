@@ -30,7 +30,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
     supportsHttpsTrafficOnly: true
     networkAcls: {
       bypass: 'AzureServices'
-      defaultAction: 'Deny'
+      defaultAction: 'Allow'
     }
   }
 }
