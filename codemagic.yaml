@@ -161,11 +161,7 @@ workflows:
           - Internal Testers  # Groupe de testeurs internes dans App Store Connect
       email:
         recipients:
-          - gchambaud@microsoft.com
-        notify:
-          success: true
-          failure: true
-      github:
+          - gabriel.chambaud@gmail.com
         notify:
           success: true
           failure: true
@@ -246,12 +242,6 @@ workflows:
       - apps/mobile/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
 
-    publishing:
-      github:
-        notify:
-          success: true
-          failure: true
-
   # ===========================================================================
   # ios-refresh-signing : Refresh manuel des profils de provisioning
   # Remplace : .github/workflows/sync-ios-certs.yml
@@ -310,11 +300,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - gchambaud@microsoft.com
-        notify:
-          success: true
-          failure: true
-      github:
+          - gabriel.chambaud@gmail.com
         notify:
           success: true
           failure: true
