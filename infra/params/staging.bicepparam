@@ -14,8 +14,8 @@ param location = 'westeurope'
 param appName = 'microlingo'
 
 // Microsoft Entra External ID (CIAM) — staging tenant/app.
-param authIssuer = 'https://microlingo.ciamlogin.com/<tenant-guid>/v2.0'
-param authAudience = '<api-client-id>'
+param entraAuthority = 'https://microlingo.ciamlogin.com/<tenant-guid>/v2.0'
+param entraAudience = '<api-client-id>'
 
 // Email notified on 401/403/5xx spikes (optional but recommended pre-prod).
 param alertEmail = ''
