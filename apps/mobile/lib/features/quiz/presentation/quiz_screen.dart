@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:confetti/confetti.dart';
-import 'package:core/core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -50,7 +49,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
   Future<void> _loadItems() async {
     final LessonRepository lessons = ref.read(lessonRepositoryProvider);
-    final Result<Lesson> lesson = await lessons.getLesson(
+    final lesson = await lessons.getLesson(
       trackId: widget.trackId,
       lessonId: widget.lessonId,
     );
@@ -64,7 +63,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         if (fromApi.isNotEmpty) return fromApi;
         return _sampleItems();
       },
-      failure: (Failure _) => _sampleItems(),
+      failure: (_) => _sampleItems(),
     );
 
     if (!mounted) return;
@@ -125,7 +124,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         )
         .toList(growable: false);
 
-    final Result<SubmitQuizResult> submission = await quiz.submit(
+    final submission = await quiz.submit(
       lessonId: widget.lessonId,
       request: SubmitQuizRequest(
         clientAttemptId: clientAttemptId,
