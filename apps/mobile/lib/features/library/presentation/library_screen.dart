@@ -1,4 +1,3 @@
-import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -118,7 +117,7 @@ class _PourToiSection extends StatelessWidget {
     final TextTheme t = Theme.of(context).textTheme;
     return Column(
       children: <Widget>[
-        const MascotAvatar(size: 72),
+        const MascotAvatar(mascot: AuroraMascot.nimbus, size: 72),
         const SizedBox(height: 12),
         Text(
           'Commence des leçons pour recevoir\ndes recommandations personnalisées !',
@@ -170,7 +169,7 @@ class _TipCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return PrismCard(
       variant: PrismCardVariant.tonal,
-      accent: p.tertiary,
+      accent: p.warning,
       elevation: 0,
       padding: const EdgeInsets.all(16),
       child: Row(
