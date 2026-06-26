@@ -165,6 +165,10 @@ workflows:
         notify:
           success: true
           failure: true
+      github:
+        notify:
+          success: true
+          failure: true
 
   # ===========================================================================
   # ios-release-dry : Build IPA signé SANS upload TestFlight (dry run)
@@ -242,7 +246,11 @@ workflows:
       - apps/mobile/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
 
-    # Pas de section publishing — l'IPA est disponible en artefact uniquement (dry run)
+    publishing:
+      github:
+        notify:
+          success: true
+          failure: true
 
   # ===========================================================================
   # ios-refresh-signing : Refresh manuel des profils de provisioning
@@ -303,6 +311,10 @@ workflows:
       email:
         recipients:
           - gchambaud@microsoft.com
+        notify:
+          success: true
+          failure: true
+      github:
         notify:
           success: true
           failure: true
