@@ -9,6 +9,7 @@ import '../features/lesson/presentation/lesson_screen.dart';
 import '../features/quiz/presentation/quiz_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/leaderboard/presentation/leaderboard_screen.dart';
+import '../features/library/presentation/library_screen.dart';
 import '../features/achievements/presentation/achievements_screen.dart';
 import '../features/seasons/presentation/seasons_screen.dart';
 import '../features/quests/presentation/quests_screen.dart';
@@ -21,6 +22,8 @@ import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/auth/presentation/splash_screen.dart' as auth;
 import '../features/onboarding/application/onboarding_controller.dart';
 import '../features/onboarding/presentation/goal_screen.dart';
+import '../features/onboarding/presentation/domains_screen.dart';
+import '../features/onboarding/presentation/level_screen.dart';
 import '../features/onboarding/presentation/login_screen.dart';
 import '../features/onboarding/presentation/onboarding_common.dart';
 import '../features/onboarding/presentation/promise_screen.dart';
@@ -37,6 +40,7 @@ import 'providers.dart';
 abstract class Routes {
   static const String home = '/home';
   static const String path = '/path';
+  static const String library = '/library';
   static const String leaderboard = '/leaderboard';
   static const String profile = '/profile';
 
@@ -179,6 +183,18 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
             _stepPage(state: state, child: const ReasonsScreen()),
       ),
       GoRoute(
+        path: OnboardingRoutes.domains,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const DomainsScreen()),
+      ),
+      GoRoute(
+        path: OnboardingRoutes.level,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const LevelScreen()),
+      ),
+      GoRoute(
         path: OnboardingRoutes.goal,
         parentNavigatorKey: _rootKey,
         pageBuilder: (_, GoRouterState state) => _stepPage(state: state, child: const GoalScreen()),
@@ -228,6 +244,28 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
                 path: Routes.home,
                 name: 'home',
                 builder: (_, __) => const HomeScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: Routes.library,
+                name: 'library',
+                builder: (_, __) => const LibraryScreen(),
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'domain/:id',
+                    name: 'library-domain',
+                    builder: (BuildContext context, GoRouterState state) {
+                      final String id = state.pathParameters['id'] ?? '';
+                      return Scaffold(
+                        appBar: AppBar(title: Text(id)),
+                        body: Center(child: Text('Domaine : $id')),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),

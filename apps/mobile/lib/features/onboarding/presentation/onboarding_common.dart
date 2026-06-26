@@ -8,6 +8,8 @@ abstract class OnboardingRoutes {
   static const String welcome = '/welcome';
   static const String start = '/onboarding/start';
   static const String reasons = '/onboarding/reasons';
+  static const String domains = '/onboarding/domains';
+  static const String level = '/onboarding/level';
   static const String goal = '/onboarding/goal';
   static const String routine = '/onboarding/routine';
   static const String promise = '/onboarding/promise';
@@ -20,6 +22,8 @@ abstract class OnboardingRoutes {
     welcome,
     start,
     reasons,
+    domains,
+    level,
     goal,
     routine,
     promise,
