@@ -24,12 +24,17 @@ param keyVaultName string
 @description('Cosmos DB account name, for the data-plane (SQL) role assignment.')
 param cosmosAccountName string
 
-@description('Authentication mode. "dev" enables the permissive dev token validator for the dev environment only; empty enforces Entra token validation.')
-@allowed([ '', 'dev' ])
-param authMode string = ''
+@description('Authentication mode. "dev" enables the permissive dev token validator (safe default for local/dev); "prod" enforces Entra External ID token validation. Set to "prod" in staging/production once the Entra External ID tenant is configured. Any value other than "dev" also enables Entra validation.')
+@allowed([ 'dev', 'prod', '' ])
+param authMode string = 'dev'
 
-param authIssuer string
-param authAudience string
+@description('Entra External ID authority URL. Format: https://<domain>.ciamlogin.com/<tenant-id>/v2.0. Replace with the value from Azure Portal → External ID tenant → Overview. Leave empty until the tenant is created.')
+@secure()
+param entraAuthority string = ''
+
+@description('Entra External ID application (audience) client ID — the App Registration client ID in the External ID tenant. Replace with the value from Azure Portal → External ID → App registrations → <your-app> → Overview. Leave empty until configured.')
+@secure()
+param entraAudience string = ''
 param tags object = {}
 
 @description('CORS allowed origins. Native mobile clients are not subject to CORS, so this can be [] (none) for staging/prod; dev passes ["*"] for browser-based tooling.')
@@ -98,10 +103,10 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         // local.settings.json.example): COSMOS_ENDPOINT, ENTRA_AUTHORITY, etc.
         { name: 'COSMOS_ENDPOINT', value: cosmosEndpoint }
         { name: 'COSMOS_DATABASE', value: 'microlingo' }
-        // "dev" => permissive DevTokenValidator (dev env only); empty => Entra.
+        // "dev" => permissive DevTokenValidator (dev env only); "prod" (or any non-"dev" value) => Entra.
         { name: 'AUTH_MODE', value: authMode }
-        { name: 'ENTRA_AUTHORITY', value: authIssuer }
-        { name: 'ENTRA_AUDIENCE', value: authAudience }
+        { name: 'ENTRA_AUTHORITY', value: entraAuthority }
+        { name: 'ENTRA_AUDIENCE', value: entraAudience }
         { name: 'KeyVault__Uri', value: 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/' }
       ]
     }
