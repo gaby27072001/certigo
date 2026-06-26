@@ -1,5 +1,10 @@
 name: sync-ios-certs
 
+# ⛔ MIGRÉ VERS CODEMAGIC — Ce workflow est désactivé.
+# Codemagic gère les certificats nativement (App Store Connect API).
+# Utiliser codemagic.yaml (workflow "ios-refresh-signing") pour un refresh manuel.
+# Ce fichier est conservé uniquement comme référence historique.
+
 # Bootstrap / renouvellement des certificats & profils iOS via fastlane match.
 # À lancer MANUELLEMENT : une fois pour initialiser le repo de certificats, puis
 # en cas de renouvellement (expiration, nouvel appareil de signature, etc.).
@@ -23,6 +28,7 @@ env:
 
 jobs:
   sync:
+    if: false  # Migré vers Codemagic — voir codemagic.yaml
     name: fastlane match (création / renouvellement)
     runs-on: [self-hosted, macOS]
     steps:
