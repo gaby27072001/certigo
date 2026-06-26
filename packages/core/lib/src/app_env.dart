@@ -44,6 +44,7 @@ class AppEnv {
   static const List<String> entraScopes = <String>[
     'openid',
     'profile',
+    'email',       // needed for the email claim on Microsoft accounts
     'offline_access',
   ];
 
@@ -58,9 +59,16 @@ class AppEnv {
   /// Indices de domaine (`domain_hint`) pour pré-orienter Entra vers le bon
   /// fournisseur fédéré. Configurables car le nom exact du fournisseur Google /
   /// Apple dépend du paramétrage du locataire externe.
+  ///
+  /// Pour Microsoft : `microsoft.com` achemine vers le fournisseur Microsoft
+  /// Account configuré dans le locataire CIAM, qui accepte à la fois les
+  /// comptes personnels MSA (outlook.com, hotmail.com…) ET les comptes
+  /// professionnels Azure AD (y compris les comptes @microsoft.com des employés
+  /// Microsoft). Laisser vide revient à afficher l'écran CIAM générique sans
+  /// bouton Microsoft visible.
   static const String microsoftDomainHint = String.fromEnvironment(
     'ENTRA_DOMAIN_HINT_MICROSOFT',
-    defaultValue: '',
+    defaultValue: 'microsoft.com',
   );
   static const String googleDomainHint = String.fromEnvironment(
     'ENTRA_DOMAIN_HINT_GOOGLE',
