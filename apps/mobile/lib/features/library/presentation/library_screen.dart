@@ -142,8 +142,7 @@ class _PourToiContent extends StatelessWidget {
     // Show a "Le sais-tu ?" tip card when the weakest domain score suggests
     // the learner is struggling (score < 60 is a reasonable proxy until
     // consecutiveErrors is available from the API).
-    final bool showTip =
-        data.weakestDomain != null && (data.weakestDomain!.score) < 60;
+    final bool showTip = data.weakestDomain != null && (data.weakestDomain!.score) < 60;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,39 +172,39 @@ class _TipCard extends StatelessWidget {
       elevation: 0,
       padding: const EdgeInsets.all(16),
       child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const Text('💡', style: TextStyle(fontSize: 24)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Le sais-tu ?',
-                    style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text('💡', style: TextStyle(fontSize: 24)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Le sais-tu ?',
+                  style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Un Azure Blob est un espace de stockage d\'objets non '
+                  'structurés dans le cloud. Parfait pour images, vidéos, '
+                  'fichiers de log.',
+                  style: t.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: p.primary,
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Un Azure Blob est un espace de stockage d\'objets non '
-                    'structurés dans le cloud. Parfait pour images, vidéos, '
-                    'fichiers de log.',
-                    style: t.bodySmall,
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: p.primary,
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    onPressed: () {},
-                    child: const Text('En savoir plus →'),
-                  ),
-                ],
-              ),
+                  onPressed: () {},
+                  child: const Text('En savoir plus →'),
+                ),
+              ],
             ),
-          ],
+          ),
+        ],
       ),
     );
   }
@@ -216,12 +215,8 @@ class _TipCard extends StatelessWidget {
 class _ExplorerSection extends StatelessWidget {
   const _ExplorerSection();
 
-  static const List<({String emoji, String label, Color color})> _domains = <
-      ({
-        String emoji,
-        String label,
-        Color color
-      })>[
+  static const List<({String emoji, String label, Color color})> _domains =
+      <({String emoji, String label, Color color})>[
     (emoji: '☁️', label: 'Compute', color: Colors.blue),
     (emoji: '🗄️', label: 'Storage', color: Colors.orange),
     (emoji: '🤖', label: 'AI', color: Colors.purple),
