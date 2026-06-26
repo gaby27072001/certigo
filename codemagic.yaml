@@ -161,7 +161,7 @@ workflows:
           - Internal Testers  # Groupe de testeurs internes dans App Store Connect
       email:
         recipients:
-          - gchambaud@microsoft.com
+          - gabriel.chambaud@gmail.com
         notify:
           success: true
           failure: true
@@ -310,7 +310,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - gchambaud@microsoft.com
+          - gabriel.chambaud@gmail.com
         notify:
           success: true
           failure: true
