@@ -18,13 +18,10 @@ class PromiseScreen extends ConsumerWidget {
     final TextTheme t = Theme.of(context).textTheme;
 
     return OnboardingScaffold(
-      progress: 1,
+      progress: 0.9,
       onBack: () => context.go(OnboardingRoutes.routine),
       primaryLabel: 'JE COMMENCE',
-      onPrimary: () {
-        c.complete();
-        context.go('/path');
-      },
+      onPrimary: () => context.go(OnboardingRoutes.birthYear),
       scrollable: false,
       child: Column(
         children: <Widget>[
