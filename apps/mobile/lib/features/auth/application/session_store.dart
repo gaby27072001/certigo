@@ -24,7 +24,7 @@ class SecureSessionStore implements SessionStore {
       : _storage = storage ??
             const FlutterSecureStorage(
               aOptions: AndroidOptions(encryptedSharedPreferences: true),
-              iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+              iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
             );
 
   static const String _key = 'microlingo.session.v1';
