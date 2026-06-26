@@ -143,6 +143,12 @@ class AppAuthGateway implements AuthGateway {
     return;
   }
 
+  /// Retourne les paramètres additionnels OIDC pour pré-sélectionner
+  /// le fournisseur d'identité dans Entra External ID.
+  ///
+  /// `domain_hint=microsoft.com` achemine vers le fournisseur Microsoft
+  /// Account du locataire CIAM, qui supporte à la fois les comptes
+  /// personnels MSA et les comptes Azure AD professionnels.
   Map<String, String>? _hintFor(AuthProvider provider) {
     final String hint = switch (provider) {
       AuthProvider.microsoft => AppEnv.microsoftDomainHint,

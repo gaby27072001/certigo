@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// What the learner wants to do first — mirrors the opening "what now?" question
 /// of a returning-user flow, themed for certification tracks.
@@ -53,6 +56,12 @@ extension DailyGoalOptionInfo on DailyGoalOption {
 /// what you want while polishing the onboarding. Persisting "already onboarded"
 /// later is a one-line change in [complete] (e.g. shared_preferences).
 class OnboardingController extends ChangeNotifier {
+  OnboardingController() {
+    Future<void>.microtask(_restoreCompletedFlag);
+  }
+
+  static const String _completedPrefsKey = 'onboarding_completed';
+
   bool _completed = false;
   bool get completed => _completed;
 
@@ -120,6 +129,7 @@ class OnboardingController extends ChangeNotifier {
     if (_completed) return;
     _completed = true;
     notifyListeners();
+    unawaited(_persistCompletedFlag(value: true));
   }
 
   /// Reset everything (useful for "recommencer l'introduction" or tests).
@@ -132,6 +142,30 @@ class OnboardingController extends ChangeNotifier {
     _goal = null;
     _reminders = true;
     notifyListeners();
+    unawaited(_persistCompletedFlag(value: false));
+  }
+
+  Future<void> _restoreCompletedFlag() async {
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final bool completed = prefs.getBool(_completedPrefsKey) ?? false;
+      if (_completed == completed) return;
+      _completed = completed;
+      notifyListeners();
+    } catch (e, st) {
+      debugPrint('[OnboardingController] Failed to restore completion flag: $e');
+      debugPrint('$st');
+    }
+  }
+
+  Future<void> _persistCompletedFlag({required bool value}) async {
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_completedPrefsKey, value);
+    } catch (e, st) {
+      debugPrint('[OnboardingController] Failed to persist completion flag: $e');
+      debugPrint('$st');
+    }
   }
 }
 
