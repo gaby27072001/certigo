@@ -14,10 +14,10 @@ class AppEnv {
   static const String _rawEnv = String.fromEnvironment('MICROLINGO_ENV', defaultValue: 'dev');
 
   static AppFlavor get flavor => switch (_rawEnv) {
-    'prod' => AppFlavor.prod,
-    'staging' => AppFlavor.staging,
-    _ => AppFlavor.dev,
-  };
+        'prod' => AppFlavor.prod,
+        'staging' => AppFlavor.staging,
+        _ => AppFlavor.dev,
+      };
 
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
