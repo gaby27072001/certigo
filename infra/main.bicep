@@ -20,11 +20,13 @@ param cosmosLocation string = ''
 @description('Base name used to derive resource names. Lowercase, no spaces.')
 param appName string = 'microlingo'
 
-@description('Entra External ID tenant (issuer) authority URL for token validation.')
-param authIssuer string
+@description('Entra External ID authority URL. Format: https://<domain>.ciamlogin.com/<tenant-id>/v2.0. Replace with the value from Azure Portal → External ID tenant → Overview. Leave empty until the tenant is created.')
+@secure()
+param entraAuthority string = ''
 
-@description('Entra External ID application (audience) client id the API validates.')
-param authAudience string
+@description('Entra External ID application (audience) client ID — the App Registration client ID. Replace with the value from Azure Portal → External ID → App registrations → <your-app> → Overview. Leave empty until configured.')
+@secure()
+param entraAudience string = ''
 
 @description('Optional email notified on security alerts (401/403/5xx spikes). Empty = no receiver.')
 param alertEmail string = ''
@@ -42,8 +44,8 @@ param ciRunnerPrincipalId string = ''
 var suffix = uniqueString(subscription().id, appName, env)
 var rgName = 'rg-${appName}-${env}'
 // Dev token bypass is allowed ONLY in the dev environment; staging/prod enforce
-// Entra token validation.
-var authMode = env == 'dev' ? 'dev' : ''
+// Entra token validation ("prod" signals to the backend that Entra is required).
+var authMode = env == 'dev' ? 'dev' : 'prod'
 // Production-grade hardening is on for every non-dev environment: Cosmos RBAC-only
 // auth, Key Vault purge protection + 90-day soft delete, geo-redundant + versioned
 // storage, and a locked-down CORS origin set.
@@ -128,8 +130,8 @@ module api 'modules/functionApp.bicep' = {
     cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
     authMode: authMode
-    authIssuer: authIssuer
-    authAudience: authAudience
+    entraAuthority: entraAuthority
+    entraAudience: entraAudience
     // Native mobile clients aren't subject to CORS; only dev keeps '*' (browser tooling).
     allowedCorsOrigins: env == 'dev' ? [ '*' ] : []
     tags: tags
