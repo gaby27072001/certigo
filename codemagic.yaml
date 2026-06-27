@@ -173,6 +173,7 @@ workflows:
           </plist>
           EOF
           flutter build ipa --release \
+            --dart-define=API_BASE_URL=https://func-microlingo-dev-a2msquxibzvcu.azurewebsites.net/api \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/tmp/ExportOptions.plist
@@ -296,6 +297,7 @@ workflows:
           </plist>
           EOF
           flutter build ipa --release \
+            --dart-define=API_BASE_URL=https://func-microlingo-dev-a2msquxibzvcu.azurewebsites.net/api \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/tmp/ExportOptions.plist
