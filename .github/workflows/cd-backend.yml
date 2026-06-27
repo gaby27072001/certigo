@@ -17,6 +17,14 @@ on:
           - dev
           - staging
           - prod
+      runner:
+        description: 'Runner pool. self-hosted is the default (the dedicated microlingo-ci VM). ubuntu-latest may be blocked by the enterprise EMU policy — see infra/ci-runner/README.md.'
+        required: false
+        default: 'self-hosted'
+        type: choice
+        options:
+          - self-hosted
+          - ubuntu-latest
   push:
     branches: [ main ]
 
@@ -31,7 +39,10 @@ concurrency:
 jobs:
   deploy-infra:
     name: Deploy infrastructure (${{ inputs.environment || 'dev' }})
-    runs-on: [self-hosted, Linux, X64, microlingo-ci]
+    environment: ${{ inputs.environment || 'dev' }}
+    # self-hosted by default (microlingo-ci VM). A workflow_dispatch run can opt into
+    # ubuntu-latest; push events always use self-hosted. Both branches evaluate to an array.
+    runs-on: ${{ inputs.runner == 'ubuntu-latest' && fromJSON('["ubuntu-latest"]') || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
     permissions:
       id-token: write
       contents: read
@@ -60,7 +71,8 @@ jobs:
 
   deploy-backend:
     name: Deploy backend code (${{ inputs.environment || 'dev' }})
-    runs-on: [self-hosted, Linux, X64, microlingo-ci]
+    environment: ${{ inputs.environment || 'dev' }}
+    runs-on: ${{ inputs.runner == 'ubuntu-latest' && fromJSON('["ubuntu-latest"]') || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
     needs: deploy-infra
     permissions:
       id-token: write
