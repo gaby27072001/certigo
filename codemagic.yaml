@@ -22,6 +22,7 @@
 #
 # 4. Déclencher un build :
 #    - Via tag git (v*) → déclenche automatiquement ios-release
+#    - Via push sur main → déclenche automatiquement ios-release-dry
 #    - Via le dashboard Codemagic → Start new build → choisir le workflow
 #
 # WORKFLOWS DISPONIBLES :
@@ -198,7 +199,7 @@ workflows:
   # ios-release-dry : Build IPA signé SANS upload TestFlight (dry run)
   # Identique à ios-release, mais sans section publishing.
   # Utile pour valider la signature et le build avant un vrai release.
-  # Déclencheur : manuel uniquement depuis le dashboard Codemagic
+  # Déclencheur : push sur main ou manuel depuis le dashboard Codemagic
   # ===========================================================================
   ios-release-dry:
     name: iOS — Build IPA signé (dry run, sans upload TestFlight)
@@ -219,7 +220,13 @@ workflows:
         BUNDLE_ID: com.microlingo.app
         FLUTTER_APP_PATH: apps/mobile
 
-    # Pas de triggering automatique — déclencher manuellement depuis le dashboard
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
 
     scripts:
       - name: Récupérer les dépendances Flutter
