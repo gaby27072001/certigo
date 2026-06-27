@@ -2,11 +2,11 @@ import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
-import '../../../app/router.dart';
+import '../../../shared/widgets/inline_error.dart';
+import '../../../shared/widgets/screen_header.dart';
 
 /// Shop — spend hard-earned gems on boosters and streak freezes. Fed by
 /// `shopCatalogProvider`. Each purchase carries a client-generated id for
@@ -25,7 +25,7 @@ class ShopScreen extends ConsumerWidget {
         bottom: false,
         child: Column(
           children: <Widget>[
-            const _ScreenHeader(title: 'Boutique'),
+            const ScreenHeader(title: 'Boutique'),
             Expanded(
               child: async.when(
                 data: (ShopCatalog catalog) => _ShopContent(catalog: catalog),
@@ -131,7 +131,7 @@ class _ShopContentState extends ConsumerState<_ShopContent> {
         ),
         if (_error != null) ...<Widget>[
           const SizedBox(height: 14),
-          _InlineError(message: _error!),
+          InlineError(message: _error!),
         ],
         const SizedBox(height: 16),
         for (final ShopItem item in catalog.items) ...<Widget>[
@@ -268,65 +268,6 @@ class _ShopLoading extends StatelessWidget {
         SizedBox(height: 12),
         PrismSkeleton(height: 150),
       ],
-    );
-  }
-}
-
-class _InlineError extends StatelessWidget {
-  const _InlineError({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final PrismColorScheme p = context.prism;
-    final TextTheme t = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: p.error.withOpacity(0.12),
-        borderRadius: PrismRadii.cardMd,
-        border: Border.all(color: p.error.withOpacity(0.4)),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.error_outline_rounded, color: p.error, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(message, style: t.bodySmall?.copyWith(color: p.error)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScreenHeader extends StatelessWidget {
-  const _ScreenHeader({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final TextTheme t = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 20, 4),
-      child: Row(
-        children: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go(Routes.home);
-              }
-            },
-          ),
-          const SizedBox(width: 4),
-          Text(title, style: t.headlineSmall),
-        ],
-      ),
     );
   }
 }

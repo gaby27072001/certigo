@@ -2,11 +2,11 @@ import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
-import '../../../app/router.dart';
+import '../../../shared/widgets/inline_error.dart';
+import '../../../shared/widgets/screen_header.dart';
 
 /// Daily quests — a small board of bite-size goals that refresh each day. Fed by
 /// `questBoardProvider`. Each completed quest can be claimed individually; we
@@ -24,7 +24,7 @@ class QuestsScreen extends ConsumerWidget {
         bottom: false,
         child: Column(
           children: <Widget>[
-            const _ScreenHeader(title: 'Quêtes du jour'),
+            const ScreenHeader(title: 'Quêtes du jour'),
             Expanded(
               child: async.when(
                 data: (QuestBoard board) => _QuestsContent(board: board),
@@ -127,7 +127,7 @@ class _QuestsContentState extends ConsumerState<_QuestsContent> {
         ),
         if (_error != null) ...<Widget>[
           const SizedBox(height: 14),
-          _InlineError(message: _error!),
+          InlineError(message: _error!),
         ],
         const SizedBox(height: 16),
         for (final Quest quest in board.quests) ...<Widget>[
@@ -260,61 +260,3 @@ class _QuestsLoading extends StatelessWidget {
   }
 }
 
-class _InlineError extends StatelessWidget {
-  const _InlineError({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final PrismColorScheme p = context.prism;
-    final TextTheme t = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: p.error.withOpacity(0.12),
-        borderRadius: PrismRadii.cardMd,
-        border: Border.all(color: p.error.withOpacity(0.4)),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.error_outline_rounded, color: p.error, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(message, style: t.bodySmall?.copyWith(color: p.error)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScreenHeader extends StatelessWidget {
-  const _ScreenHeader({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final TextTheme t = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 20, 4),
-      child: Row(
-        children: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go(Routes.home);
-              }
-            },
-          ),
-          const SizedBox(width: 4),
-          Text(title, style: t.headlineSmall),
-        ],
-      ),
-    );
-  }
-}
