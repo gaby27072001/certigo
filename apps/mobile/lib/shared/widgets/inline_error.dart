@@ -15,9 +15,9 @@ class InlineError extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: p.error.withValues(alpha: 0.12),
+        color: p.error.withOpacity(0.12),
         borderRadius: PrismRadii.cardMd,
-        border: Border.all(color: p.error.withValues(alpha: 0.4)),
+        border: Border.all(color: p.error.withOpacity(0.4)),
       ),
       child: Row(
         children: <Widget>[
