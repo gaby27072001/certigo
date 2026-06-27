@@ -305,7 +305,7 @@ class _DomainCard extends StatelessWidget {
             Text(
               '— leçons',
               style: t.labelSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
               ),
             ),
           ],
