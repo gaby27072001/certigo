@@ -27,6 +27,7 @@ class LibraryScreen extends ConsumerWidget {
           children: <Widget>[
             // Resource bar mirrors Home so moving between tabs feels seamless.
             async.maybeWhen(
+              loading: () => const _ResourceBarSkeleton(),
               data: (HomeData data) => Row(
                 children: <Widget>[
                   StreakBadge(
@@ -215,21 +216,32 @@ class _TipCard extends StatelessWidget {
 class _ExplorerSection extends StatelessWidget {
   const _ExplorerSection();
 
-  static const List<({String emoji, String label, Color color})> _domains =
-      <({String emoji, String label, Color color})>[
-    (emoji: '☁️', label: 'Compute', color: Colors.blue),
-    (emoji: '🗄️', label: 'Storage', color: Colors.orange),
-    (emoji: '🤖', label: 'AI', color: Colors.purple),
-    (emoji: '🔒', label: 'Security', color: Colors.red),
-    (emoji: '🌐', label: 'Networking', color: Colors.teal),
-    (emoji: '⚙️', label: 'DevOps', color: Colors.indigo),
-    (emoji: '📊', label: 'Monitoring', color: Colors.green),
-    (emoji: '🚀', label: 'Serverless', color: Colors.deepOrange),
+  static const List<({String emoji, String label})> _domainDefs =
+      <({String emoji, String label})>[
+    (emoji: '☁️', label: 'Compute'),
+    (emoji: '🗄️', label: 'Storage'),
+    (emoji: '🤖', label: 'AI'),
+    (emoji: '🔒', label: 'Security'),
+    (emoji: '🌐', label: 'Networking'),
+    (emoji: '⚙️', label: 'DevOps'),
+    (emoji: '📊', label: 'Monitoring'),
+    (emoji: '🚀', label: 'Serverless'),
   ];
 
   @override
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
+    final PrismColorScheme p = context.prism;
+    final List<Color> domainColors = <Color>[
+      p.primary,
+      p.warning,
+      p.info,
+      p.error,
+      p.success,
+      p.primarySoft,
+      p.success,
+      p.ember,
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,10 +258,15 @@ class _ExplorerSection extends StatelessWidget {
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
           childAspectRatio: 1.1,
-          children: _domains
-              .map((({String emoji, String label, Color color}) d) =>
-                  _DomainCard(emoji: d.emoji, label: d.label, color: d.color))
-              .toList(growable: false),
+          children: List<Widget>.generate(
+            _domainDefs.length,
+            (int i) => _DomainCard(
+              emoji: _domainDefs[i].emoji,
+              label: _domainDefs[i].label,
+              color: domainColors[i],
+            ),
+            growable: false,
+          ),
         ),
       ],
     );
@@ -288,12 +305,29 @@ class _DomainCard extends StatelessWidget {
             Text(
               '— leçons',
               style: t.labelSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ResourceBarSkeleton extends StatelessWidget {
+  const _ResourceBarSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: <Widget>[
+        PrismSkeleton(width: 72, height: 32),
+        SizedBox(width: 8),
+        PrismSkeleton(width: 72, height: 32),
+        Spacer(),
+        PrismSkeleton(width: 72, height: 32),
+      ],
     );
   }
 }

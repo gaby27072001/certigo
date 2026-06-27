@@ -29,7 +29,7 @@ dependencies:
 
   # Platform
   google_fonts: ^6.2.1
-  intl: ^0.19.0
+  intl: ^0.20.2
 
   # Auth — Entra External ID broker (Microsoft / Google / Apple), OIDC + PKCE
   flutter_appauth: ^8.0.0

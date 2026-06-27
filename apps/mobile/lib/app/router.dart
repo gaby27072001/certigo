@@ -130,14 +130,14 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       }
       // Authenticated: never remain on auth surfaces.
       if (atAuthSplash || atAuth) {
-        return onboardingCtrl.completed ? Routes.path : OnboardingRoutes.splash;
+        return onboardingCtrl.completed ? Routes.home : OnboardingRoutes.splash;
       }
       // Authenticated but onboarding not completed: force startup flow.
       if (!onboardingCtrl.completed) {
         return atOnboarding ? null : OnboardingRoutes.splash;
       }
       // Completed onboarding: startup screens should not be reachable.
-      if (atOnboarding) return Routes.path;
+      if (atOnboarding) return Routes.home;
       return null;
     },
     routes: <RouteBase>[
@@ -233,24 +233,23 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           return AppShell(shell: shell);
         },
         branches: <StatefulShellBranch>[
-          // Primary tab: the Duolingo-style learning journey is the app's
-          // home surface, so it leads the shell and is the initial location.
+          // Primary tab: Accueil (home) is the main entry surface.
           StatefulShellBranch(
             navigatorKey: _shellKey,
             routes: <RouteBase>[
               GoRoute(
-                path: Routes.path,
-                name: 'path',
-                builder: (_, __) => const _ActivePathScreen(),
+                path: Routes.home,
+                name: 'home',
+                builder: (_, __) => const HomeScreen(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: Routes.home,
-                name: 'home',
-                builder: (_, __) => const HomeScreen(),
+                path: Routes.path,
+                name: 'path',
+                builder: (_, __) => const _ActivePathScreen(),
               ),
             ],
           ),
@@ -268,7 +267,25 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
                       final String id = state.pathParameters['id'] ?? '';
                       return Scaffold(
                         appBar: AppBar(title: Text(id)),
-                        body: Center(child: Text('Domaine : $id')),
+                        body: ListView(
+                          children: <Widget>[
+                            const SizedBox(height: 48),
+                            Icon(
+                              Icons.auto_stories_rounded,
+                              size: 72,
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                            const SizedBox(height: 16),
+                            Center(
+                              child: Text(
+                                'Contenu à venir pour ce domaine',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ),
+                            const SizedBox(height: 48),
+                          ],
+                        ),
                       );
                     },
                   ),

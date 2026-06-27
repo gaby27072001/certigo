@@ -47,7 +47,6 @@ class _HomeContent extends StatelessWidget {
     final UserProfile me = data.profile;
     final LearningPath path = data.path;
     final PathLesson? next = data.nextLesson;
-    final PathUnit? nextUnit = data.nextUnit;
     final DomainProgress? weak = data.weakestDomain;
     final String firstName = me.displayName.split(' ').first;
     final int previous = (path.readinessScore - path.readinessTrend7d).clamp(0, 100);
@@ -108,18 +107,12 @@ class _HomeContent extends StatelessWidget {
         // never blocks the rest of Home.
         CoachSection(trackId: path.trackId),
 
-        // Continue lesson ------------------------------------------------
-        Text('Continuer', style: t.titleLarge),
-        const SizedBox(height: 12),
-        if (next != null)
-          _ContinueCard(
-            unit: nextUnit?.title ?? path.trackName,
-            lesson: next.title,
-            minutes: next.estMinutes,
-            onTap: () => context.go('${Routes.lesson}/${path.trackId}/${next.id}'),
-          )
-        else
-          _AllCaughtUpCard(onTap: () => context.go(Routes.path)),
+        // Current lesson indicator (non-interactive — action is in Parcours).
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Text('📍', style: TextStyle(fontSize: 22)),
+          title: Text(next?.title ?? 'Aucune leçon en cours', style: t.bodyLarge),
+        ),
         const SizedBox(height: 24),
 
         // Explorer — secondary destinations beyond the daily path.
@@ -287,93 +280,6 @@ class _DailyGoalCard extends StatelessWidget {
             gradient: <Color>[p.ember, p.xpGold],
             semanticLabel: 'Objectif du jour',
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ContinueCard extends StatelessWidget {
-  const _ContinueCard({
-    required this.unit,
-    required this.lesson,
-    required this.minutes,
-    required this.onTap,
-  });
-
-  final String unit;
-  final String lesson;
-  final int minutes;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final TextTheme t = Theme.of(context).textTheme;
-    return PrismCard(
-      variant: PrismCardVariant.filled,
-      accent: context.prism.primary,
-      elevation: 2,
-      borderRadius: PrismRadii.cardXl,
-      onTap: onTap,
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
-              borderRadius: PrismRadii.cardMd,
-            ),
-            child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 30),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(unit, style: t.bodySmall?.copyWith(color: Colors.white70)),
-                Text(lesson, style: t.titleMedium?.copyWith(color: Colors.white)),
-                Text('$minutes min', style: t.labelSmall?.copyWith(color: Colors.white70)),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: Colors.white),
-        ],
-      ),
-    );
-  }
-}
-
-class _AllCaughtUpCard extends StatelessWidget {
-  const _AllCaughtUpCard({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final PrismColorScheme p = context.prism;
-    final TextTheme t = Theme.of(context).textTheme;
-    return PrismCard(
-      variant: PrismCardVariant.tonal,
-      accent: p.success,
-      onTap: onTap,
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.celebration_rounded, color: p.success, size: 28),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('Tout est à jour !', style: t.titleMedium),
-                Text(
-                  'Explore ton parcours pour aller plus loin.',
-                  style: t.bodySmall?.copyWith(color: p.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded),
         ],
       ),
     );
