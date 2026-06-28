@@ -15,6 +15,7 @@ using Microlingo.Application.Services;
 using Microlingo.Infrastructure.Ai;
 using Microlingo.Infrastructure.Cosmos;
 using Microlingo.Infrastructure.Identity;
+using Microlingo.Infrastructure.Observability;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWorkerDefaults(worker =>
@@ -112,12 +113,14 @@ var host = new HostBuilder()
         services.AddScoped<IPurchaseRepository, CosmosPurchaseRepository>();
         services.AddScoped<IFriendRepository, CosmosFriendRepository>();
         services.AddScoped<ILearnerModelRepository, CosmosLearnerModelRepository>();
+        services.AddSingleton<ITutorLlmTelemetry, NullTutorLlmTelemetry>();
         var tutorLlmEnabled = string.Equals(configuration["TUTOR_LLM_ENABLED"], "true", StringComparison.OrdinalIgnoreCase);
         if (tutorLlmEnabled)
         {
             var tutorLlmOptions = TutorLlmConfiguration.FromConfiguration(configuration);
             services.AddSingleton(tutorLlmOptions);
             services.AddHttpClient("TutorLlm", client => client.Timeout = TimeSpan.FromSeconds(20));
+            services.AddSingleton<ITutorLlmTelemetry, ApplicationInsightsTutorLlmTelemetry>();
             services.AddSingleton<ITutorCompletion>(sp => new AzureOpenAiTutorCompletion(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient("TutorLlm"),
                 sp.GetRequiredService<TokenCredential>(),

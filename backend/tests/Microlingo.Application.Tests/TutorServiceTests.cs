@@ -11,19 +11,20 @@ internal sealed class TutorServiceHarness
     public InMemoryContentRepository Content { get; } = TestContent.Build();
     public InMemoryLearnerModelRepository LearnerModels { get; } = new();
     public InMemoryEventRepository Events { get; } = new();
+    public SpyTutorLlmTelemetry Telemetry { get; } = new();
     public FakeClock Clock { get; } = new(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
     public string UserId { get; } = "user-1";
 
     public TutorService Build(string? completionReply = null)
     {
         var context = new FakeUserContext(UserId, "Tester");
-        return new TutorService(context, Clock, Content, LearnerModels, new FakeTutorCompletion(completionReply), Events);
+        return new TutorService(context, Clock, Content, LearnerModels, new FakeTutorCompletion(completionReply), Telemetry, Events);
     }
 
     public TutorService Build(ITutorCompletion completion)
     {
         var context = new FakeUserContext(UserId, "Tester");
-        return new TutorService(context, Clock, Content, LearnerModels, completion, Events);
+        return new TutorService(context, Clock, Content, LearnerModels, completion, Telemetry, Events);
     }
 
     public static TutorExplainRequest Request(params string[] selected)
@@ -98,6 +99,8 @@ public sealed class TutorServiceTests
 
         dto.Source.Should().Be("ai");
         dto.Headline.Should().Be("Spot on — OpEx is consumption-based.");
+        h.Telemetry.SuccessCalls.Should().ContainSingle();
+        h.Telemetry.SuccessCalls[0].Should().BePositive();
         // Recommendation always stays grounded, never taken from the model.
         dto.Recommendation.Should().NotBeNullOrWhiteSpace();
     }
@@ -120,6 +123,7 @@ public sealed class TutorServiceTests
 
         dto.Source.Should().Be("grounded");
         dto.Headline.Should().NotBe("Here is a made-up grounding.");
+        h.Telemetry.RejectedResponses.Should().ContainSingle(x => x.Reason == "guardrail_rejected");
     }
 
     [Fact]
@@ -132,6 +136,7 @@ public sealed class TutorServiceTests
         var dto = await service.ExplainAsync(TutorServiceHarness.Request("a"));
 
         dto.Source.Should().Be("grounded");
+        h.Telemetry.ControlledFallbacks.Should().ContainSingle(x => x.Reason == "provider_unavailable");
     }
 
     [Fact]
@@ -143,6 +148,7 @@ public sealed class TutorServiceTests
         var act = async () => await service.ExplainAsync(TutorServiceHarness.Request("a"));
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("bug");
+        h.Telemetry.UnexpectedErrors.Should().ContainSingle(x => x.ExceptionType == nameof(InvalidOperationException));
     }
 
     [Fact]

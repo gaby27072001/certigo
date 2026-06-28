@@ -117,6 +117,24 @@ public interface ITutorCompletion
     Task<string?> CompleteAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default);
 }
 
+/// Dedicated LLM observability seam so the tutor can report outcomes without
+/// taking a dependency on a specific telemetry backend.
+public interface ITutorLlmTelemetry
+{
+    void TrackSuccess(TimeSpan latency);
+    void TrackControlledFallback(TimeSpan latency, string reason);
+    void TrackUnexpectedError(TimeSpan latency, Exception exception);
+    void TrackRejectedResponse(TimeSpan latency, string reason);
+}
+
+public sealed class NullTutorLlmTelemetry : ITutorLlmTelemetry
+{
+    public void TrackSuccess(TimeSpan latency) { }
+    public void TrackControlledFallback(TimeSpan latency, string reason) { }
+    public void TrackUnexpectedError(TimeSpan latency, Exception exception) { }
+    public void TrackRejectedResponse(TimeSpan latency, string reason) { }
+}
+
 public interface ILeaderboardRepository
 {
     Task<LeagueDto> GetLeagueAsync(string userId, CancellationToken cancellationToken = default);
