@@ -40,8 +40,13 @@ final pathRepositoryProvider = Provider<PathRepository>(
   (Ref ref) => RemotePathRepository(ref.watch(apiClientProvider)),
 );
 
+final catalogStoreProvider = Provider<CatalogCacheStore>((Ref ref) => InMemoryCatalogCacheStore());
+
 final catalogRepositoryProvider = Provider<CatalogRepository>(
-  (Ref ref) => RemoteCatalogRepository(ref.watch(apiClientProvider)),
+  (Ref ref) => OfflineCatalogRepository(
+    RemoteCatalogRepository(ref.watch(apiClientProvider)),
+    ref.watch(catalogStoreProvider),
+  ),
 );
 
 final lessonRepositoryProvider = Provider<LessonRepository>(
@@ -53,9 +58,7 @@ final lessonRepositoryProvider = Provider<LessonRepository>(
 /// Defaults to an in-memory store so widget tests need no platform channels;
 /// [bootstrap] overrides it with a SharedPreferences-backed store so a queued
 /// submission survives an app restart on iOS and Android.
-final syncStoreProvider = Provider<SyncQueueStore>(
-  (Ref ref) => InMemorySyncQueueStore(),
-);
+final syncStoreProvider = Provider<SyncQueueStore>((Ref ref) => InMemorySyncQueueStore());
 
 /// The offline-first sync engine. Replays queued submissions through the API
 /// with idempotent keys, exponential backoff and dead-lettering. A single
@@ -122,9 +125,7 @@ final themeModeProvider = StateProvider<ThemeMode>((Ref ref) => ThemeMode.system
 
 /// Audio-haptic feedback for lesson checks (§3.14). Real haptics by default;
 /// tests / reduce-motion override this with [SilentLessonFeedback].
-final lessonFeedbackProvider = Provider<LessonFeedback>(
-  (Ref ref) => const HapticLessonFeedback(),
-);
+final lessonFeedbackProvider = Provider<LessonFeedback>((Ref ref) => const HapticLessonFeedback());
 
 /// Unwraps a repository [Result] into a plain value, throwing the [Failure] so
 /// Riverpod surfaces it as `AsyncError` for the UI's `.when(error: …)` branch.
@@ -137,11 +138,12 @@ final meProvider = FutureProvider.autoDispose<UserProfile>((Ref ref) async {
 });
 
 /// A learner's path through one certification track, keyed by trackId.
-final pathProvider = FutureProvider.autoDispose.family<LearningPath, String>(
-  (Ref ref, String trackId) async {
-    return _orThrow(await ref.watch(pathRepositoryProvider).getPath(trackId));
-  },
-);
+final pathProvider = FutureProvider.autoDispose.family<LearningPath, String>((
+  Ref ref,
+  String trackId,
+) async {
+  return _orThrow(await ref.watch(pathRepositoryProvider).getPath(trackId));
+});
 
 /// The certification track currently shown on the Path screen. Switching it in
 /// the course picker re-points the whole primary tab, Duolingo-style. Defaults
@@ -157,11 +159,12 @@ final catalogProvider = FutureProvider.autoDispose<List<TrackSummary>>((Ref ref)
 /// The "next best action" coach for one track: a server-ranked shelf of what
 /// the learner should do next. Auto-disposed and keyed by trackId so Home can
 /// surface a coaching section without recomputing anything on-device.
-final nextBestProvider = FutureProvider.autoDispose.family<NextBest, String>(
-  (Ref ref, String trackId) async {
-    return _orThrow(await ref.watch(recommendationRepositoryProvider).getNextBest(trackId));
-  },
-);
+final nextBestProvider = FutureProvider.autoDispose.family<NextBest, String>((
+  Ref ref,
+  String trackId,
+) async {
+  return _orThrow(await ref.watch(recommendationRepositoryProvider).getNextBest(trackId));
+});
 
 /// The learner's current weekly league standings.
 final leagueProvider = FutureProvider.autoDispose<League>((Ref ref) async {
