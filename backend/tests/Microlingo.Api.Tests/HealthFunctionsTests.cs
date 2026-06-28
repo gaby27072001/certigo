@@ -1,10 +1,10 @@
 using System.Net;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microlingo.Api.Functions;
+using Certigo.Api.Functions;
 using Xunit;
 
-namespace Microlingo.Api.Tests;
+namespace Certigo.Api.Tests;
 
 public sealed class HealthFunctionsTests
 {

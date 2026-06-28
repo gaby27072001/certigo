@@ -18,7 +18,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Certigo.Application.Tests",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Certigo.Infrastructure.Tests", "tests\Certigo.Infrastructure.Tests\Certigo.Infrastructure.Tests.csproj", "{E2179642-C185-4563-A66C-173F5EF60DFA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microlingo.Api.Tests", "tests\Microlingo.Api.Tests\Microlingo.Api.Tests.csproj", "{817768A1-C512-4DE0-A819-51C2BA66F246}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Certigo.Api.Tests", "tests\Microlingo.Api.Tests\Microlingo.Api.Tests.csproj", "{817768A1-C512-4DE0-A819-51C2BA66F246}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

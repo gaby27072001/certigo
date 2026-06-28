@@ -13,6 +13,6 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Microlingo.Api\Microlingo.Api.csproj" />
+    <ProjectReference Include="..\..\src\Certigo.Api\Certigo.Api.csproj" />
   </ItemGroup>
 </Project>
