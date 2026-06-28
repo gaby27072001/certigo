@@ -27,6 +27,19 @@ param entraAuthority string = ''
 @description('Entra External ID application (audience) client ID — the App Registration client ID. Replace with the value from Azure Portal → External ID → App registrations → <your-app> → Overview. Leave empty until configured.')
 @secure()
 param entraAudience string = ''
+@description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
+param tutorLlmEnabled bool = false
+@description('Azure OpenAI resource endpoint used by the tutor when enabled. Example: https://<resource>.openai.azure.com/.')
+param tutorLlmEndpoint string = ''
+@description('Azure OpenAI deployment name used by the tutor when enabled.')
+param tutorLlmDeployment string = ''
+@description('Optional Azure OpenAI API version override for the tutor.')
+param tutorLlmApiVersion string = '2024-10-21'
+@description('Optional explicit Azure OpenAI API key for the tutor. Leave empty to use the Function App managed identity instead.')
+@secure()
+param tutorLlmApiKey string = ''
+@description('Maximum output tokens requested from the tutor LLM.')
+param tutorLlmMaxOutputTokens int = 400
 
 @description('Optional email notified on security alerts (401/403/5xx spikes). Empty = no receiver.')
 param alertEmail string = ''
@@ -132,6 +145,12 @@ module api 'modules/functionApp.bicep' = {
     authMode: authMode
     entraAuthority: entraAuthority
     entraAudience: entraAudience
+    tutorLlmEnabled: tutorLlmEnabled
+    tutorLlmEndpoint: tutorLlmEndpoint
+    tutorLlmDeployment: tutorLlmDeployment
+    tutorLlmApiVersion: tutorLlmApiVersion
+    tutorLlmApiKey: tutorLlmApiKey
+    tutorLlmMaxOutputTokens: tutorLlmMaxOutputTokens
     // Native mobile clients aren't subject to CORS; only dev keeps '*' (browser tooling).
     allowedCorsOrigins: env == 'dev' ? [ '*' ] : []
     tags: tags

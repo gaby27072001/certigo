@@ -32,7 +32,7 @@ Documentation opérationnelle pour publier les bêtas Certigo.
 | Nom affiché | Certigo |
 | versionName | lu depuis `apps/mobile/pubspec.yaml` (`version:` → partie avant `+`) |
 | versionCode / build number | `github.run_number` (auto-incrémenté), override possible |
-| Workflows | `release-android.yml` (prêt), `release-ios.yml` (Phase iOS) |
+| Workflows | `release-android.yml` (actif), `release-ios.yml` + `sync-ios-certs.yml` (historiques/désactivés) ; iOS actif géré par Codemagic |
 | CI inchangée | `ci-mobile.yml` (format/analyze/test) — aucune régression |
 
 > ⚠️ **`law.microlingo` est l'applicationId Android actuel.** L'applicationId est définitif une

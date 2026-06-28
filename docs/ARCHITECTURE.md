@@ -221,9 +221,11 @@ modules. `params/dev.bicepparam` porte les valeurs d'environnement.
 
 ## 10. CI/CD
 
-Quatre workflows ciblés par chemin (voir `.github/workflows/`) : `ci-mobile`, `ci-backend`,
-`ci-content`, `ci-infra`. Chacun ne se déclenche que sur les dossiers qui le concernent, pour
-des retours rapides et indépendants.
+Neuf workflows actifs ciblés par chemin ou par événement (voir `.github/workflows/`) :
+`ci-mobile`, `ci-backend`, `ci-content`, `ci-infra`, `cd-backend`, `codeql`,
+`lint-workflows`, `release-android`, `security-scan`. Les workflows iOS GitHub Actions
+`release-ios` et `sync-ios-certs` sont désactivés et conservés comme historique ; la
+chaîne iOS active passe par Codemagic.
 
 ---
 
@@ -254,4 +256,3 @@ Garanties ajoutées à l'issue de l'audit technique (voir `AUDIT_CERTIGO.md`) :
 | **Contenu** | Le validateur vérifie l'**intégrité des réponses** (chaque `correct` référence une option réelle), l'**unicité** des ids d'items, et la cohérence `ordering`/`mcq`. |
 | **Cloud** | Hardening **par environnement** (`var hardened = env != 'dev'`) : Cosmos RBAC-only, Key Vault purge protection + soft delete 90 j, Storage GRS + versioning + soft delete, CORS verrouillé ; **params `staging`/`prod`** ajoutés. |
 | **CI/CD** | SDK Dart épinglé, lockfile applicatif suivi, **SBOM** (CycloneDX) backend, **gate d'approbation** (`environment: beta`) sur les releases mobiles. |
-

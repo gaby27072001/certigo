@@ -1,0 +1,16 @@
+id: github-advanced-security
+code: GITHUB-ADVANCED-SECURITY
+title: GitHub Advanced Security
+level: associate
+summary: Microsoft certification (Administrator, Developer, DevOps Engineer, Solution
+  Architect, Student) covering GitHub.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-54fcf34f
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-54fcf34f

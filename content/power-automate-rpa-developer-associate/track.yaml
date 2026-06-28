@@ -1,0 +1,15 @@
+id: power-automate-rpa-developer-associate
+code: POWER-AUTOMATE-RPA-DEVELOPER-ASSOCIATE
+title: 'Microsoft Certified: Power Automate RPA Developer Associate'
+level: associate
+summary: Microsoft certification (Developer) covering Microsoft Power Platform.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-ee4bbbe1
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-ee4bbbe1

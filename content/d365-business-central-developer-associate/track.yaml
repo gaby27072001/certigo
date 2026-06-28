@@ -1,0 +1,17 @@
+id: d365-business-central-developer-associate
+code: D365-BUSINESS-CENTRAL-DEVELOPER-ASSOCIATE
+title: 'Microsoft Certified: Dynamics 365 Business Central Developer Associate'
+level: associate
+summary: Microsoft certification (Business Analyst, Business Owner, Business User,
+  Developer, Solution Architect, Support Engineer, Technology Manager) covering Dynamics
+  365.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-bf28d11e
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-bf28d11e

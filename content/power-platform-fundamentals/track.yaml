@@ -1,0 +1,15 @@
+id: power-platform-fundamentals
+code: POWER-PLATFORM-FUNDAMENTALS
+title: 'Microsoft Certified: Power Platform Fundamentals'
+level: fundamentals
+summary: Microsoft certification (App Maker) covering Microsoft Power Platform.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-82b99947
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-82b99947

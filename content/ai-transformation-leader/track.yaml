@@ -1,0 +1,16 @@
+id: ai-transformation-leader
+code: AI-TRANSFORMATION-LEADER
+title: 'Microsoft Certified: AI Transformation Leader'
+level: fundamentals
+summary: Microsoft certification (Business Leader) covering Microsoft Power Platform,
+  AI Builder.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-d5ed414f
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-d5ed414f

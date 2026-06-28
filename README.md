@@ -5,7 +5,8 @@
 **Apprenez, révisez et validez vos certifications Microsoft — par micro-leçons premium.**
 
 Micro-learning mobile (iOS + Android) pour maîtriser des **concepts techniques & cloud réels**
-et atteindre la *readiness* certification : AZ-900 · AZ-104 · AI-900 · DP-900 · SC-900.
+et atteindre la *readiness* certification sur **89 certifications Microsoft actives**
+(dont AZ-900 · AZ-104 · AI-900 · DP-900 · SC-900).
 
 `Flutter` · `.NET 8 isolated Functions` · `Cosmos DB` · `Entra External ID` · `Bicep`
 
@@ -58,7 +59,7 @@ certigo/
 │  │  └─ Certigo.Infrastructure/ # Cosmos DB, validation token Entra
 │  └─ tests/               # Tests de domaine (xUnit)
 ├─ infra/                  # Infrastructure as Code (Bicep) : Cosmos, Storage, Functions, KV, AI
-├─ content/                # Tracks & leçons en YAML + schémas (AZ-900, AZ-104, AI-900, DP-900, SC-900)
+├─ content/                # Tracks & leçons en YAML + schémas (89 certifications actives)
 ├─ tools/                  # Validateur de contenu (Node) + seed Cosmos (Python)
 ├─ docs/                   # Architecture & ADRs
 └─ .github/workflows/      # CI : mobile · backend · content · infra
@@ -122,6 +123,9 @@ dotnet build -warnaserror
 dotnet test                         # tests de domaine (FSRS, readiness, XP)
 # Exécution locale (Functions Core Tools) :
 cp src/Certigo.Api/local.settings.json.example src/Certigo.Api/local.settings.json
+# LLM tutor (optionnel) : laissez TUTOR_LLM_ENABLED=false par défaut ; pour l'activer,
+# renseignez TUTOR_LLM_ENDPOINT + TUTOR_LLM_DEPLOYMENT et soit TUTOR_LLM_API_KEY,
+# soit une identité Azure capable d'appeler Azure OpenAI.
 cd src/Certigo.Api && func start
 ```
 
@@ -188,9 +192,14 @@ API principale :
 | `ci-backend` | `backend/**` | `dotnet build -warnaserror`, `dotnet test` |
 | `ci-content` | `content/**`, `tools/validate_content.mjs` | schémas + intégrité + somme des poids = 1.0 |
 | `ci-infra`   | `infra/**` | `az bicep build` (lint des templates) |
+| `cd-backend` | push / workflow manuel | déploiement backend vers l'environnement cible |
+| `codeql` | schedule / push | analyse statique de sécurité |
+| `lint-workflows` | `.github/workflows/**` | lint des workflows GitHub Actions |
 | `release-android` | manuel / tag `v*` | **AAB signé** + publication Google Play (gates `analyze`/`test`) |
-| `release-ios` | manuel (runner macOS) | **IPA signé** + upload TestFlight (gates `analyze`/`test`) |
-| `sync-ios-certs` | manuel (runner macOS) | Bootstrap / renouvellement des certs iOS via `fastlane match` |
+| `security-scan` | schedule / push | scan sécurité complémentaire (NuGet + Bicep) |
+
+> `release-ios.yml` et `sync-ios-certs.yml` sont des références historiques
+> désactivées (`if: false`). La chaîne iOS active passe par Codemagic.
 
 > Publication des bêtas mobiles (signature, secrets, runbooks Android & iOS,
 > rollback, checklist) : voir [`docs/RELEASE_MOBILE.md`](docs/RELEASE_MOBILE.md).

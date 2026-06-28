@@ -1,0 +1,15 @@
+id: security-operations-analyst
+code: SECURITY-OPERATIONS-ANALYST
+title: 'Microsoft Certified: Security Operations Analyst Associate'
+level: associate
+summary: Microsoft certification (Security Operations Analyst) covering Azure.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-36bfed24
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-36bfed24

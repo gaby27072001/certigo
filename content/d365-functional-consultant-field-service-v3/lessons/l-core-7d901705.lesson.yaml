@@ -1,0 +1,42 @@
+id: l-core-7d901705
+trackId: d365-functional-consultant-field-service-v3
+unitId: u-core-7d901705
+domainId: core-objectives
+title: Core objectives overview
+estMinutes: 5
+blocks:
+- type: hook
+  conceptId: c-core-7d901705
+  body: 'Use this micro-lesson as a quick orientation for Microsoft Certified: Dynamics
+    365 Field Service Functional Consultant Associate. Focus on role scope, product
+    coverage, and expected outcomes.'
+- type: concept
+  conceptId: c-core-7d901705
+  title: Certification focus
+  body: 'Microsoft Certified: Dynamics 365 Field Service Functional Consultant Associate
+    targets competency in role scope and product coverage. Review core scenarios,
+    service boundaries, and implementation trade-offs.'
+- type: check
+  conceptId: c-core-7d901705
+  check:
+    id: l-core-7d901705-check-1
+    conceptId: c-core-7d901705
+    type: mcq
+    difficulty: 1
+    stem: What is the best use of this lesson for D365-FUNCTIONAL-CONSULTANT-FIELD-SERVICE-V3
+      preparation?
+    options:
+    - id: a
+      label: Understand role scope and core objectives first
+    - id: b
+      label: Memorize implementation details without context
+    - id: c
+      label: Skip product and scenario alignment
+    correct:
+    - a
+    explanation: Start with role scope and objective mapping before deep dives. It
+      improves study efficiency and exam readiness.
+- type: recap
+  conceptId: c-core-7d901705
+  body: 'D365-FUNCTIONAL-CONSULTANT-FIELD-SERVICE-V3: align study on role scope, product
+    boundaries, and practical scenarios to maximize readiness.'

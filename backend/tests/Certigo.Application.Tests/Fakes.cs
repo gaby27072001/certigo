@@ -17,6 +17,25 @@ internal sealed class FakeUserContext(string userId, string displayName) : IUser
     public string DisplayName { get; } = displayName;
 }
 
+internal sealed class SpyTutorLlmTelemetry : ITutorLlmTelemetry
+{
+    public List<double> SuccessCalls { get; } = new();
+    public List<(double LatencyMs, string Reason)> ControlledFallbacks { get; } = new();
+    public List<(double LatencyMs, string ExceptionType)> UnexpectedErrors { get; } = new();
+    public List<(double LatencyMs, string Reason)> RejectedResponses { get; } = new();
+
+    public void TrackSuccess(TimeSpan latency) => SuccessCalls.Add(latency.TotalMilliseconds);
+
+    public void TrackControlledFallback(TimeSpan latency, string reason)
+        => ControlledFallbacks.Add((latency.TotalMilliseconds, reason));
+
+    public void TrackUnexpectedError(TimeSpan latency, Exception exception)
+        => UnexpectedErrors.Add((latency.TotalMilliseconds, exception.GetType().Name));
+
+    public void TrackRejectedResponse(TimeSpan latency, string reason)
+        => RejectedResponses.Add((latency.TotalMilliseconds, reason));
+}
+
 internal sealed class InMemoryUserRepository : IUserRepository
 {
     private readonly Dictionary<string, UserProfileDto> _store = new(StringComparer.OrdinalIgnoreCase);
@@ -295,6 +314,12 @@ internal sealed class FakeTutorCompletion : ITutorCompletion
         LastUserPrompt = userPrompt;
         return Task.FromResult(_reply);
     }
+}
+
+internal sealed class ThrowingTutorCompletion(Exception exception) : ITutorCompletion
+{
+    public Task<string?> CompleteAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default)
+        => Task.FromException<string?>(exception);
 }
 
 /// <summary>

@@ -1,0 +1,16 @@
+id: cloud-and-ai-security-engineer-associate
+code: CLOUD-AND-AI-SECURITY-ENGINEER-ASSOCIATE
+title: 'Microsoft Certified: Cloud and AI Security Engineer Associate (beta)'
+level: associate
+summary: Microsoft certification (Security Engineer) covering Azure, Microsoft Defender,
+  Microsoft Defender XDR.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-b9e32721
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-b9e32721

@@ -1,0 +1,16 @@
+id: m365-enterprise-administrator
+code: M365-ENTERPRISE-ADMINISTRATOR
+title: 'Microsoft 365 Certified: Administrator Expert'
+level: expert
+summary: Microsoft certification (Administrator) covering Microsoft 365, Microsoft
+  Entra, Microsoft Entra ID, Office 365.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-18842eb9
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-18842eb9

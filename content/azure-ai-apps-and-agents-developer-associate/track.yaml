@@ -1,0 +1,16 @@
+id: azure-ai-apps-and-agents-developer-associate
+code: AZURE-AI-APPS-AND-AGENTS-DEVELOPER-ASSOCIATE
+title: 'Microsoft Certified: Azure AI Apps and Agents Developer Associate'
+level: associate
+summary: Microsoft certification (AI Engineer, Developer) covering Azure, Microsoft
+  Foundry.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-809d8fc2
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-809d8fc2

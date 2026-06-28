@@ -1,0 +1,15 @@
+id: azure-cosmos-db-developer-specialty
+code: AZURE-COSMOS-DB-DEVELOPER-SPECIALTY
+title: 'Microsoft Certified: Azure Cosmos DB Developer Specialty'
+level: associate
+summary: Microsoft certification (Developer) covering Azure.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-3130215c
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-3130215c

@@ -1,0 +1,18 @@
+id: cybersecurity-architect-expert
+code: CYBERSECURITY-ARCHITECT-EXPERT
+title: 'Microsoft Certified: Cybersecurity Architect Expert'
+level: expert
+summary: Microsoft certification (Administrator, Security Engineer, Security Operations
+  Analyst, Solution Architect) covering Microsoft Defender, Microsoft Defender for
+  Cloud, Microsoft Sentinel, Microsoft Entra, Microsoft Entra ID, Microsoft Defender
+  for Identity, Microsoft Defender for Cloud Apps.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-3df4609c
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-3df4609c
