@@ -24,6 +24,12 @@ scripts:
     packageFilters:
       dirExists: test
 
+  e2e:
+    description: Run mobile integration tests in packages that expose them.
+    run: flutter test integration_test
+    packageFilters:
+      dirExists: integration_test
+
   format:
     description: Format all Dart sources (line length 100).
     run: dart format --line-length 100 .
