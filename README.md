@@ -1,6 +1,6 @@
 <div align="center">
 
-# Microlingo
+# Certigo
 
 **Apprenez, révisez et validez vos certifications Microsoft — par micro-leçons premium.**
 
@@ -12,7 +12,7 @@ et atteindre la *readiness* certification : AZ-900 · AZ-104 · AI-900 · DP-900
 </div>
 
 > [!IMPORTANT]
-> **Microlingo n'est pas une app de langues.** On n'apprend pas du vocabulaire :
+> **Certigo n'est pas une app de langues.** On n'apprend pas du vocabulaire :
 > on enseigne des **concepts professionnels** via une boucle pédagogique stricte
 > — *concept → exemple appliqué → vérification de compréhension → révision adaptative*.
 > Toute la modélisation (contenu, quiz, progression, gamification) sert l'apprentissage
@@ -22,7 +22,7 @@ et atteindre la *readiness* certification : AZ-900 · AZ-104 · AI-900 · DP-900
 
 ## ✨ Le produit en une phrase
 
-L'utilisateur choisit son **profil** et sa **certification cible** ; Microlingo construit un
+L'utilisateur choisit son **profil** et sa **certification cible** ; Certigo construit un
 **parcours personnalisé** de leçons courtes, valide la compréhension par des quiz explicatifs,
 révise les concepts faibles au bon moment (spaced repetition) et matérialise la progression par
 un **Readiness Score** (0–100, la métrique nord) — porté par une gamification saine.
@@ -42,7 +42,7 @@ un **Readiness Score** (0–100, la métrique nord) — porté par une gamificat
 ## 🗺️ Monorepo
 
 ```
-microlingo/
+certigo/
 ├─ apps/
 │  └─ mobile/              # App Flutter (iOS + Android) — feature-first + Riverpod + go_router
 ├─ packages/
@@ -52,10 +52,10 @@ microlingo/
 │  └─ data/               # Modèles, API client, repositories (miroir des DTO backend)
 ├─ backend/                # .NET 8 isolated Azure Functions — Clean Architecture
 │  ├─ src/
-│  │  ├─ Microlingo.Api/            # HTTP triggers, middleware auth/erreurs
-│  │  ├─ Microlingo.Application/    # Services métier, DTO, abstractions
-│  │  ├─ Microlingo.Domain/         # Modèles + règles (readiness, FSRS, XP) — sans dépendance
-│  │  └─ Microlingo.Infrastructure/ # Cosmos DB, validation token Entra
+│  │  ├─ Certigo.Api/            # HTTP triggers, middleware auth/erreurs
+│  │  ├─ Certigo.Application/    # Services métier, DTO, abstractions
+│  │  ├─ Certigo.Domain/         # Modèles + règles (readiness, FSRS, XP) — sans dépendance
+│  │  └─ Certigo.Infrastructure/ # Cosmos DB, validation token Entra
 │  └─ tests/               # Tests de domaine (xUnit)
 ├─ infra/                  # Infrastructure as Code (Bicep) : Cosmos, Storage, Functions, KV, AI
 ├─ content/                # Tracks & leçons en YAML + schémas (AZ-900, AZ-104, AI-900, DP-900, SC-900)
@@ -121,8 +121,8 @@ dotnet restore
 dotnet build -warnaserror
 dotnet test                         # tests de domaine (FSRS, readiness, XP)
 # Exécution locale (Functions Core Tools) :
-cp src/Microlingo.Api/local.settings.json.example src/Microlingo.Api/local.settings.json
-cd src/Microlingo.Api && func start
+cp src/Certigo.Api/local.settings.json.example src/Certigo.Api/local.settings.json
+cd src/Certigo.Api && func start
 ```
 
 ### 3) Contenu
@@ -197,21 +197,21 @@ API principale :
 
 > [!NOTE]
 > Les workflows utilisent un runner **self-hosted** avec labels
-> `[self-hosted, Linux, X64, microlingo-ci]` (les runners hébergés par GitHub sont
+> `[self-hosted, Linux, X64, law-microlingo]` (les runners hébergés par GitHub sont
 > désactivés par la politique d'entreprise EMU sur ce dépôt).
 >  
-> Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `microlingo-ci`.
+> Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `law-microlingo`.
 
 > [!IMPORTANT]
 > **Accès sortant internet du runner.** Depuis le retrait de l'accès sortant par
 > défaut d'Azure (septembre 2025), une VM sans IP publique explicite n'a **aucune
 > connectivité sortante** — le runner ne peut alors ni joindre GitHub ni restaurer
 > les paquets NuGet/pub.dev, et tous les jobs échouent. La connectivité est assurée
-> par une **NAT Gateway** (`nat-microlingo`) associée au sous-réseau `snet-runners`,
+> par une **NAT Gateway** (`law-microlingo`) associée au sous-réseau `snet-runners`,
 > avec une IP publique Standard dédiée. Si l'egress retombe, vérifier :
 > ```bash
-> az network nat gateway show -g rg-microlingo-ci -n nat-microlingo
-> az network vnet subnet show -g rg-microlingo-ci --vnet-name vnet-microlingo-ci \
+> az network nat gateway show -g law-microlingo-ci -n law-microlingo
+> az network vnet subnet show -g law-microlingo-ci --vnet-name law-microlingo-ci \
 >   -n snet-runners --query natGateway.id
 > ```
 > La fonctionnalité `Microsoft.Network/AllowBringYourOwnPublicIpAddress` doit être
@@ -231,5 +231,5 @@ API principale :
 ## 📄 Licence & marques
 
 Projet original. Microsoft, Azure et les codes de certification cités sont des marques de
-Microsoft ; Microlingo n'est ni affilié, ni approuvé par Microsoft. Aucun contenu d'examen réel
+Microsoft ; Certigo n'est ni affilié, ni approuvé par Microsoft. Aucun contenu d'examen réel
 n'est reproduit — toutes les leçons et tous les items sont **originaux**.

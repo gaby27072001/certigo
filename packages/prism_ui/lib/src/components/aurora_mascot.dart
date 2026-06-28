@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'mascot_assets.dart';
 
-/// The **Aurora Crew** — Microlingo's cast of mascots, each one a *gamified,
+/// The **Aurora Crew** — Certigo's cast of mascots, each one a *gamified,
 /// cutified Azure service icon* (the equivalent of Duolingo's Duo & friends).
 /// Every member embodies a real Azure service or concept (the platform itself,
 /// Functions, Cosmos DB, Defender, Bicep, AI, Blob Storage) so the mascot doubles
@@ -11,7 +11,7 @@ import 'mascot_assets.dart';
 /// Mascots are intentionally decoupled from any data model so the design system
 /// stays dependency-free; screens map their domain/unit to a crew member.
 enum AuroraMascot {
-  /// Azure itself — the main, welcoming face of Microlingo ("the Duo").
+  /// Azure itself — the main, welcoming face of Certigo ("the Duo").
   nimbus,
 
   /// Azure Functions — quick and energetic (a yellow lightning bolt).

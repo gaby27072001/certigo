@@ -12,14 +12,14 @@ using '../main.bicep'
 
 param env = 'prod'
 param location = 'westeurope'
-param appName = 'microlingo'
+param appName = 'certigo'
 
 // Microsoft Entra External ID (CIAM) — production tenant/app.
-param entraAuthority = 'https://microlingo.ciamlogin.com/<tenant-guid>/v2.0'
+param entraAuthority = 'https://certigo.ciamlogin.com/<tenant-guid>/v2.0'
 param entraAudience = '<api-client-id>'
 
 // On-call email notified on 401/403/5xx spikes.
-param alertEmail = 'secops@microlingo.app'
+param alertEmail = 'secops@certigo.app'
 
 // Turn on paid Microsoft Defender for Cloud plans in production.
 param enableDefenderPlans = true

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_radii.dart';
 
-/// The streak signature of Microlingo: a flame badge showing the number of
+/// The streak signature of Certigo: a flame badge showing the number of
 /// consecutive active days.
 ///
 /// This is the canonical, semantic streak component (prefer it over the generic

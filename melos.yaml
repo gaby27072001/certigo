@@ -1,6 +1,6 @@
-# Melos — manages the Dart/Flutter side of the Microlingo monorepo.
+# Melos — manages the Dart/Flutter side of the Certigo monorepo.
 # https://melos.invertase.dev
-name: microlingo
+name: certigo
 
 packages:
   - apps/*

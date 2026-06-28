@@ -33,7 +33,7 @@ Runner/GeneratedPluginRegistrant.*
 !default.pbxuser
 !default.perspectivev3
 
-# --- Microlingo : artefacts de signature / CI iOS (jamais committés) ---
+# --- Certigo : artefacts de signature / CI iOS (jamais committés) ---
 ExportOptions.plist
 *.mobileprovision
 *.p12

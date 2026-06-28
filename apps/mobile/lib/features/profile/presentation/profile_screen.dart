@@ -1012,7 +1012,7 @@ class _AppInfoSection extends StatelessWidget {
           InkWell(
             onTap: () => showLicensePage(
               context: context,
-              applicationName: 'Microlingo',
+              applicationName: 'Certigo',
             ),
             borderRadius: BorderRadius.circular(8),
             child: Row(

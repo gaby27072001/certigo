@@ -1,0 +1,33 @@
+using System.Net;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
+using Certigo.Api.Http;
+using Certigo.Application.Dtos;
+using Certigo.Application.Services;
+
+namespace Certigo.Api.Functions;
+
+public sealed class StreakFunctions(IStreakRepairService streak)
+{
+    [Function("GetStreakStatus")]
+    public async Task<HttpResponseData> GetStreakStatus(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "streak")] HttpRequestData request,
+        FunctionContext context)
+    {
+        context.GetUser();
+        var status = await streak.GetStatusAsync(context.CancellationToken);
+        return await request.JsonAsync(status, cancellationToken: context.CancellationToken);
+    }
+
+    [Function("RepairStreak")]
+    public async Task<HttpResponseData> RepairStreak(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "streak/repair")] HttpRequestData request,
+        FunctionContext context)
+    {
+        context.GetUser();
+        var body = await request.ReadJsonAsync<StreakRepairRequest>(context.CancellationToken);
+        var result = await streak.RepairAsync(body, context.CancellationToken);
+        var status = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
+        return await request.JsonAsync(result, status, context.CancellationToken);
+    }
+}

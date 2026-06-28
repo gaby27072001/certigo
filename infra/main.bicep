@@ -1,5 +1,5 @@
 // ============================================================================
-// Microlingo — root infrastructure (Bicep)
+// Certigo — root infrastructure (Bicep)
 // Subscription-scoped: creates the resource group, then composes all modules.
 // Backend stack: Azure Functions (isolated .NET 8) + Cosmos DB (serverless) +
 // Blob Storage + Application Insights + Key Vault. Identity is Microsoft Entra
@@ -18,7 +18,7 @@ param location string = 'westeurope'
 param cosmosLocation string = ''
 
 @description('Base name used to derive resource names. Lowercase, no spaces.')
-param appName string = 'microlingo'
+param appName string = 'certigo'
 
 @description('Entra External ID authority URL. Format: https://<domain>.ciamlogin.com/<tenant-id>/v2.0. Replace with the value from Azure Portal → External ID tenant → Overview. Leave empty until the tenant is created.')
 @secure()
@@ -57,7 +57,7 @@ var assignPolicy = forcePolicyAssignment || env != 'dev'
 // is capacity-constrained for Cosmos (cross-region Functions->Cosmos is fine).
 var cosmosRegion = empty(cosmosLocation) ? location : cosmosLocation
 var tags = {
-  product: 'Microlingo'
+  product: 'Certigo'
   env: env
   managedBy: 'bicep'
 }
@@ -84,7 +84,7 @@ module data 'modules/cosmos.bicep' = {
   params: {
     accountName: 'cosmos-${appName}-${env}-${suffix}'
     location: cosmosRegion
-    databaseName: 'microlingo'
+    databaseName: 'certigo'
     disableLocalAuth: hardened
     tags: tags
   }

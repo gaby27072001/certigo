@@ -1,4 +1,4 @@
-// Validates Microlingo content-as-code against the JSON schemas.
+// Validates Certigo content-as-code against the JSON schemas.
 //
 //   node tools/validate_content.mjs
 //

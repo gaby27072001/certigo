@@ -11,10 +11,10 @@ using '../main.bicep'
 
 param env = 'staging'
 param location = 'westeurope'
-param appName = 'microlingo'
+param appName = 'certigo'
 
 // Microsoft Entra External ID (CIAM) — staging tenant/app.
-param entraAuthority = 'https://microlingo.ciamlogin.com/<tenant-guid>/v2.0'
+param entraAuthority = 'https://certigo.ciamlogin.com/<tenant-guid>/v2.0'
 param entraAudience = '<api-client-id>'
 
 // Email notified on 401/403/5xx spikes (optional but recommended pre-prod).

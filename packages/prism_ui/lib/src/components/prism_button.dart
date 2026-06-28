@@ -4,7 +4,7 @@ import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_motion.dart';
 import '../tokens/prism_radii.dart';
 
-/// Button hierarchy for Microlingo.
+/// Button hierarchy for Certigo.
 ///
 /// * [PrismButtonVariant.primary] — the single most important action on a
 ///   screen (Continue, Start lesson, Submit). Solid brand gradient + glow.

@@ -1,4 +1,4 @@
-# Politique de confidentialité — Microlingo
+# Politique de confidentialité — Certigo
 
 Dernière mise à jour : juin 2026
 

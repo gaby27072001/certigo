@@ -203,7 +203,7 @@ class _AchievementCard extends StatelessWidget {
                 tooltip: 'Partager',
                 icon: const Icon(Icons.share_rounded, size: 18),
                 onPressed: () => Share.share(
-                  '🏆 J\'ai débloqué ${achievement.name} sur Microlingo ! #AzureCertification #Microlingo',
+                  '🏆 J\'ai débloqué ${achievement.name} sur Certigo ! #AzureCertification #Certigo',
                 ),
               ),
             ),

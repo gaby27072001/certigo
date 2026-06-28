@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../tokens/prism_colors.dart';
 
-/// Semantic color roles for Microlingo, exposed as a [ThemeExtension] so any
+/// Semantic color roles for Certigo, exposed as a [ThemeExtension] so any
 /// widget can read `Theme.of(context).extension<PrismColorScheme>()` (or the
 /// `context.prism` helper) and stay correct in light *and* dark mode.
 ///

@@ -14,7 +14,7 @@ name: release-ios
 #   IOS_DIST_CERTIFICATE_P12_BASE64   certificat de distribution (.p12) en base64
 #   IOS_DIST_CERTIFICATE_PASSWORD     mot de passe du .p12
 #   IOS_PROVISIONING_PROFILE_BASE64   profil d'approvisionnement (.mobileprovision) en base64
-#   IOS_PROVISIONING_PROFILE_NAME     nom EXACT du profil (ex: "Microlingo Beta App Store")
+#   IOS_PROVISIONING_PROFILE_NAME     nom EXACT du profil (ex: "Certigo Beta App Store")
 #   IOS_TEAM_ID                       Team ID Apple Developer (10 caractères)
 #   ASC_KEY_ID                        App Store Connect API Key ID
 #   ASC_ISSUER_ID                     App Store Connect Issuer ID
@@ -50,7 +50,7 @@ concurrency:
 
 env:
   FLUTTER_VERSION: "3.24.0"
-  BUNDLE_ID: "com.microlingo.app"
+  BUNDLE_ID: "law-microlingo"
 
 jobs:
   release:
@@ -170,7 +170,7 @@ jobs:
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN" >/dev/null
             security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed 's/[\"[:space:]]//g')
             mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-            echo "$PROFILE_B64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/microlingo_beta.mobileprovision"
+            echo "$PROFILE_B64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/certigo_beta.mobileprovision"
             {
               echo "KEYCHAIN_PATH=$KEYCHAIN"
               echo "IOS_PROVISIONING_PROFILE_NAME=$PROFILE_NAME"
@@ -202,7 +202,7 @@ jobs:
         env:
           # ASC_*, IOS_TEAM_ID et IOS_PROVISIONING_PROFILE_NAME proviennent de l'étape « signing » ($GITHUB_ENV).
           TF_EXTERNAL: ${{ inputs.external }}
-          TF_CHANGELOG: "Bêta Microlingo ${{ steps.ver.outputs.build_name }} (+${{ steps.ver.outputs.build_number }})"
+          TF_CHANGELOG: "Bêta Certigo ${{ steps.ver.outputs.build_name }} (+${{ steps.ver.outputs.build_number }})"
         run: |
           set -euo pipefail
           which fastlane >/dev/null 2>&1 || gem install fastlane --no-document
@@ -238,7 +238,7 @@ jobs:
       - name: Publier l'IPA en artefact
         uses: actions/upload-artifact@v4
         with:
-          name: microlingo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}-ipa
+          name: certigo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}-ipa
           path: apps/mobile/build/ios/ipa/*.ipa
           if-no-files-found: error
 
@@ -253,6 +253,6 @@ jobs:
         run: |
           security delete-keychain "${KEYCHAIN_PATH:-$RUNNER_TEMP/app-signing.keychain-db}" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/ExportOptions.plist" 2>/dev/null || true
-          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/microlingo_beta.mobileprovision" 2>/dev/null || true
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/certigo_beta.mobileprovision" 2>/dev/null || true
           az logout --output none 2>/dev/null || true
           echo "Matériel de signature supprimé du runner."

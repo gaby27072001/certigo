@@ -28,7 +28,7 @@ abstract interface class CredentialsGateway {
 }
 
 /// Implémentation réelle : poste sur les points de terminaison anonymes
-/// `auth/register`, `auth/login`, `auth/refresh` de l'API Microlingo.
+/// `auth/register`, `auth/login`, `auth/refresh` de l'API Certigo.
 ///
 /// Utilise un [ApiClient] **sans jeton** (`tokenProvider` nul) : ces appels sont
 /// anonymes — c'est précisément eux qui produisent le premier jeton.

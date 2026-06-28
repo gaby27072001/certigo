@@ -1,6 +1,6 @@
 # Release mobile — Pipeline & runbooks
 
-Documentation opérationnelle pour publier les bêtas Microlingo.
+Documentation opérationnelle pour publier les bêtas Certigo.
 **Priorité : Android d'abord, puis iOS.** Pipeline reproductible :
 `code → build signée → upload beta store`.
 
@@ -28,15 +28,14 @@ Documentation opérationnelle pour publier les bêtas Microlingo.
 | Élément | Valeur |
 |---|---|
 | App Flutter | `apps/mobile` |
-| applicationId / bundle id | `com.microlingo.app` — ⚠️ **NON modifiable après le 1er upload Play** |
-| Nom affiché | Microlingo |
+| applicationId Android / bundle id iOS | `law.microlingo` (Android) / `law-microlingo` (iOS) — ⚠️ identifiants store stables |
+| Nom affiché | Certigo |
 | versionName | lu depuis `apps/mobile/pubspec.yaml` (`version:` → partie avant `+`) |
 | versionCode / build number | `github.run_number` (auto-incrémenté), override possible |
 | Workflows | `release-android.yml` (prêt), `release-ios.yml` (Phase iOS) |
 | CI inchangée | `ci-mobile.yml` (format/analyze/test) — aucune régression |
 
-> ⚠️ **`com.microlingo.app` est un placeholder explicite.** Il doit être confirmé
-> **avant la toute première publication Play** : l'applicationId est définitif une
+> ⚠️ **`law.microlingo` est l'applicationId Android actuel.** L'applicationId est définitif une
 > fois la première build uploadée. S'il change, mettre à jour :
 > `apps/mobile/android/app/build.gradle` (`applicationId`),
 > `PLAY_PACKAGE_NAME` dans `release-android.yml`, et la fiche store.
@@ -52,7 +51,7 @@ les **secrets GitHub**.
 
 ### 2.1 Recommandé — Azure Key Vault (zéro secret dans GitHub) ⭐
 
-Les secrets de signature vivent dans le Key Vault `kv-microlingo-<env>-<suffixe>`
+Les secrets de signature vivent dans le Key Vault `law-microlingo-<env>-<suffixe>`
 (déjà déployé par `infra/`), lus à la volée par l'**identité managée du runner**.
 Rien n'est stocké dans GitHub ; la rotation se fait en un seul endroit.
 
@@ -61,8 +60,8 @@ Rien n'est stocké dans GitHub ; la rotation se fait en un seul endroit.
 1. **Identité managée du runner** : active une identité (system-assigned) sur la
    VM du runner et récupère son `principalId` :
    ```bash
-   az vm identity assign -g rg-microlingo-ci -n <vm-runner>
-   az vm show -g rg-microlingo-ci -n <vm-runner> --query identity.principalId -o tsv
+   az vm identity assign -g law-microlingo-ci -n <vm-runner>
+   az vm show -g law-microlingo-ci -n <vm-runner> --query identity.principalId -o tsv
    ```
 2. **Droit de lecture sur le Key Vault** — au choix :
    - via Bicep (IaC) : redéploie `infra/main.bicep` avec
@@ -76,12 +75,12 @@ Rien n'est stocké dans GitHub ; la rotation se fait en un seul endroit.
      ```
 3. **Variable de dépôt** (non sensible) désignant le vault à utiliser :
    ```bash
-   gh variable set AZURE_KEYVAULT_NAME --body 'kv-microlingo-dev-xxxxxx'
+   gh variable set AZURE_KEYVAULT_NAME --body 'law-microlingo-dev-xxxxxx'
    ```
 4. **Charger les secrets dans le Key Vault** (une seule commande) :
    ```powershell
    Copy-Item tools/secrets/mobile-secrets.env.example tools/secrets/mobile-secrets.env  # puis renseigne-le
-   ./tools/secrets/set-keyvault-secrets.ps1 -VaultName kv-microlingo-dev-xxxxxx
+   ./tools/secrets/set-keyvault-secrets.ps1 -VaultName law-microlingo-dev-xxxxxx
    ```
    *(`mobile-secrets.env` est gitignoré ; le script encode keystore / certificat /
    profil / clé en base64 et pousse chaque valeur. `-DryRun` pour prévisualiser.)*
@@ -125,7 +124,7 @@ Utilisé automatiquement si `AZURE_KEYVAULT_NAME` n'est **pas** définie.
 | `IOS_DIST_CERTIFICATE_P12_BASE64` | iOS | Certificat de distribution (.p12) en base64 |
 | `IOS_DIST_CERTIFICATE_PASSWORD` | iOS | Mot de passe du .p12 |
 | `IOS_PROVISIONING_PROFILE_BASE64` | iOS | Profil d'approvisionnement App Store (.mobileprovision) base64 |
-| `IOS_PROVISIONING_PROFILE_NAME` | iOS | Nom EXACT du profil (ex : `Microlingo Beta App Store`) |
+| `IOS_PROVISIONING_PROFILE_NAME` | iOS | Nom EXACT du profil (ex : `Certigo Beta App Store`) |
 | `IOS_TEAM_ID` | iOS | Team ID Apple Developer (10 caractères) |
 | `ASC_KEY_ID` | iOS | App Store Connect API Key ID |
 | `ASC_ISSUER_ID` | iOS | App Store Connect Issuer ID |
@@ -141,11 +140,11 @@ Utilisé automatiquement si `AZURE_KEYVAULT_NAME` n'est **pas** définie.
 
 ### 3.1 Pré-requis du runner self-hosted
 
-Le runner `microlingo-ci` (Linux X64) doit disposer de Flutter/Dart (déjà requis
+Le runner `law-microlingo` (Linux X64) doit disposer de Flutter/Dart (déjà requis
 par la CI). Le workflow installe lui-même **JDK 17** et le **SDK Android**
 (`android-actions/setup-android` + `sdkmanager`), donc aucune action manuelle
 supplémentaire n'est nécessaire. L'egress internet passe par la NAT Gateway
-`nat-microlingo` (voir README).
+`law-microlingo` (voir README).
 
 ### 3.2 Générer le keystore upload (one-time, en local)
 
@@ -192,7 +191,7 @@ gh secret set ANDROID_KEY_PASSWORD      --body '<mot_de_passe_cle>'
 ### 3.4 Configurer Google Play (one-time)
 
 1. **Créer l'application** dans la [Google Play Console](https://play.google.com/console)
-   avec le package `com.microlingo.app`.
+   avec le package `law.microlingo`.
 2. **Activer Play App Signing** (proposé au 1er upload).
 3. **Compte de service** : dans Google Cloud, créez un compte de service, générez
    une **clé JSON**. Dans la Play Console → *Configuration → accès à l'API* →
@@ -262,10 +261,10 @@ git push origin v0.1.0
 ### 4.1 Pré-requis Apple (one-time)
 
 1. Compte **Apple Developer Program** (payant) pour l'équipe.
-2. **App ID** `com.microlingo.app` (portail Apple Developer ou App Store Connect).
+2. **App ID** `law-microlingo` (portail Apple Developer ou App Store Connect).
 3. **App** créée dans **App Store Connect** (mêmes bundle id et nom).
 4. **Certificat de distribution** (Apple Distribution) + **profil d'approvisionnement
-   App Store** pour `com.microlingo.app`.
+   App Store** pour `law-microlingo`.
 5. **Clé API App Store Connect** (rôle App Manager) : Key ID, Issuer ID, fichier `.p8`.
 
 ### 4.2 Préparer les secrets iOS (depuis un Mac)
@@ -282,7 +281,7 @@ base64 -i AuthKey_XXXX.p8          > authkey.b64    # -> ASC_KEY_P8_BASE64
 gh secret set IOS_DIST_CERTIFICATE_P12_BASE64 < cert.b64
 gh secret set IOS_DIST_CERTIFICATE_PASSWORD   --body '<mdp_du_p12>'
 gh secret set IOS_PROVISIONING_PROFILE_BASE64 < profile.b64
-gh secret set IOS_PROVISIONING_PROFILE_NAME   --body 'Microlingo Beta App Store'
+gh secret set IOS_PROVISIONING_PROFILE_NAME   --body 'Certigo Beta App Store'
 gh secret set IOS_TEAM_ID                     --body '<TEAM_ID>'
 gh secret set ASC_KEY_ID                      --body '<KEY_ID>'
 gh secret set ASC_ISSUER_ID                   --body '<ISSUER_ID>'
@@ -298,7 +297,7 @@ gh secret set ASC_KEY_P8_BASE64               < authkey.b64
 > 📍 Les builds iOS sont désormais lancés depuis le **dashboard Codemagic**
 > (plus depuis GitHub Actions).
 
-1. Se connecter sur <https://codemagic.io> → sélectionner le repo Microlingo.
+1. Se connecter sur <https://codemagic.io> → sélectionner le repo Certigo.
 2. Cliquer **Start new build** → choisir le workflow **`ios-release`**.
    - Pour un dry run (IPA sans upload) : choisir **`ios-release-dry`**.
    - Pour distribuer aux testeurs externes : modifier `beta_groups` dans
@@ -460,7 +459,7 @@ fixe et revenir à `flutter.ndkVersion` (vérifier avec `flutter doctor -v`).
 - [ ] Secrets présents : `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
       `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`.
 - [ ] (1ère fois) App créée dans Play Console + piste de test interne existante.
-- [ ] applicationId `com.microlingo.app` **confirmé** (définitif après 1er upload).
+- [ ] applicationId `law.microlingo` **confirmé** (définitif après 1er upload).
 - [ ] Run de validation `dry_run=true` réussi (AAB/IPA signé produit).
 - [ ] **iOS** : intégration Codemagic configurée (§4.0) ; clé API App Store Connect
       ajoutée dans le dashboard Codemagic (intégration `AppStoreConnect`) ; code

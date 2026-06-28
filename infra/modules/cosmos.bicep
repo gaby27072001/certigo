@@ -1,4 +1,4 @@
-// Cosmos DB (Core/SQL API, serverless) + database + the Microlingo
+// Cosmos DB (Core/SQL API, serverless) + database + the Certigo
 // containers with their locked partition keys.
 @description('Cosmos DB account name (globally unique).')
 param accountName string

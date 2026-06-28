@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-/// Prism color tokens — the raw palette of the Microlingo design language.
+/// Prism color tokens — the raw palette of the Certigo design language.
 ///
 /// These are *primitive* tokens. UI code should almost never reference them
 /// directly; prefer the semantic roles exposed by [PrismColorScheme] via the
@@ -11,7 +11,7 @@ class PrismColors {
   const PrismColors._();
 
   // ---- Brand -------------------------------------------------------------
-  /// Primary "Azure Blue" — the signature brand color of Microlingo. This is
+  /// Primary "Azure Blue" — the signature brand color of Certigo. This is
   /// Microsoft's official Azure/Fluent blue (`themePrimary`), chosen so the app
   /// instantly *reads* as Azure — the way Duolingo's green signals Duolingo.
   static const Color primary = Color(0xFF0078D4);

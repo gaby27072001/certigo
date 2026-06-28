@@ -47,13 +47,13 @@ concurrency:
 env:
   FLUTTER_VERSION: "3.24.0"
   # ⚠️ Doit correspondre à applicationId dans apps/mobile/android/app/build.gradle
-  PLAY_PACKAGE_NAME: "com.microlingo.app"
+  PLAY_PACKAGE_NAME: "law.microlingo"
   AAB_PATH: "apps/mobile/build/app/outputs/bundle/release/app-release.aab"
 
 jobs:
   release:
     name: Build AAB signé + publication Play
-    runs-on: [self-hosted, Linux, X64, microlingo-ci]
+    runs-on: [self-hosted, Linux, X64, law-microlingo]
     # Approval gate: configure required reviewers on the "beta" environment
     # (Settings → Environments) so a human signs off before any Play publish.
     environment: beta
@@ -186,7 +186,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: microlingo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}-aab
+          name: certigo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}-aab
           path: ${{ env.AAB_PATH }}
           if-no-files-found: error
           retention-days: 3
@@ -204,7 +204,7 @@ jobs:
             exit 0
           fi
           az login --identity --output none 2>/dev/null || true
-          AAB_NAME="microlingo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}.aab"
+          AAB_NAME="certigo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}.aab"
           az storage blob upload \
             --account-name "$STORAGE_ACCOUNT" \
             --container-name "android-releases" \
@@ -263,7 +263,7 @@ jobs:
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             -H "Content-Type: application/octet-stream" \
-            "$UPLOAD_URL?name=microlingo-release.aab" \
+            "$UPLOAD_URL?name=certigo-release.aab" \
             --data-binary "@$AAB_PATH"
 
           echo "> ⬆️ Artefact quota dépassé — AAB publié en **GitHub Release** \`$TAG\`." >> "$GITHUB_STEP_SUMMARY"
@@ -282,7 +282,7 @@ jobs:
             --notes "Auto-generated signed AAB from CI (artifact quota fallback)" \
             --prerelease \
             --target "$GITHUB_SHA" \
-            "$AAB_PATH#microlingo-release.aab"
+            "$AAB_PATH#certigo-release.aab"
           echo "> ⬆️ Artefact quota dépassé — AAB publié en **GitHub Release** \`build-aab-latest\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publier sur Google Play (piste ${{ steps.ver.outputs.track }})

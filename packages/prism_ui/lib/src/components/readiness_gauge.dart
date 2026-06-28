@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../theme/prism_color_scheme.dart';
 
-/// The hero progress signature of Microlingo: a 270° arc gauge that renders a
+/// The hero progress signature of Certigo: a 270° arc gauge that renders a
 /// track's **Readiness Score** (0–100, the product's North-Star metric).
 ///
 /// The arc fills with a brand gradient and animates from the previous value so

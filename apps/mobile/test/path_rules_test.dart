@@ -1,6 +1,6 @@
 import 'package:data/data.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:microlingo/features/path/application/path_rules.dart';
+import 'package:certigo/features/path/application/path_rules.dart';
 
 PathLesson _lesson(String id, NodeStatus status) =>
     PathLesson(id: id, title: id, status: status, estMinutes: 5, masteryPct: 0);
