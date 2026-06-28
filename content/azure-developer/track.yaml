@@ -1,5 +1,6 @@
 id: azure-developer
 code: AZURE-DEVELOPER
+provider: microsoft
 title: 'Microsoft Certified: Azure Developer Associate'
 level: associate
 summary: Microsoft certification (Developer) covering Azure.

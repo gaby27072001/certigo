@@ -1,5 +1,6 @@
 id: github-advanced-security
 code: GITHUB-ADVANCED-SECURITY
+provider: microsoft
 title: GitHub Advanced Security
 level: associate
 summary: Microsoft certification (Administrator, Developer, DevOps Engineer, Solution

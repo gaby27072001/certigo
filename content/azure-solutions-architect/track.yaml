@@ -1,5 +1,6 @@
 id: azure-solutions-architect
 code: AZURE-SOLUTIONS-ARCHITECT
+provider: microsoft
 title: 'Microsoft Certified: Azure Solutions Architect Expert'
 level: expert
 summary: Microsoft certification (Solution Architect) covering Azure.

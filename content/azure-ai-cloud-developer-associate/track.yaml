@@ -1,5 +1,6 @@
 id: azure-ai-cloud-developer-associate
 code: AZURE-AI-CLOUD-DEVELOPER-ASSOCIATE
+provider: microsoft
 title: 'Microsoft Certified: Azure AI Cloud Developer Associate (beta)'
 level: associate
 summary: Microsoft certification (Developer) covering Azure.

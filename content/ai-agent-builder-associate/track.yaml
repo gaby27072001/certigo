@@ -1,5 +1,6 @@
 id: ai-agent-builder-associate
 code: AI-AGENT-BUILDER-ASSOCIATE
+provider: microsoft
 title: 'Microsoft Certified: AI Agent Builder Associate'
 level: associate
 summary: Microsoft certification (App Maker, Developer) covering Azure, Microsoft

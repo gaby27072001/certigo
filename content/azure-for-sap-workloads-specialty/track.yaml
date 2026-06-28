@@ -1,5 +1,6 @@
 id: azure-for-sap-workloads-specialty
 code: AZURE-FOR-SAP-WORKLOADS-SPECIALTY
+provider: microsoft
 title: 'Microsoft Certified: Azure for SAP Workloads Specialty'
 level: associate
 summary: Microsoft certification (Solution Architect) covering Azure.

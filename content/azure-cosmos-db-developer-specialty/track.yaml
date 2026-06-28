@@ -1,5 +1,6 @@
 id: azure-cosmos-db-developer-specialty
 code: AZURE-COSMOS-DB-DEVELOPER-SPECIALTY
+provider: microsoft
 title: 'Microsoft Certified: Azure Cosmos DB Developer Specialty'
 level: associate
 summary: Microsoft certification (Developer) covering Azure.

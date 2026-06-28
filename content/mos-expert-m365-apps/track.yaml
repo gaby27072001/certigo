@@ -1,5 +1,6 @@
 id: mos-expert-m365-apps
 code: MOS-EXPERT-M365-APPS
+provider: microsoft
 title: 'Microsoft Office Specialist: Expert (Microsoft 365 Apps)'
 level: expert
 summary: Microsoft certification (Business User) covering Word, Excel.

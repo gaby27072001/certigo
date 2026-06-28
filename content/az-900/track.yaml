@@ -3,6 +3,7 @@
 # Domain weights mirror the public AZ-900 exam skills outline and sum to 1.0.
 id: az-900
 code: AZ-900
+provider: microsoft
 title: Microsoft Azure Fundamentals
 level: fundamentals
 summary: >

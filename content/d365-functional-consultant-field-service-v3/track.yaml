@@ -1,5 +1,6 @@
 id: d365-functional-consultant-field-service-v3
 code: D365-FUNCTIONAL-CONSULTANT-FIELD-SERVICE-V3
+provider: microsoft
 title: 'Microsoft Certified: Dynamics 365 Field Service Functional Consultant Associate'
 level: associate
 summary: Microsoft certification (Functional Consultant) covering Dynamics 365.

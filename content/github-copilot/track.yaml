@@ -1,5 +1,6 @@
 id: github-copilot
 code: GITHUB-COPILOT
+provider: microsoft
 title: GitHub Copilot
 level: associate
 summary: Microsoft certification (App Maker, Developer, DevOps Engineer, Technology
