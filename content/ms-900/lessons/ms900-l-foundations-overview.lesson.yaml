@@ -1,0 +1,53 @@
+id: ms900-l-foundations-overview
+trackId: ms-900
+unitId: ms900-u-core-objectives
+domainId: core-objectives
+title: MS-900 fundamentals overview
+estMinutes: 8
+blocks:
+  - type: hook
+    conceptId: ms900-c-value
+    body: >
+      Votre client veut moderniser la collaboration et reduire les couts
+      d'exploitation. Cette lecon pose les bases MS-900 pour argumenter la
+      valeur Microsoft 365.
+  - type: concept
+    conceptId: ms900-c-value
+    title: Microsoft 365 proposition de valeur
+    body: >
+      Microsoft 365 combine productivite (Microsoft 365 Apps), communication
+      (Teams), securite (Defender) et conformite (Purview) dans une approche
+      cloud integree.
+  - type: example
+    conceptId: ms900-c-value
+    title: Exemple concret
+    body: >
+      Une PME remplace des outils heterogenes par Microsoft 365 Business
+      Premium, standardise l'identite avec Entra ID, et renforce la protection
+      des postes et emails sans multiplier les consoles d'administration.
+  - type: check
+    conceptId: ms900-c-value
+    check:
+      id: ms900-l-foundations-overview-check-1
+      conceptId: ms900-c-value
+      type: mcq
+      difficulty: 1
+      stem: Quel enonce decrit le mieux la valeur de Microsoft 365 pour MS-900 ?
+      options:
+        - id: a
+          label: Une suite cloud integree couvrant productivite, collaboration, securite et conformite
+        - id: b
+          label: Uniquement une offre de stockage de fichiers sans services de securite
+        - id: c
+          label: Une plateforme reservee aux workloads on-premises
+      correct:
+        - a
+      explanation: >
+        MS-900 met en avant une plateforme cloud integree, pas un service
+        isole. La valeur vient de la complementarite entre workloads et
+        controles de securite/conformite.
+  - type: recap
+    conceptId: ms900-c-value
+    body: >
+      Pour MS-900, sachez positionner Microsoft 365 comme une plateforme cloud
+      unifiee qui combine collaboration, productivite, securite et conformite.
