@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microlingo.Application.Abstractions;
 using Microlingo.Application.Dtos;
 using Microlingo.Application.Services;
 using Xunit;
@@ -17,6 +18,12 @@ internal sealed class TutorServiceHarness
     {
         var context = new FakeUserContext(UserId, "Tester");
         return new TutorService(context, Clock, Content, LearnerModels, new FakeTutorCompletion(completionReply), Events);
+    }
+
+    public TutorService Build(ITutorCompletion completion)
+    {
+        var context = new FakeUserContext(UserId, "Tester");
+        return new TutorService(context, Clock, Content, LearnerModels, completion, Events);
     }
 
     public static TutorExplainRequest Request(params string[] selected)
@@ -113,6 +120,29 @@ public sealed class TutorServiceTests
 
         dto.Source.Should().Be("grounded");
         dto.Headline.Should().NotBe("Here is a made-up grounding.");
+    }
+
+    [Fact]
+    public async Task ExplainAsync_falls_back_to_grounded_when_llm_provider_is_temporarily_unavailable()
+    {
+        var h = new TutorServiceHarness();
+        var service = h.Build(new ThrowingTutorCompletion(
+            new TutorCompletionUnavailableException("azure openai unavailable")));
+
+        var dto = await service.ExplainAsync(TutorServiceHarness.Request("a"));
+
+        dto.Source.Should().Be("grounded");
+    }
+
+    [Fact]
+    public async Task ExplainAsync_surfaces_unexpected_llm_failures()
+    {
+        var h = new TutorServiceHarness();
+        var service = h.Build(new ThrowingTutorCompletion(new InvalidOperationException("bug")));
+
+        var act = async () => await service.ExplainAsync(TutorServiceHarness.Request("a"));
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("bug");
     }
 
     [Fact]

@@ -297,6 +297,12 @@ internal sealed class FakeTutorCompletion : ITutorCompletion
     }
 }
 
+internal sealed class ThrowingTutorCompletion(Exception exception) : ITutorCompletion
+{
+    public Task<string?> CompleteAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default)
+        => Task.FromException<string?>(exception);
+}
+
 /// <summary>
 /// Service de classement contrôlable pour les tests de notifications : on règle la
 /// zone (« promotion » / « relegation » / « safe »), le rang et le nombre d'inscrits

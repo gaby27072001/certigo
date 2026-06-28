@@ -112,7 +112,22 @@ var host = new HostBuilder()
         services.AddScoped<IPurchaseRepository, CosmosPurchaseRepository>();
         services.AddScoped<IFriendRepository, CosmosFriendRepository>();
         services.AddScoped<ILearnerModelRepository, CosmosLearnerModelRepository>();
-        services.AddSingleton<ITutorCompletion, NullTutorCompletion>();
+        var tutorLlmEnabled = string.Equals(configuration["TUTOR_LLM_ENABLED"], "true", StringComparison.OrdinalIgnoreCase);
+        if (tutorLlmEnabled)
+        {
+            var tutorLlmOptions = TutorLlmConfiguration.FromConfiguration(configuration);
+            services.AddSingleton(tutorLlmOptions);
+            services.AddHttpClient("TutorLlm", client => client.Timeout = TimeSpan.FromSeconds(20));
+            services.AddSingleton<ITutorCompletion>(sp => new AzureOpenAiTutorCompletion(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient("TutorLlm"),
+                sp.GetRequiredService<TokenCredential>(),
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AzureOpenAiTutorCompletion>>(),
+                sp.GetRequiredService<TutorLlmOptions>()));
+        }
+        else
+        {
+            services.AddSingleton<ITutorCompletion, NullTutorCompletion>();
+        }
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IContentService, ContentService>();
         services.AddScoped<IQuizService, QuizService>();
@@ -137,4 +152,54 @@ host.Run();
 public sealed class SystemClock : IClock
 {
     public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+}
+
+internal static class TutorLlmConfiguration
+{
+    private const string DefaultApiVersion = "2024-10-21";
+    private const int DefaultMaxOutputTokens = 400;
+
+    public static TutorLlmOptions FromConfiguration(IConfiguration configuration)
+    {
+        var endpointRaw = configuration["TUTOR_LLM_ENDPOINT"];
+        if (string.IsNullOrWhiteSpace(endpointRaw)
+            || !Uri.TryCreate(endpointRaw, UriKind.Absolute, out var endpoint))
+        {
+            throw new InvalidOperationException(
+                "TUTOR_LLM_ENDPOINT must be an absolute Azure OpenAI resource endpoint when TUTOR_LLM_ENABLED=true.");
+        }
+
+        var deployment = configuration["TUTOR_LLM_DEPLOYMENT"];
+        if (string.IsNullOrWhiteSpace(deployment))
+        {
+            throw new InvalidOperationException(
+                "TUTOR_LLM_DEPLOYMENT is required when TUTOR_LLM_ENABLED=true.");
+        }
+
+        var apiVersion = configuration["TUTOR_LLM_API_VERSION"];
+        var apiKey = configuration["TUTOR_LLM_API_KEY"];
+        var maxOutputTokens = DefaultMaxOutputTokens;
+        var maxOutputTokensRaw = configuration["TUTOR_LLM_MAX_OUTPUT_TOKENS"];
+        if (!string.IsNullOrWhiteSpace(maxOutputTokensRaw)
+            && (!int.TryParse(maxOutputTokensRaw, out maxOutputTokens) || maxOutputTokens <= 0))
+        {
+            throw new InvalidOperationException(
+                "TUTOR_LLM_MAX_OUTPUT_TOKENS must be a positive integer when provided.");
+        }
+
+        return new TutorLlmOptions(
+            NormalizeEndpoint(endpoint),
+            deployment,
+            string.IsNullOrWhiteSpace(apiVersion) ? DefaultApiVersion : apiVersion,
+            string.IsNullOrWhiteSpace(apiKey) ? null : apiKey,
+            maxOutputTokens);
+    }
+
+    private static Uri NormalizeEndpoint(Uri endpoint)
+    {
+        var builder = new UriBuilder(endpoint);
+        var path = builder.Path.TrimEnd('/');
+        builder.Path = string.IsNullOrEmpty(path) ? "/" : $"{path}/";
+        return builder.Uri;
+    }
 }

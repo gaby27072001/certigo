@@ -17,6 +17,12 @@ public sealed class ConcurrencyConflictException(string message) : Exception(mes
 /// replayed or concurrent submission can never be applied twice.
 public sealed class DuplicateRecordException(string message) : Exception(message);
 
+/// Raised when the optional tutor LLM cannot be reached or returns a runtime
+/// service error. Callers may deliberately fall back to the grounded tutor
+/// explanation, but unexpected coding/configuration bugs should still surface.
+public sealed class TutorCompletionUnavailableException(string message, Exception? innerException = null)
+    : Exception(message, innerException);
+
 public interface IUserContext
 {
     string UserId { get; }

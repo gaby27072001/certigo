@@ -76,9 +76,11 @@ public sealed class TutorService(
     }
 
     // Attempts an LLM upgrade, but only adopts it if it survives the guardrails
-    // (grounding, length, exam-integrity). Any failure, empty reply, malformed
-    // JSON, or guardrail violation falls back to the grounded explanation, which
-    // is always safe. The recommendation stays grounded regardless of source.
+    // (grounding, length, exam-integrity). A controlled provider outage falls
+    // back to the grounded explanation, which is always safe; unexpected bugs
+    // still surface. Empty replies, malformed JSON, or guardrail violations also
+    // fall back to the grounded path. The recommendation stays grounded
+    // regardless of source.
     private async Task<TutorExplanation> UpgradeAsync(
         TutorContext ctx,
         TutorExplanation grounded,
@@ -90,7 +92,7 @@ public sealed class TutorService(
             raw = await completion.CompleteAsync(
                 TutorPromptBuilder.System(), TutorPromptBuilder.User(ctx), cancellationToken);
         }
-        catch
+        catch (TutorCompletionUnavailableException)
         {
             return grounded;
         }
