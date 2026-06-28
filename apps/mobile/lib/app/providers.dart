@@ -113,12 +113,18 @@ final friendRepositoryProvider = Provider<FriendRepository>(
   (Ref ref) => RemoteFriendRepository(ref.watch(apiClientProvider)),
 );
 
+final shareCardRepositoryProvider = Provider<ShareCardRepository>(
+  (Ref ref) => RemoteShareCardRepository(ref.watch(apiClientProvider)),
+);
+
 final examRepositoryProvider = Provider<ExamRepository>(
   (Ref ref) => RemoteExamRepository(ref.watch(apiClientProvider)),
 );
 
 /// User-controlled theme mode (persisted by settings later). System by default.
-final themeModeProvider = StateProvider<ThemeMode>((Ref ref) => ThemeMode.system);
+final themeModeProvider = StateProvider<ThemeMode>(
+  (Ref ref) => ThemeMode.system,
+);
 
 /// Audio-haptic feedback for lesson checks (§3.14). Real haptics by default;
 /// tests / reduce-motion override this with [SilentLessonFeedback].
@@ -137,11 +143,12 @@ final meProvider = FutureProvider.autoDispose<UserProfile>((Ref ref) async {
 });
 
 /// A learner's path through one certification track, keyed by trackId.
-final pathProvider = FutureProvider.autoDispose.family<LearningPath, String>(
-  (Ref ref, String trackId) async {
-    return _orThrow(await ref.watch(pathRepositoryProvider).getPath(trackId));
-  },
-);
+final pathProvider = FutureProvider.autoDispose.family<LearningPath, String>((
+  Ref ref,
+  String trackId,
+) async {
+  return _orThrow(await ref.watch(pathRepositoryProvider).getPath(trackId));
+});
 
 /// The certification track currently shown on the Path screen. Switching it in
 /// the course picker re-points the whole primary tab, Duolingo-style. Defaults
@@ -150,18 +157,23 @@ final activeTrackProvider = StateProvider<String>((Ref ref) => 'az-900');
 
 /// The catalog of certification tracks the app offers, for the course picker.
 /// Auto-disposed: it is only loaded while the picker sheet is open.
-final catalogProvider = FutureProvider.autoDispose<List<TrackSummary>>((Ref ref) async {
+final catalogProvider = FutureProvider.autoDispose<List<TrackSummary>>((
+  Ref ref,
+) async {
   return _orThrow(await ref.watch(catalogRepositoryProvider).getCatalog());
 });
 
 /// The "next best action" coach for one track: a server-ranked shelf of what
 /// the learner should do next. Auto-disposed and keyed by trackId so Home can
 /// surface a coaching section without recomputing anything on-device.
-final nextBestProvider = FutureProvider.autoDispose.family<NextBest, String>(
-  (Ref ref, String trackId) async {
-    return _orThrow(await ref.watch(recommendationRepositoryProvider).getNextBest(trackId));
-  },
-);
+final nextBestProvider = FutureProvider.autoDispose.family<NextBest, String>((
+  Ref ref,
+  String trackId,
+) async {
+  return _orThrow(
+    await ref.watch(recommendationRepositoryProvider).getNextBest(trackId),
+  );
+});
 
 /// The learner's current weekly league standings.
 final leagueProvider = FutureProvider.autoDispose<League>((Ref ref) async {
@@ -176,29 +188,52 @@ final seasonProvider = FutureProvider.autoDispose<Season>((Ref ref) async {
 
 /// Today's daily quest board with progress and claimable rewards. Auto-disposed;
 /// refreshed after a claim via `ref.invalidate`.
-final questBoardProvider = FutureProvider.autoDispose<QuestBoard>((Ref ref) async {
+final questBoardProvider = FutureProvider.autoDispose<QuestBoard>((
+  Ref ref,
+) async {
   return _orThrow(await ref.watch(questRepositoryProvider).getQuests());
 });
 
 /// The learner's achievements with per-achievement progress. Read-only.
-final achievementBoardProvider = FutureProvider.autoDispose<AchievementBoard>((Ref ref) async {
-  return _orThrow(await ref.watch(achievementRepositoryProvider).getAchievements());
+final achievementBoardProvider = FutureProvider.autoDispose<AchievementBoard>((
+  Ref ref,
+) async {
+  return _orThrow(
+    await ref.watch(achievementRepositoryProvider).getAchievements(),
+  );
 });
 
 /// The gem shop catalog plus the learner's current gem balance. Auto-disposed;
 /// refreshed after a purchase via `ref.invalidate`.
-final shopCatalogProvider = FutureProvider.autoDispose<ShopCatalog>((Ref ref) async {
+final shopCatalogProvider = FutureProvider.autoDispose<ShopCatalog>((
+  Ref ref,
+) async {
   return _orThrow(await ref.watch(shopRepositoryProvider).getShop());
 });
 
 /// The learner's friends list. Auto-disposed; refreshed after add/remove.
-final friendListProvider = FutureProvider.autoDispose<FriendList>((Ref ref) async {
+final friendListProvider = FutureProvider.autoDispose<FriendList>((
+  Ref ref,
+) async {
   return _orThrow(await ref.watch(friendRepositoryProvider).getFriends());
 });
 
 /// The friends-only weekly leaderboard, highlighting the learner. Auto-disposed.
-final friendLeaderboardProvider = FutureProvider.autoDispose<FriendLeaderboard>((Ref ref) async {
-  return _orThrow(await ref.watch(friendRepositoryProvider).getFriendLeaderboard());
+final friendLeaderboardProvider = FutureProvider.autoDispose<FriendLeaderboard>(
+  (Ref ref) async {
+    return _orThrow(
+      await ref.watch(friendRepositoryProvider).getFriendLeaderboard(),
+    );
+  },
+);
+
+/// The server-authoritative daily share payload for the current learner.
+final dailyShareCardProvider = FutureProvider.autoDispose<ShareCard>((
+  Ref ref,
+) async {
+  return _orThrow(
+    await ref.watch(shareCardRepositoryProvider).getDailyShareCard(),
+  );
 });
 
 /// A freshly generated mock exam for the [activeTrackProvider] track: blueprint,
@@ -207,6 +242,8 @@ final friendLeaderboardProvider = FutureProvider.autoDispose<FriendLeaderboard>(
 final examProvider = FutureProvider.autoDispose<MockExam>((Ref ref) async {
   final String trackId = ref.watch(activeTrackProvider);
   return _orThrow(
-    await ref.watch(examRepositoryProvider).generateExam(MockExamRequest(trackId: trackId)),
+    await ref
+        .watch(examRepositoryProvider)
+        .generateExam(MockExamRequest(trackId: trackId)),
   );
 });

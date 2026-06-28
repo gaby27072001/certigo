@@ -32,12 +32,12 @@ class ProfileScreen extends ConsumerWidget {
           data: (UserProfile me) => _ProfileContent(
             me: me,
             mode: mode,
-            onMode: (ThemeMode m) => ref.read(themeModeProvider.notifier).state = m,
+            onMode: (ThemeMode m) =>
+                ref.read(themeModeProvider.notifier).state = m,
           ),
           loading: () => const _ProfileLoading(),
-          error: (Object error, StackTrace _) => PrismStatusView.error(
-            onRetry: () => ref.invalidate(meProvider),
-          ),
+          error: (Object error, StackTrace _) =>
+              PrismStatusView.error(onRetry: () => ref.invalidate(meProvider)),
         ),
       ),
     );
@@ -45,7 +45,11 @@ class ProfileScreen extends ConsumerWidget {
 }
 
 class _ProfileContent extends ConsumerWidget {
-  const _ProfileContent({required this.me, required this.mode, required this.onMode});
+  const _ProfileContent({
+    required this.me,
+    required this.mode,
+    required this.onMode,
+  });
 
   final UserProfile me;
   final ThemeMode mode;
@@ -60,10 +64,25 @@ class _ProfileContent extends ConsumerWidget {
     final String displayName = nameOverride ?? me.displayName;
     final String handle = handleOverride ?? me.handle;
     final List<_BadgeData> badges = <_BadgeData>[
-      _BadgeData(Icons.rocket_launch_rounded, 'Premier décollage', p.primary, me.xp > 0),
-      _BadgeData(Icons.local_fire_department_rounded, 'Série de 7 j', p.ember, me.streakDays >= 7),
+      _BadgeData(
+        Icons.rocket_launch_rounded,
+        'Premier décollage',
+        p.primary,
+        me.xp > 0,
+      ),
+      _BadgeData(
+        Icons.local_fire_department_rounded,
+        'Série de 7 j',
+        p.ember,
+        me.streakDays >= 7,
+      ),
       _BadgeData(Icons.bolt_rounded, '1 000 XP', p.xpGold, me.xp >= 1000),
-      _BadgeData(Icons.diamond_rounded, 'Collectionneur', p.info, me.gems >= 100),
+      _BadgeData(
+        Icons.diamond_rounded,
+        'Collectionneur',
+        p.info,
+        me.gems >= 100,
+      ),
     ];
 
     return ListView(
@@ -79,7 +98,10 @@ class _ProfileContent extends ConsumerWidget {
                 backgroundColor: p.primarySoft,
                 child: Text(
                   _initials(displayName),
-                  style: t.titleLarge?.copyWith(color: p.primary, fontWeight: FontWeight.w800),
+                  style: t.titleLarge?.copyWith(
+                    color: p.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -134,7 +156,12 @@ class _ProfileContent extends ConsumerWidget {
           runSpacing: 12,
           children: <Widget>[
             for (final _BadgeData b in badges)
-              _Badge(icon: b.icon, label: b.label, color: b.color, locked: !b.unlocked),
+              _Badge(
+                icon: b.icon,
+                label: b.label,
+                color: b.color,
+                locked: !b.unlocked,
+              ),
           ],
         ),
         const SizedBox(height: 12),
@@ -142,6 +169,12 @@ class _ProfileContent extends ConsumerWidget {
           label: 'Tous les succès',
           icon: Icons.chevron_right_rounded,
           onPressed: () => context.go(Routes.achievements),
+        ),
+        const SizedBox(height: 12),
+        PrismButton.secondary(
+          label: 'Partager le score du jour',
+          icon: Icons.share_rounded,
+          onPressed: () => context.go(Routes.dailyShare),
         ),
         const SizedBox(height: 24),
 
@@ -227,7 +260,9 @@ class _SignOutSection extends ConsumerWidget {
               tone: p.error,
               icon: Icons.logout_rounded,
               loading: busy,
-              onPressed: busy ? null : () => ref.read(authControllerProvider.notifier).signOut(),
+              onPressed: busy
+                  ? null
+                  : () => ref.read(authControllerProvider.notifier).signOut(),
             ),
           ],
         ),
@@ -298,9 +333,15 @@ class _Badge extends StatelessWidget {
             decoration: BoxDecoration(
               color: locked ? p.surfaceAlt : color.withOpacity(0.14),
               shape: BoxShape.circle,
-              border: Border.all(color: locked ? p.border : color.withOpacity(0.4)),
+              border: Border.all(
+                color: locked ? p.border : color.withOpacity(0.4),
+              ),
             ),
-            child: Icon(icon, color: locked ? p.textSecondary : color, size: 28),
+            child: Icon(
+              icon,
+              color: locked ? p.textSecondary : color,
+              size: 28,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -332,12 +373,18 @@ class _ThemeRow extends StatelessWidget {
         SegmentedButton<ThemeMode>(
           style: const ButtonStyle(visualDensity: VisualDensity.compact),
           segments: const <ButtonSegment<ThemeMode>>[
-            ButtonSegment<ThemeMode>(value: ThemeMode.light, icon: Icon(Icons.light_mode_rounded)),
+            ButtonSegment<ThemeMode>(
+              value: ThemeMode.light,
+              icon: Icon(Icons.light_mode_rounded),
+            ),
             ButtonSegment<ThemeMode>(
               value: ThemeMode.system,
               icon: Icon(Icons.brightness_auto_rounded),
             ),
-            ButtonSegment<ThemeMode>(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_rounded)),
+            ButtonSegment<ThemeMode>(
+              value: ThemeMode.dark,
+              icon: Icon(Icons.dark_mode_rounded),
+            ),
           ],
           selected: <ThemeMode>{mode},
           onSelectionChanged: (Set<ThemeMode> s) => onChanged(s.first),
@@ -430,7 +477,6 @@ class _NotificationPrefRowState extends State<_NotificationPrefRow> {
   }
 }
 
-
 class _ProfileLoading extends StatelessWidget {
   const _ProfileLoading();
 
@@ -467,8 +513,11 @@ String _subtitleFromParts(String handle, int level) {
 }
 
 String _initials(String name) {
-  final List<String> parts =
-      name.trim().split(RegExp(r'\s+')).where((String s) => s.isNotEmpty).toList();
+  final List<String> parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((String s) => s.isNotEmpty)
+      .toList();
   if (parts.isEmpty) return '?';
   final String a = parts.first.substring(0, 1);
   final String b = parts.length > 1 ? parts[1].substring(0, 1) : '';
@@ -512,10 +561,7 @@ class _TappableRow extends StatelessWidget {
             ),
           ),
           if (trailing != null)
-            Text(
-              trailing!,
-              style: t.labelMedium?.copyWith(color: p.primary),
-            ),
+            Text(trailing!, style: t.labelMedium?.copyWith(color: p.primary)),
           const SizedBox(width: 4),
           Icon(Icons.chevron_right_rounded, color: p.textSecondary, size: 18),
         ],
@@ -547,10 +593,7 @@ class _SwitchPrefRow extends ConsumerWidget {
         Icon(icon, color: p.textSecondary, size: 20),
         const SizedBox(width: 12),
         Expanded(child: Text(label, style: t.bodyLarge)),
-        Switch(
-          value: value,
-          onChanged: (bool v) => onChanged(v, ref),
-        ),
+        Switch(value: value, onChanged: (bool v) => onChanged(v, ref)),
       ],
     );
   }
@@ -629,7 +672,9 @@ class _ComingSoonChip extends StatelessWidget {
       ),
       child: Text(
         'Bientôt',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textSecondary),
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: p.textSecondary),
       ),
     );
   }
@@ -702,8 +747,9 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
                 onChanged: (String v) {
                   final bool valid = RegExp(r'^[a-z0-9_]*$').hasMatch(v);
                   setDialogState(() {
-                    validationError =
-                        valid ? null : 'Minuscules, chiffres et _ uniquement';
+                    validationError = valid
+                        ? null
+                        : 'Minuscules, chiffres et _ uniquement';
                   });
                 },
               ),
@@ -765,9 +811,9 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
       if (AppEnv.entraConfigured) {
         await ref.read(authControllerProvider.notifier).signOut();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Disponible bientôt')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Disponible bientôt')));
       }
     }
   }
@@ -921,7 +967,9 @@ class _LearningSectionState extends ConsumerState<_LearningSection> {
                           if (v == true) {
                             current = <AzureDomain>{...current, d};
                           } else {
-                            current = current.where((AzureDomain x) => x != d).toSet();
+                            current = current
+                                .where((AzureDomain x) => x != d)
+                                .toSet();
                           }
                         });
                       },
@@ -954,8 +1002,9 @@ class _LearningSectionState extends ConsumerState<_LearningSection> {
     final DailyGoalOption goal = ref.watch(dailyGoalProvider);
     final KnowledgeLevel level = ref.watch(knowledgeLevelProvider);
     final Set<AzureDomain> domains = ref.watch(domainsProvider);
-    final String domainsLabel =
-        domains.isEmpty ? 'Non défini' : '${domains.length} domaine${domains.length > 1 ? 's' : ''}';
+    final String domainsLabel = domains.isEmpty
+        ? 'Non défini'
+        : '${domains.length} domaine${domains.length > 1 ? 's' : ''}';
 
     return PrismCard(
       child: Column(
@@ -1002,10 +1051,17 @@ class _AppInfoSection extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(Icons.info_outline_rounded, color: p.textSecondary, size: 20),
+              Icon(
+                Icons.info_outline_rounded,
+                color: p.textSecondary,
+                size: 20,
+              ),
               const SizedBox(width: 12),
               Expanded(child: Text('Version de l\'app', style: t.bodyLarge)),
-              Text('0.1.0 (build 1)', style: t.labelMedium?.copyWith(color: p.textSecondary)),
+              Text(
+                '0.1.0 (build 1)',
+                style: t.labelMedium?.copyWith(color: p.textSecondary),
+              ),
             ],
           ),
           Divider(color: p.border, height: 24),
@@ -1017,10 +1073,18 @@ class _AppInfoSection extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: Row(
               children: <Widget>[
-                Icon(Icons.description_outlined, color: p.textSecondary, size: 20),
+                Icon(
+                  Icons.description_outlined,
+                  color: p.textSecondary,
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
                 Expanded(child: Text('Licences', style: t.bodyLarge)),
-                Icon(Icons.chevron_right_rounded, color: p.textSecondary, size: 18),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: p.textSecondary,
+                  size: 18,
+                ),
               ],
             ),
           ),
