@@ -1,4 +1,4 @@
-# Mascottes Microlingo — comment fournir tes personnages
+# Mascottes Certigo — comment fournir tes personnages
 
 Ce dossier accueille l'art de tes personnages (l'équivalent de Duo & ses amis).
 Une fois les images déposées ici **avec les bons noms**, elles apparaissent

@@ -1,11 +1,11 @@
 import 'package:core/core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:microlingo/features/auth/application/auth_controller.dart';
-import 'package:microlingo/features/auth/application/auth_gateway.dart';
-import 'package:microlingo/features/auth/application/auth_state.dart';
-import 'package:microlingo/features/auth/application/credentials_gateway.dart';
-import 'package:microlingo/features/auth/application/session_store.dart';
+import 'package:certigo/features/auth/application/auth_controller.dart';
+import 'package:certigo/features/auth/application/auth_gateway.dart';
+import 'package:certigo/features/auth/application/auth_state.dart';
+import 'package:certigo/features/auth/application/credentials_gateway.dart';
+import 'package:certigo/features/auth/application/session_store.dart';
 
 /// Passerelle OIDC factice : aucune dépendance plateforme, comportement
 /// scriptable par test (succès, échec, jeton rafraîchi…).

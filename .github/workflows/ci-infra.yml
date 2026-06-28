@@ -16,7 +16,7 @@ concurrency:
 jobs:
   bicep-build:
     name: Bicep build (lint)
-    runs-on: [self-hosted, Linux, X64, microlingo-ci]
+    runs-on: [self-hosted, Linux, X64, law-microlingo]
     steps:
       - uses: actions/checkout@v4
       - name: Build main.bicep

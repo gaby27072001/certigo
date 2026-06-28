@@ -1,6 +1,6 @@
 import 'package:data/data.dart';
 import 'package:flutter_test/flutter_test.dart' hide unorderedEquals;
-import 'package:microlingo/features/lesson/application/answer_grading.dart';
+import 'package:certigo/features/lesson/application/answer_grading.dart';
 
 /// Unit tests for the pure grading core (`answer_grading.dart`).
 ///

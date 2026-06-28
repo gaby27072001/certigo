@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:microlingo/features/onboarding/application/onboarding_controller.dart';
+import 'package:certigo/features/onboarding/application/onboarding_controller.dart';
 
 /// Tests the onboarding state machine that drives the wizard and gates the app.
 void main() {

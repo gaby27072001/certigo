@@ -70,7 +70,7 @@ resource vaultDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = 
 var hasEmail = !empty(alertEmail)
 
 resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
-  name: 'ag-microlingo-security'
+  name: 'ag-certigo-security'
   location: 'global'
   tags: tags
   properties: {
@@ -108,7 +108,7 @@ var siteMetricAlerts = [
 ]
 
 resource httpAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [ for a in siteMetricAlerts: {
-  name: 'alert-microlingo-${a.name}'
+  name: 'alert-certigo-${a.name}'
   location: 'global'
   tags: tags
   properties: {

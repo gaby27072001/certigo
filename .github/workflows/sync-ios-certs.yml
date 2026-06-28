@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  BUNDLE_ID: "com.microlingo.app"
+  BUNDLE_ID: "law-microlingo"
 
 jobs:
   sync:

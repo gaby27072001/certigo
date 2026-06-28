@@ -22,7 +22,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: [self-hosted, Linux, X64, microlingo-ci]
+    runs-on: [self-hosted, Linux, X64, law-microlingo]
     permissions:
       security-events: write
       actions: read

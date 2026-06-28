@@ -27,7 +27,7 @@ class SecureSessionStore implements SessionStore {
               iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
             );
 
-  static const String _key = 'microlingo.session.v1';
+  static const String _key = 'certigo.session.v1';
 
   final FlutterSecureStorage _storage;
 

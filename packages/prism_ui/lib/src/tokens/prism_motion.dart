@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 
 /// Prism motion tokens — durations and curves for a calm, premium feel.
 ///
-/// Motion in Microlingo is *informative*, never decorative noise: it confirms
+/// Motion in Certigo is *informative*, never decorative noise: it confirms
 /// actions (answer correct/incorrect), reveals depth (glass layering) and
 /// rewards progress (XP, mastery rings). All timings respect
 /// `MediaQuery.disableAnimations` at call sites.

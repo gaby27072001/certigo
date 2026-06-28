@@ -1,4 +1,4 @@
-/// Prism — the Microlingo design system.
+/// Prism — the Certigo design system.
 ///
 /// A premium, Liquid-Glass-inspired UI kit: translucent surfaces, luminous
 /// depth and motivating progress components, implemented with cross-platform

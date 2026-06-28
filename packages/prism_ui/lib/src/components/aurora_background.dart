@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/prism_color_scheme.dart';
 
-/// The signature Microlingo backdrop: a soft, slow "aurora" of brand-tinted
+/// The signature Certigo backdrop: a soft, slow "aurora" of brand-tinted
 /// radial glows over the base background. It gives the glass surfaces something
 /// luminous to refract without competing with content (very low opacity).
 ///

@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   Charge tous les secrets de signature mobile dans Azure Key Vault, en une commande.
 
@@ -13,10 +13,10 @@
   rôle "Key Vault Secrets Officer" sur le Key Vault cible.
 
 .EXAMPLE
-  ./set-keyvault-secrets.ps1 -VaultName kv-microlingo-dev-a2msqu
+  ./set-keyvault-secrets.ps1 -VaultName law-microlingo-dev-a2msqu
 
 .EXAMPLE
-  ./set-keyvault-secrets.ps1 -VaultName kv-microlingo-dev-a2msqu -ConfigPath .\mobile-secrets.env -DryRun
+  ./set-keyvault-secrets.ps1 -VaultName law-microlingo-dev-a2msqu -ConfigPath .\mobile-secrets.env -DryRun
 #>
 [CmdletBinding()]
 param(

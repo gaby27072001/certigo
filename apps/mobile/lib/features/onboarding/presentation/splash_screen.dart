@@ -81,7 +81,7 @@ class _SplashScreenState extends State<SplashScreen> {
                           ),
                           const SizedBox(height: 24),
                           Text(
-                            'Microlingo',
+                            'Certigo',
                             style: Theme.of(context).textTheme.displayMedium?.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w800,

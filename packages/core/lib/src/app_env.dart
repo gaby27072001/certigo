@@ -2,8 +2,8 @@
 ///
 /// Never hard-code endpoints or client ids. Build flavors pass values:
 /// ```
-/// flutter run --dart-define=MICROLINGO_ENV=dev \
-///   --dart-define=API_BASE_URL=https://dev.api.microlingo.app \
+/// flutter run --dart-define=CERTIGO_ENV=dev \
+///   --dart-define=API_BASE_URL=https://dev.api.certigo.app \
 ///   --dart-define=ENTRA_CLIENT_ID=... --dart-define=ENTRA_AUTHORITY=...
 /// ```
 enum AppFlavor { dev, staging, prod }
@@ -11,7 +11,7 @@ enum AppFlavor { dev, staging, prod }
 class AppEnv {
   const AppEnv._();
 
-  static const String _rawEnv = String.fromEnvironment('MICROLINGO_ENV', defaultValue: 'dev');
+  static const String _rawEnv = String.fromEnvironment('CERTIGO_ENV', defaultValue: 'dev');
 
   static AppFlavor get flavor => switch (_rawEnv) {
         'prod' => AppFlavor.prod,
@@ -21,7 +21,7 @@ class AppEnv {
 
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://dev.api.microlingo.app/api',
+    defaultValue: 'https://dev.api.certigo.app/api',
   );
 
   /// Dev/staging bearer token sent until Entra External ID is wired. The backend
@@ -35,7 +35,7 @@ class AppEnv {
   static const String entraAuthority = String.fromEnvironment('ENTRA_AUTHORITY', defaultValue: '');
   static const String entraRedirectUri = String.fromEnvironment(
     'ENTRA_REDIRECT_URI',
-    defaultValue: 'microlingo://auth',
+    defaultValue: 'certigo://auth',
   );
 
   static const List<String> entraScopes = <String>[

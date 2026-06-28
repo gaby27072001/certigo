@@ -1,6 +1,6 @@
-# Politique de sécurité — Microlingo
+# Politique de sécurité — Certigo
 
-La sécurité de Microlingo et de ses utilisateurs est une priorité. Ce document
+La sécurité de Certigo et de ses utilisateurs est une priorité. Ce document
 explique comment signaler une vulnérabilité et ce que couvre notre périmètre.
 
 ## Signaler une vulnérabilité
@@ -60,5 +60,5 @@ suivies par Dependabot.
 
 ## Contenu de certification
 
-Microlingo n'est ni affilié ni approuvé par Microsoft et **ne reproduit aucun
+Certigo n'est ni affilié ni approuvé par Microsoft et **ne reproduit aucun
 contenu d'examen réel**. Tout signalement à ce sujet doit être adressé en privé.

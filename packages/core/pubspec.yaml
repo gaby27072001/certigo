@@ -1,5 +1,5 @@
 name: core
-description: "Core primitives for Microlingo: Result/Failure error flow and environment configuration. Pure Dart."
+description: "Core primitives for Certigo: Result/Failure error flow and environment configuration. Pure Dart."
 version: 0.1.0
 publish_to: none
 

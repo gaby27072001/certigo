@@ -1,11 +1,11 @@
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:microlingo/features/lesson/application/check_outcome.dart';
-import 'package:microlingo/features/lesson/presentation/widgets/check_step_widget.dart';
-import 'package:microlingo/features/lesson/presentation/widgets/cloze_step_widget.dart';
-import 'package:microlingo/features/lesson/presentation/widgets/match_pairs_step_widget.dart';
-import 'package:microlingo/features/lesson/presentation/widgets/ordering_step_widget.dart';
+import 'package:certigo/features/lesson/application/check_outcome.dart';
+import 'package:certigo/features/lesson/presentation/widgets/check_step_widget.dart';
+import 'package:certigo/features/lesson/presentation/widgets/cloze_step_widget.dart';
+import 'package:certigo/features/lesson/presentation/widgets/match_pairs_step_widget.dart';
+import 'package:certigo/features/lesson/presentation/widgets/ordering_step_widget.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 /// Widget tests for the Duolingo-style exercise shells (§3.3). Each widget is

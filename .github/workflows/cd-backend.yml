@@ -1,6 +1,6 @@
 name: cd-backend
 
-# Deploys the Microlingo Azure infrastructure (Bicep) then the .NET 8
+# Deploys the Certigo Azure infrastructure (Bicep) then the .NET 8
 # Azure Functions API code.
 #
 # Required OIDC federated-identity secrets (repo/env settings):
@@ -38,7 +38,7 @@ jobs:
   deploy-infra:
     name: Deploy infrastructure (${{ inputs.environment || 'dev' }})
     environment: ${{ inputs.environment || 'dev' }}
-    runs-on: [self-hosted, Linux, X64, microlingo-ci]
+    runs-on: [self-hosted, Linux, X64, law-microlingo]
     permissions:
       id-token: write
       contents: read
@@ -58,7 +58,7 @@ jobs:
         id: deploy-bicep
         run: |
           FUNCTION_APP_NAME=$(az deployment sub create \
-            --name microlingo-$TARGET_ENV \
+            --name certigo-$TARGET_ENV \
             --location westeurope \
             --template-file infra/main.bicep \
             --parameters infra/params/$TARGET_ENV.bicepparam \
@@ -68,7 +68,7 @@ jobs:
   deploy-backend:
     name: Deploy backend code (${{ inputs.environment || 'dev' }})
     environment: ${{ inputs.environment || 'dev' }}
-    runs-on: [self-hosted, Linux, X64, microlingo-ci]
+    runs-on: [self-hosted, Linux, X64, law-microlingo]
     needs: deploy-infra
     permissions:
       id-token: write
@@ -83,7 +83,7 @@ jobs:
 
       - name: Publish
         run: |
-          dotnet publish backend/src/Microlingo.Api/Microlingo.Api.csproj \
+          dotnet publish backend/src/Certigo.Api/Certigo.Api.csproj \
             --configuration Release \
             --output ./publish
 
@@ -102,7 +102,7 @@ jobs:
           for i in 1 2 3 4 5; do
             echo "Attempt $i of 5..."
             if az functionapp deployment source config-zip \
-              --resource-group rg-microlingo-$TARGET_ENV \
+              --resource-group law-microlingo-$TARGET_ENV \
               --name ${{ needs.deploy-infra.outputs.functionAppName }} \
               --src ./publish.zip; then
               echo "Deployment succeeded on attempt $i"
