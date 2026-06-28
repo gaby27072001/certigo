@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microlingo.Application.Test
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microlingo.Infrastructure.Tests", "tests\Microlingo.Infrastructure.Tests\Microlingo.Infrastructure.Tests.csproj", "{E2179642-C185-4563-A66C-173F5EF60DFA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microlingo.Api.Tests", "tests\Microlingo.Api.Tests\Microlingo.Api.Tests.csproj", "{817768A1-C512-4DE0-A819-51C2BA66F246}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,9 +54,14 @@ Global
 		{E2179642-C185-4563-A66C-173F5EF60DFA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E2179642-C185-4563-A66C-173F5EF60DFA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E2179642-C185-4563-A66C-173F5EF60DFA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{817768A1-C512-4DE0-A819-51C2BA66F246}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{817768A1-C512-4DE0-A819-51C2BA66F246}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{817768A1-C512-4DE0-A819-51C2BA66F246}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{817768A1-C512-4DE0-A819-51C2BA66F246}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{58DC80B5-0034-41F6-98DC-29BA723E67B3} = {32CE068C-2935-420A-A014-F5AE16FBD02C}
 		{E2179642-C185-4563-A66C-173F5EF60DFA} = {32CE068C-2935-420A-A014-F5AE16FBD02C}
+		{817768A1-C512-4DE0-A819-51C2BA66F246} = {32CE068C-2935-420A-A014-F5AE16FBD02C}
 	EndGlobalSection
 EndGlobal
