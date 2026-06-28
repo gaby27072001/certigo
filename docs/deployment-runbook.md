@@ -22,13 +22,14 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | Runner configurable (`runner` input + `runs-on` dynamique) | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Jobs rattachés à un `environment:` | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Clarification placeholders Entra en dev | ✅ Fait (cette PR) | `infra/params/dev.bicepparam` |
-| App registration + federated credentials OIDC | ⛔ **Humain** (admin Azure AD) | §T0.1 |
-| 3 secrets GitHub | ⛔ **Humain** (admin repo) | §T0.1 |
-| GitHub Environments `dev`/`staging`/`prod` + reviewers | ⛔ **Humain** (admin repo) | §T0.3 |
+| App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
+| 3 secrets GitHub | ✅ **Fait (session)** — déjà positionnés | §T0.1 |
+| `publicNetworkAccess` storage épinglé `Enabled` (anti-dérive) | ✅ Fait (cette PR) | `infra/modules/storage.bicep` + `infra/main.bicep` |
+| GitHub Environments `dev`/`staging`/`prod` | ✅ **Fait (session)** — créés ; ⚠️ reviewers `prod` bloqués (billing 422) | §T0.3 |
 | Branch protection sur `main` | ⛔ **Humain** (admin repo) | §T0.3 |
-| Déploiement infra `dev` | ⛔ **Humain** (ou amorçage local) | §T0.4 |
-| Validation auth (200/401) | ⛔ **Humain** | §T0.5 |
-| Smoke test | ⛔ **Humain** | §T0.6 |
+| Déploiement infra `dev` | ✅ **Fait (session)** — amorçage local réel | §T0.4 |
+| Validation auth (200/401) | ⛔ **Bloqué** — Functions n'indexent pas (échec plateforme Flex) | §T0.5 + §Statut réel |
+| Smoke test | ⛔ **Bloqué** — idem | §T0.6 + §Statut réel |
 
 ---
 
@@ -56,6 +57,16 @@ az account show -o table
 ## T0.1 — Identité OIDC + secrets GitHub
 
 **Acteur : admin Azure AD + admin du repo GitHub.**
+
+> ✅ **Déjà réalisé dans ce tenant (session Phase 0).** L'identité OIDC existe déjà :
+> app registration **`microlingo-github-actions`** (`appId 4bfc43dc-6a25-404e-a6ab-d19784ab0673`,
+> SP objectId `15d2b34a-c0a0-4b5d-8360-b895a8164706`). Les **3 secrets repo**
+> (`AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID`) sont **déjà positionnés**, et
+> les 3 federated credentials `github-env-dev` / `github-env-staging` / `github-env-prod`
+> (sujet `repo:…:environment:<env>`) ont été **ajoutées cette session**. Les commandes ci-dessous
+> sont la **recette de référence/reproduction** (par ex. pour un nouveau tenant) — ne pas
+> recréer une seconde app `microlingo-github-oidc` sous peine de doublon. Pour réutiliser
+> l'existant, faire `APP_ID=4bfc43dc-6a25-404e-a6ab-d19784ab0673`.
 
 ### Pourquoi Owner (et pas Contributor) ?
 
@@ -162,6 +173,16 @@ gh api -X PUT "repos/$GH_ORG/$GH_REPO/environments/prod" \
   -F "deployment_branch_policy[custom_branch_policies]=false"
 ```
 
+### ⚠️ Limitation GitHub billing observée (session Phase 0)
+
+Sur ce dépôt (privé, détenu par un **compte User**), l'ajout de **required reviewers** à un
+environnement renvoie **HTTP 422** : la fonctionnalité « environment protection rules » (reviewers
+requis, wait timer, branch policy) n'est disponible que pour les **dépôts publics** ou sous un plan
+payant **GitHub Pro / Team / Enterprise**. Conséquence cette session : les environnements
+`dev` / `staging` / `prod` ont bien été **créés**, mais le **gate reviewer sur `prod` n'a pas pu
+être posé**. Résiduel admin : passer le repo sous un plan payant (ou le déplacer sous une org
+éligible), puis ré-exécuter le bloc `prod` ci-dessus.
+
 ### Branch protection sur `main`
 
 Via **Settings → Branches → Add rule** (ou `gh api`), exiger PR + au moins 1 review avant merge :
@@ -223,6 +244,23 @@ gh workflow run cd-backend.yml --repo "$GH_ORG/$GH_REPO" \
 - `cosmosLocation='northeurope'` (westeurope a des limites de capacité AZ).
 - `entraAuthority` / `entraAudience` = **placeholders** : **OK en dev** car `authMode='dev'`
   ⇒ `DevTokenValidator` (Entra non appliqué). Renseigner les vraies valeurs pour staging/prod.
+
+### Storage `publicNetworkAccess` — dérive réconciliée (cette PR)
+
+Le module `infra/modules/storage.bicep` ne fixait **pas** `publicNetworkAccess` ; le compte de
+stockage `dev` live avait dérivé vers `Disabled`. En **Flex Consumption**, la plateforme **tire le
+package applicatif via l'endpoint public** du Storage : avec `Disabled` et **sans private endpoint**,
+le déploiement échoue (observé cette session : `403 InaccessibleStorageException` au config-zip).
+Le paramètre est désormais **explicite, défaut `Enabled`**, et câblé `Enabled` depuis `main.bicep`
+(le durcissement par private endpoints est une tâche **P1**). Le `what-if` prouve que c'est un
+**no-op non destructif** (le storage passe de `modify` à `no change`).
+
+> ⚠️ **Flags policy-enforced — ne pas « corriger ».** `allowSharedKeyAccess: false` et
+> `allowBlobPublicAccess: false` sont **imposés au niveau org** par des Azure Policy
+> (`StorageAccount_DisableLocalAuth_Modify`, `StorageAccount_BlobAnonymousAccess_Modify`). Le
+> `what-if` peut les afficher en `modify` : c'est attendu et **aucune** policy n'impose
+> `publicNetworkAccess`. L'accès au blob se fait via **identité managée** (RBAC `Storage Blob Data
+> Owner`), pas par clé partagée.
 
 ---
 
@@ -293,6 +331,85 @@ curl -s -X POST "$APP_HOST/api/quiz/<lessonId>/submit" \
 
 Critères de succès : `/api/health` → `200 {status:healthy}` ; `/api/catalog/tracks` → `401`
 sans token et `200` avec ; `/api/quiz/<lessonId>/submit` répond (selon payload).
+
+---
+
+## Statut réel d'exécution (session Phase 0) + résiduels stricts
+
+Cette section consigne ce qui a été **réellement exécuté** durant la session (au-delà de la
+documentation), et le **résiduel strict** qui nécessite une action hors périmètre repo.
+
+### Ce qui est effectivement configuré
+
+- **T0.1 — OIDC : ✅ COMPLET.** App `microlingo-github-actions` (`appId 4bfc43dc-…`) + SP +
+  3 secrets repo déjà en place ; 3 federated credentials `github-env-dev/staging/prod` ajoutées.
+- **T0.3 — Environments : ✅ PARTIEL.** `dev` / `staging` / `prod` créés. **Reviewer gate `prod`
+  non posé** (billing GitHub 422, voir §T0.3). Branch protection `main` = résiduel admin.
+- **T0.2 — Runner : ✅ débloqué côté repo.** Test `ubuntu-latest` réellement dispatché
+  (run `28319327945`) → resté `pending`, `jobs[]` vide ⇒ **EMU bloque les runners GitHub-hosted**
+  (confirme le README ci-runner). Run annulé. Runner self-hosted = **P1**.
+
+### Ce qui est effectivement déployé
+
+- **T0.4 — Infra `dev` : ✅ DÉPLOYÉE (amorçage local réel).** `az deployment sub create` exécuté
+  avec succès (Owner sur la souscription). `AUTH_MODE=dev` actif. Ressources avec suffixe
+  `a2msquxibzvcu` (Function App `func-microlingo-dev-a2msquxibzvcu`, Cosmos, Key Vault, App
+  Insights, Storage). Dérive `publicNetworkAccess` du Storage réconciliée (désormais IaC).
+
+### ⛔ Blocage plateforme Flex — Functions n'indexent jamais (T0.5 / T0.6 bloqués)
+
+Malgré un déploiement de package **réussi** (`az functionapp deployment source config-zip` → 202,
+SCM `Success`, sync triggers OK), **aucune des 32 functions de l'app ne s'indexe** :
+
+- `GET /api/health` → **404** (et un `503` transitoire par cold start) ; racine `/` → **200**.
+- ARM `admin/functions` ne liste qu'**1** function : le placeholder plateforme `WarmUp`.
+- ARM `deploymentStatus/latest` reste figé sur **`RuntimeStarting`** avec
+  **0 instance** (`inProgress=0`, `successful=0`, `failed=0`, `errors=null`, `failedInstancesLogs=null`).
+
+**Diagnostic (définitif) :** le cycle de vie Flex est `Build → RuntimeStarting → RuntimeSuccessful`.
+Rester sur `RuntimeStarting` avec **0 instance allouée** et **aucune erreur/log d'échec** signifie que
+**la plateforme n'a jamais alloué de worker** pour spécialiser notre app. Un défaut de code/package
+afficherait `failed > 0` **avec** des logs. `0/0/0` = **défaillance d'allocation/spécialisation côté
+plateforme**, pas une erreur applicative.
+
+**Couches explicitement exonérées** (toutes vérifiées non coupables) : package (zip valide, 99
+fichiers, ~13 Mo), code, `functionAppConfig` + runtime, app settings (8 clés correctes), identité
+managée, **RBAC** (la MI a Storage Blob Data Owner + Storage Queue Data Contributor + Key Vault
+Secrets User), blob du package (présent + frais), manifeste, réseau Storage (Enabled + Allow).
+
+**Remédiations tentées sans succès :** redéploiement One Deploy ×4-5 ; **suppression + recréation
+complète de la Function App** ; nettoyage de 5 role assignments périmées ; **restart explicite**.
+Aucune n'a fait indexer les functions.
+
+> 🔧 **Gotcha recreate-in-place (à connaître).** `functionApp.bicep` nomme ses role assignments
+> `guid(scope.id, functionApp.id, roleDefId)`. Après une recréation **au même nom**, le
+> `functionApp.id` est **identique** → les noms de role assignments ne changent pas, mais le
+> `principalId` de la **nouvelle** identité managée diffère → ARM rejette
+> (`RoleAssignmentUpdateNotPermitted`, et `BadRequest` côté Cosmos SQL role). **Correctif qui
+> fonctionne :** supprimer les anciennes attributions par leur id au scope, puis relancer le
+> déploiement.
+
+### Chemins de déploiement Flex (pièges rencontrés — à retenir)
+
+- **Utiliser `az functionapp deployment source config-zip`** (front-end One Deploy de Flex). Le
+  zip-deploy Kudu **brut** échoue (`403 InaccessibleStorageException`) si le Storage est verrouillé.
+- **`func` Core Tools cassé sur win-arm64** — l'éviter ; tout piloter via `az` / ARM.
+- **SCM basic auth désactivée** (AAD-only). Pour interroger le hostruntime, passer par le proxy ARM
+  `…/hostruntime/admin/...` avec un token `az account get-access-token --resource
+  https://management.azure.com` (construire l'URI par concaténation : PowerShell mange `?api-version`).
+- **EMU bloque `ubuntu-latest`** (cf. ci-dessus) — pour le CI, prévoir le runner self-hosted (P1).
+
+### Résiduel strict (hors périmètre repo)
+
+1. **Azure-support** — escalade de la **défaillance de spécialisation Flex** (worker jamais alloué ;
+   `RuntimeStarting` 0 instance). C'est le **seul** blocage empêchant T0.5/T0.6. Sans functions
+   indexées, impossible de valider auth 200/401 ni le smoke test.
+2. **GitHub plan payant** — pour poser le reviewer gate `prod` (limitation billing 422).
+3. **Runner self-hosted** — pour exécuter le CI sous EMU (`infra/ci-runner/network.bicep`, P1).
+
+> Dès que les functions s'indexent (post-remédiation plateforme), **T0.5 et T0.6 sont prêts à
+> jouer** : voir les commandes en §T0.5 / §T0.6 (host
+> `https://func-microlingo-dev-a2msquxibzvcu.azurewebsites.net`).
 
 ---
 

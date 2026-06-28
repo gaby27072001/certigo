@@ -101,6 +101,12 @@ module storage 'modules/storage.bicep' = {
     enableVersioning: hardened
     blobSoftDeleteDays: hardened ? 30 : 7
     containerSoftDeleteDays: hardened ? 30 : 7
+    // Keep public network access enabled across all envs: the Flex Consumption Function App
+    // pulls its deployment package (app-package container) over the public endpoint via its
+    // managed identity. Locking this down requires private endpoints (P1 hardening for
+    // staging/prod). Set explicitly to prevent drift to Disabled (which caused a 403 on the
+    // package pull in dev).
+    publicNetworkAccess: 'Enabled'
     tags: tags
   }
 }
