@@ -26,7 +26,7 @@
 | 🧩 API | **18 groupes** de Functions (+ `GET /health`) · **≈ 29 endpoints** HTTP |
 | 🗄️ Données | **8 containers Cosmos DB** (serverless ; profil avec **ETag** concurrence optimiste) |
 | 🏗️ Infra | **9 modules Bicep** + params **dev/staging/prod** — durcie par env, **pas encore déployée** |
-| 🤖 CI/CD | **9 workflows** GitHub Actions (runner self‑hosted Azure ; SBOM + gate de release) |
+| 🤖 CI/CD | **9 workflows actifs** GitHub Actions + **2 historiques** iOS désactivés (runner self-hosted Azure ; SBOM + gate de release) |
 | 🔒 Durcissement | Idempotence atomique · ETag · garde auth dev · `/health` + correlation id · CORS/KV/Storage par env |
 
 ---
@@ -49,7 +49,7 @@
 | **App mobile (Flutter)** | 🟢 | `apps/mobile` | **62 fichiers Dart**, 15 features. Tous les moteurs de gamification (saisons, quêtes, succès, boutique, amis, examens) désormais **branchés en écran** + tests widget. Reste la validation E2E sur appareil. |
 | **Cortex (algos partagés)** | 🟢 | `packages/cortex` | SRS, scoring, fil pédagogique — partagé client/serveur. |
 | **Infrastructure (Bicep)** | 🟡 | `infra/` | 8 modules (Functions, Cosmos, Key Vault, App Insights, **Defender, Policy, Diagnostics**, Storage). **Non déployée.** |
-| **CI / qualité** | 🟢 | `.github/workflows` | 6 workflows : backend, mobile, contenu, infra, **CodeQL**, **security‑scan**. |
+| **CI / qualité** | 🟢 | `.github/workflows` | 9 workflows actifs : backend, mobile, contenu, infra, CD backend, **CodeQL**, **lint-workflows**, **release-android**, **security-scan**. 2 workflows iOS GitHub Actions sont historiques et désactivés (`release-ios`, `sync-ios-certs`). |
 
 **Légende :** 🟢 opérationnel & testé · 🟡 partiel / en cours · 🔴 absent.
 
@@ -66,7 +66,7 @@ graph TD
     ROOT --> PKG["🧩 packages/<br/>Paquets Dart partagés"]
     ROOT --> CNT["📚 content/<br/>89 certifs · 144 leçons (YAML)"]
     ROOT --> INF["🏗️ infra/<br/>8 modules Bicep"]
-    ROOT --> CI[".github/workflows/<br/>6 pipelines"]
+    ROOT --> CI[".github/workflows/<br/>9 actifs + 2 historiques"]
     ROOT --> DOC["📄 docs/<br/>README · ARCHITECTURE · ÉTAT"]
 
     BE --> API["Microlingo.Api<br/>17 groupes de Functions"]
@@ -265,11 +265,18 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 | Workflow | Rôle |
 |---|---|
 | `ci-backend.yml` | Build + **325 tests** xUnit (.NET 8) + **6** d'intégration Cosmos (émulateur‑gated). |
-| `ci-mobile.yml` | Analyse + **185 tests** Dart (unit + widget). |
+| `ci-mobile.yml` | Analyse + **185 tests** Dart (unit + widget) ; Flutter **3.24.0** / Dart **3.5.0** épinglés. |
 | `ci-content.yml` | Validation des leçons/certifs contre les schémas JSON. |
 | `ci-infra.yml` | Lint / what‑if Bicep. |
+| `cd-backend.yml` | Déploiement backend vers l'environnement cible. |
 | `codeql.yml` | Analyse statique de sécurité. |
-| `security-scan.yml` | Scan sécurité complémentaire. |
+| `lint-workflows.yml` | Lint des workflows GitHub Actions du dépôt. |
+| `release-android.yml` | AAB Android signé + publication Google Play. |
+| `security-scan.yml` | Scan sécurité complémentaire (NuGet + Bicep). |
+
+> `release-ios.yml` et `sync-ios-certs.yml` sont conservés comme références
+> historiques mais sont désactivés ; la chaîne iOS active est gérée par
+> Codemagic.
 
 > ⚠️ CI exécutée **uniquement sur le runner self‑hosted Azure** (`microlingo-ci`) — les runners
 > GitHub‑hébergés sont désactivés par la politique d'entreprise. Egress via NAT Gateway `nat-microlingo`.
