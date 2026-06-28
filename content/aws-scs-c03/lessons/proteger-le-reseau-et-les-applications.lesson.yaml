@@ -1,0 +1,37 @@
+id: awsscsc03-l-proteger-le-reseau-et-les-applications
+trackId: aws-scs-c03
+unitId: awsscsc03-u-infra-security
+domainId: infra-security
+title: "Protéger le réseau et les applications"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-proteger-le-reseau-et-les-applications
+    body: |
+      Dans l'examen SCS-C03, « Protéger le réseau et les applications » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-proteger-le-reseau-et-les-applications
+    title: "Protéger le réseau et les applications"
+    body: |
+      La sécurité de l'infrastructure combine la segmentation VPC, AWS WAF contre les attaques applicatives (injection, XSS), AWS Shield contre les attaques DDoS, et AWS Network Firewall pour un filtrage réseau avancé.
+  - type: check
+    conceptId: c-proteger-le-reseau-et-les-applications
+    check:
+      id: awsscsc03-l-proteger-le-reseau-et-les-applications-check-1
+      conceptId: c-proteger-le-reseau-et-les-applications
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel service AWS protège les applications web contre les injections SQL et le cross-site scripting ?
+      options:
+        - { id: a, label: "AWS WAF" }
+        - { id: b, label: "Amazon S3" }
+        - { id: c, label: "Amazon Cognito" }
+        - { id: d, label: "AWS Budgets" }
+      correct: [a]
+      explanation: |
+        AWS WAF (Web Application Firewall) filtre le trafic HTTP/S et bloque les attaques applicatives courantes comme les injections SQL et le XSS via des règles.
+  - type: recap
+    conceptId: c-proteger-le-reseau-et-les-applications
+    body: |
+      Retenez l'essentiel de « Protéger le réseau et les applications » pour la certification SCS-C03.

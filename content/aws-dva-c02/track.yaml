@@ -1,0 +1,45 @@
+# AWS Certified Developer – Associate — aws certification track.
+# Domain weights mirror the official DVA-C02 skills outline and sum to 1.0.
+id: aws-dva-c02
+code: "DVA-C02"
+provider: aws
+title: "AWS Certified Developer – Associate"
+level: associate
+examCode: "DVA-C02"
+sourceUrl: "https://aws.amazon.com/certification/certified-developer-associate/"
+summary: |
+  Certification pour développeurs qui conçoivent, déploient et dépannent des applications cloud-natives sur AWS avec Lambda, DynamoDB, API Gateway et les outils CI/CD.
+domains:
+  - id: development
+    name: "Développement avec les services AWS"
+    weight: 0.32
+  - id: security
+    name: "Sécurité"
+    weight: 0.26
+  - id: deployment
+    name: "Déploiement"
+    weight: 0.24
+  - id: troubleshooting
+    name: "Dépannage et optimisation"
+    weight: 0.18
+units:
+  - id: awsdvac02-u-development
+    domainId: development
+    title: "Développement avec les services AWS"
+    lessons:
+      - awsdvac02-l-developper-en-serverless-avec-lambda-et-dynamodb
+  - id: awsdvac02-u-security
+    domainId: security
+    title: "Sécurité"
+    lessons:
+      - awsdvac02-l-authentifier-les-utilisateurs-et-proteger-les-secrets
+  - id: awsdvac02-u-deployment
+    domainId: deployment
+    title: "Déploiement"
+    lessons:
+      - awsdvac02-l-ci-cd-avec-codepipeline-et-sam
+  - id: awsdvac02-u-troubleshooting
+    domainId: troubleshooting
+    title: "Dépannage et optimisation"
+    lessons:
+      - awsdvac02-l-observabilite-avec-cloudwatch-et-x-ray

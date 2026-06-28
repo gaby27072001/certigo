@@ -1,0 +1,37 @@
+id: awsansc01-l-surveiller-et-depanner-le-reseau
+trackId: aws-ans-c01
+unitId: awsansc01-u-network-management
+domainId: network-management
+title: "Surveiller et dépanner le réseau"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-surveiller-et-depanner-le-reseau
+    body: |
+      Dans l'examen ANS-C01, « Surveiller et dépanner le réseau » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-surveiller-et-depanner-le-reseau
+    title: "Surveiller et dépanner le réseau"
+    body: |
+      L'exploitation réseau s'appuie sur les VPC Flow Logs pour analyser le trafic, VPC Reachability Analyzer pour diagnostiquer la connectivité entre ressources, et Amazon CloudWatch pour les métriques et alarmes réseau.
+  - type: check
+    conceptId: c-surveiller-et-depanner-le-reseau
+    check:
+      id: awsansc01-l-surveiller-et-depanner-le-reseau-check-1
+      conceptId: c-surveiller-et-depanner-le-reseau
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel outil AWS analyse la connectivité possible entre deux ressources d'un VPC sans envoyer de trafic réel ?
+      options:
+        - { id: a, label: "VPC Reachability Analyzer" }
+        - { id: b, label: "Amazon S3" }
+        - { id: c, label: "AWS Budgets" }
+        - { id: d, label: "Amazon Cognito" }
+      correct: [a]
+      explanation: |
+        VPC Reachability Analyzer effectue une analyse de configuration pour déterminer si une ressource peut en atteindre une autre, sans générer de trafic, facilitant le dépannage.
+  - type: recap
+    conceptId: c-surveiller-et-depanner-le-reseau
+    body: |
+      Retenez l'essentiel de « Surveiller et dépanner le réseau » pour la certification ANS-C01.

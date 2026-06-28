@@ -1,0 +1,37 @@
+id: awsclfc02-l-avantages-et-valeur-du-cloud-aws
+trackId: aws-clf-c02
+unitId: awsclfc02-u-cloud-concepts
+domainId: cloud-concepts
+title: "Avantages et valeur du cloud AWS"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-avantages-et-valeur-du-cloud-aws
+    body: |
+      Dans l'examen CLF-C02, « Avantages et valeur du cloud AWS » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-avantages-et-valeur-du-cloud-aws
+    title: "Avantages et valeur du cloud AWS"
+    body: |
+      Le cloud AWS remplace les coûts fixes (CAPEX) par des coûts variables (OPEX) facturés à l'usage. Ses bénéfices clés sont l'élasticité (ajuster la capacité à la demande), l'agilité (provisionner en minutes), les économies d'échelle et la portée mondiale via les Régions et zones de disponibilité.
+  - type: check
+    conceptId: c-avantages-et-valeur-du-cloud-aws
+    check:
+      id: awsclfc02-l-avantages-et-valeur-du-cloud-aws-check-1
+      conceptId: c-avantages-et-valeur-du-cloud-aws
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel avantage économique majeur le cloud AWS apporte-t-il par rapport à un centre de données traditionnel ?
+      options:
+        - { id: a, label: "Remplacer des dépenses d'investissement fixes par des coûts variables à l'usage" }
+        - { id: b, label: "Supprimer toute notion de sécurité côté client" }
+        - { id: c, label: "Garantir un matériel gratuit en illimité" }
+        - { id: d, label: "Éliminer le besoin de toute connexion réseau" }
+      correct: [a]
+      explanation: |
+        AWS transforme le CAPEX en OPEX : on paie uniquement les ressources consommées, sans investissement initial lourd ni surdimensionnement.
+  - type: recap
+    conceptId: c-avantages-et-valeur-du-cloud-aws
+    body: |
+      Retenez l'essentiel de « Avantages et valeur du cloud AWS » pour la certification CLF-C02.

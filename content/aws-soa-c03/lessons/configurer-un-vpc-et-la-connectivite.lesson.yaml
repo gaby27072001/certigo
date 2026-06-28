@@ -1,0 +1,37 @@
+id: awssoac03-l-configurer-un-vpc-et-la-connectivite
+trackId: aws-soa-c03
+unitId: awssoac03-u-networking
+domainId: networking
+title: "Configurer un VPC et la connectivité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-configurer-un-vpc-et-la-connectivite
+    body: |
+      Dans l'examen SOA-C03, « Configurer un VPC et la connectivité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-configurer-un-vpc-et-la-connectivite
+    title: "Configurer un VPC et la connectivité"
+    body: |
+      Un Amazon VPC isole le réseau avec des sous-réseaux publics et privés, des tables de routage et des passerelles. La connectivité hybride passe par un VPN site-à-site ou AWS Direct Connect pour une liaison dédiée à faible latence.
+  - type: check
+    conceptId: c-configurer-un-vpc-et-la-connectivite
+    check:
+      id: awssoac03-l-configurer-un-vpc-et-la-connectivite-check-1
+      conceptId: c-configurer-un-vpc-et-la-connectivite
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service offre une connexion réseau dédiée et privée entre un centre de données et AWS ?
+      options:
+        - { id: a, label: "AWS Direct Connect" }
+        - { id: b, label: "Amazon CloudFront" }
+        - { id: c, label: "Amazon S3" }
+        - { id: d, label: "AWS Lambda" }
+      correct: [a]
+      explanation: |
+        AWS Direct Connect établit une liaison réseau privée et dédiée entre les locaux du client et AWS, avec une bande passante stable et une latence réduite.
+  - type: recap
+    conceptId: c-configurer-un-vpc-et-la-connectivite
+    body: |
+      Retenez l'essentiel de « Configurer un VPC et la connectivité » pour la certification SOA-C03.

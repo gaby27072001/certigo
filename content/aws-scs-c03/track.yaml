@@ -1,0 +1,61 @@
+# AWS Certified Security – Specialty — aws certification track.
+# Domain weights mirror the official SCS-C03 skills outline and sum to 1.0.
+id: aws-scs-c03
+code: "SCS-C03"
+provider: aws
+title: "AWS Certified Security – Specialty"
+level: specialty
+examCode: "SCS-C03"
+sourceUrl: "https://aws.amazon.com/certification/certified-security-specialty/"
+summary: |
+  Certification spécialisée en sécurité AWS : détection des menaces, réponse aux incidents, sécurité de l'infrastructure, gestion des identités, protection des données et gouvernance. Version SCS-C03 en vigueur depuis décembre 2025.
+domains:
+  - id: threat-detection
+    name: "Détection des menaces"
+    weight: 0.16
+  - id: incident-response
+    name: "Gestion des incidents de sécurité"
+    weight: 0.14
+  - id: infra-security
+    name: "Sécurité de l'infrastructure"
+    weight: 0.18
+  - id: iam
+    name: "Gestion des identités et des accès"
+    weight: 0.2
+  - id: data-protection
+    name: "Protection des données"
+    weight: 0.18
+  - id: governance
+    name: "Fondations de sécurité et gouvernance"
+    weight: 0.14
+units:
+  - id: awsscsc03-u-threat-detection
+    domainId: threat-detection
+    title: "Détection des menaces"
+    lessons:
+      - awsscsc03-l-detecter-les-menaces-avec-guardduty
+  - id: awsscsc03-u-incident-response
+    domainId: incident-response
+    title: "Gestion des incidents de sécurité"
+    lessons:
+      - awsscsc03-l-repondre-aux-incidents-de-securite
+  - id: awsscsc03-u-infra-security
+    domainId: infra-security
+    title: "Sécurité de l'infrastructure"
+    lessons:
+      - awsscsc03-l-proteger-le-reseau-et-les-applications
+  - id: awsscsc03-u-iam
+    domainId: iam
+    title: "Gestion des identités et des accès"
+    lessons:
+      - awsscsc03-l-concevoir-des-politiques-iam-fines
+  - id: awsscsc03-u-data-protection
+    domainId: data-protection
+    title: "Protection des données"
+    lessons:
+      - awsscsc03-l-chiffrement-et-gestion-des-cles-avec-kms
+  - id: awsscsc03-u-governance
+    domainId: governance
+    title: "Fondations de sécurité et gouvernance"
+    lessons:
+      - awsscsc03-l-gouvernance-et-conformite

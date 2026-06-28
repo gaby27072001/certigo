@@ -1,0 +1,37 @@
+id: awsscsc03-l-gouvernance-et-conformite
+trackId: aws-scs-c03
+unitId: awsscsc03-u-governance
+domainId: governance
+title: "Gouvernance et conformité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-gouvernance-et-conformite
+    body: |
+      Dans l'examen SCS-C03, « Gouvernance et conformité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-gouvernance-et-conformite
+    title: "Gouvernance et conformité"
+    body: |
+      La gouvernance s'appuie sur AWS Config pour la conformité continue, AWS CloudTrail pour la traçabilité des actions, AWS Audit Manager pour automatiser les audits, et AWS Organizations pour appliquer des garde-fous à l'échelle de plusieurs comptes.
+  - type: check
+    conceptId: c-gouvernance-et-conformite
+    check:
+      id: awsscsc03-l-gouvernance-et-conformite-check-1
+      conceptId: c-gouvernance-et-conformite
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel service AWS enregistre l'historique des appels d'API du compte à des fins d'audit ?
+      options:
+        - { id: a, label: "AWS CloudTrail" }
+        - { id: b, label: "Amazon CloudFront" }
+        - { id: c, label: "Amazon SQS" }
+        - { id: d, label: "Amazon ElastiCache" }
+      correct: [a]
+      explanation: |
+        AWS CloudTrail enregistre les appels d'API et activités du compte, fournissant une piste d'audit indispensable à la gouvernance et aux investigations.
+  - type: recap
+    conceptId: c-gouvernance-et-conformite
+    body: |
+      Retenez l'essentiel de « Gouvernance et conformité » pour la certification SCS-C03.

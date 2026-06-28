@@ -1,0 +1,37 @@
+id: awsmlac01-l-entrainer-et-evaluer-un-modele
+trackId: aws-mla-c01
+unitId: awsmlac01-u-model-dev
+domainId: model-dev
+title: "Entraîner et évaluer un modèle"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-entrainer-et-evaluer-un-modele
+    body: |
+      Dans l'examen MLA-C01, « Entraîner et évaluer un modèle » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-entrainer-et-evaluer-un-modele
+    title: "Entraîner et évaluer un modèle"
+    body: |
+      L'entraînement d'un modèle ajuste ses paramètres sur les données d'apprentissage ; le réglage des hyperparamètres optimise ses performances. On évalue un modèle de classification avec des métriques comme la précision, le rappel et le F1-score, en surveillant le sur-apprentissage.
+  - type: check
+    conceptId: c-entrainer-et-evaluer-un-modele
+    check:
+      id: awsmlac01-l-entrainer-et-evaluer-un-modele-check-1
+      conceptId: c-entrainer-et-evaluer-un-modele
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle métrique mesure la proportion de prédictions positives qui sont réellement correctes ?
+      options:
+        - { id: a, label: "La précision (precision)" }
+        - { id: b, label: "La latence" }
+        - { id: c, label: "Le débit réseau" }
+        - { id: d, label: "Le coût de stockage" }
+      correct: [a]
+      explanation: |
+        La précision mesure, parmi les éléments prédits positifs, la part réellement positive. Le rappel mesure la part des vrais positifs correctement détectés.
+  - type: recap
+    conceptId: c-entrainer-et-evaluer-un-modele
+    body: |
+      Retenez l'essentiel de « Entraîner et évaluer un modèle » pour la certification MLA-C01.

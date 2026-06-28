@@ -1,0 +1,37 @@
+id: awssapc02-l-strategies-de-migration-les-7-r
+trackId: aws-sap-c02
+unitId: awssapc02-u-migration
+domainId: migration
+title: "Stratégies de migration (les 7 R)"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-strategies-de-migration-les-7-r
+    body: |
+      Dans l'examen SAP-C02, « Stratégies de migration (les 7 R) » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-strategies-de-migration-les-7-r
+    title: "Stratégies de migration (les 7 R)"
+    body: |
+      La migration vers AWS s'appuie sur les « 7 R » : Rehost (lift-and-shift), Replatform, Refactor, Repurchase, Retire, Retain, Relocate. AWS Migration Hub suit l'avancement et AWS DMS migre les bases de données avec un minimum d'interruption.
+  - type: check
+    conceptId: c-strategies-de-migration-les-7-r
+    check:
+      id: awssapc02-l-strategies-de-migration-les-7-r-check-1
+      conceptId: c-strategies-de-migration-les-7-r
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quelle stratégie de migration consiste à déplacer une application telle quelle, sans modification (lift-and-shift) ?
+      options:
+        - { id: a, label: "Rehost" }
+        - { id: b, label: "Refactor" }
+        - { id: c, label: "Retire" }
+        - { id: d, label: "Repurchase" }
+      correct: [a]
+      explanation: |
+        Rehost (lift-and-shift) déplace l'application sans la modifier. Refactor la réarchitecture, Repurchase la remplace par un produit SaaS, Retire la met hors service.
+  - type: recap
+    conceptId: c-strategies-de-migration-les-7-r
+    body: |
+      Retenez l'essentiel de « Stratégies de migration (les 7 R) » pour la certification SAP-C02.

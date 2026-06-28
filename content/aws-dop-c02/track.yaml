@@ -1,0 +1,61 @@
+# AWS Certified DevOps Engineer – Professional — aws certification track.
+# Domain weights mirror the official DOP-C02 skills outline and sum to 1.0.
+id: aws-dop-c02
+code: "DOP-C02"
+provider: aws
+title: "AWS Certified DevOps Engineer – Professional"
+level: professional
+examCode: "DOP-C02"
+sourceUrl: "https://aws.amazon.com/certification/certified-devops-engineer-professional/"
+summary: |
+  Certification avancée validant l'automatisation du cycle de vie logiciel, l'infrastructure as code, la résilience, l'observabilité et la réponse aux incidents sur AWS.
+domains:
+  - id: sdlc-automation
+    name: "Automatisation du cycle de vie SDLC"
+    weight: 0.22
+  - id: config-iac
+    name: "Gestion de configuration et IaC"
+    weight: 0.17
+  - id: resilient-solutions
+    name: "Solutions cloud résilientes"
+    weight: 0.15
+  - id: monitoring-logging
+    name: "Surveillance et journalisation"
+    weight: 0.15
+  - id: incident-response
+    name: "Réponse aux incidents et événements"
+    weight: 0.14
+  - id: security-compliance
+    name: "Sécurité et conformité"
+    weight: 0.17
+units:
+  - id: awsdopc02-u-sdlc-automation
+    domainId: sdlc-automation
+    title: "Automatisation du cycle de vie SDLC"
+    lessons:
+      - awsdopc02-l-pipelines-ci-cd-avances
+  - id: awsdopc02-u-config-iac
+    domainId: config-iac
+    title: "Gestion de configuration et IaC"
+    lessons:
+      - awsdopc02-l-infrastructure-as-code-avec-cloudformation-et-cdk
+  - id: awsdopc02-u-resilient-solutions
+    domainId: resilient-solutions
+    title: "Solutions cloud résilientes"
+    lessons:
+      - awsdopc02-l-concevoir-des-solutions-auto-reparatrices
+  - id: awsdopc02-u-monitoring-logging
+    domainId: monitoring-logging
+    title: "Surveillance et journalisation"
+    lessons:
+      - awsdopc02-l-observabilite-centralisee
+  - id: awsdopc02-u-incident-response
+    domainId: incident-response
+    title: "Réponse aux incidents et événements"
+    lessons:
+      - awsdopc02-l-automatiser-la-reponse-aux-incidents
+  - id: awsdopc02-u-security-compliance
+    domainId: security-compliance
+    title: "Sécurité et conformité"
+    lessons:
+      - awsdopc02-l-securite-et-conformite-automatisees

@@ -1,0 +1,37 @@
+id: awsscsc03-l-detecter-les-menaces-avec-guardduty
+trackId: aws-scs-c03
+unitId: awsscsc03-u-threat-detection
+domainId: threat-detection
+title: "Détecter les menaces avec GuardDuty"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-detecter-les-menaces-avec-guardduty
+    body: |
+      Dans l'examen SCS-C03, « Détecter les menaces avec GuardDuty » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-detecter-les-menaces-avec-guardduty
+    title: "Détecter les menaces avec GuardDuty"
+    body: |
+      Amazon GuardDuty analyse en continu les journaux (VPC Flow Logs, CloudTrail, DNS) pour détecter des comportements malveillants. Amazon Detective aide à investiguer la cause racine, et Amazon Inspector évalue les vulnérabilités des charges de travail.
+  - type: check
+    conceptId: c-detecter-les-menaces-avec-guardduty
+    check:
+      id: awsscsc03-l-detecter-les-menaces-avec-guardduty-check-1
+      conceptId: c-detecter-les-menaces-avec-guardduty
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel service AWS détecte automatiquement les activités malveillantes en analysant les journaux du compte ?
+      options:
+        - { id: a, label: "Amazon GuardDuty" }
+        - { id: b, label: "Amazon S3" }
+        - { id: c, label: "AWS CloudFormation" }
+        - { id: d, label: "Amazon SQS" }
+      correct: [a]
+      explanation: |
+        Amazon GuardDuty est un service de détection des menaces qui analyse CloudTrail, les VPC Flow Logs et les journaux DNS pour repérer les activités suspectes.
+  - type: recap
+    conceptId: c-detecter-les-menaces-avec-guardduty
+    body: |
+      Retenez l'essentiel de « Détecter les menaces avec GuardDuty » pour la certification SCS-C03.

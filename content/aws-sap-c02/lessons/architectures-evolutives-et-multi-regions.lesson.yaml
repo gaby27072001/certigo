@@ -1,0 +1,37 @@
+id: awssapc02-l-architectures-evolutives-et-multi-regions
+trackId: aws-sap-c02
+unitId: awssapc02-u-new-solutions
+domainId: new-solutions
+title: "Architectures évolutives et multi-régions"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-architectures-evolutives-et-multi-regions
+    body: |
+      Dans l'examen SAP-C02, « Architectures évolutives et multi-régions » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-architectures-evolutives-et-multi-regions
+    title: "Architectures évolutives et multi-régions"
+    body: |
+      Concevoir une nouvelle solution implique de choisir les services adaptés aux exigences (performance, coût, résilience), de découpler les composants et, pour la haute disponibilité mondiale, de déployer en multi-région avec réplication des données et routage par Amazon Route 53.
+  - type: check
+    conceptId: c-architectures-evolutives-et-multi-regions
+    check:
+      id: awssapc02-l-architectures-evolutives-et-multi-regions-check-1
+      conceptId: c-architectures-evolutives-et-multi-regions
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel service permet d'acheminer le trafic des utilisateurs vers la région saine la plus proche pour une application multi-région ?
+      options:
+        - { id: a, label: "Amazon Route 53" }
+        - { id: b, label: "Amazon EBS" }
+        - { id: c, label: "AWS KMS" }
+        - { id: d, label: "Amazon SQS" }
+      correct: [a]
+      explanation: |
+        Amazon Route 53 propose des politiques de routage (latence, géolocalisation, basculement) pour diriger les utilisateurs vers la région appropriée et gérer la résilience multi-région.
+  - type: recap
+    conceptId: c-architectures-evolutives-et-multi-regions
+    body: |
+      Retenez l'essentiel de « Architectures évolutives et multi-régions » pour la certification SAP-C02.

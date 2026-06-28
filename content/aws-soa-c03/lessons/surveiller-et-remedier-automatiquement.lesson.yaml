@@ -1,0 +1,37 @@
+id: awssoac03-l-surveiller-et-remedier-automatiquement
+trackId: aws-soa-c03
+unitId: awssoac03-u-monitoring
+domainId: monitoring
+title: "Surveiller et remédier automatiquement"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-surveiller-et-remedier-automatiquement
+    body: |
+      Dans l'examen SOA-C03, « Surveiller et remédier automatiquement » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-surveiller-et-remedier-automatiquement
+    title: "Surveiller et remédier automatiquement"
+    body: |
+      Amazon CloudWatch collecte métriques, journaux et déclenche des alarmes. Couplé à Amazon EventBridge et AWS Systems Manager, il permet une remédiation automatique : redémarrer une instance, exécuter un runbook ou notifier les équipes.
+  - type: check
+    conceptId: c-surveiller-et-remedier-automatiquement
+    check:
+      id: awssoac03-l-surveiller-et-remedier-automatiquement-check-1
+      conceptId: c-surveiller-et-remedier-automatiquement
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service AWS déclenche une action automatique en réponse à une alarme CloudWatch ou un événement ?
+      options:
+        - { id: a, label: "Amazon EventBridge" }
+        - { id: b, label: "Amazon S3" }
+        - { id: c, label: "AWS KMS" }
+        - { id: d, label: "Amazon Cognito" }
+      correct: [a]
+      explanation: |
+        Amazon EventBridge route les événements (dont les alarmes) vers des cibles comme Lambda ou Systems Manager pour automatiser la remédiation.
+  - type: recap
+    conceptId: c-surveiller-et-remedier-automatiquement
+    body: |
+      Retenez l'essentiel de « Surveiller et remédier automatiquement » pour la certification SOA-C03.

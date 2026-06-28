@@ -1,0 +1,37 @@
+id: awssaac03-l-optimiser-les-couts-de-stockage-et-de-calcul
+trackId: aws-saa-c03
+unitId: awssaac03-u-cost-optimized
+domainId: cost-optimized
+title: "Optimiser les coûts de stockage et de calcul"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-optimiser-les-couts-de-stockage-et-de-calcul
+    body: |
+      Dans l'examen SAA-C03, « Optimiser les coûts de stockage et de calcul » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-optimiser-les-couts-de-stockage-et-de-calcul
+    title: "Optimiser les coûts de stockage et de calcul"
+    body: |
+      L'optimisation des coûts combine le bon dimensionnement des ressources, le choix des classes de stockage S3 (Standard, Infrequent Access, Glacier) selon la fréquence d'accès, et l'usage d'instances réservées ou Spot. S3 Lifecycle automatise la transition des objets vers des classes moins chères.
+  - type: check
+    conceptId: c-optimiser-les-couts-de-stockage-et-de-calcul
+    check:
+      id: awssaac03-l-optimiser-les-couts-de-stockage-et-de-calcul-check-1
+      conceptId: c-optimiser-les-couts-de-stockage-et-de-calcul
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle classe de stockage S3 convient le mieux à des archives rarement consultées et au coût le plus bas ?
+      options:
+        - { id: a, label: "S3 Standard" }
+        - { id: b, label: "S3 Glacier Deep Archive" }
+        - { id: c, label: "S3 Standard-IA" }
+        - { id: d, label: "S3 Intelligent-Tiering" }
+      correct: [b]
+      explanation: |
+        S3 Glacier Deep Archive offre le coût de stockage le plus bas pour des données rarement consultées et tolérantes à des délais de récupération de plusieurs heures.
+  - type: recap
+    conceptId: c-optimiser-les-couts-de-stockage-et-de-calcul
+    body: |
+      Retenez l'essentiel de « Optimiser les coûts de stockage et de calcul » pour la certification SAA-C03.

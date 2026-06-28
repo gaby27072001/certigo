@@ -1,0 +1,37 @@
+id: awsscsc03-l-concevoir-des-politiques-iam-fines
+trackId: aws-scs-c03
+unitId: awsscsc03-u-iam
+domainId: iam
+title: "Concevoir des politiques IAM fines"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-concevoir-des-politiques-iam-fines
+    body: |
+      Dans l'examen SCS-C03, « Concevoir des politiques IAM fines » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-concevoir-des-politiques-iam-fines
+    title: "Concevoir des politiques IAM fines"
+    body: |
+      Une stratégie IAM solide applique le moindre privilège via des politiques basées sur l'identité et les ressources, utilise des rôles plutôt que des clés statiques, et exploite les conditions (par exemple restreindre par adresse IP ou MFA). IAM Access Analyzer détecte les accès trop permissifs.
+  - type: check
+    conceptId: c-concevoir-des-politiques-iam-fines
+    check:
+      id: awsscsc03-l-concevoir-des-politiques-iam-fines-check-1
+      conceptId: c-concevoir-des-politiques-iam-fines
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel outil identifie les ressources partagées avec des entités externes via l'analyse des politiques IAM ?
+      options:
+        - { id: a, label: "IAM Access Analyzer" }
+        - { id: b, label: "Amazon CloudFront" }
+        - { id: c, label: "Amazon EBS" }
+        - { id: d, label: "Amazon SQS" }
+      correct: [a]
+      explanation: |
+        IAM Access Analyzer évalue les politiques basées sur les ressources et signale les accès accordés à des entités externes au compte ou à l'organisation.
+  - type: recap
+    conceptId: c-concevoir-des-politiques-iam-fines
+    body: |
+      Retenez l'essentiel de « Concevoir des politiques IAM fines » pour la certification SCS-C03.

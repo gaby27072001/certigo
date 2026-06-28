@@ -1,0 +1,45 @@
+# AWS Certified Data Engineer – Associate — aws certification track.
+# Domain weights mirror the official DEA-C01 skills outline and sum to 1.0.
+id: aws-dea-c01
+code: "DEA-C01"
+provider: aws
+title: "AWS Certified Data Engineer – Associate"
+level: associate
+examCode: "DEA-C01"
+sourceUrl: "https://aws.amazon.com/certification/certified-data-engineer-associate/"
+summary: |
+  Certification validant la conception de pipelines de données sur AWS : ingestion et transformation, choix des magasins de données, opérations et gouvernance avec Glue, Kinesis, Redshift et Lake Formation.
+domains:
+  - id: ingestion-transformation
+    name: "Ingestion et transformation des données"
+    weight: 0.34
+  - id: store-management
+    name: "Gestion du stockage de données"
+    weight: 0.26
+  - id: data-ops
+    name: "Opérations et support des données"
+    weight: 0.22
+  - id: data-security
+    name: "Sécurité et gouvernance des données"
+    weight: 0.18
+units:
+  - id: awsdeac01-u-ingestion-transformation
+    domainId: ingestion-transformation
+    title: "Ingestion et transformation des données"
+    lessons:
+      - awsdeac01-l-pipelines-d-ingestion-par-lots-et-en-flux
+  - id: awsdeac01-u-store-management
+    domainId: store-management
+    title: "Gestion du stockage de données"
+    lessons:
+      - awsdeac01-l-choisir-le-bon-magasin-de-donnees
+  - id: awsdeac01-u-data-ops
+    domainId: data-ops
+    title: "Opérations et support des données"
+    lessons:
+      - awsdeac01-l-orchestrer-et-surveiller-les-pipelines
+  - id: awsdeac01-u-data-security
+    domainId: data-security
+    title: "Sécurité et gouvernance des données"
+    lessons:
+      - awsdeac01-l-gouverner-les-donnees-avec-lake-formation

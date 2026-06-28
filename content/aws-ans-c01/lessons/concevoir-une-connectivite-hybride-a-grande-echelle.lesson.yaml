@@ -1,0 +1,37 @@
+id: awsansc01-l-concevoir-une-connectivite-hybride-a-grande-echelle
+trackId: aws-ans-c01
+unitId: awsansc01-u-network-design
+domainId: network-design
+title: "Concevoir une connectivité hybride à grande échelle"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-concevoir-une-connectivite-hybride-a-grande-echelle
+    body: |
+      Dans l'examen ANS-C01, « Concevoir une connectivité hybride à grande échelle » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-concevoir-une-connectivite-hybride-a-grande-echelle
+    title: "Concevoir une connectivité hybride à grande échelle"
+    body: |
+      La conception réseau relie locaux et AWS via AWS Direct Connect (liaison dédiée) ou VPN. AWS Transit Gateway agit comme un hub central interconnectant des centaines de VPC et de réseaux sur site, simplifiant les topologies à grande échelle.
+  - type: check
+    conceptId: c-concevoir-une-connectivite-hybride-a-grande-echelle
+    check:
+      id: awsansc01-l-concevoir-une-connectivite-hybride-a-grande-echelle-check-1
+      conceptId: c-concevoir-une-connectivite-hybride-a-grande-echelle
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel service AWS sert de hub central pour interconnecter de nombreux VPC et réseaux sur site ?
+      options:
+        - { id: a, label: "AWS Transit Gateway" }
+        - { id: b, label: "Amazon S3" }
+        - { id: c, label: "AWS KMS" }
+        - { id: d, label: "Amazon Cognito" }
+      correct: [a]
+      explanation: |
+        AWS Transit Gateway connecte des milliers de VPC et de réseaux on-premises via un hub central, remplaçant un maillage complexe de peerings.
+  - type: recap
+    conceptId: c-concevoir-une-connectivite-hybride-a-grande-echelle
+    body: |
+      Retenez l'essentiel de « Concevoir une connectivité hybride à grande échelle » pour la certification ANS-C01.

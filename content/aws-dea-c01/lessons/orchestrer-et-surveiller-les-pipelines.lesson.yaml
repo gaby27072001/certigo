@@ -1,0 +1,37 @@
+id: awsdeac01-l-orchestrer-et-surveiller-les-pipelines
+trackId: aws-dea-c01
+unitId: awsdeac01-u-data-ops
+domainId: data-ops
+title: "Orchestrer et surveiller les pipelines"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-orchestrer-et-surveiller-les-pipelines
+    body: |
+      Dans l'examen DEA-C01, « Orchestrer et surveiller les pipelines » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-orchestrer-et-surveiller-les-pipelines
+    title: "Orchestrer et surveiller les pipelines"
+    body: |
+      L'orchestration coordonne les étapes d'un pipeline : AWS Step Functions enchaîne des tâches, Amazon MWAA (Airflow managé) gère des workflows complexes. CloudWatch surveille l'exécution et la qualité des données, avec alertes en cas d'échec.
+  - type: check
+    conceptId: c-orchestrer-et-surveiller-les-pipelines
+    check:
+      id: awsdeac01-l-orchestrer-et-surveiller-les-pipelines-check-1
+      conceptId: c-orchestrer-et-surveiller-les-pipelines
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service AWS managé exécute des workflows Apache Airflow pour orchestrer des pipelines de données ?
+      options:
+        - { id: a, label: "Amazon MWAA" }
+        - { id: b, label: "Amazon S3" }
+        - { id: c, label: "AWS KMS" }
+        - { id: d, label: "Amazon CloudFront" }
+      correct: [a]
+      explanation: |
+        Amazon MWAA (Managed Workflows for Apache Airflow) fournit Airflow managé pour orchestrer et planifier des pipelines de données complexes.
+  - type: recap
+    conceptId: c-orchestrer-et-surveiller-les-pipelines
+    body: |
+      Retenez l'essentiel de « Orchestrer et surveiller les pipelines » pour la certification DEA-C01.

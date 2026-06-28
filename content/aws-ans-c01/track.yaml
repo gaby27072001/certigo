@@ -1,0 +1,46 @@
+# AWS Certified Advanced Networking – Specialty — aws certification track.
+# Domain weights mirror the official ANS-C01 skills outline and sum to 1.0.
+id: aws-ans-c01
+code: "ANS-C01"
+provider: aws
+title: "AWS Certified Advanced Networking – Specialty"
+level: specialty
+examCode: "ANS-C01"
+sourceUrl: "https://aws.amazon.com/certification/certified-advanced-networking-specialty/"
+retiringOn: "2026-08-25"
+summary: |
+  Certification spécialisée en réseaux AWS : conception, mise en œuvre, exploitation et sécurité de topologies réseau complexes et hybrides. Examen en cours de retrait (août 2026).
+domains:
+  - id: network-design
+    name: "Conception de réseaux"
+    weight: 0.3
+  - id: network-implementation
+    name: "Mise en œuvre de réseaux"
+    weight: 0.26
+  - id: network-management
+    name: "Gestion et exploitation de réseaux"
+    weight: 0.2
+  - id: network-security
+    name: "Sécurité, conformité et gouvernance réseau"
+    weight: 0.24
+units:
+  - id: awsansc01-u-network-design
+    domainId: network-design
+    title: "Conception de réseaux"
+    lessons:
+      - awsansc01-l-concevoir-une-connectivite-hybride-a-grande-echelle
+  - id: awsansc01-u-network-implementation
+    domainId: network-implementation
+    title: "Mise en œuvre de réseaux"
+    lessons:
+      - awsansc01-l-deployer-vpc-et-routage-avance
+  - id: awsansc01-u-network-management
+    domainId: network-management
+    title: "Gestion et exploitation de réseaux"
+    lessons:
+      - awsansc01-l-surveiller-et-depanner-le-reseau
+  - id: awsansc01-u-network-security
+    domainId: network-security
+    title: "Sécurité, conformité et gouvernance réseau"
+    lessons:
+      - awsansc01-l-securiser-le-reseau-en-profondeur

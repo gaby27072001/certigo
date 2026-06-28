@@ -1,0 +1,37 @@
+id: awsdeac01-l-choisir-le-bon-magasin-de-donnees
+trackId: aws-dea-c01
+unitId: awsdeac01-u-store-management
+domainId: store-management
+title: "Choisir le bon magasin de données"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-choisir-le-bon-magasin-de-donnees
+    body: |
+      Dans l'examen DEA-C01, « Choisir le bon magasin de données » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-choisir-le-bon-magasin-de-donnees
+    title: "Choisir le bon magasin de données"
+    body: |
+      Le choix du stockage dépend de l'usage : Amazon S3 comme socle d'un data lake, Amazon Redshift pour l'entreposage analytique, Amazon DynamoDB pour le NoSQL à faible latence. Le partitionnement et les formats colonnaires (Parquet) améliorent les performances et réduisent les coûts.
+  - type: check
+    conceptId: c-choisir-le-bon-magasin-de-donnees
+    check:
+      id: awsdeac01-l-choisir-le-bon-magasin-de-donnees-check-1
+      conceptId: c-choisir-le-bon-magasin-de-donnees
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service AWS est un entrepôt de données conçu pour des requêtes analytiques sur de grands volumes ?
+      options:
+        - { id: a, label: "Amazon Redshift" }
+        - { id: b, label: "Amazon SQS" }
+        - { id: c, label: "AWS Lambda" }
+        - { id: d, label: "Amazon Cognito" }
+      correct: [a]
+      explanation: |
+        Amazon Redshift est un entrepôt de données colonnaire massivement parallèle, optimisé pour les requêtes analytiques (OLAP) sur de grands volumes.
+  - type: recap
+    conceptId: c-choisir-le-bon-magasin-de-donnees
+    body: |
+      Retenez l'essentiel de « Choisir le bon magasin de données » pour la certification DEA-C01.

@@ -1,0 +1,37 @@
+id: awsclfc02-l-modeles-de-tarification-et-outils-de-couts
+trackId: aws-clf-c02
+unitId: awsclfc02-u-billing-pricing
+domainId: billing-pricing
+title: "Modèles de tarification et outils de coûts"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-modeles-de-tarification-et-outils-de-couts
+    body: |
+      Dans l'examen CLF-C02, « Modèles de tarification et outils de coûts » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-modeles-de-tarification-et-outils-de-couts
+    title: "Modèles de tarification et outils de coûts"
+    body: |
+      EC2 propose plusieurs modèles : à la demande (flexible), instances réservées et Savings Plans (engagement avec remise), et instances Spot (capacité inutilisée très économique). Les outils AWS Cost Explorer, AWS Budgets et le Pricing Calculator aident à estimer et maîtriser les dépenses.
+  - type: check
+    conceptId: c-modeles-de-tarification-et-outils-de-couts
+    check:
+      id: awsclfc02-l-modeles-de-tarification-et-outils-de-couts-check-1
+      conceptId: c-modeles-de-tarification-et-outils-de-couts
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel modèle de tarification EC2 offre les plus fortes remises pour des charges tolérantes aux interruptions ?
+      options:
+        - { id: a, label: "Instances à la demande" }
+        - { id: b, label: "Instances Spot" }
+        - { id: c, label: "Hôtes dédiés" }
+        - { id: d, label: "Instances réservées sur 3 ans" }
+      correct: [b]
+      explanation: |
+        Les instances Spot utilisent la capacité inutilisée d'AWS avec jusqu'à 90 % de remise, mais peuvent être récupérées : idéales pour des charges tolérantes aux interruptions.
+  - type: recap
+    conceptId: c-modeles-de-tarification-et-outils-de-couts
+    body: |
+      Retenez l'essentiel de « Modèles de tarification et outils de coûts » pour la certification CLF-C02.

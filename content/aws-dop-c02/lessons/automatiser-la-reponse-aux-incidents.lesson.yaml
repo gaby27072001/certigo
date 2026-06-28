@@ -1,0 +1,37 @@
+id: awsdopc02-l-automatiser-la-reponse-aux-incidents
+trackId: aws-dop-c02
+unitId: awsdopc02-u-incident-response
+domainId: incident-response
+title: "Automatiser la réponse aux incidents"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-automatiser-la-reponse-aux-incidents
+    body: |
+      Dans l'examen DOP-C02, « Automatiser la réponse aux incidents » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-automatiser-la-reponse-aux-incidents
+    title: "Automatiser la réponse aux incidents"
+    body: |
+      La réponse automatisée aux incidents s'appuie sur Amazon EventBridge pour réagir aux événements, AWS Systems Manager pour exécuter des runbooks de remédiation, et des notifications via Amazon SNS pour alerter les équipes d'astreinte.
+  - type: check
+    conceptId: c-automatiser-la-reponse-aux-incidents
+    check:
+      id: awsdopc02-l-automatiser-la-reponse-aux-incidents-check-1
+      conceptId: c-automatiser-la-reponse-aux-incidents
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel service AWS exécute des runbooks d'automatisation pour remédier à un incident ?
+      options:
+        - { id: a, label: "AWS Systems Manager (Automation)" }
+        - { id: b, label: "Amazon S3 Glacier" }
+        - { id: c, label: "Amazon CloudFront" }
+        - { id: d, label: "AWS Budgets" }
+      correct: [a]
+      explanation: |
+        AWS Systems Manager Automation exécute des runbooks (documents) qui orchestrent des actions de remédiation, déclenchés manuellement ou par EventBridge.
+  - type: recap
+    conceptId: c-automatiser-la-reponse-aux-incidents
+    body: |
+      Retenez l'essentiel de « Automatiser la réponse aux incidents » pour la certification DOP-C02.

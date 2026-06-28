@@ -1,0 +1,37 @@
+id: awsaifc01-l-securiser-et-gouverner-les-charges-d-ia
+trackId: aws-aif-c01
+unitId: awsaifc01-u-ai-security
+domainId: ai-security
+title: "Sécuriser et gouverner les charges d'IA"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-securiser-et-gouverner-les-charges-d-ia
+    body: |
+      Dans l'examen AIF-C01, « Sécuriser et gouverner les charges d'IA » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-securiser-et-gouverner-les-charges-d-ia
+    title: "Sécuriser et gouverner les charges d'IA"
+    body: |
+      La sécurisation des charges d'IA repose sur le contrôle des accès via AWS IAM, le chiffrement des données d'entraînement et d'inférence, la protection des données sensibles et la traçabilité. La gouvernance s'appuie sur des cadres de conformité et la surveillance de l'usage des modèles.
+  - type: check
+    conceptId: c-securiser-et-gouverner-les-charges-d-ia
+    check:
+      id: awsaifc01-l-securiser-et-gouverner-les-charges-d-ia-check-1
+      conceptId: c-securiser-et-gouverner-les-charges-d-ia
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service AWS contrôle finement qui peut invoquer un modèle de fondation sur Amazon Bedrock ?
+      options:
+        - { id: a, label: "AWS IAM" }
+        - { id: b, label: "Amazon S3 Glacier" }
+        - { id: c, label: "Amazon Route 53" }
+        - { id: d, label: "AWS Cost Explorer" }
+      correct: [a]
+      explanation: |
+        AWS IAM gère les identités et les permissions, permettant de restreindre précisément l'accès aux API Bedrock et aux modèles.
+  - type: recap
+    conceptId: c-securiser-et-gouverner-les-charges-d-ia
+    body: |
+      Retenez l'essentiel de « Sécuriser et gouverner les charges d'IA » pour la certification AIF-C01.

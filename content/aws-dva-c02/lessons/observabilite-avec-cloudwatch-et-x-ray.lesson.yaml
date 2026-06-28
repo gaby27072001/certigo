@@ -1,0 +1,37 @@
+id: awsdvac02-l-observabilite-avec-cloudwatch-et-x-ray
+trackId: aws-dva-c02
+unitId: awsdvac02-u-troubleshooting
+domainId: troubleshooting
+title: "Observabilité avec CloudWatch et X-Ray"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-observabilite-avec-cloudwatch-et-x-ray
+    body: |
+      Dans l'examen DVA-C02, « Observabilité avec CloudWatch et X-Ray » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-observabilite-avec-cloudwatch-et-x-ray
+    title: "Observabilité avec CloudWatch et X-Ray"
+    body: |
+      Pour diagnostiquer une application, Amazon CloudWatch collecte journaux et métriques et déclenche des alarmes, tandis qu'AWS X-Ray trace les requêtes de bout en bout pour identifier les goulets d'étranglement dans une architecture distribuée.
+  - type: check
+    conceptId: c-observabilite-avec-cloudwatch-et-x-ray
+    check:
+      id: awsdvac02-l-observabilite-avec-cloudwatch-et-x-ray-check-1
+      conceptId: c-observabilite-avec-cloudwatch-et-x-ray
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service permet de suivre une requête à travers plusieurs microservices pour localiser la cause d'une latence ?
+      options:
+        - { id: a, label: "AWS X-Ray" }
+        - { id: b, label: "Amazon S3" }
+        - { id: c, label: "AWS IAM" }
+        - { id: d, label: "Amazon Route 53" }
+      correct: [a]
+      explanation: |
+        AWS X-Ray trace les requêtes de bout en bout et produit une carte de service, révélant les segments lents ou en erreur dans une architecture distribuée.
+  - type: recap
+    conceptId: c-observabilite-avec-cloudwatch-et-x-ray
+    body: |
+      Retenez l'essentiel de « Observabilité avec CloudWatch et X-Ray » pour la certification DVA-C02.

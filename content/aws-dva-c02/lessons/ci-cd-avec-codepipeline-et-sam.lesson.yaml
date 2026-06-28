@@ -1,0 +1,37 @@
+id: awsdvac02-l-ci-cd-avec-codepipeline-et-sam
+trackId: aws-dva-c02
+unitId: awsdvac02-u-deployment
+domainId: deployment
+title: "CI/CD avec CodePipeline et SAM"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-ci-cd-avec-codepipeline-et-sam
+    body: |
+      Dans l'examen DVA-C02, « CI/CD avec CodePipeline et SAM » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-ci-cd-avec-codepipeline-et-sam
+    title: "CI/CD avec CodePipeline et SAM"
+    body: |
+      AWS propose une chaîne CI/CD intégrée : CodeCommit (dépôt), CodeBuild (compilation/tests), CodeDeploy (déploiement) et CodePipeline (orchestration). AWS SAM simplifie le packaging et le déploiement d'applications serverless. Les déploiements blue/green et canary réduisent les risques.
+  - type: check
+    conceptId: c-ci-cd-avec-codepipeline-et-sam
+    check:
+      id: awsdvac02-l-ci-cd-avec-codepipeline-et-sam-check-1
+      conceptId: c-ci-cd-avec-codepipeline-et-sam
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service orchestre les étapes de build, test et déploiement dans un pipeline AWS continu ?
+      options:
+        - { id: a, label: "AWS CodePipeline" }
+        - { id: b, label: "Amazon DynamoDB" }
+        - { id: c, label: "AWS KMS" }
+        - { id: d, label: "Amazon VPC" }
+      correct: [a]
+      explanation: |
+        AWS CodePipeline orchestre les phases d'un pipeline CI/CD (source, build, test, déploiement) en intégrant CodeBuild, CodeDeploy et d'autres outils.
+  - type: recap
+    conceptId: c-ci-cd-avec-codepipeline-et-sam
+    body: |
+      Retenez l'essentiel de « CI/CD avec CodePipeline et SAM » pour la certification DVA-C02.

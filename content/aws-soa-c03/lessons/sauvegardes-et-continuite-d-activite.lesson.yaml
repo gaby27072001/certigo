@@ -1,0 +1,37 @@
+id: awssoac03-l-sauvegardes-et-continuite-d-activite
+trackId: aws-soa-c03
+unitId: awssoac03-u-reliability
+domainId: reliability
+title: "Sauvegardes et continuité d'activité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-sauvegardes-et-continuite-d-activite
+    body: |
+      Dans l'examen SOA-C03, « Sauvegardes et continuité d'activité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-sauvegardes-et-continuite-d-activite
+    title: "Sauvegardes et continuité d'activité"
+    body: |
+      La continuité d'activité repose sur des sauvegardes régulières (AWS Backup), des architectures multi-AZ et des objectifs de reprise mesurés par le RTO (durée d'interruption acceptable) et le RPO (perte de données acceptable).
+  - type: check
+    conceptId: c-sauvegardes-et-continuite-d-activite
+    check:
+      id: awssoac03-l-sauvegardes-et-continuite-d-activite-check-1
+      conceptId: c-sauvegardes-et-continuite-d-activite
+      type: mcq
+      difficulty: 2
+      stem: |
+        Que mesure le RPO (Recovery Point Objective) dans un plan de continuité ?
+      options:
+        - { id: a, label: "La quantité maximale de données qu'on accepte de perdre" }
+        - { id: b, label: "Le coût mensuel des sauvegardes" }
+        - { id: c, label: "Le nombre de zones de disponibilité" }
+        - { id: d, label: "La latence du réseau" }
+      correct: [a]
+      explanation: |
+        Le RPO définit la perte de données maximale tolérable (l'écart de temps depuis la dernière sauvegarde), tandis que le RTO définit la durée d'indisponibilité acceptable.
+  - type: recap
+    conceptId: c-sauvegardes-et-continuite-d-activite
+    body: |
+      Retenez l'essentiel de « Sauvegardes et continuité d'activité » pour la certification SOA-C03.

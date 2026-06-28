@@ -1,0 +1,37 @@
+id: awsclfc02-l-services-principaux-calcul-stockage-et-reseau
+trackId: aws-clf-c02
+unitId: awsclfc02-u-cloud-tech
+domainId: cloud-tech
+title: "Services principaux : calcul, stockage et réseau"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-services-principaux-calcul-stockage-et-reseau
+    body: |
+      Dans l'examen CLF-C02, « Services principaux : calcul, stockage et réseau » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-services-principaux-calcul-stockage-et-reseau
+    title: "Services principaux : calcul, stockage et réseau"
+    body: |
+      Les piliers techniques d'AWS incluent le calcul (Amazon EC2 pour les machines virtuelles, AWS Lambda pour le serverless), le stockage (Amazon S3 pour les objets, EBS pour les volumes) et le réseau (Amazon VPC). On interagit avec ces services via la console, l'AWS CLI ou les SDK.
+  - type: check
+    conceptId: c-services-principaux-calcul-stockage-et-reseau
+    check:
+      id: awsclfc02-l-services-principaux-calcul-stockage-et-reseau-check-1
+      conceptId: c-services-principaux-calcul-stockage-et-reseau
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service AWS est un service de stockage d'objets adapté aux fichiers, sauvegardes et sites statiques ?
+      options:
+        - { id: a, label: "Amazon EC2" }
+        - { id: b, label: "Amazon VPC" }
+        - { id: c, label: "Amazon S3" }
+        - { id: d, label: "AWS IAM" }
+      correct: [c]
+      explanation: |
+        Amazon S3 (Simple Storage Service) est le service de stockage d'objets durable et hautement disponible d'AWS. EC2 est du calcul, VPC du réseau, IAM la gestion des accès.
+  - type: recap
+    conceptId: c-services-principaux-calcul-stockage-et-reseau
+    body: |
+      Retenez l'essentiel de « Services principaux : calcul, stockage et réseau » pour la certification CLF-C02.

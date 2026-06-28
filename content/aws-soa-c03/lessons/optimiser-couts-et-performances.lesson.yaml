@@ -1,0 +1,37 @@
+id: awssoac03-l-optimiser-couts-et-performances
+trackId: aws-soa-c03
+unitId: awssoac03-u-cost-performance
+domainId: cost-performance
+title: "Optimiser coûts et performances"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-optimiser-couts-et-performances
+    body: |
+      Dans l'examen SOA-C03, « Optimiser coûts et performances » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-optimiser-couts-et-performances
+    title: "Optimiser coûts et performances"
+    body: |
+      Le bon dimensionnement (rightsizing) ajuste les ressources à la charge réelle. AWS Cost Explorer et AWS Compute Optimizer identifient les ressources surdimensionnées ou inactives, tandis que les Savings Plans réduisent les coûts d'un usage stable.
+  - type: check
+    conceptId: c-optimiser-couts-et-performances
+    check:
+      id: awssoac03-l-optimiser-couts-et-performances-check-1
+      conceptId: c-optimiser-couts-et-performances
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service AWS recommande un redimensionnement des instances EC2 sous-utilisées ?
+      options:
+        - { id: a, label: "AWS Compute Optimizer" }
+        - { id: b, label: "Amazon Cognito" }
+        - { id: c, label: "AWS Shield" }
+        - { id: d, label: "Amazon SQS" }
+      correct: [a]
+      explanation: |
+        AWS Compute Optimizer analyse les métriques d'utilisation et recommande des types ou tailles d'instances mieux adaptés, réduisant coûts et gaspillage.
+  - type: recap
+    conceptId: c-optimiser-couts-et-performances
+    body: |
+      Retenez l'essentiel de « Optimiser coûts et performances » pour la certification SOA-C03.

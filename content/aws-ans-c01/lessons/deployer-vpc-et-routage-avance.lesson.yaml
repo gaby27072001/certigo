@@ -1,0 +1,37 @@
+id: awsansc01-l-deployer-vpc-et-routage-avance
+trackId: aws-ans-c01
+unitId: awsansc01-u-network-implementation
+domainId: network-implementation
+title: "Déployer VPC et routage avancé"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-deployer-vpc-et-routage-avance
+    body: |
+      Dans l'examen ANS-C01, « Déployer VPC et routage avancé » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-deployer-vpc-et-routage-avance
+    title: "Déployer VPC et routage avancé"
+    body: |
+      La mise en œuvre couvre le peering de VPC, le routage via les tables de routage et Transit Gateway, et l'échange de routes dynamiques avec BGP sur Direct Connect ou VPN. Le DNS hybride s'appuie sur Route 53 Resolver.
+  - type: check
+    conceptId: c-deployer-vpc-et-routage-avance
+    check:
+      id: awsansc01-l-deployer-vpc-et-routage-avance-check-1
+      conceptId: c-deployer-vpc-et-routage-avance
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel protocole permet l'échange dynamique de routes entre AWS et un réseau sur site via Direct Connect ?
+      options:
+        - { id: a, label: "BGP" }
+        - { id: b, label: "HTTP" }
+        - { id: c, label: "SMTP" }
+        - { id: d, label: "FTP" }
+      correct: [a]
+      explanation: |
+        BGP (Border Gateway Protocol) est utilisé sur Direct Connect et les VPN pour échanger dynamiquement les routes entre AWS et les réseaux clients.
+  - type: recap
+    conceptId: c-deployer-vpc-et-routage-avance
+    body: |
+      Retenez l'essentiel de « Déployer VPC et routage avancé » pour la certification ANS-C01.

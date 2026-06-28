@@ -1,0 +1,37 @@
+id: awssoac03-l-verifier-la-conformite-et-detecter-les-menaces
+trackId: aws-soa-c03
+unitId: awssoac03-u-security-compliance
+domainId: security-compliance
+title: "Vérifier la conformité et détecter les menaces"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-verifier-la-conformite-et-detecter-les-menaces
+    body: |
+      Dans l'examen SOA-C03, « Vérifier la conformité et détecter les menaces » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-verifier-la-conformite-et-detecter-les-menaces
+    title: "Vérifier la conformité et détecter les menaces"
+    body: |
+      AWS Config évalue en continu la conformité des ressources à des règles, AWS GuardDuty détecte les activités malveillantes, et IAM applique le moindre privilège. Ensemble, ils renforcent la posture de sécurité opérationnelle.
+  - type: check
+    conceptId: c-verifier-la-conformite-et-detecter-les-menaces
+    check:
+      id: awssoac03-l-verifier-la-conformite-et-detecter-les-menaces-check-1
+      conceptId: c-verifier-la-conformite-et-detecter-les-menaces
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service AWS évalue en continu la conformité de la configuration des ressources à des règles définies ?
+      options:
+        - { id: a, label: "AWS Config" }
+        - { id: b, label: "Amazon EC2" }
+        - { id: c, label: "Amazon S3" }
+        - { id: d, label: "Amazon SNS" }
+      correct: [a]
+      explanation: |
+        AWS Config enregistre et évalue les configurations des ressources par rapport à des règles de conformité, signalant les écarts.
+  - type: recap
+    conceptId: c-verifier-la-conformite-et-detecter-les-menaces
+    body: |
+      Retenez l'essentiel de « Vérifier la conformité et détecter les menaces » pour la certification SOA-C03.

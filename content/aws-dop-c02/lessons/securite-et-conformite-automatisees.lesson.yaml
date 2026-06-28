@@ -1,0 +1,37 @@
+id: awsdopc02-l-securite-et-conformite-automatisees
+trackId: aws-dop-c02
+unitId: awsdopc02-u-security-compliance
+domainId: security-compliance
+title: "Sécurité et conformité automatisées"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-securite-et-conformite-automatisees
+    body: |
+      Dans l'examen DOP-C02, « Sécurité et conformité automatisées » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-securite-et-conformite-automatisees
+    title: "Sécurité et conformité automatisées"
+    body: |
+      L'automatisation de la sécurité combine AWS Config (règles de conformité), AWS Security Hub (vue agrégée des constats de sécurité) et IAM. Les corrections automatiques rétablissent une configuration conforme dès qu'une dérive est détectée.
+  - type: check
+    conceptId: c-securite-et-conformite-automatisees
+    check:
+      id: awsdopc02-l-securite-et-conformite-automatisees-check-1
+      conceptId: c-securite-et-conformite-automatisees
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel service AWS agrège et hiérarchise les constats de sécurité de plusieurs services en une vue unique ?
+      options:
+        - { id: a, label: "AWS Security Hub" }
+        - { id: b, label: "Amazon EC2" }
+        - { id: c, label: "Amazon SQS" }
+        - { id: d, label: "Amazon Route 53" }
+      correct: [a]
+      explanation: |
+        AWS Security Hub centralise et priorise les constats de GuardDuty, Inspector, Config et d'autres sources pour une vue d'ensemble de la posture de sécurité.
+  - type: recap
+    conceptId: c-securite-et-conformite-automatisees
+    body: |
+      Retenez l'essentiel de « Sécurité et conformité automatisées » pour la certification DOP-C02.

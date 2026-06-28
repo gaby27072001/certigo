@@ -1,0 +1,37 @@
+id: awssapc02-l-gouvernance-multi-comptes-avec-organizations
+trackId: aws-sap-c02
+unitId: awssapc02-u-org-complexity
+domainId: org-complexity
+title: "Gouvernance multi-comptes avec Organizations"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-gouvernance-multi-comptes-avec-organizations
+    body: |
+      Dans l'examen SAP-C02, « Gouvernance multi-comptes avec Organizations » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-gouvernance-multi-comptes-avec-organizations
+    title: "Gouvernance multi-comptes avec Organizations"
+    body: |
+      AWS Organizations regroupe plusieurs comptes sous une gouvernance centrale. Les politiques de contrôle de service (SCP) imposent des garde-fous, AWS Control Tower automatise la création d'une landing zone conforme, et le réseau hybride relie les comptes.
+  - type: check
+    conceptId: c-gouvernance-multi-comptes-avec-organizations
+    check:
+      id: awssapc02-l-gouvernance-multi-comptes-avec-organizations-check-1
+      conceptId: c-gouvernance-multi-comptes-avec-organizations
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel mécanisme AWS Organizations impose des limites maximales de permissions à l'échelle de plusieurs comptes ?
+      options:
+        - { id: a, label: "Les politiques de contrôle de service (SCP)" }
+        - { id: b, label: "Les groupes de sécurité" }
+        - { id: c, label: "Les classes de stockage S3" }
+        - { id: d, label: "Les tables de routage VPC" }
+      correct: [a]
+      explanation: |
+        Les SCP (Service Control Policies) définissent les permissions maximales autorisées pour les comptes d'une organisation, servant de garde-fous quel que soit l'IAM local.
+  - type: recap
+    conceptId: c-gouvernance-multi-comptes-avec-organizations
+    body: |
+      Retenez l'essentiel de « Gouvernance multi-comptes avec Organizations » pour la certification SAP-C02.

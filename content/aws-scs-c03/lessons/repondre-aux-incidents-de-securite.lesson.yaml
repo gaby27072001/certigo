@@ -1,0 +1,37 @@
+id: awsscsc03-l-repondre-aux-incidents-de-securite
+trackId: aws-scs-c03
+unitId: awsscsc03-u-incident-response
+domainId: incident-response
+title: "Répondre aux incidents de sécurité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-repondre-aux-incidents-de-securite
+    body: |
+      Dans l'examen SCS-C03, « Répondre aux incidents de sécurité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-repondre-aux-incidents-de-securite
+    title: "Répondre aux incidents de sécurité"
+    body: |
+      La réponse à incident suit des playbooks : isoler la ressource compromise (groupes de sécurité restrictifs), préserver les preuves (snapshots), et remédier. AWS Security Hub centralise les constats et déclenche des réponses automatisées via EventBridge.
+  - type: check
+    conceptId: c-repondre-aux-incidents-de-securite
+    check:
+      id: awsscsc03-l-repondre-aux-incidents-de-securite-check-1
+      conceptId: c-repondre-aux-incidents-de-securite
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quelle première action permet d'isoler une instance EC2 suspectée d'être compromise ?
+      options:
+        - { id: a, label: "Lui appliquer un groupe de sécurité restrictif qui coupe le trafic" }
+        - { id: b, label: "Supprimer immédiatement tous les journaux" }
+        - { id: c, label: "Rendre son volume public" }
+        - { id: d, label: "Désactiver CloudTrail" }
+      correct: [a]
+      explanation: |
+        Appliquer un groupe de sécurité d'isolement coupe le trafic réseau tout en préservant l'instance et ses preuves pour l'investigation forensique.
+  - type: recap
+    conceptId: c-repondre-aux-incidents-de-securite
+    body: |
+      Retenez l'essentiel de « Répondre aux incidents de sécurité » pour la certification SCS-C03.

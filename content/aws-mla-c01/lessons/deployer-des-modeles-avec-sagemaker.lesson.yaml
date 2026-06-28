@@ -1,0 +1,37 @@
+id: awsmlac01-l-deployer-des-modeles-avec-sagemaker
+trackId: aws-mla-c01
+unitId: awsmlac01-u-deployment-orchestration
+domainId: deployment-orchestration
+title: "Déployer des modèles avec SageMaker"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-deployer-des-modeles-avec-sagemaker
+    body: |
+      Dans l'examen MLA-C01, « Déployer des modèles avec SageMaker » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-deployer-des-modeles-avec-sagemaker
+    title: "Déployer des modèles avec SageMaker"
+    body: |
+      SageMaker propose plusieurs modes de déploiement : endpoints temps réel pour l'inférence à faible latence, transformation par lots pour de gros volumes, et inférence serverless. SageMaker Pipelines orchestre les étapes de bout en bout (préparation, entraînement, déploiement).
+  - type: check
+    conceptId: c-deployer-des-modeles-avec-sagemaker
+    check:
+      id: awsmlac01-l-deployer-des-modeles-avec-sagemaker-check-1
+      conceptId: c-deployer-des-modeles-avec-sagemaker
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel mode de déploiement SageMaker convient à des prédictions en temps réel et à faible latence ?
+      options:
+        - { id: a, label: "Un endpoint temps réel SageMaker" }
+        - { id: b, label: "Le stockage S3 Glacier" }
+        - { id: c, label: "Un volume EBS froid" }
+        - { id: d, label: "Une file SQS" }
+      correct: [a]
+      explanation: |
+        Un endpoint temps réel SageMaker héberge le modèle derrière une API HTTPS pour des inférences synchrones à faible latence.
+  - type: recap
+    conceptId: c-deployer-des-modeles-avec-sagemaker
+    body: |
+      Retenez l'essentiel de « Déployer des modèles avec SageMaker » pour la certification MLA-C01.

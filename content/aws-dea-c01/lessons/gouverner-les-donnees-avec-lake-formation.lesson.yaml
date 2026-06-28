@@ -1,0 +1,37 @@
+id: awsdeac01-l-gouverner-les-donnees-avec-lake-formation
+trackId: aws-dea-c01
+unitId: awsdeac01-u-data-security
+domainId: data-security
+title: "Gouverner les données avec Lake Formation"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-gouverner-les-donnees-avec-lake-formation
+    body: |
+      Dans l'examen DEA-C01, « Gouverner les données avec Lake Formation » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-gouverner-les-donnees-avec-lake-formation
+    title: "Gouverner les données avec Lake Formation"
+    body: |
+      AWS Lake Formation centralise la gouvernance d'un data lake : permissions fines au niveau des tables et colonnes, chiffrement via KMS et catalogage. Combiné à IAM, il applique le moindre privilège et facilite la conformité.
+  - type: check
+    conceptId: c-gouverner-les-donnees-avec-lake-formation
+    check:
+      id: awsdeac01-l-gouverner-les-donnees-avec-lake-formation-check-1
+      conceptId: c-gouverner-les-donnees-avec-lake-formation
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service AWS centralise les permissions fines (table, colonne) d'un data lake sur S3 ?
+      options:
+        - { id: a, label: "AWS Lake Formation" }
+        - { id: b, label: "Amazon EC2" }
+        - { id: c, label: "Amazon SNS" }
+        - { id: d, label: "AWS Auto Scaling" }
+      correct: [a]
+      explanation: |
+        AWS Lake Formation gère la gouvernance d'un data lake avec des permissions granulaires (bases, tables, colonnes) et simplifie le partage sécurisé des données.
+  - type: recap
+    conceptId: c-gouverner-les-donnees-avec-lake-formation
+    body: |
+      Retenez l'essentiel de « Gouverner les données avec Lake Formation » pour la certification DEA-C01.

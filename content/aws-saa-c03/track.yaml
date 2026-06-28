@@ -1,0 +1,45 @@
+# AWS Certified Solutions Architect – Associate — aws certification track.
+# Domain weights mirror the official SAA-C03 skills outline and sum to 1.0.
+id: aws-saa-c03
+code: "SAA-C03"
+provider: aws
+title: "AWS Certified Solutions Architect – Associate"
+level: associate
+examCode: "SAA-C03"
+sourceUrl: "https://aws.amazon.com/certification/certified-solutions-architect-associate/"
+summary: |
+  Certification de référence pour concevoir des architectures AWS sécurisées, résilientes, performantes et économiques selon le AWS Well-Architected Framework.
+domains:
+  - id: secure-architectures
+    name: "Concevoir des architectures sécurisées"
+    weight: 0.3
+  - id: resilient-architectures
+    name: "Concevoir des architectures résilientes"
+    weight: 0.26
+  - id: performant-architectures
+    name: "Concevoir des architectures performantes"
+    weight: 0.24
+  - id: cost-optimized
+    name: "Concevoir des architectures économiques"
+    weight: 0.2
+units:
+  - id: awssaac03-u-secure-architectures
+    domainId: secure-architectures
+    title: "Concevoir des architectures sécurisées"
+    lessons:
+      - awssaac03-l-securiser-les-acces-avec-iam-et-le-chiffrement
+  - id: awssaac03-u-resilient-architectures
+    domainId: resilient-architectures
+    title: "Concevoir des architectures résilientes"
+    lessons:
+      - awssaac03-l-haute-disponibilite-multi-az-et-decouplage
+  - id: awssaac03-u-performant-architectures
+    domainId: performant-architectures
+    title: "Concevoir des architectures performantes"
+    lessons:
+      - awssaac03-l-mise-a-l-echelle-et-mise-en-cache
+  - id: awssaac03-u-cost-optimized
+    domainId: cost-optimized
+    title: "Concevoir des architectures économiques"
+    lessons:
+      - awssaac03-l-optimiser-les-couts-de-stockage-et-de-calcul
