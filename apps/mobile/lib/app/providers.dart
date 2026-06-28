@@ -40,8 +40,13 @@ final pathRepositoryProvider = Provider<PathRepository>(
   (Ref ref) => RemotePathRepository(ref.watch(apiClientProvider)),
 );
 
+final catalogStoreProvider = Provider<CatalogCacheStore>((Ref ref) => InMemoryCatalogCacheStore());
+
 final catalogRepositoryProvider = Provider<CatalogRepository>(
-  (Ref ref) => RemoteCatalogRepository(ref.watch(apiClientProvider)),
+  (Ref ref) => OfflineCatalogRepository(
+    RemoteCatalogRepository(ref.watch(apiClientProvider)),
+    ref.watch(catalogStoreProvider),
+  ),
 );
 
 final lessonRepositoryProvider = Provider<LessonRepository>(
@@ -53,9 +58,7 @@ final lessonRepositoryProvider = Provider<LessonRepository>(
 /// Defaults to an in-memory store so widget tests need no platform channels;
 /// [bootstrap] overrides it with a SharedPreferences-backed store so a queued
 /// submission survives an app restart on iOS and Android.
-final syncStoreProvider = Provider<SyncQueueStore>(
-  (Ref ref) => InMemorySyncQueueStore(),
-);
+final syncStoreProvider = Provider<SyncQueueStore>((Ref ref) => InMemorySyncQueueStore());
 
 /// The offline-first sync engine. Replays queued submissions through the API
 /// with idempotent keys, exponential backoff and dead-lettering. A single
@@ -128,9 +131,7 @@ final themeModeProvider = StateProvider<ThemeMode>(
 
 /// Audio-haptic feedback for lesson checks (§3.14). Real haptics by default;
 /// tests / reduce-motion override this with [SilentLessonFeedback].
-final lessonFeedbackProvider = Provider<LessonFeedback>(
-  (Ref ref) => const HapticLessonFeedback(),
-);
+final lessonFeedbackProvider = Provider<LessonFeedback>((Ref ref) => const HapticLessonFeedback());
 
 /// Unwraps a repository [Result] into a plain value, throwing the [Failure] so
 /// Riverpod surfaces it as `AsyncError` for the UI's `.when(error: …)` branch.
