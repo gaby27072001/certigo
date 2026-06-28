@@ -1,0 +1,18 @@
+id: ms-900
+code: MS-900
+title: Microsoft 365 Fundamentals
+level: fundamentals
+summary: >
+  Comprendre la valeur Microsoft 365, les principaux workloads (productivite,
+  collaboration, securite, conformite) et les modeles de services/licences
+  pour preparer efficacement l'examen MS-900.
+domains:
+  - id: core-objectives
+    name: Core objectives
+    weight: 1.0
+units:
+  - id: ms900-u-core-objectives
+    domainId: core-objectives
+    title: Core objectives
+    lessons:
+      - ms900-l-foundations-overview
