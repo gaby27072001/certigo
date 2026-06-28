@@ -13,6 +13,7 @@ import '../models/achievement.dart';
 import '../models/shop.dart';
 import '../models/friend.dart';
 import '../models/exam.dart';
+import '../models/share_card.dart';
 
 /// Repository contracts consumed by the app's feature controllers.
 ///
@@ -34,7 +35,10 @@ abstract interface class CatalogRepository {
 }
 
 abstract interface class LessonRepository {
-  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId});
+  Future<Result<Lesson>> getLesson({
+    required String trackId,
+    required String lessonId,
+  });
 }
 
 abstract interface class QuizRepository {
@@ -89,6 +93,12 @@ abstract interface class FriendRepository {
   Future<Result<FriendActionResult>> addFriend(AddFriendRequest request);
   Future<Result<FriendActionResult>> removeFriend(String friendId);
   Future<Result<FriendLeaderboard>> getFriendLeaderboard();
+}
+
+/// The learner's daily share card, generated server-side from authoritative
+/// progress, streak and referral data.
+abstract interface class ShareCardRepository {
+  Future<Result<ShareCard>> getDailyShareCard();
 }
 
 /// The adaptive mock exam: generate a blueprint-weighted exam, then submit it

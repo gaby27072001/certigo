@@ -49,7 +49,10 @@ class _HomeContent extends StatelessWidget {
     final PathLesson? next = data.nextLesson;
     final DomainProgress? weak = data.weakestDomain;
     final String firstName = me.displayName.split(' ').first;
-    final int previous = (path.readinessScore - path.readinessTrend7d).clamp(0, 100);
+    final int previous = (path.readinessScore - path.readinessTrend7d).clamp(
+      0,
+      100,
+    );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
@@ -70,7 +73,9 @@ class _HomeContent extends StatelessWidget {
         // Greeting — the guide welcomes you back in a speech bubble.
         _HomeGreeting(
           firstName: firstName,
-          subtitle: path.exam.isEmpty ? 'Prêt à progresser ?' : 'Cap sur ${path.exam}',
+          subtitle: path.exam.isEmpty
+              ? 'Prêt à progresser ?'
+              : 'Cap sur ${path.exam}',
         ),
         const SizedBox(height: 22),
 
@@ -81,10 +86,15 @@ class _HomeContent extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Column(
             children: <Widget>[
-              ReadinessGauge(score: path.readinessScore, previousScore: previous),
+              ReadinessGauge(
+                score: path.readinessScore,
+                previousScore: previous,
+              ),
               const SizedBox(height: 8),
               Text(
-                path.exam.isEmpty ? 'Score de préparation' : 'Score de préparation — ${path.exam}',
+                path.exam.isEmpty
+                    ? 'Score de préparation'
+                    : 'Score de préparation — ${path.exam}',
                 style: t.bodySmall?.copyWith(color: p.textSecondary),
               ),
               const SizedBox(height: 4),
@@ -101,6 +111,12 @@ class _HomeContent extends StatelessWidget {
           goal: me.dailyGoalXp,
         ),
         const SizedBox(height: 16),
+        _DailyShareEntryCard(
+          goalMet: me.dailyGoalXp > 0 && me.dailyXpEarned >= me.dailyGoalXp,
+          trackCode: path.exam,
+          onTap: () => context.go(Routes.dailyShare),
+        ),
+        const SizedBox(height: 16),
 
         // AI coach — server-ranked "next best action" shelf. Self-hiding:
         // collapses to nothing while loading, on error, or when empty, so it
@@ -111,7 +127,10 @@ class _HomeContent extends StatelessWidget {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Text('📍', style: TextStyle(fontSize: 22)),
-          title: Text(next?.title ?? 'Aucune leçon en cours', style: t.bodyLarge),
+          title: Text(
+            next?.title ?? 'Aucune leçon en cours',
+            style: t.bodyLarge,
+          ),
         ),
         const SizedBox(height: 24),
 
@@ -166,7 +185,8 @@ class _HomeGreetingState extends State<_HomeGreeting> {
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     final PrismColorScheme p = context.prism;
-    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final bool reduceMotion =
+        MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final Duration d = reduceMotion ? Duration.zero : PrismMotion.base;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,7 +290,10 @@ class _DailyGoalCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text('Objectif du jour', style: t.titleMedium),
               const Spacer(),
-              Text('$earned / $goal XP', style: t.labelLarge?.copyWith(color: p.textSecondary)),
+              Text(
+                '$earned / $goal XP',
+                style: t.labelLarge?.copyWith(color: p.textSecondary),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -280,6 +303,64 @@ class _DailyGoalCard extends StatelessWidget {
             gradient: <Color>[p.ember, p.xpGold],
             semanticLabel: 'Objectif du jour',
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DailyShareEntryCard extends StatelessWidget {
+  const _DailyShareEntryCard({
+    required this.goalMet,
+    required this.trackCode,
+    required this.onTap,
+  });
+
+  final bool goalMet;
+  final String trackCode;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    final TextTheme t = Theme.of(context).textTheme;
+    final Color tone = goalMet ? p.success : p.primary;
+
+    return PrismCard(
+      variant: PrismCardVariant.tonal,
+      accent: tone,
+      onTap: onTap,
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: tone.withOpacity(0.16),
+              borderRadius: PrismRadii.cardMd,
+            ),
+            child: Icon(Icons.share_rounded, color: tone),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('Partage du jour', style: t.titleMedium),
+                const SizedBox(height: 2),
+                Text(
+                  goalMet
+                      ? 'Ton objectif est atteint — partage ta progression ${trackCode.isEmpty ? '' : trackCode}.'
+                      : 'Transforme tes progrès du jour en carte de partage prête a envoyer.',
+                  style: t.bodySmall?.copyWith(
+                    color: p.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: p.textSecondary),
         ],
       ),
     );
