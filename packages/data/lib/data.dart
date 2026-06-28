@@ -18,6 +18,7 @@ export 'src/models/achievement.dart';
 export 'src/models/shop.dart';
 export 'src/models/friend.dart';
 export 'src/models/exam.dart';
+export 'src/models/share_card.dart';
 
 export 'src/api/api_client.dart';
 
