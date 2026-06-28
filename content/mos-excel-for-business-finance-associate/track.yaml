@@ -1,0 +1,15 @@
+id: mos-excel-for-business-finance-associate
+code: MOS-EXCEL-FOR-BUSINESS-FINANCE-ASSOCIATE
+title: 'Microsoft Office Specialist: Excel for Business Finance Associate'
+level: associate
+summary: Microsoft certification (Business User) covering Excel.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-1fa10b8d
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-1fa10b8d

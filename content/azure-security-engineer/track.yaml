@@ -1,0 +1,15 @@
+id: azure-security-engineer
+code: AZURE-SECURITY-ENGINEER
+title: 'Microsoft Certified: Azure Security Engineer Associate'
+level: associate
+summary: Microsoft certification (Security Engineer) covering Azure.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-f0e9b5f8
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-f0e9b5f8

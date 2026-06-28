@@ -1,0 +1,16 @@
+id: operationalizing-machine-learning-and-generative-ai-solutions
+code: OPERATIONALIZING-MACHINE-LEARNING-AND-GENERATIVE-AI-SOLUTIONS
+title: 'Microsoft Certified: Machine Learning Operations Engineer Associate'
+level: associate
+summary: Microsoft certification (AI Engineer) covering Azure, Azure Machine Learning,
+  Microsoft Foundry.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-91581b0d
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-91581b0d

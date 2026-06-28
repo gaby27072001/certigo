@@ -1,0 +1,17 @@
+id: d365-supply-chain-management-functional-consultant-expert
+code: D365-SUPPLY-CHAIN-MANAGEMENT-FUNCTIONAL-CONSULTANT-EXPERT
+title: 'Microsoft Certified: Dynamics 365 Supply Chain Management Functional Consultant
+  Expert'
+level: expert
+summary: Microsoft certification (Functional Consultant) covering Dynamics 365, Supply
+  Chain Management.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-8951bd8d
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-8951bd8d

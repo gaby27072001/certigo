@@ -5,7 +5,8 @@
 **Apprenez, révisez et validez vos certifications Microsoft — par micro-leçons premium.**
 
 Micro-learning mobile (iOS + Android) pour maîtriser des **concepts techniques & cloud réels**
-et atteindre la *readiness* certification : AZ-900 · AZ-104 · AI-900 · DP-900 · SC-900.
+et atteindre la *readiness* certification sur **89 certifications Microsoft actives**
+(dont AZ-900 · AZ-104 · AI-900 · DP-900 · SC-900).
 
 `Flutter` · `.NET 8 isolated Functions` · `Cosmos DB` · `Entra External ID` · `Bicep`
 
@@ -58,7 +59,7 @@ microlingo/
 │  │  └─ Microlingo.Infrastructure/ # Cosmos DB, validation token Entra
 │  └─ tests/               # Tests de domaine (xUnit)
 ├─ infra/                  # Infrastructure as Code (Bicep) : Cosmos, Storage, Functions, KV, AI
-├─ content/                # Tracks & leçons en YAML + schémas (AZ-900, AZ-104, AI-900, DP-900, SC-900)
+├─ content/                # Tracks & leçons en YAML + schémas (89 certifications actives)
 ├─ tools/                  # Validateur de contenu (Node) + seed Cosmos (Python)
 ├─ docs/                   # Architecture & ADRs
 └─ .github/workflows/      # CI : mobile · backend · content · infra

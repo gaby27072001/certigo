@@ -1,0 +1,15 @@
+id: power-platform-developer-associate
+code: POWER-PLATFORM-DEVELOPER-ASSOCIATE
+title: 'Microsoft Certified: Power Platform Developer Associate'
+level: associate
+summary: Microsoft certification (Developer) covering Microsoft Power Platform.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-93f84c22
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-93f84c22

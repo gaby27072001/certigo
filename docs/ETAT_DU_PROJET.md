@@ -4,7 +4,7 @@
 
 **Le « Duolingo des certifications Microsoft » — apprendre Azure / IA / sécurité par micro‑leçons gamifiées.**
 
-`🟢 Backend riche` · `🟢 Contenu 5 certifs` · `🟢 Gamification` · `🟢 Tuteur IA` · `🟢 Offline‑first` · `🟢 Mobile : écrans branchés` · `🟡 Infra non déployée`
+`🟢 Backend riche` · `🟢 Contenu 89 certifs` · `🟢 Gamification` · `🟢 Tuteur IA` · `🟢 Offline‑first` · `🟢 Mobile : écrans branchés` · `🟡 Infra non déployée`
 
 </div>
 
@@ -37,7 +37,7 @@
 |---|:---:|---|---|
 | **API backend** | 🟢 | `backend/src/Microlingo.Api` | Azure Functions .NET 8 isolé, **17 groupes / ≈ 28 endpoints**. |
 | **Moteurs métier** | 🟢 | `backend/src/Microlingo.Domain` | Logique **pure & testée** : contenu, progression, gamification, examen, tuteur, reco, notifications, intégrité. |
-| **Contenu pédagogique** | 🟢 | `content/` | **5 certifications · 60 leçons** en YAML, validées par schémas JSON. |
+| **Contenu pédagogique** | 🟢 | `content/` | **89 certifications actives · 144 leçons** en YAML, validées par schémas JSON. |
 | **Gamification** | 🟢 | Domain `Gamification/` | XP, streak (+réparation), ligues hebdo, **saisons**, quêtes, succès, boutique, amis. |
 | **Tuteur IA** | 🟢 | Domain `Tutor/` + mobile `features/tutor` | Explications ancrées sur le contenu — **branché côté serveur ET mobile** (`tutor_sheet`). *(Le moteur est actuellement un adaptateur nul — `NullTutorCompletion` — qui retourne une chaîne vide. Un vrai LLM sera branché via `ITutorCompletion`, voir H19.)* |
 | **Recommandation + coach** | 🟢 | Domain `Recommendation/` + `home/coach_section` | Moteur « next best » + coach IA sur l'accueil. |
@@ -64,7 +64,7 @@ graph TD
     ROOT --> BE["⚙️ backend/<br/>Azure Functions .NET 8"]
     ROOT --> APP["📱 apps/mobile/<br/>App Flutter"]
     ROOT --> PKG["🧩 packages/<br/>Paquets Dart partagés"]
-    ROOT --> CNT["📚 content/<br/>5 certifs · 60 leçons (YAML)"]
+    ROOT --> CNT["📚 content/<br/>89 certifs · 144 leçons (YAML)"]
     ROOT --> INF["🏗️ infra/<br/>8 modules Bicep"]
     ROOT --> CI[".github/workflows/<br/>6 pipelines"]
     ROOT --> DOC["📄 docs/<br/>README · ARCHITECTURE · ÉTAT"]
@@ -141,21 +141,16 @@ flowchart LR
 
 ```mermaid
 graph LR
-    C["📚 content/"] --> AZ900["AZ-900<br/>Fondamentaux Azure"]
-    C --> AZ104["AZ-104<br/>Administration Azure"]
-    C --> AI900["AI-900<br/>Fondamentaux IA"]
-    C --> DP900["DP-900<br/>Fondamentaux données"]
-    C --> SC900["SC-900<br/>Sécurité & conformité"]
+    C["📚 content/"] --> ACT["89 certifications actives"]
+    C --> RICH["5 tracks complets<br/>AZ-900 · AZ-104 · AI-900 · DP-900 · SC-900"]
+    C --> MIN["84 tracks catalogue<br/>1 leçon d'amorçage chacun"]
 ```
 
-| Certification | Domaines | Leçons | Format |
+| Couverture | Domaines | Leçons | Format |
 |---|:---:|:---:|---|
-| **AZ‑900** | 3 | 12 | `content/az-900/track.yaml` + `lessons/*.lesson.yaml` |
-| **AZ‑104** | 5 | 12 | idem |
-| **AI‑900** | 5 | 12 | idem |
-| **DP‑900** | 4 | 12 | idem |
-| **SC‑900** | 4 | 12 | idem |
-| **Total** | — | **60** | Validé par `content/schema/{lesson,track}.schema.json` |
+| **Tracks complets existants** | 21 (cumul) | 60 | `content/{az-900,az-104,ai-900,dp-900,sc-900}` |
+| **Tracks catalogue ajoutés** | 1 chacun | 84 | `content/<certification-active>/track.yaml` + `lessons/*.lesson.yaml` |
+| **Total** | — | **144** | **89 certifications actives** validées par `content/schema/{lesson,track}.schema.json` |
 
 ---
 

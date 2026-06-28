@@ -1,0 +1,15 @@
+id: implementing-data-engineering-solutions-using-azure-databricks
+code: IMPLEMENTING-DATA-ENGINEERING-SOLUTIONS-USING-AZURE-DATABRICKS
+title: 'Microsoft Certified: Azure Databricks Data Engineer Associate'
+level: associate
+summary: Microsoft certification (Data Engineer) covering Azure, Azure Databricks.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-48da2969
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-48da2969

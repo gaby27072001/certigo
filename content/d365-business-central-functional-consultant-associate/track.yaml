@@ -1,0 +1,16 @@
+id: d365-business-central-functional-consultant-associate
+code: D365-BUSINESS-CENTRAL-FUNCTIONAL-CONSULTANT-ASSOCIATE
+title: 'Microsoft Certified: Dynamics 365 Business Central Functional Consultant Associate'
+level: associate
+summary: Microsoft certification (Functional Consultant) covering Dynamics 365, Business
+  Central, Microsoft Power Platform.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-665222f8
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-665222f8

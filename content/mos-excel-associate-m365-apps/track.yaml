@@ -1,0 +1,15 @@
+id: mos-excel-associate-m365-apps
+code: MOS-EXCEL-ASSOCIATE-M365-APPS
+title: 'Microsoft Office Specialist: Excel Associate (Microsoft 365 Apps)'
+level: associate
+summary: Microsoft certification (Business User) covering Excel.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-f3746d54
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-f3746d54

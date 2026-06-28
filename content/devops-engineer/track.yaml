@@ -1,0 +1,16 @@
+id: devops-engineer
+code: DEVOPS-ENGINEER
+title: 'Microsoft Certified: DevOps Engineer Expert'
+level: expert
+summary: Microsoft certification (DevOps Engineer) covering Azure, Azure DevOps, Azure
+  Kubernetes Service (AKS), Azure Container Instances, Azure Automation.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-47f10003
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-47f10003

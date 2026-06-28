@@ -1,0 +1,41 @@
+id: l-core-f5bddca6
+trackId: mos-excel-expert-2019
+unitId: u-core-f5bddca6
+domainId: core-objectives
+title: Core objectives overview
+estMinutes: 5
+blocks:
+- type: hook
+  conceptId: c-core-f5bddca6
+  body: 'Use this micro-lesson as a quick orientation for Microsoft Office Specialist:
+    Excel Expert (Office 2019). Focus on role scope, product coverage, and expected
+    outcomes.'
+- type: concept
+  conceptId: c-core-f5bddca6
+  title: Certification focus
+  body: 'Microsoft Office Specialist: Excel Expert (Office 2019) targets competency
+    in role scope and product coverage. Review core scenarios, service boundaries,
+    and implementation trade-offs.'
+- type: check
+  conceptId: c-core-f5bddca6
+  check:
+    id: l-core-f5bddca6-check-1
+    conceptId: c-core-f5bddca6
+    type: mcq
+    difficulty: 1
+    stem: What is the best use of this lesson for MOS-EXCEL-EXPERT-2019 preparation?
+    options:
+    - id: a
+      label: Understand role scope and core objectives first
+    - id: b
+      label: Memorize implementation details without context
+    - id: c
+      label: Skip product and scenario alignment
+    correct:
+    - a
+    explanation: Start with role scope and objective mapping before deep dives. It
+      improves study efficiency and exam readiness.
+- type: recap
+  conceptId: c-core-f5bddca6
+  body: 'MOS-EXCEL-EXPERT-2019: align study on role scope, product boundaries, and
+    practical scenarios to maximize readiness.'

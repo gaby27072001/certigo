@@ -1,0 +1,15 @@
+id: mos-excel-2016
+code: MOS-EXCEL-2016
+title: 'Microsoft Office Specialist: Excel (Office 2016)'
+level: associate
+summary: Microsoft certification (Business User) covering Excel.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-7046003c
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-7046003c

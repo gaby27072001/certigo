@@ -1,0 +1,15 @@
+id: azure-ai-engineer
+code: AZURE-AI-ENGINEER
+title: 'Microsoft Certified: Azure AI Engineer Associate'
+level: associate
+summary: Microsoft certification (AI Engineer) covering Azure.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-50a0890a
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-50a0890a

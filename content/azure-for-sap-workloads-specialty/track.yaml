@@ -1,0 +1,15 @@
+id: azure-for-sap-workloads-specialty
+code: AZURE-FOR-SAP-WORKLOADS-SPECIALTY
+title: 'Microsoft Certified: Azure for SAP Workloads Specialty'
+level: associate
+summary: Microsoft certification (Solution Architect) covering Azure.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-a7bac5b2
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-a7bac5b2

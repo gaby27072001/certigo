@@ -1,0 +1,15 @@
+id: mos-word-2016-expert
+code: MOS-WORD-2016-EXPERT
+title: 'Microsoft Office Specialist: Word Expert (Office 2016)'
+level: expert
+summary: Microsoft certification (Business User) covering Word.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-ff0ccb63
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-ff0ccb63

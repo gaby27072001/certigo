@@ -1,0 +1,16 @@
+id: information-security-administrator
+code: INFORMATION-SECURITY-ADMINISTRATOR
+title: 'Microsoft Certified: Information Security Administrator Associate'
+level: associate
+summary: Microsoft certification (Administrator) covering Microsoft 365, Microsoft
+  365 Security Center.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-42f6c4a4
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-42f6c4a4

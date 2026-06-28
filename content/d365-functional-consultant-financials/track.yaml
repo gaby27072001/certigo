@@ -1,0 +1,15 @@
+id: d365-functional-consultant-financials
+code: D365-FUNCTIONAL-CONSULTANT-FINANCIALS
+title: 'Microsoft Certified: Dynamics 365 Finance Functional Consultant Associate'
+level: associate
+summary: Microsoft certification (Functional Consultant) covering Dynamics 365.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-d4c3ab30
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-d4c3ab30

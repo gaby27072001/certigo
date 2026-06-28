@@ -1,0 +1,15 @@
+id: azure-network-engineer-associate
+code: AZURE-NETWORK-ENGINEER-ASSOCIATE
+title: 'Microsoft Certified: Azure Network Engineer Associate'
+level: associate
+summary: Microsoft certification (Network Engineer) covering Azure.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-d5d472ba
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-d5d472ba

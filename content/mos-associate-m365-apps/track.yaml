@@ -1,0 +1,15 @@
+id: mos-associate-m365-apps
+code: MOS-ASSOCIATE-M365-APPS
+title: 'Microsoft Office Specialist: Associate (Microsoft 365 Apps)'
+level: associate
+summary: Microsoft certification (Business User) covering PowerPoint, Word, Excel.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-d3d18145
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-d3d18145

@@ -1,0 +1,16 @@
+id: power-platform-functional-consultant-associate
+code: POWER-PLATFORM-FUNCTIONAL-CONSULTANT-ASSOCIATE
+title: 'Microsoft Certified: Power Platform Functional Consultant Associate'
+level: associate
+summary: Microsoft certification (Functional Consultant) covering Microsoft Power
+  Platform.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-1d7a3dfa
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-1d7a3dfa
