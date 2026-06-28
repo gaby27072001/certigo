@@ -16,6 +16,17 @@ param containerSoftDeleteDays int = 7
 @description('Enable blob versioning (recommended for prod).')
 param enableVersioning bool = false
 
+@description('''Public network access for the account. Must stay Enabled while the Flex
+Consumption Function App pulls its deployment package (app-package container) from this
+account over the public endpoint via its managed identity. Disabling it requires private
+endpoints (P1 hardening). Encoded explicitly because an unset value let the live dev
+account drift to Disabled, which broke the package pull (403 InaccessibleStorageException).''')
+@allowed([
+  'Enabled'
+  'Disabled'
+])
+param publicNetworkAccess string = 'Enabled'
+
 resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
   name: accountName
   location: location
@@ -28,6 +39,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
     allowSharedKeyAccess: false
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
+    publicNetworkAccess: publicNetworkAccess
     networkAcls: {
       bypass: 'AzureServices'
       defaultAction: 'Allow'
