@@ -1,0 +1,53 @@
+id: pl900-l-platform-value
+trackId: pl-900
+unitId: pl900-u-core-objectives
+domainId: core-objectives
+title: PL-900 platform value overview
+estMinutes: 8
+blocks:
+  - type: hook
+    conceptId: pl900-c-value
+    body: >
+      Vous devez accelerer la livraison d'applications metier sans attendre un
+      cycle de developpement long. Cette lecon introduit la proposition de
+      valeur Power Platform pour PL-900.
+  - type: concept
+    conceptId: pl900-c-value
+    title: Composants essentiels de Power Platform
+    body: >
+      Power Apps cree des applications low-code, Power Automate automatise les
+      processus, Power BI analyse les donnees, Copilot Studio construit des
+      experiences conversationnelles, et Dataverse unifie les donnees.
+  - type: example
+    conceptId: pl900-c-value
+    title: Exemple metier
+    body: >
+      Une equipe Operations construit une app Power Apps de suivi incidents,
+      declenche des workflows Power Automate pour les escalades, puis suit les
+      KPI dans Power BI alimente par Dataverse.
+  - type: check
+    conceptId: pl900-c-value
+    check:
+      id: pl900-l-platform-value-check-1
+      conceptId: pl900-c-value
+      type: mcq
+      difficulty: 1
+      stem: Quel choix represente le mieux l'objectif principal de Power Platform ?
+      options:
+        - id: a
+          label: Permettre des solutions low-code avec applications, automatisation et analyse de donnees
+        - id: b
+          label: Remplacer toute administration IT sans gouvernance
+        - id: c
+          label: Limiter les usages a la visualisation de tableaux de bord uniquement
+      correct:
+        - a
+      explanation: >
+        Power Platform couvre un spectre large de creation de valeur low-code
+        (apps, workflows, analytics) avec gouvernance, et ne se limite pas a un
+        seul usage.
+  - type: recap
+    conceptId: pl900-c-value
+    body: >
+      Pour PL-900, retenez la complementarite de Power Apps, Power Automate,
+      Power BI, Copilot Studio et Dataverse pour resoudre des cas metier.

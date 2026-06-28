@@ -46,4 +46,14 @@ class TrackSummary {
         unitCount: (json['unitCount'] as num?)?.toInt() ?? 0,
         lessonCount: (json['lessonCount'] as num?)?.toInt() ?? 0,
       );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'code': code,
+        'title': title,
+        'level': level,
+        'summary': summary,
+        'unitCount': unitCount,
+        'lessonCount': lessonCount,
+      };
 }

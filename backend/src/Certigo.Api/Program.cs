@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Certigo.Api.Auth;
+using Certigo.Api.Functions;
 using Certigo.Api.Middleware;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Services;
@@ -45,6 +46,7 @@ var host = new HostBuilder()
         services.AddSingleton(sp => new CosmosContext(
             sp.GetRequiredService<CosmosClient>(),
             configuration["COSMOS_DATABASE"] ?? CosmosContainers.DatabaseName));
+        services.AddSingleton<IHealthProbe, CosmosHealthProbe>();
 
         // Locally-issued JWT settings shared by the issuer and the local validator.
         // The signing key is mandatory in Production; a fixed dev key is used

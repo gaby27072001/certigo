@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../app/app.dart';
 import '../app/mascots.dart';
 import '../app/offline/offline_sync_scope.dart';
+import '../app/offline/prefs_catalog_store.dart';
 import '../app/offline/prefs_sync_store.dart';
 import '../app/providers.dart';
 
@@ -17,9 +18,7 @@ import '../app/providers.dart';
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
-    DeviceOrientation.portraitUp,
-  ]);
+  await SystemChrome.setPreferredOrientations(<DeviceOrientation>[DeviceOrientation.portraitUp]);
 
   FlutterError.onError = (FlutterErrorDetails details) {
     // TODO(observability): forward to Application Insights via a Crash service.
@@ -36,6 +35,7 @@ Future<void> bootstrap() async {
   runApp(
     ProviderScope(
       overrides: <Override>[
+        catalogStoreProvider.overrideWithValue(prefsCatalogCacheStore(prefs)),
         syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
       ],
       child: const OfflineSyncScope(child: CertigoApp()),

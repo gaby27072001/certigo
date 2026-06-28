@@ -1,5 +1,9 @@
 // Dev environment parameters. Authority/audience point to the Certigo
 // Entra External ID app registration (replace placeholders before deploying).
+// NOTE on Entra placeholders: in dev, main.bicep sets authMode='dev', so the API uses
+// DevTokenValidator and Entra External ID is NOT enforced. The entraAuthority/entraAudience
+// placeholders below are therefore safe to deploy as-is for dev. Provide real CIAM values
+// for staging/prod (where authMode='prod' and EntraTokenValidator is active).
 //
 // Deploy:
 //   az deployment sub create \

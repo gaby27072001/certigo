@@ -1,0 +1,24 @@
+name: promote-backend-staging-prod
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: promote-backend-staging-prod-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging:
+    name: Promote backend to staging
+    uses: ./.github/workflows/cd-backend.yml
+    with:
+      environment: staging
+    secrets: inherit
+
+  deploy-prod:
+    name: Promote backend to prod
+    needs: deploy-staging
+    uses: ./.github/workflows/cd-backend.yml
+    with:
+      environment: prod
+    secrets: inherit

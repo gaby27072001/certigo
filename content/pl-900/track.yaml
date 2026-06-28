@@ -1,0 +1,18 @@
+id: pl-900
+code: PL-900
+title: Microsoft Power Platform Fundamentals
+level: fundamentals
+summary: >
+  Comprendre la valeur business de Power Platform, ses composants principaux
+  (Power Apps, Power Automate, Power BI, Copilot Studio, Dataverse) et les
+  usages low-code attendus a l'examen PL-900.
+domains:
+  - id: core-objectives
+    name: Core objectives
+    weight: 1.0
+units:
+  - id: pl900-u-core-objectives
+    domainId: core-objectives
+    title: Core objectives
+    lessons:
+      - pl900-l-platform-value

@@ -6,6 +6,12 @@ name: cd-backend
 # Required OIDC federated-identity secrets (repo/env settings):
 #   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
 on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       environment:
@@ -31,6 +37,7 @@ concurrency:
 jobs:
   deploy-infra:
     name: Deploy infrastructure (${{ inputs.environment || 'dev' }})
+    environment: ${{ inputs.environment || 'dev' }}
     runs-on: [self-hosted, Linux, X64, law-microlingo]
     permissions:
       id-token: write
@@ -60,6 +67,7 @@ jobs:
 
   deploy-backend:
     name: Deploy backend code (${{ inputs.environment || 'dev' }})
+    environment: ${{ inputs.environment || 'dev' }}
     runs-on: [self-hosted, Linux, X64, law-microlingo]
     needs: deploy-infra
     permissions:
