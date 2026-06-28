@@ -1,0 +1,16 @@
+id: data-analyst-associate
+code: DATA-ANALYST-ASSOCIATE
+title: 'Microsoft Certified: Power BI Data Analyst Associate'
+level: associate
+summary: Microsoft certification (Data Analyst) covering Microsoft Power Platform,
+  Power BI.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-db602383
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-db602383

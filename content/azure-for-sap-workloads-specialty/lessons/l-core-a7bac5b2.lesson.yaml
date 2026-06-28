@@ -1,0 +1,42 @@
+id: l-core-a7bac5b2
+trackId: azure-for-sap-workloads-specialty
+unitId: u-core-a7bac5b2
+domainId: core-objectives
+title: Core objectives overview
+estMinutes: 5
+blocks:
+- type: hook
+  conceptId: c-core-a7bac5b2
+  body: 'Use this micro-lesson as a quick orientation for Microsoft Certified: Azure
+    for SAP Workloads Specialty. Focus on role scope, product coverage, and expected
+    outcomes.'
+- type: concept
+  conceptId: c-core-a7bac5b2
+  title: Certification focus
+  body: 'Microsoft Certified: Azure for SAP Workloads Specialty targets competency
+    in role scope and product coverage. Review core scenarios, service boundaries,
+    and implementation trade-offs.'
+- type: check
+  conceptId: c-core-a7bac5b2
+  check:
+    id: l-core-a7bac5b2-check-1
+    conceptId: c-core-a7bac5b2
+    type: mcq
+    difficulty: 1
+    stem: What is the best use of this lesson for AZURE-FOR-SAP-WORKLOADS-SPECIALTY
+      preparation?
+    options:
+    - id: a
+      label: Understand role scope and core objectives first
+    - id: b
+      label: Memorize implementation details without context
+    - id: c
+      label: Skip product and scenario alignment
+    correct:
+    - a
+    explanation: Start with role scope and objective mapping before deep dives. It
+      improves study efficiency and exam readiness.
+- type: recap
+  conceptId: c-core-a7bac5b2
+  body: 'AZURE-FOR-SAP-WORKLOADS-SPECIALTY: align study on role scope, product boundaries,
+    and practical scenarios to maximize readiness.'

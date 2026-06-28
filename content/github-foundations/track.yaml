@@ -1,0 +1,16 @@
+id: github-foundations
+code: GITHUB-FOUNDATIONS
+title: GitHub Foundations
+level: fundamentals
+summary: Microsoft certification (Administrator, App Maker, Developer, DevOps Engineer,
+  Solution Architect) covering GitHub.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-b733b5f2
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-b733b5f2

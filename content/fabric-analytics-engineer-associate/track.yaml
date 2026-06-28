@@ -1,0 +1,16 @@
+id: fabric-analytics-engineer-associate
+code: FABRIC-ANALYTICS-ENGINEER-ASSOCIATE
+title: 'Microsoft Certified: Fabric Analytics Engineer Associate'
+level: associate
+summary: Microsoft certification (Data Engineer, Data Analyst) covering Microsoft
+  Fabric.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-05a422ed
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-05a422ed

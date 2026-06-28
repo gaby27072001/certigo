@@ -1,0 +1,15 @@
+id: copilot-and-agent-administration-fundamentals
+code: COPILOT-AND-AGENT-ADMINISTRATION-FUNDAMENTALS
+title: 'Microsoft 365 Certified: Copilot and Agent Administration Fundamentals'
+level: fundamentals
+summary: Microsoft certification (Administrator) covering Azure, Foundry Tools.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-9accd1ac
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-9accd1ac

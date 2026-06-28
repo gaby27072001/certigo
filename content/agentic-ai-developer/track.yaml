@@ -1,0 +1,16 @@
+id: agentic-ai-developer
+code: AGENTIC-AI-DEVELOPER
+title: 'GitHub Certified: Agentic AI Developer (beta)'
+level: associate
+summary: Microsoft certification (AI Engineer, App Maker, Data Engineer, Developer,
+  DevOps Engineer, Solution Architect) covering GitHub.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-64f0d3d3
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-64f0d3d3

@@ -1,0 +1,42 @@
+id: l-core-d8524a9a
+trackId: power-platform-solution-architect-expert
+unitId: u-core-d8524a9a
+domainId: core-objectives
+title: Core objectives overview
+estMinutes: 5
+blocks:
+- type: hook
+  conceptId: c-core-d8524a9a
+  body: 'Use this micro-lesson as a quick orientation for Microsoft Certified: Power
+    Platform Solution Architect Expert. Focus on role scope, product coverage, and
+    expected outcomes.'
+- type: concept
+  conceptId: c-core-d8524a9a
+  title: Certification focus
+  body: 'Microsoft Certified: Power Platform Solution Architect Expert targets competency
+    in role scope and product coverage. Review core scenarios, service boundaries,
+    and implementation trade-offs.'
+- type: check
+  conceptId: c-core-d8524a9a
+  check:
+    id: l-core-d8524a9a-check-1
+    conceptId: c-core-d8524a9a
+    type: mcq
+    difficulty: 1
+    stem: What is the best use of this lesson for POWER-PLATFORM-SOLUTION-ARCHITECT-EXPERT
+      preparation?
+    options:
+    - id: a
+      label: Understand role scope and core objectives first
+    - id: b
+      label: Memorize implementation details without context
+    - id: c
+      label: Skip product and scenario alignment
+    correct:
+    - a
+    explanation: Start with role scope and objective mapping before deep dives. It
+      improves study efficiency and exam readiness.
+- type: recap
+  conceptId: c-core-d8524a9a
+  body: 'POWER-PLATFORM-SOLUTION-ARCHITECT-EXPERT: align study on role scope, product
+    boundaries, and practical scenarios to maximize readiness.'

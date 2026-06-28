@@ -1,0 +1,15 @@
+id: azure-solutions-architect
+code: AZURE-SOLUTIONS-ARCHITECT
+title: 'Microsoft Certified: Azure Solutions Architect Expert'
+level: expert
+summary: Microsoft certification (Solution Architect) covering Azure.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-9af49cdb
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-9af49cdb

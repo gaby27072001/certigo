@@ -1,0 +1,16 @@
+id: d365-sales-ai-consultant-associate
+code: D365-SALES-AI-CONSULTANT-ASSOCIATE
+title: 'Microsoft Certified: Dynamics 365 Sales AI Consultant Associate (beta)'
+level: associate
+summary: Microsoft certification (Business Analyst, Functional Consultant) covering
+  Dynamics 365, Sales.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-ee4871fc
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-ee4871fc

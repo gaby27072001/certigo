@@ -1,0 +1,15 @@
+id: fabric-data-engineer-associate
+code: FABRIC-DATA-ENGINEER-ASSOCIATE
+title: 'Microsoft Certified: Fabric Data Engineer Associate'
+level: associate
+summary: Microsoft certification (Data Engineer) covering Microsoft Fabric.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-42be8580
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-42be8580

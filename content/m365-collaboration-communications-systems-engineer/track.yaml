@@ -1,0 +1,15 @@
+id: m365-collaboration-communications-systems-engineer
+code: M365-COLLABORATION-COMMUNICATIONS-SYSTEMS-ENGINEER
+title: 'Microsoft 365 Certified: Collaboration Communications Systems Engineer Associate'
+level: associate
+summary: Microsoft certification (Administrator) covering Microsoft 365.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-629efb2b
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-629efb2b

@@ -1,0 +1,17 @@
+id: ai-agent-builder-associate
+code: AI-AGENT-BUILDER-ASSOCIATE
+title: 'Microsoft Certified: AI Agent Builder Associate'
+level: associate
+summary: Microsoft certification (App Maker, Developer) covering Azure, Microsoft
+  365, Microsoft 365 Copilot, Microsoft Copilot, Microsoft Copilot Studio, Microsoft
+  Power Platform.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-348864c3
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-348864c3

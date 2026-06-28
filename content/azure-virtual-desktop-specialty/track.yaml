@@ -1,0 +1,15 @@
+id: azure-virtual-desktop-specialty
+code: AZURE-VIRTUAL-DESKTOP-SPECIALTY
+title: 'Microsoft Certified: Azure Virtual Desktop Specialty'
+level: associate
+summary: Microsoft certification (Administrator) covering Azure.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-fb2fe468
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-fb2fe468

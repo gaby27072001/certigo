@@ -1,0 +1,15 @@
+id: developing-ai-enabled-database-solutions
+code: DEVELOPING-AI-ENABLED-DATABASE-SOLUTIONS
+title: 'Microsoft Certified: SQL AI Developer Associate'
+level: associate
+summary: Microsoft certification (Developer) covering Azure.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-579bd92b
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-579bd92b
