@@ -17,6 +17,12 @@ public sealed class ConcurrencyConflictException(string message) : Exception(mes
 /// replayed or concurrent submission can never be applied twice.
 public sealed class DuplicateRecordException(string message) : Exception(message);
 
+/// Raised when the optional tutor LLM cannot be reached or returns a runtime
+/// service error. Callers may deliberately fall back to the grounded tutor
+/// explanation, but unexpected coding/configuration bugs should still surface.
+public sealed class TutorCompletionUnavailableException(string message, Exception? innerException = null)
+    : Exception(message, innerException);
+
 public interface IUserContext
 {
     string UserId { get; }
@@ -109,6 +115,24 @@ public interface ILearnerModelRepository
 public interface ITutorCompletion
 {
     Task<string?> CompleteAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default);
+}
+
+/// Dedicated LLM observability seam so the tutor can report outcomes without
+/// taking a dependency on a specific telemetry backend.
+public interface ITutorLlmTelemetry
+{
+    void TrackSuccess(TimeSpan latency);
+    void TrackControlledFallback(TimeSpan latency, string reason);
+    void TrackUnexpectedError(TimeSpan latency, Exception exception);
+    void TrackRejectedResponse(TimeSpan latency, string reason);
+}
+
+public sealed class NullTutorLlmTelemetry : ITutorLlmTelemetry
+{
+    public void TrackSuccess(TimeSpan latency) { }
+    public void TrackControlledFallback(TimeSpan latency, string reason) { }
+    public void TrackUnexpectedError(TimeSpan latency, Exception exception) { }
+    public void TrackRejectedResponse(TimeSpan latency, string reason) { }
 }
 
 public interface ILeaderboardRepository

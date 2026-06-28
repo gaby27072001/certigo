@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using Microlingo.Application.Abstractions;
 using Microlingo.Application.Dtos;
 using Microlingo.Domain.Content;
@@ -31,6 +32,7 @@ public sealed class TutorService(
     IContentRepository content,
     ILearnerModelRepository learnerModels,
     ITutorCompletion completion,
+    ITutorLlmTelemetry telemetry,
     IEventRepository events) : ITutorService
 {
     public async Task<TutorExplanationDto> ExplainAsync(TutorExplainRequest request, CancellationToken cancellationToken = default)
@@ -76,38 +78,56 @@ public sealed class TutorService(
     }
 
     // Attempts an LLM upgrade, but only adopts it if it survives the guardrails
-    // (grounding, length, exam-integrity). Any failure, empty reply, malformed
-    // JSON, or guardrail violation falls back to the grounded explanation, which
-    // is always safe. The recommendation stays grounded regardless of source.
+    // (grounding, length, exam-integrity). A controlled provider outage falls
+    // back to the grounded explanation, which is always safe; unexpected bugs
+    // still surface. Empty replies, malformed JSON, or guardrail violations also
+    // fall back to the grounded path. The recommendation stays grounded
+    // regardless of source.
     private async Task<TutorExplanation> UpgradeAsync(
         TutorContext ctx,
         TutorExplanation grounded,
         CancellationToken cancellationToken)
     {
+        var latency = Stopwatch.StartNew();
         string? raw;
         try
         {
             raw = await completion.CompleteAsync(
                 TutorPromptBuilder.System(), TutorPromptBuilder.User(ctx), cancellationToken);
         }
-        catch
+        catch (TutorCompletionUnavailableException)
         {
+            telemetry.TrackControlledFallback(latency.Elapsed, "provider_unavailable");
             return grounded;
+        }
+        catch (Exception ex)
+        {
+            telemetry.TrackUnexpectedError(latency.Elapsed, ex);
+            throw;
         }
 
         if (string.IsNullOrWhiteSpace(raw))
         {
+            telemetry.TrackRejectedResponse(latency.Elapsed, "empty_response");
             return grounded;
         }
 
         var candidate = TutorPayloadParser.TryParse(raw!, grounded.Recommendation);
         if (candidate is null)
         {
+            telemetry.TrackRejectedResponse(latency.Elapsed, "invalid_payload");
             return grounded;
         }
 
         var verdict = TutorGuardrails.Validate(candidate, ctx);
-        return verdict.Ok ? candidate : grounded;
+        if (!verdict.Ok)
+        {
+            telemetry.TrackRejectedResponse(latency.Elapsed, "guardrail_rejected");
+            return grounded;
+        }
+
+        telemetry.TrackSuccess(latency.Elapsed);
+        return candidate;
     }
 
     private static TutorExplanationDto ToDto(TutorContext ctx, TutorExplanation e)
