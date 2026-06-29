@@ -85,4 +85,28 @@ public sealed class QuizFunctionsTests
         await act.Should().ThrowAsync<BadRequestException>();
         quizzes.CallCount.Should().Be(0);
     }
+
+    [Theory]
+    [InlineData("{this is not valid json}")]
+    [InlineData("{\"clientAttemptId\": }")]
+    [InlineData("not json at all")]
+    public async Task SubmitQuiz_WithMalformedJsonBody_ThrowsBadRequest_NotJsonException(string badBody)
+    {
+        // Regression guard: HttpExtensions.ReadJsonAsync must convert JsonException → BadRequestException
+        // so that ExceptionMiddleware answers 400 rather than letting an unhandled JsonException
+        // surface as a generic 500 Internal Server Error.
+        var quizzes = new FakeQuizService();
+        var function = new QuizFunctions(quizzes);
+        var invocation = FunctionTestHarness.CreateHttp(
+            method: "POST",
+            path: "/api/quiz/lesson-1/submit",
+            body: badBody);
+        invocation.Context.Items["User"] = TestPrincipal.With(oid: "user-1");
+
+        var act = () => function.SubmitQuiz(invocation.Request!, "lesson-1", invocation.Context);
+
+        var ex = await act.Should().ThrowAsync<BadRequestException>();
+        ex.Which.Message.Should().Contain("Invalid JSON");
+        quizzes.CallCount.Should().Be(0);
+    }
 }
