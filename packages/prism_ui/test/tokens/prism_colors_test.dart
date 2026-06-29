@@ -4,7 +4,7 @@ import 'package:prism_ui/prism_ui.dart';
 
 void main() {
   group('PrismColors', () {
-    test('brand primary is the Microlingo blue', () {
+    test('brand primary is the Certigo blue', () {
       expect(PrismColors.primary, const Color(0xFF0078D4));
       expect(PrismColors.primaryDark, const Color(0xFF005A9E));
     });

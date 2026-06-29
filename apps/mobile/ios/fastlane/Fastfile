@@ -10,7 +10,7 @@
 # en utilisant le nom de profil fourni via IOS_PROVISIONING_PROFILE_NAME.
 default_platform(:ios)
 
-BUNDLE_ID = "law-microlingo".freeze
+BUNDLE_ID = "law-certigo".freeze
 
 # Clé API App Store Connect (lecture des secrets depuis l'environnement).
 def asc_api_key

@@ -2,7 +2,7 @@ import 'package:data/data.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Storage key for the offline catalog cache.
-const String kCatalogCachePrefsKey = 'microlingo.catalog.cache.v1';
+const String kCatalogCachePrefsKey = 'certigo.catalog.cache.v1';
 
 /// Builds a [JsonCatalogCacheStore] persisted in [SharedPreferences] under one
 /// string key so the track catalog survives app restarts.

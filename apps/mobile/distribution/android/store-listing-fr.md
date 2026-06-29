@@ -7,7 +7,7 @@
 | Champ | Valeur |
 |---|---|
 | Nom de l'application | **Certigo** |
-| applicationId / package | `law.microlingo` ⚠️ NON modifiable après le 1er upload |
+| applicationId / package | `law.certigo` ⚠️ NON modifiable après le 1er upload |
 | Catégorie | Éducation |
 | Adresse e-mail de contact | TODO (ex : `support@certigo.app`) |
 | Site web | TODO |

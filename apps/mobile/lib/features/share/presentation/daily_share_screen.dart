@@ -57,7 +57,7 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
           .read(shareIntentProvider)
           .shareText(
             _shareMessage(widget.card),
-            subject: 'Microlingo • ${widget.card.trackCode}',
+            subject: 'Certigo • ${widget.card.trackCode}',
           );
     } finally {
       if (mounted) {
@@ -127,7 +127,7 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
                   _TagPill(
                     icon: Icons.school_rounded,
                     label: card.trackCode.isEmpty
-                        ? 'Microlingo'
+                        ? 'Certigo'
                         : card.trackCode,
                     tone: mascot.color,
                   ),
@@ -401,5 +401,5 @@ AuroraMascot _mascotFrom(String raw) => switch (raw.toLowerCase()) {
 String _shareMessage(ShareCard card) {
   final String ref = Uri.encodeComponent(card.referralCode);
   final String share = Uri.encodeComponent(card.shareId);
-  return '${card.headline}\n${card.caption}\n\nmicrolingo://home?ref=$ref&share=$share';
+  return '${card.headline}\n${card.caption}\n\ncertigo://home?ref=$ref&share=$share';
 }

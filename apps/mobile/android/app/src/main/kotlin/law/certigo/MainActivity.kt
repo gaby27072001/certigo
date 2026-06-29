@@ -1,4 +1,4 @@
-package law.microlingo
+package law.certigo
 
 import io.flutter.embedding.android.FlutterActivity
 

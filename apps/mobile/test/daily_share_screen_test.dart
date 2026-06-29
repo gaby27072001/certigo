@@ -37,7 +37,7 @@ void main() {
     mascot: 'Nimbus',
     headline: '12 jours de serie',
     caption:
-        '68% de preparation sur Microlingo ! Rejoins-moi avec le code ABCD12 🚀',
+        '68% de preparation sur Certigo ! Rejoins-moi avec le code ABCD12 🚀',
     referralCode: 'ABCD12',
     generatedAt: DateTime.utc(2025, 1, 6, 12),
   );
@@ -127,7 +127,7 @@ void main() {
       await tester.pump();
 
       expect(shareIntent.calls, 1);
-      expect(shareIntent.lastSubject, 'Microlingo • AZ-900');
+      expect(shareIntent.lastSubject, 'Certigo • AZ-900');
       expect(shareIntent.lastText, contains(fakeCard.headline));
       expect(shareIntent.lastText, contains('ref=ABCD12'));
       expect(shareIntent.lastText, contains('share=share-2025-01-06'));

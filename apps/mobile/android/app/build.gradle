@@ -15,7 +15,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "law.microlingo"
+    namespace = "law.certigo"
     compileSdk = 35
     // NDK pinned explicitement : flutter.ndkVersion (23.x) est incompatible avec
     // flutter_local_notifications, flutter_appauth et d'autres plugins qui exigent 26.x.
@@ -35,10 +35,10 @@ android {
     }
 
     defaultConfig {
-        // applicationId publié sur le Google Play Store.
-        // ⚠️ NON modifiable après le 1er upload Play — placeholder à confirmer
-        // avant publication réelle (voir docs/RELEASE_MOBILE.md).
-        applicationId = "law.microlingo"
+        // applicationId de l'app (préfixe law.*). L'app n'est pas encore publiée
+        // sur le Google Play Store : modifiable sans risque tant qu'aucun upload
+        // Play n'a eu lieu (voir docs/RELEASE_MOBILE.md).
+        applicationId = "law.certigo"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

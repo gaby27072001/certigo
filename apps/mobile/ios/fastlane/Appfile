@@ -1,5 +1,5 @@
 # Identifiant de l'app (doit correspondre au bundle id Xcode et au Play package).
-app_identifier("law-microlingo")
+app_identifier("law-certigo")
 
 # Auth via clé API App Store Connect (voir Fastfile + secrets ASC_*).
 # apple_id / team_id ne sont PAS requis avec la clé API.

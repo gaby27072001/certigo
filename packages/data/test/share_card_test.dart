@@ -17,7 +17,7 @@ void main() {
         'trackCode': 'AZ-900',
         'mascot': 'Nimbus',
         'headline': '12 jours de serie',
-        'caption': '68% de preparation sur Microlingo !',
+        'caption': '68% de preparation sur Certigo !',
         'referralCode': 'ABCD12',
         'generatedAt': '2025-01-06T12:00:00Z',
       });
