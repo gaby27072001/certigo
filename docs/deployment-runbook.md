@@ -461,6 +461,11 @@ le principal `az login` en local) doit avoir le rôle **`Cognitive Services Open
 ressource `microlingo-openai`. Sans ce rôle, l'appel renvoie **401/403** même si la config est
 correcte.
 
+> ✅ **`dev` : rôle accordé.** Le rôle `Cognitive Services OpenAI User` est attribué à l'identité
+> managée de `func-microlingo-dev-a2msquxibzvcu` (principal `ec39dfb2-cb12-4279-9830-ce5d95ebce6b`)
+> sur `microlingo-openai`. Reste à exécuter **un appel réel de validation** (voir ci-dessous).
+> `staging`/`prod` devront recevoir la même attribution lors de leur déploiement.
+
 ```bash
 # Identité managée de la Function App (system-assigned)
 PRINCIPAL_ID=$(az functionapp identity show \
@@ -476,7 +481,38 @@ az role assignment create \
   --role "Cognitive Services OpenAI User" --scope "$OPENAI_ID"
 ```
 
-> **État actuel.** Code adapté à Foundry v1 / GPT‑5, compilé, et **couvert par tests unitaires**
-> (Infra + Application verts). **Aucun appel réseau réel** n'a encore été validé : l'attribution
-> RBAC ci-dessus est le **seul** résiduel côté plateforme avant de basculer le statut du tuteur
-> en 🟢 (cf. `docs/ETAT_DU_PROJET.md` §13).
+> **État actuel (mise à jour).** **RBAC accordé en `dev`** (rôle `Cognitive Services OpenAI User`
+> sur `microlingo-openai` pour l'identité managée de `func-microlingo-dev`) et **tuteur activé en
+> `dev`** : les app settings `TUTOR_LLM_*` sont décommentés dans `infra/params/dev.bicepparam` et
+> déployés par `cd-backend`. Code Foundry v1 / GPT‑5 compilé et **couvert par tests unitaires**
+> (Infra + Application verts). **Résiduel : un seul appel réel de validation** (voir §
+> « Validation live » ci-dessous) doit renvoyer **200 + une explication LLM authentique** avant de
+> basculer le statut du tuteur en 🟢 (cf. `docs/ETAT_DU_PROJET.md` §13).
+
+### Validation live (1 appel réel)
+
+Une fois le déploiement `cd-backend` réussi pour le commit d'activation et l'app de retour à
+`200` sur `/api/health`, exécuter **un** appel de bout en bout. En `dev` l'auth est en mode
+permissif (`AUTH_MODE=dev`, `DevTokenValidator`) ; on bootstrappe un JWT applicatif via les
+endpoints anonymes `auth/register` puis `auth/login`, puis on appelle `tutor/explain` :
+
+```bash
+BASE="https://func-microlingo-dev-a2msquxibzvcu.azurewebsites.net/api"
+
+# 1) Santé (doit répondre 200 après le redéploiement)
+curl -fsS "$BASE/health"
+
+# 2) Compte de test + JWT applicatif (endpoints anonymes)
+curl -fsS -X POST "$BASE/auth/register" -H 'Content-Type: application/json' \
+  -d '{"email":"tutor-smoke@example.com","password":"Passw0rd!smoke"}'
+TOKEN=$(curl -fsS -X POST "$BASE/auth/login" -H 'Content-Type: application/json' \
+  -d '{"email":"tutor-smoke@example.com","password":"Passw0rd!smoke"}' | jq -r '.accessToken')
+
+# 3) Appel tuteur réel — remplacer trackId/lessonId/itemId par des IDs de contenu réels
+curl -fsS -X POST "$BASE/tutor/explain" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"trackId":"<TRACK>","lessonId":"<LESSON>","itemId":"<ITEM>","selected":["<CHOIX>"]}'
+```
+
+Un **200** avec une explication rédigée par le modèle (et non le repli déterministe) confirme le
+chemin live → basculer alors le badge tuteur en 🟢 dans `docs/ETAT_DU_PROJET.md` §13 et ce runbook.
