@@ -37,6 +37,22 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 3. En cas d'échec Azure login, contrôler uniquement les 3 secrets repo : `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
 4. Pour une promotion, lancer `promote-backend-staging-prod.yml` (enchaînement staging puis prod).
 
+### Pourquoi Azure-first (long terme)
+
+Le workflow GitHub reste un **orchestrateur** (dispatch, ordering, traçabilité), mais la
+vérité opérationnelle est portée par Azure pour limiter la dépendance aux droits admin GitHub.
+
+| Domaine | Source de vérité | Pourquoi c'est durable pour un non-admin GitHub |
+|---|---|---|
+| Authentification de déploiement | Entra ID + OIDC federated credentials | Plus de secret long-lived à tourner côté runner ; contrôle d'accès piloté par Azure RBAC. |
+| Autorisations d'exécution | RBAC Azure (scope subscription/resource group) | Les droits de déploiement ne dépendent pas de la gestion des runners/labels GitHub. |
+| État de l'infra | Bicep + Azure Resource Manager (`az deployment`) | Déploiement idempotent et audit Azure centralisé, indépendamment du type de runner. |
+| Configuration runtime app | Azure Functions/App Service settings + ressources Azure | Les changements d'exploitation sont opérables dans Azure même si GitHub admin est indisponible. |
+| Gouvernance production | GitHub environments (approvals) + garde-fous Azure | Le gate GitHub reste utile, mais la sécurité critique est déjà enforce côté Azure. |
+
+Limites connues : ce modèle suppose des permissions Azure correctement déléguées (OIDC + RBAC),
+et une policy org/enterprise autorisant au moins les GitHub-hosted runners pour l'orchestration.
+
 ### Risque / rollback (runnerless critique)
 
 - **Risque principal** : indisponibilité GitHub-hosted à l'échelle org/enterprise (policy centrale).
