@@ -1,6 +1,6 @@
 <div align="center">
 
-# Certigo
+# Certigo = Microlingo
 
 **Apprenez, révisez et validez vos certifications Microsoft — par micro-leçons premium.**
 
