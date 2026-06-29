@@ -39,7 +39,7 @@
 | **Moteurs métier** | 🟢 | `backend/src/Certigo.Domain` | Logique **pure & testée** : contenu, progression, gamification, examen, tuteur, reco, notifications, intégrité. |
 | **Contenu pédagogique** | 🟢 | `content/` | **89 certifications actives · 144 leçons** en YAML, validées par schémas JSON. |
 | **Gamification** | 🟢 | Domain `Gamification/` | XP, streak (+réparation), ligues hebdo, **saisons**, quêtes, succès, boutique, amis. |
-| **Tuteur IA** | 🟢 | Domain `Tutor/` + mobile `features/tutor` | Explications ancrées sur le contenu — **branché côté serveur ET mobile** (`tutor_sheet`). *(Le moteur est actuellement un adaptateur nul — `NullTutorCompletion` — qui retourne une chaîne vide. Un vrai LLM sera branché via `ITutorCompletion`, voir H19.)* |
+| **Tuteur IA** | 🟢 | Domain `Tutor/` + mobile `features/tutor` | Explications ancrées sur le contenu — **branché côté serveur ET mobile** (`tutor_sheet`). LLM réel **Azure OpenAI** (`AzureOpenAiTutorCompletion`) derrière `ITutorCompletion`, activé par `TUTOR_LLM_ENABLED=true` (sinon repli déterministe `NullTutorCompletion`) ; couvert par `TutorCompletionTests`. Voir H19. |
 | **Recommandation + coach** | 🟢 | Domain `Recommendation/` + `home/coach_section` | Moteur « next best » + coach IA sur l'accueil. |
 | **Notifications** | 🟢 | Domain `Notifications/` | Planification **serveur‑autoritaire**, estimation de la meilleure heure d'envoi. |
 | **Anti‑triche / intégrité** | 🟢 (shadow) | Domain `Integrity/` | Évaluateur déterministe des tentatives — **mode détection** (signale, ne sanctionne pas encore). |
