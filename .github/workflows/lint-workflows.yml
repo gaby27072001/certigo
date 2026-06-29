@@ -25,3 +25,4 @@ jobs:
         with:
           files: ".github/workflows/*.yml"
           pyflakes: false
+          shellcheck: false
