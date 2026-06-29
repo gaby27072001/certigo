@@ -508,11 +508,15 @@ curl -fsS -X POST "$BASE/auth/register" -H 'Content-Type: application/json' \
 TOKEN=$(curl -fsS -X POST "$BASE/auth/login" -H 'Content-Type: application/json' \
   -d '{"email":"tutor-smoke@example.com","password":"Passw0rd!smoke"}' | jq -r '.accessToken')
 
-# 3) Appel tuteur réel — remplacer trackId/lessonId/itemId par des IDs de contenu réels
-curl -fsS -X POST "$BASE/tutor/explain" \
+# 3) Appel tuteur réel — IDs de contenu réels (parcours « ai-transformation-leader »,
+#    leçon l-core-d5ed414f, contrôle …-check-1 ; bonne réponse = "a").
+RESP=$(curl -fsS -X POST "$BASE/tutor/explain" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"trackId":"<TRACK>","lessonId":"<LESSON>","itemId":"<ITEM>","selected":["<CHOIX>"]}'
+  -d '{"trackId":"ai-transformation-leader","lessonId":"l-core-d5ed414f","itemId":"l-core-d5ed414f-check-1","selected":["a"]}')
+echo "$RESP" | jq .
+echo "source = $(echo "$RESP" | jq -r '.source')"   # "ai" = vrai LLM ; "grounded" = repli déterministe
 ```
 
-Un **200** avec une explication rédigée par le modèle (et non le repli déterministe) confirme le
-chemin live → basculer alors le badge tuteur en 🟢 dans `docs/ETAT_DU_PROJET.md` §13 et ce runbook.
+Critère de réussite : **HTTP 200 ET `source == "ai"`** (le repli déterministe renvoie aussi 200
+mais `source == "grounded"`). Un `source:"ai"` confirme le chemin live (LLM Foundry, guardrails
+passés) → basculer alors le badge tuteur en 🟢 dans `docs/ETAT_DU_PROJET.md` §13 et ce runbook.
