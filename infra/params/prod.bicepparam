@@ -3,6 +3,11 @@
 // geo-redundant + versioned storage, CORS locked to []). Fill the Entra values
 // from your production app registration and set an on-call alert email.
 //
+// Security note: AUTH_MODE is NOT a parameter — it is computed from `env` in
+// main.bicep: env='prod' → authMode='prod' → Entra validation is enforced.
+// DevTokenValidator is never active in staging or prod, regardless of any config
+// value that might accidentally contain "dev".
+//
 // Deploy:
 //   az deployment sub create \
 //     --location westeurope \

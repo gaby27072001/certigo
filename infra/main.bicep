@@ -59,6 +59,9 @@ param forcePolicyAssignment bool = false
 @description('Object (principal) id of the CI release runner managed identity. When set, it is granted read access (Key Vault Secrets User) to the Key Vault so the mobile release workflows can pull signing secrets — no signing secret in GitHub. Empty = skip (needs role-assignment rights to set).')
 param ciRunnerPrincipalId string = ''
 
+@description('Allowed CORS origins for staging/prod. Ignored in dev (dev always uses ["*"] for browser tooling). Default [] is correct for native mobile clients. Provide ["https://app.certigo.io"] once a web client is deployed. Never set ["*"] outside dev.')
+param allowedCorsOrigins array = []
+
 // Deterministic, collision-resistant suffix per environment/subscription.
 var suffix = uniqueString(subscription().id, appName, env)
 var rgName = 'rg-${appName}-${env}'
@@ -165,7 +168,9 @@ module api 'modules/functionApp.bicep' = {
     tutorLlmApiKey: tutorLlmApiKey
     tutorLlmMaxOutputTokens: tutorLlmMaxOutputTokens
     // Native mobile clients aren't subject to CORS; only dev keeps '*' (browser tooling).
-    allowedCorsOrigins: env == 'dev' ? [ '*' ] : []
+    // For staging/prod, pass allowedCorsOrigins (defaults to []; set to ['https://app.certigo.io']
+    // once a web client is deployed). '*' is never allowed outside dev.
+    allowedCorsOrigins: env == 'dev' ? [ '*' ] : allowedCorsOrigins
     tags: tags
   }
 }

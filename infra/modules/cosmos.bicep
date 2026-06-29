@@ -33,6 +33,9 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
     ]
     disableLocalAuth: disableLocalAuth
     minimalTlsVersion: 'Tls12'
+    // P1 hardening: set publicNetworkAccess: 'Disabled' for staging/prod once
+    // private endpoints are provisioned. Until then, the account remains publicly
+    // reachable but is protected by RBAC-only data-plane auth (disableLocalAuth).
   }
 }
 

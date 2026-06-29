@@ -71,12 +71,13 @@ var host = new HostBuilder()
                 new LocalJwtTokenValidator(signingSecret, jwtIssuer, jwtAudience)
             };
 
-            // Hard production guard: the dev validator accepts any bearer token as a
-            // user id, so it can never be wired in production (even if AUTH_MODE=dev
-            // leaks into config). The decision is a pure, unit-tested function.
+            // Hard environment guard: the dev validator accepts any bearer token as a
+            // user id, so it can only be wired in the Development environment (never
+            // staging or prod, even if AUTH_MODE=dev leaks into config). The decision
+            // is a pure, unit-tested function.
             var useDev = AuthValidatorSelection.ShouldUseDevValidator(
                 configuration["AUTH_MODE"],
-                context.HostingEnvironment.IsProduction(),
+                context.HostingEnvironment.IsDevelopment(),
                 configuration["AUTH_ALLOW_DEV"]);
             if (useDev)
             {

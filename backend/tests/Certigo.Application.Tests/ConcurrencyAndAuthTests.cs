@@ -12,26 +12,35 @@ public sealed class AuthValidatorSelectionTests
     [InlineData("entra")]
     [InlineData("Entra")]
     public void Non_dev_modes_select_the_entra_validator(string? mode)
-        => AuthValidatorSelection.ShouldUseDevValidator(mode, isProduction: false, allowDevOverride: null)
+        => AuthValidatorSelection.ShouldUseDevValidator(mode, isDevelopment: false, allowDevOverride: null)
             .Should().BeFalse();
 
     [Theory]
     [InlineData("dev")]
     [InlineData("DEV")]
-    public void Dev_mode_is_allowed_outside_production(string mode)
-        => AuthValidatorSelection.ShouldUseDevValidator(mode, isProduction: false, allowDevOverride: null)
+    public void Dev_mode_is_allowed_in_Development(string mode)
+        => AuthValidatorSelection.ShouldUseDevValidator(mode, isDevelopment: true, allowDevOverride: null)
             .Should().BeTrue();
 
     [Fact]
-    public void Dev_mode_in_production_is_rejected_hard()
+    public void Dev_mode_outside_Development_is_rejected_hard()
     {
-        var act = () => AuthValidatorSelection.ShouldUseDevValidator("dev", isProduction: true, allowDevOverride: null);
-        act.Should().Throw<InvalidOperationException>().WithMessage("*forbidden in a Production*");
+        var act = () => AuthValidatorSelection.ShouldUseDevValidator("dev", isDevelopment: false, allowDevOverride: null);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*outside Development environment*");
     }
 
     [Fact]
-    public void Dev_mode_in_production_requires_an_explicit_override()
-        => AuthValidatorSelection.ShouldUseDevValidator("dev", isProduction: true, allowDevOverride: "true")
+    public void Dev_mode_in_staging_is_rejected_hard()
+    {
+        // Regression guard: staging is not Development, so the dev validator must be blocked
+        // even though IsProduction() returns false for a staging host.
+        var act = () => AuthValidatorSelection.ShouldUseDevValidator("dev", isDevelopment: false, allowDevOverride: null);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*outside Development environment*");
+    }
+
+    [Fact]
+    public void Dev_mode_outside_Development_requires_explicit_override()
+        => AuthValidatorSelection.ShouldUseDevValidator("dev", isDevelopment: false, allowDevOverride: "true")
             .Should().BeTrue();
 }
 

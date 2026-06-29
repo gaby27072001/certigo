@@ -2,6 +2,11 @@
 // Key Vault purge protection, geo-redundant storage, locked CORS) but is a safe
 // pre-production target. Fill the Entra values from your staging app registration.
 //
+// Security note: AUTH_MODE is NOT a parameter — it is computed from `env` in
+// main.bicep: env='staging' → authMode='prod' → Entra validation is enforced.
+// DevTokenValidator is never active in staging or prod, regardless of any config
+// value that might accidentally contain "dev".
+//
 // Deploy:
 //   az deployment sub create \
 //     --location westeurope \
