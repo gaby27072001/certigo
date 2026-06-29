@@ -28,7 +28,6 @@ on:
 
 env:
   TARGET_ENV: ${{ inputs.environment || 'dev' }}
-  MAIN_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.MAIN_CRITICAL_RUNNER_LABELS || '["self-hosted","Linux","X64","law-microlingo"]' }}
 
 # Prevent concurrent deployments to the same environment.
 concurrency:
@@ -39,7 +38,7 @@ jobs:
   deploy-infra:
     name: Deploy infrastructure (${{ inputs.environment || 'dev' }})
     environment: ${{ inputs.environment || 'dev' }}
-    runs-on: ${{ fromJSON(env.MAIN_CRITICAL_RUNNER_LABELS_JSON) }}
+    runs-on: ${{ fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS || '["self-hosted","Linux","X64","law-microlingo"]') }}
     permissions:
       id-token: write
       contents: read
@@ -69,7 +68,7 @@ jobs:
   deploy-backend:
     name: Deploy backend code (${{ inputs.environment || 'dev' }})
     environment: ${{ inputs.environment || 'dev' }}
-    runs-on: ${{ fromJSON(env.MAIN_CRITICAL_RUNNER_LABELS_JSON) }}
+    runs-on: ${{ fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS || '["self-hosted","Linux","X64","law-microlingo"]') }}
     needs: deploy-infra
     permissions:
       id-token: write

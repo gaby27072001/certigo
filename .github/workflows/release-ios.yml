@@ -27,6 +27,10 @@ name: release-ios
 on:
   workflow_dispatch:
     inputs:
+      enable_legacy_workflow:
+        description: "Lancer malgré la migration vers Codemagic"
+        type: boolean
+        default: false
       version_name:
         description: "versionName (ex: 0.1.0). Vide = pubspec.yaml"
         type: string
@@ -54,7 +58,7 @@ env:
 
 jobs:
   release:
-    if: false  # Migré vers Codemagic — voir codemagic.yaml
+    if: ${{ inputs.enable_legacy_workflow }}  # Migré vers Codemagic — voir codemagic.yaml
     name: Build IPA signé + upload TestFlight
     # ⚠️ Runner macOS requis (Xcode). Fallback hébergé (désactivé EMU) : macos-14
     runs-on: [self-hosted, macOS]

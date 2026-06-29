@@ -13,13 +13,10 @@ concurrency:
   group: ci-infra-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  NON_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","microlingo-ci"]' }}
-
 jobs:
   bicep-build:
     name: Bicep build (lint)
-    runs-on: ${{ fromJSON(env.NON_CRITICAL_RUNNER_LABELS_JSON) }}
+    runs-on: ${{ fromJSON(vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","microlingo-ci"]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Build main.bicep
