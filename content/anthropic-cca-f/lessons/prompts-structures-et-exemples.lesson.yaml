@@ -1,0 +1,37 @@
+id: anthropicccaf-l-prompts-structures-et-exemples
+trackId: anthropic-cca-f
+unitId: anthropicccaf-u-prompt-engineering
+domainId: prompt-engineering
+title: "Prompts structurés et exemples"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-prompts-structures-et-exemples
+    body: |
+      Dans l'examen CCA-F, « Prompts structurés et exemples » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-prompts-structures-et-exemples
+    title: "Prompts structurés et exemples"
+    body: |
+      Des consignes claires, un rôle, des balises XML et des exemples (few-shot) augmentent la fiabilité de Claude. Préciser le format de sortie réduit l'ambiguïté et facilite l'automatisation.
+  - type: check
+    conceptId: c-prompts-structures-et-exemples
+    check:
+      id: anthropicccaf-l-prompts-structures-et-exemples-check-1
+      conceptId: c-prompts-structures-et-exemples
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle pratique améliore la fiabilité d'un prompt Claude ?
+      options:
+        - { id: a, label: "Fournir rôle, consignes et exemples structurés" }
+        - { id: b, label: "Écrire le moins de mots possible sans contexte" }
+        - { id: c, label: "Mélanger plusieurs langues sans format" }
+        - { id: d, label: "Omettre le format de sortie" }
+      correct: [a]
+      explanation: |
+        Structure, rôle et exemples cadrent la réponse et la rendent exploitable.
+  - type: recap
+    conceptId: c-prompts-structures-et-exemples
+    body: |
+      Retenez l'essentiel de « Prompts structurés et exemples » pour la certification CCA-F.

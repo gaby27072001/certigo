@@ -1,0 +1,37 @@
+id: openaichatgptteachers-l-quiz-et-feedback
+trackId: openai-chatgpt-teachers
+unitId: openaichatgptteachers-u-activities-design
+domainId: activities-design
+title: "Quiz et feedback"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-quiz-et-feedback
+    body: |
+      Dans l'examen CHATGPT-EDU, « Quiz et feedback » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-quiz-et-feedback
+    title: "Quiz et feedback"
+    body: |
+      Générer quiz, consignes et feedback personnalisé fait gagner du temps. Vérifier l'exactitude et l'alignement aux objectifs reste indispensable.
+  - type: check
+    conceptId: c-quiz-et-feedback
+    check:
+      id: openaichatgptteachers-l-quiz-et-feedback-check-1
+      conceptId: c-quiz-et-feedback
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel atout pour la conception d'activités ?
+      options:
+        - { id: a, label: "Créer rapidement quiz et feedback à valider" }
+        - { id: b, label: "Supprimer l'évaluation" }
+        - { id: c, label: "Ignorer les objectifs" }
+        - { id: d, label: "Empêcher la personnalisation" }
+      correct: [a]
+      explanation: |
+        L'IA accélère la création ; la validation garantit la pertinence.
+  - type: recap
+    conceptId: c-quiz-et-feedback
+    body: |
+      Retenez l'essentiel de « Quiz et feedback » pour la certification CHATGPT-EDU.

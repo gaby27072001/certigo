@@ -1,0 +1,37 @@
+id: openaichatgptteachers-l-automatiser-les-taches-repetitives
+trackId: openai-chatgpt-teachers
+unitId: openaichatgptteachers-u-time-saving
+domainId: time-saving
+title: "Automatiser les tâches répétitives"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-automatiser-les-taches-repetitives
+    body: |
+      Dans l'examen CHATGPT-EDU, « Automatiser les tâches répétitives » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-automatiser-les-taches-repetitives
+    title: "Automatiser les tâches répétitives"
+    body: |
+      Courriels, synthèses de réunions et modèles de documents se préparent vite avec ChatGPT, libérant du temps pour l'enseignement et le suivi des élèves.
+  - type: check
+    conceptId: c-automatiser-les-taches-repetitives
+    check:
+      id: openaichatgptteachers-l-automatiser-les-taches-repetitives-check-1
+      conceptId: c-automatiser-les-taches-repetitives
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle tâche ChatGPT aide-t-il à accélérer ?
+      options:
+        - { id: a, label: "Rédiger courriels et synthèses administratives" }
+        - { id: b, label: "Noter sans relecture" }
+        - { id: c, label: "Stocker des données élèves sensibles" }
+        - { id: d, label: "Supprimer la confidentialité" }
+      correct: [a]
+      explanation: |
+        L'IA prend en charge le répétitif, l'enseignant garde le jugement.
+  - type: recap
+    conceptId: c-automatiser-les-taches-repetitives
+    body: |
+      Retenez l'essentiel de « Automatiser les tâches répétitives » pour la certification CHATGPT-EDU.

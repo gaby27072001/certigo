@@ -1,0 +1,37 @@
+id: openaiaifoundations-l-ce-qu-est-un-llm
+trackId: openai-ai-foundations
+unitId: openaiaifoundations-u-genai-basics
+domainId: genai-basics
+title: "Ce qu’est un LLM"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-ce-qu-est-un-llm
+    body: |
+      Dans l'examen AI-FOUND, « Ce qu’est un LLM » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-ce-qu-est-un-llm
+    title: "Ce qu’est un LLM"
+    body: |
+      Un grand modèle de langage prédit le mot suivant à partir d'immenses corpus. Il génère du texte plausible mais peut se tromper : la vérification humaine reste indispensable pour les décisions importantes.
+  - type: check
+    conceptId: c-ce-qu-est-un-llm
+    check:
+      id: openaiaifoundations-l-ce-qu-est-un-llm-check-1
+      conceptId: c-ce-qu-est-un-llm
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que fait fondamentalement un LLM ?
+      options:
+        - { id: a, label: "Prédire le texte le plus probable à partir d'un contexte" }
+        - { id: b, label: "Stocker une base de faits vérifiés" }
+        - { id: c, label: "Exécuter du code garanti sans erreur" }
+        - { id: d, label: "Remplacer toute supervision humaine" }
+      correct: [a]
+      explanation: |
+        Un LLM est un prédicteur statistique de tokens ; il faut vérifier ses sorties.
+  - type: recap
+    conceptId: c-ce-qu-est-un-llm
+    body: |
+      Retenez l'essentiel de « Ce qu’est un LLM » pour la certification AI-FOUND.

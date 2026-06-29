@@ -1,0 +1,37 @@
+id: anthropicccaf-l-claude-md-et-permissions
+trackId: anthropic-cca-f
+unitId: anthropicccaf-u-claude-code
+domainId: claude-code
+title: "CLAUDE.md et permissions"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-claude-md-et-permissions
+    body: |
+      Dans l'examen CCA-F, « CLAUDE.md et permissions » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-claude-md-et-permissions
+    title: "CLAUDE.md et permissions"
+    body: |
+      Claude Code se configure via un fichier CLAUDE.md décrivant le projet et des règles d'outils. Les permissions cadrent les actions sensibles (shell, écriture) pour garder l'agent sûr tout en restant autonome.
+  - type: check
+    conceptId: c-claude-md-et-permissions
+    check:
+      id: anthropicccaf-l-claude-md-et-permissions-check-1
+      conceptId: c-claude-md-et-permissions
+      type: mcq
+      difficulty: 2
+      stem: |
+        À quoi sert le fichier CLAUDE.md dans Claude Code ?
+      options:
+        - { id: a, label: "Donner le contexte projet et les conventions à respecter" }
+        - { id: b, label: "Stocker les clés API en clair" }
+        - { id: c, label: "Compiler le binaire" }
+        - { id: d, label: "Désactiver toute sécurité" }
+      correct: [a]
+      explanation: |
+        CLAUDE.md porte les conventions et le contexte durable du dépôt pour l'agent.
+  - type: recap
+    conceptId: c-claude-md-et-permissions
+    body: |
+      Retenez l'essentiel de « CLAUDE.md et permissions » pour la certification CCA-F.

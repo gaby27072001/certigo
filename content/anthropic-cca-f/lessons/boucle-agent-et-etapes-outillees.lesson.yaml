@@ -1,0 +1,37 @@
+id: anthropicccaf-l-boucle-agent-et-etapes-outillees
+trackId: anthropic-cca-f
+unitId: anthropicccaf-u-agentic-architecture
+domainId: agentic-architecture
+title: "Boucle agent et étapes outillées"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-boucle-agent-et-etapes-outillees
+    body: |
+      Dans l'examen CCA-F, « Boucle agent et étapes outillées » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-boucle-agent-et-etapes-outillees
+    title: "Boucle agent et étapes outillées"
+    body: |
+      Un agent Claude suit une boucle perception-raisonnement-action : il reçoit un objectif, choisit un outil, observe le résultat puis itère jusqu'à la solution. Décomposer une tâche complexe en étapes outillées rend l'agent fiable et observable.
+  - type: check
+    conceptId: c-boucle-agent-et-etapes-outillees
+    check:
+      id: anthropicccaf-l-boucle-agent-et-etapes-outillees-check-1
+      conceptId: c-boucle-agent-et-etapes-outillees
+      type: mcq
+      difficulty: 2
+      stem: |
+        Qu'est-ce qui caractérise un agent Claude ?
+      options:
+        - { id: a, label: "Une boucle raisonnement-action qui appelle des outils jusqu'à atteindre l'objectif" }
+        - { id: b, label: "Une réponse unique sans appel d'outil" }
+        - { id: c, label: "Un modèle entraîné sur site" }
+        - { id: d, label: "Un cache de réponses figées" }
+      correct: [a]
+      explanation: |
+        L'agent alterne raisonnement et appels d'outils, observant chaque résultat avant de poursuivre.
+  - type: recap
+    conceptId: c-boucle-agent-et-etapes-outillees
+    body: |
+      Retenez l'essentiel de « Boucle agent et étapes outillées » pour la certification CCA-F.

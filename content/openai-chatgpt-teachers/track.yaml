@@ -1,0 +1,45 @@
+# OpenAI ChatGPT Foundations for Teachers — openai certification track.
+# Domain weights mirror the official CHATGPT-EDU skills outline and sum to 1.0.
+id: openai-chatgpt-teachers
+code: "CHATGPT-EDU"
+provider: openai
+title: "OpenAI ChatGPT Foundations for Teachers"
+level: fundamentals
+examCode: "ChatGPT Foundations for Teachers"
+sourceUrl: "https://academy.openai.com/"
+summary: |
+  Parcours OpenAI pour les enseignants : intégrer ChatGPT en classe, concevoir des activités, gagner du temps sur les tâches administratives et respecter une éthique pédagogique. Centré sur des usages concrets et responsables en éducation.
+domains:
+  - id: classroom-integration
+    name: "Intégration en classe"
+    weight: 0.3
+  - id: activities-design
+    name: "Conception d'activités"
+    weight: 0.25
+  - id: time-saving
+    name: "Gain de temps administratif"
+    weight: 0.25
+  - id: ethics
+    name: "Éthique pédagogique"
+    weight: 0.2
+units:
+  - id: openaichatgptteachers-u-classroom-integration
+    domainId: classroom-integration
+    title: "Intégration en classe"
+    lessons:
+      - openaichatgptteachers-l-preparer-un-cours-avec-chatgpt
+  - id: openaichatgptteachers-u-activities-design
+    domainId: activities-design
+    title: "Conception d'activités"
+    lessons:
+      - openaichatgptteachers-l-quiz-et-feedback
+  - id: openaichatgptteachers-u-time-saving
+    domainId: time-saving
+    title: "Gain de temps administratif"
+    lessons:
+      - openaichatgptteachers-l-automatiser-les-taches-repetitives
+  - id: openaichatgptteachers-u-ethics
+    domainId: ethics
+    title: "Éthique pédagogique"
+    lessons:
+      - openaichatgptteachers-l-donnees-eleves-et-integrite

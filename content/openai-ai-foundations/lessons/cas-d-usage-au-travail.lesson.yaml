@@ -1,0 +1,37 @@
+id: openaiaifoundations-l-cas-d-usage-au-travail
+trackId: openai-ai-foundations
+unitId: openaiaifoundations-u-applications
+domainId: applications
+title: "Cas d’usage au travail"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-cas-d-usage-au-travail
+    body: |
+      Dans l'examen AI-FOUND, « Cas d’usage au travail » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-cas-d-usage-au-travail
+    title: "Cas d’usage au travail"
+    body: |
+      Rédaction, synthèse, analyse, brainstorming et assistance au code sont des usages clés. Combiner l'IA à la relecture humaine accroît la productivité sans sacrifier la qualité.
+  - type: check
+    conceptId: c-cas-d-usage-au-travail
+    check:
+      id: openaiaifoundations-l-cas-d-usage-au-travail-check-1
+      conceptId: c-cas-d-usage-au-travail
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel est un bon cas d'usage de ChatGPT au travail ?
+      options:
+        - { id: a, label: "Synthétiser un document puis le faire relire" }
+        - { id: b, label: "Décider seul sans contrôle" }
+        - { id: c, label: "Diffuser des sorties non vérifiées" }
+        - { id: d, label: "Stocker des mots de passe" }
+      correct: [a]
+      explanation: |
+        L'IA accélère synthèse et rédaction, la relecture garantit la qualité.
+  - type: recap
+    conceptId: c-cas-d-usage-au-travail
+    body: |
+      Retenez l'essentiel de « Cas d’usage au travail » pour la certification AI-FOUND.

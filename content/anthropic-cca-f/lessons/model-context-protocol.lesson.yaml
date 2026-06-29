@@ -1,0 +1,37 @@
+id: anthropicccaf-l-model-context-protocol
+trackId: anthropic-cca-f
+unitId: anthropicccaf-u-tools-mcp
+domainId: tools-mcp
+title: "Model Context Protocol"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-model-context-protocol
+    body: |
+      Dans l'examen CCA-F, « Model Context Protocol » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-model-context-protocol
+    title: "Model Context Protocol"
+    body: |
+      Le Model Context Protocol (MCP) connecte Claude à des outils et données externes via des serveurs standardisés. Cela ouvre des capacités fichiers, bases de données et API sans coder chaque intégration.
+  - type: check
+    conceptId: c-model-context-protocol
+    check:
+      id: anthropicccaf-l-model-context-protocol-check-1
+      conceptId: c-model-context-protocol
+      type: mcq
+      difficulty: 2
+      stem: |
+        Que permet MCP pour un agent Claude ?
+      options:
+        - { id: a, label: "Connecter des outils et sources externes via un protocole standard" }
+        - { id: b, label: "Remplacer le modèle" }
+        - { id: c, label: "Chiffrer le disque" }
+        - { id: d, label: "Supprimer le besoin de prompts" }
+      correct: [a]
+      explanation: |
+        MCP standardise l'accès aux outils/données, étendant les capacités de l'agent.
+  - type: recap
+    conceptId: c-model-context-protocol
+    body: |
+      Retenez l'essentiel de « Model Context Protocol » pour la certification CCA-F.

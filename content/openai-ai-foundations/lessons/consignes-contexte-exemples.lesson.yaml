@@ -1,0 +1,37 @@
+id: openaiaifoundations-l-consignes-contexte-exemples
+trackId: openai-ai-foundations
+unitId: openaiaifoundations-u-prompting
+domainId: prompting
+title: "Consignes, contexte, exemples"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-consignes-contexte-exemples
+    body: |
+      Dans l'examen AI-FOUND, « Consignes, contexte, exemples » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-consignes-contexte-exemples
+    title: "Consignes, contexte, exemples"
+    body: |
+      Un bon prompt précise le rôle, l'objectif, le contexte et le format attendu. Ajouter des exemples et itérer améliore nettement la qualité des réponses de ChatGPT.
+  - type: check
+    conceptId: c-consignes-contexte-exemples
+    check:
+      id: openaiaifoundations-l-consignes-contexte-exemples-check-1
+      conceptId: c-consignes-contexte-exemples
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel élément renforce un prompt ?
+      options:
+        - { id: a, label: "Préciser rôle, objectif et format" }
+        - { id: b, label: "Rester vague pour laisser libre" }
+        - { id: c, label: "Interdire tout exemple" }
+        - { id: d, label: "Ne jamais itérer" }
+      correct: [a]
+      explanation: |
+        Rôle, objectif, contexte et format cadrent la réponse et la rendent utile.
+  - type: recap
+    conceptId: c-consignes-contexte-exemples
+    body: |
+      Retenez l'essentiel de « Consignes, contexte, exemples » pour la certification AI-FOUND.
