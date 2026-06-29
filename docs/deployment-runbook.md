@@ -418,3 +418,105 @@ Aucune n'a fait indexer les functions.
 - Provisionner le runner self-hosted (`infra/ci-runner/network.bicep`).
 - Vraies valeurs Entra CIAM + déploiements `staging` / `prod`.
 - Diagnostics / politiques durcis (déjà conditionnés `env != dev` dans le Bicep).
+
+---
+
+## Tuteur IA — activation du LLM réel (Azure OpenAI / Microsoft Foundry)
+
+Le tuteur IA fonctionne par défaut avec un **moteur déterministe ancré** (repli
+`NullTutorCompletion`). Pour activer un **vrai LLM**, on câble `AzureOpenAiTutorCompletion`
+derrière `ITutorCompletion` via les app settings `TUTOR_LLM_*`.
+
+### Ressource cible (dev)
+
+- **Type** : Azure OpenAI exposé en **Microsoft Foundry** (surface API **v1**, scopée projet).
+- **Déploiement** : `gpt-5.4-mini` (famille **GPT‑5**).
+- **Endpoint (base v1, sans `/responses`, slash final requis)** :
+  `https://microlingo-openai.services.ai.azure.com/api/projects/microlingo-dev/openai/v1/`
+- **Auth** : **clé API désactivée** sur la ressource → **Entra ID / identité managée
+  obligatoire**. On laisse `TUTOR_LLM_API_KEY` **vide** : le code passe alors par
+  `TokenCredential` (`DefaultAzureCredential`, scope `https://cognitiveservices.azure.com/.default`).
+
+### App settings à poser sur la Function App
+
+| Clé | Valeur (dev) |
+| --- | --- |
+| `TUTOR_LLM_ENABLED` | `true` |
+| `TUTOR_LLM_ENDPOINT` | base v1 ci-dessus (avec slash final) |
+| `TUTOR_LLM_API_SURFACE` | `v1` (Foundry) — `classic` pour l'ancien chemin `deployments/.../chat/completions?api-version=` |
+| `TUTOR_LLM_DEPLOYMENT` | `gpt-5.4-mini` (envoyé comme champ `model` du corps) |
+| `TUTOR_LLM_MAX_OUTPUT_TOKENS` | `400` (mappé sur `max_completion_tokens`) |
+| `TUTOR_LLM_API_KEY` | **vide** (⇒ Bearer AAD) |
+| `TUTOR_LLM_API_VERSION` | inutilisé en surface `v1` (uniquement requis en `classic`) |
+
+> Surface **v1** : corps `{ model, messages, max_completion_tokens, response_format: { type: "json_object" } }`
+> envoyé sur `…/openai/v1/chat/completions` (**sans** `api-version`). La famille GPT‑5 **rejette**
+> `temperature ≠ 1` et `max_tokens` → on n'envoie ni l'un ni l'autre. Le parseur de réponse reste
+> `choices[0].message.content`.
+
+### ⛔ Prérequis RBAC (bloquant pour l'appel **live**)
+
+L'identité qui exécute l'API (identité managée de la Function App en `dev`/`staging`/`prod`, ou
+le principal `az login` en local) doit avoir le rôle **`Cognitive Services OpenAI User`** sur la
+ressource `microlingo-openai`. Sans ce rôle, l'appel renvoie **401/403** même si la config est
+correcte.
+
+> ✅ **`dev` : rôle accordé.** Le rôle `Cognitive Services OpenAI User` est attribué à l'identité
+> managée de `func-microlingo-dev-a2msquxibzvcu` (principal `ec39dfb2-cb12-4279-9830-ce5d95ebce6b`)
+> sur `microlingo-openai`. Reste à exécuter **un appel réel de validation** (voir ci-dessous).
+> `staging`/`prod` devront recevoir la même attribution lors de leur déploiement.
+
+```bash
+# Identité managée de la Function App (system-assigned)
+PRINCIPAL_ID=$(az functionapp identity show \
+  --name func-microlingo-dev-a2msquxibzvcu --resource-group "$RG" \
+  --query principalId -o tsv)
+
+OPENAI_ID=$(az resource show \
+  --name microlingo-openai --resource-group "$RG" \
+  --resource-type Microsoft.CognitiveServices/accounts --query id -o tsv)
+
+az role assignment create \
+  --assignee-object-id "$PRINCIPAL_ID" --assignee-principal-type ServicePrincipal \
+  --role "Cognitive Services OpenAI User" --scope "$OPENAI_ID"
+```
+
+> **État actuel (mise à jour).** **RBAC accordé en `dev`** (rôle `Cognitive Services OpenAI User`
+> sur `microlingo-openai` pour l'identité managée de `func-microlingo-dev`) et **tuteur activé en
+> `dev`** : les app settings `TUTOR_LLM_*` sont décommentés dans `infra/params/dev.bicepparam` et
+> déployés par `cd-backend`. Code Foundry v1 / GPT‑5 compilé et **couvert par tests unitaires**
+> (Infra + Application verts). **Résiduel : un seul appel réel de validation** (voir §
+> « Validation live » ci-dessous) doit renvoyer **200 + une explication LLM authentique** avant de
+> basculer le statut du tuteur en 🟢 (cf. `docs/ETAT_DU_PROJET.md` §13).
+
+### Validation live (1 appel réel)
+
+Une fois le déploiement `cd-backend` réussi pour le commit d'activation et l'app de retour à
+`200` sur `/api/health`, exécuter **un** appel de bout en bout. En `dev` l'auth est en mode
+permissif (`AUTH_MODE=dev`, `DevTokenValidator`) ; on bootstrappe un JWT applicatif via les
+endpoints anonymes `auth/register` puis `auth/login`, puis on appelle `tutor/explain` :
+
+```bash
+BASE="https://func-microlingo-dev-a2msquxibzvcu.azurewebsites.net/api"
+
+# 1) Santé (doit répondre 200 après le redéploiement)
+curl -fsS "$BASE/health"
+
+# 2) Compte de test + JWT applicatif (endpoints anonymes)
+curl -fsS -X POST "$BASE/auth/register" -H 'Content-Type: application/json' \
+  -d '{"email":"tutor-smoke@example.com","password":"Passw0rd!smoke"}'
+TOKEN=$(curl -fsS -X POST "$BASE/auth/login" -H 'Content-Type: application/json' \
+  -d '{"email":"tutor-smoke@example.com","password":"Passw0rd!smoke"}' | jq -r '.accessToken')
+
+# 3) Appel tuteur réel — IDs de contenu réels (parcours « ai-transformation-leader »,
+#    leçon l-core-d5ed414f, contrôle …-check-1 ; bonne réponse = "a").
+RESP=$(curl -fsS -X POST "$BASE/tutor/explain" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"trackId":"ai-transformation-leader","lessonId":"l-core-d5ed414f","itemId":"l-core-d5ed414f-check-1","selected":["a"]}')
+echo "$RESP" | jq .
+echo "source = $(echo "$RESP" | jq -r '.source')"   # "ai" = vrai LLM ; "grounded" = repli déterministe
+```
+
+Critère de réussite : **HTTP 200 ET `source == "ai"`** (le repli déterministe renvoie aussi 200
+mais `source == "grounded"`). Un `source:"ai"` confirme le chemin live (LLM Foundry, guardrails
+passés) → basculer alors le badge tuteur en 🟢 dans `docs/ETAT_DU_PROJET.md` §13 et ce runbook.

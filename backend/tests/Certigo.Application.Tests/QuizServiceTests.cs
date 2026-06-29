@@ -191,11 +191,17 @@ public sealed class QuizServiceTests
         }
         var service = h.Build();
 
-        await service.SubmitAsync("l1", QuizServiceHarness.Request("rate-1", QuizServiceHarness.Answer("l1-i1", "a")));
+        var result = await service.SubmitAsync("l1", QuizServiceHarness.Request("rate-1", QuizServiceHarness.Answer("l1-i1", "a")));
 
         var flagged = h.Events.Events.SingleOrDefault(e => e.Type == "attempt.flagged");
         flagged.Should().NotBeNull();
         ((AttemptIntegritySignal)flagged!.Payload).Flags.Should().Contain("AttemptRateExceeded");
+        ((AttemptIntegritySignal)flagged.Payload).Decision.Should().Be("Flag");
+
+        // La cadence seule est un signal mou (Flag) : on détecte mais on NE sanctionne PAS.
+        // Les récompenses restent créditées, le leaderboard est mis à jour.
+        result.Rewards.XpEarned.Should().BeGreaterThan(0);
+        h.Leaderboard.Xp[h.UserId].Should().Be(result.Rewards.XpEarned);
     }
 }
 

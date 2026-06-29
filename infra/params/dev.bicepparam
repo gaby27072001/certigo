@@ -22,3 +22,14 @@ param cosmosLocation = 'northeurope'
 // Microsoft Entra External ID (CIAM) — fill from your tenant.
 param entraAuthority = 'https://certigo.ciamlogin.com/00000000-0000-0000-0000-000000000000/v2.0'
 param entraAudience = '00000000-0000-0000-0000-000000000000'
+
+// AI tutor (Azure OpenAI / Microsoft Foundry). Enabled in dev.
+// The dev resource "microlingo-openai" (deployment gpt-5.4-mini, v1 project-scoped
+// endpoint) is provisioned, and the "Cognitive Services OpenAI User" role is now granted
+// on that resource to the Function App managed identity
+// (func-microlingo-dev MI principal ec39dfb2-cb12-4279-9830-ce5d95ebce6b).
+// TUTOR_LLM_API_KEY stays empty so the managed identity (Entra) is used for auth.
+param tutorLlmEnabled = true
+param tutorLlmEndpoint = 'https://microlingo-openai.services.ai.azure.com/api/projects/microlingo-dev/openai/v1/'
+param tutorLlmDeployment = 'gpt-5.4-mini'
+param tutorLlmApiSurface = 'v1'

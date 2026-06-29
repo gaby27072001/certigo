@@ -4,7 +4,7 @@
 
 **Le « Duolingo des certifications Microsoft » — apprendre Azure / IA / sécurité par micro‑leçons gamifiées.**
 
-`🟢 Backend riche` · `🟢 Contenu 89 certifs` · `🟢 Gamification` · `🟢 Tuteur IA` · `🟢 Offline‑first` · `🟢 Mobile : écrans branchés` · `🟡 Infra non déployée`
+`🟢 Backend riche` · `🟢 Contenu 89 certifs` · `🟢 Gamification` · `🟡 Tuteur IA (LLM réel ⏳ validation live)` · `🟢 Offline‑first` · `🟢 Mobile : écrans branchés` · `🟡 Infra non déployée`
 
 </div>
 
@@ -39,7 +39,7 @@
 | **Moteurs métier** | 🟢 | `backend/src/Certigo.Domain` | Logique **pure & testée** : contenu, progression, gamification, examen, tuteur, reco, notifications, intégrité. |
 | **Contenu pédagogique** | 🟢 | `content/` | **89 certifications actives · 144 leçons** en YAML, validées par schémas JSON. |
 | **Gamification** | 🟢 | Domain `Gamification/` | XP, streak (+réparation), ligues hebdo, **saisons**, quêtes, succès, boutique, amis. |
-| **Tuteur IA** | 🟢 | Domain `Tutor/` + mobile `features/tutor` | Explications ancrées sur le contenu — **branché côté serveur ET mobile** (`tutor_sheet`). *(Le moteur est actuellement un adaptateur nul — `NullTutorCompletion` — qui retourne une chaîne vide. Un vrai LLM sera branché via `ITutorCompletion`, voir H19.)* |
+| **Tuteur IA** | 🟡 | Domain `Tutor/` + mobile `features/tutor` | Explications ancrées sur le contenu — **branché côté serveur ET mobile** (`tutor_sheet`). LLM réel **Azure OpenAI / Microsoft Foundry** (`AzureOpenAiTutorCompletion`, déploiement `gpt-5.4-mini`, surface API **v1**, auth **Entra ID** clé désactivée) derrière `ITutorCompletion`, activé par `TUTOR_LLM_ENABLED=true` (sinon repli déterministe `NullTutorCompletion`) ; **code prêt, compilé, couvert par `TutorCompletionTests`**. **RBAC accordé en `dev`** (rôle _Cognitive Services OpenAI User_ sur `microlingo-openai`, identité managée de `func-microlingo-dev`) et **activé en `dev`** via `infra/params/dev.bicepparam` ; reste à valider **un appel réel** (`POST /tutor/explain` → 200 + explication LLM authentique) avant de basculer en 🟢. Voir H19. |
 | **Recommandation + coach** | 🟢 | Domain `Recommendation/` + `home/coach_section` | Moteur « next best » + coach IA sur l'accueil. |
 | **Notifications** | 🟢 | Domain `Notifications/` | Planification **serveur‑autoritaire**, estimation de la meilleure heure d'envoi. |
 | **Anti‑triche / intégrité** | 🟢 (shadow) | Domain `Integrity/` | Évaluateur déterministe des tentatives — **mode détection** (signale, ne sanctionne pas encore). |
@@ -122,7 +122,7 @@ flowchart LR
 | **Quêtes & succès** | 🟢 | 🟢 | `GET /quests` + `claim`, `GET /achievements` — écrans `quests` & `achievements`. |
 | **Boutique** | 🟢 | 🟢 | `GET /shop` + `POST /shop/purchase` (économie de gemmes) — écran `shop`. |
 | **Amis & classement** | 🟢 | 🟢 | Ajouter/retirer un ami, `GET /friends/leaderboard` — écran `friends`. |
-| **Partage quotidien** | 🟢 | 🔴 | `GET /share/daily` (carte de partage encodée). |
+| **Partage quotidien** | 🟢 | 🟢 | `GET /share/daily` (carte de partage encodée) — écran `share-daily` (carte du jour + partage natif iOS/Android). |
 | **Examens blancs** | 🟢 | 🟢 | Moteur adaptatif : `POST /exam/generate` + `submit` — écran `exam` (génération, soumission, score). |
 | **Tuteur IA** | 🟢 | 🟢 | `POST /tutor/explain` — branché dans l'app via `tutor_sheet`. |
 | **Recommandation + coach** | 🟢 | 🟢 | `GET /me/recommendations/{trackId}` + coach IA sur l'accueil. |
@@ -281,6 +281,13 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 > ⚠️ CI exécutée **uniquement sur le runner self‑hosted Azure** (`law-microlingo`) — les runners
 > GitHub‑hébergés sont désactivés par la politique d'entreprise. Egress via NAT Gateway `law-microlingo`.
 
+> 🛟 **Repli CI backend (audit #1, SPOF runner)** — le job `build-test` de `ci-backend.yml` a un
+> repli `ubuntu-latest` **pré‑câblé mais inerte par défaut** (comportement inchangé = self‑hosted).
+> Pour l'activer en cas de panne du pool self‑hosted, **deux** prérequis : (1) définir la variable repo
+> `BACKEND_CI_FALLBACK = true` (Settings › Actions › Variables) ; (2) un admin doit **réactiver les
+> runners GitHub‑hébergés** pour le repo/org (désactivés par défaut ici). Repasser la variable à `false`
+> pour revenir au self‑hosted. Runbook détaillé en commentaire au‑dessus du `runs-on:` du job.
+
 ---
 
 ## 12 · Journal d'évolution
@@ -290,6 +297,7 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 | Date | Évolution |
 |---|---|
 | 2026‑06‑29 | 🧪 **Tests Cosmos exécutés sur émulateur réel** : 6 cas `Certigo.Infrastructure.Tests` lancés (0 ignoré) sur l'émulateur Docker `vnext-preview` (ARM64, HTTPS) → **5/6 verts** ; le 6e (agrégat `GetRecentActivityAsync`) bute sur une limite _vnext-preview_ (`RewrittenAggregateProjections`), pas un bug prod (classic amd64 inutilisable sur ARM64 : `exec format error` / segfault QEMU). ✅ **Couverture HTTP des 15 Functions** restantes ajoutée (faux services + harness) → suite globale **496** verte. |
+| 2026‑06‑28 | 🛟 **Repli CI backend (audit #1)** : repli `ubuntu-latest` pré‑câblé (inerte par défaut) sur le job `build-test` de `ci-backend.yml`, piloté par la variable repo `BACKEND_CI_FALLBACK` — comportement self‑hosted inchangé ; activation conditionnée à la réactivation des runners GitHub‑hébergés (cf. §11). |
 | 2026‑06‑24 | 📱 **Écrans gamification mobile** : saisons · quêtes · succès · boutique · amis · examens blancs branchés (couche data + providers + router) → 6 écrans + 6 tests widget ; suite Dart **185** verte. 🧪 **Tests d'intégration Cosmos** (`Certigo.Infrastructure.Tests`, 6 cas émulateur‑gated, skippés proprement hors émulateur). |
 | 2026‑06‑24 | 🔐 **Connexion sociale iOS** : ajout du callback natif `certigo://auth` dans `Info.plist` + messages d'erreur login plus explicites (redirect/client/provider) côté mobile. |
 | 2026‑06‑24 | 🛡️ **Anti‑triche examen** : fenêtre de cadence (XP/tentatives sur 1 h, conteneur `attempts`) câblée dans `ExamService` — miroir de `QuizService` → détecteurs de débit actifs aussi pour les examens blancs ; test dédié `SubmitAsync_flags_submission_spam_via_the_rate_window`. Backend **325** tests verts. |
@@ -317,8 +325,7 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 ## 13 · Prochaines étapes & écarts
 
 **Écarts backend ↔ mobile (à brancher en UI) :**
-- 🟢 Saisons, quêtes, succès, boutique, amis, examens blancs : **écrans livrés** (+ tests widget) — reste la **validation E2E sur appareil**.
-- 🔴 Partage quotidien : moteur prêt, **écran manquant**.
+- 🟢 Saisons, quêtes, succès, boutique, amis, examens blancs, partage quotidien : **écrans livrés** (+ tests widget) — reste la **validation E2E sur appareil**.
 - 🟡 Streak‑repair, ligues, notifications : partiellement exposés.
 
 **Chantiers techniques :**
@@ -328,6 +335,7 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 - ✅ **Tests d'intégration Cosmos exécutés sur émulateur réel** (le projet `Certigo.Infrastructure.Tests` est gated `CERTIGO_COSMOS_TESTS=1`). Les **6 cas ont tourné** (0 ignoré) contre l'émulateur Docker `mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview` (ARM64, HTTPS) : **5/6 verts**. Le 6e — `Attempt_recent_activity_aggregates_count_and_xp_within_window` (`CosmosAttemptRepository.GetRecentActivityAsync`, agrégat `COUNT(1)`/`SUM` projeté en objet `VALUE { … }`) — échoue **uniquement** sur l'émulateur _vnext-preview_ (back‑end PostgreSQL) avec `RewrittenAggregateProjections was not an array for a value aggregate query`. **Ce n'est pas un bug de production** : la requête est valide contre Cosmos réel et l'émulateur classic ; on **ne réécrit pas** la requête pour contourner une limite de l'émulateur preview. L'émulateur **classic amd64** est **inutilisable sur cet hôte ARM64** (`exec format error` sans QEMU ; `segfault signal 11` même avec QEMU x86_64 binfmt installé), d'où la cible 6/6 hors de portée localement — à confirmer en CI/Cosmos réel.
   - _Relancer la suite_ : `docker run -d --name cosmos-emulator -p 8081:8081 -p 1234:1234 -e PROTOCOL=https mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview` (attendre `PostgreSQL=OK, Gateway=OK, Explorer=OK` dans `docker logs`), puis exporter `CERTIGO_COSMOS_TESTS=1`, `COSMOS_EMULATOR_ENDPOINT=https://localhost:8081`, `COSMOS_EMULATOR_KEY=<clé publique émulateur>` et lancer `dotnet test backend\tests\Certigo.Infrastructure.Tests`.
 - ✅ **Couverture HTTP/middleware Functions complétée** : tests ajoutés pour les **15 Functions** jusque‑là non couvertes (User, Tutor, Streak, Shop, ShareCard, Season, Recommendation, Quest, Path, Notification, Lesson, Leaderboard, Friend, Exam, Achievement) via le harness maison (`FunctionTestHost` + faux services dans `Fakes.Functions.cs`) — happy‑path authentifié (200 + service appelé 1×) et garde non‑authentifié. **Suite globale `dotnet test backend\Certigo.sln` : 496 verts, 0 échec** (6 cas Cosmos `Skipped` proprement quand le gate est off).
+- 🤖 **Tuteur IA — valider l'appel LLM réel** : le provider Azure OpenAI / Foundry (`gpt-5.4-mini`, surface **v1**, auth **Entra ID**) est **câblé, compilé et couvert par tests unitaires**. **RBAC accordé en `dev`** (rôle _Cognitive Services OpenAI User_ sur `microlingo-openai` pour l'identité managée de `func-microlingo-dev`) et **activé en `dev`** (`infra/params/dev.bicepparam` → app settings `TUTOR_LLM_*`, déployés par `cd-backend`). Reste **un appel réel de validation** (register/login → JWT → `POST /api/tutor/explain` → 200 + explication LLM authentique) pour confirmer le chemin live et basculer le statut en 🟢 ; tant que cet appel n'est pas validé, le tuteur garde le repli déterministe en filet.
 
 ---
 

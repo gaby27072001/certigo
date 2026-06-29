@@ -16,7 +16,14 @@ concurrency:
 jobs:
   build-test:
     name: Build & test
-    runs-on: [self-hosted, Linux, X64, law-microlingo]
+    # SPOF mitigation (audit #1) : repli GitHub-hosted pré-câblé.
+    # Défaut = runner self-hosted (comportement inchangé).
+    # Pour basculer en urgence si le pool self-hosted est indisponible :
+    #   1) définir la variable repo  BACKEND_CI_FALLBACK = true  (Settings > Actions > Variables)
+    #   2) s'assurer que les GitHub-hosted runners sont ACTIVÉS pour le repo/org
+    #      (ils sont désactivés par défaut ici — cf. lint-workflows.yml).
+    # Repasser BACKEND_CI_FALLBACK à false (ou supprimer la variable) pour revenir au self-hosted.
+    runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","Linux","X64","law-microlingo"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

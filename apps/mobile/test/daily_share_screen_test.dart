@@ -4,9 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:microlingo/app/providers.dart';
-import 'package:microlingo/features/share/application/share_intent.dart';
-import 'package:microlingo/features/share/presentation/daily_share_screen.dart';
+import 'package:certigo/app/providers.dart';
+import 'package:certigo/features/share/application/share_intent.dart';
+import 'package:certigo/features/share/presentation/daily_share_screen.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 class _FakeShareIntent implements ShareIntent {

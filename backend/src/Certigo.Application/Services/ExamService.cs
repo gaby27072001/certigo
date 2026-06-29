@@ -282,6 +282,59 @@ public sealed class ExamService(
         // (l'évaluateur l'ajoute lui-même). Alimente les détecteurs anti-farming d'XP / anti-spam.
         var rateWindow = await BuildRateWindowAsync(now, cancellationToken);
 
+        // Anti-triche (autorité serveur, §6/§15) — évaluée AVANT tout crédit : cohérence
+        // temporelle + cadence récente. Reject (signal dur : horloge falsifiée, vitesse bot)
+        // supprime les récompenses ; Flag (cadence) reste en détection (récompenses créditées).
+        var integrity = AttemptIntegrityEvaluator.Evaluate(
+            new AttemptTiming(
+                request.StartedAt,
+                now,
+                request.Answers.Select(a => a.LatencyMs).ToList(),
+                xpEarned),
+            rateWindow);
+
+        if (integrity.Decision == IntegrityDecision.Reject)
+        {
+            // Sanction : tentative persistée à zéro récompense, aucun upsert profil/leaderboard.
+            var suppressedResult = result with
+            {
+                Rewards = new RewardsDto(0, profile.Xp, false, false, 0, new List<string>())
+            };
+            var rejectedAttempt = new ExamAttemptRecord(
+                $"examattempt::{request.ClientAttemptId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
+                request.StartedAt, now, suppressedResult);
+            try
+            {
+                await examAttempts.CreateAsync(rejectedAttempt, cancellationToken);
+            }
+            catch (DuplicateRecordException)
+            {
+                var existing = await examAttempts.GetByClientAttemptIdAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
+                if (existing is not null)
+                {
+                    return existing.Result;
+                }
+
+                throw;
+            }
+
+            await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "exam.submitted", now, suppressedResult), cancellationToken);
+            await events.AddAsync(new LearningEvent(
+                Guid.NewGuid().ToString("n"),
+                userContext.UserId,
+                "attempt.flagged",
+                now,
+                new AttemptIntegritySignal(
+                    "exam",
+                    request.ExamId,
+                    attemptId,
+                    integrity.Decision.ToString(),
+                    integrity.RiskScore,
+                    integrity.Flags.Select(f => f.ToString()).ToList())), cancellationToken);
+
+            return suppressedResult;
+        }
+
         var attempt = new ExamAttemptRecord(
             $"examattempt::{request.ClientAttemptId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
             request.StartedAt, now, result);
@@ -310,16 +363,7 @@ public sealed class ExamService(
 
         await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "exam.submitted", now, result), cancellationToken);
 
-        // Anti-triche (autorité serveur, §6/§15) — mode détection, comme pour le quiz :
-        // on évalue la cohérence temporelle ET la cadence récente, et si le verdict n'est pas
-        // « Allow » on signale une tentative d'examen incohérente SANS toucher aux récompenses.
-        var integrity = AttemptIntegrityEvaluator.Evaluate(
-            new AttemptTiming(
-                request.StartedAt,
-                now,
-                request.Answers.Select(a => a.LatencyMs).ToList(),
-                xpEarned),
-            rateWindow);
+        // Flag (cadence) : récompenses conservées, on signale la tentative (détection conservée).
         if (!integrity.IsClean)
         {
             await events.AddAsync(new LearningEvent(
