@@ -19,7 +19,7 @@ env:
 jobs:
   bicep-build:
     name: Bicep build (lint)
-    runs-on: ${{ fromJSON(env.NON_CRITICAL_RUNNER_LABELS_JSON) }}
+    runs-on: [self-hosted, Linux, X64, microlingo-ci]
     steps:
       - uses: actions/checkout@v4
       - name: Build main.bicep

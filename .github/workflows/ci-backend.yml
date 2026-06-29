@@ -25,7 +25,7 @@ jobs:
     # Repasser BACKEND_CI_FALLBACK à false (ou supprimer la variable) pour revenir au self-hosted.
     env:
       RUNNER_LABELS_JSON: ${{ github.ref == 'refs/heads/main' && (vars.MAIN_CRITICAL_RUNNER_LABELS || '["self-hosted","Linux","X64","law-microlingo"]') || (vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","microlingo-ci"]') }}
-    runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || fromJSON(env.RUNNER_LABELS_JSON) }}
+    runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","Linux","X64","law-microlingo"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v5

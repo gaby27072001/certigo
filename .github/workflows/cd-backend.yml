@@ -39,7 +39,7 @@ jobs:
   deploy-infra:
     name: Deploy infrastructure (${{ inputs.environment || 'dev' }})
     environment: ${{ inputs.environment || 'dev' }}
-    runs-on: ${{ fromJSON(env.MAIN_CRITICAL_RUNNER_LABELS_JSON) }}
+    runs-on: [self-hosted, Linux, X64, law-microlingo]
     permissions:
       id-token: write
       contents: read
@@ -69,7 +69,7 @@ jobs:
   deploy-backend:
     name: Deploy backend code (${{ inputs.environment || 'dev' }})
     environment: ${{ inputs.environment || 'dev' }}
-    runs-on: ${{ fromJSON(env.MAIN_CRITICAL_RUNNER_LABELS_JSON) }}
+    runs-on: [self-hosted, Linux, X64, law-microlingo]
     needs: deploy-infra
     permissions:
       id-token: write
