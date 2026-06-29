@@ -695,13 +695,26 @@ Le bundle id passe de `*.microlingo` → `*.certigo` (`law-certigo`). Côté App
 créer l'**App ID `law-certigo`**, régénérer le **provisioning / `match`** (certs + profils), et
 re-signer. Aucune perte d'utilisateurs (app non publiée).
 
-### §7 — Entra app registration + repo (Phase 5, optionnel)
+### §7 — Entra app registration + repo (Phase 5)
+- ✅ **Repo GitHub DÉJÀ renommé** `Microlingo` → `Certigo` (constaté au `git push` :
+  *« This repository moved… Certigo.git »*). L'ancienne URL redirige encore, mais la
+  location canonique est `https://github.com/gchambaud_microsoft/Certigo.git`.
+- ⚠️ **ACTION REQUISE (CI-bloquante)** : le `sub` OIDC émis par GitHub Actions reflète désormais
+  `repo:gchambaud_microsoft/Certigo:…`. Mettre à jour le **subject** des **federated credentials**
+  de l'app registration en conséquence, sinon **tous les jobs CI OIDC (cd-backend…) échoueront** à
+  obtenir un token Azure :
+  ```bash
+  az ad app federated-credential list --id 4bfc43dc-6a25-404e-a6ab-d19784ab0673 -o table
+  # pour chaque credential dont le subject cite .../Microlingo :
+  az ad app federated-credential update --id 4bfc43dc-6a25-404e-a6ab-d19784ab0673 \
+    --federated-credential-id <fic-id> \
+    --parameters '{"subject":"repo:gchambaud_microsoft/Certigo:ref:refs/heads/main"}'
+  ```
 - Renommer l'app registration `microlingo-github-actions` → **`certigo-github-actions`**
   (`az ad app update --id 4bfc43dc-6a25-404e-a6ab-d19784ab0673 --display-name certigo-github-actions`).
-- Si le **repo GitHub est renommé** `Microlingo` → `Certigo` : mettre à jour le **subject** des
-  **federated credentials** OIDC (`repo:<owner>/Certigo:…`) et toute variable/secret repo citant des
-  ressources microlingo (`AZURE_KEYVAULT_NAME`, `API_BASE_URL`, RG…). Les runbooks/docs ci-dessus
-  supposent déjà l'état cible (`GH_REPO="Certigo"`, app `certigo-github-actions`).
+- Mettre à jour toute variable/secret repo citant des ressources microlingo
+  (`AZURE_KEYVAULT_NAME`, `API_BASE_URL`, RG…). Les runbooks/docs ci-dessus supposent l'état cible
+  (`GH_REPO="Certigo"`, app `certigo-github-actions`).
 - Peut nécessiter des droits Entra ; si bloqué → documenter pour l'utilisateur.
 
 ### §8 — Validation live
