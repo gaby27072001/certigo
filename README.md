@@ -209,6 +209,7 @@ API principale :
 > Les workflows utilisent un runner **self-hosted** avec labels
 > `[self-hosted, Linux, X64, law-microlingo]` (les runners hébergés par GitHub sont
 > désactivés par la politique d'entreprise EMU sur ce dépôt).
+>
 >  
 > Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `law-microlingo`.
 

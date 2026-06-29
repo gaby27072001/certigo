@@ -4,14 +4,14 @@ Ce runbook décrit les étapes **humaines** (droits admin Azure AD / GitHub) né
 amorcer le **premier déploiement de l'environnement `dev`** et valider l'authentification réelle.
 
 > **Pourquoi ce runbook ?** Le pipeline `.github/workflows/cd-backend.yml` est un pipeline de
-> déploiement complet (infra Bicep + code Functions), mais il ne s'exécutait jamais car :
-> 1. les deux jobs ciblaient en dur un runner self-hosted non provisionné ;
-> 2. les secrets OIDC `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` n'existaient pas.
+> déploiement complet (infra Bicep + code Functions). Le chemin critique est désormais
+> **compatible EMU (self-hosted obligatoire)** :
+> 1. les jobs critiques backend restent sur self-hosted (GitHub-hosted est bloqué par policy EMU) ;
+> 2. les workflows critiques ciblent le label historique `law-microlingo`, désormais présent sur les runners actifs ;
+> 3. l'auth Azure reste via OIDC (`azure/login@v2`) avec permissions minimales.
 >
-> Le point (1) est désormais débloqué **côté repo** : le runner est rendu configurable
-> (`self-hosted` par défaut, `ubuntu-latest` en option) et les jobs sont rattachés à un
-> **GitHub Environment**. Les points OIDC + environnements + déclenchement restent des
-> **actions humaines** décrites ci-dessous.
+> Les actions humaines restantes concernent surtout la gouvernance (OIDC Azure AD, environments,
+> branch protection), pas l'édition des workflows runners.
 
 ---
 
@@ -19,7 +19,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 
 | Élément | Statut | Où |
 |---|---|---|
-| Runner configurable (`runner` input + `runs-on` dynamique) | ✅ Fait (cette PR) | `cd-backend.yml` |
+| Chemin critique backend self-hosted (`law-microlingo`) | ✅ Fait (main + PR recalée docs) | `cd-backend.yml`, `ci-backend.yml` |
 | Jobs rattachés à un `environment:` | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Clarification placeholders Entra en dev | ✅ Fait (cette PR) | `infra/params/dev.bicepparam` |
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
@@ -30,6 +30,46 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | Déploiement infra `dev` | ✅ **Fait (session)** — amorçage local réel | §T0.4 |
 | Validation auth (200/401) | ⛔ **Bloqué** — Functions n'indexent pas (échec plateforme Flex) | §T0.5 + §Statut réel |
 | Smoke test | ⛔ **Bloqué** — idem | §T0.6 + §Statut réel |
+
+### Check-list d'exploitation (utilisateur non-admin)
+
+1. Déclencher `cd-backend.yml` avec `environment=dev|staging|prod` (aucun paramètre runner à fournir).
+2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `law-microlingo`.
+3. En cas d'échec Azure login, contrôler uniquement les 3 secrets repo : `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
+4. Pour une promotion, lancer `promote-backend-staging-prod.yml` (enchaînement staging puis prod).
+
+### Pourquoi Azure-first (long terme)
+
+Le workflow GitHub reste un **orchestrateur** (dispatch, ordering, traçabilité), mais la
+vérité opérationnelle est portée par Azure pour limiter la dépendance aux droits admin GitHub.
+
+| Domaine | Source de vérité | Pourquoi c'est durable pour un non-admin GitHub |
+|---|---|---|
+| Authentification de déploiement | Entra ID + OIDC federated credentials | Plus de secret long-lived à tourner côté runner ; contrôle d'accès piloté par Azure RBAC. |
+| Autorisations d'exécution | RBAC Azure (scope subscription/resource group) | Les droits de déploiement ne dépendent pas de la gestion des runners/labels GitHub. |
+| État de l'infra | Bicep + Azure Resource Manager (`az deployment`) | Déploiement idempotent et audit Azure centralisé, indépendamment du type de runner. |
+| Configuration runtime app | Azure Functions/App Service settings + ressources Azure | Les changements d'exploitation sont opérables dans Azure même si GitHub admin est indisponible. |
+| Gouvernance production | GitHub environments (approvals) + garde-fous Azure | Le gate GitHub reste utile, mais la sécurité critique est déjà enforce côté Azure. |
+
+Limites connues : ce modèle suppose des permissions Azure correctement déléguées (OIDC + RBAC),
+et la disponibilité d'au moins un runner self-hosted online avec le label `law-microlingo`.
+
+### Réconciliation des labels runners
+
+Les deux runners existants (`vm-microlingo-runner`, `vm-microlingo-runner-2`) portent désormais
+les labels custom **`law-microlingo`** et **`microlingo-ci`** en plus des labels système
+(`self-hosted`, `Linux`, `X64`).  
+Le label a été ajouté via l'API GitHub :
+`POST /repos/{owner}/{repo}/actions/runners/{id}/labels`.
+
+Conséquence : les workflows de `main` qui exigent `law-microlingo` matchent sans édition de
+workflow, y compris après redémarrage/offline-online du runner.
+
+### Risque / rollback (chemin critique EMU)
+
+- **Risque principal** : aucun runner self-hosted online avec le label `law-microlingo`.
+- **Rollback repo** : aucun requis (les workflows `main` sont déjà cohérents avec les labels runner réconciliés).
+- **Rollback opérationnel** : démarrer/maintenir online la VM runner Azure (ou activer un auto-start), puis redéclencher le workflow.
 
 ---
 
@@ -126,27 +166,17 @@ gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPT
 
 ## T0.2 — Débloquer le runner (déjà fait côté repo) + amorçage
 
-**Côté repo (fait dans cette PR) :** `cd-backend.yml` expose un input `runner`
-(`self-hosted` par défaut, `ubuntu-latest` en option) ; le `runs-on` des deux jobs est désormais :
+**Côté repo :**
+- les jobs critiques de `cd-backend.yml` (`deploy-infra`, `deploy-backend`) ciblent
+  `runs-on: [self-hosted, Linux, X64, law-microlingo]` ;
+- `ci-backend.yml` conserve le même label cible côté self-hosted ;
+- le chemin critique reste compatible avec la contrainte EMU (self-hosted obligatoire).
 
-```yaml
-runs-on: ${{ inputs.runner == 'ubuntu-latest' && fromJSON('["ubuntu-latest"]') || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
-```
+### Isolement des dépendances runner
 
-Les deux branches du ternaire renvoient un **tableau** ; un `push` (sans input) retombe sur
-self-hosted, ce qui **préserve le comportement actuel**.
-
-### ⚠️ Risque EMU (à arbitrer avant de choisir `ubuntu-latest`)
-
-D'après `infra/ci-runner/README.md`, **les runners GitHub-hosted sont bloqués par la politique
-EMU** de l'entreprise — c'est la raison d'être du runner self-hosted (egress NAT stable
-`20.86.156.64`). Choisir `ubuntu-latest` **peut donc être refusé par l'org** : le job ne
-démarrerait pas. Trois chemins d'amorçage, par ordre de préférence :
-
-1. **Dispatch `runner=ubuntu-latest`** — le plus simple **si** l'org l'autorise (à tester).
-2. **Déploiement manuel local** (§T0.4 option A) depuis une machine dev déjà authentifiée Owner —
-   contourne entièrement le problème runner/EMU pour le tout premier déploiement.
-3. **Provisionner le runner self-hosted** (`infra/ci-runner/network.bicep`) — tâche **P1**.
+Le blocage ne vient pas du YAML mais de la disponibilité runner : sous EMU, l'exécution critique
+reste self-hosted. La durabilité non-admin passe donc par l'exploitation Azure de la VM runner
+(`rg-microlingo-ci`, tenant Microsoft Non-Production), pas par une migration vers hosted.
 
 ---
 
@@ -232,7 +262,7 @@ az deployment sub create \
 
 ```bash
 gh workflow run cd-backend.yml --repo "$GH_ORG/$GH_REPO" \
-  -f environment=dev -f runner=ubuntu-latest    # ou -f runner=self-hosted
+  -f environment=dev
 ```
 
 > Le job `deploy-infra` capture l'output `functionAppName`, réutilisé par `deploy-backend`
@@ -345,9 +375,10 @@ documentation), et le **résiduel strict** qui nécessite une action hors périm
   3 secrets repo déjà en place ; 3 federated credentials `github-env-dev/staging/prod` ajoutées.
 - **T0.3 — Environments : ✅ PARTIEL.** `dev` / `staging` / `prod` créés. **Reviewer gate `prod`
   non posé** (billing GitHub 422, voir §T0.3). Branch protection `main` = résiduel admin.
-- **T0.2 — Runner : ✅ débloqué côté repo.** Test `ubuntu-latest` réellement dispatché
-  (run `28319327945`) → resté `pending`, `jobs[]` vide ⇒ **EMU bloque les runners GitHub-hosted**
-  (confirme le README ci-runner). Run annulé. Runner self-hosted = **P1**.
+- **T0.2 — Runner : ✅ prémisse hosted réfutée en live.** Le run `28381092423` a été rejeté
+  immédiatement avec l'annotation GitHub :
+  "GitHub Actions hosted runners are disabled for this repository. For more information please contact your GitHub Enterprise Administrator."
+  ⇒ **GitHub-hosted bloqué par policy EMU**. Le chemin critique reste self-hosted (`law-microlingo`).
 
 ### Ce qui est effectivement déployé
 
@@ -397,7 +428,7 @@ Aucune n'a fait indexer les functions.
 - **SCM basic auth désactivée** (AAD-only). Pour interroger le hostruntime, passer par le proxy ARM
   `…/hostruntime/admin/...` avec un token `az account get-access-token --resource
   https://management.azure.com` (construire l'URI par concaténation : PowerShell mange `?api-version`).
-- **EMU bloque `ubuntu-latest`** (cf. ci-dessus) — pour le CI, prévoir le runner self-hosted (P1).
+- **EMU bloque `ubuntu-latest`** (cf. ci-dessus) — le CI/CD critique doit cibler self-hosted `law-microlingo`.
 
 ### Résiduel strict (hors périmètre repo)
 
@@ -405,7 +436,7 @@ Aucune n'a fait indexer les functions.
    `RuntimeStarting` 0 instance). C'est le **seul** blocage empêchant T0.5/T0.6. Sans functions
    indexées, impossible de valider auth 200/401 ni le smoke test.
 2. **GitHub plan payant** — pour poser le reviewer gate `prod` (limitation billing 422).
-3. **Runner self-hosted** — pour exécuter le CI sous EMU (`infra/ci-runner/network.bicep`, P1).
+3. **Exploitation runner Azure** — maintenir online la VM runner self-hosted pour exécuter le CI sous EMU.
 
 > Dès que les functions s'indexent (post-remédiation plateforme), **T0.5 et T0.6 sont prêts à
 > jouer** : voir les commandes en §T0.5 / §T0.6 (host
@@ -415,7 +446,7 @@ Aucune n'a fait indexer les functions.
 
 ## Hors-scope Phase 0 (P1, sessions ultérieures)
 
-- Provisionner le runner self-hosted (`infra/ci-runner/network.bicep`).
+- Industrialiser l'auto-start/auto-heal de la VM runner Azure.
 - Vraies valeurs Entra CIAM + déploiements `staging` / `prod`.
 - Diagnostics / politiques durcis (déjà conditionnés `env != dev` dans le Bicep).
 
