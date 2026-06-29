@@ -4,11 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../features/home/presentation/home_screen.dart';
+import '../features/home/presentation/streak_screen.dart';
 import '../features/path/presentation/path_screen.dart';
 import '../features/lesson/presentation/lesson_screen.dart';
 import '../features/quiz/presentation/quiz_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/leaderboard/presentation/leaderboard_screen.dart';
+import '../features/leaderboard/presentation/league_resolution_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/achievements/presentation/achievements_screen.dart';
 import '../features/seasons/presentation/seasons_screen.dart';
@@ -62,6 +64,12 @@ abstract class Routes {
   static const String friends = '/friends';
   static const String exam = '/exam';
   static const String dailyShare = '/share-daily';
+
+  /// Streak detail + repair.
+  static const String streak = '/streak';
+
+  /// League resolution — result of last completed weekly league period.
+  static const String leagueResolution = '/league/resolution';
 }
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -426,6 +434,26 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           state: state,
           begin: const Offset(0, 0.04),
           child: const DailyShareScreen(),
+        ),
+      ),
+      GoRoute(
+        path: Routes.streak,
+        name: 'streak',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const StreakScreen(),
+        ),
+      ),
+      GoRoute(
+        path: Routes.leagueResolution,
+        name: 'league-resolution',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const LeagueResolutionScreen(),
         ),
       ),
     ],

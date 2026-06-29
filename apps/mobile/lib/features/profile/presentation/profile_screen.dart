@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/router.dart';
@@ -396,52 +395,94 @@ class _ThemeRow extends StatelessWidget {
 }
 
 /// Interactive row that lets the user schedule (or cancel) a daily reminder.
-/// The chosen time is persisted in [SharedPreferences] under [_kPrefKey].
-class _NotificationPrefRow extends StatefulWidget {
+///
+/// On first open it tries to seed the initial time from:
+///   1. The server's persisted [NotificationSettings] (previously saved choice).
+///   2. The server's recommended plan ([NotificationPlan]) if no saved choice.
+///   3. 09:00 as a final fallback.
+///
+/// On change, the new time is posted to the server via [NotificationRepository]
+/// and scheduled locally via [NotificationService].
+class _NotificationPrefRow extends ConsumerStatefulWidget {
   const _NotificationPrefRow();
 
   @override
-  State<_NotificationPrefRow> createState() => _NotificationPrefRowState();
+  ConsumerState<_NotificationPrefRow> createState() =>
+      _NotificationPrefRowState();
 }
 
-class _NotificationPrefRowState extends State<_NotificationPrefRow> {
-  static const String _kPrefKey = 'daily_reminder_time';
-
+class _NotificationPrefRowState extends ConsumerState<_NotificationPrefRow> {
   TimeOfDay? _time;
   bool _loaded = false;
 
   @override
   void initState() {
     super.initState();
-    _loadSavedTime();
+    _loadInitialTime();
   }
 
-  Future<void> _loadSavedTime() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String? stored = prefs.getString(_kPrefKey);
-    if (stored != null) {
-      final List<String> parts = stored.split(':');
-      if (parts.length == 2) {
-        final int? h = int.tryParse(parts[0]);
-        final int? m = int.tryParse(parts[1]);
-        if (h != null && m != null) {
-          setState(() => _time = TimeOfDay(hour: h, minute: m));
-        }
-      }
+  Future<void> _loadInitialTime() async {
+    // 1. Try server-persisted settings.
+    final Result<NotificationSettings> settingsResult =
+        await ref.read(notificationRepositoryProvider).getSettings();
+    if (!mounted) return;
+    final NotificationSettings? settings = settingsResult.when(
+      success: (NotificationSettings v) => v,
+      failure: (_) => null,
+    );
+    if (settings != null &&
+        settings.dailyReminderEnabled &&
+        settings.reminderHour != null) {
+      setState(() {
+        _time = TimeOfDay(
+          hour: settings.reminderHour!,
+          minute: settings.reminderMinute ?? 0,
+        );
+        _loaded = true;
+      });
+      return;
     }
-    setState(() => _loaded = true);
+
+    // 2. Fall back to the server plan suggestion.
+    final Result<NotificationPlan> planResult =
+        await ref.read(notificationRepositoryProvider).getPlan();
+    if (!mounted) return;
+    final NotificationPlan? plan = planResult.when(
+      success: (NotificationPlan v) => v,
+      failure: (_) => null,
+    );
+    setState(() {
+      if (plan?.suggestedHour != null) {
+        _time = TimeOfDay(
+          hour: plan!.suggestedHour!,
+          minute: plan.suggestedMinute ?? 0,
+        );
+      }
+      _loaded = true;
+    });
   }
 
   Future<void> _pickTime() async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: _time ?? const TimeOfDay(hour: 9, minute: 0),
+      helpText: 'Heure de rappel quotidien',
     );
     if (picked == null || !mounted) return;
 
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kPrefKey, '${picked.hour}:${picked.minute}');
+    // Schedule locally.
     await NotificationService.scheduleDailyReminder(picked);
+
+    // Persist to server.
+    await ref.read(notificationRepositoryProvider).updateSettings(
+          NotificationSettings(
+            dailyReminderEnabled: true,
+            reminderHour: picked.hour,
+            reminderMinute: picked.minute,
+          ),
+        );
+
+    if (!mounted) return;
     setState(() => _time = picked);
   }
 

@@ -1,9 +1,11 @@
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/router.dart';
 
 /// Leaderboard — the weekly "Momentum League". Cohort of ~30, tiered, with a
 /// clear promotion zone. Framed positively: we highlight the promotion line and
@@ -68,6 +70,8 @@ class _LeagueContent extends StatelessWidget {
             ),
           ),
         ),
+        // Resolution entry-point: shown only when a past-week result exists.
+        _ResolutionBanner(),
         if (league.entries.isEmpty)
           const SliverFillRemaining(
             hasScrollBody: false,
@@ -251,4 +255,50 @@ String _initials(String name) {
   final String a = parts.first.substring(0, 1);
   final String b = parts.length > 1 ? parts[1].substring(0, 1) : '';
   return (a + b).toUpperCase();
+}
+
+/// Banner shown when a past league resolution exists. Self-hiding: collapses
+/// to nothing while loading or when no resolution is available (first week).
+class _ResolutionBanner extends ConsumerWidget {
+  // ignore: prefer_const_constructors_in_immutables
+  _ResolutionBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<LeagueResolution?> async =
+        ref.watch(leagueResolutionProvider);
+
+    return async.when(
+      data: (LeagueResolution? resolution) {
+        if (resolution == null) return const SliverToBoxAdapter(child: SizedBox.shrink());
+        final PrismColorScheme p = context.prism;
+        final TextTheme t = Theme.of(context).textTheme;
+        return SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+            child: PrismCard(
+              variant: PrismCardVariant.tonal,
+              accent: p.xpGold,
+              onTap: () => context.go(Routes.leagueResolution),
+              child: Row(
+                children: <Widget>[
+                  Icon(Icons.history_rounded, color: p.xpGold, size: 22),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Résultats de la semaine passée',
+                      style: t.titleSmall,
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: p.textSecondary),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+      error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+    );
+  }
 }

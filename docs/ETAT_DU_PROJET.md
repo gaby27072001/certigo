@@ -18,11 +18,11 @@
 
 | Repère | Valeur |
 |---|---|
-| 📅 Rafraîchi le | **2026‑06‑24** (écrans gamification mobile branchés : saisons · quêtes · succès · boutique · amis · examens · tests d'intégration Cosmos émulateur‑gated · anti‑triche examen : fenêtre de cadence câblée) |
-| 🔖 Reflète | HEAD post‑audit + **D8 examen** + **écrans mobiles gamification** — voir `AUDIT_CERTIGO.md` §M (remédiation appliquée) |
-| 🌿 Branche du doc | `gchambaud-microsoft-finalize-project` |
-| 📈 Activité | **49+ commits**, du 2026‑06‑19 au 2026‑06‑24 — rythme très soutenu |
-| 🧪 Tests | backend **325** exécutés (xUnit, dont concurrence/auth/parité/anti‑triche) + **6** d'intégration Cosmos (émulateur‑gated) · Dart **185** (unit + widget, dont golden Cortex) |
+| 📅 Rafraîchi le | **2026‑06‑29** (P2 mobile : streak complet + réparation · résolution de ligue hebdo (montée/descente) · notifications branchées sur plan serveur · 18 nouveaux tests Dart · intégration_test corrigé) |
+| 🔖 Reflète | HEAD post‑P2 — streak, ligues, notifications mobiles **pleinement branchés** |
+| 🌿 Branche du doc | `gchambaud-microsoft-p2-polish-streak-leagues-notifs-mobile` |
+| 📈 Activité | **49+ commits**, du 2026‑06‑19 au 2026‑06‑29 — rythme très soutenu |
+| 🧪 Tests | backend **325** exécutés (xUnit, dont concurrence/auth/parité/anti‑triche) + **6** d'intégration Cosmos (émulateur‑gated) · Dart **203** (unit + widget, dont golden Cortex) — 135 Dart widget passent en local (10 excluent font_awesome_flutter 10.7/SDK 3.44 — CI only, pré‑existant) |
 | 🧩 API | **18 groupes** de Functions (+ `GET /health`) · **≈ 29 endpoints** HTTP |
 | 🗄️ Données | **8 containers Cosmos DB** (serverless ; profil avec **ETag** concurrence optimiste) |
 | 🏗️ Infra | **9 modules Bicep** + params **dev/staging/prod** — durcie par env, **pas encore déployée** |
@@ -116,8 +116,8 @@ flowchart LR
 | **Leçons & exercices** | 🟢 | 🟢 | Leçon paginée façon Duolingo : QCM, multi‑réponses, scénario, texte à trous, **appariement**, **remise en ordre**, spot‑the‑issue. Son + haptique. |
 | **Quiz & scoring** | 🟢 | 🟢 | `POST /quiz/{lessonId}/submit` → score, XP, paliers, feedback. |
 | **Parcours « skill‑path »** | 🟢 | 🟢 | Écran vivant façon Duolingo, règles de progression pures. |
-| **Streak (série)** | 🟢 | 🟡 | `GET /streak` + `POST /streak/repair` (réparation). |
-| **Ligues hebdo** | 🟢 | 🟡 | Tournoi XP hebdomadaire serveur‑autoritaire + `GET /me/league/resolution`. |
+| **Streak (série)** | 🟢 | 🟢 | `GET /streak` + `POST /streak/repair` — écran dédié avec coût en gemmes + test widget. |
+| **Ligues hebdo** | 🟢 | 🟢 | Classement live + `GET /me/league/resolution` — écran de résolution animé (montée/descente) + test widget. |
 | **Saisons** | 🟢 | 🟢 | Défi mensuel thématisé : `GET /season`, `POST /season/claim` — écran `seasons` (thème, paliers, réclamation). |
 | **Quêtes & succès** | 🟢 | 🟢 | `GET /quests` + `claim`, `GET /achievements` — écrans `quests` & `achievements`. |
 | **Boutique** | 🟢 | 🟢 | `GET /shop` + `POST /shop/purchase` (économie de gemmes) — écran `shop`. |
@@ -126,14 +126,14 @@ flowchart LR
 | **Examens blancs** | 🟢 | 🟢 | Moteur adaptatif : `POST /exam/generate` + `submit` — écran `exam` (génération, soumission, score). |
 | **Tuteur IA** | 🟢 | 🟢 | `POST /tutor/explain` — branché dans l'app via `tutor_sheet`. |
 | **Recommandation + coach** | 🟢 | 🟢 | `GET /me/recommendations/{trackId}` + coach IA sur l'accueil. |
-| **Notifications intelligentes** | 🟢 | 🟡 | `GET /me/notifications/plan` + réglages ; meilleure heure d'envoi estimée. |
+| **Notifications intelligentes** | 🟢 | 🟢 | `GET /me/notifications/plan` + `GET/PUT /me/notifications/settings` — heure suggérée par serveur + préférences sauvegardées + tests unitaires. |
 | **Anti‑triche / intégrité** | 🟢 | — | Évaluateur déterministe (mode détection, événement `attempt.flagged`). **Fenêtre de cadence** (XP/tentatives sur 1 h, conteneur `attempts`) câblée pour **quiz et examens** → détecteurs de débit actifs. |
 | **Offline‑first** | 🟢 | 🟢 | Synchro idempotente rejouable, backoff. |
 | **Authentification** | 🟢 | 🟢 | Microsoft / Google / Apple via Entra External ID (Android + iOS natifs câblés). |
 
-> **Lecture clé :** l'écart backend ↔ UI est désormais **comblé pour la gamification** : saisons, quêtes,
-> succès, boutique, amis et examens disposent d'un **écran mobile + test widget**. Restent à exposer le
-> **partage quotidien** et la **validation E2E sur appareil**.
+> **Lecture clé :** l'écart backend ↔ UI est désormais **comblé** : saisons, quêtes,
+> succès, boutique, amis, examens, **streak (détail + réparation)**, **résolution de ligue** et
+> **notifications intelligentes** disposent chacun d'un **écran mobile + test**. Reste la validation E2E sur appareil.
 
 ---
 

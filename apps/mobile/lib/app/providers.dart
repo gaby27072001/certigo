@@ -124,6 +124,14 @@ final examRepositoryProvider = Provider<ExamRepository>(
   (Ref ref) => RemoteExamRepository(ref.watch(apiClientProvider)),
 );
 
+final streakRepositoryProvider = Provider<StreakRepository>(
+  (Ref ref) => RemoteStreakRepository(ref.watch(apiClientProvider)),
+);
+
+final notificationRepositoryProvider = Provider<NotificationRepository>(
+  (Ref ref) => RemoteNotificationRepository(ref.watch(apiClientProvider)),
+);
+
 /// User-controlled theme mode (persisted by settings later). System by default.
 final themeModeProvider = StateProvider<ThemeMode>(
   (Ref ref) => ThemeMode.system,
@@ -246,5 +254,42 @@ final examProvider = FutureProvider.autoDispose<MockExam>((Ref ref) async {
     await ref
         .watch(examRepositoryProvider)
         .generateExam(MockExamRequest(trackId: trackId)),
+  );
+});
+
+/// The learner's detailed streak: days, repair eligibility and gem cost.
+/// Auto-disposed; invalidated after a successful repair.
+final streakProvider = FutureProvider.autoDispose<Streak>((Ref ref) async {
+  return _orThrow(await ref.watch(streakRepositoryProvider).getStreak());
+});
+
+/// The server's recommended time to deliver the learner's daily reminder,
+/// computed from past activity patterns. Auto-disposed.
+final notificationPlanProvider =
+    FutureProvider.autoDispose<NotificationPlan>((Ref ref) async {
+  return _orThrow(
+    await ref.watch(notificationRepositoryProvider).getPlan(),
+  );
+});
+
+/// The learner's persisted notification preferences. Auto-disposed; refreshed
+/// after an update via `ref.invalidate`.
+final notificationSettingsProvider =
+    FutureProvider.autoDispose<NotificationSettings>((Ref ref) async {
+  return _orThrow(
+    await ref.watch(notificationRepositoryProvider).getSettings(),
+  );
+});
+
+/// The resolution of the last completed weekly league period. Returns `null`
+/// when the API returns 404 (no completed period yet) so callers can safely
+/// ignore the first week. Auto-disposed.
+final leagueResolutionProvider =
+    FutureProvider.autoDispose<LeagueResolution?>((Ref ref) async {
+  final Result<LeagueResolution> result =
+      await ref.watch(leaderboardRepositoryProvider).getResolution();
+  return result.when(
+    success: (LeagueResolution v) => v,
+    failure: (Failure f) => f is NotFoundFailure ? null : throw f,
   );
 });

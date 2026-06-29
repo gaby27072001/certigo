@@ -58,10 +58,17 @@ class _HomeContent extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
       children: <Widget>[
         // Resource bar — streak / gems / XP, the at-a-glance economy, pinned at
-        // the top like a learning app's status row.
+        // the top like a learning app's status row. Tapping the streak badge
+        // opens the detailed streak screen (current count + repair action).
         Row(
           children: <Widget>[
-            StreakBadge(days: me.streakDays, active: me.dailyProgress >= 1),
+            GestureDetector(
+              onTap: () => context.go(Routes.streak),
+              child: StreakBadge(
+                days: me.streakDays,
+                active: me.dailyProgress >= 1,
+              ),
+            ),
             const SizedBox(width: 8),
             GemCounter(gems: me.gems),
             const Spacer(),
