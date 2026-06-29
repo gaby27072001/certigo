@@ -8,12 +8,27 @@ using Certigo.Application.Abstractions;
 
 namespace Certigo.Infrastructure.Ai;
 
+/// Which HTTP surface the Azure OpenAI / Microsoft Foundry endpoint exposes.
+public enum TutorLlmApiSurface
+{
+    /// Microsoft Foundry / Azure OpenAI **v1** surface. The configured endpoint already
+    /// carries the full base path (e.g. `…/openai/v1/`) and requests target
+    /// `chat/completions` **without** an `api-version` query string. The deployment name is
+    /// carried in the request body `model` field. Authentication is Entra ID only.
+    V1,
+
+    /// Classic Azure OpenAI surface:
+    /// `openai/deployments/{deployment}/chat/completions?api-version=…`.
+    AzureClassic
+}
+
 public sealed record TutorLlmOptions(
     Uri Endpoint,
     string Deployment,
-    string ApiVersion,
+    string? ApiVersion,
     string? ApiKey,
-    int MaxOutputTokens);
+    int MaxOutputTokens,
+    TutorLlmApiSurface ApiSurface = TutorLlmApiSurface.V1);
 
 /// Azure OpenAI-backed optional tutor completion. It returns only the raw model
 /// text; grounding, parsing, and guardrails stay in the Application layer.
@@ -32,15 +47,18 @@ public sealed class AzureOpenAiTutorCompletion(
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, BuildRequestUri())
         {
+            // The GPT-5 family rejects `temperature` (≠ 1) and `max_tokens`; it requires
+            // `max_completion_tokens`. The deployment travels in `model`, which the v1 surface
+            // needs and the classic surface harmlessly ignores.
             Content = JsonContent.Create(new
             {
+                model = options.Deployment,
                 messages = new object[]
                 {
                     new { role = "system", content = systemPrompt },
                     new { role = "user", content = userPrompt }
                 },
-                temperature = 0.2,
-                max_tokens = options.MaxOutputTokens,
+                max_completion_tokens = options.MaxOutputTokens,
                 response_format = new { type = "json_object" }
             })
         };
@@ -120,8 +138,15 @@ public sealed class AzureOpenAiTutorCompletion(
     }
 
     private Uri BuildRequestUri()
-        => new(options.Endpoint,
-            $"openai/deployments/{Uri.EscapeDataString(options.Deployment)}/chat/completions?api-version={Uri.EscapeDataString(options.ApiVersion)}");
+        => options.ApiSurface switch
+        {
+            // Classic Azure OpenAI: deployment + api-version live in the path/query.
+            TutorLlmApiSurface.AzureClassic => new(
+                options.Endpoint,
+                $"openai/deployments/{Uri.EscapeDataString(options.Deployment)}/chat/completions?api-version={Uri.EscapeDataString(options.ApiVersion ?? throw new InvalidOperationException("TutorLlmOptions.ApiVersion is required for the AzureClassic surface."))}"),
+            // v1 / Foundry: endpoint already contains `…/openai/v1/`; just append the path.
+            _ => new(options.Endpoint, "chat/completions")
+        };
 
     private void LogFailure(HttpStatusCode statusCode, string detail)
     {

@@ -418,3 +418,65 @@ Aucune n'a fait indexer les functions.
 - Provisionner le runner self-hosted (`infra/ci-runner/network.bicep`).
 - Vraies valeurs Entra CIAM + déploiements `staging` / `prod`.
 - Diagnostics / politiques durcis (déjà conditionnés `env != dev` dans le Bicep).
+
+---
+
+## Tuteur IA — activation du LLM réel (Azure OpenAI / Microsoft Foundry)
+
+Le tuteur IA fonctionne par défaut avec un **moteur déterministe ancré** (repli
+`NullTutorCompletion`). Pour activer un **vrai LLM**, on câble `AzureOpenAiTutorCompletion`
+derrière `ITutorCompletion` via les app settings `TUTOR_LLM_*`.
+
+### Ressource cible (dev)
+
+- **Type** : Azure OpenAI exposé en **Microsoft Foundry** (surface API **v1**, scopée projet).
+- **Déploiement** : `gpt-5.4-mini` (famille **GPT‑5**).
+- **Endpoint (base v1, sans `/responses`, slash final requis)** :
+  `https://microlingo-openai.services.ai.azure.com/api/projects/microlingo-dev/openai/v1/`
+- **Auth** : **clé API désactivée** sur la ressource → **Entra ID / identité managée
+  obligatoire**. On laisse `TUTOR_LLM_API_KEY` **vide** : le code passe alors par
+  `TokenCredential` (`DefaultAzureCredential`, scope `https://cognitiveservices.azure.com/.default`).
+
+### App settings à poser sur la Function App
+
+| Clé | Valeur (dev) |
+| --- | --- |
+| `TUTOR_LLM_ENABLED` | `true` |
+| `TUTOR_LLM_ENDPOINT` | base v1 ci-dessus (avec slash final) |
+| `TUTOR_LLM_API_SURFACE` | `v1` (Foundry) — `classic` pour l'ancien chemin `deployments/.../chat/completions?api-version=` |
+| `TUTOR_LLM_DEPLOYMENT` | `gpt-5.4-mini` (envoyé comme champ `model` du corps) |
+| `TUTOR_LLM_MAX_OUTPUT_TOKENS` | `400` (mappé sur `max_completion_tokens`) |
+| `TUTOR_LLM_API_KEY` | **vide** (⇒ Bearer AAD) |
+| `TUTOR_LLM_API_VERSION` | inutilisé en surface `v1` (uniquement requis en `classic`) |
+
+> Surface **v1** : corps `{ model, messages, max_completion_tokens, response_format: { type: "json_object" } }`
+> envoyé sur `…/openai/v1/chat/completions` (**sans** `api-version`). La famille GPT‑5 **rejette**
+> `temperature ≠ 1` et `max_tokens` → on n'envoie ni l'un ni l'autre. Le parseur de réponse reste
+> `choices[0].message.content`.
+
+### ⛔ Prérequis RBAC (bloquant pour l'appel **live**)
+
+L'identité qui exécute l'API (identité managée de la Function App en `dev`/`staging`/`prod`, ou
+le principal `az login` en local) doit avoir le rôle **`Cognitive Services OpenAI User`** sur la
+ressource `microlingo-openai`. Sans ce rôle, l'appel renvoie **401/403** même si la config est
+correcte.
+
+```bash
+# Identité managée de la Function App (system-assigned)
+PRINCIPAL_ID=$(az functionapp identity show \
+  --name func-microlingo-dev-a2msquxibzvcu --resource-group "$RG" \
+  --query principalId -o tsv)
+
+OPENAI_ID=$(az resource show \
+  --name microlingo-openai --resource-group "$RG" \
+  --resource-type Microsoft.CognitiveServices/accounts --query id -o tsv)
+
+az role assignment create \
+  --assignee-object-id "$PRINCIPAL_ID" --assignee-principal-type ServicePrincipal \
+  --role "Cognitive Services OpenAI User" --scope "$OPENAI_ID"
+```
+
+> **État actuel.** Code adapté à Foundry v1 / GPT‑5, compilé, et **couvert par tests unitaires**
+> (Infra + Application verts). **Aucun appel réseau réel** n'a encore été validé : l'attribution
+> RBAC ci-dessus est le **seul** résiduel côté plateforme avant de basculer le statut du tuteur
+> en 🟢 (cf. `docs/ETAT_DU_PROJET.md` §13).

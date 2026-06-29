@@ -41,7 +41,13 @@ param tutorLlmEnabled bool = false
 param tutorLlmEndpoint string = ''
 @description('Azure OpenAI deployment name used by the tutor when the feature flag is enabled.')
 param tutorLlmDeployment string = ''
-@description('Optional Azure OpenAI API version override. Leave the default unless a platform rollout requires a newer stable version.')
+@description('Tutor LLM API surface: "v1" for the Microsoft Foundry project-scoped v1 endpoint (default), or "classic" for the legacy deployments/.../chat/completions?api-version path.')
+@allowed([
+  'v1'
+  'classic'
+])
+param tutorLlmApiSurface string = 'v1'
+@description('Optional Azure OpenAI API version override. Used only by the "classic" API surface; ignored when tutorLlmApiSurface is "v1".')
 param tutorLlmApiVersion string = '2024-10-21'
 @description('Optional explicit API key for the tutor LLM. Leave empty to use the Function App managed identity instead.')
 @secure()
@@ -123,6 +129,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'TUTOR_LLM_ENABLED', value: string(tutorLlmEnabled) }
         { name: 'TUTOR_LLM_ENDPOINT', value: tutorLlmEndpoint }
         { name: 'TUTOR_LLM_DEPLOYMENT', value: tutorLlmDeployment }
+        { name: 'TUTOR_LLM_API_SURFACE', value: tutorLlmApiSurface }
         { name: 'TUTOR_LLM_API_VERSION', value: tutorLlmApiVersion }
         { name: 'TUTOR_LLM_API_KEY', value: tutorLlmApiKey }
         { name: 'TUTOR_LLM_MAX_OUTPUT_TOKENS', value: string(tutorLlmMaxOutputTokens) }

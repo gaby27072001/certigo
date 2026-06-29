@@ -33,7 +33,13 @@ param tutorLlmEnabled bool = false
 param tutorLlmEndpoint string = ''
 @description('Azure OpenAI deployment name used by the tutor when enabled.')
 param tutorLlmDeployment string = ''
-@description('Optional Azure OpenAI API version override for the tutor.')
+@description('Tutor LLM API surface: "v1" for the Microsoft Foundry project-scoped v1 endpoint (default), or "classic" for the legacy deployments/.../chat/completions?api-version path.')
+@allowed([
+  'v1'
+  'classic'
+])
+param tutorLlmApiSurface string = 'v1'
+@description('Optional Azure OpenAI API version override for the tutor. Used only by the "classic" API surface.')
 param tutorLlmApiVersion string = '2024-10-21'
 @description('Optional explicit Azure OpenAI API key for the tutor. Leave empty to use the Function App managed identity instead.')
 @secure()
@@ -154,6 +160,7 @@ module api 'modules/functionApp.bicep' = {
     tutorLlmEnabled: tutorLlmEnabled
     tutorLlmEndpoint: tutorLlmEndpoint
     tutorLlmDeployment: tutorLlmDeployment
+    tutorLlmApiSurface: tutorLlmApiSurface
     tutorLlmApiVersion: tutorLlmApiVersion
     tutorLlmApiKey: tutorLlmApiKey
     tutorLlmMaxOutputTokens: tutorLlmMaxOutputTokens

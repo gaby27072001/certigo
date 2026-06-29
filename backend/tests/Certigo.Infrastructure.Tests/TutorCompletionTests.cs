@@ -14,13 +14,24 @@ namespace Certigo.Infrastructure.Tests;
 public sealed class AzureOpenAiTutorCompletionTests
 {
     [Fact]
-    public async Task CompleteAsync_uses_api_key_when_configured()
+    public async Task CompleteAsync_targets_v1_surface_with_gpt5_body_and_api_key()
     {
         var handler = new StubHttpMessageHandler(request =>
         {
             request.Headers.Authorization.Should().BeNull();
             request.Headers.GetValues("api-key").Single().Should().Be("key-123");
-            request.RequestUri!.ToString().Should().Contain("/openai/deployments/tutor-mini/chat/completions");
+
+            var uri = request.RequestUri!.ToString();
+            uri.Should().Contain("/openai/v1/chat/completions");
+            uri.Should().NotContain("api-version");
+            uri.Should().NotContain("/deployments/");
+
+            var body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            body.Should().Contain("\"model\":\"gpt-5.4-mini\"");
+            body.Should().Contain("\"max_completion_tokens\":400");
+            body.Should().NotContain("\"temperature\"");
+            body.Should().NotContain("max_tokens");
+
             return JsonResponse("""
             {
               "choices": [
@@ -95,17 +106,51 @@ public sealed class AzureOpenAiTutorCompletionTests
             .WithMessage("*429*");
     }
 
-    private static AzureOpenAiTutorCompletion CreateCompletion(HttpMessageHandler handler, string? apiKey = null)
+    [Fact]
+    public async Task CompleteAsync_targets_classic_deployment_path_when_surface_is_classic()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            var uri = request.RequestUri!.ToString();
+            uri.Should().Contain("/openai/deployments/gpt-5.4-mini/chat/completions");
+            uri.Should().Contain("api-version=2024-10-21");
+            return JsonResponse("""
+            {
+              "choices": [
+                {
+                  "message": {
+                    "content": "{\"headline\":\"Classic\",\"points\":[\"Point\"],\"encouragement\":\"Oui\",\"citedConceptIds\":[\"c1\"]}"
+                  }
+                }
+              ]
+            }
+            """);
+        });
+
+        var completion = CreateCompletion(handler, apiKey: "key-123", apiSurface: TutorLlmApiSurface.AzureClassic);
+
+        var result = await completion.CompleteAsync("system", "user");
+
+        result.Should().Contain("\"headline\":\"Classic\"");
+    }
+
+    private static AzureOpenAiTutorCompletion CreateCompletion(
+        HttpMessageHandler handler,
+        string? apiKey = null,
+        TutorLlmApiSurface apiSurface = TutorLlmApiSurface.V1)
         => new(
             new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) },
             new StubTokenCredential(),
             NullLogger<AzureOpenAiTutorCompletion>.Instance,
             new TutorLlmOptions(
-                new Uri("https://contoso.openai.azure.com/"),
-                "tutor-mini",
-                "2024-10-21",
+                apiSurface == TutorLlmApiSurface.AzureClassic
+                    ? new Uri("https://contoso.openai.azure.com/")
+                    : new Uri("https://microlingo-openai.services.ai.azure.com/api/projects/microlingo-dev/openai/v1/"),
+                "gpt-5.4-mini",
+                apiSurface == TutorLlmApiSurface.AzureClassic ? "2024-10-21" : null,
                 apiKey,
-                400));
+                400,
+                apiSurface));
 
     private static HttpResponseMessage JsonResponse(string body)
         => new(HttpStatusCode.OK)
