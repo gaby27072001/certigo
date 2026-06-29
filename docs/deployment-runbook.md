@@ -4,14 +4,13 @@ Ce runbook décrit les étapes **humaines** (droits admin Azure AD / GitHub) né
 amorcer le **premier déploiement de l'environnement `dev`** et valider l'authentification réelle.
 
 > **Pourquoi ce runbook ?** Le pipeline `.github/workflows/cd-backend.yml` est un pipeline de
-> déploiement complet (infra Bicep + code Functions), mais il ne s'exécutait jamais car :
-> 1. les deux jobs ciblaient en dur un runner self-hosted non provisionné ;
-> 2. les secrets OIDC `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` n'existaient pas.
+> déploiement complet (infra Bicep + code Functions). Le chemin critique est désormais
+> **runnerless côté repo** :
+> 1. les jobs critiques backend tournent sur `ubuntu-latest` (GitHub-hosted) ;
+> 2. l'auth Azure reste via OIDC (`azure/login@v2`) avec permissions minimales.
 >
-> Le point (1) est désormais débloqué **côté repo** : le runner est rendu configurable
-> (`self-hosted` par défaut, `ubuntu-latest` en option) et les jobs sont rattachés à un
-> **GitHub Environment**. Les points OIDC + environnements + déclenchement restent des
-> **actions humaines** décrites ci-dessous.
+> Les actions humaines restantes concernent surtout la gouvernance (OIDC Azure AD, environments,
+> branch protection), pas l'administration des runners self-hosted.
 
 ---
 
@@ -19,7 +18,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 
 | Élément | Statut | Où |
 |---|---|---|
-| Runner configurable (`runner` input + `runs-on` dynamique) | ✅ Fait (cette PR) | `cd-backend.yml` |
+| Chemin critique backend runnerless (`runs-on: ubuntu-latest`) | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Jobs rattachés à un `environment:` | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Clarification placeholders Entra en dev | ✅ Fait (cette PR) | `infra/params/dev.bicepparam` |
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
@@ -30,6 +29,19 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | Déploiement infra `dev` | ✅ **Fait (session)** — amorçage local réel | §T0.4 |
 | Validation auth (200/401) | ⛔ **Bloqué** — Functions n'indexent pas (échec plateforme Flex) | §T0.5 + §Statut réel |
 | Smoke test | ⛔ **Bloqué** — idem | §T0.6 + §Statut réel |
+
+### Check-list d'exploitation (utilisateur non-admin)
+
+1. Déclencher `cd-backend.yml` avec `environment=dev|staging|prod` (aucun paramètre runner à fournir).
+2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur `ubuntu-latest`.
+3. En cas d'échec Azure login, contrôler uniquement les 3 secrets repo : `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
+4. Pour une promotion, lancer `promote-backend-staging-prod.yml` (enchaînement staging puis prod).
+
+### Risque / rollback (runnerless critique)
+
+- **Risque principal** : indisponibilité GitHub-hosted à l'échelle org/enterprise (policy centrale).
+- **Rollback repo** : réintroduire temporairement un `runs-on` self-hosted **uniquement** sur un workflow non critique de secours, sans casser `cd-backend.yml`.
+- **Rollback opérationnel** : déployer l'infra/app localement via `az deployment sub create` puis `az functionapp deployment source config-zip` le temps de corriger la policy globale.
 
 ---
 
@@ -126,27 +138,15 @@ gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPT
 
 ## T0.2 — Débloquer le runner (déjà fait côté repo) + amorçage
 
-**Côté repo (fait dans cette PR) :** `cd-backend.yml` expose un input `runner`
-(`self-hosted` par défaut, `ubuntu-latest` en option) ; le `runs-on` des deux jobs est désormais :
+**Côté repo (fait dans cette PR) :** les deux jobs critiques de `cd-backend.yml`
+(`deploy-infra` et `deploy-backend`) sont fixés sur `runs-on: ubuntu-latest`.
+Le déploiement backend ne dépend donc plus d'un label self-hosted ni d'une action admin runner.
 
-```yaml
-runs-on: ${{ inputs.runner == 'ubuntu-latest' && fromJSON('["ubuntu-latest"]') || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
-```
+### Isolement des jobs self-hosted résiduels
 
-Les deux branches du ternaire renvoient un **tableau** ; un `push` (sans input) retombe sur
-self-hosted, ce qui **préserve le comportement actuel**.
-
-### ⚠️ Risque EMU (à arbitrer avant de choisir `ubuntu-latest`)
-
-D'après `infra/ci-runner/README.md`, **les runners GitHub-hosted sont bloqués par la politique
-EMU** de l'entreprise — c'est la raison d'être du runner self-hosted (egress NAT stable
-`20.86.156.64`). Choisir `ubuntu-latest` **peut donc être refusé par l'org** : le job ne
-démarrerait pas. Trois chemins d'amorçage, par ordre de préférence :
-
-1. **Dispatch `runner=ubuntu-latest`** — le plus simple **si** l'org l'autorise (à tester).
-2. **Déploiement manuel local** (§T0.4 option A) depuis une machine dev déjà authentifiée Owner —
-   contourne entièrement le problème runner/EMU pour le tout premier déploiement.
-3. **Provisionner le runner self-hosted** (`infra/ci-runner/network.bicep`) — tâche **P1**.
+Les workflows non critiques peuvent encore utiliser self-hosted selon les besoins d'équipe
+(`ci-content`, `ci-mobile`, `release-android`, etc.). Cette dépendance est désormais
+**isolée hors du chemin critique de déploiement backend**.
 
 ---
 
@@ -232,7 +232,7 @@ az deployment sub create \
 
 ```bash
 gh workflow run cd-backend.yml --repo "$GH_ORG/$GH_REPO" \
-  -f environment=dev -f runner=ubuntu-latest    # ou -f runner=self-hosted
+  -f environment=dev
 ```
 
 > Le job `deploy-infra` capture l'output `functionAppName`, réutilisé par `deploy-backend`
