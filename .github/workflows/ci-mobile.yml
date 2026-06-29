@@ -15,11 +15,12 @@ concurrency:
 
 env:
   FLUTTER_VERSION: "3.24.0"
+  NON_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","pr-ci"]' }}
 
 jobs:
   packages:
     name: Pure-Dart packages (core, cortex, data)
-    runs-on: [self-hosted, Linux, X64, law-microlingo]
+    runs-on: ${{ fromJSON(env.NON_CRITICAL_RUNNER_LABELS_JSON) }}
     strategy:
       matrix:
         package: [ core, cortex, data ]
@@ -42,7 +43,7 @@ jobs:
 
   app:
     name: Flutter app + UI packages
-    runs-on: [self-hosted, Linux, X64, law-microlingo]
+    runs-on: ${{ fromJSON(env.NON_CRITICAL_RUNNER_LABELS_JSON) }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2

@@ -6,13 +6,9 @@ name: codeql
 # in ci-mobile plus dependency scanning. Buildless ("none") mode is used so the
 # scan never depends on a successful compile.
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   schedule:
-    # Weekly catch-all so new advisories are surfaced even without a push.
-    - cron: "27 3 * * 1"
+    # Nightly scan to reduce daytime pressure on self-hosted runners.
+    - cron: "17 2 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -22,7 +18,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: [self-hosted, Linux, X64, law-microlingo]
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","pr-ci"]') }}
     permissions:
       security-events: write
       actions: read
