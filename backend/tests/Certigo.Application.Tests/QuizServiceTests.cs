@@ -22,7 +22,7 @@ internal sealed class QuizServiceHarness
     {
         var content = TestContent.Build();
         var context = new FakeUserContext(UserId, "Tester");
-        return new QuizService(context, Clock, content, Progress, Attempts, Events, Users, Leaderboard, LearnerModels);
+        return new QuizService(context, Clock, content, Progress, Attempts, Events, Users, Leaderboard, LearnerModels, new InMemoryIdempotencyGuard());
     }
 
     public static SubmitQuizRequest Request(string attemptId, params AnswerDto[] answers)
@@ -160,7 +160,8 @@ public sealed class QuizServiceTests
             new InMemoryEventRepository(),
             users,
             leaderboard,
-            new InMemoryLearnerModelRepository());
+            new InMemoryLearnerModelRepository(),
+            new InMemoryIdempotencyGuard());
 
         var result = await service.SubmitAsync(
             "l1",

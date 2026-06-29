@@ -45,7 +45,8 @@ public sealed class ExamService(
     IAttemptRepository attempts,
     IEventRepository events,
     IUserRepository users,
-    ILeaderboardRepository leaderboard) : IExamService
+    ILeaderboardRepository leaderboard,
+    IIdempotencyGuard idempotency) : IExamService
 {
     public async Task<MockExamDto> GenerateAsync(MockExamRequest request, CancellationToken cancellationToken = default)
     {
@@ -138,10 +139,10 @@ public sealed class ExamService(
 
     public async Task<MockExamResultDto> SubmitAsync(SubmitMockExamRequest request, CancellationToken cancellationToken = default)
     {
-        var prior = await examAttempts.GetByClientAttemptIdAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
-        if (prior is not null)
+        if (await idempotency.HasBeenProcessedAsync(userContext.UserId, request.ClientAttemptId, cancellationToken))
         {
-            return prior.Result;
+            var prior = await examAttempts.GetByClientAttemptIdAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
+            return prior!.Result;
         }
 
         var track = await content.GetTrackAsync(request.TrackId, cancellationToken)
@@ -306,6 +307,7 @@ public sealed class ExamService(
             try
             {
                 await examAttempts.CreateAsync(rejectedAttempt, cancellationToken);
+                await idempotency.MarkAsProcessedAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
             }
             catch (DuplicateRecordException)
             {
@@ -341,6 +343,7 @@ public sealed class ExamService(
         try
         {
             await examAttempts.CreateAsync(attempt, cancellationToken);
+            await idempotency.MarkAsProcessedAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
         }
         catch (DuplicateRecordException)
         {

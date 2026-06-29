@@ -297,6 +297,23 @@ internal sealed class InMemoryLearnerModelRepository : ILearnerModelRepository
     }
 }
 
+internal sealed class InMemoryIdempotencyGuard : IIdempotencyGuard
+{
+    private readonly HashSet<string> _processed = new(StringComparer.Ordinal);
+
+    private static string Key(string partitionKey, string idempotencyKey)
+        => $"{partitionKey}::{idempotencyKey}";
+
+    public Task<bool> HasBeenProcessedAsync(string partitionKey, string idempotencyKey, CancellationToken ct = default)
+        => Task.FromResult(_processed.Contains(Key(partitionKey, idempotencyKey)));
+
+    public Task MarkAsProcessedAsync(string partitionKey, string idempotencyKey, CancellationToken ct = default)
+    {
+        _processed.Add(Key(partitionKey, idempotencyKey));
+        return Task.CompletedTask;
+    }
+}
+
 internal sealed class FakeTutorCompletion : ITutorCompletion
 {
     private readonly string? _reply;

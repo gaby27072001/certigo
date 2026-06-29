@@ -22,7 +22,7 @@ internal sealed class ExamServiceHarness
     {
         var content = TestContent.Build();
         var context = new FakeUserContext(UserId, "Tester");
-        return new ExamService(context, Clock, content, Progress, ExamAttempts, Attempts, Events, Users, Leaderboard);
+        return new ExamService(context, Clock, content, Progress, ExamAttempts, Attempts, Events, Users, Leaderboard, new InMemoryIdempotencyGuard());
     }
 
     public static SubmitMockExamRequest Submit(string attemptId, string examId, params AnswerDto[] answers)

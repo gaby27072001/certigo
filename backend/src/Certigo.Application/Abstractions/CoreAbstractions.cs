@@ -141,6 +141,21 @@ public interface ILeaderboardRepository
     Task AddXpAsync(string userId, int xp, CancellationToken cancellationToken = default);
 }
 
+/// Prevents double-processing of mutable operations (quiz submissions, purchases,
+/// exam submissions, streak repairs). Implementations record a lightweight
+/// "already processed" marker so replays skip side-effects while callers can still
+/// read the original result from their dedicated record store.
+public interface IIdempotencyGuard
+{
+    /// Returns true if the operation identified by (partitionKey, idempotencyKey)
+    /// has already been successfully processed.
+    Task<bool> HasBeenProcessedAsync(string partitionKey, string idempotencyKey, CancellationToken ct = default);
+
+    /// Records that the operation identified by (partitionKey, idempotencyKey)
+    /// has been successfully processed.
+    Task MarkAsProcessedAsync(string partitionKey, string idempotencyKey, CancellationToken ct = default);
+}
+
 public interface IPurchaseRepository
 {
     Task<PurchaseRecord?> GetByClientPurchaseIdAsync(string userId, string clientPurchaseId, CancellationToken cancellationToken = default);

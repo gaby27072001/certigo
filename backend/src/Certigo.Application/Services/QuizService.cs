@@ -28,14 +28,15 @@ public sealed class QuizService(
     IEventRepository events,
     IUserRepository users,
     ILeaderboardRepository leaderboard,
-    ILearnerModelRepository learnerModels) : IQuizService
+    ILearnerModelRepository learnerModels,
+    IIdempotencyGuard idempotency) : IQuizService
 {
     public async Task<SubmitQuizResult> SubmitAsync(string lessonId, SubmitQuizRequest request, CancellationToken cancellationToken = default)
     {
-        var prior = await attempts.GetByClientAttemptIdAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
-        if (prior is not null)
+        if (await idempotency.HasBeenProcessedAsync(userContext.UserId, request.ClientAttemptId, cancellationToken))
         {
-            return prior.Result;
+            var prior = await attempts.GetByClientAttemptIdAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
+            return prior!.Result;
         }
 
         var answerKey = await content.GetAnswerKeyAsync(request.TrackId, lessonId, cancellationToken)
@@ -203,6 +204,7 @@ public sealed class QuizService(
             try
             {
                 await attempts.CreateAsync(rejectedAttempt, cancellationToken);
+                await idempotency.MarkAsProcessedAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
             }
             catch (DuplicateRecordException)
             {
@@ -251,6 +253,7 @@ public sealed class QuizService(
         try
         {
             await attempts.CreateAsync(attempt, cancellationToken);
+            await idempotency.MarkAsProcessedAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
         }
         catch (DuplicateRecordException)
         {

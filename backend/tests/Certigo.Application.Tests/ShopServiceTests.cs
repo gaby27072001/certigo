@@ -14,7 +14,7 @@ internal sealed class ShopServiceHarness
     public string UserId { get; } = "user-1";
 
     public ShopService Build()
-        => new(new FakeUserContext(UserId, "Tester"), Clock, Users, Purchases, Events);
+        => new(new FakeUserContext(UserId, "Tester"), Clock, Users, Purchases, Events, new InMemoryIdempotencyGuard());
 
     public UserProfileDto SeedProfile(int gems, int freezeTokens)
     {

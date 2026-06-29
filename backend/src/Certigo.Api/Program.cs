@@ -115,6 +115,7 @@ var host = new HostBuilder()
         services.AddScoped<IPurchaseRepository, CosmosPurchaseRepository>();
         services.AddScoped<IFriendRepository, CosmosFriendRepository>();
         services.AddScoped<ILearnerModelRepository, CosmosLearnerModelRepository>();
+        services.AddScoped<IIdempotencyGuard, CosmosIdempotencyGuard>();
         services.AddSingleton<ITutorLlmTelemetry, NullTutorLlmTelemetry>();
         var tutorLlmEnabled = string.Equals(configuration["TUTOR_LLM_ENABLED"], "true", StringComparison.OrdinalIgnoreCase);
         if (tutorLlmEnabled)

@@ -460,3 +460,38 @@ public sealed class CosmosLearnerModelRepository(CosmosContext context) : ILearn
 
     private sealed record LearnerModelDocument(string Id, string UserId, string Track, LearnerModelRecord Model);
 }
+
+/// Cosmos-backed idempotency guard. Stores a lightweight marker document in the
+/// attempts container (PK = /userId) under the key
+/// "idempotent::{partitionKey}::{idempotencyKey}". Using the existing attempts
+/// container avoids provisioning a new container; the "idempotent::" prefix keeps
+/// marker documents distinct from attempt records.
+public sealed class CosmosIdempotencyGuard(CosmosContext context) : IIdempotencyGuard
+{
+    public async Task<bool> HasBeenProcessedAsync(string partitionKey, string idempotencyKey, CancellationToken ct = default)
+    {
+        var doc = await context.Attempts.ReadOrDefaultAsync<IdempotencyMarker>(
+            DocId(partitionKey, idempotencyKey),
+            new PartitionKey(partitionKey),
+            ct);
+        return doc is not null;
+    }
+
+    public async Task MarkAsProcessedAsync(string partitionKey, string idempotencyKey, CancellationToken ct = default)
+    {
+        var marker = new IdempotencyMarker(DocId(partitionKey, idempotencyKey), partitionKey);
+        try
+        {
+            await context.Attempts.CreateItemAsync(marker, new PartitionKey(partitionKey), cancellationToken: ct);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            // Concurrent request already marked it — treat as success.
+        }
+    }
+
+    private static string DocId(string partitionKey, string idempotencyKey)
+        => $"idempotent::{partitionKey}::{idempotencyKey}";
+
+    private sealed record IdempotencyMarker(string Id, string UserId);
+}

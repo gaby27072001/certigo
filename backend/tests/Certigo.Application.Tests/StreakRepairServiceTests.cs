@@ -17,7 +17,7 @@ public sealed class StreakRepairServiceTests
         var purchases = new InMemoryPurchaseRepository();
         var events = new InMemoryEventRepository();
         var context = new FakeUserContext(UserId, "Tester");
-        var service = new StreakRepairService(context, new FakeClock(Now), users, purchases, events);
+        var service = new StreakRepairService(context, new FakeClock(Now), users, purchases, events, new InMemoryIdempotencyGuard());
         return (service, users, purchases, events);
     }
 
