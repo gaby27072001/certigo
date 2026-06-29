@@ -14,6 +14,8 @@ import '../models/shop.dart';
 import '../models/friend.dart';
 import '../models/exam.dart';
 import '../models/share_card.dart';
+import '../models/streak.dart';
+import '../models/notification.dart';
 
 /// Repository contracts consumed by the app's feature controllers.
 ///
@@ -50,6 +52,10 @@ abstract interface class QuizRepository {
 
 abstract interface class LeaderboardRepository {
   Future<Result<League>> getMyLeague();
+
+  /// Returns the resolution of the last completed weekly period.
+  /// Returns [NotFoundFailure] when no resolution is available yet.
+  Future<Result<LeagueResolution>> getResolution();
 }
 
 /// The continuously-learning AI tutor: explains one answered item, grounded in
@@ -106,4 +112,27 @@ abstract interface class ShareCardRepository {
 abstract interface class ExamRepository {
   Future<Result<MockExam>> generateExam(MockExamRequest request);
   Future<Result<MockExamResult>> submitExam(SubmitMockExamRequest request);
+}
+
+/// The learner's streak: current length, repair eligibility and gem cost.
+abstract interface class StreakRepository {
+  Future<Result<Streak>> getStreak();
+
+  /// Repairs a broken streak by spending gems. No-op if [Streak.canRepair] is
+  /// false (server enforces the guard).
+  Future<Result<RepairStreakResult>> repairStreak();
+}
+
+/// Server-authoritative notification scheduling: best‑time plan + preferences.
+abstract interface class NotificationRepository {
+  /// The server's estimate of the best delivery time for this learner.
+  Future<Result<NotificationPlan>> getPlan();
+
+  /// Reads the learner's persisted notification preferences.
+  Future<Result<NotificationSettings>> getSettings();
+
+  /// Persists updated notification preferences.
+  Future<Result<NotificationSettings>> updateSettings(
+    NotificationSettings settings,
+  );
 }

@@ -70,3 +70,46 @@ class LeaderboardEntry {
         weeklyXp: (json['weeklyXp'] as num?)?.toInt() ?? 0,
       );
 }
+
+// ---------------------------------------------------------------------------
+// League resolution — result delivered at the end of each weekly period.
+// ---------------------------------------------------------------------------
+
+/// Outcome of a completed weekly league period for the learner.
+enum ResolutionOutcome { promoted, stayed, relegated }
+
+ResolutionOutcome _resolutionOutcomeFrom(String? raw) => switch (raw) {
+      'promoted' => ResolutionOutcome.promoted,
+      'relegated' => ResolutionOutcome.relegated,
+      _ => ResolutionOutcome.stayed,
+    };
+
+/// Delivered by `GET /me/league/resolution` once the weekly period closes.
+/// Null when there is no completed period yet (first‑ever league week).
+class LeagueResolution {
+  const LeagueResolution({
+    required this.periodLeagueId,
+    required this.oldTier,
+    required this.newTier,
+    required this.outcome,
+    required this.finalRank,
+    required this.finalWeeklyXp,
+  });
+
+  final String periodLeagueId;
+  final LeagueTier oldTier;
+  final LeagueTier newTier;
+  final ResolutionOutcome outcome;
+  final int finalRank;
+  final int finalWeeklyXp;
+
+  factory LeagueResolution.fromJson(Map<String, dynamic> json) =>
+      LeagueResolution(
+        periodLeagueId: json['periodLeagueId'] as String? ?? '',
+        oldTier: leagueTierFrom(json['oldTier'] as String?),
+        newTier: leagueTierFrom(json['newTier'] as String?),
+        outcome: _resolutionOutcomeFrom(json['outcome'] as String?),
+        finalRank: (json['finalRank'] as num?)?.toInt() ?? 0,
+        finalWeeklyXp: (json['finalWeeklyXp'] as num?)?.toInt() ?? 0,
+      );
+}

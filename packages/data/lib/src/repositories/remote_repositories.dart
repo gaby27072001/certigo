@@ -15,6 +15,8 @@ import '../models/shop.dart';
 import '../models/friend.dart';
 import '../models/exam.dart';
 import '../models/share_card.dart';
+import '../models/streak.dart';
+import '../models/notification.dart';
 import 'repositories.dart';
 
 /// HTTP-backed implementations of the repository contracts. Each method maps a
@@ -91,6 +93,10 @@ class RemoteLeaderboardRepository implements LeaderboardRepository {
   @override
   Future<Result<League>> getMyLeague() =>
       _api.getJson('/me/league', League.fromJson);
+
+  @override
+  Future<Result<LeagueResolution>> getResolution() =>
+      _api.getJson('/me/league/resolution', LeagueResolution.fromJson);
 }
 
 class RemoteTutorRepository implements TutorRepository {
@@ -204,4 +210,40 @@ class RemoteExamRepository implements ExamRepository {
   @override
   Future<Result<MockExamResult>> submitExam(SubmitMockExamRequest request) =>
       _api.postJson('/exam/submit', request.toJson(), MockExamResult.fromJson);
+}
+
+class RemoteStreakRepository implements StreakRepository {
+  const RemoteStreakRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<Streak>> getStreak() =>
+      _api.getJson('/streak', Streak.fromJson);
+
+  @override
+  Future<Result<RepairStreakResult>> repairStreak() =>
+      _api.postJson('/streak/repair', <String, dynamic>{}, RepairStreakResult.fromJson);
+}
+
+class RemoteNotificationRepository implements NotificationRepository {
+  const RemoteNotificationRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<NotificationPlan>> getPlan() =>
+      _api.getJson('/me/notifications/plan', NotificationPlan.fromJson);
+
+  @override
+  Future<Result<NotificationSettings>> getSettings() =>
+      _api.getJson('/me/notifications/settings', NotificationSettings.fromJson);
+
+  @override
+  Future<Result<NotificationSettings>> updateSettings(
+    NotificationSettings settings,
+  ) =>
+      _api.postJson(
+        '/me/notifications/settings',
+        settings.toJson(),
+        NotificationSettings.fromJson,
+      );
 }
