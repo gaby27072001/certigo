@@ -142,7 +142,7 @@ public sealed class ExamServiceTests
         }
         var service = h.Build();
 
-        await service.SubmitAsync(ExamServiceHarness.Submit(
+        var result = await service.SubmitAsync(ExamServiceHarness.Submit(
             "rate-exam-1", "exam-1",
             ExamServiceHarness.Answer("l1-i1", "a"),
             ExamServiceHarness.Answer("l2-i1", "a"),
@@ -151,5 +151,10 @@ public sealed class ExamServiceTests
         var flagged = h.Events.Events.SingleOrDefault(e => e.Type == "attempt.flagged");
         flagged.Should().NotBeNull();
         ((AttemptIntegritySignal)flagged!.Payload).Flags.Should().Contain("AttemptRateExceeded");
+        ((AttemptIntegritySignal)flagged.Payload).Decision.Should().Be("Flag");
+
+        // Cadence = signal mou (Flag) : détection sans sanction. Récompenses conservées.
+        result.Rewards.XpEarned.Should().BeGreaterThan(0);
+        h.Leaderboard.Xp[h.UserId].Should().Be(result.Rewards.XpEarned);
     }
 }
