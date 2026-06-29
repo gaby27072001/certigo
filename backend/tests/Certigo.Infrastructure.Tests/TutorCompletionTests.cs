@@ -145,7 +145,7 @@ public sealed class AzureOpenAiTutorCompletionTests
             new TutorLlmOptions(
                 apiSurface == TutorLlmApiSurface.AzureClassic
                     ? new Uri("https://contoso.openai.azure.com/")
-                    : new Uri("https://microlingo-openai.services.ai.azure.com/api/projects/microlingo-dev/openai/v1/"),
+                    : new Uri("https://certigo-openai.services.ai.azure.com/api/projects/certigo-dev/openai/v1/"),
                 "gpt-5.4-mini",
                 apiSurface == TutorLlmApiSurface.AzureClassic ? "2024-10-21" : null,
                 apiKey,
