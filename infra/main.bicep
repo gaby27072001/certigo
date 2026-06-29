@@ -47,8 +47,8 @@ param tutorLlmApiKey string = ''
 @description('Maximum output tokens requested from the tutor LLM.')
 param tutorLlmMaxOutputTokens int = 400
 
-@description('Azure OpenAI account name for the tutor (resource name, not full ID). Required when tutorLlmEnabled=true and openAiRbacEnabled=true.')
-param tutorOpenAiAccountName string = ''
+@description('Full Azure resource ID of the Azure OpenAI account for the tutor. Required when tutorLlmEnabled=true and openAiRbacEnabled=true. Must be the complete resource ID (/subscriptions/.../providers/Microsoft.CognitiveServices/accounts/...) because the account may live in a different resource group than the Function App. Leave empty to skip the role assignment.')
+param tutorOpenAiAccountResourceId string = '/subscriptions/${subscription().subscriptionId}/resourceGroups/rg-microlingo-dev/providers/Microsoft.CognitiveServices/accounts/microlingo-openai'
 @description('Grant Cognitive Services OpenAI User role to the Function App managed identity.')
 param openAiRbacEnabled bool = false
 
@@ -221,14 +221,19 @@ module ciMobileSecretsAccess 'modules/keyVaultSecretsAccess.bicep' = if (!empty(
 
 // Optional: grant the Function App managed identity the "Cognitive Services OpenAI User"
 // role on the Azure OpenAI account, enabling identity-based auth for the tutor.
-// Opt-in: enabled only when tutorLlmEnabled=true, openAiRbacEnabled=true, and
-// tutorOpenAiAccountName is provided. Requires Owner / User Access Administrator
-// rights at the Azure OpenAI resource scope.
-module tutorOpenAiRbac 'modules/openAiRbac.bicep' = if (tutorLlmEnabled && openAiRbacEnabled && !empty(tutorOpenAiAccountName)) {
-  scope: rg
+// The module is scoped to the OpenAI account's resource group (extracted from the resource ID)
+// so both the existing reference and the role assignment resolve in the correct scope — even
+// when that RG differs from the Function App's RG (e.g. rg-microlingo-dev vs rg-certigo-dev).
+// Opt-in: requires tutorLlmEnabled=true, openAiRbacEnabled=true, and a non-empty resource ID.
+// Requires Owner / User Access Administrator at the Azure OpenAI resource scope.
+module tutorOpenAiRbac 'modules/openAiRbac.bicep' = if (tutorLlmEnabled && openAiRbacEnabled && !empty(tutorOpenAiAccountResourceId)) {
+  scope: resourceGroup(
+    split(tutorOpenAiAccountResourceId, '/')[2],
+    split(tutorOpenAiAccountResourceId, '/')[4]
+  )
   name: 'tutorOpenAiRbac'
   params: {
-    openAiAccountName: tutorOpenAiAccountName
+    openAiAccountResourceId: tutorOpenAiAccountResourceId
     principalId: api.outputs.principalId
   }
 }
