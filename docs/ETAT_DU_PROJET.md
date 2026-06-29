@@ -122,7 +122,7 @@ flowchart LR
 | **Quêtes & succès** | 🟢 | 🟢 | `GET /quests` + `claim`, `GET /achievements` — écrans `quests` & `achievements`. |
 | **Boutique** | 🟢 | 🟢 | `GET /shop` + `POST /shop/purchase` (économie de gemmes) — écran `shop`. |
 | **Amis & classement** | 🟢 | 🟢 | Ajouter/retirer un ami, `GET /friends/leaderboard` — écran `friends`. |
-| **Partage quotidien** | 🟢 | 🔴 | `GET /share/daily` (carte de partage encodée). |
+| **Partage quotidien** | 🟢 | 🟢 | `GET /share/daily` (carte de partage encodée) — écran `share-daily` (carte du jour + partage natif iOS/Android). |
 | **Examens blancs** | 🟢 | 🟢 | Moteur adaptatif : `POST /exam/generate` + `submit` — écran `exam` (génération, soumission, score). |
 | **Tuteur IA** | 🟢 | 🟢 | `POST /tutor/explain` — branché dans l'app via `tutor_sheet`. |
 | **Recommandation + coach** | 🟢 | 🟢 | `GET /me/recommendations/{trackId}` + coach IA sur l'accueil. |
@@ -324,8 +324,7 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 ## 13 · Prochaines étapes & écarts
 
 **Écarts backend ↔ mobile (à brancher en UI) :**
-- 🟢 Saisons, quêtes, succès, boutique, amis, examens blancs : **écrans livrés** (+ tests widget) — reste la **validation E2E sur appareil**.
-- 🔴 Partage quotidien : moteur prêt, **écran manquant**.
+- 🟢 Saisons, quêtes, succès, boutique, amis, examens blancs, partage quotidien : **écrans livrés** (+ tests widget) — reste la **validation E2E sur appareil**.
 - 🟡 Streak‑repair, ligues, notifications : partiellement exposés.
 
 **Chantiers techniques :**
