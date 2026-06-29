@@ -50,7 +50,7 @@ concurrency:
 
 env:
   FLUTTER_VERSION: "3.24.0"
-  BUNDLE_ID: "law-microlingo"
+  BUNDLE_ID: "law-certigo"
 
 jobs:
   release:

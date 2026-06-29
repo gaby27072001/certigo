@@ -17,7 +17,7 @@ concurrency:
 jobs:
   validate:
     name: Validate tracks & lessons
-    runs-on: [self-hosted, Linux, X64, law-microlingo]
+    runs-on: [self-hosted, Linux, X64, law-certigo]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v6

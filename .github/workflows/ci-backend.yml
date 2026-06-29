@@ -24,7 +24,7 @@ jobs:
     #      (ils sont désactivés par défaut ici — cf. lint-workflows.yml).
     # Repasser BACKEND_CI_FALLBACK à false (ou supprimer la variable) pour revenir au self-hosted.
     env:
-      RUNNER_LABELS_JSON: ${{ github.ref == 'refs/heads/main' && (vars.MAIN_CRITICAL_RUNNER_LABELS || '["self-hosted","Linux","X64","law-microlingo"]') || (vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","microlingo-ci"]') }}
+      RUNNER_LABELS_JSON: ${{ github.ref == 'refs/heads/main' && (vars.MAIN_CRITICAL_RUNNER_LABELS || '["self-hosted","Linux","X64","law-certigo"]') || (vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","certigo-ci"]') }}
     runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || fromJSON(env.RUNNER_LABELS_JSON) }}
     steps:
       - uses: actions/checkout@v4

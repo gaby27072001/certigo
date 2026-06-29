@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  BUNDLE_ID: "law-microlingo"
+  BUNDLE_ID: "law-certigo"
 
 jobs:
   sync:

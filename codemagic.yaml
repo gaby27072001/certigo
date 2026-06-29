@@ -62,9 +62,9 @@ workflows:
         # Codemagic gère les certificats et profils nativement via l'API App Store Connect.
         # Plus besoin de fastlane match, de .p12 ou de profils encodés en secrets.
         distribution_type: app_store
-        bundle_identifier: law-microlingo
+        bundle_identifier: law-certigo
       vars:
-        BUNDLE_ID: law-microlingo
+        BUNDLE_ID: law-certigo
         FLUTTER_APP_PATH: apps/mobile
 
     triggering:
@@ -160,7 +160,7 @@ workflows:
               <string>Apple Distribution</string>
               <key>provisioningProfiles</key>
               <dict>
-                  <key>law-microlingo</key>
+                  <key>law-certigo</key>
                   <string>Certigo AppStore</string>
               </dict>
               <key>stripSwiftSymbols</key>
@@ -173,7 +173,7 @@ workflows:
           </plist>
           EOF
           flutter build ipa --release \
-            --dart-define=API_BASE_URL=https://law-microlingodev-a2msquxibzvcu.azurewebsites.net/api \
+            --dart-define=API_BASE_URL=https://law-certigodev-a2msquxibzvcu.azurewebsites.net/api \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/tmp/ExportOptions.plist
@@ -216,9 +216,9 @@ workflows:
       cocoapods: default
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: law-microlingo
+        bundle_identifier: law-certigo
       vars:
-        BUNDLE_ID: law-microlingo
+        BUNDLE_ID: law-certigo
         FLUTTER_APP_PATH: apps/mobile
 
     triggering:
@@ -284,7 +284,7 @@ workflows:
               <string>Apple Distribution</string>
               <key>provisioningProfiles</key>
               <dict>
-                  <key>law-microlingo</key>
+                  <key>law-certigo</key>
                   <string>Certigo AppStore</string>
               </dict>
               <key>stripSwiftSymbols</key>
@@ -297,7 +297,7 @@ workflows:
           </plist>
           EOF
           flutter build ipa --release \
-            --dart-define=API_BASE_URL=https://law-microlingodev-a2msquxibzvcu.azurewebsites.net/api \
+            --dart-define=API_BASE_URL=https://law-certigodev-a2msquxibzvcu.azurewebsites.net/api \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/tmp/ExportOptions.plist
@@ -335,7 +335,7 @@ workflows:
       xcode: latest
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: law-microlingo
+        bundle_identifier: law-certigo
 
     # Pas de triggering automatique — déclencher manuellement depuis le dashboard
 

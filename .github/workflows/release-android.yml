@@ -47,13 +47,13 @@ concurrency:
 env:
   FLUTTER_VERSION: "3.24.0"
   # ⚠️ Doit correspondre à applicationId dans apps/mobile/android/app/build.gradle
-  PLAY_PACKAGE_NAME: "law.microlingo"
+  PLAY_PACKAGE_NAME: "law.certigo"
   AAB_PATH: "apps/mobile/build/app/outputs/bundle/release/app-release.aab"
 
 jobs:
   release:
     name: Build AAB signé + publication Play
-    runs-on: [self-hosted, Linux, X64, law-microlingo]
+    runs-on: [self-hosted, Linux, X64, law-certigo]
     # Approval gate: configure required reviewers on the "beta" environment
     # (Settings → Environments) so a human signs off before any Play publish.
     environment: beta
