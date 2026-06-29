@@ -47,6 +47,11 @@ param tutorLlmApiKey string = ''
 @description('Maximum output tokens requested from the tutor LLM.')
 param tutorLlmMaxOutputTokens int = 400
 
+@description('Azure OpenAI account name for the tutor (resource name, not full ID). Required when tutorLlmEnabled=true and openAiRbacEnabled=true.')
+param tutorOpenAiAccountName string = ''
+@description('Grant Cognitive Services OpenAI User role to the Function App managed identity.')
+param openAiRbacEnabled bool = false
+
 @description('Optional email notified on security alerts (401/403/5xx spikes). Empty = no receiver.')
 param alertEmail string = ''
 
@@ -211,6 +216,20 @@ module ciMobileSecretsAccess 'modules/keyVaultSecretsAccess.bicep' = if (!empty(
   params: {
     keyVaultName: vault.outputs.name
     principalId: ciRunnerPrincipalId
+  }
+}
+
+// Optional: grant the Function App managed identity the "Cognitive Services OpenAI User"
+// role on the Azure OpenAI account, enabling identity-based auth for the tutor.
+// Opt-in: enabled only when tutorLlmEnabled=true, openAiRbacEnabled=true, and
+// tutorOpenAiAccountName is provided. Requires Owner / User Access Administrator
+// rights at the Azure OpenAI resource scope.
+module tutorOpenAiRbac 'modules/openAiRbac.bicep' = if (tutorLlmEnabled && openAiRbacEnabled && !empty(tutorOpenAiAccountName)) {
+  scope: rg
+  name: 'tutorOpenAiRbac'
+  params: {
+    openAiAccountName: tutorOpenAiAccountName
+    principalId: api.outputs.principalId
   }
 }
 

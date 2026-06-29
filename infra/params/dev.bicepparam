@@ -33,3 +33,8 @@ param tutorLlmEnabled = true
 param tutorLlmEndpoint = 'https://microlingo-openai.services.ai.azure.com/api/projects/microlingo-dev/openai/v1/'
 param tutorLlmDeployment = 'gpt-5.4-mini'
 param tutorLlmApiSurface = 'v1'
+
+// RBAC: grant the Function App managed identity the "Cognitive Services OpenAI User"
+// role on the Azure OpenAI account so identity-based (keyless) auth works for the tutor.
+param tutorOpenAiAccountName = 'microlingo-openai'
+param openAiRbacEnabled = true
