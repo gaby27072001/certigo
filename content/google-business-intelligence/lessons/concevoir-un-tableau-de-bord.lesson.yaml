@@ -1,0 +1,37 @@
+id: googlebusinessintelligence-l-concevoir-un-tableau-de-bord
+trackId: google-business-intelligence
+unitId: googlebusinessintelligence-u-dashboards
+domainId: dashboards
+title: "Concevoir un tableau de bord"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-concevoir-un-tableau-de-bord
+    body: |
+      Dans l'examen BUSINESS-INTEL, « Concevoir un tableau de bord » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-concevoir-un-tableau-de-bord
+    title: "Concevoir un tableau de bord"
+    body: |
+      Un dashboard BI synthétise les KPI clés pour la décision. Clarté, mise à jour automatique et public ciblé priment ; on évite la surcharge et on met en avant l'essentiel.
+  - type: check
+    conceptId: c-concevoir-un-tableau-de-bord
+    check:
+      id: googlebusinessintelligence-l-concevoir-un-tableau-de-bord-check-1
+      conceptId: c-concevoir-un-tableau-de-bord
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle qualité prime pour un bon tableau de bord ?
+      options:
+        - { id: a, label: "La clarté centrée sur les KPI utiles" }
+        - { id: b, label: "Le maximum de graphiques possible" }
+        - { id: c, label: "Aucune mise à jour" }
+        - { id: d, label: "Des couleurs aléatoires" }
+      correct: [a]
+      explanation: |
+        Un dashboard efficace reste clair et focalisé sur les indicateurs qui guident la décision.
+  - type: recap
+    conceptId: c-concevoir-un-tableau-de-bord
+    body: |
+      Retenez l'essentiel de « Concevoir un tableau de bord » pour la certification BUSINESS-INTEL.

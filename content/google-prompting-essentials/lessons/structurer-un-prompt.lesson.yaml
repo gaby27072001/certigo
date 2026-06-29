@@ -1,0 +1,37 @@
+id: googlepromptingessentials-l-structurer-un-prompt
+trackId: google-prompting-essentials
+unitId: googlepromptingessentials-u-fundamentals
+domainId: fundamentals
+title: "Structurer un prompt"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-structurer-un-prompt
+    body: |
+      Dans l'examen PROMPTING, « Structurer un prompt » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-structurer-un-prompt
+    title: "Structurer un prompt"
+    body: |
+      La méthode tâche-contexte-références-évaluation-itération guide la rédaction. Donner un rôle, des contraintes et des exemples cadre l'IA et améliore nettement la sortie.
+  - type: check
+    conceptId: c-structurer-un-prompt
+    check:
+      id: googlepromptingessentials-l-structurer-un-prompt-check-1
+      conceptId: c-structurer-un-prompt
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel élément cadre le mieux une réponse d'IA ?
+      options:
+        - { id: a, label: "Un contexte et un format précis" }
+        - { id: b, label: "Une consigne vague" }
+        - { id: c, label: "Aucune instruction" }
+        - { id: d, label: "Un seul mot" }
+      correct: [a]
+      explanation: |
+        Contexte, contraintes et format attendu rendent la réponse pertinente.
+  - type: recap
+    conceptId: c-structurer-un-prompt
+    body: |
+      Retenez l'essentiel de « Structurer un prompt » pour la certification PROMPTING.

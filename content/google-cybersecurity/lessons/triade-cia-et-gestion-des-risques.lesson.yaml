@@ -1,0 +1,37 @@
+id: googlecybersecurity-l-triade-cia-et-gestion-des-risques
+trackId: google-cybersecurity
+unitId: googlecybersecurity-u-foundations
+domainId: foundations
+title: "Triade CIA et gestion des risques"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-triade-cia-et-gestion-des-risques
+    body: |
+      Dans l'examen CYBERSECURITY, « Triade CIA et gestion des risques » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-triade-cia-et-gestion-des-risques
+    title: "Triade CIA et gestion des risques"
+    body: |
+      La sécurité repose sur la confidentialité, l'intégrité et la disponibilité (CIA). Gérer le risque consiste à identifier les menaces, évaluer la probabilité et l'impact, puis appliquer des contrôles proportionnés.
+  - type: check
+    conceptId: c-triade-cia-et-gestion-des-risques
+    check:
+      id: googlecybersecurity-l-triade-cia-et-gestion-des-risques-check-1
+      conceptId: c-triade-cia-et-gestion-des-risques
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que vise la « disponibilité » dans la triade CIA ?
+      options:
+        - { id: a, label: "Garantir l'accès aux systèmes quand on en a besoin" }
+        - { id: b, label: "Empêcher toute lecture des données" }
+        - { id: c, label: "Modifier les données sans trace" }
+        - { id: d, label: "Supprimer les sauvegardes" }
+      correct: [a]
+      explanation: |
+        La disponibilité assure que les systèmes et données restent accessibles aux utilisateurs autorisés.
+  - type: recap
+    conceptId: c-triade-cia-et-gestion-des-risques
+    body: |
+      Retenez l'essentiel de « Triade CIA et gestion des risques » pour la certification CYBERSECURITY.

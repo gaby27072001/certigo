@@ -1,0 +1,36 @@
+# Google Business Intelligence Professional Certificate — google certification track.
+# Domain weights mirror the official BUSINESS-INTEL skills outline and sum to 1.0.
+id: google-business-intelligence
+code: "BUSINESS-INTEL"
+provider: google
+title: "Google Business Intelligence Professional Certificate"
+level: fundamentals
+sourceUrl: "https://grow.google/certificates/business-intelligence/"
+summary: |
+  Certificat de Business Intelligence : modélisation, pipelines ETL, tableaux de bord et automatisation du reporting. Prépare aux postes d'analyste BI capables de transformer des données en tableaux de bord décisionnels.
+domains:
+  - id: modeling
+    name: "Modélisation des données"
+    weight: 0.3
+  - id: etl
+    name: "Pipelines ETL"
+    weight: 0.35
+  - id: dashboards
+    name: "Tableaux de bord"
+    weight: 0.35
+units:
+  - id: googlebusinessintelligence-u-modeling
+    domainId: modeling
+    title: "Modélisation des données"
+    lessons:
+      - googlebusinessintelligence-l-schemas-en-etoile
+  - id: googlebusinessintelligence-u-etl
+    domainId: etl
+    title: "Pipelines ETL"
+    lessons:
+      - googlebusinessintelligence-l-extraire-transformer-charger
+  - id: googlebusinessintelligence-u-dashboards
+    domainId: dashboards
+    title: "Tableaux de bord"
+    lessons:
+      - googlebusinessintelligence-l-concevoir-un-tableau-de-bord

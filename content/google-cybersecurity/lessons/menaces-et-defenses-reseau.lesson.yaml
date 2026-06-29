@@ -1,0 +1,37 @@
+id: googlecybersecurity-l-menaces-et-defenses-reseau
+trackId: google-cybersecurity
+unitId: googlecybersecurity-u-networks
+domainId: networks
+title: "Menaces et défenses réseau"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-menaces-et-defenses-reseau
+    body: |
+      Dans l'examen CYBERSECURITY, « Menaces et défenses réseau » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-menaces-et-defenses-reseau
+    title: "Menaces et défenses réseau"
+    body: |
+      Les attaques réseau (DDoS, interception, usurpation) sont contrées par pare-feu, segmentation et chiffrement TLS. Comprendre TCP/IP aide à repérer un trafic anormal et à durcir le périmètre.
+  - type: check
+    conceptId: c-menaces-et-defenses-reseau
+    check:
+      id: googlecybersecurity-l-menaces-et-defenses-reseau-check-1
+      conceptId: c-menaces-et-defenses-reseau
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel équipement filtre le trafic entrant/sortant selon des règles ?
+      options:
+        - { id: a, label: "Pare-feu" }
+        - { id: b, label: "Imprimante" }
+        - { id: c, label: "Clé USB" }
+        - { id: d, label: "Webcam" }
+      correct: [a]
+      explanation: |
+        Le pare-feu applique des règles pour autoriser ou bloquer le trafic réseau.
+  - type: recap
+    conceptId: c-menaces-et-defenses-reseau
+    body: |
+      Retenez l'essentiel de « Menaces et défenses réseau » pour la certification CYBERSECURITY.

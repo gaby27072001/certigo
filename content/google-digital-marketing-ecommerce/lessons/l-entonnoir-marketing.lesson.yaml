@@ -1,0 +1,37 @@
+id: googledigitalmarketingecommerce-l-l-entonnoir-marketing
+trackId: google-digital-marketing-ecommerce
+unitId: googledigitalmarketingecommerce-u-foundations
+domainId: foundations
+title: "L'entonnoir marketing"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-l-entonnoir-marketing
+    body: |
+      Dans l'examen DIGITAL-MKT, « L'entonnoir marketing » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-l-entonnoir-marketing
+    title: "L'entonnoir marketing"
+    body: |
+      Le funnel guide le client de la sensibilisation à l'achat puis à la fidélité. Chaque étape appelle des canaux et messages adaptés. Comprendre le parcours optimise les budgets publicitaires.
+  - type: check
+    conceptId: c-l-entonnoir-marketing
+    check:
+      id: googledigitalmarketingecommerce-l-l-entonnoir-marketing-check-1
+      conceptId: c-l-entonnoir-marketing
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que représente l'entonnoir (funnel) marketing ?
+      options:
+        - { id: a, label: "Le parcours du prospect jusqu'à l'achat et la fidélité" }
+        - { id: b, label: "Un serveur web" }
+        - { id: c, label: "Un format d'image" }
+        - { id: d, label: "Une base SQL" }
+      correct: [a]
+      explanation: |
+        Le funnel modélise les étapes sensibilisation → considération → conversion → fidélisation.
+  - type: recap
+    conceptId: c-l-entonnoir-marketing
+    body: |
+      Retenez l'essentiel de « L'entonnoir marketing » pour la certification DIGITAL-MKT.

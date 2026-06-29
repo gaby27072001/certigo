@@ -1,0 +1,37 @@
+id: googleaiessentials-l-comprendre-l-ia-generative
+trackId: google-ai-essentials
+unitId: googleaiessentials-u-genai
+domainId: genai
+title: "Comprendre l'IA générative"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-comprendre-l-ia-generative
+    body: |
+      Dans l'examen AI-ESSENTIALS, « Comprendre l'IA générative » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-comprendre-l-ia-generative
+    title: "Comprendre l'IA générative"
+    body: |
+      L'IA générative produit texte, images ou code à partir de consignes. Elle assiste la rédaction, le résumé et l'idéation. Connaître ses forces et limites permet de l'intégrer utilement au quotidien.
+  - type: check
+    conceptId: c-comprendre-l-ia-generative
+    check:
+      id: googleaiessentials-l-comprendre-l-ia-generative-check-1
+      conceptId: c-comprendre-l-ia-generative
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que fait une IA générative ?
+      options:
+        - { id: a, label: "Créer du contenu à partir d'une consigne" }
+        - { id: b, label: "Remplacer le réseau" }
+        - { id: c, label: "Imprimer du papier" }
+        - { id: d, label: "Gérer la paie seule" }
+      correct: [a]
+      explanation: |
+        Elle génère du contenu (texte, image, code) en réponse à un prompt.
+  - type: recap
+    conceptId: c-comprendre-l-ia-generative
+    body: |
+      Retenez l'essentiel de « Comprendre l'IA générative » pour la certification AI-ESSENTIALS.

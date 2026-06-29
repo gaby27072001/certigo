@@ -1,0 +1,37 @@
+id: googledataanalytics-l-premiers-pas-avec-r
+trackId: google-data-analytics
+unitId: googledataanalytics-u-r-stats
+domainId: r-stats
+title: "Premiers pas avec R"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-premiers-pas-avec-r
+    body: |
+      Dans l'examen DATA-ANALYTICS, « Premiers pas avec R » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-premiers-pas-avec-r
+    title: "Premiers pas avec R"
+    body: |
+      R sert à l'analyse statistique et au nettoyage avancé. Les packages comme tidyverse facilitent la manipulation et la visualisation. R complète les tableurs quand les volumes ou la complexité augmentent.
+  - type: check
+    conceptId: c-premiers-pas-avec-r
+    check:
+      id: googledataanalytics-l-premiers-pas-avec-r-check-1
+      conceptId: c-premiers-pas-avec-r
+      type: mcq
+      difficulty: 2
+      stem: |
+        À quoi sert principalement R en analyse de données ?
+      options:
+        - { id: a, label: "Au calcul statistique et à la visualisation programmée" }
+        - { id: b, label: "À héberger des sites web" }
+        - { id: c, label: "À gérer un réseau d'entreprise" }
+        - { id: d, label: "À remplacer le système d'exploitation" }
+      correct: [a]
+      explanation: |
+        R est un langage statistique : nettoyage, analyse et visualisation reproductible des données.
+  - type: recap
+    conceptId: c-premiers-pas-avec-r
+    body: |
+      Retenez l'essentiel de « Premiers pas avec R » pour la certification DATA-ANALYTICS.

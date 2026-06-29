@@ -1,0 +1,44 @@
+# Google IT Support Professional Certificate — google certification track.
+# Domain weights mirror the official IT-SUPPORT skills outline and sum to 1.0.
+id: google-it-support
+code: "IT-SUPPORT"
+provider: google
+title: "Google IT Support Professional Certificate"
+level: fundamentals
+sourceUrl: "https://grow.google/certificates/it-support/"
+summary: |
+  Certificat professionnel d'entrée dans le support informatique : dépannage, service client, réseaux, systèmes d'exploitation, administration système et sécurité. Prépare aux postes de technicien support help-desk sans expérience préalable.
+domains:
+  - id: troubleshooting
+    name: "Dépannage et service client"
+    weight: 0.25
+  - id: networking
+    name: "Réseaux"
+    weight: 0.25
+  - id: os-sysadmin
+    name: "Systèmes et administration"
+    weight: 0.27
+  - id: security-basics
+    name: "Sécurité"
+    weight: 0.23
+units:
+  - id: googleitsupport-u-troubleshooting
+    domainId: troubleshooting
+    title: "Dépannage et service client"
+    lessons:
+      - googleitsupport-l-demarche-de-depannage-structuree
+  - id: googleitsupport-u-networking
+    domainId: networking
+    title: "Réseaux"
+    lessons:
+      - googleitsupport-l-modele-tcp-ip-et-adressage
+  - id: googleitsupport-u-os-sysadmin
+    domainId: os-sysadmin
+    title: "Systèmes et administration"
+    lessons:
+      - googleitsupport-l-gestion-des-utilisateurs-et-des-acces
+  - id: googleitsupport-u-security-basics
+    domainId: security-basics
+    title: "Sécurité"
+    lessons:
+      - googleitsupport-l-bonnes-pratiques-de-securite

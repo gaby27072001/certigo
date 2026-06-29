@@ -1,0 +1,37 @@
+id: googledigitalmarketingecommerce-l-mesurer-la-performance
+trackId: google-digital-marketing-ecommerce
+unitId: googledigitalmarketingecommerce-u-analytics
+domainId: analytics
+title: "Mesurer la performance"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-mesurer-la-performance
+    body: |
+      Dans l'examen DIGITAL-MKT, « Mesurer la performance » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-mesurer-la-performance
+    title: "Mesurer la performance"
+    body: |
+      Les analytics suivent trafic, conversion et ROI. Définir des KPI clairs et lire les tableaux de bord permet d'ajuster les campagnes en continu plutôt que d'agir à l'aveugle.
+  - type: check
+    conceptId: c-mesurer-la-performance
+    check:
+      id: googledigitalmarketingecommerce-l-mesurer-la-performance-check-1
+      conceptId: c-mesurer-la-performance
+      type: mcq
+      difficulty: 1
+      stem: |
+        Qu'est-ce qu'un taux de conversion ?
+      options:
+        - { id: a, label: "La part de visiteurs réalisant l'action voulue" }
+        - { id: b, label: "Le nombre de serveurs" }
+        - { id: c, label: "La taille des images" }
+        - { id: d, label: "Le débit réseau" }
+      correct: [a]
+      explanation: |
+        Le taux de conversion mesure le pourcentage de visiteurs accomplissant l'objectif (achat, inscription).
+  - type: recap
+    conceptId: c-mesurer-la-performance
+    body: |
+      Retenez l'essentiel de « Mesurer la performance » pour la certification DIGITAL-MKT.

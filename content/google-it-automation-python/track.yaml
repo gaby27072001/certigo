@@ -1,0 +1,36 @@
+# Google IT Automation with Python Certificate — google certification track.
+# Domain weights mirror the official IT-AUTO-PY skills outline and sum to 1.0.
+id: google-it-automation-python
+code: "IT-AUTO-PY"
+provider: google
+title: "Google IT Automation with Python Certificate"
+level: fundamentals
+sourceUrl: "https://grow.google/certificates/it-automation/"
+summary: |
+  Certificat d'automatisation IT avec Python : scripting, Git, gestion de configuration et résolution de problèmes à grande échelle. Prépare à automatiser les tâches répétitives et la maintenance de parcs IT.
+domains:
+  - id: python
+    name: "Programmation Python"
+    weight: 0.34
+  - id: git
+    name: "Git et versionnage"
+    weight: 0.33
+  - id: config
+    name: "Automatisation à grande échelle"
+    weight: 0.33
+units:
+  - id: googleitautomationpython-u-python
+    domainId: python
+    title: "Programmation Python"
+    lessons:
+      - googleitautomationpython-l-scripts-d-automatisation
+  - id: googleitautomationpython-u-git
+    domainId: git
+    title: "Git et versionnage"
+    lessons:
+      - googleitautomationpython-l-controle-de-version-avec-git
+  - id: googleitautomationpython-u-config
+    domainId: config
+    title: "Automatisation à grande échelle"
+    lessons:
+      - googleitautomationpython-l-gestion-de-configuration

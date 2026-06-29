@@ -1,0 +1,44 @@
+# Google UX Design Professional Certificate — google certification track.
+# Domain weights mirror the official UX-DESIGN skills outline and sum to 1.0.
+id: google-ux-design
+code: "UX-DESIGN"
+provider: google
+title: "Google UX Design Professional Certificate"
+level: fundamentals
+sourceUrl: "https://grow.google/certificates/ux-design/"
+summary: |
+  Certificat débutant en design d'expérience utilisateur : recherche, wireframes, prototypes et tests d'utilisabilité avec Figma et Adobe XD. Prépare aux postes de UX designer junior centrés sur l'accessibilité et la conception itérative.
+domains:
+  - id: research
+    name: "Recherche utilisateur"
+    weight: 0.26
+  - id: wireframes
+    name: "Wireframes et prototypes"
+    weight: 0.26
+  - id: usability
+    name: "Tests et accessibilité"
+    weight: 0.26
+  - id: figma
+    name: "Outils de conception"
+    weight: 0.22
+units:
+  - id: googleuxdesign-u-research
+    domainId: research
+    title: "Recherche utilisateur"
+    lessons:
+      - googleuxdesign-l-comprendre-les-utilisateurs
+  - id: googleuxdesign-u-wireframes
+    domainId: wireframes
+    title: "Wireframes et prototypes"
+    lessons:
+      - googleuxdesign-l-du-wireframe-au-prototype
+  - id: googleuxdesign-u-usability
+    domainId: usability
+    title: "Tests et accessibilité"
+    lessons:
+      - googleuxdesign-l-tests-d-utilisabilite
+  - id: googleuxdesign-u-figma
+    domainId: figma
+    title: "Outils de conception"
+    lessons:
+      - googleuxdesign-l-concevoir-avec-figma

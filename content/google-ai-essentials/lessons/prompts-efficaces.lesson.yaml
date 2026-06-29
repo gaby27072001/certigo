@@ -1,0 +1,37 @@
+id: googleaiessentials-l-prompts-efficaces
+trackId: google-ai-essentials
+unitId: googleaiessentials-u-prompts
+domainId: prompts
+title: "Prompts efficaces"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-prompts-efficaces
+    body: |
+      Dans l'examen AI-ESSENTIALS, « Prompts efficaces » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-prompts-efficaces
+    title: "Prompts efficaces"
+    body: |
+      Un bon prompt précise rôle, contexte, tâche et format attendu. Itérer et fournir des exemples améliore la qualité des réponses. La clarté de la consigne détermine la pertinence du résultat.
+  - type: check
+    conceptId: c-prompts-efficaces
+    check:
+      id: googleaiessentials-l-prompts-efficaces-check-1
+      conceptId: c-prompts-efficaces
+      type: mcq
+      difficulty: 1
+      stem: |
+        Qu'améliore un prompt clair et contextualisé ?
+      options:
+        - { id: a, label: "La pertinence de la réponse de l'IA" }
+        - { id: b, label: "La vitesse du réseau" }
+        - { id: c, label: "La taille de l'écran" }
+        - { id: d, label: "Le coût du matériel" }
+      correct: [a]
+      explanation: |
+        Plus la consigne est précise (rôle, contexte, format), meilleure est la réponse.
+  - type: recap
+    conceptId: c-prompts-efficaces
+    body: |
+      Retenez l'essentiel de « Prompts efficaces » pour la certification AI-ESSENTIALS.

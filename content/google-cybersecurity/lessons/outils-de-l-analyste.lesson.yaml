@@ -1,0 +1,37 @@
+id: googlecybersecurity-l-outils-de-l-analyste
+trackId: google-cybersecurity
+unitId: googlecybersecurity-u-linux-sql
+domainId: linux-sql
+title: "Outils de l'analyste"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-outils-de-l-analyste
+    body: |
+      Dans l'examen CYBERSECURITY, « Outils de l'analyste » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-outils-de-l-analyste
+    title: "Outils de l'analyste"
+    body: |
+      L'analyste sécurité utilise Linux (ligne de commande, permissions) et SQL pour fouiller les journaux. Savoir filtrer et corréler des événements est essentiel pour l'investigation et la chasse aux menaces.
+  - type: check
+    conceptId: c-outils-de-l-analyste
+    check:
+      id: googlecybersecurity-l-outils-de-l-analyste-check-1
+      conceptId: c-outils-de-l-analyste
+      type: mcq
+      difficulty: 1
+      stem: |
+        Pourquoi SQL est-il utile en cybersécurité ?
+      options:
+        - { id: a, label: "Pour interroger des journaux et corréler des événements" }
+        - { id: b, label: "Pour peindre des interfaces" }
+        - { id: c, label: "Pour câbler le réseau" }
+        - { id: d, label: "Pour souder du matériel" }
+      correct: [a]
+      explanation: |
+        SQL permet d'explorer rapidement de grands volumes de logs lors d'une investigation.
+  - type: recap
+    conceptId: c-outils-de-l-analyste
+    body: |
+      Retenez l'essentiel de « Outils de l'analyste » pour la certification CYBERSECURITY.

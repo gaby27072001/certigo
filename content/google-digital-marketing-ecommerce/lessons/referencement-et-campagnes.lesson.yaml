@@ -1,0 +1,37 @@
+id: googledigitalmarketingecommerce-l-referencement-et-campagnes
+trackId: google-digital-marketing-ecommerce
+unitId: googledigitalmarketingecommerce-u-seo-sea
+domainId: seo-sea
+title: "Référencement et campagnes"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-referencement-et-campagnes
+    body: |
+      Dans l'examen DIGITAL-MKT, « Référencement et campagnes » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-referencement-et-campagnes
+    title: "Référencement et campagnes"
+    body: |
+      Le SEO améliore la visibilité naturelle ; le SEA (Google Ads) achète des positions. Mots-clés, qualité du contenu et ciblage déterminent le coût et la performance des campagnes.
+  - type: check
+    conceptId: c-referencement-et-campagnes
+    check:
+      id: googledigitalmarketingecommerce-l-referencement-et-campagnes-check-1
+      conceptId: c-referencement-et-campagnes
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle différence entre SEO et SEA ?
+      options:
+        - { id: a, label: "SEO est organique, SEA est payant" }
+        - { id: b, label: "Les deux sont gratuits" }
+        - { id: c, label: "SEO est payant, SEA organique" }
+        - { id: d, label: "Aucune différence" }
+      correct: [a]
+      explanation: |
+        Le SEO vise le trafic naturel ; le SEA repose sur des annonces payantes.
+  - type: recap
+    conceptId: c-referencement-et-campagnes
+    body: |
+      Retenez l'essentiel de « Référencement et campagnes » pour la certification DIGITAL-MKT.

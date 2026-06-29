@@ -1,0 +1,37 @@
+id: googleadvanceddataanalytics-l-presenter-des-insights-actionnables
+trackId: google-advanced-data-analytics
+unitId: googleadvanceddataanalytics-u-communicate
+domainId: communicate
+title: "Présenter des insights actionnables"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-presenter-des-insights-actionnables
+    body: |
+      Dans l'examen ADV-DATA-ANALYTICS, « Présenter des insights actionnables » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-presenter-des-insights-actionnables
+    title: "Présenter des insights actionnables"
+    body: |
+      Un data analyst traduit les modèles en recommandations claires pour les décideurs : visuels lisibles, hypothèses explicites, limites du modèle. La valeur naît de l'action déclenchée, pas du modèle seul.
+  - type: check
+    conceptId: c-presenter-des-insights-actionnables
+    check:
+      id: googleadvanceddataanalytics-l-presenter-des-insights-actionnables-check-1
+      conceptId: c-presenter-des-insights-actionnables
+      type: mcq
+      difficulty: 1
+      stem: |
+        Qu'est-ce qui rend une analyse vraiment utile à l'entreprise ?
+      options:
+        - { id: a, label: "Des recommandations claires menant à une décision" }
+        - { id: b, label: "Un modèle complexe inexpliqué" }
+        - { id: c, label: "Un graphique surchargé" }
+        - { id: d, label: "Aucune documentation" }
+      correct: [a]
+      explanation: |
+        La valeur vient de recommandations exploitables ; la complexité sans clarté n'aide pas la décision.
+  - type: recap
+    conceptId: c-presenter-des-insights-actionnables
+    body: |
+      Retenez l'essentiel de « Présenter des insights actionnables » pour la certification ADV-DATA-ANALYTICS.

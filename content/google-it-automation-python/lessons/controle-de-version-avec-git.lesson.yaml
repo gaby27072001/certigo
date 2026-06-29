@@ -1,0 +1,37 @@
+id: googleitautomationpython-l-controle-de-version-avec-git
+trackId: google-it-automation-python
+unitId: googleitautomationpython-u-git
+domainId: git
+title: "Contrôle de version avec Git"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-controle-de-version-avec-git
+    body: |
+      Dans l'examen IT-AUTO-PY, « Contrôle de version avec Git » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-controle-de-version-avec-git
+    title: "Contrôle de version avec Git"
+    body: |
+      Git suit l'historique du code via commits, branches et fusions. Il permet de collaborer, revenir en arrière et automatiser des déploiements. C'est un socle des pratiques DevOps.
+  - type: check
+    conceptId: c-controle-de-version-avec-git
+    check:
+      id: googleitautomationpython-l-controle-de-version-avec-git-check-1
+      conceptId: c-controle-de-version-avec-git
+      type: mcq
+      difficulty: 1
+      stem: |
+        À quoi sert un commit Git ?
+      options:
+        - { id: a, label: "Enregistrer un instantané versionné des modifications" }
+        - { id: b, label: "Supprimer le dépôt" }
+        - { id: c, label: "Éteindre le serveur" }
+        - { id: d, label: "Effacer l'historique" }
+      correct: [a]
+      explanation: |
+        Un commit capture l'état du code, traçable et réversible.
+  - type: recap
+    conceptId: c-controle-de-version-avec-git
+    body: |
+      Retenez l'essentiel de « Contrôle de version avec Git » pour la certification IT-AUTO-PY.
