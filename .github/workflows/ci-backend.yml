@@ -28,7 +28,7 @@ jobs:
     runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || fromJSON(env.RUNNER_LABELS_JSON) }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "8.0.x"
       - name: Restore
