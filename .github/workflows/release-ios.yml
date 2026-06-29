@@ -236,7 +236,7 @@ jobs:
             -exportPath ../build/ios/ipa -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
 
       - name: Publier l'IPA en artefact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: certigo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}-ipa
           path: apps/mobile/build/ios/ipa/*.ipa
