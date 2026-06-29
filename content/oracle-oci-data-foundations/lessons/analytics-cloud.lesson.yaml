@@ -1,0 +1,37 @@
+id: oracleocidatafoundations-l-analytics-cloud
+trackId: oracle-oci-data-foundations
+unitId: oracleocidatafoundations-u-analytics
+domainId: analytics
+title: "Analytics Cloud"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-analytics-cloud
+    body: |
+      Dans l'examen 1Z0-1124, « Analytics Cloud » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-analytics-cloud
+    title: "Analytics Cloud"
+    body: |
+      Oracle Analytics Cloud explore et visualise les données augmentées par l'IA.
+  - type: check
+    conceptId: c-analytics-cloud
+    check:
+      id: oracleocidatafoundations-l-analytics-cloud-check-1
+      conceptId: c-analytics-cloud
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service visualise et explore la donnée ?
+      options:
+        - { id: a, label: "Analytics Cloud" }
+        - { id: b, label: "OCIR" }
+        - { id: c, label: "Vault" }
+        - { id: d, label: "DRG" }
+      correct: [a]
+      explanation: |
+        Analytics Cloud fournit dashboards et insights.
+  - type: recap
+    conceptId: c-analytics-cloud
+    body: |
+      Retenez l'essentiel de « Analytics Cloud » pour la certification 1Z0-1124.

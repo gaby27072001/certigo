@@ -1,0 +1,37 @@
+id: oraclejavase8-l-classes-et-heritage
+trackId: oracle-java-se-8
+unitId: oraclejavase8-u-oop
+domainId: oop
+title: "Classes et héritage"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-classes-et-heritage
+    body: |
+      Dans l'examen 1Z0-808, « Classes et héritage » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-classes-et-heritage
+    title: "Classes et héritage"
+    body: |
+      Encapsulation, héritage et polymorphisme structurent le code. extends crée une sous-classe.
+  - type: check
+    conceptId: c-classes-et-heritage
+    check:
+      id: oraclejavase8-l-classes-et-heritage-check-1
+      conceptId: c-classes-et-heritage
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel mot-clé établit l'héritage ?
+      options:
+        - { id: a, label: "extends" }
+        - { id: b, label: "import" }
+        - { id: c, label: "static" }
+        - { id: d, label: "final" }
+      correct: [a]
+      explanation: |
+        extends fait hériter une classe d'une autre.
+  - type: recap
+    conceptId: c-classes-et-heritage
+    body: |
+      Retenez l'essentiel de « Classes et héritage » pour la certification 1Z0-808.

@@ -1,0 +1,37 @@
+id: oracledb19cadministration-l-privileges-et-roles
+trackId: oracle-db-19c-administration
+unitId: oracledb19cadministration-u-storage-users
+domainId: storage-users
+title: "Privilèges et rôles"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-privileges-et-roles
+    body: |
+      Dans l'examen 1Z0-082, « Privilèges et rôles » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-privileges-et-roles
+    title: "Privilèges et rôles"
+    body: |
+      Rôles et privilèges contrôlent les permissions ; le moindre privilège protège.
+  - type: check
+    conceptId: c-privileges-et-roles
+    check:
+      id: oracledb19cadministration-l-privileges-et-roles-check-1
+      conceptId: c-privileges-et-roles
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel objet regroupe des privilèges réutilisables ?
+      options:
+        - { id: a, label: "Rôle" }
+        - { id: b, label: "Synonyme" }
+        - { id: c, label: "Séquence" }
+        - { id: d, label: "Vue" }
+      correct: [a]
+      explanation: |
+        Un rôle agrège des privilèges accordables.
+  - type: recap
+    conceptId: c-privileges-et-roles
+    body: |
+      Retenez l'essentiel de « Privilèges et rôles » pour la certification 1Z0-082.

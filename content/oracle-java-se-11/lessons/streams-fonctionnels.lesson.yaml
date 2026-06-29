@@ -1,0 +1,37 @@
+id: oraclejavase11-l-streams-fonctionnels
+trackId: oracle-java-se-11
+unitId: oraclejavase11-u-lambdas-streams
+domainId: lambdas-streams
+title: "Streams fonctionnels"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-streams-fonctionnels
+    body: |
+      Dans l'examen 1Z0-819, « Streams fonctionnels » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-streams-fonctionnels
+    title: "Streams fonctionnels"
+    body: |
+      Les streams traitent des collections de façon déclarative avec map/filter/collect.
+  - type: check
+    conceptId: c-streams-fonctionnels
+    check:
+      id: oraclejavase11-l-streams-fonctionnels-check-1
+      conceptId: c-streams-fonctionnels
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle opération transforme chaque élément d'un stream ?
+      options:
+        - { id: a, label: "map" }
+        - { id: b, label: "forEach" }
+        - { id: c, label: "sort" }
+        - { id: d, label: "close" }
+      correct: [a]
+      explanation: |
+        map applique une fonction à chaque élément.
+  - type: recap
+    conceptId: c-streams-fonctionnels
+    body: |
+      Retenez l'essentiel de « Streams fonctionnels » pour la certification 1Z0-819.

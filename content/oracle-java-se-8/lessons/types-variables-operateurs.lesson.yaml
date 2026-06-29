@@ -1,0 +1,37 @@
+id: oraclejavase8-l-types-variables-operateurs
+trackId: oracle-java-se-8
+unitId: oraclejavase8-u-basics
+domainId: basics
+title: "Types, variables, opérateurs"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-types-variables-operateurs
+    body: |
+      Dans l'examen 1Z0-808, « Types, variables, opérateurs » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-types-variables-operateurs
+    title: "Types, variables, opérateurs"
+    body: |
+      Java est fortement typé : primitifs vs objets, portée et opérateurs régissent les calculs.
+  - type: check
+    conceptId: c-types-variables-operateurs
+    check:
+      id: oraclejavase8-l-types-variables-operateurs-check-1
+      conceptId: c-types-variables-operateurs
+      type: mcq
+      difficulty: 1
+      stem: |
+        Lequel est un type primitif Java ?
+      options:
+        - { id: a, label: "int" }
+        - { id: b, label: "String" }
+        - { id: c, label: "List" }
+        - { id: d, label: "Map" }
+      correct: [a]
+      explanation: |
+        int est un primitif ; String/List/Map sont des objets.
+  - type: recap
+    conceptId: c-types-variables-operateurs
+    body: |
+      Retenez l'essentiel de « Types, variables, opérateurs » pour la certification 1Z0-808.

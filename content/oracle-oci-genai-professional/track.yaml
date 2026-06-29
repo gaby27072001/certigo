@@ -1,0 +1,38 @@
+# Oracle Cloud Infrastructure Generative AI Professional — oracle certification track.
+# Domain weights mirror the official 1Z0-1127-24 skills outline and sum to 1.0.
+id: oracle-oci-genai-professional
+code: "1Z0-1127-24"
+provider: oracle
+title: "Oracle Cloud Infrastructure Generative AI Professional"
+level: professional
+examCode: "1Z0-1127-24"
+sourceUrl: "https://education.oracle.com/oracle-cloud-infrastructure-2024-generative-ai-professional/pexam_1Z0-1127-24"
+summary: |
+  Valide la conception de solutions de Generative AI sur OCI : LLM, prompt engineering, RAG, embeddings et déploiement. Pour ingénieurs IA.
+domains:
+  - id: llm-fundamentals
+    name: "Fondations des LLM"
+    weight: 0.3
+  - id: oci-genai-service
+    name: "Service OCI Generative AI"
+    weight: 0.4
+  - id: deployment
+    name: "Déploiement et sécurité"
+    weight: 0.3
+units:
+  - id: oracleocigenaiprofessional-u-llm-fundamentals
+    domainId: llm-fundamentals
+    title: "Fondations des LLM"
+    lessons:
+      - oracleocigenaiprofessional-l-architecture-des-llm
+  - id: oracleocigenaiprofessional-u-oci-genai-service
+    domainId: oci-genai-service
+    title: "Service OCI Generative AI"
+    lessons:
+      - oracleocigenaiprofessional-l-modeles-et-fine-tuning
+      - oracleocigenaiprofessional-l-rag-et-embeddings
+  - id: oracleocigenaiprofessional-u-deployment
+    domainId: deployment
+    title: "Déploiement et sécurité"
+    lessons:
+      - oracleocigenaiprofessional-l-endpoints-dedies

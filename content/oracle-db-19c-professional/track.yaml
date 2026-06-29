@@ -1,0 +1,38 @@
+# Oracle Database Administration II (19c) — oracle certification track.
+# Domain weights mirror the official 1Z0-083 skills outline and sum to 1.0.
+id: oracle-db-19c-professional
+code: "1Z0-083"
+provider: oracle
+title: "Oracle Database Administration II (19c)"
+level: professional
+examCode: "1Z0-083"
+sourceUrl: "https://education.oracle.com/oracle-database-administration-ii/pexam_1Z0-083"
+summary: |
+  Valide l'administration avancée 19c : multitenant, reprise, patch, performance et Data Guard. Pour DBA confirmés.
+domains:
+  - id: multitenant
+    name: "Multitenant"
+    weight: 0.3
+  - id: recovery
+    name: "Reprise et patch"
+    weight: 0.4
+  - id: performance
+    name: "Performance"
+    weight: 0.3
+units:
+  - id: oracledb19cprofessional-u-multitenant
+    domainId: multitenant
+    title: "Multitenant"
+    lessons:
+      - oracledb19cprofessional-l-cdb-et-pdb
+  - id: oracledb19cprofessional-u-recovery
+    domainId: recovery
+    title: "Reprise et patch"
+    lessons:
+      - oracledb19cprofessional-l-rman-avance
+      - oracledb19cprofessional-l-data-guard
+  - id: oracledb19cprofessional-u-performance
+    domainId: performance
+    title: "Performance"
+    lessons:
+      - oracledb19cprofessional-l-awr-et-tuning

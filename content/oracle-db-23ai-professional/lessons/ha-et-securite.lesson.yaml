@@ -1,0 +1,37 @@
+id: oracledb23aiprofessional-l-ha-et-securite
+trackId: oracle-db-23ai-professional
+unitId: oracledb23aiprofessional-u-availability
+domainId: availability
+title: "HA et sécurité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-ha-et-securite
+    body: |
+      Dans l'examen 1Z0-915-1, « HA et sécurité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-ha-et-securite
+    title: "HA et sécurité"
+    body: |
+      True Cache, sharding et chiffrement renforcent disponibilité et sécurité.
+  - type: check
+    conceptId: c-ha-et-securite
+    check:
+      id: oracledb23aiprofessional-l-ha-et-securite-check-1
+      conceptId: c-ha-et-securite
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle option distribue la base sur plusieurs nœuds ?
+      options:
+        - { id: a, label: "Sharding" }
+        - { id: b, label: "Vue" }
+        - { id: c, label: "Trigger" }
+        - { id: d, label: "Synonyme" }
+      correct: [a]
+      explanation: |
+        Le sharding répartit les données horizontalement.
+  - type: recap
+    conceptId: c-ha-et-securite
+    body: |
+      Retenez l'essentiel de « HA et sécurité » pour la certification 1Z0-915-1.

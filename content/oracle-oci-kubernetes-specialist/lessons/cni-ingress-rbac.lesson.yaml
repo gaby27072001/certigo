@@ -1,0 +1,37 @@
+id: oracleocikubernetesspecialist-l-cni-ingress-rbac
+trackId: oracle-oci-kubernetes-specialist
+unitId: oracleocikubernetesspecialist-u-networking-sec
+domainId: networking-sec
+title: "CNI, ingress, RBAC"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-cni-ingress-rbac
+    body: |
+      Dans l'examen 1Z0-1118, « CNI, ingress, RBAC » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-cni-ingress-rbac
+    title: "CNI, ingress, RBAC"
+    body: |
+      Le réseau VCN-native, l'ingress et le RBAC sécurisent l'accès aux services.
+  - type: check
+    conceptId: c-cni-ingress-rbac
+    check:
+      id: oracleocikubernetesspecialist-l-cni-ingress-rbac-check-1
+      conceptId: c-cni-ingress-rbac
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel mécanisme limite les droits dans le cluster ?
+      options:
+        - { id: a, label: "RBAC" }
+        - { id: b, label: "NAT" }
+        - { id: c, label: "KMS" }
+        - { id: d, label: "DNS" }
+      correct: [a]
+      explanation: |
+        RBAC contrôle les permissions Kubernetes.
+  - type: recap
+    conceptId: c-cni-ingress-rbac
+    body: |
+      Retenez l'essentiel de « CNI, ingress, RBAC » pour la certification 1Z0-1118.

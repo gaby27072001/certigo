@@ -1,0 +1,37 @@
+id: oracleociarchitectprofessional-l-kms-waf-cloud-guard
+trackId: oracle-oci-architect-professional
+unitId: oracleociarchitectprofessional-u-security-pro
+domainId: security-pro
+title: "KMS, WAF, Cloud Guard"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-kms-waf-cloud-guard
+    body: |
+      Dans l'examen 1Z0-997-24, « KMS, WAF, Cloud Guard » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-kms-waf-cloud-guard
+    title: "KMS, WAF, Cloud Guard"
+    body: |
+      Le chiffrement KMS, le WAF et Cloud Guard renforcent la posture de sécurité et automatisent la détection.
+  - type: check
+    conceptId: c-kms-waf-cloud-guard
+    check:
+      id: oracleociarchitectprofessional-l-kms-waf-cloud-guard-check-1
+      conceptId: c-kms-waf-cloud-guard
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service détecte et corrige les risques de sécurité ?
+      options:
+        - { id: a, label: "Cloud Guard" }
+        - { id: b, label: "NAT" }
+        - { id: c, label: "DRG" }
+        - { id: d, label: "OKE" }
+      correct: [a]
+      explanation: |
+        Cloud Guard surveille et remédie aux menaces de configuration.
+  - type: recap
+    conceptId: c-kms-waf-cloud-guard
+    body: |
+      Retenez l'essentiel de « KMS, WAF, Cloud Guard » pour la certification 1Z0-997-24.

@@ -1,0 +1,37 @@
+id: oraclejavase11-l-threads-et-executeurs
+trackId: oracle-java-se-11
+unitId: oraclejavase11-u-concurrency
+domainId: concurrency
+title: "Threads et exécuteurs"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-threads-et-executeurs
+    body: |
+      Dans l'examen 1Z0-819, « Threads et exécuteurs » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-threads-et-executeurs
+    title: "Threads et exécuteurs"
+    body: |
+      ExecutorService gère des pools de threads ; les collections concurrentes évitent les conditions de course.
+  - type: check
+    conceptId: c-threads-et-executeurs
+    check:
+      id: oraclejavase11-l-threads-et-executeurs-check-1
+      conceptId: c-threads-et-executeurs
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service gère un pool de threads ?
+      options:
+        - { id: a, label: "ExecutorService" }
+        - { id: b, label: "ArrayList" }
+        - { id: c, label: "String" }
+        - { id: d, label: "File" }
+      correct: [a]
+      explanation: |
+        ExecutorService planifie des tâches concurrentes.
+  - type: recap
+    conceptId: c-threads-et-executeurs
+    body: |
+      Retenez l'essentiel de « Threads et exécuteurs » pour la certification 1Z0-819.

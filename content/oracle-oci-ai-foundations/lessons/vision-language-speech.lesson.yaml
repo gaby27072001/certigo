@@ -1,0 +1,37 @@
+id: oracleociaifoundations-l-vision-language-speech
+trackId: oracle-oci-ai-foundations
+unitId: oracleociaifoundations-u-oci-ai-services
+domainId: oci-ai-services
+title: "Vision, Language, Speech"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-vision-language-speech
+    body: |
+      Dans l'examen 1Z0-1122-24, « Vision, Language, Speech » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-vision-language-speech
+    title: "Vision, Language, Speech"
+    body: |
+      OCI propose des services pré-entraînés pour vision, langage, parole et documents, consommables par API.
+  - type: check
+    conceptId: c-vision-language-speech
+    check:
+      id: oracleociaifoundations-l-vision-language-speech-check-1
+      conceptId: c-vision-language-speech
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service OCI analyse du texte (sentiment, entités) ?
+      options:
+        - { id: a, label: "Language" }
+        - { id: b, label: "Vision" }
+        - { id: c, label: "Streaming" }
+        - { id: d, label: "Functions" }
+      correct: [a]
+      explanation: |
+        OCI Language fournit sentiment, entités et traduction.
+  - type: recap
+    conceptId: c-vision-language-speech
+    body: |
+      Retenez l'essentiel de « Vision, Language, Speech » pour la certification 1Z0-1122-24.

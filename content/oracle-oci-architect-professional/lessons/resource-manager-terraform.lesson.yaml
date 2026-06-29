@@ -1,0 +1,37 @@
+id: oracleociarchitectprofessional-l-resource-manager-terraform
+trackId: oracle-oci-architect-professional
+unitId: oracleociarchitectprofessional-u-automation
+domainId: automation
+title: "Resource Manager (Terraform)"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-resource-manager-terraform
+    body: |
+      Dans l'examen 1Z0-997-24, « Resource Manager (Terraform) » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-resource-manager-terraform
+    title: "Resource Manager (Terraform)"
+    body: |
+      Resource Manager exécute Terraform pour provisionner l'infrastructure de manière reproductible.
+  - type: check
+    conceptId: c-resource-manager-terraform
+    check:
+      id: oracleociarchitectprofessional-l-resource-manager-terraform-check-1
+      conceptId: c-resource-manager-terraform
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel outil OCI applique l'IaC via Terraform ?
+      options:
+        - { id: a, label: "Resource Manager" }
+        - { id: b, label: "Cloud Shell" }
+        - { id: c, label: "Object Storage" }
+        - { id: d, label: "IAM" }
+      correct: [a]
+      explanation: |
+        Resource Manager orchestre des stacks Terraform.
+  - type: recap
+    conceptId: c-resource-manager-terraform
+    body: |
+      Retenez l'essentiel de « Resource Manager (Terraform) » pour la certification 1Z0-997-24.

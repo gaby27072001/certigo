@@ -1,0 +1,37 @@
+id: oracleocikubernetesspecialist-l-deployments-et-hpa
+trackId: oracle-oci-kubernetes-specialist
+unitId: oracleocikubernetesspecialist-u-workloads
+domainId: workloads
+title: "Deployments et HPA"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-deployments-et-hpa
+    body: |
+      Dans l'examen 1Z0-1118, « Deployments et HPA » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-deployments-et-hpa
+    title: "Deployments et HPA"
+    body: |
+      Deployments et HPA orchestrent et mettent à l'échelle les pods selon la charge.
+  - type: check
+    conceptId: c-deployments-et-hpa
+    check:
+      id: oracleocikubernetesspecialist-l-deployments-et-hpa-check-1
+      conceptId: c-deployments-et-hpa
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel objet ajuste les pods selon le CPU ?
+      options:
+        - { id: a, label: "HPA" }
+        - { id: b, label: "NAT" }
+        - { id: c, label: "PV" }
+        - { id: d, label: "NSG" }
+      correct: [a]
+      explanation: |
+        Le Horizontal Pod Autoscaler scale les pods.
+  - type: recap
+    conceptId: c-deployments-et-hpa
+    body: |
+      Retenez l'essentiel de « Deployments et HPA » pour la certification 1Z0-1118.

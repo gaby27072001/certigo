@@ -1,0 +1,45 @@
+# OCI Container Engine for Kubernetes Specialist — oracle certification track.
+# Domain weights mirror the official 1Z0-1118 skills outline and sum to 1.0.
+id: oracle-oci-kubernetes-specialist
+code: "1Z0-1118"
+provider: oracle
+title: "OCI Container Engine for Kubernetes Specialist"
+level: specialty
+examCode: "1Z0-1118"
+sourceUrl: "https://education.oracle.com/oci-container-engine-for-kubernetes-specialist/pexam_1Z0-1118"
+summary: |
+  Valide l'expertise OKE : déploiement, mise à l'échelle, réseau, sécurité et observabilité de Kubernetes sur OCI. Pour spécialistes conteneurs.
+domains:
+  - id: cluster-ops
+    name: "Clusters et nœuds"
+    weight: 0.3
+  - id: workloads
+    name: "Workloads et scaling"
+    weight: 0.25
+  - id: networking-sec
+    name: "Réseau et sécurité"
+    weight: 0.25
+  - id: observability
+    name: "Observabilité"
+    weight: 0.2
+units:
+  - id: oracleocikubernetesspecialist-u-cluster-ops
+    domainId: cluster-ops
+    title: "Clusters et nœuds"
+    lessons:
+      - oracleocikubernetesspecialist-l-node-pools-et-upgrades
+  - id: oracleocikubernetesspecialist-u-workloads
+    domainId: workloads
+    title: "Workloads et scaling"
+    lessons:
+      - oracleocikubernetesspecialist-l-deployments-et-hpa
+  - id: oracleocikubernetesspecialist-u-networking-sec
+    domainId: networking-sec
+    title: "Réseau et sécurité"
+    lessons:
+      - oracleocikubernetesspecialist-l-cni-ingress-rbac
+  - id: oracleocikubernetesspecialist-u-observability
+    domainId: observability
+    title: "Observabilité"
+    lessons:
+      - oracleocikubernetesspecialist-l-logging-et-monitoring

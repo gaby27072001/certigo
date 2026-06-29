@@ -1,0 +1,37 @@
+id: oracleociaifoundations-l-ia-ml-et-deep-learning
+trackId: oracle-oci-ai-foundations
+unitId: oracleociaifoundations-u-ai-ml-basics
+domainId: ai-ml-basics
+title: "IA, ML et deep learning"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-ia-ml-et-deep-learning
+    body: |
+      Dans l'examen 1Z0-1122-24, « IA, ML et deep learning » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-ia-ml-et-deep-learning
+    title: "IA, ML et deep learning"
+    body: |
+      L'IA simule l'intelligence, le ML apprend des données, le deep learning utilise des réseaux profonds. Ces couches s'emboîtent.
+  - type: check
+    conceptId: c-ia-ml-et-deep-learning
+    check:
+      id: oracleociaifoundations-l-ia-ml-et-deep-learning-check-1
+      conceptId: c-ia-ml-et-deep-learning
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle approche apprend automatiquement à partir de données ?
+      options:
+        - { id: a, label: "Machine learning" }
+        - { id: b, label: "Programmation impérative" }
+        - { id: c, label: "Tableur" }
+        - { id: d, label: "DNS" }
+      correct: [a]
+      explanation: |
+        Le ML déduit des modèles depuis les données sans règles explicites.
+  - type: recap
+    conceptId: c-ia-ml-et-deep-learning
+    body: |
+      Retenez l'essentiel de « IA, ML et deep learning » pour la certification 1Z0-1122-24.

@@ -1,0 +1,37 @@
+id: oraclemysqldba-l-index-et-explain
+trackId: oracle-mysql-dba
+unitId: oraclemysqldba-u-performance
+domainId: performance
+title: "Index et EXPLAIN"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-index-et-explain
+    body: |
+      Dans l'examen 1Z0-908, « Index et EXPLAIN » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-index-et-explain
+    title: "Index et EXPLAIN"
+    body: |
+      Index et EXPLAIN optimisent les requêtes ; InnoDB gère transactions.
+  - type: check
+    conceptId: c-index-et-explain
+    check:
+      id: oraclemysqldba-l-index-et-explain-check-1
+      conceptId: c-index-et-explain
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel outil montre le plan d'exécution ?
+      options:
+        - { id: a, label: "EXPLAIN" }
+        - { id: b, label: "SHOW" }
+        - { id: c, label: "USE" }
+        - { id: d, label: "GRANT" }
+      correct: [a]
+      explanation: |
+        EXPLAIN révèle le plan d'une requête.
+  - type: recap
+    conceptId: c-index-et-explain
+    body: |
+      Retenez l'essentiel de « Index et EXPLAIN » pour la certification 1Z0-908.

@@ -1,0 +1,37 @@
+id: oracleocisecurityprofessional-l-federation-et-mfa
+trackId: oracle-oci-security-professional
+unitId: oracleocisecurityprofessional-u-iam-advanced
+domainId: iam-advanced
+title: "Fédération et MFA"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-federation-et-mfa
+    body: |
+      Dans l'examen 1Z0-1104-24, « Fédération et MFA » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-federation-et-mfa
+    title: "Fédération et MFA"
+    body: |
+      La fédération SSO, le MFA et les politiques granulaires durcissent l'accès. Le moindre privilège est la règle.
+  - type: check
+    conceptId: c-federation-et-mfa
+    check:
+      id: oracleocisecurityprofessional-l-federation-et-mfa-check-1
+      conceptId: c-federation-et-mfa
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel contrôle ajoute un second facteur d'authentification ?
+      options:
+        - { id: a, label: "MFA" }
+        - { id: b, label: "NAT" }
+        - { id: c, label: "KMS" }
+        - { id: d, label: "DNS" }
+      correct: [a]
+      explanation: |
+        Le MFA exige un facteur additionnel à l'accès.
+  - type: recap
+    conceptId: c-federation-et-mfa
+    body: |
+      Retenez l'essentiel de « Fédération et MFA » pour la certification 1Z0-1104-24.

@@ -1,0 +1,37 @@
+id: oracleociarchitectprofessional-l-ha-multi-ad-et-dr
+trackId: oracle-oci-architect-professional
+unitId: oracleociarchitectprofessional-u-ha-dr
+domainId: ha-dr
+title: "HA multi-AD et DR"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-ha-multi-ad-et-dr
+    body: |
+      Dans l'examen 1Z0-997-24, « HA multi-AD et DR » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-ha-multi-ad-et-dr
+    title: "HA multi-AD et DR"
+    body: |
+      La résilience repose sur plusieurs domaines de disponibilité, la réplication inter-régions et des plans de reprise éprouvés.
+  - type: check
+    conceptId: c-ha-multi-ad-et-dr
+    check:
+      id: oracleociarchitectprofessional-l-ha-multi-ad-et-dr-check-1
+      conceptId: c-ha-multi-ad-et-dr
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle stratégie protège contre la perte d'une région ?
+      options:
+        - { id: a, label: "Réplication inter-régions" }
+        - { id: b, label: "AD unique" }
+        - { id: c, label: "Volume local" }
+        - { id: d, label: "Snapshot manuel" }
+      correct: [a]
+      explanation: |
+        La réplication inter-régions assure la reprise en cas de sinistre régional.
+  - type: recap
+    conceptId: c-ha-multi-ad-et-dr
+    body: |
+      Retenez l'essentiel de « HA multi-AD et DR » pour la certification 1Z0-997-24.

@@ -1,0 +1,37 @@
+id: oracleocifoundations-l-modeles-de-service-et-deploiement
+trackId: oracle-oci-foundations
+unitId: oracleocifoundations-u-cloud-concepts
+domainId: cloud-concepts
+title: "Modèles de service et déploiement"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-modeles-de-service-et-deploiement
+    body: |
+      Dans l'examen 1Z0-1085-24, « Modèles de service et déploiement » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-modeles-de-service-et-deploiement
+    title: "Modèles de service et déploiement"
+    body: |
+      IaaS, PaaS et SaaS définissent le niveau de responsabilité partagée. OCI fournit principalement de l'IaaS et du PaaS avec une facturation à l'usage.
+  - type: check
+    conceptId: c-modeles-de-service-et-deploiement
+    check:
+      id: oracleocifoundations-l-modeles-de-service-et-deploiement-check-1
+      conceptId: c-modeles-de-service-et-deploiement
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel modèle fournit des machines virtuelles et du stockage à la demande ?
+      options:
+        - { id: a, label: "IaaS" }
+        - { id: b, label: "SaaS" }
+        - { id: c, label: "CaaS" }
+        - { id: d, label: "FaaS" }
+      correct: [a]
+      explanation: |
+        IaaS fournit l'infrastructure (calcul, stockage, réseau) à la demande.
+  - type: recap
+    conceptId: c-modeles-de-service-et-deploiement
+    body: |
+      Retenez l'essentiel de « Modèles de service et déploiement » pour la certification 1Z0-1085-24.

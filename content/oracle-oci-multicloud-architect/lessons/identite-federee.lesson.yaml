@@ -1,0 +1,37 @@
+id: oracleocimulticloudarchitect-l-identite-federee
+trackId: oracle-oci-multicloud-architect
+unitId: oracleocimulticloudarchitect-u-interconnect
+domainId: interconnect
+title: "Identité fédérée"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-identite-federee
+    body: |
+      Dans l'examen 1Z0-1151-1, « Identité fédérée » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-identite-federee
+    title: "Identité fédérée"
+    body: |
+      La fédération unifie l'identité entre OCI et Azure pour un SSO cohérent.
+  - type: check
+    conceptId: c-identite-federee
+    check:
+      id: oracleocimulticloudarchitect-l-identite-federee-check-1
+      conceptId: c-identite-federee
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que simplifie la fédération d'identité ?
+      options:
+        - { id: a, label: "SSO multicloud" }
+        - { id: b, label: "Stockage" }
+        - { id: c, label: "DNS" }
+        - { id: d, label: "Quotas" }
+      correct: [a]
+      explanation: |
+        La fédération offre un SSO entre les clouds.
+  - type: recap
+    conceptId: c-identite-federee
+    body: |
+      Retenez l'essentiel de « Identité fédérée » pour la certification 1Z0-1151-1.

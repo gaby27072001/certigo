@@ -1,0 +1,37 @@
+id: oraclejavase17-l-records-et-sealed
+trackId: oracle-java-se-17
+unitId: oraclejavase17-u-modern-language
+domainId: modern-language
+title: "Records et sealed"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-records-et-sealed
+    body: |
+      Dans l'examen 1Z0-829, « Records et sealed » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-records-et-sealed
+    title: "Records et sealed"
+    body: |
+      Records offrent des porteurs de données immuables ; sealed restreint l'héritage.
+  - type: check
+    conceptId: c-records-et-sealed
+    check:
+      id: oraclejavase17-l-records-et-sealed-check-1
+      conceptId: c-records-et-sealed
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle construction crée un type de données immuable concis ?
+      options:
+        - { id: a, label: "record" }
+        - { id: b, label: "enum" }
+        - { id: c, label: "interface" }
+        - { id: d, label: "abstract" }
+      correct: [a]
+      explanation: |
+        record génère un type immuable compact.
+  - type: recap
+    conceptId: c-records-et-sealed
+    body: |
+      Retenez l'essentiel de « Records et sealed » pour la certification 1Z0-829.

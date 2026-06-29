@@ -1,0 +1,38 @@
+# OCI Multicloud Architect Associate — oracle certification track.
+# Domain weights mirror the official 1Z0-1151-1 skills outline and sum to 1.0.
+id: oracle-oci-multicloud-architect
+code: "1Z0-1151-1"
+provider: oracle
+title: "OCI Multicloud Architect Associate"
+level: associate
+examCode: "1Z0-1151-1"
+sourceUrl: "https://education.oracle.com/oci-multicloud-architect-associate/pexam_1Z0-1151-1"
+summary: |
+  Valide la conception multicloud avec OCI : interconnexion Azure/Google, Oracle Database@Azure, gouvernance et réseau. Pour architectes hybrides.
+domains:
+  - id: multicloud-concepts
+    name: "Concepts multicloud"
+    weight: 0.3
+  - id: interconnect
+    name: "Interconnexion réseau"
+    weight: 0.4
+  - id: governance
+    name: "Gouvernance"
+    weight: 0.3
+units:
+  - id: oracleocimulticloudarchitect-u-multicloud-concepts
+    domainId: multicloud-concepts
+    title: "Concepts multicloud"
+    lessons:
+      - oracleocimulticloudarchitect-l-partenariats-oracle
+  - id: oracleocimulticloudarchitect-u-interconnect
+    domainId: interconnect
+    title: "Interconnexion réseau"
+    lessons:
+      - oracleocimulticloudarchitect-l-cross-cloud-peering
+      - oracleocimulticloudarchitect-l-identite-federee
+  - id: oracleocimulticloudarchitect-u-governance
+    domainId: governance
+    title: "Gouvernance"
+    lessons:
+      - oracleocimulticloudarchitect-l-couts-et-conformite

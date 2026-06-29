@@ -1,0 +1,37 @@
+id: oracleociarchitectassociate-l-db-systems-et-autonomous
+trackId: oracle-oci-architect-associate
+unitId: oracleociarchitectassociate-u-databases
+domainId: databases
+title: "DB Systems et Autonomous"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-db-systems-et-autonomous
+    body: |
+      Dans l'examen 1Z0-1072-24, « DB Systems et Autonomous » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-db-systems-et-autonomous
+    title: "DB Systems et Autonomous"
+    body: |
+      OCI offre DB Systems managés et Autonomous Database, avec sauvegardes et haute disponibilité intégrées.
+  - type: check
+    conceptId: c-db-systems-et-autonomous
+    check:
+      id: oracleociarchitectassociate-l-db-systems-et-autonomous-check-1
+      conceptId: c-db-systems-et-autonomous
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle option exige le moins d'administration ?
+      options:
+        - { id: a, label: "Autonomous Database" }
+        - { id: b, label: "Bare metal DB" }
+        - { id: c, label: "VM auto-gérée" }
+        - { id: d, label: "On-premise" }
+      correct: [a]
+      explanation: |
+        L'Autonomous Database automatise l'administration.
+  - type: recap
+    conceptId: c-db-systems-et-autonomous
+    body: |
+      Retenez l'essentiel de « DB Systems et Autonomous » pour la certification 1Z0-1072-24.

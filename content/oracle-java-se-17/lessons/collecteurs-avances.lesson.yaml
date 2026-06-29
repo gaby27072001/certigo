@@ -1,0 +1,37 @@
+id: oraclejavase17-l-collecteurs-avances
+trackId: oracle-java-se-17
+unitId: oraclejavase17-u-streams-api
+domainId: streams-api
+title: "Collecteurs avancés"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-collecteurs-avances
+    body: |
+      Dans l'examen 1Z0-829, « Collecteurs avancés » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-collecteurs-avances
+    title: "Collecteurs avancés"
+    body: |
+      Collectors.groupingBy et flatMap composent des transformations puissantes.
+  - type: check
+    conceptId: c-collecteurs-avances
+    check:
+      id: oraclejavase17-l-collecteurs-avances-check-1
+      conceptId: c-collecteurs-avances
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle méthode aplatit des streams imbriqués ?
+      options:
+        - { id: a, label: "flatMap" }
+        - { id: b, label: "peek" }
+        - { id: c, label: "limit" }
+        - { id: d, label: "skip" }
+      correct: [a]
+      explanation: |
+        flatMap fusionne des streams imbriqués.
+  - type: recap
+    conceptId: c-collecteurs-avances
+    body: |
+      Retenez l'essentiel de « Collecteurs avancés » pour la certification 1Z0-829.

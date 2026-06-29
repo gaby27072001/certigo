@@ -1,0 +1,37 @@
+id: oracleautonomousdbspecialist-l-auto-scaling
+trackId: oracle-autonomous-db-specialist
+unitId: oracleautonomousdbspecialist-u-scaling
+domainId: scaling
+title: "Auto-scaling"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-auto-scaling
+    body: |
+      Dans l'examen 1Z0-931-1, « Auto-scaling » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-auto-scaling
+    title: "Auto-scaling"
+    body: |
+      Le scaling automatique ajuste CPU/stockage sans interruption.
+  - type: check
+    conceptId: c-auto-scaling
+    check:
+      id: oracleautonomousdbspecialist-l-auto-scaling-check-1
+      conceptId: c-auto-scaling
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle promesse d'Autonomous réduit l'effort ?
+      options:
+        - { id: a, label: "Auto-scaling" }
+        - { id: b, label: "Patch manuel" }
+        - { id: c, label: "Sans backup" }
+        - { id: d, label: "Mono-coeur" }
+      correct: [a]
+      explanation: |
+        L'auto-scaling adapte les ressources dynamiquement.
+  - type: recap
+    conceptId: c-auto-scaling
+    body: |
+      Retenez l'essentiel de « Auto-scaling » pour la certification 1Z0-931-1.

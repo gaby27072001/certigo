@@ -1,0 +1,46 @@
+# Oracle Cloud Infrastructure Foundations Associate — oracle certification track.
+# Domain weights mirror the official 1Z0-1085-24 skills outline and sum to 1.0.
+id: oracle-oci-foundations
+code: "1Z0-1085-24"
+provider: oracle
+title: "Oracle Cloud Infrastructure Foundations Associate"
+level: fundamentals
+examCode: "1Z0-1085-24"
+sourceUrl: "https://education.oracle.com/oracle-cloud-infrastructure-2024-foundations-associate/pexam_1Z0-1085-24"
+summary: |
+  Certification d'entrée OCI validant la compréhension des concepts cloud, des services cœur d'Oracle Cloud Infrastructure, de la sécurité, des prix et du support. Idéale pour débuter sur OCI.
+domains:
+  - id: cloud-concepts
+    name: "Concepts du cloud"
+    weight: 0.2
+  - id: core-services
+    name: "Services cœur OCI"
+    weight: 0.4
+  - id: security
+    name: "Sécurité"
+    weight: 0.2
+  - id: pricing-support
+    name: "Prix, facturation et support"
+    weight: 0.2
+units:
+  - id: oracleocifoundations-u-cloud-concepts
+    domainId: cloud-concepts
+    title: "Concepts du cloud"
+    lessons:
+      - oracleocifoundations-l-modeles-de-service-et-deploiement
+  - id: oracleocifoundations-u-core-services
+    domainId: core-services
+    title: "Services cœur OCI"
+    lessons:
+      - oracleocifoundations-l-compute-storage-networking
+      - oracleocifoundations-l-base-de-donnees-autonome
+  - id: oracleocifoundations-u-security
+    domainId: security
+    title: "Sécurité"
+    lessons:
+      - oracleocifoundations-l-iam-et-responsabilite-partagee
+  - id: oracleocifoundations-u-pricing-support
+    domainId: pricing-support
+    title: "Prix, facturation et support"
+    lessons:
+      - oracleocifoundations-l-modeles-de-couts

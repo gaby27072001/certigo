@@ -1,0 +1,37 @@
+id: oracleocikubernetesspecialist-l-logging-et-monitoring
+trackId: oracle-oci-kubernetes-specialist
+unitId: oracleocikubernetesspecialist-u-observability
+domainId: observability
+title: "Logging et monitoring"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-logging-et-monitoring
+    body: |
+      Dans l'examen 1Z0-1118, « Logging et monitoring » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-logging-et-monitoring
+    title: "Logging et monitoring"
+    body: |
+      Logging, Monitoring et metrics serveur assurent le suivi et le dépannage.
+  - type: check
+    conceptId: c-logging-et-monitoring
+    check:
+      id: oracleocikubernetesspecialist-l-logging-et-monitoring-check-1
+      conceptId: c-logging-et-monitoring
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service collecte les métriques OKE ?
+      options:
+        - { id: a, label: "Monitoring" }
+        - { id: b, label: "WAF" }
+        - { id: c, label: "OCIR" }
+        - { id: d, label: "DRG" }
+      correct: [a]
+      explanation: |
+        Monitoring agrège métriques et alertes.
+  - type: recap
+    conceptId: c-logging-et-monitoring
+    body: |
+      Retenez l'essentiel de « Logging et monitoring » pour la certification 1Z0-1118.

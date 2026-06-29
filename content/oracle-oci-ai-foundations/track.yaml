@@ -1,0 +1,38 @@
+# Oracle Cloud Infrastructure AI Foundations Associate — oracle certification track.
+# Domain weights mirror the official 1Z0-1122-24 skills outline and sum to 1.0.
+id: oracle-oci-ai-foundations
+code: "1Z0-1122-24"
+provider: oracle
+title: "Oracle Cloud Infrastructure AI Foundations Associate"
+level: fundamentals
+examCode: "1Z0-1122-24"
+sourceUrl: "https://education.oracle.com/oracle-cloud-infrastructure-2024-ai-foundations-associate/pexam_1Z0-1122-24"
+summary: |
+  Valide les fondations de l'IA, du machine learning et du deep learning ainsi que les services d'IA et la Generative AI d'OCI. Pour profils découvrant l'IA sur Oracle Cloud.
+domains:
+  - id: ai-ml-basics
+    name: "Fondations IA et ML"
+    weight: 0.35
+  - id: oci-ai-services
+    name: "Services IA OCI"
+    weight: 0.35
+  - id: genai
+    name: "Generative AI"
+    weight: 0.3
+units:
+  - id: oracleociaifoundations-u-ai-ml-basics
+    domainId: ai-ml-basics
+    title: "Fondations IA et ML"
+    lessons:
+      - oracleociaifoundations-l-ia-ml-et-deep-learning
+      - oracleociaifoundations-l-apprentissage-supervise
+  - id: oracleociaifoundations-u-oci-ai-services
+    domainId: oci-ai-services
+    title: "Services IA OCI"
+    lessons:
+      - oracleociaifoundations-l-vision-language-speech
+  - id: oracleociaifoundations-u-genai
+    domainId: genai
+    title: "Generative AI"
+    lessons:
+      - oracleociaifoundations-l-llm-et-oci-generative-ai

@@ -1,0 +1,37 @@
+id: oracledbfoundations-l-insert-update-delete
+trackId: oracle-db-foundations
+unitId: oracledbfoundations-u-dml
+domainId: dml
+title: "INSERT/UPDATE/DELETE"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-insert-update-delete
+    body: |
+      Dans l'examen 1Z0-006, « INSERT/UPDATE/DELETE » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-insert-update-delete
+    title: "INSERT/UPDATE/DELETE"
+    body: |
+      Le DML modifie les données ; COMMIT valide, ROLLBACK annule.
+  - type: check
+    conceptId: c-insert-update-delete
+    check:
+      id: oracledbfoundations-l-insert-update-delete-check-1
+      conceptId: c-insert-update-delete
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle commande valide une transaction ?
+      options:
+        - { id: a, label: "COMMIT" }
+        - { id: b, label: "SELECT" }
+        - { id: c, label: "GRANT" }
+        - { id: d, label: "CREATE" }
+      correct: [a]
+      explanation: |
+        COMMIT rend les changements permanents.
+  - type: recap
+    conceptId: c-insert-update-delete
+    body: |
+      Retenez l'essentiel de « INSERT/UPDATE/DELETE » pour la certification 1Z0-006.

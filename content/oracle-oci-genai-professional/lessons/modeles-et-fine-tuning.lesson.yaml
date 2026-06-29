@@ -1,0 +1,37 @@
+id: oracleocigenaiprofessional-l-modeles-et-fine-tuning
+trackId: oracle-oci-genai-professional
+unitId: oracleocigenaiprofessional-u-oci-genai-service
+domainId: oci-genai-service
+title: "Modèles et fine-tuning"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-modeles-et-fine-tuning
+    body: |
+      Dans l'examen 1Z0-1127-24, « Modèles et fine-tuning » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-modeles-et-fine-tuning
+    title: "Modèles et fine-tuning"
+    body: |
+      OCI Generative AI propose modèles managés, fine-tuning dédié et clusters d'inférence.
+  - type: check
+    conceptId: c-modeles-et-fine-tuning
+    check:
+      id: oracleocigenaiprofessional-l-modeles-et-fine-tuning-check-1
+      conceptId: c-modeles-et-fine-tuning
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle technique adapte un modèle à un domaine ?
+      options:
+        - { id: a, label: "Fine-tuning" }
+        - { id: b, label: "NAT" }
+        - { id: c, label: "Peering" }
+        - { id: d, label: "Snapshot" }
+      correct: [a]
+      explanation: |
+        Le fine-tuning spécialise un modèle sur des données métier.
+  - type: recap
+    conceptId: c-modeles-et-fine-tuning
+    body: |
+      Retenez l'essentiel de « Modèles et fine-tuning » pour la certification 1Z0-1127-24.

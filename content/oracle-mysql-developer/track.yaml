@@ -1,0 +1,37 @@
+# MySQL 8.0 Developer — oracle certification track.
+# Domain weights mirror the official 1Z0-919 skills outline and sum to 1.0.
+id: oracle-mysql-developer
+code: "1Z0-919"
+provider: oracle
+title: "MySQL 8.0 Developer"
+level: professional
+examCode: "1Z0-919"
+sourceUrl: "https://education.oracle.com/mysql/"
+summary: |
+  Valide le développement MySQL 8.0 : SQL avancé, procédures, JSON, transactions et optimisation. Pour développeurs base de données.
+domains:
+  - id: advanced-sql
+    name: "SQL avancé"
+    weight: 0.4
+  - id: procedures-json
+    name: "Procédures et JSON"
+    weight: 0.35
+  - id: transactions
+    name: "Transactions"
+    weight: 0.25
+units:
+  - id: oraclemysqldeveloper-u-advanced-sql
+    domainId: advanced-sql
+    title: "SQL avancé"
+    lessons:
+      - oraclemysqldeveloper-l-cte-et-fenetres
+  - id: oraclemysqldeveloper-u-procedures-json
+    domainId: procedures-json
+    title: "Procédures et JSON"
+    lessons:
+      - oraclemysqldeveloper-l-stored-routines
+  - id: oraclemysqldeveloper-u-transactions
+    domainId: transactions
+    title: "Transactions"
+    lessons:
+      - oraclemysqldeveloper-l-acid-et-isolation

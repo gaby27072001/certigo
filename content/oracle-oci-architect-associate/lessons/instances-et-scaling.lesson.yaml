@@ -1,0 +1,37 @@
+id: oracleociarchitectassociate-l-instances-et-scaling
+trackId: oracle-oci-architect-associate
+unitId: oracleociarchitectassociate-u-compute
+domainId: compute
+title: "Instances et scaling"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-instances-et-scaling
+    body: |
+      Dans l'examen 1Z0-1072-24, « Instances et scaling » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-instances-et-scaling
+    title: "Instances et scaling"
+    body: |
+      Compute propose VM et bare metal, images, scaling automatique et instance pools pour la haute disponibilité.
+  - type: check
+    conceptId: c-instances-et-scaling
+    check:
+      id: oracleociarchitectassociate-l-instances-et-scaling-check-1
+      conceptId: c-instances-et-scaling
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel mécanisme ajuste le nombre d'instances à la charge ?
+      options:
+        - { id: a, label: "Autoscaling" }
+        - { id: b, label: "NAT" }
+        - { id: c, label: "IAM" }
+        - { id: d, label: "KMS" }
+      correct: [a]
+      explanation: |
+        L'autoscaling adapte les pools d'instances à la demande.
+  - type: recap
+    conceptId: c-instances-et-scaling
+    body: |
+      Retenez l'essentiel de « Instances et scaling » pour la certification 1Z0-1072-24.

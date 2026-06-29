@@ -1,0 +1,37 @@
+id: oracledb19cadministration-l-rman
+trackId: oracle-db-19c-administration
+unitId: oracledb19cadministration-u-backup
+domainId: backup
+title: "RMAN"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-rman
+    body: |
+      Dans l'examen 1Z0-082, « RMAN » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-rman
+    title: "RMAN"
+    body: |
+      RMAN automatise sauvegardes et restaurations, base de la reprise.
+  - type: check
+    conceptId: c-rman
+    check:
+      id: oracledb19cadministration-l-rman-check-1
+      conceptId: c-rman
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel outil gère les sauvegardes Oracle ?
+      options:
+        - { id: a, label: "RMAN" }
+        - { id: b, label: "SQL*Plus seul" }
+        - { id: c, label: "DNS" }
+        - { id: d, label: "KMS" }
+      correct: [a]
+      explanation: |
+        RMAN orchestre backup et recovery.
+  - type: recap
+    conceptId: c-rman
+    body: |
+      Retenez l'essentiel de « RMAN » pour la certification 1Z0-082.

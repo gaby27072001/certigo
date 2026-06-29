@@ -1,0 +1,37 @@
+id: oracleautonomousdbspecialist-l-chiffrement-et-migration
+trackId: oracle-autonomous-db-specialist
+unitId: oracleautonomousdbspecialist-u-security
+domainId: security
+title: "Chiffrement et migration"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-chiffrement-et-migration
+    body: |
+      Dans l'examen 1Z0-931-1, « Chiffrement et migration » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-chiffrement-et-migration
+    title: "Chiffrement et migration"
+    body: |
+      Chiffrement par défaut et outils de migration sécurisent et facilitent le passage au cloud.
+  - type: check
+    conceptId: c-chiffrement-et-migration
+    check:
+      id: oracleautonomousdbspecialist-l-chiffrement-et-migration-check-1
+      conceptId: c-chiffrement-et-migration
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle protection est activée par défaut ?
+      options:
+        - { id: a, label: "Chiffrement" }
+        - { id: b, label: "Aucune" }
+        - { id: c, label: "IP publique" }
+        - { id: d, label: "Debug" }
+      correct: [a]
+      explanation: |
+        Autonomous chiffre données au repos et en transit.
+  - type: recap
+    conceptId: c-chiffrement-et-migration
+    body: |
+      Retenez l'essentiel de « Chiffrement et migration » pour la certification 1Z0-931-1.

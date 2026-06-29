@@ -1,0 +1,37 @@
+id: oracledb19cprofessional-l-awr-et-tuning
+trackId: oracle-db-19c-professional
+unitId: oracledb19cprofessional-u-performance
+domainId: performance
+title: "AWR et tuning"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-awr-et-tuning
+    body: |
+      Dans l'examen 1Z0-083, « AWR et tuning » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-awr-et-tuning
+    title: "AWR et tuning"
+    body: |
+      AWR et SQL tuning identifient et corrigent les goulots d'étranglement.
+  - type: check
+    conceptId: c-awr-et-tuning
+    check:
+      id: oracledb19cprofessional-l-awr-et-tuning-check-1
+      conceptId: c-awr-et-tuning
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel rapport diagnostique la performance ?
+      options:
+        - { id: a, label: "AWR" }
+        - { id: b, label: "WAF" }
+        - { id: c, label: "DNS" }
+        - { id: d, label: "NSG" }
+      correct: [a]
+      explanation: |
+        AWR fournit des snapshots de performance.
+  - type: recap
+    conceptId: c-awr-et-tuning
+    body: |
+      Retenez l'essentiel de « AWR et tuning » pour la certification 1Z0-083.

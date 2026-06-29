@@ -1,0 +1,37 @@
+id: oracleocigenaiprofessional-l-endpoints-dedies
+trackId: oracle-oci-genai-professional
+unitId: oracleocigenaiprofessional-u-deployment
+domainId: deployment
+title: "Endpoints dédiés"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-endpoints-dedies
+    body: |
+      Dans l'examen 1Z0-1127-24, « Endpoints dédiés » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-endpoints-dedies
+    title: "Endpoints dédiés"
+    body: |
+      Le déploiement sur clusters dédiés isole capacité et données ; IAM contrôle l'accès.
+  - type: check
+    conceptId: c-endpoints-dedies
+    check:
+      id: oracleocigenaiprofessional-l-endpoints-dedies-check-1
+      conceptId: c-endpoints-dedies
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel élément isole la capacité d'inférence ?
+      options:
+        - { id: a, label: "Cluster dédié" }
+        - { id: b, label: "NAT" }
+        - { id: c, label: "WAF" }
+        - { id: d, label: "DNS" }
+      correct: [a]
+      explanation: |
+        Un cluster dédié réserve la capacité d'inférence.
+  - type: recap
+    conceptId: c-endpoints-dedies
+    body: |
+      Retenez l'essentiel de « Endpoints dédiés » pour la certification 1Z0-1127-24.

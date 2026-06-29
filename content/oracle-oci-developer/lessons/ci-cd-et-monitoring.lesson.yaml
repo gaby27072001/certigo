@@ -1,0 +1,37 @@
+id: oracleocideveloper-l-ci-cd-et-monitoring
+trackId: oracle-oci-developer
+unitId: oracleocideveloper-u-devops
+domainId: devops
+title: "CI/CD et monitoring"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-ci-cd-et-monitoring
+    body: |
+      Dans l'examen 1Z0-1084-24, « CI/CD et monitoring » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-ci-cd-et-monitoring
+    title: "CI/CD et monitoring"
+    body: |
+      Le service DevOps automatise build/déploiement ; Monitoring et Logging assurent l'observabilité.
+  - type: check
+    conceptId: c-ci-cd-et-monitoring
+    check:
+      id: oracleocideveloper-l-ci-cd-et-monitoring-check-1
+      conceptId: c-ci-cd-et-monitoring
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service fournit pipelines CI/CD managés ?
+      options:
+        - { id: a, label: "DevOps" }
+        - { id: b, label: "OCIR seul" }
+        - { id: c, label: "VCN" }
+        - { id: d, label: "WAF" }
+      correct: [a]
+      explanation: |
+        DevOps OCI orchestre des pipelines de livraison.
+  - type: recap
+    conceptId: c-ci-cd-et-monitoring
+    body: |
+      Retenez l'essentiel de « CI/CD et monitoring » pour la certification 1Z0-1084-24.

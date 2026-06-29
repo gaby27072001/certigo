@@ -1,0 +1,45 @@
+# Oracle Cloud Infrastructure Security Professional — oracle certification track.
+# Domain weights mirror the official 1Z0-1104-24 skills outline and sum to 1.0.
+id: oracle-oci-security-professional
+code: "1Z0-1104-24"
+provider: oracle
+title: "Oracle Cloud Infrastructure Security Professional"
+level: professional
+examCode: "1Z0-1104-24"
+sourceUrl: "https://education.oracle.com/oracle-cloud-infrastructure-2024-security-professional/pexam_1Z0-1104-24"
+summary: |
+  Valide la sécurisation des charges OCI : IAM avancé, chiffrement, détection des menaces, conformité et protection réseau. Pour ingénieurs sécurité cloud.
+domains:
+  - id: iam-advanced
+    name: "IAM avancé"
+    weight: 0.25
+  - id: encryption
+    name: "Chiffrement et secrets"
+    weight: 0.25
+  - id: threat-detection
+    name: "Détection des menaces"
+    weight: 0.25
+  - id: network-protection
+    name: "Protection réseau"
+    weight: 0.25
+units:
+  - id: oracleocisecurityprofessional-u-iam-advanced
+    domainId: iam-advanced
+    title: "IAM avancé"
+    lessons:
+      - oracleocisecurityprofessional-l-federation-et-mfa
+  - id: oracleocisecurityprofessional-u-encryption
+    domainId: encryption
+    title: "Chiffrement et secrets"
+    lessons:
+      - oracleocisecurityprofessional-l-kms-et-vault
+  - id: oracleocisecurityprofessional-u-threat-detection
+    domainId: threat-detection
+    title: "Détection des menaces"
+    lessons:
+      - oracleocisecurityprofessional-l-cloud-guard-et-security-zones
+  - id: oracleocisecurityprofessional-u-network-protection
+    domainId: network-protection
+    title: "Protection réseau"
+    lessons:
+      - oracleocisecurityprofessional-l-waf-et-nsg

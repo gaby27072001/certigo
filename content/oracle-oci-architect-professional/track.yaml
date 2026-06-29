@@ -1,0 +1,45 @@
+# Oracle Cloud Infrastructure Architect Professional — oracle certification track.
+# Domain weights mirror the official 1Z0-997-24 skills outline and sum to 1.0.
+id: oracle-oci-architect-professional
+code: "1Z0-997-24"
+provider: oracle
+title: "Oracle Cloud Infrastructure Architect Professional"
+level: professional
+examCode: "1Z0-997-24"
+sourceUrl: "https://education.oracle.com/oracle-cloud-infrastructure-2024-architect-professional/pexam_1Z0-997-24"
+summary: |
+  Valide la conception d'architectures OCI complexes, résilientes et sécurisées : haute disponibilité, reprise après sinistre, hybride et automatisation. Pour architectes confirmés.
+domains:
+  - id: ha-dr
+    name: "Haute disponibilité et reprise"
+    weight: 0.3
+  - id: network-advanced
+    name: "Réseau avancé"
+    weight: 0.25
+  - id: security-pro
+    name: "Sécurité et gouvernance"
+    weight: 0.25
+  - id: automation
+    name: "Automatisation"
+    weight: 0.2
+units:
+  - id: oracleociarchitectprofessional-u-ha-dr
+    domainId: ha-dr
+    title: "Haute disponibilité et reprise"
+    lessons:
+      - oracleociarchitectprofessional-l-ha-multi-ad-et-dr
+  - id: oracleociarchitectprofessional-u-network-advanced
+    domainId: network-advanced
+    title: "Réseau avancé"
+    lessons:
+      - oracleociarchitectprofessional-l-drg-fastconnect-peering
+  - id: oracleociarchitectprofessional-u-security-pro
+    domainId: security-pro
+    title: "Sécurité et gouvernance"
+    lessons:
+      - oracleociarchitectprofessional-l-kms-waf-cloud-guard
+  - id: oracleociarchitectprofessional-u-automation
+    domainId: automation
+    title: "Automatisation"
+    lessons:
+      - oracleociarchitectprofessional-l-resource-manager-terraform

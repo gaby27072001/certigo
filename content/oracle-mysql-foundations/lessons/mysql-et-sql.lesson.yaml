@@ -1,0 +1,37 @@
+id: oraclemysqlfoundations-l-mysql-et-sql
+trackId: oracle-mysql-foundations
+unitId: oraclemysqlfoundations-u-fundamentals
+domainId: fundamentals
+title: "MySQL et SQL"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-mysql-et-sql
+    body: |
+      Dans l'examen 1Z0-915, « MySQL et SQL » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-mysql-et-sql
+    title: "MySQL et SQL"
+    body: |
+      MySQL est un SGBD relationnel open source ; SQL interroge et modifie les données.
+  - type: check
+    conceptId: c-mysql-et-sql
+    check:
+      id: oraclemysqlfoundations-l-mysql-et-sql-check-1
+      conceptId: c-mysql-et-sql
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel langage interroge MySQL ?
+      options:
+        - { id: a, label: "SQL" }
+        - { id: b, label: "HTML" }
+        - { id: c, label: "YAML" }
+        - { id: d, label: "CSS" }
+      correct: [a]
+      explanation: |
+        SQL est le langage de requête de MySQL.
+  - type: recap
+    conceptId: c-mysql-et-sql
+    body: |
+      Retenez l'essentiel de « MySQL et SQL » pour la certification 1Z0-915.

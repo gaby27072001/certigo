@@ -1,0 +1,37 @@
+id: oraclesqlassociate-l-create-et-contraintes
+trackId: oracle-sql-associate
+unitId: oraclesqlassociate-u-ddl
+domainId: ddl
+title: "CREATE et contraintes"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-create-et-contraintes
+    body: |
+      Dans l'examen 1Z0-071, « CREATE et contraintes » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-create-et-contraintes
+    title: "CREATE et contraintes"
+    body: |
+      DDL crée des tables ; contraintes garantissent l'intégrité.
+  - type: check
+    conceptId: c-create-et-contraintes
+    check:
+      id: oraclesqlassociate-l-create-et-contraintes-check-1
+      conceptId: c-create-et-contraintes
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle contrainte impose l'unicité ?
+      options:
+        - { id: a, label: "UNIQUE" }
+        - { id: b, label: "CHECK" }
+        - { id: c, label: "DEFAULT" }
+        - { id: d, label: "INDEX" }
+      correct: [a]
+      explanation: |
+        UNIQUE empêche les doublons.
+  - type: recap
+    conceptId: c-create-et-contraintes
+    body: |
+      Retenez l'essentiel de « CREATE et contraintes » pour la certification 1Z0-071.

@@ -1,0 +1,37 @@
+id: oracleocideveloper-l-streaming-et-events
+trackId: oracle-oci-developer
+unitId: oracleocideveloper-u-messaging
+domainId: messaging
+title: "Streaming et Events"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-streaming-et-events
+    body: |
+      Dans l'examen 1Z0-1084-24, « Streaming et Events » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-streaming-et-events
+    title: "Streaming et Events"
+    body: |
+      Streaming traite des flux ; Events déclenche des actions sur changements de ressources, pour des apps réactives.
+  - type: check
+    conceptId: c-streaming-et-events
+    check:
+      id: oracleocideveloper-l-streaming-et-events-check-1
+      conceptId: c-streaming-et-events
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service ingère des flux temps réel ?
+      options:
+        - { id: a, label: "Streaming" }
+        - { id: b, label: "KMS" }
+        - { id: c, label: "IAM" }
+        - { id: d, label: "File Storage" }
+      correct: [a]
+      explanation: |
+        Streaming gère des flux d'événements à haut débit.
+  - type: recap
+    conceptId: c-streaming-et-events
+    body: |
+      Retenez l'essentiel de « Streaming et Events » pour la certification 1Z0-1084-24.

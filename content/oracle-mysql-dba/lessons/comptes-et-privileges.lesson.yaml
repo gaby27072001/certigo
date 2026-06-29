@@ -1,0 +1,37 @@
+id: oraclemysqldba-l-comptes-et-privileges
+trackId: oracle-mysql-dba
+unitId: oraclemysqldba-u-config
+domainId: config
+title: "Comptes et privilèges"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-comptes-et-privileges
+    body: |
+      Dans l'examen 1Z0-908, « Comptes et privilèges » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-comptes-et-privileges
+    title: "Comptes et privilèges"
+    body: |
+      La gestion des comptes, du SSL et des privilèges sécurise MySQL.
+  - type: check
+    conceptId: c-comptes-et-privileges
+    check:
+      id: oraclemysqldba-l-comptes-et-privileges-check-1
+      conceptId: c-comptes-et-privileges
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle commande accorde des droits ?
+      options:
+        - { id: a, label: "GRANT" }
+        - { id: b, label: "SELECT" }
+        - { id: c, label: "SHOW" }
+        - { id: d, label: "USE" }
+      correct: [a]
+      explanation: |
+        GRANT attribue des privilèges.
+  - type: recap
+    conceptId: c-comptes-et-privileges
+    body: |
+      Retenez l'essentiel de « Comptes et privilèges » pour la certification 1Z0-908.

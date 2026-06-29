@@ -1,0 +1,37 @@
+id: oracledb19cadministration-l-tablespaces-et-schemas
+trackId: oracle-db-19c-administration
+unitId: oracledb19cadministration-u-storage-users
+domainId: storage-users
+title: "Tablespaces et schémas"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-tablespaces-et-schemas
+    body: |
+      Dans l'examen 1Z0-082, « Tablespaces et schémas » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-tablespaces-et-schemas
+    title: "Tablespaces et schémas"
+    body: |
+      Tablespaces, datafiles et schémas organisent le stockage et l'accès.
+  - type: check
+    conceptId: c-tablespaces-et-schemas
+    check:
+      id: oracledb19cadministration-l-tablespaces-et-schemas-check-1
+      conceptId: c-tablespaces-et-schemas
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel objet regroupe des fichiers de stockage logique ?
+      options:
+        - { id: a, label: "Tablespace" }
+        - { id: b, label: "Vue" }
+        - { id: c, label: "Index" }
+        - { id: d, label: "Trigger" }
+      correct: [a]
+      explanation: |
+        Le tablespace mappe le stockage logique aux datafiles.
+  - type: recap
+    conceptId: c-tablespaces-et-schemas
+    body: |
+      Retenez l'essentiel de « Tablespaces et schémas » pour la certification 1Z0-082.

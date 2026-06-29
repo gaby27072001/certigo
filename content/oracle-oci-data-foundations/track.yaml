@@ -1,0 +1,37 @@
+# OCI Data Foundations Associate — oracle certification track.
+# Domain weights mirror the official 1Z0-1124 skills outline and sum to 1.0.
+id: oracle-oci-data-foundations
+code: "1Z0-1124"
+provider: oracle
+title: "OCI Data Foundations Associate"
+level: fundamentals
+examCode: "1Z0-1124"
+sourceUrl: "https://education.oracle.com/"
+summary: |
+  Valide les fondations data sur OCI : entrepôts, lacs, intégration et analytique. Pour profils data débutants.
+domains:
+  - id: data-stores
+    name: "Stockages de données"
+    weight: 0.4
+  - id: integration
+    name: "Intégration"
+    weight: 0.3
+  - id: analytics
+    name: "Analytique"
+    weight: 0.3
+units:
+  - id: oracleocidatafoundations-u-data-stores
+    domainId: data-stores
+    title: "Stockages de données"
+    lessons:
+      - oracleocidatafoundations-l-autonomous-data-warehouse
+  - id: oracleocidatafoundations-u-integration
+    domainId: integration
+    title: "Intégration"
+    lessons:
+      - oracleocidatafoundations-l-data-integration
+  - id: oracleocidatafoundations-u-analytics
+    domainId: analytics
+    title: "Analytique"
+    lessons:
+      - oracleocidatafoundations-l-analytics-cloud

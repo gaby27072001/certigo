@@ -1,0 +1,37 @@
+id: oraclejavase21-l-concurrence-legere
+trackId: oracle-java-se-21
+unitId: oraclejavase21-u-virtual-threads
+domainId: virtual-threads
+title: "Concurrence légère"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-concurrence-legere
+    body: |
+      Dans l'examen 1Z0-830, « Concurrence légère » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-concurrence-legere
+    title: "Concurrence légère"
+    body: |
+      Les virtual threads (Project Loom) massifient la concurrence à faible coût.
+  - type: check
+    conceptId: c-concurrence-legere
+    check:
+      id: oraclejavase21-l-concurrence-legere-check-1
+      conceptId: c-concurrence-legere
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel atout offrent les virtual threads ?
+      options:
+        - { id: a, label: "Concurrence massive" }
+        - { id: b, label: "Compilation native" }
+        - { id: c, label: "Sans JVM" }
+        - { id: d, label: "Mono-thread" }
+      correct: [a]
+      explanation: |
+        Les virtual threads autorisent des millions de tâches concurrentes.
+  - type: recap
+    conceptId: c-concurrence-legere
+    body: |
+      Retenez l'essentiel de « Concurrence légère » pour la certification 1Z0-830.

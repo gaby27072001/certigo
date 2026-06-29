@@ -1,0 +1,37 @@
+id: oraclejavase8-l-try-catch-finally
+trackId: oracle-java-se-8
+unitId: oraclejavase8-u-exceptions
+domainId: exceptions
+title: "try/catch/finally"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-try-catch-finally
+    body: |
+      Dans l'examen 1Z0-808, « try/catch/finally » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-try-catch-finally
+    title: "try/catch/finally"
+    body: |
+      La gestion d'exceptions sépare le flux nominal des erreurs ; finally garantit le nettoyage.
+  - type: check
+    conceptId: c-try-catch-finally
+    check:
+      id: oraclejavase8-l-try-catch-finally-check-1
+      conceptId: c-try-catch-finally
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel bloc s'exécute toujours ?
+      options:
+        - { id: a, label: "finally" }
+        - { id: b, label: "catch" }
+        - { id: c, label: "try" }
+        - { id: d, label: "throw" }
+      correct: [a]
+      explanation: |
+        finally s'exécute qu'il y ait erreur ou non.
+  - type: recap
+    conceptId: c-try-catch-finally
+    body: |
+      Retenez l'essentiel de « try/catch/finally » pour la certification 1Z0-808.

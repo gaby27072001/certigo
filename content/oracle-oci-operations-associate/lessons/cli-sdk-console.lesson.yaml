@@ -1,0 +1,37 @@
+id: oracleocioperationsassociate-l-cli-sdk-console
+trackId: oracle-oci-operations-associate
+unitId: oracleocioperationsassociate-u-provisioning
+domainId: provisioning
+title: "CLI, SDK, console"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-cli-sdk-console
+    body: |
+      Dans l'examen 1Z0-1067-24, « CLI, SDK, console » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-cli-sdk-console
+    title: "CLI, SDK, console"
+    body: |
+      OCI s'administre via console, CLI, SDK et Resource Manager pour automatiser le déploiement.
+  - type: check
+    conceptId: c-cli-sdk-console
+    check:
+      id: oracleocioperationsassociate-l-cli-sdk-console-check-1
+      conceptId: c-cli-sdk-console
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel outil exécute des stacks Terraform managés ?
+      options:
+        - { id: a, label: "Resource Manager" }
+        - { id: b, label: "WAF" }
+        - { id: c, label: "KMS" }
+        - { id: d, label: "DNS" }
+      correct: [a]
+      explanation: |
+        Resource Manager applique l'IaC Terraform.
+  - type: recap
+    conceptId: c-cli-sdk-console
+    body: |
+      Retenez l'essentiel de « CLI, SDK, console » pour la certification 1Z0-1067-24.

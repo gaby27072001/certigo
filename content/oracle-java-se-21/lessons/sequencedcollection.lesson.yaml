@@ -1,0 +1,37 @@
+id: oraclejavase21-l-sequencedcollection
+trackId: oracle-java-se-21
+unitId: oraclejavase21-u-collections
+domainId: collections
+title: "SequencedCollection"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-sequencedcollection
+    body: |
+      Dans l'examen 1Z0-830, « SequencedCollection » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-sequencedcollection
+    title: "SequencedCollection"
+    body: |
+      Les collections séquencées exposent un ordre clair avec accès premier/dernier.
+  - type: check
+    conceptId: c-sequencedcollection
+    check:
+      id: oraclejavase21-l-sequencedcollection-check-1
+      conceptId: c-sequencedcollection
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle interface ajoute un ordre explicite aux collections ?
+      options:
+        - { id: a, label: "SequencedCollection" }
+        - { id: b, label: "Runnable" }
+        - { id: c, label: "Cloneable" }
+        - { id: d, label: "Serializable" }
+      correct: [a]
+      explanation: |
+        SequencedCollection garantit ordre et accès aux extrêmes.
+  - type: recap
+    conceptId: c-sequencedcollection
+    body: |
+      Retenez l'essentiel de « SequencedCollection » pour la certification 1Z0-830.

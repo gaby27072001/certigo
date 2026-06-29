@@ -1,0 +1,37 @@
+id: oraclejavase8-l-interfaces
+trackId: oracle-java-se-8
+unitId: oraclejavase8-u-oop
+domainId: oop
+title: "Interfaces"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-interfaces
+    body: |
+      Dans l'examen 1Z0-808, « Interfaces » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-interfaces
+    title: "Interfaces"
+    body: |
+      Les interfaces définissent un contrat implémenté par implements.
+  - type: check
+    conceptId: c-interfaces
+    check:
+      id: oraclejavase8-l-interfaces-check-1
+      conceptId: c-interfaces
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel mot-clé implémente une interface ?
+      options:
+        - { id: a, label: "implements" }
+        - { id: b, label: "extends" }
+        - { id: c, label: "new" }
+        - { id: d, label: "throws" }
+      correct: [a]
+      explanation: |
+        implements relie une classe à une interface.
+  - type: recap
+    conceptId: c-interfaces
+    body: |
+      Retenez l'essentiel de « Interfaces » pour la certification 1Z0-808.

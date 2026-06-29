@@ -1,0 +1,37 @@
+id: oracledb19cprofessional-l-data-guard
+trackId: oracle-db-19c-professional
+unitId: oracledb19cprofessional-u-recovery
+domainId: recovery
+title: "Data Guard"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-data-guard
+    body: |
+      Dans l'examen 1Z0-083, « Data Guard » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-data-guard
+    title: "Data Guard"
+    body: |
+      Data Guard réplique vers un standby pour la haute disponibilité et la reprise.
+  - type: check
+    conceptId: c-data-guard
+    check:
+      id: oracledb19cprofessional-l-data-guard-check-1
+      conceptId: c-data-guard
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel rôle protège contre la perte du site primaire ?
+      options:
+        - { id: a, label: "Standby" }
+        - { id: b, label: "Bucket" }
+        - { id: c, label: "Vue" }
+        - { id: d, label: "NAT" }
+      correct: [a]
+      explanation: |
+        Le standby Data Guard assure la continuité.
+  - type: recap
+    conceptId: c-data-guard
+    body: |
+      Retenez l'essentiel de « Data Guard » pour la certification 1Z0-083.

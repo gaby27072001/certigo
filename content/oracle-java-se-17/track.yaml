@@ -1,0 +1,37 @@
+# Oracle Certified Professional, Java SE 17 Developer — oracle certification track.
+# Domain weights mirror the official 1Z0-829 skills outline and sum to 1.0.
+id: oracle-java-se-17
+code: "1Z0-829"
+provider: oracle
+title: "Oracle Certified Professional, Java SE 17 Developer"
+level: professional
+examCode: "1Z0-829"
+sourceUrl: "https://education.oracle.com/java-se-17-developer/pexam_1Z0-829"
+summary: |
+  Valide Java SE 17 LTS : records, sealed classes, switch enrichi, streams et concurrence moderne. Pour développeurs confirmés.
+domains:
+  - id: modern-language
+    name: "Langage moderne"
+    weight: 0.4
+  - id: streams-api
+    name: "Streams et collections"
+    weight: 0.3
+  - id: jvm-concurrency
+    name: "JVM et concurrence"
+    weight: 0.3
+units:
+  - id: oraclejavase17-u-modern-language
+    domainId: modern-language
+    title: "Langage moderne"
+    lessons:
+      - oraclejavase17-l-records-et-sealed
+  - id: oraclejavase17-u-streams-api
+    domainId: streams-api
+    title: "Streams et collections"
+    lessons:
+      - oraclejavase17-l-collecteurs-avances
+  - id: oraclejavase17-u-jvm-concurrency
+    domainId: jvm-concurrency
+    title: "JVM et concurrence"
+    lessons:
+      - oraclejavase17-l-completablefuture
