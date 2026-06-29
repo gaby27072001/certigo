@@ -124,29 +124,40 @@ gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPT
 
 ---
 
-## T0.2 — Débloquer le runner (déjà fait côté repo) + amorçage
+## T0.2 — Débloquer le runner (label configurable) + amorçage
 
-**Côté repo (fait dans cette PR) :** `cd-backend.yml` expose un input `runner`
-(`self-hosted` par défaut, `ubuntu-latest` en option) ; le `runs-on` des deux jobs est désormais :
+**Côté repo (cette PR) :** `cd-backend.yml` et `ci-backend.yml` ne ciblent plus un label
+en dur. Le `runs-on` est résolu depuis la **variable repo `CI_RUNNER_LABELS`** (un tableau
+JSON de labels) :
 
 ```yaml
-runs-on: ${{ inputs.runner == 'ubuntu-latest' && fromJSON('["ubuntu-latest"]') || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
+runs-on: ${{ vars.CI_RUNNER_LABELS != '' && fromJSON(vars.CI_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
 ```
 
-Les deux branches du ternaire renvoient un **tableau** ; un `push` (sans input) retombe sur
-self-hosted, ce qui **préserve le comportement actuel**.
+- **Variable absente (défaut)** → `["self-hosted","Linux","X64","microlingo-ci"]`, soit le
+  **label réel des runners enregistrés** (vérifié via `gh api .../actions/runners`).
+- **Override** → définir `CI_RUNNER_LABELS` (Settings → Actions → Variables), ex.
+  `["self-hosted","Linux","X64","law-microlingo"]`. La variable s'applique à **tous** les
+  déclencheurs (`push`, `workflow_dispatch`, `workflow_call`) — contrairement à un input de
+  dispatch, elle couvre donc aussi le `push:[main]` qui déclenche le déploiement tuteur.
 
-### ⚠️ Risque EMU (à arbitrer avant de choisir `ubuntu-latest`)
+> Pourquoi pas `ubuntu-latest` ? **EMU bloque les runners GitHub-hosted** sur ce dépôt
+> (test empirique : dispatch run `28319327945` resté `pending`, `jobs[]` vide, puis annulé ;
+> cf. `infra/ci-runner/README.md`). La variable sert à suivre une **dérive de label**, pas à
+> basculer en hosted. Si l'entreprise active un jour les hosted runners, il suffira de poser
+> `CI_RUNNER_LABELS = ["ubuntu-latest"]` — sans toucher au workflow.
 
-D'après `infra/ci-runner/README.md`, **les runners GitHub-hosted sont bloqués par la politique
-EMU** de l'entreprise — c'est la raison d'être du runner self-hosted (egress NAT stable
-`20.86.156.64`). Choisir `ubuntu-latest` **peut donc être refusé par l'org** : le job ne
-démarrerait pas. Trois chemins d'amorçage, par ordre de préférence :
+**Amorçage immédiat (self-service, aucun admin runner).** Le runner self-hosted existe déjà
+(VM `vm-microlingo-runner`, RG `rg-microlingo-ci`) mais est **`deallocated`**. L'identité
+Owner de la souscription le démarre directement :
 
-1. **Dispatch `runner=ubuntu-latest`** — le plus simple **si** l'org l'autorise (à tester).
-2. **Déploiement manuel local** (§T0.4 option A) depuis une machine dev déjà authentifiée Owner —
-   contourne entièrement le problème runner/EMU pour le tout premier déploiement.
-3. **Provisionner le runner self-hosted** (`infra/ci-runner/network.bicep`) — tâche **P1**.
+```bash
+az vm start -g rg-microlingo-ci -n vm-microlingo-runner
+```
+
+Une fois la VM démarrée et le service runner en ligne (label `microlingo-ci`), le job
+`cd-backend` en attente s'exécute. Alternative pour le tout premier déploiement sans runner :
+déploiement manuel local (§T0.4 option A) depuis une machine dev authentifiée Owner.
 
 ---
 
@@ -232,7 +243,7 @@ az deployment sub create \
 
 ```bash
 gh workflow run cd-backend.yml --repo "$GH_ORG/$GH_REPO" \
-  -f environment=dev -f runner=ubuntu-latest    # ou -f runner=self-hosted
+  -f environment=dev    # runner résolu via la variable repo CI_RUNNER_LABELS (défaut microlingo-ci)
 ```
 
 > Le job `deploy-infra` capture l'output `functionAppName`, réutilisé par `deploy-backend`

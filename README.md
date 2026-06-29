@@ -206,11 +206,15 @@ API principale :
 > rollback, checklist) : voir [`docs/RELEASE_MOBILE.md`](docs/RELEASE_MOBILE.md).
 
 > [!NOTE]
-> Les workflows utilisent un runner **self-hosted** avec labels
-> `[self-hosted, Linux, X64, law-microlingo]` (les runners hébergés par GitHub sont
-> désactivés par la politique d'entreprise EMU sur ce dépôt).
+> Les workflows s'exécutent sur un runner **self-hosted** (les runners hébergés par
+> GitHub sont désactivés par la politique d'entreprise EMU sur ce dépôt).
+>
+> Les workflows backend `cd-backend` et `ci-backend` résolvent leur(s) label(s) via la
+> variable repo **`CI_RUNNER_LABELS`** (tableau JSON ; défaut =
+> `["self-hosted","Linux","X64","microlingo-ci"]`, le label réel des runners enregistrés).
+> Les autres workflows ciblent encore `law-microlingo` en dur.
 >  
-> Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `law-microlingo`.
+> Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `microlingo-ci`. Démarrage de la VM si elle est *deallocated* : `az vm start -g rg-microlingo-ci -n vm-microlingo-runner`.
 
 > [!IMPORTANT]
 > **Accès sortant internet du runner.** Depuis le retrait de l'accès sortant par

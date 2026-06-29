@@ -16,14 +16,14 @@ concurrency:
 jobs:
   build-test:
     name: Build & test
-    # SPOF mitigation (audit #1) : repli GitHub-hosted pré-câblé.
-    # Défaut = runner self-hosted (comportement inchangé).
-    # Pour basculer en urgence si le pool self-hosted est indisponible :
-    #   1) définir la variable repo  BACKEND_CI_FALLBACK = true  (Settings > Actions > Variables)
-    #   2) s'assurer que les GitHub-hosted runners sont ACTIVÉS pour le repo/org
-    #      (ils sont désactivés par défaut ici — cf. lint-workflows.yml).
-    # Repasser BACKEND_CI_FALLBACK à false (ou supprimer la variable) pour revenir au self-hosted.
-    runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","Linux","X64","law-microlingo"]') }}
+    # Runner cible configurable via la variable repo CI_RUNNER_LABELS (tableau JSON de labels).
+    # Défaut (variable absente) = label RÉEL des runners enregistrés : "microlingo-ci".
+    # Override ex. :  CI_RUNNER_LABELS = ["self-hosted","Linux","X64","law-microlingo"]
+    # Rappel EMU : ubuntu-latest est désactivé par la politique d'entreprise sur ce repo ;
+    #   l'override sert à suivre une dérive de label runner, pas à basculer en hosted.
+    # (Remplace l'ancien levier BACKEND_CI_FALLBACK — retiré au profit d'une variable unique
+    #  partagée avec cd-backend.)
+    runs-on: ${{ vars.CI_RUNNER_LABELS != '' && fromJSON(vars.CI_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
