@@ -37,5 +37,6 @@ param tutorLlmApiSurface = 'v1'
 // RBAC: grant the Function App managed identity the "Cognitive Services OpenAI User"
 // role on the Azure OpenAI account so identity-based (keyless) auth works for the tutor.
 // The OpenAI account lives in rg-microlingo-dev (separate from the Function App's rg-certigo-dev).
-param tutorOpenAiAccountResourceId = '/subscriptions/${subscription().subscriptionId}/resourceGroups/rg-microlingo-dev/providers/Microsoft.CognitiveServices/accounts/microlingo-openai'
+// Subscription ID confirmed: b8952c8c-8f72-469d-99cd-ac906da4e2fc (microlingo dev subscription).
+param tutorOpenAiAccountResourceId = '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-microlingo-dev/providers/Microsoft.CognitiveServices/accounts/microlingo-openai'
 param openAiRbacEnabled = true
