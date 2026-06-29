@@ -1,0 +1,19 @@
+id: power-platform-solution-architect-expert
+code: POWER-PLATFORM-SOLUTION-ARCHITECT-EXPERT
+title: 'Microsoft Certified: Power Platform Solution Architect Expert'
+level: expert
+summary: Microsoft certification (Developer, Functional Consultant, Solution Architect)
+  covering Dynamics 365, Microsoft Power Platform, AI Builder, Power Automate, Power
+  BI, Power Apps, Microsoft Copilot, Microsoft Copilot Studio, Azure, Microsoft Entra,
+  Microsoft Entra ID, Customer Engagement apps, Microsoft Dataverse, Azure App Configuration,
+  Azure App Service.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-d8524a9a
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-d8524a9a

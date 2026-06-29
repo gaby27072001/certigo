@@ -1,0 +1,15 @@
+id: microsoft-office-specialist-expert-2019
+code: MICROSOFT-OFFICE-SPECIALIST-EXPERT-2019
+title: 'Microsoft Office Specialist: Expert (Office 2019)'
+level: expert
+summary: Microsoft certification (Business User) covering Office, Excel, Office 365.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-25646056
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-25646056

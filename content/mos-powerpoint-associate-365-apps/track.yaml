@@ -1,0 +1,15 @@
+id: mos-powerpoint-associate-365-apps
+code: MOS-POWERPOINT-ASSOCIATE-365-APPS
+title: 'Microsoft Office Specialist: PowerPoint Associate (Microsoft 365 Apps)'
+level: associate
+summary: Microsoft certification (Business User) covering PowerPoint.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-1f8ba541
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-1f8ba541

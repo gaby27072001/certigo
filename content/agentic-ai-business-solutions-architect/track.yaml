@@ -1,0 +1,16 @@
+id: agentic-ai-business-solutions-architect
+code: AGENTIC-AI-BUSINESS-SOLUTIONS-ARCHITECT
+title: 'Microsoft Certified: Agentic AI Business Solutions Architect'
+level: expert
+summary: Microsoft certification (Solution Architect) covering Dynamics 365, Microsoft
+  Copilot, Microsoft Power Platform.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-970cf922
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-970cf922

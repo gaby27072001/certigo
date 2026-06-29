@@ -1,0 +1,21 @@
+id: windows-server-hybrid-administrator
+code: WINDOWS-SERVER-HYBRID-ADMINISTRATOR
+title: 'Microsoft Certified: Windows Server Hybrid Administrator Associate'
+level: associate
+summary: Microsoft certification (Administrator, Identity and Access Administrator,
+  Information Protection and Compliance Administrator, Network Engineer, Security
+  Engineer, Support Engineer, Technology Manager) covering Microsoft Entra, Microsoft
+  Entra ID, Azure, Azure Arc, Azure Automation, Microsoft Defender, Microsoft Defender
+  for Cloud, Azure Disk Encryption, Azure Files, Azure Monitor, Azure Policy, Azure
+  PowerShell, Microsoft Sentinel, Azure Virtual Machines, Microsoft Defender for Endpoint,
+  Windows Server.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-58c725f3
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-58c725f3

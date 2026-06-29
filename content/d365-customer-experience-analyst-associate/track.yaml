@@ -1,0 +1,16 @@
+id: d365-customer-experience-analyst-associate
+code: D365-CUSTOMER-EXPERIENCE-ANALYST-ASSOCIATE
+title: 'Microsoft Certified: Dynamics 365 Customer Experience Analyst Associate'
+level: associate
+summary: Microsoft certification (Business Analyst, Functional Consultant) covering
+  Dynamics, Dynamics 365, Customer Engagement apps.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-471d9c14
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-471d9c14

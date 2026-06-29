@@ -1,12 +1,11 @@
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
-import '../../../app/router.dart';
+import '../../../shared/widgets/screen_header.dart';
 
 /// Achievements — the learner's trophy cabinet. Read-only board fed by
 /// `achievementBoardProvider`. We celebrate what is unlocked, and for the rest
@@ -24,7 +23,7 @@ class AchievementsScreen extends ConsumerWidget {
         bottom: false,
         child: Column(
           children: <Widget>[
-            const _ScreenHeader(title: 'Succès'),
+            const ScreenHeader(title: 'Succès'),
             Expanded(
               child: async.when(
                 data: (AchievementBoard board) => _AchievementsContent(board: board),
@@ -204,7 +203,7 @@ class _AchievementCard extends StatelessWidget {
                 tooltip: 'Partager',
                 icon: const Icon(Icons.share_rounded, size: 18),
                 onPressed: () => Share.share(
-                  '🏆 J\'ai débloqué ${achievement.name} sur Microlingo ! #Microlingo #ApprentissageLangues',
+                  '🏆 J\'ai débloqué ${achievement.name} sur Certigo ! #AzureCertification #Certigo',
                 ),
               ),
             ),
@@ -254,37 +253,6 @@ class _AchievementsLoading extends StatelessWidget {
         SizedBox(height: 12),
         PrismSkeleton(height: 120),
       ],
-    );
-  }
-}
-
-/// Shared back-bar for above-shell feature screens.
-class _ScreenHeader extends StatelessWidget {
-  const _ScreenHeader({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final TextTheme t = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 20, 4),
-      child: Row(
-        children: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go(Routes.home);
-              }
-            },
-          ),
-          const SizedBox(width: 4),
-          Text(title, style: t.headlineSmall),
-        ],
-      ),
     );
   }
 }

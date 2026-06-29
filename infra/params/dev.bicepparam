@@ -1,5 +1,9 @@
-// Dev environment parameters. Authority/audience point to the Microlingo
+// Dev environment parameters. Authority/audience point to the Certigo
 // Entra External ID app registration (replace placeholders before deploying).
+// NOTE on Entra placeholders: in dev, main.bicep sets authMode='dev', so the API uses
+// DevTokenValidator and Entra External ID is NOT enforced. The entraAuthority/entraAudience
+// placeholders below are therefore safe to deploy as-is for dev. Provide real CIAM values
+// for staging/prod (where authMode='prod' and EntraTokenValidator is active).
 //
 // Deploy:
 //   az deployment sub create \
@@ -10,11 +14,11 @@ using '../main.bicep'
 
 param env = 'dev'
 param location = 'westeurope'
-param appName = 'microlingo'
+param appName = 'certigo'
 
 // Cosmos DB deployed in northeurope — westeurope has AZ-capacity limits.
 param cosmosLocation = 'northeurope'
 
 // Microsoft Entra External ID (CIAM) — fill from your tenant.
-param entraAuthority = 'https://microlingo.ciamlogin.com/00000000-0000-0000-0000-000000000000/v2.0'
+param entraAuthority = 'https://certigo.ciamlogin.com/00000000-0000-0000-0000-000000000000/v2.0'
 param entraAudience = '00000000-0000-0000-0000-000000000000'

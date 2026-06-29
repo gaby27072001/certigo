@@ -1,0 +1,16 @@
+id: github-actions
+code: GITHUB-ACTIONS
+title: GitHub Actions
+level: associate
+summary: Microsoft certification (Administrator, Developer, DevOps Engineer, Solution
+  Architect, Student) covering GitHub.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-5624755d
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-5624755d

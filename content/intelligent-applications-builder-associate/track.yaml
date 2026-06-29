@@ -1,0 +1,16 @@
+id: intelligent-applications-builder-associate
+code: INTELLIGENT-APPLICATIONS-BUILDER-ASSOCIATE
+title: 'Microsoft Certified: Intelligent Applications Builder Associate (beta)'
+level: associate
+summary: Microsoft certification (Developer) covering Microsoft Power Platform, Power
+  Apps, Power Automate, Power BI, Power Pages.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-9df68d29
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-9df68d29

@@ -1,0 +1,15 @@
+id: azure-database-administrator-associate
+code: AZURE-DATABASE-ADMINISTRATOR-ASSOCIATE
+title: 'Microsoft Certified: Azure Database Administrator Associate'
+level: associate
+summary: Microsoft certification (Database Administrator) covering Azure.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-8fdefd70
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-8fdefd70

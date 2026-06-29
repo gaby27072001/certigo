@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:microlingo/features/auth/application/auth_controller.dart';
-import 'package:microlingo/features/auth/application/auth_state.dart';
-import 'package:microlingo/features/auth/presentation/sign_in_screen.dart';
-import 'package:microlingo/features/auth/presentation/widgets/auth_provider_button.dart';
+import 'package:certigo/features/auth/application/auth_controller.dart';
+import 'package:certigo/features/auth/application/auth_state.dart';
+import 'package:certigo/features/auth/presentation/sign_in_screen.dart';
+import 'package:certigo/features/auth/presentation/widgets/auth_provider_button.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import 'auth_controller_test.dart' show FakeAuthGateway, FakeCredentialsGateway, FakeSessionStore;
@@ -49,7 +49,7 @@ void main() {
   testWidgets('présente le formulaire e-mail (Se connecter par défaut)', (tester) async {
     await pumpSignIn(tester, gateway: FakeAuthGateway(), store: FakeSessionStore());
 
-    expect(find.text('Microlingo'), findsOneWidget);
+    expect(find.text('Certigo'), findsOneWidget);
     expect(find.byKey(const Key('email-field')), findsOneWidget);
     expect(find.byKey(const Key('password-field')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Se connecter'), findsOneWidget);

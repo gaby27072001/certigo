@@ -10,8 +10,8 @@ import 'router.dart';
 /// The root widget. Wires the Prism themes, localization scaffolding and the
 /// GoRouter instance. Stateless + Riverpod: theme mode and routing come from
 /// providers so the whole app rebuilds correctly on changes.
-class MicrolingoApp extends ConsumerWidget {
-  const MicrolingoApp({super.key});
+class CertigoApp extends ConsumerWidget {
+  const CertigoApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -19,7 +19,7 @@ class MicrolingoApp extends ConsumerWidget {
     final GoRouter router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Microlingo',
+      title: 'Certigo',
       debugShowCheckedModeBanner: false,
       theme: PrismTheme.light(),
       darkTheme: PrismTheme.dark(),

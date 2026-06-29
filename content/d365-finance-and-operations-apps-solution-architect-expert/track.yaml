@@ -1,0 +1,17 @@
+id: d365-finance-and-operations-apps-solution-architect-expert
+code: D365-FINANCE-AND-OPERATIONS-APPS-SOLUTION-ARCHITECT-EXPERT
+title: 'Microsoft Certified: Dynamics 365: Finance and Operations Apps Solution Architect
+  Expert'
+level: expert
+summary: Microsoft certification (Functional Consultant, Solution Architect) covering
+  Dynamics 365.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-6af3640d
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-6af3640d

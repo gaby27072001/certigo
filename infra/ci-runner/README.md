@@ -1,14 +1,14 @@
 # Egress réseau du runner CI — Infrastructure-as-Code
 
 Ce dossier réconcilie en Bicep le **chemin d'egress (sortie Internet) du runner GitHub
-Actions auto-hébergé** de Microlingo. Tout y est nommé en français pour rester aligné
+Actions auto-hébergé** de Certigo. Tout y est nommé en français pour rester aligné
 avec le reste des livrables ; les noms de ressources Azure reprennent ceux du portail.
 
 ## Pourquoi
 
 Les runners hébergés par GitHub sont **désactivés par la politique d'entreprise EMU**.
 La CI s'exécute donc sur une machine virtuelle Azure auto-hébergée
-(`vm-microlingo-runner`, dans le groupe de ressources `rg-microlingo-ci`). Cette
+(`vm-certigo-runner`, dans le groupe de ressources `law-microlingo-ci`). Cette
 machine **n'a aucune IP publique propre** : son seul accès à Internet passe par une
 **Passerelle NAT (NAT Gateway)** attachée à son sous-réseau.
 
@@ -20,13 +20,13 @@ dérive pouvait le **détruire silencieusement** et casser la CI de façon perma
 ## Chemin d'egress réconcilié
 
 ```
-vm-microlingo-runner (carte réseau, pas d'IP publique)
+vm-certigo-runner (carte réseau, pas d'IP publique)
         │
         ▼
 sous-réseau snet-runners (10.42.1.0/24)
         │   défaut sortant désactivé (defaultOutboundAccess = false)
         ▼
-Passerelle NAT nat-microlingo  ──►  IP publique pip-microlingo-nat (20.86.156.64)
+Passerelle NAT law-microlingo  ──►  IP publique pip-certigo-nat (20.86.156.64)
                                          │
                                          ▼
                                       Internet
@@ -34,33 +34,33 @@ Passerelle NAT nat-microlingo  ──►  IP publique pip-microlingo-nat (20.86.
 
 | Ressource | Type | Rôle |
 | --- | --- | --- |
-| `pip-microlingo-nat` | IP publique (Standard, statique, régionale) | Adresse d'egress **stable** présentée à Internet (à mettre en liste d'autorisation) |
-| `nat-microlingo` | Passerelle NAT (Standard) | SNAT sortant déterministe ; **survit à la désallocation** de la VM |
-| `vnet-microlingo-ci` | Réseau virtuel (`10.42.0.0/16`) | Héberge le sous-réseau runner |
+| `pip-certigo-nat` | IP publique (Standard, statique, régionale) | Adresse d'egress **stable** présentée à Internet (à mettre en liste d'autorisation) |
+| `law-microlingo` | Passerelle NAT (Standard) | SNAT sortant déterministe ; **survit à la désallocation** de la VM |
+| `law-microlingo-ci` | Réseau virtuel (`10.42.0.0/16`) | Héberge le sous-réseau runner |
 | `snet-runners` | Sous-réseau (`10.42.1.0/24`) | La carte réseau du runner s'y rattache ; associé à la Passerelle NAT + NSG |
-| `vnet-microlingo-ci-snet-runners-nsg-westeurope` | Groupe de sécurité réseau (NSG) | Vide (règles Azure par défaut) ; conservé pour matcher l'état réel |
+| `law-microlingo-ci-snet-runners-nsg-westeurope` | Groupe de sécurité réseau (NSG) | Vide (règles Azure par défaut) ; conservé pour matcher l'état réel |
 
 ## Ce qui n'est **pas** géré ici (volontairement)
 
 Un déploiement de **groupe de ressources** est **incrémentiel** : les ressources non
 déclarées ne sont **jamais** touchées. Sont donc laissées à leur gestion propre :
-la machine virtuelle `vm-microlingo-runner`, sa carte réseau, son disque OS.
+la machine virtuelle `vm-certigo-runner`, sa carte réseau, son disque OS.
 
 > ⚠️ **Ne jamais déployer ce modèle en mode « complet » (Complete)** : il supprimerait
 > tout ce qui n'est pas listé (dont la VM, sa carte réseau et son disque).
 
 ## Dérive constatée — candidats au nettoyage (à traiter manuellement)
 
-L'inventaire du groupe `rg-microlingo-ci` révèle des ressources **orphelines ou en
+L'inventaire du groupe `law-microlingo-ci` révèle des ressources **orphelines ou en
 double**, vestiges des tâtonnements de mise en place. Elles ne sont **ni importées ni
 supprimées automatiquement** ici (suppression = décision humaine), mais documentées :
 
 | Ressource | Constat | Action suggérée |
 | --- | --- | --- |
-| `pip-microlingo-test` (`20.61.109.230`) | IP publique **orpheline** (aucune configuration IP, aucune Passerelle NAT) | Supprimer (fuite de coût) |
-| `vm-microlingo-runnerVNET` | **Réseau virtuel en double** non utilisé par le runner | Supprimer après vérification |
-| `vm-microlingo-runnerVNET-vm-microlingo-runnerSubnet-nsg-westeurope` | NSG du sous-réseau du VNet en double | Supprimer avec le VNet ci-dessus |
-| `vm-microlingo-runnerNSG` | NSG par défaut de la VM, non rattaché au chemin d'egress | Vérifier puis supprimer si inutilisé |
+| `pip-certigo-test` (`20.61.109.230`) | IP publique **orpheline** (aucune configuration IP, aucune Passerelle NAT) | Supprimer (fuite de coût) |
+| `vm-certigo-runnerVNET` | **Réseau virtuel en double** non utilisé par le runner | Supprimer après vérification |
+| `vm-certigo-runnerVNET-vm-certigo-runnerSubnet-nsg-westeurope` | NSG du sous-réseau du VNet en double | Supprimer avec le VNet ci-dessus |
+| `vm-certigo-runnerNSG` | NSG par défaut de la VM, non rattaché au chemin d'egress | Vérifier puis supprimer si inutilisé |
 
 ## Commandes
 
@@ -68,14 +68,14 @@ Valider sans rien changer — n'affiche que des différences **bénignes** (voir
 « Différences résiduelles du what-if » plus bas) ; aucune ne modifie le chemin d'egress :
 
 ```bash
-az deployment group what-if -g rg-microlingo-ci \
+az deployment group what-if -g law-microlingo-ci \
   --template-file infra/ci-runner/network.bicep
 ```
 
 Déployer (incrémentiel — ne touche que les 5 ressources d'egress) :
 
 ```bash
-az deployment group create -g rg-microlingo-ci \
+az deployment group create -g law-microlingo-ci \
   --template-file infra/ci-runner/network.bicep
 ```
 
@@ -90,9 +90,9 @@ sous-réseau↔NAT↔NSG restent **identiques au bit près**.
 
 | Ressource | Propriété signalée | Pourquoi on ne la fige pas |
 | --- | --- | --- |
-| `nat-microlingo` | `sku.tier` (= `Regional`) | Le type `NatGatewaySku` n'accepte que `name` ; `tier` n'existe pas dans le schéma. |
-| `nat-microlingo` | `properties.scope` (= `Public`) | Non réglable via modèle ; `Public` est déjà la valeur par défaut d'une Passerelle NAT. |
-| `pip-microlingo-nat` | `properties.ipTags` (`FirstPartyUsage` / `/Unprivileged`) | Étiquette **première-partie réservée** à Azure ; un déploiement qui tenterait de la poser serait **rejeté**. |
+| `law-microlingo` | `sku.tier` (= `Regional`) | Le type `NatGatewaySku` n'accepte que `name` ; `tier` n'existe pas dans le schéma. |
+| `law-microlingo` | `properties.scope` (= `Public`) | Non réglable via modèle ; `Public` est déjà la valeur par défaut d'une Passerelle NAT. |
+| `pip-certigo-nat` | `properties.ipTags` (`FirstPartyUsage` / `/Unprivileged`) | Étiquette **première-partie réservée** à Azure ; un déploiement qui tenterait de la poser serait **rejeté**. |
 
 Les fausses différences réglables (`ddosSettings` héritée du VNet sur l'IP publique,
 `privateEndpointVNetPolicies` sur le réseau virtuel) ont déjà été **explicitées** dans le

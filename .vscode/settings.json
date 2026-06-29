@@ -1,5 +1,5 @@
 {
-  "// Microlingo workspace settings": "Dart/Flutter + .NET, cohérents avec la CI",
+  "// Certigo workspace settings": "Dart/Flutter + .NET, cohérents avec la CI",
 
   "editor.formatOnSave": true,
   "editor.rulers": [100],
@@ -31,7 +31,7 @@
     "editor.defaultFormatter": "ms-dotnettools.csharp",
     "editor.formatOnSave": true
   },
-  "dotnet.defaultSolution": "backend/Microlingo.sln",
+  "dotnet.defaultSolution": "backend/Certigo.sln",
 
   "[yaml]": {
     "editor.defaultFormatter": "redhat.vscode-yaml",

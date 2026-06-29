@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Storage key for the offline action queue. Versioned so a future schema
 /// change can migrate or discard old payloads cleanly.
-const String kSyncQueuePrefsKey = 'microlingo.sync.queue.v1';
+const String kSyncQueuePrefsKey = 'certigo.sync.queue.v1';
 
 /// Builds a [JsonSyncQueueStore] persisted in [SharedPreferences] under a
 /// single string key, so the offline action queue survives app restarts on

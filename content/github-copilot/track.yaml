@@ -1,0 +1,16 @@
+id: github-copilot
+code: GITHUB-COPILOT
+title: GitHub Copilot
+level: associate
+summary: Microsoft certification (App Maker, Developer, DevOps Engineer, Technology
+  Manager) covering GitHub.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-57b8791c
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-57b8791c

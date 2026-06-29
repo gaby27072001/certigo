@@ -5,7 +5,7 @@ import '../tokens/prism_radii.dart' show PrismRadii;
 import '../tokens/prism_typography.dart';
 import 'prism_color_scheme.dart';
 
-/// Builds the Material [ThemeData] for Microlingo from Prism tokens.
+/// Builds the Material [ThemeData] for Certigo from Prism tokens.
 ///
 /// We lean on Material 3 for accessibility plumbing (touch targets, focus,
 /// contrast) but override the surfaces, shapes and type so the result reads as

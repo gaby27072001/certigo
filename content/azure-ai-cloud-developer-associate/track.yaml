@@ -1,0 +1,15 @@
+id: azure-ai-cloud-developer-associate
+code: AZURE-AI-CLOUD-DEVELOPER-ASSOCIATE
+title: 'Microsoft Certified: Azure AI Cloud Developer Associate (beta)'
+level: associate
+summary: Microsoft certification (Developer) covering Azure.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-1ae7270b
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-1ae7270b

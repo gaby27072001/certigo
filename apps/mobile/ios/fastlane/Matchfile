@@ -7,4 +7,4 @@
 #   MATCH_GIT_BASIC_AUTHORIZATION    base64 de "utilisateur:token" (clone HTTPS)
 storage_mode("git")
 type("appstore")
-app_identifier(["com.microlingo.app"])
+app_identifier(["law-microlingo"])

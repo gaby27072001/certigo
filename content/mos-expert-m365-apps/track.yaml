@@ -1,0 +1,15 @@
+id: mos-expert-m365-apps
+code: MOS-EXPERT-M365-APPS
+title: 'Microsoft Office Specialist: Expert (Microsoft 365 Apps)'
+level: expert
+summary: Microsoft certification (Business User) covering Word, Excel.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-a1207493
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-a1207493

@@ -16,6 +16,7 @@ import '../features/quests/presentation/quests_screen.dart';
 import '../features/shop/presentation/shop_screen.dart';
 import '../features/friends/presentation/friends_screen.dart';
 import '../features/exam/presentation/exam_screen.dart';
+import '../features/share/presentation/daily_share_screen.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/application/auth_state.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
@@ -60,6 +61,7 @@ abstract class Routes {
   static const String shop = '/shop';
   static const String friends = '/friends';
   static const String exam = '/exam';
+  static const String dailyShare = '/share-daily';
 }
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -75,25 +77,29 @@ CustomTransitionPage<void> _stepPage({
     child: child,
     transitionDuration: PrismMotion.base,
     reverseTransitionDuration: PrismMotion.fast,
-    transitionsBuilder: (
-      BuildContext context,
-      Animation<double> animation,
-      Animation<double> secondaryAnimation,
-      Widget child,
-    ) {
-      final CurvedAnimation curved = CurvedAnimation(
-        parent: animation,
-        curve: PrismMotion.decelerate,
-        reverseCurve: PrismMotion.standard,
-      );
-      return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
-          child: child,
-        ),
-      );
-    },
+    transitionsBuilder:
+        (
+          BuildContext context,
+          Animation<double> animation,
+          Animation<double> secondaryAnimation,
+          Widget child,
+        ) {
+          final CurvedAnimation curved = CurvedAnimation(
+            parent: animation,
+            curve: PrismMotion.decelerate,
+            reverseCurve: PrismMotion.standard,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: begin,
+                end: Offset.zero,
+              ).animate(curved),
+              child: child,
+            ),
+          );
+        },
   );
 }
 
@@ -106,8 +112,13 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   ref.listen<AuthState>(authControllerProvider, (_, __) => authRefresh.value++);
   ref.onDispose(authRefresh.dispose);
 
-  final OnboardingController onboardingCtrl = ref.read(onboardingControllerProvider);
-  final Listenable refresh = Listenable.merge(<Listenable>[authRefresh, onboardingCtrl]);
+  final OnboardingController onboardingCtrl = ref.read(
+    onboardingControllerProvider,
+  );
+  final Listenable refresh = Listenable.merge(<Listenable>[
+    authRefresh,
+    onboardingCtrl,
+  ]);
 
   return GoRouter(
     navigatorKey: _rootKey,
@@ -130,14 +141,14 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       }
       // Authenticated: never remain on auth surfaces.
       if (atAuthSplash || atAuth) {
-        return onboardingCtrl.completed ? Routes.path : OnboardingRoutes.splash;
+        return onboardingCtrl.completed ? Routes.home : OnboardingRoutes.splash;
       }
       // Authenticated but onboarding not completed: force startup flow.
       if (!onboardingCtrl.completed) {
         return atOnboarding ? null : OnboardingRoutes.splash;
       }
       // Completed onboarding: startup screens should not be reachable.
-      if (atOnboarding) return Routes.path;
+      if (atOnboarding) return Routes.home;
       return null;
     },
     routes: <RouteBase>[
@@ -198,7 +209,8 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: OnboardingRoutes.goal,
         parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) => _stepPage(state: state, child: const GoalScreen()),
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const GoalScreen()),
       ),
       GoRoute(
         path: OnboardingRoutes.routine,
@@ -229,28 +241,32 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       ),
       // Bottom-nav shell: persistent state per tab via StatefulShellRoute.
       StatefulShellRoute.indexedStack(
-        builder: (BuildContext context, GoRouterState state, StatefulNavigationShell shell) {
-          return AppShell(shell: shell);
-        },
+        builder:
+            (
+              BuildContext context,
+              GoRouterState state,
+              StatefulNavigationShell shell,
+            ) {
+              return AppShell(shell: shell);
+            },
         branches: <StatefulShellBranch>[
-          // Primary tab: the Duolingo-style learning journey is the app's
-          // home surface, so it leads the shell and is the initial location.
+          // Primary tab: Accueil (home) is the main entry surface.
           StatefulShellBranch(
             navigatorKey: _shellKey,
             routes: <RouteBase>[
               GoRoute(
-                path: Routes.path,
-                name: 'path',
-                builder: (_, __) => const _ActivePathScreen(),
+                path: Routes.home,
+                name: 'home',
+                builder: (_, __) => const HomeScreen(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: Routes.home,
-                name: 'home',
-                builder: (_, __) => const HomeScreen(),
+                path: Routes.path,
+                name: 'path',
+                builder: (_, __) => const _ActivePathScreen(),
               ),
             ],
           ),
@@ -268,7 +284,25 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
                       final String id = state.pathParameters['id'] ?? '';
                       return Scaffold(
                         appBar: AppBar(title: Text(id)),
-                        body: Center(child: Text('Domaine : $id')),
+                        body: ListView(
+                          children: <Widget>[
+                            const SizedBox(height: 48),
+                            Icon(
+                              Icons.auto_stories_rounded,
+                              size: 72,
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                            const SizedBox(height: 16),
+                            Center(
+                              child: Text(
+                                'Contenu à venir pour ce domaine',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ),
+                            const SizedBox(height: 48),
+                          ],
+                        ),
                       );
                     },
                   ),
@@ -382,6 +416,16 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           state: state,
           begin: const Offset(0, 0.04),
           child: const ExamScreen(),
+        ),
+      ),
+      GoRoute(
+        path: Routes.dailyShare,
+        name: 'daily-share',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const DailyShareScreen(),
         ),
       ),
     ],

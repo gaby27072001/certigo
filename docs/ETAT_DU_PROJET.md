@@ -1,10 +1,10 @@
 <div align="center">
 
-# 🟢 Microlingo — État vivant du projet
+# 🟢 Certigo — État vivant du projet
 
 **Le « Duolingo des certifications Microsoft » — apprendre Azure / IA / sécurité par micro‑leçons gamifiées.**
 
-`🟢 Backend riche` · `🟢 Contenu 5 certifs` · `🟢 Gamification` · `🟢 Tuteur IA` · `🟢 Offline‑first` · `🟢 Mobile : écrans branchés` · `🟡 Infra non déployée`
+`🟢 Backend riche` · `🟢 Contenu 89 certifs` · `🟢 Gamification` · `🟢 Tuteur IA` · `🟢 Offline‑first` · `🟢 Mobile : écrans branchés` · `🟡 Infra non déployée`
 
 </div>
 
@@ -19,14 +19,14 @@
 | Repère | Valeur |
 |---|---|
 | 📅 Rafraîchi le | **2026‑06‑24** (écrans gamification mobile branchés : saisons · quêtes · succès · boutique · amis · examens · tests d'intégration Cosmos émulateur‑gated · anti‑triche examen : fenêtre de cadence câblée) |
-| 🔖 Reflète | HEAD post‑audit + **D8 examen** + **écrans mobiles gamification** — voir `AUDIT_MICROLINGO.md` §M (remédiation appliquée) |
+| 🔖 Reflète | HEAD post‑audit + **D8 examen** + **écrans mobiles gamification** — voir `AUDIT_CERTIGO.md` §M (remédiation appliquée) |
 | 🌿 Branche du doc | `gchambaud-microsoft-finalize-project` |
 | 📈 Activité | **49+ commits**, du 2026‑06‑19 au 2026‑06‑24 — rythme très soutenu |
 | 🧪 Tests | backend **325** exécutés (xUnit, dont concurrence/auth/parité/anti‑triche) + **6** d'intégration Cosmos (émulateur‑gated) · Dart **185** (unit + widget, dont golden Cortex) |
 | 🧩 API | **18 groupes** de Functions (+ `GET /health`) · **≈ 29 endpoints** HTTP |
 | 🗄️ Données | **8 containers Cosmos DB** (serverless ; profil avec **ETag** concurrence optimiste) |
 | 🏗️ Infra | **9 modules Bicep** + params **dev/staging/prod** — durcie par env, **pas encore déployée** |
-| 🤖 CI/CD | **9 workflows** GitHub Actions (runner self‑hosted Azure ; SBOM + gate de release) |
+| 🤖 CI/CD | **9 workflows actifs** GitHub Actions + **2 historiques** iOS désactivés (runner self-hosted Azure ; SBOM + gate de release) |
 | 🔒 Durcissement | Idempotence atomique · ETag · garde auth dev · `/health` + correlation id · CORS/KV/Storage par env |
 
 ---
@@ -35,9 +35,9 @@
 
 | Brique | Statut | Où | En clair |
 |---|:---:|---|---|
-| **API backend** | 🟢 | `backend/src/Microlingo.Api` | Azure Functions .NET 8 isolé, **17 groupes / ≈ 28 endpoints**. |
-| **Moteurs métier** | 🟢 | `backend/src/Microlingo.Domain` | Logique **pure & testée** : contenu, progression, gamification, examen, tuteur, reco, notifications, intégrité. |
-| **Contenu pédagogique** | 🟢 | `content/` | **5 certifications · 60 leçons** en YAML, validées par schémas JSON. |
+| **API backend** | 🟢 | `backend/src/Certigo.Api` | Azure Functions .NET 8 isolé, **17 groupes / ≈ 28 endpoints**. |
+| **Moteurs métier** | 🟢 | `backend/src/Certigo.Domain` | Logique **pure & testée** : contenu, progression, gamification, examen, tuteur, reco, notifications, intégrité. |
+| **Contenu pédagogique** | 🟢 | `content/` | **89 certifications actives · 144 leçons** en YAML, validées par schémas JSON. |
 | **Gamification** | 🟢 | Domain `Gamification/` | XP, streak (+réparation), ligues hebdo, **saisons**, quêtes, succès, boutique, amis. |
 | **Tuteur IA** | 🟢 | Domain `Tutor/` + mobile `features/tutor` | Explications ancrées sur le contenu — **branché côté serveur ET mobile** (`tutor_sheet`). *(Le moteur est actuellement un adaptateur nul — `NullTutorCompletion` — qui retourne une chaîne vide. Un vrai LLM sera branché via `ITutorCompletion`, voir H19.)* |
 | **Recommandation + coach** | 🟢 | Domain `Recommendation/` + `home/coach_section` | Moteur « next best » + coach IA sur l'accueil. |
@@ -49,7 +49,7 @@
 | **App mobile (Flutter)** | 🟢 | `apps/mobile` | **62 fichiers Dart**, 15 features. Tous les moteurs de gamification (saisons, quêtes, succès, boutique, amis, examens) désormais **branchés en écran** + tests widget. Reste la validation E2E sur appareil. |
 | **Cortex (algos partagés)** | 🟢 | `packages/cortex` | SRS, scoring, fil pédagogique — partagé client/serveur. |
 | **Infrastructure (Bicep)** | 🟡 | `infra/` | 8 modules (Functions, Cosmos, Key Vault, App Insights, **Defender, Policy, Diagnostics**, Storage). **Non déployée.** |
-| **CI / qualité** | 🟢 | `.github/workflows` | 6 workflows : backend, mobile, contenu, infra, **CodeQL**, **security‑scan**. |
+| **CI / qualité** | 🟢 | `.github/workflows` | 9 workflows actifs : backend, mobile, contenu, infra, CD backend, **CodeQL**, **lint-workflows**, **release-android**, **security-scan**. 2 workflows iOS GitHub Actions sont historiques et désactivés (`release-ios`, `sync-ios-certs`). |
 
 **Légende :** 🟢 opérationnel & testé · 🟡 partiel / en cours · 🔴 absent.
 
@@ -59,19 +59,19 @@
 
 ```mermaid
 graph TD
-    ROOT["📦 Microlingo (monorepo)"]
+    ROOT["📦 Certigo (monorepo)"]
 
     ROOT --> BE["⚙️ backend/<br/>Azure Functions .NET 8"]
     ROOT --> APP["📱 apps/mobile/<br/>App Flutter"]
     ROOT --> PKG["🧩 packages/<br/>Paquets Dart partagés"]
-    ROOT --> CNT["📚 content/<br/>5 certifs · 60 leçons (YAML)"]
+    ROOT --> CNT["📚 content/<br/>89 certifs · 144 leçons (YAML)"]
     ROOT --> INF["🏗️ infra/<br/>8 modules Bicep"]
-    ROOT --> CI[".github/workflows/<br/>6 pipelines"]
+    ROOT --> CI[".github/workflows/<br/>9 actifs + 2 historiques"]
     ROOT --> DOC["📄 docs/<br/>README · ARCHITECTURE · ÉTAT"]
 
-    BE --> API["Microlingo.Api<br/>17 groupes de Functions"]
-    BE --> DOM["Microlingo.Domain<br/>moteurs métier purs"]
-    BE --> TST["Microlingo.Tests<br/>325 tests (+6 Cosmos émulateur)"]
+    BE --> API["Certigo.Api<br/>17 groupes de Functions"]
+    BE --> DOM["Certigo.Domain<br/>moteurs métier purs"]
+    BE --> TST["Certigo.Tests<br/>325 tests (+6 Cosmos émulateur)"]
 
     PKG --> CORE["core/ — base commune"]
     PKG --> CORTEX["cortex/ — SRS & scoring"]
@@ -141,21 +141,16 @@ flowchart LR
 
 ```mermaid
 graph LR
-    C["📚 content/"] --> AZ900["AZ-900<br/>Fondamentaux Azure"]
-    C --> AZ104["AZ-104<br/>Administration Azure"]
-    C --> AI900["AI-900<br/>Fondamentaux IA"]
-    C --> DP900["DP-900<br/>Fondamentaux données"]
-    C --> SC900["SC-900<br/>Sécurité & conformité"]
+    C["📚 content/"] --> ACT["89 certifications actives"]
+    C --> RICH["5 tracks complets<br/>AZ-900 · AZ-104 · AI-900 · DP-900 · SC-900"]
+    C --> MIN["84 tracks catalogue<br/>1 leçon d'amorçage chacun"]
 ```
 
-| Certification | Domaines | Leçons | Format |
+| Couverture | Domaines | Leçons | Format |
 |---|:---:|:---:|---|
-| **AZ‑900** | 3 | 12 | `content/az-900/track.yaml` + `lessons/*.lesson.yaml` |
-| **AZ‑104** | 5 | 12 | idem |
-| **AI‑900** | 5 | 12 | idem |
-| **DP‑900** | 4 | 12 | idem |
-| **SC‑900** | 4 | 12 | idem |
-| **Total** | — | **60** | Validé par `content/schema/{lesson,track}.schema.json` |
+| **Tracks complets existants** | 21 (cumul) | 60 | `content/{az-900,az-104,ai-900,dp-900,sc-900}` |
+| **Tracks catalogue ajoutés** | 1 chacun | 84 | `content/<certification-active>/track.yaml` + `lessons/*.lesson.yaml` |
+| **Total** | — | **144** | **89 certifications actives** validées par `content/schema/{lesson,track}.schema.json` |
 
 ---
 
@@ -216,8 +211,8 @@ les décisions serveur‑autoritaires.
 |---|---|---|
 | **Auth multi‑fournisseurs** | mobile `features/auth` | Microsoft · Google · Apple, fédérés derrière **Entra External ID** via `flutter_appauth` ; session persistante (`session_store`). |
 | **Validation JWT** | `Api/Middleware/JwtAuthMiddleware` | Vérifie le porteur `Bearer` sur chaque requête, sauf endpoints explicitement anonymes. |
-| **Config native Android** | `apps/mobile/android` | Schéma de redirection `microlingo://auth` + permission `INTERNET` (#46). |
-| **Config native iOS** | `apps/mobile/ios` | URL Scheme `microlingo` déclaré dans `Info.plist` pour le callback OIDC `microlingo://auth`. |
+| **Config native Android** | `apps/mobile/android` | Schéma de redirection `certigo://auth` + permission `INTERNET` (#46). |
+| **Config native iOS** | `apps/mobile/ios` | URL Scheme `certigo` déclaré dans `Info.plist` pour le callback OIDC `certigo://auth`. |
 | **Anti‑triche** | `Domain/Integrity/AttemptIntegrity` | Évaluateur **déterministe & pur** → verdict `Allow / Flag / Reject` + score de risque [0..1] + drapeaux nommés (vitesse surhumaine, soumission avant départ, débit XP excessif…). **Mode détection** d'abord (signale, ne touche pas aux récompenses). **Fenêtre de cadence** (XP + nombre de tentatives sur 1 h, lue du conteneur `attempts`, sans Redis) alimentée côté **`QuizService` et `ExamService`** → détecteurs `XpRateExceeded`/`AttemptRateExceeded` actifs. |
 | **Baseline sécurité CI** | `.github/workflows` | **CodeQL** + **security‑scan** + Bicep `Defender` / `Policy` / `Diagnostics`. |
 
@@ -239,8 +234,8 @@ les décisions serveur‑autoritaires.
 > Mode **serverless** : on paie à la requête, idéal tant que la charge est faible.
 
 > Les dépôts Cosmos (`users`, `attempts`, `friends`) sont couverts par un **projet de tests
-> d'intégration** (`backend/tests/Microlingo.Infrastructure.Tests`, 6 cas) exécuté contre l'**émulateur
-> Cosmos** — gated par `MICROLINGO_COSMOS_TESTS=1`, **skippé proprement** sans émulateur (runtime réel
+> d'intégration** (`backend/tests/Certigo.Infrastructure.Tests`, 6 cas) exécuté contre l'**émulateur
+> Cosmos** — gated par `CERTIGO_COSMOS_TESTS=1`, **skippé proprement** sans émulateur (runtime réel
 > non exécuté dans cet environnement).
 
 ---
@@ -270,14 +265,21 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 | Workflow | Rôle |
 |---|---|
 | `ci-backend.yml` | Build + **325 tests** xUnit (.NET 8) + **6** d'intégration Cosmos (émulateur‑gated). |
-| `ci-mobile.yml` | Analyse + **185 tests** Dart (unit + widget). |
+| `ci-mobile.yml` | Analyse + **185 tests** Dart (unit + widget) ; Flutter **3.24.0** / Dart **3.5.0** épinglés. |
 | `ci-content.yml` | Validation des leçons/certifs contre les schémas JSON. |
 | `ci-infra.yml` | Lint / what‑if Bicep. |
+| `cd-backend.yml` | Déploiement backend vers l'environnement cible. |
 | `codeql.yml` | Analyse statique de sécurité. |
-| `security-scan.yml` | Scan sécurité complémentaire. |
+| `lint-workflows.yml` | Lint des workflows GitHub Actions du dépôt. |
+| `release-android.yml` | AAB Android signé + publication Google Play. |
+| `security-scan.yml` | Scan sécurité complémentaire (NuGet + Bicep). |
 
-> ⚠️ CI exécutée **uniquement sur le runner self‑hosted Azure** (`microlingo-ci`) — les runners
-> GitHub‑hébergés sont désactivés par la politique d'entreprise. Egress via NAT Gateway `nat-microlingo`.
+> `release-ios.yml` et `sync-ios-certs.yml` sont conservés comme références
+> historiques mais sont désactivés ; la chaîne iOS active est gérée par
+> Codemagic.
+
+> ⚠️ CI exécutée **uniquement sur le runner self‑hosted Azure** (`law-microlingo`) — les runners
+> GitHub‑hébergés sont désactivés par la politique d'entreprise. Egress via NAT Gateway `law-microlingo`.
 
 ---
 
@@ -287,11 +289,11 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 
 | Date | Évolution |
 |---|---|
-| 2026‑06‑24 | 📱 **Écrans gamification mobile** : saisons · quêtes · succès · boutique · amis · examens blancs branchés (couche data + providers + router) → 6 écrans + 6 tests widget ; suite Dart **185** verte. 🧪 **Tests d'intégration Cosmos** (`Microlingo.Infrastructure.Tests`, 6 cas émulateur‑gated, skippés proprement hors émulateur). |
-| 2026‑06‑24 | 🔐 **Connexion sociale iOS** : ajout du callback natif `microlingo://auth` dans `Info.plist` + messages d'erreur login plus explicites (redirect/client/provider) côté mobile. |
+| 2026‑06‑24 | 📱 **Écrans gamification mobile** : saisons · quêtes · succès · boutique · amis · examens blancs branchés (couche data + providers + router) → 6 écrans + 6 tests widget ; suite Dart **185** verte. 🧪 **Tests d'intégration Cosmos** (`Certigo.Infrastructure.Tests`, 6 cas émulateur‑gated, skippés proprement hors émulateur). |
+| 2026‑06‑24 | 🔐 **Connexion sociale iOS** : ajout du callback natif `certigo://auth` dans `Info.plist` + messages d'erreur login plus explicites (redirect/client/provider) côté mobile. |
 | 2026‑06‑24 | 🛡️ **Anti‑triche examen** : fenêtre de cadence (XP/tentatives sur 1 h, conteneur `attempts`) câblée dans `ExamService` — miroir de `QuizService` → détecteurs de débit actifs aussi pour les examens blancs ; test dédié `SubmitAsync_flags_submission_spam_via_the_rate_window`. Backend **325** tests verts. |
-| 2026‑06‑23 | 🛡️ **Remédiation post‑audit** : intégrité économie (ETag + idempotence atomique), garde auth dev en prod, parité Cortex (golden tests), `/health` + correlation id, 400/409, hardening infra par env + params staging/prod, SBOM + gate de release, validateur de contenu renforcé — voir `AUDIT_MICROLINGO.md` §M |
-| 2026‑06‑23 | 🔐 **Config Android native** activant la connexion Entra (`microlingo://auth` + INTERNET) — #46 |
+| 2026‑06‑23 | 🛡️ **Remédiation post‑audit** : intégrité économie (ETag + idempotence atomique), garde auth dev en prod, parité Cortex (golden tests), `/health` + correlation id, 400/409, hardening infra par env + params staging/prod, SBOM + gate de release, validateur de contenu renforcé — voir `AUDIT_CERTIGO.md` §M |
+| 2026‑06‑23 | 🔐 **Config Android native** activant la connexion Entra (`certigo://auth` + INTERNET) — #46 |
 | 2026‑06‑23 | 🔍 **Anti‑triche** : moteur d'intégrité de tentative + détection « shadow » (quiz/examen) — #43 |
 | 2026‑06‑23 | 🪪 **Auth multi‑fournisseurs** Microsoft / Google / Apple + session persistante — #41 |
 | 2026‑06‑23 | 🗓️ **Saisons** : moteur de défi mensuel thématisé serveur‑autoritaire — #42 |
@@ -322,7 +324,7 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 - 🏗️ **Déployer l'infra** Bicep sur un environnement reproductible (aujourd'hui décrite seulement).
 - 🔐 **Valider l'auth de bout en bout** sur un vrai tenant Entra External ID (E2E).
 - 🔍 **Faire passer l'anti‑triche** du mode détection au mode application des sanctions (lot suivant) — la **fenêtre de cadence** (débit XP/tentatives sur 1 h) est désormais câblée pour **quiz et examens** ; reste la calibration puis la bascule en mode sanction.
-- 🧪 **Exécuter les tests d'intégration Cosmos** sur un émulateur réel (le projet `Microlingo.Infrastructure.Tests` existe, gated `MICROLINGO_COSMOS_TESTS=1`) puis écrire les tests HTTP/middleware (Functions SDK).
+- 🧪 **Exécuter les tests d'intégration Cosmos** sur un émulateur réel (le projet `Certigo.Infrastructure.Tests` existe, gated `CERTIGO_COSMOS_TESTS=1`) puis écrire les tests HTTP/middleware (Functions SDK).
 
 ---
 
@@ -330,7 +332,7 @@ environnement n'est provisionné par ce dépôt). Une instance de **dev** a déj
 
 ### 🔄 Comment ce document reste à jour
 
-À chaque évolution traitée dans une session de travail sur Microlingo, ce fichier est **rafraîchi dans
+À chaque évolution traitée dans une session de travail sur Certigo, ce fichier est **rafraîchi dans
 le même commit / la même PR** : en‑tête (date + commit reflété), Vue d'ensemble, inventaire des
 fonctionnalités, contenu, API, données et **Journal d'évolution**. Pas de workflow autonome —
 la mise à jour fait partie du travail.

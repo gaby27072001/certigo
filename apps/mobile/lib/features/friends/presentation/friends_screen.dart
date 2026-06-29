@@ -2,11 +2,11 @@ import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
-import '../../../app/router.dart';
+import '../../../shared/widgets/inline_error.dart';
+import '../../../shared/widgets/screen_header.dart';
 
 /// Friends — add learners by handle, view their level/streak, and remove them.
 /// The whole screen is stateful because it owns the add-friend text field; the
@@ -112,7 +112,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
           bottom: false,
           child: Column(
             children: <Widget>[
-              const _ScreenHeader(title: 'Amis'),
+              const ScreenHeader(title: 'Amis'),
               _AddFriendCard(
                 controller: _handleController,
                 adding: _adding,
@@ -121,7 +121,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                  child: _InlineError(message: _error!),
+                  child: InlineError(message: _error!),
                 ),
               const SizedBox(height: 8),
               Expanded(
@@ -379,65 +379,6 @@ class _FriendsLoading extends StatelessWidget {
         SizedBox(height: 10),
         PrismSkeleton(height: 74),
       ],
-    );
-  }
-}
-
-class _InlineError extends StatelessWidget {
-  const _InlineError({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final PrismColorScheme p = context.prism;
-    final TextTheme t = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: p.error.withOpacity(0.12),
-        borderRadius: PrismRadii.cardMd,
-        border: Border.all(color: p.error.withOpacity(0.4)),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.error_outline_rounded, color: p.error, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(message, style: t.bodySmall?.copyWith(color: p.error)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScreenHeader extends StatelessWidget {
-  const _ScreenHeader({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final TextTheme t = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 20, 4),
-      child: Row(
-        children: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go(Routes.home);
-              }
-            },
-          ),
-          const SizedBox(width: 4),
-          Text(title, style: t.headlineSmall),
-        ],
-      ),
     );
   }
 }

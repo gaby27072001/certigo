@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:microlingo/app/providers.dart';
-import 'package:microlingo/features/seasons/presentation/seasons_screen.dart';
+import 'package:certigo/app/providers.dart';
+import 'package:certigo/features/seasons/presentation/seasons_screen.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 /// Widget test for [SeasonsScreen].

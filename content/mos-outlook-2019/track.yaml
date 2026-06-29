@@ -1,0 +1,15 @@
+id: mos-outlook-2019
+code: MOS-OUTLOOK-2019
+title: 'Microsoft Office Specialist: Outlook Associate (Office 2019)'
+level: associate
+summary: Microsoft certification (Business User) covering Outlook.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-4dbdd4df
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-4dbdd4df

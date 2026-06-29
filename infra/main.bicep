@@ -1,5 +1,5 @@
 // ============================================================================
-// Microlingo — root infrastructure (Bicep)
+// Certigo — root infrastructure (Bicep)
 // Subscription-scoped: creates the resource group, then composes all modules.
 // Backend stack: Azure Functions (isolated .NET 8) + Cosmos DB (serverless) +
 // Blob Storage + Application Insights + Key Vault. Identity is Microsoft Entra
@@ -18,7 +18,7 @@ param location string = 'westeurope'
 param cosmosLocation string = ''
 
 @description('Base name used to derive resource names. Lowercase, no spaces.')
-param appName string = 'microlingo'
+param appName string = 'certigo'
 
 @description('Entra External ID authority URL. Format: https://<domain>.ciamlogin.com/<tenant-id>/v2.0. Replace with the value from Azure Portal → External ID tenant → Overview. Leave empty until the tenant is created.')
 @secure()
@@ -27,6 +27,19 @@ param entraAuthority string = ''
 @description('Entra External ID application (audience) client ID — the App Registration client ID. Replace with the value from Azure Portal → External ID → App registrations → <your-app> → Overview. Leave empty until configured.')
 @secure()
 param entraAudience string = ''
+@description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
+param tutorLlmEnabled bool = false
+@description('Azure OpenAI resource endpoint used by the tutor when enabled. Example: https://<resource>.openai.azure.com/.')
+param tutorLlmEndpoint string = ''
+@description('Azure OpenAI deployment name used by the tutor when enabled.')
+param tutorLlmDeployment string = ''
+@description('Optional Azure OpenAI API version override for the tutor.')
+param tutorLlmApiVersion string = '2024-10-21'
+@description('Optional explicit Azure OpenAI API key for the tutor. Leave empty to use the Function App managed identity instead.')
+@secure()
+param tutorLlmApiKey string = ''
+@description('Maximum output tokens requested from the tutor LLM.')
+param tutorLlmMaxOutputTokens int = 400
 
 @description('Optional email notified on security alerts (401/403/5xx spikes). Empty = no receiver.')
 param alertEmail string = ''
@@ -57,7 +70,7 @@ var assignPolicy = forcePolicyAssignment || env != 'dev'
 // is capacity-constrained for Cosmos (cross-region Functions->Cosmos is fine).
 var cosmosRegion = empty(cosmosLocation) ? location : cosmosLocation
 var tags = {
-  product: 'Microlingo'
+  product: 'Certigo'
   env: env
   managedBy: 'bicep'
 }
@@ -84,7 +97,7 @@ module data 'modules/cosmos.bicep' = {
   params: {
     accountName: 'cosmos-${appName}-${env}-${suffix}'
     location: cosmosRegion
-    databaseName: 'microlingo'
+    databaseName: 'certigo'
     disableLocalAuth: hardened
     tags: tags
   }
@@ -101,6 +114,12 @@ module storage 'modules/storage.bicep' = {
     enableVersioning: hardened
     blobSoftDeleteDays: hardened ? 30 : 7
     containerSoftDeleteDays: hardened ? 30 : 7
+    // Keep public network access enabled across all envs: the Flex Consumption Function App
+    // pulls its deployment package (app-package container) over the public endpoint via its
+    // managed identity. Locking this down requires private endpoints (P1 hardening for
+    // staging/prod). Set explicitly to prevent drift to Disabled (which caused a 403 on the
+    // package pull in dev).
+    publicNetworkAccess: 'Enabled'
     tags: tags
   }
 }
@@ -132,6 +151,12 @@ module api 'modules/functionApp.bicep' = {
     authMode: authMode
     entraAuthority: entraAuthority
     entraAudience: entraAudience
+    tutorLlmEnabled: tutorLlmEnabled
+    tutorLlmEndpoint: tutorLlmEndpoint
+    tutorLlmDeployment: tutorLlmDeployment
+    tutorLlmApiVersion: tutorLlmApiVersion
+    tutorLlmApiKey: tutorLlmApiKey
+    tutorLlmMaxOutputTokens: tutorLlmMaxOutputTokens
     // Native mobile clients aren't subject to CORS; only dev keeps '*' (browser tooling).
     allowedCorsOrigins: env == 'dev' ? [ '*' ] : []
     tags: tags

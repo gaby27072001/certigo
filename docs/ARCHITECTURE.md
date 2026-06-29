@@ -1,9 +1,9 @@
-# Architecture — Microlingo
+# Architecture — Certigo
 
 Ce document décrit l'architecture de référence du monorepo : frontend Flutter, backend
 .NET 8 Azure Functions, moteur pédagogique Cortex, contenu *as-code* et flux de données.
 
-> Rappel produit : Microlingo enseigne des **concepts techniques réels** et prépare aux
+> Rappel produit : Certigo enseigne des **concepts techniques réels** et prépare aux
 > certifications Microsoft (AZ-900, AZ-104, AI-900, DP-900). Ce **n'est pas** une app de langues.
 
 ---
@@ -37,15 +37,15 @@ Ce document décrit l'architecture de référence du monorepo : frontend Flutter
                                      │ HTTPS + JWT (Entra External ID)
                                      ▼
 ┌──────────────────────── backend (.NET 8 isolated Functions) ─────────────────────┐
-│  Microlingo.Api            HTTP triggers · JwtAuthMiddleware · ExceptionMiddleware │
+│  Certigo.Api            HTTP triggers · JwtAuthMiddleware · ExceptionMiddleware │
 │      │                                                                            │
 │      ▼                                                                            │
-│  Microlingo.Application    services métier · DTO · abstractions (ports)           │
+│  Certigo.Application    services métier · DTO · abstractions (ports)           │
 │      │                                                                            │
 │      ▼                                                                            │
-│  Microlingo.Domain         readiness · FSRS · XP · modèles (AUCUNE dépendance)     │
+│  Certigo.Domain         readiness · FSRS · XP · modèles (AUCUNE dépendance)     │
 │      ▲                                                                            │
-│  Microlingo.Infrastructure Cosmos repositories · Entra token validator (adapters) │
+│  Certigo.Infrastructure Cosmos repositories · Entra token validator (adapters) │
 └───────────────────────────────────┬──────────────────────────────────────────────┘
                                      ▼
                 Azure Cosmos DB · Blob Storage · Key Vault · App Insights
@@ -99,11 +99,11 @@ gitignorés).
 
 | Projet | Responsabilité |
 |---|---|
-| `Microlingo.Domain` | Modèles + règles pures : `ReadinessCalculator`, `ReviewScheduler` (FSRS), XP, gamification, contenu. Zéro dépendance externe. |
-| `Microlingo.Application` | Services d'orchestration, DTO (`Dtos.cs`), abstractions/ports (`CoreAbstractions.cs`). |
-| `Microlingo.Infrastructure` | Adapters Cosmos (`CosmosContext`, repositories, sérialiseur System.Text.Json), validation token Entra. |
-| `Microlingo.Api` | HTTP triggers (`*Functions.cs`), `JwtAuthMiddleware`, `ExceptionMiddleware`, `FunctionUserContext`. |
-| `Microlingo.Domain.Tests` | xUnit — couvre FSRS, readiness, XP. |
+| `Certigo.Domain` | Modèles + règles pures : `ReadinessCalculator`, `ReviewScheduler` (FSRS), XP, gamification, contenu. Zéro dépendance externe. |
+| `Certigo.Application` | Services d'orchestration, DTO (`Dtos.cs`), abstractions/ports (`CoreAbstractions.cs`). |
+| `Certigo.Infrastructure` | Adapters Cosmos (`CosmosContext`, repositories, sérialiseur System.Text.Json), validation token Entra. |
+| `Certigo.Api` | HTTP triggers (`*Functions.cs`), `JwtAuthMiddleware`, `ExceptionMiddleware`, `FunctionUserContext`. |
+| `Certigo.Domain.Tests` | xUnit — couvre FSRS, readiness, XP. |
 
 ### 4.2 Endpoints
 
@@ -128,7 +128,7 @@ En local : `local.settings.json` (gabarit `.example` fourni, fichier réel gitig
 
 ## 5. Données — Cosmos DB
 
-Base `microlingo`, mode **serverless**. Huit containers, partitionnés pour la localité des accès :
+Base `certigo`, mode **serverless**. Huit containers, partitionnés pour la localité des accès :
 
 | Container | Partition key | Contenu |
 |---|---|---|
@@ -149,7 +149,7 @@ partition logique (progression, tentatives, événements) — requêtes mono-par
 ## 6. Cortex — moteur pédagogique
 
 Cortex est **dupliqué à l'identique** en Dart (`packages/cortex`) et en C#
-(`Microlingo.Domain`). Mêmes constantes, mêmes formules, **même planification en
+(`Certigo.Domain`). Mêmes constantes, mêmes formules, **même planification en
 jours fractionnaires** — la parité est verrouillée par des **golden tests partagés**
 (`cortex_golden_test.dart` ↔ `CortexParityTests.cs`). Le client anticipe, le serveur tranche.
 *(Des divergences mineures subsistent sur les champs `dueAt` et `recency` entre les deux implémentations ; elles feront l'objet de golden tests dédiés.)*
@@ -221,9 +221,11 @@ modules. `params/dev.bicepparam` porte les valeurs d'environnement.
 
 ## 10. CI/CD
 
-Quatre workflows ciblés par chemin (voir `.github/workflows/`) : `ci-mobile`, `ci-backend`,
-`ci-content`, `ci-infra`. Chacun ne se déclenche que sur les dossiers qui le concernent, pour
-des retours rapides et indépendants.
+Neuf workflows actifs ciblés par chemin ou par événement (voir `.github/workflows/`) :
+`ci-mobile`, `ci-backend`, `ci-content`, `ci-infra`, `cd-backend`, `codeql`,
+`lint-workflows`, `release-android`, `security-scan`. Les workflows iOS GitHub Actions
+`release-ios` et `sync-ios-certs` sont désactivés et conservés comme historique ; la
+chaîne iOS active passe par Codemagic.
 
 ---
 
@@ -242,7 +244,7 @@ des retours rapides et indépendants.
 
 ## 12. Durcissement & intégrité (remédiation post-audit)
 
-Garanties ajoutées à l'issue de l'audit technique (voir `AUDIT_MICROLINGO.md`) :
+Garanties ajoutées à l'issue de l'audit technique (voir `AUDIT_CERTIGO.md`) :
 
 | Domaine | Garantie |
 |---|---|
@@ -254,4 +256,3 @@ Garanties ajoutées à l'issue de l'audit technique (voir `AUDIT_MICROLINGO.md`)
 | **Contenu** | Le validateur vérifie l'**intégrité des réponses** (chaque `correct` référence une option réelle), l'**unicité** des ids d'items, et la cohérence `ordering`/`mcq`. |
 | **Cloud** | Hardening **par environnement** (`var hardened = env != 'dev'`) : Cosmos RBAC-only, Key Vault purge protection + soft delete 90 j, Storage GRS + versioning + soft delete, CORS verrouillé ; **params `staging`/`prod`** ajoutés. |
 | **CI/CD** | SDK Dart épinglé, lockfile applicatif suivi, **SBOM** (CycloneDX) backend, **gate d'approbation** (`environment: beta`) sur les releases mobiles. |
-

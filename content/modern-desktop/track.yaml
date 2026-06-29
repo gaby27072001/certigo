@@ -1,0 +1,15 @@
+id: modern-desktop
+code: MODERN-DESKTOP
+title: 'Microsoft 365 Certified: Endpoint Administrator Associate'
+level: associate
+summary: Microsoft certification (Administrator) covering Microsoft 365.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-127a2cbe
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-127a2cbe

@@ -1,5 +1,5 @@
 # =============================================================================
-# codemagic.yaml — Configuration Codemagic pour Microlingo iOS CI/CD
+# codemagic.yaml — Configuration Codemagic pour Certigo iOS CI/CD
 # =============================================================================
 #
 # Ce fichier remplace les workflows GitHub Actions iOS qui nécessitaient
@@ -22,6 +22,7 @@
 #
 # 4. Déclencher un build :
 #    - Via tag git (v*) → déclenche automatiquement ios-release
+#    - Via push sur main → déclenche automatiquement ios-release-dry
 #    - Via le dashboard Codemagic → Start new build → choisir le workflow
 #
 # WORKFLOWS DISPONIBLES :
@@ -61,9 +62,9 @@ workflows:
         # Codemagic gère les certificats et profils nativement via l'API App Store Connect.
         # Plus besoin de fastlane match, de .p12 ou de profils encodés en secrets.
         distribution_type: app_store
-        bundle_identifier: com.microlingo.app
+        bundle_identifier: law-microlingo
       vars:
-        BUNDLE_ID: com.microlingo.app
+        BUNDLE_ID: law-microlingo
         FLUTTER_APP_PATH: apps/mobile
 
     triggering:
@@ -144,9 +145,38 @@ workflows:
       # -----------------------------------------------------------------------
       - name: Build IPA signé (flutter build ipa)
         script: |
+          cat > /tmp/ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>teamID</key>
+              <string>FFQPC7NC68</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>signingCertificate</key>
+              <string>Apple Distribution</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>law-microlingo</key>
+                  <string>Certigo AppStore</string>
+              </dict>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>manageAppVersionAndBuildNumber</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
           flutter build ipa --release \
+            --dart-define=API_BASE_URL=https://law-microlingodev-a2msquxibzvcu.azurewebsites.net/api \
             --build-name="$BUILD_NAME" \
-            --build-number="$BUILD_NUMBER"
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/tmp/ExportOptions.plist
         working_directory: apps/mobile
 
     artifacts:
@@ -161,7 +191,7 @@ workflows:
           - Internal Testers  # Groupe de testeurs internes dans App Store Connect
       email:
         recipients:
-          - gchambaud@microsoft.com
+          - gabriel.chambaud@gmail.com
         notify:
           success: true
           failure: true
@@ -174,7 +204,7 @@ workflows:
   # ios-release-dry : Build IPA signé SANS upload TestFlight (dry run)
   # Identique à ios-release, mais sans section publishing.
   # Utile pour valider la signature et le build avant un vrai release.
-  # Déclencheur : manuel uniquement depuis le dashboard Codemagic
+  # Déclencheur : push sur main ou manuel depuis le dashboard Codemagic
   # ===========================================================================
   ios-release-dry:
     name: iOS — Build IPA signé (dry run, sans upload TestFlight)
@@ -190,12 +220,18 @@ workflows:
       cocoapods: default
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.microlingo.app
+        bundle_identifier: law-microlingo
       vars:
-        BUNDLE_ID: com.microlingo.app
+        BUNDLE_ID: law-microlingo
         FLUTTER_APP_PATH: apps/mobile
 
-    # Pas de triggering automatique — déclencher manuellement depuis le dashboard
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
 
     scripts:
       - name: Récupérer les dépendances Flutter
@@ -237,9 +273,38 @@ workflows:
 
       - name: Build IPA signé (flutter build ipa)
         script: |
+          cat > /tmp/ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>teamID</key>
+              <string>FFQPC7NC68</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>signingCertificate</key>
+              <string>Apple Distribution</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>law-microlingo</key>
+                  <string>Certigo AppStore</string>
+              </dict>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>manageAppVersionAndBuildNumber</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
           flutter build ipa --release \
+            --dart-define=API_BASE_URL=https://law-microlingodev-a2msquxibzvcu.azurewebsites.net/api \
             --build-name="$BUILD_NAME" \
-            --build-number="$BUILD_NUMBER"
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/tmp/ExportOptions.plist
         working_directory: apps/mobile
 
     artifacts:
@@ -278,7 +343,7 @@ workflows:
       xcode: latest
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.microlingo.app
+        bundle_identifier: law-microlingo
 
     # Pas de triggering automatique — déclencher manuellement depuis le dashboard
 
@@ -310,7 +375,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - gchambaud@microsoft.com
+          - gabriel.chambaud@gmail.com
         notify:
           success: true
           failure: true

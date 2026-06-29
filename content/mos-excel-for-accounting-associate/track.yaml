@@ -1,0 +1,15 @@
+id: mos-excel-for-accounting-associate
+code: MOS-EXCEL-FOR-ACCOUNTING-ASSOCIATE
+title: 'Microsoft Office Specialist: Excel for Accounting Associate'
+level: associate
+summary: Microsoft certification (Business User) covering Excel.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-0b60083e
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-0b60083e

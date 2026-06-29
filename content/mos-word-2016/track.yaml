@@ -1,0 +1,15 @@
+id: mos-word-2016
+code: MOS-WORD-2016
+title: 'Microsoft Office Specialist: Word (Office 2016)'
+level: associate
+summary: Microsoft certification (Business User) covering Word.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-8dcd2d26
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-8dcd2d26

@@ -1,5 +1,5 @@
 // Azure Functions (Linux Flex Consumption, .NET 8 isolated worker) hosting the
-// Microlingo API. Uses a system-assigned managed identity for Key Vault, Cosmos
+// Certigo API. Uses a system-assigned managed identity for Key Vault, Cosmos
 // data-plane, and identity-based storage access — NO account keys anywhere
 // (the platform's storage accounts have shared-key auth disabled by policy).
 @description('Function App name (globally unique).')
@@ -35,6 +35,19 @@ param entraAuthority string = ''
 @description('Entra External ID application (audience) client ID — the App Registration client ID in the External ID tenant. Replace with the value from Azure Portal → External ID → App registrations → <your-app> → Overview. Leave empty until configured.')
 @secure()
 param entraAudience string = ''
+@description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
+param tutorLlmEnabled bool = false
+@description('Azure OpenAI resource endpoint used by the tutor when the feature flag is enabled. Example: https://<resource>.openai.azure.com/.')
+param tutorLlmEndpoint string = ''
+@description('Azure OpenAI deployment name used by the tutor when the feature flag is enabled.')
+param tutorLlmDeployment string = ''
+@description('Optional Azure OpenAI API version override. Leave the default unless a platform rollout requires a newer stable version.')
+param tutorLlmApiVersion string = '2024-10-21'
+@description('Optional explicit API key for the tutor LLM. Leave empty to use the Function App managed identity instead.')
+@secure()
+param tutorLlmApiKey string = ''
+@description('Maximum output tokens requested from the tutor LLM.')
+param tutorLlmMaxOutputTokens int = 400
 param tags object = {}
 
 @description('CORS allowed origins. Native mobile clients are not subject to CORS, so this can be [] (none) for staging/prod; dev passes ["*"] for browser-based tooling.')
@@ -102,11 +115,17 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         // App config consumed by the API. Keys are FLAT (match Program.cs /
         // local.settings.json.example): COSMOS_ENDPOINT, ENTRA_AUTHORITY, etc.
         { name: 'COSMOS_ENDPOINT', value: cosmosEndpoint }
-        { name: 'COSMOS_DATABASE', value: 'microlingo' }
+        { name: 'COSMOS_DATABASE', value: 'certigo' }
         // "dev" => permissive DevTokenValidator (dev env only); "prod" (or any non-"dev" value) => Entra.
         { name: 'AUTH_MODE', value: authMode }
         { name: 'ENTRA_AUTHORITY', value: entraAuthority }
         { name: 'ENTRA_AUDIENCE', value: entraAudience }
+        { name: 'TUTOR_LLM_ENABLED', value: string(tutorLlmEnabled) }
+        { name: 'TUTOR_LLM_ENDPOINT', value: tutorLlmEndpoint }
+        { name: 'TUTOR_LLM_DEPLOYMENT', value: tutorLlmDeployment }
+        { name: 'TUTOR_LLM_API_VERSION', value: tutorLlmApiVersion }
+        { name: 'TUTOR_LLM_API_KEY', value: tutorLlmApiKey }
+        { name: 'TUTOR_LLM_MAX_OUTPUT_TOKENS', value: string(tutorLlmMaxOutputTokens) }
         { name: 'KeyVault__Uri', value: 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/' }
       ]
     }

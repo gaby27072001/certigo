@@ -1,4 +1,4 @@
-# Fastlane — pipeline beta iOS de Microlingo (TestFlight).
+# Fastlane — pipeline beta iOS de Certigo (TestFlight).
 # Authentification via clé API App Store Connect (.p8) → pas d'Apple ID ni de 2FA.
 #
 # Deux modes de signature, choisis par le workflow (variable IOS_MATCH_GIT_URL) :
@@ -10,7 +10,7 @@
 # en utilisant le nom de profil fourni via IOS_PROVISIONING_PROFILE_NAME.
 default_platform(:ios)
 
-BUNDLE_ID = "com.microlingo.app".freeze
+BUNDLE_ID = "law-microlingo".freeze
 
 # Clé API App Store Connect (lecture des secrets depuis l'environnement).
 def asc_api_key
@@ -54,7 +54,7 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       output_directory: "../build/ios/ipa",
-      output_name: "microlingo.ipa",
+      output_name: "certigo.ipa",
       export_options: {
         signingStyle: "manual",
         teamID: team_id,
@@ -65,7 +65,7 @@ platform :ios do
 
     upload_to_testflight(
       api_key: asc_api_key,
-      ipa: "../build/ios/ipa/microlingo.ipa",
+      ipa: "../build/ios/ipa/certigo.ipa",
       skip_submission: true,
       skip_waiting_for_build_processing: true,
       distribute_external: ENV["TF_EXTERNAL"] == "true",

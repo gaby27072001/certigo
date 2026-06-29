@@ -1,0 +1,42 @@
+id: l-core-8fdefd70
+trackId: azure-database-administrator-associate
+unitId: u-core-8fdefd70
+domainId: core-objectives
+title: Core objectives overview
+estMinutes: 5
+blocks:
+- type: hook
+  conceptId: c-core-8fdefd70
+  body: 'Use this micro-lesson as a quick orientation for Microsoft Certified: Azure
+    Database Administrator Associate. Focus on role scope, product coverage, and expected
+    outcomes.'
+- type: concept
+  conceptId: c-core-8fdefd70
+  title: Certification focus
+  body: 'Microsoft Certified: Azure Database Administrator Associate targets competency
+    in role scope and product coverage. Review core scenarios, service boundaries,
+    and implementation trade-offs.'
+- type: check
+  conceptId: c-core-8fdefd70
+  check:
+    id: l-core-8fdefd70-check-1
+    conceptId: c-core-8fdefd70
+    type: mcq
+    difficulty: 1
+    stem: What is the best use of this lesson for AZURE-DATABASE-ADMINISTRATOR-ASSOCIATE
+      preparation?
+    options:
+    - id: a
+      label: Understand role scope and core objectives first
+    - id: b
+      label: Memorize implementation details without context
+    - id: c
+      label: Skip product and scenario alignment
+    correct:
+    - a
+    explanation: Start with role scope and objective mapping before deep dives. It
+      improves study efficiency and exam readiness.
+- type: recap
+  conceptId: c-core-8fdefd70
+  body: 'AZURE-DATABASE-ADMINISTRATOR-ASSOCIATE: align study on role scope, product
+    boundaries, and practical scenarios to maximize readiness.'

@@ -14,7 +14,7 @@ class StartChoiceScreen extends ConsumerWidget {
   static const List<(StartChoice, IconData, String)> _options = <(StartChoice, IconData, String)>[
     (StartChoice.continueTrack, Icons.play_circle_rounded, 'Je continue ma préparation'),
     (StartChoice.switchTrack, Icons.swap_horiz_rounded, 'Je vise une autre certification'),
-    (StartChoice.explore, Icons.explore_rounded, 'Je découvre Microlingo'),
+    (StartChoice.explore, Icons.explore_rounded, 'Je découvre Certigo'),
   ];
 
   @override

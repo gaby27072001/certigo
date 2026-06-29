@@ -1,0 +1,15 @@
+id: identity-and-access-administrator
+code: IDENTITY-AND-ACCESS-ADMINISTRATOR
+title: 'Microsoft Certified: Identity and Access Administrator Associate'
+level: associate
+summary: Microsoft certification (Security Engineer) covering Azure.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-36561325
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-36561325

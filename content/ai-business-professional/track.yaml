@@ -1,0 +1,16 @@
+id: ai-business-professional
+code: AI-BUSINESS-PROFESSIONAL
+title: 'Microsoft Certified: AI Business Professional'
+level: fundamentals
+summary: Microsoft certification (Administrator, Business User) covering Microsoft
+  365, Microsoft 365 Copilot.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-99c616d2
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-99c616d2

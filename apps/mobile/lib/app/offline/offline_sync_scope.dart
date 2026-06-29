@@ -9,7 +9,7 @@ import '../providers.dart';
 /// Drains the offline action queue whenever the app regains connectivity, is
 /// resumed from the background, or starts up.
 ///
-/// It lives above [MicrolingoApp] so a single lifecycle observer and a single
+/// It lives above [CertigoApp] so a single lifecycle observer and a single
 /// connectivity subscription cover the whole session. It is a pure side-effect
 /// wrapper: it renders [child] unchanged and only ever *reads* the sync engine
 /// to flush it, never mutating UI state.

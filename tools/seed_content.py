@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile Microlingo content-as-code into Cosmos documents.
+"""Compile Certigo content-as-code into Cosmos documents.
 
 Reads content/<track>/track.yaml and content/<track>/lessons/*.lesson.yaml and
 emits one JSON document per track and per lesson into tools/seed_output/ (the
@@ -153,14 +153,14 @@ def upsert_cosmos(docs: list[dict]) -> None:
             )
         credential = DefaultAzureCredential()
     client = CosmosClient(endpoint, credential=credential)
-    container = client.get_database_client("microlingo").get_container_client("content")
+    container = client.get_database_client("certigo").get_container_client("content")
     for doc in docs:
         container.upsert_item(doc)
     print(f"[ok] Upserted {len(docs)} documents to Cosmos (content).")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Seed Microlingo content.")
+    parser = argparse.ArgumentParser(description="Seed Certigo content.")
     parser.add_argument("--cosmos", action="store_true", help="Upsert to Cosmos DB.")
     args = parser.parse_args()
 

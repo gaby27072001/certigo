@@ -47,10 +47,12 @@ class _HomeContent extends StatelessWidget {
     final UserProfile me = data.profile;
     final LearningPath path = data.path;
     final PathLesson? next = data.nextLesson;
-    final PathUnit? nextUnit = data.nextUnit;
     final DomainProgress? weak = data.weakestDomain;
     final String firstName = me.displayName.split(' ').first;
-    final int previous = (path.readinessScore - path.readinessTrend7d).clamp(0, 100);
+    final int previous = (path.readinessScore - path.readinessTrend7d).clamp(
+      0,
+      100,
+    );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
@@ -71,7 +73,9 @@ class _HomeContent extends StatelessWidget {
         // Greeting — the guide welcomes you back in a speech bubble.
         _HomeGreeting(
           firstName: firstName,
-          subtitle: path.exam.isEmpty ? 'Prêt à progresser ?' : 'Cap sur ${path.exam}',
+          subtitle: path.exam.isEmpty
+              ? 'Prêt à progresser ?'
+              : 'Cap sur ${path.exam}',
         ),
         const SizedBox(height: 22),
 
@@ -82,10 +86,15 @@ class _HomeContent extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Column(
             children: <Widget>[
-              ReadinessGauge(score: path.readinessScore, previousScore: previous),
+              ReadinessGauge(
+                score: path.readinessScore,
+                previousScore: previous,
+              ),
               const SizedBox(height: 8),
               Text(
-                path.exam.isEmpty ? 'Score de préparation' : 'Score de préparation — ${path.exam}',
+                path.exam.isEmpty
+                    ? 'Score de préparation'
+                    : 'Score de préparation — ${path.exam}',
                 style: t.bodySmall?.copyWith(color: p.textSecondary),
               ),
               const SizedBox(height: 4),
@@ -102,24 +111,27 @@ class _HomeContent extends StatelessWidget {
           goal: me.dailyGoalXp,
         ),
         const SizedBox(height: 16),
+        _DailyShareEntryCard(
+          goalMet: me.dailyGoalXp > 0 && me.dailyXpEarned >= me.dailyGoalXp,
+          trackCode: path.exam,
+          onTap: () => context.go(Routes.dailyShare),
+        ),
+        const SizedBox(height: 16),
 
         // AI coach — server-ranked "next best action" shelf. Self-hiding:
         // collapses to nothing while loading, on error, or when empty, so it
         // never blocks the rest of Home.
         CoachSection(trackId: path.trackId),
 
-        // Continue lesson ------------------------------------------------
-        Text('Continuer', style: t.titleLarge),
-        const SizedBox(height: 12),
-        if (next != null)
-          _ContinueCard(
-            unit: nextUnit?.title ?? path.trackName,
-            lesson: next.title,
-            minutes: next.estMinutes,
-            onTap: () => context.go('${Routes.lesson}/${path.trackId}/${next.id}'),
-          )
-        else
-          _AllCaughtUpCard(onTap: () => context.go(Routes.path)),
+        // Current lesson indicator (non-interactive — action is in Parcours).
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Text('📍', style: TextStyle(fontSize: 22)),
+          title: Text(
+            next?.title ?? 'Aucune leçon en cours',
+            style: t.bodyLarge,
+          ),
+        ),
         const SizedBox(height: 24),
 
         // Explorer — secondary destinations beyond the daily path.
@@ -173,7 +185,8 @@ class _HomeGreetingState extends State<_HomeGreeting> {
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     final PrismColorScheme p = context.prism;
-    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final bool reduceMotion =
+        MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final Duration d = reduceMotion ? Duration.zero : PrismMotion.base;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,7 +290,10 @@ class _DailyGoalCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text('Objectif du jour', style: t.titleMedium),
               const Spacer(),
-              Text('$earned / $goal XP', style: t.labelLarge?.copyWith(color: p.textSecondary)),
+              Text(
+                '$earned / $goal XP',
+                style: t.labelLarge?.copyWith(color: p.textSecondary),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -293,87 +309,58 @@ class _DailyGoalCard extends StatelessWidget {
   }
 }
 
-class _ContinueCard extends StatelessWidget {
-  const _ContinueCard({
-    required this.unit,
-    required this.lesson,
-    required this.minutes,
+class _DailyShareEntryCard extends StatelessWidget {
+  const _DailyShareEntryCard({
+    required this.goalMet,
+    required this.trackCode,
     required this.onTap,
   });
 
-  final String unit;
-  final String lesson;
-  final int minutes;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final TextTheme t = Theme.of(context).textTheme;
-    return PrismCard(
-      variant: PrismCardVariant.filled,
-      accent: context.prism.primary,
-      elevation: 2,
-      borderRadius: PrismRadii.cardXl,
-      onTap: onTap,
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
-              borderRadius: PrismRadii.cardMd,
-            ),
-            child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 30),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(unit, style: t.bodySmall?.copyWith(color: Colors.white70)),
-                Text(lesson, style: t.titleMedium?.copyWith(color: Colors.white)),
-                Text('$minutes min', style: t.labelSmall?.copyWith(color: Colors.white70)),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: Colors.white),
-        ],
-      ),
-    );
-  }
-}
-
-class _AllCaughtUpCard extends StatelessWidget {
-  const _AllCaughtUpCard({required this.onTap});
-
+  final bool goalMet;
+  final String trackCode;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
+    final Color tone = goalMet ? p.success : p.primary;
+
     return PrismCard(
       variant: PrismCardVariant.tonal,
-      accent: p.success,
+      accent: tone,
       onTap: onTap,
       child: Row(
         children: <Widget>[
-          Icon(Icons.celebration_rounded, color: p.success, size: 28),
-          const SizedBox(width: 14),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: tone.withOpacity(0.16),
+              borderRadius: PrismRadii.cardMd,
+            ),
+            child: Icon(Icons.share_rounded, color: tone),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Tout est à jour !', style: t.titleMedium),
+                Text('Partage du jour', style: t.titleMedium),
+                const SizedBox(height: 2),
                 Text(
-                  'Explore ton parcours pour aller plus loin.',
-                  style: t.bodySmall?.copyWith(color: p.textSecondary),
+                  goalMet
+                      ? 'Ton objectif est atteint — partage ta progression ${trackCode.isEmpty ? '' : trackCode}.'
+                      : 'Transforme tes progrès du jour en carte de partage prête a envoyer.',
+                  style: t.bodySmall?.copyWith(
+                    color: p.textSecondary,
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded),
+          Icon(Icons.chevron_right_rounded, color: p.textSecondary),
         ],
       ),
     );

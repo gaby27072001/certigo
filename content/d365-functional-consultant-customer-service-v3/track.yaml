@@ -1,0 +1,15 @@
+id: d365-functional-consultant-customer-service-v3
+code: D365-FUNCTIONAL-CONSULTANT-CUSTOMER-SERVICE-V3
+title: 'Microsoft Certified: Dynamics 365 Customer Service Functional Consultant Associate'
+level: associate
+summary: Microsoft certification (Functional Consultant) covering Dynamics 365.
+domains:
+- id: core-objectives
+  name: Core objectives
+  weight: 1.0
+units:
+- id: u-core-32f11137
+  domainId: core-objectives
+  title: Core objectives
+  lessons:
+  - l-core-32f11137
