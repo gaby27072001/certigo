@@ -15,7 +15,7 @@ param appName = 'certigo'
 
 // Microsoft Entra External ID (CIAM) — staging tenant/app.
 param entraAuthority = 'https://certigo.ciamlogin.com/<tenant-guid>/v2.0'
-param entraAudience = '<api-client-id>'
+param entraAudience = 'api://<api-client-id>'
 
 // Email notified on 401/403/5xx spikes (optional but recommended pre-prod).
 param alertEmail = ''

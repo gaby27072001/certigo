@@ -53,15 +53,19 @@ Code = `certigo://auth` (source de vérité). Demande initiale = `microlingo://a
 `entraConfigured` = client_id + authority non vides. Tant que vide → flux Entra
 désactivé, app reste fonctionnelle.
 
-## 5. ⚠️ Alignements backend↔mobile à corriger AVANT E2E
+## 5. ✅ Alignements backend↔mobile (corrigés)
 
-Deux écarts dans `backend/src/Certigo.Api/local.settings.json.example` qui causeront
-des **401 systématiques** s'ils ne sont pas alignés :
+`backend/src/Certigo.Api/local.settings.json.example` est désormais aligné sur le
+mobile (évite les **401 systématiques**). À fournir uniquement les vraies valeurs
+`<domain>`, `<tenant-id>`, `<client-id>` :
 
-1. **Authority** : backend = `login.microsoftonline.com/<tenant-id>` (workforce) ;
-   mobile = `<domain>.ciamlogin.com`. → mettre le backend sur l'authority **CIAM**.
-2. **Audience** : backend = `api://certigo` ; le scope `api://<client-id>/user_impersonation`
-   produit aud = `api://<client-id>`. → `ENTRA_AUDIENCE` doit = `api://<client-id>`.
+1. **Authority** : backend = `https://<domain>.ciamlogin.com/<tenant-id>/v2.0` (CIAM),
+   identique au mobile. ✅
+2. **Audience** : `ENTRA_AUDIENCE` = `api://<client-id>` — le scope
+   `api://<client-id>/user_impersonation` produit aud = `api://<client-id>`. ✅
+
+L'infra (`infra/params/*.bicepparam` → `functionApp.bicep`) câble déjà
+`ENTRA_AUTHORITY` / `ENTRA_AUDIENCE` sur les mêmes valeurs CIAM.
 
 ## 6. Tests automatisables (sans tenant, déjà OK)
 

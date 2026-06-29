@@ -12,8 +12,8 @@
     "TUTOR_LLM_API_VERSION": "2024-10-21",
     "TUTOR_LLM_MAX_OUTPUT_TOKENS": "400",
     "TUTOR_LLM_API_KEY": "",
-    "ENTRA_AUTHORITY": "https://login.microsoftonline.com/<tenant-id>/v2.0",
-    "ENTRA_AUDIENCE": "api://certigo",
+    "ENTRA_AUTHORITY": "https://<domain>.ciamlogin.com/<tenant-id>/v2.0",
+    "ENTRA_AUDIENCE": "api://<client-id>",
     "APPLICATIONINSIGHTS_CONNECTION_STRING": "<connection-string>"
   }
 }
