@@ -50,7 +50,7 @@ jobs:
           dotnet CycloneDX Certigo.sln --output ./sbom --json
       - name: Upload SBOM
         continue-on-error: true # advisory artifact: never fail the gate (e.g. on storage quota)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-sbom
           path: backend/sbom/**
