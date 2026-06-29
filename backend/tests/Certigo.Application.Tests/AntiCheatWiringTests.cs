@@ -5,10 +5,10 @@ using Xunit;
 
 namespace Certigo.Application.Tests;
 
-// Câblage anti-triche en mode DÉTECTION (§6/§15). On vérifie le contrat de bord :
+// Câblage anti-triche en mode SANCTION (§6/§15). On vérifie le contrat de bord :
 // un signal `attempt.flagged` typé est émis pour une tentative incohérente, AUCUN
-// pour une tentative honnête, et — crucial — les récompenses ne sont JAMAIS modifiées
-// (mode shadow : on détecte avant de punir).
+// pour une tentative honnête, et — crucial — un verdict Reject (≥0.8 : horloge falsifiée /
+// vitesse bot) SUPPRIME toutes les récompenses (0 XP, pas de leaderboard, profil intact).
 public sealed class AntiCheatWiringTests
 {
     [Fact]
@@ -27,7 +27,7 @@ public sealed class AntiCheatWiringTests
     }
 
     [Fact]
-    public async Task Tampered_clock_quiz_emits_attempt_flagged_without_touching_rewards()
+    public async Task Tampered_clock_quiz_emits_attempt_flagged_and_suppresses_rewards()
     {
         var h = new QuizServiceHarness();
         h.Users.Seed(TestContent.NewProfile(h.UserId));
@@ -51,11 +51,11 @@ public sealed class AntiCheatWiringTests
         signal.Decision.Should().Be("Reject");
         signal.Flags.Should().Contain("SubmittedBeforeStarted");
 
-        // Mode détection : la récompense est calculée et persistée NORMALEMENT.
-        result.Rewards.XpEarned.Should().BeGreaterThan(0);
-        h.Leaderboard.Xp[h.UserId].Should().Be(result.Rewards.XpEarned);
+        // Mode sanction : verdict Reject → récompenses supprimées, profil et leaderboard intacts.
+        result.Rewards.XpEarned.Should().Be(0);
+        h.Leaderboard.Xp.ContainsKey(h.UserId).Should().BeFalse();
         var profile = await h.Users.GetAsync(h.UserId);
-        profile!.Xp.Should().Be(result.Rewards.XpEarned);
+        profile!.Xp.Should().Be(0);
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed class AntiCheatWiringTests
     }
 
     [Fact]
-    public async Task Bot_speed_exam_emits_attempt_flagged_without_touching_rewards()
+    public async Task Bot_speed_exam_emits_attempt_flagged_and_suppresses_rewards()
     {
         var h = new ExamServiceHarness();
         h.Users.Seed(TestContent.NewProfile(h.UserId));
@@ -106,7 +106,10 @@ public sealed class AntiCheatWiringTests
         signal.Decision.Should().Be("Reject");
         signal.Flags.Should().Contain("SuperhumanItemSpeed");
 
-        result.Rewards.XpEarned.Should().BeGreaterThan(0);
-        h.Leaderboard.Xp[h.UserId].Should().Be(result.Rewards.XpEarned);
+        // Mode sanction : verdict Reject → récompenses supprimées, profil et leaderboard intacts.
+        result.Rewards.XpEarned.Should().Be(0);
+        h.Leaderboard.Xp.ContainsKey(h.UserId).Should().BeFalse();
+        var profile = await h.Users.GetAsync(h.UserId);
+        profile!.Xp.Should().Be(0);
     }
 }

@@ -171,6 +171,68 @@ public sealed class QuizService(
         // yet) feeds the anti-cheat XP-farming / submission-spam detectors.
         var rateWindow = await BuildRateWindowAsync(now, cancellationToken);
 
+        // Anti-triche (autorité serveur, §6/§15) — mode SANCTION : on évalue la
+        // cohérence temporelle ET la cadence récente AVANT de créditer quoi que ce soit.
+        // Reject ⇒ tentative non récompensée ; Flag ⇒ détection seule (récompenses créditées).
+        var integrity = AttemptIntegrityEvaluator.Evaluate(
+            new AttemptTiming(
+                request.StartedAt,
+                now,
+                request.Answers.Select(a => a.LatencyMs).ToList(),
+                xpEarned),
+            rateWindow);
+
+        // Verdict Reject : on supprime TOUTES les récompenses (0 XP/gems, pas de level-up,
+        // ni leaderboard ni upsert profil), on persiste la tentative à zéro pour l'audit et
+        // l'idempotence, et on émet le signal d'intégrité. Le profil reste intact.
+        if (integrity.Decision == IntegrityDecision.Reject)
+        {
+            var rejectedResult = result with
+            {
+                Rewards = new RewardsDto(0, p0.Xp, false, false, 0, new List<string>())
+            };
+            var rejectedAttempt = new AttemptRecord(
+                $"attempt::{request.ClientAttemptId}",
+                userContext.UserId,
+                request.ClientAttemptId,
+                request.TrackId,
+                lessonId,
+                request.StartedAt,
+                now,
+                rejectedResult);
+            try
+            {
+                await attempts.CreateAsync(rejectedAttempt, cancellationToken);
+            }
+            catch (DuplicateRecordException)
+            {
+                var winner = await attempts.GetByClientAttemptIdAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
+                if (winner is not null)
+                {
+                    return winner.Result;
+                }
+
+                throw new ConcurrencyConflictException(
+                    $"Attempt '{request.ClientAttemptId}' is being processed concurrently.");
+            }
+
+            await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "quiz.submitted", now, rejectedResult), cancellationToken);
+            await events.AddAsync(new LearningEvent(
+                Guid.NewGuid().ToString("n"),
+                userContext.UserId,
+                "attempt.flagged",
+                now,
+                new AttemptIntegritySignal(
+                    "quiz",
+                    lessonId,
+                    rejectedResult.AttemptId,
+                    integrity.Decision.ToString(),
+                    integrity.RiskScore,
+                    integrity.Flags.Select(f => f.ToString()).ToList())), cancellationToken);
+
+            return rejectedResult;
+        }
+
         // Atomic, idempotent reservation of the attempt BEFORE crediting the
         // profile. The id is derived from clientAttemptId, so a replayed or
         // concurrent create loses the race and returns the winner's result — the
@@ -233,17 +295,9 @@ public sealed class QuizService(
 
         await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "quiz.submitted", now, result), cancellationToken);
 
-        // Anti-triche (autorité serveur, §6/§15) — mode détection : on évalue la
-        // cohérence temporelle ET la cadence récente (anti-farming d'XP / anti-spam de
-        // soumissions), et si le verdict n'est pas « Allow » on émet un signal
-        // d'intégrité SANS jamais modifier les récompenses.
-        var integrity = AttemptIntegrityEvaluator.Evaluate(
-            new AttemptTiming(
-                request.StartedAt,
-                now,
-                request.Answers.Select(a => a.LatencyMs).ToList(),
-                xpEarned),
-            rateWindow);
+        // Anti-triche — mode SANCTION : ici le verdict ne peut être que Allow ou Flag
+        // (Reject a déjà court-circuité plus haut sans créditer). Flag = détection seule :
+        // récompenses conservées + signal `attempt.flagged` pour audit/ML.
         if (!integrity.IsClean)
         {
             await events.AddAsync(new LearningEvent(

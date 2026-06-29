@@ -13,12 +13,13 @@ namespace Certigo.Domain.Integrity;
 // `clientAttemptId` des services (qui renvoient `prior.Result` avant toute
 // notation) ; ce n'est donc volontairement PAS une entrée de ce moteur.
 //
-// Premier lot = mode DÉTECTION : les services émettent un événement
-// `attempt.flagged` quand le verdict n'est pas `Allow`, SANS jamais modifier les
-// récompenses. L'application des sanctions et les plafonds de cadence
-// (fenêtres glissantes Redis au bord APIM/Front Door) viendront au lot cloud :
-// les détecteurs de cadence sont déjà implémentés et testés ici, prêts à être
-// alimentés par une `RateWindow` réelle.
+// Mode SANCTION : le verdict est appliqué par les services. `Reject` (signaux
+// durs : horloge falsifiée, vitesse bot — risk ≥ 0.8) SUPPRIME les récompenses
+// (0 XP/gems, pas de ligue, pas d'upsert profil) ET émet `attempt.flagged`.
+// `Flag` (cadence 0.4–0.8) reste en détection : récompenses créditées +
+// `attempt.flagged`. `Allow` passe sans event. La fenêtre de cadence 1h
+// (débit XP / nb tentatives) est alimentée par une `RateWindow` réelle lue du
+// conteneur `attempts`.
 
 /// <summary>
 /// Décision du serveur sur une tentative notée. <see cref="Allow"/> laisse passer,
@@ -102,6 +103,13 @@ public sealed record IntegrityPolicy(
     /// 350 ms ; on n'évalue la vitesse qu'à partir de 3 items (un tap chanceux rapide
     /// n'est pas de la triche) ; il faut une MAJORITÉ d'items sous le plancher pour
     /// suspecter un bot.
+    ///
+    /// Calibration sanction (conservée, ne pas durcir sans test dédié) :
+    /// la cadence (MaxXpPerWindow 600, MaxAttemptsPerWindow 40/1h) plafonne à
+    /// FlagThreshold 0.4 → un débit excessif seul donne au plus un `Flag`
+    /// (récompenses conservées), jamais un `Reject` solo. Le `Reject` (≥ 0.8) est
+    /// réservé aux signaux durs : soumission avant départ (risk 1) ou vitesse
+    /// surhumaine cumulée. Marge 0.4 entre Flag et Reject = aucun faux positif punitif.
     /// </summary>
     public static IntegrityPolicy Default { get; } = new(
         HumanFloorMs: 350,
