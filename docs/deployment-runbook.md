@@ -1,4 +1,4 @@
-# Runbook de déploiement — Microlingo (Phase 0 : socle de production)
+# Runbook de déploiement — Certigo (Phase 0 : socle de production)
 
 Ce runbook décrit les étapes **humaines** (droits admin Azure AD / GitHub) nécessaires pour
 amorcer le **premier déploiement de l'environnement `dev`** et valider l'authentification réelle.
@@ -7,7 +7,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 > déploiement complet (infra Bicep + code Functions). Le chemin critique est désormais
 > **compatible EMU (self-hosted obligatoire)** :
 > 1. les jobs critiques backend restent sur self-hosted (GitHub-hosted est bloqué par policy EMU) ;
-> 2. la capacité CI est séparée entre flux critiques `main` (`law-microlingo`) et flux PR/non-critiques (`microlingo-ci`) ;
+> 2. la capacité CI est séparée entre flux critiques `main` (`law-certigo`) et flux PR/non-critiques (`certigo-ci`) ;
 > 3. l'auth Azure reste via OIDC (`azure/login@v2`) avec permissions minimales.
 >
 > Les actions humaines restantes concernent surtout la gouvernance (OIDC Azure AD, environments,
@@ -19,10 +19,10 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 
 | Élément | Statut | Où |
 |---|---|---|
-| Chemin critique backend self-hosted (`law-microlingo`) | ✅ Fait | `cd-backend.yml`, `ci-backend.yml` |
+| Chemin critique backend self-hosted (`law-certigo`) | ✅ Fait | `cd-backend.yml`, `ci-backend.yml` |
 | Jobs rattachés à un `environment:` | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Clarification placeholders Entra en dev | ✅ Fait (cette PR) | `infra/params/dev.bicepparam` |
-| App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
+| App registration + federated credentials OIDC | ✅ **Fait (session)** — app `certigo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
 | 3 secrets GitHub | ✅ **Fait (session)** — déjà positionnés | §T0.1 |
 | `publicNetworkAccess` storage épinglé `Enabled` (anti-dérive) | ✅ Fait (cette PR) | `infra/modules/storage.bicep` + `infra/main.bicep` |
 | GitHub Environments `dev`/`staging`/`prod` | ✅ **Fait (session)** — créés ; ⚠️ reviewers `prod` bloqués (billing 422) | §T0.3 |
@@ -34,7 +34,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 ### Check-list d'exploitation (utilisateur non-admin)
 
 1. Déclencher `cd-backend.yml` avec `environment=dev|staging|prod` (aucun paramètre runner à fournir).
-2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `law-microlingo`.
+2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `law-certigo`.
 3. En cas d'échec Azure login, contrôler uniquement les 3 secrets repo : `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
 4. Pour une promotion, lancer `promote-backend-staging-prod.yml` (enchaînement staging puis prod).
 
@@ -52,32 +52,32 @@ vérité opérationnelle est portée par Azure pour limiter la dépendance aux d
 | Gouvernance production | GitHub environments (approvals) + garde-fous Azure | Le gate GitHub reste utile, mais la sécurité critique est déjà enforce côté Azure. |
 
 Limites connues : ce modèle suppose des permissions Azure correctement déléguées (OIDC + RBAC),
-et la disponibilité d'au moins un runner self-hosted online avec le label `law-microlingo`.
+et la disponibilité d'au moins un runner self-hosted online avec le label `law-certigo`.
 
 ### Réconciliation des labels runners
 
-Les deux runners existants (`vm-microlingo-runner`, `vm-microlingo-runner-2`) portent les labels
-custom **`law-microlingo`** (chemin critique) et **`microlingo-ci`** (PR/non-critique), en plus
+Les deux runners existants (`vm-certigo-runner`, `vm-certigo-runner-2`) portent les labels
+custom **`law-certigo`** (chemin critique) et **`certigo-ci`** (PR/non-critique), en plus
 des labels système
 (`self-hosted`, `Linux`, `X64`).  
 Le label a été ajouté via l'API GitHub :
 `POST /repos/{owner}/{repo}/actions/runners/{id}/labels`.
 
-Conséquence : les workflows critiques `main` ciblent `law-microlingo` et les workflows PR/non
-critiques ciblent `microlingo-ci`, ce qui réserve la capacité sans éditer les YAML à chaque
+Conséquence : les workflows critiques `main` ciblent `law-certigo` et les workflows PR/non
+critiques ciblent `certigo-ci`, ce qui réserve la capacité sans éditer les YAML à chaque
 ajustement.
 
 ### Variables repo de pilotage runners
 
 Les workflows lisent des variables Actions **optionnelles** pour éviter les edits récurrents :
 
-- `MAIN_CRITICAL_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","law-microlingo"]`
-- `PR_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","microlingo-ci"]`
+- `MAIN_CRITICAL_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","law-certigo"]`
+- `PR_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","certigo-ci"]`
 
 Exemple de valeur valide :
 
 ```json
-["self-hosted","Linux","X64","law-microlingo"]
+["self-hosted","Linux","X64","law-certigo"]
 ```
 
 ### Politique scans lourds (CodeQL / security-scan)
@@ -93,7 +93,7 @@ Compromis assumé : plus de scan automatique à chaque PR/push ; la détection s
 
 ### Risque / rollback (chemin critique EMU)
 
-- **Risque principal** : aucun runner self-hosted online avec le label `law-microlingo`.
+- **Risque principal** : aucun runner self-hosted online avec le label `law-certigo`.
 - **Rollback repo** : ajuster (ou supprimer) `MAIN_CRITICAL_RUNNER_LABELS` / `PR_RUNNER_LABELS` pour revenir aux defaults sans modifier les workflows.
 - **Rollback opérationnel** : démarrer/maintenir online la VM runner Azure (ou activer un auto-start), puis redéclencher le workflow.
 
@@ -103,8 +103,8 @@ Compromis assumé : plus de scan automatique à chaque PR/push ; la détection s
 
 ```bash
 GH_ORG="gchambaud_microsoft"
-GH_REPO="Microlingo"
-APP_NAME="microlingo-github-oidc"
+GH_REPO="Certigo"
+APP_NAME="certigo-github-oidc"
 
 # Détectés dans l'environnement de dev (à confirmer via `az account show`) :
 SUBSCRIPTION_ID="b8952c8c-8f72-469d-99cd-ac906da4e2fc"   # MCAPS-Hybrid-REQ-150432-2026
@@ -125,13 +125,13 @@ az account show -o table
 **Acteur : admin Azure AD + admin du repo GitHub.**
 
 > ✅ **Déjà réalisé dans ce tenant (session Phase 0).** L'identité OIDC existe déjà :
-> app registration **`microlingo-github-actions`** (`appId 4bfc43dc-6a25-404e-a6ab-d19784ab0673`,
+> app registration **`certigo-github-actions`** (`appId 4bfc43dc-6a25-404e-a6ab-d19784ab0673`,
 > SP objectId `15d2b34a-c0a0-4b5d-8360-b895a8164706`). Les **3 secrets repo**
 > (`AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID`) sont **déjà positionnés**, et
 > les 3 federated credentials `github-env-dev` / `github-env-staging` / `github-env-prod`
 > (sujet `repo:…:environment:<env>`) ont été **ajoutées cette session**. Les commandes ci-dessous
 > sont la **recette de référence/reproduction** (par ex. pour un nouveau tenant) — ne pas
-> recréer une seconde app `microlingo-github-oidc` sous peine de doublon. Pour réutiliser
+> recréer une seconde app `certigo-github-oidc` sous peine de doublon. Pour réutiliser
 > l'existant, faire `APP_ID=4bfc43dc-6a25-404e-a6ab-d19784ab0673`.
 
 ### Pourquoi Owner (et pas Contributor) ?
@@ -194,7 +194,7 @@ gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPT
 
 **Côté repo :**
 - les jobs critiques de `cd-backend.yml` (`deploy-infra`, `deploy-backend`) ciblent
-  `MAIN_CRITICAL_RUNNER_LABELS` (défaut `["self-hosted","Linux","X64","law-microlingo"]`) ;
+  `MAIN_CRITICAL_RUNNER_LABELS` (défaut `["self-hosted","Linux","X64","law-certigo"]`) ;
 - `ci-backend.yml` cible le même pool sur `main` et le pool `PR_RUNNER_LABELS` sur PR/non-main ;
 - le chemin critique reste compatible avec la contrainte EMU (self-hosted obligatoire).
 
@@ -202,7 +202,7 @@ gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPT
 
 Le blocage ne vient pas du YAML mais de la disponibilité runner : sous EMU, l'exécution critique
 reste self-hosted. La durabilité non-admin passe donc par l'exploitation Azure de la VM runner
-(`rg-microlingo-ci`, tenant Microsoft Non-Production), pas par une migration vers hosted.
+(`rg-certigo-ci`, tenant Microsoft Non-Production), pas par une migration vers hosted.
 
 ---
 
@@ -258,14 +258,14 @@ gh api -X PUT "repos/$GH_ORG/$GH_REPO/branches/main/protection" \
 
 ## T0.4 — Déployer l'infra `dev`
 
-**Acteur : humain (ou amorçage local).** L'infra crée : RG `rg-microlingo-dev`, Application
+**Acteur : humain (ou amorçage local).** L'infra crée : RG `rg-certigo-dev`, Application
 Insights, Cosmos DB, Storage, Key Vault, Function App (sans diagnostics durcis en dev).
 
 ### Étape 1 — What-if (lecture seule, recommandé d'abord)
 
 ```bash
 az deployment sub what-if \
-  --name microlingo-dev \
+  --name certigo-dev \
   --location westeurope \
   --template-file infra/main.bicep \
   --parameters infra/params/dev.bicepparam
@@ -277,7 +277,7 @@ az deployment sub what-if \
 
 ```bash
 az deployment sub create \
-  --name microlingo-dev \
+  --name certigo-dev \
   --location westeurope \
   --template-file infra/main.bicep \
   --parameters infra/params/dev.bicepparam \
@@ -296,7 +296,7 @@ gh workflow run cd-backend.yml --repo "$GH_ORG/$GH_REPO" \
 
 ### Cohérence des paramètres `dev`
 
-- `env='dev'`, `location='westeurope'`, `appName='microlingo'`.
+- `env='dev'`, `location='westeurope'`, `appName='certigo'`.
 - `cosmosLocation='northeurope'` (westeurope a des limites de capacité AZ).
 - `entraAuthority` / `entraAudience` = **placeholders** : **OK en dev** car `authMode='dev'`
   ⇒ `DevTokenValidator` (Entra non appliqué). Renseigner les vraies valeurs pour staging/prod.
@@ -338,12 +338,12 @@ APP_HOST="https://<functionAppName>.azurewebsites.net"
 # 1) S'enregistrer (anonyme)
 curl -s -X POST "$APP_HOST/api/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"email":"smoke@microlingo.test","password":"P@ssw0rd!"}'
+  -d '{"email":"smoke@certigo.test","password":"P@ssw0rd!"}'
 
 # 2) Se connecter (anonyme) → récupérer le JWT
 TOKEN=$(curl -s -X POST "$APP_HOST/api/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"smoke@microlingo.test","password":"P@ssw0rd!"}' | jq -r '.accessToken')
+  -d '{"email":"smoke@certigo.test","password":"P@ssw0rd!"}' | jq -r '.accessToken')
 
 # 3) Sans token → 401
 curl -s -o /dev/null -w "sans token: %{http_code}\n" "$APP_HOST/api/catalog/tracks"
@@ -358,7 +358,7 @@ curl -s -o /dev/null -w "avec token: %{http_code}\n" \
 ### Chemin 2 — Entra External ID (CIAM réel) — pour staging/prod
 
 Nécessite un environnement avec `authMode='prod'` et de **vraies** valeurs
-`ENTRA_AUTHORITY` / `ENTRA_AUDIENCE`, puis un token obtenu du tenant CIAM Microlingo. En `dev`,
+`ENTRA_AUTHORITY` / `ENTRA_AUDIENCE`, puis un token obtenu du tenant CIAM Certigo. En `dev`,
 Entra n'est **pas** appliqué (`DevTokenValidator`), donc tout bearer non vide est accepté.
 
 ---
@@ -397,20 +397,20 @@ documentation), et le **résiduel strict** qui nécessite une action hors périm
 
 ### Ce qui est effectivement configuré
 
-- **T0.1 — OIDC : ✅ COMPLET.** App `microlingo-github-actions` (`appId 4bfc43dc-…`) + SP +
+- **T0.1 — OIDC : ✅ COMPLET.** App `certigo-github-actions` (`appId 4bfc43dc-…`) + SP +
   3 secrets repo déjà en place ; 3 federated credentials `github-env-dev/staging/prod` ajoutées.
 - **T0.3 — Environments : ✅ PARTIEL.** `dev` / `staging` / `prod` créés. **Reviewer gate `prod`
   non posé** (billing GitHub 422, voir §T0.3). Branch protection `main` = résiduel admin.
 - **T0.2 — Runner : ✅ prémisse hosted réfutée en live.** Le run `28381092423` a été rejeté
   immédiatement avec l'annotation GitHub :
   "GitHub Actions hosted runners are disabled for this repository. For more information please contact your GitHub Enterprise Administrator."
-  ⇒ **GitHub-hosted bloqué par policy EMU**. Le chemin critique reste self-hosted (`law-microlingo`).
+  ⇒ **GitHub-hosted bloqué par policy EMU**. Le chemin critique reste self-hosted (`law-certigo`).
 
 ### Ce qui est effectivement déployé
 
 - **T0.4 — Infra `dev` : ✅ DÉPLOYÉE (amorçage local réel).** `az deployment sub create` exécuté
   avec succès (Owner sur la souscription). `AUTH_MODE=dev` actif. Ressources avec suffixe
-  `a2msquxibzvcu` (Function App `func-microlingo-dev-a2msquxibzvcu`, Cosmos, Key Vault, App
+  `a2msquxibzvcu` (Function App `func-certigo-dev-a2msquxibzvcu`, Cosmos, Key Vault, App
   Insights, Storage). Dérive `publicNetworkAccess` du Storage réconciliée (désormais IaC).
 
 ### ⛔ Blocage plateforme Flex — Functions n'indexent jamais (T0.5 / T0.6 bloqués)
@@ -454,7 +454,7 @@ Aucune n'a fait indexer les functions.
 - **SCM basic auth désactivée** (AAD-only). Pour interroger le hostruntime, passer par le proxy ARM
   `…/hostruntime/admin/...` avec un token `az account get-access-token --resource
   https://management.azure.com` (construire l'URI par concaténation : PowerShell mange `?api-version`).
-- **EMU bloque `ubuntu-latest`** (cf. ci-dessus) — le CI/CD critique doit cibler self-hosted `law-microlingo`.
+- **EMU bloque `ubuntu-latest`** (cf. ci-dessus) — le CI/CD critique doit cibler self-hosted `law-certigo`.
 
 ### Résiduel strict (hors périmètre repo)
 
@@ -466,7 +466,7 @@ Aucune n'a fait indexer les functions.
 
 > Dès que les functions s'indexent (post-remédiation plateforme), **T0.5 et T0.6 sont prêts à
 > jouer** : voir les commandes en §T0.5 / §T0.6 (host
-> `https://func-microlingo-dev-a2msquxibzvcu.azurewebsites.net`).
+> `https://func-certigo-dev-a2msquxibzvcu.azurewebsites.net`).
 
 ---
 
@@ -489,7 +489,7 @@ derrière `ITutorCompletion` via les app settings `TUTOR_LLM_*`.
 - **Type** : Azure OpenAI exposé en **Microsoft Foundry** (surface API **v1**, scopée projet).
 - **Déploiement** : `gpt-5.4-mini` (famille **GPT‑5**).
 - **Endpoint (base v1, sans `/responses`, slash final requis)** :
-  `https://microlingo-openai.services.ai.azure.com/api/projects/microlingo-dev/openai/v1/`
+  `https://certigo-openai.services.ai.azure.com/api/projects/certigo-dev/openai/v1/`
 - **Auth** : **clé API désactivée** sur la ressource → **Entra ID / identité managée
   obligatoire**. On laisse `TUTOR_LLM_API_KEY` **vide** : le code passe alors par
   `TokenCredential` (`DefaultAzureCredential`, scope `https://cognitiveservices.azure.com/.default`).
@@ -515,22 +515,22 @@ derrière `ITutorCompletion` via les app settings `TUTOR_LLM_*`.
 
 L'identité qui exécute l'API (identité managée de la Function App en `dev`/`staging`/`prod`, ou
 le principal `az login` en local) doit avoir le rôle **`Cognitive Services OpenAI User`** sur la
-ressource `microlingo-openai`. Sans ce rôle, l'appel renvoie **401/403** même si la config est
+ressource `certigo-openai`. Sans ce rôle, l'appel renvoie **401/403** même si la config est
 correcte.
 
 > ✅ **`dev` : rôle accordé.** Le rôle `Cognitive Services OpenAI User` est attribué à l'identité
-> managée de `func-microlingo-dev-a2msquxibzvcu` (principal `ec39dfb2-cb12-4279-9830-ce5d95ebce6b`)
-> sur `microlingo-openai`. Reste à exécuter **un appel réel de validation** (voir ci-dessous).
+> managée de `func-certigo-dev-a2msquxibzvcu` (principal `ec39dfb2-cb12-4279-9830-ce5d95ebce6b`)
+> sur `certigo-openai`. Reste à exécuter **un appel réel de validation** (voir ci-dessous).
 > `staging`/`prod` devront recevoir la même attribution lors de leur déploiement.
 
 ```bash
 # Identité managée de la Function App (system-assigned)
 PRINCIPAL_ID=$(az functionapp identity show \
-  --name func-microlingo-dev-a2msquxibzvcu --resource-group "$RG" \
+  --name func-certigo-dev-a2msquxibzvcu --resource-group "$RG" \
   --query principalId -o tsv)
 
 OPENAI_ID=$(az resource show \
-  --name microlingo-openai --resource-group "$RG" \
+  --name certigo-openai --resource-group "$RG" \
   --resource-type Microsoft.CognitiveServices/accounts --query id -o tsv)
 
 az role assignment create \
@@ -539,7 +539,7 @@ az role assignment create \
 ```
 
 > **État actuel (mise à jour).** **RBAC accordé en `dev`** (rôle `Cognitive Services OpenAI User`
-> sur `microlingo-openai` pour l'identité managée de `func-microlingo-dev`) et **tuteur activé en
+> sur `certigo-openai` pour l'identité managée de `func-certigo-dev`) et **tuteur activé en
 > `dev`** : les app settings `TUTOR_LLM_*` sont décommentés dans `infra/params/dev.bicepparam` et
 > déployés par `cd-backend`. Code Foundry v1 / GPT‑5 compilé et **couvert par tests unitaires**
 > (Infra + Application verts). **Résiduel : un seul appel réel de validation** (voir §
@@ -554,7 +554,7 @@ permissif (`AUTH_MODE=dev`, `DevTokenValidator`) ; on bootstrappe un JWT applica
 endpoints anonymes `auth/register` puis `auth/login`, puis on appelle `tutor/explain` :
 
 ```bash
-BASE="https://func-microlingo-dev-a2msquxibzvcu.azurewebsites.net/api"
+BASE="https://func-certigo-dev-a2msquxibzvcu.azurewebsites.net/api"
 
 # 1) Santé (doit répondre 200 après le redéploiement)
 curl -fsS "$BASE/health"
@@ -577,3 +577,156 @@ echo "source = $(echo "$RESP" | jq -r '.source')"   # "ai" = vrai LLM ; "grounde
 Critère de réussite : **HTTP 200 ET `source == "ai"`** (le repli déterministe renvoie aussi 200
 mais `source == "grounded"`). Un `source:"ai"` confirme le chemin live (LLM Foundry, guardrails
 passés) → basculer alors le badge tuteur en 🟢 dans `docs/ETAT_DU_PROJET.md` §13 et ce runbook.
+
+
+---
+
+## Rebranding microlingo → certigo — actions Azure restantes (runbook)
+
+> ⚠️ **Cette section cite volontairement les anciens noms `*microlingo*`** (groupes de
+> ressources, OpenAI, Key Vault, VMs, app registration…). C'est **intentionnel et justifié** :
+> ce sont les ressources **live à inventorier, recréer en `certigo`, puis supprimer**. Les
+> commandes `az` doivent les nommer littéralement pour être copiables. Ce sont les seules
+> occurrences de « microlingo » qui subsistent dans le repo après le rebrand code/docs/CI.
+>
+> Le rebrand **code/docs/CI est déjà fait** (mobile, backend, workflows, params, docs). Cette
+> section est le **plan d'exécution Azure** (non joué par l'agent) : à dérouler par l'utilisateur,
+> **non-destructif d'abord**, destructif en dernier et **sous confirmation explicite**.
+
+### Coordonnées & règle d'outil
+- **Subscription** : `b8952c8c-8f72-469d-99cd-ac906da4e2fc`
+- **Tenant** : `16b3c013-d300-468d-ac64-7eda0820b6d3` (`fdpo.onmicrosoft.com`)
+- Toujours passer `--subscription b8952c8c-8f72-469d-99cd-ac906da4e2fc`.
+- Utiliser **le CLI `az`** pour ces ressources. ⚠️ Les outils Azure Resource Graph / `subscription list`
+  tapent dans le **mauvais tenant corp** (`72f988bf-…`) et renvoient **0 résultat** — ne pas s'y fier.
+
+### Ressources live connues (état au moment du rebrand)
+| Ressource | Nom live (ancien) | Cible certigo (IaC) |
+| --- | --- | --- |
+| RG dev actif | `rg-microlingo-dev` | `rg-certigo-dev` (recréé propre) |
+| RG dev obsolète (doublon) | `rg-certigo-dev` *(ancien, à recréer/écraser)* | idem, stack neuf |
+| RG CI | `rg-microlingo-ci` | `rg-certigo-ci` |
+| Function App | `func-microlingo-dev-a2msquxibzvcu` | `func-certigo-dev-<NOUVEAU_SUFFIX>` |
+| Key Vault | `law-microlingo-dev-a2msqu` | `kv-certigo-dev-<NOUVEAU_SUFFIX6>` |
+| OpenAI / Foundry | `microlingo-openai` (projet `microlingo-dev`) | `certigo-openai` (projet `certigo-dev`) |
+| VMs runner | `vm-microlingo-runner`, `vm-microlingo-runner-2` | `vm-certigo-runner*` |
+| NAT / VNet CI | `law-microlingo` / `law-microlingo-ci` | `law-certigo` / `law-certigo-ci` |
+| App registration | `microlingo-github-actions` (`4bfc43dc-6a25-404e-a6ab-d19784ab0673`) | `certigo-github-actions` |
+
+> 🔑 **Le suffixe `uniqueString` dépend de `appName`** (`infra/main.bicep` L63 :
+> `suffix = uniqueString(subscription().id, appName, env)`). Comme `appName` passe de `microlingo`
+> à `certigo`, **le hash `a2msquxibzvcu` VA CHANGER**. Donc le host de la Function App **et** le nom du
+> Key Vault seront **nouveaux** après déploiement → il faudra les **re-dériver** (voir §3) et mettre à
+> jour `codemagic.yaml` (`API_BASE_URL`) ainsi que la variable repo `AZURE_KEYVAULT_NAME`.
+
+### §1 — Inventaire (read-only, sans risque)
+```bash
+SUB=b8952c8c-8f72-469d-99cd-ac906da4e2fc
+az group list --subscription $SUB -o table
+az resource list --subscription $SUB \
+  --query "[?contains(name,'microlingo') || contains(resourceGroup,'microlingo')].{name:name,type:type,rg:resourceGroup,loc:location}" -o table
+# Inspecter chaque RG candidat
+for RG in rg-microlingo-dev rg-microlingo-ci rg-certigo-dev; do
+  echo "== $RG =="; az resource list -g $RG --subscription $SUB -o table 2>/dev/null
+done
+```
+
+### §2 — Vérifier s'il y a de VRAIES données (AVANT tout)
+Environnement **dev personnel** : si Cosmos/Storage/Key Vault ne contiennent que du **seed/test
+régénérable**, **aucune migration** n'est nécessaire. Si de **vraies données** sont détectées →
+**NE RIEN SUPPRIMER** et demander la stratégie de migration.
+```bash
+# Cosmos : comptage rapide des conteneurs/élements (adapter le compte/clé)
+az cosmosdb list -g rg-microlingo-dev --subscription $SUB -o table
+# Storage : blobs présents ?
+az storage account list -g rg-microlingo-dev --subscription $SUB -o table
+# Key Vault : secrets présents (noms only) ?
+az keyvault secret list --vault-name law-microlingo-dev-a2msqu --subscription $SUB -o table 2>/dev/null
+```
+→ Seed/test ⇒ continuer. Vraies données ⇒ **STOP**, escalade.
+
+### §3 — Déployer le stack certigo (IaC déjà en certigo)
+```bash
+# 1) What-if (lecture seule)
+az deployment sub what-if --location westeurope --subscription $SUB \
+  --template-file infra/main.bicep --parameters infra/params/dev.bicepparam
+# 2) Déploiement
+az deployment sub create --location westeurope --subscription $SUB \
+  --template-file infra/main.bicep --parameters infra/params/dev.bicepparam
+```
+**Puis RE-DÉRIVER les noms (le suffixe a changé) et propager :**
+```bash
+FUNC_HOST=$(az functionapp show -g rg-certigo-dev -n $(az functionapp list -g rg-certigo-dev --subscription $SUB --query "[0].name" -o tsv) \
+  --subscription $SUB --query defaultHostName -o tsv)
+KV_NAME=$(az keyvault list -g rg-certigo-dev --subscription $SUB --query "[0].name" -o tsv)
+echo "API host = https://$FUNC_HOST"   # -> mettre à jour codemagic.yaml API_BASE_URL
+echo "Key Vault = $KV_NAME"            # -> gh variable set AZURE_KEYVAULT_NAME --body "$KV_NAME"
+```
+- Mettre à jour `codemagic.yaml` (`API_BASE_URL`) avec le **nouveau** host `func-certigo-dev-<suffix>`.
+- Mettre à jour la variable repo : `gh variable set AZURE_KEYVAULT_NAME --body "$KV_NAME"`.
+
+### §4 — Recréer l'OpenAI/Foundry certigo
+Recréer l'équivalent de `microlingo-openai` sous le nom **`certigo-openai`** (région **swedencentral**),
+projet **`certigo-dev`**, **déploiement du modèle `gpt-5.4-mini`** (surface API **v1**, auth **Entra ID**,
+clé désactivée). Puis accorder le rôle **« Cognitive Services OpenAI User »** à l'**identité managée** de
+la Function App certigo :
+```bash
+FUNC_MI=$(az functionapp identity show -g rg-certigo-dev \
+  -n func-certigo-dev-<suffix> --subscription $SUB --query principalId -o tsv)
+OAI_ID=$(az cognitiveservices account show -g rg-certigo-dev -n certigo-openai \
+  --subscription $SUB --query id -o tsv)
+az role assignment create --assignee $FUNC_MI \
+  --role "Cognitive Services OpenAI User" --scope $OAI_ID --subscription $SUB
+```
+`infra/params/dev.bicepparam` pointe déjà sur
+`https://certigo-openai.services.ai.azure.com/api/projects/certigo-dev/openai/v1/` → **redéployer/synchroniser** après création.
+
+### §5 — Recréer l'infra CI runner + re-labelliser les runners
+```bash
+az deployment group create -g rg-certigo-ci --subscription $SUB \
+  --template-file infra/ci-runner/network.bicep   # + autres modules ci-runner si présents
+```
+⚠️ **Les workflows ciblent désormais les labels `law-certigo` / `certigo-ci`.** Tant que les VMs runner
+ne sont pas **re-labellisées** (ou recréées) avec ces labels, **la CI ne trouvera aucun runner**.
+Re-labelliser/recréer `vm-microlingo-runner*` → labels `law-certigo`, `certigo-ci`.
+
+### §6 — Apple (iOS) — nouveau bundle id
+Le bundle id passe de `*.microlingo` → `*.certigo` (`law-certigo`). Côté Apple Developer :
+créer l'**App ID `law-certigo`**, régénérer le **provisioning / `match`** (certs + profils), et
+re-signer. Aucune perte d'utilisateurs (app non publiée).
+
+### §7 — Entra app registration + repo (Phase 5, optionnel)
+- Renommer l'app registration `microlingo-github-actions` → **`certigo-github-actions`**
+  (`az ad app update --id 4bfc43dc-6a25-404e-a6ab-d19784ab0673 --display-name certigo-github-actions`).
+- Si le **repo GitHub est renommé** `Microlingo` → `Certigo` : mettre à jour le **subject** des
+  **federated credentials** OIDC (`repo:<owner>/Certigo:…`) et toute variable/secret repo citant des
+  ressources microlingo (`AZURE_KEYVAULT_NAME`, `API_BASE_URL`, RG…). Les runbooks/docs ci-dessus
+  supposent déjà l'état cible (`GH_REPO="Certigo"`, app `certigo-github-actions`).
+- Peut nécessiter des droits Entra ; si bloqué → documenter pour l'utilisateur.
+
+### §8 — Validation live
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://$FUNC_HOST/api/health   # attendu 200
+# /tutor/explain -> source == "ai" (voir section "Validation live" ci-dessus)
+```
+Vérifier : endpoints **200**, identité managée OK, appel **LLM live** `source=="ai"`.
+
+### §9 — DESTRUCTIF (VERROUILLÉ — exige un GO explicite)
+> ❌ **Ne rien supprimer sans confirmation explicite de l'utilisateur** et **uniquement après** que le
+> stack certigo neuf soit déployé et **validé**. Si de vraies données ont été détectées en §2 → **STOP**.
+
+Cibles potentielles (à confirmer une par une) :
+```bash
+# APRÈS validation certigo + GO explicite uniquement :
+az group delete -n rg-microlingo-dev  --subscription $SUB --yes
+az group delete -n rg-microlingo-ci   --subscription $SUB --yes
+az group delete -n rg-certigo-dev      --subscription $SUB --yes   # ANCIEN doublon obsolète, si recréé neuf
+# microlingo-openai : supprimé avec son RG, ou explicitement :
+az cognitiveservices account delete -g <rg> -n microlingo-openai --subscription $SUB
+```
+⚠️ **Key Vault soft-delete** : `law-microlingo-dev-a2msqu` reste en état *soft-deleted* après suppression
+(rétention + éventuelle **purge protection**). Pour réutiliser un nom ou purger définitivement :
+```bash
+az keyvault list-deleted --subscription $SUB -o table
+az keyvault purge --name law-microlingo-dev-a2msqu --subscription $SUB   # bloqué si purge protection active
+```

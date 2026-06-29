@@ -254,7 +254,7 @@ Forces **réelles et vérifiées**, sur lesquelles capitaliser :
   OpenAI/Foundry derrière le port quand pertinent ; flag de fonctionnalité. — ✅ **fait** :
   `AzureOpenAiTutorCompletion` câblé derrière `ITutorCompletion`, activé par `TUTOR_LLM_ENABLED`,
   adapté à la ressource **Microsoft Foundry** (`gpt-5.4-mini`, surface API **v1**, auth **Entra ID**).
-  ⏳ **Reste** l'attribution du rôle RBAC _Cognitive Services OpenAI User_ sur `microlingo-openai`
+  ⏳ **Reste** l'attribution du rôle RBAC _Cognitive Services OpenAI User_ sur `certigo-openai`
   pour valider un appel **live** (clé API désactivée sur la ressource).
 
 ### D8 — Anti‑triche : détecteurs de débit morts · *Sécurité / Intégrité*
@@ -309,7 +309,7 @@ Forces **réelles et vérifiées**, sur lesquelles capitaliser :
 
 ### D12 — Runner CI unique self‑hosted (SPOF) + PR non fiables · *CI/CD / Exploitation*
 - **Description.** **Tous** les workflows s'exécutent sur un seul runner `[self-hosted, Linux,
-  X64, law-microlingo]`. Les déclencheurs `pull_request` s'exécutent dessus.
+  X64, law-certigo]`. Les déclencheurs `pull_request` s'exécutent dessus.
 - **Preuve.** `ci-mobile.yml:22`, `ci-backend.yml:19`, `codeql.yml:25`, `security-scan.yml:23,46`.
 - **Impact.** Runner indisponible ⇒ **toute la CI bloquée** ; risque d'exécution de code de PR
   non fiable sur l'hôte (si des contributeurs externes sont ajoutés).
@@ -704,7 +704,7 @@ avant d'envisager une mise à l'échelle ou une ouverture publique.
 | **D5** God-file `Services.cs` (96 Ko) | **Éclaté** en 11 fichiers par domaine (Quiz, Gamification, Social, Learning, Exam, Tutor, Notification, Leaderboard, User, Content, Misc) via **Roslyn** (réorganisation pure, formatage préservé) | `backend/src/Certigo.Application/Services/*.cs` | ✅ build + **324 tests** (comportement identique) |
 | **D9** Builds reproductibles | SDK Dart épinglé (`3.5.0`), lockfile applicatif suivi (`.gitignore`) | `ci-mobile.yml`, `.gitignore` | ✅ YAML valide |
 | **D13** Release / SBOM | **SBOM** CycloneDX (backend), **gate d'approbation** `environment: beta` sur releases mobiles | `ci-backend.yml`, `release-android.yml`, `release-ios.yml` | ✅ YAML valide |
-| **D7/H19** Tuteur IA sans IA | Provider LLM réel **Azure OpenAI / Microsoft Foundry** derrière `ITutorCompletion` (surface API **v1**, déploiement `gpt-5.4-mini`, corps GPT‑5 `max_completion_tokens` + `response_format: json_object`, auth **Entra ID** clé désactivée), flag `TUTOR_LLM_ENABLED` (sinon repli déterministe ancré), timeout/exceptions contrôlés, télémétrie App Insights ; ⏳ appel **live** en attente du rôle RBAC _Cognitive Services OpenAI User_ sur `microlingo-openai` | `AzureOpenAiTutorCompletion.cs`, `Program.cs`, `TutorCompletionTests.cs` | 🧪 tests dédiés (Infra **23** + App **131** verts) |
+| **D7/H19** Tuteur IA sans IA | Provider LLM réel **Azure OpenAI / Microsoft Foundry** derrière `ITutorCompletion` (surface API **v1**, déploiement `gpt-5.4-mini`, corps GPT‑5 `max_completion_tokens` + `response_format: json_object`, auth **Entra ID** clé désactivée), flag `TUTOR_LLM_ENABLED` (sinon repli déterministe ancré), timeout/exceptions contrôlés, télémétrie App Insights ; ⏳ appel **live** en attente du rôle RBAC _Cognitive Services OpenAI User_ sur `certigo-openai` | `AzureOpenAiTutorCompletion.cs`, `Program.cs`, `TutorCompletionTests.cs` | 🧪 tests dédiés (Infra **23** + App **131** verts) |
 
 **Suite de tests après remédiation :** backend **325** (Domain 224 + Application 101, dont
 les nouveaux tests de concurrence/auth/parité/anti-triche), Dart `cortex` **10** (dont 2 golden),

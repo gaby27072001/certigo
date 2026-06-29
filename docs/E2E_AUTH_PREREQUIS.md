@@ -32,7 +32,7 @@
 
 ## 3. Décision préalable : scheme deep-link
 
-Code = `certigo://auth` (source de vérité). Demande initiale = `microlingo://auth`.
+Code = `certigo://auth` (source de vérité pour le callback OAuth).
 **Recommandé : garder `certigo`.** Sinon modifier iOS `Info.plist`, Android
 `build.gradle`, `ENTRA_REDIRECT_URI` + redirect URIs tenant.
 

@@ -8,7 +8,7 @@ avec le reste des livrables ; les noms de ressources Azure reprennent ceux du po
 
 Les runners hébergés par GitHub sont **désactivés par la politique d'entreprise EMU**.
 La CI s'exécute donc sur une machine virtuelle Azure auto-hébergée
-(`vm-certigo-runner`, dans le groupe de ressources `law-microlingo-ci`). Cette
+(`vm-certigo-runner`, dans le groupe de ressources `law-certigo-ci`). Cette
 machine **n'a aucune IP publique propre** : son seul accès à Internet passe par une
 **Passerelle NAT (NAT Gateway)** attachée à son sous-réseau.
 
@@ -26,7 +26,7 @@ vm-certigo-runner (carte réseau, pas d'IP publique)
 sous-réseau snet-runners (10.42.1.0/24)
         │   défaut sortant désactivé (defaultOutboundAccess = false)
         ▼
-Passerelle NAT law-microlingo  ──►  IP publique pip-certigo-nat (20.86.156.64)
+Passerelle NAT law-certigo  ──►  IP publique pip-certigo-nat (20.86.156.64)
                                          │
                                          ▼
                                       Internet
@@ -35,10 +35,10 @@ Passerelle NAT law-microlingo  ──►  IP publique pip-certigo-nat (20.86.156
 | Ressource | Type | Rôle |
 | --- | --- | --- |
 | `pip-certigo-nat` | IP publique (Standard, statique, régionale) | Adresse d'egress **stable** présentée à Internet (à mettre en liste d'autorisation) |
-| `law-microlingo` | Passerelle NAT (Standard) | SNAT sortant déterministe ; **survit à la désallocation** de la VM |
-| `law-microlingo-ci` | Réseau virtuel (`10.42.0.0/16`) | Héberge le sous-réseau runner |
+| `law-certigo` | Passerelle NAT (Standard) | SNAT sortant déterministe ; **survit à la désallocation** de la VM |
+| `law-certigo-ci` | Réseau virtuel (`10.42.0.0/16`) | Héberge le sous-réseau runner |
 | `snet-runners` | Sous-réseau (`10.42.1.0/24`) | La carte réseau du runner s'y rattache ; associé à la Passerelle NAT + NSG |
-| `law-microlingo-ci-snet-runners-nsg-westeurope` | Groupe de sécurité réseau (NSG) | Vide (règles Azure par défaut) ; conservé pour matcher l'état réel |
+| `law-certigo-ci-snet-runners-nsg-westeurope` | Groupe de sécurité réseau (NSG) | Vide (règles Azure par défaut) ; conservé pour matcher l'état réel |
 
 ## Ce qui n'est **pas** géré ici (volontairement)
 
@@ -51,7 +51,7 @@ la machine virtuelle `vm-certigo-runner`, sa carte réseau, son disque OS.
 
 ## Dérive constatée — candidats au nettoyage (à traiter manuellement)
 
-L'inventaire du groupe `law-microlingo-ci` révèle des ressources **orphelines ou en
+L'inventaire du groupe `law-certigo-ci` révèle des ressources **orphelines ou en
 double**, vestiges des tâtonnements de mise en place. Elles ne sont **ni importées ni
 supprimées automatiquement** ici (suppression = décision humaine), mais documentées :
 
@@ -68,14 +68,14 @@ Valider sans rien changer — n'affiche que des différences **bénignes** (voir
 « Différences résiduelles du what-if » plus bas) ; aucune ne modifie le chemin d'egress :
 
 ```bash
-az deployment group what-if -g law-microlingo-ci \
+az deployment group what-if -g law-certigo-ci \
   --template-file infra/ci-runner/network.bicep
 ```
 
 Déployer (incrémentiel — ne touche que les 5 ressources d'egress) :
 
 ```bash
-az deployment group create -g law-microlingo-ci \
+az deployment group create -g law-certigo-ci \
   --template-file infra/ci-runner/network.bicep
 ```
 
@@ -90,8 +90,8 @@ sous-réseau↔NAT↔NSG restent **identiques au bit près**.
 
 | Ressource | Propriété signalée | Pourquoi on ne la fige pas |
 | --- | --- | --- |
-| `law-microlingo` | `sku.tier` (= `Regional`) | Le type `NatGatewaySku` n'accepte que `name` ; `tier` n'existe pas dans le schéma. |
-| `law-microlingo` | `properties.scope` (= `Public`) | Non réglable via modèle ; `Public` est déjà la valeur par défaut d'une Passerelle NAT. |
+| `law-certigo` | `sku.tier` (= `Regional`) | Le type `NatGatewaySku` n'accepte que `name` ; `tier` n'existe pas dans le schéma. |
+| `law-certigo` | `properties.scope` (= `Public`) | Non réglable via modèle ; `Public` est déjà la valeur par défaut d'une Passerelle NAT. |
 | `pip-certigo-nat` | `properties.ipTags` (`FirstPartyUsage` / `/Unprivileged`) | Étiquette **première-partie réservée** à Azure ; un déploiement qui tenterait de la poser serait **rejeté**. |
 
 Les fausses différences réglables (`ddosSettings` héritée du VNet sur l'IP publique,
