@@ -72,7 +72,7 @@ class _BirthYearScreenState extends ConsumerState<BirthYearScreen> {
           const MascotPrompt(message: 'En quelle année es-tu né(e) ?'),
           const SizedBox(height: 8),
           Text(
-            'Tu dois avoir au moins 13 ans pour utiliser Microlingo.',
+            'Tu dois avoir au moins 13 ans pour utiliser Certigo.',
             textAlign: TextAlign.center,
             style: t.bodySmall?.copyWith(color: p.textSecondary, height: 1.4),
           ),

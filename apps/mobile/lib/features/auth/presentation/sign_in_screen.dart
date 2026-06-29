@@ -140,7 +140,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     _Logo(color: p.primary),
                     const SizedBox(height: PrismSpacing.lg),
                     Text(
-                      'Microlingo',
+                      'Certigo',
                       textAlign: TextAlign.center,
                       style: text.displaySmall?.copyWith(
                         color: p.textPrimary,

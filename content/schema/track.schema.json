@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://microlingo.app/schema/track.schema.json",
-  "title": "Microlingo Track",
+  "$id": "https://certigo.app/schema/track.schema.json",
+  "title": "Certigo Track",
   "description": "A certification track: weighted exam domains and an ordered list of units. Domain weights MUST sum to 1.0 and drive the Readiness Score.",
   "type": "object",
   "required": ["id", "code", "title", "domains", "units"],

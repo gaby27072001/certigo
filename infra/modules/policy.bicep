@@ -15,13 +15,13 @@ param assignmentLocation string = 'westeurope'
 var mcsbInitiativeId = '/providers/Microsoft.Authorization/policySetDefinitions/1f3afdf9-d0c9-4c3d-847f-89da613e70a8'
 
 resource mcsb 'Microsoft.Authorization/policyAssignments@2022-06-01' = {
-  name: 'microlingo-mcsb'
+  name: 'certigo-mcsb'
   location: assignmentLocation
   identity: {
     type: 'SystemAssigned'
   }
   properties: {
-    displayName: 'Microsoft Cloud Security Benchmark — Microlingo'
+    displayName: 'Microsoft Cloud Security Benchmark — Certigo'
     description: 'Continuous, audit-only compliance assessment. Enforcement disabled (no Deny, no auto-remediation).'
     policyDefinitionId: mcsbInitiativeId
     enforcementMode: 'DoNotEnforce'

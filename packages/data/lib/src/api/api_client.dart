@@ -8,7 +8,7 @@ typedef TokenProvider = Future<String?> Function();
 /// Called when the API returns 401 so the app can trigger re-authentication.
 typedef UnauthorizedHandler = Future<void> Function();
 
-/// Thin, configured Dio wrapper for the Microlingo API.
+/// Thin, configured Dio wrapper for the Certigo API.
 ///
 /// Centralizes base URL, timeouts, bearer-token injection and uniform error
 /// translation into typed [Failure]s. Feature repositories depend on this, not

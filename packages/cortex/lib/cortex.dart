@@ -1,4 +1,4 @@
-/// Cortex — Microlingo's adaptive learning engine (pure Dart).
+/// Cortex — Certigo's adaptive learning engine (pure Dart).
 ///
 /// Spaced repetition (FSRS-inspired), mastery tracking, session planning and
 /// the Readiness Score math. Deliberately free of Flutter and I/O so it is

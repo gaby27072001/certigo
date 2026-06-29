@@ -2,9 +2,9 @@ import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:microlingo/app/providers.dart';
-import 'package:microlingo/features/tutor/application/tutor_controller.dart';
-import 'package:microlingo/features/tutor/application/tutor_state.dart';
+import 'package:certigo/app/providers.dart';
+import 'package:certigo/features/tutor/application/tutor_controller.dart';
+import 'package:certigo/features/tutor/application/tutor_state.dart';
 
 /// A tutor repository that returns a canned [Result] and records the request it
 /// was asked to explain, so we can assert the controller forwards it verbatim.

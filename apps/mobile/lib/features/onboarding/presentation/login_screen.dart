@@ -105,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'En te connectant à Microlingo, tu acceptes nos Conditions d\'utilisation '
+              'En te connectant à Certigo, tu acceptes nos Conditions d\'utilisation '
               'et notre Politique de confidentialité.',
               textAlign: TextAlign.center,
               style: t.bodySmall?.copyWith(color: p.textSecondary, height: 1.45),

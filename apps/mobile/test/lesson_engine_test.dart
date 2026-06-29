@@ -2,14 +2,14 @@ import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:microlingo/app/providers.dart';
-import 'package:microlingo/features/lesson/application/check_outcome.dart';
-import 'package:microlingo/features/lesson/application/lesson_args.dart';
-import 'package:microlingo/features/lesson/application/lesson_controller.dart';
-import 'package:microlingo/features/lesson/application/lesson_feedback.dart';
-import 'package:microlingo/features/lesson/application/lesson_session_state.dart';
-import 'package:microlingo/features/lesson/application/lesson_step.dart';
-import 'package:microlingo/features/lesson/application/sample_lesson.dart';
+import 'package:certigo/app/providers.dart';
+import 'package:certigo/features/lesson/application/check_outcome.dart';
+import 'package:certigo/features/lesson/application/lesson_args.dart';
+import 'package:certigo/features/lesson/application/lesson_controller.dart';
+import 'package:certigo/features/lesson/application/lesson_feedback.dart';
+import 'package:certigo/features/lesson/application/lesson_session_state.dart';
+import 'package:certigo/features/lesson/application/lesson_step.dart';
+import 'package:certigo/features/lesson/application/sample_lesson.dart';
 
 /// Repositories that always fail, forcing the controller's offline path
 /// (bundled sample lesson + embedded answer key + locally computed result).

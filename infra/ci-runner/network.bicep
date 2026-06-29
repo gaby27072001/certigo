@@ -3,28 +3,28 @@
 // qui donnent l'accès Internet sortant au runner GitHub Actions auto-hébergé.
 //
 // POURQUOI CE FICHIER EXISTE
-// La machine virtuelle du runner (vm-microlingo-runner, dans rg-microlingo-ci) n'a
+// La machine virtuelle du runner (vm-certigo-runner, dans law-microlingo-ci) n'a
 // aucune IP publique propre ; son unique chemin vers Internet est :
-//   carte réseau (NIC) → sous-réseau snet-runners → Passerelle NAT nat-microlingo
-//   → IP publique pip-microlingo-nat (20.86.156.64).
+//   carte réseau (NIC) → sous-réseau snet-runners → Passerelle NAT law-microlingo
+//   → IP publique pip-certigo-nat (20.86.156.64).
 // Cet egress a été créé de façon impérative (az CLI) pour débloquer l'intégration
 // continue après la désactivation des runners hébergés par GitHub (politique
 // d'entreprise EMU). Le capturer ici garantit qu'un futur redéploiement ou une
 // correction de dérive ne pourra JAMAIS le détruire silencieusement et casser la
 // CI de façon permanente.
 //
-// PÉRIMÈTRE : groupe de ressources rg-microlingo-ci. La machine virtuelle, sa carte
+// PÉRIMÈTRE : groupe de ressources law-microlingo-ci. La machine virtuelle, sa carte
 // réseau et son disque OS sont gérés séparément et ne sont volontairement PAS
 // déclarés ici — un déploiement de groupe de ressources est INCRÉMENTIEL, donc ces
 // ressources non déclarées restent intactes. Ne jamais déployer ce modèle en mode
 // « complet » (Complete), qui supprimerait tout ce qui n'est pas listé.
 //
 // Déployer :
-//   az deployment group create -g rg-microlingo-ci \
+//   az deployment group create -g law-microlingo-ci \
 //     --template-file infra/ci-runner/network.bicep
 // Valider sans rien changer (n'affiche que des différences bénignes — valeurs par
 // défaut Azure non réglables ; voir la section dédiée du README) :
-//   az deployment group what-if -g rg-microlingo-ci \
+//   az deployment group what-if -g law-microlingo-ci \
 //     --template-file infra/ci-runner/network.bicep
 targetScope = 'resourceGroup'
 
@@ -32,19 +32,19 @@ targetScope = 'resourceGroup'
 param location string = 'westeurope'
 
 @description('IP publique en façade de la Passerelle NAT (adresse d\'egress du runner).')
-param publicIpName string = 'pip-microlingo-nat'
+param publicIpName string = 'pip-certigo-nat'
 
 @description('Passerelle NAT fournissant la traduction sortante (SNAT) du sous-réseau runner.')
-param natGatewayName string = 'nat-microlingo'
+param natGatewayName string = 'law-microlingo'
 
 @description('Réseau virtuel hébergeant le sous-réseau du runner.')
-param vnetName string = 'vnet-microlingo-ci'
+param vnetName string = 'law-microlingo-ci'
 
 @description('Sous-réseau auquel la carte réseau de la machine virtuelle runner est rattachée.')
 param subnetName string = 'snet-runners'
 
 @description('Groupe de sécurité réseau (NSG) du sous-réseau runner (aucune règle personnalisée — règles Azure par défaut uniquement).')
-param nsgName string = 'vnet-microlingo-ci-snet-runners-nsg-westeurope'
+param nsgName string = 'law-microlingo-ci-snet-runners-nsg-westeurope'
 
 @description('Espace d\'adressage du Réseau virtuel.')
 param vnetAddressPrefix string = '10.42.0.0/16'

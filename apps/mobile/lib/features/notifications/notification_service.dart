@@ -51,7 +51,7 @@ class NotificationService {
 
     await _plugin.zonedSchedule(
       _dailyReminderId,
-      'Microlingo 🎓',
+      'Certigo 🎓',
       'Ta leçon du jour t\'attend ! Garde ta série active.',
       scheduledDate,
       details,

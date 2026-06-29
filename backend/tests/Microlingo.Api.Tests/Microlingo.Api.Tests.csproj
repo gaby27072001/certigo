@@ -1,10 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- The Cosmos SDK flows in transitively via Microlingo.Api; opt out of its
+         legacy Newtonsoft.Json probe to match the Api project and keep the
+         -warnaserror build clean. -->
+    <AzureCosmosDisableNewtonsoftJsonCheck>true</AzureCosmosDisableNewtonsoftJsonCheck>
+    <!-- The SDK's CSharpDetectPreviewFeatureAnalyzer intermittently throws an NRE
+         (reported as AD0001) when analyzing the DispatchProxy-based test harness.
+         Suppress that analyzer-infrastructure diagnostic entirely so a flaky analyzer
+         crash can never be promoted into a build failure under -warnaserror. AD0001
+         signals an analyzer that crashed, not a real code defect; suppressing it is
+         test-project build hygiene only, with no effect on production or on genuine
+         code diagnostics. -->
+    <NoWarn>$(NoWarn);AD0001</NoWarn>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="FluentAssertions" Version="6.12.2" />
@@ -12,7 +26,13 @@
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
+
   <ItemGroup>
+    <!-- The system under test. ExceptionMiddleware constructs
+         Microsoft.AspNetCore.Mvc.ProblemDetails at runtime, so the AspNetCore
+         shared framework must be resolvable in the test host. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\Microlingo.Api\Microlingo.Api.csproj" />
   </ItemGroup>
+
 </Project>

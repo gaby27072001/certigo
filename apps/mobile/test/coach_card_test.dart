@@ -1,7 +1,7 @@
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:microlingo/features/home/presentation/coach_section.dart';
+import 'package:certigo/features/home/presentation/coach_section.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 /// Widget tests for the AI coach card.

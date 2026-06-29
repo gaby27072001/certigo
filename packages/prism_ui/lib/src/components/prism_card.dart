@@ -14,7 +14,7 @@ import '../tokens/prism_radii.dart';
 /// * [outlined]— opaque surface with a confident accent stroke and no shadow.
 enum PrismCardVariant { surface, tonal, filled, outlined }
 
-/// The solid, colorful, rounded content surface of Microlingo.
+/// The solid, colorful, rounded content surface of Certigo.
 ///
 /// Where [GlassSurface] is reserved for *chrome* (bottom nav, small floating
 /// utilities, premium reward overlays), [PrismCard] is the default surface for

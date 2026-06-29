@@ -1,5 +1,5 @@
 name: data
-description: "Microlingo data layer: JSON models, Dio API client and repositories."
+description: "Certigo data layer: JSON models, Dio API client and repositories."
 version: 0.1.0
 publish_to: none
 

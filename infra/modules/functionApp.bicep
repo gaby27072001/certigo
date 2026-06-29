@@ -1,5 +1,5 @@
 // Azure Functions (Linux Flex Consumption, .NET 8 isolated worker) hosting the
-// Microlingo API. Uses a system-assigned managed identity for Key Vault, Cosmos
+// Certigo API. Uses a system-assigned managed identity for Key Vault, Cosmos
 // data-plane, and identity-based storage access — NO account keys anywhere
 // (the platform's storage accounts have shared-key auth disabled by policy).
 @description('Function App name (globally unique).')
@@ -115,7 +115,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         // App config consumed by the API. Keys are FLAT (match Program.cs /
         // local.settings.json.example): COSMOS_ENDPOINT, ENTRA_AUTHORITY, etc.
         { name: 'COSMOS_ENDPOINT', value: cosmosEndpoint }
-        { name: 'COSMOS_DATABASE', value: 'microlingo' }
+        { name: 'COSMOS_DATABASE', value: 'certigo' }
         // "dev" => permissive DevTokenValidator (dev env only); "prod" (or any non-"dev" value) => Entra.
         { name: 'AUTH_MODE', value: authMode }
         { name: 'ENTRA_AUTHORITY', value: entraAuthority }

@@ -23,7 +23,7 @@ jobs:
     #   2) s'assurer que les GitHub-hosted runners sont ACTIVÉS pour le repo/org
     #      (ils sont désactivés par défaut ici — cf. lint-workflows.yml).
     # Repasser BACKEND_CI_FALLBACK à false (ou supprimer la variable) pour revenir au self-hosted.
-    runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
+    runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","Linux","X64","law-microlingo"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -31,13 +31,13 @@ jobs:
           dotnet-version: "8.0.x"
       - name: Restore
         working-directory: backend
-        run: dotnet restore Microlingo.sln
+        run: dotnet restore Certigo.sln
       - name: Build
         working-directory: backend
-        run: dotnet build Microlingo.sln --configuration Release --no-restore -warnaserror
+        run: dotnet build Certigo.sln --configuration Release --no-restore -warnaserror
       - name: Test
         working-directory: backend
-        run: dotnet test Microlingo.sln --configuration Release --no-build --verbosity normal
+        run: dotnet test Certigo.sln --configuration Release --no-build --verbosity normal
 
       - name: Generate SBOM (CycloneDX)
         working-directory: backend
@@ -45,7 +45,7 @@ jobs:
         run: |
           dotnet tool install --global CycloneDX
           export PATH="$PATH:$HOME/.dotnet/tools"
-          dotnet CycloneDX Microlingo.sln --output ./sbom --json
+          dotnet CycloneDX Certigo.sln --output ./sbom --json
       - name: Upload SBOM
         continue-on-error: true # advisory artifact: never fail the gate (e.g. on storage quota)
         uses: actions/upload-artifact@v4

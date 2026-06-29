@@ -87,7 +87,7 @@ void main() {
 
     test('ships sensible default endpoints and Entra scopes', () {
       expect(AppEnv.apiBaseUrl, isNotEmpty);
-      expect(AppEnv.entraRedirectUri, 'microlingo://auth');
+      expect(AppEnv.entraRedirectUri, 'certigo://auth');
       expect(AppEnv.entraScopes, contains('openid'));
     });
   });

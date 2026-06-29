@@ -1,5 +1,5 @@
 name: cortex
-description: "Cortex — Microlingo's pure-Dart spaced-repetition and readiness engine (FSRS-inspired, backend-equivalent)."
+description: "Cortex — Certigo's pure-Dart spaced-repetition and readiness engine (FSRS-inspired, backend-equivalent)."
 version: 0.1.0
 publish_to: none
 

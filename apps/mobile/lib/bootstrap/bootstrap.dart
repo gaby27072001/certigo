@@ -38,7 +38,7 @@ Future<void> bootstrap() async {
         catalogStoreProvider.overrideWithValue(prefsCatalogCacheStore(prefs)),
         syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
       ],
-      child: const OfflineSyncScope(child: MicrolingoApp()),
+      child: const OfflineSyncScope(child: CertigoApp()),
     ),
   );
 }

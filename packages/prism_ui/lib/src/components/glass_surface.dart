@@ -4,7 +4,7 @@ import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_radii.dart';
 import '../tokens/prism_elevation.dart';
 
-/// The foundational "Liquid-Glass inspired" surface of Microlingo.
+/// The foundational "Liquid-Glass inspired" surface of Certigo.
 ///
 /// A [GlassSurface] is a translucent, blurred panel with a subtle top
 /// highlight and a hairline stroke — it reads as frosted material floating

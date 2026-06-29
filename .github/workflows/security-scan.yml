@@ -20,7 +20,7 @@ concurrency:
 jobs:
   dependency-scan:
     name: NuGet vulnerability scan
-    runs-on: [self-hosted, Linux, X64, microlingo-ci]
+    runs-on: [self-hosted, Linux, X64, law-microlingo]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -28,13 +28,13 @@ jobs:
           dotnet-version: "8.0.x"
       - name: Restore
         working-directory: backend
-        run: dotnet restore Microlingo.sln
+        run: dotnet restore Certigo.sln
       - name: Scan for vulnerable & deprecated packages
         working-directory: backend
         shell: bash
         run: |
           set -euo pipefail
-          dotnet list Microlingo.sln package --vulnerable --include-transitive 2>&1 | tee vulnerable.txt
+          dotnet list Certigo.sln package --vulnerable --include-transitive 2>&1 | tee vulnerable.txt
           if grep -qi "has the following vulnerable" vulnerable.txt; then
             echo "::error::Vulnerable NuGet packages detected — see the log above."
             exit 1
@@ -43,7 +43,7 @@ jobs:
 
   iac-scan:
     name: Bicep IaC scan (Checkov)
-    runs-on: [self-hosted, Linux, X64, microlingo-ci]
+    runs-on: [self-hosted, Linux, X64, law-microlingo]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

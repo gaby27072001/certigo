@@ -1,5 +1,5 @@
 # =============================================================================
-# codemagic.yaml — Configuration Codemagic pour Microlingo iOS CI/CD
+# codemagic.yaml — Configuration Codemagic pour Certigo iOS CI/CD
 # =============================================================================
 #
 # Ce fichier remplace les workflows GitHub Actions iOS qui nécessitaient
@@ -62,9 +62,9 @@ workflows:
         # Codemagic gère les certificats et profils nativement via l'API App Store Connect.
         # Plus besoin de fastlane match, de .p12 ou de profils encodés en secrets.
         distribution_type: app_store
-        bundle_identifier: com.microlingo.app
+        bundle_identifier: law-microlingo
       vars:
-        BUNDLE_ID: com.microlingo.app
+        BUNDLE_ID: law-microlingo
         FLUTTER_APP_PATH: apps/mobile
 
     triggering:
@@ -160,8 +160,8 @@ workflows:
               <string>Apple Distribution</string>
               <key>provisioningProfiles</key>
               <dict>
-                  <key>com.microlingo.app</key>
-                  <string>Microlingo AppStore</string>
+                  <key>law-microlingo</key>
+                  <string>Certigo AppStore</string>
               </dict>
               <key>stripSwiftSymbols</key>
               <true/>
@@ -173,7 +173,7 @@ workflows:
           </plist>
           EOF
           flutter build ipa --release \
-            --dart-define=API_BASE_URL=https://func-microlingo-dev-a2msquxibzvcu.azurewebsites.net/api \
+            --dart-define=API_BASE_URL=https://law-microlingodev-a2msquxibzvcu.azurewebsites.net/api \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/tmp/ExportOptions.plist
@@ -216,9 +216,9 @@ workflows:
       cocoapods: default
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.microlingo.app
+        bundle_identifier: law-microlingo
       vars:
-        BUNDLE_ID: com.microlingo.app
+        BUNDLE_ID: law-microlingo
         FLUTTER_APP_PATH: apps/mobile
 
     triggering:
@@ -284,8 +284,8 @@ workflows:
               <string>Apple Distribution</string>
               <key>provisioningProfiles</key>
               <dict>
-                  <key>com.microlingo.app</key>
-                  <string>Microlingo AppStore</string>
+                  <key>law-microlingo</key>
+                  <string>Certigo AppStore</string>
               </dict>
               <key>stripSwiftSymbols</key>
               <true/>
@@ -297,7 +297,7 @@ workflows:
           </plist>
           EOF
           flutter build ipa --release \
-            --dart-define=API_BASE_URL=https://func-microlingo-dev-a2msquxibzvcu.azurewebsites.net/api \
+            --dart-define=API_BASE_URL=https://law-microlingodev-a2msquxibzvcu.azurewebsites.net/api \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/tmp/ExportOptions.plist
@@ -333,7 +333,7 @@ workflows:
       xcode: latest
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.microlingo.app
+        bundle_identifier: law-microlingo
 
     # Pas de triggering automatique — déclencher manuellement depuis le dashboard
 

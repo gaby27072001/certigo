@@ -1,4 +1,4 @@
-/// Data — Microlingo's models, API client and repositories.
+/// Data — Certigo's models, API client and repositories.
 ///
 /// Hand-written JSON models (no codegen), a configured Dio [ApiClient] and the
 /// repository contracts + remote implementations that the app depends on.

@@ -39,7 +39,7 @@ blocks:
     language: bash
     code: |
       # App Service : héberger une web app sans gérer de serveur (PaaS)
-      az webapp up --name microlingo-web --runtime "DOTNET:8" --sku B1
+      az webapp up --name certigo-web --runtime "DOTNET:8" --sku B1
 
   - type: check
     conceptId: c-compute-options

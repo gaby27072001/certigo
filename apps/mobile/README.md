@@ -1,6 +1,6 @@
-# Microlingo — mobile app
+# Certigo — mobile app
 
-Flutter client for Microlingo, the bite-sized learning app for Microsoft
+Flutter client for Certigo, the bite-sized learning app for Microsoft
 certifications (AZ-900 and beyond). Built on the shared `prism_ui` design
 system and the `core` / `cortex` / `data` packages in this monorepo.
 

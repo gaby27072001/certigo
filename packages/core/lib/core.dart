@@ -1,4 +1,4 @@
-/// Core — cross-cutting primitives shared by every Microlingo package:
+/// Core — cross-cutting primitives shared by every Certigo package:
 /// `Result`/`Failure` error flow and compile-time environment config.
 ///
 /// Pure Dart, no Flutter dependency, so it is trivially unit-testable and can
