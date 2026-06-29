@@ -1,13 +1,13 @@
 using System.Net;
 using FluentAssertions;
-using Microlingo.Api.Http;
-using Microlingo.Api.Middleware;
-using Microlingo.Application.Abstractions;
+using Certigo.Api.Http;
+using Certigo.Api.Middleware;
+using Certigo.Application.Abstractions;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
-namespace Microlingo.Api.Tests;
+namespace Certigo.Api.Tests;
 
 /// <summary>
 /// Verifies the middleware registration order declared in <c>Program.cs</c>

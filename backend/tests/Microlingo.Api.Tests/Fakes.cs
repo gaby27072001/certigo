@@ -1,12 +1,12 @@
 using System.Security.Claims;
-using Microlingo.Application.Abstractions;
-using Microlingo.Application.Dtos;
-using Microlingo.Application.Services;
+using Certigo.Application.Abstractions;
+using Certigo.Application.Dtos;
+using Certigo.Application.Services;
 
-namespace Microlingo.Api.Tests;
+namespace Certigo.Api.Tests;
 
 // Hand-rolled doubles for the application abstractions the HTTP layer depends on.
-// Following the convention of Microlingo.Application.Tests: no mocking library, fakes are
+// Following the convention of Certigo.Application.Tests: no mocking library, fakes are
 // `internal sealed`, and they capture call arguments / counts as public properties so the
 // tests can assert on what the middleware and functions forwarded.
 

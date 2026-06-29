@@ -1,10 +1,10 @@
 using System.Net;
 using FluentAssertions;
-using Microlingo.Api.Functions;
-using Microlingo.Api.Http;
+using Certigo.Api.Functions;
+using Certigo.Api.Http;
 using Xunit;
 
-namespace Microlingo.Api.Tests;
+namespace Certigo.Api.Tests;
 
 /// <summary>
 /// Exercises the request→handler boundary of <see cref="AuthFunctions"/>: each anonymous endpoint

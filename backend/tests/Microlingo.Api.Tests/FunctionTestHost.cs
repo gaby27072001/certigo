@@ -7,7 +7,7 @@ using System.Text.Json;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 
-namespace Microlingo.Api.Tests;
+namespace Certigo.Api.Tests;
 
 internal sealed class TestFunctionContext : FunctionContext
 {

@@ -1,12 +1,12 @@
 using System.Net;
 using System.Security.Claims;
 using FluentAssertions;
-using Microlingo.Api.Auth;
-using Microlingo.Api.Middleware;
+using Certigo.Api.Auth;
+using Certigo.Api.Middleware;
 using Microsoft.Azure.Functions.Worker;
 using Xunit;
 
-namespace Microlingo.Api.Tests;
+namespace Certigo.Api.Tests;
 
 public sealed class JwtAuthMiddlewareTests
 {

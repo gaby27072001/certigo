@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <!-- The Cosmos SDK flows in transitively via Microlingo.Api; opt out of its
+    <!-- The Cosmos SDK flows in transitively via Certigo.Api; opt out of its
          legacy Newtonsoft.Json probe to match the Api project and keep the
          -warnaserror build clean. -->
     <AzureCosmosDisableNewtonsoftJsonCheck>true</AzureCosmosDisableNewtonsoftJsonCheck>
@@ -32,7 +32,7 @@
          Microsoft.AspNetCore.Mvc.ProblemDetails at runtime, so the AspNetCore
          shared framework must be resolvable in the test host. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <ProjectReference Include="..\..\src\Microlingo.Api\Microlingo.Api.csproj" />
+    <ProjectReference Include="..\..\src\Certigo.Api\Certigo.Api.csproj" />
   </ItemGroup>
 
 </Project>
