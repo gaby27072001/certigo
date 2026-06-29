@@ -8,16 +8,14 @@ void main() {
   setUpAll(disableGoogleFontsFetching);
 
   group('GlassSurface', () {
-    testWidgets('renders its child and blurs by default',
-        (WidgetTester tester) async {
+    testWidgets('renders its child and blurs by default', (WidgetTester tester) async {
       await pumpPrism(tester, const GlassSurface(child: Text('Frosted')));
 
       expect(find.text('Frosted'), findsOneWidget);
       expect(find.byType(BackdropFilter), findsOneWidget);
     });
 
-    testWidgets('drops the blur when disabled but keeps the child',
-        (WidgetTester tester) async {
+    testWidgets('drops the blur when disabled but keeps the child', (WidgetTester tester) async {
       await pumpPrism(
         tester,
         const GlassSurface(blurEnabled: false, child: Text('Solid')),

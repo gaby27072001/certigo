@@ -32,8 +32,7 @@ class ProfileScreen extends ConsumerWidget {
           data: (UserProfile me) => _ProfileContent(
             me: me,
             mode: mode,
-            onMode: (ThemeMode m) =>
-                ref.read(themeModeProvider.notifier).state = m,
+            onMode: (ThemeMode m) => ref.read(themeModeProvider.notifier).state = m,
           ),
           loading: () => const _ProfileLoading(),
           error: (Object error, StackTrace _) =>
@@ -204,16 +203,14 @@ class _ProfileContent extends ConsumerWidget {
                 icon: Icons.local_fire_department_rounded,
                 label: 'Rappel de série',
                 provider: streakReminderProvider,
-                onChanged: (bool v, WidgetRef r) =>
-                    r.read(streakReminderProvider.notifier).set(v),
+                onChanged: (bool v, WidgetRef r) => r.read(streakReminderProvider.notifier).set(v),
               ),
               Divider(color: p.border, height: 24),
               _SwitchPrefRow(
                 icon: Icons.volume_up_rounded,
                 label: 'Sons & vibrations',
                 provider: soundsEnabledProvider,
-                onChanged: (bool v, WidgetRef r) =>
-                    r.read(soundsEnabledProvider.notifier).set(v),
+                onChanged: (bool v, WidgetRef r) => r.read(soundsEnabledProvider.notifier).set(v),
               ),
               Divider(color: p.border, height: 24),
               const _LanguagePrefRow(),
@@ -260,9 +257,7 @@ class _SignOutSection extends ConsumerWidget {
               tone: p.error,
               icon: Icons.logout_rounded,
               loading: busy,
-              onPressed: busy
-                  ? null
-                  : () => ref.read(authControllerProvider.notifier).signOut(),
+              onPressed: busy ? null : () => ref.read(authControllerProvider.notifier).signOut(),
             ),
           ],
         ),
@@ -513,11 +508,8 @@ String _subtitleFromParts(String handle, int level) {
 }
 
 String _initials(String name) {
-  final List<String> parts = name
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((String s) => s.isNotEmpty)
-      .toList();
+  final List<String> parts =
+      name.trim().split(RegExp(r'\s+')).where((String s) => s.isNotEmpty).toList();
   if (parts.isEmpty) return '?';
   final String a = parts.first.substring(0, 1);
   final String b = parts.length > 1 ? parts[1].substring(0, 1) : '';
@@ -560,8 +552,7 @@ class _TappableRow extends StatelessWidget {
               style: t.bodyLarge?.copyWith(color: trailingColor),
             ),
           ),
-          if (trailing != null)
-            Text(trailing!, style: t.labelMedium?.copyWith(color: p.primary)),
+          if (trailing != null) Text(trailing!, style: t.labelMedium?.copyWith(color: p.primary)),
           const SizedBox(width: 4),
           Icon(Icons.chevron_right_rounded, color: p.textSecondary, size: 18),
         ],
@@ -695,8 +686,7 @@ class _AccountSection extends ConsumerStatefulWidget {
 
 class _AccountSectionState extends ConsumerState<_AccountSection> {
   Future<void> _editDisplayName() async {
-    final String current =
-        ref.read(displayNameOverrideProvider) ?? widget.me.displayName;
+    final String current = ref.read(displayNameOverrideProvider) ?? widget.me.displayName;
     final TextEditingController ctrl = TextEditingController(text: current);
     final String? result = await showDialog<String>(
       context: context,
@@ -747,9 +737,7 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
                 onChanged: (String v) {
                   final bool valid = RegExp(r'^[a-z0-9_]*$').hasMatch(v);
                   setDialogState(() {
-                    validationError = valid
-                        ? null
-                        : 'Minuscules, chiffres et _ uniquement';
+                    validationError = valid ? null : 'Minuscules, chiffres et _ uniquement';
                   });
                 },
               ),
@@ -772,9 +760,7 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
               child: const Text('Annuler'),
             ),
             TextButton(
-              onPressed: validationError == null
-                  ? () => Navigator.of(ctx2).pop(ctrl.text)
-                  : null,
+              onPressed: validationError == null ? () => Navigator.of(ctx2).pop(ctrl.text) : null,
               child: const Text('Enregistrer'),
             ),
           ],
@@ -967,9 +953,7 @@ class _LearningSectionState extends ConsumerState<_LearningSection> {
                           if (v == true) {
                             current = <AzureDomain>{...current, d};
                           } else {
-                            current = current
-                                .where((AzureDomain x) => x != d)
-                                .toSet();
+                            current = current.where((AzureDomain x) => x != d).toSet();
                           }
                         });
                       },

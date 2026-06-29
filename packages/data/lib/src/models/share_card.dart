@@ -45,8 +45,7 @@ class ShareCard {
     return (dailyXp / dailyGoalXp).clamp(0.0, 1.0).toDouble();
   }
 
-  String get formattedHandle =>
-      handle.trim().isEmpty ? '' : '@${handle.trim()}';
+  String get formattedHandle => handle.trim().isEmpty ? '' : '@${handle.trim()}';
 
   factory ShareCard.fromJson(Map<String, dynamic> json) => ShareCard(
         shareId: json['shareId'] as String? ?? '',
@@ -63,8 +62,7 @@ class ShareCard {
         headline: json['headline'] as String? ?? '',
         caption: json['caption'] as String? ?? '',
         referralCode: json['referralCode'] as String? ?? '',
-        generatedAt:
-            DateTime.tryParse(json['generatedAt'] as String? ?? '')?.toUtc() ??
-                DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+        generatedAt: DateTime.tryParse(json['generatedAt'] as String? ?? '')?.toUtc() ??
+            DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
       );
 }

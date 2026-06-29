@@ -1,0 +1,24 @@
+# Checkov configuration — Certigo / Bicep IaC scan
+# Only suppress checks with a documented, accepted justification.
+# All other findings from `checkov --framework bicep` are hard-fail.
+#
+# To add a new suppression:
+#   1. Understand the finding (checkov --check <ID> docs).
+#   2. Confirm it is a deliberate design choice or a Checkov false positive.
+#   3. Add it here with a one-line reason, reviewer name, and date.
+#   4. Open a follow-up issue if the suppression should be re-evaluated later.
+
+skip_checks:
+  # CKV_AZURE_65 — Cosmos DB should have automatic failover enabled.
+  # Reason: Certigo uses Cosmos in **serverless** mode, which only supports a
+  # single write region and does not support automatic failover. Enabling it
+  # would break the deployment. Acceptable for the current stage; revisit when
+  # provisioned throughput / multi-region is adopted.
+  - CKV_AZURE_65
+
+  # CKV_AZURE_132 — Cosmos DB local (key-based) auth should be disabled.
+  # Reason: `disableLocalAuth` is set to `true` in staging/prod via the
+  # `hardened` variable; it is intentionally left `false` in dev so that the
+  # seed script and local tooling can authenticate without Entra. The dev
+  # environment is not production-sensitive.
+  - CKV_AZURE_132

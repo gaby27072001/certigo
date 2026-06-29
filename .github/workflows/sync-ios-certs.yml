@@ -18,6 +18,12 @@ name: sync-ios-certs
 
 on:
   workflow_dispatch:
+    inputs:
+      enable_legacy_workflow:
+        description: "Exécuter exceptionnellement ce workflow historique (Codemagic est recommandé)"
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: sync-ios-certs
@@ -28,7 +34,7 @@ env:
 
 jobs:
   sync:
-    if: false  # Migré vers Codemagic — voir codemagic.yaml
+    if: ${{ inputs.enable_legacy_workflow }}
     name: fastlane match (création / renouvellement)
     runs-on: [self-hosted, macOS]
     steps:

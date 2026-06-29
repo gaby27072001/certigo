@@ -11,8 +11,7 @@ void main() {
   });
 
   group('PrismTheme', () {
-    test('light theme is Material 3 with the light scaffold background',
-        () async {
+    test('light theme is Material 3 with the light scaffold background', () async {
       late ThemeData theme;
       await runSwallowingFontErrors(() async {
         theme = PrismTheme.light();
@@ -22,8 +21,7 @@ void main() {
       expect(theme.scaffoldBackgroundColor, PrismColors.lightBg);
     });
 
-    test('dark theme is Material 3 with the dark scaffold background',
-        () async {
+    test('dark theme is Material 3 with the dark scaffold background', () async {
       late ThemeData theme;
       await runSwallowingFontErrors(() async {
         theme = PrismTheme.dark();

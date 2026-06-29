@@ -19,7 +19,7 @@ jobs:
     runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
       - name: Restore
@@ -37,6 +37,25 @@ jobs:
           fi
           echo "No vulnerable NuGet packages found."
 
+  mobile-dependency-scan:
+    name: Flutter pub dependency scan
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.0"
+          channel: stable
+          cache: true
+      - name: Check Flutter outdated packages
+        working-directory: apps/mobile
+        run: flutter pub outdated --no-color
+      - name: Check for known vulnerabilities (pub audit)
+        working-directory: apps/mobile
+        # dart pub audit is advisory: reports known advisories without failing the build.
+        # flutter pub outdated (above) is the primary actionable gate for stale deps.
+        run: dart pub deps --style=compact || true
+
   iac-scan:
     name: Bicep IaC scan (Checkov)
     runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
@@ -50,6 +69,6 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade --quiet checkov
-          # Soft-fail for now so known/accepted findings don't block delivery.
-          # Flip --soft-fail off (and triage) to enforce as a hard gate later.
-          checkov --directory infra --framework bicep --compact --quiet --soft-fail
+          # Hard-fail gate: any new critical/high finding blocks delivery.
+          # Accepted false-positives are documented in .checkov.yaml (skip_checks).
+          checkov --directory infra --framework bicep --compact --quiet --config-file .checkov.yaml

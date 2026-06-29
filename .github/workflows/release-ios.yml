@@ -43,6 +43,11 @@ on:
         description: "Construire l'IPA signé SANS uploader sur TestFlight"
         type: boolean
         default: false
+      enable_legacy_workflow:
+        description: "Exécuter exceptionnellement ce workflow historique (Codemagic est recommandé)"
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: release-ios-${{ github.ref }}
@@ -54,7 +59,7 @@ env:
 
 jobs:
   release:
-    if: false  # Migré vers Codemagic — voir codemagic.yaml
+    if: ${{ inputs.enable_legacy_workflow }}
     name: Build IPA signé + upload TestFlight
     # ⚠️ Runner macOS requis (Xcode). Fallback hébergé (désactivé EMU) : macos-14
     runs-on: [self-hosted, macOS]

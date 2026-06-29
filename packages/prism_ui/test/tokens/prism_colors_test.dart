@@ -14,8 +14,7 @@ void main() {
     });
 
     test('domain accents are all distinct', () {
-      final Set<int> unique =
-          PrismColors.domainAccents.map((Color c) => c.value).toSet();
+      final Set<int> unique = PrismColors.domainAccents.map((Color c) => c.value).toSet();
       expect(unique, hasLength(PrismColors.domainAccents.length));
     });
 

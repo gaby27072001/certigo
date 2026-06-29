@@ -243,8 +243,6 @@ final dailyShareCardProvider = FutureProvider.autoDispose<ShareCard>((
 final examProvider = FutureProvider.autoDispose<MockExam>((Ref ref) async {
   final String trackId = ref.watch(activeTrackProvider);
   return _orThrow(
-    await ref
-        .watch(examRepositoryProvider)
-        .generateExam(MockExamRequest(trackId: trackId)),
+    await ref.watch(examRepositoryProvider).generateExam(MockExamRequest(trackId: trackId)),
   );
 });
