@@ -7,7 +7,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 > déploiement complet (infra Bicep + code Functions). Le chemin critique est désormais
 > **compatible EMU (self-hosted obligatoire)** :
 > 1. les jobs critiques backend restent sur self-hosted (GitHub-hosted est bloqué par policy EMU) ;
-> 2. les workflows critiques ciblent le label historique `law-microlingo`, désormais présent sur les runners actifs ;
+> 2. la capacité CI est séparée entre flux critiques `main` (`law-microlingo`) et flux PR/non-critiques (`microlingo-ci`) ;
 > 3. l'auth Azure reste via OIDC (`azure/login@v2`) avec permissions minimales.
 >
 > Les actions humaines restantes concernent surtout la gouvernance (OIDC Azure AD, environments,
@@ -19,7 +19,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 
 | Élément | Statut | Où |
 |---|---|---|
-| Chemin critique backend self-hosted (`law-microlingo`) | ✅ Fait (main + PR recalée docs) | `cd-backend.yml`, `ci-backend.yml` |
+| Chemin critique backend self-hosted (`law-microlingo`) | ✅ Fait | `cd-backend.yml`, `ci-backend.yml` |
 | Jobs rattachés à un `environment:` | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Clarification placeholders Entra en dev | ✅ Fait (cette PR) | `infra/params/dev.bicepparam` |
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
@@ -56,19 +56,45 @@ et la disponibilité d'au moins un runner self-hosted online avec le label `law-
 
 ### Réconciliation des labels runners
 
-Les deux runners existants (`vm-microlingo-runner`, `vm-microlingo-runner-2`) portent désormais
-les labels custom **`law-microlingo`** et **`microlingo-ci`** en plus des labels système
+Les deux runners existants (`vm-microlingo-runner`, `vm-microlingo-runner-2`) portent les labels
+custom **`law-microlingo`** (chemin critique) et **`microlingo-ci`** (PR/non-critique), en plus
+des labels système
 (`self-hosted`, `Linux`, `X64`).  
 Le label a été ajouté via l'API GitHub :
 `POST /repos/{owner}/{repo}/actions/runners/{id}/labels`.
 
-Conséquence : les workflows de `main` qui exigent `law-microlingo` matchent sans édition de
-workflow, y compris après redémarrage/offline-online du runner.
+Conséquence : les workflows critiques `main` ciblent `law-microlingo` et les workflows PR/non
+critiques ciblent `microlingo-ci`, ce qui réserve la capacité sans éditer les YAML à chaque
+ajustement.
+
+### Variables repo de pilotage runners
+
+Les workflows lisent des variables Actions **optionnelles** pour éviter les edits récurrents :
+
+- `MAIN_CRITICAL_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","law-microlingo"]`
+- `PR_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","microlingo-ci"]`
+
+Exemple de valeur valide :
+
+```json
+["self-hosted","Linux","X64","law-microlingo"]
+```
+
+### Politique scans lourds (CodeQL / security-scan)
+
+Pour fluidifier la file CI en journée, les workflows `codeql.yml` et `security-scan.yml`
+déclenchent désormais :
+
+- en **nightly** (`schedule`) ;
+- en **manuel** (`workflow_dispatch`) pour un lancement ad-hoc.
+
+Compromis assumé : plus de scan automatique à chaque PR/push ; la détection se fait en nightly
+(ou sur déclenchement manuel en cas de besoin immédiat).
 
 ### Risque / rollback (chemin critique EMU)
 
 - **Risque principal** : aucun runner self-hosted online avec le label `law-microlingo`.
-- **Rollback repo** : aucun requis (les workflows `main` sont déjà cohérents avec les labels runner réconciliés).
+- **Rollback repo** : ajuster (ou supprimer) `MAIN_CRITICAL_RUNNER_LABELS` / `PR_RUNNER_LABELS` pour revenir aux defaults sans modifier les workflows.
 - **Rollback opérationnel** : démarrer/maintenir online la VM runner Azure (ou activer un auto-start), puis redéclencher le workflow.
 
 ---
@@ -168,8 +194,8 @@ gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPT
 
 **Côté repo :**
 - les jobs critiques de `cd-backend.yml` (`deploy-infra`, `deploy-backend`) ciblent
-  `runs-on: [self-hosted, Linux, X64, law-microlingo]` ;
-- `ci-backend.yml` conserve le même label cible côté self-hosted ;
+  `MAIN_CRITICAL_RUNNER_LABELS` (défaut `["self-hosted","Linux","X64","law-microlingo"]`) ;
+- `ci-backend.yml` cible le même pool sur `main` et le pool `PR_RUNNER_LABELS` sur PR/non-main ;
 - le chemin critique reste compatible avec la contrainte EMU (self-hosted obligatoire).
 
 ### Isolement des dépendances runner

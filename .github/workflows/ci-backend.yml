@@ -11,7 +11,7 @@ on:
 
 concurrency:
   group: ci-backend-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build-test:
@@ -23,7 +23,9 @@ jobs:
     #   2) s'assurer que les GitHub-hosted runners sont ACTIVÉS pour le repo/org
     #      (ils sont désactivés par défaut ici — cf. lint-workflows.yml).
     # Repasser BACKEND_CI_FALLBACK à false (ou supprimer la variable) pour revenir au self-hosted.
-    runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","Linux","X64","law-microlingo"]') }}
+    env:
+      RUNNER_LABELS_JSON: ${{ github.ref == 'refs/heads/main' && (vars.MAIN_CRITICAL_RUNNER_LABELS || '["self-hosted","Linux","X64","law-microlingo"]') || (vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","microlingo-ci"]') }}
+    runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || fromJSON(env.RUNNER_LABELS_JSON) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
