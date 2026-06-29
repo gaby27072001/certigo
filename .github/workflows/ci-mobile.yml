@@ -15,7 +15,7 @@ concurrency:
 
 env:
   FLUTTER_VERSION: "3.24.0"
-  NON_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","pr-ci"]' }}
+  NON_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","microlingo-ci"]' }}
 
 jobs:
   packages:

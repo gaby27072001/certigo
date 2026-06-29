@@ -28,7 +28,7 @@ on:
 
 env:
   TARGET_ENV: ${{ inputs.environment || 'dev' }}
-  MAIN_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.MAIN_CRITICAL_RUNNER_LABELS || '["self-hosted","Linux","X64","main-critical"]' }}
+  MAIN_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.MAIN_CRITICAL_RUNNER_LABELS || '["self-hosted","Linux","X64","law-microlingo"]' }}
 
 # Prevent concurrent deployments to the same environment.
 concurrency:
