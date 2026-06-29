@@ -181,6 +181,7 @@ internal static class TutorLlmConfiguration
                 "TUTOR_LLM_DEPLOYMENT is required when TUTOR_LLM_ENABLED=true.");
         }
 
+        var apiSurface = ParseApiSurface(configuration["TUTOR_LLM_API_SURFACE"]);
         var apiVersion = configuration["TUTOR_LLM_API_VERSION"];
         var apiKey = configuration["TUTOR_LLM_API_KEY"];
         var maxOutputTokens = DefaultMaxOutputTokens;
@@ -192,12 +193,34 @@ internal static class TutorLlmConfiguration
                 "TUTOR_LLM_MAX_OUTPUT_TOKENS must be a positive integer when provided.");
         }
 
+        // The v1 (Microsoft Foundry) surface ignores api-version; only the classic surface uses it.
+        var resolvedApiVersion = apiSurface == TutorLlmApiSurface.AzureClassic
+            ? (string.IsNullOrWhiteSpace(apiVersion) ? DefaultApiVersion : apiVersion)
+            : (string.IsNullOrWhiteSpace(apiVersion) ? null : apiVersion);
+
         return new TutorLlmOptions(
             NormalizeEndpoint(endpoint),
             deployment,
-            string.IsNullOrWhiteSpace(apiVersion) ? DefaultApiVersion : apiVersion,
+            resolvedApiVersion,
             string.IsNullOrWhiteSpace(apiKey) ? null : apiKey,
-            maxOutputTokens);
+            maxOutputTokens,
+            apiSurface);
+    }
+
+    private static TutorLlmApiSurface ParseApiSurface(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return TutorLlmApiSurface.V1;
+        }
+
+        return raw.Trim().ToLowerInvariant() switch
+        {
+            "v1" or "foundry" => TutorLlmApiSurface.V1,
+            "classic" or "azure" => TutorLlmApiSurface.AzureClassic,
+            _ => throw new InvalidOperationException(
+                "TUTOR_LLM_API_SURFACE must be 'v1' (Microsoft Foundry, default) or 'classic' (Azure OpenAI deployments path).")
+        };
     }
 
     private static Uri NormalizeEndpoint(Uri endpoint)

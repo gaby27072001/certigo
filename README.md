@@ -124,8 +124,9 @@ dotnet test                         # tests de domaine (FSRS, readiness, XP)
 # Exécution locale (Functions Core Tools) :
 cp src/Certigo.Api/local.settings.json.example src/Certigo.Api/local.settings.json
 # LLM tutor (optionnel) : laissez TUTOR_LLM_ENABLED=false par défaut ; pour l'activer,
-# renseignez TUTOR_LLM_ENDPOINT + TUTOR_LLM_DEPLOYMENT et soit TUTOR_LLM_API_KEY,
-# soit une identité Azure capable d'appeler Azure OpenAI.
+# renseignez TUTOR_LLM_ENDPOINT + TUTOR_LLM_DEPLOYMENT (+ TUTOR_LLM_API_SURFACE=v1 pour
+# la surface Microsoft Foundry v1, défaut), et soit TUTOR_LLM_API_KEY, soit une identité
+# Azure capable d'appeler Azure OpenAI (rôle « Cognitive Services OpenAI User »).
 cd src/Certigo.Api && func start
 ```
 
