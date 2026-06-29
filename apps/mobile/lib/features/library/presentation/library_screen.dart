@@ -216,8 +216,7 @@ class _TipCard extends StatelessWidget {
 class _ExplorerSection extends StatelessWidget {
   const _ExplorerSection();
 
-  static const List<({String emoji, String label})> _domainDefs =
-      <({String emoji, String label})>[
+  static const List<({String emoji, String label})> _domainDefs = <({String emoji, String label})>[
     (emoji: '☁️', label: 'Compute'),
     (emoji: '🗄️', label: 'Storage'),
     (emoji: '🤖', label: 'AI'),

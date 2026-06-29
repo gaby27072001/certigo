@@ -53,9 +53,7 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
   Future<void> _share() async {
     setState(() => _sharing = true);
     try {
-      await ref
-          .read(shareIntentProvider)
-          .shareText(
+      await ref.read(shareIntentProvider).shareText(
             _shareMessage(widget.card),
             subject: 'Certigo • ${widget.card.trackCode}',
           );
@@ -98,9 +96,7 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
                 children: <Widget>[
                   MascotAvatar(
                     mascot: mascot,
-                    mood: card.goalMet
-                        ? MascotMood.celebrate
-                        : MascotMood.happy,
+                    mood: card.goalMet ? MascotMood.celebrate : MascotMood.happy,
                     size: 72,
                   ),
                   const SizedBox(width: 14),
@@ -126,9 +122,7 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
                   ),
                   _TagPill(
                     icon: Icons.school_rounded,
-                    label: card.trackCode.isEmpty
-                        ? 'Certigo'
-                        : card.trackCode,
+                    label: card.trackCode.isEmpty ? 'Certigo' : card.trackCode,
                     tone: mascot.color,
                   ),
                 ],
@@ -389,14 +383,14 @@ class _TagPill extends StatelessWidget {
 }
 
 AuroraMascot _mascotFrom(String raw) => switch (raw.toLowerCase()) {
-  'volt' => AuroraMascot.volt,
-  'cosmo' => AuroraMascot.cosmo,
-  'sentinel' => AuroraMascot.sentinel,
-  'bicky' => AuroraMascot.bicky,
-  'pixel' => AuroraMascot.pixel,
-  'pip' => AuroraMascot.pip,
-  _ => AuroraMascot.nimbus,
-};
+      'volt' => AuroraMascot.volt,
+      'cosmo' => AuroraMascot.cosmo,
+      'sentinel' => AuroraMascot.sentinel,
+      'bicky' => AuroraMascot.bicky,
+      'pixel' => AuroraMascot.pixel,
+      'pip' => AuroraMascot.pip,
+      _ => AuroraMascot.nimbus,
+    };
 
 String _shareMessage(ShareCard card) {
   final String ref = Uri.encodeComponent(card.referralCode);

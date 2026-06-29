@@ -73,9 +73,7 @@ class _HomeContent extends StatelessWidget {
         // Greeting — the guide welcomes you back in a speech bubble.
         _HomeGreeting(
           firstName: firstName,
-          subtitle: path.exam.isEmpty
-              ? 'Prêt à progresser ?'
-              : 'Cap sur ${path.exam}',
+          subtitle: path.exam.isEmpty ? 'Prêt à progresser ?' : 'Cap sur ${path.exam}',
         ),
         const SizedBox(height: 22),
 
@@ -92,9 +90,7 @@ class _HomeContent extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                path.exam.isEmpty
-                    ? 'Score de préparation'
-                    : 'Score de préparation — ${path.exam}',
+                path.exam.isEmpty ? 'Score de préparation' : 'Score de préparation — ${path.exam}',
                 style: t.bodySmall?.copyWith(color: p.textSecondary),
               ),
               const SizedBox(height: 4),
@@ -185,8 +181,7 @@ class _HomeGreetingState extends State<_HomeGreeting> {
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     final PrismColorScheme p = context.prism;
-    final bool reduceMotion =
-        MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final Duration d = reduceMotion ? Duration.zero : PrismMotion.base;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,

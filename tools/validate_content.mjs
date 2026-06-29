@@ -73,6 +73,9 @@ for (const trackFile of trackFiles) {
       if (optionIdSet.size !== optionIds.length) {
         fail(lf, `item "${item.id}": duplicate option ids`);
       }
+      if (item.correct.length === 0) {
+        fail(lf, `item "${item.id}": correct[] must not be empty`);
+      }
       for (const c of item.correct) {
         if (!optionIdSet.has(c)) {
           fail(lf, `INVALID_CORRECT_REF: question ${item.id} has correct answer '${c}' that does not match any option id`);

@@ -27,8 +27,7 @@ void main() {
       expect(find.textContaining('+'), findsNothing);
     });
 
-    testWidgets('exposes an experience semantics label',
-        (WidgetTester tester) async {
+    testWidgets('exposes an experience semantics label', (WidgetTester tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpPrism(tester, const XpChip(xp: 1200));
 

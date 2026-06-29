@@ -7,8 +7,7 @@ void main() {
   setUpAll(disableGoogleFontsFetching);
 
   group('PrismProgressBar', () {
-    testWidgets('exposes its percentage through semantics',
-        (WidgetTester tester) async {
+    testWidgets('exposes its percentage through semantics', (WidgetTester tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpPrism(
         tester,
@@ -24,8 +23,7 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('rejects values outside the 0..1 range',
-        (WidgetTester tester) async {
+    testWidgets('rejects values outside the 0..1 range', (WidgetTester tester) async {
       const double tooHigh = 1.5;
 
       expect(() => PrismProgressBar(value: tooHigh), throwsAssertionError);

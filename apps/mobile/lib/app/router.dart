@@ -77,29 +77,28 @@ CustomTransitionPage<void> _stepPage({
     child: child,
     transitionDuration: PrismMotion.base,
     reverseTransitionDuration: PrismMotion.fast,
-    transitionsBuilder:
-        (
-          BuildContext context,
-          Animation<double> animation,
-          Animation<double> secondaryAnimation,
-          Widget child,
-        ) {
-          final CurvedAnimation curved = CurvedAnimation(
-            parent: animation,
-            curve: PrismMotion.decelerate,
-            reverseCurve: PrismMotion.standard,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: begin,
-                end: Offset.zero,
-              ).animate(curved),
-              child: child,
-            ),
-          );
-        },
+    transitionsBuilder: (
+      BuildContext context,
+      Animation<double> animation,
+      Animation<double> secondaryAnimation,
+      Widget child,
+    ) {
+      final CurvedAnimation curved = CurvedAnimation(
+        parent: animation,
+        curve: PrismMotion.decelerate,
+        reverseCurve: PrismMotion.standard,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: begin,
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
+        ),
+      );
+    },
   );
 }
 
@@ -209,8 +208,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: OnboardingRoutes.goal,
         parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const GoalScreen()),
+        pageBuilder: (_, GoRouterState state) => _stepPage(state: state, child: const GoalScreen()),
       ),
       GoRoute(
         path: OnboardingRoutes.routine,
@@ -241,14 +239,13 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       ),
       // Bottom-nav shell: persistent state per tab via StatefulShellRoute.
       StatefulShellRoute.indexedStack(
-        builder:
-            (
-              BuildContext context,
-              GoRouterState state,
-              StatefulNavigationShell shell,
-            ) {
-              return AppShell(shell: shell);
-            },
+        builder: (
+          BuildContext context,
+          GoRouterState state,
+          StatefulNavigationShell shell,
+        ) {
+          return AppShell(shell: shell);
+        },
         branches: <StatefulShellBranch>[
           // Primary tab: Accueil (home) is the main entry surface.
           StatefulShellBranch(

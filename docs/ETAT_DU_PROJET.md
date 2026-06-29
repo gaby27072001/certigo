@@ -18,15 +18,15 @@
 
 | Repère | Valeur |
 |---|---|
-| 📅 Rafraîchi le | **2026‑06‑24** (écrans gamification mobile branchés : saisons · quêtes · succès · boutique · amis · examens · tests d'intégration Cosmos émulateur‑gated · anti‑triche examen : fenêtre de cadence câblée) |
-| 🔖 Reflète | HEAD post‑audit + **D8 examen** + **écrans mobiles gamification** — voir `AUDIT_CERTIGO.md` §M (remédiation appliquée) |
-| 🌿 Branche du doc | `gchambaud-microsoft-finalize-project` |
-| 📈 Activité | **49+ commits**, du 2026‑06‑19 au 2026‑06‑24 — rythme très soutenu |
+| 📅 Rafraîchi le | **2026‑06‑29** (CI qualité : builds reproductibles · scan CVE pub · Checkov hard-fail · validateur contenu renforcé · protection branche main) |
+| 🔖 Reflète | HEAD post‑audit + **D8 examen** + **écrans mobiles gamification** + **P2 CI qualité** — voir `AUDIT_CERTIGO.md` §M (remédiation appliquée) |
+| 🌿 Branche du doc | `gchambaud-microsoft-ci-quality-builds-cve-content-doc` |
+| 📈 Activité | **163+ commits**, du 2026‑06‑19 au 2026‑06‑29 — rythme très soutenu |
 | 🧪 Tests | backend **325** exécutés (xUnit, dont concurrence/auth/parité/anti‑triche) + **6** d'intégration Cosmos (émulateur‑gated) · Dart **185** (unit + widget, dont golden Cortex) |
 | 🧩 API | **18 groupes** de Functions (+ `GET /health`) · **≈ 29 endpoints** HTTP |
 | 🗄️ Données | **8 containers Cosmos DB** (serverless ; profil avec **ETag** concurrence optimiste) |
 | 🏗️ Infra | **9 modules Bicep** + params **dev/staging/prod** — durcie par env, **pas encore déployée** |
-| 🤖 CI/CD | **9 workflows actifs** GitHub Actions + **2 historiques** iOS désactivés (runner self-hosted Azure ; SBOM + gate de release) |
+| 🤖 CI/CD | **12 workflows** GitHub Actions (10 actifs + 2 historiques iOS désactivés) : backend · mobile · contenu · infra · CD backend · CodeQL · lint-workflows · release-android · security-scan · promote-staging-prod (runner self-hosted Azure ; SBOM + gate release) |
 | 🔒 Durcissement | Idempotence atomique · ETag · garde auth dev · `/health` + correlation id · CORS/KV/Storage par env |
 
 ---
@@ -49,7 +49,7 @@
 | **App mobile (Flutter)** | 🟢 | `apps/mobile` | **62 fichiers Dart**, 15 features. Tous les moteurs de gamification (saisons, quêtes, succès, boutique, amis, examens) désormais **branchés en écran** + tests widget. Reste la validation E2E sur appareil. |
 | **Cortex (algos partagés)** | 🟢 | `packages/cortex` | SRS, scoring, fil pédagogique — partagé client/serveur. |
 | **Infrastructure (Bicep)** | 🟢 | `infra/` | 8 modules (Functions, Cosmos, Key Vault, App Insights, **Defender, Policy, Diagnostics**, Storage). **Déployée en `dev`** (`rg-certigo-dev`, westeurope). |
-| **CI / qualité** | 🟢 | `.github/workflows` | 9 workflows actifs : backend, mobile, contenu, infra, CD backend, **CodeQL**, **lint-workflows**, **release-android**, **security-scan**. 2 workflows iOS GitHub Actions sont historiques et désactivés (`release-ios`, `sync-ios-certs`). |
+| **CI / qualité** | 🟢 | `.github/workflows` | **12 workflows** (10 actifs + 2 historiques iOS désactivés) : backend · mobile · contenu · infra · CD backend · CodeQL · lint-workflows · release-android · security-scan · promote-staging-prod. **Builds reproductibles** : SDK Dart épinglé `3.5.0` · .NET épinglé `8.0.x`. **Scan CVE** : NuGet + Flutter pub (nightly). **Checkov hard-fail** (skip justifiés dans `.checkov.yaml`). |
 
 **Légende :** 🟢 opérationnel & testé · 🟡 partiel / en cours · 🔴 absent.
 
@@ -66,7 +66,7 @@ graph TD
     ROOT --> PKG["🧩 packages/<br/>Paquets Dart partagés"]
     ROOT --> CNT["📚 content/<br/>89 certifs · 144 leçons (YAML)"]
     ROOT --> INF["🏗️ infra/<br/>8 modules Bicep"]
-    ROOT --> CI[".github/workflows/<br/>9 actifs + 2 historiques"]
+    ROOT --> CI[".github/workflows/<br/>12 workflows (10 actifs + 2 historiques)"]
     ROOT --> DOC["📄 docs/<br/>README · ARCHITECTURE · ÉTAT"]
 
     BE --> API["Certigo.Api<br/>17 groupes de Functions"]

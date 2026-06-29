@@ -23,12 +23,10 @@ jobs:
     #   2) s'assurer que les GitHub-hosted runners sont ACTIVÉS pour le repo/org
     #      (ils sont désactivés par défaut ici — cf. lint-workflows.yml).
     # Repasser BACKEND_CI_FALLBACK à false (ou supprimer la variable) pour revenir au self-hosted.
-    env:
-      RUNNER_LABELS_JSON: ${{ github.ref == 'refs/heads/main' && (vars.MAIN_CRITICAL_RUNNER_LABELS || '["self-hosted","Linux","X64","certigo-ci"]') || (vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","certigo-ci"]') }}
-    runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || fromJSON(env.RUNNER_LABELS_JSON) }}
+    runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || (github.ref == 'refs/heads/main' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
       - name: Restore
