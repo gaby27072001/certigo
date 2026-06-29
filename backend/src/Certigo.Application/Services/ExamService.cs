@@ -203,52 +203,60 @@ public sealed class ExamService(
             d => d.Id, d => (d.Name, d.Weight), StringComparer.OrdinalIgnoreCase);
         var score = MockExamScorer.Score(examItems, correctByItemId, domainMeta, ExamConstants.PassingScore);
 
+        var gemsEarned = score.Passed ? ExamConstants.PassGemBonus : 0;
+
         var profile = await users.GetAsync(userContext.UserId, cancellationToken)
             ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
 
-        var today = DateOnly.FromDateTime(now.UtcDateTime);
-        var sameDay = profile.DailyXpDate == today;
-        var newDailyXp = (sameDay ? profile.DailyXpEarned : 0) + xpEarned;
-        var goalMet = profile.DailyGoalXp > 0 && newDailyXp >= profile.DailyGoalXp;
+        // Pure function: applies the exam rewards delta to any profile snapshot.
+        // Captures: now, xpEarned, correctCount, gemsEarned (all fixed for this
+        // submission). Re-reads every profile-derived variable from `p` so the
+        // same function is safe to call with a fresh snapshot on a concurrency
+        // retry without carrying over stale daily/monthly accumulators.
+        UserProfileDto ApplyExamRewards(UserProfileDto p)
+        {
+            var pToday = DateOnly.FromDateTime(now.UtcDateTime);
+            var pSameDay = p.DailyXpDate == pToday;
+            var pNewDailyXp = (pSameDay ? p.DailyXpEarned : 0) + xpEarned;
+            var pGoalMet = p.DailyGoalXp > 0 && pNewDailyXp >= p.DailyGoalXp;
+            var pMonthAnchor = new DateOnly(pToday.Year, pToday.Month, 1);
+            var pSameMonth = p.MonthlyAnchor == pMonthAnchor;
+            var pStats = new GamificationStats(
+                p.Xp, p.Level, p.StreakDays, p.LastActiveDate ?? DateOnly.MinValue,
+                p.FreezeTokens, p.DailyGoalXp, pSameDay ? p.DailyXpEarned : 0);
+            var pNewStats = StreakService.UpdateStreak(pStats, pToday, pGoalMet);
+            return p with
+            {
+                Xp = p.Xp + xpEarned,
+                Level = XpEngine.LevelFromXp(p.Xp + xpEarned),
+                StreakDays = pGoalMet ? pNewStats.StreakDays : p.StreakDays,
+                FreezeTokens = pGoalMet ? pNewStats.FreezeTokens : p.FreezeTokens,
+                LastActiveDate = pGoalMet ? pNewStats.LastActiveDate : p.LastActiveDate,
+                DailyXpEarned = pNewDailyXp,
+                DailyXpDate = pToday,
+                DailyCorrectAnswers = (pSameDay ? p.DailyCorrectAnswers : 0) + correctCount,
+                MonthlyAnchor = pMonthAnchor,
+                MonthlyXpEarned = (pSameMonth ? p.MonthlyXpEarned : 0) + xpEarned,
+                MonthlyLessonsCompleted = pSameMonth ? p.MonthlyLessonsCompleted : 0,
+                MonthlyPerfectLessons = pSameMonth ? p.MonthlyPerfectLessons : 0,
+                Gems = p.Gems + gemsEarned
+            };
+        }
 
         // The mock exam awards XP too, so it feeds MonthlyXpEarned. Lessons and
         // perfect-lessons stay lesson-only, but the anchor still resets every
         // monthly counter on the first activity of a new month, whichever flow
         // fires first.
-        var monthAnchor = new DateOnly(today.Year, today.Month, 1);
-        var sameMonth = profile.MonthlyAnchor == monthAnchor;
-
-        var stats = new GamificationStats(
-            profile.Xp,
-            profile.Level,
-            profile.StreakDays,
-            profile.LastActiveDate ?? DateOnly.MinValue,
-            profile.FreezeTokens,
-            profile.DailyGoalXp,
-            sameDay ? profile.DailyXpEarned : 0);
-        var newStats = StreakService.UpdateStreak(stats, today, goalMet);
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var sameDay = profile.DailyXpDate == today;
+        var newDailyXp = (sameDay ? profile.DailyXpEarned : 0) + xpEarned;
+        var goalMet = profile.DailyGoalXp > 0 && newDailyXp >= profile.DailyGoalXp;
         var streakExtended = goalMet && profile.LastActiveDate != today;
 
         var newXp = profile.Xp + xpEarned;
         var newLevel = XpEngine.LevelFromXp(newXp);
-        var gemsEarned = score.Passed ? ExamConstants.PassGemBonus : 0;
 
-        var updatedProfile = profile with
-        {
-            Xp = newXp,
-            Level = newLevel,
-            StreakDays = goalMet ? newStats.StreakDays : profile.StreakDays,
-            FreezeTokens = goalMet ? newStats.FreezeTokens : profile.FreezeTokens,
-            LastActiveDate = goalMet ? newStats.LastActiveDate : profile.LastActiveDate,
-            DailyXpEarned = newDailyXp,
-            DailyXpDate = today,
-            DailyCorrectAnswers = (sameDay ? profile.DailyCorrectAnswers : 0) + correctCount,
-            MonthlyAnchor = monthAnchor,
-            MonthlyXpEarned = (sameMonth ? profile.MonthlyXpEarned : 0) + xpEarned,
-            MonthlyLessonsCompleted = sameMonth ? profile.MonthlyLessonsCompleted : 0,
-            MonthlyPerfectLessons = sameMonth ? profile.MonthlyPerfectLessons : 0,
-            Gems = profile.Gems + gemsEarned
-        };
+        var updatedProfile = ApplyExamRewards(profile);
 
         var weakConcepts = updatedMasteries.Values
             .Where(m => m.MasteryScore < 0.5)
@@ -353,7 +361,23 @@ public sealed class ExamService(
             throw;
         }
 
-        await users.UpsertAsync(updatedProfile, cancellationToken);
+        // Credit the profile under optimistic concurrency. On a conflict (another
+        // writer changed the profile after our read), re-read and re-apply the same
+        // deterministic delta (xpEarned, gemsEarned) so the reward is never lost.
+        try
+        {
+            await users.UpsertAsync(updatedProfile, cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await OptimisticConcurrency.ExecuteAsync(async () =>
+            {
+                var latest = await users.GetAsync(userContext.UserId, cancellationToken)
+                    ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+                await users.UpsertAsync(ApplyExamRewards(latest), cancellationToken);
+            }, cancellationToken: cancellationToken);
+        }
+
         await progress.UpsertMasteryBatchAsync(userContext.UserId, updatedMasteries.Values.ToArray(), cancellationToken);
 
         if (xpEarned > 0)

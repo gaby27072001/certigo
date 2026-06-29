@@ -67,7 +67,6 @@ public sealed class ShopService(
             Gems = evaluation.State.Gems,
             FreezeTokens = evaluation.State.FreezeTokens,
         };
-        await users.UpsertAsync(updated, cancellationToken);
 
         var result = new PurchaseResultDto(true, item.Id, evaluation.GemsSpent, updated.Gems, updated.FreezeTokens, null);
         var now = clock.UtcNow;
@@ -79,7 +78,49 @@ public sealed class ShopService(
             evaluation.GemsSpent,
             now,
             result);
-        await purchases.CreateAsync(record, cancellationToken);
+
+        // Write the purchase record FIRST as the idempotency guard. A concurrent
+        // or replayed request fails the unique-id create and returns the winner's
+        // result — the economy is never debited twice. The only failure direction
+        // is a rare "profile not yet debited" (the safe direction for an economy).
+        try
+        {
+            await purchases.CreateAsync(record, cancellationToken);
+        }
+        catch (DuplicateRecordException)
+        {
+            var winner = await purchases.GetByClientPurchaseIdAsync(userContext.UserId, request.ClientPurchaseId, cancellationToken);
+            if (winner is not null)
+            {
+                return winner.Result;
+            }
+
+            throw new ConcurrencyConflictException(
+                $"Purchase '{request.ClientPurchaseId}' is being processed concurrently.");
+        }
+
+        // Debit the profile. On a concurrent write (412), re-read and re-apply
+        // the same deterministic deltas (gems spent, freeze tokens added).
+        var gemsSpent = evaluation.GemsSpent;
+        var freezeTokensDelta = evaluation.State.FreezeTokens - profile.FreezeTokens;
+        try
+        {
+            await users.UpsertAsync(updated, cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await OptimisticConcurrency.ExecuteAsync(async () =>
+            {
+                var latest = await users.GetAsync(userContext.UserId, cancellationToken)
+                    ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+                await users.UpsertAsync(latest with
+                {
+                    Gems = latest.Gems - gemsSpent,
+                    FreezeTokens = latest.FreezeTokens + freezeTokensDelta,
+                }, cancellationToken);
+            }, cancellationToken: cancellationToken);
+        }
+
         await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "shop.purchased", now, result), cancellationToken);
 
         return result;
@@ -432,7 +473,6 @@ public sealed class StreakRepairService(
             Gems = profile.Gems - assessment.CostGems,
             LastActiveDate = assessment.BridgeTo,
         };
-        await users.UpsertAsync(updated, cancellationToken);
 
         var now = clock.UtcNow;
         var result = new StreakRepairResultDto(true, updated.StreakDays, assessment.CostGems, updated.Gems, updated.LastActiveDate, null);
@@ -444,7 +484,55 @@ public sealed class StreakRepairService(
             assessment.CostGems,
             now,
             new PurchaseResultDto(true, "streak-repair", assessment.CostGems, updated.Gems, updated.FreezeTokens, null));
-        await purchases.CreateAsync(record, cancellationToken);
+
+        // Write the purchase record FIRST as the idempotency guard. A concurrent
+        // or replayed request fails the unique-id create and returns the winner's
+        // result — the economy is never debited twice.
+        try
+        {
+            await purchases.CreateAsync(record, cancellationToken);
+        }
+        catch (DuplicateRecordException)
+        {
+            var winner = await purchases.GetByClientPurchaseIdAsync(userContext.UserId, request.ClientRepairId, cancellationToken);
+            if (winner is not null)
+            {
+                var existing = await users.GetAsync(userContext.UserId, cancellationToken);
+                return new StreakRepairResultDto(
+                    true,
+                    existing?.StreakDays ?? 0,
+                    winner.GemsSpent,
+                    winner.Result.GemsBalance,
+                    existing?.LastActiveDate,
+                    null);
+            }
+
+            throw new ConcurrencyConflictException(
+                $"Streak repair '{request.ClientRepairId}' is being processed concurrently.");
+        }
+
+        // Debit gems and bridge the streak gap. On a concurrent write (412),
+        // re-read and re-apply the same deterministic deltas.
+        var gemsCost = assessment.CostGems;
+        var bridgeTo = assessment.BridgeTo;
+        try
+        {
+            await users.UpsertAsync(updated, cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await OptimisticConcurrency.ExecuteAsync(async () =>
+            {
+                var latest = await users.GetAsync(userContext.UserId, cancellationToken)
+                    ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+                await users.UpsertAsync(latest with
+                {
+                    Gems = latest.Gems - gemsCost,
+                    LastActiveDate = bridgeTo,
+                }, cancellationToken);
+            }, cancellationToken: cancellationToken);
+        }
+
         await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "streak.repaired", now, result), cancellationToken);
 
         return result;

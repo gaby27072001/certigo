@@ -78,16 +78,28 @@ public sealed class StreakRepairServiceTests
     }
 
     [Fact]
-    public async Task GetStatusAsync_reports_repairable_state()
+    public async Task RepairAsync_recovers_the_debit_when_profile_write_conflicts_once()
     {
-        var (service, users, _, _) = Build();
-        users.Seed(Profile(5, Today.AddDays(-3), gems: 100));
+        // A concurrent writer bumps the profile between our read and our write.
+        // The ETag retry must re-read and re-apply, spending gems exactly once.
+        var inner = new InMemoryUserRepository();
+        inner.Seed(Profile(10, Today.AddDays(-2), gems: 100));
+        var users = new ConflictOnceUserRepository(inner);
+        var purchases = new InMemoryPurchaseRepository();
+        var events = new InMemoryEventRepository();
+        var service = new StreakRepairService(
+            new FakeUserContext(UserId, "Tester"),
+            new FakeClock(Now),
+            users,
+            purchases,
+            events);
 
-        var status = await service.GetStatusAsync();
+        var result = await service.RepairAsync(new StreakRepairRequest("r-etag"));
 
-        status.Repairable.Should().BeTrue();
-        status.RepairCostGems.Should().Be(50);
-        status.StreakDays.Should().Be(5);
-        status.Reason.Should().BeNull();
+        result.Success.Should().BeTrue();
+        users.UpsertCalls.Should().BeGreaterThanOrEqualTo(2); // conflicted once, retried
+        var profile = await inner.GetAsync(UserId);
+        profile!.Gems.Should().Be(50); // deducted exactly once
+        purchases.CreateCount.Should().Be(1);
     }
 }

@@ -157,4 +157,38 @@ public sealed class ExamServiceTests
         result.Rewards.XpEarned.Should().BeGreaterThan(0);
         h.Leaderboard.Xp[h.UserId].Should().Be(result.Rewards.XpEarned);
     }
+
+    [Fact]
+    public async Task SubmitAsync_recovers_the_reward_when_profile_write_conflicts_once()
+    {
+        // A concurrent non-exam writer bumps the profile between our read and our
+        // write, so the first upsert conflicts. The optimistic-concurrency retry
+        // must re-read and re-apply, crediting the reward exactly once — never
+        // lost, never doubled.
+        var inner = new InMemoryUserRepository();
+        inner.Seed(TestContent.NewProfile("user-1"));
+        var users = new ConflictOnceUserRepository(inner);
+        var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
+        var service = new ExamService(
+            new FakeUserContext("user-1", "Tester"),
+            clock,
+            TestContent.Build(),
+            new InMemoryProgressRepository(),
+            new InMemoryExamAttemptRepository(),
+            new InMemoryAttemptRepository(),
+            new InMemoryEventRepository(),
+            users,
+            new InMemoryLeaderboardRepository());
+
+        var result = await service.SubmitAsync(ExamServiceHarness.Submit(
+            "etag-1", "exam-1",
+            ExamServiceHarness.Answer("l1-i1", "a"),
+            ExamServiceHarness.Answer("l2-i1", "a"),
+            ExamServiceHarness.Answer("l3-i1", "a")));
+
+        users.UpsertCalls.Should().BeGreaterThanOrEqualTo(2); // conflicted once, retried
+        var profile = await inner.GetAsync("user-1");
+        profile!.Xp.Should().Be(result.Rewards.XpEarned); // recovered, applied once
+        profile.Gems.Should().Be(20); // pass bonus applied exactly once
+    }
 }

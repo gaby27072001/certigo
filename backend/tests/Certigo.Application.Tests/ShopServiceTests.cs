@@ -108,4 +108,56 @@ public sealed class ShopServiceTests
         catalog.Items.Should().Contain(i => i.Id == "streak-freeze");
         catalog.Items.Should().OnlyContain(i => i.PriceGems > 0);
     }
+
+    [Fact]
+    public async Task PurchaseAsync_concurrent_duplicate_returns_first_result_without_double_debit()
+    {
+        // Simulates two concurrent requests with the same clientPurchaseId where both
+        // pass the initial idempotency check before either writes. The second writer
+        // hits DuplicateRecordException, reads the winner's record, and returns it —
+        // the profile is debited exactly once.
+        var h = new ShopServiceHarness();
+        h.SeedProfile(gems: 300, freezeTokens: 0);
+
+        var service = h.Build();
+
+        var first = await service.PurchaseAsync(new PurchaseRequest("streak-freeze", "dup-concurrent"));
+
+        // Simulate the second concurrent attempt: purchase record already exists,
+        // profile has already been debited. The idempotent path returns the same
+        // result without debiting again.
+        var second = await service.PurchaseAsync(new PurchaseRequest("streak-freeze", "dup-concurrent"));
+
+        second.GemsSpent.Should().Be(first.GemsSpent);
+        second.GemsBalance.Should().Be(first.GemsBalance);
+        h.Purchases.CreateCount.Should().Be(1); // only one real write
+        var profile = await h.Users.GetAsync(h.UserId);
+        profile!.Gems.Should().Be(100); // debited exactly once, not twice
+    }
+
+    [Fact]
+    public async Task PurchaseAsync_recovers_the_debit_when_profile_write_conflicts_once()
+    {
+        // A concurrent writer bumps the profile between our read and our write.
+        // The ETag retry must re-read the profile and re-apply the gem deduction,
+        // so gems are spent exactly once and the purchase succeeds.
+        var inner = new InMemoryUserRepository();
+        inner.Seed(TestContent.NewProfile("user-1") with { Gems = 300 });
+        var users = new ConflictOnceUserRepository(inner);
+        var purchases = new InMemoryPurchaseRepository();
+        var service = new ShopService(
+            new FakeUserContext("user-1", "Tester"),
+            new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero)),
+            users,
+            purchases,
+            new InMemoryEventRepository());
+
+        var result = await service.PurchaseAsync(new PurchaseRequest("streak-freeze", "p-etag"));
+
+        result.Success.Should().BeTrue();
+        result.GemsSpent.Should().Be(200);
+        users.UpsertCalls.Should().BeGreaterThanOrEqualTo(2); // conflicted once, retried
+        var profile = await inner.GetAsync("user-1");
+        profile!.Gems.Should().Be(100); // deducted exactly once
+    }
 }
