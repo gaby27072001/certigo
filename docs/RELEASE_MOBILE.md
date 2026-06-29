@@ -51,7 +51,7 @@ les **secrets GitHub**.
 
 ### 2.1 Recommandé — Azure Key Vault (zéro secret dans GitHub) ⭐
 
-Les secrets de signature vivent dans le Key Vault `law-microlingo-<env>-<suffixe>`
+Les secrets de signature vivent dans le Key Vault `kv-certigo-<env>-<suffixe>`
 (déjà déployé par `infra/`), lus à la volée par l'**identité managée du runner**.
 Rien n'est stocké dans GitHub ; la rotation se fait en un seul endroit.
 
@@ -60,8 +60,8 @@ Rien n'est stocké dans GitHub ; la rotation se fait en un seul endroit.
 1. **Identité managée du runner** : active une identité (system-assigned) sur la
    VM du runner et récupère son `principalId` :
    ```bash
-   az vm identity assign -g law-microlingo-ci -n <vm-runner>
-   az vm show -g law-microlingo-ci -n <vm-runner> --query identity.principalId -o tsv
+   az vm identity assign -g rg-certigo-ci -n <vm-runner>
+   az vm show -g rg-certigo-ci -n <vm-runner> --query identity.principalId -o tsv
    ```
 2. **Droit de lecture sur le Key Vault** — au choix :
    - via Bicep (IaC) : redéploie `infra/main.bicep` avec
@@ -75,12 +75,12 @@ Rien n'est stocké dans GitHub ; la rotation se fait en un seul endroit.
      ```
 3. **Variable de dépôt** (non sensible) désignant le vault à utiliser :
    ```bash
-   gh variable set AZURE_KEYVAULT_NAME --body 'law-microlingo-dev-xxxxxx'
+   gh variable set AZURE_KEYVAULT_NAME --body 'kv-certigo-dev-bk3j5j'
    ```
 4. **Charger les secrets dans le Key Vault** (une seule commande) :
    ```powershell
    Copy-Item tools/secrets/mobile-secrets.env.example tools/secrets/mobile-secrets.env  # puis renseigne-le
-   ./tools/secrets/set-keyvault-secrets.ps1 -VaultName law-microlingo-dev-xxxxxx
+   ./tools/secrets/set-keyvault-secrets.ps1 -VaultName kv-certigo-dev-bk3j5j
    ```
    *(`mobile-secrets.env` est gitignoré ; le script encode keystore / certificat /
    profil / clé en base64 et pousse chaque valeur. `-DryRun` pour prévisualiser.)*
@@ -140,11 +140,11 @@ Utilisé automatiquement si `AZURE_KEYVAULT_NAME` n'est **pas** définie.
 
 ### 3.1 Pré-requis du runner self-hosted
 
-Le runner `law-microlingo` (Linux X64) doit disposer de Flutter/Dart (déjà requis
+Le runner `certigo-ci` (Linux X64) doit disposer de Flutter/Dart (déjà requis
 par la CI). Le workflow installe lui-même **JDK 17** et le **SDK Android**
 (`android-actions/setup-android` + `sdkmanager`), donc aucune action manuelle
 supplémentaire n'est nécessaire. L'egress internet passe par la NAT Gateway
-`law-microlingo` (voir README).
+`certigo-ci` (voir README).
 
 ### 3.2 Générer le keystore upload (one-time, en local)
 

@@ -1,4 +1,4 @@
-# Runbook de déploiement — Microlingo (Phase 0 : socle de production)
+# Runbook de déploiement — Certigo (Phase 0 : socle de production)
 
 Ce runbook décrit les étapes **humaines** (droits admin Azure AD / GitHub) nécessaires pour
 amorcer le **premier déploiement de l'environnement `dev`** et valider l'authentification réelle.
@@ -7,7 +7,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 > déploiement complet (infra Bicep + code Functions). Le chemin critique est désormais
 > **compatible EMU (self-hosted obligatoire)** :
 > 1. les jobs critiques backend restent sur self-hosted (GitHub-hosted est bloqué par policy EMU) ;
-> 2. la capacité CI est séparée entre flux critiques `main` (`law-microlingo`) et flux PR/non-critiques (`microlingo-ci`) ;
+> 2. la capacité CI est séparée entre flux critiques `main` (`certigo-ci`) et flux PR/non-critiques (`certigo-ci`) ;
 > 3. l'auth Azure reste via OIDC (`azure/login@v2`) avec permissions minimales.
 >
 > Les actions humaines restantes concernent surtout la gouvernance (OIDC Azure AD, environments,
@@ -19,7 +19,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 
 | Élément | Statut | Où |
 |---|---|---|
-| Chemin critique backend self-hosted (`law-microlingo`) | ✅ Fait | `cd-backend.yml`, `ci-backend.yml` |
+| Chemin critique backend self-hosted (`certigo-ci`) | ✅ Fait | `cd-backend.yml`, `ci-backend.yml` |
 | Jobs rattachés à un `environment:` | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Clarification placeholders Entra en dev | ✅ Fait (cette PR) | `infra/params/dev.bicepparam` |
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
@@ -34,7 +34,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 ### Check-list d'exploitation (utilisateur non-admin)
 
 1. Déclencher `cd-backend.yml` avec `environment=dev|staging|prod` (aucun paramètre runner à fournir).
-2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `law-microlingo`.
+2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `certigo-ci`.
 3. En cas d'échec Azure login, contrôler uniquement les 3 secrets repo : `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
 4. Pour une promotion, lancer `promote-backend-staging-prod.yml` (enchaînement staging puis prod).
 
@@ -52,32 +52,32 @@ vérité opérationnelle est portée par Azure pour limiter la dépendance aux d
 | Gouvernance production | GitHub environments (approvals) + garde-fous Azure | Le gate GitHub reste utile, mais la sécurité critique est déjà enforce côté Azure. |
 
 Limites connues : ce modèle suppose des permissions Azure correctement déléguées (OIDC + RBAC),
-et la disponibilité d'au moins un runner self-hosted online avec le label `law-microlingo`.
+et la disponibilité d'au moins un runner self-hosted online avec le label `certigo-ci`.
 
 ### Réconciliation des labels runners
 
-Les deux runners existants (`vm-microlingo-runner`, `vm-microlingo-runner-2`) portent les labels
-custom **`law-microlingo`** (chemin critique) et **`microlingo-ci`** (PR/non-critique), en plus
+Les deux runners existants (`vm-certigo-runner`) portent les labels
+custom **`certigo-ci`** (chemin critique et PR/non-critique), en plus
 des labels système
 (`self-hosted`, `Linux`, `X64`).  
 Le label a été ajouté via l'API GitHub :
 `POST /repos/{owner}/{repo}/actions/runners/{id}/labels`.
 
-Conséquence : les workflows critiques `main` ciblent `law-microlingo` et les workflows PR/non
-critiques ciblent `microlingo-ci`, ce qui réserve la capacité sans éditer les YAML à chaque
+Conséquence : les workflows critiques `main` ciblent `certigo-ci` et les workflows PR/non
+critiques ciblent `certigo-ci`, ce qui réserve la capacité sans éditer les YAML à chaque
 ajustement.
 
 ### Variables repo de pilotage runners
 
 Les workflows lisent des variables Actions **optionnelles** pour éviter les edits récurrents :
 
-- `MAIN_CRITICAL_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","law-microlingo"]`
-- `PR_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","microlingo-ci"]`
+- `MAIN_CRITICAL_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","certigo-ci"]`
+- `PR_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","certigo-ci"]`
 
 Exemple de valeur valide :
 
 ```json
-["self-hosted","Linux","X64","law-microlingo"]
+["self-hosted","Linux","X64","certigo-ci"]
 ```
 
 ### Politique scans lourds (CodeQL / security-scan)
@@ -93,7 +93,7 @@ Compromis assumé : plus de scan automatique à chaque PR/push ; la détection s
 
 ### Risque / rollback (chemin critique EMU)
 
-- **Risque principal** : aucun runner self-hosted online avec le label `law-microlingo`.
+- **Risque principal** : aucun runner self-hosted online avec le label `certigo-ci`.
 - **Rollback repo** : ajuster (ou supprimer) `MAIN_CRITICAL_RUNNER_LABELS` / `PR_RUNNER_LABELS` pour revenir aux defaults sans modifier les workflows.
 - **Rollback opérationnel** : démarrer/maintenir online la VM runner Azure (ou activer un auto-start), puis redéclencher le workflow.
 
@@ -194,7 +194,7 @@ gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPT
 
 **Côté repo :**
 - les jobs critiques de `cd-backend.yml` (`deploy-infra`, `deploy-backend`) ciblent
-  `MAIN_CRITICAL_RUNNER_LABELS` (défaut `["self-hosted","Linux","X64","law-microlingo"]`) ;
+  `MAIN_CRITICAL_RUNNER_LABELS` (défaut `["self-hosted","Linux","X64","certigo-ci"]`) ;
 - `ci-backend.yml` cible le même pool sur `main` et le pool `PR_RUNNER_LABELS` sur PR/non-main ;
 - le chemin critique reste compatible avec la contrainte EMU (self-hosted obligatoire).
 
@@ -202,7 +202,7 @@ gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPT
 
 Le blocage ne vient pas du YAML mais de la disponibilité runner : sous EMU, l'exécution critique
 reste self-hosted. La durabilité non-admin passe donc par l'exploitation Azure de la VM runner
-(`rg-microlingo-ci`, tenant Microsoft Non-Production), pas par une migration vers hosted.
+(`rg-certigo-ci`, tenant Microsoft Non-Production), pas par une migration vers hosted.
 
 ---
 
@@ -258,14 +258,14 @@ gh api -X PUT "repos/$GH_ORG/$GH_REPO/branches/main/protection" \
 
 ## T0.4 — Déployer l'infra `dev`
 
-**Acteur : humain (ou amorçage local).** L'infra crée : RG `rg-microlingo-dev`, Application
+**Acteur : humain (ou amorçage local).** L'infra crée : RG `rg-certigo-dev`, Application
 Insights, Cosmos DB, Storage, Key Vault, Function App (sans diagnostics durcis en dev).
 
 ### Étape 1 — What-if (lecture seule, recommandé d'abord)
 
 ```bash
 az deployment sub what-if \
-  --name microlingo-dev \
+  --name certigo-dev \
   --location westeurope \
   --template-file infra/main.bicep \
   --parameters infra/params/dev.bicepparam
@@ -277,7 +277,7 @@ az deployment sub what-if \
 
 ```bash
 az deployment sub create \
-  --name microlingo-dev \
+  --name certigo-dev \
   --location westeurope \
   --template-file infra/main.bicep \
   --parameters infra/params/dev.bicepparam \
@@ -296,7 +296,7 @@ gh workflow run cd-backend.yml --repo "$GH_ORG/$GH_REPO" \
 
 ### Cohérence des paramètres `dev`
 
-- `env='dev'`, `location='westeurope'`, `appName='microlingo'`.
+- `env='dev'`, `location='westeurope'`, `appName='certigo'`.
 - `cosmosLocation='northeurope'` (westeurope a des limites de capacité AZ).
 - `entraAuthority` / `entraAudience` = **placeholders** : **OK en dev** car `authMode='dev'`
   ⇒ `DevTokenValidator` (Entra non appliqué). Renseigner les vraies valeurs pour staging/prod.
@@ -338,12 +338,12 @@ APP_HOST="https://<functionAppName>.azurewebsites.net"
 # 1) S'enregistrer (anonyme)
 curl -s -X POST "$APP_HOST/api/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"email":"smoke@microlingo.test","password":"P@ssw0rd!"}'
+  -d '{"email":"smoke@certigo.test","password":"P@ssw0rd!"}'
 
 # 2) Se connecter (anonyme) → récupérer le JWT
 TOKEN=$(curl -s -X POST "$APP_HOST/api/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"smoke@microlingo.test","password":"P@ssw0rd!"}' | jq -r '.accessToken')
+  -d '{"email":"smoke@certigo.test","password":"P@ssw0rd!"}' | jq -r '.accessToken')
 
 # 3) Sans token → 401
 curl -s -o /dev/null -w "sans token: %{http_code}\n" "$APP_HOST/api/catalog/tracks"
@@ -358,7 +358,7 @@ curl -s -o /dev/null -w "avec token: %{http_code}\n" \
 ### Chemin 2 — Entra External ID (CIAM réel) — pour staging/prod
 
 Nécessite un environnement avec `authMode='prod'` et de **vraies** valeurs
-`ENTRA_AUTHORITY` / `ENTRA_AUDIENCE`, puis un token obtenu du tenant CIAM Microlingo. En `dev`,
+`ENTRA_AUTHORITY` / `ENTRA_AUDIENCE`, puis un token obtenu du tenant CIAM Certigo. En `dev`,
 Entra n'est **pas** appliqué (`DevTokenValidator`), donc tout bearer non vide est accepté.
 
 ---
@@ -404,13 +404,13 @@ documentation), et le **résiduel strict** qui nécessite une action hors périm
 - **T0.2 — Runner : ✅ prémisse hosted réfutée en live.** Le run `28381092423` a été rejeté
   immédiatement avec l'annotation GitHub :
   "GitHub Actions hosted runners are disabled for this repository. For more information please contact your GitHub Enterprise Administrator."
-  ⇒ **GitHub-hosted bloqué par policy EMU**. Le chemin critique reste self-hosted (`law-microlingo`).
+  ⇒ **GitHub-hosted bloqué par policy EMU**. Le chemin critique reste self-hosted (`certigo-ci`).
 
 ### Ce qui est effectivement déployé
 
 - **T0.4 — Infra `dev` : ✅ DÉPLOYÉE (amorçage local réel).** `az deployment sub create` exécuté
   avec succès (Owner sur la souscription). `AUTH_MODE=dev` actif. Ressources avec suffixe
-  `a2msquxibzvcu` (Function App `func-microlingo-dev-a2msquxibzvcu`, Cosmos, Key Vault, App
+  `a2msquxibzvcu` (Function App `func-certigo-dev-bk3j5ja6vw23s`, Cosmos, Key Vault, App
   Insights, Storage). Dérive `publicNetworkAccess` du Storage réconciliée (désormais IaC).
 
 ### ⛔ Blocage plateforme Flex — Functions n'indexent jamais (T0.5 / T0.6 bloqués)
@@ -454,7 +454,7 @@ Aucune n'a fait indexer les functions.
 - **SCM basic auth désactivée** (AAD-only). Pour interroger le hostruntime, passer par le proxy ARM
   `…/hostruntime/admin/...` avec un token `az account get-access-token --resource
   https://management.azure.com` (construire l'URI par concaténation : PowerShell mange `?api-version`).
-- **EMU bloque `ubuntu-latest`** (cf. ci-dessus) — le CI/CD critique doit cibler self-hosted `law-microlingo`.
+- **EMU bloque `ubuntu-latest`** (cf. ci-dessus) — le CI/CD critique doit cibler self-hosted `certigo-ci`.
 
 ### Résiduel strict (hors périmètre repo)
 
@@ -466,7 +466,7 @@ Aucune n'a fait indexer les functions.
 
 > Dès que les functions s'indexent (post-remédiation plateforme), **T0.5 et T0.6 sont prêts à
 > jouer** : voir les commandes en §T0.5 / §T0.6 (host
-> `https://func-microlingo-dev-a2msquxibzvcu.azurewebsites.net`).
+> `https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net`).
 
 ---
 
@@ -489,7 +489,7 @@ derrière `ITutorCompletion` via les app settings `TUTOR_LLM_*`.
 - **Type** : Azure OpenAI exposé en **Microsoft Foundry** (surface API **v1**, scopée projet).
 - **Déploiement** : `gpt-5.4-mini` (famille **GPT‑5**).
 - **Endpoint (base v1, sans `/responses`, slash final requis)** :
-  `https://microlingo-openai.services.ai.azure.com/api/projects/microlingo-dev/openai/v1/`
+  `https://certigo-openai.services.ai.azure.com/api/projects/certigo-dev/openai/v1/`
 - **Auth** : **clé API désactivée** sur la ressource → **Entra ID / identité managée
   obligatoire**. On laisse `TUTOR_LLM_API_KEY` **vide** : le code passe alors par
   `TokenCredential` (`DefaultAzureCredential`, scope `https://cognitiveservices.azure.com/.default`).
@@ -515,22 +515,22 @@ derrière `ITutorCompletion` via les app settings `TUTOR_LLM_*`.
 
 L'identité qui exécute l'API (identité managée de la Function App en `dev`/`staging`/`prod`, ou
 le principal `az login` en local) doit avoir le rôle **`Cognitive Services OpenAI User`** sur la
-ressource `microlingo-openai`. Sans ce rôle, l'appel renvoie **401/403** même si la config est
+ressource `certigo-openai`. Sans ce rôle, l'appel renvoie **401/403** même si la config est
 correcte.
 
 > ✅ **`dev` : rôle accordé.** Le rôle `Cognitive Services OpenAI User` est attribué à l'identité
-> managée de `func-microlingo-dev-a2msquxibzvcu` (principal `ec39dfb2-cb12-4279-9830-ce5d95ebce6b`)
-> sur `microlingo-openai`. Reste à exécuter **un appel réel de validation** (voir ci-dessous).
+> managée de `func-certigo-dev-bk3j5ja6vw23s` (principal `ec39dfb2-cb12-4279-9830-ce5d95ebce6b`)
+> sur `certigo-openai`. Reste à exécuter **un appel réel de validation** (voir ci-dessous).
 > `staging`/`prod` devront recevoir la même attribution lors de leur déploiement.
 
 ```bash
 # Identité managée de la Function App (system-assigned)
 PRINCIPAL_ID=$(az functionapp identity show \
-  --name func-microlingo-dev-a2msquxibzvcu --resource-group "$RG" \
+  --name func-certigo-dev-bk3j5ja6vw23s --resource-group "$RG" \
   --query principalId -o tsv)
 
 OPENAI_ID=$(az resource show \
-  --name microlingo-openai --resource-group "$RG" \
+  --name certigo-openai --resource-group "$RG" \
   --resource-type Microsoft.CognitiveServices/accounts --query id -o tsv)
 
 az role assignment create \
@@ -539,7 +539,7 @@ az role assignment create \
 ```
 
 > **État actuel (mise à jour).** **RBAC accordé en `dev`** (rôle `Cognitive Services OpenAI User`
-> sur `microlingo-openai` pour l'identité managée de `func-microlingo-dev`) et **tuteur activé en
+> sur `certigo-openai` pour l'identité managée de `func-certigo-dev`) et **tuteur activé en
 > `dev`** : les app settings `TUTOR_LLM_*` sont décommentés dans `infra/params/dev.bicepparam` et
 > déployés par `cd-backend`. Code Foundry v1 / GPT‑5 compilé et **couvert par tests unitaires**
 > (Infra + Application verts). **Résiduel : un seul appel réel de validation** (voir §
@@ -554,7 +554,7 @@ permissif (`AUTH_MODE=dev`, `DevTokenValidator`) ; on bootstrappe un JWT applica
 endpoints anonymes `auth/register` puis `auth/login`, puis on appelle `tutor/explain` :
 
 ```bash
-BASE="https://func-microlingo-dev-a2msquxibzvcu.azurewebsites.net/api"
+BASE="https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net/api"
 
 # 1) Santé (doit répondre 200 après le redéploiement)
 curl -fsS "$BASE/health"

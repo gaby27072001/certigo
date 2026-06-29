@@ -1,6 +1,6 @@
 <div align="center">
 
-# Certigo = Microlingo
+# Certigo
 
 **Apprenez, révisez et validez vos certifications Microsoft — par micro-leçons premium.**
 
@@ -207,22 +207,22 @@ API principale :
 
 > [!NOTE]
 > Les workflows utilisent un runner **self-hosted** avec labels
-> `[self-hosted, Linux, X64, law-microlingo]` (les runners hébergés par GitHub sont
+> `[self-hosted, Linux, X64, certigo-ci]` (les runners hébergés par GitHub sont
 > désactivés par la politique d'entreprise EMU sur ce dépôt).
 >
 >  
-> Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `law-microlingo`.
+> Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `certigo-ci`.
 
 > [!IMPORTANT]
 > **Accès sortant internet du runner.** Depuis le retrait de l'accès sortant par
 > défaut d'Azure (septembre 2025), une VM sans IP publique explicite n'a **aucune
 > connectivité sortante** — le runner ne peut alors ni joindre GitHub ni restaurer
 > les paquets NuGet/pub.dev, et tous les jobs échouent. La connectivité est assurée
-> par une **NAT Gateway** (`law-microlingo`) associée au sous-réseau `snet-runners`,
+> par une **NAT Gateway** (`nat-certigo`) associée au sous-réseau `snet-runners`,
 > avec une IP publique Standard dédiée. Si l'egress retombe, vérifier :
 > ```bash
-> az network nat gateway show -g law-microlingo-ci -n law-microlingo
-> az network vnet subnet show -g law-microlingo-ci --vnet-name law-microlingo-ci \
+> az network nat gateway show -g rg-certigo-ci -n nat-certigo
+> az network vnet subnet show -g rg-certigo-ci --vnet-name vnet-certigo-ci \
 >   -n snet-runners --query natGateway.id
 > ```
 > La fonctionnalité `Microsoft.Network/AllowBringYourOwnPublicIpAddress` doit être

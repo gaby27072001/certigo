@@ -7,7 +7,7 @@
     "COSMOS_DATABASE": "certigo",
     "BLOB_ENDPOINT": "https://<account>.blob.core.windows.net/",
     "TUTOR_LLM_ENABLED": "true",
-    "TUTOR_LLM_ENDPOINT": "https://microlingo-openai.services.ai.azure.com/api/projects/microlingo-dev/openai/v1/",
+    "TUTOR_LLM_ENDPOINT": "https://certigo-openai.services.ai.azure.com/api/projects/certigo-dev/openai/v1/",
     "TUTOR_LLM_API_SURFACE": "v1",
     "TUTOR_LLM_DEPLOYMENT": "gpt-5.4-mini",
     "TUTOR_LLM_API_VERSION": "2024-10-21",

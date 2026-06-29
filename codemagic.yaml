@@ -173,7 +173,7 @@ workflows:
           </plist>
           EOF
           flutter build ipa --release \
-            --dart-define=API_BASE_URL=https://law-microlingodev-a2msquxibzvcu.azurewebsites.net/api \
+            --dart-define=API_BASE_URL=https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net/api \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/tmp/ExportOptions.plist
@@ -297,7 +297,7 @@ workflows:
           </plist>
           EOF
           flutter build ipa --release \
-            --dart-define=API_BASE_URL=https://law-microlingodev-a2msquxibzvcu.azurewebsites.net/api \
+            --dart-define=API_BASE_URL=https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net/api \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/tmp/ExportOptions.plist

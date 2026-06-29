@@ -127,7 +127,7 @@ void main() {
       await tester.pump();
 
       expect(shareIntent.calls, 1);
-      expect(shareIntent.lastSubject, 'Microlingo • AZ-900');
+      expect(shareIntent.lastSubject, 'Certigo • AZ-900');
       expect(shareIntent.lastText, contains(fakeCard.headline));
       expect(shareIntent.lastText, contains('ref=ABCD12'));
       expect(shareIntent.lastText, contains('share=share-2025-01-06'));

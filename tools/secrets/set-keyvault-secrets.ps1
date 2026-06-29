@@ -13,10 +13,10 @@
   rôle "Key Vault Secrets Officer" sur le Key Vault cible.
 
 .EXAMPLE
-  ./set-keyvault-secrets.ps1 -VaultName law-microlingo-dev-a2msqu
+  ./set-keyvault-secrets.ps1 -VaultName kv-certigo-dev-bk3j5j
 
 .EXAMPLE
-  ./set-keyvault-secrets.ps1 -VaultName law-microlingo-dev-a2msqu -ConfigPath .\mobile-secrets.env -DryRun
+  ./set-keyvault-secrets.ps1 -VaultName kv-certigo-dev-bk3j5j -ConfigPath .\mobile-secrets.env -DryRun
 #>
 [CmdletBinding()]
 param(

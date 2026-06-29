@@ -16,10 +16,7 @@ concurrency:
 jobs:
   dependency-scan:
     name: NuGet vulnerability scan
-    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v5
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
         with:
           dotnet-version: "8.0.x"
       - name: Restore
@@ -39,10 +36,7 @@ jobs:
 
   iac-scan:
     name: Bicep IaC scan (Checkov)
-    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v6
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
         with:
           python-version: "3.x"
       - name: Run Checkov on infra/

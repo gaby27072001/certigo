@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NON_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","microlingo-ci"]' }}
+  NON_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","certigo-ci"]' }}
 
 jobs:
   bicep-build:

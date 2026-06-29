@@ -16,7 +16,7 @@ permissions:
 jobs:
   validate:
     name: Validate workflow YAML
-    runs-on: [self-hosted, Linux, X64, law-microlingo]
+    runs-on: [self-hosted, Linux, X64, certigo-ci]
     steps:
       - uses: actions/checkout@v4
 

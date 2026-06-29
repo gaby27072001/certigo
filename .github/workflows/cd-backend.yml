@@ -28,7 +28,7 @@ on:
 
 env:
   TARGET_ENV: ${{ inputs.environment || 'dev' }}
-  MAIN_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.MAIN_CRITICAL_RUNNER_LABELS || '["self-hosted","Linux","X64","law-microlingo"]' }}
+  MAIN_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.MAIN_CRITICAL_RUNNER_LABELS || '["self-hosted","Linux","X64","certigo-ci"]' }}
 
 # Prevent concurrent deployments to the same environment.
 concurrency:
@@ -103,7 +103,7 @@ jobs:
           for i in 1 2 3 4 5; do
             echo "Attempt $i of 5..."
             if az functionapp deployment source config-zip \
-              --resource-group law-microlingo-$TARGET_ENV \
+              --resource-group rg-certigo-$TARGET_ENV \
               --name ${{ needs.deploy-infra.outputs.functionAppName }} \
               --src ./publish.zip; then
               echo "Deployment succeeded on attempt $i"
