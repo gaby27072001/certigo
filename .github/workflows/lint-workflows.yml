@@ -1,7 +1,7 @@
 # Valide la syntaxe de tous les workflows GitHub Actions a chaque PR sur main.
 # Bloque les PRs qui introduisent des workflows YAML malformes ou non conformes
 # au schema GitHub Actions (ex. doublon d'id:, champs inconnus, etc.).
-# Note: ce lint reste runnerless (GitHub-hosted) pour eviter toute dependance au pool self-hosted.
+# Note: ce lint utilise le meme label self-hosted configurable que le reste du repo.
 name: Lint GitHub Actions workflows
 
 on:
@@ -16,7 +16,7 @@ permissions:
 jobs:
   validate:
     name: Validate workflow YAML
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS || '["self-hosted","Linux","X64","microlingo-ci"]') }}
     steps:
       - uses: actions/checkout@v4
 

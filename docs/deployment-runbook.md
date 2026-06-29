@@ -5,12 +5,13 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 
 > **Pourquoi ce runbook ?** Le pipeline `.github/workflows/cd-backend.yml` est un pipeline de
 > déploiement complet (infra Bicep + code Functions). Le chemin critique est désormais
-> **runnerless côté repo** :
-> 1. les jobs critiques backend tournent sur `ubuntu-latest` (GitHub-hosted) ;
-> 2. l'auth Azure reste via OIDC (`azure/login@v2`) avec permissions minimales.
+> **compatible EMU (self-hosted configurable)** :
+> 1. les jobs critiques backend restent sur self-hosted (GitHub-hosted est bloqué par policy EMU) ;
+> 2. le label runner est piloté par `CI_RUNNER_LABELS` (variable repo) avec fallback `microlingo-ci` ;
+> 3. l'auth Azure reste via OIDC (`azure/login@v2`) avec permissions minimales.
 >
 > Les actions humaines restantes concernent surtout la gouvernance (OIDC Azure AD, environments,
-> branch protection), pas l'administration des runners self-hosted.
+> branch protection), pas l'édition des workflows runners.
 
 ---
 
@@ -18,7 +19,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 
 | Élément | Statut | Où |
 |---|---|---|
-| Chemin critique backend runnerless (`runs-on: ubuntu-latest`) | ✅ Fait (cette PR) | `cd-backend.yml` |
+| Chemin critique backend self-hosted configurable (`CI_RUNNER_LABELS`) | ✅ Fait (cette PR) | `cd-backend.yml`, `ci-backend.yml` |
 | Jobs rattachés à un `environment:` | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Clarification placeholders Entra en dev | ✅ Fait (cette PR) | `infra/params/dev.bicepparam` |
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
@@ -33,7 +34,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 ### Check-list d'exploitation (utilisateur non-admin)
 
 1. Déclencher `cd-backend.yml` avec `environment=dev|staging|prod` (aucun paramètre runner à fournir).
-2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur `ubuntu-latest`.
+2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent avec le label défini dans `CI_RUNNER_LABELS` (ou fallback `microlingo-ci`).
 3. En cas d'échec Azure login, contrôler uniquement les 3 secrets repo : `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
 4. Pour une promotion, lancer `promote-backend-staging-prod.yml` (enchaînement staging puis prod).
 
@@ -51,12 +52,12 @@ vérité opérationnelle est portée par Azure pour limiter la dépendance aux d
 | Gouvernance production | GitHub environments (approvals) + garde-fous Azure | Le gate GitHub reste utile, mais la sécurité critique est déjà enforce côté Azure. |
 
 Limites connues : ce modèle suppose des permissions Azure correctement déléguées (OIDC + RBAC),
-et une policy org/enterprise autorisant au moins les GitHub-hosted runners pour l'orchestration.
+et la disponibilité d'au moins un runner self-hosted portant le label ciblé par `CI_RUNNER_LABELS`.
 
-### Risque / rollback (runnerless critique)
+### Risque / rollback (chemin critique EMU)
 
-- **Risque principal** : indisponibilité GitHub-hosted à l'échelle org/enterprise (policy centrale).
-- **Rollback repo** : réintroduire temporairement un `runs-on` self-hosted **uniquement** sur un workflow non critique de secours, sans casser `cd-backend.yml`.
+- **Risque principal** : aucun runner self-hosted online avec le label ciblé (`CI_RUNNER_LABELS`).
+- **Rollback repo** : changer la variable `CI_RUNNER_LABELS` vers un label runner disponible (sans modifier les workflows).
 - **Rollback opérationnel** : déployer l'infra/app localement via `az deployment sub create` puis `az functionapp deployment source config-zip` le temps de corriger la policy globale.
 
 ---
@@ -154,15 +155,17 @@ gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPT
 
 ## T0.2 — Débloquer le runner (déjà fait côté repo) + amorçage
 
-**Côté repo (fait dans cette PR) :** les deux jobs critiques de `cd-backend.yml`
-(`deploy-infra` et `deploy-backend`) sont fixés sur `runs-on: ubuntu-latest`.
-Le déploiement backend ne dépend donc plus d'un label self-hosted ni d'une action admin runner.
+**Côté repo (fait dans cette PR) :**
+- les jobs critiques de `cd-backend.yml` (`deploy-infra`, `deploy-backend`) et `ci-backend.yml`
+  utilisent `runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS || '["self-hosted","Linux","X64","microlingo-ci"]') }}`;
+- le label runner devient une **variable de dépôt** (source de vérité opérable sans édition des workflows) ;
+- le chemin critique reste compatible avec la contrainte EMU (self-hosted obligatoire).
 
-### Isolement des jobs self-hosted résiduels
+### Isolement des dépendances runner
 
-Les workflows non critiques peuvent encore utiliser self-hosted selon les besoins d'équipe
-(`ci-content`, `ci-mobile`, `release-android`, etc.). Cette dépendance est désormais
-**isolée hors du chemin critique de déploiement backend**.
+Les workflows peuvent conserver des labels historiques (`law-microlingo`) ou dédiés par équipe,
+mais le chemin backend critique est centralisé sur `CI_RUNNER_LABELS`, ce qui évite les blocages
+liés à une valeur codée en dur dans YAML.
 
 ---
 
@@ -361,9 +364,9 @@ documentation), et le **résiduel strict** qui nécessite une action hors périm
   3 secrets repo déjà en place ; 3 federated credentials `github-env-dev/staging/prod` ajoutées.
 - **T0.3 — Environments : ✅ PARTIEL.** `dev` / `staging` / `prod` créés. **Reviewer gate `prod`
   non posé** (billing GitHub 422, voir §T0.3). Branch protection `main` = résiduel admin.
-- **T0.2 — Runner : ✅ débloqué côté repo.** Test `ubuntu-latest` réellement dispatché
-  (run `28319327945`) → resté `pending`, `jobs[]` vide ⇒ **EMU bloque les runners GitHub-hosted**
-  (confirme le README ci-runner). Run annulé. Runner self-hosted = **P1**.
+- **T0.2 — Runner : ✅ recalé EMU côté repo.** Le test `ubuntu-latest` (run `28319327945`)
+  est resté `pending` avec `jobs[]` vide ⇒ **GitHub-hosted bloqué par policy EMU** (README).
+  Les workflows critiques sont donc self-hosted avec label configurable via `CI_RUNNER_LABELS`.
 
 ### Ce qui est effectivement déployé
 
@@ -413,7 +416,7 @@ Aucune n'a fait indexer les functions.
 - **SCM basic auth désactivée** (AAD-only). Pour interroger le hostruntime, passer par le proxy ARM
   `…/hostruntime/admin/...` avec un token `az account get-access-token --resource
   https://management.azure.com` (construire l'URI par concaténation : PowerShell mange `?api-version`).
-- **EMU bloque `ubuntu-latest`** (cf. ci-dessus) — pour le CI, prévoir le runner self-hosted (P1).
+- **EMU bloque `ubuntu-latest`** (cf. ci-dessus) — le CI/CD critique doit cibler self-hosted via `CI_RUNNER_LABELS`.
 
 ### Résiduel strict (hors périmètre repo)
 
