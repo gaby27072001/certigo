@@ -110,4 +110,39 @@ public sealed class MiddlewareOrderingTests
         invocation.Response!.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await invocation.ReadBodyAsync()).Should().Be("Unauthorized");
     }
+
+    [Fact]
+    public async Task FullPipeline_CorrelationIdFlowsThroughAllMiddlewares()
+    {
+        // Verifies the complete production ordering:
+        //   ExceptionMiddleware → CorrelationMiddleware → JwtAuthMiddleware → handler
+        // The correlation id set by CorrelationMiddleware must be visible to
+        // ExceptionMiddleware when it maps a downstream exception.
+        var principal = TestPrincipal.With(oid: "pipeline-user-1");
+        var validator = FakeTokenValidator.Succeeding(principal);
+        var exception = new ExceptionMiddleware(NullLogger<ExceptionMiddleware>.Instance);
+        var correlation = new CorrelationMiddleware(NullLogger<CorrelationMiddleware>.Instance);
+        var jwt = new JwtAuthMiddleware(validator);
+
+        var invocation = FunctionTestHarness.CreateHttp(
+            method: "POST",
+            path: ProtectedPath,
+            headers: new Dictionary<string, string>
+            {
+                ["Authorization"] = "Bearer good-token",
+                ["x-correlation-id"] = "full-pipeline-trace"
+            });
+
+        await exception.Invoke(invocation.Context, ctx =>
+            correlation.Invoke(ctx, ctx2 =>
+                jwt.Invoke(ctx2, _ =>
+                    throw new BadRequestException("pipeline test"))));
+
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        invocation.Context.Items["CorrelationId"].Should().Be("full-pipeline-trace");
+        invocation.CorrelationId.Should().Be("full-pipeline-trace");
+
+        var problem = await invocation.ReadProblemAsync();
+        problem!.CorrelationId.Should().Be("full-pipeline-trace");
+    }
 }

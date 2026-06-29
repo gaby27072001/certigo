@@ -22,13 +22,18 @@ var host = new HostBuilder()
     .ConfigureFunctionsWorkerDefaults(worker =>
     {
         worker.UseMiddleware<ExceptionMiddleware>();
+        worker.UseMiddleware<CorrelationMiddleware>();
         worker.UseMiddleware<JwtAuthMiddleware>();
+        worker.UseMiddleware<RateLimitMiddleware>();
     })
     .ConfigureServices((context, services) =>
     {
         var configuration = context.Configuration;
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
+
+        // Scoped per-invocation correlation context set by CorrelationMiddleware.
+        services.AddScoped<ICorrelationContext, CorrelationContext>();
 
         services.AddSingleton<TokenCredential, DefaultAzureCredential>();
         services.AddSingleton(sp =>

@@ -191,4 +191,57 @@ public sealed class ExceptionMiddlewareTests
         invocation.Response.Should().BeNull();
         invocation.Context.Items["CorrelationId"].Should().BeOfType<string>();
     }
+
+    [Fact]
+    public async Task JsonException_MapsTo400_ProblemDetails_WithBadRequestTitle()
+    {
+        var middleware = CreateMiddleware();
+        var invocation = FunctionTestHarness.CreateHttp();
+
+        await middleware.Invoke(invocation.Context,
+            _ => throw new System.Text.Json.JsonException("Unexpected character '{' at line 1, position 0."));
+
+        invocation.Response.Should().NotBeNull();
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problem = await invocation.ReadProblemAsync();
+        problem!.Status.Should().Be(400);
+        problem.Title.Should().Be("Invalid request");
+        problem.Detail.Should().Contain("JSON");
+    }
+
+    [Fact]
+    public async Task FormatException_MapsTo400_ProblemDetails()
+    {
+        var middleware = CreateMiddleware();
+        var invocation = FunctionTestHarness.CreateHttp();
+
+        await middleware.Invoke(invocation.Context,
+            _ => throw new FormatException("Input string 'abc' was not in a correct format."));
+
+        invocation.Response.Should().NotBeNull();
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problem = await invocation.ReadProblemAsync();
+        problem!.Status.Should().Be(400);
+        problem.Title.Should().Be("Invalid request");
+    }
+
+    [Fact]
+    public async Task CorrelationId_From_ContextItems_Takes_Priority_Over_Header()
+    {
+        // Verifies that when CorrelationMiddleware pre-populates context.Items["CorrelationId"],
+        // ExceptionMiddleware reuses it rather than re-reading the request header.
+        var middleware = CreateMiddleware();
+        var invocation = FunctionTestHarness.CreateHttp(
+            headers: new Dictionary<string, string> { ["x-correlation-id"] = "from-header" });
+
+        // Simulate what CorrelationMiddleware would have done:
+        invocation.Context.Items["CorrelationId"] = "pre-resolved-by-correlation-mw";
+
+        await middleware.Invoke(invocation.Context, _ => throw new BadRequestException("bad"));
+
+        invocation.Context.Items["CorrelationId"].Should().Be("pre-resolved-by-correlation-mw");
+        invocation.CorrelationId.Should().Be("pre-resolved-by-correlation-mw");
+    }
 }

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,8 +23,22 @@ Future<void> bootstrap() async {
   await SystemChrome.setPreferredOrientations(<DeviceOrientation>[DeviceOrientation.portraitUp]);
 
   FlutterError.onError = (FlutterErrorDetails details) {
-    // TODO(observability): forward to Application Insights via a Crash service.
+    // Logs widget-tree errors to the console. To forward to a crash service,
+    // replace this body with a call to your crash reporter, for example:
+    //   FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+    //   AppInsights.trackException(details.exception, details.stack);
+    // TODO(observability): wire Firebase Crashlytics or Application Insights.
+    //   Run: flutter pub add firebase_crashlytics   (or applicationinsights)
     FlutterError.presentError(details);
+  };
+
+  // Catch uncaught async errors on the platform dispatcher (e.g. isolate errors,
+  // platform-channel failures) that FlutterError.onError does not see.
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    // TODO(observability): forward to crash service (same as FlutterError.onError above).
+    //   FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    FlutterError.reportError(FlutterErrorDetails(exception: error, stack: stack));
+    return true; // handled — do not re-throw
   };
 
   // Wire mascot artwork (built-in faces by default; see app/mascots.dart).
