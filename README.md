@@ -210,14 +210,8 @@ API principale :
 > `[self-hosted, Linux, X64, law-microlingo]` (les runners hébergés par GitHub sont
 > désactivés par la politique d'entreprise EMU sur ce dépôt).
 >
-> Pour les workflows backend critiques (`cd-backend.yml`, `ci-backend.yml`), le label runner est
-> piloté par la variable de dépôt **`CI_RUNNER_LABELS`** (JSON) avec fallback
-> `["self-hosted","Linux","X64","microlingo-ci"]`. Cela permet d'ajuster le label sans éditer les
-> workflows et sans droits admin runner.
->
-> Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI
-> (Bicep), puis enregistrez le runner GitHub avec le label attendu (`law-microlingo` historique, ou
-> celui défini dans `CI_RUNNER_LABELS`).
+>  
+> Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `law-microlingo`.
 
 > [!IMPORTANT]
 > **Accès sortant internet du runner.** Depuis le retrait de l'accès sortant par
