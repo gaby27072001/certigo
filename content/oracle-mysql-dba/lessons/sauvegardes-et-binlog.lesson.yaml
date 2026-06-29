@@ -1,0 +1,37 @@
+id: oraclemysqldba-l-sauvegardes-et-binlog
+trackId: oracle-mysql-dba
+unitId: oraclemysqldba-u-backup-replication
+domainId: backup-replication
+title: "Sauvegardes et binlog"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-sauvegardes-et-binlog
+    body: |
+      Dans l'examen 1Z0-908, « Sauvegardes et binlog » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-sauvegardes-et-binlog
+    title: "Sauvegardes et binlog"
+    body: |
+      mysqldump et binlog permettent sauvegarde et reprise point-in-time.
+  - type: check
+    conceptId: c-sauvegardes-et-binlog
+    check:
+      id: oraclemysqldba-l-sauvegardes-et-binlog-check-1
+      conceptId: c-sauvegardes-et-binlog
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel journal alimente la réplication ?
+      options:
+        - { id: a, label: "Binary log" }
+        - { id: b, label: "Slow log" }
+        - { id: c, label: "Error log" }
+        - { id: d, label: "General log" }
+      correct: [a]
+      explanation: |
+        Le binlog enregistre les changements répliqués.
+  - type: recap
+    conceptId: c-sauvegardes-et-binlog
+    body: |
+      Retenez l'essentiel de « Sauvegardes et binlog » pour la certification 1Z0-908.

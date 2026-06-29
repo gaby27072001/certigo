@@ -1,0 +1,45 @@
+# Oracle Cloud Infrastructure Developer Professional — oracle certification track.
+# Domain weights mirror the official 1Z0-1084-24 skills outline and sum to 1.0.
+id: oracle-oci-developer
+code: "1Z0-1084-24"
+provider: oracle
+title: "Oracle Cloud Infrastructure Developer Professional"
+level: professional
+examCode: "1Z0-1084-24"
+sourceUrl: "https://education.oracle.com/oracle-cloud-infrastructure-2024-developer-professional/pexam_1Z0-1084-24"
+summary: |
+  Valide le développement d'applications cloud-natives sur OCI : conteneurs, Kubernetes, Functions, API et messaging. Pour développeurs cloud.
+domains:
+  - id: containers
+    name: "Conteneurs et OKE"
+    weight: 0.3
+  - id: serverless
+    name: "Serverless Functions"
+    weight: 0.25
+  - id: messaging
+    name: "Messaging et événements"
+    weight: 0.25
+  - id: devops
+    name: "DevOps et observabilité"
+    weight: 0.2
+units:
+  - id: oracleocideveloper-u-containers
+    domainId: containers
+    title: "Conteneurs et OKE"
+    lessons:
+      - oracleocideveloper-l-kubernetes-manage
+  - id: oracleocideveloper-u-serverless
+    domainId: serverless
+    title: "Serverless Functions"
+    lessons:
+      - oracleocideveloper-l-functions-et-api-gateway
+  - id: oracleocideveloper-u-messaging
+    domainId: messaging
+    title: "Messaging et événements"
+    lessons:
+      - oracleocideveloper-l-streaming-et-events
+  - id: oracleocideveloper-u-devops
+    domainId: devops
+    title: "DevOps et observabilité"
+    lessons:
+      - oracleocideveloper-l-ci-cd-et-monitoring

@@ -1,0 +1,37 @@
+id: googleadvanceddataanalytics-l-regression-lineaire
+trackId: google-advanced-data-analytics
+unitId: googleadvanceddataanalytics-u-stats
+domainId: stats
+title: "Régression linéaire"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-regression-lineaire
+    body: |
+      Dans l'examen ADV-DATA-ANALYTICS, « Régression linéaire » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-regression-lineaire
+    title: "Régression linéaire"
+    body: |
+      La régression linéaire modélise la relation entre une variable cible et des prédicteurs. Le coefficient indique l'effet de chaque variable ; le R² mesure la part de variance expliquée. C'est la base de la modélisation prédictive.
+  - type: check
+    conceptId: c-regression-lineaire
+    check:
+      id: googleadvanceddataanalytics-l-regression-lineaire-check-1
+      conceptId: c-regression-lineaire
+      type: mcq
+      difficulty: 2
+      stem: |
+        Que mesure le R² d'un modèle de régression ?
+      options:
+        - { id: a, label: "La part de variance de la cible expliquée par le modèle" }
+        - { id: b, label: "Le nombre de lignes du jeu de données" }
+        - { id: c, label: "La vitesse du calcul" }
+        - { id: d, label: "Le coût mémoire" }
+      correct: [a]
+      explanation: |
+        Le R² indique la proportion de variance expliquée ; plus il est proche de 1, mieux le modèle s'ajuste.
+  - type: recap
+    conceptId: c-regression-lineaire
+    body: |
+      Retenez l'essentiel de « Régression linéaire » pour la certification ADV-DATA-ANALYTICS.

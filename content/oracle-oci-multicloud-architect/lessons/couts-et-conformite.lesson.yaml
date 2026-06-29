@@ -1,0 +1,37 @@
+id: oracleocimulticloudarchitect-l-couts-et-conformite
+trackId: oracle-oci-multicloud-architect
+unitId: oracleocimulticloudarchitect-u-governance
+domainId: governance
+title: "Coûts et conformité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-couts-et-conformite
+    body: |
+      Dans l'examen 1Z0-1151-1, « Coûts et conformité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-couts-et-conformite
+    title: "Coûts et conformité"
+    body: |
+      Le suivi des coûts et la conformité s'étendent à tous les clouds via tags et budgets.
+  - type: check
+    conceptId: c-couts-et-conformite
+    check:
+      id: oracleocimulticloudarchitect-l-couts-et-conformite-check-1
+      conceptId: c-couts-et-conformite
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel outil maîtrise la dépense multicloud ?
+      options:
+        - { id: a, label: "Budgets et tags" }
+        - { id: b, label: "NAT" }
+        - { id: c, label: "OKE" }
+        - { id: d, label: "KMS" }
+      correct: [a]
+      explanation: |
+        Budgets et tags pilotent coûts et conformité.
+  - type: recap
+    conceptId: c-couts-et-conformite
+    body: |
+      Retenez l'essentiel de « Coûts et conformité » pour la certification 1Z0-1151-1.

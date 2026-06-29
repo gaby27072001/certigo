@@ -1,0 +1,37 @@
+id: oracleociarchitectassociate-l-vcn-sous-reseaux-et-passerelles
+trackId: oracle-oci-architect-associate
+unitId: oracleociarchitectassociate-u-networking
+domainId: networking
+title: "VCN, sous-réseaux et passerelles"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-vcn-sous-reseaux-et-passerelles
+    body: |
+      Dans l'examen 1Z0-1072-24, « VCN, sous-réseaux et passerelles » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-vcn-sous-reseaux-et-passerelles
+    title: "VCN, sous-réseaux et passerelles"
+    body: |
+      Un VCN segmente des sous-réseaux publics/privés reliés par Internet, NAT et Service Gateways, sécurisés par security lists.
+  - type: check
+    conceptId: c-vcn-sous-reseaux-et-passerelles
+    check:
+      id: oracleociarchitectassociate-l-vcn-sous-reseaux-et-passerelles-check-1
+      conceptId: c-vcn-sous-reseaux-et-passerelles
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle passerelle permet un accès sortant sans IP publique ?
+      options:
+        - { id: a, label: "NAT Gateway" }
+        - { id: b, label: "Internet Gateway" }
+        - { id: c, label: "DRG" }
+        - { id: d, label: "LPG" }
+      correct: [a]
+      explanation: |
+        La NAT Gateway autorise le trafic sortant des sous-réseaux privés.
+  - type: recap
+    conceptId: c-vcn-sous-reseaux-et-passerelles
+    body: |
+      Retenez l'essentiel de « VCN, sous-réseaux et passerelles » pour la certification 1Z0-1072-24.

@@ -1,0 +1,37 @@
+id: oraclemysqlfoundations-l-utilisateurs-et-bases
+trackId: oracle-mysql-foundations
+unitId: oraclemysqlfoundations-u-admin-basics
+domainId: admin-basics
+title: "Utilisateurs et bases"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-utilisateurs-et-bases
+    body: |
+      Dans l'examen 1Z0-915, « Utilisateurs et bases » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-utilisateurs-et-bases
+    title: "Utilisateurs et bases"
+    body: |
+      Comptes, bases et sauvegardes constituent l'administration minimale.
+  - type: check
+    conceptId: c-utilisateurs-et-bases
+    check:
+      id: oraclemysqlfoundations-l-utilisateurs-et-bases-check-1
+      conceptId: c-utilisateurs-et-bases
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle commande crée une base ?
+      options:
+        - { id: a, label: "CREATE DATABASE" }
+        - { id: b, label: "DROP USER" }
+        - { id: c, label: "SELECT" }
+        - { id: d, label: "SHOW" }
+      correct: [a]
+      explanation: |
+        CREATE DATABASE crée une nouvelle base.
+  - type: recap
+    conceptId: c-utilisateurs-et-bases
+    body: |
+      Retenez l'essentiel de « Utilisateurs et bases » pour la certification 1Z0-915.

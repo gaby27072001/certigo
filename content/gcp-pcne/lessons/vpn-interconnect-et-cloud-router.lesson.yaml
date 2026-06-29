@@ -1,0 +1,37 @@
+id: gcppcne-l-vpn-interconnect-et-cloud-router
+trackId: gcp-pcne
+unitId: gcppcne-u-hybrid-connectivity
+domainId: hybrid-connectivity
+title: "VPN, Interconnect et Cloud Router"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-vpn-interconnect-et-cloud-router
+    body: |
+      Dans l'examen PCNE, « VPN, Interconnect et Cloud Router » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-vpn-interconnect-et-cloud-router
+    title: "VPN, Interconnect et Cloud Router"
+    body: |
+      Cloud VPN chiffre sur Internet, Interconnect offre du privé dédié, et Cloud Router propage les routes en BGP. Le choix dépend du débit et de la latence.
+  - type: check
+    conceptId: c-vpn-interconnect-et-cloud-router
+    check:
+      id: gcppcne-l-vpn-interconnect-et-cloud-router-check-1
+      conceptId: c-vpn-interconnect-et-cloud-router
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel composant échange dynamiquement les routes en BGP ?
+      options:
+        - { id: a, label: "Cloud Router" }
+        - { id: b, label: "Cloud CDN" }
+        - { id: c, label: "BigQuery" }
+        - { id: d, label: "Pub/Sub" }
+      correct: [a]
+      explanation: |
+        Cloud Router gère le routage dynamique BGP.
+  - type: recap
+    conceptId: c-vpn-interconnect-et-cloud-router
+    body: |
+      Retenez l'essentiel de « VPN, Interconnect et Cloud Router » pour la certification PCNE.

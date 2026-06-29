@@ -1,0 +1,37 @@
+id: oracledbfoundations-l-select-where-join
+trackId: oracle-db-foundations
+unitId: oracledbfoundations-u-sql-basics
+domainId: sql-basics
+title: "SELECT, WHERE, JOIN"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-select-where-join
+    body: |
+      Dans l'examen 1Z0-006, « SELECT, WHERE, JOIN » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-select-where-join
+    title: "SELECT, WHERE, JOIN"
+    body: |
+      SELECT interroge, WHERE filtre, JOIN relie les tables sur des clés.
+  - type: check
+    conceptId: c-select-where-join
+    check:
+      id: oracledbfoundations-l-select-where-join-check-1
+      conceptId: c-select-where-join
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle clause combine deux tables ?
+      options:
+        - { id: a, label: "JOIN" }
+        - { id: b, label: "ORDER BY" }
+        - { id: c, label: "GROUP BY" }
+        - { id: d, label: "INSERT" }
+      correct: [a]
+      explanation: |
+        JOIN associe des tables par colonnes communes.
+  - type: recap
+    conceptId: c-select-where-join
+    body: |
+      Retenez l'essentiel de « SELECT, WHERE, JOIN » pour la certification 1Z0-006.

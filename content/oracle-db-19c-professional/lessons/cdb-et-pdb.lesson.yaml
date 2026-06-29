@@ -1,0 +1,37 @@
+id: oracledb19cprofessional-l-cdb-et-pdb
+trackId: oracle-db-19c-professional
+unitId: oracledb19cprofessional-u-multitenant
+domainId: multitenant
+title: "CDB et PDB"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-cdb-et-pdb
+    body: |
+      Dans l'examen 1Z0-083, « CDB et PDB » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-cdb-et-pdb
+    title: "CDB et PDB"
+    body: |
+      L'architecture multitenant héberge des PDB dans une CDB pour consolider et déplacer aisément.
+  - type: check
+    conceptId: c-cdb-et-pdb
+    check:
+      id: oracledb19cprofessional-l-cdb-et-pdb-check-1
+      conceptId: c-cdb-et-pdb
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel conteneur héberge plusieurs bases enfichables ?
+      options:
+        - { id: a, label: "CDB" }
+        - { id: b, label: "PDB unique" }
+        - { id: c, label: "Tablespace" }
+        - { id: d, label: "Schéma" }
+      correct: [a]
+      explanation: |
+        La CDB héberge des PDB enfichables.
+  - type: recap
+    conceptId: c-cdb-et-pdb
+    body: |
+      Retenez l'essentiel de « CDB et PDB » pour la certification 1Z0-083.

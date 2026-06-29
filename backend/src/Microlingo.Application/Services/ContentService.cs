@@ -19,7 +19,7 @@ public interface IContentService
     Task<Lesson?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default);
 
     // The certification catalog for the course picker: a lightweight summary per
-    // track (counts only, no lesson bodies), ordered fundamentals → expert.
+    // track (counts only, no lesson bodies), ordered by level then provider then code.
     Task<CatalogDto> GetCatalogAsync(CancellationToken cancellationToken = default);
 }
 
@@ -39,20 +39,27 @@ public sealed class ContentService(IContentRepository content) : IContentService
                 Level: t.Level ?? string.Empty,
                 Summary: t.Summary,
                 UnitCount: t.Units.Count,
-                LessonCount: t.Units.Sum(u => u.Lessons.Count)))
+                LessonCount: t.Units.Sum(u => u.Lessons.Count),
+                Provider: string.IsNullOrWhiteSpace(t.Provider) ? "microsoft" : t.Provider,
+                RetiringOn: t.RetiringOn))
             .OrderBy(s => LevelRank(s.Level))
+            .ThenBy(s => s.Provider, StringComparer.Ordinal)
             .ThenBy(s => s.Code, StringComparer.Ordinal)
             .ToArray();
         return new CatalogDto(summaries);
     }
 
-    // Order the picker the way Microsoft tiers certifications: Fundamentals
-    // first, then Associate, then Expert, with anything unlabelled last.
+    // Order the picker the way vendors tier certifications: Fundamentals first,
+    // then Associate, Professional, Specialty, Expert and Master, with anything
+    // unlabelled last. Ties break by provider then exam code.
     private static int LevelRank(string level) => level.ToLowerInvariant() switch
     {
         "fundamentals" => 0,
         "associate" => 1,
-        "expert" => 2,
-        _ => 3,
+        "professional" => 2,
+        "specialty" => 3,
+        "expert" => 4,
+        "master" => 5,
+        _ => 6,
     };
 }

@@ -1,0 +1,37 @@
+id: awsdopc02-l-concevoir-des-solutions-auto-reparatrices
+trackId: aws-dop-c02
+unitId: awsdopc02-u-resilient-solutions
+domainId: resilient-solutions
+title: "Concevoir des solutions auto-réparatrices"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-concevoir-des-solutions-auto-reparatrices
+    body: |
+      Dans l'examen DOP-C02, « Concevoir des solutions auto-réparatrices » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-concevoir-des-solutions-auto-reparatrices
+    title: "Concevoir des solutions auto-réparatrices"
+    body: |
+      La résilience combine la redondance multi-AZ, l'Auto Scaling pour absorber la charge, et des mécanismes d'auto-réparation (remplacement automatique des instances défaillantes via les vérifications de santé du load balancer et de l'Auto Scaling).
+  - type: check
+    conceptId: c-concevoir-des-solutions-auto-reparatrices
+    check:
+      id: awsdopc02-l-concevoir-des-solutions-auto-reparatrices-check-1
+      conceptId: c-concevoir-des-solutions-auto-reparatrices
+      type: mcq
+      difficulty: 3
+      stem: |
+        Comment un groupe Auto Scaling assure-t-il l'auto-réparation d'une flotte d'instances ?
+      options:
+        - { id: a, label: "En remplaçant automatiquement les instances qui échouent aux vérifications de santé" }
+        - { id: b, label: "En supprimant définitivement toute la flotte" }
+        - { id: c, label: "En augmentant la latence réseau" }
+        - { id: d, label: "En désactivant les sauvegardes" }
+      correct: [a]
+      explanation: |
+        L'Auto Scaling surveille la santé des instances et remplace automatiquement celles jugées défaillantes, maintenant la capacité souhaitée.
+  - type: recap
+    conceptId: c-concevoir-des-solutions-auto-reparatrices
+    body: |
+      Retenez l'essentiel de « Concevoir des solutions auto-réparatrices » pour la certification DOP-C02.

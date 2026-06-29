@@ -1,0 +1,37 @@
+id: gcppcse-l-chiffrement-et-kms
+trackId: gcp-pcse
+unitId: gcppcse-u-data-protection
+domainId: data-protection
+title: "Chiffrement et KMS"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-chiffrement-et-kms
+    body: |
+      Dans l'examen PCSE, « Chiffrement et KMS » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-chiffrement-et-kms
+    title: "Chiffrement et KMS"
+    body: |
+      Le chiffrement est par défaut ; CMEK/Cloud KMS gère les clés ; le DLP détecte les données sensibles. La rotation des clés réduit les risques.
+  - type: check
+    conceptId: c-chiffrement-et-kms
+    check:
+      id: gcppcse-l-chiffrement-et-kms-check-1
+      conceptId: c-chiffrement-et-kms
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service gère les clés de chiffrement client ?
+      options:
+        - { id: a, label: "Cloud KMS" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "Cloud CDN" }
+        - { id: d, label: "Pub/Sub" }
+      correct: [a]
+      explanation: |
+        Cloud KMS gère le cycle de vie des clés (CMEK).
+  - type: recap
+    conceptId: c-chiffrement-et-kms
+    body: |
+      Retenez l'essentiel de « Chiffrement et KMS » pour la certification PCSE.

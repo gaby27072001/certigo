@@ -1,5 +1,6 @@
 id: azure-ai-engineer
 code: AZURE-AI-ENGINEER
+provider: microsoft
 title: 'Microsoft Certified: Azure AI Engineer Associate'
 level: associate
 summary: Microsoft certification (AI Engineer) covering Azure.

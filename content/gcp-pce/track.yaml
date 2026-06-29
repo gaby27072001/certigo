@@ -1,0 +1,45 @@
+# Google Workspace Professional Collaboration Engineer — google certification track.
+# Domain weights mirror the official PCE skills outline and sum to 1.0.
+id: gcp-pce
+code: "PCE"
+provider: google
+title: "Google Workspace Professional Collaboration Engineer"
+level: professional
+examCode: "Professional Collaboration Engineer"
+sourceUrl: "https://cloud.google.com/learn/certification/collaboration-engineer"
+summary: |
+  Certification d'administration avancée Google Workspace : configuration du compte, gestion des utilisateurs, services collaboratifs, sécurité et support pour entreprises.
+domains:
+  - id: manage-account
+    name: "Configurer le compte"
+    weight: 0.25
+  - id: manage-users
+    name: "Gérer utilisateurs et services"
+    weight: 0.25
+  - id: security-compliance
+    name: "Sécurité et conformité"
+    weight: 0.3
+  - id: support-troubleshoot
+    name: "Support et dépannage"
+    weight: 0.2
+units:
+  - id: gcppce-u-manage-account
+    domainId: manage-account
+    title: "Configurer le compte"
+    lessons:
+      - gcppce-l-dns-domaines-et-provisioning
+  - id: gcppce-u-manage-users
+    domainId: manage-users
+    title: "Gérer utilisateurs et services"
+    lessons:
+      - gcppce-l-groupes-et-partage
+  - id: gcppce-u-security-compliance
+    domainId: security-compliance
+    title: "Sécurité et conformité"
+    lessons:
+      - gcppce-l-2fa-sso-et-vault
+  - id: gcppce-u-support-troubleshoot
+    domainId: support-troubleshoot
+    title: "Support et dépannage"
+    lessons:
+      - gcppce-l-en-tetes-et-journaux

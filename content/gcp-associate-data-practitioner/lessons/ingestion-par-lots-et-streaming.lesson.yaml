@@ -1,0 +1,37 @@
+id: gcpassociatedatapractitioner-l-ingestion-par-lots-et-streaming
+trackId: gcp-associate-data-practitioner
+unitId: gcpassociatedatapractitioner-u-data-prep
+domainId: data-prep
+title: "Ingestion par lots et streaming"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-ingestion-par-lots-et-streaming
+    body: |
+      Dans l'examen ADP, « Ingestion par lots et streaming » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-ingestion-par-lots-et-streaming
+    title: "Ingestion par lots et streaming"
+    body: |
+      Cloud Storage reçoit les fichiers, Pub/Sub le streaming, Dataflow transforme. Le choix lots vs flux dépend de la latence requise.
+  - type: check
+    conceptId: c-ingestion-par-lots-et-streaming
+    check:
+      id: gcpassociatedatapractitioner-l-ingestion-par-lots-et-streaming-check-1
+      conceptId: c-ingestion-par-lots-et-streaming
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service ingère des flux d'événements en temps réel ?
+      options:
+        - { id: a, label: "Pub/Sub" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "Cloud VPN" }
+        - { id: d, label: "IAM" }
+      correct: [a]
+      explanation: |
+        Pub/Sub est la messagerie temps réel de Google Cloud.
+  - type: recap
+    conceptId: c-ingestion-par-lots-et-streaming
+    body: |
+      Retenez l'essentiel de « Ingestion par lots et streaming » pour la certification ADP.

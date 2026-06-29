@@ -1,0 +1,37 @@
+id: oracledbfoundations-l-tables-cles-relations
+trackId: oracle-db-foundations
+unitId: oracledbfoundations-u-relational
+domainId: relational
+title: "Tables, clés, relations"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-tables-cles-relations
+    body: |
+      Dans l'examen 1Z0-006, « Tables, clés, relations » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-tables-cles-relations
+    title: "Tables, clés, relations"
+    body: |
+      Tables, clés primaires/étrangères et normalisation structurent les données relationnelles.
+  - type: check
+    conceptId: c-tables-cles-relations
+    check:
+      id: oracledbfoundations-l-tables-cles-relations-check-1
+      conceptId: c-tables-cles-relations
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel objet identifie de façon unique une ligne ?
+      options:
+        - { id: a, label: "Clé primaire" }
+        - { id: b, label: "Index seul" }
+        - { id: c, label: "Vue" }
+        - { id: d, label: "Synonyme" }
+      correct: [a]
+      explanation: |
+        La clé primaire garantit l'unicité d'une ligne.
+  - type: recap
+    conceptId: c-tables-cles-relations
+    body: |
+      Retenez l'essentiel de « Tables, clés, relations » pour la certification 1Z0-006.

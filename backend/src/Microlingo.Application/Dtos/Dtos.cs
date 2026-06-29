@@ -144,7 +144,9 @@ public sealed record TrackSummaryDto(
     string Level,
     string Summary,
     int UnitCount,
-    int LessonCount);
+    int LessonCount,
+    string Provider = "microsoft",
+    string? RetiringOn = null);
 
 public sealed record CatalogDto(IReadOnlyList<TrackSummaryDto> Tracks);
 

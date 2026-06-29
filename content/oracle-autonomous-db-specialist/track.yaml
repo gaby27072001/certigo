@@ -1,0 +1,38 @@
+# Oracle Autonomous Database Cloud Specialist — oracle certification track.
+# Domain weights mirror the official 1Z0-931-1 skills outline and sum to 1.0.
+id: oracle-autonomous-db-specialist
+code: "1Z0-931-1"
+provider: oracle
+title: "Oracle Autonomous Database Cloud Specialist"
+level: specialty
+examCode: "1Z0-931-1"
+sourceUrl: "https://education.oracle.com/oracle-autonomous-database-cloud-2021-specialist/pexam_1Z0-931-1"
+summary: |
+  Valide la maîtrise d'Autonomous Database : provisioning, mise à l'échelle, sauvegarde, sécurité et migration. Pour spécialistes données cloud.
+domains:
+  - id: provisioning
+    name: "Provisioning"
+    weight: 0.3
+  - id: scaling
+    name: "Scaling et HA"
+    weight: 0.4
+  - id: security
+    name: "Sécurité et migration"
+    weight: 0.3
+units:
+  - id: oracleautonomousdbspecialist-u-provisioning
+    domainId: provisioning
+    title: "Provisioning"
+    lessons:
+      - oracleautonomousdbspecialist-l-atp-et-adw
+  - id: oracleautonomousdbspecialist-u-scaling
+    domainId: scaling
+    title: "Scaling et HA"
+    lessons:
+      - oracleautonomousdbspecialist-l-auto-scaling
+      - oracleautonomousdbspecialist-l-sauvegardes-auto
+  - id: oracleautonomousdbspecialist-u-security
+    domainId: security
+    title: "Sécurité et migration"
+    lessons:
+      - oracleautonomousdbspecialist-l-chiffrement-et-migration

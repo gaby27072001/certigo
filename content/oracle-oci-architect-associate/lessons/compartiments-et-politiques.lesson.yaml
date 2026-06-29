@@ -1,0 +1,37 @@
+id: oracleociarchitectassociate-l-compartiments-et-politiques
+trackId: oracle-oci-architect-associate
+unitId: oracleociarchitectassociate-u-iam-security
+domainId: iam-security
+title: "Compartiments et politiques"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-compartiments-et-politiques
+    body: |
+      Dans l'examen 1Z0-1072-24, « Compartiments et politiques » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-compartiments-et-politiques
+    title: "Compartiments et politiques"
+    body: |
+      Les compartiments isolent les ressources ; les politiques accordent des permissions par groupe et par compartiment.
+  - type: check
+    conceptId: c-compartiments-et-politiques
+    check:
+      id: oracleociarchitectassociate-l-compartiments-et-politiques-check-1
+      conceptId: c-compartiments-et-politiques
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel objet OCI isole logiquement les ressources ?
+      options:
+        - { id: a, label: "Compartiment" }
+        - { id: b, label: "Tenancy unique" }
+        - { id: c, label: "Sous-réseau" }
+        - { id: d, label: "Bucket" }
+      correct: [a]
+      explanation: |
+        Les compartiments cloisonnent ressources et accès.
+  - type: recap
+    conceptId: c-compartiments-et-politiques
+    body: |
+      Retenez l'essentiel de « Compartiments et politiques » pour la certification 1Z0-1072-24.

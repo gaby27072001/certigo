@@ -1,0 +1,45 @@
+# OpenAI AI Foundations — openai certification track.
+# Domain weights mirror the official AI-FOUND skills outline and sum to 1.0.
+id: openai-ai-foundations
+code: "AI-FOUND"
+provider: openai
+title: "OpenAI AI Foundations"
+level: fundamentals
+examCode: "AI Foundations"
+sourceUrl: "https://openai.com/index/openai-certifications/"
+summary: |
+  Certification fondamentale d'OpenAI couvrant les bases de l'IA générative : grands modèles de langage, prompting efficace, usage responsable et applications concrètes. Pour démarrer avec ChatGPT et l'IA dans un cadre professionnel.
+domains:
+  - id: genai-basics
+    name: "Fondamentaux de l'IA générative"
+    weight: 0.3
+  - id: prompting
+    name: "Prompting efficace"
+    weight: 0.3
+  - id: responsible-ai
+    name: "Usage responsable"
+    weight: 0.2
+  - id: applications
+    name: "Applications professionnelles"
+    weight: 0.2
+units:
+  - id: openaiaifoundations-u-genai-basics
+    domainId: genai-basics
+    title: "Fondamentaux de l'IA générative"
+    lessons:
+      - openaiaifoundations-l-ce-qu-est-un-llm
+  - id: openaiaifoundations-u-prompting
+    domainId: prompting
+    title: "Prompting efficace"
+    lessons:
+      - openaiaifoundations-l-consignes-contexte-exemples
+  - id: openaiaifoundations-u-responsible-ai
+    domainId: responsible-ai
+    title: "Usage responsable"
+    lessons:
+      - openaiaifoundations-l-biais-confidentialite-verification
+  - id: openaiaifoundations-u-applications
+    domainId: applications
+    title: "Applications professionnelles"
+    lessons:
+      - openaiaifoundations-l-cas-d-usage-au-travail

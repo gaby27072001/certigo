@@ -1,0 +1,45 @@
+# AWS Certified Solutions Architect – Professional — aws certification track.
+# Domain weights mirror the official SAP-C02 skills outline and sum to 1.0.
+id: aws-sap-c02
+code: "SAP-C02"
+provider: aws
+title: "AWS Certified Solutions Architect – Professional"
+level: professional
+examCode: "SAP-C02"
+sourceUrl: "https://aws.amazon.com/certification/certified-solutions-architect-professional/"
+summary: |
+  Certification avancée pour architectes concevant des solutions complexes multi-comptes, des migrations à grande échelle et l'amélioration continue d'environnements AWS d'entreprise.
+domains:
+  - id: org-complexity
+    name: "Concevoir des solutions pour la complexité organisationnelle"
+    weight: 0.26
+  - id: new-solutions
+    name: "Concevoir de nouvelles solutions"
+    weight: 0.29
+  - id: continuous-improvement
+    name: "Amélioration continue des solutions existantes"
+    weight: 0.25
+  - id: migration
+    name: "Accélérer la migration et la modernisation"
+    weight: 0.2
+units:
+  - id: awssapc02-u-org-complexity
+    domainId: org-complexity
+    title: "Concevoir des solutions pour la complexité organisationnelle"
+    lessons:
+      - awssapc02-l-gouvernance-multi-comptes-avec-organizations
+  - id: awssapc02-u-new-solutions
+    domainId: new-solutions
+    title: "Concevoir de nouvelles solutions"
+    lessons:
+      - awssapc02-l-architectures-evolutives-et-multi-regions
+  - id: awssapc02-u-continuous-improvement
+    domainId: continuous-improvement
+    title: "Amélioration continue des solutions existantes"
+    lessons:
+      - awssapc02-l-ameliorer-avec-le-well-architected-framework
+  - id: awssapc02-u-migration
+    domainId: migration
+    title: "Accélérer la migration et la modernisation"
+    lessons:
+      - awssapc02-l-strategies-de-migration-les-7-r

@@ -1,0 +1,37 @@
+id: googleuxdesign-l-du-wireframe-au-prototype
+trackId: google-ux-design
+unitId: googleuxdesign-u-wireframes
+domainId: wireframes
+title: "Du wireframe au prototype"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-du-wireframe-au-prototype
+    body: |
+      Dans l'examen UX-DESIGN, « Du wireframe au prototype » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-du-wireframe-au-prototype
+    title: "Du wireframe au prototype"
+    body: |
+      On esquisse d'abord des wireframes basse fidélité pour structurer l'écran, puis des prototypes interactifs (Figma) pour simuler le parcours. Itérer tôt et à moindre coût évite les erreurs coûteuses.
+  - type: check
+    conceptId: c-du-wireframe-au-prototype
+    check:
+      id: googleuxdesign-l-du-wireframe-au-prototype-check-1
+      conceptId: c-du-wireframe-au-prototype
+      type: mcq
+      difficulty: 1
+      stem: |
+        Pourquoi commencer par des wireframes basse fidélité ?
+      options:
+        - { id: a, label: "Pour explorer vite et corriger à faible coût" }
+        - { id: b, label: "Pour livrer le produit final" }
+        - { id: c, label: "Pour écrire le code serveur" }
+        - { id: d, label: "Pour acheter du matériel" }
+      correct: [a]
+      explanation: |
+        La basse fidélité permet d'itérer rapidement avant d'investir dans le design détaillé.
+  - type: recap
+    conceptId: c-du-wireframe-au-prototype
+    body: |
+      Retenez l'essentiel de « Du wireframe au prototype » pour la certification UX-DESIGN.

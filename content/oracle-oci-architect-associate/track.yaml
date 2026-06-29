@@ -1,0 +1,53 @@
+# Oracle Cloud Infrastructure Architect Associate — oracle certification track.
+# Domain weights mirror the official 1Z0-1072-24 skills outline and sum to 1.0.
+id: oracle-oci-architect-associate
+code: "1Z0-1072-24"
+provider: oracle
+title: "Oracle Cloud Infrastructure Architect Associate"
+level: associate
+examCode: "1Z0-1072-24"
+sourceUrl: "https://education.oracle.com/oracle-cloud-infrastructure-2024-architect-associate/pexam_1Z0-1072-24"
+summary: |
+  Valide la conception et le déploiement de solutions OCI : réseau, calcul, stockage, IAM et bases de données. Pour architectes et administrateurs cloud intermédiaires.
+domains:
+  - id: networking
+    name: "Réseau VCN"
+    weight: 0.25
+  - id: compute
+    name: "Compute"
+    weight: 0.2
+  - id: storage
+    name: "Stockage"
+    weight: 0.2
+  - id: iam-security
+    name: "IAM et sécurité"
+    weight: 0.2
+  - id: databases
+    name: "Bases de données"
+    weight: 0.15
+units:
+  - id: oracleociarchitectassociate-u-networking
+    domainId: networking
+    title: "Réseau VCN"
+    lessons:
+      - oracleociarchitectassociate-l-vcn-sous-reseaux-et-passerelles
+  - id: oracleociarchitectassociate-u-compute
+    domainId: compute
+    title: "Compute"
+    lessons:
+      - oracleociarchitectassociate-l-instances-et-scaling
+  - id: oracleociarchitectassociate-u-storage
+    domainId: storage
+    title: "Stockage"
+    lessons:
+      - oracleociarchitectassociate-l-block-object-file
+  - id: oracleociarchitectassociate-u-iam-security
+    domainId: iam-security
+    title: "IAM et sécurité"
+    lessons:
+      - oracleociarchitectassociate-l-compartiments-et-politiques
+  - id: oracleociarchitectassociate-u-databases
+    domainId: databases
+    title: "Bases de données"
+    lessons:
+      - oracleociarchitectassociate-l-db-systems-et-autonomous

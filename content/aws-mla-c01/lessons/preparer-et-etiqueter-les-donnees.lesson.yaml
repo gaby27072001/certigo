@@ -1,0 +1,37 @@
+id: awsmlac01-l-preparer-et-etiqueter-les-donnees
+trackId: aws-mla-c01
+unitId: awsmlac01-u-data-prep
+domainId: data-prep
+title: "Préparer et étiqueter les données"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-preparer-et-etiqueter-les-donnees
+    body: |
+      Dans l'examen MLA-C01, « Préparer et étiqueter les données » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-preparer-et-etiqueter-les-donnees
+    title: "Préparer et étiqueter les données"
+    body: |
+      La préparation des données (feature engineering, nettoyage, normalisation) conditionne la qualité d'un modèle. Amazon SageMaker Data Wrangler accélère la transformation des features, tandis que SageMaker Ground Truth aide à étiqueter des jeux de données à grande échelle.
+  - type: check
+    conceptId: c-preparer-et-etiqueter-les-donnees
+    check:
+      id: awsmlac01-l-preparer-et-etiqueter-les-donnees-check-1
+      conceptId: c-preparer-et-etiqueter-les-donnees
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel outil SageMaker aide à étiqueter de grands jeux de données pour l'apprentissage supervisé ?
+      options:
+        - { id: a, label: "SageMaker Ground Truth" }
+        - { id: b, label: "Amazon CloudFront" }
+        - { id: c, label: "AWS Shield" }
+        - { id: d, label: "Amazon SQS" }
+      correct: [a]
+      explanation: |
+        SageMaker Ground Truth fournit des workflows d'étiquetage de données (humains et automatisés) pour produire des jeux de données d'entraînement de qualité.
+  - type: recap
+    conceptId: c-preparer-et-etiqueter-les-donnees
+    body: |
+      Retenez l'essentiel de « Préparer et étiqueter les données » pour la certification MLA-C01.

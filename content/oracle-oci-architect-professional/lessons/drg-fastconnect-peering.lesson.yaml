@@ -1,0 +1,37 @@
+id: oracleociarchitectprofessional-l-drg-fastconnect-peering
+trackId: oracle-oci-architect-professional
+unitId: oracleociarchitectprofessional-u-network-advanced
+domainId: network-advanced
+title: "DRG, FastConnect, peering"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-drg-fastconnect-peering
+    body: |
+      Dans l'examen 1Z0-997-24, « DRG, FastConnect, peering » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-drg-fastconnect-peering
+    title: "DRG, FastConnect, peering"
+    body: |
+      Le DRG relie VCN et on-premise ; FastConnect fournit une connexion dédiée ; le peering connecte des VCN.
+  - type: check
+    conceptId: c-drg-fastconnect-peering
+    check:
+      id: oracleociarchitectprofessional-l-drg-fastconnect-peering-check-1
+      conceptId: c-drg-fastconnect-peering
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service offre une liaison privée dédiée vers OCI ?
+      options:
+        - { id: a, label: "FastConnect" }
+        - { id: b, label: "Internet Gateway" }
+        - { id: c, label: "NAT" }
+        - { id: d, label: "WAF" }
+      correct: [a]
+      explanation: |
+        FastConnect établit une connexion privée à bande passante dédiée.
+  - type: recap
+    conceptId: c-drg-fastconnect-peering
+    body: |
+      Retenez l'essentiel de « DRG, FastConnect, peering » pour la certification 1Z0-997-24.

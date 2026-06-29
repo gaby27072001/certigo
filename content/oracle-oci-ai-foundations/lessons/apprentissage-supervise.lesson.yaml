@@ -1,0 +1,37 @@
+id: oracleociaifoundations-l-apprentissage-supervise
+trackId: oracle-oci-ai-foundations
+unitId: oracleociaifoundations-u-ai-ml-basics
+domainId: ai-ml-basics
+title: "Apprentissage supervisé"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-apprentissage-supervise
+    body: |
+      Dans l'examen 1Z0-1122-24, « Apprentissage supervisé » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-apprentissage-supervise
+    title: "Apprentissage supervisé"
+    body: |
+      La classification et la régression apprennent d'exemples étiquetés pour prédire labels ou valeurs.
+  - type: check
+    conceptId: c-apprentissage-supervise
+    check:
+      id: oracleociaifoundations-l-apprentissage-supervise-check-1
+      conceptId: c-apprentissage-supervise
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel type de tâche prédit une catégorie discrète ?
+      options:
+        - { id: a, label: "Classification" }
+        - { id: b, label: "Clustering" }
+        - { id: c, label: "Compression" }
+        - { id: d, label: "Routage" }
+      correct: [a]
+      explanation: |
+        La classification prédit une étiquette de classe.
+  - type: recap
+    conceptId: c-apprentissage-supervise
+    body: |
+      Retenez l'essentiel de « Apprentissage supervisé » pour la certification 1Z0-1122-24.

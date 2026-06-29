@@ -1,0 +1,61 @@
+# AWS Certified SysOps Administrator – Associate — aws certification track.
+# Domain weights mirror the official SOA-C03 skills outline and sum to 1.0.
+id: aws-soa-c03
+code: "SOA-C03"
+provider: aws
+title: "AWS Certified SysOps Administrator – Associate"
+level: associate
+examCode: "SOA-C03"
+sourceUrl: "https://aws.amazon.com/certification/certified-sysops-admin-associate/"
+summary: |
+  Certification opérationnelle validant le déploiement, la gestion, la surveillance et l'exploitation de charges de travail sur AWS, avec un fort accent sur l'automatisation et la fiabilité.
+domains:
+  - id: monitoring
+    name: "Surveillance, journalisation et remédiation"
+    weight: 0.2
+  - id: reliability
+    name: "Fiabilité et continuité d'activité"
+    weight: 0.16
+  - id: deployment-automation
+    name: "Déploiement, provisionnement et automatisation"
+    weight: 0.18
+  - id: security-compliance
+    name: "Sécurité et conformité"
+    weight: 0.16
+  - id: networking
+    name: "Mise en réseau et connectivité"
+    weight: 0.18
+  - id: cost-performance
+    name: "Optimisation des coûts et des performances"
+    weight: 0.12
+units:
+  - id: awssoac03-u-monitoring
+    domainId: monitoring
+    title: "Surveillance, journalisation et remédiation"
+    lessons:
+      - awssoac03-l-surveiller-et-remedier-automatiquement
+  - id: awssoac03-u-reliability
+    domainId: reliability
+    title: "Fiabilité et continuité d'activité"
+    lessons:
+      - awssoac03-l-sauvegardes-et-continuite-d-activite
+  - id: awssoac03-u-deployment-automation
+    domainId: deployment-automation
+    title: "Déploiement, provisionnement et automatisation"
+    lessons:
+      - awssoac03-l-automatiser-avec-cloudformation-et-systems-manager
+  - id: awssoac03-u-security-compliance
+    domainId: security-compliance
+    title: "Sécurité et conformité"
+    lessons:
+      - awssoac03-l-verifier-la-conformite-et-detecter-les-menaces
+  - id: awssoac03-u-networking
+    domainId: networking
+    title: "Mise en réseau et connectivité"
+    lessons:
+      - awssoac03-l-configurer-un-vpc-et-la-connectivite
+  - id: awssoac03-u-cost-performance
+    domainId: cost-performance
+    title: "Optimisation des coûts et des performances"
+    lessons:
+      - awssoac03-l-optimiser-couts-et-performances

@@ -1,0 +1,37 @@
+id: googleitautomationpython-l-gestion-de-configuration
+trackId: google-it-automation-python
+unitId: googleitautomationpython-u-config
+domainId: config
+title: "Gestion de configuration"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-gestion-de-configuration
+    body: |
+      Dans l'examen IT-AUTO-PY, « Gestion de configuration » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-gestion-de-configuration
+    title: "Gestion de configuration"
+    body: |
+      Des outils comme Puppet appliquent un état désiré à des centaines de machines. L'infrastructure devient reproductible et cohérente, réduisant la dérive et les interventions manuelles.
+  - type: check
+    conceptId: c-gestion-de-configuration
+    check:
+      id: googleitautomationpython-l-gestion-de-configuration-check-1
+      conceptId: c-gestion-de-configuration
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel intérêt de la gestion de configuration automatisée ?
+      options:
+        - { id: a, label: "Appliquer un état cohérent à de nombreuses machines" }
+        - { id: b, label: "Configurer chaque serveur à la main" }
+        - { id: c, label: "Désactiver le réseau" }
+        - { id: d, label: "Supprimer les comptes" }
+      correct: [a]
+      explanation: |
+        Elle garantit une configuration reproductible et uniforme à grande échelle.
+  - type: recap
+    conceptId: c-gestion-de-configuration
+    body: |
+      Retenez l'essentiel de « Gestion de configuration » pour la certification IT-AUTO-PY.

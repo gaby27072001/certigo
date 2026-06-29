@@ -1,0 +1,37 @@
+id: googleuxdesign-l-tests-d-utilisabilite
+trackId: google-ux-design
+unitId: googleuxdesign-u-usability
+domainId: usability
+title: "Tests d'utilisabilité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-tests-d-utilisabilite
+    body: |
+      Dans l'examen UX-DESIGN, « Tests d'utilisabilité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-tests-d-utilisabilite
+    title: "Tests d'utilisabilité"
+    body: |
+      Tester avec de vrais utilisateurs révèle les blocages ; l'accessibilité (contraste, lecteurs d'écran, navigation clavier) élargit l'audience. Le design inclusif profite à tous.
+  - type: check
+    conceptId: c-tests-d-utilisabilite
+    check:
+      id: googleuxdesign-l-tests-d-utilisabilite-check-1
+      conceptId: c-tests-d-utilisabilite
+      type: mcq
+      difficulty: 2
+      stem: |
+        Que cherche-t-on lors d'un test d'utilisabilité ?
+      options:
+        - { id: a, label: "Observer où les utilisateurs rencontrent des difficultés" }
+        - { id: b, label: "Vendre le produit" }
+        - { id: c, label: "Compter les serveurs" }
+        - { id: d, label: "Optimiser le SQL" }
+      correct: [a]
+      explanation: |
+        Le test d'utilisabilité identifie les points de friction réels pour les corriger.
+  - type: recap
+    conceptId: c-tests-d-utilisabilite
+    body: |
+      Retenez l'essentiel de « Tests d'utilisabilité » pour la certification UX-DESIGN.

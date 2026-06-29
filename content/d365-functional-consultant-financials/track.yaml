@@ -1,5 +1,6 @@
 id: d365-functional-consultant-financials
 code: D365-FUNCTIONAL-CONSULTANT-FINANCIALS
+provider: microsoft
 title: 'Microsoft Certified: Dynamics 365 Finance Functional Consultant Associate'
 level: associate
 summary: Microsoft certification (Functional Consultant) covering Dynamics 365.

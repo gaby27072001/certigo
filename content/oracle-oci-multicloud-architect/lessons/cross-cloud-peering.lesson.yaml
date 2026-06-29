@@ -1,0 +1,37 @@
+id: oracleocimulticloudarchitect-l-cross-cloud-peering
+trackId: oracle-oci-multicloud-architect
+unitId: oracleocimulticloudarchitect-u-interconnect
+domainId: interconnect
+title: "Cross-cloud peering"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-cross-cloud-peering
+    body: |
+      Dans l'examen 1Z0-1151-1, « Cross-cloud peering » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-cross-cloud-peering
+    title: "Cross-cloud peering"
+    body: |
+      Les interconnexions dédiées relient OCI à d'autres clouds pour des architectures latence-sensibles.
+  - type: check
+    conceptId: c-cross-cloud-peering
+    check:
+      id: oracleocimulticloudarchitect-l-cross-cloud-peering-check-1
+      conceptId: c-cross-cloud-peering
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel atout offre l'interconnexion OCI-Azure ?
+      options:
+        - { id: a, label: "Faible latence" }
+        - { id: b, label: "Gratuité" }
+        - { id: c, label: "Sans IAM" }
+        - { id: d, label: "Mono-région" }
+      correct: [a]
+      explanation: |
+        L'interconnexion garantit une latence réduite entre clouds.
+  - type: recap
+    conceptId: c-cross-cloud-peering
+    body: |
+      Retenez l'essentiel de « Cross-cloud peering » pour la certification 1Z0-1151-1.

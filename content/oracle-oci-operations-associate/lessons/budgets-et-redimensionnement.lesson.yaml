@@ -1,0 +1,37 @@
+id: oracleocioperationsassociate-l-budgets-et-redimensionnement
+trackId: oracle-oci-operations-associate
+unitId: oracleocioperationsassociate-u-cost-opt
+domainId: cost-opt
+title: "Budgets et redimensionnement"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-budgets-et-redimensionnement
+    body: |
+      Dans l'examen 1Z0-1067-24, « Budgets et redimensionnement » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-budgets-et-redimensionnement
+    title: "Budgets et redimensionnement"
+    body: |
+      Budgets, alertes et right-sizing réduisent la facture sans perte de performance.
+  - type: check
+    conceptId: c-budgets-et-redimensionnement
+    check:
+      id: oracleocioperationsassociate-l-budgets-et-redimensionnement-check-1
+      conceptId: c-budgets-et-redimensionnement
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel levier diminue le coût sans nuire à la perf ?
+      options:
+        - { id: a, label: "Right-sizing" }
+        - { id: b, label: "Sur-provisionnement" }
+        - { id: c, label: "IP publiques" }
+        - { id: d, label: "Snapshots inutiles" }
+      correct: [a]
+      explanation: |
+        Le right-sizing aligne ressources et besoins réels.
+  - type: recap
+    conceptId: c-budgets-et-redimensionnement
+    body: |
+      Retenez l'essentiel de « Budgets et redimensionnement » pour la certification 1Z0-1067-24.

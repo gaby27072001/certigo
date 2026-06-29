@@ -1,5 +1,6 @@
 id: identity-and-access-administrator
 code: IDENTITY-AND-ACCESS-ADMINISTRATOR
+provider: microsoft
 title: 'Microsoft Certified: Identity and Access Administrator Associate'
 level: associate
 summary: Microsoft certification (Security Engineer) covering Azure.

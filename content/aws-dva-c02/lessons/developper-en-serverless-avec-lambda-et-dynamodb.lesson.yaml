@@ -1,0 +1,37 @@
+id: awsdvac02-l-developper-en-serverless-avec-lambda-et-dynamodb
+trackId: aws-dva-c02
+unitId: awsdvac02-u-development
+domainId: development
+title: "Développer en serverless avec Lambda et DynamoDB"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-developper-en-serverless-avec-lambda-et-dynamodb
+    body: |
+      Dans l'examen DVA-C02, « Développer en serverless avec Lambda et DynamoDB » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-developper-en-serverless-avec-lambda-et-dynamodb
+    title: "Développer en serverless avec Lambda et DynamoDB"
+    body: |
+      Une application cloud-native combine souvent AWS Lambda (exécution de code sans serveur), Amazon API Gateway (exposition d'API REST/HTTP) et Amazon DynamoDB (base NoSQL à faible latence). Les SDK AWS permettent d'appeler ces services depuis le code applicatif.
+  - type: check
+    conceptId: c-developper-en-serverless-avec-lambda-et-dynamodb
+    check:
+      id: awsdvac02-l-developper-en-serverless-avec-lambda-et-dynamodb-check-1
+      conceptId: c-developper-en-serverless-avec-lambda-et-dynamodb
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle base de données AWS est conçue pour des accès clé-valeur à très faible latence et une mise à l'échelle automatique ?
+      options:
+        - { id: a, label: "Amazon DynamoDB" }
+        - { id: b, label: "Amazon Redshift" }
+        - { id: c, label: "Amazon EC2" }
+        - { id: d, label: "Amazon S3 Glacier" }
+      correct: [a]
+      explanation: |
+        Amazon DynamoDB est une base NoSQL entièrement managée offrant une latence de l'ordre de la milliseconde et une mise à l'échelle automatique, idéale pour le serverless.
+  - type: recap
+    conceptId: c-developper-en-serverless-avec-lambda-et-dynamodb
+    body: |
+      Retenez l'essentiel de « Développer en serverless avec Lambda et DynamoDB » pour la certification DVA-C02.

@@ -1,0 +1,37 @@
+id: gcppcne-l-load-balancing-et-cloud-dns
+trackId: gcp-pcne
+unitId: gcppcne-u-network-services
+domainId: network-services
+title: "Load balancing et Cloud DNS"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-load-balancing-et-cloud-dns
+    body: |
+      Dans l'examen PCNE, « Load balancing et Cloud DNS » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-load-balancing-et-cloud-dns
+    title: "Load balancing et Cloud DNS"
+    body: |
+      Les équilibreurs HTTP(S) mondiaux répartissent le trafic ; Cloud CDN met en cache ; Cloud DNS résout les noms. Cloud NAT permet la sortie sans IP publique.
+  - type: check
+    conceptId: c-load-balancing-et-cloud-dns
+    check:
+      id: gcppcne-l-load-balancing-et-cloud-dns-check-1
+      conceptId: c-load-balancing-et-cloud-dns
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service permet une sortie Internet sans IP publique aux VM ?
+      options:
+        - { id: a, label: "Cloud NAT" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "BigQuery" }
+        - { id: d, label: "GKE" }
+      correct: [a]
+      explanation: |
+        Cloud NAT gère la traduction sortante.
+  - type: recap
+    conceptId: c-load-balancing-et-cloud-dns
+    body: |
+      Retenez l'essentiel de « Load balancing et Cloud DNS » pour la certification PCNE.

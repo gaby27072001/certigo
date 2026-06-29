@@ -2,11 +2,11 @@
 
 # Microlingo
 
-**Apprenez, révisez et validez vos certifications Microsoft — par micro-leçons premium.**
+**Apprenez, révisez et validez vos certifications cloud & tech — par micro-leçons premium.**
 
 Micro-learning mobile (iOS + Android) pour maîtriser des **concepts techniques & cloud réels**
-et atteindre la *readiness* certification sur **89 certifications Microsoft actives**
-(dont AZ-900 · AZ-104 · AI-900 · DP-900 · SC-900).
+et atteindre la *readiness* certification sur **153 certifications · 6 fournisseurs**
+(Microsoft · AWS · Google · Oracle · Anthropic · OpenAI ; dont AZ-900 · SAA-C03 · GCP-ACE · OCI Foundations).
 
 `Flutter` · `.NET 8 isolated Functions` · `Cosmos DB` · `Entra External ID` · `Bicep`
 
@@ -59,7 +59,7 @@ microlingo/
 │  │  └─ Microlingo.Infrastructure/ # Cosmos DB, validation token Entra
 │  └─ tests/               # Tests de domaine (xUnit)
 ├─ infra/                  # Infrastructure as Code (Bicep) : Cosmos, Storage, Functions, KV, AI
-├─ content/                # Tracks & leçons en YAML + schémas (89 certifications actives)
+├─ content/                # Tracks & leçons en YAML + schémas (153 certifications · 6 fournisseurs)
 ├─ tools/                  # Validateur de contenu (Node) + seed Cosmos (Python)
 ├─ docs/                   # Architecture & ADRs
 └─ .github/workflows/      # CI : mobile · backend · content · infra

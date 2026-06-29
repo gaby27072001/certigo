@@ -1,0 +1,37 @@
+id: oracleocidatafoundations-l-data-integration
+trackId: oracle-oci-data-foundations
+unitId: oracleocidatafoundations-u-integration
+domainId: integration
+title: "Data Integration"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-data-integration
+    body: |
+      Dans l'examen 1Z0-1124, « Data Integration » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-data-integration
+    title: "Data Integration"
+    body: |
+      Le service Data Integration extrait, transforme et charge les données entre sources.
+  - type: check
+    conceptId: c-data-integration
+    check:
+      id: oracleocidatafoundations-l-data-integration-check-1
+      conceptId: c-data-integration
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service réalise des pipelines ETL managés ?
+      options:
+        - { id: a, label: "Data Integration" }
+        - { id: b, label: "NAT" }
+        - { id: c, label: "KMS" }
+        - { id: d, label: "DNS" }
+      correct: [a]
+      explanation: |
+        Data Integration orchestre l'ETL.
+  - type: recap
+    conceptId: c-data-integration
+    body: |
+      Retenez l'essentiel de « Data Integration » pour la certification 1Z0-1124.

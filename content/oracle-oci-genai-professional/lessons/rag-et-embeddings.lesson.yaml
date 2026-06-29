@@ -1,0 +1,37 @@
+id: oracleocigenaiprofessional-l-rag-et-embeddings
+trackId: oracle-oci-genai-professional
+unitId: oracleocigenaiprofessional-u-oci-genai-service
+domainId: oci-genai-service
+title: "RAG et embeddings"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-rag-et-embeddings
+    body: |
+      Dans l'examen 1Z0-1127-24, « RAG et embeddings » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-rag-et-embeddings
+    title: "RAG et embeddings"
+    body: |
+      Le RAG injecte des connaissances via recherche vectorielle d'embeddings pour réduire les hallucinations.
+  - type: check
+    conceptId: c-rag-et-embeddings
+    check:
+      id: oracleocigenaiprofessional-l-rag-et-embeddings-check-1
+      conceptId: c-rag-et-embeddings
+      type: mcq
+      difficulty: 2
+      stem: |
+        Que stocke un index d'embeddings ?
+      options:
+        - { id: a, label: "Vecteurs" }
+        - { id: b, label: "Logs bruts" }
+        - { id: c, label: "Disques" }
+        - { id: d, label: "Politiques" }
+      correct: [a]
+      explanation: |
+        Les embeddings sont des vecteurs sémantiques recherchables.
+  - type: recap
+    conceptId: c-rag-et-embeddings
+    body: |
+      Retenez l'essentiel de « RAG et embeddings » pour la certification 1Z0-1127-24.

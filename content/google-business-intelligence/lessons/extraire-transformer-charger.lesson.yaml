@@ -1,0 +1,37 @@
+id: googlebusinessintelligence-l-extraire-transformer-charger
+trackId: google-business-intelligence
+unitId: googlebusinessintelligence-u-etl
+domainId: etl
+title: "Extraire, transformer, charger"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-extraire-transformer-charger
+    body: |
+      Dans l'examen BUSINESS-INTEL, « Extraire, transformer, charger » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-extraire-transformer-charger
+    title: "Extraire, transformer, charger"
+    body: |
+      Un pipeline ETL extrait les données sources, les transforme (nettoyage, normalisation) et les charge dans un entrepôt. L'automatisation garantit des données fraîches et fiables pour le reporting.
+  - type: check
+    conceptId: c-extraire-transformer-charger
+    check:
+      id: googlebusinessintelligence-l-extraire-transformer-charger-check-1
+      conceptId: c-extraire-transformer-charger
+      type: mcq
+      difficulty: 2
+      stem: |
+        Que signifie le « T » d'ETL ?
+      options:
+        - { id: a, label: "Transformer" }
+        - { id: b, label: "Tester" }
+        - { id: c, label: "Transférer" }
+        - { id: d, label: "Tracer" }
+      correct: [a]
+      explanation: |
+        ETL = Extraire, Transformer, Charger ; la transformation nettoie et structure les données.
+  - type: recap
+    conceptId: c-extraire-transformer-charger
+    body: |
+      Retenez l'essentiel de « Extraire, transformer, charger » pour la certification BUSINESS-INTEL.

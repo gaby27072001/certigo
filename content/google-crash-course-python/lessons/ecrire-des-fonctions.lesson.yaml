@@ -1,0 +1,37 @@
+id: googlecrashcoursepython-l-ecrire-des-fonctions
+trackId: google-crash-course-python
+unitId: googlecrashcoursepython-u-functions
+domainId: functions
+title: "Écrire des fonctions"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-ecrire-des-fonctions
+    body: |
+      Dans l'examen PY-CRASH, « Écrire des fonctions » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-ecrire-des-fonctions
+    title: "Écrire des fonctions"
+    body: |
+      Une fonction regroupe une logique réutilisable avec des paramètres et un retour. Elle évite la répétition et rend le code clair et testable, base d'une automatisation maintenable.
+  - type: check
+    conceptId: c-ecrire-des-fonctions
+    check:
+      id: googlecrashcoursepython-l-ecrire-des-fonctions-check-1
+      conceptId: c-ecrire-des-fonctions
+      type: mcq
+      difficulty: 1
+      stem: |
+        Pourquoi écrire des fonctions ?
+      options:
+        - { id: a, label: "Réutiliser une logique et éviter la répétition" }
+        - { id: b, label: "Ralentir le code" }
+        - { id: c, label: "Empêcher les tests" }
+        - { id: d, label: "Effacer les variables" }
+      correct: [a]
+      explanation: |
+        Les fonctions encapsulent une logique réutilisable, rendant le code clair et maintenable.
+  - type: recap
+    conceptId: c-ecrire-des-fonctions
+    body: |
+      Retenez l'essentiel de « Écrire des fonctions » pour la certification PY-CRASH.

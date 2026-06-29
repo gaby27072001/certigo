@@ -1,0 +1,37 @@
+id: oracleocikubernetesspecialist-l-node-pools-et-upgrades
+trackId: oracle-oci-kubernetes-specialist
+unitId: oracleocikubernetesspecialist-u-cluster-ops
+domainId: cluster-ops
+title: "Node pools et upgrades"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-node-pools-et-upgrades
+    body: |
+      Dans l'examen 1Z0-1118, « Node pools et upgrades » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-node-pools-et-upgrades
+    title: "Node pools et upgrades"
+    body: |
+      OKE gère plan de contrôle, node pools et mises à niveau ; le scaling adapte la capacité.
+  - type: check
+    conceptId: c-node-pools-et-upgrades
+    check:
+      id: oracleocikubernetesspecialist-l-node-pools-et-upgrades-check-1
+      conceptId: c-node-pools-et-upgrades
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel objet OKE regroupe des workers homogènes ?
+      options:
+        - { id: a, label: "Node pool" }
+        - { id: b, label: "VCN" }
+        - { id: c, label: "Vault" }
+        - { id: d, label: "DRG" }
+      correct: [a]
+      explanation: |
+        Un node pool regroupe des nœuds workers similaires.
+  - type: recap
+    conceptId: c-node-pools-et-upgrades
+    body: |
+      Retenez l'essentiel de « Node pools et upgrades » pour la certification 1Z0-1118.

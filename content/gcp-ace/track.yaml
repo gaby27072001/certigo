@@ -1,0 +1,53 @@
+# Google Cloud Associate Cloud Engineer — google certification track.
+# Domain weights mirror the official ACE skills outline and sum to 1.0.
+id: gcp-ace
+code: "ACE"
+provider: google
+title: "Google Cloud Associate Cloud Engineer"
+level: associate
+examCode: "Associate Cloud Engineer"
+sourceUrl: "https://cloud.google.com/learn/certification/cloud-engineer"
+summary: |
+  Certification opérationnelle pour déployer, surveiller et maintenir des projets sur Google Cloud : configuration de l'environnement, planification, déploiement de ressources, exploitation et gestion des accès.
+domains:
+  - id: setup-env
+    name: "Configurer l'environnement cloud"
+    weight: 0.2
+  - id: plan-configure
+    name: "Planifier et configurer une solution"
+    weight: 0.2
+  - id: deploy-implement
+    name: "Déployer et implémenter"
+    weight: 0.25
+  - id: ensure-operation
+    name: "Assurer l'exploitation"
+    weight: 0.2
+  - id: access-security
+    name: "Configurer accès et sécurité"
+    weight: 0.15
+units:
+  - id: gcpace-u-setup-env
+    domainId: setup-env
+    title: "Configurer l'environnement cloud"
+    lessons:
+      - gcpace-l-projets-facturation-et-gcloud
+  - id: gcpace-u-plan-configure
+    domainId: plan-configure
+    title: "Planifier et configurer une solution"
+    lessons:
+      - gcpace-l-choisir-le-bon-compute
+  - id: gcpace-u-deploy-implement
+    domainId: deploy-implement
+    title: "Déployer et implémenter"
+    lessons:
+      - gcpace-l-deployer-des-ressources
+  - id: gcpace-u-ensure-operation
+    domainId: ensure-operation
+    title: "Assurer l'exploitation"
+    lessons:
+      - gcpace-l-monitoring-et-logs
+  - id: gcpace-u-access-security
+    domainId: access-security
+    title: "Configurer accès et sécurité"
+    lessons:
+      - gcpace-l-iam-et-comptes-de-service

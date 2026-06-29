@@ -1,0 +1,37 @@
+id: oracleocimulticloudarchitect-l-partenariats-oracle
+trackId: oracle-oci-multicloud-architect
+unitId: oracleocimulticloudarchitect-u-multicloud-concepts
+domainId: multicloud-concepts
+title: "Partenariats Oracle"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-partenariats-oracle
+    body: |
+      Dans l'examen 1Z0-1151-1, « Partenariats Oracle » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-partenariats-oracle
+    title: "Partenariats Oracle"
+    body: |
+      OCI s'interconnecte avec Azure et Google via des liaisons à faible latence pour exécuter des workloads répartis.
+  - type: check
+    conceptId: c-partenariats-oracle
+    check:
+      id: oracleocimulticloudarchitect-l-partenariats-oracle-check-1
+      conceptId: c-partenariats-oracle
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel partenariat héberge Oracle DB dans Azure ?
+      options:
+        - { id: a, label: "Oracle Database@Azure" }
+        - { id: b, label: "VCN local" }
+        - { id: c, label: "NAT" }
+        - { id: d, label: "OCIR" }
+      correct: [a]
+      explanation: |
+        Oracle Database@Azure place la DB dans les datacenters Azure.
+  - type: recap
+    conceptId: c-partenariats-oracle
+    body: |
+      Retenez l'essentiel de « Partenariats Oracle » pour la certification 1Z0-1151-1.

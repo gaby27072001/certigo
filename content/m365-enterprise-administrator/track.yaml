@@ -1,5 +1,6 @@
 id: m365-enterprise-administrator
 code: M365-ENTERPRISE-ADMINISTRATOR
+provider: microsoft
 title: 'Microsoft 365 Certified: Administrator Expert'
 level: expert
 summary: Microsoft certification (Administrator) covering Microsoft 365, Microsoft

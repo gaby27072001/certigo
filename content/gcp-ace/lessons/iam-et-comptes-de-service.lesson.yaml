@@ -1,0 +1,37 @@
+id: gcpace-l-iam-et-comptes-de-service
+trackId: gcp-ace
+unitId: gcpace-u-access-security
+domainId: access-security
+title: "IAM et comptes de service"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-iam-et-comptes-de-service
+    body: |
+      Dans l'examen ACE, « IAM et comptes de service » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-iam-et-comptes-de-service
+    title: "IAM et comptes de service"
+    body: |
+      IAM attribue des rôles à des utilisateurs, groupes et comptes de service selon le moindre privilège. Les comptes de service authentifient les applications.
+  - type: check
+    conceptId: c-iam-et-comptes-de-service
+    check:
+      id: gcpace-l-iam-et-comptes-de-service-check-1
+      conceptId: c-iam-et-comptes-de-service
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle identité une application utilise-t-elle pour s'authentifier ?
+      options:
+        - { id: a, label: "Un compte de service" }
+        - { id: b, label: "Un bucket" }
+        - { id: c, label: "Un dataset" }
+        - { id: d, label: "Un VPC" }
+      correct: [a]
+      explanation: |
+        Les comptes de service portent les permissions des charges applicatives.
+  - type: recap
+    conceptId: c-iam-et-comptes-de-service
+    body: |
+      Retenez l'essentiel de « IAM et comptes de service » pour la certification ACE.

@@ -1,0 +1,37 @@
+id: oracleocideveloper-l-functions-et-api-gateway
+trackId: oracle-oci-developer
+unitId: oracleocideveloper-u-serverless
+domainId: serverless
+title: "Functions et API Gateway"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-functions-et-api-gateway
+    body: |
+      Dans l'examen 1Z0-1084-24, « Functions et API Gateway » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-functions-et-api-gateway
+    title: "Functions et API Gateway"
+    body: |
+      Functions exécute du code sans serveur ; API Gateway expose et sécurise les endpoints.
+  - type: check
+    conceptId: c-functions-et-api-gateway
+    check:
+      id: oracleocideveloper-l-functions-et-api-gateway-check-1
+      conceptId: c-functions-et-api-gateway
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel composant publie des APIs sécurisées ?
+      options:
+        - { id: a, label: "API Gateway" }
+        - { id: b, label: "VCN" }
+        - { id: c, label: "KMS" }
+        - { id: d, label: "OCIR" }
+      correct: [a]
+      explanation: |
+        API Gateway gère routage, auth et limites de débit.
+  - type: recap
+    conceptId: c-functions-et-api-gateway
+    body: |
+      Retenez l'essentiel de « Functions et API Gateway » pour la certification 1Z0-1084-24.

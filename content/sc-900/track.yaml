@@ -3,6 +3,7 @@
 # Domain weights mirror the public SC-900 exam skills outline and sum to 1.0.
 id: sc-900
 code: SC-900
+provider: microsoft
 title: Microsoft Security, Compliance, and Identity Fundamentals
 level: fundamentals
 summary: >

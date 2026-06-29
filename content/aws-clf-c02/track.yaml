@@ -1,0 +1,45 @@
+# AWS Certified Cloud Practitioner — aws certification track.
+# Domain weights mirror the official CLF-C02 skills outline and sum to 1.0.
+id: aws-clf-c02
+code: "CLF-C02"
+provider: aws
+title: "AWS Certified Cloud Practitioner"
+level: fundamentals
+examCode: "CLF-C02"
+sourceUrl: "https://aws.amazon.com/certification/certified-cloud-practitioner/"
+summary: |
+  Certification d'entrée AWS validant une compréhension globale du cloud AWS : valeur du cloud, sécurité et conformité, services principaux et modèles de tarification. Idéale pour les profils non techniques comme premier jalon.
+domains:
+  - id: cloud-concepts
+    name: "Concepts du cloud"
+    weight: 0.24
+  - id: security-compliance
+    name: "Sécurité et conformité"
+    weight: 0.3
+  - id: cloud-tech
+    name: "Technologies et services cloud"
+    weight: 0.34
+  - id: billing-pricing
+    name: "Facturation, tarification et support"
+    weight: 0.12
+units:
+  - id: awsclfc02-u-cloud-concepts
+    domainId: cloud-concepts
+    title: "Concepts du cloud"
+    lessons:
+      - awsclfc02-l-avantages-et-valeur-du-cloud-aws
+  - id: awsclfc02-u-security-compliance
+    domainId: security-compliance
+    title: "Sécurité et conformité"
+    lessons:
+      - awsclfc02-l-le-modele-de-responsabilite-partagee
+  - id: awsclfc02-u-cloud-tech
+    domainId: cloud-tech
+    title: "Technologies et services cloud"
+    lessons:
+      - awsclfc02-l-services-principaux-calcul-stockage-et-reseau
+  - id: awsclfc02-u-billing-pricing
+    domainId: billing-pricing
+    title: "Facturation, tarification et support"
+    lessons:
+      - awsclfc02-l-modeles-de-tarification-et-outils-de-couts

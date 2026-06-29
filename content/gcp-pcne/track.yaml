@@ -1,0 +1,45 @@
+# Google Cloud Professional Cloud Network Engineer — google certification track.
+# Domain weights mirror the official PCNE skills outline and sum to 1.0.
+id: gcp-pcne
+code: "PCNE"
+provider: google
+title: "Google Cloud Professional Cloud Network Engineer"
+level: professional
+examCode: "Professional Cloud Network Engineer"
+sourceUrl: "https://cloud.google.com/learn/certification/cloud-network-engineer"
+summary: |
+  Certification réseau : conception de VPC, hybride, services réseau, sécurité et exploitation pour des architectures performantes et sûres.
+domains:
+  - id: vpc-design
+    name: "Concevoir et implémenter le VPC"
+    weight: 0.3
+  - id: hybrid-connectivity
+    name: "Connectivité hybride"
+    weight: 0.25
+  - id: network-services
+    name: "Services réseau"
+    weight: 0.25
+  - id: network-security-ops
+    name: "Sécurité et exploitation réseau"
+    weight: 0.2
+units:
+  - id: gcppcne-u-vpc-design
+    domainId: vpc-design
+    title: "Concevoir et implémenter le VPC"
+    lessons:
+      - gcppcne-l-vpc-sous-reseaux-et-routes
+  - id: gcppcne-u-hybrid-connectivity
+    domainId: hybrid-connectivity
+    title: "Connectivité hybride"
+    lessons:
+      - gcppcne-l-vpn-interconnect-et-cloud-router
+  - id: gcppcne-u-network-services
+    domainId: network-services
+    title: "Services réseau"
+    lessons:
+      - gcppcne-l-load-balancing-et-cloud-dns
+  - id: gcppcne-u-network-security-ops
+    domainId: network-security-ops
+    title: "Sécurité et exploitation réseau"
+    lessons:
+      - gcppcne-l-pare-feu-et-monitoring

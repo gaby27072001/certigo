@@ -1,0 +1,37 @@
+id: googlecybersecurity-l-detecter-et-repondre-aux-incidents
+trackId: google-cybersecurity
+unitId: googlecybersecurity-u-siem-ir
+domainId: siem-ir
+title: "Détecter et répondre aux incidents"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-detecter-et-repondre-aux-incidents
+    body: |
+      Dans l'examen CYBERSECURITY, « Détecter et répondre aux incidents » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-detecter-et-repondre-aux-incidents
+    title: "Détecter et répondre aux incidents"
+    body: |
+      Un SIEM agrège les journaux pour détecter les anomalies. Le cycle de réponse couvre préparation, détection, confinement, éradication, restauration et leçons apprises. La rapidité limite l'impact d'une intrusion.
+  - type: check
+    conceptId: c-detecter-et-repondre-aux-incidents
+    check:
+      id: googlecybersecurity-l-detecter-et-repondre-aux-incidents-check-1
+      conceptId: c-detecter-et-repondre-aux-incidents
+      type: mcq
+      difficulty: 2
+      stem: |
+        À quoi sert un outil SIEM ?
+      options:
+        - { id: a, label: "Centraliser et analyser les journaux pour détecter les menaces" }
+        - { id: b, label: "Imprimer des rapports papier" }
+        - { id: c, label: "Remplacer les sauvegardes" }
+        - { id: d, label: "Gérer la paie" }
+      correct: [a]
+      explanation: |
+        Le SIEM collecte et corrèle les logs pour repérer les comportements suspects en temps réel.
+  - type: recap
+    conceptId: c-detecter-et-repondre-aux-incidents
+    body: |
+      Retenez l'essentiel de « Détecter et répondre aux incidents » pour la certification CYBERSECURITY.

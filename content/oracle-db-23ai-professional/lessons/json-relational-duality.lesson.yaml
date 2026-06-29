@@ -1,0 +1,37 @@
+id: oracledb23aiprofessional-l-json-relational-duality
+trackId: oracle-db-23ai-professional
+unitId: oracledb23aiprofessional-u-json-duality
+domainId: json-duality
+title: "JSON Relational Duality"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-json-relational-duality
+    body: |
+      Dans l'examen 1Z0-915-1, « JSON Relational Duality » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-json-relational-duality
+    title: "JSON Relational Duality"
+    body: |
+      Les vues duality exposent JSON et relationnel sur les mêmes données.
+  - type: check
+    conceptId: c-json-relational-duality
+    check:
+      id: oracledb23aiprofessional-l-json-relational-duality-check-1
+      conceptId: c-json-relational-duality
+      type: mcq
+      difficulty: 2
+      stem: |
+        Que combinent les vues duality ?
+      options:
+        - { id: a, label: "JSON et relationnel" }
+        - { id: b, label: "Backup seul" }
+        - { id: c, label: "DNS" }
+        - { id: d, label: "NAT" }
+      correct: [a]
+      explanation: |
+        Duality unifie accès JSON et relationnel.
+  - type: recap
+    conceptId: c-json-relational-duality
+    body: |
+      Retenez l'essentiel de « JSON Relational Duality » pour la certification 1Z0-915-1.

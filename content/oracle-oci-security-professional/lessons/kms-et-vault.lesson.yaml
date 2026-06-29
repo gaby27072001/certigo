@@ -1,0 +1,37 @@
+id: oracleocisecurityprofessional-l-kms-et-vault
+trackId: oracle-oci-security-professional
+unitId: oracleocisecurityprofessional-u-encryption
+domainId: encryption
+title: "KMS et Vault"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-kms-et-vault
+    body: |
+      Dans l'examen 1Z0-1104-24, « KMS et Vault » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-kms-et-vault
+    title: "KMS et Vault"
+    body: |
+      KMS gère clés et HSM ; Vault stocke les secrets. Le chiffrement protège données au repos et en transit.
+  - type: check
+    conceptId: c-kms-et-vault
+    check:
+      id: oracleocisecurityprofessional-l-kms-et-vault-check-1
+      conceptId: c-kms-et-vault
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service gère les clés de chiffrement ?
+      options:
+        - { id: a, label: "KMS" }
+        - { id: b, label: "OKE" }
+        - { id: c, label: "VCN" }
+        - { id: d, label: "DevOps" }
+      correct: [a]
+      explanation: |
+        KMS gère le cycle de vie des clés.
+  - type: recap
+    conceptId: c-kms-et-vault
+    body: |
+      Retenez l'essentiel de « KMS et Vault » pour la certification 1Z0-1104-24.

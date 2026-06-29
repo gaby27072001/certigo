@@ -1,0 +1,45 @@
+# AWS Certified Machine Learning Engineer – Associate — aws certification track.
+# Domain weights mirror the official MLA-C01 skills outline and sum to 1.0.
+id: aws-mla-c01
+code: "MLA-C01"
+provider: aws
+title: "AWS Certified Machine Learning Engineer – Associate"
+level: associate
+examCode: "MLA-C01"
+sourceUrl: "https://aws.amazon.com/certification/certified-machine-learning-engineer-associate/"
+summary: |
+  Certification pour ingénieurs ML qui préparent les données, développent, déploient et surveillent des modèles de machine learning en production avec Amazon SageMaker.
+domains:
+  - id: data-prep
+    name: "Préparation des données pour le ML"
+    weight: 0.28
+  - id: model-dev
+    name: "Développement de modèles ML"
+    weight: 0.26
+  - id: deployment-orchestration
+    name: "Déploiement et orchestration des workflows ML"
+    weight: 0.22
+  - id: monitoring-security
+    name: "Surveillance, maintenance et sécurité des solutions ML"
+    weight: 0.24
+units:
+  - id: awsmlac01-u-data-prep
+    domainId: data-prep
+    title: "Préparation des données pour le ML"
+    lessons:
+      - awsmlac01-l-preparer-et-etiqueter-les-donnees
+  - id: awsmlac01-u-model-dev
+    domainId: model-dev
+    title: "Développement de modèles ML"
+    lessons:
+      - awsmlac01-l-entrainer-et-evaluer-un-modele
+  - id: awsmlac01-u-deployment-orchestration
+    domainId: deployment-orchestration
+    title: "Déploiement et orchestration des workflows ML"
+    lessons:
+      - awsmlac01-l-deployer-des-modeles-avec-sagemaker
+  - id: awsmlac01-u-monitoring-security
+    domainId: monitoring-security
+    title: "Surveillance, maintenance et sécurité des solutions ML"
+    lessons:
+      - awsmlac01-l-surveiller-la-derive-et-securiser-les-modeles

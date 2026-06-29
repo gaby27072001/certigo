@@ -1,0 +1,37 @@
+id: oracleocigenaiprofessional-l-architecture-des-llm
+trackId: oracle-oci-genai-professional
+unitId: oracleocigenaiprofessional-u-llm-fundamentals
+domainId: llm-fundamentals
+title: "Architecture des LLM"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-architecture-des-llm
+    body: |
+      Dans l'examen 1Z0-1127-24, « Architecture des LLM » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-architecture-des-llm
+    title: "Architecture des LLM"
+    body: |
+      Les LLM reposent sur des transformeurs ; tokens, contexte et température pilotent la génération.
+  - type: check
+    conceptId: c-architecture-des-llm
+    check:
+      id: oracleocigenaiprofessional-l-architecture-des-llm-check-1
+      conceptId: c-architecture-des-llm
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel paramètre contrôle l'aléa des réponses ?
+      options:
+        - { id: a, label: "Température" }
+        - { id: b, label: "Région" }
+        - { id: c, label: "Quota" }
+        - { id: d, label: "Compartiment" }
+      correct: [a]
+      explanation: |
+        La température règle la créativité/aléa des sorties.
+  - type: recap
+    conceptId: c-architecture-des-llm
+    body: |
+      Retenez l'essentiel de « Architecture des LLM » pour la certification 1Z0-1127-24.

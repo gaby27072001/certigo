@@ -1,0 +1,37 @@
+id: gcppce-l-groupes-et-partage
+trackId: gcp-pce
+unitId: gcppce-u-manage-users
+domainId: manage-users
+title: "Groupes et partage"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-groupes-et-partage
+    body: |
+      Dans l'examen PCE, « Groupes et partage » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-groupes-et-partage
+    title: "Groupes et partage"
+    body: |
+      Groupes, droits de partage Drive et paramètres de service ciblent les besoins. Les API automatisent les opérations à grande échelle.
+  - type: check
+    conceptId: c-groupes-et-partage
+    check:
+      id: gcppce-l-groupes-et-partage-check-1
+      conceptId: c-groupes-et-partage
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel objet applique des paramètres à un ensemble d'utilisateurs ?
+      options:
+        - { id: a, label: "Unité organisationnelle" }
+        - { id: b, label: "Bucket" }
+        - { id: c, label: "Dataset" }
+        - { id: d, label: "VPC" }
+      correct: [a]
+      explanation: |
+        Les OU différencient les politiques par population.
+  - type: recap
+    conceptId: c-groupes-et-partage
+    body: |
+      Retenez l'essentiel de « Groupes et partage » pour la certification PCE.

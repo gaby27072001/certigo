@@ -1,0 +1,37 @@
+id: googleadvanceddataanalytics-l-apprentissage-supervise
+trackId: google-advanced-data-analytics
+unitId: googleadvanceddataanalytics-u-ml
+domainId: ml
+title: "Apprentissage supervisé"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-apprentissage-supervise
+    body: |
+      Dans l'examen ADV-DATA-ANALYTICS, « Apprentissage supervisé » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-apprentissage-supervise
+    title: "Apprentissage supervisé"
+    body: |
+      Le ML supervisé apprend à partir d'exemples étiquetés pour prédire (classification ou régression). On sépare entraînement et test, on évalue avec précision/rappel et on évite le surapprentissage via la validation croisée.
+  - type: check
+    conceptId: c-apprentissage-supervise
+    check:
+      id: googleadvanceddataanalytics-l-apprentissage-supervise-check-1
+      conceptId: c-apprentissage-supervise
+      type: mcq
+      difficulty: 2
+      stem: |
+        Pourquoi sépare-t-on données d'entraînement et de test ?
+      options:
+        - { id: a, label: "Pour évaluer le modèle sur des données jamais vues" }
+        - { id: b, label: "Pour doubler la taille du jeu" }
+        - { id: c, label: "Pour supprimer les colonnes" }
+        - { id: d, label: "Pour accélérer l'affichage" }
+      correct: [a]
+      explanation: |
+        Le test mesure la généralisation sur des données inédites et détecte le surapprentissage.
+  - type: recap
+    conceptId: c-apprentissage-supervise
+    body: |
+      Retenez l'essentiel de « Apprentissage supervisé » pour la certification ADV-DATA-ANALYTICS.

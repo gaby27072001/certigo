@@ -1,0 +1,37 @@
+id: oracleocifoundations-l-base-de-donnees-autonome
+trackId: oracle-oci-foundations
+unitId: oracleocifoundations-u-core-services
+domainId: core-services
+title: "Base de données autonome"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-base-de-donnees-autonome
+    body: |
+      Dans l'examen 1Z0-1085-24, « Base de données autonome » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-base-de-donnees-autonome
+    title: "Base de données autonome"
+    body: |
+      Autonomous Database s'auto-administre, s'auto-sécurise et s'auto-répare, réduisant la charge opérationnelle.
+  - type: check
+    conceptId: c-base-de-donnees-autonome
+    check:
+      id: oracleocifoundations-l-base-de-donnees-autonome-check-1
+      conceptId: c-base-de-donnees-autonome
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle promesse caractérise l'Autonomous Database ?
+      options:
+        - { id: a, label: "Auto-gestion" }
+        - { id: b, label: "Gratuité totale" }
+        - { id: c, label: "Sans SQL" }
+        - { id: d, label: "Mono-région" }
+      correct: [a]
+      explanation: |
+        L'Autonomous Database automatise patch, tuning et sécurité.
+  - type: recap
+    conceptId: c-base-de-donnees-autonome
+    body: |
+      Retenez l'essentiel de « Base de données autonome » pour la certification 1Z0-1085-24.

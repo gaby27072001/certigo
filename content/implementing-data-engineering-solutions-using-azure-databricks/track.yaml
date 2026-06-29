@@ -1,5 +1,6 @@
 id: implementing-data-engineering-solutions-using-azure-databricks
 code: IMPLEMENTING-DATA-ENGINEERING-SOLUTIONS-USING-AZURE-DATABRICKS
+provider: microsoft
 title: 'Microsoft Certified: Azure Databricks Data Engineer Associate'
 level: associate
 summary: Microsoft certification (Data Engineer) covering Azure, Azure Databricks.

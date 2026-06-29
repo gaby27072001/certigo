@@ -1,0 +1,37 @@
+id: oracleocidatafoundations-l-autonomous-data-warehouse
+trackId: oracle-oci-data-foundations
+unitId: oracleocidatafoundations-u-data-stores
+domainId: data-stores
+title: "Autonomous Data Warehouse"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-autonomous-data-warehouse
+    body: |
+      Dans l'examen 1Z0-1124, « Autonomous Data Warehouse » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-autonomous-data-warehouse
+    title: "Autonomous Data Warehouse"
+    body: |
+      ADW offre un entrepôt autonome ; Object Storage sert de data lake. Le bon stockage dépend de l'usage.
+  - type: check
+    conceptId: c-autonomous-data-warehouse
+    check:
+      id: oracleocidatafoundations-l-autonomous-data-warehouse-check-1
+      conceptId: c-autonomous-data-warehouse
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service est un entrepôt analytique autonome ?
+      options:
+        - { id: a, label: "ADW" }
+        - { id: b, label: "OKE" }
+        - { id: c, label: "VCN" }
+        - { id: d, label: "WAF" }
+      correct: [a]
+      explanation: |
+        Autonomous Data Warehouse cible l'analytique.
+  - type: recap
+    conceptId: c-autonomous-data-warehouse
+    body: |
+      Retenez l'essentiel de « Autonomous Data Warehouse » pour la certification 1Z0-1124.

@@ -1,0 +1,37 @@
+id: oracleocisecurityprofessional-l-waf-et-nsg
+trackId: oracle-oci-security-professional
+unitId: oracleocisecurityprofessional-u-network-protection
+domainId: network-protection
+title: "WAF et NSG"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-waf-et-nsg
+    body: |
+      Dans l'examen 1Z0-1104-24, « WAF et NSG » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-waf-et-nsg
+    title: "WAF et NSG"
+    body: |
+      Le WAF filtre le trafic web ; les NSG et security lists segmentent finement le réseau.
+  - type: check
+    conceptId: c-waf-et-nsg
+    check:
+      id: oracleocisecurityprofessional-l-waf-et-nsg-check-1
+      conceptId: c-waf-et-nsg
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service protège les applications web des attaques ?
+      options:
+        - { id: a, label: "WAF" }
+        - { id: b, label: "DRG" }
+        - { id: c, label: "KMS" }
+        - { id: d, label: "IAM" }
+      correct: [a]
+      explanation: |
+        Le WAF bloque OWASP et trafic malveillant.
+  - type: recap
+    conceptId: c-waf-et-nsg
+    body: |
+      Retenez l'essentiel de « WAF et NSG » pour la certification 1Z0-1104-24.

@@ -1,0 +1,37 @@
+id: awsansc01-l-securiser-le-reseau-en-profondeur
+trackId: aws-ans-c01
+unitId: awsansc01-u-network-security
+domainId: network-security
+title: "Sécuriser le réseau en profondeur"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-securiser-le-reseau-en-profondeur
+    body: |
+      Dans l'examen ANS-C01, « Sécuriser le réseau en profondeur » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-securiser-le-reseau-en-profondeur
+    title: "Sécuriser le réseau en profondeur"
+    body: |
+      La sécurité réseau combine des couches : groupes de sécurité (stateful, au niveau de l'instance) et ACL réseau (stateless, au niveau du sous-réseau), AWS Network Firewall pour un filtrage avancé, et AWS Shield et WAF pour la protection en périphérie.
+  - type: check
+    conceptId: c-securiser-le-reseau-en-profondeur
+    check:
+      id: awsansc01-l-securiser-le-reseau-en-profondeur-check-1
+      conceptId: c-securiser-le-reseau-en-profondeur
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quelle différence clé distingue un groupe de sécurité d'une ACL réseau (NACL) ?
+      options:
+        - { id: a, label: "Le groupe de sécurité est « stateful », la NACL est « stateless »" }
+        - { id: b, label: "Le groupe de sécurité s'applique au sous-réseau, la NACL à l'instance" }
+        - { id: c, label: "La NACL chiffre automatiquement les données" }
+        - { id: d, label: "Le groupe de sécurité gère le DNS" }
+      correct: [a]
+      explanation: |
+        Un groupe de sécurité est stateful (le trafic retour est automatiquement autorisé) et s'applique à l'instance ; une NACL est stateless et s'applique au sous-réseau.
+  - type: recap
+    conceptId: c-securiser-le-reseau-en-profondeur
+    body: |
+      Retenez l'essentiel de « Sécuriser le réseau en profondeur » pour la certification ANS-C01.

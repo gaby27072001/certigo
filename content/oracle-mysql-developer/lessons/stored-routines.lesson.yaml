@@ -1,0 +1,37 @@
+id: oraclemysqldeveloper-l-stored-routines
+trackId: oracle-mysql-developer
+unitId: oraclemysqldeveloper-u-procedures-json
+domainId: procedures-json
+title: "Stored routines"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-stored-routines
+    body: |
+      Dans l'examen 1Z0-919, « Stored routines » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-stored-routines
+    title: "Stored routines"
+    body: |
+      Procédures et fonctions encapsulent la logique ; le type JSON stocke des documents.
+  - type: check
+    conceptId: c-stored-routines
+    check:
+      id: oraclemysqldeveloper-l-stored-routines-check-1
+      conceptId: c-stored-routines
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel type stocke des documents flexibles ?
+      options:
+        - { id: a, label: "JSON" }
+        - { id: b, label: "INT" }
+        - { id: c, label: "CHAR" }
+        - { id: d, label: "BLOB seul" }
+      correct: [a]
+      explanation: |
+        JSON stocke des documents semi-structurés.
+  - type: recap
+    conceptId: c-stored-routines
+    body: |
+      Retenez l'essentiel de « Stored routines » pour la certification 1Z0-919.

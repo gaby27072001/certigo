@@ -1,0 +1,37 @@
+id: awsmlac01-l-surveiller-la-derive-et-securiser-les-modeles
+trackId: aws-mla-c01
+unitId: awsmlac01-u-monitoring-security
+domainId: monitoring-security
+title: "Surveiller la dérive et sécuriser les modèles"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-surveiller-la-derive-et-securiser-les-modeles
+    body: |
+      Dans l'examen MLA-C01, « Surveiller la dérive et sécuriser les modèles » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-surveiller-la-derive-et-securiser-les-modeles
+    title: "Surveiller la dérive et sécuriser les modèles"
+    body: |
+      En production, SageMaker Model Monitor détecte la dérive des données et de la qualité du modèle (data drift), déclenchant un réentraînement si nécessaire. La sécurité s'appuie sur IAM, le chiffrement et l'isolement réseau (VPC) des endpoints.
+  - type: check
+    conceptId: c-surveiller-la-derive-et-securiser-les-modeles
+    check:
+      id: awsmlac01-l-surveiller-la-derive-et-securiser-les-modeles-check-1
+      conceptId: c-surveiller-la-derive-et-securiser-les-modeles
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel phénomène SageMaker Model Monitor aide-t-il à détecter en production ?
+      options:
+        - { id: a, label: "La dérive des données et de la qualité du modèle" }
+        - { id: b, label: "La rotation des certificats TLS" }
+        - { id: c, label: "Le coût des transferts réseau" }
+        - { id: d, label: "Le nombre de buckets S3" }
+      correct: [a]
+      explanation: |
+        SageMaker Model Monitor surveille la dérive (data drift, dégradation de qualité) entre les données de production et celles d'entraînement, signalant un éventuel réentraînement.
+  - type: recap
+    conceptId: c-surveiller-la-derive-et-securiser-les-modeles
+    body: |
+      Retenez l'essentiel de « Surveiller la dérive et sécuriser les modèles » pour la certification MLA-C01.

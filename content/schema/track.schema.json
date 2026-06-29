@@ -4,14 +4,26 @@
   "title": "Microlingo Track",
   "description": "A certification track: weighted exam domains and an ordered list of units. Domain weights MUST sum to 1.0 and drive the Readiness Score.",
   "type": "object",
-  "required": ["id", "code", "title", "domains", "units"],
+  "required": ["id", "code", "title", "provider", "domains", "units"],
   "additionalProperties": false,
   "properties": {
     "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
     "code": { "type": "string", "description": "Official exam code, e.g. AZ-900." },
     "title": { "type": "string" },
     "summary": { "type": "string" },
-    "level": { "type": "string", "enum": ["fundamentals", "associate", "expert"] },
+    "provider": {
+      "type": "string",
+      "enum": ["microsoft", "aws", "google", "oracle", "anthropic", "openai"],
+      "description": "Certification vendor. Drives catalog grouping/filtering."
+    },
+    "level": {
+      "type": "string",
+      "enum": ["fundamentals", "associate", "professional", "specialty", "expert", "master"]
+    },
+    "examCode": { "type": "string", "description": "Official exam code when distinct from the slug-friendly code." },
+    "sourceUrl": { "type": "string", "description": "Canonical certification page used to author this track." },
+    "sourceUid": { "type": "string", "description": "Vendor-side stable identifier for the certification, when one exists." },
+    "retiringOn": { "type": "string", "description": "ISO date the certification/exam retires, when announced." },
     "domains": {
       "type": "array",
       "minItems": 1,

@@ -1,0 +1,37 @@
+id: googleprojectmanagement-l-identifier-et-attenuer-les-risques
+trackId: google-project-management
+unitId: googleprojectmanagement-u-risk
+domainId: risk
+title: "Identifier et atténuer les risques"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-identifier-et-attenuer-les-risques
+    body: |
+      Dans l'examen PROJECT-MGMT, « Identifier et atténuer les risques » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-identifier-et-attenuer-les-risques
+    title: "Identifier et atténuer les risques"
+    body: |
+      On recense les risques, on évalue probabilité et impact, puis on planifie des réponses (éviter, réduire, transférer, accepter). Un registre des risques tenu à jour évite les mauvaises surprises.
+  - type: check
+    conceptId: c-identifier-et-attenuer-les-risques
+    check:
+      id: googleprojectmanagement-l-identifier-et-attenuer-les-risques-check-1
+      conceptId: c-identifier-et-attenuer-les-risques
+      type: mcq
+      difficulty: 2
+      stem: |
+        Que contient un registre des risques ?
+      options:
+        - { id: a, label: "Les risques, leur impact et les actions prévues" }
+        - { id: b, label: "La liste des salaires" }
+        - { id: c, label: "Le code source" }
+        - { id: d, label: "Les factures clients" }
+      correct: [a]
+      explanation: |
+        Le registre suit chaque risque, son évaluation et la réponse planifiée.
+  - type: recap
+    conceptId: c-identifier-et-attenuer-les-risques
+    body: |
+      Retenez l'essentiel de « Identifier et atténuer les risques » pour la certification PROJECT-MGMT.

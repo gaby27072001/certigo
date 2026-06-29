@@ -1,0 +1,36 @@
+# Google Prompting Essentials — google certification track.
+# Domain weights mirror the official PROMPTING skills outline and sum to 1.0.
+id: google-prompting-essentials
+code: "PROMPTING"
+provider: google
+title: "Google Prompting Essentials"
+level: fundamentals
+sourceUrl: "https://grow.google/certificates/prompting-essentials/"
+summary: |
+  Programme court sur l'art du prompting : structurer des consignes, enchaîner des prompts, exploiter l'IA pour analyse, contenu et décisions. Pour gagner en productivité avec les assistants génératifs.
+domains:
+  - id: fundamentals
+    name: "Bases du prompting"
+    weight: 0.4
+  - id: chaining
+    name: "Chaînage et itération"
+    weight: 0.35
+  - id: apply
+    name: "Applications professionnelles"
+    weight: 0.25
+units:
+  - id: googlepromptingessentials-u-fundamentals
+    domainId: fundamentals
+    title: "Bases du prompting"
+    lessons:
+      - googlepromptingessentials-l-structurer-un-prompt
+  - id: googlepromptingessentials-u-chaining
+    domainId: chaining
+    title: "Chaînage et itération"
+    lessons:
+      - googlepromptingessentials-l-enchainer-les-prompts
+  - id: googlepromptingessentials-u-apply
+    domainId: apply
+    title: "Applications professionnelles"
+    lessons:
+      - googlepromptingessentials-l-prompting-pour-la-productivite

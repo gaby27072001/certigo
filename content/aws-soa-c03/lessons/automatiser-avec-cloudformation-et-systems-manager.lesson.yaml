@@ -1,0 +1,37 @@
+id: awssoac03-l-automatiser-avec-cloudformation-et-systems-manager
+trackId: aws-soa-c03
+unitId: awssoac03-u-deployment-automation
+domainId: deployment-automation
+title: "Automatiser avec CloudFormation et Systems Manager"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-automatiser-avec-cloudformation-et-systems-manager
+    body: |
+      Dans l'examen SOA-C03, « Automatiser avec CloudFormation et Systems Manager » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-automatiser-avec-cloudformation-et-systems-manager
+    title: "Automatiser avec CloudFormation et Systems Manager"
+    body: |
+      AWS CloudFormation provisionne l'infrastructure en tant que code de façon reproductible. AWS Systems Manager automatise les opérations courantes : application de correctifs (Patch Manager), exécution de commandes à distance et gestion de l'inventaire.
+  - type: check
+    conceptId: c-automatiser-avec-cloudformation-et-systems-manager
+    check:
+      id: awssoac03-l-automatiser-avec-cloudformation-et-systems-manager-check-1
+      conceptId: c-automatiser-avec-cloudformation-et-systems-manager
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service AWS provisionne l'infrastructure de manière déclarative et reproductible (IaC) ?
+      options:
+        - { id: a, label: "AWS CloudFormation" }
+        - { id: b, label: "Amazon SQS" }
+        - { id: c, label: "Amazon Route 53" }
+        - { id: d, label: "Amazon Cognito" }
+      correct: [a]
+      explanation: |
+        AWS CloudFormation décrit l'infrastructure dans des templates (JSON/YAML) et la déploie de façon reproductible, c'est le service natif d'Infrastructure as Code.
+  - type: recap
+    conceptId: c-automatiser-avec-cloudformation-et-systems-manager
+    body: |
+      Retenez l'essentiel de « Automatiser avec CloudFormation et Systems Manager » pour la certification SOA-C03.

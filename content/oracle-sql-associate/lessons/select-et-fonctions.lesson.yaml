@@ -1,0 +1,37 @@
+id: oraclesqlassociate-l-select-et-fonctions
+trackId: oracle-sql-associate
+unitId: oraclesqlassociate-u-queries
+domainId: queries
+title: "SELECT et fonctions"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-select-et-fonctions
+    body: |
+      Dans l'examen 1Z0-071, « SELECT et fonctions » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-select-et-fonctions
+    title: "SELECT et fonctions"
+    body: |
+      Fonctions de chaîne, numériques et dates enrichissent les requêtes.
+  - type: check
+    conceptId: c-select-et-fonctions
+    check:
+      id: oraclesqlassociate-l-select-et-fonctions-check-1
+      conceptId: c-select-et-fonctions
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle fonction renvoie la date courante ?
+      options:
+        - { id: a, label: "SYSDATE" }
+        - { id: b, label: "COUNT" }
+        - { id: c, label: "UPPER" }
+        - { id: d, label: "NVL" }
+      correct: [a]
+      explanation: |
+        SYSDATE renvoie la date/heure système.
+  - type: recap
+    conceptId: c-select-et-fonctions
+    body: |
+      Retenez l'essentiel de « SELECT et fonctions » pour la certification 1Z0-071.

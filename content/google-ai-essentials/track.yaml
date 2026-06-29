@@ -1,0 +1,36 @@
+# Google AI Essentials — google certification track.
+# Domain weights mirror the official AI-ESSENTIALS skills outline and sum to 1.0.
+id: google-ai-essentials
+code: "AI-ESSENTIALS"
+provider: google
+title: "Google AI Essentials"
+level: fundamentals
+sourceUrl: "https://grow.google/certificates/ai-essentials/"
+summary: |
+  Programme court d'initiation à l'IA générative pour le travail : usages courants, rédaction de prompts efficaces, productivité et IA responsable. Sans prérequis technique, destiné à tous les métiers.
+domains:
+  - id: genai
+    name: "IA générative au travail"
+    weight: 0.4
+  - id: prompts
+    name: "Rédiger des prompts"
+    weight: 0.35
+  - id: responsible
+    name: "IA responsable"
+    weight: 0.25
+units:
+  - id: googleaiessentials-u-genai
+    domainId: genai
+    title: "IA générative au travail"
+    lessons:
+      - googleaiessentials-l-comprendre-l-ia-generative
+  - id: googleaiessentials-u-prompts
+    domainId: prompts
+    title: "Rédiger des prompts"
+    lessons:
+      - googleaiessentials-l-prompts-efficaces
+  - id: googleaiessentials-u-responsible
+    domainId: responsible
+    title: "IA responsable"
+    lessons:
+      - googleaiessentials-l-usage-responsable-de-l-ia

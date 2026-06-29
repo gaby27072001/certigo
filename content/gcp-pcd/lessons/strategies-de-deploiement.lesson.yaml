@@ -1,0 +1,37 @@
+id: gcppcd-l-strategies-de-deploiement
+trackId: gcp-pcd
+unitId: gcppcd-u-deploy-app
+domainId: deploy-app
+title: "Stratégies de déploiement"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-strategies-de-deploiement
+    body: |
+      Dans l'examen PCD, « Stratégies de déploiement » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-strategies-de-deploiement
+    title: "Stratégies de déploiement"
+    body: |
+      Le déploiement bleu/vert et canary réduit le risque. Le rollback rapide protège la production. La répartition du trafic Cloud Run facilite les tests.
+  - type: check
+    conceptId: c-strategies-de-deploiement
+    check:
+      id: gcppcd-l-strategies-de-deploiement-check-1
+      conceptId: c-strategies-de-deploiement
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle stratégie déploie progressivement vers un sous-ensemble d'utilisateurs ?
+      options:
+        - { id: a, label: "Canary" }
+        - { id: b, label: "Big bang" }
+        - { id: c, label: "Aucune" }
+        - { id: d, label: "DNS round-robin seul" }
+      correct: [a]
+      explanation: |
+        Le canary limite l'exposition d'une nouvelle version.
+  - type: recap
+    conceptId: c-strategies-de-deploiement
+    body: |
+      Retenez l'essentiel de « Stratégies de déploiement » pour la certification PCD.

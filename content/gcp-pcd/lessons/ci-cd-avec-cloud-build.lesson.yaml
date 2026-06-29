@@ -1,0 +1,37 @@
+id: gcppcd-l-ci-cd-avec-cloud-build
+trackId: gcp-pcd
+unitId: gcppcd-u-build-test
+domainId: build-test
+title: "CI/CD avec Cloud Build"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-ci-cd-avec-cloud-build
+    body: |
+      Dans l'examen PCD, « CI/CD avec Cloud Build » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-ci-cd-avec-cloud-build
+    title: "CI/CD avec Cloud Build"
+    body: |
+      Cloud Build automatise compilation, tests et images conteneurs. Artifact Registry stocke les artefacts. Les tests fiabilisent les livraisons.
+  - type: check
+    conceptId: c-ci-cd-avec-cloud-build
+    check:
+      id: gcppcd-l-ci-cd-avec-cloud-build-check-1
+      conceptId: c-ci-cd-avec-cloud-build
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service stocke les images de conteneurs ?
+      options:
+        - { id: a, label: "Artifact Registry" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "Cloud CDN" }
+        - { id: d, label: "Cloud VPN" }
+      correct: [a]
+      explanation: |
+        Artifact Registry héberge images et paquets.
+  - type: recap
+    conceptId: c-ci-cd-avec-cloud-build
+    body: |
+      Retenez l'essentiel de « CI/CD avec Cloud Build » pour la certification PCD.

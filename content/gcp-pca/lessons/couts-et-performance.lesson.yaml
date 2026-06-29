@@ -1,0 +1,37 @@
+id: gcppca-l-couts-et-performance
+trackId: gcp-pca
+unitId: gcppca-u-analyze-optimize
+domainId: analyze-optimize
+title: "Coûts et performance"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-couts-et-performance
+    body: |
+      Dans l'examen PCA, « Coûts et performance » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-couts-et-performance
+    title: "Coûts et performance"
+    body: |
+      On optimise via remises d'engagement, autoscaling et dimensionnement adapté. Les tableaux de bord de coûts guident les arbitrages.
+  - type: check
+    conceptId: c-couts-et-performance
+    check:
+      id: gcppca-l-couts-et-performance-check-1
+      conceptId: c-couts-et-performance
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle technique réduit le coût de charges stables et prévisibles ?
+      options:
+        - { id: a, label: "Remises d'engagement" }
+        - { id: b, label: "Surdimensionnement" }
+        - { id: c, label: "Désactiver le monitoring" }
+        - { id: d, label: "DNS public" }
+      correct: [a]
+      explanation: |
+        Les engagements offrent des tarifs réduits pour un usage durable.
+  - type: recap
+    conceptId: c-couts-et-performance
+    body: |
+      Retenez l'essentiel de « Coûts et performance » pour la certification PCA.

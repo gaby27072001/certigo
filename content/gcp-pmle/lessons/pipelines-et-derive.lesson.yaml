@@ -1,0 +1,37 @@
+id: gcppmle-l-pipelines-et-derive
+trackId: gcp-pmle
+unitId: gcppmle-u-mlops
+domainId: mlops
+title: "Pipelines et dérive"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-pipelines-et-derive
+    body: |
+      Dans l'examen PMLE, « Pipelines et dérive » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-pipelines-et-derive
+    title: "Pipelines et dérive"
+    body: |
+      Vertex AI Pipelines automatise réentraînement ; le monitoring détecte la dérive des données. L'IA responsable veille à l'équité.
+  - type: check
+    conceptId: c-pipelines-et-derive
+    check:
+      id: gcppmle-l-pipelines-et-derive-check-1
+      conceptId: c-pipelines-et-derive
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel risque surveille-t-on après mise en production ?
+      options:
+        - { id: a, label: "La dérive des données" }
+        - { id: b, label: "Le DNS" }
+        - { id: c, label: "Le CDN" }
+        - { id: d, label: "Le VPN" }
+      correct: [a]
+      explanation: |
+        La dérive dégrade les performances dans le temps.
+  - type: recap
+    conceptId: c-pipelines-et-derive
+    body: |
+      Retenez l'essentiel de « Pipelines et dérive » pour la certification PMLE.

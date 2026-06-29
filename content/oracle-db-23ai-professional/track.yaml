@@ -1,0 +1,37 @@
+# Oracle Database 23ai Professional — oracle certification track.
+# Domain weights mirror the official 1Z0-915-1 skills outline and sum to 1.0.
+id: oracle-db-23ai-professional
+code: "1Z0-915-1"
+provider: oracle
+title: "Oracle Database 23ai Professional"
+level: professional
+examCode: "1Z0-915-1"
+sourceUrl: "https://education.oracle.com/"
+summary: |
+  Valide Oracle Database 23ai : recherche vectorielle IA, JSON relationnel, SQL avancé et haute disponibilité. Pour DBA et développeurs data.
+domains:
+  - id: ai-vector
+    name: "Recherche vectorielle"
+    weight: 0.35
+  - id: json-duality
+    name: "JSON et duality"
+    weight: 0.35
+  - id: availability
+    name: "Disponibilité"
+    weight: 0.3
+units:
+  - id: oracledb23aiprofessional-u-ai-vector
+    domainId: ai-vector
+    title: "Recherche vectorielle"
+    lessons:
+      - oracledb23aiprofessional-l-ai-vector-search
+  - id: oracledb23aiprofessional-u-json-duality
+    domainId: json-duality
+    title: "JSON et duality"
+    lessons:
+      - oracledb23aiprofessional-l-json-relational-duality
+  - id: oracledb23aiprofessional-u-availability
+    domainId: availability
+    title: "Disponibilité"
+    lessons:
+      - oracledb23aiprofessional-l-ha-et-securite

@@ -1,5 +1,6 @@
 id: github-actions
 code: GITHUB-ACTIONS
+provider: microsoft
 title: GitHub Actions
 level: associate
 summary: Microsoft certification (Administrator, Developer, DevOps Engineer, Solution

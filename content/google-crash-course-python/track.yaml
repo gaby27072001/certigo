@@ -1,0 +1,36 @@
+# Google Crash Course on Python — google certification track.
+# Domain weights mirror the official PY-CRASH skills outline and sum to 1.0.
+id: google-crash-course-python
+code: "PY-CRASH"
+provider: google
+title: "Google Crash Course on Python"
+level: fundamentals
+sourceUrl: "https://grow.google/certificates/it-automation/"
+summary: |
+  Cours intensif d'introduction à Python : syntaxe, variables, conditions, boucles et fonctions. Premier jalon vers l'automatisation IT et l'analyse de données pour débutants sans expérience de programmation.
+domains:
+  - id: syntax
+    name: "Syntaxe et variables"
+    weight: 0.34
+  - id: control
+    name: "Conditions et boucles"
+    weight: 0.33
+  - id: functions
+    name: "Fonctions"
+    weight: 0.33
+units:
+  - id: googlecrashcoursepython-u-syntax
+    domainId: syntax
+    title: "Syntaxe et variables"
+    lessons:
+      - googlecrashcoursepython-l-variables-et-types
+  - id: googlecrashcoursepython-u-control
+    domainId: control
+    title: "Conditions et boucles"
+    lessons:
+      - googlecrashcoursepython-l-boucles-et-conditions
+  - id: googlecrashcoursepython-u-functions
+    domainId: functions
+    title: "Fonctions"
+    lessons:
+      - googlecrashcoursepython-l-ecrire-des-fonctions

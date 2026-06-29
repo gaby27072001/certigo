@@ -1,0 +1,37 @@
+id: gcpclouddigitalleader-l-pourquoi-le-cloud-transforme-le-metier
+trackId: gcp-cloud-digital-leader
+unitId: gcpclouddigitalleader-u-digital-transformation
+domainId: digital-transformation
+title: "Pourquoi le cloud transforme le métier"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-pourquoi-le-cloud-transforme-le-metier
+    body: |
+      Dans l'examen CDL, « Pourquoi le cloud transforme le métier » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-pourquoi-le-cloud-transforme-le-metier
+    title: "Pourquoi le cloud transforme le métier"
+    body: |
+      Le cloud remplace les coûts fixes d'infrastructure par des coûts variables payés à l'usage, accélère la mise sur le marché et permet d'innover rapidement. Google Cloud aide les organisations à moderniser, à exploiter leurs données et à se différencier face à la concurrence.
+  - type: check
+    conceptId: c-pourquoi-le-cloud-transforme-le-metier
+    check:
+      id: gcpclouddigitalleader-l-pourquoi-le-cloud-transforme-le-metier-check-1
+      conceptId: c-pourquoi-le-cloud-transforme-le-metier
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel bénéfice majeur le cloud apporte-t-il à une organisation ?
+      options:
+        - { id: a, label: "Transformer des coûts fixes en coûts variables payés à l'usage" }
+        - { id: b, label: "Supprimer tout besoin de sécurité" }
+        - { id: c, label: "Garantir du matériel gratuit illimité" }
+        - { id: d, label: "Éliminer la connexion réseau" }
+      correct: [a]
+      explanation: |
+        Le cloud bascule les dépenses d'investissement vers un modèle OPEX élastique facturé à l'usage.
+  - type: recap
+    conceptId: c-pourquoi-le-cloud-transforme-le-metier
+    body: |
+      Retenez l'essentiel de « Pourquoi le cloud transforme le métier » pour la certification CDL.

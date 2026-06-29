@@ -1,0 +1,37 @@
+id: gcppcse-l-scc-logs-et-conformite
+trackId: gcp-pcse
+unitId: gcppcse-u-secops-compliance
+domainId: secops-compliance
+title: "SCC, logs et conformité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-scc-logs-et-conformite
+    body: |
+      Dans l'examen PCSE, « SCC, logs et conformité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-scc-logs-et-conformite
+    title: "SCC, logs et conformité"
+    body: |
+      Security Command Center centralise menaces et vulnérabilités ; les logs d'audit tracent les actions ; la conformité aligne contrôles et réglementations.
+  - type: check
+    conceptId: c-scc-logs-et-conformite
+    check:
+      id: gcppcse-l-scc-logs-et-conformite-check-1
+      conceptId: c-scc-logs-et-conformite
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service centralise la posture de sécurité ?
+      options:
+        - { id: a, label: "Security Command Center" }
+        - { id: b, label: "Cloud CDN" }
+        - { id: c, label: "BigQuery" }
+        - { id: d, label: "Cloud DNS" }
+      correct: [a]
+      explanation: |
+        SCC agrège risques et alertes.
+  - type: recap
+    conceptId: c-scc-logs-et-conformite
+    body: |
+      Retenez l'essentiel de « SCC, logs et conformité » pour la certification PCSE.

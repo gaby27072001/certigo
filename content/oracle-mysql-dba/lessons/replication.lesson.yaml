@@ -1,0 +1,37 @@
+id: oraclemysqldba-l-replication
+trackId: oracle-mysql-dba
+unitId: oraclemysqldba-u-backup-replication
+domainId: backup-replication
+title: "Réplication"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-replication
+    body: |
+      Dans l'examen 1Z0-908, « Réplication » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-replication
+    title: "Réplication"
+    body: |
+      La réplication source-réplica scale la lecture et assure la résilience.
+  - type: check
+    conceptId: c-replication
+    check:
+      id: oraclemysqldba-l-replication-check-1
+      conceptId: c-replication
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel atout offre la réplica ?
+      options:
+        - { id: a, label: "Lecture scalée" }
+        - { id: b, label: "Sans backup" }
+        - { id: c, label: "Mono-noeud" }
+        - { id: d, label: "Sans SQL" }
+      correct: [a]
+      explanation: |
+        Les répliques répartissent les lectures.
+  - type: recap
+    conceptId: c-replication
+    body: |
+      Retenez l'essentiel de « Réplication » pour la certification 1Z0-908.

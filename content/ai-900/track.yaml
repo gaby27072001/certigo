@@ -3,6 +3,7 @@
 # Domain weights mirror the public AI-900 exam skills outline and sum to 1.0.
 id: ai-900
 code: AI-900
+provider: microsoft
 title: Microsoft Azure AI Fundamentals
 level: fundamentals
 summary: >

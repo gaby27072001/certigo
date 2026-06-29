@@ -1,0 +1,38 @@
+# Oracle Database Administration I (19c) — oracle certification track.
+# Domain weights mirror the official 1Z0-082 skills outline and sum to 1.0.
+id: oracle-db-19c-administration
+code: "1Z0-082"
+provider: oracle
+title: "Oracle Database Administration I (19c)"
+level: associate
+examCode: "1Z0-082"
+sourceUrl: "https://education.oracle.com/oracle-database-administration-i/pexam_1Z0-082"
+summary: |
+  Valide l'administration d'Oracle Database 19c : architecture, stockage, utilisateurs, sauvegarde et sécurité. Pour DBA débutants.
+domains:
+  - id: architecture
+    name: "Architecture"
+    weight: 0.3
+  - id: storage-users
+    name: "Stockage et utilisateurs"
+    weight: 0.4
+  - id: backup
+    name: "Sauvegarde"
+    weight: 0.3
+units:
+  - id: oracledb19cadministration-u-architecture
+    domainId: architecture
+    title: "Architecture"
+    lessons:
+      - oracledb19cadministration-l-instance-et-bases
+  - id: oracledb19cadministration-u-storage-users
+    domainId: storage-users
+    title: "Stockage et utilisateurs"
+    lessons:
+      - oracledb19cadministration-l-tablespaces-et-schemas
+      - oracledb19cadministration-l-privileges-et-roles
+  - id: oracledb19cadministration-u-backup
+    domainId: backup
+    title: "Sauvegarde"
+    lessons:
+      - oracledb19cadministration-l-rman

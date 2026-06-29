@@ -1,0 +1,37 @@
+id: googleprojectmanagement-l-communiquer-avec-les-parties-prenantes
+trackId: google-project-management
+unitId: googleprojectmanagement-u-stakeholders
+domainId: stakeholders
+title: "Communiquer avec les parties prenantes"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-communiquer-avec-les-parties-prenantes
+    body: |
+      Dans l'examen PROJECT-MGMT, « Communiquer avec les parties prenantes » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-communiquer-avec-les-parties-prenantes
+    title: "Communiquer avec les parties prenantes"
+    body: |
+      Le chef de projet aligne sponsors, équipe et clients via un plan de communication clair. Identifier les attentes et tenir chacun informé prévient les conflits et maintient le soutien au projet.
+  - type: check
+    conceptId: c-communiquer-avec-les-parties-prenantes
+    check:
+      id: googleprojectmanagement-l-communiquer-avec-les-parties-prenantes-check-1
+      conceptId: c-communiquer-avec-les-parties-prenantes
+      type: mcq
+      difficulty: 1
+      stem: |
+        Pourquoi un plan de communication est-il essentiel ?
+      options:
+        - { id: a, label: "Pour aligner les attentes des parties prenantes" }
+        - { id: b, label: "Pour augmenter les coûts" }
+        - { id: c, label: "Pour cacher l'avancement" }
+        - { id: d, label: "Pour éviter l'équipe" }
+      correct: [a]
+      explanation: |
+        Une communication structurée maintient l'alignement et le soutien tout au long du projet.
+  - type: recap
+    conceptId: c-communiquer-avec-les-parties-prenantes
+    body: |
+      Retenez l'essentiel de « Communiquer avec les parties prenantes » pour la certification PROJECT-MGMT.

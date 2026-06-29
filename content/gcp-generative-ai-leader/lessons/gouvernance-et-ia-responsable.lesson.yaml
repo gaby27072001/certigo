@@ -1,0 +1,37 @@
+id: gcpgenerativeaileader-l-gouvernance-et-ia-responsable
+trackId: gcp-generative-ai-leader
+unitId: gcpgenerativeaileader-u-ai-strategy
+domainId: ai-strategy
+title: "Gouvernance et IA responsable"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-gouvernance-et-ia-responsable
+    body: |
+      Dans l'examen GENAI-LEADER, « Gouvernance et IA responsable » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-gouvernance-et-ia-responsable
+    title: "Gouvernance et IA responsable"
+    body: |
+      Une adoption responsable couvre équité, transparence, sécurité des données et conformité. La gouvernance définit qui peut utiliser quels modèles et sur quelles données.
+  - type: check
+    conceptId: c-gouvernance-et-ia-responsable
+    check:
+      id: gcpgenerativeaileader-l-gouvernance-et-ia-responsable-check-1
+      conceptId: c-gouvernance-et-ia-responsable
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel pilier relève de l'IA responsable ?
+      options:
+        - { id: a, label: "Équité et transparence" }
+        - { id: b, label: "Surcadençage GPU" }
+        - { id: c, label: "Câblage" }
+        - { id: d, label: "Tarification VM" }
+      correct: [a]
+      explanation: |
+        Équité, transparence et sécurité fondent une IA digne de confiance.
+  - type: recap
+    conceptId: c-gouvernance-et-ia-responsable
+    body: |
+      Retenez l'essentiel de « Gouvernance et IA responsable » pour la certification GENAI-LEADER.

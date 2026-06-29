@@ -1,0 +1,37 @@
+id: oracleautonomousdbspecialist-l-atp-et-adw
+trackId: oracle-autonomous-db-specialist
+unitId: oracleautonomousdbspecialist-u-provisioning
+domainId: provisioning
+title: "ATP et ADW"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-atp-et-adw
+    body: |
+      Dans l'examen 1Z0-931-1, « ATP et ADW » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-atp-et-adw
+    title: "ATP et ADW"
+    body: |
+      Autonomous Transaction Processing et Data Warehouse couvrent OLTP et analytique sans administration.
+  - type: check
+    conceptId: c-atp-et-adw
+    check:
+      id: oracleautonomousdbspecialist-l-atp-et-adw-check-1
+      conceptId: c-atp-et-adw
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel mode cible l'analytique ?
+      options:
+        - { id: a, label: "ADW" }
+        - { id: b, label: "ATP" }
+        - { id: c, label: "VCN" }
+        - { id: d, label: "OKE" }
+      correct: [a]
+      explanation: |
+        ADW est optimisé pour l'analytique.
+  - type: recap
+    conceptId: c-atp-et-adw
+    body: |
+      Retenez l'essentiel de « ATP et ADW » pour la certification 1Z0-931-1.

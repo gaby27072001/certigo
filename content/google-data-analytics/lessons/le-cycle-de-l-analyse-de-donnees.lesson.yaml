@@ -1,0 +1,37 @@
+id: googledataanalytics-l-le-cycle-de-l-analyse-de-donnees
+trackId: google-data-analytics
+unitId: googledataanalytics-u-foundations
+domainId: foundations
+title: "Le cycle de l'analyse de données"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-le-cycle-de-l-analyse-de-donnees
+    body: |
+      Dans l'examen DATA-ANALYTICS, « Le cycle de l'analyse de données » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-le-cycle-de-l-analyse-de-donnees
+    title: "Le cycle de l'analyse de données"
+    body: |
+      L'analyste suit six phases : demander (cadrer le problème), préparer (collecter), traiter (nettoyer), analyser, partager (visualiser) et agir. Cette démarche garantit des conclusions fiables et exploitables par les décideurs.
+  - type: check
+    conceptId: c-le-cycle-de-l-analyse-de-donnees
+    check:
+      id: googledataanalytics-l-le-cycle-de-l-analyse-de-donnees-check-1
+      conceptId: c-le-cycle-de-l-analyse-de-donnees
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle phase consiste à nettoyer et corriger les données ?
+      options:
+        - { id: a, label: "Demander" }
+        - { id: b, label: "Traiter" }
+        - { id: c, label: "Agir" }
+        - { id: d, label: "Partager" }
+      correct: [b]
+      explanation: |
+        La phase « traiter » couvre le nettoyage et la correction des données avant analyse.
+  - type: recap
+    conceptId: c-le-cycle-de-l-analyse-de-donnees
+    body: |
+      Retenez l'essentiel de « Le cycle de l'analyse de données » pour la certification DATA-ANALYTICS.

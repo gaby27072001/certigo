@@ -1,0 +1,37 @@
+id: awsdeac01-l-pipelines-d-ingestion-par-lots-et-en-flux
+trackId: aws-dea-c01
+unitId: awsdeac01-u-ingestion-transformation
+domainId: ingestion-transformation
+title: "Pipelines d'ingestion par lots et en flux"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-pipelines-d-ingestion-par-lots-et-en-flux
+    body: |
+      Dans l'examen DEA-C01, « Pipelines d'ingestion par lots et en flux » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-pipelines-d-ingestion-par-lots-et-en-flux
+    title: "Pipelines d'ingestion par lots et en flux"
+    body: |
+      L'ingestion peut être par lots (batch) ou en flux (streaming). Amazon Kinesis et Amazon MSK capturent des données en temps réel, tandis qu'AWS Glue exécute des tâches ETL serverless pour nettoyer et transformer les données avant leur chargement.
+  - type: check
+    conceptId: c-pipelines-d-ingestion-par-lots-et-en-flux
+    check:
+      id: awsdeac01-l-pipelines-d-ingestion-par-lots-et-en-flux-check-1
+      conceptId: c-pipelines-d-ingestion-par-lots-et-en-flux
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service AWS convient le mieux à l'ingestion de données en flux continu et en temps réel ?
+      options:
+        - { id: a, label: "Amazon Kinesis Data Streams" }
+        - { id: b, label: "Amazon S3 Glacier" }
+        - { id: c, label: "AWS IAM" }
+        - { id: d, label: "Amazon Route 53" }
+      correct: [a]
+      explanation: |
+        Amazon Kinesis Data Streams ingère et traite des flux de données en temps réel à grande échelle, contrairement aux traitements purement par lots.
+  - type: recap
+    conceptId: c-pipelines-d-ingestion-par-lots-et-en-flux
+    body: |
+      Retenez l'essentiel de « Pipelines d'ingestion par lots et en flux » pour la certification DEA-C01.

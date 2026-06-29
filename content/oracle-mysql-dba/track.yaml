@@ -1,0 +1,38 @@
+# MySQL 8.0 Database Administrator — oracle certification track.
+# Domain weights mirror the official 1Z0-908 skills outline and sum to 1.0.
+id: oracle-mysql-dba
+code: "1Z0-908"
+provider: oracle
+title: "MySQL 8.0 Database Administrator"
+level: professional
+examCode: "1Z0-908"
+sourceUrl: "https://education.oracle.com/mysql-80-database-administrator/pexam_1Z0-908"
+summary: |
+  Valide l'administration MySQL 8.0 : installation, sécurité, sauvegarde, réplication et performance. Pour DBA confirmés.
+domains:
+  - id: config
+    name: "Configuration et sécurité"
+    weight: 0.35
+  - id: backup-replication
+    name: "Sauvegarde et réplication"
+    weight: 0.4
+  - id: performance
+    name: "Performance"
+    weight: 0.25
+units:
+  - id: oraclemysqldba-u-config
+    domainId: config
+    title: "Configuration et sécurité"
+    lessons:
+      - oraclemysqldba-l-comptes-et-privileges
+  - id: oraclemysqldba-u-backup-replication
+    domainId: backup-replication
+    title: "Sauvegarde et réplication"
+    lessons:
+      - oraclemysqldba-l-sauvegardes-et-binlog
+      - oraclemysqldba-l-replication
+  - id: oraclemysqldba-u-performance
+    domainId: performance
+    title: "Performance"
+    lessons:
+      - oraclemysqldba-l-index-et-explain

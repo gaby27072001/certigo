@@ -1,0 +1,37 @@
+id: gcppcdoe-l-infrastructure-as-code
+trackId: gcp-pcdoe
+unitId: gcppcdoe-u-bootstrap-org
+domainId: bootstrap-org
+title: "Infrastructure as code"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-infrastructure-as-code
+    body: |
+      Dans l'examen PCDOE, « Infrastructure as code » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-infrastructure-as-code
+    title: "Infrastructure as code"
+    body: |
+      L'IaC et les pipelines reproductibles posent les fondations. La gestion des configurations garantit cohérence et auditabilité.
+  - type: check
+    conceptId: c-infrastructure-as-code
+    check:
+      id: gcppcdoe-l-infrastructure-as-code-check-1
+      conceptId: c-infrastructure-as-code
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel avantage l'IaC apporte-t-elle ?
+      options:
+        - { id: a, label: "Reproductibilité et auditabilité" }
+        - { id: b, label: "Coûts cachés" }
+        - { id: c, label: "Pannes garanties" }
+        - { id: d, label: "Aucun versioning" }
+      correct: [a]
+      explanation: |
+        L'IaC versionne et reproduit l'infrastructure.
+  - type: recap
+    conceptId: c-infrastructure-as-code
+    body: |
+      Retenez l'essentiel de « Infrastructure as code » pour la certification PCDOE.

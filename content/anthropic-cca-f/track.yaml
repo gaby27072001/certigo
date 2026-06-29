@@ -1,0 +1,53 @@
+# Anthropic Claude Certified Architect – Foundations — anthropic certification track.
+# Domain weights mirror the official CCA-F skills outline and sum to 1.0.
+id: anthropic-cca-f
+code: "CCA-F"
+provider: anthropic
+title: "Anthropic Claude Certified Architect – Foundations"
+level: associate
+examCode: "CCA-F"
+sourceUrl: "https://www.claude.com/resources/courses"
+summary: |
+  Certification fondamentale d'Anthropic validant la conception d'applications agentiques avec Claude : architecture d'agents, configuration de Claude Code, ingénierie de prompts, intégration d'outils via MCP et gestion du contexte. Pour les développeurs et architectes qui construisent des solutions d'IA fiables avec Claude.
+domains:
+  - id: agentic-architecture
+    name: "Architecture agentique"
+    weight: 0.25
+  - id: claude-code
+    name: "Configuration de Claude Code"
+    weight: 0.2
+  - id: prompt-engineering
+    name: "Ingénierie de prompts"
+    weight: 0.2
+  - id: tools-mcp
+    name: "Outils et MCP"
+    weight: 0.2
+  - id: context-management
+    name: "Gestion du contexte"
+    weight: 0.15
+units:
+  - id: anthropicccaf-u-agentic-architecture
+    domainId: agentic-architecture
+    title: "Architecture agentique"
+    lessons:
+      - anthropicccaf-l-boucle-agent-et-etapes-outillees
+  - id: anthropicccaf-u-claude-code
+    domainId: claude-code
+    title: "Configuration de Claude Code"
+    lessons:
+      - anthropicccaf-l-claude-md-et-permissions
+  - id: anthropicccaf-u-prompt-engineering
+    domainId: prompt-engineering
+    title: "Ingénierie de prompts"
+    lessons:
+      - anthropicccaf-l-prompts-structures-et-exemples
+  - id: anthropicccaf-u-tools-mcp
+    domainId: tools-mcp
+    title: "Outils et MCP"
+    lessons:
+      - anthropicccaf-l-model-context-protocol
+  - id: anthropicccaf-u-context-management
+    domainId: context-management
+    title: "Gestion du contexte"
+    lessons:
+      - anthropicccaf-l-fenetre-de-contexte-et-synthese

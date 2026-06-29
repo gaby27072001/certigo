@@ -1,0 +1,37 @@
+id: gcppca-l-aligner-architecture-et-besoins-metier
+trackId: gcp-pca
+unitId: gcppca-u-design-plan
+domainId: design-plan
+title: "Aligner architecture et besoins métier"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-aligner-architecture-et-besoins-metier
+    body: |
+      Dans l'examen PCA, « Aligner architecture et besoins métier » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-aligner-architecture-et-besoins-metier
+    title: "Aligner architecture et besoins métier"
+    body: |
+      L'architecte traduit exigences métier et techniques en solution : choix compute/stockage/réseau, RTO/RPO, conformité. Les schémas haute disponibilité multi-zones limitent les pannes.
+  - type: check
+    conceptId: c-aligner-architecture-et-besoins-metier
+    check:
+      id: gcppca-l-aligner-architecture-et-besoins-metier-check-1
+      conceptId: c-aligner-architecture-et-besoins-metier
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle paire de métriques cadre la reprise après sinistre ?
+      options:
+        - { id: a, label: "RTO et RPO" }
+        - { id: b, label: "CPU et RAM" }
+        - { id: c, label: "DNS et NAT" }
+        - { id: d, label: "CDN et VPN" }
+      correct: [a]
+      explanation: |
+        RTO/RPO définissent délai et perte de données tolérés.
+  - type: recap
+    conceptId: c-aligner-architecture-et-besoins-metier
+    body: |
+      Retenez l'essentiel de « Aligner architecture et besoins métier » pour la certification PCA.

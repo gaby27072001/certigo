@@ -1,5 +1,6 @@
 id: windows-server-hybrid-administrator
 code: WINDOWS-SERVER-HYBRID-ADMINISTRATOR
+provider: microsoft
 title: 'Microsoft Certified: Windows Server Hybrid Administrator Associate'
 level: associate
 summary: Microsoft certification (Administrator, Identity and Access Administrator,

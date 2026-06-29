@@ -1,0 +1,37 @@
+id: googleitsupport-l-modele-tcp-ip-et-adressage
+trackId: google-it-support
+unitId: googleitsupport-u-networking
+domainId: networking
+title: "Modèle TCP/IP et adressage"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-modele-tcp-ip-et-adressage
+    body: |
+      Dans l'examen IT-SUPPORT, « Modèle TCP/IP et adressage » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-modele-tcp-ip-et-adressage
+    title: "Modèle TCP/IP et adressage"
+    body: |
+      Les réseaux reposent sur la pile TCP/IP (liaison, Internet, transport, application). Chaque appareil a une adresse IP ; DNS traduit les noms en adresses, DHCP attribue les IP automatiquement. Comprendre ces bases permet de diagnostiquer une perte de connectivité.
+  - type: check
+    conceptId: c-modele-tcp-ip-et-adressage
+    check:
+      id: googleitsupport-l-modele-tcp-ip-et-adressage-check-1
+      conceptId: c-modele-tcp-ip-et-adressage
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service traduit un nom de domaine en adresse IP ?
+      options:
+        - { id: a, label: "DHCP" }
+        - { id: b, label: "DNS" }
+        - { id: c, label: "NAT" }
+        - { id: d, label: "FTP" }
+      correct: [b]
+      explanation: |
+        Le DNS résout les noms (ex. exemple.com) en adresses IP ; DHCP attribue les adresses.
+  - type: recap
+    conceptId: c-modele-tcp-ip-et-adressage
+    body: |
+      Retenez l'essentiel de « Modèle TCP/IP et adressage » pour la certification IT-SUPPORT.

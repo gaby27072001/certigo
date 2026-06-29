@@ -1,0 +1,45 @@
+# Google Cloud Generative AI Leader — google certification track.
+# Domain weights mirror the official GENAI-LEADER skills outline and sum to 1.0.
+id: gcp-generative-ai-leader
+code: "GENAI-LEADER"
+provider: google
+title: "Google Cloud Generative AI Leader"
+level: fundamentals
+examCode: "Generative AI Leader"
+sourceUrl: "https://cloud.google.com/learn/certification/generative-ai-leader"
+summary: |
+  Certification stratégique sur l'IA générative : fondamentaux des LLM, transformation par l'IA, techniques d'amélioration (prompting, RAG, fine-tuning) et stratégies d'adoption responsable. Pour décideurs et profils métier.
+domains:
+  - id: genai-fundamentals
+    name: "Fondamentaux de l'IA générative"
+    weight: 0.3
+  - id: transform-genai
+    name: "Transformer avec l'IA générative"
+    weight: 0.3
+  - id: improve-genai
+    name: "Améliorer les résultats de l'IA"
+    weight: 0.25
+  - id: ai-strategy
+    name: "Stratégie et IA responsable"
+    weight: 0.15
+units:
+  - id: gcpgenerativeaileader-u-genai-fundamentals
+    domainId: genai-fundamentals
+    title: "Fondamentaux de l'IA générative"
+    lessons:
+      - gcpgenerativeaileader-l-llm-et-modeles-de-fondation
+  - id: gcpgenerativeaileader-u-transform-genai
+    domainId: transform-genai
+    title: "Transformer avec l'IA générative"
+    lessons:
+      - gcpgenerativeaileader-l-cas-d-usage-metier
+  - id: gcpgenerativeaileader-u-improve-genai
+    domainId: improve-genai
+    title: "Améliorer les résultats de l'IA"
+    lessons:
+      - gcpgenerativeaileader-l-prompting-rag-et-fine-tuning
+  - id: gcpgenerativeaileader-u-ai-strategy
+    domainId: ai-strategy
+    title: "Stratégie et IA responsable"
+    lessons:
+      - gcpgenerativeaileader-l-gouvernance-et-ia-responsable

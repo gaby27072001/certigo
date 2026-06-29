@@ -1,0 +1,37 @@
+id: googledigitalmarketingecommerce-l-gerer-une-boutique-en-ligne
+trackId: google-digital-marketing-ecommerce
+unitId: googledigitalmarketingecommerce-u-ecommerce
+domainId: ecommerce
+title: "Gérer une boutique en ligne"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-gerer-une-boutique-en-ligne
+    body: |
+      Dans l'examen DIGITAL-MKT, « Gérer une boutique en ligne » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-gerer-une-boutique-en-ligne
+    title: "Gérer une boutique en ligne"
+    body: |
+      L'e-commerce couvre catalogue, panier, paiement et service client. Optimiser l'expérience d'achat et réduire l'abandon de panier augmentent le chiffre d'affaires en ligne.
+  - type: check
+    conceptId: c-gerer-une-boutique-en-ligne
+    check:
+      id: googledigitalmarketingecommerce-l-gerer-une-boutique-en-ligne-check-1
+      conceptId: c-gerer-une-boutique-en-ligne
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que cherche-t-on à réduire pour augmenter les ventes en ligne ?
+      options:
+        - { id: a, label: "L'abandon de panier" }
+        - { id: b, label: "Le nombre de produits" }
+        - { id: c, label: "Les visiteurs" }
+        - { id: d, label: "Les avis clients" }
+      correct: [a]
+      explanation: |
+        Réduire l'abandon de panier convertit plus de visites en achats.
+  - type: recap
+    conceptId: c-gerer-une-boutique-en-ligne
+    body: |
+      Retenez l'essentiel de « Gérer une boutique en ligne » pour la certification DIGITAL-MKT.

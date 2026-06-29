@@ -1,0 +1,37 @@
+id: oracleociarchitectassociate-l-block-object-file
+trackId: oracle-oci-architect-associate
+unitId: oracleociarchitectassociate-u-storage
+domainId: storage
+title: "Block, Object, File"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-block-object-file
+    body: |
+      Dans l'examen 1Z0-1072-24, « Block, Object, File » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-block-object-file
+    title: "Block, Object, File"
+    body: |
+      Block Storage pour volumes, Object Storage pour objets, File Storage pour NFS. Les politiques de cycle de vie optimisent les coûts.
+  - type: check
+    conceptId: c-block-object-file
+    check:
+      id: oracleociarchitectassociate-l-block-object-file-check-1
+      conceptId: c-block-object-file
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel stockage convient à des fichiers partagés NFS ?
+      options:
+        - { id: a, label: "File Storage" }
+        - { id: b, label: "Object Storage" }
+        - { id: c, label: "Block Volume" }
+        - { id: d, label: "KMS" }
+      correct: [a]
+      explanation: |
+        File Storage expose un système de fichiers NFS partagé.
+  - type: recap
+    conceptId: c-block-object-file
+    body: |
+      Retenez l'essentiel de « Block, Object, File » pour la certification 1Z0-1072-24.

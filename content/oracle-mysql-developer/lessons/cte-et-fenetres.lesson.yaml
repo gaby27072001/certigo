@@ -1,0 +1,37 @@
+id: oraclemysqldeveloper-l-cte-et-fenetres
+trackId: oracle-mysql-developer
+unitId: oraclemysqldeveloper-u-advanced-sql
+domainId: advanced-sql
+title: "CTE et fenêtres"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-cte-et-fenetres
+    body: |
+      Dans l'examen 1Z0-919, « CTE et fenêtres » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-cte-et-fenetres
+    title: "CTE et fenêtres"
+    body: |
+      CTE et fonctions de fenêtrage simplifient les requêtes analytiques.
+  - type: check
+    conceptId: c-cte-et-fenetres
+    check:
+      id: oraclemysqldeveloper-l-cte-et-fenetres-check-1
+      conceptId: c-cte-et-fenetres
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle fonctionnalité nomme une sous-requête réutilisable ?
+      options:
+        - { id: a, label: "CTE" }
+        - { id: b, label: "Trigger" }
+        - { id: c, label: "Index" }
+        - { id: d, label: "View seule" }
+      correct: [a]
+      explanation: |
+        Une CTE (WITH) nomme un résultat intermédiaire.
+  - type: recap
+    conceptId: c-cte-et-fenetres
+    body: |
+      Retenez l'essentiel de « CTE et fenêtres » pour la certification 1Z0-919.

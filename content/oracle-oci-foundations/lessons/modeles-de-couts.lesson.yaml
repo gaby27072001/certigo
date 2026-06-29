@@ -1,0 +1,37 @@
+id: oracleocifoundations-l-modeles-de-couts
+trackId: oracle-oci-foundations
+unitId: oracleocifoundations-u-pricing-support
+domainId: pricing-support
+title: "Modèles de coûts"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-modeles-de-couts
+    body: |
+      Dans l'examen 1Z0-1085-24, « Modèles de coûts » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-modeles-de-couts
+    title: "Modèles de coûts"
+    body: |
+      OCI propose pay-as-you-go, crédits annuels et Always Free. Les budgets et alertes maîtrisent la dépense.
+  - type: check
+    conceptId: c-modeles-de-couts
+    check:
+      id: oracleocifoundations-l-modeles-de-couts-check-1
+      conceptId: c-modeles-de-couts
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel modèle facture uniquement les ressources consommées ?
+      options:
+        - { id: a, label: "Pay-as-you-go" }
+        - { id: b, label: "Forfait fixe" }
+        - { id: c, label: "Licence perpétuelle" }
+        - { id: d, label: "Prépayé obligatoire" }
+      correct: [a]
+      explanation: |
+        Le pay-as-you-go facture l'usage réel sans engagement.
+  - type: recap
+    conceptId: c-modeles-de-couts
+    body: |
+      Retenez l'essentiel de « Modèles de coûts » pour la certification 1Z0-1085-24.

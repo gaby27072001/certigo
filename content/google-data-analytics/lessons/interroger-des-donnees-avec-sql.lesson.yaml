@@ -1,0 +1,37 @@
+id: googledataanalytics-l-interroger-des-donnees-avec-sql
+trackId: google-data-analytics
+unitId: googledataanalytics-u-sql
+domainId: sql
+title: "Interroger des données avec SQL"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-interroger-des-donnees-avec-sql
+    body: |
+      Dans l'examen DATA-ANALYTICS, « Interroger des données avec SQL » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-interroger-des-donnees-avec-sql
+    title: "Interroger des données avec SQL"
+    body: |
+      SQL permet d'extraire et d'agréger des données : SELECT choisit les colonnes, WHERE filtre, GROUP BY agrège, JOIN combine plusieurs tables. C'est l'outil clé pour exploiter de grands volumes stockés en base.
+  - type: check
+    conceptId: c-interroger-des-donnees-avec-sql
+    check:
+      id: googledataanalytics-l-interroger-des-donnees-avec-sql-check-1
+      conceptId: c-interroger-des-donnees-avec-sql
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle clause SQL filtre les lignes selon une condition ?
+      options:
+        - { id: a, label: "ORDER BY" }
+        - { id: b, label: "WHERE" }
+        - { id: c, label: "JOIN" }
+        - { id: d, label: "INSERT" }
+      correct: [b]
+      explanation: |
+        WHERE filtre les lignes ; ORDER BY trie, JOIN combine, INSERT ajoute des données.
+  - type: recap
+    conceptId: c-interroger-des-donnees-avec-sql
+    body: |
+      Retenez l'essentiel de « Interroger des données avec SQL » pour la certification DATA-ANALYTICS.

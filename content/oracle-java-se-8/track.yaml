@@ -1,0 +1,38 @@
+# Oracle Certified Associate, Java SE 8 Programmer — oracle certification track.
+# Domain weights mirror the official 1Z0-808 skills outline and sum to 1.0.
+id: oracle-java-se-8
+code: "1Z0-808"
+provider: oracle
+title: "Oracle Certified Associate, Java SE 8 Programmer"
+level: associate
+examCode: "1Z0-808"
+sourceUrl: "https://education.oracle.com/java-se-8-programmer-i/pexam_1Z0-808"
+summary: |
+  Valide les bases de la programmation Java SE 8 : syntaxe, POO, types, tableaux et gestion des exceptions. Pour développeurs débutants.
+domains:
+  - id: basics
+    name: "Bases du langage"
+    weight: 0.3
+  - id: oop
+    name: "Programmation objet"
+    weight: 0.4
+  - id: exceptions
+    name: "Exceptions"
+    weight: 0.3
+units:
+  - id: oraclejavase8-u-basics
+    domainId: basics
+    title: "Bases du langage"
+    lessons:
+      - oraclejavase8-l-types-variables-operateurs
+  - id: oraclejavase8-u-oop
+    domainId: oop
+    title: "Programmation objet"
+    lessons:
+      - oraclejavase8-l-classes-et-heritage
+      - oraclejavase8-l-interfaces
+  - id: oraclejavase8-u-exceptions
+    domainId: exceptions
+    title: "Exceptions"
+    lessons:
+      - oraclejavase8-l-try-catch-finally

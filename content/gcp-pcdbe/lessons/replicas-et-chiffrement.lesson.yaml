@@ -1,0 +1,37 @@
+id: gcppcdbe-l-replicas-et-chiffrement
+trackId: gcp-pcdbe
+unitId: gcppcdbe-u-scale-secure
+domainId: scale-secure
+title: "Réplicas et chiffrement"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-replicas-et-chiffrement
+    body: |
+      Dans l'examen PCDBE, « Réplicas et chiffrement » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-replicas-et-chiffrement
+    title: "Réplicas et chiffrement"
+    body: |
+      Les réplicas en lecture et le sharding scalent ; chiffrement, IAM et réseaux privés sécurisent. La sauvegarde protège les données.
+  - type: check
+    conceptId: c-replicas-et-chiffrement
+    check:
+      id: gcppcdbe-l-replicas-et-chiffrement-check-1
+      conceptId: c-replicas-et-chiffrement
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel mécanisme améliore la lecture à grande échelle ?
+      options:
+        - { id: a, label: "Réplicas en lecture" }
+        - { id: b, label: "Aucun cache" }
+        - { id: c, label: "Suppression d'index" }
+        - { id: d, label: "DNS public" }
+      correct: [a]
+      explanation: |
+        Les réplicas répartissent la charge de lecture.
+  - type: recap
+    conceptId: c-replicas-et-chiffrement
+    body: |
+      Retenez l'essentiel de « Réplicas et chiffrement » pour la certification PCDBE.

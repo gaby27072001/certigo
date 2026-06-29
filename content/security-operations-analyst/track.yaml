@@ -1,5 +1,6 @@
 id: security-operations-analyst
 code: SECURITY-OPERATIONS-ANALYST
+provider: microsoft
 title: 'Microsoft Certified: Security Operations Analyst Associate'
 level: associate
 summary: Microsoft certification (Security Operations Analyst) covering Azure.

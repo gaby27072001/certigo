@@ -1,0 +1,44 @@
+id: googleitautomationpython-l-scripts-d-automatisation
+trackId: google-it-automation-python
+unitId: googleitautomationpython-u-python
+domainId: python
+title: "Scripts d'automatisation"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-scripts-d-automatisation
+    body: |
+      Dans l'examen IT-AUTO-PY, « Scripts d'automatisation » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-scripts-d-automatisation
+    title: "Scripts d'automatisation"
+    body: |
+      Python automatise les tâches répétitives : parcourir des fichiers, appeler des API, manipuler du texte. Les boucles, fonctions et bibliothèques standard réduisent l'effort manuel et les erreurs.
+  - type: code
+    conceptId: c-scripts-d-automatisation
+    language: python
+    code: |
+      for fichier in dossier:
+          if fichier.endswith('.log'):
+              archiver(fichier)
+  - type: check
+    conceptId: c-scripts-d-automatisation
+    check:
+      id: googleitautomationpython-l-scripts-d-automatisation-check-1
+      conceptId: c-scripts-d-automatisation
+      type: mcq
+      difficulty: 1
+      stem: |
+        Pourquoi automatiser une tâche IT répétitive en Python ?
+      options:
+        - { id: a, label: "Gagner du temps et réduire les erreurs humaines" }
+        - { id: b, label: "Augmenter le travail manuel" }
+        - { id: c, label: "Supprimer les sauvegardes" }
+        - { id: d, label: "Ralentir les serveurs" }
+      correct: [a]
+      explanation: |
+        Un script exécute la même tâche de façon fiable et rapide, limitant les erreurs.
+  - type: recap
+    conceptId: c-scripts-d-automatisation
+    body: |
+      Retenez l'essentiel de « Scripts d'automatisation » pour la certification IT-AUTO-PY.

@@ -1,0 +1,37 @@
+id: awsscsc03-l-chiffrement-et-gestion-des-cles-avec-kms
+trackId: aws-scs-c03
+unitId: awsscsc03-u-data-protection
+domainId: data-protection
+title: "Chiffrement et gestion des clés avec KMS"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-chiffrement-et-gestion-des-cles-avec-kms
+    body: |
+      Dans l'examen SCS-C03, « Chiffrement et gestion des clés avec KMS » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-chiffrement-et-gestion-des-cles-avec-kms
+    title: "Chiffrement et gestion des clés avec KMS"
+    body: |
+      AWS KMS gère le cycle de vie des clés de chiffrement avec rotation automatique. Le chiffrement par enveloppe protège les données : une clé de données chiffre les données, et est elle-même chiffrée par une clé maîtresse KMS. ACM gère les certificats TLS pour le chiffrement en transit.
+  - type: check
+    conceptId: c-chiffrement-et-gestion-des-cles-avec-kms
+    check:
+      id: awsscsc03-l-chiffrement-et-gestion-des-cles-avec-kms-check-1
+      conceptId: c-chiffrement-et-gestion-des-cles-avec-kms
+      type: mcq
+      difficulty: 3
+      stem: |
+        En quoi consiste le chiffrement par enveloppe utilisé avec AWS KMS ?
+      options:
+        - { id: a, label: "Chiffrer les données avec une clé de données, elle-même chiffrée par une clé maîtresse" }
+        - { id: b, label: "Stocker les données en clair dans S3" }
+        - { id: c, label: "Désactiver le chiffrement pour gagner en performance" }
+        - { id: d, label: "Partager publiquement la clé maîtresse" }
+      correct: [a]
+      explanation: |
+        Le chiffrement par enveloppe utilise une clé de données pour chiffrer les données, puis chiffre cette clé de données avec une clé maîtresse KMS, combinant performance et sécurité.
+  - type: recap
+    conceptId: c-chiffrement-et-gestion-des-cles-avec-kms
+    body: |
+      Retenez l'essentiel de « Chiffrement et gestion des clés avec KMS » pour la certification SCS-C03.

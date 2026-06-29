@@ -1,0 +1,37 @@
+id: awssaac03-l-haute-disponibilite-multi-az-et-decouplage
+trackId: aws-saa-c03
+unitId: awssaac03-u-resilient-architectures
+domainId: resilient-architectures
+title: "Haute disponibilité multi-AZ et découplage"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-haute-disponibilite-multi-az-et-decouplage
+    body: |
+      Dans l'examen SAA-C03, « Haute disponibilité multi-AZ et découplage » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-haute-disponibilite-multi-az-et-decouplage
+    title: "Haute disponibilité multi-AZ et découplage"
+    body: |
+      La résilience s'obtient en répartissant les ressources sur plusieurs zones de disponibilité, derrière un Elastic Load Balancer et un groupe Auto Scaling. Le découplage via Amazon SQS ou SNS limite la propagation des pannes entre composants.
+  - type: check
+    conceptId: c-haute-disponibilite-multi-az-et-decouplage
+    check:
+      id: awssaac03-l-haute-disponibilite-multi-az-et-decouplage-check-1
+      conceptId: c-haute-disponibilite-multi-az-et-decouplage
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel mécanisme permet de découpler les composants d'une application pour absorber les pics de charge ?
+      options:
+        - { id: a, label: "Une file d'attente Amazon SQS" }
+        - { id: b, label: "Un volume EBS unique" }
+        - { id: c, label: "Une adresse IP élastique" }
+        - { id: d, label: "Un certificat ACM" }
+      correct: [a]
+      explanation: |
+        Amazon SQS met en mémoire tampon les messages entre producteurs et consommateurs, absorbant les pics et évitant qu'une panne d'un composant n'en bloque un autre.
+  - type: recap
+    conceptId: c-haute-disponibilite-multi-az-et-decouplage
+    body: |
+      Retenez l'essentiel de « Haute disponibilité multi-AZ et découplage » pour la certification SAA-C03.

@@ -1,0 +1,37 @@
+id: awsaifc01-l-modeles-de-fondation-et-ia-generative
+trackId: aws-aif-c01
+unitId: awsaifc01-u-genai-fundamentals
+domainId: genai-fundamentals
+title: "Modèles de fondation et IA générative"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-modeles-de-fondation-et-ia-generative
+    body: |
+      Dans l'examen AIF-C01, « Modèles de fondation et IA générative » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-modeles-de-fondation-et-ia-generative
+    title: "Modèles de fondation et IA générative"
+    body: |
+      L'IA générative repose sur des modèles de fondation (foundation models), de grands modèles pré-entraînés capables de produire texte, images ou code. Les grands modèles de langage (LLM) décomposent le texte en tokens et s'appuient sur des embeddings pour représenter le sens. La qualité des résultats dépend fortement du prompt fourni.
+  - type: check
+    conceptId: c-modeles-de-fondation-et-ia-generative
+    check:
+      id: awsaifc01-l-modeles-de-fondation-et-ia-generative-check-1
+      conceptId: c-modeles-de-fondation-et-ia-generative
+      type: mcq
+      difficulty: 1
+      stem: |
+        Qu'est-ce qu'un modèle de fondation dans le contexte de l'IA générative ?
+      options:
+        - { id: a, label: "Un petit modèle spécialisé entraîné sur une seule tâche" }
+        - { id: b, label: "Un grand modèle pré-entraîné, adaptable à de nombreuses tâches" }
+        - { id: c, label: "Une base de données relationnelle" }
+        - { id: d, label: "Un pare-feu réseau pour l'IA" }
+      correct: [b]
+      explanation: |
+        Un modèle de fondation est un grand modèle pré-entraîné sur d'immenses corpus, réutilisable et adaptable à de multiples tâches via le prompt ou le fine-tuning.
+  - type: recap
+    conceptId: c-modeles-de-fondation-et-ia-generative
+    body: |
+      Retenez l'essentiel de « Modèles de fondation et IA générative » pour la certification AIF-C01.

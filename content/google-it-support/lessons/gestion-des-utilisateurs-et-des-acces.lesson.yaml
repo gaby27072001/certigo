@@ -1,0 +1,37 @@
+id: googleitsupport-l-gestion-des-utilisateurs-et-des-acces
+trackId: google-it-support
+unitId: googleitsupport-u-os-sysadmin
+domainId: os-sysadmin
+title: "Gestion des utilisateurs et des accès"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-gestion-des-utilisateurs-et-des-acces
+    body: |
+      Dans l'examen IT-SUPPORT, « Gestion des utilisateurs et des accès » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-gestion-des-utilisateurs-et-des-acces
+    title: "Gestion des utilisateurs et des accès"
+    body: |
+      L'administration système consiste à gérer comptes, permissions et logiciels sur Windows, Linux et macOS. Le principe du moindre privilège limite chaque compte aux droits strictement nécessaires, réduisant la surface d'attaque.
+  - type: check
+    conceptId: c-gestion-des-utilisateurs-et-des-acces
+    check:
+      id: googleitsupport-l-gestion-des-utilisateurs-et-des-acces-check-1
+      conceptId: c-gestion-des-utilisateurs-et-des-acces
+      type: mcq
+      difficulty: 2
+      stem: |
+        Que recommande le principe du moindre privilège ?
+      options:
+        - { id: a, label: "Donner les droits administrateur à tous" }
+        - { id: b, label: "Accorder uniquement les permissions nécessaires à chaque rôle" }
+        - { id: c, label: "Supprimer toute authentification" }
+        - { id: d, label: "Partager un seul compte pour l'équipe" }
+      correct: [b]
+      explanation: |
+        Chaque utilisateur reçoit le minimum de droits requis, ce qui limite les risques en cas de compromission.
+  - type: recap
+    conceptId: c-gestion-des-utilisateurs-et-des-acces
+    body: |
+      Retenez l'essentiel de « Gestion des utilisateurs et des accès » pour la certification IT-SUPPORT.

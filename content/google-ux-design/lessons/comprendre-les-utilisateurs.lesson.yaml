@@ -1,0 +1,37 @@
+id: googleuxdesign-l-comprendre-les-utilisateurs
+trackId: google-ux-design
+unitId: googleuxdesign-u-research
+domainId: research
+title: "Comprendre les utilisateurs"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-comprendre-les-utilisateurs
+    body: |
+      Dans l'examen UX-DESIGN, « Comprendre les utilisateurs » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-comprendre-les-utilisateurs
+    title: "Comprendre les utilisateurs"
+    body: |
+      La recherche UX (entretiens, personas, parcours) révèle les besoins et frustrations réels. On conçoit pour des problèmes vérifiés, pas pour des hypothèses, ce qui réduit les risques d'échec produit.
+  - type: check
+    conceptId: c-comprendre-les-utilisateurs
+    check:
+      id: googleuxdesign-l-comprendre-les-utilisateurs-check-1
+      conceptId: c-comprendre-les-utilisateurs
+      type: mcq
+      difficulty: 1
+      stem: |
+        À quoi sert un persona ?
+      options:
+        - { id: a, label: "Représenter un profil type d'utilisateur pour guider la conception" }
+        - { id: b, label: "Coder l'application" }
+        - { id: c, label: "Héberger le site" }
+        - { id: d, label: "Gérer la facturation" }
+      correct: [a]
+      explanation: |
+        Le persona synthétise besoins et objectifs d'un segment d'utilisateurs pour orienter les décisions.
+  - type: recap
+    conceptId: c-comprendre-les-utilisateurs
+    body: |
+      Retenez l'essentiel de « Comprendre les utilisateurs » pour la certification UX-DESIGN.

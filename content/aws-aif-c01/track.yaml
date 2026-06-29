@@ -1,0 +1,53 @@
+# AWS Certified AI Practitioner — aws certification track.
+# Domain weights mirror the official AIF-C01 skills outline and sum to 1.0.
+id: aws-aif-c01
+code: "AIF-C01"
+provider: aws
+title: "AWS Certified AI Practitioner"
+level: fundamentals
+examCode: "AIF-C01"
+sourceUrl: "https://aws.amazon.com/certification/certified-ai-practitioner/"
+summary: |
+  Certification fondamentale validant la compréhension de l'IA, du machine learning et de l'IA générative sur AWS, y compris Amazon Bedrock, les modèles de fondation et les principes d'IA responsable.
+domains:
+  - id: ai-ml-fundamentals
+    name: "Fondamentaux de l'IA et du ML"
+    weight: 0.2
+  - id: genai-fundamentals
+    name: "Fondamentaux de l'IA générative"
+    weight: 0.24
+  - id: foundation-models
+    name: "Applications des modèles de fondation"
+    weight: 0.28
+  - id: responsible-ai
+    name: "IA responsable"
+    weight: 0.14
+  - id: ai-security
+    name: "Sécurité, conformité et gouvernance de l'IA"
+    weight: 0.14
+units:
+  - id: awsaifc01-u-ai-ml-fundamentals
+    domainId: ai-ml-fundamentals
+    title: "Fondamentaux de l'IA et du ML"
+    lessons:
+      - awsaifc01-l-notions-d-ia-de-ml-et-de-deep-learning
+  - id: awsaifc01-u-genai-fundamentals
+    domainId: genai-fundamentals
+    title: "Fondamentaux de l'IA générative"
+    lessons:
+      - awsaifc01-l-modeles-de-fondation-et-ia-generative
+  - id: awsaifc01-u-foundation-models
+    domainId: foundation-models
+    title: "Applications des modèles de fondation"
+    lessons:
+      - awsaifc01-l-amazon-bedrock-et-ingenierie-de-prompts
+  - id: awsaifc01-u-responsible-ai
+    domainId: responsible-ai
+    title: "IA responsable"
+    lessons:
+      - awsaifc01-l-principes-d-ia-responsable
+  - id: awsaifc01-u-ai-security
+    domainId: ai-security
+    title: "Sécurité, conformité et gouvernance de l'IA"
+    lessons:
+      - awsaifc01-l-securiser-et-gouverner-les-charges-d-ia

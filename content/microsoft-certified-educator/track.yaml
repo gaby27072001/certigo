@@ -1,5 +1,6 @@
 id: microsoft-certified-educator
 code: MICROSOFT-CERTIFIED-EDUCATOR
+provider: microsoft
 title: Microsoft Certified Educator
 level: associate
 summary: Microsoft certification (Business User) covering Windows.

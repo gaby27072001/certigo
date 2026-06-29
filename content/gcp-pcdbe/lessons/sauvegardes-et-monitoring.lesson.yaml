@@ -1,0 +1,37 @@
+id: gcppcdbe-l-sauvegardes-et-monitoring
+trackId: gcp-pcdbe
+unitId: gcppcdbe-u-operate-db
+domainId: operate-db
+title: "Sauvegardes et monitoring"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-sauvegardes-et-monitoring
+    body: |
+      Dans l'examen PCDBE, « Sauvegardes et monitoring » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-sauvegardes-et-monitoring
+    title: "Sauvegardes et monitoring"
+    body: |
+      PITR, sauvegardes automatiques et monitoring garantissent disponibilité et reprise. Le tuning des requêtes optimise les coûts.
+  - type: check
+    conceptId: c-sauvegardes-et-monitoring
+    check:
+      id: gcppcdbe-l-sauvegardes-et-monitoring-check-1
+      conceptId: c-sauvegardes-et-monitoring
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que permet le PITR ?
+      options:
+        - { id: a, label: "Restaurer à un instant précis" }
+        - { id: b, label: "Couper le réseau" }
+        - { id: c, label: "Supprimer les logs" }
+        - { id: d, label: "Désactiver IAM" }
+      correct: [a]
+      explanation: |
+        Le Point-in-time recovery restaure un état antérieur.
+  - type: recap
+    conceptId: c-sauvegardes-et-monitoring
+    body: |
+      Retenez l'essentiel de « Sauvegardes et monitoring » pour la certification PCDBE.

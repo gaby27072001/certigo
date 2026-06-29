@@ -1,0 +1,37 @@
+id: openaichatgptteachers-l-preparer-un-cours-avec-chatgpt
+trackId: openai-chatgpt-teachers
+unitId: openaichatgptteachers-u-classroom-integration
+domainId: classroom-integration
+title: "Préparer un cours avec ChatGPT"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-preparer-un-cours-avec-chatgpt
+    body: |
+      Dans l'examen CHATGPT-EDU, « Préparer un cours avec ChatGPT » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-preparer-un-cours-avec-chatgpt
+    title: "Préparer un cours avec ChatGPT"
+    body: |
+      ChatGPT aide à générer plans de cours, différenciation et exemples adaptés au niveau des élèves. L'enseignant garde le pilotage pédagogique et valide chaque contenu produit.
+  - type: check
+    conceptId: c-preparer-un-cours-avec-chatgpt
+    check:
+      id: openaichatgptteachers-l-preparer-un-cours-avec-chatgpt-check-1
+      conceptId: c-preparer-un-cours-avec-chatgpt
+      type: mcq
+      difficulty: 1
+      stem: |
+        Comment utiliser ChatGPT pour préparer un cours ?
+      options:
+        - { id: a, label: "Générer un brouillon différencié puis le valider" }
+        - { id: b, label: "Le diffuser tel quel sans relecture" }
+        - { id: c, label: "Remplacer l'enseignant" }
+        - { id: d, label: "Noter sans contrôle" }
+      correct: [a]
+      explanation: |
+        L'IA fournit un brouillon ; l'enseignant valide et adapte.
+  - type: recap
+    conceptId: c-preparer-un-cours-avec-chatgpt
+    body: |
+      Retenez l'essentiel de « Préparer un cours avec ChatGPT » pour la certification CHATGPT-EDU.

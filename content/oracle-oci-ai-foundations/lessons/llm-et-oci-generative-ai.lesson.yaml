@@ -1,0 +1,37 @@
+id: oracleociaifoundations-l-llm-et-oci-generative-ai
+trackId: oracle-oci-ai-foundations
+unitId: oracleociaifoundations-u-genai
+domainId: genai
+title: "LLM et OCI Generative AI"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-llm-et-oci-generative-ai
+    body: |
+      Dans l'examen 1Z0-1122-24, « LLM et OCI Generative AI » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-llm-et-oci-generative-ai
+    title: "LLM et OCI Generative AI"
+    body: |
+      Les grands modèles de langage génèrent du texte ; OCI Generative AI les expose en service managé avec embeddings et RAG.
+  - type: check
+    conceptId: c-llm-et-oci-generative-ai
+    check:
+      id: oracleociaifoundations-l-llm-et-oci-generative-ai-check-1
+      conceptId: c-llm-et-oci-generative-ai
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que génère un grand modèle de langage ?
+      options:
+        - { id: a, label: "Texte" }
+        - { id: b, label: "Disques" }
+        - { id: c, label: "Sous-réseaux" }
+        - { id: d, label: "Quotas" }
+      correct: [a]
+      explanation: |
+        Un LLM produit du texte à partir d'un prompt.
+  - type: recap
+    conceptId: c-llm-et-oci-generative-ai
+    body: |
+      Retenez l'essentiel de « LLM et OCI Generative AI » pour la certification 1Z0-1122-24.

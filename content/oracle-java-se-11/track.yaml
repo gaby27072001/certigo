@@ -1,0 +1,37 @@
+# Oracle Certified Professional, Java SE 11 Developer — oracle certification track.
+# Domain weights mirror the official 1Z0-819 skills outline and sum to 1.0.
+id: oracle-java-se-11
+code: "1Z0-819"
+provider: oracle
+title: "Oracle Certified Professional, Java SE 11 Developer"
+level: professional
+examCode: "1Z0-819"
+sourceUrl: "https://education.oracle.com/java-se-11-developer/pexam_1Z0-819"
+summary: |
+  Valide le développement Java SE 11 : modules, lambdas, streams, génériques et concurrence. Pour développeurs confirmés.
+domains:
+  - id: lambdas-streams
+    name: "Lambdas et streams"
+    weight: 0.35
+  - id: modules
+    name: "Système de modules"
+    weight: 0.3
+  - id: concurrency
+    name: "Concurrence"
+    weight: 0.35
+units:
+  - id: oraclejavase11-u-lambdas-streams
+    domainId: lambdas-streams
+    title: "Lambdas et streams"
+    lessons:
+      - oraclejavase11-l-streams-fonctionnels
+  - id: oraclejavase11-u-modules
+    domainId: modules
+    title: "Système de modules"
+    lessons:
+      - oraclejavase11-l-jpms
+  - id: oraclejavase11-u-concurrency
+    domainId: concurrency
+    title: "Concurrence"
+    lessons:
+      - oraclejavase11-l-threads-et-executeurs

@@ -1,0 +1,37 @@
+id: gcppce-l-2fa-sso-et-vault
+trackId: gcp-pce
+unitId: gcppce-u-security-compliance
+domainId: security-compliance
+title: "2FA, SSO et Vault"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-2fa-sso-et-vault
+    body: |
+      Dans l'examen PCE, « 2FA, SSO et Vault » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-2fa-sso-et-vault
+    title: "2FA, SSO et Vault"
+    body: |
+      2FA, SSO SAML, contexte d'accès et Google Vault protègent et conservent. Le centre de sécurité détecte les menaces.
+  - type: check
+    conceptId: c-2fa-sso-et-vault
+    check:
+      id: gcppce-l-2fa-sso-et-vault-check-1
+      conceptId: c-2fa-sso-et-vault
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel outil assure rétention et e-discovery dans Workspace ?
+      options:
+        - { id: a, label: "Google Vault" }
+        - { id: b, label: "Cloud CDN" }
+        - { id: c, label: "Pub/Sub" }
+        - { id: d, label: "BigQuery" }
+      correct: [a]
+      explanation: |
+        Vault gère conservation et investigation légale.
+  - type: recap
+    conceptId: c-2fa-sso-et-vault
+    body: |
+      Retenez l'essentiel de « 2FA, SSO et Vault » pour la certification PCE.

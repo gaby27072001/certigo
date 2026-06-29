@@ -1,0 +1,37 @@
+id: gcppmle-l-endpoints-et-batch
+trackId: gcp-pmle
+unitId: gcppmle-u-deploy-serve
+domainId: deploy-serve
+title: "Endpoints et batch"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-endpoints-et-batch
+    body: |
+      Dans l'examen PMLE, « Endpoints et batch » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-endpoints-et-batch
+    title: "Endpoints et batch"
+    body: |
+      Vertex AI sert des prédictions en ligne (endpoints) ou par lots. La répartition du trafic permet des tests A/B de modèles.
+  - type: check
+    conceptId: c-endpoints-et-batch
+    check:
+      id: gcppmle-l-endpoints-et-batch-check-1
+      conceptId: c-endpoints-et-batch
+      type: mcq
+      difficulty: 1
+      stem: |
+        Comment servir des prédictions à faible latence ?
+      options:
+        - { id: a, label: "Endpoints en ligne Vertex AI" }
+        - { id: b, label: "Email" }
+        - { id: c, label: "DNS" }
+        - { id: d, label: "CDN" }
+      correct: [a]
+      explanation: |
+        Les endpoints répondent en temps réel.
+  - type: recap
+    conceptId: c-endpoints-et-batch
+    body: |
+      Retenez l'essentiel de « Endpoints et batch » pour la certification PMLE.

@@ -1,5 +1,6 @@
 id: modern-desktop
 code: MODERN-DESKTOP
+provider: microsoft
 title: 'Microsoft 365 Certified: Endpoint Administrator Associate'
 level: associate
 summary: Microsoft certification (Administrator) covering Microsoft 365.

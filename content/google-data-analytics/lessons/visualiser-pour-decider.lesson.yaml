@@ -1,0 +1,37 @@
+id: googledataanalytics-l-visualiser-pour-decider
+trackId: google-data-analytics
+unitId: googledataanalytics-u-viz
+domainId: viz
+title: "Visualiser pour décider"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-visualiser-pour-decider
+    body: |
+      Dans l'examen DATA-ANALYTICS, « Visualiser pour décider » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-visualiser-pour-decider
+    title: "Visualiser pour décider"
+    body: |
+      Une bonne visualisation (Tableau, tableurs) rend les tendances lisibles : choisir le bon graphique (barres pour comparer, lignes pour le temps), éviter la surcharge et raconter une histoire orientée action.
+  - type: check
+    conceptId: c-visualiser-pour-decider
+    check:
+      id: googledataanalytics-l-visualiser-pour-decider-check-1
+      conceptId: c-visualiser-pour-decider
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel graphique convient le mieux pour montrer une évolution dans le temps ?
+      options:
+        - { id: a, label: "Diagramme en barres" }
+        - { id: b, label: "Graphique en lignes" }
+        - { id: c, label: "Camembert" }
+        - { id: d, label: "Nuage de mots" }
+      correct: [b]
+      explanation: |
+        Les courbes (lignes) illustrent les tendances temporelles ; les barres comparent des catégories.
+  - type: recap
+    conceptId: c-visualiser-pour-decider
+    body: |
+      Retenez l'essentiel de « Visualiser pour décider » pour la certification DATA-ANALYTICS.

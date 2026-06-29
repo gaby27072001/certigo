@@ -1,0 +1,37 @@
+id: oraclejavase21-l-switch-et-records
+trackId: oracle-java-se-21
+unitId: oraclejavase21-u-pattern-matching
+domainId: pattern-matching
+title: "switch et records"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-switch-et-records
+    body: |
+      Dans l'examen 1Z0-830, « switch et records » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-switch-et-records
+    title: "switch et records"
+    body: |
+      Le pattern matching pour switch et records simplifie le code conditionnel.
+  - type: check
+    conceptId: c-switch-et-records
+    check:
+      id: oraclejavase21-l-switch-et-records-check-1
+      conceptId: c-switch-et-records
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle fonctionnalité déconstruit un record dans switch ?
+      options:
+        - { id: a, label: "Pattern matching" }
+        - { id: b, label: "Réflexion" }
+        - { id: c, label: "JNI" }
+        - { id: d, label: "Sérialisation" }
+      correct: [a]
+      explanation: |
+        Le pattern matching déstructure les records.
+  - type: recap
+    conceptId: c-switch-et-records
+    body: |
+      Retenez l'essentiel de « switch et records » pour la certification 1Z0-830.

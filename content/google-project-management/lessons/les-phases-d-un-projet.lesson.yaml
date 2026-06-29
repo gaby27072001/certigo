@@ -1,0 +1,37 @@
+id: googleprojectmanagement-l-les-phases-d-un-projet
+trackId: google-project-management
+unitId: googleprojectmanagement-u-lifecycle
+domainId: lifecycle
+title: "Les phases d'un projet"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-les-phases-d-un-projet
+    body: |
+      Dans l'examen PROJECT-MGMT, « Les phases d'un projet » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-les-phases-d-un-projet
+    title: "Les phases d'un projet"
+    body: |
+      Un projet passe par initiation, planification, exécution et clôture. Définir clairement la portée, le budget et les délais (le triangle d'or) cadre les attentes et limite les dérives.
+  - type: check
+    conceptId: c-les-phases-d-un-projet
+    check:
+      id: googleprojectmanagement-l-les-phases-d-un-projet-check-1
+      conceptId: c-les-phases-d-un-projet
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que regroupe le « triangle d'or » de la gestion de projet ?
+      options:
+        - { id: a, label: "Portée, délais et budget" }
+        - { id: b, label: "Marketing, vente et RH" }
+        - { id: c, label: "CPU, RAM, disque" }
+        - { id: d, label: "Design, code, test" }
+      correct: [a]
+      explanation: |
+        Portée, temps et coût sont liés : modifier l'un impacte les autres.
+  - type: recap
+    conceptId: c-les-phases-d-un-projet
+    body: |
+      Retenez l'essentiel de « Les phases d'un projet » pour la certification PROJECT-MGMT.

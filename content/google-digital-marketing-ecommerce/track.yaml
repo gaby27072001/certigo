@@ -1,0 +1,44 @@
+# Google Digital Marketing & E-commerce Certificate — google certification track.
+# Domain weights mirror the official DIGITAL-MKT skills outline and sum to 1.0.
+id: google-digital-marketing-ecommerce
+code: "DIGITAL-MKT"
+provider: google
+title: "Google Digital Marketing & E-commerce Certificate"
+level: fundamentals
+sourceUrl: "https://grow.google/certificates/digital-marketing-ecommerce/"
+summary: |
+  Certificat débutant en marketing digital et e-commerce : email, réseaux sociaux, SEO/SEA, analytics et gestion de boutique en ligne. Prépare aux postes de spécialiste marketing digital et coordinateur e-commerce.
+domains:
+  - id: foundations
+    name: "Fondamentaux du marketing digital"
+    weight: 0.26
+  - id: seo-sea
+    name: "SEO et publicité"
+    weight: 0.26
+  - id: analytics
+    name: "Mesure et analytics"
+    weight: 0.24
+  - id: ecommerce
+    name: "E-commerce"
+    weight: 0.24
+units:
+  - id: googledigitalmarketingecommerce-u-foundations
+    domainId: foundations
+    title: "Fondamentaux du marketing digital"
+    lessons:
+      - googledigitalmarketingecommerce-l-l-entonnoir-marketing
+  - id: googledigitalmarketingecommerce-u-seo-sea
+    domainId: seo-sea
+    title: "SEO et publicité"
+    lessons:
+      - googledigitalmarketingecommerce-l-referencement-et-campagnes
+  - id: googledigitalmarketingecommerce-u-analytics
+    domainId: analytics
+    title: "Mesure et analytics"
+    lessons:
+      - googledigitalmarketingecommerce-l-mesurer-la-performance
+  - id: googledigitalmarketingecommerce-u-ecommerce
+    domainId: ecommerce
+    title: "E-commerce"
+    lessons:
+      - googledigitalmarketingecommerce-l-gerer-une-boutique-en-ligne

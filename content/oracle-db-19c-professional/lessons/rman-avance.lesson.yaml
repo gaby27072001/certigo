@@ -1,0 +1,37 @@
+id: oracledb19cprofessional-l-rman-avance
+trackId: oracle-db-19c-professional
+unitId: oracledb19cprofessional-u-recovery
+domainId: recovery
+title: "RMAN avancé"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-rman-avance
+    body: |
+      Dans l'examen 1Z0-083, « RMAN avancé » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-rman-avance
+    title: "RMAN avancé"
+    body: |
+      Restaurations point-in-time, duplications et patch sécurisent l'exploitation.
+  - type: check
+    conceptId: c-rman-avance
+    check:
+      id: oracledb19cprofessional-l-rman-avance-check-1
+      conceptId: c-rman-avance
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle reprise revient à un instant précis ?
+      options:
+        - { id: a, label: "Point-in-time" }
+        - { id: b, label: "Sans backup" }
+        - { id: c, label: "Manuel" }
+        - { id: d, label: "Aucune" }
+      correct: [a]
+      explanation: |
+        Le PITR restaure à un horodatage donné.
+  - type: recap
+    conceptId: c-rman-avance
+    body: |
+      Retenez l'essentiel de « RMAN avancé » pour la certification 1Z0-083.

@@ -1,0 +1,37 @@
+id: gcpclouddigitalleader-l-donnees-structurees-semi-et-non-structurees
+trackId: gcp-cloud-digital-leader
+unitId: gcpclouddigitalleader-u-data-innovation
+domainId: data-innovation
+title: "Données structurées, semi et non structurées"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-donnees-structurees-semi-et-non-structurees
+    body: |
+      Dans l'examen CDL, « Données structurées, semi et non structurées » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-donnees-structurees-semi-et-non-structurees
+    title: "Données structurées, semi et non structurées"
+    body: |
+      BigQuery sert l'analytique de données structurées à grande échelle, Cloud Storage stocke des objets non structurés, et l'IA Google Cloud transforme ces données en valeur. Une stratégie data forte est le socle de la différenciation.
+  - type: check
+    conceptId: c-donnees-structurees-semi-et-non-structurees
+    check:
+      id: gcpclouddigitalleader-l-donnees-structurees-semi-et-non-structurees-check-1
+      conceptId: c-donnees-structurees-semi-et-non-structurees
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service Google Cloud est dédié à l'analytique de données à grande échelle ?
+      options:
+        - { id: a, label: "BigQuery" }
+        - { id: b, label: "Cloud Storage" }
+        - { id: c, label: "Cloud VPN" }
+        - { id: d, label: "Cloud DNS" }
+      correct: [a]
+      explanation: |
+        BigQuery est l'entrepôt de données serverless pour interroger des téraoctets en SQL.
+  - type: recap
+    conceptId: c-donnees-structurees-semi-et-non-structurees
+    body: |
+      Retenez l'essentiel de « Données structurées, semi et non structurées » pour la certification CDL.

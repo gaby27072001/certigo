@@ -1,0 +1,37 @@
+id: gcpclouddigitalleader-l-responsabilite-partagee-et-iam
+trackId: gcp-cloud-digital-leader
+unitId: gcpclouddigitalleader-u-trust-security
+domainId: trust-security
+title: "Responsabilité partagée et IAM"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-responsabilite-partagee-et-iam
+    body: |
+      Dans l'examen CDL, « Responsabilité partagée et IAM » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-responsabilite-partagee-et-iam
+    title: "Responsabilité partagée et IAM"
+    body: |
+      Google sécurise l'infrastructure tandis que le client gère ses accès et configurations. IAM applique le principe du moindre privilège ; la sécurité est intégrée par conception.
+  - type: check
+    conceptId: c-responsabilite-partagee-et-iam
+    check:
+      id: gcpclouddigitalleader-l-responsabilite-partagee-et-iam-check-1
+      conceptId: c-responsabilite-partagee-et-iam
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel principe IAM faut-il appliquer aux accès ?
+      options:
+        - { id: a, label: "Moindre privilège" }
+        - { id: b, label: "Accès total par défaut" }
+        - { id: c, label: "Aucun audit" }
+        - { id: d, label: "Mots de passe partagés" }
+      correct: [a]
+      explanation: |
+        Le moindre privilège limite chaque identité aux seules permissions nécessaires.
+  - type: recap
+    conceptId: c-responsabilite-partagee-et-iam
+    body: |
+      Retenez l'essentiel de « Responsabilité partagée et IAM » pour la certification CDL.

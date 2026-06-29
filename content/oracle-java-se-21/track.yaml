@@ -1,0 +1,37 @@
+# Oracle Certified Professional, Java SE 21 Developer — oracle certification track.
+# Domain weights mirror the official 1Z0-830 skills outline and sum to 1.0.
+id: oracle-java-se-21
+code: "1Z0-830"
+provider: oracle
+title: "Oracle Certified Professional, Java SE 21 Developer"
+level: professional
+examCode: "1Z0-830"
+sourceUrl: "https://education.oracle.com/java-se-21-developer/pexam_1Z0-830"
+summary: |
+  Valide Java SE 21 LTS : virtual threads, pattern matching, sequenced collections et records avancés. Pour développeurs confirmés.
+domains:
+  - id: virtual-threads
+    name: "Virtual threads"
+    weight: 0.35
+  - id: pattern-matching
+    name: "Pattern matching"
+    weight: 0.35
+  - id: collections
+    name: "Collections séquencées"
+    weight: 0.3
+units:
+  - id: oraclejavase21-u-virtual-threads
+    domainId: virtual-threads
+    title: "Virtual threads"
+    lessons:
+      - oraclejavase21-l-concurrence-legere
+  - id: oraclejavase21-u-pattern-matching
+    domainId: pattern-matching
+    title: "Pattern matching"
+    lessons:
+      - oraclejavase21-l-switch-et-records
+  - id: oraclejavase21-u-collections
+    domainId: collections
+    title: "Collections séquencées"
+    lessons:
+      - oraclejavase21-l-sequencedcollection

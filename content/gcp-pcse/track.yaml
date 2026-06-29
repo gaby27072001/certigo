@@ -1,0 +1,45 @@
+# Google Cloud Professional Cloud Security Engineer — google certification track.
+# Domain weights mirror the official PCSE skills outline and sum to 1.0.
+id: gcp-pcse
+code: "PCSE"
+provider: google
+title: "Google Cloud Professional Cloud Security Engineer"
+level: professional
+examCode: "Professional Cloud Security Engineer"
+sourceUrl: "https://cloud.google.com/learn/certification/cloud-security-engineer"
+summary: |
+  Certification sécurité : gestion des accès, protection de l'infrastructure et des données, opérations de sécurité et conformité sur Google Cloud.
+domains:
+  - id: configure-access
+    name: "Gérer les accès"
+    weight: 0.25
+  - id: protect-infra
+    name: "Protéger l'infrastructure"
+    weight: 0.25
+  - id: data-protection
+    name: "Protéger les données"
+    weight: 0.25
+  - id: secops-compliance
+    name: "Opérations et conformité"
+    weight: 0.25
+units:
+  - id: gcppcse-u-configure-access
+    domainId: configure-access
+    title: "Gérer les accès"
+    lessons:
+      - gcppcse-l-iam-roles-et-identites
+  - id: gcppcse-u-protect-infra
+    domainId: protect-infra
+    title: "Protéger l'infrastructure"
+    lessons:
+      - gcppcse-l-perimetres-et-pare-feu
+  - id: gcppcse-u-data-protection
+    domainId: data-protection
+    title: "Protéger les données"
+    lessons:
+      - gcppcse-l-chiffrement-et-kms
+  - id: gcppcse-u-secops-compliance
+    domainId: secops-compliance
+    title: "Opérations et conformité"
+    lessons:
+      - gcppcse-l-scc-logs-et-conformite

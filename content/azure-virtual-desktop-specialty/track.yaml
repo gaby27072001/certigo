@@ -1,5 +1,6 @@
 id: azure-virtual-desktop-specialty
 code: AZURE-VIRTUAL-DESKTOP-SPECIALTY
+provider: microsoft
 title: 'Microsoft Certified: Azure Virtual Desktop Specialty'
 level: associate
 summary: Microsoft certification (Administrator) covering Azure.

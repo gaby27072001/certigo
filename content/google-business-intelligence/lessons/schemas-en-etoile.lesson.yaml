@@ -1,0 +1,37 @@
+id: googlebusinessintelligence-l-schemas-en-etoile
+trackId: google-business-intelligence
+unitId: googlebusinessintelligence-u-modeling
+domainId: modeling
+title: "Schémas en étoile"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-schemas-en-etoile
+    body: |
+      Dans l'examen BUSINESS-INTEL, « Schémas en étoile » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-schemas-en-etoile
+    title: "Schémas en étoile"
+    body: |
+      La BI organise les données en tables de faits et dimensions (schéma en étoile) pour des requêtes rapides. Une bonne modélisation simplifie l'analyse et accélère les tableaux de bord.
+  - type: check
+    conceptId: c-schemas-en-etoile
+    check:
+      id: googlebusinessintelligence-l-schemas-en-etoile-check-1
+      conceptId: c-schemas-en-etoile
+      type: mcq
+      difficulty: 2
+      stem: |
+        Que contient une table de faits dans un schéma en étoile ?
+      options:
+        - { id: a, label: "Les mesures numériques de l'activité" }
+        - { id: b, label: "Uniquement des images" }
+        - { id: c, label: "Des mots de passe" }
+        - { id: d, label: "Du code source" }
+      correct: [a]
+      explanation: |
+        La table de faits stocke les mesures (ventes, quantités) reliées aux dimensions (temps, produit).
+  - type: recap
+    conceptId: c-schemas-en-etoile
+    body: |
+      Retenez l'essentiel de « Schémas en étoile » pour la certification BUSINESS-INTEL.

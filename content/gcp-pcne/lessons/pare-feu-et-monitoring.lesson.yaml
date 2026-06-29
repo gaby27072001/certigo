@@ -1,0 +1,37 @@
+id: gcppcne-l-pare-feu-et-monitoring
+trackId: gcp-pcne
+unitId: gcppcne-u-network-security-ops
+domainId: network-security-ops
+title: "Pare-feu et monitoring"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-pare-feu-et-monitoring
+    body: |
+      Dans l'examen PCNE, « Pare-feu et monitoring » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-pare-feu-et-monitoring
+    title: "Pare-feu et monitoring"
+    body: |
+      Les règles de pare-feu et Cloud Armor protègent ; les VPC Flow Logs tracent les flux pour diagnostiquer et auditer.
+  - type: check
+    conceptId: c-pare-feu-et-monitoring
+    check:
+      id: gcppcne-l-pare-feu-et-monitoring-check-1
+      conceptId: c-pare-feu-et-monitoring
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que protège Cloud Armor ?
+      options:
+        - { id: a, label: "Les applications contre DDoS/attaques web" }
+        - { id: b, label: "Les buckets" }
+        - { id: c, label: "Les datasets" }
+        - { id: d, label: "Le DNS" }
+      correct: [a]
+      explanation: |
+        Cloud Armor filtre le trafic malveillant.
+  - type: recap
+    conceptId: c-pare-feu-et-monitoring
+    body: |
+      Retenez l'essentiel de « Pare-feu et monitoring » pour la certification PCNE.

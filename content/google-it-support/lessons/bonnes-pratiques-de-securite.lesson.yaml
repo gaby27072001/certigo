@@ -1,0 +1,37 @@
+id: googleitsupport-l-bonnes-pratiques-de-securite
+trackId: google-it-support
+unitId: googleitsupport-u-security-basics
+domainId: security-basics
+title: "Bonnes pratiques de sécurité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-bonnes-pratiques-de-securite
+    body: |
+      Dans l'examen IT-SUPPORT, « Bonnes pratiques de sécurité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-bonnes-pratiques-de-securite
+    title: "Bonnes pratiques de sécurité"
+    body: |
+      La sécurité du support IT couvre l'authentification forte, le chiffrement, les sauvegardes et la sensibilisation au phishing. Une politique de mots de passe robuste et l'authentification multifacteur (MFA) sont des défenses de base contre les intrusions.
+  - type: check
+    conceptId: c-bonnes-pratiques-de-securite
+    check:
+      id: googleitsupport-l-bonnes-pratiques-de-securite-check-1
+      conceptId: c-bonnes-pratiques-de-securite
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle mesure renforce le plus l'accès aux comptes ?
+      options:
+        - { id: a, label: "L'authentification multifacteur (MFA)" }
+        - { id: b, label: "Un mot de passe unique partagé" }
+        - { id: c, label: "Désactiver les sauvegardes" }
+        - { id: d, label: "Ouvrir tous les pare-feu" }
+      correct: [a]
+      explanation: |
+        La MFA ajoute un second facteur, rendant l'accès bien plus difficile même si le mot de passe fuit.
+  - type: recap
+    conceptId: c-bonnes-pratiques-de-securite
+    body: |
+      Retenez l'essentiel de « Bonnes pratiques de sécurité » pour la certification IT-SUPPORT.

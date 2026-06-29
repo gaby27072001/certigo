@@ -1,0 +1,37 @@
+id: googleaiessentials-l-usage-responsable-de-l-ia
+trackId: google-ai-essentials
+unitId: googleaiessentials-u-responsible
+domainId: responsible
+title: "Usage responsable de l'IA"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-usage-responsable-de-l-ia
+    body: |
+      Dans l'examen AI-ESSENTIALS, « Usage responsable de l'IA » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-usage-responsable-de-l-ia
+    title: "Usage responsable de l'IA"
+    body: |
+      L'IA peut comporter biais et erreurs : vérifier les sorties, protéger les données et respecter la vie privée sont essentiels. L'humain reste responsable des décisions finales.
+  - type: check
+    conceptId: c-usage-responsable-de-l-ia
+    check:
+      id: googleaiessentials-l-usage-responsable-de-l-ia-check-1
+      conceptId: c-usage-responsable-de-l-ia
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle bonne pratique face aux réponses d'une IA ?
+      options:
+        - { id: a, label: "Vérifier les faits avant de les utiliser" }
+        - { id: b, label: "Les diffuser sans contrôle" }
+        - { id: c, label: "Ignorer la confidentialité" }
+        - { id: d, label: "Supprimer toute relecture" }
+      correct: [a]
+      explanation: |
+        On garde un esprit critique : vérification, confidentialité et responsabilité humaine.
+  - type: recap
+    conceptId: c-usage-responsable-de-l-ia
+    body: |
+      Retenez l'essentiel de « Usage responsable de l'IA » pour la certification AI-ESSENTIALS.

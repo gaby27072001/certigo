@@ -1,0 +1,37 @@
+id: gcppde-l-pipelines-dataflow
+trackId: gcp-pde
+unitId: gcppde-u-ingest-process
+domainId: ingest-process
+title: "Pipelines Dataflow"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-pipelines-dataflow
+    body: |
+      Dans l'examen PDE, « Pipelines Dataflow » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-pipelines-dataflow
+    title: "Pipelines Dataflow"
+    body: |
+      Dataflow exécute lots et streaming via Apache Beam. Pub/Sub découple producteurs et consommateurs. Dataproc gère Spark/Hadoop managés.
+  - type: check
+    conceptId: c-pipelines-dataflow
+    check:
+      id: gcppde-l-pipelines-dataflow-check-1
+      conceptId: c-pipelines-dataflow
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel framework Dataflow exécute-t-il ?
+      options:
+        - { id: a, label: "Apache Beam" }
+        - { id: b, label: "COBOL" }
+        - { id: c, label: "jQuery" }
+        - { id: d, label: "WordPress" }
+      correct: [a]
+      explanation: |
+        Dataflow est le runner managé d'Apache Beam.
+  - type: recap
+    conceptId: c-pipelines-dataflow
+    body: |
+      Retenez l'essentiel de « Pipelines Dataflow » pour la certification PDE.

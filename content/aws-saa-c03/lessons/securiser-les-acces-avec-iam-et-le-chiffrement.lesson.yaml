@@ -1,0 +1,37 @@
+id: awssaac03-l-securiser-les-acces-avec-iam-et-le-chiffrement
+trackId: aws-saa-c03
+unitId: awssaac03-u-secure-architectures
+domainId: secure-architectures
+title: "Sécuriser les accès avec IAM et le chiffrement"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-securiser-les-acces-avec-iam-et-le-chiffrement
+    body: |
+      Dans l'examen SAA-C03, « Sécuriser les accès avec IAM et le chiffrement » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-securiser-les-acces-avec-iam-et-le-chiffrement
+    title: "Sécuriser les accès avec IAM et le chiffrement"
+    body: |
+      Une architecture sécurisée applique le moindre privilège via des rôles IAM plutôt que des clés statiques, segmente le réseau avec des VPC et des groupes de sécurité, et chiffre les données au repos (AWS KMS) comme en transit (TLS). On privilégie les identités fédérées et la rotation des secrets.
+  - type: check
+    conceptId: c-securiser-les-acces-avec-iam-et-le-chiffrement
+    check:
+      id: awssaac03-l-securiser-les-acces-avec-iam-et-le-chiffrement-check-1
+      conceptId: c-securiser-les-acces-avec-iam-et-le-chiffrement
+      type: mcq
+      difficulty: 2
+      stem: |
+        Comment accorder à une instance EC2 l'accès à un bucket S3 de façon sécurisée et sans clés statiques ?
+      options:
+        - { id: a, label: "Stocker les clés d'accès dans le code de l'application" }
+        - { id: b, label: "Attacher un rôle IAM à l'instance EC2" }
+        - { id: c, label: "Rendre le bucket public" }
+        - { id: d, label: "Partager les identifiants racine du compte" }
+      correct: [b]
+      explanation: |
+        Un rôle IAM attaché à l'instance fournit des identifiants temporaires gérés automatiquement, évitant le stockage de clés statiques et respectant le moindre privilège.
+  - type: recap
+    conceptId: c-securiser-les-acces-avec-iam-et-le-chiffrement
+    body: |
+      Retenez l'essentiel de « Sécuriser les accès avec IAM et le chiffrement » pour la certification SAA-C03.

@@ -1,0 +1,37 @@
+id: googleadvanceddataanalytics-l-manipuler-des-donnees-avec-pandas
+trackId: google-advanced-data-analytics
+unitId: googleadvanceddataanalytics-u-python
+domainId: python
+title: "Manipuler des données avec pandas"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-manipuler-des-donnees-avec-pandas
+    body: |
+      Dans l'examen ADV-DATA-ANALYTICS, « Manipuler des données avec pandas » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-manipuler-des-donnees-avec-pandas
+    title: "Manipuler des données avec pandas"
+    body: |
+      Python avec pandas et NumPy permet de charger, nettoyer et transformer de grands jeux de données. Les DataFrames offrent filtrage, agrégation et jointures, base de toute analyse avancée et préparation au machine learning.
+  - type: check
+    conceptId: c-manipuler-des-donnees-avec-pandas
+    check:
+      id: googleadvanceddataanalytics-l-manipuler-des-donnees-avec-pandas-check-1
+      conceptId: c-manipuler-des-donnees-avec-pandas
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle bibliothèque Python sert à manipuler des tableaux de données ?
+      options:
+        - { id: a, label: "pandas" }
+        - { id: b, label: "Flask" }
+        - { id: c, label: "Django" }
+        - { id: d, label: "pytest" }
+      correct: [a]
+      explanation: |
+        pandas fournit le DataFrame pour manipuler des données tabulaires ; Flask/Django sont des frameworks web.
+  - type: recap
+    conceptId: c-manipuler-des-donnees-avec-pandas
+    body: |
+      Retenez l'essentiel de « Manipuler des données avec pandas » pour la certification ADV-DATA-ANALYTICS.

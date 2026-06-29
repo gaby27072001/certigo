@@ -1,0 +1,37 @@
+id: oraclemysqldeveloper-l-acid-et-isolation
+trackId: oracle-mysql-developer
+unitId: oraclemysqldeveloper-u-transactions
+domainId: transactions
+title: "ACID et isolation"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-acid-et-isolation
+    body: |
+      Dans l'examen 1Z0-919, « ACID et isolation » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-acid-et-isolation
+    title: "ACID et isolation"
+    body: |
+      Les transactions ACID et niveaux d'isolation garantissent la cohérence.
+  - type: check
+    conceptId: c-acid-et-isolation
+    check:
+      id: oraclemysqldeveloper-l-acid-et-isolation-check-1
+      conceptId: c-acid-et-isolation
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle commande valide une transaction ?
+      options:
+        - { id: a, label: "COMMIT" }
+        - { id: b, label: "SELECT" }
+        - { id: c, label: "GRANT" }
+        - { id: d, label: "SHOW" }
+      correct: [a]
+      explanation: |
+        COMMIT rend les changements définitifs.
+  - type: recap
+    conceptId: c-acid-et-isolation
+    body: |
+      Retenez l'essentiel de « ACID et isolation » pour la certification 1Z0-919.

@@ -1,0 +1,37 @@
+id: awssapc02-l-ameliorer-avec-le-well-architected-framework
+trackId: aws-sap-c02
+unitId: awssapc02-u-continuous-improvement
+domainId: continuous-improvement
+title: "Améliorer avec le Well-Architected Framework"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-ameliorer-avec-le-well-architected-framework
+    body: |
+      Dans l'examen SAP-C02, « Améliorer avec le Well-Architected Framework » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-ameliorer-avec-le-well-architected-framework
+    title: "Améliorer avec le Well-Architected Framework"
+    body: |
+      Le AWS Well-Architected Framework structure l'amélioration continue autour de six piliers (excellence opérationnelle, sécurité, fiabilité, efficacité des performances, optimisation des coûts, durabilité). Les revues identifient les risques et priorisent les actions correctives.
+  - type: check
+    conceptId: c-ameliorer-avec-le-well-architected-framework
+    check:
+      id: awssapc02-l-ameliorer-avec-le-well-architected-framework-check-1
+      conceptId: c-ameliorer-avec-le-well-architected-framework
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel cadre AWS guide l'évaluation et l'amélioration d'une architecture selon plusieurs piliers ?
+      options:
+        - { id: a, label: "Le AWS Well-Architected Framework" }
+        - { id: b, label: "Amazon CloudFront" }
+        - { id: c, label: "AWS Budgets" }
+        - { id: d, label: "Amazon Cognito" }
+      correct: [a]
+      explanation: |
+        Le Well-Architected Framework fournit des bonnes pratiques et des questions de revue selon six piliers pour améliorer en continu les architectures.
+  - type: recap
+    conceptId: c-ameliorer-avec-le-well-architected-framework
+    body: |
+      Retenez l'essentiel de « Améliorer avec le Well-Architected Framework » pour la certification SAP-C02.

@@ -1,0 +1,37 @@
+id: oracleocioperationsassociate-l-logs-et-notifications
+trackId: oracle-oci-operations-associate
+unitId: oracleocioperationsassociate-u-monitoring
+domainId: monitoring
+title: "Logs et notifications"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-logs-et-notifications
+    body: |
+      Dans l'examen 1Z0-1067-24, « Logs et notifications » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-logs-et-notifications
+    title: "Logs et notifications"
+    body: |
+      Notifications diffuse alertes vers email et Functions pour la remédiation.
+  - type: check
+    conceptId: c-logs-et-notifications
+    check:
+      id: oracleocioperationsassociate-l-logs-et-notifications-check-1
+      conceptId: c-logs-et-notifications
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service envoie des notifications d'alerte ?
+      options:
+        - { id: a, label: "Notifications" }
+        - { id: b, label: "Vault" }
+        - { id: c, label: "DRG" }
+        - { id: d, label: "VCN" }
+      correct: [a]
+      explanation: |
+        Notifications publie alertes vers abonnés.
+  - type: recap
+    conceptId: c-logs-et-notifications
+    body: |
+      Retenez l'essentiel de « Logs et notifications » pour la certification 1Z0-1067-24.

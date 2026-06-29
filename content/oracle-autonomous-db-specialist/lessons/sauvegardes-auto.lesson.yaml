@@ -1,0 +1,37 @@
+id: oracleautonomousdbspecialist-l-sauvegardes-auto
+trackId: oracle-autonomous-db-specialist
+unitId: oracleautonomousdbspecialist-u-scaling
+domainId: scaling
+title: "Sauvegardes auto"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-sauvegardes-auto
+    body: |
+      Dans l'examen 1Z0-931-1, « Sauvegardes auto » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-sauvegardes-auto
+    title: "Sauvegardes auto"
+    body: |
+      Les sauvegardes automatiques et la reprise simplifient la continuité.
+  - type: check
+    conceptId: c-sauvegardes-auto
+    check:
+      id: oracleautonomousdbspecialist-l-sauvegardes-auto-check-1
+      conceptId: c-sauvegardes-auto
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle tâche est automatisée par Autonomous ?
+      options:
+        - { id: a, label: "Sauvegarde" }
+        - { id: b, label: "Code applicatif" }
+        - { id: c, label: "Réseau client" }
+        - { id: d, label: "DNS" }
+      correct: [a]
+      explanation: |
+        Autonomous gère sauvegardes et restauration.
+  - type: recap
+    conceptId: c-sauvegardes-auto
+    body: |
+      Retenez l'essentiel de « Sauvegardes auto » pour la certification 1Z0-931-1.

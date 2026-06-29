@@ -1,0 +1,44 @@
+# Google Project Management Professional Certificate — google certification track.
+# Domain weights mirror the official PROJECT-MGMT skills outline and sum to 1.0.
+id: google-project-management
+code: "PROJECT-MGMT"
+provider: google
+title: "Google Project Management Professional Certificate"
+level: fundamentals
+sourceUrl: "https://grow.google/certificates/project-management/"
+summary: |
+  Certificat débutant en gestion de projet : cycle de vie, planification, gestion des risques, agile/scrum et communication des parties prenantes. Prépare aux postes de chef de projet junior avec méthodes traditionnelles et agiles.
+domains:
+  - id: lifecycle
+    name: "Cycle de vie projet"
+    weight: 0.26
+  - id: agile
+    name: "Agile et Scrum"
+    weight: 0.26
+  - id: risk
+    name: "Gestion des risques"
+    weight: 0.24
+  - id: stakeholders
+    name: "Parties prenantes"
+    weight: 0.24
+units:
+  - id: googleprojectmanagement-u-lifecycle
+    domainId: lifecycle
+    title: "Cycle de vie projet"
+    lessons:
+      - googleprojectmanagement-l-les-phases-d-un-projet
+  - id: googleprojectmanagement-u-agile
+    domainId: agile
+    title: "Agile et Scrum"
+    lessons:
+      - googleprojectmanagement-l-scrum-et-sprints
+  - id: googleprojectmanagement-u-risk
+    domainId: risk
+    title: "Gestion des risques"
+    lessons:
+      - googleprojectmanagement-l-identifier-et-attenuer-les-risques
+  - id: googleprojectmanagement-u-stakeholders
+    domainId: stakeholders
+    title: "Parties prenantes"
+    lessons:
+      - googleprojectmanagement-l-communiquer-avec-les-parties-prenantes

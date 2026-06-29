@@ -1,5 +1,6 @@
 id: m365-teams-administrator-associate
 code: M365-TEAMS-ADMINISTRATOR-ASSOCIATE
+provider: microsoft
 title: 'Microsoft 365 Certified: Teams Administrator Associate'
 level: associate
 summary: Microsoft certification (Administrator) covering Microsoft 365.

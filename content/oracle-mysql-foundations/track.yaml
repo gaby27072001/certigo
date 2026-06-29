@@ -1,0 +1,29 @@
+# MySQL Foundations — oracle certification track.
+# Domain weights mirror the official 1Z0-915 skills outline and sum to 1.0.
+id: oracle-mysql-foundations
+code: "1Z0-915"
+provider: oracle
+title: "MySQL Foundations"
+level: fundamentals
+examCode: "1Z0-915"
+sourceUrl: "https://education.oracle.com/mysql/"
+summary: |
+  Valide les fondations MySQL : modèle relationnel, SQL et concepts d'administration. Pour profils débutants.
+domains:
+  - id: fundamentals
+    name: "Fondations"
+    weight: 0.5
+  - id: admin-basics
+    name: "Administration de base"
+    weight: 0.5
+units:
+  - id: oraclemysqlfoundations-u-fundamentals
+    domainId: fundamentals
+    title: "Fondations"
+    lessons:
+      - oraclemysqlfoundations-l-mysql-et-sql
+  - id: oraclemysqlfoundations-u-admin-basics
+    domainId: admin-basics
+    title: "Administration de base"
+    lessons:
+      - oraclemysqlfoundations-l-utilisateurs-et-bases

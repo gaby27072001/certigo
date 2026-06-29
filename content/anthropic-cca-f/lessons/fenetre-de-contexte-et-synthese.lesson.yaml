@@ -1,0 +1,37 @@
+id: anthropicccaf-l-fenetre-de-contexte-et-synthese
+trackId: anthropic-cca-f
+unitId: anthropicccaf-u-context-management
+domainId: context-management
+title: "Fenêtre de contexte et synthèse"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-fenetre-de-contexte-et-synthese
+    body: |
+      Dans l'examen CCA-F, « Fenêtre de contexte et synthèse » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-fenetre-de-contexte-et-synthese
+    title: "Fenêtre de contexte et synthèse"
+    body: |
+      La fenêtre de contexte est limitée : il faut prioriser l'information, résumer l'historique et récupérer (RAG) le strict nécessaire. Une bonne gestion du contexte garde l'agent pertinent et économe en tokens.
+  - type: check
+    conceptId: c-fenetre-de-contexte-et-synthese
+    check:
+      id: anthropicccaf-l-fenetre-de-contexte-et-synthese-check-1
+      conceptId: c-fenetre-de-contexte-et-synthese
+      type: mcq
+      difficulty: 2
+      stem: |
+        Comment gérer une fenêtre de contexte limitée ?
+      options:
+        - { id: a, label: "Résumer l'historique et ne récupérer que le nécessaire" }
+        - { id: b, label: "Tout coller à chaque tour" }
+        - { id: c, label: "Ignorer la pertinence" }
+        - { id: d, label: "Doubler chaque message" }
+      correct: [a]
+      explanation: |
+        Synthèse et récupération ciblée préservent pertinence et budget de tokens.
+  - type: recap
+    conceptId: c-fenetre-de-contexte-et-synthese
+    body: |
+      Retenez l'essentiel de « Fenêtre de contexte et synthèse » pour la certification CCA-F.

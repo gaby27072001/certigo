@@ -1,0 +1,37 @@
+id: awsdopc02-l-observabilite-centralisee
+trackId: aws-dop-c02
+unitId: awsdopc02-u-monitoring-logging
+domainId: monitoring-logging
+title: "Observabilité centralisée"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-observabilite-centralisee
+    body: |
+      Dans l'examen DOP-C02, « Observabilité centralisée » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-observabilite-centralisee
+    title: "Observabilité centralisée"
+    body: |
+      L'observabilité combine métriques, journaux et traces. Amazon CloudWatch centralise métriques et journaux (avec métriques personnalisées), tandis qu'AWS X-Ray fournit les traces distribuées. Les tableaux de bord et alarmes rendent les tendances exploitables.
+  - type: check
+    conceptId: c-observabilite-centralisee
+    check:
+      id: awsdopc02-l-observabilite-centralisee-check-1
+      conceptId: c-observabilite-centralisee
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quel pilier de l'observabilité fournit le suivi de bout en bout d'une requête entre microservices ?
+      options:
+        - { id: a, label: "Les traces distribuées" }
+        - { id: b, label: "Les classes de stockage" }
+        - { id: c, label: "Les tables de routage" }
+        - { id: d, label: "Les groupes de placement" }
+      correct: [a]
+      explanation: |
+        Les traces distribuées (via AWS X-Ray) suivent une requête à travers les services et révèlent les latences, complétant les métriques et les journaux.
+  - type: recap
+    conceptId: c-observabilite-centralisee
+    body: |
+      Retenez l'essentiel de « Observabilité centralisée » pour la certification DOP-C02.

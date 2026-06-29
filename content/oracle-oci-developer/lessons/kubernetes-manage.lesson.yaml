@@ -1,0 +1,37 @@
+id: oracleocideveloper-l-kubernetes-manage
+trackId: oracle-oci-developer
+unitId: oracleocideveloper-u-containers
+domainId: containers
+title: "Kubernetes managé"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-kubernetes-manage
+    body: |
+      Dans l'examen 1Z0-1084-24, « Kubernetes managé » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-kubernetes-manage
+    title: "Kubernetes managé"
+    body: |
+      OKE déploie des clusters Kubernetes managés ; OCIR héberge les images. Le packaging conteneur standardise les livraisons.
+  - type: check
+    conceptId: c-kubernetes-manage
+    check:
+      id: oracleocideveloper-l-kubernetes-manage-check-1
+      conceptId: c-kubernetes-manage
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service OCI orchestre des conteneurs Kubernetes ?
+      options:
+        - { id: a, label: "OKE" }
+        - { id: b, label: "Functions" }
+        - { id: c, label: "Streaming" }
+        - { id: d, label: "ATP" }
+      correct: [a]
+      explanation: |
+        OKE est le Kubernetes managé d'OCI.
+  - type: recap
+    conceptId: c-kubernetes-manage
+    body: |
+      Retenez l'essentiel de « Kubernetes managé » pour la certification 1Z0-1084-24.

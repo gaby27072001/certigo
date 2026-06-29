@@ -1,0 +1,37 @@
+id: awsdopc02-l-infrastructure-as-code-avec-cloudformation-et-cdk
+trackId: aws-dop-c02
+unitId: awsdopc02-u-config-iac
+domainId: config-iac
+title: "Infrastructure as Code avec CloudFormation et CDK"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-infrastructure-as-code-avec-cloudformation-et-cdk
+    body: |
+      Dans l'examen DOP-C02, « Infrastructure as Code avec CloudFormation et CDK » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-infrastructure-as-code-avec-cloudformation-et-cdk
+    title: "Infrastructure as Code avec CloudFormation et CDK"
+    body: |
+      L'infrastructure as code rend les déploiements reproductibles et versionnés. AWS CloudFormation utilise des templates déclaratifs, tandis qu'AWS CDK permet de définir l'infrastructure dans un langage de programmation. La détection de dérive (drift) signale les modifications manuelles.
+  - type: check
+    conceptId: c-infrastructure-as-code-avec-cloudformation-et-cdk
+    check:
+      id: awsdopc02-l-infrastructure-as-code-avec-cloudformation-et-cdk-check-1
+      conceptId: c-infrastructure-as-code-avec-cloudformation-et-cdk
+      type: mcq
+      difficulty: 3
+      stem: |
+        Que détecte la fonction « drift detection » de CloudFormation ?
+      options:
+        - { id: a, label: "Les modifications manuelles divergentes du template d'origine" }
+        - { id: b, label: "Les pics de latence réseau" }
+        - { id: c, label: "Les coûts mensuels excessifs" }
+        - { id: d, label: "Les tentatives de connexion échouées" }
+      correct: [a]
+      explanation: |
+        La détection de dérive compare l'état réel des ressources au template de la pile et signale les changements effectués hors CloudFormation.
+  - type: recap
+    conceptId: c-infrastructure-as-code-avec-cloudformation-et-cdk
+    body: |
+      Retenez l'essentiel de « Infrastructure as Code avec CloudFormation et CDK » pour la certification DOP-C02.

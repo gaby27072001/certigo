@@ -1,0 +1,37 @@
+id: googlecrashcoursepython-l-boucles-et-conditions
+trackId: google-crash-course-python
+unitId: googlecrashcoursepython-u-control
+domainId: control
+title: "Boucles et conditions"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-boucles-et-conditions
+    body: |
+      Dans l'examen PY-CRASH, « Boucles et conditions » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-boucles-et-conditions
+    title: "Boucles et conditions"
+    body: |
+      if/else décide selon une condition ; for/while répète une action. Combinés, ils automatisent le traitement de listes et de fichiers, cœur de tout script utile.
+  - type: check
+    conceptId: c-boucles-et-conditions
+    check:
+      id: googlecrashcoursepython-l-boucles-et-conditions-check-1
+      conceptId: c-boucles-et-conditions
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel mot-clé répète une action sur chaque élément d'une liste ?
+      options:
+        - { id: a, label: "for" }
+        - { id: b, label: "print" }
+        - { id: c, label: "import" }
+        - { id: d, label: "def" }
+      correct: [a]
+      explanation: |
+        La boucle for parcourt chaque élément ; def déclare une fonction, import charge un module.
+  - type: recap
+    conceptId: c-boucles-et-conditions
+    body: |
+      Retenez l'essentiel de « Boucles et conditions » pour la certification PY-CRASH.

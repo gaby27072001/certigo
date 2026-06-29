@@ -1,0 +1,37 @@
+id: oraclejavase17-l-completablefuture
+trackId: oracle-java-se-17
+unitId: oraclejavase17-u-jvm-concurrency
+domainId: jvm-concurrency
+title: "CompletableFuture"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-completablefuture
+    body: |
+      Dans l'examen 1Z0-829, « CompletableFuture » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-completablefuture
+    title: "CompletableFuture"
+    body: |
+      CompletableFuture compose des traitements asynchrones non bloquants.
+  - type: check
+    conceptId: c-completablefuture
+    check:
+      id: oraclejavase17-l-completablefuture-check-1
+      conceptId: c-completablefuture
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel type compose des tâches async ?
+      options:
+        - { id: a, label: "CompletableFuture" }
+        - { id: b, label: "Thread brut" }
+        - { id: c, label: "String" }
+        - { id: d, label: "List" }
+      correct: [a]
+      explanation: |
+        CompletableFuture chaîne des étapes asynchrones.
+  - type: recap
+    conceptId: c-completablefuture
+    body: |
+      Retenez l'essentiel de « CompletableFuture » pour la certification 1Z0-829.

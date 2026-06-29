@@ -1,0 +1,44 @@
+# Google Cybersecurity Professional Certificate — google certification track.
+# Domain weights mirror the official CYBERSECURITY skills outline and sum to 1.0.
+id: google-cybersecurity
+code: "CYBERSECURITY"
+provider: google
+title: "Google Cybersecurity Professional Certificate"
+level: fundamentals
+sourceUrl: "https://grow.google/certificates/cybersecurity/"
+summary: |
+  Certificat débutant en cybersécurité : gestion des risques, réseaux, Linux, SQL, SIEM et réponse aux incidents. Prépare aux postes d'analyste SOC en abordant la détection des menaces et la protection des données.
+domains:
+  - id: foundations
+    name: "Fondamentaux de la sécurité"
+    weight: 0.26
+  - id: networks
+    name: "Sécurité réseau"
+    weight: 0.25
+  - id: siem-ir
+    name: "SIEM et réponse aux incidents"
+    weight: 0.27
+  - id: linux-sql
+    name: "Linux et SQL pour la sécurité"
+    weight: 0.22
+units:
+  - id: googlecybersecurity-u-foundations
+    domainId: foundations
+    title: "Fondamentaux de la sécurité"
+    lessons:
+      - googlecybersecurity-l-triade-cia-et-gestion-des-risques
+  - id: googlecybersecurity-u-networks
+    domainId: networks
+    title: "Sécurité réseau"
+    lessons:
+      - googlecybersecurity-l-menaces-et-defenses-reseau
+  - id: googlecybersecurity-u-siem-ir
+    domainId: siem-ir
+    title: "SIEM et réponse aux incidents"
+    lessons:
+      - googlecybersecurity-l-detecter-et-repondre-aux-incidents
+  - id: googlecybersecurity-u-linux-sql
+    domainId: linux-sql
+    title: "Linux et SQL pour la sécurité"
+    lessons:
+      - googlecybersecurity-l-outils-de-l-analyste

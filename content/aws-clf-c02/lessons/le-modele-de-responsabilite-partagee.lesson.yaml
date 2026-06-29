@@ -1,0 +1,37 @@
+id: awsclfc02-l-le-modele-de-responsabilite-partagee
+trackId: aws-clf-c02
+unitId: awsclfc02-u-security-compliance
+domainId: security-compliance
+title: "Le modèle de responsabilité partagée"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-le-modele-de-responsabilite-partagee
+    body: |
+      Dans l'examen CLF-C02, « Le modèle de responsabilité partagée » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-le-modele-de-responsabilite-partagee
+    title: "Le modèle de responsabilité partagée"
+    body: |
+      Dans le modèle de responsabilité partagée, AWS assure la « sécurité DU cloud » (matériel, infrastructure physique, services managés) tandis que le client assure la « sécurité DANS le cloud » (configuration IAM, chiffrement des données, mises à jour des systèmes d'exploitation qu'il gère). La frontière dépend du service utilisé.
+  - type: check
+    conceptId: c-le-modele-de-responsabilite-partagee
+    check:
+      id: awsclfc02-l-le-modele-de-responsabilite-partagee-check-1
+      conceptId: c-le-modele-de-responsabilite-partagee
+      type: mcq
+      difficulty: 1
+      stem: |
+        Selon le modèle de responsabilité partagée AWS, de quoi le client est-il responsable ?
+      options:
+        - { id: a, label: "La sécurité physique des centres de données" }
+        - { id: b, label: "La configuration des accès IAM et le chiffrement de ses données" }
+        - { id: c, label: "La maintenance du matériel réseau d'AWS" }
+        - { id: d, label: "L'alimentation électrique des serveurs" }
+      correct: [b]
+      explanation: |
+        Le client gère la sécurité « dans » le cloud : identités, permissions, chiffrement et données. AWS gère la sécurité « du » cloud (infrastructure physique).
+  - type: recap
+    conceptId: c-le-modele-de-responsabilite-partagee
+    body: |
+      Retenez l'essentiel de « Le modèle de responsabilité partagée » pour la certification CLF-C02.

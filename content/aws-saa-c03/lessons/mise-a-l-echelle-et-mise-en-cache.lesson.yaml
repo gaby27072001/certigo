@@ -1,0 +1,37 @@
+id: awssaac03-l-mise-a-l-echelle-et-mise-en-cache
+trackId: aws-saa-c03
+unitId: awssaac03-u-performant-architectures
+domainId: performant-architectures
+title: "Mise à l'échelle et mise en cache"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-mise-a-l-echelle-et-mise-en-cache
+    body: |
+      Dans l'examen SAA-C03, « Mise à l'échelle et mise en cache » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-mise-a-l-echelle-et-mise-en-cache
+    title: "Mise à l'échelle et mise en cache"
+    body: |
+      La performance se conçoit en choisissant le bon type de calcul et de stockage, en mettant à l'échelle horizontalement, et en réduisant la latence par la mise en cache : Amazon CloudFront pour le contenu statique en périphérie, Amazon ElastiCache pour les données fréquemment lues.
+  - type: check
+    conceptId: c-mise-a-l-echelle-et-mise-en-cache
+    check:
+      id: awssaac03-l-mise-a-l-echelle-et-mise-en-cache-check-1
+      conceptId: c-mise-a-l-echelle-et-mise-en-cache
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service réduit la latence en diffusant du contenu depuis des emplacements proches des utilisateurs ?
+      options:
+        - { id: a, label: "Amazon CloudFront" }
+        - { id: b, label: "Amazon EBS" }
+        - { id: c, label: "AWS IAM" }
+        - { id: d, label: "Amazon SQS" }
+      correct: [a]
+      explanation: |
+        Amazon CloudFront est un réseau de diffusion de contenu (CDN) qui met en cache le contenu dans des points de présence proches des utilisateurs, réduisant la latence.
+  - type: recap
+    conceptId: c-mise-a-l-echelle-et-mise-en-cache
+    body: |
+      Retenez l'essentiel de « Mise à l'échelle et mise en cache » pour la certification SAA-C03.

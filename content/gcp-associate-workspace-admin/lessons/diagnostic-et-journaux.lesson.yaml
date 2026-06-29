@@ -1,0 +1,37 @@
+id: gcpassociateworkspaceadmin-l-diagnostic-et-journaux
+trackId: gcp-associate-workspace-admin
+unitId: gcpassociateworkspaceadmin-u-support-ops
+domainId: support-ops
+title: "Diagnostic et journaux"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-diagnostic-et-journaux
+    body: |
+      Dans l'examen AGWA, « Diagnostic et journaux » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-diagnostic-et-journaux
+    title: "Diagnostic et journaux"
+    body: |
+      Les rapports et journaux d'audit aident à diagnostiquer. Les outils Toolbox et logs d'email tracent les incidents quotidiens.
+  - type: check
+    conceptId: c-diagnostic-et-journaux
+    check:
+      id: gcpassociateworkspaceadmin-l-diagnostic-et-journaux-check-1
+      conceptId: c-diagnostic-et-journaux
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que consulte-t-on pour tracer un email problématique ?
+      options:
+        - { id: a, label: "Les journaux et rapports d'audit" }
+        - { id: b, label: "Le DNS" }
+        - { id: c, label: "Le CDN" }
+        - { id: d, label: "Le VPC" }
+      correct: [a]
+      explanation: |
+        Les journaux d'audit retracent l'activité.
+  - type: recap
+    conceptId: c-diagnostic-et-journaux
+    body: |
+      Retenez l'essentiel de « Diagnostic et journaux » pour la certification AGWA.

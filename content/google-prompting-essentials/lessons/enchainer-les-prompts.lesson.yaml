@@ -1,0 +1,37 @@
+id: googlepromptingessentials-l-enchainer-les-prompts
+trackId: google-prompting-essentials
+unitId: googlepromptingessentials-u-chaining
+domainId: chaining
+title: "Enchaîner les prompts"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-enchainer-les-prompts
+    body: |
+      Dans l'examen PROMPTING, « Enchaîner les prompts » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-enchainer-les-prompts
+    title: "Enchaîner les prompts"
+    body: |
+      Décomposer une tâche complexe en plusieurs prompts successifs (analyser puis rédiger puis vérifier) donne de meilleurs résultats qu'une seule consigne. L'itération affine progressivement la sortie.
+  - type: check
+    conceptId: c-enchainer-les-prompts
+    check:
+      id: googlepromptingessentials-l-enchainer-les-prompts-check-1
+      conceptId: c-enchainer-les-prompts
+      type: mcq
+      difficulty: 2
+      stem: |
+        Pourquoi enchaîner plusieurs prompts ?
+      options:
+        - { id: a, label: "Décomposer une tâche complexe pour de meilleurs résultats" }
+        - { id: b, label: "Ralentir le travail" }
+        - { id: c, label: "Augmenter les erreurs" }
+        - { id: d, label: "Éviter toute relecture" }
+      correct: [a]
+      explanation: |
+        Découper en étapes guide l'IA et améliore la qualité finale.
+  - type: recap
+    conceptId: c-enchainer-les-prompts
+    body: |
+      Retenez l'essentiel de « Enchaîner les prompts » pour la certification PROMPTING.

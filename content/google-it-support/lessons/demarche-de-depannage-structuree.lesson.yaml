@@ -1,0 +1,37 @@
+id: googleitsupport-l-demarche-de-depannage-structuree
+trackId: google-it-support
+unitId: googleitsupport-u-troubleshooting
+domainId: troubleshooting
+title: "Démarche de dépannage structurée"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-demarche-de-depannage-structuree
+    body: |
+      Dans l'examen IT-SUPPORT, « Démarche de dépannage structurée » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-demarche-de-depannage-structuree
+    title: "Démarche de dépannage structurée"
+    body: |
+      Un bon support IT suit une méthode : reproduire le problème, isoler la cause (matériel, logiciel, réseau, utilisateur), tester une hypothèse à la fois, documenter la résolution. La communication empathique avec l'utilisateur est aussi importante que la compétence technique.
+  - type: check
+    conceptId: c-demarche-de-depannage-structuree
+    check:
+      id: googleitsupport-l-demarche-de-depannage-structuree-check-1
+      conceptId: c-demarche-de-depannage-structuree
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle est la première étape recommandée face à un incident utilisateur ?
+      options:
+        - { id: a, label: "Reproduire et comprendre le problème avant d'agir" }
+        - { id: b, label: "Réinstaller immédiatement le système" }
+        - { id: c, label: "Remplacer le matériel sans diagnostic" }
+        - { id: d, label: "Ignorer l'utilisateur pour gagner du temps" }
+      correct: [a]
+      explanation: |
+        On reproduit et on cerne le problème d'abord ; agir sans diagnostic risque d'aggraver la situation.
+  - type: recap
+    conceptId: c-demarche-de-depannage-structuree
+    body: |
+      Retenez l'essentiel de « Démarche de dépannage structurée » pour la certification IT-SUPPORT.

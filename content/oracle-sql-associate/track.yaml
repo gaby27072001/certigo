@@ -1,0 +1,37 @@
+# Oracle Database SQL Certified Associate — oracle certification track.
+# Domain weights mirror the official 1Z0-071 skills outline and sum to 1.0.
+id: oracle-sql-associate
+code: "1Z0-071"
+provider: oracle
+title: "Oracle Database SQL Certified Associate"
+level: associate
+examCode: "1Z0-071"
+sourceUrl: "https://education.oracle.com/oracle-database-sql/pexam_1Z0-071"
+summary: |
+  Valide la maîtrise du SQL Oracle : requêtes, jointures, fonctions, DDL et gestion des données. Pour développeurs et analystes.
+domains:
+  - id: queries
+    name: "Requêtes"
+    weight: 0.35
+  - id: joins-subqueries
+    name: "Jointures et sous-requêtes"
+    weight: 0.35
+  - id: ddl
+    name: "DDL et contraintes"
+    weight: 0.3
+units:
+  - id: oraclesqlassociate-u-queries
+    domainId: queries
+    title: "Requêtes"
+    lessons:
+      - oraclesqlassociate-l-select-et-fonctions
+  - id: oraclesqlassociate-u-joins-subqueries
+    domainId: joins-subqueries
+    title: "Jointures et sous-requêtes"
+    lessons:
+      - oraclesqlassociate-l-join-et-sous-requetes
+  - id: oraclesqlassociate-u-ddl
+    domainId: ddl
+    title: "DDL et contraintes"
+    lessons:
+      - oraclesqlassociate-l-create-et-contraintes

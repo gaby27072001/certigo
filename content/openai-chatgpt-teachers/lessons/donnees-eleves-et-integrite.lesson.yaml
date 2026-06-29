@@ -1,0 +1,37 @@
+id: openaichatgptteachers-l-donnees-eleves-et-integrite
+trackId: openai-chatgpt-teachers
+unitId: openaichatgptteachers-u-ethics
+domainId: ethics
+title: "Données élèves et intégrité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-donnees-eleves-et-integrite
+    body: |
+      Dans l'examen CHATGPT-EDU, « Données élèves et intégrité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-donnees-eleves-et-integrite
+    title: "Données élèves et intégrité"
+    body: |
+      Protéger les données des élèves, citer l'IA et encadrer son usage évitent les dérives. L'éthique guide une intégration responsable de ChatGPT en éducation.
+  - type: check
+    conceptId: c-donnees-eleves-et-integrite
+    check:
+      id: openaichatgptteachers-l-donnees-eleves-et-integrite-check-1
+      conceptId: c-donnees-eleves-et-integrite
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle règle éthique appliquer en classe ?
+      options:
+        - { id: a, label: "Protéger les données élèves et encadrer l'usage" }
+        - { id: b, label: "Partager les copies en ligne" }
+        - { id: c, label: "Désactiver la vie privée" }
+        - { id: d, label: "Cacher l'usage de l'IA" }
+      correct: [a]
+      explanation: |
+        Confidentialité et transparence fondent un usage responsable.
+  - type: recap
+    conceptId: c-donnees-eleves-et-integrite
+    body: |
+      Retenez l'essentiel de « Données élèves et intégrité » pour la certification CHATGPT-EDU.

@@ -1,0 +1,37 @@
+id: gcppcne-l-vpc-sous-reseaux-et-routes
+trackId: gcp-pcne
+unitId: gcppcne-u-vpc-design
+domainId: vpc-design
+title: "VPC, sous-réseaux et routes"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-vpc-sous-reseaux-et-routes
+    body: |
+      Dans l'examen PCNE, « VPC, sous-réseaux et routes » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-vpc-sous-reseaux-et-routes
+    title: "VPC, sous-réseaux et routes"
+    body: |
+      Un VPC global segmente en sous-réseaux régionaux ; routes et pare-feu contrôlent le trafic. Le VPC partagé centralise la connectivité.
+  - type: check
+    conceptId: c-vpc-sous-reseaux-et-routes
+    check:
+      id: gcppcne-l-vpc-sous-reseaux-et-routes-check-1
+      conceptId: c-vpc-sous-reseaux-et-routes
+      type: mcq
+      difficulty: 2
+      stem: |
+        À quelle portée appartient un sous-réseau VPC ?
+      options:
+        - { id: a, label: "Régionale" }
+        - { id: b, label: "Zonale" }
+        - { id: c, label: "Mondiale" }
+        - { id: d, label: "Locale machine" }
+      correct: [a]
+      explanation: |
+        Les sous-réseaux sont régionaux dans un VPC global.
+  - type: recap
+    conceptId: c-vpc-sous-reseaux-et-routes
+    body: |
+      Retenez l'essentiel de « VPC, sous-réseaux et routes » pour la certification PCNE.

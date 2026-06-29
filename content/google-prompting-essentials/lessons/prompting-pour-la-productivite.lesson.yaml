@@ -1,0 +1,37 @@
+id: googlepromptingessentials-l-prompting-pour-la-productivite
+trackId: google-prompting-essentials
+unitId: googlepromptingessentials-u-apply
+domainId: apply
+title: "Prompting pour la productivité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-prompting-pour-la-productivite
+    body: |
+      Dans l'examen PROMPTING, « Prompting pour la productivité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-prompting-pour-la-productivite
+    title: "Prompting pour la productivité"
+    body: |
+      Le prompting accélère résumés, brouillons, analyses et brainstorming. On reste critique sur les résultats et on protège les données sensibles. L'IA amplifie, l'humain valide.
+  - type: check
+    conceptId: c-prompting-pour-la-productivite
+    check:
+      id: googlepromptingessentials-l-prompting-pour-la-productivite-check-1
+      conceptId: c-prompting-pour-la-productivite
+      type: mcq
+      difficulty: 1
+      stem: |
+        Comment utiliser l'IA générative de façon productive ?
+      options:
+        - { id: a, label: "Pour brouillons et analyses, en validant les résultats" }
+        - { id: b, label: "En diffusant sans vérifier" }
+        - { id: c, label: "En partageant des secrets" }
+        - { id: d, label: "Sans aucun objectif" }
+      correct: [a]
+      explanation: |
+        L'IA accélère le travail mais l'humain valide et protège les données sensibles.
+  - type: recap
+    conceptId: c-prompting-pour-la-productivite
+    body: |
+      Retenez l'essentiel de « Prompting pour la productivité » pour la certification PROMPTING.

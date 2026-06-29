@@ -2,9 +2,9 @@
 
 # 🟢 Microlingo — État vivant du projet
 
-**Le « Duolingo des certifications Microsoft » — apprendre Azure / IA / sécurité par micro‑leçons gamifiées.**
+**Le « Duolingo des certifications cloud & tech » — Microsoft, AWS, Google, Oracle, Anthropic, OpenAI par micro‑leçons gamifiées.**
 
-`🟢 Backend riche` · `🟢 Contenu 89 certifs` · `🟢 Gamification` · `🟢 Tuteur IA` · `🟢 Offline‑first` · `🟢 Mobile : écrans branchés` · `🟡 Infra non déployée`
+`🟢 Backend riche` · `🟢 Contenu 153 certifs · 6 fournisseurs` · `🟢 Gamification` · `🟢 Tuteur IA` · `🟢 Offline‑first` · `🟢 Mobile : écrans branchés` · `🟡 Infra non déployée`
 
 </div>
 
@@ -37,7 +37,7 @@
 |---|:---:|---|---|
 | **API backend** | 🟢 | `backend/src/Microlingo.Api` | Azure Functions .NET 8 isolé, **17 groupes / ≈ 28 endpoints**. |
 | **Moteurs métier** | 🟢 | `backend/src/Microlingo.Domain` | Logique **pure & testée** : contenu, progression, gamification, examen, tuteur, reco, notifications, intégrité. |
-| **Contenu pédagogique** | 🟢 | `content/` | **89 certifications actives · 144 leçons** en YAML, validées par schémas JSON. |
+| **Contenu pédagogique** | 🟢 | `content/` | **153 certifications · 6 fournisseurs · 400 leçons** en YAML, validées par schémas JSON. |
 | **Gamification** | 🟢 | Domain `Gamification/` | XP, streak (+réparation), ligues hebdo, **saisons**, quêtes, succès, boutique, amis. |
 | **Tuteur IA** | 🟢 | Domain `Tutor/` + mobile `features/tutor` | Explications ancrées sur le contenu — **branché côté serveur ET mobile** (`tutor_sheet`). *(Le moteur est actuellement un adaptateur nul — `NullTutorCompletion` — qui retourne une chaîne vide. Un vrai LLM sera branché via `ITutorCompletion`, voir H19.)* |
 | **Recommandation + coach** | 🟢 | Domain `Recommendation/` + `home/coach_section` | Moteur « next best » + coach IA sur l'accueil. |
@@ -64,7 +64,7 @@ graph TD
     ROOT --> BE["⚙️ backend/<br/>Azure Functions .NET 8"]
     ROOT --> APP["📱 apps/mobile/<br/>App Flutter"]
     ROOT --> PKG["🧩 packages/<br/>Paquets Dart partagés"]
-    ROOT --> CNT["📚 content/<br/>89 certifs · 144 leçons (YAML)"]
+    ROOT --> CNT["📚 content/<br/>153 certifs · 6 fournisseurs · 400 leçons (YAML)"]
     ROOT --> INF["🏗️ infra/<br/>8 modules Bicep"]
     ROOT --> CI[".github/workflows/<br/>6 pipelines"]
     ROOT --> DOC["📄 docs/<br/>README · ARCHITECTURE · ÉTAT"]
@@ -141,16 +141,22 @@ flowchart LR
 
 ```mermaid
 graph LR
-    C["📚 content/"] --> ACT["89 certifications actives"]
-    C --> RICH["5 tracks complets<br/>AZ-900 · AZ-104 · AI-900 · DP-900 · SC-900"]
-    C --> MIN["84 tracks catalogue<br/>1 leçon d'amorçage chacun"]
+    C["📚 content/"] --> MS["Microsoft · 89"]
+    C --> GO["Google · 26<br/>Cloud + Career Certs"]
+    C --> OR["Oracle · 24"]
+    C --> AW["AWS · 11"]
+    C --> AI["OpenAI · 2 · Anthropic · 1"]
 ```
 
-| Couverture | Domaines | Leçons | Format |
-|---|:---:|:---:|---|
-| **Tracks complets existants** | 21 (cumul) | 60 | `content/{az-900,az-104,ai-900,dp-900,sc-900}` |
-| **Tracks catalogue ajoutés** | 1 chacun | 84 | `content/<certification-active>/track.yaml` + `lessons/*.lesson.yaml` |
-| **Total** | — | **144** | **89 certifications actives** validées par `content/schema/{lesson,track}.schema.json` |
+| Fournisseur | Tracks | Préfixe id | Exemples |
+|---|:---:|---|---|
+| **Microsoft** | 89 | `az-…`, `ai-…`, `sc-…` | AZ-900, AI-900, DP-900 |
+| **Google** | 26 | `gcp-…`, `google-…` | gcp-pca, google-it-support |
+| **Oracle** | 24 | `oracle-…` | oracle-oci-foundations, oracle-java-se-17 |
+| **AWS** | 11 | `aws-…` | aws-saa-c03, aws-clf-c02 |
+| **OpenAI** | 2 | `openai-…` | openai-ai-foundations |
+| **Anthropic** | 1 | `anthropic-…` | anthropic-cca-f |
+| **Total** | **153** | — | **400 leçons** validées par `content/schema/{lesson,track}.schema.json` |
 
 ---
 

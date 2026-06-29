@@ -3,6 +3,7 @@
 # Domain weights mirror the public AZ-104 exam skills outline and sum to 1.0.
 id: az-104
 code: AZ-104
+provider: microsoft
 title: Microsoft Azure Administrator
 level: associate
 summary: >

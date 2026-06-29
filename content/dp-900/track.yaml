@@ -3,6 +3,7 @@
 # Domain weights mirror the public DP-900 exam skills outline and sum to 1.0.
 id: dp-900
 code: DP-900
+provider: microsoft
 title: Microsoft Azure Data Fundamentals
 level: fundamentals
 summary: >

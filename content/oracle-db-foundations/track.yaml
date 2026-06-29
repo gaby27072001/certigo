@@ -1,0 +1,37 @@
+# Oracle Database Foundations — oracle certification track.
+# Domain weights mirror the official 1Z0-006 skills outline and sum to 1.0.
+id: oracle-db-foundations
+code: "1Z0-006"
+provider: oracle
+title: "Oracle Database Foundations"
+level: fundamentals
+examCode: "1Z0-006"
+sourceUrl: "https://education.oracle.com/"
+summary: |
+  Valide les fondations des bases de données relationnelles et de SQL sur Oracle. Pour profils débutants en données.
+domains:
+  - id: relational
+    name: "Modèle relationnel"
+    weight: 0.4
+  - id: sql-basics
+    name: "SQL de base"
+    weight: 0.4
+  - id: dml
+    name: "Manipulation de données"
+    weight: 0.2
+units:
+  - id: oracledbfoundations-u-relational
+    domainId: relational
+    title: "Modèle relationnel"
+    lessons:
+      - oracledbfoundations-l-tables-cles-relations
+  - id: oracledbfoundations-u-sql-basics
+    domainId: sql-basics
+    title: "SQL de base"
+    lessons:
+      - oracledbfoundations-l-select-where-join
+  - id: oracledbfoundations-u-dml
+    domainId: dml
+    title: "Manipulation de données"
+    lessons:
+      - oracledbfoundations-l-insert-update-delete

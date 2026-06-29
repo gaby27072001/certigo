@@ -1,0 +1,37 @@
+id: openaiaifoundations-l-biais-confidentialite-verification
+trackId: openai-ai-foundations
+unitId: openaiaifoundations-u-responsible-ai
+domainId: responsible-ai
+title: "Biais, confidentialité, vérification"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-biais-confidentialite-verification
+    body: |
+      Dans l'examen AI-FOUND, « Biais, confidentialité, vérification » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-biais-confidentialite-verification
+    title: "Biais, confidentialité, vérification"
+    body: |
+      L'IA peut produire des biais ou des erreurs et ne doit pas recevoir de données sensibles non autorisées. Vérifier les faits et protéger la confidentialité sont des règles de base d'un usage responsable.
+  - type: check
+    conceptId: c-biais-confidentialite-verification
+    check:
+      id: openaiaifoundations-l-biais-confidentialite-verification-check-1
+      conceptId: c-biais-confidentialite-verification
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle pratique relève d'un usage responsable ?
+      options:
+        - { id: a, label: "Vérifier les faits et protéger les données sensibles" }
+        - { id: b, label: "Coller des secrets dans le prompt" }
+        - { id: c, label: "Publier sans relecture" }
+        - { id: d, label: "Ignorer les biais" }
+      correct: [a]
+      explanation: |
+        Vérification et confidentialité limitent risques et erreurs.
+  - type: recap
+    conceptId: c-biais-confidentialite-verification
+    body: |
+      Retenez l'essentiel de « Biais, confidentialité, vérification » pour la certification AI-FOUND.

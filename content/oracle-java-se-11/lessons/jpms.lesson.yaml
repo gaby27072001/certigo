@@ -1,0 +1,37 @@
+id: oraclejavase11-l-jpms
+trackId: oracle-java-se-11
+unitId: oraclejavase11-u-modules
+domainId: modules
+title: "JPMS"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-jpms
+    body: |
+      Dans l'examen 1Z0-819, « JPMS » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-jpms
+    title: "JPMS"
+    body: |
+      Le module-info.java déclare exports/requires pour un fort encapsulage.
+  - type: check
+    conceptId: c-jpms
+    check:
+      id: oraclejavase11-l-jpms-check-1
+      conceptId: c-jpms
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel fichier déclare un module Java ?
+      options:
+        - { id: a, label: "module-info.java" }
+        - { id: b, label: "pom.xml" }
+        - { id: c, label: "manifest" }
+        - { id: d, label: "build.gradle" }
+      correct: [a]
+      explanation: |
+        module-info.java définit le module.
+  - type: recap
+    conceptId: c-jpms
+    body: |
+      Retenez l'essentiel de « JPMS » pour la certification 1Z0-819.

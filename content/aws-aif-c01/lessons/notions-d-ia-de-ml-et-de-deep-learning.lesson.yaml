@@ -1,0 +1,37 @@
+id: awsaifc01-l-notions-d-ia-de-ml-et-de-deep-learning
+trackId: aws-aif-c01
+unitId: awsaifc01-u-ai-ml-fundamentals
+domainId: ai-ml-fundamentals
+title: "Notions d'IA, de ML et de deep learning"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-notions-d-ia-de-ml-et-de-deep-learning
+    body: |
+      Dans l'examen AIF-C01, « Notions d'IA, de ML et de deep learning » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-notions-d-ia-de-ml-et-de-deep-learning
+    title: "Notions d'IA, de ML et de deep learning"
+    body: |
+      L'intelligence artificielle est l'ensemble des techniques permettant aux machines d'imiter des comportements intelligents. Le machine learning en est un sous-ensemble qui apprend à partir de données (apprentissage supervisé, non supervisé, par renforcement). Le deep learning utilise des réseaux de neurones profonds.
+  - type: check
+    conceptId: c-notions-d-ia-de-ml-et-de-deep-learning
+    check:
+      id: awsaifc01-l-notions-d-ia-de-ml-et-de-deep-learning-check-1
+      conceptId: c-notions-d-ia-de-ml-et-de-deep-learning
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel type d'apprentissage automatique utilise des données étiquetées pour prédire une sortie connue ?
+      options:
+        - { id: a, label: "Apprentissage non supervisé" }
+        - { id: b, label: "Apprentissage supervisé" }
+        - { id: c, label: "Apprentissage par renforcement" }
+        - { id: d, label: "Apprentissage par regroupement" }
+      correct: [b]
+      explanation: |
+        L'apprentissage supervisé s'entraîne sur des données étiquetées (entrée + réponse attendue) pour prédire des sorties, comme la classification ou la régression.
+  - type: recap
+    conceptId: c-notions-d-ia-de-ml-et-de-deep-learning
+    body: |
+      Retenez l'essentiel de « Notions d'IA, de ML et de deep learning » pour la certification AIF-C01.

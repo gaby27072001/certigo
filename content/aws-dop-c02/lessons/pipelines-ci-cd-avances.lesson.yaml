@@ -1,0 +1,37 @@
+id: awsdopc02-l-pipelines-ci-cd-avances
+trackId: aws-dop-c02
+unitId: awsdopc02-u-sdlc-automation
+domainId: sdlc-automation
+title: "Pipelines CI/CD avancés"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-pipelines-ci-cd-avances
+    body: |
+      Dans l'examen DOP-C02, « Pipelines CI/CD avancés » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-pipelines-ci-cd-avances
+    title: "Pipelines CI/CD avancés"
+    body: |
+      Un pipeline CI/CD mature automatise build, tests et déploiement avec CodePipeline et CodeBuild, en intégrant des tests automatisés et des stratégies de déploiement progressives (blue/green, canary) pour limiter le risque de régression.
+  - type: check
+    conceptId: c-pipelines-ci-cd-avances
+    check:
+      id: awsdopc02-l-pipelines-ci-cd-avances-check-1
+      conceptId: c-pipelines-ci-cd-avances
+      type: mcq
+      difficulty: 3
+      stem: |
+        Quelle stratégie de déploiement bascule progressivement le trafic vers la nouvelle version pour limiter le risque ?
+      options:
+        - { id: a, label: "Le déploiement canary" }
+        - { id: b, label: "La suppression directe de l'ancienne version" }
+        - { id: c, label: "Le redémarrage simultané de tous les serveurs" }
+        - { id: d, label: "La copie manuelle des fichiers" }
+      correct: [a]
+      explanation: |
+        Le déploiement canary dirige d'abord une petite fraction du trafic vers la nouvelle version pour détecter les problèmes avant un déploiement complet.
+  - type: recap
+    conceptId: c-pipelines-ci-cd-avances
+    body: |
+      Retenez l'essentiel de « Pipelines CI/CD avancés » pour la certification DOP-C02.

@@ -1,0 +1,37 @@
+id: oraclesqlassociate-l-join-et-sous-requetes
+trackId: oracle-sql-associate
+unitId: oraclesqlassociate-u-joins-subqueries
+domainId: joins-subqueries
+title: "JOIN et sous-requêtes"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-join-et-sous-requetes
+    body: |
+      Dans l'examen 1Z0-071, « JOIN et sous-requêtes » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-join-et-sous-requetes
+    title: "JOIN et sous-requêtes"
+    body: |
+      Les sous-requêtes et jointures composent des résultats complexes.
+  - type: check
+    conceptId: c-join-et-sous-requetes
+    check:
+      id: oraclesqlassociate-l-join-et-sous-requetes-check-1
+      conceptId: c-join-et-sous-requetes
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel type de jointure garde les lignes sans correspondance ?
+      options:
+        - { id: a, label: "OUTER JOIN" }
+        - { id: b, label: "INNER JOIN" }
+        - { id: c, label: "CROSS JOIN" }
+        - { id: d, label: "SELF JOIN seul" }
+      correct: [a]
+      explanation: |
+        OUTER JOIN conserve les lignes non appariées.
+  - type: recap
+    conceptId: c-join-et-sous-requetes
+    body: |
+      Retenez l'essentiel de « JOIN et sous-requêtes » pour la certification 1Z0-071.

@@ -1,0 +1,37 @@
+id: awsaifc01-l-principes-d-ia-responsable
+trackId: aws-aif-c01
+unitId: awsaifc01-u-responsible-ai
+domainId: responsible-ai
+title: "Principes d'IA responsable"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-principes-d-ia-responsable
+    body: |
+      Dans l'examen AIF-C01, « Principes d'IA responsable » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-principes-d-ia-responsable
+    title: "Principes d'IA responsable"
+    body: |
+      Une IA responsable veille à l'équité (limiter les biais), la transparence et l'explicabilité des décisions, la robustesse et la protection de la vie privée. Sur AWS, Amazon Bedrock Guardrails permet de filtrer les contenus indésirables et d'appliquer des garde-fous.
+  - type: check
+    conceptId: c-principes-d-ia-responsable
+    check:
+      id: awsaifc01-l-principes-d-ia-responsable-check-1
+      conceptId: c-principes-d-ia-responsable
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel risque l'IA responsable cherche-t-elle à atténuer en priorité dans les modèles ?
+      options:
+        - { id: a, label: "La latence réseau" }
+        - { id: b, label: "Les biais et l'iniquité des décisions" }
+        - { id: c, label: "Le coût du stockage S3" }
+        - { id: d, label: "La taille des images Docker" }
+      correct: [b]
+      explanation: |
+        L'IA responsable vise à réduire les biais et garantir l'équité, la transparence et le respect de la vie privée des décisions automatisées.
+  - type: recap
+    conceptId: c-principes-d-ia-responsable
+    body: |
+      Retenez l'essentiel de « Principes d'IA responsable » pour la certification AIF-C01.

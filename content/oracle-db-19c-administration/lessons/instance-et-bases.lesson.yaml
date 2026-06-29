@@ -1,0 +1,37 @@
+id: oracledb19cadministration-l-instance-et-bases
+trackId: oracle-db-19c-administration
+unitId: oracledb19cadministration-u-architecture
+domainId: architecture
+title: "Instance et bases"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-instance-et-bases
+    body: |
+      Dans l'examen 1Z0-082, « Instance et bases » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-instance-et-bases
+    title: "Instance et bases"
+    body: |
+      Une instance (mémoire+processus) ouvre une base ; SGA et PGA gèrent la mémoire.
+  - type: check
+    conceptId: c-instance-et-bases
+    check:
+      id: oracledb19cadministration-l-instance-et-bases-check-1
+      conceptId: c-instance-et-bases
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle zone mémoire est partagée par l'instance ?
+      options:
+        - { id: a, label: "SGA" }
+        - { id: b, label: "PGA" }
+        - { id: c, label: "Buffer client" }
+        - { id: d, label: "Disque" }
+      correct: [a]
+      explanation: |
+        La SGA est la mémoire partagée de l'instance.
+  - type: recap
+    conceptId: c-instance-et-bases
+    body: |
+      Retenez l'essentiel de « Instance et bases » pour la certification 1Z0-082.

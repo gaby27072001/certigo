@@ -1,0 +1,37 @@
+id: oracleocisecurityprofessional-l-cloud-guard-et-security-zones
+trackId: oracle-oci-security-professional
+unitId: oracleocisecurityprofessional-u-threat-detection
+domainId: threat-detection
+title: "Cloud Guard et Security Zones"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-cloud-guard-et-security-zones
+    body: |
+      Dans l'examen 1Z0-1104-24, « Cloud Guard et Security Zones » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-cloud-guard-et-security-zones
+    title: "Cloud Guard et Security Zones"
+    body: |
+      Cloud Guard détecte les écarts ; Security Zones imposent des garde-fous sur des compartiments sensibles.
+  - type: check
+    conceptId: c-cloud-guard-et-security-zones
+    check:
+      id: oracleocisecurityprofessional-l-cloud-guard-et-security-zones-check-1
+      conceptId: c-cloud-guard-et-security-zones
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service applique des règles de posture par compartiment ?
+      options:
+        - { id: a, label: "Security Zones" }
+        - { id: b, label: "NAT" }
+        - { id: c, label: "OCIR" }
+        - { id: d, label: "ATP" }
+      correct: [a]
+      explanation: |
+        Security Zones empêche les configurations non conformes.
+  - type: recap
+    conceptId: c-cloud-guard-et-security-zones
+    body: |
+      Retenez l'essentiel de « Cloud Guard et Security Zones » pour la certification 1Z0-1104-24.

@@ -1,0 +1,37 @@
+id: googleprojectmanagement-l-scrum-et-sprints
+trackId: google-project-management
+unitId: googleprojectmanagement-u-agile
+domainId: agile
+title: "Scrum et sprints"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-scrum-et-sprints
+    body: |
+      Dans l'examen PROJECT-MGMT, « Scrum et sprints » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-scrum-et-sprints
+    title: "Scrum et sprints"
+    body: |
+      Scrum organise le travail en sprints courts avec backlog, daily, revue et rétrospective. Cette approche itérative livre de la valeur tôt et s'adapte au changement, contrairement au cycle en cascade.
+  - type: check
+    conceptId: c-scrum-et-sprints
+    check:
+      id: googleprojectmanagement-l-scrum-et-sprints-check-1
+      conceptId: c-scrum-et-sprints
+      type: mcq
+      difficulty: 2
+      stem: |
+        Que produit un sprint Scrum ?
+      options:
+        - { id: a, label: "Un incrément de produit livrable" }
+        - { id: b, label: "Un rapport annuel" }
+        - { id: c, label: "Un budget définitif" }
+        - { id: d, label: "Un seul document" }
+      correct: [a]
+      explanation: |
+        Chaque sprint vise un incrément utilisable, permettant feedback et adaptation rapides.
+  - type: recap
+    conceptId: c-scrum-et-sprints
+    body: |
+      Retenez l'essentiel de « Scrum et sprints » pour la certification PROJECT-MGMT.

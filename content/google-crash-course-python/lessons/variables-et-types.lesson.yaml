@@ -1,0 +1,44 @@
+id: googlecrashcoursepython-l-variables-et-types
+trackId: google-crash-course-python
+unitId: googlecrashcoursepython-u-syntax
+domainId: syntax
+title: "Variables et types"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-variables-et-types
+    body: |
+      Dans l'examen PY-CRASH, « Variables et types » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-variables-et-types
+    title: "Variables et types"
+    body: |
+      Python stocke des valeurs dans des variables typées dynamiquement (texte, nombres, listes). Une syntaxe lisible en fait un excellent premier langage pour automatiser et analyser.
+  - type: code
+    conceptId: c-variables-et-types
+    language: python
+    code: |
+      nom = "Ada"
+      age = 30
+      print(f"{nom} a {age} ans")
+  - type: check
+    conceptId: c-variables-et-types
+    check:
+      id: googlecrashcoursepython-l-variables-et-types-check-1
+      conceptId: c-variables-et-types
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que fait Python d'une variable comme age = 30 ?
+      options:
+        - { id: a, label: "Elle stocke la valeur 30, type déduit automatiquement" }
+        - { id: b, label: "Elle supprime le programme" }
+        - { id: c, label: "Elle ferme le réseau" }
+        - { id: d, label: "Elle imprime du papier" }
+      correct: [a]
+      explanation: |
+        Python déduit le type ; la variable conserve la valeur pour la réutiliser.
+  - type: recap
+    conceptId: c-variables-et-types
+    body: |
+      Retenez l'essentiel de « Variables et types » pour la certification PY-CRASH.

@@ -1,0 +1,37 @@
+id: gcpace-l-projets-facturation-et-gcloud
+trackId: gcp-ace
+unitId: gcpace-u-setup-env
+domainId: setup-env
+title: "Projets, facturation et gcloud"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-projets-facturation-et-gcloud
+    body: |
+      Dans l'examen ACE, « Projets, facturation et gcloud » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-projets-facturation-et-gcloud
+    title: "Projets, facturation et gcloud"
+    body: |
+      Tout commence par un projet rattaché à un compte de facturation. gcloud CLI gère ressources et configurations. La hiérarchie organisation > dossiers > projets structure la gouvernance.
+  - type: check
+    conceptId: c-projets-facturation-et-gcloud
+    check:
+      id: gcpace-l-projets-facturation-et-gcloud-check-1
+      conceptId: c-projets-facturation-et-gcloud
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel outil en ligne de commande gère les ressources Google Cloud ?
+      options:
+        - { id: a, label: "gcloud" }
+        - { id: b, label: "kubectl seul" }
+        - { id: c, label: "terraform seul" }
+        - { id: d, label: "ssh" }
+      correct: [a]
+      explanation: |
+        gcloud est la CLI principale de Google Cloud.
+  - type: recap
+    conceptId: c-projets-facturation-et-gcloud
+    body: |
+      Retenez l'essentiel de « Projets, facturation et gcloud » pour la certification ACE.

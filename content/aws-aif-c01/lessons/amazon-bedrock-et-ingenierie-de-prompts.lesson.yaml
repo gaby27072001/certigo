@@ -1,0 +1,37 @@
+id: awsaifc01-l-amazon-bedrock-et-ingenierie-de-prompts
+trackId: aws-aif-c01
+unitId: awsaifc01-u-foundation-models
+domainId: foundation-models
+title: "Amazon Bedrock et ingénierie de prompts"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-amazon-bedrock-et-ingenierie-de-prompts
+    body: |
+      Dans l'examen AIF-C01, « Amazon Bedrock et ingénierie de prompts » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-amazon-bedrock-et-ingenierie-de-prompts
+    title: "Amazon Bedrock et ingénierie de prompts"
+    body: |
+      Amazon Bedrock donne accès via une API à des modèles de fondation de plusieurs fournisseurs. On améliore les réponses par l'ingénierie de prompts, la génération augmentée par récupération (RAG) qui injecte des données de l'entreprise, et le fine-tuning pour spécialiser un modèle.
+  - type: check
+    conceptId: c-amazon-bedrock-et-ingenierie-de-prompts
+    check:
+      id: awsaifc01-l-amazon-bedrock-et-ingenierie-de-prompts-check-1
+      conceptId: c-amazon-bedrock-et-ingenierie-de-prompts
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle technique permet d'enrichir les réponses d'un modèle avec des données propres à l'entreprise sans le réentraîner ?
+      options:
+        - { id: a, label: "La génération augmentée par récupération (RAG)" }
+        - { id: b, label: "La rotation des clés KMS" }
+        - { id: c, label: "Le redimensionnement d'instances" }
+        - { id: d, label: "L'équilibrage de charge" }
+      correct: [a]
+      explanation: |
+        Le RAG (Retrieval-Augmented Generation) récupère des documents pertinents et les fournit au modèle comme contexte, sans coût ni complexité d'un réentraînement.
+  - type: recap
+    conceptId: c-amazon-bedrock-et-ingenierie-de-prompts
+    body: |
+      Retenez l'essentiel de « Amazon Bedrock et ingénierie de prompts » pour la certification AIF-C01.

@@ -1,0 +1,38 @@
+# OCI HPC / Operations Associate — oracle certification track.
+# Domain weights mirror the official 1Z0-1067-24 skills outline and sum to 1.0.
+id: oracle-oci-operations-associate
+code: "1Z0-1067-24"
+provider: oracle
+title: "OCI HPC / Operations Associate"
+level: associate
+examCode: "1Z0-1067-24"
+sourceUrl: "https://education.oracle.com/"
+summary: |
+  Valide l'exploitation OCI : provisioning, surveillance, automatisation et optimisation des coûts. Pour administrateurs et opérateurs cloud.
+domains:
+  - id: provisioning
+    name: "Provisioning"
+    weight: 0.3
+  - id: monitoring
+    name: "Surveillance"
+    weight: 0.4
+  - id: cost-opt
+    name: "Optimisation des coûts"
+    weight: 0.3
+units:
+  - id: oracleocioperationsassociate-u-provisioning
+    domainId: provisioning
+    title: "Provisioning"
+    lessons:
+      - oracleocioperationsassociate-l-cli-sdk-console
+  - id: oracleocioperationsassociate-u-monitoring
+    domainId: monitoring
+    title: "Surveillance"
+    lessons:
+      - oracleocioperationsassociate-l-monitoring-et-alarmes
+      - oracleocioperationsassociate-l-logs-et-notifications
+  - id: oracleocioperationsassociate-u-cost-opt
+    domainId: cost-opt
+    title: "Optimisation des coûts"
+    lessons:
+      - oracleocioperationsassociate-l-budgets-et-redimensionnement

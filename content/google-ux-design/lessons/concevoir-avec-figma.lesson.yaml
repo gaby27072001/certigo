@@ -1,0 +1,37 @@
+id: googleuxdesign-l-concevoir-avec-figma
+trackId: google-ux-design
+unitId: googleuxdesign-u-figma
+domainId: figma
+title: "Concevoir avec Figma"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-concevoir-avec-figma
+    body: |
+      Dans l'examen UX-DESIGN, « Concevoir avec Figma » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-concevoir-avec-figma
+    title: "Concevoir avec Figma"
+    body: |
+      Figma permet design collaboratif, composants réutilisables et prototypage. Maîtriser un outil pro accélère la production et facilite la remise des maquettes aux développeurs.
+  - type: check
+    conceptId: c-concevoir-avec-figma
+    check:
+      id: googleuxdesign-l-concevoir-avec-figma-check-1
+      conceptId: c-concevoir-avec-figma
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel atout offre Figma à une équipe design ?
+      options:
+        - { id: a, label: "La collaboration en temps réel et les composants réutilisables" }
+        - { id: b, label: "L'hébergement de bases de données" }
+        - { id: c, label: "Le routage réseau" }
+        - { id: d, label: "La gestion de la paie" }
+      correct: [a]
+      explanation: |
+        Figma centralise design collaboratif, prototypes et bibliothèques de composants.
+  - type: recap
+    conceptId: c-concevoir-avec-figma
+    body: |
+      Retenez l'essentiel de « Concevoir avec Figma » pour la certification UX-DESIGN.

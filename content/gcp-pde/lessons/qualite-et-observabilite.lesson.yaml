@@ -1,0 +1,37 @@
+id: gcppde-l-qualite-et-observabilite
+trackId: gcp-pde
+unitId: gcppde-u-maintain-workloads
+domainId: maintain-workloads
+title: "Qualité et observabilité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-qualite-et-observabilite
+    body: |
+      Dans l'examen PDE, « Qualité et observabilité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-qualite-et-observabilite
+    title: "Qualité et observabilité"
+    body: |
+      Le monitoring des pipelines, la gestion d'erreurs et la qualité des données garantissent des traitements fiables et auditables.
+  - type: check
+    conceptId: c-qualite-et-observabilite
+    check:
+      id: gcppde-l-qualite-et-observabilite-check-1
+      conceptId: c-qualite-et-observabilite
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que surveille-t-on pour des pipelines fiables ?
+      options:
+        - { id: a, label: "Métriques, erreurs et qualité des données" }
+        - { id: b, label: "Le DNS uniquement" }
+        - { id: c, label: "Le CDN" }
+        - { id: d, label: "Le VPN" }
+      correct: [a]
+      explanation: |
+        L'observabilité prévient les défaillances silencieuses.
+  - type: recap
+    conceptId: c-qualite-et-observabilite
+    body: |
+      Retenez l'essentiel de « Qualité et observabilité » pour la certification PDE.

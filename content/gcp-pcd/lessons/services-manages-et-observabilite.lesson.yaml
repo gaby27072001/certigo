@@ -1,0 +1,37 @@
+id: gcppcd-l-services-manages-et-observabilite
+trackId: gcp-pcd
+unitId: gcppcd-u-integrate-monitor
+domainId: integrate-monitor
+title: "Services managés et observabilité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-services-manages-et-observabilite
+    body: |
+      Dans l'examen PCD, « Services managés et observabilité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-services-manages-et-observabilite
+    title: "Services managés et observabilité"
+    body: |
+      Les apps consomment Pub/Sub, Firestore et Secret Manager. Cloud Trace et Monitoring tracent latence et erreurs.
+  - type: check
+    conceptId: c-services-manages-et-observabilite
+    check:
+      id: gcppcd-l-services-manages-et-observabilite-check-1
+      conceptId: c-services-manages-et-observabilite
+      type: mcq
+      difficulty: 1
+      stem: |
+        Où stocker des secrets applicatifs en sécurité ?
+      options:
+        - { id: a, label: "Secret Manager" }
+        - { id: b, label: "Dans le code" }
+        - { id: c, label: "Dans le DNS" }
+        - { id: d, label: "Dans le CDN" }
+      correct: [a]
+      explanation: |
+        Secret Manager protège clés et identifiants.
+  - type: recap
+    conceptId: c-services-manages-et-observabilite
+    body: |
+      Retenez l'essentiel de « Services managés et observabilité » pour la certification PCD.
