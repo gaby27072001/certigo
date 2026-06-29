@@ -1,13 +1,13 @@
 using System.Net;
 using FluentAssertions;
-using Microlingo.Api.Http;
-using Microlingo.Api.Middleware;
-using Microlingo.Application.Abstractions;
+using Certigo.Api.Http;
+using Certigo.Api.Middleware;
+using Certigo.Application.Abstractions;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
-namespace Microlingo.Api.Tests;
+namespace Certigo.Api.Tests;
 
 public sealed class ExceptionMiddlewareTests
 {
@@ -121,7 +121,7 @@ public sealed class ExceptionMiddlewareTests
         var problem = await invocation.ReadProblemAsync();
         problem!.Status.Should().Be(500);
         problem.Title.Should().Be("Unexpected server error");
-        problem.Detail.Should().Be("Microlingo could not complete the request.");
+        problem.Detail.Should().Be("Certigo could not complete the request.");
         problem.Detail.Should().NotContain("secret");
     }
 

@@ -9,7 +9,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 
-namespace Microlingo.Api.Tests;
+namespace Certigo.Api.Tests;
 
 // Hand-rolled doubles for the Azure Functions isolated-worker SDK (Worker.Core 1.20.0).
 // HttpRequestData / HttpResponseData / FunctionContext / FunctionDefinition are abstract

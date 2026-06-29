@@ -1,13 +1,13 @@
 using System.Net;
 using FluentAssertions;
-using Microlingo.Api.Functions;
-using Microlingo.Api.Http;
-using Microlingo.Application.Dtos;
-using Microlingo.Application.Services;
-using Microlingo.Domain.Content;
+using Certigo.Api.Functions;
+using Certigo.Api.Http;
+using Certigo.Application.Dtos;
+using Certigo.Application.Services;
+using Certigo.Domain.Content;
 using Xunit;
 
-namespace Microlingo.Api.Tests;
+namespace Certigo.Api.Tests;
 
 public sealed class CriticalHttpFunctionsTests
 {
