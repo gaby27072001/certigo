@@ -20,7 +20,7 @@ env:
 jobs:
   packages:
     name: Pure-Dart packages (core, cortex, data)
-    runs-on: ${{ fromJSON(env.NON_CRITICAL_RUNNER_LABELS_JSON) }}
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
     strategy:
       matrix:
         package: [ core, cortex, data ]
@@ -29,7 +29,7 @@ jobs:
       - uses: dart-lang/setup-dart@v1
         with:
           # Pinned for reproducible CI (matches the Dart bundled with Flutter
-          # 3.24.0). Bump deliberately alongside FLUTTER_VERSION.
+          # 3.27.4). Bump deliberately alongside FLUTTER_VERSION.
           sdk: "3.6.0"
       - name: Get dependencies
         working-directory: packages/${{ matrix.package }}
@@ -43,9 +43,28 @@ jobs:
 
   app:
     name: Flutter app + UI packages
-    runs-on: ${{ fromJSON(env.NON_CRITICAL_RUNNER_LABELS_JSON) }}
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
     steps:
       - uses: actions/checkout@v4
+      - name: Clear corrupted Flutter tool cache
+        run: |
+          # subosito/flutter-action caches Flutter under _work/_tool/flutter.
+          # If a previous download was interrupted, the extracted dir exists but
+          # bin/internal/shared.sh is missing, causing every subsequent run to
+          # fail. Detect and remove such entries so the action downloads fresh.
+          TOOL_DIR="/home/runner/actions-runner/_work/_tool/flutter"
+          TOOL_DIR2="/home/runner/actions-runner-2/_work/_tool/flutter"
+          for BASE in "$TOOL_DIR" "$TOOL_DIR2"; do
+            if [ -d "$BASE" ]; then
+              for DIR in "$BASE"/stable-*; do
+                if [ -d "$DIR" ] && [ ! -f "$DIR/flutter/bin/internal/shared.sh" ]; then
+                  echo "Removing corrupted Flutter install: $DIR"
+                  rm -rf "$DIR"
+                fi
+              done
+            fi
+          done
+        continue-on-error: true
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}

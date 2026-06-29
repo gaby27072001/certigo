@@ -8,8 +8,7 @@ void main() {
   setUpAll(disableGoogleFontsFetching);
 
   group('GemCounter', () {
-    testWidgets('renders the gem total verbatim under a thousand',
-        (WidgetTester tester) async {
+    testWidgets('renders the gem total verbatim under a thousand', (WidgetTester tester) async {
       await pumpPrism(tester, const GemCounter(gems: 500));
 
       expect(find.text('500'), findsOneWidget);
@@ -22,8 +21,7 @@ void main() {
       expect(find.text('+5'), findsOneWidget);
     });
 
-    testWidgets('exposes a gems semantics label',
-        (WidgetTester tester) async {
+    testWidgets('exposes a gems semantics label', (WidgetTester tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpPrism(tester, const GemCounter(gems: 500));
 

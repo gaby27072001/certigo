@@ -20,7 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate all workflows with action-validator
-        uses: raven-actions/actionlint@v2
-        with:
-          files: ".github/workflows/*.yml"
+      - name: Install actionlint
+        run: |
+          curl -sSfL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            | tar xz -C /tmp
+          chmod +x /tmp/actionlint
+
+      - name: Validate all workflows
+        run: /tmp/actionlint .github/workflows/*.yml

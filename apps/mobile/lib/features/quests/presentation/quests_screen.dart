@@ -259,4 +259,3 @@ class _QuestsLoading extends StatelessWidget {
     );
   }
 }
-

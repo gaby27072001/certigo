@@ -22,8 +22,7 @@ void main() {
       expect(find.text('Continuer'), findsOneWidget);
     });
 
-    testWidgets('shows a spinner and suppresses taps while loading',
-        (WidgetTester tester) async {
+    testWidgets('shows a spinner and suppresses taps while loading', (WidgetTester tester) async {
       int taps = 0;
       await pumpPrism(
         tester,
@@ -42,8 +41,7 @@ void main() {
       expect(taps, 0);
     });
 
-    testWidgets('is marked as a disabled button without an onPressed',
-        (WidgetTester tester) async {
+    testWidgets('is marked as a disabled button without an onPressed', (WidgetTester tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpPrism(tester, const PrismButton(label: 'Indispo'));
 

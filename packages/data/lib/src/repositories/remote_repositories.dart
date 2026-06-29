@@ -26,8 +26,7 @@ class RemoteUserRepository implements UserRepository {
   final ApiClient _api;
 
   @override
-  Future<Result<UserProfile>> getMe() =>
-      _api.getJson('/me', UserProfile.fromJson);
+  Future<Result<UserProfile>> getMe() => _api.getJson('/me', UserProfile.fromJson);
 }
 
 class RemotePathRepository implements PathRepository {
@@ -46,13 +45,11 @@ class RemoteCatalogRepository implements CatalogRepository {
   @override
   Future<Result<List<TrackSummary>>> getCatalog() => _api.getJson(
         '/catalog/tracks',
-        (Map<String, dynamic> json) =>
-            (json['tracks'] as List<dynamic>? ?? <dynamic>[])
-                .map(
-                  (dynamic e) =>
-                      TrackSummary.fromJson(e as Map<String, dynamic>),
-                )
-                .toList(),
+        (Map<String, dynamic> json) => (json['tracks'] as List<dynamic>? ?? <dynamic>[])
+            .map(
+              (dynamic e) => TrackSummary.fromJson(e as Map<String, dynamic>),
+            )
+            .toList(),
       );
 }
 
@@ -89,8 +86,7 @@ class RemoteLeaderboardRepository implements LeaderboardRepository {
   final ApiClient _api;
 
   @override
-  Future<Result<League>> getMyLeague() =>
-      _api.getJson('/me/league', League.fromJson);
+  Future<Result<League>> getMyLeague() => _api.getJson('/me/league', League.fromJson);
 }
 
 class RemoteTutorRepository implements TutorRepository {
@@ -98,8 +94,8 @@ class RemoteTutorRepository implements TutorRepository {
   final ApiClient _api;
 
   @override
-  Future<Result<TutorExplanation>> explain(TutorExplainRequest request) => _api
-      .postJson('/tutor/explain', request.toJson(), TutorExplanation.fromJson);
+  Future<Result<TutorExplanation>> explain(TutorExplainRequest request) =>
+      _api.postJson('/tutor/explain', request.toJson(), TutorExplanation.fromJson);
 }
 
 class RemoteRecommendationRepository implements RecommendationRepository {
@@ -116,12 +112,10 @@ class RemoteSeasonRepository implements SeasonRepository {
   final ApiClient _api;
 
   @override
-  Future<Result<Season>> getSeason() =>
-      _api.getJson('/season', Season.fromJson);
+  Future<Result<Season>> getSeason() => _api.getJson('/season', Season.fromJson);
 
   @override
-  Future<Result<ClaimSeasonResult>> claimSeason(ClaimSeasonRequest request) =>
-      _api.postJson(
+  Future<Result<ClaimSeasonResult>> claimSeason(ClaimSeasonRequest request) => _api.postJson(
         '/season/claim',
         request.toJson(),
         ClaimSeasonResult.fromJson,
@@ -133,12 +127,11 @@ class RemoteQuestRepository implements QuestRepository {
   final ApiClient _api;
 
   @override
-  Future<Result<QuestBoard>> getQuests() =>
-      _api.getJson('/quests', QuestBoard.fromJson);
+  Future<Result<QuestBoard>> getQuests() => _api.getJson('/quests', QuestBoard.fromJson);
 
   @override
-  Future<Result<ClaimQuestResult>> claimQuest(ClaimQuestRequest request) => _api
-      .postJson('/quests/claim', request.toJson(), ClaimQuestResult.fromJson);
+  Future<Result<ClaimQuestResult>> claimQuest(ClaimQuestRequest request) =>
+      _api.postJson('/quests/claim', request.toJson(), ClaimQuestResult.fromJson);
 }
 
 class RemoteAchievementRepository implements AchievementRepository {
@@ -155,12 +148,11 @@ class RemoteShopRepository implements ShopRepository {
   final ApiClient _api;
 
   @override
-  Future<Result<ShopCatalog>> getShop() =>
-      _api.getJson('/shop', ShopCatalog.fromJson);
+  Future<Result<ShopCatalog>> getShop() => _api.getJson('/shop', ShopCatalog.fromJson);
 
   @override
-  Future<Result<PurchaseResult>> purchase(PurchaseRequest request) => _api
-      .postJson('/shop/purchase', request.toJson(), PurchaseResult.fromJson);
+  Future<Result<PurchaseResult>> purchase(PurchaseRequest request) =>
+      _api.postJson('/shop/purchase', request.toJson(), PurchaseResult.fromJson);
 }
 
 class RemoteFriendRepository implements FriendRepository {
@@ -168,8 +160,7 @@ class RemoteFriendRepository implements FriendRepository {
   final ApiClient _api;
 
   @override
-  Future<Result<FriendList>> getFriends() =>
-      _api.getJson('/friends', FriendList.fromJson);
+  Future<Result<FriendList>> getFriends() => _api.getJson('/friends', FriendList.fromJson);
 
   @override
   Future<Result<FriendActionResult>> addFriend(AddFriendRequest request) =>
@@ -189,8 +180,7 @@ class RemoteShareCardRepository implements ShareCardRepository {
   final ApiClient _api;
 
   @override
-  Future<Result<ShareCard>> getDailyShareCard() =>
-      _api.getJson('/share/daily', ShareCard.fromJson);
+  Future<Result<ShareCard>> getDailyShareCard() => _api.getJson('/share/daily', ShareCard.fromJson);
 }
 
 class RemoteExamRepository implements ExamRepository {

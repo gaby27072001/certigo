@@ -211,7 +211,7 @@ modules. `params/dev.bicepparam` porte les valeurs d'environnement.
 
 | Module | Crée |
 |---|---|
-| `cosmos.bicep` | compte Cosmos serverless + 6 containers (PK verrouillées) |
+| `cosmos.bicep` | compte Cosmos serverless + **8 containers** (PK verrouillées) |
 | `storage.bicep` | StorageV2 + container `lesson-assets` |
 | `appInsights.bicep` | Application Insights *workspace-based* |
 | `keyvault.bicep` | Key Vault (modèle RBAC) |
@@ -221,9 +221,9 @@ modules. `params/dev.bicepparam` porte les valeurs d'environnement.
 
 ## 10. CI/CD
 
-Neuf workflows actifs ciblés par chemin ou par événement (voir `.github/workflows/`) :
+Douze workflows au total (10 actifs, 2 historiques iOS désactivés) ciblés par chemin ou par événement (voir `.github/workflows/`) :
 `ci-mobile`, `ci-backend`, `ci-content`, `ci-infra`, `cd-backend`, `codeql`,
-`lint-workflows`, `release-android`, `security-scan`. Les workflows iOS GitHub Actions
+`lint-workflows`, `release-android`, `security-scan`, `promote-backend-staging-prod`. Les workflows iOS GitHub Actions
 `release-ios` et `sync-ios-certs` sont désactivés et conservés comme historique ; la
 chaîne iOS active passe par Codemagic.
 

@@ -36,8 +36,7 @@ void main() {
     trackCode: 'AZ-900',
     mascot: 'Nimbus',
     headline: '12 jours de serie',
-    caption:
-        '68% de preparation sur Microlingo ! Rejoins-moi avec le code ABCD12 🚀',
+    caption: '68% de preparation sur Microlingo ! Rejoins-moi avec le code ABCD12 🚀',
     referralCode: 'ABCD12',
     generatedAt: DateTime.utc(2025, 1, 6, 12),
   );
@@ -51,8 +50,7 @@ void main() {
       routes: <RouteBase>[
         GoRoute(
           path: '/share-daily',
-          builder: (BuildContext context, GoRouterState state) =>
-              const DailyShareScreen(),
+          builder: (BuildContext context, GoRouterState state) => const DailyShareScreen(),
         ),
       ],
     );
@@ -76,8 +74,7 @@ void main() {
 
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform,
-            (MethodCall call) async {
+        .setMockMethodCallHandler(SystemChannels.platform, (MethodCall call) async {
       if (call.method == 'Clipboard.setData') {
         return null;
       }

@@ -38,8 +38,7 @@ class _BirthYearScreenState extends ConsumerState<BirthYearScreen> {
     super.initState();
     // Default selection: a plausible 20-year-old learner.
     _selectedYear = (_currentYear - 20).clamp(_minYear, _maxYear);
-    _scrollController =
-        FixedExtentScrollController(initialItem: _selectedYear - _minYear);
+    _scrollController = FixedExtentScrollController(initialItem: _selectedYear - _minYear);
   }
 
   @override
