@@ -1,0 +1,37 @@
+id: gcppcdoe-l-pipelines-cloud-build-deploy
+trackId: gcp-pcdoe
+unitId: gcppcdoe-u-cicd
+domainId: cicd
+title: "Pipelines Cloud Build / Deploy"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-pipelines-cloud-build-deploy
+    body: |
+      Dans l'examen PCDOE, « Pipelines Cloud Build / Deploy » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-pipelines-cloud-build-deploy
+    title: "Pipelines Cloud Build / Deploy"
+    body: |
+      Cloud Build construit et teste, Cloud Deploy promeut entre environnements. Les déploiements canary/bleu-vert réduisent le risque.
+  - type: check
+    conceptId: c-pipelines-cloud-build-deploy
+    check:
+      id: gcppcdoe-l-pipelines-cloud-build-deploy-check-1
+      conceptId: c-pipelines-cloud-build-deploy
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service orchestre la promotion entre environnements ?
+      options:
+        - { id: a, label: "Cloud Deploy" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "BigQuery" }
+        - { id: d, label: "Cloud VPN" }
+      correct: [a]
+      explanation: |
+        Cloud Deploy gère les pipelines de livraison.
+  - type: recap
+    conceptId: c-pipelines-cloud-build-deploy
+    body: |
+      Retenez l'essentiel de « Pipelines Cloud Build / Deploy » pour la certification PCDOE.

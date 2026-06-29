@@ -1,0 +1,37 @@
+id: gcpassociateworkspaceadmin-l-2fa-sso-et-partage
+trackId: gcp-associate-workspace-admin
+unitId: gcpassociateworkspaceadmin-u-security-collab
+domainId: security-collab
+title: "2FA, SSO et partage"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-2fa-sso-et-partage
+    body: |
+      Dans l'examen AGWA, « 2FA, SSO et partage » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-2fa-sso-et-partage
+    title: "2FA, SSO et partage"
+    body: |
+      La validation en deux étapes, le SSO et les règles de partage Drive sécurisent les données. Les alertes et le centre de sécurité détectent les incidents.
+  - type: check
+    conceptId: c-2fa-sso-et-partage
+    check:
+      id: gcpassociateworkspaceadmin-l-2fa-sso-et-partage-check-1
+      conceptId: c-2fa-sso-et-partage
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quelle mesure renforce l'authentification des utilisateurs ?
+      options:
+        - { id: a, label: "Validation en deux étapes" }
+        - { id: b, label: "Mots de passe partagés" }
+        - { id: c, label: "Aucun audit" }
+        - { id: d, label: "DNS public" }
+      correct: [a]
+      explanation: |
+        La 2FA ajoute un second facteur d'authentification.
+  - type: recap
+    conceptId: c-2fa-sso-et-partage
+    body: |
+      Retenez l'essentiel de « 2FA, SSO et partage » pour la certification AGWA.

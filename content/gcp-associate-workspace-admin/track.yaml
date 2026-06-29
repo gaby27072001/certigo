@@ -1,0 +1,45 @@
+# Associate Google Workspace Administrator — google certification track.
+# Domain weights mirror the official AGWA skills outline and sum to 1.0.
+id: gcp-associate-workspace-admin
+code: "AGWA"
+provider: google
+title: "Associate Google Workspace Administrator"
+level: associate
+examCode: "Associate Google Workspace Administrator"
+sourceUrl: "https://cloud.google.com/learn/certification/google-workspace-administrator"
+summary: |
+  Certification d'administration Google Workspace : gestion du compte et des utilisateurs, messagerie, sécurité, services collaboratifs et support. Pour administrateurs IT.
+domains:
+  - id: account-management
+    name: "Gérer le compte et les utilisateurs"
+    weight: 0.3
+  - id: mail-management
+    name: "Gérer la messagerie"
+    weight: 0.25
+  - id: security-collab
+    name: "Sécurité et collaboration"
+    weight: 0.3
+  - id: support-ops
+    name: "Support et exploitation"
+    weight: 0.15
+units:
+  - id: gcpassociateworkspaceadmin-u-account-management
+    domainId: account-management
+    title: "Gérer le compte et les utilisateurs"
+    lessons:
+      - gcpassociateworkspaceadmin-l-unites-organisationnelles
+  - id: gcpassociateworkspaceadmin-u-mail-management
+    domainId: mail-management
+    title: "Gérer la messagerie"
+    lessons:
+      - gcpassociateworkspaceadmin-l-routage-et-anti-spam
+  - id: gcpassociateworkspaceadmin-u-security-collab
+    domainId: security-collab
+    title: "Sécurité et collaboration"
+    lessons:
+      - gcpassociateworkspaceadmin-l-2fa-sso-et-partage
+  - id: gcpassociateworkspaceadmin-u-support-ops
+    domainId: support-ops
+    title: "Support et exploitation"
+    lessons:
+      - gcpassociateworkspaceadmin-l-diagnostic-et-journaux

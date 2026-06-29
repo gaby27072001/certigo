@@ -1,0 +1,37 @@
+id: gcpassociatedatapractitioner-l-acces-et-qualite
+trackId: gcp-associate-data-practitioner
+unitId: gcpassociatedatapractitioner-u-data-governance
+domainId: data-governance
+title: "Accès et qualité"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-acces-et-qualite
+    body: |
+      Dans l'examen ADP, « Accès et qualité » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-acces-et-qualite
+    title: "Accès et qualité"
+    body: |
+      IAM protège datasets et tables ; le chiffrement est par défaut. La qualité et le catalogage des données soutiennent la confiance.
+  - type: check
+    conceptId: c-acces-et-qualite
+    check:
+      id: gcpassociatedatapractitioner-l-acces-et-qualite-check-1
+      conceptId: c-acces-et-qualite
+      type: mcq
+      difficulty: 1
+      stem: |
+        Qu'est-ce qui protège l'accès aux datasets BigQuery ?
+      options:
+        - { id: a, label: "IAM" }
+        - { id: b, label: "CDN" }
+        - { id: c, label: "DNS" }
+        - { id: d, label: "NAT" }
+      correct: [a]
+      explanation: |
+        IAM contrôle les permissions sur les ressources data.
+  - type: recap
+    conceptId: c-acces-et-qualite
+    body: |
+      Retenez l'essentiel de « Accès et qualité » pour la certification ADP.

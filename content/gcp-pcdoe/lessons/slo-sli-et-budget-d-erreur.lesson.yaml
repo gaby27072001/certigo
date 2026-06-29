@@ -1,0 +1,37 @@
+id: gcppcdoe-l-slo-sli-et-budget-d-erreur
+trackId: gcp-pcdoe
+unitId: gcppcdoe-u-sre-reliability
+domainId: sre-reliability
+title: "SLO, SLI et budget d'erreur"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-slo-sli-et-budget-d-erreur
+    body: |
+      Dans l'examen PCDOE, « SLO, SLI et budget d'erreur » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-slo-sli-et-budget-d-erreur
+    title: "SLO, SLI et budget d'erreur"
+    body: |
+      Les SLI mesurent, les SLO ciblent, et le budget d'erreur arbitre vélocité vs fiabilité. Postmortems sans blâme améliorent en continu.
+  - type: check
+    conceptId: c-slo-sli-et-budget-d-erreur
+    check:
+      id: gcppcdoe-l-slo-sli-et-budget-d-erreur-check-1
+      conceptId: c-slo-sli-et-budget-d-erreur
+      type: mcq
+      difficulty: 2
+      stem: |
+        À quoi sert un budget d'erreur ?
+      options:
+        - { id: a, label: "Arbitrer vélocité et fiabilité" }
+        - { id: b, label: "Augmenter les pannes" }
+        - { id: c, label: "Supprimer les SLO" }
+        - { id: d, label: "Ignorer les incidents" }
+      correct: [a]
+      explanation: |
+        Le budget d'erreur autorise un risque maîtrisé.
+  - type: recap
+    conceptId: c-slo-sli-et-budget-d-erreur
+    body: |
+      Retenez l'essentiel de « SLO, SLI et budget d'erreur » pour la certification PCDOE.

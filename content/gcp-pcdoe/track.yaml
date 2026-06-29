@@ -1,0 +1,45 @@
+# Google Cloud Professional Cloud DevOps Engineer — google certification track.
+# Domain weights mirror the official PCDOE skills outline and sum to 1.0.
+id: gcp-pcdoe
+code: "PCDOE"
+provider: google
+title: "Google Cloud Professional Cloud DevOps Engineer"
+level: professional
+examCode: "Professional Cloud DevOps Engineer"
+sourceUrl: "https://cloud.google.com/learn/certification/cloud-devops-engineer"
+summary: |
+  Certification SRE/DevOps : CI/CD, fiabilité des services, SLO/SLI, observabilité et optimisation des performances pour des livraisons rapides et fiables.
+domains:
+  - id: bootstrap-org
+    name: "Bootstrap et organisation"
+    weight: 0.2
+  - id: cicd
+    name: "CI/CD"
+    weight: 0.25
+  - id: sre-reliability
+    name: "SRE et fiabilité"
+    weight: 0.3
+  - id: monitor-optimize
+    name: "Observabilité et optimisation"
+    weight: 0.25
+units:
+  - id: gcppcdoe-u-bootstrap-org
+    domainId: bootstrap-org
+    title: "Bootstrap et organisation"
+    lessons:
+      - gcppcdoe-l-infrastructure-as-code
+  - id: gcppcdoe-u-cicd
+    domainId: cicd
+    title: "CI/CD"
+    lessons:
+      - gcppcdoe-l-pipelines-cloud-build-deploy
+  - id: gcppcdoe-u-sre-reliability
+    domainId: sre-reliability
+    title: "SRE et fiabilité"
+    lessons:
+      - gcppcdoe-l-slo-sli-et-budget-d-erreur
+  - id: gcppcdoe-u-monitor-optimize
+    domainId: monitor-optimize
+    title: "Observabilité et optimisation"
+    lessons:
+      - gcppcdoe-l-monitoring-trace-et-profiler

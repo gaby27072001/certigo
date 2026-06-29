@@ -1,0 +1,45 @@
+# Google Cloud Professional Cloud Database Engineer — google certification track.
+# Domain weights mirror the official PCDBE skills outline and sum to 1.0.
+id: gcp-pcdbe
+code: "PCDBE"
+provider: google
+title: "Google Cloud Professional Cloud Database Engineer"
+level: professional
+examCode: "Professional Cloud Database Engineer"
+sourceUrl: "https://cloud.google.com/learn/certification/cloud-database-engineer"
+summary: |
+  Certification bases de données : conception, migration, scalabilité, sécurité et exploitation des bases managées Google Cloud (Cloud SQL, Spanner, Bigtable, Firestore).
+domains:
+  - id: design-db
+    name: "Concevoir des solutions de données"
+    weight: 0.3
+  - id: migrate-db
+    name: "Migrer les bases"
+    weight: 0.25
+  - id: scale-secure
+    name: "Scalabilité et sécurité"
+    weight: 0.25
+  - id: operate-db
+    name: "Exploiter et surveiller"
+    weight: 0.2
+units:
+  - id: gcppcdbe-u-design-db
+    domainId: design-db
+    title: "Concevoir des solutions de données"
+    lessons:
+      - gcppcdbe-l-choisir-la-base-adaptee
+  - id: gcppcdbe-u-migrate-db
+    domainId: migrate-db
+    title: "Migrer les bases"
+    lessons:
+      - gcppcdbe-l-database-migration-service
+  - id: gcppcdbe-u-scale-secure
+    domainId: scale-secure
+    title: "Scalabilité et sécurité"
+    lessons:
+      - gcppcdbe-l-replicas-et-chiffrement
+  - id: gcppcdbe-u-operate-db
+    domainId: operate-db
+    title: "Exploiter et surveiller"
+    lessons:
+      - gcppcdbe-l-sauvegardes-et-monitoring

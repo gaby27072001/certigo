@@ -1,0 +1,37 @@
+id: gcpclouddigitalleader-l-finops-et-support
+trackId: gcp-cloud-digital-leader
+unitId: gcpclouddigitalleader-u-scaling-operations
+domainId: scaling-operations
+title: "FinOps et support"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-finops-et-support
+    body: |
+      Dans l'examen CDL, « FinOps et support » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-finops-et-support
+    title: "FinOps et support"
+    body: |
+      La maîtrise des coûts (FinOps), les niveaux de support et l'observabilité avec Cloud Monitoring permettent de scaler les opérations de façon durable.
+  - type: check
+    conceptId: c-finops-et-support
+    check:
+      id: gcpclouddigitalleader-l-finops-et-support-check-1
+      conceptId: c-finops-et-support
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel domaine vise à maîtriser et optimiser les coûts cloud ?
+      options:
+        - { id: a, label: "FinOps" }
+        - { id: b, label: "CAPEX uniquement" }
+        - { id: c, label: "Sécurité réseau" }
+        - { id: d, label: "CI/CD" }
+      correct: [a]
+      explanation: |
+        FinOps aligne dépenses cloud et valeur métier.
+  - type: recap
+    conceptId: c-finops-et-support
+    body: |
+      Retenez l'essentiel de « FinOps et support » pour la certification CDL.

@@ -1,0 +1,37 @@
+id: gcpgenerativeaileader-l-cas-d-usage-metier
+trackId: gcp-generative-ai-leader
+unitId: gcpgenerativeaileader-u-transform-genai
+domainId: transform-genai
+title: "Cas d'usage métier"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-cas-d-usage-metier
+    body: |
+      Dans l'examen GENAI-LEADER, « Cas d'usage métier » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-cas-d-usage-metier
+    title: "Cas d'usage métier"
+    body: |
+      L'IA générative automatise le support, accélère la création de contenu, résume des documents et assiste le développement. La valeur vient de cas d'usage ciblés et mesurables.
+  - type: check
+    conceptId: c-cas-d-usage-metier
+    check:
+      id: gcpgenerativeaileader-l-cas-d-usage-metier-check-1
+      conceptId: c-cas-d-usage-metier
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel est un cas d'usage typique de l'IA générative ?
+      options:
+        - { id: a, label: "Résumer des documents et assister le support" }
+        - { id: b, label: "Refroidir les serveurs" }
+        - { id: c, label: "Câbler le réseau" }
+        - { id: d, label: "Remplacer le DNS" }
+      correct: [a]
+      explanation: |
+        Synthèse, génération et assistance sont des usages clés.
+  - type: recap
+    conceptId: c-cas-d-usage-metier
+    body: |
+      Retenez l'essentiel de « Cas d'usage métier » pour la certification GENAI-LEADER.

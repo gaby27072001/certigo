@@ -1,0 +1,37 @@
+id: gcpassociatedatapractitioner-l-requeter-avec-bigquery
+trackId: gcp-associate-data-practitioner
+unitId: gcpassociatedatapractitioner-u-data-analysis
+domainId: data-analysis
+title: "Requêter avec BigQuery"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-requeter-avec-bigquery
+    body: |
+      Dans l'examen ADP, « Requêter avec BigQuery » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-requeter-avec-bigquery
+    title: "Requêter avec BigQuery"
+    body: |
+      BigQuery analyse des téraoctets en SQL standard. Looker Studio visualise les résultats. Les vues et requêtes paramétrées facilitent la réutilisation.
+  - type: check
+    conceptId: c-requeter-avec-bigquery
+    check:
+      id: gcpassociatedatapractitioner-l-requeter-avec-bigquery-check-1
+      conceptId: c-requeter-avec-bigquery
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel langage utilise BigQuery pour interroger les données ?
+      options:
+        - { id: a, label: "SQL" }
+        - { id: b, label: "COBOL" }
+        - { id: c, label: "Bash" }
+        - { id: d, label: "YAML" }
+      correct: [a]
+      explanation: |
+        BigQuery s'interroge en SQL standard.
+  - type: recap
+    conceptId: c-requeter-avec-bigquery
+    body: |
+      Retenez l'essentiel de « Requêter avec BigQuery » pour la certification ADP.

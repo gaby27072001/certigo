@@ -1,0 +1,37 @@
+id: gcppmle-l-du-probleme-metier-au-ml
+trackId: gcp-pmle
+unitId: gcppmle-u-frame-architect
+domainId: frame-architect
+title: "Du problème métier au ML"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-du-probleme-metier-au-ml
+    body: |
+      Dans l'examen PMLE, « Du problème métier au ML » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-du-probleme-metier-au-ml
+    title: "Du problème métier au ML"
+    body: |
+      On traduit un besoin en problème ML (classification, régression), on définit métriques et données. Vertex AI structure le cycle complet.
+  - type: check
+    conceptId: c-du-probleme-metier-au-ml
+    check:
+      id: gcppmle-l-du-probleme-metier-au-ml-check-1
+      conceptId: c-du-probleme-metier-au-ml
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle plateforme couvre le cycle ML de bout en bout ?
+      options:
+        - { id: a, label: "Vertex AI" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "Cloud CDN" }
+        - { id: d, label: "Cloud VPN" }
+      correct: [a]
+      explanation: |
+        Vertex AI gère données, entraînement et déploiement.
+  - type: recap
+    conceptId: c-du-probleme-metier-au-ml
+    body: |
+      Retenez l'essentiel de « Du problème métier au ML » pour la certification PMLE.

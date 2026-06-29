@@ -1,0 +1,37 @@
+id: gcppde-l-choisir-le-stockage-adapte
+trackId: gcp-pde
+unitId: gcppde-u-design-systems
+domainId: design-systems
+title: "Choisir le stockage adapté"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-choisir-le-stockage-adapte
+    body: |
+      Dans l'examen PDE, « Choisir le stockage adapté » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-choisir-le-stockage-adapte
+    title: "Choisir le stockage adapté"
+    body: |
+      BigQuery pour l'analytique, Bigtable pour le NoSQL à faible latence, Cloud SQL/Spanner pour le relationnel, Cloud Storage pour les objets. Le choix dépend du modèle d'accès.
+  - type: check
+    conceptId: c-choisir-le-stockage-adapte
+    check:
+      id: gcppde-l-choisir-le-stockage-adapte-check-1
+      conceptId: c-choisir-le-stockage-adapte
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service convient au NoSQL à très faible latence et fort volume ?
+      options:
+        - { id: a, label: "Bigtable" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "Cloud CDN" }
+        - { id: d, label: "Cloud VPN" }
+      correct: [a]
+      explanation: |
+        Bigtable cible les charges analytiques/temps réel massives.
+  - type: recap
+    conceptId: c-choisir-le-stockage-adapte
+    body: |
+      Retenez l'essentiel de « Choisir le stockage adapté » pour la certification PDE.

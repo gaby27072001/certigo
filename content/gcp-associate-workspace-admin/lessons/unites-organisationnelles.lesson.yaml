@@ -1,0 +1,37 @@
+id: gcpassociateworkspaceadmin-l-unites-organisationnelles
+trackId: gcp-associate-workspace-admin
+unitId: gcpassociateworkspaceadmin-u-account-management
+domainId: account-management
+title: "Unités organisationnelles"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-unites-organisationnelles
+    body: |
+      Dans l'examen AGWA, « Unités organisationnelles » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-unites-organisationnelles
+    title: "Unités organisationnelles"
+    body: |
+      La console d'admin gère utilisateurs, groupes et unités organisationnelles pour appliquer des paramètres ciblés. Les licences sont attribuées par utilisateur.
+  - type: check
+    conceptId: c-unites-organisationnelles
+    check:
+      id: gcpassociateworkspaceadmin-l-unites-organisationnelles-check-1
+      conceptId: c-unites-organisationnelles
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel objet structure des paramètres ciblés pour des groupes d'utilisateurs ?
+      options:
+        - { id: a, label: "Unité organisationnelle" }
+        - { id: b, label: "Bucket" }
+        - { id: c, label: "Dataset" }
+        - { id: d, label: "VPC" }
+      correct: [a]
+      explanation: |
+        Les unités organisationnelles appliquent des politiques différenciées.
+  - type: recap
+    conceptId: c-unites-organisationnelles
+    body: |
+      Retenez l'essentiel de « Unités organisationnelles » pour la certification AGWA.

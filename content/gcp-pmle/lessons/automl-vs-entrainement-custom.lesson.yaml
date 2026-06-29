@@ -1,0 +1,37 @@
+id: gcppmle-l-automl-vs-entrainement-custom
+trackId: gcp-pmle
+unitId: gcppmle-u-build-train
+domainId: build-train
+title: "AutoML vs entraînement custom"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-automl-vs-entrainement-custom
+    body: |
+      Dans l'examen PMLE, « AutoML vs entraînement custom » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-automl-vs-entrainement-custom
+    title: "AutoML vs entraînement custom"
+    body: |
+      AutoML accélère sans expertise ; l'entraînement custom donne contrôle total. L'hyperparameter tuning optimise les modèles.
+  - type: check
+    conceptId: c-automl-vs-entrainement-custom
+    check:
+      id: gcppmle-l-automl-vs-entrainement-custom-check-1
+      conceptId: c-automl-vs-entrainement-custom
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel approche entraîne un modèle sans coder l'architecture ?
+      options:
+        - { id: a, label: "AutoML" }
+        - { id: b, label: "Assembleur" }
+        - { id: c, label: "Bash seul" }
+        - { id: d, label: "YAML seul" }
+      correct: [a]
+      explanation: |
+        AutoML automatise la conception et l'entraînement.
+  - type: recap
+    conceptId: c-automl-vs-entrainement-custom
+    body: |
+      Retenez l'essentiel de « AutoML vs entraînement custom » pour la certification PMLE.

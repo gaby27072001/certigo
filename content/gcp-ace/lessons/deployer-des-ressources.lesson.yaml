@@ -1,0 +1,37 @@
+id: gcpace-l-deployer-des-ressources
+trackId: gcp-ace
+unitId: gcpace-u-deploy-implement
+domainId: deploy-implement
+title: "Déployer des ressources"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-deployer-des-ressources
+    body: |
+      Dans l'examen ACE, « Déployer des ressources » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-deployer-des-ressources
+    title: "Déployer des ressources"
+    body: |
+      On déploie via la console, gcloud ou l'infrastructure as code. GKE crée des clusters, Cloud Storage des buckets, BigQuery des datasets. L'automatisation garantit la reproductibilité.
+  - type: check
+    conceptId: c-deployer-des-ressources
+    check:
+      id: gcpace-l-deployer-des-ressources-check-1
+      conceptId: c-deployer-des-ressources
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle ressource Cloud Storage contient les objets ?
+      options:
+        - { id: a, label: "Un bucket" }
+        - { id: b, label: "Un cluster" }
+        - { id: c, label: "Un dataset" }
+        - { id: d, label: "Un VPC" }
+      correct: [a]
+      explanation: |
+        Les objets sont stockés dans des buckets.
+  - type: recap
+    conceptId: c-deployer-des-ressources
+    body: |
+      Retenez l'essentiel de « Déployer des ressources » pour la certification ACE.

@@ -1,0 +1,45 @@
+# Google Cloud Professional Cloud Developer — google certification track.
+# Domain weights mirror the official PCD skills outline and sum to 1.0.
+id: gcp-pcd
+code: "PCD"
+provider: google
+title: "Google Cloud Professional Cloud Developer"
+level: professional
+examCode: "Professional Cloud Developer"
+sourceUrl: "https://cloud.google.com/learn/certification/cloud-developer"
+summary: |
+  Certification pour concevoir, construire, déployer et superviser des applications cloud-native scalables, en intégrant les services managés Google Cloud.
+domains:
+  - id: app-design
+    name: "Concevoir des applications scalables"
+    weight: 0.3
+  - id: build-test
+    name: "Construire et tester"
+    weight: 0.25
+  - id: deploy-app
+    name: "Déployer"
+    weight: 0.25
+  - id: integrate-monitor
+    name: "Intégrer et superviser"
+    weight: 0.2
+units:
+  - id: gcppcd-u-app-design
+    domainId: app-design
+    title: "Concevoir des applications scalables"
+    lessons:
+      - gcppcd-l-microservices-et-serverless
+  - id: gcppcd-u-build-test
+    domainId: build-test
+    title: "Construire et tester"
+    lessons:
+      - gcppcd-l-ci-cd-avec-cloud-build
+  - id: gcppcd-u-deploy-app
+    domainId: deploy-app
+    title: "Déployer"
+    lessons:
+      - gcppcd-l-strategies-de-deploiement
+  - id: gcppcd-u-integrate-monitor
+    domainId: integrate-monitor
+    title: "Intégrer et superviser"
+    lessons:
+      - gcppcd-l-services-manages-et-observabilite

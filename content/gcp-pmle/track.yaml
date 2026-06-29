@@ -1,0 +1,53 @@
+# Google Cloud Professional Machine Learning Engineer — google certification track.
+# Domain weights mirror the official PMLE skills outline and sum to 1.0.
+id: gcp-pmle
+code: "PMLE"
+provider: google
+title: "Google Cloud Professional Machine Learning Engineer"
+level: professional
+examCode: "Professional Machine Learning Engineer"
+sourceUrl: "https://cloud.google.com/learn/certification/machine-learning-engineer"
+summary: |
+  Certification ML : cadrage, préparation des données, entraînement, déploiement et automatisation MLOps avec Vertex AI, en assurant fiabilité et responsabilité.
+domains:
+  - id: frame-architect
+    name: "Cadrer et architecturer le ML"
+    weight: 0.22
+  - id: data-prep
+    name: "Préparer les données"
+    weight: 0.2
+  - id: build-train
+    name: "Construire et entraîner"
+    weight: 0.2
+  - id: deploy-serve
+    name: "Déployer et servir"
+    weight: 0.2
+  - id: mlops
+    name: "Automatiser et superviser (MLOps)"
+    weight: 0.18
+units:
+  - id: gcppmle-u-frame-architect
+    domainId: frame-architect
+    title: "Cadrer et architecturer le ML"
+    lessons:
+      - gcppmle-l-du-probleme-metier-au-ml
+  - id: gcppmle-u-data-prep
+    domainId: data-prep
+    title: "Préparer les données"
+    lessons:
+      - gcppmle-l-feature-engineering
+  - id: gcppmle-u-build-train
+    domainId: build-train
+    title: "Construire et entraîner"
+    lessons:
+      - gcppmle-l-automl-vs-entrainement-custom
+  - id: gcppmle-u-deploy-serve
+    domainId: deploy-serve
+    title: "Déployer et servir"
+    lessons:
+      - gcppmle-l-endpoints-et-batch
+  - id: gcppmle-u-mlops
+    domainId: mlops
+    title: "Automatiser et superviser (MLOps)"
+    lessons:
+      - gcppmle-l-pipelines-et-derive

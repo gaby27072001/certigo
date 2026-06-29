@@ -1,0 +1,37 @@
+id: gcppcdbe-l-choisir-la-base-adaptee
+trackId: gcp-pcdbe
+unitId: gcppcdbe-u-design-db
+domainId: design-db
+title: "Choisir la base adaptée"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-choisir-la-base-adaptee
+    body: |
+      Dans l'examen PCDBE, « Choisir la base adaptée » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-choisir-la-base-adaptee
+    title: "Choisir la base adaptée"
+    body: |
+      Cloud SQL pour le relationnel, Spanner pour le relationnel mondial, Bigtable/Firestore pour le NoSQL. Le choix dépend de cohérence, échelle et latence.
+  - type: check
+    conceptId: c-choisir-la-base-adaptee
+    check:
+      id: gcppcdbe-l-choisir-la-base-adaptee-check-1
+      conceptId: c-choisir-la-base-adaptee
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle base offre du relationnel à cohérence forte et échelle mondiale ?
+      options:
+        - { id: a, label: "Spanner" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "Cloud CDN" }
+        - { id: d, label: "Pub/Sub" }
+      correct: [a]
+      explanation: |
+        Spanner combine SQL, scalabilité horizontale et cohérence forte.
+  - type: recap
+    conceptId: c-choisir-la-base-adaptee
+    body: |
+      Retenez l'essentiel de « Choisir la base adaptée » pour la certification PCDBE.

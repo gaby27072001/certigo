@@ -1,0 +1,37 @@
+id: gcppce-l-en-tetes-et-journaux
+trackId: gcp-pce
+unitId: gcppce-u-support-troubleshoot
+domainId: support-troubleshoot
+title: "En-têtes et journaux"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-en-tetes-et-journaux
+    body: |
+      Dans l'examen PCE, « En-têtes et journaux » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-en-tetes-et-journaux
+    title: "En-têtes et journaux"
+    body: |
+      L'analyse des en-têtes email, des journaux d'audit et des rapports résout les incidents. L'escalade vers le support Google complète le dispositif.
+  - type: check
+    conceptId: c-en-tetes-et-journaux
+    check:
+      id: gcppce-l-en-tetes-et-journaux-check-1
+      conceptId: c-en-tetes-et-journaux
+      type: mcq
+      difficulty: 1
+      stem: |
+        Que consulte-t-on pour diagnostiquer un email non reçu ?
+      options:
+        - { id: a, label: "Les journaux/en-têtes email" }
+        - { id: b, label: "Le CDN" }
+        - { id: c, label: "Le VPC" }
+        - { id: d, label: "Le DNS public" }
+      correct: [a]
+      explanation: |
+        Les en-têtes et logs retracent le cheminement.
+  - type: recap
+    conceptId: c-en-tetes-et-journaux
+    body: |
+      Retenez l'essentiel de « En-têtes et journaux » pour la certification PCE.

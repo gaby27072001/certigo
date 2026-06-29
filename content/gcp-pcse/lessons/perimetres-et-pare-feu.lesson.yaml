@@ -1,0 +1,37 @@
+id: gcppcse-l-perimetres-et-pare-feu
+trackId: gcp-pcse
+unitId: gcppcse-u-protect-infra
+domainId: protect-infra
+title: "Périmètres et pare-feu"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-perimetres-et-pare-feu
+    body: |
+      Dans l'examen PCSE, « Périmètres et pare-feu » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-perimetres-et-pare-feu
+    title: "Périmètres et pare-feu"
+    body: |
+      VPC Service Controls isole, Cloud Armor filtre, Shielded VM durcit. La défense en profondeur multiplie les couches.
+  - type: check
+    conceptId: c-perimetres-et-pare-feu
+    check:
+      id: gcppcse-l-perimetres-et-pare-feu-check-1
+      conceptId: c-perimetres-et-pare-feu
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service crée un périmètre limitant l'exfiltration ?
+      options:
+        - { id: a, label: "VPC Service Controls" }
+        - { id: b, label: "Cloud CDN" }
+        - { id: c, label: "BigQuery" }
+        - { id: d, label: "Pub/Sub" }
+      correct: [a]
+      explanation: |
+        VPC Service Controls protège les API et données.
+  - type: recap
+    conceptId: c-perimetres-et-pare-feu
+    body: |
+      Retenez l'essentiel de « Périmètres et pare-feu » pour la certification PCSE.

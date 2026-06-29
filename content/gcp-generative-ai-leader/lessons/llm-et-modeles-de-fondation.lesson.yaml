@@ -1,0 +1,37 @@
+id: gcpgenerativeaileader-l-llm-et-modeles-de-fondation
+trackId: gcp-generative-ai-leader
+unitId: gcpgenerativeaileader-u-genai-fundamentals
+domainId: genai-fundamentals
+title: "LLM et modèles de fondation"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-llm-et-modeles-de-fondation
+    body: |
+      Dans l'examen GENAI-LEADER, « LLM et modèles de fondation » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-llm-et-modeles-de-fondation
+    title: "LLM et modèles de fondation"
+    body: |
+      Les grands modèles de langage (LLM) comme Gemini sont entraînés sur d'immenses corpus pour générer texte, code et images. Vertex AI fournit l'accès managé à ces modèles.
+  - type: check
+    conceptId: c-llm-et-modeles-de-fondation
+    check:
+      id: gcpgenerativeaileader-l-llm-et-modeles-de-fondation-check-1
+      conceptId: c-llm-et-modeles-de-fondation
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service Google Cloud donne accès aux modèles de fondation managés ?
+      options:
+        - { id: a, label: "Vertex AI" }
+        - { id: b, label: "Cloud VPN" }
+        - { id: c, label: "Cloud DNS" }
+        - { id: d, label: "Cloud Storage" }
+      correct: [a]
+      explanation: |
+        Vertex AI est la plateforme ML/IA générative de Google Cloud.
+  - type: recap
+    conceptId: c-llm-et-modeles-de-fondation
+    body: |
+      Retenez l'essentiel de « LLM et modèles de fondation » pour la certification GENAI-LEADER.

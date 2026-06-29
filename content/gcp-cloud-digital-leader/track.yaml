@@ -1,0 +1,53 @@
+# Google Cloud Digital Leader — google certification track.
+# Domain weights mirror the official CDL skills outline and sum to 1.0.
+id: gcp-cloud-digital-leader
+code: "CDL"
+provider: google
+title: "Google Cloud Digital Leader"
+level: fundamentals
+examCode: "Cloud Digital Leader"
+sourceUrl: "https://cloud.google.com/learn/certification/cloud-digital-leader"
+summary: |
+  Certification d'entrée Google Cloud validant la compréhension des capacités du cloud et la valeur métier de Google Cloud : transformation digitale, données et IA, modernisation des infrastructures, confiance et sécurité. Idéale pour des profils non techniques.
+domains:
+  - id: digital-transformation
+    name: "Transformation digitale avec Google Cloud"
+    weight: 0.17
+  - id: data-innovation
+    name: "Innover avec les données"
+    weight: 0.3
+  - id: infra-app-modernization
+    name: "Modernisation des infrastructures et applications"
+    weight: 0.3
+  - id: trust-security
+    name: "Confiance et sécurité"
+    weight: 0.13
+  - id: scaling-operations
+    name: "Mise à l'échelle des opérations"
+    weight: 0.1
+units:
+  - id: gcpclouddigitalleader-u-digital-transformation
+    domainId: digital-transformation
+    title: "Transformation digitale avec Google Cloud"
+    lessons:
+      - gcpclouddigitalleader-l-pourquoi-le-cloud-transforme-le-metier
+  - id: gcpclouddigitalleader-u-data-innovation
+    domainId: data-innovation
+    title: "Innover avec les données"
+    lessons:
+      - gcpclouddigitalleader-l-donnees-structurees-semi-et-non-structurees
+  - id: gcpclouddigitalleader-u-infra-app-modernization
+    domainId: infra-app-modernization
+    title: "Modernisation des infrastructures et applications"
+    lessons:
+      - gcpclouddigitalleader-l-compute-engine-gke-et-cloud-run
+  - id: gcpclouddigitalleader-u-trust-security
+    domainId: trust-security
+    title: "Confiance et sécurité"
+    lessons:
+      - gcpclouddigitalleader-l-responsabilite-partagee-et-iam
+  - id: gcpclouddigitalleader-u-scaling-operations
+    domainId: scaling-operations
+    title: "Mise à l'échelle des opérations"
+    lessons:
+      - gcpclouddigitalleader-l-finops-et-support

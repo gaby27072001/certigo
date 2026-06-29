@@ -1,0 +1,37 @@
+id: gcppde-l-bigquery-ml-et-vertex-ai
+trackId: gcp-pde
+unitId: gcppde-u-analyze-ml
+domainId: analyze-ml
+title: "BigQuery ML et Vertex AI"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-bigquery-ml-et-vertex-ai
+    body: |
+      Dans l'examen PDE, « BigQuery ML et Vertex AI » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-bigquery-ml-et-vertex-ai
+    title: "BigQuery ML et Vertex AI"
+    body: |
+      BigQuery ML entraîne des modèles en SQL ; Vertex AI gère le cycle ML complet. Les données préparées alimentent l'analytique avancée.
+  - type: check
+    conceptId: c-bigquery-ml-et-vertex-ai
+    check:
+      id: gcppde-l-bigquery-ml-et-vertex-ai-check-1
+      conceptId: c-bigquery-ml-et-vertex-ai
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel outil entraîne des modèles directement en SQL ?
+      options:
+        - { id: a, label: "BigQuery ML" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "Cloud CDN" }
+        - { id: d, label: "Cloud VPN" }
+      correct: [a]
+      explanation: |
+        BigQuery ML crée des modèles via requêtes SQL.
+  - type: recap
+    conceptId: c-bigquery-ml-et-vertex-ai
+    body: |
+      Retenez l'essentiel de « BigQuery ML et Vertex AI » pour la certification PDE.

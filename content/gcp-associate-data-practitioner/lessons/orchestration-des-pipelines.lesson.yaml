@@ -1,0 +1,37 @@
+id: gcpassociatedatapractitioner-l-orchestration-des-pipelines
+trackId: gcp-associate-data-practitioner
+unitId: gcpassociatedatapractitioner-u-pipelines-automation
+domainId: pipelines-automation
+title: "Orchestration des pipelines"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-orchestration-des-pipelines
+    body: |
+      Dans l'examen ADP, « Orchestration des pipelines » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-orchestration-des-pipelines
+    title: "Orchestration des pipelines"
+    body: |
+      Dataflow et Cloud Composer orchestrent les pipelines ETL/ELT. La planification et la reprise sur erreur fiabilisent les traitements.
+  - type: check
+    conceptId: c-orchestration-des-pipelines
+    check:
+      id: gcpassociatedatapractitioner-l-orchestration-des-pipelines-check-1
+      conceptId: c-orchestration-des-pipelines
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service exécute des pipelines de transformation distribués ?
+      options:
+        - { id: a, label: "Dataflow" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "Cloud CDN" }
+        - { id: d, label: "Cloud VPN" }
+      correct: [a]
+      explanation: |
+        Dataflow exécute des pipelines Apache Beam managés.
+  - type: recap
+    conceptId: c-orchestration-des-pipelines
+    body: |
+      Retenez l'essentiel de « Orchestration des pipelines » pour la certification ADP.

@@ -1,0 +1,37 @@
+id: gcpgenerativeaileader-l-prompting-rag-et-fine-tuning
+trackId: gcp-generative-ai-leader
+unitId: gcpgenerativeaileader-u-improve-genai
+domainId: improve-genai
+title: "Prompting, RAG et fine-tuning"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-prompting-rag-et-fine-tuning
+    body: |
+      Dans l'examen GENAI-LEADER, « Prompting, RAG et fine-tuning » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-prompting-rag-et-fine-tuning
+    title: "Prompting, RAG et fine-tuning"
+    body: |
+      Le prompt engineering oriente les réponses ; le RAG ancre le modèle sur des données d'entreprise ; le fine-tuning spécialise un modèle. Le grounding réduit les hallucinations.
+  - type: check
+    conceptId: c-prompting-rag-et-fine-tuning
+    check:
+      id: gcpgenerativeaileader-l-prompting-rag-et-fine-tuning-check-1
+      conceptId: c-prompting-rag-et-fine-tuning
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quelle technique ancre un LLM sur des données d'entreprise à jour ?
+      options:
+        - { id: a, label: "RAG (génération augmentée par récupération)" }
+        - { id: b, label: "Reboot" }
+        - { id: c, label: "Compression vidéo" }
+        - { id: d, label: "Pare-feu" }
+      correct: [a]
+      explanation: |
+        Le RAG injecte des documents pertinents dans le contexte pour ancrer la réponse.
+  - type: recap
+    conceptId: c-prompting-rag-et-fine-tuning
+    body: |
+      Retenez l'essentiel de « Prompting, RAG et fine-tuning » pour la certification GENAI-LEADER.

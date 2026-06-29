@@ -1,0 +1,37 @@
+id: gcpace-l-choisir-le-bon-compute
+trackId: gcp-ace
+unitId: gcpace-u-plan-configure
+domainId: plan-configure
+title: "Choisir le bon compute"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-choisir-le-bon-compute
+    body: |
+      Dans l'examen ACE, « Choisir le bon compute » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-choisir-le-bon-compute
+    title: "Choisir le bon compute"
+    body: |
+      Compute Engine pour des VM, GKE pour des conteneurs orchestrés, Cloud Run pour du serverless, App Engine pour des apps managées. La planification estime aussi les coûts.
+  - type: check
+    conceptId: c-choisir-le-bon-compute
+    check:
+      id: gcpace-l-choisir-le-bon-compute-check-1
+      conceptId: c-choisir-le-bon-compute
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service convient pour orchestrer des conteneurs ?
+      options:
+        - { id: a, label: "GKE" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "Cloud VPN" }
+        - { id: d, label: "BigQuery" }
+      correct: [a]
+      explanation: |
+        GKE est le Kubernetes managé de Google Cloud.
+  - type: recap
+    conceptId: c-choisir-le-bon-compute
+    body: |
+      Retenez l'essentiel de « Choisir le bon compute » pour la certification ACE.

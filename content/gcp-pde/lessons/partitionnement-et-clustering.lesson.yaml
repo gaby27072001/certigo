@@ -1,0 +1,37 @@
+id: gcppde-l-partitionnement-et-clustering
+trackId: gcp-pde
+unitId: gcppde-u-store-data
+domainId: store-data
+title: "Partitionnement et clustering"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-partitionnement-et-clustering
+    body: |
+      Dans l'examen PDE, « Partitionnement et clustering » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-partitionnement-et-clustering
+    title: "Partitionnement et clustering"
+    body: |
+      Dans BigQuery, partitionner par date et clusterer par colonnes réduit coûts et latence. Le schéma influence performances et facturation.
+  - type: check
+    conceptId: c-partitionnement-et-clustering
+    check:
+      id: gcppde-l-partitionnement-et-clustering-check-1
+      conceptId: c-partitionnement-et-clustering
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel levier réduit le coût des requêtes BigQuery ?
+      options:
+        - { id: a, label: "Partitionner et clusterer les tables" }
+        - { id: b, label: "Tout scanner" }
+        - { id: c, label: "Désactiver IAM" }
+        - { id: d, label: "VPN" }
+      correct: [a]
+      explanation: |
+        Le partitionnement limite les données scannées.
+  - type: recap
+    conceptId: c-partitionnement-et-clustering
+    body: |
+      Retenez l'essentiel de « Partitionnement et clustering » pour la certification PDE.

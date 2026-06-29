@@ -1,0 +1,37 @@
+id: gcpace-l-monitoring-et-logs
+trackId: gcp-ace
+unitId: gcpace-u-ensure-operation
+domainId: ensure-operation
+title: "Monitoring et logs"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-monitoring-et-logs
+    body: |
+      Dans l'examen ACE, « Monitoring et logs » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-monitoring-et-logs
+    title: "Monitoring et logs"
+    body: |
+      Cloud Monitoring et Cloud Logging offrent métriques, tableaux de bord et alertes. La gestion des VM (snapshots, autoscaling) maintient la disponibilité.
+  - type: check
+    conceptId: c-monitoring-et-logs
+    check:
+      id: gcpace-l-monitoring-et-logs-check-1
+      conceptId: c-monitoring-et-logs
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service collecte les journaux applicatifs ?
+      options:
+        - { id: a, label: "Cloud Logging" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "Cloud CDN" }
+        - { id: d, label: "Cloud VPN" }
+      correct: [a]
+      explanation: |
+        Cloud Logging centralise les logs.
+  - type: recap
+    conceptId: c-monitoring-et-logs
+    body: |
+      Retenez l'essentiel de « Monitoring et logs » pour la certification ACE.

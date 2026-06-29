@@ -1,0 +1,37 @@
+id: gcppcse-l-iam-roles-et-identites
+trackId: gcp-pcse
+unitId: gcppcse-u-configure-access
+domainId: configure-access
+title: "IAM, rôles et identités"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-iam-roles-et-identites
+    body: |
+      Dans l'examen PCSE, « IAM, rôles et identités » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-iam-roles-et-identites
+    title: "IAM, rôles et identités"
+    body: |
+      IAM, Cloud Identity et les comptes de service appliquent le moindre privilège. Les conditions et l'identité fédérée affinent les accès.
+  - type: check
+    conceptId: c-iam-roles-et-identites
+    check:
+      id: gcppcse-l-iam-roles-et-identites-check-1
+      conceptId: c-iam-roles-et-identites
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel principe doit guider l'attribution des rôles IAM ?
+      options:
+        - { id: a, label: "Moindre privilège" }
+        - { id: b, label: "Accès total" }
+        - { id: c, label: "Comptes partagés" }
+        - { id: d, label: "Aucun audit" }
+      correct: [a]
+      explanation: |
+        Le moindre privilège réduit la surface d'attaque.
+  - type: recap
+    conceptId: c-iam-roles-et-identites
+    body: |
+      Retenez l'essentiel de « IAM, rôles et identités » pour la certification PCSE.

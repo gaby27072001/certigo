@@ -1,0 +1,53 @@
+# Google Cloud Professional Data Engineer — google certification track.
+# Domain weights mirror the official PDE skills outline and sum to 1.0.
+id: gcp-pde
+code: "PDE"
+provider: google
+title: "Google Cloud Professional Data Engineer"
+level: professional
+examCode: "Professional Data Engineer"
+sourceUrl: "https://cloud.google.com/learn/certification/data-engineer"
+summary: |
+  Certification pour concevoir des systèmes de traitement de données : ingestion, stockage, pipelines, analytique et ML, en assurant qualité, sécurité et fiabilité.
+domains:
+  - id: design-systems
+    name: "Concevoir des systèmes de données"
+    weight: 0.22
+  - id: ingest-process
+    name: "Ingérer et traiter"
+    weight: 0.25
+  - id: store-data
+    name: "Stocker et organiser"
+    weight: 0.2
+  - id: analyze-ml
+    name: "Analyser et exploiter le ML"
+    weight: 0.18
+  - id: maintain-workloads
+    name: "Maintenir la fiabilité"
+    weight: 0.15
+units:
+  - id: gcppde-u-design-systems
+    domainId: design-systems
+    title: "Concevoir des systèmes de données"
+    lessons:
+      - gcppde-l-choisir-le-stockage-adapte
+  - id: gcppde-u-ingest-process
+    domainId: ingest-process
+    title: "Ingérer et traiter"
+    lessons:
+      - gcppde-l-pipelines-dataflow
+  - id: gcppde-u-store-data
+    domainId: store-data
+    title: "Stocker et organiser"
+    lessons:
+      - gcppde-l-partitionnement-et-clustering
+  - id: gcppde-u-analyze-ml
+    domainId: analyze-ml
+    title: "Analyser et exploiter le ML"
+    lessons:
+      - gcppde-l-bigquery-ml-et-vertex-ai
+  - id: gcppde-u-maintain-workloads
+    domainId: maintain-workloads
+    title: "Maintenir la fiabilité"
+    lessons:
+      - gcppde-l-qualite-et-observabilite

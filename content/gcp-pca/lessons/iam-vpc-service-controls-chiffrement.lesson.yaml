@@ -1,0 +1,37 @@
+id: gcppca-l-iam-vpc-service-controls-chiffrement
+trackId: gcp-pca
+unitId: gcppca-u-security-compliance
+domainId: security-compliance
+title: "IAM, VPC Service Controls, chiffrement"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-iam-vpc-service-controls-chiffrement
+    body: |
+      Dans l'examen PCA, « IAM, VPC Service Controls, chiffrement » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-iam-vpc-service-controls-chiffrement
+    title: "IAM, VPC Service Controls, chiffrement"
+    body: |
+      Le moindre privilège, VPC Service Controls et CMEK protègent données et accès. La conformité aligne contrôles et réglementations.
+  - type: check
+    conceptId: c-iam-vpc-service-controls-chiffrement
+    check:
+      id: gcppca-l-iam-vpc-service-controls-chiffrement-check-1
+      conceptId: c-iam-vpc-service-controls-chiffrement
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel mécanisme limite l'exfiltration en isolant les services ?
+      options:
+        - { id: a, label: "VPC Service Controls" }
+        - { id: b, label: "CDN" }
+        - { id: c, label: "DNS" }
+        - { id: d, label: "Autoscaling" }
+      correct: [a]
+      explanation: |
+        VPC Service Controls crée un périmètre de sécurité.
+  - type: recap
+    conceptId: c-iam-vpc-service-controls-chiffrement
+    body: |
+      Retenez l'essentiel de « IAM, VPC Service Controls, chiffrement » pour la certification PCA.

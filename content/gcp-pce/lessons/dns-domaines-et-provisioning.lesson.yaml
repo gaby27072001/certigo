@@ -1,0 +1,37 @@
+id: gcppce-l-dns-domaines-et-provisioning
+trackId: gcp-pce
+unitId: gcppce-u-manage-account
+domainId: manage-account
+title: "DNS, domaines et provisioning"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-dns-domaines-et-provisioning
+    body: |
+      Dans l'examen PCE, « DNS, domaines et provisioning » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-dns-domaines-et-provisioning
+    title: "DNS, domaines et provisioning"
+    body: |
+      On vérifie le domaine, configure les MX et provisionne les utilisateurs (manuel, GCDS, API). Les unités organisationnelles structurent les politiques.
+  - type: check
+    conceptId: c-dns-domaines-et-provisioning
+    check:
+      id: gcppce-l-dns-domaines-et-provisioning-check-1
+      conceptId: c-dns-domaines-et-provisioning
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel enregistrement DNS dirige le courrier vers Workspace ?
+      options:
+        - { id: a, label: "MX" }
+        - { id: b, label: "CNAME seul" }
+        - { id: c, label: "A seul" }
+        - { id: d, label: "PTR" }
+      correct: [a]
+      explanation: |
+        Les MX routent l'email entrant.
+  - type: recap
+    conceptId: c-dns-domaines-et-provisioning
+    body: |
+      Retenez l'essentiel de « DNS, domaines et provisioning » pour la certification PCE.

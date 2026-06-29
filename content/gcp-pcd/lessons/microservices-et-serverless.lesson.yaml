@@ -1,0 +1,37 @@
+id: gcppcd-l-microservices-et-serverless
+trackId: gcp-pcd
+unitId: gcppcd-u-app-design
+domainId: app-design
+title: "Microservices et serverless"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-microservices-et-serverless
+    body: |
+      Dans l'examen PCD, « Microservices et serverless » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-microservices-et-serverless
+    title: "Microservices et serverless"
+    body: |
+      Cloud Run et Functions favorisent un design cloud-native découplé. Les patterns de résilience (retry, circuit breaker) évitent les pannes en cascade.
+  - type: check
+    conceptId: c-microservices-et-serverless
+    check:
+      id: gcppcd-l-microservices-et-serverless-check-1
+      conceptId: c-microservices-et-serverless
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service exécute des microservices conteneurisés serverless ?
+      options:
+        - { id: a, label: "Cloud Run" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "BigQuery" }
+        - { id: d, label: "Cloud VPN" }
+      correct: [a]
+      explanation: |
+        Cloud Run scale les conteneurs sans gérer de cluster.
+  - type: recap
+    conceptId: c-microservices-et-serverless
+    body: |
+      Retenez l'essentiel de « Microservices et serverless » pour la certification PCD.

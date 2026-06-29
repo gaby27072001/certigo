@@ -1,0 +1,37 @@
+id: gcppcdbe-l-database-migration-service
+trackId: gcp-pcdbe
+unitId: gcppcdbe-u-migrate-db
+domainId: migrate-db
+title: "Database Migration Service"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-database-migration-service
+    body: |
+      Dans l'examen PCDBE, « Database Migration Service » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-database-migration-service
+    title: "Database Migration Service"
+    body: |
+      DMS migre avec un minimum d'interruption. La réplication continue limite la fenêtre de bascule. La validation garantit l'intégrité.
+  - type: check
+    conceptId: c-database-migration-service
+    check:
+      id: gcppcdbe-l-database-migration-service-check-1
+      conceptId: c-database-migration-service
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service migre des bases avec faible interruption ?
+      options:
+        - { id: a, label: "Database Migration Service" }
+        - { id: b, label: "Cloud CDN" }
+        - { id: c, label: "Pub/Sub" }
+        - { id: d, label: "Cloud DNS" }
+      correct: [a]
+      explanation: |
+        DMS automatise les migrations gérées.
+  - type: recap
+    conceptId: c-database-migration-service
+    body: |
+      Retenez l'essentiel de « Database Migration Service » pour la certification PCDBE.

@@ -1,0 +1,37 @@
+id: gcppca-l-slo-sla-et-resilience
+trackId: gcp-pca
+unitId: gcppca-u-reliability
+domainId: reliability
+title: "SLO, SLA et résilience"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-slo-sla-et-resilience
+    body: |
+      Dans l'examen PCA, « SLO, SLA et résilience » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-slo-sla-et-resilience
+    title: "SLO, SLA et résilience"
+    body: |
+      Les SLO guident la fiabilité, les SLA engagent contractuellement, et la redondance multi-régions assure la continuité.
+  - type: check
+    conceptId: c-slo-sla-et-resilience
+    check:
+      id: gcppca-l-slo-sla-et-resilience-check-1
+      conceptId: c-slo-sla-et-resilience
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel objectif interne mesure la fiabilité visée ?
+      options:
+        - { id: a, label: "SLO" }
+        - { id: b, label: "CDN" }
+        - { id: c, label: "NAT" }
+        - { id: d, label: "VPC" }
+      correct: [a]
+      explanation: |
+        Le SLO définit la cible de fiabilité.
+  - type: recap
+    conceptId: c-slo-sla-et-resilience
+    body: |
+      Retenez l'essentiel de « SLO, SLA et résilience » pour la certification PCA.

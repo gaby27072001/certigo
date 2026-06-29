@@ -1,0 +1,37 @@
+id: gcppmle-l-feature-engineering
+trackId: gcp-pmle
+unitId: gcppmle-u-data-prep
+domainId: data-prep
+title: "Feature engineering"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-feature-engineering
+    body: |
+      Dans l'examen PMLE, « Feature engineering » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-feature-engineering
+    title: "Feature engineering"
+    body: |
+      La qualité des features détermine la performance. Feature Store centralise et réutilise les features ; BigQuery prépare à grande échelle.
+  - type: check
+    conceptId: c-feature-engineering
+    check:
+      id: gcppmle-l-feature-engineering-check-1
+      conceptId: c-feature-engineering
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service centralise et réutilise les features ML ?
+      options:
+        - { id: a, label: "Vertex AI Feature Store" }
+        - { id: b, label: "Cloud DNS" }
+        - { id: c, label: "Cloud CDN" }
+        - { id: d, label: "Pub/Sub" }
+      correct: [a]
+      explanation: |
+        Feature Store partage des features cohérentes.
+  - type: recap
+    conceptId: c-feature-engineering
+    body: |
+      Retenez l'essentiel de « Feature engineering » pour la certification PMLE.

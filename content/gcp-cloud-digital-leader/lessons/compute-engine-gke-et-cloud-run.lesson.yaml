@@ -1,0 +1,37 @@
+id: gcpclouddigitalleader-l-compute-engine-gke-et-cloud-run
+trackId: gcp-cloud-digital-leader
+unitId: gcpclouddigitalleader-u-infra-app-modernization
+domainId: infra-app-modernization
+title: "Compute Engine, GKE et Cloud Run"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-compute-engine-gke-et-cloud-run
+    body: |
+      Dans l'examen CDL, « Compute Engine, GKE et Cloud Run » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-compute-engine-gke-et-cloud-run
+    title: "Compute Engine, GKE et Cloud Run"
+    body: |
+      Compute Engine fournit des machines virtuelles, Google Kubernetes Engine orchestre des conteneurs, et Cloud Run exécute des conteneurs serverless. Le choix dépend du niveau de contrôle et de gestion souhaité.
+  - type: check
+    conceptId: c-compute-engine-gke-et-cloud-run
+    check:
+      id: gcpclouddigitalleader-l-compute-engine-gke-et-cloud-run-check-1
+      conceptId: c-compute-engine-gke-et-cloud-run
+      type: mcq
+      difficulty: 1
+      stem: |
+        Quel service exécute des conteneurs en mode serverless sans gérer de cluster ?
+      options:
+        - { id: a, label: "Cloud Run" }
+        - { id: b, label: "Compute Engine" }
+        - { id: c, label: "BigQuery" }
+        - { id: d, label: "Cloud VPN" }
+      correct: [a]
+      explanation: |
+        Cloud Run met à l'échelle automatiquement des conteneurs sans gérer l'infrastructure.
+  - type: recap
+    conceptId: c-compute-engine-gke-et-cloud-run
+    body: |
+      Retenez l'essentiel de « Compute Engine, GKE et Cloud Run » pour la certification CDL.

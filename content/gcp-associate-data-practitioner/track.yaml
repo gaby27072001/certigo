@@ -1,0 +1,45 @@
+# Google Cloud Associate Data Practitioner — google certification track.
+# Domain weights mirror the official ADP skills outline and sum to 1.0.
+id: gcp-associate-data-practitioner
+code: "ADP"
+provider: google
+title: "Google Cloud Associate Data Practitioner"
+level: associate
+examCode: "Associate Data Practitioner"
+sourceUrl: "https://cloud.google.com/learn/certification/data-practitioner"
+summary: |
+  Certification data généraliste : préparation et ingestion des données, analyse et présentation, pipelines, gouvernance. Pour des profils data débutants sur Google Cloud.
+domains:
+  - id: data-prep
+    name: "Préparation et ingestion"
+    weight: 0.3
+  - id: data-analysis
+    name: "Analyse et présentation"
+    weight: 0.3
+  - id: pipelines-automation
+    name: "Pipelines et automatisation"
+    weight: 0.25
+  - id: data-governance
+    name: "Gouvernance et sécurité"
+    weight: 0.15
+units:
+  - id: gcpassociatedatapractitioner-u-data-prep
+    domainId: data-prep
+    title: "Préparation et ingestion"
+    lessons:
+      - gcpassociatedatapractitioner-l-ingestion-par-lots-et-streaming
+  - id: gcpassociatedatapractitioner-u-data-analysis
+    domainId: data-analysis
+    title: "Analyse et présentation"
+    lessons:
+      - gcpassociatedatapractitioner-l-requeter-avec-bigquery
+  - id: gcpassociatedatapractitioner-u-pipelines-automation
+    domainId: pipelines-automation
+    title: "Pipelines et automatisation"
+    lessons:
+      - gcpassociatedatapractitioner-l-orchestration-des-pipelines
+  - id: gcpassociatedatapractitioner-u-data-governance
+    domainId: data-governance
+    title: "Gouvernance et sécurité"
+    lessons:
+      - gcpassociatedatapractitioner-l-acces-et-qualite

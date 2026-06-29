@@ -1,0 +1,37 @@
+id: gcppca-l-reseau-et-provisionnement
+trackId: gcp-pca
+unitId: gcppca-u-manage-provision
+domainId: manage-provision
+title: "Réseau et provisionnement"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-reseau-et-provisionnement
+    body: |
+      Dans l'examen PCA, « Réseau et provisionnement » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-reseau-et-provisionnement
+    title: "Réseau et provisionnement"
+    body: |
+      Le VPC, le peering et Cloud Interconnect relient les charges. Le provisionnement automatisé (IaC) garantit reproductibilité et gouvernance.
+  - type: check
+    conceptId: c-reseau-et-provisionnement
+    check:
+      id: gcppca-l-reseau-et-provisionnement-check-1
+      conceptId: c-reseau-et-provisionnement
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel service relie un datacenter à Google Cloud en privé à haut débit ?
+      options:
+        - { id: a, label: "Cloud Interconnect" }
+        - { id: b, label: "Cloud CDN" }
+        - { id: c, label: "BigQuery" }
+        - { id: d, label: "Pub/Sub" }
+      correct: [a]
+      explanation: |
+        Interconnect fournit une connexion privée dédiée.
+  - type: recap
+    conceptId: c-reseau-et-provisionnement
+    body: |
+      Retenez l'essentiel de « Réseau et provisionnement » pour la certification PCA.

@@ -1,0 +1,37 @@
+id: gcpassociateworkspaceadmin-l-routage-et-anti-spam
+trackId: gcp-associate-workspace-admin
+unitId: gcpassociateworkspaceadmin-u-mail-management
+domainId: mail-management
+title: "Routage et anti-spam"
+estMinutes: 6
+blocks:
+  - type: hook
+    conceptId: c-routage-et-anti-spam
+    body: |
+      Dans l'examen AGWA, « Routage et anti-spam » revient régulièrement. Sauriez-vous l'expliquer simplement ?
+  - type: concept
+    conceptId: c-routage-et-anti-spam
+    title: "Routage et anti-spam"
+    body: |
+      Gmail d'entreprise gère routage, conformité (SPF, DKIM, DMARC) et filtrage. La rétention et l'archivage répondent aux exigences légales.
+  - type: check
+    conceptId: c-routage-et-anti-spam
+    check:
+      id: gcpassociateworkspaceadmin-l-routage-et-anti-spam-check-1
+      conceptId: c-routage-et-anti-spam
+      type: mcq
+      difficulty: 2
+      stem: |
+        Quel mécanisme authentifie l'expéditeur d'un email ?
+      options:
+        - { id: a, label: "DKIM/SPF/DMARC" }
+        - { id: b, label: "CDN" }
+        - { id: c, label: "NAT" }
+        - { id: d, label: "VPN" }
+      correct: [a]
+      explanation: |
+        SPF, DKIM et DMARC luttent contre l'usurpation.
+  - type: recap
+    conceptId: c-routage-et-anti-spam
+    body: |
+      Retenez l'essentiel de « Routage et anti-spam » pour la certification AGWA.

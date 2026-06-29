@@ -1,0 +1,53 @@
+# Google Cloud Professional Cloud Architect — google certification track.
+# Domain weights mirror the official PCA skills outline and sum to 1.0.
+id: gcp-pca
+code: "PCA"
+provider: google
+title: "Google Cloud Professional Cloud Architect"
+level: professional
+examCode: "Professional Cloud Architect"
+sourceUrl: "https://cloud.google.com/learn/certification/cloud-architect"
+summary: |
+  Certification phare pour concevoir des architectures cloud robustes, sécurisées et évolutives : conception et planification, provisionnement, sécurité et conformité, optimisation, fiabilité.
+domains:
+  - id: design-plan
+    name: "Concevoir et planifier l'architecture"
+    weight: 0.24
+  - id: manage-provision
+    name: "Gérer et provisionner"
+    weight: 0.2
+  - id: security-compliance
+    name: "Sécurité et conformité"
+    weight: 0.2
+  - id: analyze-optimize
+    name: "Analyser et optimiser"
+    weight: 0.2
+  - id: reliability
+    name: "Fiabilité et exploitation"
+    weight: 0.16
+units:
+  - id: gcppca-u-design-plan
+    domainId: design-plan
+    title: "Concevoir et planifier l'architecture"
+    lessons:
+      - gcppca-l-aligner-architecture-et-besoins-metier
+  - id: gcppca-u-manage-provision
+    domainId: manage-provision
+    title: "Gérer et provisionner"
+    lessons:
+      - gcppca-l-reseau-et-provisionnement
+  - id: gcppca-u-security-compliance
+    domainId: security-compliance
+    title: "Sécurité et conformité"
+    lessons:
+      - gcppca-l-iam-vpc-service-controls-chiffrement
+  - id: gcppca-u-analyze-optimize
+    domainId: analyze-optimize
+    title: "Analyser et optimiser"
+    lessons:
+      - gcppca-l-couts-et-performance
+  - id: gcppca-u-reliability
+    domainId: reliability
+    title: "Fiabilité et exploitation"
+    lessons:
+      - gcppca-l-slo-sla-et-resilience
