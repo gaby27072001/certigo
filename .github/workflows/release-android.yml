@@ -50,7 +50,7 @@ permissions:
 env:
   FLUTTER_VERSION: "3.27.4"
   # ⚠️ Doit correspondre à applicationId dans apps/mobile/android/app/build.gradle
-  PLAY_PACKAGE_NAME: "law.microlingo"
+  PLAY_PACKAGE_NAME: "com.certigo.mobileapp"
   AAB_PATH: "apps/mobile/build/app/outputs/bundle/release/app-release.aab"
 
 jobs:
@@ -190,7 +190,7 @@ jobs:
         # continue-on-error: quota GitHub Actions (500 MB free) peut être dépassé.
         # La publication Google Play se poursuit quoi qu'il arrive.
         continue-on-error: true
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: certigo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}-aab
           path: ${{ env.AAB_PATH }}

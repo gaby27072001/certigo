@@ -7,15 +7,6 @@ name: deploy-privacy-policy
 # et conserver le chemin /privacy-policy/ pour une bascule transparente.
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - "docs/legal/privacy-policy.md"
-      - ".github/workflows/deploy-privacy-policy.yml"
-  pull_request:
-    paths:
-      - "docs/legal/privacy-policy.md"
-      - ".github/workflows/deploy-privacy-policy.yml"
 
 permissions:
   contents: read
