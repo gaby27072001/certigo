@@ -103,7 +103,7 @@ Compromis assumé : plus de scan automatique à chaque PR/push ; la détection s
 
 ```bash
 GH_ORG="gchambaud_microsoft"
-GH_REPO="Microlingo"
+GH_REPO="Certigo"
 APP_NAME="microlingo-github-oidc"
 
 # Détectés dans l'environnement de dev (à confirmer via `az account show`) :
