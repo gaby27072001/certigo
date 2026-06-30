@@ -57,9 +57,8 @@ jobs:
   release:
     name: Build AAB signé + publication Play
     runs-on: [self-hosted, Linux, X64, certigo-ci]
-    # CI-03 : ce job crée une GitHub Release (gh release create/delete) via GITHUB_TOKEN.
     permissions:
-      contents: write
+      contents: read
     # Approval gate: configure required reviewers on the "beta" environment
     # (Settings → Environments) so a human signs off before any Play publish.
     environment: beta
@@ -185,60 +184,6 @@ jobs:
           --build-name=${{ steps.ver.outputs.build_name }}
           --build-number=${{ steps.ver.outputs.build_number }}
 
-      - name: Publier l'AAB en artefact
-        id: upload_artifact
-        # continue-on-error: quota GitHub Actions (500 MB free) peut être dépassé.
-        # La publication Google Play se poursuit quoi qu'il arrive.
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: certigo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}-aab
-          path: ${{ env.AAB_PATH }}
-          if-no-files-found: error
-          retention-days: 3
-
-      - name: Copier l'AAB vers Azure Storage (repli si quota GitHub plein)
-        continue-on-error: true
-        if: ${{ steps.upload_artifact.outcome == 'failure' }}
-        shell: bash
-        env:
-          STORAGE_ACCOUNT: ${{ vars.AZURE_STORAGE_ACCOUNT }}
-        run: |
-          set -euo pipefail
-          if [ -z "${STORAGE_ACCOUNT:-}" ]; then
-            echo "::warning::AZURE_STORAGE_ACCOUNT non défini, copie Azure Storage ignorée."
-            exit 0
-          fi
-          az login --identity --output none 2>/dev/null || true
-          AAB_NAME="certigo-${{ steps.ver.outputs.build_name }}-${{ steps.ver.outputs.build_number }}.aab"
-          az storage blob upload \
-            --account-name "$STORAGE_ACCOUNT" \
-            --container-name "android-releases" \
-            --name "$AAB_NAME" \
-            --file "${{ env.AAB_PATH }}" \
-            --auth-mode login \
-            --overwrite \
-            --output none \
-            && echo "::notice::AAB uploadé : https://${STORAGE_ACCOUNT}.blob.core.windows.net/android-releases/${AAB_NAME}" \
-            || echo "::warning::Upload Azure Storage échoué. Télécharger l'AAB manuellement depuis le runner."
-
-      - name: Fallback — GitHub Release
-        if: steps.upload_artifact.outcome == 'failure'
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh release delete build-aab-latest --yes 2>/dev/null || true
-          gh release create build-aab-latest \
-            --title "AAB Build $(date +%Y-%m-%d)" \
-            --notes "Auto-generated signed AAB from CI (artifact quota fallback)" \
-            --prerelease \
-            --target "$GITHUB_SHA" \
-            "$AAB_PATH#certigo-release.aab"
-          echo "> ⬆️ Artefact quota dépassé — AAB publié en **GitHub Release** \`build-aab-latest\`." >> "$GITHUB_STEP_SUMMARY"
-
       - name: Publier sur Google Play (piste ${{ steps.ver.outputs.track }})
         if: ${{ inputs.dry_run != true && steps.signing.outputs.has_play == 'true' }}
         uses: r0adkll/upload-google-play@v1
@@ -269,7 +214,7 @@ jobs:
             echo "| Version | ${{ steps.ver.outputs.build_name }}+${{ steps.ver.outputs.build_number }} |" >> "$GITHUB_STEP_SUMMARY"
             echo "| Taille | $SIZE |" >> "$GITHUB_STEP_SUMMARY"
             echo "| Chemin runner | ${{ env.AAB_PATH }} |" >> "$GITHUB_STEP_SUMMARY"
-            echo "| Artefact GitHub | ${{ steps.upload_artifact.outcome == 'success' && 'Disponible' || '⚠️ Quota plein — télécharger depuis le runner' }} |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Publication | AAB signé publié sur Google Play — binaire conservé sur le runner (${{ env.AAB_PATH }}) |" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "::error::AAB introuvable à ${{ env.AAB_PATH }}"
           fi
