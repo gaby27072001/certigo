@@ -13,6 +13,9 @@ concurrency:
   group: ci-mobile-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   FLUTTER_VERSION: "3.27.4"
   NON_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","certigo-ci"]' }}
@@ -20,6 +23,14 @@ env:
 jobs:
   packages:
     name: Pure-Dart packages (core, cortex, data)
+    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
+    # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
+    # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
+    # évènements push/dispatch passent inchangés → zéro régression.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
+    # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
     runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
     strategy:
       matrix:
@@ -43,6 +54,14 @@ jobs:
 
   app:
     name: Flutter app + UI packages
+    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
+    # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
+    # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
+    # évènements push/dispatch passent inchangés → zéro régression.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
+    # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
     runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
     steps:
       - uses: actions/checkout@v4

@@ -44,6 +44,9 @@ concurrency:
   group: release-android-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 env:
   FLUTTER_VERSION: "3.27.4"
   # ⚠️ Doit correspondre à applicationId dans apps/mobile/android/app/build.gradle
@@ -54,6 +57,9 @@ jobs:
   release:
     name: Build AAB signé + publication Play
     runs-on: [self-hosted, Linux, X64, certigo-ci]
+    # CI-03 : ce job crée une GitHub Release (gh release create/delete) via GITHUB_TOKEN.
+    permissions:
+      contents: write
     # Approval gate: configure required reviewers on the "beta" environment
     # (Settings → Environments) so a human signs off before any Play publish.
     environment: beta

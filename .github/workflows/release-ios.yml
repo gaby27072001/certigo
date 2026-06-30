@@ -53,6 +53,9 @@ concurrency:
   group: release-ios-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 env:
   FLUTTER_VERSION: "3.27.4"
   BUNDLE_ID: "law-microlingo"

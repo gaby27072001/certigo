@@ -3,6 +3,10 @@ name: promote-backend-staging-prod
 on:
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 concurrency:
   group: promote-backend-staging-prod-${{ github.ref }}
   cancel-in-progress: false

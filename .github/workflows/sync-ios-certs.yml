@@ -29,6 +29,9 @@ concurrency:
   group: sync-ios-certs
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 env:
   BUNDLE_ID: "law-microlingo"
 

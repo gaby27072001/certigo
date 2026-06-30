@@ -13,9 +13,20 @@ concurrency:
   group: ci-infra-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   bicep-build:
     name: Bicep build (lint)
+    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
+    # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
+    # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
+    # évènements push/dispatch passent inchangés → zéro régression.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
+    # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
     runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
     steps:
       - uses: actions/checkout@v4

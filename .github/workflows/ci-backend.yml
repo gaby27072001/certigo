@@ -13,9 +13,20 @@ concurrency:
   group: ci-backend-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+permissions:
+  contents: read
+
 jobs:
   build-test:
     name: Build & test
+    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
+    # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
+    # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
+    # évènements push/dispatch passent inchangés → zéro régression.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
+    # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
     # SPOF mitigation (audit #1) : repli GitHub-hosted pré-câblé.
     # Défaut = runner self-hosted (comportement inchangé).
     # Pour basculer en urgence si le pool self-hosted est indisponible :
