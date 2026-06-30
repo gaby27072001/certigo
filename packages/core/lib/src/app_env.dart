@@ -1,6 +1,10 @@
 /// Compile-time environment configuration, injected via `--dart-define`.
 ///
-/// Never hard-code endpoints or client ids. Build flavors pass values:
+/// Les *secrets* (client secrets, clés API) ne doivent JAMAIS figurer ici : ils
+/// passent par `--dart-define` au build ou par le Key Vault côté backend. En
+/// revanche les identifiants OIDC *publics* (client id public, authority CIAM,
+/// redirect URI) peuvent avoir des défauts committés ci-dessous. Les flavors de
+/// build surchargent ces valeurs :
 /// ```
 /// flutter run --dart-define=CERTIGO_ENV=dev \
 ///   --dart-define=API_BASE_URL=https://dev.api.certigo.app \
@@ -31,8 +35,21 @@ class AppEnv {
   static const String devAuthToken = String.fromEnvironment('DEV_AUTH_TOKEN', defaultValue: 'dev');
 
   /// Microsoft Entra External ID — public client configuration.
-  static const String entraClientId = String.fromEnvironment('ENTRA_CLIENT_ID', defaultValue: '');
-  static const String entraAuthority = String.fromEnvironment('ENTRA_AUTHORITY', defaultValue: '');
+  ///
+  /// Les défauts pointent vers le locataire CIAM Certigo (`certigoapp`). Ce sont
+  /// des identifiants OIDC *publics* (visibles dans chaque requête d'autorisation
+  /// et la redirection navigateur), pas des secrets — d'où leur présence ici pour
+  /// que le social sign-in fonctionne out-of-the-box. Surchargeables via
+  /// `--dart-define=ENTRA_CLIENT_ID=…` / `ENTRA_AUTHORITY=…` pour cibler un autre
+  /// locataire (staging/prod).
+  static const String entraClientId = String.fromEnvironment(
+    'ENTRA_CLIENT_ID',
+    defaultValue: '4d1f1075-7bc5-4764-947b-701435a85f8c',
+  );
+  static const String entraAuthority = String.fromEnvironment(
+    'ENTRA_AUTHORITY',
+    defaultValue: 'https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0',
+  );
   static const String entraRedirectUri = String.fromEnvironment(
     'ENTRA_REDIRECT_URI',
     defaultValue: 'certigo://auth',
