@@ -7,25 +7,35 @@
 | Champ | Valeur |
 |---|---|
 | Nom de l'application | **Certigo** |
-| applicationId / package | `law.microlingo` ⚠️ NON modifiable après le 1er upload |
+| applicationId / package | `com.certigo.mobileapp` ⚠️ NON modifiable après le 1er upload |
 | Catégorie | Éducation |
 | Adresse e-mail de contact | TODO (ex : `support@certigo.app`) |
 | Site web | TODO |
 | Politique de confidentialité (URL) | **TODO obligatoire** (exigée par Play même en test interne) |
 
 ## Description courte (≤ 80 caractères)
-Maîtrisez vos certifications Microsoft par micro-leçons premium.
+Le Duolingo des certifications IT — formez-vous, entraînez-vous, réussissez.
 
 ## Description complète (≤ 4000 caractères)
-Certigo vous prépare aux certifications Microsoft (AZ-900, AZ-104, AI-900,
-DP-900, SC-900) avec une pédagogie courte et efficace : concept → exemple
-appliqué → vérification de compréhension → révision adaptative (répétition
-espacée). Suivez votre progression grâce au Readiness Score (0–100) et restez
-motivé avec XP, niveaux, streak et badges — sans cœurs ni vies.
+Certigo est LA plateforme de référence pour apprendre, s'entraîner et décrocher ses certifications IT.
 
-⚠️ Certigo n'est ni affilié, ni approuvé par Microsoft. Aucun contenu
-d'examen réel n'est reproduit : toutes les leçons et tous les items sont
-originaux.
+🏆 Le Duolingo du monde tech
+Oubliez les cours interminables et les PDF ennuyeux. Certigo transforme votre préparation aux certifications en une expérience engageante, progressive et addictive — quelques minutes par jour suffisent pour progresser vraiment.
+
+📚 Toutes les certifications IT au même endroit
+Cloud : AWS, Azure, Google Cloud
+Réseau : Cisco CCNA, CompTIA Network+
+Sécurité : CompTIA Security+, certifications Cybersec
+DevOps, IA, Data et bien plus encore…
+Un seul endroit pour tout votre parcours IT professionnel.
+
+🎯 Une méthode qui fonctionne
+Concept → Exemple concret → Quiz → Révision adaptative par répétition espacée. Vous apprenez, vous pratiquez, vous mémorisez — exactement ce qu'il faut pour réussir le jour J.
+
+🎮 Apprenez en jouant
+XP, niveaux, streak quotidien, badges de progression — sans cœurs ni vies. Votre Readiness Score (0–100) vous indique en temps réel si vous êtes prêt à passer votre examen.
+
+⚠️ Certigo est une plateforme indépendante, non affiliée ni approuvée par Microsoft, Amazon, Cisco, CompTIA ou tout autre organisme de certification. Toutes les leçons et questions sont originales.
 
 ## Conformité (à vérifier dans la console Play)
 - **Politique de confidentialité** : URL publique obligatoire. TODO.
