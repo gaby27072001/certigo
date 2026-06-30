@@ -52,6 +52,9 @@ param tutorLlmApiVersion string = '2024-10-21'
 @description('Optional explicit API key for the tutor LLM. Leave empty to use the Function App managed identity instead.')
 @secure()
 param tutorLlmApiKey string = ''
+@description('Signing key for email/password JWTs. Passed from main.bicep (deterministic per env). @secure so it never appears in deploy logs.')
+@secure()
+param authJwtSigningKey string
 @description('Maximum output tokens requested from the tutor LLM.')
 param tutorLlmMaxOutputTokens int = 400
 param tags object = {}
@@ -124,6 +127,12 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'COSMOS_DATABASE', value: 'certigo' }
         // "dev" => permissive DevTokenValidator (dev env only); "prod" (or any non-"dev" value) => Entra.
         { name: 'AUTH_MODE', value: authMode }
+        // Azure Functions defaults the hosting environment to "Production", so the dev-validator
+        // production guard (AuthValidatorSelection.ShouldUseDevValidator) throws on every request
+        // unless this explicit non-production override is set. Only enabled when AUTH_MODE=dev
+        // (dev env); 'false' elsewhere is inert because the guard short-circuits when AUTH_MODE!=dev.
+        { name: 'AUTH_ALLOW_DEV', value: authMode == 'dev' ? 'true' : 'false' }
+        { name: 'AUTH_JWT_SIGNING_KEY', value: authJwtSigningKey }
         { name: 'ENTRA_AUTHORITY', value: entraAuthority }
         { name: 'ENTRA_AUDIENCE', value: entraAudience }
         { name: 'TUTOR_LLM_ENABLED', value: string(tutorLlmEnabled) }

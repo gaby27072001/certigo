@@ -44,6 +44,9 @@ param tutorLlmApiVersion string = '2024-10-21'
 @description('Optional explicit Azure OpenAI API key for the tutor. Leave empty to use the Function App managed identity instead.')
 @secure()
 param tutorLlmApiKey string = ''
+@description('Signing key for email/password JWTs. Empty in dev/staging => a deterministic guid() is derived (stable across redeploys, not stored in the repo). Provide a real secret in prod to override.')
+@secure()
+param authJwtSigningKey string = ''
 @description('Maximum output tokens requested from the tutor LLM.')
 param tutorLlmMaxOutputTokens int = 400
 
@@ -65,6 +68,9 @@ var rgName = 'rg-${appName}-${env}'
 // Dev token bypass is allowed ONLY in the dev environment; staging/prod enforce
 // Entra token validation ("prod" signals to the backend that Entra is required).
 var authMode = env == 'dev' ? 'dev' : 'prod'
+// Email/password JWT signing key. When not supplied, derive a deterministic value so
+// tokens stay valid across redeploys without storing a secret in the repo or Key Vault.
+var effectiveAuthJwtSigningKey = empty(authJwtSigningKey) ? guid(subscription().id, appName, env, 'auth-jwt-signing-key') : authJwtSigningKey
 // Production-grade hardening is on for every non-dev environment: Cosmos RBAC-only
 // auth, Key Vault purge protection + 90-day soft delete, geo-redundant + versioned
 // storage, and a locked-down CORS origin set.
@@ -155,6 +161,7 @@ module api 'modules/functionApp.bicep' = {
     cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
     authMode: authMode
+    authJwtSigningKey: effectiveAuthJwtSigningKey
     entraAuthority: entraAuthority
     entraAudience: entraAudience
     tutorLlmEnabled: tutorLlmEnabled
