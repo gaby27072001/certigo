@@ -20,7 +20,7 @@ env:
 jobs:
   packages:
     name: Pure-Dart packages (core, cortex, data)
-    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
     strategy:
       matrix:
         package: [ core, cortex, data ]
@@ -43,7 +43,7 @@ jobs:
 
   app:
     name: Flutter app + UI packages
-    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","microlingo-ci"]') }}
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Clear corrupted Flutter tool cache
