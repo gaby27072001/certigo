@@ -36,7 +36,7 @@ void main() {
     trackCode: 'AZ-900',
     mascot: 'Nimbus',
     headline: '12 jours de serie',
-    caption: '68% de preparation sur Microlingo ! Rejoins-moi avec le code ABCD12 🚀',
+    caption: '68% de preparation sur Certigo ! Rejoins-moi avec le code ABCD12 🚀',
     referralCode: 'ABCD12',
     generatedAt: DateTime.utc(2025, 1, 6, 12),
   );
