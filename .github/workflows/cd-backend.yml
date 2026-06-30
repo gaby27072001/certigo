@@ -88,7 +88,9 @@ jobs:
             --output ./publish
 
       - name: Zip publish artefact
-        run: cd ./publish && zip -r ../publish.zip . && cd ..
+        shell: pwsh
+        run: |
+          Compress-Archive -Path ./publish/* -DestinationPath ./publish.zip -Force
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
