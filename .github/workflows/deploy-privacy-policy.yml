@@ -1,0 +1,70 @@
+name: deploy-privacy-policy
+
+# Publie une page publique (GitHub Pages) a partir de docs/legal/privacy-policy.md.
+# URL de secours immediate pour Google Play :
+# https://gchambaud_microsoft.github.io/Certigo/privacy-policy/
+# Si le domaine certigo.app est configure ensuite, mapper le domaine sur GitHub Pages
+# et conserver le chemin /privacy-policy/ pour une bascule transparente.
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - "docs/legal/privacy-policy.md"
+      - ".github/workflows/deploy-privacy-policy.yml"
+  pull_request:
+    paths:
+      - "docs/legal/privacy-policy.md"
+      - ".github/workflows/deploy-privacy-policy.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-privacy-policy
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build privacy policy page
+    # CI-01 (fork-guard) : une PR de FORK execute du code non fiable -> elle NE doit
+    # PAS toucher le runner self-hosted persistant.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    # CI-01 : approbation humaine requise pour les PR avant execution sur le runner self-hosted.
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Prepare Jekyll source
+        run: |
+          mkdir -p pages-src
+          cat > pages-src/privacy-policy.md <<'EOF'
+          ---
+          title: Politique de confidentialite - Certigo
+          permalink: /privacy-policy/
+          layout: default
+          ---
+          EOF
+          cat docs/legal/privacy-policy.md >> pages-src/privacy-policy.md
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: pages-src
+          destination: _site
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
