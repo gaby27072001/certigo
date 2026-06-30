@@ -10,8 +10,8 @@
 | applicationId / package | `law.microlingo` ⚠️ NON modifiable après le 1er upload |
 | Catégorie | Éducation |
 | Adresse e-mail de contact | TODO (ex : `support@certigo.app`) |
-| Site web | TODO |
-| Politique de confidentialité (URL) | **TODO obligatoire** (exigée par Play même en test interne) |
+| Site web | `https://gchambaud_microsoft.github.io/Certigo/` |
+| Politique de confidentialité (URL) | `https://gchambaud_microsoft.github.io/Certigo/privacy-policy/` |
 
 ## Description courte (≤ 80 caractères)
 Maîtrisez vos certifications Microsoft par micro-leçons premium.
@@ -28,7 +28,7 @@ d'examen réel n'est reproduit : toutes les leçons et tous les items sont
 originaux.
 
 ## Conformité (à vérifier dans la console Play)
-- **Politique de confidentialité** : URL publique obligatoire. TODO.
+- **Politique de confidentialité** : URL publique en place via GitHub Pages (`/privacy-policy/`). Migration ultérieure possible vers `https://certigo.app/privacy-policy/` en conservant le même chemin.
 - **Section "Sécurité des données"** : déclarer les données collectées. La bêta
   stocke des préférences locales (`shared_preferences`) et appelle l'API
   Certigo authentifiée (Entra External ID). TODO : compléter le formulaire.
