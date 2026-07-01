@@ -61,6 +61,15 @@ $map = @(
   @{ Key = 'ASC_KEY_P8_FILE';                Kv = 'mobile-asc-key-p8-base64';               Kind = 'fileB64' }
   @{ Key = 'IOS_MATCH_PASSWORD';             Kv = 'mobile-ios-match-password';              Kind = 'value'   }
   @{ Key = 'IOS_MATCH_GIT_AUTH';             Kv = 'mobile-ios-match-git-auth';              Kind = 'value'   }
+
+  # --- Configuration app injectée au build via --dart-define (non secrète : finit
+  #     dans le binaire public). Lue en priorité depuis le Key Vault par les
+  #     workflows CI, avec repli sur les variables GitHub `vars.MOBILE_*`. ---
+  @{ Key = 'API_BASE_URL';                   Kv = 'mobile-app-api-base-url';                Kind = 'value'   }
+  @{ Key = 'CERTIGO_ENV';                    Kv = 'mobile-app-env';                         Kind = 'value'   }
+  @{ Key = 'ENTRA_CLIENT_ID';                Kv = 'mobile-entra-client-id';                 Kind = 'value'   }
+  @{ Key = 'ENTRA_AUTHORITY';                Kv = 'mobile-entra-authority';                 Kind = 'value'   }
+  @{ Key = 'ENTRA_API_SCOPE';                Kv = 'mobile-entra-api-scope';                 Kind = 'value'   }
 )
 
 function Set-KvSecret {

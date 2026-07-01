@@ -20,7 +20,18 @@
 #    → Codemagic gère les certificats et profils via l'API Apple ; plus besoin
 #      de fastlane match, de GitHub Secrets IOS_* ou d'Azure Key Vault pour iOS.
 #
-# 4. Déclencher un build :
+# 4. Configuration app injectée au build (dart-define) — groupe de variables :
+#    Dashboard → App > Environment variables → créer le groupe "certigo_mobile_config"
+#    avec (valeurs NON secrètes : elles finissent dans le binaire public) :
+#      PROD_API_BASE_URL = https://<host-prod>/api      (URL backend de PROD)
+#      ENTRA_CLIENT_ID   = <guid app registration mobile>
+#      ENTRA_AUTHORITY   = https://<domain>.ciamlogin.com/<tenant-id>/v2.0
+#      ENTRA_API_SCOPE   = api://<backend-client-id>/user_impersonation
+#    Sans ces variables, les boutons sociaux restent masqués et/ou le login e-mail
+#    échoue (« Pas de connexion… »). Ce sont les mêmes valeurs que côté Android
+#    (Key Vault mobile-* / variables GitHub vars.MOBILE_*) — cf. docs/RELEASE_MOBILE.md.
+#
+# 5. Déclencher un build :
 #    - Via tag git (v*) → déclenche automatiquement ios-release
 #    - Via push sur main → déclenche automatiquement ios-release-dry
 #    - Via le dashboard Codemagic → Start new build → choisir le workflow
@@ -58,6 +69,10 @@ workflows:
       flutter: 3.24.0
       xcode: latest
       cocoapods: default
+      groups:
+        # Config app (dart-define) — voir l'entête « 4. Configuration app ».
+        # Fournit PROD_API_BASE_URL, ENTRA_CLIENT_ID, ENTRA_AUTHORITY, ENTRA_API_SCOPE.
+        - certigo_mobile_config
       ios_signing:
         # Codemagic gère les certificats et profils nativement via l'API App Store Connect.
         # Plus besoin de fastlane match, de .p12 ou de profils encodés en secrets.
@@ -66,10 +81,10 @@ workflows:
       vars:
         BUNDLE_ID: law-microlingo
         FLUTTER_APP_PATH: apps/mobile
-        # CI-02 : URL backend de PRODUCTION pour les builds de release (jamais DEV).
-        # À renseigner avec l'hôte réel du backend prod ; le placeholder fait
-        # échouer le build de façon visible plutôt que de pointer vers DEV.
-        API_BASE_URL: "https://REPLACE-WITH-PROD-BACKEND/api"
+        # CI-02 : flavor de build. La release iOS cible la PRODUCTION.
+        CERTIGO_ENV: prod
+        # URL backend de PRODUCTION : fournie par le groupe certigo_mobile_config
+        # (variable PROD_API_BASE_URL), jamais committée en dur ici.
 
     triggering:
       events:
@@ -177,7 +192,11 @@ workflows:
           </plist>
           EOF
           flutter build ipa --release \
-            --dart-define=API_BASE_URL=$API_BASE_URL \
+            --dart-define=CERTIGO_ENV=$CERTIGO_ENV \
+            --dart-define=API_BASE_URL=$PROD_API_BASE_URL \
+            --dart-define=ENTRA_CLIENT_ID=$ENTRA_CLIENT_ID \
+            --dart-define=ENTRA_AUTHORITY=$ENTRA_AUTHORITY \
+            --dart-define=ENTRA_API_SCOPE=$ENTRA_API_SCOPE \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/tmp/ExportOptions.plist
@@ -218,12 +237,19 @@ workflows:
       flutter: 3.24.0
       xcode: latest
       cocoapods: default
+      groups:
+        # Config app (dart-define) — fournit ENTRA_CLIENT_ID, ENTRA_AUTHORITY,
+        # ENTRA_API_SCOPE (mêmes valeurs que la release ; le dry run garde son
+        # propre API_BASE_URL DEV inline ci-dessous).
+        - certigo_mobile_config
       ios_signing:
         distribution_type: app_store
         bundle_identifier: law-microlingo
       vars:
         BUNDLE_ID: law-microlingo
         FLUTTER_APP_PATH: apps/mobile
+        # CI-02 : flavor de build. Le dry run cible le backend DEV.
+        CERTIGO_ENV: dev
         # CI-02 : build de validation (dry run) — pointe explicitement vers le
         # backend DEV via variable (et non plus en dur dans la commande de build).
         API_BASE_URL: "https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net/api"
@@ -304,7 +330,11 @@ workflows:
           </plist>
           EOF
           flutter build ipa --release \
+            --dart-define=CERTIGO_ENV=$CERTIGO_ENV \
             --dart-define=API_BASE_URL=$API_BASE_URL \
+            --dart-define=ENTRA_CLIENT_ID=$ENTRA_CLIENT_ID \
+            --dart-define=ENTRA_AUTHORITY=$ENTRA_AUTHORITY \
+            --dart-define=ENTRA_API_SCOPE=$ENTRA_API_SCOPE \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/tmp/ExportOptions.plist

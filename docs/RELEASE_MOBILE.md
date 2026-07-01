@@ -134,6 +134,53 @@ Utilisé automatiquement si `AZURE_KEYVAULT_NAME` n'est **pas** définie.
 > même l'AAB signé** (téléchargeable en artefact) et **saute** proprement la
 > publication.
 
+### 2.3 Configuration app (dart-define) — social login & API ⚙️
+
+> ⚠️ **Sans cette configuration, l'app buildée est dégradée** : les boutons de
+> connexion Google / Apple / Microsoft n'apparaissent pas (`entraConfigured ==
+> false`) et le login e-mail échoue avec « Pas de connexion… » (l'app retombe
+> sur l'URL d'API par défaut, non déployée). Ces valeurs sont **injectées au
+> build** via `--dart-define` par `release-android.yml` (étape `appconfig`) et
+> `codemagic.yaml`.
+
+Ces valeurs **ne sont pas des secrets cryptographiques** : elles finissent dans
+le **binaire public** de l'app. On les stocke donc comme **variables** GitHub
+(`vars.*`), pas comme secrets — Key Vault reste la source prioritaire (même
+motif que la signature). **Aucune valeur réelle n'est committée** ; seuls des
+noms sont référencés dans le code.
+
+**Android — Key Vault (prioritaire) → repli variable GitHub `vars.*`**
+
+| Valeur | Secret Key Vault | Repli variable GitHub | Format / exemple |
+|---|---|---|---|
+| URL de base API | `mobile-app-api-base-url` | `vars.MOBILE_API_BASE_URL` | `https://<host>/api` |
+| Entra client ID | `mobile-entra-client-id` | `vars.MOBILE_ENTRA_CLIENT_ID` | GUID App Registration mobile |
+| Entra authority | `mobile-entra-authority` | `vars.MOBILE_ENTRA_AUTHORITY` | `https://<domain>.ciamlogin.com/<tenant-id>/v2.0` |
+| Entra API scope | `mobile-entra-api-scope` | `vars.MOBILE_ENTRA_API_SCOPE` | `api://<backend-client-id>/user_impersonation` |
+| Env (flavor) | `mobile-app-env` | `vars.MOBILE_CERTIGO_ENV` | `prod` \| `staging` \| `dev` (défaut : `prod`) |
+
+- **Via Key Vault (recommandé)** : renseigner `API_BASE_URL`, `CERTIGO_ENV`,
+  `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`, `ENTRA_API_SCOPE` dans
+  `tools/secrets/mobile-secrets.env` puis lancer `set-keyvault-secrets.ps1`
+  (§2.1). Le script crée les secrets `mobile-app-*` / `mobile-entra-*`.
+- **Via variables GitHub (repli)** : `Settings → Secrets and variables →
+  Actions → Variables → New repository variable` pour chaque `MOBILE_*`
+  ci-dessus. (Onglet **Variables**, pas **Secrets**.)
+
+> 🟡 **Comportement warn-only** : si `API_BASE_URL`, `ENTRA_CLIENT_ID` ou
+> `ENTRA_AUTHORITY` est vide, l'étape `appconfig` émet un `::warning::` mais
+> **ne casse pas** le build beta (l'AAB est produit avec social/login
+> désactivés). Renseigner les valeurs pour un login fonctionnel.
+
+**iOS — groupe de variables Codemagic `certigo_mobile_config`**
+
+Codemagic n'a pas accès au Key Vault : créer dans le dashboard Codemagic
+(**Settings → Environment variables**) un **groupe** nommé `certigo_mobile_config`
+contenant `PROD_API_BASE_URL`, `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`,
+`ENTRA_API_SCOPE` (mêmes formats que le tableau ci-dessus). `codemagic.yaml`
+référence ce groupe et injecte les `--dart-define` ; `CERTIGO_ENV` est fixé
+inline (`prod` pour `ios-release`, `dev` pour `ios-release-dry`).
+
 ---
 
 ## 3. Android
@@ -458,6 +505,9 @@ fixe et revenir à `flutter.ndkVersion` (vérifier avec `flutter doctor -v`).
 - [ ] Notes de version `apps/mobile/distribution/android/whatsnew/*` actualisées.
 - [ ] Secrets présents : `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
       `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`.
+- [ ] **Config app (§2.3)** : `API_BASE_URL`, `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`,
+      `ENTRA_API_SCOPE`, `CERTIGO_ENV` renseignés — via Key Vault (`mobile-app-*` /
+      `mobile-entra-*`) ou variables GitHub `vars.MOBILE_*` — sinon social/login KO.
 - [ ] (1ère fois) App créée dans Play Console + piste de test interne existante.
 - [ ] applicationId `law.microlingo` **confirmé** (définitif après 1er upload).
 - [ ] Run de validation `dry_run=true` réussi (AAB/IPA signé produit).

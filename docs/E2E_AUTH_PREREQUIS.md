@@ -53,6 +53,13 @@ Code = `certigo://auth` (source de vérité). Demande initiale = `microlingo://a
 `entraConfigured` = client_id + authority non vides. Tant que vide → flux Entra
 désactivé, app reste fonctionnelle.
 
+> **Injection au build (CI)** : ces dart-defines sont câblés par
+> `.github/workflows/release-android.yml` (étape `appconfig` : Key Vault
+> `mobile-app-*`/`mobile-entra-*` → repli variables GitHub `vars.MOBILE_*`) et
+> par `codemagic.yaml` (groupe `certigo_mobile_config`). Voir
+> `docs/RELEASE_MOBILE.md` §2.3 pour les noms exacts et formats. **Aucune
+> valeur réelle n'est committée.**
+
 ## 5. ✅ Alignements backend↔mobile (corrigés)
 
 `backend/src/Certigo.Api/local.settings.json.example` est désormais aligné sur le

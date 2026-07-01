@@ -10,6 +10,17 @@ name: release-android
 #   ANDROID_KEY_ALIAS           alias de la clé (ex: upload)
 #   ANDROID_KEY_PASSWORD        mot de passe de la clé
 #   PLAY_SERVICE_ACCOUNT_JSON   JSON du compte de service Google Play (rôle "Release manager")
+#
+# Configuration app injectée au build via --dart-define (étape "appconfig").
+# Source prioritaire = Azure Key Vault (vars.AZURE_KEYVAULT_NAME), repli = variables GitHub.
+# Ce ne sont PAS des secrets cryptographiques (elles finissent dans le binaire public de
+# l'app) -> variables GitHub (vars.*), pas secrets.*. Aucune valeur n'est committée.
+#   Secret Key Vault            | Repli variable GitHub       | Rôle / format
+#   mobile-app-api-base-url     | vars.MOBILE_API_BASE_URL    | URL backend, https://<host>/api
+#   mobile-entra-client-id      | vars.MOBILE_ENTRA_CLIENT_ID | GUID App Registration mobile
+#   mobile-entra-authority      | vars.MOBILE_ENTRA_AUTHORITY | https://<domain>.ciamlogin.com/<tenant-id>/v2.0
+#   mobile-entra-api-scope      | vars.MOBILE_ENTRA_API_SCOPE | api://<backend-client-id>/user_impersonation
+#   mobile-app-env              | vars.MOBILE_CERTIGO_ENV     | prod | staging | dev (défaut: prod)
 # Voir docs/RELEASE_MOBILE.md pour la génération des secrets (aucune valeur n'est committée).
 
 on:
@@ -177,12 +188,66 @@ jobs:
             echo "has_play=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Résoudre la configuration app (Key Vault → repli variables)
+        id: appconfig
+        shell: bash
+        env:
+          KV_NAME: ${{ vars.AZURE_KEYVAULT_NAME }}
+          # Repli si Key Vault non configuré. Ce sont des variables (vars.*), pas des
+          # secrets : ces valeurs sont embarquées en clair dans le binaire de l'app.
+          FB_API_BASE_URL: ${{ vars.MOBILE_API_BASE_URL }}
+          FB_ENTRA_CLIENT_ID: ${{ vars.MOBILE_ENTRA_CLIENT_ID }}
+          FB_ENTRA_AUTHORITY: ${{ vars.MOBILE_ENTRA_AUTHORITY }}
+          FB_ENTRA_API_SCOPE: ${{ vars.MOBILE_ENTRA_API_SCOPE }}
+          FB_CERTIGO_ENV: ${{ vars.MOBILE_CERTIGO_ENV }}
+        run: |
+          set -euo pipefail
+          API_BASE_URL="$FB_API_BASE_URL"; ENTRA_CLIENT_ID="$FB_ENTRA_CLIENT_ID"
+          ENTRA_AUTHORITY="$FB_ENTRA_AUTHORITY"; ENTRA_API_SCOPE="$FB_ENTRA_API_SCOPE"
+          CERTIGO_ENV="$FB_CERTIGO_ENV"
+
+          if [ -n "${KV_NAME:-}" ]; then
+            echo "Config app : Azure Key Vault ($KV_NAME) via l'identité managée du runner."
+            az login --identity --output none
+            kv(){ az keyvault secret show --vault-name "$KV_NAME" --name "$1" --query value -o tsv 2>/dev/null || true; }
+            V="$(kv mobile-app-api-base-url)"; [ -n "$V" ] && API_BASE_URL="$V"
+            V="$(kv mobile-entra-client-id)"; [ -n "$V" ] && ENTRA_CLIENT_ID="$V"
+            V="$(kv mobile-entra-authority)"; [ -n "$V" ] && ENTRA_AUTHORITY="$V"
+            V="$(kv mobile-entra-api-scope)"; [ -n "$V" ] && ENTRA_API_SCOPE="$V"
+            V="$(kv mobile-app-env)";         [ -n "$V" ] && CERTIGO_ENV="$V"
+          else
+            echo "Config app : variables GitHub (variable AZURE_KEYVAULT_NAME non définie)."
+          fi
+
+          CERTIGO_ENV="${CERTIGO_ENV:-prod}"
+
+          # Garde-fou : ces 3 valeurs sont indispensables au login/social. Vide = build
+          # dégradé (social/login désactivés) mais on n'échoue PAS le build beta.
+          [ -z "${API_BASE_URL:-}" ]    && echo "::warning::Config API_BASE_URL absente → login e-mail désactivé dans ce build."
+          [ -z "${ENTRA_CLIENT_ID:-}" ] && echo "::warning::Config ENTRA_CLIENT_ID absente → boutons sociaux désactivés dans ce build."
+          [ -z "${ENTRA_AUTHORITY:-}" ] && echo "::warning::Config ENTRA_AUTHORITY absente → boutons sociaux désactivés dans ce build."
+
+          {
+            echo "APP_API_BASE_URL=$API_BASE_URL"
+            echo "APP_ENTRA_CLIENT_ID=$ENTRA_CLIENT_ID"
+            echo "APP_ENTRA_AUTHORITY=$ENTRA_AUTHORITY"
+            echo "APP_ENTRA_API_SCOPE=$ENTRA_API_SCOPE"
+            echo "APP_CERTIGO_ENV=$CERTIGO_ENV"
+          } >> "$GITHUB_ENV"
+          echo "Configuration app résolue (env=$CERTIGO_ENV)."
+
       - name: Construire l'AAB signé
         working-directory: apps/mobile
+        shell: bash
         run: >
           flutter build appbundle --release
           --build-name=${{ steps.ver.outputs.build_name }}
           --build-number=${{ steps.ver.outputs.build_number }}
+          --dart-define=CERTIGO_ENV=${APP_CERTIGO_ENV}
+          --dart-define=API_BASE_URL=${APP_API_BASE_URL}
+          --dart-define=ENTRA_CLIENT_ID=${APP_ENTRA_CLIENT_ID}
+          --dart-define=ENTRA_AUTHORITY=${APP_ENTRA_AUTHORITY}
+          --dart-define=ENTRA_API_SCOPE=${APP_ENTRA_API_SCOPE}
 
       - name: Publier sur Google Play (piste ${{ steps.ver.outputs.track }})
         if: ${{ inputs.dry_run != true && steps.signing.outputs.has_play == 'true' }}
