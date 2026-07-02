@@ -1,7 +1,9 @@
 // Production environment parameters. Hardening is on automatically for any non-dev
 // env (Cosmos RBAC-only auth, Key Vault purge protection + 90-day soft delete,
-// geo-redundant + versioned storage, CORS locked to []). Fill the Entra values
-// from your production app registration and set an on-call alert email.
+// geo-redundant + versioned storage, CORS locked to []).
+//
+// Entra is wired to the certigoapp CIAM tenant (authority) and the backend
+// "Certigo API" app registration (audience). No placeholder left to fill.
 //
 // Deploy:
 //   az deployment sub create \
@@ -14,12 +16,46 @@ param env = 'prod'
 param location = 'westeurope'
 param appName = 'certigo'
 
-// Microsoft Entra External ID (CIAM) — production tenant/app.
-param entraAuthority = 'https://certigo.ciamlogin.com/<tenant-guid>/v2.0'
-param entraAudience = 'api://<api-client-id>'
+// Cosmos DB region. West Europe has AZ-capacity limits for Cosmos (the reason dev
+// deploys Cosmos in North Europe). We pin prod to North Europe too so the deploy
+// does not fail on capacity; cross-region Functions -> Cosmos is fine (see main.bicep).
+param cosmosLocation = 'northeurope'
 
-// On-call email notified on 401/403/5xx spikes.
+// ============================================================================
+// Microsoft Entra External ID (CIAM) — PRODUCTION.
+// authMode is 'prod' for any non-dev env (main.bicep), so the backend runs the
+// real EntraTokenValidator: these values MUST match the certigoapp CIAM tenant,
+// otherwise every social/Entra login is rejected (401 aud/issuer mismatch).
+// ============================================================================
+
+// Authority of the certigoapp CIAM tenant (same tenant the mobile app targets:
+// client id 4d1f1075-7bc5-4764-947b-701435a85f8c, redirect certigo://auth).
+param entraAuthority = 'https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0'
+
+// Audience = Application ID URI of the backend "Certigo API" app registration.
+// The mobile ENTRA_API_SCOPE (api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation)
+// mints an access_token whose aud = api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915; the
+// backend validates it against this value. This is the BACKEND app registration
+// client id (12910b8e-...), NOT the mobile client id (4d1f1075-...), both in the
+// same tenant (af721be8-...).
+param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
+
+// On-call email notified on 401/403/5xx spikes (diagnostics module deploys for
+// every non-dev env). Verify this is a real, monitored inbox before go-live.
 param alertEmail = 'secops@certigo.app'
 
 // Turn on paid Microsoft Defender for Cloud plans in production.
 param enableDefenderPlans = true
+
+// AI tutor (Azure OpenAI / Foundry): left DISABLED in prod (main.bicep default is
+// false). No prod Azure OpenAI resource is provisioned (dev uses "certigo-openai"
+// scoped to the certigo-dev project), so enabling it here without a prod endpoint
+// would break the tutor feature. This does NOT block deployment — the backend
+// falls back to the deterministic grounded tutor. Provide tutorLlmEnabled = true
+// + tutorLlmEndpoint/tutorLlmDeployment when a prod OpenAI resource exists.
+
+// Email/password JWT signing key: intentionally NOT set here. main.bicep derives a
+// deterministic guid() (stable across redeploys) when empty, so email/password
+// login works for the beta without committing a secret to the repo. For a hardened
+// prod, inject a real authJwtSigningKey out-of-band (secure param / Key Vault),
+// never committed in this file.
