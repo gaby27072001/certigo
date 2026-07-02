@@ -344,8 +344,6 @@ workflows:
       - apps/mobile/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
 
-    publishing:
-
   # ===========================================================================
   # ios-refresh-signing : Refresh manuel des profils de provisioning
   # Remplace : .github/workflows/sync-ios-certs.yml
