@@ -9,8 +9,10 @@
 #   1. Connect this GitHub repo to a Codemagic app.
 #   2. Teams > Integrations > App Store Connect: add an integration named
 #      exactly "AppStoreConnect" (App Store Connect API key: Key ID, Issuer ID,
-#      .p8). Automatic signing uses this integration - no fastlane match, no
-#      .p12, no GitHub secrets for iOS.
+#      .p8). The pipeline CREATES the distribution certificate + App Store
+#      provisioning profile on the first build via this key
+#      (app-store-connect fetch-signing-files --create) - no fastlane match, no
+#      .p12, no manual profile upload, no GitHub secrets for iOS.
 #   3. App > Environment variables: create the group "certigo_mobile_config"
 #      (NON-secret dart-define values baked into the public binary):
 #        PROD_API_BASE_URL = https://<prod-func-app>.azurewebsites.net/api
@@ -33,10 +35,6 @@
 # referenced as one list item (`- *anchor`); this keeps the two build workflows
 # in sync without drift. (A list anchor cannot be spliced into `scripts:`.)
 definitions:
-  signing: &ios_signing
-    distribution_type: app_store
-    bundle_identifier: com.certigo.mobileapp
-
   cache: &cache
     cache_paths:
       # Dart/Flutter package cache - the biggest, safest speed win.
@@ -62,19 +60,34 @@ definitions:
       name: Unit tests (blocking gate)
       script: flutter test
       working_directory: apps/mobile
-    - &step_use_profiles
-      name: Apply provisioning profiles + generate ExportOptions.plist
-      # `use-profiles` fetches the App Store profile Codemagic provisioned for the
-      # bundle id (via the AppStoreConnect integration + ios_signing
-      # distribution_type: app_store), applies it to Runner.xcodeproj, AND writes
-      # $HOME/export_options.plist containing the REAL profile name/UUID, the
-      # signing certificate, teamID FFQPC7NC68 (derived from the fetched profile)
-      # and method app-store. The build step exports with THAT generated plist, so
-      # no profile name is hardcoded anywhere - it always matches whatever
-      # Codemagic fetches for the fresh App Store Connect key. Default output path
-      # ($HOME/export_options.plist) is documented at:
-      # https://github.com/codemagic-ci-cd/cli-tools/blob/master/docs/xcode-project/use-profiles.md
-      script: xcode-project use-profiles
+    - &step_setup_signing
+      name: Set up code signing (create App Store cert + profile, then apply)
+      script: |
+        set -euo pipefail
+        # Fresh App Store Connect setup: the App ID has no provisioning profile and
+        # no distribution certificate yet, so `xcode-project use-profiles` alone
+        # (which only APPLIES existing profiles) failed with
+        #   "No matching profiles found ... distribution type app_store".
+        # `app-store-connect fetch-signing-files --create` creates BOTH the
+        # distribution certificate and the App Store provisioning profile via the
+        # App Store Connect API when they don't exist, and reuses them on later runs
+        # (idempotent - safe to re-run once they exist). The AppStoreConnect
+        # integration injects the API key (APP_STORE_CONNECT_ISSUER_ID /
+        # _KEY_IDENTIFIER / _PRIVATE_KEY) and, on Codemagic-hosted machines,
+        # CERTIFICATE_PRIVATE_KEY - so no key/id is passed on the command line and
+        # nothing is hardcoded. --type IOS_APP_STORE = App Store/TestFlight
+        # distribution; --platform IOS is the default, kept explicit for clarity.
+        # keychain initialize + add-certificates make the created distribution cert
+        # usable for signing; use-profiles then applies the profile to
+        # Runner.xcodeproj and writes $HOME/export_options.plist (used by the build).
+        # Docs: https://github.com/codemagic-ci-cd/cli-tools/blob/master/docs/app-store-connect/fetch-signing-files.md
+        keychain initialize
+        app-store-connect fetch-signing-files "$BUNDLE_ID" \
+          --type IOS_APP_STORE \
+          --platform IOS \
+          --create
+        keychain add-certificates
+        xcode-project use-profiles
     - &step_resolve_version
       name: Resolve version from git tag or pubspec.yaml
       script: |
@@ -118,7 +131,6 @@ workflows:
       cocoapods: default
       groups:
         - certigo_mobile_config   # PROD_API_BASE_URL, ENTRA_CLIENT_ID/AUTHORITY/API_SCOPE
-      ios_signing: *ios_signing
       vars:
         BUNDLE_ID: com.certigo.mobileapp
         FLUTTER_APP_PATH: apps/mobile
@@ -135,7 +147,7 @@ workflows:
       - *step_pub_get
       - *step_analyze
       - *step_test
-      - *step_use_profiles
+      - *step_setup_signing
       - *step_resolve_version
       - name: Build signed IPA (production)
         script: |
@@ -180,7 +192,6 @@ workflows:
       cocoapods: default
       groups:
         - certigo_mobile_config   # ENTRA_* reused; API_BASE_URL is dev-inline below.
-      ios_signing: *ios_signing
       vars:
         BUNDLE_ID: com.certigo.mobileapp
         FLUTTER_APP_PATH: apps/mobile
@@ -198,7 +209,7 @@ workflows:
       - *step_pub_get
       - *step_analyze
       - *step_test
-      - *step_use_profiles
+      - *step_setup_signing
       - *step_resolve_version
       - name: Build signed IPA (dev, no upload)
         script: |
@@ -228,14 +239,12 @@ workflows:
       app_store_connect: AppStoreConnect
     environment:
       xcode: latest
-      ios_signing: *ios_signing
+      vars:
+        BUNDLE_ID: com.certigo.mobileapp
     scripts:
-      - name: Refresh provisioning profiles via App Store Connect API
-        script: |
-          set -euo pipefail
-          echo "Refreshing iOS signing profiles for com.certigo.mobileapp ..."
-          xcode-project use-profiles --force
-          echo "Provisioning profiles refreshed."
+      # Same idempotent recipe as the build workflows: creates the distribution
+      # certificate + App Store profile if missing, refreshes them if present.
+      - *step_setup_signing
     artifacts:
       - /tmp/xcodebuild_logs/*.log
     publishing:

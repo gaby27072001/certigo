@@ -307,10 +307,17 @@ git push origin v0.1.0
    uploader le **`.p8`** (nouvelle clé API, rôle App Manager) → nommer
    l'intégration **exactement `AppStoreConnect`** (le `codemagic.yaml` la
    référence sous ce nom).
-3. **Signature automatique** : dashboard → **App > Code signing > iOS code
-   signing** → **Automatic** (utilise l'intégration ci-dessus). Codemagic crée et
-   renouvelle certificats et profils via l'API Apple. Plus de fastlane match, de
-   `.p12` ni de secrets GitHub/Key Vault pour iOS.
+3. **Signature (pilotée par `codemagic.yaml`, aucune action UI)** : la signature
+   est entièrement définie dans `codemagic.yaml`. À chaque build, l'étape « Set up
+   code signing » exécute, via l'intégration `AppStoreConnect` :
+   `app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create`
+   → **crée** le certificat de distribution + le profil App Store au **1er build**
+   (puis les réutilise, idempotent), suivi de `keychain add-certificates` +
+   `xcode-project use-profiles`. Sur les machines hébergées Codemagic, la clé privée
+   du certificat (`CERTIFICATE_PRIVATE_KEY`) est fournie automatiquement — rien à
+   uploader. Plus de fastlane match, de `.p12`, de profil manuel, ni de secrets
+   GitHub/Key Vault pour iOS. ⚠️ Ne PAS activer « App > Code signing → Automatic »
+   dans l'UI : inutile (et sans effet) pour un build piloté par `codemagic.yaml`.
 4. **Groupe de variables `certigo_mobile_config`** : dashboard → **App >
    Environment variables** → créer le groupe **`certigo_mobile_config`** et y
    poser ces **4 variables** (valeurs NON secrètes, injectées en `--dart-define`) :
@@ -422,8 +429,11 @@ gh secret set ASC_KEY_P8_BASE64               < authkey.b64
 
 **Refresh manuel des profils** (si nécessaire après ajout d'appareil, révocation,
 etc.) : utiliser le workflow Codemagic **`ios-refresh-signing`** (dashboard →
-Start new build → `ios-refresh-signing`). Ce workflow exécute
-`xcode-project use-profiles --force` pour forcer le re-téléchargement des profils.
+Start new build → `ios-refresh-signing`). Ce workflow ré-exécute la même recette
+idempotente que les builds (`app-store-connect fetch-signing-files "$BUNDLE_ID"
+--type IOS_APP_STORE --create` + `keychain add-certificates` +
+`xcode-project use-profiles`) pour (re)créer ou rafraîchir le certificat et le
+profil App Store.
 
 ---
 
