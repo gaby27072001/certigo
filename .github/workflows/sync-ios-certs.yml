@@ -33,7 +33,7 @@ permissions:
   contents: read
 
 env:
-  BUNDLE_ID: "law-microlingo"
+  BUNDLE_ID: "com.certigo.mobileapp"
 
 jobs:
   sync:

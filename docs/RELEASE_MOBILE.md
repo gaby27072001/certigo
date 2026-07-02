@@ -28,17 +28,20 @@ Documentation opérationnelle pour publier les bêtas Certigo.
 | Élément | Valeur |
 |---|---|
 | App Flutter | `apps/mobile` |
-| applicationId Android / bundle id iOS | `law.microlingo` (Android) / `law-microlingo` (iOS) — ⚠️ identifiants store stables |
+| applicationId Android / bundle id iOS | `com.certigo.mobileapp` (identique sur les deux plateformes) — ⚠️ identifiants store stables |
 | Nom affiché | Certigo |
 | versionName | lu depuis `apps/mobile/pubspec.yaml` (`version:` → partie avant `+`) |
 | versionCode / build number | `github.run_number` (auto-incrémenté), override possible |
 | Workflows | `release-android.yml` (actif), `release-ios.yml` + `sync-ios-certs.yml` (historiques/désactivés) ; iOS actif géré par Codemagic |
 | CI inchangée | `ci-mobile.yml` (format/analyze/test) — aucune régression |
 
-> ⚠️ **`law.microlingo` est l'applicationId Android actuel.** L'applicationId est définitif une
-> fois la première build uploadée. S'il change, mettre à jour :
-> `apps/mobile/android/app/build.gradle` (`applicationId`),
-> `PLAY_PACKAGE_NAME` dans `release-android.yml`, et la fiche store.
+> ⚠️ **`com.certigo.mobileapp` est l'identifiant unifié** (Android `applicationId`
+> = iOS bundle id). Il est définitif une fois la première build store uploadée.
+> S'il change, mettre à jour : `apps/mobile/android/app/build.gradle`
+> (`applicationId` + `namespace`), `PLAY_PACKAGE_NAME` dans `release-android.yml`,
+> les `PRODUCT_BUNDLE_IDENTIFIER` de `apps/mobile/ios/Runner.xcodeproj/project.pbxproj`,
+> `codemagic.yaml` (`bundle_identifier` + `BUNDLE_ID` + clé `provisioningProfiles`),
+> et les fiches store (Play + App Store Connect).
 
 ---
 
@@ -238,7 +241,7 @@ gh secret set ANDROID_KEY_PASSWORD      --body '<mot_de_passe_cle>'
 ### 3.4 Configurer Google Play (one-time)
 
 1. **Créer l'application** dans la [Google Play Console](https://play.google.com/console)
-   avec le package `law.microlingo`.
+   avec le package `com.certigo.mobileapp`.
 2. **Activer Play App Signing** (proposé au 1er upload).
 3. **Compte de service** : dans Google Cloud, créez un compte de service, générez
    une **clé JSON**. Dans la Play Console → *Configuration → accès à l'API* →
@@ -294,30 +297,60 @@ git push origin v0.1.0
 
 ### 4.0 Codemagic — Setup initial (one-time)
 
-1. Créer un compte sur <https://codemagic.io> et connecter le repo GitHub
-   (OAuth ou installation de l'app GitHub).
-2. Dans le dashboard Codemagic → **Teams > Integrations > App Store Connect** →
-   cliquer **Add integration** → saisir le **Key ID**, l'**Issuer ID** et uploader
-   le fichier **`.p8`** → nommer l'intégration exactement **`AppStoreConnect`**.
-3. Dans le dashboard → **App > Code signing > iOS code signing** → choisir
-   **Automatic** (utilise l'intégration App Store Connect ci-dessus). Codemagic
-   crée et renouvelle les certificats et profils via l'API Apple.
-4. Les secrets Apple (clé ASC, Team ID) sont désormais gérés dans Codemagic.
-   **Plus besoin** de les stocker dans GitHub Secrets ou Azure Key Vault pour iOS.
+> 🔄 **Repartir de zéro** (app Codemagic supprimée / clé ASC révoquée) : suivre
+> ces étapes dans l'ordre. Le pipeline vit dans `codemagic.yaml` à la racine.
+
+1. Créer/reconnecter un compte sur <https://codemagic.io> et **connecter le repo
+   GitHub** `gchambaud_microsoft/Certigo` (installer l'app GitHub Codemagic).
+2. **Intégration App Store Connect** : dashboard → **Teams > Integrations > App
+   Store Connect** → **Add integration** → saisir **Key ID**, **Issuer ID**,
+   uploader le **`.p8`** (nouvelle clé API, rôle App Manager) → nommer
+   l'intégration **exactement `AppStoreConnect`** (le `codemagic.yaml` la
+   référence sous ce nom).
+3. **Signature automatique** : dashboard → **App > Code signing > iOS code
+   signing** → **Automatic** (utilise l'intégration ci-dessus). Codemagic crée et
+   renouvelle certificats et profils via l'API Apple. Plus de fastlane match, de
+   `.p12` ni de secrets GitHub/Key Vault pour iOS.
+4. **Groupe de variables `certigo_mobile_config`** : dashboard → **App >
+   Environment variables** → créer le groupe **`certigo_mobile_config`** et y
+   poser ces **4 variables** (valeurs NON secrètes, injectées en `--dart-define`) :
+
+   | Variable | Valeur | Utilisée par |
+   |---|---|---|
+   | `PROD_API_BASE_URL` | `https://<prod-func-app>.azurewebsites.net/api` (sortie du déploiement backend prod, cf. PR #158 → `functionAppName`) | `ios-release` |
+   | `ENTRA_CLIENT_ID` | `4d1f1075-7bc5-4764-947b-701435a85f8c` | `ios-release` + `ios-release-dry` |
+   | `ENTRA_AUTHORITY` | `https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0` | idem |
+   | `ENTRA_API_SCOPE` | `api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation` | idem |
+
+   > Sans ces variables : boutons sociaux masqués et/ou login e-mail cassé. Mêmes
+   > valeurs que côté Android (Key Vault `mobile-*` / `vars.MOBILE_*`). Le
+   > `PROD_API_BASE_URL` provient du **backend prod** déployé via `cd-backend`
+   > (`environment=prod`, params `infra/params/prod.bicepparam` — voir §backend).
 
 ### 4.1 Pré-requis Apple (one-time)
 
 1. Compte **Apple Developer Program** (payant) pour l'équipe.
-2. **App ID** `law-microlingo` (portail Apple Developer ou App Store Connect).
-3. **App** créée dans **App Store Connect** (mêmes bundle id et nom).
+2. **App ID** `com.certigo.mobileapp` (portail Apple Developer ou App Store Connect).
+3. **App** créée dans **App Store Connect** : bundle id **`com.certigo.mobileapp`**,
+   nom **Certigo**.
 4. **Certificat de distribution** (Apple Distribution) + **profil d'approvisionnement
-   App Store** pour `law-microlingo`.
+   App Store** pour `com.certigo.mobileapp` (gérés automatiquement par Codemagic
+   une fois l'intégration en place ; le nom de profil attendu par
+   `codemagic.yaml` est **`Certigo AppStore`**).
 5. **Clé API App Store Connect** (rôle App Manager) : Key ID, Issuer ID, fichier `.p8`.
 
-### 4.2 Préparer les secrets iOS (depuis un Mac)
+### 4.2 (Legacy) Secrets iOS GitHub Actions — NON requis avec Codemagic
 
-> 💡 Avec **Key Vault** (§2.1, recommandé), charge ces valeurs via
-> `set-keyvault-secrets.ps1` plutôt que de créer des secrets GitHub.
+> ⛔ **Obsolète.** Cette section décrivait l'ancien pipeline iOS sur GitHub
+> Actions (fastlane match + `.p12`/profil encodés en secrets). Avec la
+> **signature automatique Codemagic** (§4.0), **aucun** de ces secrets n'est
+> nécessaire : Codemagic gère certificats et profils via l'API App Store
+> Connect. Conservé uniquement à titre historique pour les workflows
+> `release-ios.yml` / `sync-ios-certs.yml` (désactivés, `workflow_dispatch`).
+> **Ne pas créer ces secrets pour une release Codemagic.**
+
+<details>
+<summary>Ancienne procédure (GitHub Actions iOS, dépréciée)</summary>
 
 ```bash
 base64 -i dist.p12                 > cert.b64       # -> IOS_DIST_CERTIFICATE_P12_BASE64
@@ -334,10 +367,7 @@ gh secret set ASC_KEY_ID                      --body '<KEY_ID>'
 gh secret set ASC_ISSUER_ID                   --body '<ISSUER_ID>'
 gh secret set ASC_KEY_P8_BASE64               < authkey.b64
 ```
-
-> 📌 **TODO à confirmer** (non devinables, dépendent du compte Apple) :
-> `IOS_TEAM_ID`, `IOS_PROVISIONING_PROFILE_NAME` (nom **exact** du profil),
-> `ASC_KEY_ID`, `ASC_ISSUER_ID`. À renseigner avant le premier run.
+</details>
 
 ### 4.3 Runbook — Lancer une beta iOS (TestFlight) ✅
 
@@ -509,7 +539,7 @@ fixe et revenir à `flutter.ndkVersion` (vérifier avec `flutter doctor -v`).
       `ENTRA_API_SCOPE`, `CERTIGO_ENV` renseignés — via Key Vault (`mobile-app-*` /
       `mobile-entra-*`) ou variables GitHub `vars.MOBILE_*` — sinon social/login KO.
 - [ ] (1ère fois) App créée dans Play Console + piste de test interne existante.
-- [ ] applicationId `law.microlingo` **confirmé** (définitif après 1er upload).
+- [ ] identifiant `com.certigo.mobileapp` **confirmé** (Android + iOS, définitif après 1er upload).
 - [ ] Run de validation `dry_run=true` réussi (AAB/IPA signé produit).
 - [ ] **iOS** : intégration Codemagic configurée (§4.0) ; clé API App Store Connect
       ajoutée dans le dashboard Codemagic (intégration `AppStoreConnect`) ; code

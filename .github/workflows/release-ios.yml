@@ -58,7 +58,7 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.27.4"
-  BUNDLE_ID: "law-microlingo"
+  BUNDLE_ID: "com.certigo.mobileapp"
 
 jobs:
   release:
