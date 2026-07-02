@@ -8,6 +8,11 @@ typedef TokenProvider = Future<String?> Function();
 /// Called when the API returns 401 so the app can trigger re-authentication.
 typedef UnauthorizedHandler = Future<void> Function();
 
+/// Sink for lightweight HTTP debug traces. Injected by the app (which passes
+/// `debugPrint`) so `data` stays Flutter-free while still surfacing logs in
+/// `flutter run` / `adb logcat`. Null in production paths that don't opt in.
+typedef DebugLogger = void Function(String message);
+
 /// Thin, configured Dio wrapper for the Certigo API.
 ///
 /// Centralizes base URL, timeouts, bearer-token injection and uniform error
@@ -19,12 +24,43 @@ class ApiClient {
     required TokenProvider tokenProvider,
     UnauthorizedHandler? onUnauthorized,
     String? baseUrl,
-  }) : _dio = dio ?? Dio() {
+    DebugLogger? debugLog,
+  })  : _dio = dio ?? Dio(),
+        _debugLog = debugLog {
     _dio.options
       ..baseUrl = baseUrl ?? AppEnv.apiBaseUrl
       ..connectTimeout = const Duration(seconds: 12)
       ..receiveTimeout = const Duration(seconds: 20)
       ..contentType = 'application/json';
+
+    // Trace HTTP requests/responses/errors so the login flow is visible in
+    // `flutter run` / `adb logcat` — Dio rides on dart:io and emits nothing by
+    // default. Registered first so the request is logged before token fetch.
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
+          options.extra['__loginDbgStart'] = DateTime.now().microsecondsSinceEpoch;
+          _debugLog?.call('[LOGIN-DBG] HTTP → ${options.method} ${options.path}');
+          handler.next(options);
+        },
+        onResponse: (Response<dynamic> response, ResponseInterceptorHandler handler) {
+          final int ms = _elapsedMs(response.requestOptions);
+          _debugLog?.call(
+            '[LOGIN-DBG] HTTP ← ${response.statusCode} '
+            '${response.requestOptions.path} (${ms}ms)',
+          );
+          handler.next(response);
+        },
+        onError: (DioException e, ErrorInterceptorHandler handler) {
+          final int ms = _elapsedMs(e.requestOptions);
+          _debugLog?.call(
+            '[LOGIN-DBG] HTTP ✗ ${e.type.name} ${e.requestOptions.path} '
+            '(${ms}ms): ${e.message}',
+          );
+          handler.next(e);
+        },
+      ),
+    );
 
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -46,6 +82,7 @@ class ApiClient {
   }
 
   final Dio _dio;
+  final DebugLogger? _debugLog;
 
   Future<Result<T>> getJson<T>(
     String path,
@@ -95,6 +132,15 @@ class ApiClient {
   Map<String, dynamic> _asMap(dynamic data) {
     if (data is Map<String, dynamic>) return data;
     throw const FormatException('Expected a JSON object');
+  }
+
+  /// Milliseconds elapsed since the `onRequest` marker, or -1 if unavailable.
+  static int _elapsedMs(RequestOptions options) {
+    final Object? start = options.extra['__loginDbgStart'];
+    if (start is int) {
+      return ((DateTime.now().microsecondsSinceEpoch - start) / 1000).round();
+    }
+    return -1;
   }
 
   Failure _mapDioError(DioException e) {

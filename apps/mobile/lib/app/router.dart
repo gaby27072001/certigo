@@ -130,25 +130,34 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       final bool atAuth = loc == Routes.auth;
       final bool atOnboarding = OnboardingRoutes.isStartup(loc);
 
-      // Restoring session: stay on auth splash.
-      if (auth is AuthLoading) {
-        return atAuthSplash ? null : Routes.splash;
+      String? resolve() {
+        // Restoring session: stay on auth splash.
+        if (auth is AuthLoading) {
+          return atAuthSplash ? null : Routes.splash;
+        }
+        // Not authenticated: force sign-in.
+        if (auth is Unauthenticated) {
+          return atAuth ? null : Routes.auth;
+        }
+        // Authenticated: never remain on auth surfaces.
+        if (atAuthSplash || atAuth) {
+          return onboardingCtrl.completed ? Routes.home : OnboardingRoutes.splash;
+        }
+        // Authenticated but onboarding not completed: force startup flow.
+        if (!onboardingCtrl.completed) {
+          return atOnboarding ? null : OnboardingRoutes.splash;
+        }
+        // Completed onboarding: startup screens should not be reachable.
+        if (atOnboarding) return Routes.home;
+        return null;
       }
-      // Not authenticated: force sign-in.
-      if (auth is Unauthenticated) {
-        return atAuth ? null : Routes.auth;
-      }
-      // Authenticated: never remain on auth surfaces.
-      if (atAuthSplash || atAuth) {
-        return onboardingCtrl.completed ? Routes.home : OnboardingRoutes.splash;
-      }
-      // Authenticated but onboarding not completed: force startup flow.
-      if (!onboardingCtrl.completed) {
-        return atOnboarding ? null : OnboardingRoutes.splash;
-      }
-      // Completed onboarding: startup screens should not be reachable.
-      if (atOnboarding) return Routes.home;
-      return null;
+
+      final String? target = resolve();
+      final String targetLabel = target ?? 'stay';
+      debugPrint(
+        '[LOGIN-DBG] redirect: auth=${auth.runtimeType} loc=$loc -> $targetLabel',
+      );
+      return target;
     },
     routes: <RouteBase>[
       // Auth flows, above the shell (no bottom nav).

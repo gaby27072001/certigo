@@ -19,9 +19,13 @@ class AppEnv {
         _ => AppFlavor.dev,
       };
 
+  // Fallback utilisé uniquement quand aucun `--dart-define=API_BASE_URL` n'est
+  // fourni (ex. `flutter run` local sans flag). Tous les builds officiels
+  // (CI release, Codemagic) injectent l'URL réelle et n'atteignent jamais ce
+  // défaut. Pointe vers le backend dev joignable plutôt qu'un host mort.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://dev.api.certigo.app/api',
+    defaultValue: 'https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net/api',
   );
 
   /// Dev/staging bearer token sent until Entra External ID is wired. The backend

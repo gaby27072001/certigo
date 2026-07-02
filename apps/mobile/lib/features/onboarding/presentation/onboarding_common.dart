@@ -4,7 +4,11 @@ import 'package:prism_ui/prism_ui.dart';
 /// Route paths for the startup flow (splash → welcome → wizard → app), kept in
 /// one place so the router, the redirect guard and the screens agree.
 abstract class OnboardingRoutes {
-  static const String splash = '/splash';
+  // NOTE: must NOT collide with the auth splash (`Routes.splash == '/splash'`).
+  // A shared path made GoRouter resolve `/splash` to the auth splash (registered
+  // first) and turned the post-login redirect into a no-op, trapping freshly
+  // authenticated users on the spinner instead of entering onboarding.
+  static const String splash = '/onboarding/splash';
   static const String welcome = '/welcome';
   static const String start = '/onboarding/start';
   static const String reasons = '/onboarding/reasons';

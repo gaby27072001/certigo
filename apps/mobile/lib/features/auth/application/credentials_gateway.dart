@@ -1,5 +1,6 @@
 import 'package:core/core.dart';
 import 'package:data/data.dart';
+import 'package:flutter/foundation.dart';
 
 import 'auth_gateway.dart';
 import 'auth_state.dart';
@@ -34,7 +35,7 @@ abstract interface class CredentialsGateway {
 /// anonymes — c'est précisément eux qui produisent le premier jeton.
 class HttpCredentialsGateway implements CredentialsGateway {
   HttpCredentialsGateway({ApiClient? client})
-      : _client = client ?? ApiClient(tokenProvider: _noToken);
+      : _client = client ?? ApiClient(tokenProvider: _noToken, debugLog: debugPrint);
 
   final ApiClient _client;
 
