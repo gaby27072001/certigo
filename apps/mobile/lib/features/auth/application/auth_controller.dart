@@ -82,8 +82,7 @@ class AuthController extends Notifier<AuthState> {
     // applique déjà un timeout) — doit dégrader proprement vers « non
     // authentifié » pour que l'app quitte TOUJOURS le splash et atteigne /auth.
     try {
-      final AuthSession? session =
-          await _store.read().timeout(const Duration(seconds: 6));
+      final AuthSession? session = await _store.read().timeout(const Duration(seconds: 6));
       if (session == null) {
         state = const Unauthenticated();
         return;

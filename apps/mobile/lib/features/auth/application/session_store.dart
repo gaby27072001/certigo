@@ -34,8 +34,7 @@ class SecureSessionStore implements SessionStore {
   @override
   Future<AuthSession?> read() async {
     try {
-      final String? raw =
-          await _storage.read(key: _key).timeout(const Duration(seconds: 5));
+      final String? raw = await _storage.read(key: _key).timeout(const Duration(seconds: 5));
       return AuthSession.decode(raw);
     } catch (_) {
       // Coffre indisponible ou bloqué (ex. Keystore Android au 1er accès) :
@@ -47,9 +46,7 @@ class SecureSessionStore implements SessionStore {
   @override
   Future<void> write(AuthSession session) async {
     try {
-      await _storage
-          .write(key: _key, value: session.encode())
-          .timeout(const Duration(seconds: 5));
+      await _storage.write(key: _key, value: session.encode()).timeout(const Duration(seconds: 5));
     } catch (_) {
       // Best-effort : la persistance ne doit jamais bloquer la connexion.
     }
