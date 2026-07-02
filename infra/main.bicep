@@ -62,6 +62,9 @@ param forcePolicyAssignment bool = false
 @description('Object (principal) id of the CI release runner managed identity. When set, it is granted read access (Key Vault Secrets User) to the Key Vault so the mobile release workflows can pull signing secrets — no signing secret in GitHub. Empty = skip (needs role-assignment rights to set).')
 param ciRunnerPrincipalId string = ''
 
+@description('When true, the security log-search alerts get a system-assigned identity + least-privilege Log Analytics Reader role on the workspace (most robust). Default false: creating that role assignment needs Microsoft.Authorization/roleAssignments/write at the workspace scope, which the deployer may lack — off keeps the deployment guaranteed to succeed. Turn on once the deployer has role-assignment rights.')
+param grantAlertReaderRole bool = false
+
 // Deterministic, collision-resistant suffix per environment/subscription.
 var suffix = uniqueString(subscription().id, appName, env)
 var rgName = 'rg-${appName}-${env}'
@@ -186,7 +189,9 @@ module diagnostics 'modules/diagnostics.bicep' = if (env != 'dev') {
     cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
     workspaceId: monitoring.outputs.workspaceId
+    location: location
     alertEmail: alertEmail
+    grantAlertReaderRole: grantAlertReaderRole
     tags: tags
   }
 }
