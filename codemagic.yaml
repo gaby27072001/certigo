@@ -206,7 +206,7 @@ workflows:
       - apps/mobile/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
 
-
+    publishing:
       app_store_connect:
         auth: integration  # Utilise l'intégration "AppStoreConnect" définie dans les variables
         submit_to_testflight: true
