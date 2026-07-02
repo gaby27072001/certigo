@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:core/core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -70,11 +72,13 @@ class AuthController extends Notifier<AuthState> {
 
   /// Restauration au démarrage : c'est ce qui réalise l'**auto-connexion**.
   Future<void> _restore() async {
+    debugPrint('[LOGIN-DBG] restore:start required=$_required');
     // Passage direct en dev : tant qu'Entra n'est pas configuré (et qu'on ne
     // force pas l'aperçu), on n'impose pas d'écran de connexion pour préserver
     // le flux de développement existant (jeton dev).
     if (!_required) {
       state = Authenticated(_devSession());
+      debugPrint('[LOGIN-DBG] restore:dev-passthrough state=Authenticated');
       return;
     }
 
@@ -83,19 +87,26 @@ class AuthController extends Notifier<AuthState> {
     // authentifié » pour que l'app quitte TOUJOURS le splash et atteigne /auth.
     try {
       final AuthSession? session = await _store.read().timeout(const Duration(seconds: 6));
+      final String readResult = session == null ? 'null' : 'session-found';
+      debugPrint('[LOGIN-DBG] restore:read $readResult');
       if (session == null) {
         state = const Unauthenticated();
+        debugPrint('[LOGIN-DBG] restore:end state=Unauthenticated');
         return;
       }
       if (!session.isExpired) {
         state = Authenticated(session);
+        debugPrint('[LOGIN-DBG] restore:end state=Authenticated');
         return;
       }
       // Session expirée → tentative de rafraîchissement silencieux.
       final AuthSession? refreshed = await _tryRefresh(session);
+      final String refreshState = refreshed != null ? 'Authenticated' : 'Unauthenticated';
       state = refreshed != null ? Authenticated(refreshed) : const Unauthenticated();
+      debugPrint('[LOGIN-DBG] restore:end state=$refreshState (post-refresh)');
     } catch (e, st) {
       _logAuthError('_restore', e, st);
+      debugPrint('[LOGIN-DBG] restore:error $e');
       state = const Unauthenticated();
     }
   }
@@ -130,19 +141,35 @@ class AuthController extends Notifier<AuthState> {
     required String email,
     required String password,
   }) async {
+    debugPrint('[LOGIN-DBG] signIn:start');
     state = const AuthLoading();
+    final Stopwatch sw = Stopwatch()..start();
     try {
-      final AuthSession session = await _credentials.login(email: email, password: password);
+      debugPrint('[LOGIN-DBG] signIn:before login()');
+      final AuthSession session = await _credentials
+          .login(email: email, password: password)
+          .timeout(const Duration(seconds: 25));
+      final String tokenState = session.accessToken.isEmpty ? 'empty-token' : 'token-present';
+      debugPrint('[LOGIN-DBG] signIn:after login() $tokenState (${sw.elapsedMilliseconds}ms)');
       if (session.accessToken.isEmpty) {
         state = const Unauthenticated('La connexion a échoué. Réessayez.');
         return;
       }
+      debugPrint('[LOGIN-DBG] signIn:before write()');
       await _store.write(session);
+      debugPrint('[LOGIN-DBG] signIn:after write()');
       state = Authenticated(session);
+      debugPrint('[LOGIN-DBG] signIn:end state=Authenticated (${sw.elapsedMilliseconds}ms)');
+    } on TimeoutException catch (e, st) {
+      _logAuthError('signInWithEmail(timeout)', e, st);
+      debugPrint('[LOGIN-DBG] signIn:timeout after ${sw.elapsedMilliseconds}ms');
+      state = const Unauthenticated('La connexion a expiré. Réessayez.');
     } on AuthGatewayException catch (e) {
+      debugPrint('[LOGIN-DBG] signIn:gateway-error (${sw.elapsedMilliseconds}ms) ${e.message}');
       state = Unauthenticated(e.message);
     } catch (e, st) {
       _logAuthError('signInWithEmail', e, st);
+      debugPrint('[LOGIN-DBG] signIn:error (${sw.elapsedMilliseconds}ms) $e');
       state = const Unauthenticated('La connexion a échoué. Réessayez.');
     }
   }

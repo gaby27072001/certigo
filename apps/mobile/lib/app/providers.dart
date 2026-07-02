@@ -29,6 +29,7 @@ final apiClientProvider = Provider<ApiClient>((Ref ref) {
   return ApiClient(
     tokenProvider: ref.watch(tokenProvider),
     onUnauthorized: auth.handleUnauthorized,
+    debugLog: debugPrint,
   );
 });
 
