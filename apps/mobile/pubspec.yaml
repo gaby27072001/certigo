@@ -52,6 +52,9 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  # Utilisé par les tests d'auth pour piloter le temps (filet de sécurité
+  # `.timeout()` de la connexion sociale) sans attendre réellement.
+  fake_async: ^1.3.1
 
 flutter:
   uses-material-design: true

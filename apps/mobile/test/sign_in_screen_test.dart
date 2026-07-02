@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:certigo/features/auth/application/auth_controller.dart';
+import 'package:certigo/features/auth/application/auth_gateway.dart';
 import 'package:certigo/features/auth/application/auth_state.dart';
 import 'package:certigo/features/auth/presentation/sign_in_screen.dart';
 import 'package:certigo/features/auth/presentation/widgets/auth_provider_button.dart';
@@ -158,5 +161,61 @@ void main() {
     expect(credentials.loginCalls, isEmpty);
     expect(find.text('Adresse e-mail invalide.'), findsOneWidget);
     expect(find.text('Au moins 8 caractères.'), findsOneWidget);
+  });
+
+  testWidgets('annulation d\'une connexion sociale affiche un message et réarme le bouton',
+      (tester) async {
+    final FakeAuthGateway gateway = FakeAuthGateway(
+      onSignIn: (_) => throw const AuthGatewayException(
+        'Connexion annulée.',
+        cause: AuthFailureCause.cancelled,
+      ),
+    );
+    await pumpSignIn(tester, gateway: gateway, store: FakeSessionStore());
+
+    final Finder microsoft = find.text('Continuer avec Microsoft');
+    await tester.ensureVisible(microsoft);
+    await tester.pump();
+    await tester.tap(microsoft);
+    await tester.pump(); // AuthLoading
+    await tester.pump(const Duration(milliseconds: 50)); // échec → snackbar + réarmement
+
+    expect(gateway.signInCalls, <AuthProvider>[AuthProvider.microsoft]);
+    // Message d'annulation affiché dans un SnackBar.
+    expect(find.text('Connexion annulée.'), findsOneWidget);
+    // Bouton réarmé : plus de spinner en cours.
+    final AuthProviderButton button = tester.widget<AuthProviderButton>(
+      find.ancestor(of: microsoft, matching: find.byType(AuthProviderButton)),
+    );
+    expect(button.loading, isFalse);
+    expect(button.enabled, isTrue);
+  });
+
+  testWidgets('pendant une connexion e-mail en cours, le bouton est désactivé', (tester) async {
+    final Completer<AuthSession> pending = Completer<AuthSession>();
+    final FakeCredentialsGateway credentials = FakeCredentialsGateway(
+      onLoginFuture: (_, __) => pending.future,
+    );
+    await pumpSignIn(
+      tester,
+      gateway: FakeAuthGateway(),
+      store: FakeSessionStore(),
+      credentials: credentials,
+    );
+
+    await tester.enterText(find.byKey(const Key('email-field')), 'a@b.com');
+    await tester.enterText(find.byKey(const Key('password-field')), 'password123');
+    await tester.tap(find.byKey(const Key('email-submit')));
+    await tester.pump(); // état AuthLoading + _emailSubmitting
+
+    // Anti-double-clic : le bouton principal n'a plus de handler tant que busy.
+    final FilledButton submit = tester.widget<FilledButton>(find.byKey(const Key('email-submit')));
+    expect(submit.onPressed, isNull);
+    expect(credentials.loginCalls, hasLength(1));
+
+    // Débloque la future pour laisser le test se terminer proprement.
+    pending.complete(const AuthSession(accessToken: 'jeton'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
   });
 }

@@ -84,3 +84,70 @@ L'infra (`infra/params/*.bicepparam` → `functionApp.bicep`) câble déjà
 Tout E2E ci-dessous **nécessite un vrai tenant + appareils** → non exécuté ici :
 config tenant (Phase 1), login/refresh/logout réels (Phase 2), deep-link natif
 (Phase 3), gamification on-device (Phase 4). À lancer après fourniture §2.
+
+## 8. Checklist E2E exacte (à exécuter après déblocage §2)
+
+Pré-requis : build strict qui **démarre** (le garde-fou `AppEnv.validate` échoue
+au lancement si la config est incomplète — voir `docs/CONFIG_AUTH.md`).
+
+Pour **chaque plateforme (iOS physique + Android physique)** et **chaque méthode
+(e-mail, Microsoft, Google, Apple)** :
+
+1. **Inscription (compte neuf)** — e-mail : créer un compte ; social : premier
+   consentement IdP. → attendu : arrivée sur onboarding puis accueil.
+2. **Connexion (compte existant)** → attendu : accueil ; médiane ≤ 3 s.
+3. **Auto-connexion (relaunch)** — tuer/relancer l'app → attendu : accueil sans
+   ressaisie (session restaurée).
+4. **Callback deep-link** — vérifier le retour dans l'app après le navigateur
+   système (schéma `certigo://auth`).
+5. **Annulation** — fermer le navigateur / bouton retour → attendu : message
+   « Connexion annulée. », boutons **réarmés**, pas de spinner figé.
+6. **Réseau lent / hors-ligne** — activer un réseau dégradé ou le mode avion →
+   attendu : message réseau clair, réarmement ; en social, expiration au bout du
+   filet de sécurité (120 s) → « La connexion a expiré. Réessayez. »
+7. **Identifiants invalides** (e-mail) → « E-mail ou mot de passe incorrect. »
+8. **Token expiré** — attendre/forcer l'expiration puis appeler l'API →
+   rafraîchissement silencieux (200) ou, si échec, redirection connexion (401).
+9. **Déconnexion** → retour écran de connexion ; relaunch → écran de connexion.
+10. **Double-clic** — taps rapides sur un bouton → une seule tentative.
+
+Notes : Apple Sign-In **exige un iPhone physique** (KO simulateur). Prévoir
+1 compte neuf **et** 1 compte existant par fournisseur.
+
+## 9. Matrice de résultats (à remplir lors de l'exécution)
+
+| Méthode | Plateforme | Inscription | Connexion | Auto-connexion | Annulation | Réseau lent/offline | Token expiré | Déconnexion | Médiane (s) |
+|---|---|---|---|---|---|---|---|---|---|
+| E-mail | iOS | ☐ | ☐ | ☐ | n/a | ☐ | ☐ | ☐ | |
+| E-mail | Android | ☐ | ☐ | ☐ | n/a | ☐ | ☐ | ☐ | |
+| Microsoft | iOS | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
+| Microsoft | Android | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
+| Google | iOS | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
+| Google | Android | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
+| Apple | iOS | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
+| Apple | Android | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
+
+DoD : succès ≥ 98 %/provider, médiane ≤ 3 s, aucun blocage silencieux.
+
+## 10. Ce qui est automatisé (sans tenant ni appareil)
+
+Tests **verts** exécutables via `flutter test` dans `apps/mobile` +
+`dart test` dans `packages/core` :
+
+- `auth_controller_test.dart` — login/register/refresh/logout, 4 fournisseurs
+  (fake), 401→refresh, **timeout social**, **annulation**, **erreur réseau**,
+  causes normalisées + télémétrie.
+- `router_redirect_test.dart` — **non-régression #154** (garde de redirection,
+  pas de piège `/splash`, pas de boucle).
+- `deep_link_config_test.dart` — garde des déclarations natives `certigo`
+  (Info.plist + build.gradle) + cohérence `ENTRA_REDIRECT_URI`.
+- `core_test.dart` — `AppEnv.validateConfig` (prod/dev, Entra manquant/partiel,
+  URL dev en prod, schéma de redirection…).
+
+**Blocage connu (environnement)** : `font_awesome_flutter` 10.7.0 et
+`google_fonts` 6.2.1 sont incompatibles avec le SDK courant (Flutter 3.44 /
+Dart 3.12 : `IconData` est devenu `final`). Cela **empêche la compilation de tous
+les tests widget** (dont `sign_in_screen_test.dart`) — état **pré-existant**, non
+lié à l'auth. Correctif recommandé : monter `font_awesome_flutter` (≥ 10.8) et
+`google_fonts` vers une version compatible, ou épingler le SDK Flutter.
+

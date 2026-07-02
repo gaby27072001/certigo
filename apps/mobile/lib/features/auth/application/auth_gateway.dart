@@ -8,12 +8,15 @@ import 'auth_state.dart';
 
 /// Erreur métier remontée au contrôleur pour afficher un message clair.
 class AuthGatewayException implements Exception {
-  const AuthGatewayException(this.message);
+  const AuthGatewayException(this.message, {this.cause = AuthFailureCause.unknown});
 
   final String message;
 
+  /// Cause normalisée (pour la télémétrie et le repli de message).
+  final AuthFailureCause cause;
+
   @override
-  String toString() => 'AuthGatewayException($message)';
+  String toString() => 'AuthGatewayException($cause, $message)';
 }
 
 /// Abstraction du flux OIDC (Authorization Code + PKCE).
@@ -70,42 +73,75 @@ class AppAuthGateway implements AuthGateway {
         provider,
       );
     } on FlutterAppAuthUserCancelledException {
-      throw const AuthGatewayException('Connexion annulée.');
+      throw const AuthGatewayException('Connexion annulée.', cause: AuthFailureCause.cancelled);
     } on PlatformException catch (e) {
-      throw AuthGatewayException(_toUserMessage(e, provider));
+      final ({String message, AuthFailureCause cause}) described = _describeError(e, provider);
+      throw AuthGatewayException(described.message, cause: described.cause);
     } catch (_) {
       throw AuthGatewayException(
         'La connexion via ${provider.id} a échoué. Vérifiez la configuration Entra puis réessayez.',
+        cause: AuthFailureCause.providerError,
       );
     }
   }
 
-  String _toUserMessage(PlatformException e, AuthProvider provider) {
+  /// Traduit une [PlatformException] `flutter_appauth` en message utilisateur FR
+  /// **et** en [AuthFailureCause] normalisée (source unique côté social).
+  ({String message, AuthFailureCause cause}) _describeError(
+    PlatformException e,
+    AuthProvider provider,
+  ) {
     final String lowerCode = e.code.toLowerCase();
     final String lowerMessage = (e.message ?? '').toLowerCase();
     final String details = '${e.details ?? ''}'.toLowerCase();
     final String haystack = '$lowerCode $lowerMessage $details';
 
     if (haystack.contains('user_cancel')) {
-      return 'Connexion annulée.';
+      return (message: 'Connexion annulée.', cause: AuthFailureCause.cancelled);
+    }
+    if (haystack.contains('network') ||
+        haystack.contains('timeout') ||
+        haystack.contains('timed out') ||
+        haystack.contains('unreachable') ||
+        haystack.contains('connection')) {
+      return (
+        message: 'Pas de connexion. Vérifiez votre réseau puis réessayez.',
+        cause: AuthFailureCause.network,
+      );
     }
     if (haystack.contains('redirect_uri') ||
         haystack.contains('redirect uri') ||
         haystack.contains('invalid_redirect')) {
-      return 'Configuration de redirection invalide. Vérifiez ENTRA_REDIRECT_URI (${AppEnv.entraRedirectUri}) et sa déclaration native sur iOS/Android.';
+      return (
+        message:
+            'Configuration de redirection invalide. Vérifiez ENTRA_REDIRECT_URI (${AppEnv.entraRedirectUri}) et sa déclaration native sur iOS/Android.',
+        cause: AuthFailureCause.configError,
+      );
     }
     if (haystack.contains('invalid_client') ||
         haystack.contains('unauthorized_client') ||
         haystack.contains('client_id')) {
-      return 'Client Entra invalide. Vérifiez ENTRA_CLIENT_ID et l\'application Entra External ID.';
+      return (
+        message:
+            'Client Entra invalide. Vérifiez ENTRA_CLIENT_ID et l\'application Entra External ID.',
+        cause: AuthFailureCause.configError,
+      );
     }
     if (haystack.contains('domain_hint') ||
         haystack.contains('idp') ||
         haystack.contains('identity provider') ||
         haystack.contains('federat')) {
-      return 'Fournisseur ${provider.id} indisponible dans Entra External ID. Vérifiez la fédération et le domain_hint.';
+      return (
+        message:
+            'Fournisseur ${provider.id} indisponible dans Entra External ID. Vérifiez la fédération et le domain_hint.',
+        cause: AuthFailureCause.providerError,
+      );
     }
-    return 'La connexion via ${provider.id} a échoué. Vérifiez la configuration Entra puis réessayez.';
+    return (
+      message:
+          'La connexion via ${provider.id} a échoué. Vérifiez la configuration Entra puis réessayez.',
+      cause: AuthFailureCause.providerError,
+    );
   }
 
   @override
@@ -129,9 +165,14 @@ class AppAuthGateway implements AuthGateway {
         null,
       );
     } on PlatformException catch (e) {
-      throw AuthGatewayException(_toUserMessage(e, AuthProvider.microsoft));
+      final ({String message, AuthFailureCause cause}) described =
+          _describeError(e, AuthProvider.microsoft);
+      throw AuthGatewayException(described.message, cause: described.cause);
     } catch (_) {
-      throw const AuthGatewayException('Impossible de rafraîchir la session.');
+      throw const AuthGatewayException(
+        'Impossible de rafraîchir la session.',
+        cause: AuthFailureCause.providerError,
+      );
     }
   }
 

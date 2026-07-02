@@ -91,4 +91,105 @@ void main() {
       expect(AppEnv.entraScopes, contains('openid'));
     });
   });
+
+  group('AppEnv.validateConfig', () {
+    // Config prod complète et valide : sert de base à muter par cas.
+    AppConfigReport validate({
+      AppFlavor flavor = AppFlavor.prod,
+      String apiBaseUrl = 'https://api.certigo.app/api',
+      String entraClientId = 'client-123',
+      String entraAuthority = 'https://tenant.ciamlogin.com/tid/v2.0',
+      String entraRedirectUri = 'certigo://auth',
+      String entraApiScope = 'api://client-123/user_impersonation',
+      bool entraOptional = false,
+    }) =>
+        AppEnv.validateConfig(
+          flavor: flavor,
+          apiBaseUrl: apiBaseUrl,
+          entraClientId: entraClientId,
+          entraAuthority: entraAuthority,
+          entraRedirectUri: entraRedirectUri,
+          entraApiScope: entraApiScope,
+          entraOptional: entraOptional,
+        );
+
+    bool hasError(AppConfigReport r, String key) =>
+        r.errors.any((AppConfigIssue i) => i.key == key);
+    bool hasWarning(AppConfigReport r, String key) =>
+        r.warnings.any((AppConfigIssue i) => i.key == key);
+
+    test('une config prod complète est valide (aucune erreur)', () {
+      final AppConfigReport r = validate();
+      expect(r.isValid, isTrue);
+      expect(r.errors, isEmpty);
+    });
+
+    test('prod sans Entra → erreur bloquante ENTRA_CLIENT_ID', () {
+      final AppConfigReport r = validate(entraClientId: '', entraAuthority: '');
+      expect(r.isValid, isFalse);
+      expect(hasError(r, 'ENTRA_CLIENT_ID'), isTrue);
+    });
+
+    test('prod sans Entra mais ENTRA_OPTIONAL=true → avertissement, pas d\'erreur', () {
+      final AppConfigReport r = validate(
+        entraClientId: '',
+        entraAuthority: '',
+        entraApiScope: '',
+        entraOptional: true,
+      );
+      expect(r.isValid, isTrue);
+      expect(hasWarning(r, 'ENTRA_CLIENT_ID'), isTrue);
+    });
+
+    test('prod pointant sur l\'API dev par défaut → erreur bloquante', () {
+      final AppConfigReport r = validate(apiBaseUrl: AppEnv.devApiBaseUrl);
+      expect(r.isValid, isFalse);
+      expect(hasError(r, 'API_BASE_URL'), isTrue);
+    });
+
+    test('prod avec API en HTTP (non https) → erreur bloquante', () {
+      final AppConfigReport r = validate(apiBaseUrl: 'http://api.certigo.app/api');
+      expect(hasError(r, 'API_BASE_URL'), isTrue);
+    });
+
+    test('API_BASE_URL vide → erreur bloquante quel que soit le flavor', () {
+      final AppConfigReport r = validate(flavor: AppFlavor.dev, apiBaseUrl: '');
+      expect(hasError(r, 'API_BASE_URL'), isTrue);
+    });
+
+    test('Entra partiel (client sans autorité) → erreur bloquante', () {
+      final AppConfigReport r = validate(entraAuthority: '');
+      expect(r.isValid, isFalse);
+      expect(hasError(r, 'ENTRA_AUTHORITY'), isTrue);
+    });
+
+    test('schéma de redirection non-certigo avec Entra configuré → erreur', () {
+      final AppConfigReport r = validate(entraRedirectUri: 'microlingo://auth');
+      expect(r.isValid, isFalse);
+      expect(hasError(r, 'ENTRA_REDIRECT_URI'), isTrue);
+    });
+
+    test('Entra configuré sans API scope → avertissement (risque 401)', () {
+      final AppConfigReport r = validate(entraApiScope: '');
+      expect(r.isValid, isTrue);
+      expect(hasWarning(r, 'ENTRA_API_SCOPE'), isTrue);
+    });
+
+    test('dev sans Entra → avertissements seulement, démarrage autorisé', () {
+      final AppConfigReport r = validate(
+        flavor: AppFlavor.dev,
+        apiBaseUrl: AppEnv.devApiBaseUrl,
+        entraClientId: '',
+        entraAuthority: '',
+        entraApiScope: '',
+      );
+      expect(r.isValid, isTrue);
+      expect(r.hasWarnings, isTrue);
+    });
+
+    test('validate() réel (dev par défaut) est valide', () {
+      // Sans --dart-define, flavor=dev : la config par défaut ne doit pas bloquer.
+      expect(AppEnv.validate().isValid, isTrue);
+    });
+  });
 }

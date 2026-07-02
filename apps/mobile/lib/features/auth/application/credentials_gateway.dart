@@ -101,27 +101,48 @@ class HttpCredentialsGateway implements CredentialsGateway {
 
   AuthSession _unwrap(Result<AuthSession> result) => result.when(
         success: (AuthSession session) => session,
-        failure: (Failure f) => throw AuthGatewayException(_messageFor(f)),
+        failure: (Failure f) {
+          final ({String message, AuthFailureCause cause}) described = _describeFor(f);
+          throw AuthGatewayException(described.message, cause: described.cause);
+        },
       );
 
   /// Traduit une [Failure] (mappée par [ApiClient] depuis le code HTTP) en
-  /// message clair et localisé. Le backend renvoie déjà des messages en
-  /// français, mais on reste robuste en se basant aussi sur le code.
-  String _messageFor(Failure failure) {
+  /// message clair FR **et** en [AuthFailureCause] normalisée. Le backend renvoie
+  /// déjà des messages en français ; on reste robuste en se basant sur le code.
+  ({String message, AuthFailureCause cause}) _describeFor(Failure failure) {
     if (failure is NetworkFailure) {
-      return 'Pas de connexion. Vérifiez votre réseau puis réessayez.';
+      return (
+        message: 'Pas de connexion. Vérifiez votre réseau puis réessayez.',
+        cause: AuthFailureCause.network,
+      );
     }
     if (failure is AuthFailure) {
-      return 'E-mail ou mot de passe incorrect.';
+      return (
+        message: 'E-mail ou mot de passe incorrect.',
+        cause: AuthFailureCause.invalidCredentials,
+      );
     }
     if (failure is ServerFailure) {
       return switch (failure.statusCode) {
-        429 => 'Trop de tentatives de connexion. Réessayez dans quelques minutes.',
-        409 => 'Cette adresse e-mail est déjà utilisée.',
-        400 => 'Vérifiez votre e-mail et un mot de passe d’au moins 8 caractères.',
-        _ => 'Le service est momentanément indisponible. Réessayez.',
+        429 => (
+            message: 'Trop de tentatives de connexion. Réessayez dans quelques minutes.',
+            cause: AuthFailureCause.providerError,
+          ),
+        409 => (
+            message: 'Cette adresse e-mail est déjà utilisée.',
+            cause: AuthFailureCause.invalidCredentials,
+          ),
+        400 => (
+            message: 'Vérifiez votre e-mail et un mot de passe d’au moins 8 caractères.',
+            cause: AuthFailureCause.invalidCredentials,
+          ),
+        _ => (
+            message: 'Le service est momentanément indisponible. Réessayez.',
+            cause: AuthFailureCause.providerError,
+          ),
       };
     }
-    return 'Une erreur est survenue. Réessayez.';
+    return (message: 'Une erreur est survenue. Réessayez.', cause: AuthFailureCause.unknown);
   }
 }
