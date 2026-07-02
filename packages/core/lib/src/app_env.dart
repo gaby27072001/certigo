@@ -150,27 +150,33 @@ class AppEnv {
 
     // --- API_BASE_URL ---
     if (apiBaseUrl.trim().isEmpty) {
-      issues.add(const AppConfigIssue(
-        AppConfigSeverity.error,
-        'API_BASE_URL',
-        'URL de l\'API absente : le login e-mail échouera (« Pas de connexion »). '
-            'Injectez --dart-define=API_BASE_URL=https://<host>/api.',
-      ));
+      issues.add(
+        const AppConfigIssue(
+          AppConfigSeverity.error,
+          'API_BASE_URL',
+          'URL de l\'API absente : le login e-mail échouera (« Pas de connexion »). '
+              'Injectez --dart-define=API_BASE_URL=https://<host>/api.',
+        ),
+      );
     } else {
       if (strictFlavor && apiBaseUrl == devApiBaseUrl) {
-        issues.add(const AppConfigIssue(
-          AppConfigSeverity.error,
-          'API_BASE_URL',
-          'Build prod/staging pointant sur l\'API DEV par défaut. '
-              'Injectez l\'URL réelle via --dart-define=API_BASE_URL.',
-        ));
+        issues.add(
+          const AppConfigIssue(
+            AppConfigSeverity.error,
+            'API_BASE_URL',
+            'Build prod/staging pointant sur l\'API DEV par défaut. '
+                'Injectez l\'URL réelle via --dart-define=API_BASE_URL.',
+          ),
+        );
       }
       if (strictFlavor && !apiBaseUrl.startsWith('https://')) {
-        issues.add(AppConfigIssue(
-          AppConfigSeverity.error,
-          'API_BASE_URL',
-          'L\'API doit être servie en HTTPS en prod/staging (reçu : $apiBaseUrl).',
-        ));
+        issues.add(
+          AppConfigIssue(
+            AppConfigSeverity.error,
+            'API_BASE_URL',
+            'L\'API doit être servie en HTTPS en prod/staging (reçu : $apiBaseUrl).',
+          ),
+        );
       }
     }
 
@@ -180,23 +186,27 @@ class AppEnv {
     if (hasClientId != hasAuthority) {
       // Config partielle : toujours un bug (bouton social présent qui échoue,
       // ou disparition silencieuse selon l'ordre de lecture).
-      issues.add(AppConfigIssue(
-        AppConfigSeverity.error,
-        hasClientId ? 'ENTRA_AUTHORITY' : 'ENTRA_CLIENT_ID',
-        'Configuration Entra incomplète : ENTRA_CLIENT_ID et ENTRA_AUTHORITY '
-        'doivent être fournis ensemble (l\'un est renseigné, l\'autre vide).',
-      ));
+      issues.add(
+        AppConfigIssue(
+          AppConfigSeverity.error,
+          hasClientId ? 'ENTRA_AUTHORITY' : 'ENTRA_CLIENT_ID',
+          'Configuration Entra incomplète : ENTRA_CLIENT_ID et ENTRA_AUTHORITY '
+          'doivent être fournis ensemble (l\'un est renseigné, l\'autre vide).',
+        ),
+      );
     } else if (!hasClientId) {
       // Entra totalement absent : bloquant en prod (sauf opt-in e-mail seul).
       final AppConfigSeverity sev =
           (strictFlavor && !entraOptional) ? AppConfigSeverity.error : AppConfigSeverity.warning;
-      issues.add(AppConfigIssue(
-        sev,
-        'ENTRA_CLIENT_ID',
-        'Connexion sociale (Microsoft/Google/Apple) désactivée : ENTRA_CLIENT_ID '
-            'et ENTRA_AUTHORITY absents. Renseignez-les, ou assumez un build '
-            'e-mail uniquement avec --dart-define=ENTRA_OPTIONAL=true.',
-      ));
+      issues.add(
+        AppConfigIssue(
+          sev,
+          'ENTRA_CLIENT_ID',
+          'Connexion sociale (Microsoft/Google/Apple) désactivée : ENTRA_CLIENT_ID '
+              'et ENTRA_AUTHORITY absents. Renseignez-les, ou assumez un build '
+              'e-mail uniquement avec --dart-define=ENTRA_OPTIONAL=true.',
+        ),
+      );
     }
 
     // --- Redirect URI : doit utiliser le schéma natif ---
@@ -206,24 +216,28 @@ class AppEnv {
       // Bloquant dès qu'Entra est (au moins partiellement) configuré ou strict.
       final AppConfigSeverity sev =
           (hasClientId || hasAuthority || strictFlavor) ? strict : AppConfigSeverity.warning;
-      issues.add(AppConfigIssue(
-        sev,
-        'ENTRA_REDIRECT_URI',
-        'ENTRA_REDIRECT_URI ($entraRedirectUri) n\'utilise pas le schéma natif '
-            '« $redirectScheme:// » déclaré dans Info.plist / build.gradle : le '
-            'callback de connexion ne reviendra jamais dans l\'app.',
-      ));
+      issues.add(
+        AppConfigIssue(
+          sev,
+          'ENTRA_REDIRECT_URI',
+          'ENTRA_REDIRECT_URI ($entraRedirectUri) n\'utilise pas le schéma natif '
+              '« $redirectScheme:// » déclaré dans Info.plist / build.gradle : le '
+              'callback de connexion ne reviendra jamais dans l\'app.',
+        ),
+      );
     }
 
     // --- API scope : recommandé quand Entra est configuré (aud backend) ---
     if (hasClientId && hasAuthority && entraApiScope.trim().isEmpty) {
-      issues.add(const AppConfigIssue(
-        AppConfigSeverity.warning,
-        'ENTRA_API_SCOPE',
-        'ENTRA_API_SCOPE vide alors qu\'Entra est configuré : l\'access_token '
-            'peut ne pas cibler l\'API (risque de 401). Renseignez '
-            'api://<client-id>/... si le backend valide l\'audience.',
-      ));
+      issues.add(
+        const AppConfigIssue(
+          AppConfigSeverity.warning,
+          'ENTRA_API_SCOPE',
+          'ENTRA_API_SCOPE vide alors qu\'Entra est configuré : l\'access_token '
+              'peut ne pas cibler l\'API (risque de 401). Renseignez '
+              'api://<client-id>/... si le backend valide l\'audience.',
+        ),
+      );
     }
 
     return AppConfigReport(issues);
