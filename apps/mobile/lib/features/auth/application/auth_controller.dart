@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_gateway.dart';
 import 'auth_state.dart';
+import 'auth_telemetry.dart';
 import 'credentials_gateway.dart';
 import 'session_store.dart';
 
@@ -55,14 +56,27 @@ class AuthController extends Notifier<AuthState> {
   late final AuthGateway _gateway;
   late final CredentialsGateway _credentials;
   late final SessionStore _store;
+  late final AuthTelemetry _telemetry;
   late final bool _required;
   late final bool _configured;
+
+  /// Filet de sécurité pour la connexion e-mail (appel API direct).
+  static const Duration _emailTimeout = Duration(seconds: 25);
+
+  /// Filet de sécurité pour la connexion sociale : plus généreux car l'utilisateur
+  /// saisit ses identifiants dans le navigateur système. Borne néanmoins le flux
+  /// pour éviter un spinner infini si le callback ne revient jamais.
+  static const Duration _socialTimeout = Duration(seconds: 120);
+
+  /// Délai de lecture du coffre au démarrage (déjà borné dans le store aussi).
+  static const Duration _restoreReadTimeout = Duration(seconds: 6);
 
   @override
   AuthState build() {
     _gateway = ref.read(authGatewayProvider);
     _credentials = ref.read(credentialsGatewayProvider);
     _store = ref.read(sessionStoreProvider);
+    _telemetry = ref.read(authTelemetryProvider);
     _required = ref.read(authRequiredProvider);
     _configured = ref.read(authConfiguredProvider);
     // Différé en micro-tâche : `build` doit retourner sans muter l'état.
@@ -72,13 +86,11 @@ class AuthController extends Notifier<AuthState> {
 
   /// Restauration au démarrage : c'est ce qui réalise l'**auto-connexion**.
   Future<void> _restore() async {
-    debugPrint('[LOGIN-DBG] restore:start required=$_required');
     // Passage direct en dev : tant qu'Entra n'est pas configuré (et qu'on ne
     // force pas l'aperçu), on n'impose pas d'écran de connexion pour préserver
     // le flux de développement existant (jeton dev).
     if (!_required) {
       state = Authenticated(_devSession());
-      debugPrint('[LOGIN-DBG] restore:dev-passthrough state=Authenticated');
       return;
     }
 
@@ -86,52 +98,70 @@ class AuthController extends Notifier<AuthState> {
     // applique déjà un timeout) — doit dégrader proprement vers « non
     // authentifié » pour que l'app quitte TOUJOURS le splash et atteigne /auth.
     try {
-      final AuthSession? session = await _store.read().timeout(const Duration(seconds: 6));
-      final String readResult = session == null ? 'null' : 'session-found';
-      debugPrint('[LOGIN-DBG] restore:read $readResult');
+      final AuthSession? session = await _store.read().timeout(_restoreReadTimeout);
       if (session == null) {
+        // Aucune session mémorisée (premier lancement / déconnecté) : ce n'est
+        // pas un échec — aucune tentative d'auto-connexion à mesurer.
         state = const Unauthenticated();
-        debugPrint('[LOGIN-DBG] restore:end state=Unauthenticated');
         return;
       }
+      // Une session existe : c'est une vraie tentative d'auto-connexion.
+      _telemetry.authStart(AuthMethod.restore);
       if (!session.isExpired) {
+        _telemetry.authSuccess(AuthMethod.restore);
         state = Authenticated(session);
-        debugPrint('[LOGIN-DBG] restore:end state=Authenticated');
         return;
       }
       // Session expirée → tentative de rafraîchissement silencieux.
       final AuthSession? refreshed = await _tryRefresh(session);
-      final String refreshState = refreshed != null ? 'Authenticated' : 'Unauthenticated';
-      state = refreshed != null ? Authenticated(refreshed) : const Unauthenticated();
-      debugPrint('[LOGIN-DBG] restore:end state=$refreshState (post-refresh)');
+      if (refreshed != null) {
+        _telemetry.authSuccess(AuthMethod.restore);
+        state = Authenticated(refreshed);
+      } else {
+        _telemetry.authFailure(AuthMethod.restore, AuthFailureCause.providerError);
+        state = const Unauthenticated();
+      }
     } catch (e, st) {
       _logAuthError('_restore', e, st);
-      debugPrint('[LOGIN-DBG] restore:error $e');
+      _telemetry.authFailure(AuthMethod.restore, AuthFailureCause.unknown);
       state = const Unauthenticated();
     }
   }
 
   /// Connexion explicite via l'un des trois fournisseurs.
   Future<void> signIn(AuthProvider provider) async {
+    final AuthMethod method = AuthMethodX.fromProvider(provider);
     if (!_configured) {
+      _telemetry.authFailure(method, AuthFailureCause.configError);
       state = const Unauthenticated(
         'Configuration Entra requise : renseignez ENTRA_CLIENT_ID et ENTRA_AUTHORITY.',
       );
       return;
     }
+    _telemetry.authStart(method);
     state = const AuthLoading();
+    final Stopwatch sw = Stopwatch()..start();
     try {
-      final AuthSession session = await _gateway.signIn(provider);
+      final AuthSession session = await _gateway.signIn(provider).timeout(_socialTimeout);
       if (session.accessToken.isEmpty) {
+        _telemetry.authFailure(method, AuthFailureCause.providerError,
+            durationMs: sw.elapsedMilliseconds);
         state = const Unauthenticated('La connexion a échoué. Réessayez.');
         return;
       }
       await _store.write(session);
+      _telemetry.authSuccess(method, durationMs: sw.elapsedMilliseconds);
       state = Authenticated(session);
+    } on TimeoutException catch (e, st) {
+      _logAuthError('signIn(${provider.id}, timeout)', e, st);
+      _telemetry.authFailure(method, AuthFailureCause.timeout, durationMs: sw.elapsedMilliseconds);
+      state = Unauthenticated(authMessageForCause(AuthFailureCause.timeout));
     } on AuthGatewayException catch (e) {
+      _telemetry.authFailure(method, e.cause, durationMs: sw.elapsedMilliseconds);
       state = Unauthenticated(e.message);
     } catch (e, st) {
       _logAuthError('signIn(${provider.id})', e, st);
+      _telemetry.authFailure(method, AuthFailureCause.unknown, durationMs: sw.elapsedMilliseconds);
       state = const Unauthenticated('La connexion a échoué. Réessayez.');
     }
   }
@@ -141,35 +171,33 @@ class AuthController extends Notifier<AuthState> {
     required String email,
     required String password,
   }) async {
-    debugPrint('[LOGIN-DBG] signIn:start');
+    _telemetry.authStart(AuthMethod.email);
     state = const AuthLoading();
     final Stopwatch sw = Stopwatch()..start();
     try {
-      debugPrint('[LOGIN-DBG] signIn:before login()');
-      final AuthSession session = await _credentials
-          .login(email: email, password: password)
-          .timeout(const Duration(seconds: 25));
-      final String tokenState = session.accessToken.isEmpty ? 'empty-token' : 'token-present';
-      debugPrint('[LOGIN-DBG] signIn:after login() $tokenState (${sw.elapsedMilliseconds}ms)');
+      final AuthSession session =
+          await _credentials.login(email: email, password: password).timeout(_emailTimeout);
       if (session.accessToken.isEmpty) {
+        _telemetry.authFailure(AuthMethod.email, AuthFailureCause.providerError,
+            durationMs: sw.elapsedMilliseconds);
         state = const Unauthenticated('La connexion a échoué. Réessayez.');
         return;
       }
-      debugPrint('[LOGIN-DBG] signIn:before write()');
       await _store.write(session);
-      debugPrint('[LOGIN-DBG] signIn:after write()');
+      _telemetry.authSuccess(AuthMethod.email, durationMs: sw.elapsedMilliseconds);
       state = Authenticated(session);
-      debugPrint('[LOGIN-DBG] signIn:end state=Authenticated (${sw.elapsedMilliseconds}ms)');
     } on TimeoutException catch (e, st) {
       _logAuthError('signInWithEmail(timeout)', e, st);
-      debugPrint('[LOGIN-DBG] signIn:timeout after ${sw.elapsedMilliseconds}ms');
-      state = const Unauthenticated('La connexion a expiré. Réessayez.');
+      _telemetry.authFailure(AuthMethod.email, AuthFailureCause.timeout,
+          durationMs: sw.elapsedMilliseconds);
+      state = Unauthenticated(authMessageForCause(AuthFailureCause.timeout));
     } on AuthGatewayException catch (e) {
-      debugPrint('[LOGIN-DBG] signIn:gateway-error (${sw.elapsedMilliseconds}ms) ${e.message}');
+      _telemetry.authFailure(AuthMethod.email, e.cause, durationMs: sw.elapsedMilliseconds);
       state = Unauthenticated(e.message);
     } catch (e, st) {
       _logAuthError('signInWithEmail', e, st);
-      debugPrint('[LOGIN-DBG] signIn:error (${sw.elapsedMilliseconds}ms) $e');
+      _telemetry.authFailure(AuthMethod.email, AuthFailureCause.unknown,
+          durationMs: sw.elapsedMilliseconds);
       state = const Unauthenticated('La connexion a échoué. Réessayez.');
     }
   }
@@ -180,23 +208,34 @@ class AuthController extends Notifier<AuthState> {
     required String password,
     String? displayName,
   }) async {
+    _telemetry.authStart(AuthMethod.register);
     state = const AuthLoading();
+    final Stopwatch sw = Stopwatch()..start();
     try {
-      final AuthSession session = await _credentials.register(
-        email: email,
-        password: password,
-        displayName: displayName,
-      );
+      final AuthSession session = await _credentials
+          .register(email: email, password: password, displayName: displayName)
+          .timeout(_emailTimeout);
       if (session.accessToken.isEmpty) {
+        _telemetry.authFailure(AuthMethod.register, AuthFailureCause.providerError,
+            durationMs: sw.elapsedMilliseconds);
         state = const Unauthenticated('La création du compte a échoué. Réessayez.');
         return;
       }
       await _store.write(session);
+      _telemetry.authSuccess(AuthMethod.register, durationMs: sw.elapsedMilliseconds);
       state = Authenticated(session);
+    } on TimeoutException catch (e, st) {
+      _logAuthError('registerWithEmail(timeout)', e, st);
+      _telemetry.authFailure(AuthMethod.register, AuthFailureCause.timeout,
+          durationMs: sw.elapsedMilliseconds);
+      state = Unauthenticated(authMessageForCause(AuthFailureCause.timeout));
     } on AuthGatewayException catch (e) {
+      _telemetry.authFailure(AuthMethod.register, e.cause, durationMs: sw.elapsedMilliseconds);
       state = Unauthenticated(e.message);
     } catch (e, st) {
       _logAuthError('registerWithEmail', e, st);
+      _telemetry.authFailure(AuthMethod.register, AuthFailureCause.unknown,
+          durationMs: sw.elapsedMilliseconds);
       state = const Unauthenticated('La création du compte a échoué. Réessayez.');
     }
   }

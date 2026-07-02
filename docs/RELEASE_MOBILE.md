@@ -515,3 +515,58 @@ fixe et revenir à `flutter.ndkVersion` (vérifier avec `flutter doctor -v`).
       ajoutée dans le dashboard Codemagic (intégration `AppStoreConnect`) ; code
       signing automatique activé ; app créée dans App Store Connect.
 - [ ] `docs/RELEASE_MOBILE.md` à jour.
+
+---
+
+## Déploiement progressif & rollback auth
+
+Objectif : détecter une régression d'authentification (échec de login, boucle,
+config invalide) **avant** qu'elle n'atteigne 100 % des utilisateurs.
+
+### Rollout progressif (Android → iOS)
+
+| Étape | Piste | Audience | Durée d'observation | Passage à l'étape suivante |
+|---|---|---|---|---|
+| 1 | `internal` (staging) | équipe interne | tests E2E `docs/E2E_AUTH_PREREQUIS.md` verts | manuel |
+| 2 | `closed`/`production` **staged 5 %** | ~5 % prod | ≥ 24 h de trafic réel | KPI auth sous seuils ci-dessous |
+| 3 | `production` **staged 20 %** | ~20 % | ≥ 24 h | KPI stables |
+| 4 | `production` **100 %** | tous | — | — |
+
+iOS : équivalent via App Store Connect (TestFlight → phased release 7 jours).
+
+### Seuils de rollback automatique
+
+Sur la fenêtre glissante d'une étape (source : KPI télémétrie, cf.
+`docs/CONFIG_AUTH.md`) :
+
+| Signal | Seuil d'alerte | Action |
+|---|---|---|
+| Taux de succès login (par provider) | < **98 %** | halt rollout ; investiguer |
+| Taux d'échec `cause=config_error` | > **0,5 %** | **rollback immédiat** (config build cassée) |
+| Taux d'échec `cause=timeout`+`network` | > **3 %** | halt ; vérifier backend / Entra |
+| Latence médiane connexion | > **3 s** | halt ; investiguer |
+| Crash-free sessions (Play/ASC) | < **99 %** | rollback |
+
+Rollback = **halt staged rollout** (Play Console / ASC) sur la version fautive et
+promotion de la précédente version stable. La config étant compile-time, un
+`config_error` implique un **rebuild** avec les bons `--dart-define` (le garde-fou
+`AppEnv.validate` aurait dû bloquer le build fautif : vérifier la CI d'abord).
+
+### Runbook incident auth
+
+1. **Constat** — pic d'`auth_failure` / signalements « impossible de se connecter ».
+2. **Trier par cause** (télémétrie) :
+   - `config_error` → build mal configuré : comparer les `--dart-define` du build
+     (Key Vault `mobile-app-*`/`mobile-entra-*`, `vars.MOBILE_*`) au tableau
+     `docs/CONFIG_AUTH.md` §2 ; **halt rollout** ; rebuild.
+   - `timeout`/`network` → backend `API_BASE_URL` ou tenant Entra injoignable :
+     vérifier santé backend + statut Entra External ID.
+   - `provider_error` → fédération IdP (Microsoft/Google/Apple) cassée côté CIAM :
+     vérifier les IdP et `domain_hint`.
+   - `invalid_credentials` élevé mais isolé → probable côté utilisateur, pas une régression.
+3. **Vérifier le deep-link** si social casse après un changement natif : le test
+   `deep_link_config_test.dart` doit être vert (schéma `certigo`).
+4. **Décision** — sous seuil → rollback (halt staged rollout) ; sinon correctif +
+   nouveau build passant CI (`ci-mobile` : format/analyze/test) + garde-fou config.
+5. **Post-mortem** — ajouter un test de non-régression pour la cause racine.
+

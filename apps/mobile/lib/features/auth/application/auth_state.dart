@@ -9,6 +9,51 @@ import 'dart:convert';
 /// backend (jetons signés localement), toujours disponible même sans Entra.
 enum AuthProvider { microsoft, google, apple, email }
 
+/// Cause **normalisée** d'un échec d'authentification.
+///
+/// Source unique de vérité partagée par les deux passerelles (e-mail via
+/// [credentials_gateway] et social via [auth_gateway]) : chaque couche traduit
+/// son erreur technique vers l'une de ces causes, ce qui permet (1) un message
+/// utilisateur cohérent via [authMessageForCause] et (2) une télémétrie sans
+/// donnée sensible. Aucune donnée personnelle n'est portée ici.
+enum AuthFailureCause {
+  /// L'utilisateur a annulé (fermeture du navigateur, bouton retour).
+  cancelled,
+
+  /// Délai dépassé (réseau lent, navigateur laissé ouvert…).
+  timeout,
+
+  /// Pas de connectivité / requête réseau échouée.
+  network,
+
+  /// Le fournisseur (Entra/IdP fédéré) a refusé ou n'est pas disponible.
+  providerError,
+
+  /// Identifiants e-mail/mot de passe invalides.
+  invalidCredentials,
+
+  /// Configuration d'authentification absente ou incohérente.
+  configError,
+
+  /// Cause non catégorisée.
+  unknown,
+}
+
+/// Message utilisateur FR par défaut pour une [AuthFailureCause].
+///
+/// Les passerelles peuvent fournir un message plus spécifique (ex. redirection
+/// invalide) tout en taguant la même cause ; ceci est le repli normalisé.
+String authMessageForCause(AuthFailureCause cause) => switch (cause) {
+      AuthFailureCause.cancelled => 'Connexion annulée.',
+      AuthFailureCause.timeout => 'La connexion a expiré. Réessayez.',
+      AuthFailureCause.network => 'Pas de connexion. Vérifiez votre réseau puis réessayez.',
+      AuthFailureCause.providerError => 'La connexion a échoué. Réessayez.',
+      AuthFailureCause.invalidCredentials => 'E-mail ou mot de passe incorrect.',
+      AuthFailureCause.configError =>
+        'Configuration d\'authentification invalide. Contactez le support.',
+      AuthFailureCause.unknown => 'Une erreur est survenue. Réessayez.',
+    };
+
 /// Indice de domaine (`domain_hint`) éventuel transmis à Entra pour pré-router
 /// l'utilisateur vers le bon fournisseur fédéré.
 extension AuthProviderX on AuthProvider {

@@ -1,30 +1,39 @@
+import 'dart:async';
+
 import 'package:core/core.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:certigo/features/auth/application/auth_controller.dart';
 import 'package:certigo/features/auth/application/auth_gateway.dart';
 import 'package:certigo/features/auth/application/auth_state.dart';
+import 'package:certigo/features/auth/application/auth_telemetry.dart';
 import 'package:certigo/features/auth/application/credentials_gateway.dart';
 import 'package:certigo/features/auth/application/session_store.dart';
 
 /// Passerelle OIDC factice : aucune dépendance plateforme, comportement
 /// scriptable par test (succès, échec, jeton rafraîchi…).
 class FakeAuthGateway implements AuthGateway {
-  FakeAuthGateway({this.onSignIn, this.onRefresh});
+  FakeAuthGateway({this.onSignIn, this.onRefresh, this.hangSignIn = false});
 
   AuthSession Function(AuthProvider provider)? onSignIn;
   AuthSession Function(String refreshToken)? onRefresh;
+
+  /// Quand `true`, [signIn] renvoie une future qui ne se résout jamais (sert à
+  /// tester le filet de sécurité `.timeout()` via `fake_async`).
+  bool hangSignIn;
 
   final List<AuthProvider> signInCalls = <AuthProvider>[];
   final List<String> refreshCalls = <String>[];
   int signOutCalls = 0;
 
   @override
-  Future<AuthSession> signIn(AuthProvider provider) async {
+  Future<AuthSession> signIn(AuthProvider provider) {
     signInCalls.add(provider);
+    if (hangSignIn) return Completer<AuthSession>().future;
     final AuthSession Function(AuthProvider)? builder = onSignIn;
     if (builder == null) throw StateError('signIn non câblé');
-    return builder(provider);
+    return Future<AuthSession>.value(builder(provider));
   }
 
   @override
@@ -43,9 +52,13 @@ class FakeAuthGateway implements AuthGateway {
 
 /// Passerelle e-mail/mot de passe factice (aucun réseau), scriptable par test.
 class FakeCredentialsGateway implements CredentialsGateway {
-  FakeCredentialsGateway({this.onLogin, this.onRegister, this.onRefresh});
+  FakeCredentialsGateway({this.onLogin, this.onLoginFuture, this.onRegister, this.onRefresh});
 
   AuthSession Function(String email, String password)? onLogin;
+
+  /// Variante asynchrone : permet de renvoyer une future en attente (test du
+  /// spinner / anti-double-clic pendant qu'une connexion est en cours).
+  Future<AuthSession> Function(String email, String password)? onLoginFuture;
   AuthSession Function(String email, String password, String? displayName)? onRegister;
   AuthSession Function(String refreshToken)? onRefresh;
 
@@ -54,11 +67,13 @@ class FakeCredentialsGateway implements CredentialsGateway {
   final List<String> refreshCalls = <String>[];
 
   @override
-  Future<AuthSession> login({required String email, required String password}) async {
+  Future<AuthSession> login({required String email, required String password}) {
     loginCalls.add(email);
+    final Future<AuthSession> Function(String, String)? asyncBuilder = onLoginFuture;
+    if (asyncBuilder != null) return asyncBuilder(email, password);
     final AuthSession Function(String, String)? builder = onLogin;
     if (builder == null) throw const AuthGatewayException('login non câblé');
-    return builder(email, password);
+    return Future<AuthSession>.value(builder(email, password));
   }
 
   @override
@@ -106,6 +121,24 @@ class FakeSessionStore implements SessionStore {
   }
 }
 
+/// Télémétrie factice : enregistre chaque événement pour vérification.
+class FakeAuthTelemetry implements AuthTelemetry {
+  final List<String> starts = <String>[];
+  final List<String> successes = <String>[];
+  final List<({String method, AuthFailureCause cause})> failures =
+      <({String method, AuthFailureCause cause})>[];
+
+  @override
+  void authStart(AuthMethod method) => starts.add(method.label);
+
+  @override
+  void authSuccess(AuthMethod method, {int? durationMs}) => successes.add(method.label);
+
+  @override
+  void authFailure(AuthMethod method, AuthFailureCause cause, {int? durationMs}) =>
+      failures.add((method: method.label, cause: cause));
+}
+
 void main() {
   /// Draine entièrement la file de micro-tâches (le `_restore` différé du
   /// contrôleur et ses `await` enchaînés) sans déclencher de timer.
@@ -115,6 +148,7 @@ void main() {
     required FakeAuthGateway gateway,
     required FakeSessionStore store,
     FakeCredentialsGateway? credentials,
+    FakeAuthTelemetry? telemetry,
     bool configured = true,
     bool required = true,
   }) {
@@ -127,6 +161,7 @@ void main() {
         sessionStoreProvider.overrideWithValue(store),
         authConfiguredProvider.overrideWithValue(configured),
         authRequiredProvider.overrideWithValue(required),
+        if (telemetry != null) authTelemetryProvider.overrideWithValue(telemetry),
       ],
     );
     addTearDown(container.dispose);
@@ -582,6 +617,147 @@ void main() {
       // Le rafraîchissement passe par credentials, pas par la passerelle OIDC.
       expect(credentials.refreshCalls, hasLength(1));
       expect(gateway.refreshCalls, isEmpty);
+    });
+  });
+
+  group('timeout, annulation & causes normalisées (P2)', () {
+    test('connexion sociale sans timeout → succès + télémétrie start/success', () async {
+      final FakeAuthTelemetry telemetry = FakeAuthTelemetry();
+      final FakeAuthGateway gateway = FakeAuthGateway(
+        onSignIn: (AuthProvider p) => session(accessToken: 'jeton-${p.id}'),
+      );
+      final ProviderContainer container = makeContainer(
+        gateway: gateway,
+        store: FakeSessionStore(),
+        telemetry: telemetry,
+      );
+      container.read(authControllerProvider);
+      await settle();
+
+      await container.read(authControllerProvider.notifier).signIn(AuthProvider.google);
+
+      expect(container.read(authControllerProvider), isA<Authenticated>());
+      expect(telemetry.starts, contains('google'));
+      expect(telemetry.successes, contains('google'));
+    });
+
+    test('annulation sociale → message « Connexion annulée. » + cause cancelled', () async {
+      final FakeAuthTelemetry telemetry = FakeAuthTelemetry();
+      final FakeAuthGateway gateway = FakeAuthGateway(
+        onSignIn: (_) => throw const AuthGatewayException(
+          'Connexion annulée.',
+          cause: AuthFailureCause.cancelled,
+        ),
+      );
+      final ProviderContainer container = makeContainer(
+        gateway: gateway,
+        store: FakeSessionStore(),
+        telemetry: telemetry,
+      );
+      container.read(authControllerProvider);
+      await settle();
+
+      await container.read(authControllerProvider.notifier).signIn(AuthProvider.apple);
+
+      final AuthState state = container.read(authControllerProvider);
+      expect(state, isA<Unauthenticated>());
+      expect((state as Unauthenticated).message, 'Connexion annulée.');
+      expect(telemetry.failures.single.cause, AuthFailureCause.cancelled);
+    });
+
+    test('connexion sociale qui ne répond jamais → timeout + cause timeout', () {
+      fakeAsync((FakeAsync async) {
+        final FakeAuthTelemetry telemetry = FakeAuthTelemetry();
+        final FakeAuthGateway gateway = FakeAuthGateway(hangSignIn: true);
+        final ProviderContainer container = makeContainer(
+          gateway: gateway,
+          store: FakeSessionStore(),
+          telemetry: telemetry,
+        );
+        container.read(authControllerProvider);
+        async.flushMicrotasks();
+
+        container.read(authControllerProvider.notifier).signIn(AuthProvider.microsoft);
+        // Avance au-delà du filet de sécurité social (120 s).
+        async.elapse(const Duration(seconds: 121));
+        async.flushMicrotasks();
+
+        final AuthState state = container.read(authControllerProvider);
+        expect(state, isA<Unauthenticated>());
+        expect((state as Unauthenticated).message, 'La connexion a expiré. Réessayez.');
+        expect(telemetry.failures.last.cause, AuthFailureCause.timeout);
+      });
+    });
+
+    test('erreur réseau e-mail → message réseau + cause network', () async {
+      final FakeAuthTelemetry telemetry = FakeAuthTelemetry();
+      final FakeCredentialsGateway credentials = FakeCredentialsGateway(
+        onLogin: (_, __) => throw const AuthGatewayException(
+          'Pas de connexion. Vérifiez votre réseau puis réessayez.',
+          cause: AuthFailureCause.network,
+        ),
+      );
+      final ProviderContainer container = makeContainer(
+        gateway: FakeAuthGateway(),
+        store: FakeSessionStore(),
+        credentials: credentials,
+        telemetry: telemetry,
+      );
+      container.read(authControllerProvider);
+      await settle();
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmail(email: 'a@b.com', password: 'password123');
+
+      final AuthState state = container.read(authControllerProvider);
+      expect(state, isA<Unauthenticated>());
+      expect((state as Unauthenticated).message,
+          'Pas de connexion. Vérifiez votre réseau puis réessayez.');
+      expect(telemetry.failures.single, (method: 'email', cause: AuthFailureCause.network));
+    });
+
+    test('création de compte → télémétrie register start/success', () async {
+      final FakeAuthTelemetry telemetry = FakeAuthTelemetry();
+      final FakeCredentialsGateway credentials = FakeCredentialsGateway(
+        onRegister: (String email, String password, String? name) => AuthSession(
+          accessToken: 'jeton',
+          provider: AuthProvider.email,
+          email: email,
+        ),
+      );
+      final ProviderContainer container = makeContainer(
+        gateway: FakeAuthGateway(),
+        store: FakeSessionStore(),
+        credentials: credentials,
+        telemetry: telemetry,
+      );
+      container.read(authControllerProvider);
+      await settle();
+
+      await container
+          .read(authControllerProvider.notifier)
+          .registerWithEmail(email: 'new@b.com', password: 'password123');
+
+      expect(container.read(authControllerProvider), isA<Authenticated>());
+      expect(telemetry.starts, contains('register'));
+      expect(telemetry.successes, contains('register'));
+    });
+
+    test('Entra non configuré → cause configError en télémétrie', () async {
+      final FakeAuthTelemetry telemetry = FakeAuthTelemetry();
+      final ProviderContainer container = makeContainer(
+        gateway: FakeAuthGateway(onSignIn: (_) => session()),
+        store: FakeSessionStore(),
+        telemetry: telemetry,
+        configured: false,
+      );
+      container.read(authControllerProvider);
+      await settle();
+
+      await container.read(authControllerProvider.notifier).signIn(AuthProvider.microsoft);
+
+      expect(telemetry.failures.single.cause, AuthFailureCause.configError);
     });
   });
 }

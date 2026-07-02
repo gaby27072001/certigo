@@ -35,6 +35,7 @@ import '../features/onboarding/presentation/splash_screen.dart' as onboarding;
 import '../features/onboarding/presentation/start_choice_screen.dart';
 import '../features/onboarding/presentation/welcome_screen.dart';
 import 'app_shell.dart';
+import 'auth_redirect.dart';
 import 'providers.dart';
 
 /// Centralized, named route table. Using constants avoids stringly-typed
@@ -105,6 +106,22 @@ CustomTransitionPage<void> _stepPage({
 /// The app router. Exposed as a provider so auth/session/onboarding guards can
 /// react to state changes without rebuilding the app shell manually.
 final routerProvider = Provider<GoRouter>((Ref ref) {
+  // Garde de synchronisation : les constantes du garde d'auth (fichier feuille
+  // testable) doivent rester alignées sur le table de routes et l'onboarding.
+  // En debug, tout écart casse tôt plutôt que de laisser passer une régression.
+  assert(Routes.splash == AuthShellRoutes.splash, 'Routes.splash désynchronisé');
+  assert(Routes.auth == AuthShellRoutes.auth, 'Routes.auth désynchronisé');
+  assert(Routes.home == AuthShellRoutes.home, 'Routes.home désynchronisé');
+  assert(
+    OnboardingRoutes.splash == AuthShellRoutes.onboardingSplash,
+    'OnboardingRoutes.splash désynchronisé du garde d\'auth',
+  );
+  assert(
+    OnboardingRoutes.all.every(AuthShellRoutes.startupPaths.contains) &&
+        AuthShellRoutes.startupPaths.every(OnboardingRoutes.all.contains),
+    'AuthShellRoutes.startupPaths désynchronisé de OnboardingRoutes.all',
+  );
+
   // Bridge auth-state changes into a [Listenable] so GoRouter re-runs redirects
   // as soon as session restore / sign-in / sign-out happens.
   final ValueNotifier<int> authRefresh = ValueNotifier<int>(0);
@@ -125,39 +142,11 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
       final AuthState auth = ref.read(authControllerProvider);
-      final String loc = state.matchedLocation;
-      final bool atAuthSplash = loc == Routes.splash;
-      final bool atAuth = loc == Routes.auth;
-      final bool atOnboarding = OnboardingRoutes.isStartup(loc);
-
-      String? resolve() {
-        // Restoring session: stay on auth splash.
-        if (auth is AuthLoading) {
-          return atAuthSplash ? null : Routes.splash;
-        }
-        // Not authenticated: force sign-in.
-        if (auth is Unauthenticated) {
-          return atAuth ? null : Routes.auth;
-        }
-        // Authenticated: never remain on auth surfaces.
-        if (atAuthSplash || atAuth) {
-          return onboardingCtrl.completed ? Routes.home : OnboardingRoutes.splash;
-        }
-        // Authenticated but onboarding not completed: force startup flow.
-        if (!onboardingCtrl.completed) {
-          return atOnboarding ? null : OnboardingRoutes.splash;
-        }
-        // Completed onboarding: startup screens should not be reachable.
-        if (atOnboarding) return Routes.home;
-        return null;
-      }
-
-      final String? target = resolve();
-      final String targetLabel = target ?? 'stay';
-      debugPrint(
-        '[LOGIN-DBG] redirect: auth=${auth.runtimeType} loc=$loc -> $targetLabel',
+      return resolveAuthRedirect(
+        auth: auth,
+        location: state.matchedLocation,
+        onboardingCompleted: onboardingCtrl.completed,
       );
-      return target;
     },
     routes: <RouteBase>[
       // Auth flows, above the shell (no bottom nav).
