@@ -310,29 +310,37 @@ git push origin v0.1.0
 3. **Signature (pilotée par `codemagic.yaml`, aucune action UI)** : la signature
    est entièrement définie dans `codemagic.yaml`. À chaque build, l'étape « Set up
    code signing » exécute, via l'intégration `AppStoreConnect` :
-   `app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create`
+   `app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create --certificate-key @env:CERTIFICATE_PRIVATE_KEY`
    → **crée** le certificat de distribution + le profil App Store au **1er build**
    (puis les réutilise, idempotent), suivi de `keychain add-certificates` +
-   `xcode-project use-profiles`. Sur les machines hébergées Codemagic, la clé privée
-   du certificat (`CERTIFICATE_PRIVATE_KEY`) est fournie automatiquement — rien à
-   uploader. Plus de fastlane match, de `.p12`, de profil manuel, ni de secrets
-   GitHub/Key Vault pour iOS. ⚠️ Ne PAS activer « App > Code signing → Automatic »
-   dans l'UI : inutile (et sans effet) pour un build piloté par `codemagic.yaml`.
+   `xcode-project use-profiles`. ⚠️ La création du certificat exige une **clé privée**
+   (compte Apple neuf, aucun certificat existant) : elle est fournie via la variable
+   sécurisée **`CERTIFICATE_PRIVATE_KEY`** (§4, ci-dessous) — Codemagic ne la
+   fournit **pas** automatiquement pour un compte from-scratch. Plus de fastlane
+   match, de `.p12` ni de profil manuel à uploader. ⚠️ Ne PAS activer « App > Code
+   signing → Automatic » dans l'UI : inutile (et sans effet) pour un build piloté
+   par `codemagic.yaml`.
 4. **Groupe de variables `certigo_mobile_config`** : dashboard → **App >
    Environment variables** → créer le groupe **`certigo_mobile_config`** et y
-   poser ces **4 variables** (valeurs NON secrètes, injectées en `--dart-define`) :
+   poser ces **4 variables NON secrètes** (injectées en `--dart-define`) **+ 1
+   variable SÉCURISÉE** (signature, jamais un `--dart-define`) :
 
-   | Variable | Valeur | Utilisée par |
-   |---|---|---|
-   | `PROD_API_BASE_URL` | `https://<prod-func-app>.azurewebsites.net/api` (sortie du déploiement backend prod, cf. PR #158 → `functionAppName`) | `ios-release` |
-   | `ENTRA_CLIENT_ID` | `4d1f1075-7bc5-4764-947b-701435a85f8c` | `ios-release` + `ios-release-dry` |
-   | `ENTRA_AUTHORITY` | `https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0` | idem |
-   | `ENTRA_API_SCOPE` | `api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation` | idem |
+   | Variable | Valeur | Secure ? | Utilisée par |
+   |---|---|---|---|
+   | `PROD_API_BASE_URL` | `https://<prod-func-app>.azurewebsites.net/api` (sortie du déploiement backend prod, cf. PR #158 → `functionAppName`) | non | `ios-release` |
+   | `ENTRA_CLIENT_ID` | `4d1f1075-7bc5-4764-947b-701435a85f8c` | non | `ios-release` + `ios-release-dry` |
+   | `ENTRA_AUTHORITY` | `https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0` | non | idem |
+   | `ENTRA_API_SCOPE` | `api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation` | non | idem |
+   | `CERTIFICATE_PRIVATE_KEY` | clé privée **RSA 2048 PEM non chiffrée** (`openssl genrsa 2048`), sans passphrase. Sert à créer le certificat de distribution iOS au 1er build. | **OUI (Secure)** | les 3 workflows iOS |
 
-   > Sans ces variables : boutons sociaux masqués et/ou login e-mail cassé. Mêmes
+   > Sans les 4 premières : boutons sociaux masqués et/ou login e-mail cassé. Mêmes
    > valeurs que côté Android (Key Vault `mobile-*` / `vars.MOBILE_*`). Le
    > `PROD_API_BASE_URL` provient du **backend prod** déployé via `cd-backend`
    > (`environment=prod`, params `infra/params/prod.bicepparam` — voir §backend).
+   > Sans `CERTIFICATE_PRIVATE_KEY` : le build échoue en signature avec
+   > « Cannot save Signing Certificates without certificate private key ». La clé
+   > n'a **pas** de passphrase → aucun `--certificate-key-password` requis. Cochez
+   > **Secure** pour cette variable (elle est masquée dans les logs).
 
 ### 4.1 Pré-requis Apple (one-time)
 

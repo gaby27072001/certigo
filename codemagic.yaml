@@ -12,15 +12,21 @@
 #      .p8). The pipeline CREATES the distribution certificate + App Store
 #      provisioning profile on the first build via this key
 #      (app-store-connect fetch-signing-files --create) - no fastlane match, no
-#      .p12, no manual profile upload, no GitHub secrets for iOS.
-#   3. App > Environment variables: create the group "certigo_mobile_config"
-#      (NON-secret dart-define values baked into the public binary):
+#      manual profile upload, no GitHub secrets for iOS.
+#   3. App > Environment variables: create the group "certigo_mobile_config".
+#      NON-secret dart-define values baked into the public binary:
 #        PROD_API_BASE_URL = https://<prod-func-app>.azurewebsites.net/api
 #        ENTRA_CLIENT_ID    = 4d1f1075-7bc5-4764-947b-701435a85f8c
 #        ENTRA_AUTHORITY    = https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0
 #        ENTRA_API_SCOPE    = api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation
 #      Missing values keep social buttons hidden and/or break email login. Same
 #      values as Android (Key Vault mobile-* / GitHub vars.MOBILE_*).
+#      Plus one SECURE variable (masked, NOT a dart-define - used only to create
+#      the iOS distribution certificate on the first build):
+#        CERTIFICATE_PRIVATE_KEY = unencrypted RSA 2048 private key in PEM form
+#          (openssl genrsa 2048). No passphrase. Required by fetch-signing-files
+#          --create; without it the build fails "Cannot save Signing Certificates
+#          without certificate private key".
 #
 # WORKFLOWS:
 #   ios-release         : tag v* -> signed IPA + upload to TestFlight (prod config)
@@ -71,21 +77,28 @@ definitions:
         # `app-store-connect fetch-signing-files --create` creates BOTH the
         # distribution certificate and the App Store provisioning profile via the
         # App Store Connect API when they don't exist, and reuses them on later runs
-        # (idempotent - safe to re-run once they exist). The AppStoreConnect
-        # integration injects the API key (APP_STORE_CONNECT_ISSUER_ID /
-        # _KEY_IDENTIFIER / _PRIVATE_KEY) and, on Codemagic-hosted machines,
-        # CERTIFICATE_PRIVATE_KEY - so no key/id is passed on the command line and
-        # nothing is hardcoded. --type IOS_APP_STORE = App Store/TestFlight
-        # distribution; --platform IOS is the default, kept explicit for clarity.
-        # keychain initialize + add-certificates make the created distribution cert
-        # usable for signing; use-profiles then applies the profile to
-        # Runner.xcodeproj and writes $HOME/export_options.plist (used by the build).
+        # (--create only creates what is missing -> idempotent, safe to re-run).
+        # Creating a NEW distribution certificate needs a private key. On a
+        # from-scratch Apple account Codemagic does NOT auto-provide one (the build
+        # failed with "Cannot save Signing Certificates without certificate private
+        # key"), so we pass it explicitly with --certificate-key @env:CERTIFICATE_PRIVATE_KEY
+        # (an unencrypted RSA 2048 PEM stored as a SECURE variable in the
+        # certigo_mobile_config group). No passphrase -> no --certificate-key-password.
+        # The key is referenced by env name only, never hardcoded. The private key
+        # stays required on every run: later runs rebuild the signing .p12 from the
+        # fetched certificate + this key. The AppStoreConnect integration injects the
+        # API key (APP_STORE_CONNECT_ISSUER_ID / _KEY_IDENTIFIER / _PRIVATE_KEY).
+        # --type IOS_APP_STORE = App Store/TestFlight; --platform IOS is the default,
+        # kept explicit. keychain initialize + add-certificates make the cert usable
+        # for signing; use-profiles then applies the profile and writes
+        # $HOME/export_options.plist (used by the build step).
         # Docs: https://github.com/codemagic-ci-cd/cli-tools/blob/master/docs/app-store-connect/fetch-signing-files.md
         keychain initialize
         app-store-connect fetch-signing-files "$BUNDLE_ID" \
           --type IOS_APP_STORE \
           --platform IOS \
-          --create
+          --create \
+          --certificate-key @env:CERTIFICATE_PRIVATE_KEY
         keychain add-certificates
         xcode-project use-profiles
     - &step_resolve_version
