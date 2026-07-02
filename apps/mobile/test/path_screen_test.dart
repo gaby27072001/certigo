@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:certigo/app/providers.dart';
+import 'package:certigo/features/auth/application/auth_controller.dart';
 import 'package:certigo/features/path/presentation/path_screen.dart';
 import 'package:prism_ui/prism_ui.dart';
+
+import 'auth_controller_test.dart' show FakeSessionStore;
 
 /// Widget tests for the winding [PathScreen].
 ///
@@ -97,6 +100,7 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           pathProvider('az-900').overrideWith((Ref ref) async => fakePath()),
+          sessionStoreProvider.overrideWithValue(FakeSessionStore()),
         ],
         child: MaterialApp.router(
           theme: PrismTheme.light(),

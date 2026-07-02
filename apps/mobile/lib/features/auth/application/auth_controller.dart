@@ -78,18 +78,26 @@ class AuthController extends Notifier<AuthState> {
       return;
     }
 
-    final AuthSession? session = await _store.read();
-    if (session == null) {
+    // Garde-fou : toute erreur — ou tout blocage du coffre sécurisé (le store
+    // applique déjà un timeout) — doit dégrader proprement vers « non
+    // authentifié » pour que l'app quitte TOUJOURS le splash et atteigne /auth.
+    try {
+      final AuthSession? session = await _store.read().timeout(const Duration(seconds: 6));
+      if (session == null) {
+        state = const Unauthenticated();
+        return;
+      }
+      if (!session.isExpired) {
+        state = Authenticated(session);
+        return;
+      }
+      // Session expirée → tentative de rafraîchissement silencieux.
+      final AuthSession? refreshed = await _tryRefresh(session);
+      state = refreshed != null ? Authenticated(refreshed) : const Unauthenticated();
+    } catch (e, st) {
+      _logAuthError('_restore', e, st);
       state = const Unauthenticated();
-      return;
     }
-    if (!session.isExpired) {
-      state = Authenticated(session);
-      return;
-    }
-    // Session expirée → tentative de rafraîchissement silencieux.
-    final AuthSession? refreshed = await _tryRefresh(session);
-    state = refreshed != null ? Authenticated(refreshed) : const Unauthenticated();
   }
 
   /// Connexion explicite via l'un des trois fournisseurs.

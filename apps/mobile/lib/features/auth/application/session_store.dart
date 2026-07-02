@@ -33,17 +33,31 @@ class SecureSessionStore implements SessionStore {
 
   @override
   Future<AuthSession?> read() async {
-    final String? raw = await _storage.read(key: _key);
-    return AuthSession.decode(raw);
+    try {
+      final String? raw = await _storage.read(key: _key).timeout(const Duration(seconds: 5));
+      return AuthSession.decode(raw);
+    } catch (_) {
+      // Coffre indisponible ou bloqué (ex. Keystore Android au 1er accès) :
+      // on dégrade en « pas de session » plutôt que de figer le démarrage.
+      return null;
+    }
   }
 
   @override
-  Future<void> write(AuthSession session) {
-    return _storage.write(key: _key, value: session.encode());
+  Future<void> write(AuthSession session) async {
+    try {
+      await _storage.write(key: _key, value: session.encode()).timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Best-effort : la persistance ne doit jamais bloquer la connexion.
+    }
   }
 
   @override
-  Future<void> clear() {
-    return _storage.delete(key: _key);
+  Future<void> clear() async {
+    try {
+      await _storage.delete(key: _key).timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Best-effort : nettoyage silencieux, ne jamais relancer.
+    }
   }
 }
