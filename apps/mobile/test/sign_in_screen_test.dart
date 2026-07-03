@@ -30,17 +30,12 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           authGatewayProvider.overrideWithValue(gateway),
-          credentialsGatewayProvider.overrideWithValue(
-            credentials ?? FakeCredentialsGateway(),
-          ),
+          credentialsGatewayProvider.overrideWithValue(credentials ?? FakeCredentialsGateway()),
           sessionStoreProvider.overrideWithValue(store),
           authConfiguredProvider.overrideWithValue(configured),
           authRequiredProvider.overrideWithValue(true),
         ],
-        child: MaterialApp(
-          theme: PrismTheme.light(),
-          home: const SignInScreen(),
-        ),
+        child: MaterialApp(theme: PrismTheme.light(), home: const SignInScreen()),
       ),
     );
     // Laisse la restauration différée se résoudre (aucune session → écran de
@@ -69,8 +64,9 @@ void main() {
     expect(find.text('Continuer avec Apple'), findsOneWidget);
   });
 
-  testWidgets('sans Entra, les boutons sociaux disparaissent mais le formulaire reste',
-      (tester) async {
+  testWidgets('sans Entra, les boutons sociaux disparaissent mais le formulaire reste', (
+    tester,
+  ) async {
     await pumpSignIn(
       tester,
       gateway: FakeAuthGateway(),
@@ -95,10 +91,7 @@ void main() {
 
   testWidgets('le tap sur un fournisseur déclenche sa connexion', (tester) async {
     final FakeAuthGateway gateway = FakeAuthGateway(
-      onSignIn: (AuthProvider provider) => AuthSession(
-        accessToken: 'jeton',
-        provider: provider,
-      ),
+      onSignIn: (AuthProvider provider) => AuthSession(accessToken: 'jeton', provider: provider),
     );
     final FakeSessionStore store = FakeSessionStore();
     await pumpSignIn(tester, gateway: gateway, store: store);
@@ -125,12 +118,7 @@ void main() {
       ),
     );
     final FakeSessionStore store = FakeSessionStore();
-    await pumpSignIn(
-      tester,
-      gateway: FakeAuthGateway(),
-      store: store,
-      credentials: credentials,
-    );
+    await pumpSignIn(tester, gateway: FakeAuthGateway(), store: store, credentials: credentials);
 
     await tester.enterText(find.byKey(const Key('email-field')), 'a@b.com');
     await tester.enterText(find.byKey(const Key('password-field')), 'password123');
@@ -163,12 +151,41 @@ void main() {
     expect(find.text('Au moins 8 caractères.'), findsOneWidget);
   });
 
-  testWidgets('annulation d\'une connexion sociale affiche un message et réarme le bouton',
-      (tester) async {
+  testWidgets('annulation d\'une connexion sociale affiche un message et réarme le bouton', (
+    tester,
+  ) async {
+    final FakeAuthGateway gateway = FakeAuthGateway(
+      onSignIn: (_) =>
+          throw const AuthGatewayException('Connexion annulée.', cause: AuthFailureCause.cancelled),
+    );
+    await pumpSignIn(tester, gateway: gateway, store: FakeSessionStore());
+
+    final Finder microsoft = find.text('Continuer avec Microsoft');
+    await tester.ensureVisible(microsoft);
+    await tester.pump();
+    await tester.tap(microsoft);
+    await tester.pump(); // AuthLoading
+    await tester.pump(const Duration(milliseconds: 50)); // échec → carte persistante + réarmement
+
+    expect(gateway.signInCalls, <AuthProvider>[AuthProvider.microsoft]);
+    // Message d'annulation affiché dans la carte d'erreur persistante.
+    expect(find.text('Connexion annulée.'), findsOneWidget);
+    // Bouton réarmé : plus de spinner en cours.
+    final AuthProviderButton button = tester.widget<AuthProviderButton>(
+      find.ancestor(of: microsoft, matching: find.byType(AuthProviderButton)),
+    );
+    expect(button.loading, isFalse);
+    expect(button.enabled, isTrue);
+  });
+
+  testWidgets('échec social → carte persistante et sélectionnable avec détail technique', (
+    tester,
+  ) async {
     final FakeAuthGateway gateway = FakeAuthGateway(
       onSignIn: (_) => throw const AuthGatewayException(
-        'Connexion annulée.',
-        cause: AuthFailureCause.cancelled,
+        'Fournisseur microsoft indisponible dans Entra External ID.',
+        cause: AuthFailureCause.providerError,
+        diagnostic: 'PlatformException code=access_denied msg=IdP refusé',
       ),
     );
     await pumpSignIn(tester, gateway: gateway, store: FakeSessionStore());
@@ -178,17 +195,25 @@ void main() {
     await tester.pump();
     await tester.tap(microsoft);
     await tester.pump(); // AuthLoading
-    await tester.pump(const Duration(milliseconds: 50)); // échec → snackbar + réarmement
+    await tester.pump(const Duration(milliseconds: 50)); // échec → carte persistante
 
-    expect(gateway.signInCalls, <AuthProvider>[AuthProvider.microsoft]);
-    // Message d'annulation affiché dans un SnackBar.
-    expect(find.text('Connexion annulée.'), findsOneWidget);
-    // Bouton réarmé : plus de spinner en cours.
-    final AuthProviderButton button = tester.widget<AuthProviderButton>(
-      find.ancestor(of: microsoft, matching: find.byType(AuthProviderButton)),
+    // La carte d'erreur persistante est affichée, avec le message convivial ET
+    // le détail technique brut, dans un SelectableText (copiable/capturable).
+    final Finder card = find.byKey(const Key('auth-error'));
+    expect(card, findsOneWidget);
+    final Finder selectableFinder = find.descendant(
+      of: card,
+      matching: find.byType(SelectableText),
     );
-    expect(button.loading, isFalse);
-    expect(button.enabled, isTrue);
+    expect(selectableFinder, findsOneWidget);
+    final SelectableText selectable = tester.widget<SelectableText>(selectableFinder);
+    expect(selectable.data, contains('Fournisseur microsoft indisponible'));
+    expect(selectable.data, contains('[technique] PlatformException code=access_denied'));
+
+    // Persistance : le temps passe mais la carte reste (contrairement à un
+    // SnackBar auto-disparaissant) → l'utilisateur peut la lire et la capturer.
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.byKey(const Key('auth-error')), findsOneWidget);
   });
 
   testWidgets('pendant une connexion e-mail en cours, le bouton est désactivé', (tester) async {

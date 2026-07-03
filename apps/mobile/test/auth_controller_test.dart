@@ -155,9 +155,7 @@ void main() {
     final ProviderContainer container = ProviderContainer(
       overrides: <Override>[
         authGatewayProvider.overrideWithValue(gateway),
-        credentialsGatewayProvider.overrideWithValue(
-          credentials ?? FakeCredentialsGateway(),
-        ),
+        credentialsGatewayProvider.overrideWithValue(credentials ?? FakeCredentialsGateway()),
         sessionStoreProvider.overrideWithValue(store),
         authConfiguredProvider.overrideWithValue(configured),
         authRequiredProvider.overrideWithValue(required),
@@ -183,10 +181,7 @@ void main() {
   group('restauration au démarrage (auto-connexion)', () {
     test('sans session stockée → Unauthenticated', () async {
       final FakeSessionStore store = FakeSessionStore();
-      final ProviderContainer container = makeContainer(
-        gateway: FakeAuthGateway(),
-        store: store,
-      );
+      final ProviderContainer container = makeContainer(gateway: FakeAuthGateway(), store: store);
 
       container.read(authControllerProvider);
       await settle();
@@ -194,69 +189,51 @@ void main() {
       expect(container.read(authControllerProvider), isA<Unauthenticated>());
     });
 
-    test(
-      'avec session valide → Authenticated, sans toucher au réseau',
-      () async {
-        final FakeSessionStore store = FakeSessionStore(session());
-        final FakeAuthGateway gateway = FakeAuthGateway();
-        final ProviderContainer container = makeContainer(
-          gateway: gateway,
-          store: store,
-        );
+    test('avec session valide → Authenticated, sans toucher au réseau', () async {
+      final FakeSessionStore store = FakeSessionStore(session());
+      final FakeAuthGateway gateway = FakeAuthGateway();
+      final ProviderContainer container = makeContainer(gateway: gateway, store: store);
 
-        container.read(authControllerProvider);
-        await settle();
+      container.read(authControllerProvider);
+      await settle();
 
-        final AuthState state = container.read(authControllerProvider);
-        expect(state, isA<Authenticated>());
-        expect((state as Authenticated).session.accessToken, 'access');
-        expect(gateway.refreshCalls, isEmpty);
-      },
-    );
+      final AuthState state = container.read(authControllerProvider);
+      expect(state, isA<Authenticated>());
+      expect((state as Authenticated).session.accessToken, 'access');
+      expect(gateway.refreshCalls, isEmpty);
+    });
 
-    test(
-      'avec session expirée → rafraîchissement silencieux → Authenticated',
-      () async {
-        final FakeSessionStore store = FakeSessionStore(
-          session(expiry: DateTime.now().subtract(const Duration(minutes: 5))),
-        );
-        final FakeAuthGateway gateway = FakeAuthGateway(
-          onRefresh: (_) => session(accessToken: 'frais'),
-        );
-        final ProviderContainer container = makeContainer(
-          gateway: gateway,
-          store: store,
-        );
+    test('avec session expirée → rafraîchissement silencieux → Authenticated', () async {
+      final FakeSessionStore store = FakeSessionStore(
+        session(expiry: DateTime.now().subtract(const Duration(minutes: 5))),
+      );
+      final FakeAuthGateway gateway = FakeAuthGateway(
+        onRefresh: (_) => session(accessToken: 'frais'),
+      );
+      final ProviderContainer container = makeContainer(gateway: gateway, store: store);
 
-        container.read(authControllerProvider);
-        await settle();
+      container.read(authControllerProvider);
+      await settle();
 
-        final AuthState state = container.read(authControllerProvider);
-        expect(state, isA<Authenticated>());
-        expect((state as Authenticated).session.accessToken, 'frais');
-        expect(gateway.refreshCalls, hasLength(1));
-        expect(store.writeCalls, 1);
-      },
-    );
+      final AuthState state = container.read(authControllerProvider);
+      expect(state, isA<Authenticated>());
+      expect((state as Authenticated).session.accessToken, 'frais');
+      expect(gateway.refreshCalls, hasLength(1));
+      expect(store.writeCalls, 1);
+    });
 
-    test(
-      'session expirée + rafraîchissement échoué → Unauthenticated',
-      () async {
-        final FakeSessionStore store = FakeSessionStore(
-          session(expiry: DateTime.now().subtract(const Duration(minutes: 5))),
-        );
-        // onRefresh non câblé → lève → échec de rafraîchissement.
-        final ProviderContainer container = makeContainer(
-          gateway: FakeAuthGateway(),
-          store: store,
-        );
+    test('session expirée + rafraîchissement échoué → Unauthenticated', () async {
+      final FakeSessionStore store = FakeSessionStore(
+        session(expiry: DateTime.now().subtract(const Duration(minutes: 5))),
+      );
+      // onRefresh non câblé → lève → échec de rafraîchissement.
+      final ProviderContainer container = makeContainer(gateway: FakeAuthGateway(), store: store);
 
-        container.read(authControllerProvider);
-        await settle();
+      container.read(authControllerProvider);
+      await settle();
 
-        expect(container.read(authControllerProvider), isA<Unauthenticated>());
-      },
-    );
+      expect(container.read(authControllerProvider), isA<Unauthenticated>());
+    });
   });
 
   group('connexion explicite', () {
@@ -265,10 +242,7 @@ void main() {
       final FakeAuthGateway gateway = FakeAuthGateway(
         onSignIn: (AuthProvider p) => session(accessToken: 'jeton-${p.id}'),
       );
-      final ProviderContainer container = makeContainer(
-        gateway: gateway,
-        store: store,
-      );
+      final ProviderContainer container = makeContainer(gateway: gateway, store: store);
       container.read(authControllerProvider);
       await settle();
 
@@ -282,40 +256,52 @@ void main() {
       expect((await store.read())?.accessToken, 'jeton-google');
     });
 
-    test(
-      'échec de la passerelle → message d\'erreur, Unauthenticated',
-      () async {
-        final FakeSessionStore store = FakeSessionStore();
-        // onSignIn non câblé → la passerelle lève.
-        final ProviderContainer container = makeContainer(
-          gateway: FakeAuthGateway(),
-          store: store,
-        );
-        container.read(authControllerProvider);
-        await settle();
+    test('échec de la passerelle → message d\'erreur, Unauthenticated', () async {
+      final FakeSessionStore store = FakeSessionStore();
+      // onSignIn non câblé → la passerelle lève.
+      final ProviderContainer container = makeContainer(gateway: FakeAuthGateway(), store: store);
+      container.read(authControllerProvider);
+      await settle();
 
-        await container.read(authControllerProvider.notifier).signIn(AuthProvider.apple);
+      await container.read(authControllerProvider.notifier).signIn(AuthProvider.apple);
 
-        final AuthState state = container.read(authControllerProvider);
-        expect(state, isA<Unauthenticated>());
-        expect(
-          (state as Unauthenticated).message,
-          'La connexion a échoué. Réessayez.',
-        );
-        expect(store.writeCalls, 0);
-      },
-    );
+      final AuthState state = container.read(authControllerProvider);
+      expect(state, isA<Unauthenticated>());
+      // L'erreur inattendue est désormais **révélée** (build de diagnostic) :
+      // message convivial + détail technique (type + toString) concaténé,
+      // jamais avalé derrière un message générique.
+      final String? message = (state as Unauthenticated).message;
+      expect(message, startsWith('Connexion Apple échouée.'));
+      expect(message, contains('[technique]'));
+      expect(message, contains('StateError'));
+      expect(store.writeCalls, 0);
+    });
 
     test('erreur métier passerelle → message explicite propagé', () async {
       final FakeSessionStore store = FakeSessionStore();
       final FakeAuthGateway gateway = FakeAuthGateway(
-        onSignIn: (_) => throw const AuthGatewayException(
-          'Configuration de redirection invalide.',
-        ),
+        onSignIn: (_) => throw const AuthGatewayException('Configuration de redirection invalide.'),
       );
+      final ProviderContainer container = makeContainer(gateway: gateway, store: store);
+      container.read(authControllerProvider);
+      await settle();
+
+      await container.read(authControllerProvider.notifier).signIn(AuthProvider.microsoft);
+
+      final AuthState state = container.read(authControllerProvider);
+      expect(state, isA<Unauthenticated>());
+      expect((state as Unauthenticated).message, 'Configuration de redirection invalide.');
+      expect(store.writeCalls, 0);
+    });
+
+    test('Entra non configuré → message de configuration, aucun appel passerelle', () async {
+      final FakeSessionStore store = FakeSessionStore();
+      final FakeAuthGateway gateway = FakeAuthGateway(onSignIn: (_) => session());
+      // required=true (UI forcée) mais configured=false.
       final ProviderContainer container = makeContainer(
         gateway: gateway,
         store: store,
+        configured: false,
       );
       container.read(authControllerProvider);
       await settle();
@@ -324,98 +310,50 @@ void main() {
 
       final AuthState state = container.read(authControllerProvider);
       expect(state, isA<Unauthenticated>());
-      expect(
-        (state as Unauthenticated).message,
-        'Configuration de redirection invalide.',
-      );
-      expect(store.writeCalls, 0);
+      expect((state as Unauthenticated).message, contains('Configuration Entra requise'));
+      expect(gateway.signInCalls, isEmpty);
     });
-
-    test(
-      'Entra non configuré → message de configuration, aucun appel passerelle',
-      () async {
-        final FakeSessionStore store = FakeSessionStore();
-        final FakeAuthGateway gateway = FakeAuthGateway(
-          onSignIn: (_) => session(),
-        );
-        // required=true (UI forcée) mais configured=false.
-        final ProviderContainer container = makeContainer(
-          gateway: gateway,
-          store: store,
-          configured: false,
-        );
-        container.read(authControllerProvider);
-        await settle();
-
-        await container.read(authControllerProvider.notifier).signIn(AuthProvider.microsoft);
-
-        final AuthState state = container.read(authControllerProvider);
-        expect(state, isA<Unauthenticated>());
-        expect(
-          (state as Unauthenticated).message,
-          contains('Configuration Entra requise'),
-        );
-        expect(gateway.signInCalls, isEmpty);
-      },
-    );
   });
 
-  test(
-    'déconnexion → passerelle notifiée, stockage effacé, Unauthenticated',
-    () async {
-      final FakeSessionStore store = FakeSessionStore(session());
-      final FakeAuthGateway gateway = FakeAuthGateway();
-      final ProviderContainer container = makeContainer(
-        gateway: gateway,
-        store: store,
-      );
-      container.read(authControllerProvider);
-      await settle();
-      expect(container.read(authControllerProvider), isA<Authenticated>());
+  test('déconnexion → passerelle notifiée, stockage effacé, Unauthenticated', () async {
+    final FakeSessionStore store = FakeSessionStore(session());
+    final FakeAuthGateway gateway = FakeAuthGateway();
+    final ProviderContainer container = makeContainer(gateway: gateway, store: store);
+    container.read(authControllerProvider);
+    await settle();
+    expect(container.read(authControllerProvider), isA<Authenticated>());
 
-      await container.read(authControllerProvider.notifier).signOut();
+    await container.read(authControllerProvider.notifier).signOut();
 
-      expect(container.read(authControllerProvider), isA<Unauthenticated>());
-      expect(gateway.signOutCalls, 1);
-      expect(store.clearCalls, 1);
-      expect(await store.read(), isNull);
-    },
-  );
+    expect(container.read(authControllerProvider), isA<Unauthenticated>());
+    expect(gateway.signOutCalls, 1);
+    expect(store.clearCalls, 1);
+    expect(await store.read(), isNull);
+  });
 
   group('jeton d\'accès courant', () {
-    test(
-      'rafraîchit de façon proactive quand le jeton va bientôt expirer',
-      () async {
-        final FakeSessionStore store = FakeSessionStore(
-          session(
-            accessToken: 'ancien',
-            expiry: DateTime.now().add(const Duration(seconds: 30)),
-          ),
-        );
-        final FakeAuthGateway gateway = FakeAuthGateway(
-          onRefresh: (_) => session(
-            accessToken: 'nouveau',
-            expiry: DateTime.now().add(const Duration(hours: 1)),
-          ),
-        );
-        final ProviderContainer container = makeContainer(
-          gateway: gateway,
-          store: store,
-        );
-        container.read(authControllerProvider);
-        await settle();
+    test('rafraîchit de façon proactive quand le jeton va bientôt expirer', () async {
+      final FakeSessionStore store = FakeSessionStore(
+        session(accessToken: 'ancien', expiry: DateTime.now().add(const Duration(seconds: 30))),
+      );
+      final FakeAuthGateway gateway = FakeAuthGateway(
+        onRefresh: (_) =>
+            session(accessToken: 'nouveau', expiry: DateTime.now().add(const Duration(hours: 1))),
+      );
+      final ProviderContainer container = makeContainer(gateway: gateway, store: store);
+      container.read(authControllerProvider);
+      await settle();
 
-        final String? token =
-            await container.read(authControllerProvider.notifier).currentAccessToken();
+      final String? token =
+          await container.read(authControllerProvider.notifier).currentAccessToken();
 
-        expect(token, 'nouveau');
-        expect(gateway.refreshCalls, hasLength(1));
-        expect(
-          (container.read(authControllerProvider) as Authenticated).session.accessToken,
-          'nouveau',
-        );
-      },
-    );
+      expect(token, 'nouveau');
+      expect(gateway.refreshCalls, hasLength(1));
+      expect(
+        (container.read(authControllerProvider) as Authenticated).session.accessToken,
+        'nouveau',
+      );
+    });
   });
 
   group('réponse 401', () {
@@ -424,10 +362,7 @@ void main() {
       final FakeAuthGateway gateway = FakeAuthGateway(
         onRefresh: (_) => session(accessToken: 'rafraichi'),
       );
-      final ProviderContainer container = makeContainer(
-        gateway: gateway,
-        store: store,
-      );
+      final ProviderContainer container = makeContainer(gateway: gateway, store: store);
       container.read(authControllerProvider);
       await settle();
 
@@ -438,53 +373,41 @@ void main() {
       expect((state as Authenticated).session.accessToken, 'rafraichi');
     });
 
-    test(
-      'rafraîchissement impossible → session effacée, Unauthenticated',
-      () async {
-        final FakeSessionStore store = FakeSessionStore(session());
-        // onRefresh non câblé → échec.
-        final ProviderContainer container = makeContainer(
-          gateway: FakeAuthGateway(),
-          store: store,
-        );
-        container.read(authControllerProvider);
-        await settle();
+    test('rafraîchissement impossible → session effacée, Unauthenticated', () async {
+      final FakeSessionStore store = FakeSessionStore(session());
+      // onRefresh non câblé → échec.
+      final ProviderContainer container = makeContainer(gateway: FakeAuthGateway(), store: store);
+      container.read(authControllerProvider);
+      await settle();
 
-        await container.read(authControllerProvider.notifier).handleUnauthorized();
+      await container.read(authControllerProvider.notifier).handleUnauthorized();
 
-        final AuthState state = container.read(authControllerProvider);
-        expect(state, isA<Unauthenticated>());
-        expect(
-          (state as Unauthenticated).message,
-          'Votre session a expiré. Reconnectez-vous.',
-        );
-        expect(store.clearCalls, 1);
-      },
-    );
+      final AuthState state = container.read(authControllerProvider);
+      expect(state, isA<Unauthenticated>());
+      expect((state as Unauthenticated).message, 'Votre session a expiré. Reconnectez-vous.');
+      expect(store.clearCalls, 1);
+    });
   });
 
   group('passage direct en dev (Entra non requis)', () {
-    test(
-      'restauration → Authenticated sans lire le stockage ni le réseau',
-      () async {
-        final FakeSessionStore store = FakeSessionStore();
-        final FakeAuthGateway gateway = FakeAuthGateway();
-        final ProviderContainer container = makeContainer(
-          gateway: gateway,
-          store: store,
-          configured: false,
-          required: false,
-        );
+    test('restauration → Authenticated sans lire le stockage ni le réseau', () async {
+      final FakeSessionStore store = FakeSessionStore();
+      final FakeAuthGateway gateway = FakeAuthGateway();
+      final ProviderContainer container = makeContainer(
+        gateway: gateway,
+        store: store,
+        configured: false,
+        required: false,
+      );
 
-        container.read(authControllerProvider);
-        await settle();
+      container.read(authControllerProvider);
+      await settle();
 
-        final AuthState state = container.read(authControllerProvider);
-        expect(state, isA<Authenticated>());
-        expect((state as Authenticated).session.displayName, 'Développeur');
-        expect(gateway.signInCalls, isEmpty);
-      },
-    );
+      final AuthState state = container.read(authControllerProvider);
+      expect(state, isA<Authenticated>());
+      expect((state as Authenticated).session.displayName, 'Développeur');
+      expect(gateway.signInCalls, isEmpty);
+    });
 
     test('jeton courant = jeton dev', () async {
       final ProviderContainer container = makeContainer(
@@ -678,15 +601,42 @@ void main() {
         async.flushMicrotasks();
 
         container.read(authControllerProvider.notifier).signIn(AuthProvider.microsoft);
-        // Avance au-delà du filet de sécurité social (120 s).
-        async.elapse(const Duration(seconds: 121));
+        // Avance au-delà du filet de sécurité social (45 s) : plus jamais de
+        // spinner infini, l'état repasse à Unauthenticated avec un message clair.
+        async.elapse(const Duration(seconds: 46));
         async.flushMicrotasks();
 
         final AuthState state = container.read(authControllerProvider);
         expect(state, isA<Unauthenticated>());
-        expect((state as Unauthenticated).message, 'La connexion a expiré. Réessayez.');
+        final String? message = (state as Unauthenticated).message;
+        expect(message, startsWith('Connexion Microsoft expirée : aucune réponse après 45s.'));
+        expect(message, contains('TimeoutException'));
         expect(telemetry.failures.last.cause, AuthFailureCause.timeout);
       });
+    });
+
+    test('détail technique de la passerelle propagé dans le message (diagnostic)', () async {
+      final FakeSessionStore store = FakeSessionStore();
+      final FakeAuthGateway gateway = FakeAuthGateway(
+        onSignIn: (_) => throw const AuthGatewayException(
+          'Fournisseur microsoft indisponible dans Entra External ID.',
+          cause: AuthFailureCause.providerError,
+          diagnostic: 'PlatformException code=access_denied msg=IdP refusé',
+        ),
+      );
+      final ProviderContainer container = makeContainer(gateway: gateway, store: store);
+      container.read(authControllerProvider);
+      await settle();
+
+      await container.read(authControllerProvider.notifier).signIn(AuthProvider.microsoft);
+
+      final AuthState state = container.read(authControllerProvider);
+      expect(state, isA<Unauthenticated>());
+      final String? message = (state as Unauthenticated).message;
+      // Le message convivial ET le détail technique brut sont présents à l'écran.
+      expect(message, contains('Fournisseur microsoft indisponible'));
+      expect(message, contains('[technique] PlatformException code=access_denied'));
+      expect(store.writeCalls, 0);
     });
 
     test('erreur réseau e-mail → message réseau + cause network', () async {
@@ -712,19 +662,18 @@ void main() {
 
       final AuthState state = container.read(authControllerProvider);
       expect(state, isA<Unauthenticated>());
-      expect((state as Unauthenticated).message,
-          'Pas de connexion. Vérifiez votre réseau puis réessayez.');
+      expect(
+        (state as Unauthenticated).message,
+        'Pas de connexion. Vérifiez votre réseau puis réessayez.',
+      );
       expect(telemetry.failures.single, (method: 'email', cause: AuthFailureCause.network));
     });
 
     test('création de compte → télémétrie register start/success', () async {
       final FakeAuthTelemetry telemetry = FakeAuthTelemetry();
       final FakeCredentialsGateway credentials = FakeCredentialsGateway(
-        onRegister: (String email, String password, String? name) => AuthSession(
-          accessToken: 'jeton',
-          provider: AuthProvider.email,
-          email: email,
-        ),
+        onRegister: (String email, String password, String? name) =>
+            AuthSession(accessToken: 'jeton', provider: AuthProvider.email, email: email),
       );
       final ProviderContainer container = makeContainer(
         gateway: FakeAuthGateway(),

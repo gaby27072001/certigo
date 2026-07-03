@@ -37,6 +37,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   /// Soumission e-mail en cours (spinner du bouton principal).
   bool _emailSubmitting = false;
 
+  /// Dernier message d'échec d'authentification, affiché de façon **persistante**
+  /// (jusqu'à la prochaine tentative) pour être lu et capturé — indispensable au
+  /// diagnostic quand l'erreur OIDC réelle doit être remontée depuis l'appareil.
+  String? _authError;
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -46,7 +51,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   }
 
   void _signInSocial(AuthProvider provider) {
-    setState(() => _pending = provider);
+    setState(() {
+      _pending = provider;
+      _authError = null;
+    });
     ref.read(authControllerProvider.notifier).signIn(provider);
   }
 
@@ -54,7 +62,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final FormState? form = _formKey.currentState;
     if (form == null || !form.validate()) return;
     FocusScope.of(context).unfocus();
-    setState(() => _emailSubmitting = true);
+    setState(() {
+      _emailSubmitting = true;
+      _authError = null;
+    });
 
     final String email = _emailController.text.trim();
     final String password = _passwordController.text;
@@ -98,23 +109,19 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final TextTheme text = Theme.of(context).textTheme;
     final bool socialEnabled = ref.watch(authConfiguredProvider);
 
-    // Affiche les erreurs et réarme les boutons quand le flux retombe sur un
-    // état non authentifié.
+    // Réarme les boutons et **conserve** l'erreur à l'écran quand le flux
+    // retombe sur un état non authentifié. Un SnackBar disparaîtrait trop vite
+    // pour être lu/capturé : on affiche une carte persistante (voir _ErrorCard).
     ref.listen<AuthState>(authControllerProvider, (AuthState? prev, AuthState next) {
-      if (next is Unauthenticated) {
-        if (_pending != null || _emailSubmitting) {
-          setState(() {
-            _pending = null;
-            _emailSubmitting = false;
-          });
-        }
-        final String? message = next.message;
+      if (next is! Unauthenticated) return;
+      final String? message = next.message;
+      setState(() {
+        _pending = null;
+        _emailSubmitting = false;
         if (message != null && message.isNotEmpty) {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(SnackBar(content: Text(message)));
+          _authError = message;
         }
-      }
+      });
     });
 
     final AuthState state = ref.watch(authControllerProvider);
@@ -205,9 +212,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                               prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
                                 onPressed: () => setState(() => _obscure = !_obscure),
-                                icon: Icon(_obscure
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined),
+                                icon: Icon(
+                                  _obscure
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
                                 tooltip: _obscure ? 'Afficher' : 'Masquer',
                               ),
                             ),
@@ -269,6 +278,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                         onPressed: () => _signInSocial(AuthProvider.apple),
                       ),
                     ],
+                    if (_authError != null) ...<Widget>[
+                      const SizedBox(height: PrismSpacing.lg),
+                      _ErrorCard(message: _authError!),
+                    ],
                     const SizedBox(height: PrismSpacing.xl),
                     Text(
                       'En continuant, tu acceptes nos conditions d’utilisation et '
@@ -282,6 +295,61 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Carte d'erreur d'authentification **persistante** et **sélectionnable**.
+///
+/// Remplace le SnackBar (trop fugace) : reste affichée jusqu'à la prochaine
+/// tentative, avec le message complet (incluant le détail technique `[technique]`
+/// remonté par la passerelle/le contrôleur) afin que l'utilisateur puisse le
+/// lire, le copier ou le capturer pour diagnostiquer l'échec réel.
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    final TextTheme text = Theme.of(context).textTheme;
+    return Container(
+      key: const Key('auth-error'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(PrismSpacing.md),
+      decoration: BoxDecoration(
+        color: p.error.withOpacity(0.12),
+        borderRadius: const BorderRadius.all(Radius.circular(14)),
+        border: Border.all(color: p.error.withOpacity(0.55)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(Icons.error_outline, color: p.error, size: 20),
+              const SizedBox(width: PrismSpacing.xs),
+              Expanded(
+                child: Text(
+                  'Échec de la connexion',
+                  style: text.titleSmall?.copyWith(color: p.error, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: PrismSpacing.xs),
+          SelectableText(
+            message,
+            style: text.bodySmall?.copyWith(color: p.textPrimary, height: 1.35),
+          ),
+          const SizedBox(height: PrismSpacing.xs),
+          Text(
+            'Copie ou capture ce message pour le diagnostic.',
+            style: text.bodySmall?.copyWith(color: p.textSecondary),
+          ),
+        ],
       ),
     );
   }
@@ -343,11 +411,7 @@ class _Logo extends StatelessWidget {
         child: const Center(
           child: Text(
             'M',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 44,
-              fontWeight: FontWeight.w900,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w900),
           ),
         ),
       ),

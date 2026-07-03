@@ -11,9 +11,7 @@ import 'credentials_gateway.dart';
 import 'session_store.dart';
 
 /// Passerelle OIDC réelle. Surchargée par un faux dans les tests.
-final authGatewayProvider = Provider<AuthGateway>(
-  (Ref ref) => AppAuthGateway(),
-);
+final authGatewayProvider = Provider<AuthGateway>((Ref ref) => AppAuthGateway());
 
 /// Passerelle e-mail/mot de passe réelle (API HTTP). Surchargée dans les tests.
 final credentialsGatewayProvider = Provider<CredentialsGateway>(
@@ -21,32 +19,24 @@ final credentialsGatewayProvider = Provider<CredentialsGateway>(
 );
 
 /// Stockage sécurisé de la session. Surchargé par un faux dans les tests.
-final sessionStoreProvider = Provider<SessionStore>(
-  (Ref ref) => SecureSessionStore(),
-);
+final sessionStoreProvider = Provider<SessionStore>((Ref ref) => SecureSessionStore());
 
 /// Vrai quand Entra External ID est réellement configuré (clientId + autorité).
 ///
 /// Exposé comme provider — et non lu directement depuis [AppEnv] dans le
 /// contrôleur — pour pouvoir le forcer à `true` dans les tests, où les
 /// `--dart-define` ne sont pas appliqués.
-final authConfiguredProvider = Provider<bool>(
-  (Ref ref) => AppEnv.entraConfigured,
-);
+final authConfiguredProvider = Provider<bool>((Ref ref) => AppEnv.entraConfigured);
 
 /// Vrai quand l'écran de connexion doit être présenté. Désormais **toujours
 /// vrai** : la connexion par e-mail/mot de passe est disponible en permanence,
 /// indépendamment d'Entra. (Surchargeable à `false` dans les tests pour vérifier
 /// l'ancien passage direct en dev.)
-final authRequiredProvider = Provider<bool>(
-  (Ref ref) => true,
-);
+final authRequiredProvider = Provider<bool>((Ref ref) => true);
 
 /// Contrôleur d'authentification : source de vérité synchrone de l'état de
 /// session, pilotant le garde de navigation et l'injection du jeton d'API.
-final authControllerProvider = NotifierProvider<AuthController, AuthState>(
-  AuthController.new,
-);
+final authControllerProvider = NotifierProvider<AuthController, AuthState>(AuthController.new);
 
 /// Orchestration de l'authentification multi-fournisseurs + persistance.
 ///
@@ -63,10 +53,11 @@ class AuthController extends Notifier<AuthState> {
   /// Filet de sécurité pour la connexion e-mail (appel API direct).
   static const Duration _emailTimeout = Duration(seconds: 25);
 
-  /// Filet de sécurité pour la connexion sociale : plus généreux car l'utilisateur
-  /// saisit ses identifiants dans le navigateur système. Borne néanmoins le flux
-  /// pour éviter un spinner infini si le callback ne revient jamais.
-  static const Duration _socialTimeout = Duration(seconds: 120);
+  /// Filet de sécurité pour la connexion sociale : borne le flux pour éviter un
+  /// spinner infini si le callback OIDC ne revient jamais (build de diagnostic).
+  /// Assez long pour une vraie saisie d'identifiants dans le navigateur système,
+  /// assez court pour ne pas laisser l'utilisateur bloqué sans retour.
+  static const Duration _socialTimeout = Duration(seconds: 45);
 
   /// Délai de lecture du coffre au démarrage (déjà borné dans le store aussi).
   static const Duration _restoreReadTimeout = Duration(seconds: 6);
@@ -144,9 +135,16 @@ class AuthController extends Notifier<AuthState> {
     try {
       final AuthSession session = await _gateway.signIn(provider).timeout(_socialTimeout);
       if (session.accessToken.isEmpty) {
-        _telemetry.authFailure(method, AuthFailureCause.providerError,
-            durationMs: sw.elapsedMilliseconds);
-        state = const Unauthenticated('La connexion a échoué. Réessayez.');
+        _telemetry.authFailure(
+          method,
+          AuthFailureCause.providerError,
+          durationMs: sw.elapsedMilliseconds,
+        );
+        state = Unauthenticated(
+          'Connexion ${_providerLabel(provider)} échouée : jeton d\'accès vide.\n'
+          '[technique] La réponse OIDC ne contenait ni access_token ni id_token '
+          '(étape : échange du code).',
+        );
         return;
       }
       await _store.write(session);
@@ -155,22 +153,44 @@ class AuthController extends Notifier<AuthState> {
     } on TimeoutException catch (e, st) {
       _logAuthError('signIn(${provider.id}, timeout)', e, st);
       _telemetry.authFailure(method, AuthFailureCause.timeout, durationMs: sw.elapsedMilliseconds);
-      state = Unauthenticated(authMessageForCause(AuthFailureCause.timeout));
+      final int seconds = _socialTimeout.inSeconds;
+      state = Unauthenticated(
+        'Connexion ${_providerLabel(provider)} expirée : aucune réponse après ${seconds}s.\n'
+        '[technique] TimeoutException après ${seconds}s — le navigateur ou le '
+        'callback OIDC n\'est jamais revenu (étape : autorisation + échange du code).',
+      );
     } on AuthGatewayException catch (e) {
       _telemetry.authFailure(method, e.cause, durationMs: sw.elapsedMilliseconds);
-      state = Unauthenticated(e.message);
+      state = Unauthenticated(_composeError(e));
     } catch (e, st) {
       _logAuthError('signIn(${provider.id})', e, st);
       _telemetry.authFailure(method, AuthFailureCause.unknown, durationMs: sw.elapsedMilliseconds);
-      state = const Unauthenticated('La connexion a échoué. Réessayez.');
+      state = Unauthenticated(
+        'Connexion ${_providerLabel(provider)} échouée.\n'
+        '[technique] ${e.runtimeType} : $e',
+      );
     }
   }
 
+  /// Compose le message affiché à partir d'une erreur métier passerelle : le
+  /// message convivial **concaténé** au détail technique brut (quand présent),
+  /// pour révéler la cause réelle à l'écran sans rien perdre.
+  String _composeError(AuthGatewayException e) {
+    final String? diagnostic = e.diagnostic;
+    if (diagnostic == null || diagnostic.isEmpty) return e.message;
+    return '${e.message}\n[technique] $diagnostic';
+  }
+
+  /// Libellé lisible du fournisseur, inséré dans les messages d'erreur.
+  String _providerLabel(AuthProvider provider) => switch (provider) {
+        AuthProvider.microsoft => 'Microsoft',
+        AuthProvider.google => 'Google',
+        AuthProvider.apple => 'Apple',
+        AuthProvider.email => 'e-mail',
+      };
+
   /// Connexion par e-mail + mot de passe (compte géré par notre backend).
-  Future<void> signInWithEmail({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> signInWithEmail({required String email, required String password}) async {
     _telemetry.authStart(AuthMethod.email);
     state = const AuthLoading();
     final Stopwatch sw = Stopwatch()..start();
@@ -178,8 +198,11 @@ class AuthController extends Notifier<AuthState> {
       final AuthSession session =
           await _credentials.login(email: email, password: password).timeout(_emailTimeout);
       if (session.accessToken.isEmpty) {
-        _telemetry.authFailure(AuthMethod.email, AuthFailureCause.providerError,
-            durationMs: sw.elapsedMilliseconds);
+        _telemetry.authFailure(
+          AuthMethod.email,
+          AuthFailureCause.providerError,
+          durationMs: sw.elapsedMilliseconds,
+        );
         state = const Unauthenticated('La connexion a échoué. Réessayez.');
         return;
       }
@@ -188,16 +211,22 @@ class AuthController extends Notifier<AuthState> {
       state = Authenticated(session);
     } on TimeoutException catch (e, st) {
       _logAuthError('signInWithEmail(timeout)', e, st);
-      _telemetry.authFailure(AuthMethod.email, AuthFailureCause.timeout,
-          durationMs: sw.elapsedMilliseconds);
+      _telemetry.authFailure(
+        AuthMethod.email,
+        AuthFailureCause.timeout,
+        durationMs: sw.elapsedMilliseconds,
+      );
       state = Unauthenticated(authMessageForCause(AuthFailureCause.timeout));
     } on AuthGatewayException catch (e) {
       _telemetry.authFailure(AuthMethod.email, e.cause, durationMs: sw.elapsedMilliseconds);
       state = Unauthenticated(e.message);
     } catch (e, st) {
       _logAuthError('signInWithEmail', e, st);
-      _telemetry.authFailure(AuthMethod.email, AuthFailureCause.unknown,
-          durationMs: sw.elapsedMilliseconds);
+      _telemetry.authFailure(
+        AuthMethod.email,
+        AuthFailureCause.unknown,
+        durationMs: sw.elapsedMilliseconds,
+      );
       state = const Unauthenticated('La connexion a échoué. Réessayez.');
     }
   }
@@ -216,8 +245,11 @@ class AuthController extends Notifier<AuthState> {
           .register(email: email, password: password, displayName: displayName)
           .timeout(_emailTimeout);
       if (session.accessToken.isEmpty) {
-        _telemetry.authFailure(AuthMethod.register, AuthFailureCause.providerError,
-            durationMs: sw.elapsedMilliseconds);
+        _telemetry.authFailure(
+          AuthMethod.register,
+          AuthFailureCause.providerError,
+          durationMs: sw.elapsedMilliseconds,
+        );
         state = const Unauthenticated('La création du compte a échoué. Réessayez.');
         return;
       }
@@ -226,16 +258,22 @@ class AuthController extends Notifier<AuthState> {
       state = Authenticated(session);
     } on TimeoutException catch (e, st) {
       _logAuthError('registerWithEmail(timeout)', e, st);
-      _telemetry.authFailure(AuthMethod.register, AuthFailureCause.timeout,
-          durationMs: sw.elapsedMilliseconds);
+      _telemetry.authFailure(
+        AuthMethod.register,
+        AuthFailureCause.timeout,
+        durationMs: sw.elapsedMilliseconds,
+      );
       state = Unauthenticated(authMessageForCause(AuthFailureCause.timeout));
     } on AuthGatewayException catch (e) {
       _telemetry.authFailure(AuthMethod.register, e.cause, durationMs: sw.elapsedMilliseconds);
       state = Unauthenticated(e.message);
     } catch (e, st) {
       _logAuthError('registerWithEmail', e, st);
-      _telemetry.authFailure(AuthMethod.register, AuthFailureCause.unknown,
-          durationMs: sw.elapsedMilliseconds);
+      _telemetry.authFailure(
+        AuthMethod.register,
+        AuthFailureCause.unknown,
+        durationMs: sw.elapsedMilliseconds,
+      );
       state = const Unauthenticated('La création du compte a échoué. Réessayez.');
     }
   }
@@ -316,8 +354,6 @@ class AuthController extends Notifier<AuthState> {
     debugPrint('$stackTrace');
   }
 
-  AuthSession _devSession() => const AuthSession(
-        accessToken: AppEnv.devAuthToken,
-        displayName: 'Développeur',
-      );
+  AuthSession _devSession() =>
+      const AuthSession(accessToken: AppEnv.devAuthToken, displayName: 'Développeur');
 }

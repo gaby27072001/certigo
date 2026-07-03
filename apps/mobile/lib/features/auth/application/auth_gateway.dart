@@ -8,15 +8,27 @@ import 'auth_state.dart';
 
 /// Erreur métier remontée au contrôleur pour afficher un message clair.
 class AuthGatewayException implements Exception {
-  const AuthGatewayException(this.message, {this.cause = AuthFailureCause.unknown});
+  const AuthGatewayException(
+    this.message, {
+    this.cause = AuthFailureCause.unknown,
+    this.diagnostic,
+  });
 
   final String message;
 
   /// Cause normalisée (pour la télémétrie et le repli de message).
   final AuthFailureCause cause;
 
+  /// Détail technique **brut** de l'erreur sous-jacente (build de diagnostic) :
+  /// `code=…/msg=…/details=…` d'une [PlatformException] `flutter_appauth`, ou
+  /// `type : toString()` d'une erreur inattendue. Concaténé au message affiché
+  /// par le contrôleur afin de révéler la cause réelle à l'écran, sans rien
+  /// perdre. `null` pour les cas volontairement propres (ex. annulation).
+  final String? diagnostic;
+
   @override
-  String toString() => 'AuthGatewayException($cause, $message)';
+  String toString() =>
+      'AuthGatewayException($cause, $message${diagnostic == null ? '' : ', diag=$diagnostic'})';
 }
 
 /// Abstraction du flux OIDC (Authorization Code + PKCE).
@@ -76,13 +88,29 @@ class AppAuthGateway implements AuthGateway {
       throw const AuthGatewayException('Connexion annulée.', cause: AuthFailureCause.cancelled);
     } on PlatformException catch (e) {
       final ({String message, AuthFailureCause cause}) described = _describeError(e, provider);
-      throw AuthGatewayException(described.message, cause: described.cause);
-    } catch (_) {
+      throw AuthGatewayException(
+        described.message,
+        cause: described.cause,
+        // Annulation : on garde le message propre, sans bruit technique.
+        diagnostic: described.cause == AuthFailureCause.cancelled ? null : _platformDiagnostic(e),
+      );
+    } catch (e) {
+      // Erreur inattendue (non PlatformException) : on ne l'avale pas, on
+      // remonte son type + toString() pour diagnostic à l'écran.
       throw AuthGatewayException(
         'La connexion via ${provider.id} a échoué. Vérifiez la configuration Entra puis réessayez.',
         cause: AuthFailureCause.providerError,
+        diagnostic: '${e.runtimeType} : $e',
       );
     }
+  }
+
+  /// Détail technique brut d'une [PlatformException] `flutter_appauth`
+  /// (code + message + details) destiné à révéler la cause réelle à l'écran.
+  String _platformDiagnostic(PlatformException e) {
+    final String msg = e.message == null ? '' : ' msg=${e.message}';
+    final String details = e.details == null ? '' : ' details=${e.details}';
+    return 'PlatformException code=${e.code}$msg$details';
   }
 
   /// Traduit une [PlatformException] `flutter_appauth` en message utilisateur FR
@@ -165,13 +193,20 @@ class AppAuthGateway implements AuthGateway {
         null,
       );
     } on PlatformException catch (e) {
-      final ({String message, AuthFailureCause cause}) described =
-          _describeError(e, AuthProvider.microsoft);
-      throw AuthGatewayException(described.message, cause: described.cause);
-    } catch (_) {
-      throw const AuthGatewayException(
+      final ({String message, AuthFailureCause cause}) described = _describeError(
+        e,
+        AuthProvider.microsoft,
+      );
+      throw AuthGatewayException(
+        described.message,
+        cause: described.cause,
+        diagnostic: described.cause == AuthFailureCause.cancelled ? null : _platformDiagnostic(e),
+      );
+    } catch (e) {
+      throw AuthGatewayException(
         'Impossible de rafraîchir la session.',
         cause: AuthFailureCause.providerError,
+        diagnostic: '${e.runtimeType} : $e',
       );
     }
   }
@@ -232,9 +267,7 @@ class AppAuthGateway implements AuthGateway {
     final List<String> parts = token.split('.');
     if (parts.length != 3) return const <String, dynamic>{};
     try {
-      final String payload = utf8.decode(
-        base64Url.decode(base64Url.normalize(parts[1])),
-      );
+      final String payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
       final Object? decoded = jsonDecode(payload);
       return decoded is Map<String, dynamic> ? decoded : const <String, dynamic>{};
     } catch (_) {
