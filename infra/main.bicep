@@ -65,6 +65,9 @@ param ciRunnerPrincipalId string = ''
 @description('When true, the security log-search alerts get a system-assigned identity + least-privilege Log Analytics Reader role on the workspace (most robust). Default false: creating that role assignment needs Microsoft.Authorization/roleAssignments/write at the workspace scope, which the deployer may lack — off keeps the deployment guaranteed to succeed. Turn on once the deployer has role-assignment rights.')
 param grantAlertReaderRole bool = false
 
+@description('Private-networking posture for the data resources (Storage, Cosmos DB, Key Vault). When true, their PUBLIC network endpoints are Disabled (and Storage/Key Vault network ACLs default to Deny), which assumes private endpoints + VNet integration are in place. Default false keeps the public endpoints Enabled so the Flex Consumption (FC1) Function App can reach Storage (deployment-package pull), Key Vault (secrets at startup) and Cosmos over the public endpoint via its managed identity. IMPORTANT: this flag is DECOUPLED from `hardened` on purpose — flipping it to true WITHOUT first provisioning private endpoints (Phase 2) takes the backend fully offline (503/timeout: the Function host cannot pull its package or read secrets). Security is unaffected either way: RBAC-only data access (Cosmos disableLocalAuth, Storage allowSharedKeyAccess=false, Key Vault RBAC) stays on regardless of this flag — only the public NETWORK filter is governed here.')
+param enablePrivateNetworking bool = false
+
 // Deterministic, collision-resistant suffix per environment/subscription.
 var suffix = uniqueString(subscription().id, appName, env)
 var rgName = 'rg-${appName}-${env}'
@@ -114,6 +117,7 @@ module data 'modules/cosmos.bicep' = {
     location: cosmosRegion
     databaseName: 'certigo'
     disableLocalAuth: hardened
+    enablePrivateNetworking: enablePrivateNetworking
     tags: tags
   }
 }
@@ -129,12 +133,13 @@ module storage 'modules/storage.bicep' = {
     enableVersioning: hardened
     blobSoftDeleteDays: hardened ? 30 : 7
     containerSoftDeleteDays: hardened ? 30 : 7
-    // Keep public network access enabled across all envs: the Flex Consumption Function App
-    // pulls its deployment package (app-package container) over the public endpoint via its
-    // managed identity. Locking this down requires private endpoints (P1 hardening for
-    // staging/prod). Set explicitly to prevent drift to Disabled (which caused a 403 on the
-    // package pull in dev).
-    publicNetworkAccess: 'Enabled'
+    // Public network access is governed by enablePrivateNetworking (default false =>
+    // Enabled), NOT by `hardened`. The Flex Consumption Function App pulls its deployment
+    // package (app-package container) over the public endpoint via its managed identity, so
+    // the endpoint MUST stay reachable until private endpoints exist (Phase 2). Locking it
+    // down previously caused a 403 (InaccessibleStorageException) on the package pull.
+    // RBAC-only access is enforced independently (allowSharedKeyAccess=false in storage.bicep).
+    enablePrivateNetworking: enablePrivateNetworking
     tags: tags
   }
 }
@@ -147,6 +152,7 @@ module vault 'modules/keyvault.bicep' = {
     location: location
     enablePurgeProtection: hardened
     softDeleteRetentionInDays: hardened ? 90 : 7
+    enablePrivateNetworking: enablePrivateNetworking
     tags: tags
   }
 }

@@ -9,6 +9,9 @@ param tags object = {}
 @description('Disable Cosmos key-based (local) auth — RBAC/Entra only. Recommended for staging/prod; the API and seed use managed identity.')
 param disableLocalAuth bool = false
 
+@description('Private-networking posture. When true, the Cosmos public network endpoint is Disabled (assumes private endpoints exist — Phase 2). Default false keeps it Enabled so the Function App managed identity can reach the account without private endpoints. Decoupled from disableLocalAuth (RBAC-only auth), which stays on independently for hardened envs.')
+param enablePrivateNetworking bool = false
+
 resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   name: accountName
   location: location
@@ -32,6 +35,7 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
       }
     ]
     disableLocalAuth: disableLocalAuth
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
     minimalTlsVersion: 'Tls12'
   }
 }

@@ -59,3 +59,20 @@ param enableDefenderPlans = true
 // login works for the beta without committing a secret to the repo. For a hardened
 // prod, inject a real authJwtSigningKey out-of-band (secure param / Key Vault),
 // never committed in this file.
+
+// ============================================================================
+// Network posture (public network access) — BETA trade-off.
+// enablePrivateNetworking is intentionally LEFT AT ITS DEFAULT (false): the data
+// resources (Storage, Cosmos DB, Key Vault) keep their PUBLIC network endpoints
+// Enabled. This is required today because the Flex Consumption (FC1) Function App
+// has NO private endpoints / VNet integration, so it must reach Storage (deployment
+// package pull), Key Vault (secrets at startup) and Cosmos over the public endpoint
+// via its managed identity. Setting enablePrivateNetworking = true WITHOUT first
+// provisioning those private endpoints takes the backend fully offline (503/timeout).
+// Security is NOT relaxed by this flag: access stays RBAC-only (Cosmos
+// disableLocalAuth=true, Storage allowSharedKeyAccess=false, Key Vault RBAC) — only
+// the public NETWORK filter is left open. Acceptable for the beta.
+// Phase 2: provision private endpoints + VNet integration for the Function App, then
+// add here:  param enablePrivateNetworking = true  to close the public endpoints.
+// ============================================================================
+

@@ -16,16 +16,13 @@ param containerSoftDeleteDays int = 7
 @description('Enable blob versioning (recommended for prod).')
 param enableVersioning bool = false
 
-@description('''Public network access for the account. Must stay Enabled while the Flex
-Consumption Function App pulls its deployment package (app-package container) from this
-account over the public endpoint via its managed identity. Disabling it requires private
-endpoints (P1 hardening). Encoded explicitly because an unset value let the live dev
-account drift to Disabled, which broke the package pull (403 InaccessibleStorageException).''')
-@allowed([
-  'Enabled'
-  'Disabled'
-])
-param publicNetworkAccess string = 'Enabled'
+@description('''Private-networking posture. When true, public network access is Disabled and the
+network ACL default action is Deny (assumes private endpoints exist — Phase 2). Default false keeps
+the public endpoint Enabled + default action Allow so the Flex Consumption Function App can pull its
+deployment package (app-package container) over the public endpoint via its managed identity (an
+unset/Disabled value previously broke the package pull with a 403 InaccessibleStorageException).
+Decoupled from data hardening: RBAC-only access is enforced separately via allowSharedKeyAccess=false.''')
+param enablePrivateNetworking bool = false
 
 resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
   name: accountName
@@ -39,10 +36,10 @@ resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
     allowSharedKeyAccess: false
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
-    publicNetworkAccess: publicNetworkAccess
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
     networkAcls: {
       bypass: 'AzureServices'
-      defaultAction: 'Allow'
+      defaultAction: enablePrivateNetworking ? 'Deny' : 'Allow'
     }
   }
 }
