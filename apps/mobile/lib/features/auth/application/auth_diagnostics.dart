@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Étape **tracée** du flux de connexion sociale (OIDC via Entra External ID).
 ///
-/// Motivation (build de diagnostic iOS) : le callback `certigo://auth` peut ne
+/// Motivation (build de diagnostic iOS) : le callback `certigo://auth/` peut ne
 /// jamais revenir à `ASWebAuthenticationSession` après la page de confirmation
 /// CIAM, ou l'échange de jeton peut bloquer. En horodatant chaque étape et en
 /// l'affichant de façon **persistante** sur l'écran de connexion (voir

@@ -74,7 +74,7 @@ gh auth login            # authentifie la CLI GitHub sur le repo gchambaud_micro
 | `ENTRA_API_SCOPE` | `api://<backend-client-id>/user_impersonation` | App registration **BACKEND** (**A**) |
 
 Optionnelles (laisser vide = défaut app) :
-`ENTRA_REDIRECT_URI=certigo://auth`, `ENTRA_DOMAIN_HINT_MICROSOFT=microsoft.com`,
+`ENTRA_REDIRECT_URI=certigo://auth/`, `ENTRA_DOMAIN_HINT_MICROSOFT=microsoft.com`,
 `ENTRA_DOMAIN_HINT_GOOGLE=google.com`, `ENTRA_DOMAIN_HINT_APPLE=apple.com`.
 
 > 💡 Gardez un bloc‑notes ouvert : à chaque étape A/B, vous y collerez la valeur
@@ -123,11 +123,17 @@ activer les fournisseurs sociaux.
 
 ### A.2 — Redirect URI mobile
 1. Dans l'app **MOBILE** → **Authentication → Add a platform → Mobile and desktop applications**.
-2. Ajoutez le **Redirect URI** exact :
+2. Ajoutez le **Redirect URI** exact (**avec le slash final**) :
    ```
-   certigo://auth
+   certigo://auth/
    ```
 3. **Save**. (C'est la valeur par défaut `ENTRA_REDIRECT_URI` de l'app ; ne pas la changer.)
+
+   > ⚠️ **Le slash final est obligatoire.** Le SDK AppAuth iOS valide l'URL de
+   > redirection avec Azure/CIAM ; sans le slash final, le callback n'est pas
+   > reconnu côté iOS et la connexion **sociale** iOS « hang » (Android + e-mail
+   > non affectés). Le schéma reste `certigo`. Réf. : FAQ officielle
+   > `flutter_appauth`. Enregistrez la valeur **exacte** `certigo://auth/`.
 
 ### A.3 — App registration **BACKEND** (l'API)
 1. Refaites **New registration** → nom `Certigo API` (par ex.) → **Register**.
@@ -365,7 +371,7 @@ gh variable set MOBILE_ENTRA_API_SCOPE  --body "api://<backend-client-id>/user_i
 API_BASE_URL      = https://<functionAppHostName>/api
 ENTRA_AUTHORITY   = https://<domaine>.ciamlogin.com/<tenant-id>/v2.0
 ENTRA_API_SCOPE   = api://<backend-client-id>/user_impersonation
-ENTRA_REDIRECT_URI= certigo://auth        (plateforme « Mobile and desktop applications »)
+ENTRA_REDIRECT_URI= certigo://auth/       (plateforme « Mobile and desktop applications », slash final requis)
 Audience backend  = api://<backend-client-id>
 ```
 

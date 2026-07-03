@@ -47,7 +47,9 @@ android {
         versionName = flutter.versionName
 
         // Schéma de redirection OAuth/OIDC natif pour flutter_appauth.
-        // L'activité RedirectUriReceiverActivity du plugin capture certigo://auth.
+        // L'activité RedirectUriReceiverActivity du plugin capture certigo://auth/
+        // (matching par schéma « certigo », le slash final ne change rien côté
+        // Android ; il est requis uniquement pour la validation iOS d'AppAuth).
         manifestPlaceholders += [appAuthRedirectScheme: "certigo"]
     }
 

@@ -87,7 +87,7 @@ void main() {
 
     test('ships sensible default endpoints and Entra scopes', () {
       expect(AppEnv.apiBaseUrl, isNotEmpty);
-      expect(AppEnv.entraRedirectUri, 'certigo://auth');
+      expect(AppEnv.entraRedirectUri, 'certigo://auth/');
       expect(AppEnv.entraScopes, contains('openid'));
     });
   });
@@ -99,7 +99,7 @@ void main() {
       String apiBaseUrl = 'https://api.certigo.app/api',
       String entraClientId = 'client-123',
       String entraAuthority = 'https://tenant.ciamlogin.com/tid/v2.0',
-      String entraRedirectUri = 'certigo://auth',
+      String entraRedirectUri = 'certigo://auth/',
       String entraApiScope = 'api://client-123/user_impersonation',
       bool entraOptional = false,
     }) =>

@@ -4,7 +4,7 @@ import 'package:certigo/features/auth/application/auth_state.dart';
 import 'package:core/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Garde de **non-régression** de la configuration deep-link `certigo://auth`.
+/// Garde de **non-régression** de la configuration deep-link `certigo://auth/`.
 ///
 /// Le callback OIDC (Microsoft/Google/Apple via Entra) ne revient dans l'app que
 /// si le schéma `certigo` est déclaré nativement des DEUX côtés. Ce test lit les

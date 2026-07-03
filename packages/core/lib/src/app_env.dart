@@ -44,9 +44,24 @@ class AppEnv {
   /// Microsoft Entra External ID — public client configuration.
   static const String entraClientId = String.fromEnvironment('ENTRA_CLIENT_ID', defaultValue: '');
   static const String entraAuthority = String.fromEnvironment('ENTRA_AUTHORITY', defaultValue: '');
+
+  /// URI de redirection OIDC de l'app.
+  ///
+  /// Le **slash final** (`certigo://auth/`) est **requis**. Le SDK AppAuth iOS
+  /// valide l'URL de redirection avant de décider s'il doit traiter le callback ;
+  /// avec Azure/CIAM (Entra External ID) cette validation échoue pour un redirect
+  /// **sans** slash final → la connexion sociale iOS « hang » : le navigateur se
+  /// ferme après la page de confirmation CIAM mais `authorize()` ne reçoit jamais
+  /// le code (le callback n'est pas reconnu). Android et le login e-mail ne sont
+  /// pas affectés. Référence : FAQ officielle `flutter_appauth`.
+  ///
+  /// Le schéma reste `certigo` (voir [redirectScheme]) : seul le chemin gagne un
+  /// slash, donc les déclarations natives (Info.plist / build.gradle) restent
+  /// valables. Cette valeur exacte (`certigo://auth/`) doit être enregistrée dans
+  /// l'app registration Entra (plateforme « Applications de bureau et mobiles »).
   static const String entraRedirectUri = String.fromEnvironment(
     'ENTRA_REDIRECT_URI',
-    defaultValue: 'certigo://auth',
+    defaultValue: 'certigo://auth/',
   );
 
   /// Schéma d'URI natif câblé en dur côté iOS (`Info.plist` CFBundleURLSchemes)

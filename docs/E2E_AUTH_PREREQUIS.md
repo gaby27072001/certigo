@@ -12,7 +12,7 @@
 
 - Auth multi-fournisseurs câblée : Microsoft / Google / Apple fédérés derrière Entra
   External ID via `flutter_appauth`, + email/mot de passe via backend.
-- Deep-link `certigo://auth` configuré : iOS `Info.plist`, Android `appAuthRedirectScheme`.
+- Deep-link `certigo://auth/` configuré : iOS `Info.plist`, Android `appAuthRedirectScheme`.
 - `AppEnv` (`packages/core/lib/src/app_env.dart`) lit tous les dart-defines Entra.
 - Tests auth verts : `auth_controller_test.dart` 18/18 (login/refresh/logout/cancel,
   4 providers, persistance, 401→refresh). Mockés, exécutables sans tenant.
@@ -22,7 +22,7 @@
 | # | Élément | Détail |
 |---|---------|--------|
 | 1 | **Tenant Entra External ID (CIAM)** | Domaine `<domain>.ciamlogin.com`, tenant-id. |
-| 2 | **App registration mobile** | client_id, redirect URI `certigo://auth`. |
+| 2 | **App registration mobile** | client_id, redirect URI `certigo://auth/` (slash final requis). |
 | 3 | **IdP fédérés** | Microsoft Account, Google, Apple activés dans le tenant. |
 | 4 | **API scope** | `api://<client-id>/user_impersonation` exposé. |
 | 5 | **Compte de test** | 1 par fournisseur (MS, Google, Apple) + 1 email/pwd si backend. |
@@ -32,9 +32,18 @@
 
 ## 3. Décision préalable : scheme deep-link
 
-Code = `certigo://auth` (source de vérité). Demande initiale = `microlingo://auth`.
+Code = `certigo://auth/` (source de vérité, **slash final requis**). Demande
+initiale = `microlingo://auth`.
 **Recommandé : garder `certigo`.** Sinon modifier iOS `Info.plist`, Android
 `build.gradle`, `ENTRA_REDIRECT_URI` + redirect URIs tenant.
+
+> ⚠️ **Slash final obligatoire (`certigo://auth/`).** Le SDK AppAuth iOS valide
+> l'URL de redirection avec Azure/CIAM ; **sans** le slash final, le callback
+> n'est pas reconnu côté iOS et la connexion **sociale** iOS « hang » (Android et
+> e-mail non affectés). Le **schéma** reste `certigo` (seul le chemin gagne un
+> slash). Réf. : FAQ officielle `flutter_appauth`. Enregistrez la valeur exacte
+> `certigo://auth/` dans l'app registration Entra (plateforme « Applications de
+> bureau et mobiles »).
 
 ## 4. Matrice dart-define (mobile)
 
@@ -44,7 +53,7 @@ Code = `certigo://auth` (source de vérité). Demande initiale = `microlingo://a
 |-------------|--------|:---:|
 | `ENTRA_CLIENT_ID` | client_id app reg | ✅ requis |
 | `ENTRA_AUTHORITY` | `https://<domain>.ciamlogin.com/<tenant-id>/v2.0` | ✅ requis |
-| `ENTRA_REDIRECT_URI` | `certigo://auth` | défaut |
+| `ENTRA_REDIRECT_URI` | `certigo://auth/` | défaut |
 | `ENTRA_API_SCOPE` | `api://<client-id>/user_impersonation` | – |
 | `ENTRA_DOMAIN_HINT_MICROSOFT` | `microsoft.com` | défaut |
 | `ENTRA_DOMAIN_HINT_GOOGLE` | `google.com` | défaut |
@@ -99,7 +108,7 @@ Pour **chaque plateforme (iOS physique + Android physique)** et **chaque méthod
 3. **Auto-connexion (relaunch)** — tuer/relancer l'app → attendu : accueil sans
    ressaisie (session restaurée).
 4. **Callback deep-link** — vérifier le retour dans l'app après le navigateur
-   système (schéma `certigo://auth`).
+   système (schéma `certigo://auth/`).
 5. **Annulation** — fermer le navigateur / bouton retour → attendu : message
    « Connexion annulée. », boutons **réarmés**, pas de spinner figé.
 6. **Réseau lent / hors-ligne** — activer un réseau dégradé ou le mode avion →

@@ -30,7 +30,7 @@ Au démarrage, `bootstrap()` appelle `AppEnv.validate()` :
 | `API_BASE_URL` | Base de l'API backend | **Oui** (tous flavors) | `https://api.certigo.app/api` | vide → login e-mail « Pas de connexion » ; URL **dev** en prod → **erreur bloquante** ; `http://` en prod → erreur |
 | `ENTRA_CLIENT_ID` | Client id app reg Entra | **Oui en prod/staging** (sauf `ENTRA_OPTIONAL`) | `00000000-0000-0000-0000-000000000000` | vide en prod → **erreur** (social désactivé) ; renseigné sans autorité → **erreur** (config partielle) |
 | `ENTRA_AUTHORITY` | Autorité CIAM | **Oui en prod/staging** | `https://tenant.ciamlogin.com/<tid>/v2.0` | vide alors que client id présent → **erreur** |
-| `ENTRA_REDIRECT_URI` | URI de redirection OIDC | Défaut `certigo://auth` | `certigo://auth` | schéma ≠ `certigo` → **erreur** (callback ne revient jamais) |
+| `ENTRA_REDIRECT_URI` | URI de redirection OIDC | Défaut `certigo://auth/` | `certigo://auth/` | schéma ≠ `certigo` → **erreur** (callback ne revient jamais) |
 | `ENTRA_API_SCOPE` | Scope d'API protégée | Recommandé si Entra actif | `api://<client-id>/user_impersonation` | vide avec Entra actif → **avertissement** (risque 401) |
 | `ENTRA_DOMAIN_HINT_MICROSOFT` | `domain_hint` Microsoft | Non | `microsoft.com` | vide → écran CIAM générique |
 | `ENTRA_DOMAIN_HINT_GOOGLE` | `domain_hint` Google | Non | `google.com` | vide → écran CIAM générique |
@@ -53,6 +53,17 @@ Le schéma natif `certigo` est déclaré dans `ios/Runner/Info.plist`
 (`CFBundleURLSchemes`) et `android/app/build.gradle`
 (`manifestPlaceholders.appAuthRedirectScheme`). Le test
 `apps/mobile/test/deep_link_config_test.dart` garde ces déclarations.
+
+> ⚠️ **Slash final obligatoire (`certigo://auth/`).** Le SDK AppAuth iOS valide
+> l'URL de redirection avant de traiter le callback ; avec Azure/CIAM (Entra
+> External ID) un redirect **sans** slash final n'est pas reconnu côté iOS → la
+> connexion **sociale** iOS « hang » (le navigateur se ferme après la page de
+> confirmation CIAM mais `authorize()` ne reçoit jamais le code). Android et le
+> login e-mail ne sont pas affectés. Le **schéma** reste `certigo` (seul le
+> chemin gagne un slash), donc les déclarations natives restent valables.
+> Réf. : FAQ officielle `flutter_appauth`. Enregistrez la valeur **exacte**
+> `certigo://auth/` dans l'app registration Entra (plateforme « Applications de
+> bureau et mobiles »).
 
 ## 3. Injection au build (CI)
 
