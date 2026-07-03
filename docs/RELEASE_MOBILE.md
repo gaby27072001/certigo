@@ -329,7 +329,7 @@ git push origin v0.1.0
    |---|---|---|---|
    | `PROD_API_BASE_URL` | `https://<prod-func-app>.azurewebsites.net/api` (sortie du déploiement backend prod, cf. PR #158 → `functionAppName`) | non | `ios-release` |
    | `ENTRA_CLIENT_ID` | `4d1f1075-7bc5-4764-947b-701435a85f8c` | non | `ios-release` + `ios-release-dry` |
-   | `ENTRA_AUTHORITY` | `https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0` | non | idem |
+   | `ENTRA_AUTHORITY` | `https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0` | non | idem |
    | `ENTRA_API_SCOPE` | `api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation` | non | idem |
    | `CERTIFICATE_PRIVATE_KEY` | clé privée **RSA 2048 PEM non chiffrée** (`openssl genrsa 2048`), sans passphrase. Sert à créer le certificat de distribution iOS au 1er build. | **OUI (Secure)** | les 3 workflows iOS |
 

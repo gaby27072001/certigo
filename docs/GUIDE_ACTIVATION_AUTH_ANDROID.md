@@ -183,9 +183,11 @@ ENTRA_API_SCOPE = api://<backend-client-id>/user_impersonation
 Exemple **réel Certigo** (tenant `certigoapp`) :
 ```
 ENTRA_CLIENT_ID = 4d1f1075-7bc5-4764-947b-701435a85f8c
-ENTRA_AUTHORITY = https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0
+ENTRA_AUTHORITY = https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0
 ENTRA_API_SCOPE = api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation
 ```
+
+> ⚠️ Utilisez le sous-domaine = GUID du tenant (issuer canonique retourné par le document de découverte OIDC), PAS le domaine vanity certigoapp.ciamlogin.com — flutter_appauth valide strictement l'issuer et un mismatch fait échouer silencieusement l'échange de jetons (spinner infini).
 
 ✅ **Fin de A**, vous avez : `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`, `ENTRA_API_SCOPE`.
 
@@ -195,7 +197,7 @@ E2E réaliste on aligne ses réglages sur le tenant CIAM :
 ```powershell
 az functionapp config appsettings set -g rg-certigo-dev -n func-certigo-dev-bk3j5ja6vw23s --settings `
   ENTRA_AUDIENCE="12910b8e-6c75-4d51-91d8-4d5fb8a6e915" `
-  ENTRA_AUTHORITY="https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0"
+  ENTRA_AUTHORITY="https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0"
 az functionapp restart -g rg-certigo-dev -n func-certigo-dev-bk3j5ja6vw23s
 ```
 > En **staging/prod**, ces valeurs viennent de `infra/params/<env>.bicepparam`

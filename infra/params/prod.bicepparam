@@ -30,7 +30,14 @@ param cosmosLocation = 'northeurope'
 
 // Authority of the certigoapp CIAM tenant (same tenant the mobile app targets:
 // client id 4d1f1075-7bc5-4764-947b-701435a85f8c, redirect certigo://auth).
-param entraAuthority = 'https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0'
+// ⚠️ Use the tenant-GUID subdomain (af721be8-….ciamlogin.com), NOT the vanity
+// certigoapp.ciamlogin.com domain: the OIDC discovery document returns the GUID
+// subdomain as the canonical issuer, and flutter_appauth validates the issuer
+// strictly — a mismatch makes the token exchange fail silently (infinite spinner
+// on social login). This value MUST match the app's ENTRA_AUTHORITY (Codemagic).
+// CRITICAL: the next `cd-backend prod` overwrites the live app setting from here,
+// so the wrong value here re-breaks login on every redeploy.
+param entraAuthority = 'https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0'
 
 // Audience = Application ID URI of the backend "Certigo API" app registration.
 // The mobile ENTRA_API_SCOPE (api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation)

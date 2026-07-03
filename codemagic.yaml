@@ -17,7 +17,7 @@
 #      NON-secret dart-define values baked into the public binary:
 #        PROD_API_BASE_URL = https://<prod-func-app>.azurewebsites.net/api
 #        ENTRA_CLIENT_ID    = 4d1f1075-7bc5-4764-947b-701435a85f8c
-#        ENTRA_AUTHORITY    = https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0
+#        ENTRA_AUTHORITY    = https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0
 #        ENTRA_API_SCOPE    = api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation
 #      Missing values keep social buttons hidden and/or break email login. Same
 #      values as Android (Key Vault mobile-* / GitHub vars.MOBILE_*).
