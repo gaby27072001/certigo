@@ -53,6 +53,9 @@ param tutorLlmMaxOutputTokens int = 400
 @description('Optional email notified on security alerts (401/403/5xx spikes). Empty = no receiver.')
 param alertEmail string = ''
 
+@description('Data residency for the Azure Communication Services Email resource (e.g. Europe, United States).')
+param emailDataLocation string = 'Europe'
+
 @description('Enable paid Microsoft Defender for Cloud plans (per-resource cost). Default false — only free CSPM stays on.')
 param enableDefenderPlans bool = false
 
@@ -157,6 +160,19 @@ module vault 'modules/keyvault.bicep' = {
   }
 }
 
+// Azure Communication Services Email — transactional sender for the
+// email/password verification message. Global resource with an Azure-managed
+// domain (no DNS setup). Its outputs feed the Function App app settings below.
+module email 'modules/communicationEmail.bicep' = {
+  scope: rg
+  name: 'communicationEmail'
+  params: {
+    name: '${appName}-${env}-${take(suffix, 8)}'
+    dataLocation: emailDataLocation
+    tags: tags
+  }
+}
+
 module api 'modules/functionApp.bicep' = {
   scope: rg
   name: 'functionApp'
@@ -180,6 +196,12 @@ module api 'modules/functionApp.bicep' = {
     tutorLlmApiVersion: tutorLlmApiVersion
     tutorLlmApiKey: tutorLlmApiKey
     tutorLlmMaxOutputTokens: tutorLlmMaxOutputTokens
+    // Email verification wiring. The verify base URL is derived from the (known,
+    // deterministic) Function App name to avoid a self-reference on its hostname.
+    acsEmailEndpoint: email.outputs.endpoint
+    acsEmailSender: email.outputs.senderAddress
+    acsEmailConnectionString: email.outputs.connectionString
+    emailVerifyBaseUrl: 'https://func-${appName}-${env}-${suffix}.azurewebsites.net/api/auth/verify-email'
     // Native mobile clients aren't subject to CORS; only dev keeps '*' (browser tooling).
     allowedCorsOrigins: env == 'dev' ? [ '*' ] : []
     tags: tags

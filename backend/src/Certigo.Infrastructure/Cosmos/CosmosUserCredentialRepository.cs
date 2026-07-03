@@ -16,6 +16,35 @@ public sealed class CosmosUserCredentialRepository(CosmosContext context) : IUse
         return context.Users.ReadOrDefaultAsync<UserCredentialRecord>(id, new PartitionKey(id), cancellationToken);
     }
 
+    public async Task<UserCredentialRecord?> FindByCanonicalEmailAsync(string canonicalEmail, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(canonicalEmail))
+        {
+            return null;
+        }
+
+        // Cross-partition query (credential docs are keyed by id = the exact email),
+        // hit only on register and login misses — never on the hot login path. The
+        // type discriminator keeps it isolated from profile documents that share
+        // the Users container.
+        var query = new QueryDefinition(
+                "SELECT * FROM c WHERE c.type = 'credential' AND c.canonicalEmail = @canonical")
+            .WithParameter("@canonical", canonicalEmail);
+
+        using var iterator = context.Users.GetItemQueryIterator<UserCredentialRecord>(query);
+        while (iterator.HasMoreResults)
+        {
+            var page = await iterator.ReadNextAsync(cancellationToken);
+            var match = page.FirstOrDefault();
+            if (match is not null)
+            {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
     public async Task CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
     {
         try

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Azure.Communication.Email;
 using Azure.Core;
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
@@ -15,6 +16,7 @@ using Certigo.Application.Abstractions;
 using Certigo.Application.Services;
 using Certigo.Infrastructure.Ai;
 using Certigo.Infrastructure.Cosmos;
+using Certigo.Infrastructure.Email;
 using Certigo.Infrastructure.Identity;
 using Certigo.Infrastructure.Observability;
 
@@ -110,7 +112,44 @@ var host = new HostBuilder()
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<ITokenIssuer>(_ => new JwtTokenIssuer(signingSecret, jwtIssuer, jwtAudience));
         services.AddScoped<IUserCredentialRepository, CosmosUserCredentialRepository>();
-        services.AddScoped<IAuthService, AuthService>();
+
+        // Email verification for email/password accounts. Non-blocking: the default
+        // binding is a logging no-op so sign-up works with no provider configured;
+        // a real Azure Communication Services sender is wired only when the ACS
+        // settings are present (endpoint+sender for managed identity, or a
+        // connection string). EMAIL_VERIFY_BASE_URL is the public URL of the GET
+        // verify endpoint; empty is tolerated (the link is still logged/emailed).
+        var verifyBaseUrl = configuration["EMAIL_VERIFY_BASE_URL"] ?? string.Empty;
+        var verifyTtlHours = int.TryParse(configuration["EMAIL_VERIFY_TOKEN_TTL_HOURS"], out var ttl) && ttl > 0 ? ttl : 24;
+        services.AddSingleton(new AuthEmailOptions(verifyBaseUrl, TimeSpan.FromHours(verifyTtlHours)));
+
+        var acsConnectionString = configuration["ACS_EMAIL_CONNECTION_STRING"];
+        var acsEndpoint = configuration["ACS_EMAIL_ENDPOINT"];
+        var acsSender = configuration["ACS_EMAIL_SENDER"];
+        if (!string.IsNullOrWhiteSpace(acsSender)
+            && (!string.IsNullOrWhiteSpace(acsConnectionString) || !string.IsNullOrWhiteSpace(acsEndpoint)))
+        {
+            services.AddSingleton<IEmailSender>(sp =>
+            {
+                var client = !string.IsNullOrWhiteSpace(acsConnectionString)
+                    ? new EmailClient(acsConnectionString)
+                    : new EmailClient(new Uri(acsEndpoint!), sp.GetRequiredService<TokenCredential>());
+                return new AzureCommunicationEmailSender(
+                    client,
+                    acsSender!,
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AzureCommunicationEmailSender>>());
+            });
+        }
+        else
+        {
+            services.AddSingleton<IEmailSender, LoggingEmailSender>();
+        }
+
+        // One AuthService per scope, exposed under both its interfaces so the auth
+        // endpoints and the verify/resend endpoints share the same instance.
+        services.AddScoped<AuthService>();
+        services.AddScoped<IAuthService>(sp => sp.GetRequiredService<AuthService>());
+        services.AddScoped<IEmailVerificationService>(sp => sp.GetRequiredService<AuthService>());
 
         services.AddScoped<IUserContext, FunctionUserContext>();
         services.AddSingleton<IClock, SystemClock>();

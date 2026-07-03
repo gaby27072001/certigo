@@ -86,6 +86,7 @@ class AuthSession {
     this.displayName,
     this.email,
     this.provider,
+    this.emailVerified = true,
   });
 
   final String accessToken;
@@ -95,6 +96,11 @@ class AuthSession {
   final String? displayName;
   final String? email;
   final AuthProvider? provider;
+
+  /// Whether the backend considers this account's e-mail confirmed. Defaults to
+  /// `true` so social/Entra sessions and pre-feature accounts are never nagged;
+  /// only a freshly-registered, unconfirmed email/password account is `false`.
+  final bool emailVerified;
 
   /// Marge de sécurité : on rafraîchit le jeton un peu avant son expiration
   /// réelle pour éviter qu'une requête parte avec un jeton tout juste expiré.
@@ -120,6 +126,7 @@ class AuthSession {
     String? displayName,
     String? email,
     AuthProvider? provider,
+    bool? emailVerified,
   }) {
     return AuthSession(
       accessToken: accessToken ?? this.accessToken,
@@ -129,6 +136,7 @@ class AuthSession {
       displayName: displayName ?? this.displayName,
       email: email ?? this.email,
       provider: provider ?? this.provider,
+      emailVerified: emailVerified ?? this.emailVerified,
     );
   }
 
@@ -140,6 +148,7 @@ class AuthSession {
         'displayName': displayName,
         'email': email,
         'provider': provider?.id,
+        'emailVerified': emailVerified,
       };
 
   static AuthSession? fromJson(Map<String, dynamic> json) {
@@ -154,6 +163,7 @@ class AuthSession {
       displayName: json['displayName'] as String?,
       email: json['email'] as String?,
       provider: AuthProviderX.fromId(json['provider'] as String?),
+      emailVerified: json['emailVerified'] as bool? ?? true,
     );
   }
 

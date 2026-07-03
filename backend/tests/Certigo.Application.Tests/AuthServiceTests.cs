@@ -13,6 +13,17 @@ internal sealed class InMemoryUserCredentialRepository : IUserCredentialReposito
     public Task<UserCredentialRecord?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
         => Task.FromResult(_store.GetValueOrDefault(UserCredentialRecord.IdFor(email.Trim().ToLowerInvariant())));
 
+    public Task<UserCredentialRecord?> FindByCanonicalEmailAsync(string canonicalEmail, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(canonicalEmail))
+        {
+            return Task.FromResult<UserCredentialRecord?>(null);
+        }
+
+        var match = _store.Values.FirstOrDefault(r => string.Equals(r.CanonicalEmail, canonicalEmail, StringComparison.Ordinal));
+        return Task.FromResult<UserCredentialRecord?>(match);
+    }
+
     public Task CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
     {
         if (!_store.TryAdd(record.Id, record))
@@ -26,6 +37,21 @@ internal sealed class InMemoryUserCredentialRepository : IUserCredentialReposito
     public Task UpdateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
     {
         _store[record.Id] = record;
+        return Task.CompletedTask;
+    }
+}
+
+/// Captures the emails an <see cref="AuthService"/> would send so verification
+/// tests can pull the confirmation link out of the outbox.
+internal sealed class CapturingEmailSender : IEmailSender
+{
+    public List<EmailMessage> Sent { get; } = new();
+
+    public EmailMessage? Last => Sent.Count == 0 ? null : Sent[^1];
+
+    public Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    {
+        Sent.Add(message);
         return Task.CompletedTask;
     }
 }
@@ -82,10 +108,22 @@ public sealed class AuthRulesTests
     [Fact]
     public void NormalizeEmail_trims_and_lowercases()
         => AuthRules.NormalizeEmail("  Foo@Bar.COM ").Should().Be("foo@bar.com");
+
+    [Theory]
+    [InlineData("gabriel.chambaud@gmail.com", "gabrielchambaud@gmail.com")]
+    [InlineData("Gabriel.Chambaud+news@googlemail.com", "gabrielchambaud@gmail.com")]
+    [InlineData("g.a.b@gmail.com", "gab@gmail.com")]
+    [InlineData("user+tag@outlook.com", "user+tag@outlook.com")]
+    [InlineData("plain.dot@example.com", "plain.dot@example.com")]
+    public void CanonicalizeEmail_reduces_only_gmail_variants(string input, string expected)
+        => AuthRules.CanonicalizeEmail(input).Should().Be(expected);
 }
 
 public sealed class AuthServiceTests
 {
+    private static readonly AuthEmailOptions TestEmailOptions =
+        new("https://verify.test/api/auth/verify-email", TimeSpan.FromHours(24));
+
     private static (AuthService Service, InMemoryUserRepository Users, InMemoryUserCredentialRepository Credentials) Build()
     {
         var users = new InMemoryUserRepository();
@@ -95,7 +133,9 @@ public sealed class AuthServiceTests
             new FakePasswordHasher(),
             new FakeTokenIssuer(),
             users,
-            new FakeClock(DateTimeOffset.UtcNow));
+            new FakeClock(DateTimeOffset.UtcNow),
+            new CapturingEmailSender(),
+            TestEmailOptions);
         return (service, users, credentials);
     }
 
@@ -217,8 +257,40 @@ public sealed class AuthServiceTests
             new FakePasswordHasher(),
             new FakeTokenIssuer(),
             new InMemoryUserRepository(),
-            clock);
+            clock,
+            new CapturingEmailSender(),
+            TestEmailOptions);
         return (service, clock);
+    }
+
+    private static (AuthService Service, InMemoryUserCredentialRepository Credentials, CapturingEmailSender Email) BuildWithEmail()
+    {
+        var credentials = new InMemoryUserCredentialRepository();
+        var email = new CapturingEmailSender();
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new InMemoryUserRepository(),
+            new FakeClock(DateTimeOffset.UtcNow),
+            email,
+            TestEmailOptions);
+        return (service, credentials, email);
+    }
+
+    private static string ExtractVerificationCode(CapturingEmailSender email)
+    {
+        var body = email.Last!.PlainTextBody;
+        var marker = body.IndexOf("code=", StringComparison.Ordinal);
+        marker.Should().BeGreaterThan(-1);
+        var raw = body[(marker + "code=".Length)..];
+        var end = raw.IndexOfAny(new[] { ' ', '\r', '\n', '\t' });
+        if (end >= 0)
+        {
+            raw = raw[..end];
+        }
+
+        return Uri.UnescapeDataString(raw);
     }
 
     [Fact]
@@ -278,5 +350,81 @@ public sealed class AuthServiceTests
             var bad = async () => await service.LoginAsync(new LoginRequest("reset@example.com", "wrong-password"));
             await bad.Should().ThrowAsync<AuthFailedException>();
         }
+    }
+
+    [Fact]
+    public async Task Register_marks_the_new_account_unverified_and_sends_a_confirmation_email()
+    {
+        var (service, _, email) = BuildWithEmail();
+
+        var result = await service.RegisterAsync(new RegisterRequest("newbie@example.com", "password123", null));
+
+        result.EmailVerified.Should().BeFalse();
+        email.Sent.Should().ContainSingle();
+        email.Last!.ToEmail.Should().Be("newbie@example.com");
+        email.Last.PlainTextBody.Should().Contain("code=");
+    }
+
+    [Fact]
+    public async Task Login_is_not_blocked_while_the_email_is_unverified()
+    {
+        var (service, _, _) = BuildWithEmail();
+        await service.RegisterAsync(new RegisterRequest("pending@example.com", "password123", null));
+
+        var login = await service.LoginAsync(new LoginRequest("pending@example.com", "password123"));
+
+        login.AccessToken.Should().StartWith("access:");
+        login.EmailVerified.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Verify_confirms_the_account_and_a_later_login_reports_verified()
+    {
+        var (service, _, email) = BuildWithEmail();
+        await service.RegisterAsync(new RegisterRequest("confirm@example.com", "password123", null));
+        var code = ExtractVerificationCode(email);
+
+        var verify = await service.VerifyAsync(code);
+
+        verify.Success.Should().BeTrue();
+        var login = await service.LoginAsync(new LoginRequest("confirm@example.com", "password123"));
+        login.EmailVerified.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Verify_rejects_a_tampered_code()
+    {
+        var (service, _, _) = BuildWithEmail();
+        await service.RegisterAsync(new RegisterRequest("tamper@example.com", "password123", null));
+
+        var verify = await service.VerifyAsync("not-a-real-code");
+
+        verify.Success.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("gabriel.chambaud@gmail.com", "gabrielchambaud@gmail.com")]
+    [InlineData("gabriel.chambaud@gmail.com", "gabriel.chambaud+news@gmail.com")]
+    [InlineData("gabriel.chambaud@gmail.com", "Gabriel.Chambaud@googlemail.com")]
+    public async Task Register_rejects_a_gmail_variant_of_an_existing_account(string first, string second)
+    {
+        var (service, _, _) = BuildWithEmail();
+        await service.RegisterAsync(new RegisterRequest(first, "password123", null));
+
+        var act = async () => await service.RegisterAsync(new RegisterRequest(second, "password123", null));
+
+        await act.Should().ThrowAsync<DuplicateRecordException>().WithMessage("*déjà utilisée*");
+    }
+
+    [Fact]
+    public async Task Login_matches_a_gmail_dot_variant_of_the_registered_address()
+    {
+        var (service, _, _) = BuildWithEmail();
+        await service.RegisterAsync(new RegisterRequest("gabriel.chambaud@gmail.com", "password123", "Gab"));
+
+        // A learner who typed their own address without the dots still gets in.
+        var login = await service.LoginAsync(new LoginRequest("gabrielchambaud@gmail.com", "password123"));
+
+        login.Profile.DisplayName.Should().Be("Gab");
     }
 }

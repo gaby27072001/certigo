@@ -312,6 +312,34 @@ class AuthController extends Notifier<AuthState> {
     state = const Unauthenticated();
   }
 
+  /// Renvoie l'e-mail de vérification pour le compte connecté (best-effort).
+  /// Retourne `true` si l'appel a abouti, `false` sinon.
+  Future<bool> resendVerificationEmail() async {
+    final AuthState current = state;
+    if (current is! Authenticated) return false;
+    final String? email = current.session.email;
+    if (email == null || email.isEmpty) return false;
+    try {
+      await _credentials.resendVerification(email);
+      return true;
+    } catch (e, st) {
+      _logAuthError('resendVerificationEmail', e, st);
+      return false;
+    }
+  }
+
+  /// Rafraîchit la session pour re-lire l'état de vérification après confirmation
+  /// (le lien étant cliqué hors de l'app). Sans effet si non authentifié ou sans
+  /// jeton de rafraîchissement.
+  Future<void> reloadVerificationStatus() async {
+    final AuthState current = state;
+    if (current is! Authenticated) return;
+    final AuthSession? refreshed = await _tryRefresh(current.session);
+    if (refreshed != null) {
+      state = Authenticated(refreshed);
+    }
+  }
+
   /// Jeton d'accès courant pour l'API, rafraîchi de façon proactive.
   ///
   /// Branché sur le `tokenProvider` : injecté en en-tête `Authorization` à
@@ -360,8 +388,14 @@ class AuthController extends Notifier<AuthState> {
           ? await _credentials.refresh(refreshToken)
           : await _gateway.refresh(refreshToken);
       if (refreshed.accessToken.isEmpty) return null;
-      await _store.write(refreshed);
-      return refreshed;
+      // La réponse `/auth/refresh` n'inclut pas l'e-mail : on reporte celui de la
+      // session précédente pour que les fonctions qui s'appuient dessus (renvoi de
+      // l'e-mail de vérification) continuent de marcher après un refresh silencieux.
+      final AuthSession carried = refreshed.email == null && session.email != null
+          ? refreshed.copyWith(email: session.email)
+          : refreshed;
+      await _store.write(carried);
+      return carried;
     } catch (e, st) {
       _logAuthError('_tryRefresh', e, st);
       return null;

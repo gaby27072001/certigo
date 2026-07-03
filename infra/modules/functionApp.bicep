@@ -62,6 +62,19 @@ param tags object = {}
 @description('CORS allowed origins. Native mobile clients are not subject to CORS, so this can be [] (none) for staging/prod; dev passes ["*"] for browser-based tooling.')
 param allowedCorsOrigins array = [ '*' ]
 
+@description('Azure Communication Services Email data-plane endpoint. Empty disables managed-identity email sending (the API then uses a logging no-op, so sign-up still works).')
+param acsEmailEndpoint string = ''
+
+@description('ACS Email sender address, e.g. DoNotReply@<azure-managed-domain>. Empty disables real email sending.')
+param acsEmailSender string = ''
+
+@description('ACS Email connection string. Optional; when provided the API uses it instead of the managed identity.')
+@secure()
+param acsEmailConnectionString string = ''
+
+@description('Public base URL of the GET email-verification endpoint, used to build the confirmation link in the email.')
+param emailVerifyBaseUrl string = ''
+
 resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
   name: storageAccountName
 }
@@ -143,6 +156,13 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'TUTOR_LLM_API_KEY', value: tutorLlmApiKey }
         { name: 'TUTOR_LLM_MAX_OUTPUT_TOKENS', value: string(tutorLlmMaxOutputTokens) }
         { name: 'KeyVault__Uri', value: 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/' }
+        // Email verification (email/password accounts). When ACS_EMAIL_* are empty
+        // the API falls back to a logging no-op sender — sign-up still works, the
+        // confirmation link is just written to the logs instead of emailed.
+        { name: 'ACS_EMAIL_ENDPOINT', value: acsEmailEndpoint }
+        { name: 'ACS_EMAIL_SENDER', value: acsEmailSender }
+        { name: 'ACS_EMAIL_CONNECTION_STRING', value: acsEmailConnectionString }
+        { name: 'EMAIL_VERIFY_BASE_URL', value: emailVerifyBaseUrl }
       ]
     }
   }

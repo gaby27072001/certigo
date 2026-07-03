@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import '../features/auth/presentation/widgets/email_verification_banner.dart';
+
 /// App shell hosting the four primary tabs behind a floating glass nav bar.
 ///
 /// Uses [StatefulNavigationShell] so each tab keeps its own navigation stack
@@ -30,7 +32,14 @@ class AppShell extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     return Scaffold(
       extendBody: true,
-      body: shell,
+      // The verification banner sits above the tab content and self-hides unless
+      // the session is an unverified email/password account (non-blocking).
+      body: Column(
+        children: <Widget>[
+          const EmailVerificationBanner(),
+          Expanded(child: shell),
+        ],
+      ),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         child: GlassSurface(

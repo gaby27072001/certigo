@@ -14,7 +14,9 @@ public sealed class JwtAuthMiddleware(ITokenValidator tokenValidator) : IFunctio
         "/api/health",
         "/api/auth/register",
         "/api/auth/login",
-        "/api/auth/refresh"
+        "/api/auth/refresh",
+        "/api/auth/verify-email",
+        "/api/auth/resend-verification"
     };
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)

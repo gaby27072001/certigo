@@ -26,6 +26,10 @@ abstract interface class CredentialsGateway {
 
   /// Réémet une session à partir du `refresh_token` local.
   Future<AuthSession> refresh(String refreshToken);
+
+  /// Renvoie l'e-mail de vérification pour un compte non confirmé. Best-effort :
+  /// le backend répond toujours de façon générique (aucune énumération de comptes).
+  Future<void> resendVerification(String email);
 }
 
 /// Implémentation réelle : poste sur les points de terminaison anonymes
@@ -82,6 +86,17 @@ class HttpCredentialsGateway implements CredentialsGateway {
     return _unwrap(result);
   }
 
+  @override
+  Future<void> resendVerification(String email) async {
+    // Le backend répond toujours de façon générique ({message}) ; on ignore le
+    // corps et on ne propage pas d'échec bloquant (best-effort).
+    await _client.postJson<bool>(
+      '/auth/resend-verification',
+      <String, dynamic>{'email': email},
+      (Map<String, dynamic> json) => true,
+    );
+  }
+
   /// Convertit l'`AuthResultDto` JSON du backend en [AuthSession] locale.
   /// L'e-mail n'est pas renvoyé par l'API : on conserve celui saisi (best-effort).
   AuthSession _sessionFrom(Map<String, dynamic> json, {String? email}) {
@@ -96,6 +111,7 @@ class HttpCredentialsGateway implements CredentialsGateway {
       displayName: displayName,
       email: email,
       provider: AuthProvider.email,
+      emailVerified: json['emailVerified'] as bool? ?? true,
     );
   }
 

@@ -65,6 +65,7 @@ class FakeCredentialsGateway implements CredentialsGateway {
   final List<String> loginCalls = <String>[];
   final List<String> registerCalls = <String>[];
   final List<String> refreshCalls = <String>[];
+  final List<String> resendCalls = <String>[];
 
   @override
   Future<AuthSession> login({required String email, required String password}) {
@@ -94,6 +95,11 @@ class FakeCredentialsGateway implements CredentialsGateway {
     final AuthSession Function(String)? builder = onRefresh;
     if (builder == null) throw const AuthGatewayException('refresh non câblé');
     return builder(refreshToken);
+  }
+
+  @override
+  Future<void> resendVerification(String email) async {
+    resendCalls.add(email);
   }
 }
 
@@ -483,6 +489,104 @@ void main() {
       expect((state as Authenticated).session.displayName, 'Alice');
       expect(credentials.registerCalls, <String>['new@b.com']);
       expect(store.writeCalls, 1);
+    });
+
+    test('inscription non vérifiée → session.emailVerified = false', () async {
+      final FakeSessionStore store = FakeSessionStore();
+      final FakeCredentialsGateway credentials = FakeCredentialsGateway(
+        onRegister: (String email, String password, String? name) => AuthSession(
+          accessToken: 'jeton',
+          refreshToken: 'refresh-email',
+          provider: AuthProvider.email,
+          email: email,
+          emailVerified: false,
+        ),
+      );
+      final ProviderContainer container = makeContainer(
+        gateway: FakeAuthGateway(),
+        store: store,
+        credentials: credentials,
+      );
+      container.read(authControllerProvider);
+      await settle();
+
+      await container
+          .read(authControllerProvider.notifier)
+          .registerWithEmail(email: 'pending@b.com', password: 'password123');
+
+      final AuthState state = container.read(authControllerProvider);
+      expect((state as Authenticated).session.emailVerified, isFalse);
+    });
+
+    test('resendVerificationEmail relaie l\'e-mail du compte connecté', () async {
+      final FakeSessionStore store = FakeSessionStore();
+      final FakeCredentialsGateway credentials = FakeCredentialsGateway(
+        onLogin: (String email, String password) => AuthSession(
+          accessToken: 'jeton',
+          refreshToken: 'refresh-email',
+          provider: AuthProvider.email,
+          email: email,
+          emailVerified: false,
+        ),
+      );
+      final ProviderContainer container = makeContainer(
+        gateway: FakeAuthGateway(),
+        store: store,
+        credentials: credentials,
+      );
+      container.read(authControllerProvider);
+      await settle();
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmail(email: 'pending@b.com', password: 'password123');
+
+      final bool ok =
+          await container.read(authControllerProvider.notifier).resendVerificationEmail();
+
+      expect(ok, isTrue);
+      expect(credentials.resendCalls, <String>['pending@b.com']);
+    });
+
+    test('un refresh e-mail conserve l\'e-mail → renvoi de vérification possible', () async {
+      final FakeSessionStore store = FakeSessionStore();
+      final FakeCredentialsGateway credentials = FakeCredentialsGateway(
+        onLogin: (String email, String password) => AuthSession(
+          accessToken: 'jeton',
+          refreshToken: 'refresh-email',
+          provider: AuthProvider.email,
+          email: email,
+          emailVerified: false,
+        ),
+        // La réponse /auth/refresh omet volontairement l'e-mail.
+        onRefresh: (String token) => const AuthSession(
+          accessToken: 'jeton-2',
+          refreshToken: 'refresh-email-2',
+          provider: AuthProvider.email,
+          emailVerified: false,
+        ),
+      );
+      final ProviderContainer container = makeContainer(
+        gateway: FakeAuthGateway(),
+        store: store,
+        credentials: credentials,
+      );
+      container.read(authControllerProvider);
+      await settle();
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmail(email: 'pending@b.com', password: 'password123');
+
+      // Simule le refresh silencieux (ex. bouton « J'ai confirmé »).
+      await container.read(authControllerProvider.notifier).reloadVerificationStatus();
+
+      final AuthState state = container.read(authControllerProvider);
+      expect((state as Authenticated).session.accessToken, 'jeton-2');
+      expect(state.session.email, 'pending@b.com'); // reporté malgré l'absence côté API
+
+      final bool ok =
+          await container.read(authControllerProvider.notifier).resendVerificationEmail();
+      expect(ok, isTrue);
+      expect(credentials.resendCalls, <String>['pending@b.com']);
     });
 
     test('échec de connexion → message d\'erreur propagé', () async {
