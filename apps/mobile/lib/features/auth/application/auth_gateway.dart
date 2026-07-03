@@ -2,8 +2,10 @@ import 'dart:convert';
 
 import 'package:core/core.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'auth_diagnostics.dart';
 import 'auth_state.dart';
 
 /// Erreur métier remontée au contrôleur pour afficher un message clair.
@@ -53,20 +55,48 @@ abstract interface class AuthGateway {
 /// Implémentation réelle basée sur `flutter_appauth` + Microsoft Entra
 /// External ID.
 class AppAuthGateway implements AuthGateway {
-  AppAuthGateway({FlutterAppAuth? appAuth}) : _appAuth = appAuth ?? const FlutterAppAuth();
+  AppAuthGateway({FlutterAppAuth? appAuth, AuthDiagnostics? diagnostics})
+      : _appAuth = appAuth ?? const FlutterAppAuth(),
+        _diagnostics = diagnostics ?? const NoopAuthDiagnostics();
 
   final FlutterAppAuth _appAuth;
+
+  /// Puits d'étapes tracées à l'écran (build de diagnostic). Inerte par défaut.
+  final AuthDiagnostics _diagnostics;
 
   List<String> get _scopes => <String>[
         ...AppEnv.entraScopes,
         if (AppEnv.entraApiScope.isNotEmpty) AppEnv.entraApiScope,
       ];
 
+  /// Agent externe préféré pour l'ouverture du navigateur système.
+  ///
+  /// Sur **iOS/macOS**, on force une session **éphémère**
+  /// (`ASWebAuthenticationSession` sans partage de cookies avec le navigateur de
+  /// l'utilisateur) : cela supprime le prompt système de session partagée
+  /// (« … souhaite utiliser ciamlogin.com ») et isole les cookies. C'est un
+  /// correctif connu des blocages de callback `ASWebAuthenticationSession` après
+  /// la page de confirmation CIAM. En v8 de `flutter_appauth`, l'ancien
+  /// `preferEphemeralSession: true` a été remplacé par cette valeur d'enum.
+  ///
+  /// Ailleurs (Android), on conserve l'agent par défaut : la fédération y
+  /// fonctionne déjà et cet enum n'y est de toute façon pas appliqué.
+  ExternalUserAgent get _preferredUserAgent =>
+      (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS)
+          ? ExternalUserAgent.ephemeralAsWebAuthenticationSession
+          : ExternalUserAgent.asWebAuthenticationSession;
+
   @override
   Future<AuthSession> signIn(AuthProvider provider) async {
     try {
-      final AuthorizationTokenResponse result = await _appAuth.authorizeAndExchangeCode(
-        AuthorizationTokenRequest(
+      // Étape 1 — ouverture de l'autorisation (navigateur système). On sépare
+      // volontairement `authorize()` de `token()` (plutôt que le combiné
+      // `authorizeAndExchangeCode`) afin d'ISOLER un blocage du callback
+      // (authorize) d'un blocage de l'échange (token) : chaque étape est tracée
+      // et remonte son erreur propre, sans hang silencieux.
+      _diagnostics.mark(AuthDiagnosticStep.authorizeOpened);
+      final AuthorizationResponse authorization = await _appAuth.authorize(
+        AuthorizationRequest(
           AppEnv.entraClientId,
           AppEnv.entraRedirectUri,
           issuer: AppEnv.entraAuthority,
@@ -75,8 +105,55 @@ class AppAuthGateway implements AuthGateway {
           // Laisse l'utilisateur choisir/ajouter un compte à chaque connexion
           // explicite (utile après une déconnexion).
           promptValues: const <String>['select_account'],
+          externalUserAgent: _preferredUserAgent,
         ),
       );
+
+      // Étape 2 — le callback natif est revenu ; on trace la présence (et la
+      // longueur, jamais la valeur) du code d'autorisation.
+      final String? code = authorization.authorizationCode;
+      _diagnostics.mark(
+        AuthDiagnosticStep.callbackReturned,
+        detail: code == null || code.isEmpty ? 'code absent' : 'code len=${code.length}',
+      );
+      if (code == null || code.isEmpty) {
+        _diagnostics.mark(
+          AuthDiagnosticStep.failed,
+          detail: 'callback revenu sans code d\'autorisation',
+        );
+        throw const AuthGatewayException(
+          'La connexion n\'a pas renvoyé de code d\'autorisation.',
+          cause: AuthFailureCause.providerError,
+          diagnostic: 'authorize() est revenu sans authorizationCode '
+              '(étape : callback / autorisation). Le navigateur est revenu à '
+              'l\'app mais sans code exploitable.',
+        );
+      }
+
+      // Étape 3 — échange du code contre des jetons (token endpoint). On réutilise
+      // le `codeVerifier` (PKCE) et le `nonce` produits par `authorize()`, à
+      // l'identique de ce que faisait le combiné en interne.
+      _diagnostics.mark(AuthDiagnosticStep.tokenExchangeStarted);
+      final TokenResponse result = await _appAuth.token(
+        TokenRequest(
+          AppEnv.entraClientId,
+          AppEnv.entraRedirectUri,
+          issuer: AppEnv.entraAuthority,
+          scopes: _scopes,
+          authorizationCode: code,
+          codeVerifier: authorization.codeVerifier,
+          nonce: authorization.nonce,
+          grantType: GrantType.authorizationCode,
+        ),
+      );
+
+      // Étape 4 — jetons reçus (longueurs seulement, jamais les jetons).
+      _diagnostics.mark(
+        AuthDiagnosticStep.tokenReceived,
+        detail: 'access len=${result.accessToken?.length ?? 0}, '
+            'id len=${result.idToken?.length ?? 0}',
+      );
+
       return _toSession(
         result.accessToken,
         result.refreshToken,
@@ -85,18 +162,22 @@ class AppAuthGateway implements AuthGateway {
         provider,
       );
     } on FlutterAppAuthUserCancelledException {
+      _diagnostics.mark(AuthDiagnosticStep.failed, detail: 'annulé par l\'utilisateur');
       throw const AuthGatewayException('Connexion annulée.', cause: AuthFailureCause.cancelled);
+    } on AuthGatewayException {
+      // Déjà typée + tracée (ex. code d'autorisation absent) : relayer telle quelle.
+      rethrow;
     } on PlatformException catch (e) {
       final ({String message, AuthFailureCause cause}) described = _describeError(e, provider);
-      throw AuthGatewayException(
-        described.message,
-        cause: described.cause,
-        // Annulation : on garde le message propre, sans bruit technique.
-        diagnostic: described.cause == AuthFailureCause.cancelled ? null : _platformDiagnostic(e),
-      );
+      // Annulation : on garde le message propre, sans bruit technique.
+      final String? diagnostic =
+          described.cause == AuthFailureCause.cancelled ? null : _platformDiagnostic(e);
+      _diagnostics.mark(AuthDiagnosticStep.failed, detail: diagnostic ?? described.message);
+      throw AuthGatewayException(described.message, cause: described.cause, diagnostic: diagnostic);
     } catch (e) {
       // Erreur inattendue (non PlatformException) : on ne l'avale pas, on
       // remonte son type + toString() pour diagnostic à l'écran.
+      _diagnostics.mark(AuthDiagnosticStep.failed, detail: '${e.runtimeType} : $e');
       throw AuthGatewayException(
         'La connexion via ${provider.id} a échoué. Vérifiez la configuration Entra puis réessayez.',
         cause: AuthFailureCause.providerError,

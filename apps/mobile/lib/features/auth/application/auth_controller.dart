@@ -4,6 +4,7 @@ import 'package:core/core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'auth_diagnostics.dart';
 import 'auth_gateway.dart';
 import 'auth_state.dart';
 import 'auth_telemetry.dart';
@@ -11,7 +12,9 @@ import 'credentials_gateway.dart';
 import 'session_store.dart';
 
 /// Passerelle OIDC réelle. Surchargée par un faux dans les tests.
-final authGatewayProvider = Provider<AuthGateway>((Ref ref) => AppAuthGateway());
+final authGatewayProvider = Provider<AuthGateway>(
+  (Ref ref) => AppAuthGateway(diagnostics: ref.read(authDiagnosticsProvider.notifier)),
+);
 
 /// Passerelle e-mail/mot de passe réelle (API HTTP). Surchargée dans les tests.
 final credentialsGatewayProvider = Provider<CredentialsGateway>(
@@ -47,6 +50,7 @@ class AuthController extends Notifier<AuthState> {
   late final CredentialsGateway _credentials;
   late final SessionStore _store;
   late final AuthTelemetry _telemetry;
+  late final AuthDiagnosticsNotifier _diagnostics;
   late final bool _required;
   late final bool _configured;
 
@@ -68,6 +72,7 @@ class AuthController extends Notifier<AuthState> {
     _credentials = ref.read(credentialsGatewayProvider);
     _store = ref.read(sessionStoreProvider);
     _telemetry = ref.read(authTelemetryProvider);
+    _diagnostics = ref.read(authDiagnosticsProvider.notifier);
     _required = ref.read(authRequiredProvider);
     _configured = ref.read(authConfiguredProvider);
     // Différé en micro-tâche : `build` doit retourner sans muter l'état.
@@ -130,6 +135,10 @@ class AuthController extends Notifier<AuthState> {
       return;
     }
     _telemetry.authStart(method);
+    // Nouvelle tentative sociale : on repart d'une trace de diagnostic vierge.
+    // Les étapes 1→4 sont poussées par la passerelle (authorize/token), l'étape
+    // 5 (session écrite) ci-dessous, et « échec » par la passerelle ou ici.
+    _diagnostics.reset();
     state = const AuthLoading();
     final Stopwatch sw = Stopwatch()..start();
     try {
@@ -140,6 +149,10 @@ class AuthController extends Notifier<AuthState> {
           AuthFailureCause.providerError,
           durationMs: sw.elapsedMilliseconds,
         );
+        _diagnostics.mark(
+          AuthDiagnosticStep.failed,
+          detail: 'jeton d\'accès vide après échange du code',
+        );
         state = Unauthenticated(
           'Connexion ${_providerLabel(provider)} échouée : jeton d\'accès vide.\n'
           '[technique] La réponse OIDC ne contenait ni access_token ni id_token '
@@ -148,12 +161,17 @@ class AuthController extends Notifier<AuthState> {
         return;
       }
       await _store.write(session);
+      _diagnostics.mark(AuthDiagnosticStep.sessionWritten);
       _telemetry.authSuccess(method, durationMs: sw.elapsedMilliseconds);
       state = Authenticated(session);
     } on TimeoutException catch (e, st) {
       _logAuthError('signIn(${provider.id}, timeout)', e, st);
       _telemetry.authFailure(method, AuthFailureCause.timeout, durationMs: sw.elapsedMilliseconds);
       final int seconds = _socialTimeout.inSeconds;
+      _diagnostics.mark(
+        AuthDiagnosticStep.failed,
+        detail: 'timeout ${seconds}s — voir la dernière étape atteinte ci-dessus',
+      );
       state = Unauthenticated(
         'Connexion ${_providerLabel(provider)} expirée : aucune réponse après ${seconds}s.\n'
         '[technique] TimeoutException après ${seconds}s — le navigateur ou le '
@@ -165,6 +183,7 @@ class AuthController extends Notifier<AuthState> {
     } catch (e, st) {
       _logAuthError('signIn(${provider.id})', e, st);
       _telemetry.authFailure(method, AuthFailureCause.unknown, durationMs: sw.elapsedMilliseconds);
+      _diagnostics.mark(AuthDiagnosticStep.failed, detail: '${e.runtimeType} : $e');
       state = Unauthenticated(
         'Connexion ${_providerLabel(provider)} échouée.\n'
         '[technique] ${e.runtimeType} : $e',

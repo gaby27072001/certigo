@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../application/auth_controller.dart';
+import '../application/auth_diagnostics.dart';
 import '../application/auth_state.dart';
 import 'widgets/auth_provider_button.dart';
 
@@ -62,6 +63,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final FormState? form = _formKey.currentState;
     if (form == null || !form.validate()) return;
     FocusScope.of(context).unfocus();
+    // Hygiène d'affichage : une soumission e-mail efface la trace de diagnostic
+    // d'une éventuelle tentative sociale précédente (le contrôleur e-mail, lui,
+    // n'y touche pas — le diagnostic ne concerne que le flux social).
+    ref.read(authDiagnosticsProvider.notifier).reset();
     setState(() {
       _emailSubmitting = true;
       _authError = null;
@@ -127,6 +132,22 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final AuthState state = ref.watch(authControllerProvider);
     final bool busy = state is AuthLoading || _pending != null || _emailSubmitting;
     final bool registering = _mode == _AuthMode.register;
+
+    // Message d'erreur affiché : on privilégie le message local (posé par le
+    // `ref.listen` ci-dessus sur CETTE instance d'écran) et on retombe sur celui
+    // porté par l'état `Unauthenticated` courant. Ce repli est ESSENTIEL au flux
+    // social : le routeur démonte cet écran (AuthLoading → /splash) puis en
+    // remonte un NEUF (Unauthenticated → /auth) ; ce nouvel écran n'a pas de
+    // `_authError` local et son `ref.listen` a manqué l'émission — sans ce repli,
+    // aucun message ne s'afficherait malgré l'échec ou le timeout (bug observé).
+    final String? stateMessage = state is Unauthenticated ? state.message : null;
+    final String? shownError =
+        _authError ?? (stateMessage != null && stateMessage.isNotEmpty ? stateMessage : null);
+
+    // Trace de diagnostic (étapes horodatées du dernier flux social). Portée par
+    // un provider — et non par l'état local — pour survivre au démontage/remontage
+    // de l'écran par le routeur pendant le flux.
+    final List<AuthDiagnosticEntry> diagnostics = ref.watch(authDiagnosticsProvider);
 
     return Scaffold(
       body: AuroraBackground(
@@ -278,9 +299,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                         onPressed: () => _signInSocial(AuthProvider.apple),
                       ),
                     ],
-                    if (_authError != null) ...<Widget>[
+                    if (shownError != null) ...<Widget>[
                       const SizedBox(height: PrismSpacing.lg),
-                      _ErrorCard(message: _authError!),
+                      _ErrorCard(message: shownError),
+                    ],
+                    if (diagnostics.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: PrismSpacing.md),
+                      _DiagnosticCard(entries: diagnostics),
                     ],
                     const SizedBox(height: PrismSpacing.xl),
                     Text(
@@ -353,6 +378,78 @@ class _ErrorCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Carte de **diagnostic** du flux de connexion sociale : journal horodaté et
+/// **persistant** des étapes (authorize → callback → échange → jeton → session),
+/// pour localiser sur appareil réel (iOS) où le flux s'arrête. Le contenu est
+/// **sélectionnable** (copiable/capturable) et reste affiché. Alimentée par
+/// [authDiagnosticsProvider], donc elle survit au démontage/remontage de l'écran
+/// par le routeur pendant le flux (AuthLoading → /splash → Unauthenticated → /auth).
+class _DiagnosticCard extends StatelessWidget {
+  const _DiagnosticCard({required this.entries});
+
+  final List<AuthDiagnosticEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    final TextTheme text = Theme.of(context).textTheme;
+    final DateTime start = entries.first.at;
+    final String trace = <String>[
+      for (final AuthDiagnosticEntry e in entries)
+        '[${_formatClock(e.at)}] +${e.at.difference(start).inMilliseconds}ms  '
+            '${e.step.label}${e.detail == null || e.detail!.isEmpty ? '' : ' — ${e.detail}'}',
+    ].join('\n');
+    return Container(
+      key: const Key('auth-diagnostic'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(PrismSpacing.md),
+      decoration: BoxDecoration(
+        color: p.textSecondary.withOpacity(0.08),
+        borderRadius: const BorderRadius.all(Radius.circular(14)),
+        border: Border.all(color: p.textSecondary.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(Icons.timeline, color: p.textSecondary, size: 20),
+              const SizedBox(width: PrismSpacing.xs),
+              Expanded(
+                child: Text(
+                  'Diagnostic de connexion (étapes)',
+                  style: text.titleSmall?.copyWith(
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: PrismSpacing.xs),
+          SelectableText(
+            trace,
+            style: text.bodySmall?.copyWith(color: p.textPrimary, height: 1.4),
+          ),
+          const SizedBox(height: PrismSpacing.xs),
+          Text(
+            'Capture ces étapes : la dernière ligne indique où le flux s\'est arrêté.',
+            style: text.bodySmall?.copyWith(color: p.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Formate un horodatage en `HH:mm:ss.SSS` (heure murale locale), sans dépendance
+/// `intl`, pour le journal de diagnostic.
+String _formatClock(DateTime t) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  final String ms = t.millisecond.toString().padLeft(3, '0');
+  return '${two(t.hour)}:${two(t.minute)}:${two(t.second)}.$ms';
 }
 
 /// Séparateur « ou » entre le formulaire e-mail et les fournisseurs sociaux.
