@@ -21,6 +21,11 @@ using Certigo.Infrastructure.Observability;
 var host = new HostBuilder()
     .ConfigureFunctionsWorkerDefaults(worker =>
     {
+        // Order matters: SecurityHeadersMiddleware is outermost so it stamps security
+        // headers on every response (including the error/401 responses written by the
+        // middleware below). ExceptionMiddleware then wraps JwtAuthMiddleware so any
+        // downstream exception is mapped to ProblemDetails.
+        worker.UseMiddleware<SecurityHeadersMiddleware>();
         worker.UseMiddleware<ExceptionMiddleware>();
         worker.UseMiddleware<JwtAuthMiddleware>();
     })
@@ -49,26 +54,28 @@ var host = new HostBuilder()
         services.AddSingleton<IHealthProbe, CosmosHealthProbe>();
 
         // Locally-issued JWT settings shared by the issuer and the local validator.
-        // The signing key is mandatory in Production; a fixed dev key is used
-        // elsewhere so the email/password flow works out of the box locally.
-        var configuredSecret = configuration["AUTH_JWT_SIGNING_KEY"];
-        var signingSecret = !string.IsNullOrWhiteSpace(configuredSecret)
-            ? configuredSecret
-            : context.HostingEnvironment.IsProduction()
-                ? throw new InvalidOperationException(
-                    "AUTH_JWT_SIGNING_KEY is required in Production to sign email/password tokens.")
-                : "certigo-dev-signing-key-change-me";
+        // The signing key is mandatory in a hardened environment (Production or
+        // AUTH_MODE=prod): a missing, blank, or default dev key fails fast at startup
+        // so a weak, publicly-known key can never sign tokens in production. Outside
+        // production a fixed dev key is tolerated so the email/password flow works out
+        // of the box locally. The decision is a pure, unit-tested function.
+        var signingSecret = JwtSigningKeyGuard.ResolveSigningSecret(
+            configuration["AUTH_JWT_SIGNING_KEY"],
+            context.HostingEnvironment.IsProduction(),
+            configuration["AUTH_MODE"]);
         var jwtIssuer = configuration["AUTH_JWT_ISSUER"] ?? "certigo";
         var jwtAudience = configuration["AUTH_JWT_AUDIENCE"] ?? "certigo";
 
-        services.AddSingleton<ITokenValidator>(_ =>
+        services.AddSingleton<ITokenValidator>(sp =>
         {
             // The local email/password validator is always first; whichever
             // environment validator follows is the fallback. The Dev validator
             // accepts ANY token, so it can only ever be the last link in the chain.
             var validators = new List<ITokenValidator>
             {
-                new LocalJwtTokenValidator(signingSecret, jwtIssuer, jwtAudience)
+                new LocalJwtTokenValidator(
+                    signingSecret, jwtIssuer, jwtAudience,
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LocalJwtTokenValidator>>())
             };
 
             // Hard production guard: the dev validator accepts any bearer token as a
@@ -91,7 +98,9 @@ var host = new HostBuilder()
                 var audience = configuration["ENTRA_AUDIENCE"];
                 if (!string.IsNullOrWhiteSpace(authority) && !string.IsNullOrWhiteSpace(audience))
                 {
-                    validators.Add(new EntraTokenValidator(authority, audience));
+                    validators.Add(new EntraTokenValidator(
+                        authority, audience,
+                        sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<EntraTokenValidator>>()));
                 }
             }
 
