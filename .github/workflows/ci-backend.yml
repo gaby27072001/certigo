@@ -7,7 +7,6 @@ on:
     branches: [ main ]
     paths: [ "backend/**", ".github/workflows/ci-backend.yml" ]
   pull_request:
-    paths: [ "backend/**", ".github/workflows/ci-backend.yml" ]
 
 concurrency:
   group: ci-backend-${{ github.ref }}
@@ -17,13 +16,42 @@ permissions:
   contents: read
 
 jobs:
+  # CI-08 : détecte si des chemins pertinents ont changé pour cette PR. Une PR qui ne
+  # touche pas ces chemins skippe build-test AU NIVEAU JOB (le check requis passe alors
+  # en success 'skipped'), au lieu d'un skip par filtre de chemin workflow-level qui
+  # laisserait le check requis Pending et bloquerait la PR indéfiniment.
+  changes:
+    name: Detect changed paths
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || (github.ref == 'refs/heads/main' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - 'backend/**'
+              - '.github/workflows/ci-backend.yml'
+
   build-test:
     name: Build & test
+    needs: [changes]
     # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
     # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
     # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
     # évènements push/dispatch passent inchangés → zéro régression.
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    # CI-08 : `always()` neutralise le skip hérité de `needs.changes` ; le fork-guard reste
+    # (clause 2) ; on ne skippe QUE si paths-filter dit explicitement `false` (clause 3, PR
+    # seulement). Un output vide/erreur de filtre (!= 'false') => le vrai build tourne (sûr).
+    if: >-
+      always()
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name != 'pull_request' || needs.changes.outputs.relevant != 'false')
     # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
     # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
     environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
@@ -35,6 +63,10 @@ jobs:
     #      (ils sont désactivés par défaut ici — cf. lint-workflows.yml).
     # Repasser BACKEND_CI_FALLBACK à false (ou supprimer la variable) pour revenir au self-hosted.
     runs-on: ${{ vars.BACKEND_CI_FALLBACK == 'true' && 'ubuntu-latest' || (github.ref == 'refs/heads/main' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    # Le runner-2 a /usr/share/dotnet NON inscriptible : on force actions/setup-dotnet à
+    # installer dans un dossier temporaire inscriptible pour que le job passe sur les 2 runners.
+    env:
+      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

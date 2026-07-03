@@ -30,13 +30,24 @@ jobs:
     runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
     steps:
       - uses: actions/checkout@v4
+      # CI-09 : le runner-2 n'a PAS l'Azure CLI (`az`). On installe le CLI Bicep
+      # standalone dans un répertoire écrivable ($RUNNER_TEMP) et on l'ajoute au PATH,
+      # de sorte que le lint fonctionne à l'identique sur les DEUX runners.
+      - name: Install Bicep CLI
+        run: |
+          BICEP_DIR="$RUNNER_TEMP/bicep"
+          mkdir -p "$BICEP_DIR"
+          curl -sSL -o "$BICEP_DIR/bicep" https://github.com/Azure/bicep/releases/download/v0.44.1/bicep-linux-x64
+          chmod +x "$BICEP_DIR/bicep"
+          echo "$BICEP_DIR" >> "$GITHUB_PATH"
+          "$BICEP_DIR/bicep" --version
       - name: Build main.bicep
-        run: az bicep build --file infra/main.bicep
+        run: bicep build infra/main.bicep --stdout > /dev/null
       - name: Build ci-runner network.bicep
-        run: az bicep build --file infra/ci-runner/network.bicep
+        run: bicep build infra/ci-runner/network.bicep --stdout > /dev/null
       - name: Lint params
-        run: az bicep build-params --file infra/params/dev.bicepparam --outfile /dev/null
+        run: bicep build-params infra/params/dev.bicepparam --stdout > /dev/null
       - name: Lint params (staging)
-        run: az bicep build-params --file infra/params/staging.bicepparam --outfile /dev/null
+        run: bicep build-params infra/params/staging.bicepparam --stdout > /dev/null
       - name: Lint params (prod)
-        run: az bicep build-params --file infra/params/prod.bicepparam --outfile /dev/null
+        run: bicep build-params infra/params/prod.bicepparam --stdout > /dev/null

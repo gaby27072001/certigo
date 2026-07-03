@@ -7,7 +7,6 @@ on:
     branches: [ main ]
     paths: [ "apps/**", "packages/**", ".github/workflows/ci-mobile.yml" ]
   pull_request:
-    paths: [ "apps/**", "packages/**", ".github/workflows/ci-mobile.yml" ]
 
 concurrency:
   group: ci-mobile-${{ github.ref }}
@@ -21,13 +20,43 @@ env:
   NON_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","certigo-ci"]' }}
 
 jobs:
+  # CI-08 : détecte si des chemins pertinents ont changé pour cette PR. Une PR qui ne
+  # touche pas ces chemins skippe packages/app AU NIVEAU JOB (le check requis passe alors
+  # en success 'skipped'), au lieu d'un skip par filtre de chemin workflow-level qui
+  # laisserait le check requis Pending et bloquerait la PR indéfiniment.
+  changes:
+    name: Detect changed paths
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - 'apps/**'
+              - 'packages/**'
+              - '.github/workflows/ci-mobile.yml'
+
   packages:
     name: Pure-Dart packages (core, cortex, data)
+    needs: [changes]
     # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
     # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
     # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
     # évènements push/dispatch passent inchangés → zéro régression.
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    # CI-08 : `always()` neutralise le skip hérité de `needs.changes` ; le fork-guard reste
+    # (clause 2) ; on ne skippe QUE si paths-filter dit explicitement `false` (clause 3, PR
+    # seulement). Un output vide/erreur de filtre (!= 'false') => le vrai job tourne (sûr).
+    if: >-
+      always()
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name != 'pull_request' || needs.changes.outputs.relevant != 'false')
     # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
     # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
     environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
@@ -54,11 +83,18 @@ jobs:
 
   app:
     name: Flutter app + UI packages
+    needs: [changes]
     # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
     # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
     # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
     # évènements push/dispatch passent inchangés → zéro régression.
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    # CI-08 : `always()` neutralise le skip hérité de `needs.changes` ; le fork-guard reste
+    # (clause 2) ; on ne skippe QUE si paths-filter dit explicitement `false` (clause 3, PR
+    # seulement). Un output vide/erreur de filtre (!= 'false') => le vrai job tourne (sûr).
+    if: >-
+      always()
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name != 'pull_request' || needs.changes.outputs.relevant != 'false')
     # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
     # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
     environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
