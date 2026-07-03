@@ -48,3 +48,10 @@ final class ParseFailure extends Failure {
 final class UnknownFailure extends Failure {
   const UnknownFailure([super.message = 'Une erreur est survenue']) : super(code: 'unknown');
 }
+
+/// Catalog was reachable but returned no tracks — backend likely not seeded yet.
+/// UI should surface an actionable message instead of silently showing an empty list.
+final class CatalogEmptyFailure extends Failure {
+  const CatalogEmptyFailure([super.message = 'Aucune certification disponible'])
+      : super(code: 'catalog_empty');
+}

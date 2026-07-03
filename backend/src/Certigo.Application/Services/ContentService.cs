@@ -31,6 +31,9 @@ public sealed class ContentService(IContentRepository content) : IContentService
     public async Task<CatalogDto> GetCatalogAsync(CancellationToken cancellationToken = default)
     {
         var tracks = await content.ListTracksAsync(cancellationToken);
+        if (!tracks.Any())
+            throw new EmptyCatalogException();
+
         var summaries = tracks
             .Select(t => new TrackSummaryDto(
                 Id: t.Id,

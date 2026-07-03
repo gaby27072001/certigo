@@ -23,6 +23,17 @@ public sealed class DuplicateRecordException(string message) : Exception(message
 public sealed class TutorCompletionUnavailableException(string message, Exception? innerException = null)
     : Exception(message, innerException);
 
+/// Raised when the content catalog is empty (Cosmos DB not seeded or all tracks
+/// deleted). Converts to HTTP 503 Service Unavailable so the mobile client can
+/// display an actionable state instead of silently rendering an empty list.
+public sealed class EmptyCatalogException()
+    : Exception("The content catalog is empty — the database has not been seeded yet.");
+
+/// Raised when a requested certification track is not found in the content store.
+/// Converts to HTTP 404 so callers surface a clear "not found" state.
+public sealed class TrackNotFoundException(string trackId)
+    : Exception($"Track '{trackId}' was not found in the catalog.");
+
 public interface IUserContext
 {
     string UserId { get; }

@@ -38,6 +38,7 @@ SyncDispatch classifyFailure(Failure failure) {
     NotFoundFailure() => SyncDispatch.permanent,
     ParseFailure() => SyncDispatch.permanent,
     CacheFailure() => SyncDispatch.permanent,
+    CatalogEmptyFailure() => SyncDispatch.retryable,
     UnknownFailure() => SyncDispatch.retryable,
   };
 }

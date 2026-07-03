@@ -29,9 +29,7 @@ public sealed class PathService(
     {
         var track = await content.GetTrackAsync(trackId, cancellationToken);
         if (track is null)
-        {
-            return new PathDto(trackId, trackId, trackId, 0, 0, Array.Empty<PathUnitDto>(), Array.Empty<DomainProgressDto>());
-        }
+            throw new TrackNotFoundException(trackId);
 
         var masteries = await progress.ListMasteriesAsync(userContext.UserId, trackId, cancellationToken);
         var masteryByConcept = masteries

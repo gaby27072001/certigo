@@ -152,9 +152,14 @@ class ApiClient {
     final int? status = e.response?.statusCode;
     if (status == 401 || status == 403) return const AuthFailure();
     if (status == 404) return const NotFoundFailure();
+    // Extract the RFC 9457 ProblemDetails `detail` field when the server sends one
+    // (e.g. 503 Catalog unavailable). Surfaces actionable server messages to the UI.
+    final String? detail = e.response?.data is Map<String, dynamic>
+        ? (e.response!.data as Map<String, dynamic>)['detail'] as String?
+        : null;
     if (status != null && status >= 500) {
-      return ServerFailure('Erreur serveur', statusCode: status);
+      return ServerFailure(detail ?? 'Erreur serveur', statusCode: status);
     }
-    return ServerFailure(e.message ?? 'Requête échouée', statusCode: status);
+    return ServerFailure(detail ?? e.message ?? 'Requête échouée', statusCode: status);
   }
 }

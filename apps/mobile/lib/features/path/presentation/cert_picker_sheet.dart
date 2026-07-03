@@ -1,3 +1,4 @@
+import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -92,9 +93,18 @@ class CertPickerSheet extends ConsumerWidget {
                     },
                   ),
                   loading: () => const _CertLoading(),
-                  error: (Object _, StackTrace __) => _CertError(
-                    onRetry: () => ref.invalidate(catalogProvider),
-                  ),
+                  error: (Object err, StackTrace __) {
+                    final bool isEmptyCatalog = err is CatalogEmptyFailure ||
+                        (err is ServerFailure && err.statusCode == 503);
+                    return _CertError(
+                      title: isEmptyCatalog ? 'Catalogue vide' : 'Catalogue indisponible',
+                      message: err is Failure
+                          ? err.message
+                          : 'Impossible de charger les certifications. Réessaie dans un instant.',
+                      calloutKind: isEmptyCatalog ? CalloutKind.info : CalloutKind.warning,
+                      onRetry: () => ref.invalidate(catalogProvider),
+                    );
+                  },
                 ),
               ),
             ],
@@ -337,9 +347,17 @@ class _CertLoading extends StatelessWidget {
 }
 
 class _CertError extends StatelessWidget {
-  const _CertError({required this.onRetry});
+  const _CertError({
+    required this.onRetry,
+    this.title = 'Catalogue indisponible',
+    this.message = 'Impossible de charger les certifications. Réessaie dans un instant.',
+    this.calloutKind = CalloutKind.warning,
+  });
 
   final VoidCallback onRetry;
+  final String title;
+  final String message;
+  final CalloutKind calloutKind;
 
   @override
   Widget build(BuildContext context) {
@@ -348,10 +366,10 @@ class _CertError extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: <Widget>[
-        const CalloutBlock(
-          kind: CalloutKind.warning,
-          title: 'Catalogue indisponible',
-          text: 'Impossible de charger les certifications. Réessaie dans un instant.',
+        CalloutBlock(
+          kind: calloutKind,
+          title: title,
+          text: message,
         ),
         const SizedBox(height: 18),
         PrismButton.secondary(

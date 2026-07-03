@@ -50,6 +50,18 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
             await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict",
                 "The request conflicted with a concurrent update; please retry.", correlationId);
         }
+        catch (EmptyCatalogException)
+        {
+            logger.LogWarning(
+                "Catalog empty in function {FunctionName} — database may not be seeded.",
+                context.FunctionDefinition.Name);
+            await WriteProblemAsync(context, HttpStatusCode.ServiceUnavailable, "Catalog unavailable",
+                "No certification tracks are available yet. The database needs to be seeded.", correlationId);
+        }
+        catch (TrackNotFoundException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.NotFound, "Track not found", ex.Message, correlationId);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Unhandled exception in function {FunctionName}.", context.FunctionDefinition.Name);

@@ -21,6 +21,11 @@ import 'repositories.dart';
 /// single REST endpoint to a typed model via [ApiClient]. Routes mirror the
 /// backend exactly (userId is always derived from the JWT, never sent).
 
+List<TrackSummary> _decodeTrackSummaries(Map<String, dynamic> json) {
+  final List<dynamic> tracks = json['tracks'] as List<dynamic>? ?? <dynamic>[];
+  return tracks.map((dynamic e) => TrackSummary.fromJson(e as Map<String, dynamic>)).toList();
+}
+
 class RemoteUserRepository implements UserRepository {
   const RemoteUserRepository(this._api);
   final ApiClient _api;
@@ -43,14 +48,22 @@ class RemoteCatalogRepository implements CatalogRepository {
   final ApiClient _api;
 
   @override
-  Future<Result<List<TrackSummary>>> getCatalog() => _api.getJson(
-        '/catalog/tracks',
-        (Map<String, dynamic> json) => (json['tracks'] as List<dynamic>? ?? <dynamic>[])
-            .map(
-              (dynamic e) => TrackSummary.fromJson(e as Map<String, dynamic>),
+  Future<Result<List<TrackSummary>>> getCatalog() async {
+    final Result<List<TrackSummary>> result = await _api.getJson(
+      '/catalog/tracks',
+      _decodeTrackSummaries,
+    );
+    return result.when(
+      success: (tracks) => tracks.isEmpty
+          ? const Err(
+              CatalogEmptyFailure(
+                'Aucune certification disponible — le catalogue n\'a pas encore été alimenté.',
+              ),
             )
-            .toList(),
-      );
+          : Success(tracks),
+      failure: Err.new,
+    );
+  }
 }
 
 class RemoteLessonRepository implements LessonRepository {
@@ -58,10 +71,7 @@ class RemoteLessonRepository implements LessonRepository {
   final ApiClient _api;
 
   @override
-  Future<Result<Lesson>> getLesson({
-    required String trackId,
-    required String lessonId,
-  }) =>
+  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) =>
       _api.getJson('/tracks/$trackId/lessons/$lessonId', Lesson.fromJson);
 }
 
@@ -74,11 +84,7 @@ class RemoteQuizRepository implements QuizRepository {
     required String lessonId,
     required SubmitQuizRequest request,
   }) =>
-      _api.postJson(
-        '/quiz/$lessonId/submit',
-        request.toJson(),
-        SubmitQuizResult.fromJson,
-      );
+      _api.postJson('/quiz/$lessonId/submit', request.toJson(), SubmitQuizResult.fromJson);
 }
 
 class RemoteLeaderboardRepository implements LeaderboardRepository {
@@ -115,11 +121,8 @@ class RemoteSeasonRepository implements SeasonRepository {
   Future<Result<Season>> getSeason() => _api.getJson('/season', Season.fromJson);
 
   @override
-  Future<Result<ClaimSeasonResult>> claimSeason(ClaimSeasonRequest request) => _api.postJson(
-        '/season/claim',
-        request.toJson(),
-        ClaimSeasonResult.fromJson,
-      );
+  Future<Result<ClaimSeasonResult>> claimSeason(ClaimSeasonRequest request) =>
+      _api.postJson('/season/claim', request.toJson(), ClaimSeasonResult.fromJson);
 }
 
 class RemoteQuestRepository implements QuestRepository {
