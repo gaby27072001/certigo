@@ -66,12 +66,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.x"
+          # Keep Checkov runtime on a stable, broadly compatible Python release.
+          python-version: "3.12"
       - name: Run Checkov on infra/
         shell: bash
         run: |
           set -euo pipefail
           python -m pip install --upgrade --quiet checkov
           # Hard-fail gate: any new critical/high finding blocks delivery.
-          # Accepted false-positives are documented in .checkov.yaml (skip_checks).
+          # Accepted false-positives are documented in .checkov.yaml (skip-check).
           checkov --directory infra --framework bicep --compact --quiet --config-file .checkov.yaml
