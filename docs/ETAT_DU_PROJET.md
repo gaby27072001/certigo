@@ -240,7 +240,7 @@ les décisions serveur‑autoritaires.
 
 ---
 
-## 10 · Infrastructure (Bicep) — décrite, pas encore déployée
+## 10 · Infrastructure (Bicep) — déployée (dev / prod / CI), staging à provisionner
 
 ```mermaid
 graph TD
@@ -254,7 +254,9 @@ graph TD
     M --> G["diagnostics<br/>logs/metrics"]
 ```
 
-**8 modules** prêts. L'environnement **`dev`** est déployé (`rg-certigo-dev`, subscription MCAPS Hybrid `b8952c8c`). Staging et prod restent à provisionner.
+**8 modules** prêts. Les environnements **`dev`**, **`prod`** et **CI** sont déployés sur Azure (subscription MCAPS Hybrid `b8952c8c`) — `rg-certigo-dev`, `rg-certigo-prod` (**entièrement en réseau privé**) et `rg-certigo-ci`. **Seul `staging` n'est pas déployé** (bien que `infra/params/staging.bicepparam` existe).
+
+> ℹ️ État d'infra vérifié le **2026-07-04** — voir [`AUDIT_Certigo.md`](../AUDIT_Certigo.md) (source de vérité de l'état d'infra).
 
 ---
 
