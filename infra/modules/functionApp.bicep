@@ -52,9 +52,8 @@ param tutorLlmApiVersion string = '2024-10-21'
 @description('Optional explicit API key for the tutor LLM. Leave empty to use the Function App managed identity instead.')
 @secure()
 param tutorLlmApiKey string = ''
-@description('Signing key for email/password JWTs. Passed from main.bicep (deterministic per env). @secure so it never appears in deploy logs.')
-@secure()
-param authJwtSigningKey string
+@description('Key Vault secret URI holding the JWT signing key. Injected into the AUTH_JWT_SIGNING_KEY app setting as a KV reference, resolved at runtime by the managed identity.')
+param authJwtSigningKeySecretUri string
 @description('Maximum output tokens requested from the tutor LLM.')
 param tutorLlmMaxOutputTokens int = 400
 param tags object = {}
@@ -145,7 +144,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         // unless this explicit non-production override is set. Only enabled when AUTH_MODE=dev
         // (dev env); 'false' elsewhere is inert because the guard short-circuits when AUTH_MODE!=dev.
         { name: 'AUTH_ALLOW_DEV', value: authMode == 'dev' ? 'true' : 'false' }
-        { name: 'AUTH_JWT_SIGNING_KEY', value: authJwtSigningKey }
+        { name: 'AUTH_JWT_SIGNING_KEY', value: '@Microsoft.KeyVault(SecretUri=${authJwtSigningKeySecretUri})' }
         { name: 'ENTRA_AUTHORITY', value: entraAuthority }
         { name: 'ENTRA_AUDIENCE', value: entraAudience }
         { name: 'TUTOR_LLM_ENABLED', value: string(tutorLlmEnabled) }
@@ -171,17 +170,20 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
 // Identity-based storage access for the Functions host (deployment package +
 // AzureWebJobsStorage). Required because the storage account has shared-key auth
 // disabled — the runtime authenticates with the app's managed identity.
-var storageBlobDataOwner = subscriptionResourceId(
+// Storage Blob Data Contributor (read/write) suffices for the Functions runtime;
+// Data Owner (which additionally grants POSIX ACL / RBAC management on blobs) is
+// over-privileged for this workload (finding R-03).
+var storageBlobDataContributor = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
-  'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+  'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 )
 
 resource storageBlobAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: storage
-  name: guid(storage.id, functionApp.id, storageBlobDataOwner)
+  name: guid(storage.id, functionApp.id, storageBlobDataContributor)
   properties: {
     principalId: functionApp.identity.principalId
-    roleDefinitionId: storageBlobDataOwner
+    roleDefinitionId: storageBlobDataContributor
     principalType: 'ServicePrincipal'
   }
 }

@@ -1,9 +1,17 @@
 // Dev environment parameters. Authority/audience point to the Certigo
 // Entra External ID app registration (replace placeholders before deploying).
-// NOTE on Entra placeholders: in dev, main.bicep sets authMode='dev', so the API uses
-// DevTokenValidator and Entra External ID is NOT enforced. The entraAuthority/entraAudience
-// placeholders below are therefore safe to deploy as-is for dev. Provide real CIAM values
-// for staging/prod (where authMode='prod' and EntraTokenValidator is active).
+// NOTE on Entra placeholders (audit finding F-02): the entraAuthority/entraAudience
+// values below are the all-zeros tenant placeholder (00000000-...). This is INTENTIONAL
+// and safe for dev, because dev runs on an explicit auth bypass — it never validates
+// Entra tokens at runtime:
+//   * main.bicep sets authMode='dev' for env=='dev', which becomes AUTH_MODE=dev on the
+//     Function App, and functionApp.bicep derives AUTH_ALLOW_DEV=true from it.
+//   * With AUTH_MODE=dev + AUTH_ALLOW_DEV=true the API selects the permissive
+//     DevTokenValidator; the EntraTokenValidator (which would consume these values) is
+//     never activated, so ENTRA_AUTHORITY / ENTRA_AUDIENCE are inert.
+// => Do NOT waste effort wiring a real CIAM tenant for dev. Real Entra External ID values
+//    are only required for staging/prod, where authMode='prod' and EntraTokenValidator is
+//    active (see prod.bicepparam / staging.bicepparam).
 //
 // Deploy:
 //   az deployment sub create \
@@ -19,7 +27,8 @@ param appName = 'certigo'
 // Cosmos DB deployed in northeurope — westeurope has AZ-capacity limits.
 param cosmosLocation = 'northeurope'
 
-// Microsoft Entra External ID (CIAM) — fill from your tenant.
+// Microsoft Entra External ID (CIAM) — placeholder tenant, deliberately inert in dev
+// (see the F-02 note at the top of this file). Leave as-is unless testing Entra locally.
 param entraAuthority = 'https://certigo.ciamlogin.com/00000000-0000-0000-0000-000000000000/v2.0'
 param entraAudience = '00000000-0000-0000-0000-000000000000'
 

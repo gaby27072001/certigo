@@ -121,6 +121,8 @@ module data 'modules/cosmos.bicep' = {
     databaseName: 'certigo'
     disableLocalAuth: hardened
     enablePrivateNetworking: enablePrivateNetworking
+    // PITR (Continuous) for every non-dev env; dev stays Periodic (simplicity/cost).
+    enableContinuousBackup: hardened
     tags: tags
   }
 }
@@ -156,6 +158,7 @@ module vault 'modules/keyvault.bicep' = {
     enablePurgeProtection: hardened
     softDeleteRetentionInDays: hardened ? 90 : 7
     enablePrivateNetworking: enablePrivateNetworking
+    jwtSigningKey: effectiveAuthJwtSigningKey
     tags: tags
   }
 }
@@ -186,7 +189,7 @@ module api 'modules/functionApp.bicep' = {
     cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
     authMode: authMode
-    authJwtSigningKey: effectiveAuthJwtSigningKey
+    authJwtSigningKeySecretUri: vault.outputs.jwtSecretUri
     entraAuthority: entraAuthority
     entraAudience: entraAudience
     tutorLlmEnabled: tutorLlmEnabled
@@ -204,6 +207,24 @@ module api 'modules/functionApp.bicep' = {
     emailVerifyBaseUrl: 'https://func-${appName}-${env}-${suffix}.azurewebsites.net/api/auth/verify-email'
     // Native mobile clients aren't subject to CORS; only dev keeps '*' (browser tooling).
     allowedCorsOrigins: env == 'dev' ? [ '*' ] : []
+    tags: tags
+  }
+}
+
+// Azure AI Services account for the LLM tutor. Brought under IaC to remove the
+// drift documented in audit finding G (the 'certigo-openai' account was created
+// out-of-band). Gated on tutorLlmEnabled (dev only today). accountName/location
+// target the existing dev resource: on the first apply, review the what-if so the
+// account is adopted/updated, not recreated. Deployed after 'api' because it needs
+// the Function App managed-identity principal id for the OpenAI User role grant.
+module tutor 'modules/openai.bicep' = if (tutorLlmEnabled) {
+  scope: rg
+  name: 'openai'
+  params: {
+    accountName: 'certigo-openai'
+    location: 'swedencentral'
+    deploymentName: tutorLlmDeployment
+    functionAppPrincipalId: api.outputs.principalId
     tags: tags
   }
 }

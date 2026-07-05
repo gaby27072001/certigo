@@ -12,6 +12,9 @@ param disableLocalAuth bool = false
 @description('Private-networking posture. When true, the Cosmos public network endpoint is Disabled (assumes private endpoints exist — Phase 2). Default false keeps it Enabled so the Function App managed identity can reach the account without private endpoints. Decoupled from disableLocalAuth (RBAC-only auth), which stays on independently for hardened envs.')
 param enablePrivateNetworking bool = false
 
+@description('Enable Continuous backup (Point-In-Time Restore) instead of the implicit Periodic default. Recommended for staging/prod. WARNING: on an EXISTING account, switching Periodic to Continuous is IRREVERSIBLE and one-way.')
+param enableContinuousBackup bool = false
+
 resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   name: accountName
   location: location
@@ -37,6 +40,15 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
     disableLocalAuth: disableLocalAuth
     publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
     minimalTlsVersion: 'Tls12'
+    // Backup posture (audit finding R-02). Continuous = Point-In-Time Restore.
+    // Continuous7Days tier is free; bump to Continuous30Days if longer PITR is needed.
+    // null preserves the account default (Periodic) for dev.
+    backupPolicy: enableContinuousBackup ? {
+      type: 'Continuous'
+      continuousModeProperties: {
+        tier: 'Continuous7Days'
+      }
+    } : null
   }
 }
 
