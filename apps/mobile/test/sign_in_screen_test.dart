@@ -16,8 +16,8 @@ import 'auth_controller_test.dart' show FakeAuthGateway, FakeCredentialsGateway,
 /// Créer un compte) toujours présent, et boutons sociaux affichés uniquement
 /// quand Entra est configuré.
 ///
-/// On ne `pumpAndSettle` jamais : l'[AuroraBackground] anime en boucle et ne se
-/// stabiliserait jamais.
+/// On évite `pumpAndSettle` : on avance par frames courtes après la
+/// restauration différée de session (aucune session → écran de connexion).
 void main() {
   Future<void> pumpSignIn(
     WidgetTester tester, {

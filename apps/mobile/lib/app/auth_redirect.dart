@@ -13,7 +13,8 @@ import '../features/auth/application/auth_state.dart';
 /// vérifie par ailleurs (assert) que `OnboardingRoutes` reste synchronisé.
 abstract class AuthShellRoutes {
   static const String splash = '/splash'; // splash d'auth (restauration de session)
-  static const String auth = '/auth'; // écran de connexion
+  static const String landing = '/landing'; // écran d'ouverture façon Luma (hero + sheet)
+  static const String auth = '/auth'; // écran de connexion e-mail (ouvert depuis la sheet)
   static const String home = '/home'; // accueil (dans le shell)
   static const String onboardingSplash = '/onboarding/splash'; // ≠ [splash] (cf. #154)
 
@@ -42,9 +43,12 @@ abstract class AuthShellRoutes {
 /// Retourne la route cible, ou `null` pour rester sur [location].
 ///
 /// Invariants garantis :
+/// - un utilisateur `Unauthenticated` atterrit par défaut sur l'écran
+///   d'ouverture [AuthShellRoutes.landing] (façon Luma) ; l'écran de connexion
+///   e-mail [AuthShellRoutes.auth] reste accessible (ouvert depuis la sheet) ;
 /// - un utilisateur `Authenticated` ne reste JAMAIS sur une surface d'auth
-///   ([AuthShellRoutes.splash] ou [AuthShellRoutes.auth]) : il part vers
-///   l'onboarding ou l'accueil ;
+///   ([AuthShellRoutes.splash], [AuthShellRoutes.landing] ou
+///   [AuthShellRoutes.auth]) : il part vers l'onboarding ou l'accueil ;
 /// - la cible d'onboarding est [AuthShellRoutes.onboardingSplash]
 ///   (≠ [AuthShellRoutes.splash]), ce qui évite le piège du spinner (#154) ;
 /// - aucune redirection ne renvoie vers [location] elle-même (pas de boucle).
@@ -54,6 +58,7 @@ String? resolveAuthRedirect({
   required bool onboardingCompleted,
 }) {
   final bool atAuthSplash = location == AuthShellRoutes.splash;
+  final bool atLanding = location == AuthShellRoutes.landing;
   final bool atAuth = location == AuthShellRoutes.auth;
   final bool atOnboarding = AuthShellRoutes.isStartup(location);
 
@@ -61,12 +66,13 @@ String? resolveAuthRedirect({
   if (auth is AuthLoading) {
     return atAuthSplash ? null : AuthShellRoutes.splash;
   }
-  // Non authentifié : forcer la connexion.
+  // Non authentifié : présenter l'écran d'ouverture (landing) par défaut, tout
+  // en autorisant l'écran de connexion e-mail atteint depuis la sheet.
   if (auth is Unauthenticated) {
-    return atAuth ? null : AuthShellRoutes.auth;
+    return (atLanding || atAuth) ? null : AuthShellRoutes.landing;
   }
-  // Authentifié : ne jamais rester sur une surface d'auth.
-  if (atAuthSplash || atAuth) {
+  // Authentifié : ne jamais rester sur une surface d'auth (splash, landing, auth).
+  if (atAuthSplash || atLanding || atAuth) {
     return onboardingCompleted ? AuthShellRoutes.home : AuthShellRoutes.onboardingSplash;
   }
   // Authentifié mais onboarding non terminé : forcer le flux de démarrage.

@@ -38,7 +38,18 @@ void main() {
   });
 
   group('resolveAuthRedirect — non authentifié', () {
-    test('sur /auth → reste', () {
+    test('sur /landing → reste (écran d\'ouverture par défaut)', () {
+      expect(
+        resolveAuthRedirect(
+          auth: const Unauthenticated(),
+          location: AuthShellRoutes.landing,
+          onboardingCompleted: false,
+        ),
+        isNull,
+      );
+    });
+
+    test('sur /auth → reste (connexion e-mail ouverte depuis la sheet)', () {
       expect(
         resolveAuthRedirect(
           auth: const Unauthenticated(),
@@ -49,14 +60,14 @@ void main() {
       );
     });
 
-    test('ailleurs → forcé sur /auth', () {
+    test('ailleurs → forcé sur /landing (Option B)', () {
       expect(
         resolveAuthRedirect(
           auth: const Unauthenticated('msg'),
           location: AuthShellRoutes.home,
           onboardingCompleted: true,
         ),
-        AuthShellRoutes.auth,
+        AuthShellRoutes.landing,
       );
     });
   });
@@ -92,6 +103,16 @@ void main() {
       );
       expect(target, AuthShellRoutes.home);
       expect(target, isNot(AuthShellRoutes.auth));
+    });
+
+    test('sur /landing → quitte toujours l\'écran d\'ouverture', () {
+      final String? target = resolveAuthRedirect(
+        auth: const Authenticated(validSession),
+        location: AuthShellRoutes.landing,
+        onboardingCompleted: true,
+      );
+      expect(target, AuthShellRoutes.home);
+      expect(target, isNot(AuthShellRoutes.landing));
     });
 
     test('sur /home + onboarding non terminé → /onboarding/splash', () {
@@ -148,6 +169,7 @@ void main() {
     test('un utilisateur authentifié ne cible jamais une surface d\'auth', () {
       const List<String> locations = <String>[
         AuthShellRoutes.splash,
+        AuthShellRoutes.landing,
         AuthShellRoutes.auth,
         AuthShellRoutes.home,
         AuthShellRoutes.onboardingSplash,
@@ -162,7 +184,9 @@ void main() {
             onboardingCompleted: completed,
           );
           expect(
-            target == AuthShellRoutes.splash || target == AuthShellRoutes.auth,
+            target == AuthShellRoutes.splash ||
+                target == AuthShellRoutes.landing ||
+                target == AuthShellRoutes.auth,
             isFalse,
             reason: 'loc=$loc completed=$completed a ciblé une surface d\'auth ($target)',
           );

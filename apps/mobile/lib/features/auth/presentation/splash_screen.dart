@@ -29,7 +29,7 @@ class SplashScreen extends StatelessWidget {
                 ),
                 child: const Center(
                   child: Text(
-                    'M',
+                    'C',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 36,

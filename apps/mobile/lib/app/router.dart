@@ -20,6 +20,7 @@ import '../features/share/presentation/daily_share_screen.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/application/auth_state.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
+import '../features/auth/presentation/landing_screen.dart';
 import '../features/auth/presentation/splash_screen.dart' as auth;
 import '../features/onboarding/application/onboarding_controller.dart';
 import '../features/onboarding/presentation/birth_year_screen.dart';
@@ -49,7 +50,8 @@ abstract class Routes {
 
   /// Auth flows (outside the shell, on the root navigator).
   static const String splash = '/splash'; // session restore in progress
-  static const String auth = '/auth'; // sign-in (Microsoft / Google / Apple)
+  static const String landing = '/landing'; // Luma-style opening hero (pre-auth)
+  static const String auth = '/auth'; // sign-in (Microsoft / Google / Apple / e-mail)
 
   /// Full-screen (outside the shell) flows.
   static const String lesson = '/lesson'; // /lesson/:trackId/:lessonId
@@ -110,6 +112,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   // testable) doivent rester alignées sur le table de routes et l'onboarding.
   // En debug, tout écart casse tôt plutôt que de laisser passer une régression.
   assert(Routes.splash == AuthShellRoutes.splash, 'Routes.splash désynchronisé');
+  assert(Routes.landing == AuthShellRoutes.landing, 'Routes.landing désynchronisé');
   assert(Routes.auth == AuthShellRoutes.auth, 'Routes.auth désynchronisé');
   assert(Routes.home == AuthShellRoutes.home, 'Routes.home désynchronisé');
   assert(
@@ -157,10 +160,24 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         builder: (_, __) => const auth.SplashScreen(),
       ),
       GoRoute(
+        path: Routes.landing,
+        name: 'landing',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) => _stepPage(
+          state: state,
+          child: const LandingScreen(),
+          begin: const Offset(0, 0.03),
+        ),
+      ),
+      GoRoute(
         path: Routes.auth,
         name: 'auth',
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const SignInScreen(),
+        builder: (_, GoRouterState state) => SignInScreen(
+          // Ouvert depuis la sheet « Commencer » avec ?emailOnly=1 : on masque
+          // alors les boutons sociaux (déjà proposés par la sheet).
+          emailOnly: state.uri.queryParameters['emailOnly'] == '1',
+        ),
       ),
 
       // Onboarding startup flow (full-screen, above the shell).

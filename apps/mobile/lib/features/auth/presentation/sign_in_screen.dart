@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../application/auth_controller.dart';
@@ -17,7 +18,13 @@ enum _AuthMode { signIn, register }
 /// Microsoft Entra External ID est configuré, les trois boutons sociaux
 /// (Microsoft, Google, Apple) s'affichent en complément.
 class SignInScreen extends ConsumerStatefulWidget {
-  const SignInScreen({super.key});
+  const SignInScreen({super.key, this.emailOnly = false});
+
+  /// Quand `true`, masque les boutons sociaux (Microsoft/Google/Apple) et ne
+  /// laisse que le formulaire e-mail. Utilisé quand l'écran est atteint depuis
+  /// la bottom sheet « Commencer » (qui propose déjà les sociaux), pour éviter
+  /// le doublon. N'affecte pas la logique d'authentification.
+  final bool emailOnly;
 
   @override
   ConsumerState<SignInScreen> createState() => _SignInScreenState();
@@ -112,7 +119,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
-    final bool socialEnabled = ref.watch(authConfiguredProvider);
+    final bool socialEnabled = ref.watch(authConfiguredProvider) && !widget.emailOnly;
 
     // Réarme les boutons et **conserve** l'erreur à l'écran quand le flux
     // retombe sur un état non authentifié. Un SnackBar disparaîtrait trop vite
@@ -150,176 +157,209 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final List<AuthDiagnosticEntry> diagnostics = ref.watch(authDiagnosticsProvider);
 
     return Scaffold(
-      body: AuroraBackground(
-        animate: true,
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: PrismSpacing.lg,
-                vertical: PrismSpacing.xl,
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    _Logo(color: p.primary),
-                    const SizedBox(height: PrismSpacing.lg),
-                    Text(
-                      'Certigo',
-                      textAlign: TextAlign.center,
-                      style: text.displaySmall?.copyWith(
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w800,
+      body: Stack(
+        children: <Widget>[
+          // Backdrop lumineux de marque, cohérent avec l'écran d'ouverture.
+          const Positioned.fill(child: _AuthBackdrop()),
+          SafeArea(
+            child: Column(
+              children: <Widget>[
+                // Barre supérieure : retour vers l'écran d'ouverture (landing).
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      left: PrismSpacing.sm,
+                      top: PrismSpacing.xs,
+                    ),
+                    child: _AuthBackButton(onTap: () => context.go('/landing')),
+                  ),
+                ),
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: PrismSpacing.lg,
+                        vertical: PrismSpacing.md,
                       ),
-                    ),
-                    const SizedBox(height: PrismSpacing.xs),
-                    Text(
-                      registering
-                          ? 'Crée ton compte pour commencer.'
-                          : 'Décroche tes certifications, une leçon à la fois.',
-                      textAlign: TextAlign.center,
-                      style: text.titleMedium?.copyWith(color: p.textSecondary),
-                    ),
-                    const SizedBox(height: PrismSpacing.xl),
-                    Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: <Widget>[
-                          if (registering) ...<Widget>[
-                            TextFormField(
-                              key: const Key('name-field'),
-                              controller: _nameController,
-                              enabled: !busy,
-                              textInputAction: TextInputAction.next,
-                              textCapitalization: TextCapitalization.words,
-                              decoration: const InputDecoration(
-                                labelText: 'Nom (facultatif)',
-                                prefixIcon: Icon(Icons.person_outline),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                            const _BrandBadge(),
+                            const SizedBox(height: PrismSpacing.md),
+                            Text(
+                              'Certigo',
+                              textAlign: TextAlign.center,
+                              style: text.titleMedium?.copyWith(
+                                color: p.textSecondary,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                            const SizedBox(height: PrismSpacing.xs),
+                            Text(
+                              registering ? 'Crée ton compte' : 'Content de te revoir',
+                              textAlign: TextAlign.center,
+                              style: text.displaySmall?.copyWith(
+                                color: p.textPrimary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: PrismSpacing.xs),
+                            Text(
+                              registering
+                                  ? 'Quelques secondes, et ta progression commence.'
+                                  : 'Reprends tes certifs là où tu t’es arrêté.',
+                              textAlign: TextAlign.center,
+                              style: text.titleMedium?.copyWith(color: p.textSecondary),
+                            ),
+                            const SizedBox(height: PrismSpacing.xl),
+                            Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: <Widget>[
+                                  if (registering) ...<Widget>[
+                                    TextFormField(
+                                      key: const Key('name-field'),
+                                      controller: _nameController,
+                                      enabled: !busy,
+                                      textInputAction: TextInputAction.next,
+                                      textCapitalization: TextCapitalization.words,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Nom (facultatif)',
+                                        prefixIcon: Icon(Icons.person_outline),
+                                      ),
+                                    ),
+                                    const SizedBox(height: PrismSpacing.sm),
+                                  ],
+                                  TextFormField(
+                                    key: const Key('email-field'),
+                                    controller: _emailController,
+                                    enabled: !busy,
+                                    keyboardType: TextInputType.emailAddress,
+                                    textInputAction: TextInputAction.next,
+                                    autocorrect: false,
+                                    autofillHints: const <String>[AutofillHints.email],
+                                    decoration: const InputDecoration(
+                                      labelText: 'E-mail',
+                                      prefixIcon: Icon(Icons.alternate_email),
+                                    ),
+                                    validator: _validateEmail,
+                                  ),
+                                  const SizedBox(height: PrismSpacing.sm),
+                                  TextFormField(
+                                    key: const Key('password-field'),
+                                    controller: _passwordController,
+                                    enabled: !busy,
+                                    obscureText: _obscure,
+                                    textInputAction: TextInputAction.done,
+                                    autofillHints: <String>[
+                                      registering
+                                          ? AutofillHints.newPassword
+                                          : AutofillHints.password,
+                                    ],
+                                    onFieldSubmitted: (_) => _submitEmail(),
+                                    decoration: InputDecoration(
+                                      labelText: 'Mot de passe',
+                                      prefixIcon: const Icon(Icons.lock_outline),
+                                      suffixIcon: IconButton(
+                                        onPressed: () => setState(() => _obscure = !_obscure),
+                                        icon: Icon(
+                                          _obscure
+                                              ? Icons.visibility_outlined
+                                              : Icons.visibility_off_outlined,
+                                        ),
+                                        tooltip: _obscure ? 'Afficher' : 'Masquer',
+                                      ),
+                                    ),
+                                    validator: _validatePassword,
+                                  ),
+                                  const SizedBox(height: PrismSpacing.lg),
+                                  SizedBox(
+                                    height: 52,
+                                    child: FilledButton(
+                                      key: const Key('email-submit'),
+                                      onPressed: busy ? null : _submitEmail,
+                                      child: _emailSubmitting
+                                          ? const SizedBox(
+                                              width: 22,
+                                              height: 22,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.4,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                                              ),
+                                            )
+                                          : Text(registering ? 'Créer un compte' : 'Se connecter'),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: PrismSpacing.sm),
-                          ],
-                          TextFormField(
-                            key: const Key('email-field'),
-                            controller: _emailController,
-                            enabled: !busy,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            autocorrect: false,
-                            autofillHints: const <String>[AutofillHints.email],
-                            decoration: const InputDecoration(
-                              labelText: 'E-mail',
-                              prefixIcon: Icon(Icons.alternate_email),
-                            ),
-                            validator: _validateEmail,
-                          ),
-                          const SizedBox(height: PrismSpacing.sm),
-                          TextFormField(
-                            key: const Key('password-field'),
-                            controller: _passwordController,
-                            enabled: !busy,
-                            obscureText: _obscure,
-                            textInputAction: TextInputAction.done,
-                            autofillHints: <String>[
-                              registering ? AutofillHints.newPassword : AutofillHints.password,
-                            ],
-                            onFieldSubmitted: (_) => _submitEmail(),
-                            decoration: InputDecoration(
-                              labelText: 'Mot de passe',
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              suffixIcon: IconButton(
-                                onPressed: () => setState(() => _obscure = !_obscure),
-                                icon: Icon(
-                                  _obscure
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                ),
-                                tooltip: _obscure ? 'Afficher' : 'Masquer',
+                            TextButton(
+                              key: const Key('toggle-mode'),
+                              onPressed: busy ? null : _toggleMode,
+                              child: Text(
+                                registering
+                                    ? 'Déjà un compte ? Se connecter'
+                                    : 'Pas encore de compte ? Créer un compte',
                               ),
                             ),
-                            validator: _validatePassword,
-                          ),
-                          const SizedBox(height: PrismSpacing.lg),
-                          SizedBox(
-                            height: 52,
-                            child: FilledButton(
-                              key: const Key('email-submit'),
-                              onPressed: busy ? null : _submitEmail,
-                              child: _emailSubmitting
-                                  ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.4,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                      ),
-                                    )
-                                  : Text(registering ? 'Créer un compte' : 'Se connecter'),
+                            if (socialEnabled) ...<Widget>[
+                              const SizedBox(height: PrismSpacing.md),
+                              _OrDivider(color: p.textSecondary),
+                              const SizedBox(height: PrismSpacing.md),
+                              AuthProviderButton(
+                                provider: AuthProvider.microsoft,
+                                loading: _pending == AuthProvider.microsoft,
+                                enabled: !busy,
+                                onPressed: () => _signInSocial(AuthProvider.microsoft),
+                              ),
+                              const SizedBox(height: PrismSpacing.sm),
+                              AuthProviderButton(
+                                provider: AuthProvider.google,
+                                loading: _pending == AuthProvider.google,
+                                enabled: !busy,
+                                onPressed: () => _signInSocial(AuthProvider.google),
+                              ),
+                              const SizedBox(height: PrismSpacing.sm),
+                              AuthProviderButton(
+                                provider: AuthProvider.apple,
+                                loading: _pending == AuthProvider.apple,
+                                enabled: !busy,
+                                onPressed: () => _signInSocial(AuthProvider.apple),
+                              ),
+                            ],
+                            if (shownError != null) ...<Widget>[
+                              const SizedBox(height: PrismSpacing.lg),
+                              _ErrorCard(message: shownError),
+                            ],
+                            if (diagnostics.isNotEmpty) ...<Widget>[
+                              const SizedBox(height: PrismSpacing.md),
+                              _DiagnosticCard(entries: diagnostics),
+                            ],
+                            const SizedBox(height: PrismSpacing.xl),
+                            Text(
+                              'En continuant, tu acceptes nos conditions d’utilisation et '
+                              'notre politique de confidentialité.',
+                              textAlign: TextAlign.center,
+                              style: text.bodySmall?.copyWith(color: p.textSecondary),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: PrismSpacing.sm),
-                    TextButton(
-                      key: const Key('toggle-mode'),
-                      onPressed: busy ? null : _toggleMode,
-                      child: Text(
-                        registering
-                            ? 'Déjà un compte ? Se connecter'
-                            : 'Pas encore de compte ? Créer un compte',
-                      ),
-                    ),
-                    if (socialEnabled) ...<Widget>[
-                      const SizedBox(height: PrismSpacing.md),
-                      _OrDivider(color: p.textSecondary),
-                      const SizedBox(height: PrismSpacing.md),
-                      AuthProviderButton(
-                        provider: AuthProvider.microsoft,
-                        loading: _pending == AuthProvider.microsoft,
-                        enabled: !busy,
-                        onPressed: () => _signInSocial(AuthProvider.microsoft),
-                      ),
-                      const SizedBox(height: PrismSpacing.sm),
-                      AuthProviderButton(
-                        provider: AuthProvider.google,
-                        loading: _pending == AuthProvider.google,
-                        enabled: !busy,
-                        onPressed: () => _signInSocial(AuthProvider.google),
-                      ),
-                      const SizedBox(height: PrismSpacing.sm),
-                      AuthProviderButton(
-                        provider: AuthProvider.apple,
-                        loading: _pending == AuthProvider.apple,
-                        enabled: !busy,
-                        onPressed: () => _signInSocial(AuthProvider.apple),
-                      ),
-                    ],
-                    if (shownError != null) ...<Widget>[
-                      const SizedBox(height: PrismSpacing.lg),
-                      _ErrorCard(message: shownError),
-                    ],
-                    if (diagnostics.isNotEmpty) ...<Widget>[
-                      const SizedBox(height: PrismSpacing.md),
-                      _DiagnosticCard(entries: diagnostics),
-                    ],
-                    const SizedBox(height: PrismSpacing.xl),
-                    Text(
-                      'En continuant, tu acceptes nos conditions d’utilisation et '
-                      'notre politique de confidentialité.',
-                      textAlign: TextAlign.center,
-                      style: text.bodySmall?.copyWith(color: p.textSecondary),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -476,39 +516,144 @@ class _OrDivider extends StatelessWidget {
   }
 }
 
-/// Logo simple et autonome (aucune ressource externe) : un losange lumineux aux
-/// couleurs de la marque.
-class _Logo extends StatelessWidget {
-  const _Logo({required this.color});
-
-  final Color color;
+/// Backdrop lumineux de l'écran de connexion : dégradé de base + halos radiaux
+/// teintés marque, construits localement à partir des tokens — cohérent avec
+/// l'écran d'ouverture (landing) pour une continuité visuelle.
+class _AuthBackdrop extends StatelessWidget {
+  const _AuthBackdrop();
 
   @override
   Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[
+            Color.alphaBlend(p.primary.withOpacity(0.10), p.background),
+            p.background,
+          ],
+        ),
+      ),
+      child: Stack(
+        children: <Widget>[
+          Positioned(
+            top: -140,
+            left: -90,
+            child: _AuthGlow(color: p.primary.withOpacity(0.20), size: 340),
+          ),
+          Positioned(
+            top: -30,
+            right: -110,
+            child: _AuthGlow(color: p.ember.withOpacity(0.14), size: 300),
+          ),
+          Positioned(
+            bottom: -170,
+            left: 0,
+            child: _AuthGlow(color: const Color(0xFF8C5CF6).withOpacity(0.14), size: 360),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Halo radial doux (repris de l'esprit d'`AuroraBackground`).
+class _AuthGlow extends StatelessWidget {
+  const _AuthGlow({required this.color, required this.size});
+
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: <Color>[color, color.withOpacity(0)]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bouton retour glass circulaire, ramène à l'écran d'ouverture.
+class _AuthBackButton extends StatelessWidget {
+  const _AuthBackButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    return Semantics(
+      button: true,
+      label: 'Retour',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: p.surface.withOpacity(0.7),
+            border: Border.all(color: p.border),
+          ),
+          alignment: Alignment.center,
+          child: Icon(Icons.arrow_back_rounded, color: p.textPrimary, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+/// Badge de marque : l'initiale « C » de Certigo (losange dégradé) dans un
+/// anneau glass lumineux — même langage visuel que l'ancre de l'écran hero.
+class _BrandBadge extends StatelessWidget {
+  const _BrandBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    const double outer = 88;
     return Center(
       child: Container(
-        width: 88,
-        height: 88,
+        width: outer,
+        height: outer,
         decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(24)),
-          gradient: LinearGradient(
-            colors: <Color>[color, context.prism.ember],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          shape: BoxShape.circle,
+          color: p.glassFill,
+          border: Border.all(color: Colors.white.withOpacity(0.55), width: 1.5),
           boxShadow: <BoxShadow>[
             BoxShadow(
-              color: color.withOpacity(0.40),
-              blurRadius: 28,
+              color: p.primary.withOpacity(0.32),
+              blurRadius: 30,
               offset: const Offset(0, 14),
-              spreadRadius: -8,
+              spreadRadius: -10,
             ),
           ],
         ),
-        child: const Center(
-          child: Text(
-            'M',
-            style: TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w900),
+        alignment: Alignment.center,
+        child: Container(
+          width: outer * 0.56,
+          height: outer * 0.56,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(outer * 0.18),
+            gradient: LinearGradient(
+              colors: <Color>[p.primary, p.ember],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: const Text(
+            'C',
+            style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900),
           ),
         ),
       ),
