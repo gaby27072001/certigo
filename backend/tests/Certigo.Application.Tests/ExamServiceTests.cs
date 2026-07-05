@@ -157,4 +157,82 @@ public sealed class ExamServiceTests
         result.Rewards.XpEarned.Should().BeGreaterThan(0);
         h.Leaderboard.Xp[h.UserId].Should().Be(result.Rewards.XpEarned);
     }
+
+    [Fact]
+    public async Task SubmitAsync_recovers_the_reward_when_the_profile_write_conflicts_once()
+    {
+        // Un writer concurrent distinct (ex. un achat boutique) fait muter le profil
+        // entre notre lecture et notre écriture : le premier upsert entre en conflit.
+        // Le retry de concurrence optimiste doit relire et ré-appliquer, créditant la
+        // récompense exactement une fois. Ici l'attempt idempotent est créé AVANT
+        // l'upsert : sans retry, l'exception laisserait l'attempt en base mais le profil
+        // non crédité → le rejeu client renverrait le résultat caché SANS re-créditer →
+        // XP/gems définitivement perdus. C'est le gate obligatoire de R-01.
+        var inner = new InMemoryUserRepository();
+        inner.Seed(TestContent.NewProfile("user-1"));
+        var users = new ConflictOnceUserRepository(inner);
+        var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
+        var examAttempts = new InMemoryExamAttemptRepository();
+        var leaderboard = new InMemoryLeaderboardRepository();
+        var service = new ExamService(
+            new FakeUserContext("user-1", "Tester"),
+            clock,
+            TestContent.Build(),
+            new InMemoryProgressRepository(),
+            examAttempts,
+            new InMemoryAttemptRepository(),
+            new InMemoryEventRepository(),
+            users,
+            leaderboard);
+
+        var result = await service.SubmitAsync(ExamServiceHarness.Submit(
+            "a1", "exam-1",
+            ExamServiceHarness.Answer("l1-i1", "a"),
+            ExamServiceHarness.Answer("l2-i1", "a"),
+            ExamServiceHarness.Answer("l3-i1", "a")));
+
+        users.UpsertCalls.Should().BeGreaterThanOrEqualTo(2); // conflit une fois, puis ré-appliqué
+        var profile = await inner.GetAsync("user-1");
+        profile!.Xp.Should().Be(result.Rewards.XpEarned); // récupéré, pas perdu
+        profile.Gems.Should().Be(20); // bonus de passage appliqué exactement une fois
+        examAttempts.CreateCount.Should().Be(1); // attempt idempotent créé une seule fois
+        leaderboard.Xp["user-1"].Should().Be(result.Rewards.XpEarned);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_no_lost_update_when_a_distinct_writer_commits_first()
+    {
+        // Preuve directe d'absence de lost update : un writer DISTINCT crédite +100 XP
+        // out-of-band juste avant notre écriture (et fait donc échouer notre premier
+        // upsert). Le retry doit relire ce profil frais puis empiler notre gain d'examen
+        // dessus → total final = gain externe + gain examen, aucune écriture écrasée.
+        var inner = new InMemoryUserRepository();
+        inner.Seed(TestContent.NewProfile("user-1"));
+        var users = new BumpThenConflictUserRepository(inner, p => p with { Xp = p.Xp + 100 });
+        var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
+        var examAttempts = new InMemoryExamAttemptRepository();
+        var leaderboard = new InMemoryLeaderboardRepository();
+        var service = new ExamService(
+            new FakeUserContext("user-1", "Tester"),
+            clock,
+            TestContent.Build(),
+            new InMemoryProgressRepository(),
+            examAttempts,
+            new InMemoryAttemptRepository(),
+            new InMemoryEventRepository(),
+            users,
+            leaderboard);
+
+        var result = await service.SubmitAsync(ExamServiceHarness.Submit(
+            "a1", "exam-1",
+            ExamServiceHarness.Answer("l1-i1", "a"),
+            ExamServiceHarness.Answer("l2-i1", "a"),
+            ExamServiceHarness.Answer("l3-i1", "a")));
+
+        users.UpsertCalls.Should().BeGreaterThanOrEqualTo(2);
+        var profile = await inner.GetAsync("user-1");
+        profile!.Xp.Should().Be(100 + result.Rewards.XpEarned); // gain externe préservé + notre gain
+        profile.Gems.Should().Be(20); // bonus de passage une seule fois
+        examAttempts.CreateCount.Should().Be(1);
+    }
 }

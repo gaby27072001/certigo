@@ -206,49 +206,65 @@ public sealed class ExamService(
         var profile = await users.GetAsync(userContext.UserId, cancellationToken)
             ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
 
-        var today = DateOnly.FromDateTime(now.UtcDateTime);
-        var sameDay = profile.DailyXpDate == today;
-        var newDailyXp = (sameDay ? profile.DailyXpEarned : 0) + xpEarned;
-        var goalMet = profile.DailyGoalXp > 0 && newDailyXp >= profile.DailyGoalXp;
-
-        // The mock exam awards XP too, so it feeds MonthlyXpEarned. Lessons and
-        // perfect-lessons stay lesson-only, but the anchor still resets every
-        // monthly counter on the first activity of a new month, whichever flow
-        // fires first.
-        var monthAnchor = new DateOnly(today.Year, today.Month, 1);
-        var sameMonth = profile.MonthlyAnchor == monthAnchor;
-
-        var stats = new GamificationStats(
-            profile.Xp,
-            profile.Level,
-            profile.StreakDays,
-            profile.LastActiveDate ?? DateOnly.MinValue,
-            profile.FreezeTokens,
-            profile.DailyGoalXp,
-            sameDay ? profile.DailyXpEarned : 0);
-        var newStats = StreakService.UpdateStreak(stats, today, goalMet);
-        var streakExtended = goalMet && profile.LastActiveDate != today;
-
-        var newXp = profile.Xp + xpEarned;
-        var newLevel = XpEngine.LevelFromXp(newXp);
-        var gemsEarned = score.Passed ? ExamConstants.PassGemBonus : 0;
-
-        var updatedProfile = profile with
+        // Récompense déterministe extraite en fonction PURE : elle recalcule tous les
+        // deltas (XP/niveau/streak/mensuel/gems) à partir du SNAPSHOT passé, sans capturer
+        // le profil lu. Cela permet, sur conflit de concurrence optimiste (412), de relire
+        // le profil frais et de ré-appliquer exactement le même gain — cf. wrap de l'upsert.
+        (UserProfileDto Updated, int NewXp, int NewLevel, bool StreakExtended, int GemsEarned) ComputeOutcome(UserProfileDto snapshot)
         {
-            Xp = newXp,
-            Level = newLevel,
-            StreakDays = goalMet ? newStats.StreakDays : profile.StreakDays,
-            FreezeTokens = goalMet ? newStats.FreezeTokens : profile.FreezeTokens,
-            LastActiveDate = goalMet ? newStats.LastActiveDate : profile.LastActiveDate,
-            DailyXpEarned = newDailyXp,
-            DailyXpDate = today,
-            DailyCorrectAnswers = (sameDay ? profile.DailyCorrectAnswers : 0) + correctCount,
-            MonthlyAnchor = monthAnchor,
-            MonthlyXpEarned = (sameMonth ? profile.MonthlyXpEarned : 0) + xpEarned,
-            MonthlyLessonsCompleted = sameMonth ? profile.MonthlyLessonsCompleted : 0,
-            MonthlyPerfectLessons = sameMonth ? profile.MonthlyPerfectLessons : 0,
-            Gems = profile.Gems + gemsEarned
-        };
+            var today = DateOnly.FromDateTime(now.UtcDateTime);
+            var sameDay = snapshot.DailyXpDate == today;
+            var newDailyXp = (sameDay ? snapshot.DailyXpEarned : 0) + xpEarned;
+            var goalMet = snapshot.DailyGoalXp > 0 && newDailyXp >= snapshot.DailyGoalXp;
+
+            // The mock exam awards XP too, so it feeds MonthlyXpEarned. Lessons and
+            // perfect-lessons stay lesson-only, but the anchor still resets every
+            // monthly counter on the first activity of a new month, whichever flow
+            // fires first.
+            var monthAnchor = new DateOnly(today.Year, today.Month, 1);
+            var sameMonth = snapshot.MonthlyAnchor == monthAnchor;
+
+            var stats = new GamificationStats(
+                snapshot.Xp,
+                snapshot.Level,
+                snapshot.StreakDays,
+                snapshot.LastActiveDate ?? DateOnly.MinValue,
+                snapshot.FreezeTokens,
+                snapshot.DailyGoalXp,
+                sameDay ? snapshot.DailyXpEarned : 0);
+            var newStats = StreakService.UpdateStreak(stats, today, goalMet);
+            var streakExtended = goalMet && snapshot.LastActiveDate != today;
+
+            var newXp = snapshot.Xp + xpEarned;
+            var newLevel = XpEngine.LevelFromXp(newXp);
+            var gemsEarned = score.Passed ? ExamConstants.PassGemBonus : 0;
+
+            var updated = snapshot with
+            {
+                Xp = newXp,
+                Level = newLevel,
+                StreakDays = goalMet ? newStats.StreakDays : snapshot.StreakDays,
+                FreezeTokens = goalMet ? newStats.FreezeTokens : snapshot.FreezeTokens,
+                LastActiveDate = goalMet ? newStats.LastActiveDate : snapshot.LastActiveDate,
+                DailyXpEarned = newDailyXp,
+                DailyXpDate = today,
+                DailyCorrectAnswers = (sameDay ? snapshot.DailyCorrectAnswers : 0) + correctCount,
+                MonthlyAnchor = monthAnchor,
+                MonthlyXpEarned = (sameMonth ? snapshot.MonthlyXpEarned : 0) + xpEarned,
+                MonthlyLessonsCompleted = sameMonth ? snapshot.MonthlyLessonsCompleted : 0,
+                MonthlyPerfectLessons = sameMonth ? snapshot.MonthlyPerfectLessons : 0,
+                Gems = snapshot.Gems + gemsEarned
+            };
+
+            return (updated, newXp, newLevel, streakExtended, gemsEarned);
+        }
+
+        var outcome = ComputeOutcome(profile);
+        var updatedProfile = outcome.Updated;
+        var newXp = outcome.NewXp;
+        var newLevel = outcome.NewLevel;
+        var streakExtended = outcome.StreakExtended;
+        var gemsEarned = outcome.GemsEarned;
 
         var weakConcepts = updatedMasteries.Values
             .Where(m => m.MasteryScore < 0.5)
@@ -353,7 +369,26 @@ public sealed class ExamService(
             throw;
         }
 
-        await users.UpsertAsync(updatedProfile, cancellationToken);
+        // Concurrence optimiste (R-01) : le repo envoie déjà l'IfMatchEtag et traduit un
+        // 412 en ConcurrencyConflictException. L'attempt idempotent étant créé JUSTE au-dessus
+        // (avant l'upsert), une exception non rattrapée laisserait l'attempt en base mais le
+        // profil non crédité → le rejeu client renverrait le résultat caché SANS re-créditer,
+        // perdant définitivement la récompense. On rattrape donc le conflit et on retente en
+        // relisant le profil frais puis en ré-appliquant le même gain déterministe (retry borné).
+        try
+        {
+            await users.UpsertAsync(updatedProfile, cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await OptimisticConcurrency.ExecuteAsync(async () =>
+            {
+                var latest = await users.GetAsync(userContext.UserId, cancellationToken)
+                    ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+                await users.UpsertAsync(ComputeOutcome(latest).Updated, cancellationToken);
+            }, cancellationToken: cancellationToken);
+        }
+
         await progress.UpsertMasteryBatchAsync(userContext.UserId, updatedMasteries.Values.ToArray(), cancellationToken);
 
         if (xpEarned > 0)

@@ -80,6 +80,39 @@ internal sealed class InMemoryUserRepository : IUserRepository
     private string NextETag() => $"\"{System.Threading.Interlocked.Increment(ref _version)}\"";
 }
 
+/// Wraps the in-memory user repo to simulate a DISTINCT concurrent writer: on the
+/// first upsert it commits an out-of-band profile mutation (bumping the stored ETag)
+/// AND throws a conflict, forcing the caller to re-read the fresher profile and
+/// re-apply its own delta on top. Proves the absence of lost update — the competing
+/// writer's change and ours must both survive. Subsequent writes delegate.
+internal sealed class BumpThenConflictUserRepository(
+    InMemoryUserRepository inner,
+    Func<UserProfileDto, UserProfileDto> concurrentMutation) : IUserRepository
+{
+    private bool _bumped;
+
+    public int UpsertCalls { get; private set; }
+
+    public Task<UserProfileDto?> GetAsync(string userId, CancellationToken cancellationToken = default)
+        => inner.GetAsync(userId, cancellationToken);
+
+    public Task<UserProfileDto?> FindByHandleAsync(string handle, CancellationToken cancellationToken = default)
+        => inner.FindByHandleAsync(handle, cancellationToken);
+
+    public Task<UserProfileDto> UpsertAsync(UserProfileDto profile, CancellationToken cancellationToken = default)
+    {
+        UpsertCalls++;
+        if (!_bumped)
+        {
+            _bumped = true;
+            inner.ForceConcurrentWrite(profile.Id, concurrentMutation);
+            throw new ConcurrencyConflictException("simulated distinct concurrent write");
+        }
+
+        return inner.UpsertAsync(profile, cancellationToken);
+    }
+}
+
 internal sealed class InMemoryContentRepository : IContentRepository
 {
     private readonly Dictionary<string, Track> _tracks = new(StringComparer.OrdinalIgnoreCase);

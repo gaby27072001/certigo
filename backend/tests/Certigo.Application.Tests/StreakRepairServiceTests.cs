@@ -52,6 +52,30 @@ public sealed class StreakRepairServiceTests
     }
 
     [Fact]
+    public async Task RepairAsync_charges_exactly_once_when_the_profile_write_conflicts_once()
+    {
+        // Concurrence optimiste (R-01) : un writer distinct commit entre notre lecture et
+        // notre écriture → le premier upsert lève un conflit 412. Le retry relit le profil,
+        // re-vérifie le solde et l'idempotence, puis débite EXACTEMENT une fois.
+        var inner = new InMemoryUserRepository();
+        inner.Seed(Profile(10, Today.AddDays(-2), gems: 100));
+        var users = new ConflictOnceUserRepository(inner);
+        var purchases = new InMemoryPurchaseRepository();
+        var events = new InMemoryEventRepository();
+        var service = new StreakRepairService(new FakeUserContext(UserId, "Tester"), new FakeClock(Now), users, purchases, events);
+
+        var result = await service.RepairAsync(new StreakRepairRequest("r1"));
+
+        result.Success.Should().BeTrue();
+        users.UpsertCalls.Should().BeGreaterThanOrEqualTo(2); // conflicted once, then re-applied
+        var profile = await inner.GetAsync(UserId);
+        profile!.Gems.Should().Be(50); // debited exactly once (100 - 50)
+        profile.LastActiveDate.Should().Be(Today.AddDays(-1)); // bridged
+        purchases.CreateCount.Should().Be(1); // ledger written once
+        events.Events.Count(e => e.Type == "streak.repaired").Should().Be(1);
+    }
+
+    [Fact]
     public async Task RepairAsync_when_streak_intact_fails()
     {
         var (service, users, _, _) = Build();

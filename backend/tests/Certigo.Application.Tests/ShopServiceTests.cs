@@ -65,6 +65,33 @@ public sealed class ShopServiceTests
     }
 
     [Fact]
+    public async Task PurchaseAsync_charges_exactly_once_when_the_profile_write_conflicts_once()
+    {
+        // Concurrence optimiste (R-01) : un writer concurrent distinct bouscule le profil
+        // entre notre lecture et notre écriture, donc le premier upsert lève un conflit 412.
+        // Le retry doit relire, ré-évaluer la garde de solde, puis débiter EXACTEMENT une fois
+        // — jamais deux fois, jamais un 409 spurious propagé à l'appelant.
+        var inner = new InMemoryUserRepository();
+        inner.Seed(TestContent.NewProfile("user-1") with { Gems = 300, FreezeTokens = 0 });
+        var users = new ConflictOnceUserRepository(inner);
+        var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
+        var purchases = new InMemoryPurchaseRepository();
+        var events = new InMemoryEventRepository();
+        var service = new ShopService(new FakeUserContext("user-1", "Tester"), clock, users, purchases, events);
+
+        var result = await service.PurchaseAsync(new PurchaseRequest("streak-freeze", "p1"));
+
+        result.Success.Should().BeTrue();
+        result.Error.Should().BeNull();
+        users.UpsertCalls.Should().BeGreaterThanOrEqualTo(2); // conflicted once, then re-applied
+        var profile = await inner.GetAsync("user-1");
+        profile!.Gems.Should().Be(100); // debited exactly once, not doubled
+        profile.FreezeTokens.Should().Be(1);
+        purchases.CreateCount.Should().Be(1); // ledger written once
+        events.Events.Count(e => e.Type == "shop.purchased").Should().Be(1);
+    }
+
+    [Fact]
     public async Task PurchaseAsync_insufficient_gems_fails_without_side_effects()
     {
         var h = new ShopServiceHarness();

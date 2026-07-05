@@ -109,6 +109,39 @@ public sealed class QuestServiceTests
     }
 
     [Fact]
+    public async Task ClaimAsync_awards_exactly_once_when_the_profile_write_conflicts_once()
+    {
+        // Concurrence optimiste (R-01) : un writer distinct commit entre notre lecture et
+        // notre écriture → le premier upsert lève un conflit 412. Le retry relit le profil,
+        // re-vérifie l'idempotence de la réclamation, puis crédite EXACTEMENT une fois.
+        var inner = new InMemoryUserRepository();
+        inner.Seed(TestContent.NewProfile("user-1") with
+        {
+            Gems = 100,
+            DailyXpDate = new DateOnly(2025, 1, 6),
+            DailyXpEarned = 999,
+            DailyLessonsCompleted = 99,
+            DailyCorrectAnswers = 99,
+            DailyPerfectLessons = 9,
+        });
+        var users = new ConflictOnceUserRepository(inner);
+        var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
+        var events = new InMemoryEventRepository();
+        var service = new QuestService(new FakeUserContext("user-1", "Tester"), clock, users, events);
+
+        var quest = (await service.GetTodayAsync()).Quests[0];
+        var result = await service.ClaimAsync(new ClaimQuestRequest(quest.Id));
+
+        result.Success.Should().BeTrue();
+        result.Claimed.Should().BeTrue();
+        users.UpsertCalls.Should().BeGreaterThanOrEqualTo(2); // conflicted once, then re-applied
+        var profile = await inner.GetAsync("user-1");
+        profile!.Gems.Should().Be(100 + quest.RewardGems); // credited exactly once
+        profile.DailyQuestClaims!.Count(id => id == quest.Id).Should().Be(1); // claim recorded once
+        events.Events.Count(e => e.Type == "quest.claimed").Should().Be(1);
+    }
+
+    [Fact]
     public async Task ClaimAsync_rejects_incomplete_quest_without_side_effects()
     {
         var h = new QuestServiceHarness();
