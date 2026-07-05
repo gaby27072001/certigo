@@ -37,7 +37,7 @@ param entraAudience = '00000000-0000-0000-0000-000000000000'
 // endpoint) is provisioned, and the "Cognitive Services OpenAI User" role is now granted
 // on that resource to the Function App managed identity.
 // TUTOR_LLM_API_KEY stays empty so the managed identity (Entra) is used for auth.
-param tutorLlmEnabled = true
+param tutorLlmEnabled = false
 param tutorLlmEndpoint = 'https://certigo-openai.services.ai.azure.com/api/projects/certigo-dev/openai/v1/'
 param tutorLlmDeployment = 'gpt-5.4-mini'
 param tutorLlmApiSurface = 'v1'
