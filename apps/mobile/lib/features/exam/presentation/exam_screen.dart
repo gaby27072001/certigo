@@ -37,7 +37,12 @@ class ExamScreen extends ConsumerWidget {
                       ),
                 loading: () => const _ExamLoading(),
                 error: (Object error, StackTrace _) => Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                  padding: const EdgeInsets.fromLTRB(
+                    PrismSpacing.gutter,
+                    PrismSpacing.xs,
+                    PrismSpacing.gutter,
+                    PrismSpacing.gutter,
+                  ),
                   child: PrismStatusView.error(
                     message: 'Impossible de charger cet examen.',
                     onRetry: () => ref.invalidate(examProvider),
@@ -190,7 +195,12 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
     return Column(
       children: <Widget>[
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+          padding: const EdgeInsets.fromLTRB(
+            PrismSpacing.gutter,
+            0,
+            PrismSpacing.gutter,
+            PrismSpacing.xs,
+          ),
           child: Row(
             children: <Widget>[
               Expanded(
@@ -210,7 +220,12 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
         ),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            padding: const EdgeInsets.fromLTRB(
+              PrismSpacing.gutter,
+              PrismSpacing.xs,
+              PrismSpacing.gutter,
+              PrismSpacing.lg,
+            ),
             children: <Widget>[
               Text(
                 eyebrow.toUpperCase(),
@@ -242,7 +257,12 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          padding: const EdgeInsets.fromLTRB(
+            PrismSpacing.gutter,
+            0,
+            PrismSpacing.gutter,
+            PrismSpacing.md,
+          ),
           child: Row(
             children: <Widget>[
               if (_index > 0) ...<Widget>[
@@ -308,7 +328,7 @@ class _ExamResultView extends StatelessWidget {
     };
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: <Widget>[
         Center(
           child: ReadinessGauge(
@@ -445,7 +465,7 @@ class _DomainScoreRow extends StatelessWidget {
     final double ratio = (score.pct / 100).clamp(0.0, 1.0);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: PrismSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -542,7 +562,10 @@ class _Pill extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.sm,
+        vertical: PrismSpacing.xs,
+      ),
       decoration: BoxDecoration(
         color: color.withOpacity(0.14),
         borderRadius: PrismRadii.pillAll,
@@ -566,7 +589,12 @@ class _ExamEmpty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 8, 20, 20),
+      padding: EdgeInsets.fromLTRB(
+        PrismSpacing.gutter,
+        PrismSpacing.xs,
+        PrismSpacing.gutter,
+        PrismSpacing.gutter,
+      ),
       child: PrismStatusView(
         icon: Icons.assignment_outlined,
         title: 'Examen indisponible',
@@ -582,7 +610,7 @@ class _ExamLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: const <Widget>[
         PrismSkeleton(height: 10),
         SizedBox(height: 20),
@@ -610,7 +638,10 @@ class _InlineError extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.sm,
+        vertical: PrismSpacing.debt10,
+      ),
       decoration: BoxDecoration(
         color: p.error.withOpacity(0.12),
         borderRadius: PrismRadii.cardMd,
@@ -638,7 +669,12 @@ class _ScreenHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 20, 4),
+      padding: const EdgeInsets.fromLTRB(
+        PrismSpacing.xs,
+        PrismSpacing.xxs,
+        PrismSpacing.gutter,
+        PrismSpacing.xxs,
+      ),
       child: Row(
         children: <Widget>[
           IconButton(

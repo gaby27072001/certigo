@@ -170,7 +170,7 @@ class _EmptyBlank extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 64),
       height: 38,
       alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.sm),
       decoration: BoxDecoration(
         color: p.primarySoft.withOpacity(0.35),
         borderRadius: PrismRadii.pillAll,

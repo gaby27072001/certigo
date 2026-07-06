@@ -46,7 +46,7 @@ work_packages:
     precondition: "Rechercher toute signing key en clair dans les app settings et les fichiers Bicep/params (grep AUTH_JWT_SIGNING_KEY, @Microsoft.KeyVault). Idempotent : si déjà en Key Vault reference et aucune valeur en clair, le lot est déjà fait."
     dod: "Aucun secret de signature en clair (dev + prod) ; l'app démarre via une Key Vault reference ; GET /health vert."
     rollback: "Restaurer l'app setting précédent (la Key Vault reference est désactivable) et redéployer ; aucune perte de données."
-    status: todo
+    status: in_review
 
   - id: wp-p0-02-etag-concurrency
     phase: 0
@@ -57,7 +57,7 @@ work_packages:
     precondition: "Localiser les écritures profil (XP, gems, streak) et vérifier la présence ou l'absence d'un If-Match ETag. Idempotent : si toutes les écritures profil sont déjà conditionnelles avec retry, le lot est déjà fait."
     dod: "Test de charge concurrent (écritures parallèles sur le même profil) sans lost update ; conflits 409/412 gérés par retry lecture-fusion-écriture ; tests verts."
     rollback: "Revert des écritures conditionnelles (retour à l'écriture non conditionnelle) ; comportement antérieur restauré."
-    status: todo
+    status: in_review
 
   - id: wp-p0-03-cosmos-pitr
     phase: 0
@@ -113,7 +113,7 @@ work_packages:
     precondition: "Vérifier les règles de protection de la branche main (gh api) et l'existence d'un process de release documenté. Idempotent : si protection + process sont déjà en place, le lot est déjà fait."
     dod: "Branche main protégée (revues obligatoires + checks requis, push direct interdit) ; processus de release formalisé (documenté et appliqué)."
     rollback: "Les règles de protection sont réversibles via gh api / settings ; aucune donnée touchée."
-    status: todo
+    status: in_review
 
   - id: wp-p0-08-e2e-auth-health-release
     phase: 0

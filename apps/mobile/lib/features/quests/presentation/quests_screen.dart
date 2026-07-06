@@ -99,7 +99,7 @@ class _QuestsContentState extends ConsumerState<_QuestsContent> {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: <Widget>[
         PrismCard(
           variant: PrismCardVariant.tonal,
@@ -246,7 +246,7 @@ class _QuestsLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: const <Widget>[
         PrismSkeleton(height: 78),
         SizedBox(height: 16),
