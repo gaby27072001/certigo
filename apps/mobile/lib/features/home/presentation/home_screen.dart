@@ -55,7 +55,7 @@ class _HomeContent extends StatelessWidget {
     );
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
       children: <Widget>[
         // Resource bar — streak / gems / XP, the at-a-glance economy, pinned at
         // the top like a learning app's status row.
@@ -81,7 +81,7 @@ class _HomeContent extends StatelessWidget {
         PrismCard(
           elevation: 2,
           borderRadius: PrismRadii.cardXxl,
-          padding: const EdgeInsets.symmetric(vertical: 24),
+          padding: const EdgeInsets.symmetric(vertical: PrismSpacing.lg),
           child: Column(
             children: <Widget>[
               ReadinessGauge(
@@ -411,7 +411,7 @@ class _HomeLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
       children: const <Widget>[
         PrismSkeleton(width: 150, height: 14),
         SizedBox(height: 12),
@@ -521,7 +521,8 @@ class _ExploreCard extends StatelessWidget {
       onTap: () => context.go(item.route),
       child: PrismCard(
         borderRadius: PrismRadii.cardLg,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        padding: const EdgeInsets.symmetric(
+            horizontal: PrismSpacing.md, vertical: PrismSpacing.cardInset),
         child: Row(
           children: <Widget>[
             Container(
