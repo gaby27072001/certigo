@@ -1,0 +1,14 @@
+{
+  "id": "wp-p0-05-ciam-governance",
+  "status": "in_progress",
+  "session_id": "f8ba9096-7adc-41d9-a793-b64490c6090a",
+  "branch": "gchambaud-microsoft-wp-p0-05-ciam-governance",
+  "pr": null,
+  "checkpoint": {
+    "step": "idempotence-audit",
+    "note": "Audit d'idempotence finding par finding (R-04/R-05/R-06/O-05/F-02). F-02 déjà remédié en IaC+code sur main (AUTH_ALLOW_DEV compile à 'false' en prod, garde-fou backend). R-04/R-05/R-06/O-05 = actions live Entra/Azure, runbooks déjà présents sous docs/runbooks/ (autorité registre). Aucune modif code/IaC requise.",
+    "at": "2026-07-06T18:20:01+01:00"
+  },
+  "updated_at": "2026-07-06T18:20:01+01:00",
+  "history_ref": "log.jsonl"
+}
