@@ -1,0 +1,14 @@
+{
+  "id": "wp-p0-04-ai-tutor-decision",
+  "status": "in_review",
+  "session_id": "cdfcd3cd-9b2a-4764-9871-56e696c389b2",
+  "branch": "gchambaud-microsoft-wp-p0-04-ai-tutor-decision",
+  "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/204",
+  "checkpoint": {
+    "step": "pr-opened",
+    "note": "Livrable ADR ecrit : docs/adr/ADR-O-01-ai-tutor-prod.md (Accepte - Option B, repli deterministe NullTutorCompletion en Phase 0 ; bascule LLM differee en Phase 2). Idempotence confirmee : flag prod TUTOR_LLM_ENABLED=false deja coherent (aucune modif code/IaC). Note de decision docs/runbooks/O-01 basculee 'Propose' -> 'Decide - Option B'. Registre (work-packages.yaml + STATE.md) passe a in_review. DoD ADR-only verte : YAML/JSON/JSONL parses OK, aucun secret en clair. PR draft base main a ouvrir.",
+    "at": "2026-07-06T18:52:00+01:00"
+  },
+  "updated_at": "2026-07-06T18:52:00+01:00",
+  "history_ref": "log.jsonl"
+}

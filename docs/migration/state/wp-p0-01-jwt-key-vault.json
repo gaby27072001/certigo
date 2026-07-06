@@ -1,0 +1,14 @@
+{
+  "id": "wp-p0-01-jwt-key-vault",
+  "status": "in_review",
+  "session_id": "db177b8b-c988-4639-9e2a-7e7decb19cf1",
+  "branch": "gchambaud-microsoft-wp-p0-01-jwt-key-vault",
+  "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/198",
+  "checkpoint": {
+    "step": "dod-verte",
+    "note": "F-01 deja remedie par PR #178 (mergee sur main) : AUTH_JWT_SIGNING_KEY servi via Key Vault reference @Microsoft.KeyVault(SecretUri=...) en dev+prod, Managed Identity SystemAssigned du Function App + role 'Key Vault Secrets User' sur le vault, secret AUTH-JWT-SIGNING-KEY dans Key Vault (params @secure(), prod.bicepparam sans valeur en clair). Aucun secret de signature en clair dans le repo (grep vert). DoD machine verte : dotnet build OK (0 err/0 warn), dotnet test 531 reussis / 0 echec (dont 10 JwtSigningKeyGuardTests), az bicep build OK (ARM 86 Ko). PR draft de bookkeeping registre en cours d'ouverture (non mergee).",
+    "at": "2026-07-06T17:23:15+01:00"
+  },
+  "updated_at": "2026-07-06T17:23:15+01:00",
+  "history_ref": "log.jsonl"
+}
