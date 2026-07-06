@@ -57,7 +57,7 @@ work_packages:
     precondition: "Localiser les écritures profil (XP, gems, streak) et vérifier la présence ou l'absence d'un If-Match ETag. Idempotent : si toutes les écritures profil sont déjà conditionnelles avec retry, le lot est déjà fait."
     dod: "Test de charge concurrent (écritures parallèles sur le même profil) sans lost update ; conflits 409/412 gérés par retry lecture-fusion-écriture ; tests verts."
     rollback: "Revert des écritures conditionnelles (retour à l'écriture non conditionnelle) ; comportement antérieur restauré."
-    status: todo
+    status: in_review
 
   - id: wp-p0-03-cosmos-pitr
     phase: 0
