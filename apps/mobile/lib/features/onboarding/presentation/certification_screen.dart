@@ -8,7 +8,8 @@ import 'onboarding_common.dart';
 
 /// The heart of the adaptation — the Certigo equivalent of the reference flow's
 /// "which language?" question: pick the certification you're aiming for. Each
-/// option is a [ChoiceTile] tagged with its exam-domain accent chip.
+/// option is a shared [CertificationCard] (the same design-system component the
+/// library catalogue and course picker use), tinted with its exam-domain accent.
 class CertificationScreen extends ConsumerWidget {
   const CertificationScreen({super.key});
 
@@ -28,11 +29,9 @@ class CertificationScreen extends ConsumerWidget {
           const MascotPrompt(message: 'Quelle certification veux-tu décrocher ?'),
           const SizedBox(height: 24),
           for (final TargetCertification cert in TargetCertification.values) ...<Widget>[
-            ChoiceTile(
-              title: cert.code,
-              trailingLabel: cert.title,
-              showCheckbox: false,
-              leading: _CertChip(cert: cert),
+            CertificationCard(
+              code: cert.code,
+              title: cert.title,
               accent: context.prism.accentFor(cert.domainIndex),
               selected: c.targetCertification == cert,
               onTap: () => c.setTargetCertification(cert),
@@ -40,33 +39,6 @@ class CertificationScreen extends ConsumerWidget {
             const SizedBox(height: 12),
           ],
         ],
-      ),
-    );
-  }
-}
-
-/// A rounded, accent-tinted chip showing the exam family initials — the
-/// per-domain color cue that tags each certification.
-class _CertChip extends StatelessWidget {
-  const _CertChip({required this.cert});
-
-  final TargetCertification cert;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color accent = context.prism.accentFor(cert.domainIndex);
-    return Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        color: accent.withOpacity(0.15),
-        borderRadius: PrismRadii.cardSm,
-        border: Border.all(color: accent.withOpacity(0.4)),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        cert.code.split('-').first,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: accent),
       ),
     );
   }

@@ -37,6 +37,12 @@ export 'src/components/streak_badge.dart';
 export 'src/components/xp_chip.dart';
 export 'src/components/gem_counter.dart';
 export 'src/components/lesson_tile.dart';
+
+// Certification catalogue (vendor → certification → chapter)
+export 'src/components/vendor_brand.dart';
+export 'src/components/vendor_tile.dart';
+export 'src/components/certification_card.dart';
+export 'src/components/chapter_section_card.dart';
 export 'src/components/quiz_option_tile.dart';
 export 'src/components/answer_chip.dart';
 export 'src/components/match_tile.dart';

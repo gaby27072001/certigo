@@ -147,163 +147,18 @@ class _CertList extends StatelessWidget {
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (BuildContext context, int i) {
         final TrackSummary track = tracks[i];
-        return _CertCard(
-          track: track,
+        return CertificationCard(
+          code: track.code,
+          title: track.title,
+          summary: track.summary,
+          levelLabel: _levelLabels[track.level] ?? track.level,
+          lessonCount: track.lessonCount,
+          unitCount: track.unitCount,
           accent: context.prism.accentFor(i),
           selected: track.id == activeId,
           onTap: () => onSelect(track.id),
         );
       },
-    );
-  }
-}
-
-/// One Duolingo-style course card: a colored emblem with the exam code, the
-/// official title, a level chip and lesson/chapter counts, plus a selected mark.
-class _CertCard extends StatelessWidget {
-  const _CertCard({
-    required this.track,
-    required this.accent,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final TrackSummary track;
-  final Color accent;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final PrismColorScheme p = context.prism;
-    final TextTheme text = Theme.of(context).textTheme;
-    final String level = _levelLabels[track.level] ?? track.level;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: selected ? accent.withOpacity(0.10) : p.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: selected ? accent : p.border,
-              width: selected ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: <Widget>[
-              _Emblem(code: track.code, accent: accent),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      track.title,
-                      style: text.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (track.summary.isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 3),
-                      Text(
-                        track.summary,
-                        style: text.bodySmall?.copyWith(color: p.textSecondary, height: 1.3),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    const SizedBox(height: 9),
-                    Row(
-                      children: <Widget>[
-                        if (level.isNotEmpty) ...<Widget>[
-                          _MetaChip(label: level, color: accent),
-                          const SizedBox(width: 8),
-                        ],
-                        Icon(Icons.menu_book_rounded, size: 14, color: p.textSecondary),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            '${track.lessonCount} leçons · ${track.unitCount} chapitres',
-                            style: text.labelSmall?.copyWith(color: p.textSecondary),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                selected ? Icons.check_circle_rounded : Icons.chevron_right_rounded,
-                color: selected ? accent : p.textSecondary,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Emblem extends StatelessWidget {
-  const _Emblem({required this.code, required this.accent});
-
-  final String code;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 56,
-      height: 56,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[accent, accent.withOpacity(0.74)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Text(
-        code,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w900,
-          fontSize: 13,
-          letterSpacing: 0.4,
-        ),
-      ),
-    );
-  }
-}
-
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.14),
-        borderRadius: PrismRadii.pillAll,
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 11),
-      ),
     );
   }
 }

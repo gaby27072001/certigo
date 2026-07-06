@@ -9,7 +9,9 @@ import '../features/lesson/presentation/lesson_screen.dart';
 import '../features/quiz/presentation/quiz_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/leaderboard/presentation/leaderboard_screen.dart';
-import '../features/library/presentation/library_screen.dart';
+import '../features/library/presentation/certification_chapters_screen.dart';
+import '../features/library/presentation/vendor_catalog_screen.dart';
+import '../features/library/presentation/vendor_certifications_screen.dart';
 import '../features/achievements/presentation/achievements_screen.dart';
 import '../features/seasons/presentation/seasons_screen.dart';
 import '../features/quests/presentation/quests_screen.dart';
@@ -443,36 +445,26 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
               GoRoute(
                 path: Routes.library,
                 name: 'library',
-                builder: (_, __) => const LibraryScreen(),
+                builder: (_, __) => const VendorCatalogScreen(),
                 routes: <RouteBase>[
                   GoRoute(
-                    path: 'domain/:id',
-                    name: 'library-domain',
+                    path: 'vendor/:vendorId',
+                    name: 'library-vendor',
                     builder: (BuildContext context, GoRouterState state) {
-                      final String id = state.pathParameters['id'] ?? '';
-                      return Scaffold(
-                        appBar: AppBar(title: Text(id)),
-                        body: ListView(
-                          children: <Widget>[
-                            const SizedBox(height: 48),
-                            Icon(
-                              Icons.auto_stories_rounded,
-                              size: 72,
-                              color: Theme.of(context).colorScheme.outline,
-                            ),
-                            const SizedBox(height: 16),
-                            Center(
-                              child: Text(
-                                'Contenu à venir pour ce domaine',
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.bodyLarge,
-                              ),
-                            ),
-                            const SizedBox(height: 48),
-                          ],
-                        ),
-                      );
+                      final VendorBrand vendor =
+                          VendorBrandInfo.fromId(state.pathParameters['vendorId'] ?? '');
+                      return VendorCertificationsScreen(vendor: vendor);
                     },
+                    routes: <RouteBase>[
+                      GoRoute(
+                        path: 'cert/:trackId',
+                        name: 'library-chapters',
+                        builder: (BuildContext context, GoRouterState state) {
+                          final String trackId = state.pathParameters['trackId'] ?? '';
+                          return CertificationChaptersScreen(trackId: trackId);
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
