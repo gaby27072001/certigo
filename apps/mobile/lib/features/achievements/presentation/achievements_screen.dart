@@ -60,7 +60,7 @@ class _AchievementsContent extends StatelessWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: <Widget>[
         PrismCard(
           variant: PrismCardVariant.tonal,
@@ -224,7 +224,10 @@ class _TierTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.debt10,
+        vertical: PrismSpacing.xxs,
+      ),
       decoration: BoxDecoration(
         color: color.withOpacity(0.16),
         borderRadius: PrismRadii.pillAll,
@@ -243,7 +246,7 @@ class _AchievementsLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: const <Widget>[
         PrismSkeleton(height: 88),
         SizedBox(height: 16),

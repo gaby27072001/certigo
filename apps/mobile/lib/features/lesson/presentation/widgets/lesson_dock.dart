@@ -47,7 +47,12 @@ class LessonDock extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      padding: const EdgeInsets.fromLTRB(
+        PrismSpacing.gutter,
+        PrismSpacing.xs,
+        PrismSpacing.gutter,
+        PrismSpacing.sm,
+      ),
       child: PrismButton(
         label: label,
         icon: validating ? Icons.check_rounded : Icons.arrow_forward_rounded,

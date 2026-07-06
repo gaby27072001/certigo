@@ -7,7 +7,7 @@ class ProfileLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
       children: const <Widget>[
         PrismSkeleton(height: 88),
         SizedBox(height: 16),
