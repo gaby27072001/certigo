@@ -90,7 +90,7 @@ work_packages:
     precondition: "Suivre les runbooks docs/runbooks/ (R-04, R-05, R-06, O-05) et vérifier l'état de chaque garde-fou (lock présent ? break-glass testé ? secret MSA daté ? AUTH_ALLOW_DEV en prod ?). Idempotent : sauter les sous-tâches déjà en place."
     dod: "R-06 resource lock CanNotDelete posé sur ciamDirectories ; R-04 compte break-glass cloud-only créé et testé ; R-05 rotation du secret MSA outillée + alerte J-30 (échéance 2027-07-01) ; O-05 résidus QuickStart + subscription vide nettoyés ; F-02 AUTH_ALLOW_DEV=false vérifié en prod."
     rollback: "Chaque sous-tâche a un rollback propre dans son runbook (lock supprimable, break-glass désactivable, secret re-rotatable, flag réactivable)."
-    status: todo
+    status: in_review
     notes: "Peut être re-découpé en sous-lots XS–S si trop gros."
 
   - id: wp-p0-06-server-authoritative-integrity
