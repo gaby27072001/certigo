@@ -55,7 +55,12 @@ class _PathResourceBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      padding: const EdgeInsets.fromLTRB(
+        PrismSpacing.gutter,
+        PrismSpacing.xs,
+        PrismSpacing.gutter,
+        0,
+      ),
       child: Row(
         children: <Widget>[
           StreakBadge(days: me.streakDays, active: me.dailyProgress >= 1),
@@ -165,7 +170,12 @@ class _PathContent extends StatelessWidget {
       final AuroraMascot guardian = _guardians[i % _guardians.length];
       slivers.add(
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+          padding: const EdgeInsets.fromLTRB(
+            PrismSpacing.md,
+            PrismSpacing.gutter,
+            PrismSpacing.md,
+            0,
+          ),
           sliver: SliverToBoxAdapter(
             child: UnitHeader(
               index: i + 1,
@@ -372,7 +382,12 @@ class _PathBannerDelegate extends SliverPersistentHeaderDelegate {
     final TextTheme t = Theme.of(context).textTheme;
     return Container(
       color: p.background,
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+      padding: const EdgeInsets.fromLTRB(
+        PrismSpacing.gutter,
+        PrismSpacing.xs,
+        PrismSpacing.gutter,
+        PrismSpacing.debt10,
+      ),
       alignment: Alignment.center,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -408,7 +423,10 @@ class _PathBannerDelegate extends SliverPersistentHeaderDelegate {
           Row(
             children: <Widget>[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: PrismSpacing.debt9,
+                  vertical: PrismSpacing.debt3,
+                ),
                 decoration: BoxDecoration(
                   color: p.primarySoft,
                   borderRadius: PrismRadii.pillAll,
@@ -463,7 +481,12 @@ class _ContinueCtaDelegate extends SliverPersistentHeaderDelegate {
     final PrismColorScheme p = context.prism;
     return Container(
       color: p.background,
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+      padding: const EdgeInsets.fromLTRB(
+        PrismSpacing.gutter,
+        PrismSpacing.debt10,
+        PrismSpacing.gutter,
+        PrismSpacing.debt14,
+      ),
       alignment: Alignment.center,
       child: AnimatedSwitcher(
         duration: PrismMotion.fast,
@@ -503,7 +526,10 @@ class _ReadinessChip extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final bool up = trend >= 0;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.sm,
+        vertical: PrismSpacing.debt7,
+      ),
       decoration: BoxDecoration(
         color: p.primarySoft,
         borderRadius: PrismRadii.pillAll,
@@ -565,7 +591,7 @@ class _PathLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
       children: const <Widget>[
         PrismSkeleton(width: 120, height: 14),
         SizedBox(height: 10),

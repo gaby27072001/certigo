@@ -120,7 +120,12 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               ),
               if (_error != null)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                  padding: const EdgeInsets.fromLTRB(
+                    PrismSpacing.gutter,
+                    PrismSpacing.debt14,
+                    PrismSpacing.gutter,
+                    0,
+                  ),
                   child: InlineError(message: _error!),
                 ),
               const SizedBox(height: 8),
@@ -161,7 +166,12 @@ class _AddFriendCard extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+      padding: const EdgeInsets.fromLTRB(
+        PrismSpacing.gutter,
+        PrismSpacing.xxs,
+        PrismSpacing.gutter,
+        0,
+      ),
       child: PrismCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,10 +238,15 @@ class _FriendRoster extends StatelessWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: <Widget>[
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+          padding: const EdgeInsets.fromLTRB(
+            PrismSpacing.xxs,
+            0,
+            PrismSpacing.xxs,
+            PrismSpacing.debt10,
+          ),
           child: Text(
             '${list.count} ami${list.count > 1 ? 's' : ''}',
             style: t.labelLarge?.copyWith(color: p.textSecondary),
@@ -268,7 +283,10 @@ class _FriendCard extends StatelessWidget {
     final bool hasAvatar = friend.avatarUrl != null && friend.avatarUrl!.isNotEmpty;
 
     return PrismCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.debt14,
+        vertical: PrismSpacing.sm,
+      ),
       child: Row(
         children: <Widget>[
           CircleAvatar(
@@ -325,7 +343,7 @@ class _FriendCard extends StatelessWidget {
               width: 40,
               height: 40,
               child: Padding(
-                padding: EdgeInsets.all(10),
+                padding: EdgeInsets.all(PrismSpacing.debt10),
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             )
@@ -371,7 +389,7 @@ class _FriendsLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: const <Widget>[
         PrismSkeleton(height: 74),
         SizedBox(height: 10),

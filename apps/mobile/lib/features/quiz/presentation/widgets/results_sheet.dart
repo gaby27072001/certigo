@@ -74,10 +74,15 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
         Container(
           decoration: BoxDecoration(
             color: p.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(PrismRadii.debt28)),
             border: Border.all(color: p.border),
           ),
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+          padding: const EdgeInsets.fromLTRB(
+            PrismSpacing.lg,
+            PrismSpacing.md,
+            PrismSpacing.lg,
+            PrismSpacing.debt28,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[

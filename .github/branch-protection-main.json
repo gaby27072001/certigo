@@ -1,0 +1,25 @@
+{
+  "_comment": "Certigo — Etat CIBLE (durci) de la protection de la branche main. Capture versionnable et re-appliquable. Applicable par un ADMIN du depot via : gh api --method PUT repos/gchambaud_microsoft/Certigo/branches/main/protection --input .github/branch-protection-main.json. Voir docs/GOVERNANCE.md. Ce fichier decrit l'etat SOUHAITE ; il n'est PAS applique automatiquement par un workflow (choix delibere du lot wp-p0-07 : reglage a privileges admin = reserve documentee, pas de mutation live non reviewable).",
+  "required_status_checks": {
+    "strict": true,
+    "contexts": [
+      "Build & test",
+      "Flutter app + UI packages"
+    ]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": {
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": true,
+    "required_approving_review_count": 1,
+    "require_last_push_approval": false
+  },
+  "restrictions": null,
+  "required_linear_history": false,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": true,
+  "block_creations": false,
+  "lock_branch": false,
+  "allow_fork_syncing": false
+}

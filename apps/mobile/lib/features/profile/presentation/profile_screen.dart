@@ -87,7 +87,7 @@ class _ProfileContent extends ConsumerWidget {
     ];
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
       children: <Widget>[
         // Identity -------------------------------------------------------
         PrismCard(

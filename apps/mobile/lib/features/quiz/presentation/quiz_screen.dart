@@ -133,7 +133,12 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           children: <Widget>[
             // Progress dots --------------------------------------------------
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 20, 8),
+              padding: const EdgeInsets.fromLTRB(
+                PrismSpacing.xs,
+                PrismSpacing.xxs,
+                PrismSpacing.gutter,
+                PrismSpacing.xs,
+              ),
               child: Row(
                 children: <Widget>[
                   IconButton(
@@ -158,7 +163,12 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                padding: const EdgeInsets.fromLTRB(
+                  PrismSpacing.gutter,
+                  PrismSpacing.xs,
+                  PrismSpacing.gutter,
+                  PrismSpacing.lg,
+                ),
                 children: <Widget>[
                   Text(item.stem, style: t.titleLarge?.copyWith(height: 1.4)),
                   const SizedBox(height: 20),
@@ -180,7 +190,12 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             ),
             // Action bar -----------------------------------------------------
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              padding: const EdgeInsets.fromLTRB(
+                PrismSpacing.gutter,
+                0,
+                PrismSpacing.gutter,
+                PrismSpacing.md,
+              ),
               child: _controller.graded
                   ? PrismButton(
                       label: _controller.isLast ? 'Voir mon résultat' : 'Continuer',
