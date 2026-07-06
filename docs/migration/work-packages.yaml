@@ -46,7 +46,7 @@ work_packages:
     precondition: "Rechercher toute signing key en clair dans les app settings et les fichiers Bicep/params (grep AUTH_JWT_SIGNING_KEY, @Microsoft.KeyVault). Idempotent : si déjà en Key Vault reference et aucune valeur en clair, le lot est déjà fait."
     dod: "Aucun secret de signature en clair (dev + prod) ; l'app démarre via une Key Vault reference ; GET /health vert."
     rollback: "Restaurer l'app setting précédent (la Key Vault reference est désactivable) et redéployer ; aucune perte de données."
-    status: in_review
+    status: done
 
   - id: wp-p0-02-etag-concurrency
     phase: 0
@@ -57,7 +57,7 @@ work_packages:
     precondition: "Localiser les écritures profil (XP, gems, streak) et vérifier la présence ou l'absence d'un If-Match ETag. Idempotent : si toutes les écritures profil sont déjà conditionnelles avec retry, le lot est déjà fait."
     dod: "Test de charge concurrent (écritures parallèles sur le même profil) sans lost update ; conflits 409/412 gérés par retry lecture-fusion-écriture ; tests verts."
     rollback: "Revert des écritures conditionnelles (retour à l'écriture non conditionnelle) ; comportement antérieur restauré."
-    status: in_review
+    status: done
 
   - id: wp-p0-03-cosmos-pitr
     phase: 0
@@ -68,7 +68,7 @@ work_packages:
     precondition: "Inspecter la config backup du compte Cosmos (Bicep + portail) : mode Periodic vs Continuous. Idempotent : si Continuous/PITR est déjà actif et sans drift, valider seulement la restauration test."
     dod: "PITR actif (drift IaC corrigé) et restauration test réussie (point-in-time restore vérifié)."
     rollback: "La config PITR est réversible (retour Periodic) ; aucune donnée perdue."
-    status: in_review
+    status: done
 
   - id: wp-p0-04-ai-tutor-decision
     phase: 0
@@ -79,7 +79,7 @@ work_packages:
     precondition: "Relire docs/runbooks/O-01 (décision tutor IA prod) et l'état du flag (dev/prod). Idempotent : si l'ADR/décision est déjà écrite et le flag cohérent, le lot est déjà fait."
     dod: "Décision écrite (ADR ou section dédiée) : Option A (activer derrière quota + safety + eval) ou Option B (repli déterministe NullTutorCompletion) ; flag prod cohérent avec la décision."
     rollback: "Le repli déterministe (NullTutorCompletion) est le rollback naturel : désactiver le flag."
-    status: in_review
+    status: done
 
   - id: wp-p0-05-ciam-governance
     phase: 0
@@ -90,7 +90,7 @@ work_packages:
     precondition: "Suivre les runbooks docs/runbooks/ (R-04, R-05, R-06, O-05) et vérifier l'état de chaque garde-fou (lock présent ? break-glass testé ? secret MSA daté ? AUTH_ALLOW_DEV en prod ?). Idempotent : sauter les sous-tâches déjà en place."
     dod: "R-06 resource lock CanNotDelete posé sur ciamDirectories ; R-04 compte break-glass cloud-only créé et testé ; R-05 rotation du secret MSA outillée + alerte J-30 (échéance 2027-07-01) ; O-05 résidus QuickStart + subscription vide nettoyés ; F-02 AUTH_ALLOW_DEV=false vérifié en prod."
     rollback: "Chaque sous-tâche a un rollback propre dans son runbook (lock supprimable, break-glass désactivable, secret re-rotatable, flag réactivable)."
-    status: in_review
+    status: done
     notes: "Peut être re-découpé en sous-lots XS–S si trop gros."
 
   - id: wp-p0-06-server-authoritative-integrity
@@ -102,7 +102,7 @@ work_packages:
     precondition: "Auditer les endpoints économie/quiz : source du userId (JWT vs payload client) et présence d'idempotence (clientAttemptId, ids déterministes). Idempotent : si tous les endpoints tirent déjà userId du JWT et sont idempotents, le lot est déjà fait."
     dod: "Sur tous les endpoints économie/quiz, userId provient exclusivement du JWT (jamais du client) ; idempotence garantie (clientAttemptId + ids déterministes sur récompenses/achats) ; tests anti-rejeu verts."
     rollback: "Revert des gardes serveur-autoritatif et de la clé d'idempotence ; comportement antérieur restauré."
-    status: in_review
+    status: done
 
   - id: wp-p0-07-github-branch-protection-release
     phase: 0
@@ -113,7 +113,7 @@ work_packages:
     precondition: "Vérifier les règles de protection de la branche main (gh api) et l'existence d'un process de release documenté. Idempotent : si protection + process sont déjà en place, le lot est déjà fait."
     dod: "Branche main protégée (revues obligatoires + checks requis, push direct interdit) ; processus de release formalisé (documenté et appliqué)."
     rollback: "Les règles de protection sont réversibles via gh api / settings ; aucune donnée touchée."
-    status: in_review
+    status: done
 
   - id: wp-p0-08-e2e-auth-health-release
     phase: 0
@@ -124,7 +124,203 @@ work_packages:
     precondition: "Vérifier le flux auth mobile (OIDC+PKCE, refresh silencieux, re-auth sur 401), la sonde /health (Cosmos) + correlation id, et l'absence de tag de release E2E. Idempotent : si l'E2E est vert et la release déjà taguée, le lot est déjà fait."
     dod: "E2E auth mobile passant (OIDC+PKCE → refresh silencieux → 401 re-auth) ; GET /health interroge Cosmos et renvoie vert + correlation id ; première release E2E taguée (backend + gate mobile beta)."
     rollback: "Retirer le tag de release ; le durcissement /health et le correlation id sont additifs et désactivables."
+    status: done
+
+  # --- Phase 1 — Contenu & Renderer + observabilité/fiabilité (décomposition) ---
+  # 16 lots concrets (wp-p1-00..15) issus de la décomposition de la Phase 1.
+  # Les placeholders wp-phase-1..5 ci-dessous restent inchangés (additif).
+
+  - id: wp-p1-00-decomposition
+    phase: 1
+    title: "Décomposition Phase 1 : inscription des 15 lots au registre + clôture P0 (bookkeeping additif)"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-p0-08-e2e-auth-health-release]
+    precondition: "Vérifier que les lots wp-p1-* ne sont pas déjà présents dans work-packages.yaml. Idempotent : si la décomposition existe déjà, ne rien réécrire — compléter seulement ce qui manque."
+    dod: "Les 15 lots wp-p1-01..15 sont inscrits (id, phase, taille, dépendances, précondition, DoD, rollback, status) ; chaque state/wp-p1-*.json parse ; les 8 lots P0 sont passés à done ; YAML/JSON/JSONL valides ; git diff code/infra vide ; PR draft ouverte."
+    rollback: "Purement additif sous docs/migration/ : abandon de la branche et fermeture de la PR (aucun code applicatif touché)."
     status: in_review
+    notes: "Vague V0 · voie registre/bookkeeping. Les placeholders wp-phase-1..5 sont laissés intacts (additif)."
+
+  - id: wp-p1-01-renderer-registry-fallback
+    phase: 1
+    title: "Renderer dynamique : registre de composants typés + fallback gracieux sur bloc inconnu (Flutter/Riverpod)"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p1-00-decomposition]
+    precondition: "Inspecter le renderer de contenu mobile : présence d'un registre de types de blocs et d'un comportement de repli. Idempotent : si le registre + fallback existent déjà, le lot est déjà fait."
+    dod: "Chaque type de bloc connu est rendu par son composant enregistré ; un bloc de type inconnu affiche un fallback non bloquant (aucun crash) ; tests widget verts."
+    rollback: "Abandon de la branche (aucun merge) ; le renderer précédent reste en place."
+    status: todo
+    notes: "Vague V1 · voie Flutter."
+
+  - id: wp-p1-02-content-schemas-v2
+    phase: 1
+    title: "Schémas de contenu v2 : versionnage + validation stricte des blocs (JSON Schema)"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p1-01-renderer-registry-fallback]
+    precondition: "Recenser les schémas de contenu existants et leur version. Idempotent : si les schémas v2 versionnés + validateur existent déjà, le lot est déjà fait."
+    dod: "Les schémas de blocs v2 sont versionnés ; un validateur rejette tout contenu non conforme ; couverture de test des cas valides/invalides verte."
+    rollback: "Abandon de la branche ; les schémas v1 restent la référence."
+    status: todo
+    notes: "Vague V2 · voie code/contenu."
+
+  - id: wp-p1-03-renderer-golden-tests
+    phase: 1
+    title: "Golden tests du renderer : captures de référence par type de bloc + gate CI"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-p1-01-renderer-registry-fallback, wp-p1-02-content-schemas-v2]
+    precondition: "Vérifier l'existence de golden tests couvrant les types de blocs rendus. Idempotent : si les goldens + le gate CI existent déjà, le lot est déjà fait."
+    dod: "Chaque type de bloc a un golden test ; toute régression visuelle échoue le job CI dédié ; suite golden verte sur main."
+    rollback: "Abandon de la branche ; aucun golden ajouté au gate."
+    status: todo
+    notes: "Vague V3 · voie code/CI."
+
+  - id: wp-p1-04-certigo-content-repo
+    phase: 1
+    title: "Dépôt de contenu certigo-content dédié : structure + gouvernance (séparation contenu/app)"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-p1-00-decomposition]
+    precondition: "Vérifier l'existence d'un dépôt de contenu séparé et sa structure. Idempotent : si certigo-content existe déjà avec sa structure, le lot est déjà fait."
+    dod: "Dépôt certigo-content créé avec arborescence + CODEOWNERS + README de contribution ; contenu de démonstration présent et validable."
+    rollback: "Abandon de la branche ; le dépôt de contenu (le cas échéant) reste isolé et non référencé."
+    status: todo
+    notes: "Vague V2 · voie ops/live."
+
+  - id: wp-p1-05-content-migration
+    phase: 1
+    title: "Migration du contenu existant vers certigo-content au format schémas v2"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p1-04-certigo-content-repo, wp-p1-02-content-schemas-v2]
+    precondition: "Inventorier le contenu à migrer et son format actuel. Idempotent : si tout le contenu est déjà migré et conforme v2, le lot est déjà fait."
+    dod: "Tout le contenu ciblé est migré vers certigo-content au format v2 et passe le validateur ; inventaire avant/après réconcilié (0 perte)."
+    rollback: "Abandon de la branche ; le contenu source d'origine reste intact et fait foi."
+    status: todo
+    notes: "Vague V4 · voie contenu."
+
+  - id: wp-p1-06-ci-content-pipeline
+    phase: 1
+    title: "Pipeline CI du contenu : validation des schémas + publication d'un manifeste versionné"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p1-04-certigo-content-repo]
+    precondition: "Vérifier l'existence d'un pipeline CI validant le contenu de certigo-content. Idempotent : si le pipeline valide + publie déjà, le lot est déjà fait."
+    dod: "Chaque PR sur certigo-content déclenche la validation des schémas ; un manifeste de contenu versionné est produit en artefact ; job vert sur la branche par défaut."
+    rollback: "Abandon de la branche ; aucun workflow CI ajouté."
+    status: todo
+    notes: "Vague V3 · voie CI."
+
+  - id: wp-p1-07-content-manifest-immutable
+    phase: 1
+    title: "Manifeste de contenu immuable : versions figées + résolution côté app par hash"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-p1-06-ci-content-pipeline]
+    precondition: "Vérifier que le manifeste publié est immuable (hash/version figée). Idempotent : si l'immuabilité + résolution par hash existent déjà, le lot est déjà fait."
+    dod: "Chaque version de manifeste est immuable et adressable par hash ; l'app résout le contenu par version figée ; test de non-régression (même hash ⇒ même contenu) vert."
+    rollback: "Abandon de la branche ; l'app continue de résoudre le contenu comme avant."
+    status: todo
+    notes: "Vague V4 · voie code/contenu."
+
+  - id: wp-p1-08-offline-study-cache
+    phase: 1
+    title: "Cache d'étude hors-ligne : téléchargement + lecture de contenu sans réseau (mobile)"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p1-07-content-manifest-immutable]
+    precondition: "Vérifier la présence d'un cache de contenu hors-ligne côté mobile. Idempotent : si le cache offline existe déjà et est fonctionnel, le lot est déjà fait."
+    dod: "Le contenu d'une session d'étude est téléchargeable et consultable hors-ligne (mode avion) ; invalidation à la nouvelle version de manifeste ; tests d'intégration offline verts."
+    rollback: "Abandon de la branche ; le mode en-ligne reste le comportement par défaut."
+    status: todo
+    notes: "Vague V5 · voie Flutter."
+
+  - id: wp-p1-09-cortex-parity-gate
+    phase: 1
+    title: "Gate de parité Cortex : contrôle d'équivalence des règles métier client/serveur"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p1-00-decomposition]
+    precondition: "Recenser les règles métier dupliquées client/serveur et l'existence d'un contrôle de parité. Idempotent : si un gate de parité existe déjà, le lot est déjà fait."
+    dod: "Un jeu de vecteurs de test partagé vérifie l'équivalence des décisions client/serveur ; toute divergence échoue le job CI dédié ; gate vert sur main."
+    rollback: "Abandon de la branche ; aucun gate ajouté à la CI."
+    status: todo
+    notes: "Vague V1 · voie code."
+
+  - id: wp-p1-10-mobile-crash-reporting
+    phase: 1
+    title: "Crash reporting mobile : capture des erreurs non gérées + symbolisation"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-p1-00-decomposition]
+    precondition: "Vérifier l'existence d'une remontée de crash côté mobile. Idempotent : si le crash reporting est déjà intégré et actif, le lot est déjà fait."
+    dod: "Les exceptions non gérées et erreurs de zone Flutter sont capturées et remontées ; les symboles sont uploadés pour symbolisation ; un crash de test apparaît dans le tableau de bord."
+    rollback: "Abandon de la branche ; désactivation de l'intégration (aucune donnée applicative touchée)."
+    status: todo
+    notes: "Vague V1 · voie Flutter."
+
+  - id: wp-p1-11-ci-spof-runners
+    phase: 1
+    title: "Résilience CI : suppression du point unique de défaillance runners (matrix + fallback hébergé)"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-p1-00-decomposition]
+    precondition: "Auditer les workflows CI pour tout point unique de défaillance sur les runners. Idempotent : si les jobs tolèrent déjà l'indisponibilité d'un runner, le lot est déjà fait."
+    dod: "Les jobs critiques n'ont plus de dépendance à un runner unique (matrix ou fallback runner hébergé) ; simulation d'indisponibilité d'un runner sans blocage de la CI."
+    rollback: "Abandon de la branche ; les workflows précédents restent en place."
+    status: todo
+    notes: "Vague V5 · voie ops/live (SPOF = point unique de défaillance)."
+
+  - id: wp-p1-12-iac-drift-import
+    phase: 1
+    title: "Réconciliation IaC : import des ressources Azure hors-Bicep + détection de drift"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p1-00-decomposition]
+    precondition: "Comparer les ressources Azure live au code Bicep pour identifier le drift et les ressources non gérées. Idempotent : si tout est déjà géré en IaC sans drift, le lot est déjà fait."
+    dod: "Les ressources hors-Bicep sont importées/décrites en IaC ; un what-if Bicep ne montre aucun drift non intentionnel ; procédure de détection de drift documentée et exécutable."
+    rollback: "Abandon de la branche ; aucune modification appliquée aux ressources live (import descriptif uniquement)."
+    status: todo
+    notes: "Vague V5 · voie ops/live Azure."
+
+  - id: wp-p1-13-staging-environment
+    phase: 1
+    title: "Environnement de staging : environnement pré-prod paramétré par IaC, isolé de la prod"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-p1-12-iac-drift-import]
+    precondition: "Vérifier l'existence d'un environnement de staging isolé de la prod. Idempotent : si le staging existe déjà et est provisionné par IaC, le lot est déjà fait."
+    dod: "Un environnement de staging est provisionnable par IaC (paramètres dédiés) et isolé de la prod ; un déploiement de staging réussit + /health vert."
+    rollback: "Abandon de la branche ; suppression de l'environnement de staging (le cas échéant), prod inchangée."
+    status: todo
+    notes: "Vague V5 · voie ops/live."
+
+  - id: wp-p1-14-opentelemetry-correlation
+    phase: 1
+    title: "OpenTelemetry : traçage distribué + propagation du correlation id mobile→backend"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p1-00-decomposition]
+    precondition: "Vérifier l'instrumentation OTel et la propagation du correlation id de bout en bout. Idempotent : si le traçage distribué + corrélation existent déjà, le lot est déjà fait."
+    dod: "Les requêtes mobile→backend portent un correlation id propagé ; les traces OTel sont exportées et corrélées (une trace de bout en bout visible) ; tests d'instrumentation verts."
+    rollback: "Abandon de la branche ; l'instrumentation additive est désactivable (aucun changement de comportement métier)."
+    status: todo
+    notes: "Vague V2 · voie code."
+
+  - id: wp-p1-15-gamification-integrity
+    phase: 1
+    title: "Intégrité gamification : anti-triche XP/gems/streak côté serveur (idempotence + plafonds)"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p0-02-etag-concurrency, wp-p0-06-server-authoritative-integrity]
+    precondition: "Auditer les gains de gamification (XP/gems/streak) pour l'idempotence et les plafonds anti-abus. Idempotent : si les gardes anti-triche + plafonds existent déjà, le lot est déjà fait."
+    dod: "Les gains XP/gems/streak sont idempotents (rejeu sans double-crédit) et plafonnés/anti-abus côté serveur ; tests anti-rejeu et de plafond verts."
+    rollback: "Abandon de la branche ; retour au comportement de gamification antérieur."
+    status: todo
+    notes: "Vague V3 · voie code."
 
   # --- Phases 1–5 — placeholders (à décomposer au lancement) ---------------
   # Chaîne séquentielle. Chaque placeholder sera éclaté en lots XS–M au démarrage
