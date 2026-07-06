@@ -23,7 +23,7 @@ class TappableRow extends StatelessWidget {
     final TextTheme t = Theme.of(context).textTheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(PrismRadii.sm),
       child: Row(
         children: <Widget>[
           Icon(icon, color: trailingColor ?? p.textSecondary, size: 20),

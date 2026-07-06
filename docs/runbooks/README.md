@@ -1,14 +1,14 @@
-# Runbooks — Gouvernance CIAM & Opérations Cloud (Certigo)
+# Runbooks — Gouvernance CIAM, Opérations Cloud & Protection des données (Certigo)
 
 > **Origine** : findings de l'audit de sécurité `AUDIT_Certigo.md` (PR #176).
-> Ce dossier regroupe les procédures opérationnelles pour les findings **gouvernance CIAM**
-> et **opérations cloud** : `R-04`, `R-05`, `R-06`, `O-01`, `O-02`, `O-05`.
+> Ce dossier regroupe les procédures opérationnelles pour les findings **gouvernance CIAM**,
+> **opérations cloud** et **protection des données** : `R-02`, `R-04`, `R-05`, `R-06`, `O-01`, `O-02`, `O-05`.
 
 ## ⚠️ Principe : « l'agent PRÉPARE, VOUS EXÉCUTEZ »
 
-Ces runbooks portent sur le **tenant CIAM Azure** et la **subscription de facturation**. Les
-opérations nécessitent des accès (Global Admin du tenant CIAM, Owner de la subscription) que **seul
-l'opérateur humain possède**. L'agent Copilot **n'a lancé aucune commande Azure** : il a **préparé**
+Ces runbooks portent sur le **tenant CIAM Azure**, la **subscription de facturation** et les
+**données applicatives (Cosmos DB)**. Les opérations nécessitent des accès (Global Admin du tenant
+CIAM, Owner de la subscription, opérateur Cosmos DB) que **seul l'opérateur humain possède**. L'agent Copilot **n'a lancé aucune commande Azure** : il a **préparé**
 les commandes `az` CLI / Microsoft Graph exactes, les procédures pas-à-pas, les vérifications et les
 rollbacks. **C'est vous qui exécutez** chaque commande, après relecture.
 
@@ -50,6 +50,7 @@ rollbacks. **C'est vous qui exécutez** chaque commande, après relecture.
 | **O-05** | 🟠 Moyen | Nettoyage sûr du tenant CIAM (résidus QuickStart) | [`O-05_nettoyage-tenant-ciam.md`](./O-05_nettoyage-tenant-ciam.md) | Application Administrator (apps) + Owner sub `906c6a44` (billing) | À exécuter |
 | **O-01** | 🔴 Haut | Décision : Tutor IA en production (note ADR) | [`O-01_decision-tutor-ia-prod.md`](./O-01_decision-tutor-ia-prod.md) | Décision produit/technique (aucune commande destructive) | À arbitrer |
 | **O-02** | 🔴 Haut | Plan de test de charge Azure OpenAI + bump capacity | [`O-02_plan-test-charge-openai.md`](./O-02_plan-test-charge-openai.md) | Cognitive Services OpenAI User (test) + Contributor (bump) | À exécuter |
+| **R-02** | 🟠 Moyen | Restauration Point-In-Time (PITR) du compte Cosmos DB | [`R-02_cosmos-pitr-restauration.md`](./R-02_cosmos-pitr-restauration.md) | Cosmos DB Operator/Contributor + `CosmosRestoreOperator` (sub staging/prod) | Remédiation IaC ✅ (PR #178) — restore-test à planifier |
 
 ## Ordre d'exécution conseillé
 

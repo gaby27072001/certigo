@@ -47,7 +47,12 @@ class _LeagueContent extends StatelessWidget {
       slivers: <Widget>[
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            padding: const EdgeInsets.fromLTRB(
+              PrismSpacing.gutter,
+              PrismSpacing.sm,
+              PrismSpacing.gutter,
+              PrismSpacing.xs,
+            ),
             child: Row(
               children: <Widget>[
                 Icon(Icons.emoji_events_rounded, color: tierColor, size: 28),
@@ -79,7 +84,7 @@ class _LeagueContent extends StatelessWidget {
           )
         else
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+            padding: PrismSpacing.scrollBody(),
             sliver: SliverList.builder(
               itemCount: league.entries.length,
               itemBuilder: (BuildContext context, int i) {
@@ -122,7 +127,10 @@ class _EntryRow extends StatelessWidget {
       variant: isMe ? PrismCardVariant.tonal : PrismCardVariant.surface,
       accent: isMe ? p.primary : null,
       elevation: isMe ? 2 : 0,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.debt14,
+        vertical: PrismSpacing.sm,
+      ),
       child: Row(
         children: <Widget>[
           SizedBox(
@@ -164,12 +172,12 @@ class _PromotionDivider extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: PrismSpacing.debt10),
       child: Row(
         children: <Widget>[
           Expanded(child: Divider(color: p.success, thickness: 1.5)),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.debt10),
             child: Text(
               'ZONE DE PROMOTION',
               style: t.labelSmall?.copyWith(
@@ -192,7 +200,7 @@ class _LeaderboardLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
       children: const <Widget>[
         PrismSkeleton(width: 180, height: 26),
         SizedBox(height: 20),

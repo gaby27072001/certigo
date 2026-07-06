@@ -32,7 +32,7 @@ class AppInfoSection extends StatelessWidget {
               context: context,
               applicationName: 'Certigo',
             ),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(PrismRadii.sm),
             child: Row(
               children: <Widget>[
                 Icon(
