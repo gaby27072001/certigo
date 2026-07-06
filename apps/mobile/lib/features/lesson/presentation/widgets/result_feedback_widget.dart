@@ -209,7 +209,8 @@ class _RewardPill extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding:
+          const EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.debt7),
       decoration: BoxDecoration(
         color: p.surface,
         borderRadius: PrismRadii.pillAll,
@@ -269,12 +270,12 @@ class _ResultRow extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Padding(
-          padding: const EdgeInsets.only(left: 30),
+          padding: const EdgeInsets.only(left: PrismSpacing.debt30),
           child: GestureDetector(
             onTap: onExplain,
             behavior: HitTestBehavior.opaque,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: PrismSpacing.xxs),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[

@@ -20,7 +20,12 @@ class LessonProgressHeader extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 20, 8),
+      padding: const EdgeInsets.fromLTRB(
+        PrismSpacing.xs,
+        PrismSpacing.xxs,
+        PrismSpacing.gutter,
+        PrismSpacing.xs,
+      ),
       child: Row(
         children: <Widget>[
           IconButton(

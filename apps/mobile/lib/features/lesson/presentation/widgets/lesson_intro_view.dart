@@ -20,7 +20,8 @@ class LessonIntroView extends StatelessWidget {
       children: <Widget>[
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding:
+              const EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.debt6),
           decoration: BoxDecoration(
             color: p.primarySoft,
             borderRadius: PrismRadii.pillAll,
@@ -81,7 +82,7 @@ class _MetaPill extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.xs),
       decoration: BoxDecoration(
         color: p.surface,
         borderRadius: PrismRadii.pillAll,
@@ -112,12 +113,12 @@ class _Bullet extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme textTheme = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: PrismSpacing.xs),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.only(top: 7),
+            padding: const EdgeInsets.only(top: PrismSpacing.debt7),
             child: Icon(Icons.circle, size: 6, color: p.primary),
           ),
           const SizedBox(width: 10),

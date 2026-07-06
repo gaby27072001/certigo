@@ -165,7 +165,7 @@ class _MatchPairsStepWidgetState extends State<MatchPairsStepWidget> {
                 children: <Widget>[
                   for (final QuizOption o in widget.item.options)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.only(bottom: PrismSpacing.debt10),
                       child: MatchTile(
                         label: o.label,
                         state: _leftState(o.id, _rightFor(o.id)),
@@ -185,7 +185,7 @@ class _MatchPairsStepWidgetState extends State<MatchPairsStepWidget> {
                 children: <Widget>[
                   for (final QuizOption o in widget.item.matches)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.only(bottom: PrismSpacing.debt10),
                       child: MatchTile(
                         label: o.label,
                         state: _rightState(o.id, _leftFor(o.id)),
@@ -251,7 +251,7 @@ class _CorrectPairs extends StatelessWidget {
         for (final String token in tokens)
           if (token.split(':').length == 2)
             Padding(
-              padding: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.only(bottom: PrismSpacing.debt6),
               child: Row(
                 children: <Widget>[
                   Icon(Icons.link_rounded, size: 16, color: p.success),

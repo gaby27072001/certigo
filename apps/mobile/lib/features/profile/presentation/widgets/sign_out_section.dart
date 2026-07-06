@@ -21,7 +21,7 @@ class SignOutSection extends ConsumerWidget {
     final AuthState state = ref.watch(authControllerProvider);
     final bool busy = state is AuthLoading;
     return Padding(
-      padding: const EdgeInsets.only(top: 24),
+      padding: const EdgeInsets.only(top: PrismSpacing.lg),
       child: PrismCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
