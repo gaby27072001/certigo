@@ -23,7 +23,7 @@ class LibraryScreen extends ConsumerWidget {
       child: SafeArea(
         bottom: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+          padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
           children: <Widget>[
             // Resource bar mirrors Home so moving between tabs feels seamless.
             async.maybeWhen(
@@ -100,7 +100,7 @@ class _PourToiSection extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     return PrismCard(
       elevation: 0,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(PrismSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -171,7 +171,7 @@ class _TipCard extends StatelessWidget {
       variant: PrismCardVariant.tonal,
       accent: p.warning,
       elevation: 0,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(PrismSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -289,7 +289,7 @@ class _DomainCard extends StatelessWidget {
         variant: PrismCardVariant.tonal,
         accent: color,
         elevation: 0,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(PrismSpacing.md),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
