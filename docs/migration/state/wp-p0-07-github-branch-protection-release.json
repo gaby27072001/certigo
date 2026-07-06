@@ -1,14 +1,14 @@
 {
   "id": "wp-p0-07-github-branch-protection-release",
-  "status": "in_progress",
+  "status": "in_review",
   "session_id": "946123c6-af59-44ca-b666-88f19bf69c5c",
   "branch": "gchambaud-microsoft-wp-p0-07-branch-protection-release",
-  "pr": null,
+  "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/201",
   "checkpoint": {
-    "step": "inspection-done",
-    "note": "Idempotence PARTIELLE. Branch protection main DÉJÀ active (revues=1, checks stricts 'Build & test' + 'Flutter app + UI packages', force-push/deletions interdits) ; gaps de durcissement : enforce_admins, require_code_owner_reviews (pas de CODEOWNERS), required_conversation_resolution. Release APPLIQUÉE (tags v1.0.0/1/2, workflows mobile+backend, RELEASE_MOBILE.md, deployment-runbook.md) mais pas de doc de process consolidée. Livrables versionnables en cours : CODEOWNERS, branch-protection-main.json, GOVERNANCE.md (procédure admin = réserve), RELEASE.md.",
-    "at": "2026-07-06T18:00:00+01:00"
+    "step": "deliverables-done-pr-draft",
+    "note": "PR DRAFT #201 ouverte (base main, NON mergée). Livrables versionnés : .github/CODEOWNERS, .github/branch-protection-main.json (état cible durci ré-appliquable), docs/GOVERNANCE.md, docs/RELEASE.md. Cœur de la DoD constaté SATISFAIT (main déjà protégée : revues=1 + checks stricts + push direct interdit ; release appliquée tags v1.0.x). Réserves ADMIN documentées (non mutées en live, choix délibéré) : enforce_admins, require_code_owner_reviews, required_conversation_resolution via gh api PUT --input .github/branch-protection-main.json. JSON/YAML validés. Issue #197 commentée.",
+    "at": "2026-07-06T18:30:00+01:00"
   },
-  "updated_at": "2026-07-06T18:00:00+01:00",
+  "updated_at": "2026-07-06T18:30:00+01:00",
   "history_ref": "log.jsonl"
 }
