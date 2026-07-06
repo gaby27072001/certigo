@@ -1,0 +1,45 @@
+# CODEOWNERS — Certigo
+#
+# Ce fichier définit les responsables (« code owners ») par domaine du dépôt.
+# Objectif gouvernance (lot migration wp-p0-07) : permettre l'activation de la
+# règle « Require review from Code Owners » sur la branche `main` et documenter
+# la responsabilité de revue par périmètre.
+#
+# NOTE — Le dépôt appartient à un compte utilisateur (`gchambaud_microsoft`),
+# pas à une organisation : il n'existe pas encore d'équipes GitHub (@org/team).
+# Tous les périmètres pointent donc pour l'instant vers le propriétaire unique.
+# Remplacer par des handles d'équipe (`@certigo/backend`, etc.) dès qu'une
+# organisation / des équipes existeront, sans changer la structure ci-dessous.
+#
+# Rappel : le dernier motif correspondant l'emporte (ordre = du plus général
+# au plus spécifique).
+
+# Défaut — tout le dépôt
+*                       @gchambaud_microsoft
+
+# Gouvernance CI/CD, workflows, sécurité de la chaîne d'approvisionnement
+/.github/               @gchambaud_microsoft
+
+# Backend .NET (Azure Functions)
+/backend/               @gchambaud_microsoft
+
+# Application mobile Flutter
+/apps/mobile/           @gchambaud_microsoft
+
+# Paquets partagés
+/packages/              @gchambaud_microsoft
+
+# Infrastructure as Code (Bicep / Azure)
+/infra/                 @gchambaud_microsoft
+
+# Outils & scripts
+/tools/                 @gchambaud_microsoft
+
+# Contenu (pages statiques, privacy policy, etc.)
+/content/               @gchambaud_microsoft
+
+# Documentation
+/docs/                  @gchambaud_microsoft
+
+# Registre de migration — source de vérité de l'orchestration
+/docs/migration/        @gchambaud_microsoft
