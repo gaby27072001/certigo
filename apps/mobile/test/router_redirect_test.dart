@@ -160,6 +160,81 @@ void main() {
     });
   });
 
+  group('resolveAuthRedirect — flux d\'inscription progressif (Partie 3)', () {
+    const List<String> registerPaths = <String>[
+      AuthShellRoutes.registerName,
+      AuthShellRoutes.registerEmail,
+      AuthShellRoutes.registerPassword,
+      AuthShellRoutes.registerSyncContacts,
+      AuthShellRoutes.registerFriends,
+      AuthShellRoutes.registerProfileCreated,
+    ];
+
+    test('isRegisterFlow reconnaît les routes /register et rien d\'autre', () {
+      for (final String p in registerPaths) {
+        expect(AuthShellRoutes.isRegisterFlow(p), isTrue, reason: p);
+      }
+      expect(AuthShellRoutes.isRegisterFlow(AuthShellRoutes.onboardingSplash), isFalse);
+      expect(AuthShellRoutes.isRegisterFlow(AuthShellRoutes.home), isFalse);
+    });
+
+    test('les routes register ne polluent pas l\'ensemble onboarding', () {
+      for (final String p in registerPaths) {
+        expect(AuthShellRoutes.startupPaths.contains(p), isFalse, reason: p);
+        expect(AuthShellRoutes.isStartup(p), isFalse, reason: p);
+      }
+    });
+
+    test('AuthLoading sur un écran register → reste (chargement inline, PAS /splash)', () {
+      // Cœur du piège : l\'appel registerWithEmail passe par AuthLoading ; on ne
+      // doit pas éjecter l\'écran de mot de passe vers le splash.
+      expect(
+        resolveAuthRedirect(
+          auth: const AuthLoading(),
+          location: AuthShellRoutes.registerPassword,
+          onboardingCompleted: false,
+        ),
+        isNull,
+      );
+    });
+
+    test('Unauthenticated sur un écran register pré-création → reste', () {
+      expect(
+        resolveAuthRedirect(
+          auth: const Unauthenticated(),
+          location: AuthShellRoutes.registerName,
+          onboardingCompleted: false,
+        ),
+        isNull,
+      );
+    });
+
+    test('Authenticated + onboarding non terminé → reste (le flux pilote sa nav)', () {
+      for (final String p in registerPaths) {
+        expect(
+          resolveAuthRedirect(
+            auth: const Authenticated(validSession),
+            location: p,
+            onboardingCompleted: false,
+          ),
+          isNull,
+          reason: p,
+        );
+      }
+    });
+
+    test('Authenticated + onboarding terminé → /home (le flux ne piège pas)', () {
+      expect(
+        resolveAuthRedirect(
+          auth: const Authenticated(validSession),
+          location: AuthShellRoutes.registerProfileCreated,
+          onboardingCompleted: true,
+        ),
+        AuthShellRoutes.home,
+      );
+    });
+  });
+
   group('invariants globaux', () {
     test('les deux splash sont des routes distinctes', () {
       expect(AuthShellRoutes.splash, isNot(AuthShellRoutes.onboardingSplash));

@@ -21,6 +21,12 @@ import '../features/auth/application/auth_controller.dart';
 import '../features/auth/application/auth_state.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/auth/presentation/landing_screen.dart';
+import '../features/auth/presentation/register_name_screen.dart';
+import '../features/auth/presentation/register_email_screen.dart';
+import '../features/auth/presentation/register_password_screen.dart';
+import '../features/auth/presentation/register_sync_contacts_screen.dart';
+import '../features/auth/presentation/register_friends_screen.dart';
+import '../features/auth/presentation/register_profile_created_screen.dart';
 import '../features/auth/presentation/splash_screen.dart' as auth;
 import '../features/onboarding/application/onboarding_controller.dart';
 import '../features/onboarding/presentation/attribution_screen.dart';
@@ -184,6 +190,51 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           // Ouvert depuis la sheet « Commencer » avec ?emailOnly=1 : on masque
           // alors les boutons sociaux (déjà proposés par la sheet).
           emailOnly: state.uri.queryParameters['emailOnly'] == '1',
+        ),
+      ),
+
+      // Flux d'inscription progressif (Partie 3, façon Duo) : nom → e-mail →
+      // mot de passe (branché sur registerWithEmail) → contacts → amis →
+      // bienvenue. Écrans hors shell, sur le navigateur racine, avec la même
+      // transition `_stepPage` que l'onboarding. Le garde d'auth
+      // (resolveAuthRedirect) autorise ces routes (`isRegisterFlow`).
+      GoRoute(
+        path: AuthShellRoutes.registerName,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const RegisterNameScreen()),
+      ),
+      GoRoute(
+        path: AuthShellRoutes.registerEmail,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const RegisterEmailScreen()),
+      ),
+      GoRoute(
+        path: AuthShellRoutes.registerPassword,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const RegisterPasswordScreen()),
+      ),
+      GoRoute(
+        path: AuthShellRoutes.registerSyncContacts,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const RegisterSyncContactsScreen()),
+      ),
+      GoRoute(
+        path: AuthShellRoutes.registerFriends,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const RegisterFriendsScreen()),
+      ),
+      GoRoute(
+        path: AuthShellRoutes.registerProfileCreated,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) => _stepPage(
+          state: state,
+          child: const RegisterProfileCreatedScreen(),
+          begin: const Offset(0, 0.03),
         ),
       ),
 

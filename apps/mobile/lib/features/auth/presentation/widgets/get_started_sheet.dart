@@ -48,10 +48,11 @@ class _GetStartedSheetState extends ConsumerState<GetStartedSheet> {
   }
 
   void _continueWithEmail() {
-    // Ferme la feuille avant de naviguer vers l'écran e-mail dédié, en masquant
-    // ses boutons sociaux (déjà présents ici) via le paramètre `emailOnly`.
+    // Ferme la feuille avant de lancer le flux d'inscription progressif (façon
+    // Duo) : nom → e-mail → mot de passe → écrans post-création. La connexion à
+    // un compte existant reste accessible depuis le 1er écran de ce flux.
     Navigator.of(context).pop();
-    context.go('/auth?emailOnly=1');
+    context.go('/register/name');
   }
 
   @override

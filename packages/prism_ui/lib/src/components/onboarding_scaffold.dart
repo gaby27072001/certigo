@@ -11,6 +11,10 @@ import 'prism_button.dart';
 /// pinned at the top, the step body in the middle, and a full-width **sticky
 /// CTA** at the bottom that stays disabled until the step is valid (pass
 /// `onPrimary: null`). An optional [secondary] action sits just below the CTA.
+///
+/// The leading affordance next to the bar is a back chevron when [onBack] is
+/// set; on the **first screen of a flow** (Duo-style) pass [onClose] instead to
+/// render a dismissal cross (✕). [onBack] takes precedence if both are given.
 class OnboardingScaffold extends StatelessWidget {
   const OnboardingScaffold({
     super.key,
@@ -19,6 +23,7 @@ class OnboardingScaffold extends StatelessWidget {
     this.onPrimary,
     this.progress,
     this.onBack,
+    this.onClose,
     this.primaryTone,
     this.primaryLoading = false,
     this.secondary,
@@ -39,6 +44,11 @@ class OnboardingScaffold extends StatelessWidget {
 
   /// Back handler; `null` hides the chevron.
   final VoidCallback? onBack;
+
+  /// Close handler; when set (and [onBack] is null), a dismissal cross (✕) is
+  /// shown in the leading slot — the Duo-style "close the flow" affordance used
+  /// on the first screen of a progressive sign-up.
+  final VoidCallback? onClose;
 
   final Color? primaryTone;
   final bool primaryLoading;
@@ -70,13 +80,15 @@ class OnboardingScaffold extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: <Widget>[
-            if (progress != null || onBack != null)
+            if (progress != null || onBack != null || onClose != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 20, 6),
                 child: Row(
                   children: <Widget>[
                     if (onBack != null)
                       _BackChevron(onTap: onBack!, color: p.textSecondary)
+                    else if (onClose != null)
+                      _CloseCross(onTap: onClose!, color: p.textSecondary)
                     else
                       const SizedBox(width: 4),
                     const SizedBox(width: 8),
@@ -124,6 +136,29 @@ class _BackChevron extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(4),
           child: Icon(Icons.arrow_back_rounded, color: color, size: 26),
+        ),
+      ),
+    );
+  }
+}
+
+class _CloseCross extends StatelessWidget {
+  const _CloseCross({required this.onTap, required this.color});
+
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Fermer',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(Icons.close_rounded, color: color, size: 26),
         ),
       ),
     );
