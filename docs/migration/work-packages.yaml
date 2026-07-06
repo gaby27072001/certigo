@@ -79,7 +79,7 @@ work_packages:
     precondition: "Relire docs/runbooks/O-01 (décision tutor IA prod) et l'état du flag (dev/prod). Idempotent : si l'ADR/décision est déjà écrite et le flag cohérent, le lot est déjà fait."
     dod: "Décision écrite (ADR ou section dédiée) : Option A (activer derrière quota + safety + eval) ou Option B (repli déterministe NullTutorCompletion) ; flag prod cohérent avec la décision."
     rollback: "Le repli déterministe (NullTutorCompletion) est le rollback naturel : désactiver le flag."
-    status: todo
+    status: in_review
 
   - id: wp-p0-05-ciam-governance
     phase: 0
