@@ -239,6 +239,7 @@ chaîne iOS active passe par Codemagic.
 | ADR-04 | Contenu *as-code* YAML | revue par PR, validation CI, pas de CMS à maintenir au départ |
 | ADR-05 | Pas de codegen Dart au départ | fichiers auto-suffisants, squelette robuste ; migration freezed possible plus tard |
 | ADR-06 | Pas de cœurs / vies dans la gamification | éviter la frustration ; motiver la régularité, pas la punition |
+| ADR-011 | Intégrité serveur-autoritatif : `userId` **toujours** issu du JWT (jamais du corps de requête) + idempotence par `clientAttemptId` et ids déterministes sur récompenses/achats | empêcher l'usurpation d'identité côté client et le double-crédit sur rejeu réseau (voir §12.1) |
 
 ---
 
@@ -256,3 +257,52 @@ Garanties ajoutées à l'issue de l'audit technique (voir `AUDIT_CERTIGO.md`) :
 | **Contenu** | Le validateur vérifie l'**intégrité des réponses** (chaque `correct` référence une option réelle), l'**unicité** des ids d'items, et la cohérence `ordering`/`mcq`. |
 | **Cloud** | Hardening **par environnement** (`var hardened = env != 'dev'`) : Cosmos RBAC-only, Key Vault purge protection + soft delete 90 j, Storage GRS + versioning + soft delete, CORS verrouillé ; **params `staging`/`prod`** ajoutés. |
 | **CI/CD** | SDK Dart épinglé, lockfile applicatif suivi, **SBOM** (CycloneDX) backend, **gate d'approbation** (`environment: beta`) sur les releases mobiles. |
+
+### 12.1 ADR-011 — Intégrité serveur-autoritatif (économie / quiz)
+
+**Décision.** Sur **tous** les endpoints économie et quiz, l'identité de l'appelant et la sûreté
+des écritures sont **autoritatives côté serveur**. Confirmé par l'audit du lot
+`wp-p0-06-server-authoritative-integrity` : le backend était **déjà conforme** ; ce lot **consigne**
+la décision et **verrouille** la non-régression par les tests anti-rejeu.
+
+**Identité (`userId`) — exclusivement issue du JWT.**
+
+- `JwtAuthMiddleware` valide le Bearer et publie le `ClaimsPrincipal` dans
+  `context.Items["User"]` + `FunctionUserContext.Current`.
+- `HttpExtensions.GetUser()` lit ce principal (401 si absent) ; `FunctionUserContext.UserId`
+  mappe les claims `oid` → `NameIdentifier` → `sub`.
+- Tous les services consomment `IUserContext.UserId`. **Aucun DTO** économie/quiz ne transporte de
+  `userId` fourni par le client : l'identité ne peut pas être usurpée via le corps de requête.
+
+**Idempotence — clé cliente + ids déterministes (sens d'échec sûr).**
+
+| Domaine | Clé d'idempotence | Id déterministe |
+|---|---|---|
+| Quiz | `ClientAttemptId` | `attempt::{ClientAttemptId}` |
+| Examen | `ClientAttemptId` | `examattempt::{ClientAttemptId}` |
+| Boutique | `ClientPurchaseId` | `purchase::{ClientPurchaseId}` |
+| Réparation de série | `ClientRepairId` | `streakrepair::{ClientRepairId}` (réutilise le ledger d'achat) |
+| Quête quotidienne | flag profil | `DailyQuestClaims` |
+| Saison | flag profil | `SeasonBadges` |
+
+- **Réserver-avant-créditer** : garde `GetByClient*IdAsync` (court-circuit de rejeu renvoyant le
+  résultat antérieur) → `CreateAsync` sur l'id déterministe → sur `DuplicateRecordException`,
+  relecture du gagnant et renvoi de **son** résultat. Au pire une récompense est *rejouable*,
+  **jamais** double-créditée.
+- **Concurrence optimiste** : les mutations passent par `OptimisticConcurrency.ExecuteAsync`
+  (ETag `_etag`) → sur 412, relecture du profil et **ré-évaluation** de la règle métier
+  (garde de débit conditionnel re-vérifiée).
+- **Cosmos** : `Conflict` → `DuplicateRecordException` ; ETag `PreconditionFailed` →
+  `ConcurrencyConflictException` ; progression via `TransactionalBatch`.
+
+**Tests anti-rejeu (garde de non-régression).** `QuizServiceTests` /
+`ExamServiceTests.SubmitAsync_is_idempotent_per_client_attempt_id`,
+`ShopServiceTests.PurchaseAsync_is_idempotent_per_client_purchase_id`,
+`QuestServiceTests` / `SeasonServiceTests.ClaimAsync_is_idempotent`,
+`StreakRepairServiceTests.RepairAsync_bridges_gap_charges_gems_and_is_idempotent`.
+
+**Hors périmètre (différé Phase 1+).** La réserve du lot `wp-p0-02` sur
+`NotificationService.UpsertAsync` (honore l'ETag **sans retry** → `ConcurrencyConflictException`
+propre, pas de lost update silencieux) **n'entre pas** dans le DoD de ce lot, strictement limité aux
+écritures **économie/quiz**. Le retry des notifications est **différé** en Phase 1+ et **non**
+implémenté ici.
