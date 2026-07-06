@@ -167,7 +167,7 @@ class _AnswerTray extends StatelessWidget {
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(minHeight: 60),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(PrismSpacing.debt14),
       decoration: BoxDecoration(
         color: p.surfaceAlt.withOpacity(0.5),
         borderRadius: PrismRadii.cardLg,

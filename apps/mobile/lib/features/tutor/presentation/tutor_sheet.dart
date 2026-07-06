@@ -59,7 +59,9 @@ class _TutorSheetState extends ConsumerState<_TutorSheet> {
         ),
         decoration: BoxDecoration(
           color: p.background,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(PrismRadii.debt26),
+          ),
           border: Border.all(color: p.border),
         ),
         child: SafeArea(
@@ -93,10 +95,10 @@ class _Grip extends StatelessWidget {
     return Container(
       width: 44,
       height: 5,
-      margin: const EdgeInsets.only(top: 12, bottom: 6),
+      margin: const EdgeInsets.only(top: PrismSpacing.sm, bottom: PrismSpacing.debt6),
       decoration: BoxDecoration(
         color: p.border,
-        borderRadius: BorderRadius.circular(3),
+        borderRadius: BorderRadius.circular(PrismRadii.debt3),
       ),
     );
   }
@@ -116,7 +118,12 @@ class _Header extends StatelessWidget {
     final bool ai = explanation?.isAiGenerated ?? false;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 12, 12),
+      padding: const EdgeInsets.fromLTRB(
+        PrismSpacing.gutter,
+        PrismSpacing.debt6,
+        PrismSpacing.sm,
+        PrismSpacing.sm,
+      ),
       child: Row(
         children: <Widget>[
           Container(
@@ -125,7 +132,7 @@ class _Header extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: tone.withOpacity(0.16),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(PrismRadii.md),
             ),
             child: Icon(Icons.auto_awesome_rounded, color: tone, size: 22),
           ),
@@ -188,7 +195,12 @@ class _TutorLoading extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      padding: const EdgeInsets.fromLTRB(
+        PrismSpacing.gutter,
+        PrismSpacing.xxs,
+        PrismSpacing.gutter,
+        PrismSpacing.lg,
+      ),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: <Widget>[
@@ -220,7 +232,12 @@ class _TutorError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      padding: const EdgeInsets.fromLTRB(
+        PrismSpacing.gutter,
+        PrismSpacing.xxs,
+        PrismSpacing.gutter,
+        PrismSpacing.lg,
+      ),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: <Widget>[
@@ -253,7 +270,12 @@ class _TutorContent extends StatelessWidget {
     final Color tone = correct ? p.success : p.warning;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+      padding: const EdgeInsets.fromLTRB(
+        PrismSpacing.gutter,
+        PrismSpacing.xxs,
+        PrismSpacing.gutter,
+        PrismSpacing.debt28,
+      ),
       shrinkWrap: true,
       physics: const BouncingScrollPhysics(),
       children: <Widget>[
@@ -381,7 +403,10 @@ class _Chip extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.debt11,
+        vertical: PrismSpacing.debt6,
+      ),
       decoration: BoxDecoration(
         color: p.surface,
         borderRadius: PrismRadii.pillAll,
@@ -418,7 +443,7 @@ class _PointRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Padding(
-          padding: const EdgeInsets.only(top: 6),
+          padding: const EdgeInsets.only(top: PrismSpacing.debt6),
           child: Container(
             width: 7,
             height: 7,

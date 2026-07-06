@@ -83,7 +83,7 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
     ).formatFullDate(card.generatedAt.toLocal());
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: <Widget>[
         PrismCard(
           variant: PrismCardVariant.tonal,
@@ -209,8 +209,8 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 14,
+                  horizontal: PrismSpacing.debt14,
+                  vertical: PrismSpacing.debt14,
                 ),
                 decoration: BoxDecoration(
                   color: p.surfaceAlt,
@@ -294,7 +294,7 @@ class _DailyShareLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+      padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: const <Widget>[
         PrismSkeleton(height: 180),
         SizedBox(height: 16),
@@ -325,7 +325,10 @@ class _StatPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.sm,
+        vertical: PrismSpacing.debt10,
+      ),
       decoration: BoxDecoration(
         color: tone.withOpacity(0.12),
         borderRadius: PrismRadii.cardMd,
@@ -359,7 +362,10 @@ class _TagPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.debt10,
+        vertical: PrismSpacing.debt6,
+      ),
       decoration: BoxDecoration(
         color: tone.withOpacity(0.14),
         borderRadius: PrismRadii.pillAll,

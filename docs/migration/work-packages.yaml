@@ -113,7 +113,7 @@ work_packages:
     precondition: "Vérifier les règles de protection de la branche main (gh api) et l'existence d'un process de release documenté. Idempotent : si protection + process sont déjà en place, le lot est déjà fait."
     dod: "Branche main protégée (revues obligatoires + checks requis, push direct interdit) ; processus de release formalisé (documenté et appliqué)."
     rollback: "Les règles de protection sont réversibles via gh api / settings ; aucune donnée touchée."
-    status: todo
+    status: in_review
 
   - id: wp-p0-08-e2e-auth-health-release
     phase: 0
