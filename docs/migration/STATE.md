@@ -7,7 +7,7 @@
 | Lot | Phase | Taille | Statut | Dépend de | PR |
 |---|---|---|---|---|---|
 | `wp-000-amorcage-registre` | 0 | S | in_review | — | [#196](https://github.com/gchambaud_microsoft/Certigo/pull/196) |
-| `wp-p0-01-jwt-key-vault` | 0 | S | todo | `wp-000-amorcage-registre` | — |
+| `wp-p0-01-jwt-key-vault` | 0 | S | in_review | `wp-000-amorcage-registre` | [#198](https://github.com/gchambaud_microsoft/Certigo/pull/198) |
 | `wp-p0-02-etag-concurrency` | 0 | M | todo | `wp-000-amorcage-registre` | — |
 | `wp-p0-03-cosmos-pitr` | 0 | S | todo | `wp-000-amorcage-registre` | — |
 | `wp-p0-04-ai-tutor-decision` | 0 | S | todo | `wp-000-amorcage-registre` | — |
