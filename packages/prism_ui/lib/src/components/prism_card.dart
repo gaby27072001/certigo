@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_elevation.dart';
 import '../tokens/prism_radii.dart';
+import '../tokens/prism_spacing.dart';
 
 /// How a [PrismCard] is filled.
 ///
@@ -25,11 +26,31 @@ enum PrismCardVariant { surface, tonal, filled, outlined }
 /// It mirrors the [GlassSurface] API (child, padding, borderRadius, elevation,
 /// onTap) so call sites can swap one for the other with minimal churn; `tint`
 /// becomes [accent].
+///
+/// ### Usage
+///
+/// Always feed it tokens, never raw numbers, so a future restyle stays a
+/// one-line change instead of a hunt across screens:
+///
+/// ```dart
+/// PrismCard(
+///   variant: PrismCardVariant.tonal,
+///   accent: context.prism.primary,
+///   padding: const EdgeInsets.all(PrismSpacing.md),
+///   borderRadius: PrismRadii.cardLg,
+///   child: ...,
+/// );
+/// ```
+///
+/// Its default [padding] is [PrismSpacing.cardInset] and its default
+/// [borderRadius] is [PrismRadii.cardXl]; override with other tokens as needed.
+/// Prefer this over hand-rolled `Container(decoration: BoxDecoration(...))`
+/// cards so every content surface shares one restylable definition.
 class PrismCard extends StatelessWidget {
   const PrismCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(18),
+    this.padding = const EdgeInsets.all(PrismSpacing.cardInset),
     this.borderRadius = PrismRadii.cardXl,
     this.variant = PrismCardVariant.surface,
     this.accent,
