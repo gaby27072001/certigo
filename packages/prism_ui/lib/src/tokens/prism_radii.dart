@@ -21,6 +21,21 @@ class PrismRadii {
 
   static const double pill = 999;
 
+  // Design-debt radii (off the 4pt grid) ----------------------------------
+  //
+  // Exact off-grid radius values still hard-coded across screens. Tokenised to
+  // kill the magic numbers and keep the debt grep-able (`debt` / "dette design
+  // 4pt"); a later design pass reconciles them with the scale above.
+
+  /// Design debt (dette design 4pt): off-grid `3`, 1 use across screens.
+  static const double debt3 = 3;
+
+  /// Design debt (dette design 4pt): off-grid `26`, 1 use across screens.
+  static const double debt26 = 26;
+
+  /// Design debt (dette design 4pt): off-grid `28`, 1 use across screens.
+  static const double debt28 = 28;
+
   static const BorderRadius cardSm = BorderRadius.all(Radius.circular(sm));
   static const BorderRadius cardMd = BorderRadius.all(Radius.circular(md));
   static const BorderRadius cardLg = BorderRadius.all(Radius.circular(lg));

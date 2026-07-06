@@ -43,6 +43,40 @@ class PrismSpacing {
   /// `fromLTRB(gutter, top, gutter, bottomNavClearance)` padding.
   static const double bottomNavClearance = 120;
 
+  // Design-debt tokens (off the 4pt grid) ---------------------------------
+  //
+  // Exact off-grid spacing values still hard-coded across screens. Tokenising
+  // them removes the magic numbers and makes the debt grep-able (`debt` /
+  // "dette design 4pt") so a later design pass can reconcile them with the
+  // grid. Prefer the scale above (xxs..xxxl) for any new code.
+
+  /// Design debt (dette design 4pt): off-grid `3`, 2 uses across screens.
+  static const double debt3 = 3;
+
+  /// Design debt (dette design 4pt): off-grid `6`, 8 uses across screens.
+  static const double debt6 = 6;
+
+  /// Design debt (dette design 4pt): off-grid `7`, 3 uses across screens.
+  static const double debt7 = 7;
+
+  /// Design debt (dette design 4pt): off-grid `9`, 1 use across screens.
+  static const double debt9 = 9;
+
+  /// Design debt (dette design 4pt): off-grid `10`, 13 uses across screens.
+  static const double debt10 = 10;
+
+  /// Design debt (dette design 4pt): off-grid `11`, 1 use across screens.
+  static const double debt11 = 11;
+
+  /// Design debt (dette design 4pt): off-grid `14`, 7 uses across screens.
+  static const double debt14 = 14;
+
+  /// Design debt (dette design 4pt): off-grid `28`, 2 uses across screens.
+  static const double debt28 = 28;
+
+  /// Design debt (dette design 4pt): off-grid `30`, 1 use across screens.
+  static const double debt30 = 30;
+
   // Convenience EdgeInsets ------------------------------------------------
   static const EdgeInsets screen = EdgeInsets.symmetric(horizontal: gutter, vertical: lg);
   static const EdgeInsets cardPadding = EdgeInsets.all(md);
