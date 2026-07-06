@@ -124,7 +124,7 @@ work_packages:
     precondition: "Vérifier le flux auth mobile (OIDC+PKCE, refresh silencieux, re-auth sur 401), la sonde /health (Cosmos) + correlation id, et l'absence de tag de release E2E. Idempotent : si l'E2E est vert et la release déjà taguée, le lot est déjà fait."
     dod: "E2E auth mobile passant (OIDC+PKCE → refresh silencieux → 401 re-auth) ; GET /health interroge Cosmos et renvoie vert + correlation id ; première release E2E taguée (backend + gate mobile beta)."
     rollback: "Retirer le tag de release ; le durcissement /health et le correlation id sont additifs et désactivables."
-    status: todo
+    status: in_review
 
   # --- Phases 1–5 — placeholders (à décomposer au lancement) ---------------
   # Chaîne séquentielle. Chaque placeholder sera éclaté en lots XS–M au démarrage
