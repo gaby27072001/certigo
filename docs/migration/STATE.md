@@ -12,7 +12,7 @@
 | `wp-p0-03-cosmos-pitr` | 0 | S | todo | `wp-000-amorcage-registre` | — |
 | `wp-p0-04-ai-tutor-decision` | 0 | S | todo | `wp-000-amorcage-registre` | — |
 | `wp-p0-05-ciam-governance` | 0 | M | todo | `wp-000-amorcage-registre` | — |
-| `wp-p0-06-server-authoritative-integrity` | 0 | M | todo | `wp-000-amorcage-registre` | — |
+| `wp-p0-06-server-authoritative-integrity` | 0 | M | in_review | `wp-000-amorcage-registre` | [#206](https://github.com/gchambaud_microsoft/Certigo/pull/206) |
 | `wp-p0-07-github-branch-protection-release` | 0 | S | todo | `wp-000-amorcage-registre` | — |
 | `wp-p0-08-e2e-auth-health-release` | 0 | M | todo | `wp-p0-01-jwt-key-vault`, `wp-p0-07-github-branch-protection-release` | — |
 | `wp-phase-1-contenu-renderer` | 1 | L | planned | `wp-p0-08-e2e-auth-health-release` | — |

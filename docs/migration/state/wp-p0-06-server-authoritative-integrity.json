@@ -1,14 +1,14 @@
 {
   "id": "wp-p0-06-server-authoritative-integrity",
-  "status": "in_progress",
+  "status": "in_review",
   "session_id": "c88d6fe0-c83d-484b-9a88-fc5e0f764397",
   "branch": "gchambaud-microsoft-wp-p0-06-server-authoritative-integrity",
-  "pr": null,
+  "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/206",
   "checkpoint": {
-    "step": "audit-conforme",
-    "note": "Audit intégrité serveur-autoritatif (ADR-011) terminé finding-by-finding : backend DÉJÀ CONFORME (userId exclusivement JWT ; idempotence clientAttemptId + ids déterministes récompenses/achats ; Cosmos DuplicateRecordException/ConcurrencyConflictException/TransactionalBatch ; tests anti-rejeu présents). Lot de confirmation : consignation ADR-011 + bookkeeping registre, aucune modification backend. Réserve NotificationService (wp-p0-02) tranchée HORS PÉRIMÈTRE (différée Phase 1+).",
-    "at": "2026-07-06T18:10:00+01:00"
+    "step": "pr-opened",
+    "note": "Lot de confirmation : backend DÉJÀ CONFORME (userId exclusivement JWT ; idempotence clientAttemptId + ids déterministes récompenses/achats ; Cosmos DuplicateRecordException/ConcurrencyConflictException/TransactionalBatch ; tests anti-rejeu verts). ADR-011 consigné dans ARCHITECTURE.md (S.11 + S.12.1), aucune modification backend. Réserve NotificationService (wp-p0-02) tranchée HORS PÉRIMÈTRE (différée Phase 1+). DoD verte : build Release 0/0, dotnet test 531 passed / 0 failed (6 intégration Cosmos ignorés), aucun secret, registre valide. PR draft #206 ouverte (ne pas merger).",
+    "at": "2026-07-06T18:30:00+01:00"
   },
-  "updated_at": "2026-07-06T18:10:00+01:00",
+  "updated_at": "2026-07-06T18:30:00+01:00",
   "history_ref": "log.jsonl"
 }

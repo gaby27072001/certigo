@@ -102,7 +102,7 @@ work_packages:
     precondition: "Auditer les endpoints économie/quiz : source du userId (JWT vs payload client) et présence d'idempotence (clientAttemptId, ids déterministes). Idempotent : si tous les endpoints tirent déjà userId du JWT et sont idempotents, le lot est déjà fait."
     dod: "Sur tous les endpoints économie/quiz, userId provient exclusivement du JWT (jamais du client) ; idempotence garantie (clientAttemptId + ids déterministes sur récompenses/achats) ; tests anti-rejeu verts."
     rollback: "Revert des gardes serveur-autoritatif et de la clé d'idempotence ; comportement antérieur restauré."
-    status: todo
+    status: in_review
 
   - id: wp-p0-07-github-branch-protection-release
     phase: 0
