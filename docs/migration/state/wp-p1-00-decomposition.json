@@ -1,0 +1,14 @@
+{
+  "id": "wp-p1-00-decomposition",
+  "status": "in_review",
+  "session_id": "d1ee6fe8-bd01-4ba3-9cbc-174fe41ee8d9",
+  "branch": "gchambaud-microsoft-wp-p1-00-decomposition",
+  "pr": null,
+  "checkpoint": {
+    "step": "pr-ouverte",
+    "note": "Décomposition Phase 1 (15 lots inscrits) + clôture P0 (8 lots in_review→done). PR draft ouverte.",
+    "at": "2026-07-07T00:16:20+01:00"
+  },
+  "updated_at": "2026-07-07T00:16:20+01:00",
+  "history_ref": "log.jsonl"
+}

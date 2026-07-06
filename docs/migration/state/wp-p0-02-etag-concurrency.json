@@ -1,6 +1,6 @@
 {
   "id": "wp-p0-02-etag-concurrency",
-  "status": "in_review",
+  "status": "done",
   "session_id": "52bfcaf6-405b-4cf6-b769-2e8b61868efa",
   "branch": "gchambaud-microsoft-wp-p0-02-etag-concurrency",
   "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/200",
@@ -9,6 +9,6 @@
     "note": "R-01 déjà remédié sur origin/main via PR #179 (b62a489 « R-01 : concurrence optimiste sur les écritures du profil joueur (ExamService + Gamification) »). git diff origin/main...HEAD -- backend/ = vide. Chaîne ETag/If-Match/412→retry lecture-fusion-écriture en place (OptimisticConcurrency.ExecuteAsync, CosmosUserRepository.UpsertAsync IfMatchEtag, QuizService/ExamService/GamificationServices) + tests. DoD attestée : build Release 0 warning, dotnet test 531 réussis/0 échec (6 tests intégration Cosmos skippés faute d'émulateur, dont le conflit ETag). Bookkeeping registre uniquement, aucun changement de code. Réserve : NotificationService.UpsertAsync honore l'ETag mais sans retry (échoue proprement, pas de lost update silencieux)     — hors périmètre XP/gems/streak. PR draft #200 ouverte (base main), en attente de revue — ne pas merger.",
         "at": "2026-07-06T17:48:00+01:00"
   },
-      "updated_at": "2026-07-06T17:48:00+01:00",
+      "updated_at": "2026-07-07T00:16:20+01:00",
   "history_ref": "log.jsonl"
 }

@@ -1,0 +1,14 @@
+{
+  "id": "wp-p1-15-gamification-integrity",
+  "status": "todo",
+  "session_id": null,
+  "branch": null,
+  "pr": null,
+  "checkpoint": {
+    "step": null,
+    "note": null,
+    "at": null
+  },
+  "updated_at": "2026-07-07T00:16:20+01:00",
+  "history_ref": "log.jsonl"
+}
