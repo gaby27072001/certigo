@@ -3,7 +3,7 @@
   "status": "in_review",
   "session_id": "d1ee6fe8-bd01-4ba3-9cbc-174fe41ee8d9",
   "branch": "gchambaud-microsoft-wp-p1-00-decomposition",
-  "pr": null,
+  "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/211",
   "checkpoint": {
     "step": "pr-ouverte",
     "note": "Décomposition Phase 1 (15 lots inscrits) + clôture P0 (8 lots in_review→done). PR draft ouverte.",
