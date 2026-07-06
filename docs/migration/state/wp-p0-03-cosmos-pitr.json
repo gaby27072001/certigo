@@ -1,0 +1,14 @@
+{
+  "id": "wp-p0-03-cosmos-pitr",
+  "status": "in_progress",
+  "session_id": "1898d2d2-f1b1-41f1-9217-449c6b783f66",
+  "branch": "gchambaud-microsoft-wp-p0-03-cosmos-pitr",
+  "pr": null,
+  "checkpoint": {
+    "step": "idempotence-check",
+    "note": "Contrôle d'idempotence : R-02 (Cosmos backup Continuous/PITR) DÉJÀ remédié sur main via PR #178 (commit 4899a66). infra/main.bicep ligne 125 `enableContinuousBackup: hardened` (hardened = env != 'dev') ; infra/modules/cosmos.bicep backupPolicy type 'Continuous' tier 'Continuous7Days'. `git diff origin/main...HEAD -- infra/` VIDE = zéro drift. `az bicep build infra/main.bicep` VERT (EXIT=0). Volet 1 DoD (PITR actif) = VERT. Mode bookkeeping seul + valeur ajoutée : rédaction du runbook R-02 de restauration (volet 2 DoD = réserve, test restore nécessite credentials Azure).",
+    "at": "2026-07-06T17:39:37+01:00"
+  },
+  "updated_at": "2026-07-06T17:39:37+01:00",
+  "history_ref": "log.jsonl"
+}
