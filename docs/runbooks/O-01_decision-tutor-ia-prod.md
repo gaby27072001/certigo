@@ -5,7 +5,7 @@
 | **Finding** | O-01 (🔴 Haut — **décision requise**) |
 | **Constat audit** | Le Tutor IA est **désactivé en prod** (`TUTOR_LLM_ENABLED=False`) ; **aucune** ressource Azure OpenAI n'est provisionnée en prod. La feature n'existe qu'en **dev**. |
 | **Nature** | Ce document n'est **pas** un runbook d'exécution mais une **note de décision (ADR)** à valider par les responsables produit/technique. |
-| **Statut** | ⏳ **Proposé** — en attente de décision |
+| **Statut** | ✅ **Décidé — Option B (repli déterministe, Phase 0)** le 2026-07-06 — voir [`docs/adr/ADR-O-01-ai-tutor-prod.md`](../adr/ADR-O-01-ai-tutor-prod.md) |
 
 > **Pourquoi ce document ?** Il faut **trancher officiellement** : soit on investit pour amener le
 > tutor en prod (Option A), soit on **acte** le mode « grounded-only » comme choix assumé (Option B).

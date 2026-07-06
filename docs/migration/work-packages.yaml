@@ -46,7 +46,7 @@ work_packages:
     precondition: "Rechercher toute signing key en clair dans les app settings et les fichiers Bicep/params (grep AUTH_JWT_SIGNING_KEY, @Microsoft.KeyVault). Idempotent : si déjà en Key Vault reference et aucune valeur en clair, le lot est déjà fait."
     dod: "Aucun secret de signature en clair (dev + prod) ; l'app démarre via une Key Vault reference ; GET /health vert."
     rollback: "Restaurer l'app setting précédent (la Key Vault reference est désactivable) et redéployer ; aucune perte de données."
-    status: todo
+    status: in_review
 
   - id: wp-p0-02-etag-concurrency
     phase: 0
@@ -57,7 +57,7 @@ work_packages:
     precondition: "Localiser les écritures profil (XP, gems, streak) et vérifier la présence ou l'absence d'un If-Match ETag. Idempotent : si toutes les écritures profil sont déjà conditionnelles avec retry, le lot est déjà fait."
     dod: "Test de charge concurrent (écritures parallèles sur le même profil) sans lost update ; conflits 409/412 gérés par retry lecture-fusion-écriture ; tests verts."
     rollback: "Revert des écritures conditionnelles (retour à l'écriture non conditionnelle) ; comportement antérieur restauré."
-    status: todo
+    status: in_review
 
   - id: wp-p0-03-cosmos-pitr
     phase: 0
@@ -68,7 +68,7 @@ work_packages:
     precondition: "Inspecter la config backup du compte Cosmos (Bicep + portail) : mode Periodic vs Continuous. Idempotent : si Continuous/PITR est déjà actif et sans drift, valider seulement la restauration test."
     dod: "PITR actif (drift IaC corrigé) et restauration test réussie (point-in-time restore vérifié)."
     rollback: "La config PITR est réversible (retour Periodic) ; aucune donnée perdue."
-    status: todo
+    status: in_review
 
   - id: wp-p0-04-ai-tutor-decision
     phase: 0
@@ -79,7 +79,7 @@ work_packages:
     precondition: "Relire docs/runbooks/O-01 (décision tutor IA prod) et l'état du flag (dev/prod). Idempotent : si l'ADR/décision est déjà écrite et le flag cohérent, le lot est déjà fait."
     dod: "Décision écrite (ADR ou section dédiée) : Option A (activer derrière quota + safety + eval) ou Option B (repli déterministe NullTutorCompletion) ; flag prod cohérent avec la décision."
     rollback: "Le repli déterministe (NullTutorCompletion) est le rollback naturel : désactiver le flag."
-    status: todo
+    status: in_review
 
   - id: wp-p0-05-ciam-governance
     phase: 0
@@ -90,7 +90,7 @@ work_packages:
     precondition: "Suivre les runbooks docs/runbooks/ (R-04, R-05, R-06, O-05) et vérifier l'état de chaque garde-fou (lock présent ? break-glass testé ? secret MSA daté ? AUTH_ALLOW_DEV en prod ?). Idempotent : sauter les sous-tâches déjà en place."
     dod: "R-06 resource lock CanNotDelete posé sur ciamDirectories ; R-04 compte break-glass cloud-only créé et testé ; R-05 rotation du secret MSA outillée + alerte J-30 (échéance 2027-07-01) ; O-05 résidus QuickStart + subscription vide nettoyés ; F-02 AUTH_ALLOW_DEV=false vérifié en prod."
     rollback: "Chaque sous-tâche a un rollback propre dans son runbook (lock supprimable, break-glass désactivable, secret re-rotatable, flag réactivable)."
-    status: todo
+    status: in_review
     notes: "Peut être re-découpé en sous-lots XS–S si trop gros."
 
   - id: wp-p0-06-server-authoritative-integrity
@@ -102,7 +102,7 @@ work_packages:
     precondition: "Auditer les endpoints économie/quiz : source du userId (JWT vs payload client) et présence d'idempotence (clientAttemptId, ids déterministes). Idempotent : si tous les endpoints tirent déjà userId du JWT et sont idempotents, le lot est déjà fait."
     dod: "Sur tous les endpoints économie/quiz, userId provient exclusivement du JWT (jamais du client) ; idempotence garantie (clientAttemptId + ids déterministes sur récompenses/achats) ; tests anti-rejeu verts."
     rollback: "Revert des gardes serveur-autoritatif et de la clé d'idempotence ; comportement antérieur restauré."
-    status: todo
+    status: in_review
 
   - id: wp-p0-07-github-branch-protection-release
     phase: 0
@@ -113,7 +113,7 @@ work_packages:
     precondition: "Vérifier les règles de protection de la branche main (gh api) et l'existence d'un process de release documenté. Idempotent : si protection + process sont déjà en place, le lot est déjà fait."
     dod: "Branche main protégée (revues obligatoires + checks requis, push direct interdit) ; processus de release formalisé (documenté et appliqué)."
     rollback: "Les règles de protection sont réversibles via gh api / settings ; aucune donnée touchée."
-    status: todo
+    status: in_review
 
   - id: wp-p0-08-e2e-auth-health-release
     phase: 0
@@ -124,7 +124,7 @@ work_packages:
     precondition: "Vérifier le flux auth mobile (OIDC+PKCE, refresh silencieux, re-auth sur 401), la sonde /health (Cosmos) + correlation id, et l'absence de tag de release E2E. Idempotent : si l'E2E est vert et la release déjà taguée, le lot est déjà fait."
     dod: "E2E auth mobile passant (OIDC+PKCE → refresh silencieux → 401 re-auth) ; GET /health interroge Cosmos et renvoie vert + correlation id ; première release E2E taguée (backend + gate mobile beta)."
     rollback: "Retirer le tag de release ; le durcissement /health et le correlation id sont additifs et désactivables."
-    status: todo
+    status: in_review
 
   # --- Phases 1–5 — placeholders (à décomposer au lancement) ---------------
   # Chaîne séquentielle. Chaque placeholder sera éclaté en lots XS–M au démarrage

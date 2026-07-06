@@ -1,0 +1,14 @@
+{
+  "id": "wp-p0-08-e2e-auth-health-release",
+  "status": "in_review",
+  "session_id": "e026d82c-7d64-44b0-86cc-ff38b907a2b0",
+  "branch": "gchambaud-microsoft-wp-p0-08-e2e-auth-health-release",
+  "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/209",
+  "checkpoint": {
+    "step": "pr-ouverte",
+    "note": "Lot de confirmation : 4 findings deja remedies sur main (E2E auth OIDC+PKCE / refresh silencieux / 401 re-auth ; /health sonde Cosmos vert ; correlation id backend ; release taguee v1.0.x + gate mobile beta). Build Release 0 warning/0 erreur ; tests 531 reussis / 0 echec / 6 ignores (Cosmos). Runbook livre. PR draft #209 ouverte (base main, NON mergee). Reste in_review : deps wp-p0-01/wp-p0-07 non mergees, gate beta = config GitHub/humaine.",
+    "at": "2026-07-06T19:05:00+01:00"
+  },
+  "updated_at": "2026-07-06T19:05:00+01:00",
+  "history_ref": "log.jsonl"
+}
