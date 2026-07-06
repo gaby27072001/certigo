@@ -1,0 +1,14 @@
+{
+  "id": "",
+  "status": "todo",
+  "session_id": null,
+  "branch": null,
+  "pr": null,
+  "checkpoint": {
+    "step": null,
+    "note": null,
+    "at": null
+  },
+  "updated_at": null,
+  "history_ref": "log.jsonl"
+}
