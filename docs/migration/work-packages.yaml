@@ -1,0 +1,186 @@
+# Certigo — Manifeste des lots de migration (source de vérité du séquencement)
+# Convention : 1 lot (WP) = 1 session = 1 PR. Périmètre visé XS–M.
+# Ce fichier est lu au démarrage de chaque session pour calculer l'ensemble « prêt »
+# (lots dont toutes les dépendances sont `done`). Voir docs/migration/README.md.
+
+version: 1
+
+conventions:
+  sizes:
+    XS: "≈ 0.25 semaine-personne"
+    S: "≈ 0.5 semaine-personne"
+    M: "≈ 1 semaine-personne"
+    L: "≈ 2–3 semaines-personne"
+    XL: "≈ 4–6 semaines-personne"
+  statuses:
+    todo: "Pas encore commencé ; prêt si toutes les dépendances sont done."
+    in_progress: "En cours dans une session active (session_id + branch renseignés)."
+    blocked: "Bloqué (timeout, échec, dépendance externe) ; note dans state/ + log.jsonl."
+    in_review: "Travail terminé, PR ouverte, en attente de revue/merge."
+    done: "Mergé et DoD verte."
+    rolled_back: "Annulé via son rollback documenté."
+    planned: "Placeholder de phase, à décomposer en lots XS–M au lancement de la phase."
+
+work_packages:
+
+  - id: wp-000-amorcage-registre
+    phase: 0
+    title: "Amorçage du dispositif de reprise / registre de migration"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: []
+    precondition: "Vérifier l'absence de docs/migration/ committé. Idempotent : si le registre existe déjà, ne rien réécrire — reprendre au dernier checkpoint enregistré dans state/."
+    dod: "docs/migration/ contient README.md, work-packages.yaml, STATE.md, log.jsonl, state/_TEMPLATE.json, state/wp-000-amorcage-registre.json, templates/session-kickoff.md, templates/work-package.md ; le YAML, tous les JSON et chaque ligne JSONL parsent ; branche poussée + PR ouverte."
+    rollback: "Purement additif sous docs/migration/ : rollback = supprimer le dossier et fermer la PR (aucun code applicatif touché)."
+    status: in_review
+
+  # --- Phase 0 — Stabilisation (bloquant) ---------------------------------
+  # Tous dépendent de l'amorçage du registre.
+
+  - id: wp-p0-01-jwt-key-vault
+    phase: 0
+    title: "F-01 — AUTH_JWT_SIGNING_KEY → Key Vault reference + purge de la valeur en clair"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-000-amorcage-registre]
+    precondition: "Rechercher toute signing key en clair dans les app settings et les fichiers Bicep/params (grep AUTH_JWT_SIGNING_KEY, @Microsoft.KeyVault). Idempotent : si déjà en Key Vault reference et aucune valeur en clair, le lot est déjà fait."
+    dod: "Aucun secret de signature en clair (dev + prod) ; l'app démarre via une Key Vault reference ; GET /health vert."
+    rollback: "Restaurer l'app setting précédent (la Key Vault reference est désactivable) et redéployer ; aucune perte de données."
+    status: todo
+
+  - id: wp-p0-02-etag-concurrency
+    phase: 0
+    title: "R-01 — Concurrence optimiste ETag/If-Match sur écritures profil (XP/gems/streak), 409/412 → retry lecture-fusion-écriture"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-000-amorcage-registre]
+    precondition: "Localiser les écritures profil (XP, gems, streak) et vérifier la présence ou l'absence d'un If-Match ETag. Idempotent : si toutes les écritures profil sont déjà conditionnelles avec retry, le lot est déjà fait."
+    dod: "Test de charge concurrent (écritures parallèles sur le même profil) sans lost update ; conflits 409/412 gérés par retry lecture-fusion-écriture ; tests verts."
+    rollback: "Revert des écritures conditionnelles (retour à l'écriture non conditionnelle) ; comportement antérieur restauré."
+    status: todo
+
+  - id: wp-p0-03-cosmos-pitr
+    phase: 0
+    title: "R-02 — Cosmos backup Continuous/PITR via Bicep + restauration test validée"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-000-amorcage-registre]
+    precondition: "Inspecter la config backup du compte Cosmos (Bicep + portail) : mode Periodic vs Continuous. Idempotent : si Continuous/PITR est déjà actif et sans drift, valider seulement la restauration test."
+    dod: "PITR actif (drift IaC corrigé) et restauration test réussie (point-in-time restore vérifié)."
+    rollback: "La config PITR est réversible (retour Periodic) ; aucune donnée perdue."
+    status: todo
+
+  - id: wp-p0-04-ai-tutor-decision
+    phase: 0
+    title: "O-01 — Décision AI Tutor prod documentée (activer derrière quota+safety+eval OU assumer repli déterministe NullTutorCompletion)"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-000-amorcage-registre]
+    precondition: "Relire docs/runbooks/O-01 (décision tutor IA prod) et l'état du flag (dev/prod). Idempotent : si l'ADR/décision est déjà écrite et le flag cohérent, le lot est déjà fait."
+    dod: "Décision écrite (ADR ou section dédiée) : Option A (activer derrière quota + safety + eval) ou Option B (repli déterministe NullTutorCompletion) ; flag prod cohérent avec la décision."
+    rollback: "Le repli déterministe (NullTutorCompletion) est le rollback naturel : désactiver le flag."
+    status: todo
+
+  - id: wp-p0-05-ciam-governance
+    phase: 0
+    title: "Gouvernance CIAM : R-04 break-glass cloud-only testé, R-05 rotation+alerte secret MSA (échéance 2027-07-01), R-06 resource lock CanNotDelete sur ciamDirectories, O-05 ménage app registrations QuickStart + subscription vide, F-02 verrouiller bypass dev en prod (AUTH_ALLOW_DEV=false)"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-000-amorcage-registre]
+    precondition: "Suivre les runbooks docs/runbooks/ (R-04, R-05, R-06, O-05) et vérifier l'état de chaque garde-fou (lock présent ? break-glass testé ? secret MSA daté ? AUTH_ALLOW_DEV en prod ?). Idempotent : sauter les sous-tâches déjà en place."
+    dod: "R-06 resource lock CanNotDelete posé sur ciamDirectories ; R-04 compte break-glass cloud-only créé et testé ; R-05 rotation du secret MSA outillée + alerte J-30 (échéance 2027-07-01) ; O-05 résidus QuickStart + subscription vide nettoyés ; F-02 AUTH_ALLOW_DEV=false vérifié en prod."
+    rollback: "Chaque sous-tâche a un rollback propre dans son runbook (lock supprimable, break-glass désactivable, secret re-rotatable, flag réactivable)."
+    status: todo
+    notes: "Peut être re-découpé en sous-lots XS–S si trop gros."
+
+  - id: wp-p0-06-server-authoritative-integrity
+    phase: 0
+    title: "Intégrité serveur-autoritatif (ADR-011) : userId TOUJOURS issu du JWT sur endpoints économie/quiz + idempotence (clientAttemptId, ids déterministes sur récompenses/achats)"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-000-amorcage-registre]
+    precondition: "Auditer les endpoints économie/quiz : source du userId (JWT vs payload client) et présence d'idempotence (clientAttemptId, ids déterministes). Idempotent : si tous les endpoints tirent déjà userId du JWT et sont idempotents, le lot est déjà fait."
+    dod: "Sur tous les endpoints économie/quiz, userId provient exclusivement du JWT (jamais du client) ; idempotence garantie (clientAttemptId + ids déterministes sur récompenses/achats) ; tests anti-rejeu verts."
+    rollback: "Revert des gardes serveur-autoritatif et de la clé d'idempotence ; comportement antérieur restauré."
+    status: todo
+
+  - id: wp-p0-07-github-branch-protection-release
+    phase: 0
+    title: "Gouvernance GitHub : branch protection main (revues + checks requis, pas de push direct) + release management formalisé"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-000-amorcage-registre]
+    precondition: "Vérifier les règles de protection de la branche main (gh api) et l'existence d'un process de release documenté. Idempotent : si protection + process sont déjà en place, le lot est déjà fait."
+    dod: "Branche main protégée (revues obligatoires + checks requis, push direct interdit) ; processus de release formalisé (documenté et appliqué)."
+    rollback: "Les règles de protection sont réversibles via gh api / settings ; aucune donnée touchée."
+    status: todo
+
+  - id: wp-p0-08-e2e-auth-health-release
+    phase: 0
+    title: "E2E auth mobile (OIDC+PKCE → refresh silencieux → 401 re-auth) + /health (sonde Cosmos) + correlation id + première release E2E taguée (backend + gate mobile beta)"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p0-01-jwt-key-vault, wp-p0-07-github-branch-protection-release]
+    precondition: "Vérifier le flux auth mobile (OIDC+PKCE, refresh silencieux, re-auth sur 401), la sonde /health (Cosmos) + correlation id, et l'absence de tag de release E2E. Idempotent : si l'E2E est vert et la release déjà taguée, le lot est déjà fait."
+    dod: "E2E auth mobile passant (OIDC+PKCE → refresh silencieux → 401 re-auth) ; GET /health interroge Cosmos et renvoie vert + correlation id ; première release E2E taguée (backend + gate mobile beta)."
+    rollback: "Retirer le tag de release ; le durcissement /health et le correlation id sont additifs et désactivables."
+    status: todo
+
+  # --- Phases 1–5 — placeholders (à décomposer au lancement) ---------------
+  # Chaîne séquentielle. Chaque placeholder sera éclaté en lots XS–M au démarrage
+  # de sa phase ; les DoD ci-dessous restent à préciser par sous-lot.
+
+  - id: wp-phase-1-contenu-renderer
+    phase: 1
+    title: "Contenu & Renderer dynamique + observabilité/fiabilité (à décomposer)"
+    size: L
+    effort_pweeks: 2.5
+    depends_on: [wp-p0-08-e2e-auth-health-release]
+    precondition: "À définir au lancement de la phase : décomposer en lots XS–M et écrire leurs préconditions idempotentes."
+    dod: "À définir — chaque sous-lot aura sa DoD machine-vérifiable."
+    rollback: "À définir par sous-lot."
+    status: planned
+
+  - id: wp-phase-2-search-ai-tutor
+    phase: 2
+    title: "Azure AI Search & AI Tutor grounded (à décomposer)"
+    size: L
+    effort_pweeks: 2.5
+    depends_on: [wp-phase-1-contenu-renderer]
+    precondition: "À définir au lancement de la phase : décomposer en lots XS–M et écrire leurs préconditions idempotentes."
+    dod: "À définir — chaque sous-lot aura sa DoD machine-vérifiable."
+    rollback: "À définir par sous-lot."
+    status: planned
+
+  - id: wp-phase-3-admin-ops
+    phase: 3
+    title: "Admin portal, feature flags, dashboards (à décomposer)"
+    size: L  # M–L, à préciser au lancement de la phase
+    effort_pweeks: 2
+    depends_on: [wp-phase-2-search-ai-tutor]
+    precondition: "À définir au lancement de la phase : décomposer en lots XS–M et écrire leurs préconditions idempotentes."
+    dod: "À définir — chaque sous-lot aura sa DoD machine-vérifiable."
+    rollback: "À définir par sous-lot."
+    status: planned
+
+  - id: wp-phase-4-backend-modularisation
+    phase: 4
+    title: "APIM, modularisation, Container Apps, event-driven (à décomposer)"
+    size: XL
+    effort_pweeks: 5
+    depends_on: [wp-phase-3-admin-ops]
+    precondition: "À définir au lancement de la phase : décomposer en lots XS–M et écrire leurs préconditions idempotentes."
+    dod: "À définir — chaque sous-lot aura sa DoD machine-vérifiable."
+    rollback: "À définir par sous-lot."
+    status: planned
+
+  - id: wp-phase-5-scale-mondial
+    phase: 5
+    title: "Multi-région, DR, B2B — à la demande (à décomposer)"
+    size: L
+    effort_pweeks: 2.5
+    depends_on: [wp-phase-4-backend-modularisation]
+    precondition: "À définir au lancement de la phase : décomposer en lots XS–M et écrire leurs préconditions idempotentes."
+    dod: "À définir — chaque sous-lot aura sa DoD machine-vérifiable."
+    rollback: "À définir par sous-lot."
+    status: planned
