@@ -109,7 +109,7 @@ class _NotificationPrefRowState extends State<NotificationPrefRow> {
     final TextTheme t = Theme.of(context).textTheme;
     return InkWell(
       onTap: _pickTime,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(PrismRadii.sm),
       child: Row(
         children: <Widget>[
           Icon(Icons.notifications_rounded, color: p.textSecondary, size: 20),
@@ -203,7 +203,7 @@ class LanguagePrefRow extends StatelessWidget {
     final TextTheme t = Theme.of(context).textTheme;
     return InkWell(
       onTap: () => _showPicker(context),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(PrismRadii.sm),
       child: Row(
         children: <Widget>[
           Icon(Icons.language_rounded, color: p.textSecondary, size: 20),
@@ -223,10 +223,13 @@ class _ComingSoonChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.xs,
+        vertical: PrismSpacing.debt3,
+      ),
       decoration: BoxDecoration(
         color: p.surfaceAlt,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(PrismRadii.md),
       ),
       child: Text(
         'Bientôt',

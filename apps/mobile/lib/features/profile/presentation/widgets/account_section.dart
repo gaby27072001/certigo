@@ -76,7 +76,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
               ),
               if (validationError != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: 6),
+                  padding: const EdgeInsets.only(top: PrismSpacing.debt6),
                   child: Text(
                     validationError!,
                     style: TextStyle(
