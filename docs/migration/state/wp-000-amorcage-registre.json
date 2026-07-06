@@ -3,12 +3,12 @@
   "status": "in_review",
   "session_id": "b0faa7db-afd9-4078-ae8f-bdc5a3680b99",
   "branch": "gchambaud-microsoft-wp-000-migration-registry",
-  "pr": null,
+  "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/196",
   "checkpoint": {
-    "step": "registry-scaffolded",
-    "note": "docs/migration/ créé (README, work-packages.yaml, STATE.md, log.jsonl, state/, templates/) ; validations YAML/JSON/JSONL vertes. PR à ouvrir (champ pr mis à jour ensuite).",
-    "at": "2026-07-06T17:05:00+01:00"
+    "step": "pr-opened",
+    "note": "docs/migration/ créé (README, work-packages.yaml, STATE.md, log.jsonl, state/, templates/) ; validations YAML/JSON/JSONL vertes ; PR draft #196 ouverte. En attente de revue (ne pas merger).",
+    "at": "2026-07-06T17:08:05+01:00"
   },
-  "updated_at": "2026-07-06T17:05:00+01:00",
+  "updated_at": "2026-07-06T17:08:05+01:00",
   "history_ref": "log.jsonl"
 }
