@@ -46,7 +46,7 @@ class WelcomeScreen extends StatelessWidget {
               const Spacer(flex: 3),
               PrismButton(
                 label: 'C\'EST PARTI',
-                onPressed: () => context.go(OnboardingRoutes.start),
+                onPressed: () => context.go(OnboardingRoutes.intro),
               ),
               const SizedBox(height: 12),
               PrismButton.secondary(

@@ -3,6 +3,12 @@ import 'package:prism_ui/prism_ui.dart';
 
 /// Route paths for the startup flow (splash → welcome → wizard → app), kept in
 /// one place so the router, the redirect guard and the screens agree.
+///
+/// The sequence mirrors a polished learning-app onboarding: brand splash, a
+/// greeting from the guide, a handful of tailoring questions interleaved with
+/// short mascot "reactions", a couple of value/permission moments and a closing
+/// readiness reveal. Reaction/loading screens hide the progress bar; question
+/// and intro screens fill it as the learner advances.
 abstract class OnboardingRoutes {
   // NOTE: must NOT collide with the auth splash (`Routes.splash == '/splash'`).
   // A shared path made GoRouter resolve `/splash` to the auth splash (registered
@@ -10,30 +16,56 @@ abstract class OnboardingRoutes {
   // authenticated users on the spinner instead of entering onboarding.
   static const String splash = '/onboarding/splash';
   static const String welcome = '/welcome';
-  static const String start = '/onboarding/start';
-  static const String reasons = '/onboarding/reasons';
-  static const String domains = '/onboarding/domains';
-  static const String level = '/onboarding/level';
-  static const String goal = '/onboarding/goal';
-  static const String routine = '/onboarding/routine';
-  static const String promise = '/onboarding/promise';
-  static const String login = '/login';
+  static const String intro = '/onboarding/intro';
   static const String birthYear = '/onboarding/birth-year';
+  static const String certification = '/onboarding/certification';
+  static const String domains = '/onboarding/domains';
+  static const String building = '/onboarding/building';
+  static const String attribution = '/onboarding/attribution';
+  static const String level = '/onboarding/level';
+  static const String levelReaction = '/onboarding/level-reaction';
+  static const String reasons = '/onboarding/reasons';
+  static const String reasonsReaction = '/onboarding/reasons-reaction';
+  static const String routineIntro = '/onboarding/routine-intro';
+  static const String goal = '/onboarding/goal';
+  static const String goalReaction = '/onboarding/goal-reaction';
+  static const String notifications = '/onboarding/notifications';
+  static const String widget = '/onboarding/widget';
+  static const String widgetReaction = '/onboarding/widget-reaction';
+  static const String promise = '/onboarding/promise';
+  static const String paywall = '/onboarding/paywall';
+  static const String paywallReaction = '/onboarding/paywall-reaction';
+  static const String start = '/onboarding/start';
+  static const String startReaction = '/onboarding/start-reaction';
+  static const String login = '/login';
 
   /// Every location that belongs to the startup flow (i.e. lives *outside* the
   /// app shell). Used by the router redirect to gate entry to the app.
   static const Set<String> all = <String>{
     splash,
     welcome,
-    start,
-    reasons,
-    domains,
-    level,
-    goal,
-    routine,
-    promise,
-    login,
+    intro,
     birthYear,
+    certification,
+    domains,
+    building,
+    attribution,
+    level,
+    levelReaction,
+    reasons,
+    reasonsReaction,
+    routineIntro,
+    goal,
+    goalReaction,
+    notifications,
+    widget,
+    widgetReaction,
+    promise,
+    paywall,
+    paywallReaction,
+    start,
+    startReaction,
+    login,
   };
 
   static bool isStartup(String location) =>
@@ -42,6 +74,9 @@ abstract class OnboardingRoutes {
 
 /// A mascot paired with a tailed speech bubble — the recurring "the guide asks
 /// you something" header at the top of each wizard step.
+///
+/// The question "writes itself" via [TypewriterText] (instant under
+/// reduced-motion). Set [typewriter] to `false` for a static bubble.
 class MascotPrompt extends StatefulWidget {
   const MascotPrompt({
     super.key,
@@ -49,12 +84,16 @@ class MascotPrompt extends StatefulWidget {
     this.mascot = AuroraMascot.nimbus,
     this.mood = MascotMood.happy,
     this.size = 72,
+    this.typewriter = true,
   });
 
   final String message;
   final AuroraMascot mascot;
   final MascotMood mood;
   final double size;
+
+  /// Whether the message types itself in (defaults to the Duo-style reveal).
+  final bool typewriter;
 
   @override
   State<MascotPrompt> createState() => _MascotPromptState();
@@ -76,6 +115,9 @@ class _MascotPromptState extends State<MascotPrompt> {
     final TextTheme t = Theme.of(context).textTheme;
     final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final Duration d = reduceMotion ? Duration.zero : PrismMotion.base;
+    final TextStyle bubbleStyle =
+        t.titleMedium?.copyWith(height: 1.3, fontWeight: FontWeight.w600) ??
+            const TextStyle(fontWeight: FontWeight.w600);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -110,16 +152,88 @@ class _MascotPromptState extends State<MascotPrompt> {
                 child: SpeechBubble(
                   tail: SpeechTail.left,
                   tailAlignment: 0.32,
-                  child: Text(
-                    widget.message,
-                    style: t.titleMedium?.copyWith(height: 1.3, fontWeight: FontWeight.w600),
-                  ),
+                  child: widget.typewriter
+                      ? TypewriterText(widget.message, style: bubbleStyle)
+                      : Text(widget.message, style: bubbleStyle),
                 ),
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A discreet "bientôt" pill flagging a screen whose behaviour is a deliberate
+/// placeholder (paywall / widget / attribution) with no real business logic yet.
+class SoonTag extends StatelessWidget {
+  const SoonTag({super.key, this.label = 'Bientôt'});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: p.surfaceAlt,
+        borderRadius: PrismRadii.pillAll,
+        border: Border.all(color: p.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(Icons.schedule_rounded, size: 13, color: p.textSecondary),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: p.textSecondary,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A big, accent-tinted "hero metric" badge — the punchy number a reaction
+/// screen shows off ("≈ N notions", "Readiness X"). Reused across reactions so
+/// the celebratory number always reads the same.
+class MetricBadge extends StatelessWidget {
+  const MetricBadge({super.key, required this.value, required this.label, this.accent});
+
+  final String value;
+  final String label;
+  final Color? accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    final TextTheme t = Theme.of(context).textTheme;
+    final Color a = accent ?? p.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
+      decoration: BoxDecoration(
+        color: a.withOpacity(0.10),
+        borderRadius: PrismRadii.cardXxl,
+        border: Border.all(color: a.withOpacity(0.3), width: 1.5),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            value,
+            style: t.displayMedium?.copyWith(color: a, fontWeight: FontWeight.w800),
+          ),
+          Text(label, style: t.labelLarge?.copyWith(color: a)),
+        ],
+      ),
     );
   }
 }

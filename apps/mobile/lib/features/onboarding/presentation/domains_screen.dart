@@ -27,10 +27,10 @@ class DomainsScreen extends ConsumerWidget {
     final OnboardingController c = ref.watch(onboardingControllerProvider);
 
     return OnboardingScaffold(
-      progress: 0.45,
-      onBack: () => context.go(OnboardingRoutes.reasons),
+      progress: 0.22,
+      onBack: () => context.go(OnboardingRoutes.certification),
       primaryLabel: 'CONTINUER',
-      onPrimary: c.domains.isEmpty ? null : () => context.go(OnboardingRoutes.level),
+      onPrimary: c.domains.isEmpty ? null : () => context.go(OnboardingRoutes.building),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

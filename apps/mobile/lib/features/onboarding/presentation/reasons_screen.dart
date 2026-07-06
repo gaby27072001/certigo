@@ -26,10 +26,10 @@ class ReasonsScreen extends ConsumerWidget {
     final OnboardingController c = ref.watch(onboardingControllerProvider);
 
     return OnboardingScaffold(
-      progress: 0.4,
-      onBack: () => context.go(OnboardingRoutes.start),
+      progress: 0.46,
+      onBack: () => context.go(OnboardingRoutes.level),
       primaryLabel: 'CONTINUER',
-      onPrimary: c.reasons.isEmpty ? null : () => context.go(OnboardingRoutes.domains),
+      onPrimary: c.reasons.isEmpty ? null : () => context.go(OnboardingRoutes.reasonsReaction),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

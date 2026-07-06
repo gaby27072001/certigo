@@ -51,6 +51,9 @@ export 'src/components/unit_header.dart';
 export 'src/components/speech_bubble.dart';
 export 'src/components/choice_tile.dart';
 export 'src/components/onboarding_scaffold.dart';
+export 'src/components/typewriter_text.dart';
+export 'src/components/recommended_option_card.dart';
+export 'src/components/signal_bars.dart';
 
 // Pedagogical blocks (Lesson Engine)
 export 'src/components/hook_block.dart';

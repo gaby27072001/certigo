@@ -56,4 +56,48 @@ void main() {
     expect(DailyGoalOption.regular.xp, 50);
     expect(DailyGoalOption.intense.label, 'Extrême');
   });
+
+  test('Part-2 single-select fields default to null and set independently', () {
+    final OnboardingController c = OnboardingController();
+    expect(c.targetCertification, isNull);
+    expect(c.attributionSource, isNull);
+    expect(c.premiumChoice, isNull);
+    expect(c.startMode, isNull);
+
+    c.setTargetCertification(TargetCertification.az900);
+    c.setAttributionSource(AttributionSource.youtube);
+    c.setPremiumChoice(PremiumChoice.premium);
+    c.setStartMode(StartMode.findLevel);
+
+    expect(c.targetCertification, TargetCertification.az900);
+    expect(c.attributionSource, AttributionSource.youtube);
+    expect(c.premiumChoice, PremiumChoice.premium);
+    expect(c.startMode, StartMode.findLevel);
+  });
+
+  test('readinessScore climbs with the knowledge level and never starts at 0', () {
+    final OnboardingController c = OnboardingController();
+    expect(c.readinessScore, 5); // no level yet, still non-zero
+    c.setLevel(KnowledgeLevel.beginner);
+    final int beginner = c.readinessScore;
+    c.setLevel(KnowledgeLevel.expert);
+    expect(c.readinessScore, greaterThan(beginner));
+  });
+
+  test('restart clears the Part-2 fields too', () {
+    final OnboardingController c = OnboardingController()
+      ..setTargetCertification(TargetCertification.dp900)
+      ..setPremiumChoice(PremiumChoice.free)
+      ..setStartMode(StartMode.scratch);
+    c.restart();
+    expect(c.targetCertification, isNull);
+    expect(c.premiumChoice, isNull);
+    expect(c.startMode, isNull);
+  });
+
+  test('certification exposes code/title/domainIndex', () {
+    expect(TargetCertification.az900.code, 'AZ-900');
+    expect(TargetCertification.ai900.title, 'AI Fundamentals');
+    expect(TargetCertification.sc900.domainIndex, isNonNegative);
+  });
 }

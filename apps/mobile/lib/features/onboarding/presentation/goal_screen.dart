@@ -16,10 +16,10 @@ class GoalScreen extends ConsumerWidget {
     final OnboardingController c = ref.watch(onboardingControllerProvider);
 
     return OnboardingScaffold(
-      progress: 0.6,
-      onBack: () => context.go(OnboardingRoutes.reasons),
+      progress: 0.60,
+      onBack: () => context.go(OnboardingRoutes.routineIntro),
       primaryLabel: 'CONTINUER',
-      onPrimary: c.goal == null ? null : () => context.go(OnboardingRoutes.routine),
+      onPrimary: c.goal == null ? null : () => context.go(OnboardingRoutes.goalReaction),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

@@ -21,6 +21,48 @@ enum KnowledgeLevel { beginner, intermediate, advanced, expert }
 /// label (the right-aligned caption on the goal selector).
 enum DailyGoalOption { chill, regular, serious, intense }
 
+/// The certification the learner is aiming for — the Certigo equivalent of the
+/// "which language?" question that opens the reference flow.
+enum TargetCertification { az900, ai900, dp900, sc900, az104 }
+
+extension TargetCertificationInfo on TargetCertification {
+  /// Exam code shown as the bold tile label (e.g. "AZ-900").
+  String get code => switch (this) {
+        TargetCertification.az900 => 'AZ-900',
+        TargetCertification.ai900 => 'AI-900',
+        TargetCertification.dp900 => 'DP-900',
+        TargetCertification.sc900 => 'SC-900',
+        TargetCertification.az104 => 'AZ-104',
+      };
+
+  /// Human-readable exam title (the tile subtitle / trailing caption).
+  String get title => switch (this) {
+        TargetCertification.az900 => 'Azure Fundamentals',
+        TargetCertification.ai900 => 'AI Fundamentals',
+        TargetCertification.dp900 => 'Data Fundamentals',
+        TargetCertification.sc900 => 'Security Fundamentals',
+        TargetCertification.az104 => 'Azure Administrator',
+      };
+
+  /// Index into `PrismColors.domainAccents` used for the leading accent chip.
+  int get domainIndex => switch (this) {
+        TargetCertification.az900 => 0,
+        TargetCertification.ai900 => 3,
+        TargetCertification.dp900 => 4,
+        TargetCertification.sc900 => 5,
+        TargetCertification.az104 => 1,
+      };
+}
+
+/// How the learner first heard about Certigo (single-select attribution).
+enum AttributionSource { newsBlog, friendsFamily, search, youtube, appStore, social, tiktok, other }
+
+/// The plan the learner picks on the paywall (placeholder — no billing yet).
+enum PremiumChoice { premium, free }
+
+/// Where the learner wants to begin their track (single-select).
+enum StartMode { scratch, findLevel }
+
 extension DailyGoalOptionInfo on DailyGoalOption {
   int get minutes => switch (this) {
         DailyGoalOption.chill => 3,
@@ -83,6 +125,18 @@ class OnboardingController extends ChangeNotifier {
   bool _reminders = true;
   bool get reminders => _reminders;
 
+  TargetCertification? _targetCertification;
+  TargetCertification? get targetCertification => _targetCertification;
+
+  AttributionSource? _attributionSource;
+  AttributionSource? get attributionSource => _attributionSource;
+
+  PremiumChoice? _premiumChoice;
+  PremiumChoice? get premiumChoice => _premiumChoice;
+
+  StartMode? _startMode;
+  StartMode? get startMode => _startMode;
+
   void setStart(StartChoice value) {
     _start = value;
     notifyListeners();
@@ -117,6 +171,37 @@ class OnboardingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setTargetCertification(TargetCertification value) {
+    _targetCertification = value;
+    notifyListeners();
+  }
+
+  void setAttributionSource(AttributionSource value) {
+    _attributionSource = value;
+    notifyListeners();
+  }
+
+  void setPremiumChoice(PremiumChoice value) {
+    _premiumChoice = value;
+    notifyListeners();
+  }
+
+  void setStartMode(StartMode value) {
+    _startMode = value;
+    notifyListeners();
+  }
+
+  /// Starting Readiness Score, credited from the self-reported knowledge level —
+  /// powers the closing "tu démarres à X !" reaction. A learner who already
+  /// knows some notions never starts from zero.
+  int get readinessScore => switch (_level) {
+        KnowledgeLevel.beginner => 8,
+        KnowledgeLevel.intermediate => 22,
+        KnowledgeLevel.advanced => 40,
+        KnowledgeLevel.expert => 58,
+        null => 5,
+      };
+
   /// Number of new notions promised for the first week, derived from the daily
   /// goal — used by the "≈ N notions cette semaine" promise screen.
   int get weeklyNotions {
@@ -141,6 +226,10 @@ class OnboardingController extends ChangeNotifier {
     _level = null;
     _goal = null;
     _reminders = true;
+    _targetCertification = null;
+    _attributionSource = null;
+    _premiumChoice = null;
+    _startMode = null;
     notifyListeners();
     unawaited(_persistCompletedFlag(value: false));
   }

@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../application/birth_year_provider.dart';
-import '../application/onboarding_controller.dart';
 import 'onboarding_common.dart';
 
 /// Final onboarding step — collects the learner's year of birth.
@@ -50,8 +49,7 @@ class _BirthYearScreenState extends ConsumerState<BirthYearScreen> {
   Future<void> _confirm() async {
     await ref.read(birthYearProvider.notifier).save(_selectedYear);
     if (!mounted) return;
-    ref.read(onboardingControllerProvider).complete();
-    context.go('/path');
+    context.go(OnboardingRoutes.certification);
   }
 
   @override
@@ -60,9 +58,9 @@ class _BirthYearScreenState extends ConsumerState<BirthYearScreen> {
     final TextTheme t = Theme.of(context).textTheme;
 
     return OnboardingScaffold(
-      progress: 1,
-      onBack: () => context.go(OnboardingRoutes.promise),
-      primaryLabel: 'C\'EST PARTI',
+      progress: 0.10,
+      onBack: () => context.go(OnboardingRoutes.intro),
+      primaryLabel: 'CONTINUER',
       onPrimary: _confirm,
       scrollable: false,
       child: Column(

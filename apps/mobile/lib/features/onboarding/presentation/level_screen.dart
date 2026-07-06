@@ -7,38 +7,40 @@ import 'package:prism_ui/prism_ui.dart';
 import '../application/onboarding_controller.dart';
 import 'onboarding_common.dart';
 
-/// Step 4 — "Quel est ton niveau actuel sur Azure ?". Single-select knowledge
-/// level that helps the coach calibrate difficulty from day one.
+/// Step — "Où en es-tu sur Azure ?". Single-select knowledge level with a
+/// growing "signal bars" glyph (1 bar = beginner … 4 bars = expert) that helps
+/// the coach calibrate difficulty from day one.
 class LevelScreen extends ConsumerWidget {
   const LevelScreen({super.key});
 
-  static const List<(KnowledgeLevel, String, String, String)> _options =
-      <(KnowledgeLevel, String, String, String)>[
-    (KnowledgeLevel.beginner, '🌱', 'Débutant', 'Je débute en Cloud / Azure'),
-    (KnowledgeLevel.intermediate, '🌿', 'Intermédiaire', 'Je connais les bases du Cloud'),
-    (KnowledgeLevel.advanced, '🌳', 'Avancé', 'J\'utilise Azure au quotidien'),
-    (KnowledgeLevel.expert, '🏆', 'Expert', 'Je prépare des certifications avancées'),
+  static const List<(KnowledgeLevel, int, String, String)> _options =
+      <(KnowledgeLevel, int, String, String)>[
+    (KnowledgeLevel.beginner, 1, 'Débutant', 'Je débute en Cloud / Azure'),
+    (KnowledgeLevel.intermediate, 2, 'Intermédiaire', 'Je connais les bases du Cloud'),
+    (KnowledgeLevel.advanced, 3, 'Avancé', 'J\'utilise Azure au quotidien'),
+    (KnowledgeLevel.expert, 4, 'Expert', 'Je prépare des certifications avancées'),
   ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final OnboardingController c = ref.watch(onboardingControllerProvider);
+    final PrismColorScheme p = context.prism;
 
     return OnboardingScaffold(
-      progress: 0.5,
-      onBack: () => context.go(OnboardingRoutes.domains),
+      progress: 0.38,
+      onBack: () => context.go(OnboardingRoutes.attribution),
       primaryLabel: 'CONTINUER',
-      onPrimary: c.level == null ? null : () => context.go(OnboardingRoutes.goal),
+      onPrimary: c.level == null ? null : () => context.go(OnboardingRoutes.levelReaction),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const SizedBox(height: 8),
-          const MascotPrompt(message: 'Quel est ton niveau actuel sur Azure ?'),
+          const MascotPrompt(message: 'Où en es-tu sur Azure ?'),
           const SizedBox(height: 24),
-          for (final (KnowledgeLevel value, String emoji, String label, String subtitle)
+          for (final (KnowledgeLevel value, int bars, String label, String subtitle)
               in _options) ...<Widget>[
             _LevelTile(
-              emoji: emoji,
+              leading: SignalBars(level: bars, color: p.primary, size: 26),
               label: label,
               subtitle: subtitle,
               selected: c.level == value,
@@ -52,19 +54,19 @@ class LevelScreen extends ConsumerWidget {
   }
 }
 
-/// A selectable tile with a leading emoji, a bold label and a subtitle line.
+/// A selectable tile with a leading glyph, a bold label and a subtitle line.
 /// Designed to match the visual style of [ChoiceTile] while supporting two
 /// lines of text.
 class _LevelTile extends StatefulWidget {
   const _LevelTile({
-    required this.emoji,
+    required this.leading,
     required this.label,
     required this.subtitle,
     required this.selected,
     required this.onTap,
   });
 
-  final String emoji;
+  final Widget leading;
   final String label;
   final String subtitle;
   final bool selected;
@@ -124,9 +126,7 @@ class _LevelTileState extends State<_LevelTile> {
               SizedBox(
                 width: 34,
                 height: 34,
-                child: Center(
-                  child: Text(widget.emoji, style: const TextStyle(fontSize: 22)),
-                ),
+                child: Center(child: widget.leading),
               ),
               const SizedBox(width: 14),
               Expanded(
