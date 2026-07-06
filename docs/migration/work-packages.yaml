@@ -68,7 +68,7 @@ work_packages:
     precondition: "Inspecter la config backup du compte Cosmos (Bicep + portail) : mode Periodic vs Continuous. Idempotent : si Continuous/PITR est déjà actif et sans drift, valider seulement la restauration test."
     dod: "PITR actif (drift IaC corrigé) et restauration test réussie (point-in-time restore vérifié)."
     rollback: "La config PITR est réversible (retour Periodic) ; aucune donnée perdue."
-    status: in_progress
+    status: in_review
 
   - id: wp-p0-04-ai-tutor-decision
     phase: 0
