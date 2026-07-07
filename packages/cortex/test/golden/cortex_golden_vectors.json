@@ -1,0 +1,84 @@
+{
+  "_comment": "Single source of truth for Cortex Dart <-> .NET parity. The 'parity' group is asserted IDENTICALLY by the Dart golden tests (packages/cortex/test/cortex_golden_test.dart) and the .NET CortexParityTests (backend/tests/Certigo.Domain.Tests/CortexParityTests.cs); any divergence fails the ci-cortex-parity gate. The 'cortexOnly' group covers the SessionPlanner, which has no .NET twin, so only Dart asserts it. See ADR-013.",
+  "algoVersion": "1.0.0",
+  "parity": {
+    "scheduler": [
+      {
+        "name": "fresh-good",
+        "grades": ["good"],
+        "expected": { "stability": 1.6, "difficulty": 4.85, "reps": 1, "lapses": 0 },
+        "checkDueAt": true,
+        "dueAtOffsetSeconds": 138240
+      },
+      {
+        "name": "fresh-again",
+        "grades": ["again"],
+        "expected": { "stability": 0.5, "difficulty": 5.8, "reps": 1, "lapses": 1 },
+        "checkDueAt": true,
+        "dueAtOffsetSeconds": 43200
+      },
+      {
+        "name": "fresh-easy",
+        "grades": ["easy"],
+        "expected": { "stability": 2.1, "difficulty": 4.85, "reps": 1, "lapses": 0 },
+        "checkDueAt": true,
+        "dueAtOffsetSeconds": 181440
+      },
+      {
+        "name": "mixed-sequence",
+        "grades": ["good", "good", "again", "hard", "good"],
+        "expected": { "stability": 1.80224, "difficulty": 5.2, "reps": 5, "lapses": 1 },
+        "checkDueAt": false,
+        "dueAtOffsetSeconds": 0
+      }
+    ],
+    "weakness": [
+      { "name": "unseen", "reps": 0, "masteryScore": 0.0, "expectedIsWeak": false },
+      { "name": "seen-low", "reps": 1, "masteryScore": 0.3, "expectedIsWeak": true },
+      { "name": "seen-high", "reps": 5, "masteryScore": 0.8, "expectedIsWeak": false },
+      { "name": "boundary-half", "reps": 3, "masteryScore": 0.5, "expectedIsWeak": false }
+    ],
+    "readiness": [
+      {
+        "name": "single-mastered-recent",
+        "trackId": "az-900",
+        "domains": [ { "domainId": "d", "weight": 1, "conceptsInDomain": 1 } ],
+        "masteries": [
+          { "conceptId": "c", "domainId": "d", "masteryScore": 1.0, "reps": 5, "lastReviewedAtOffsetDays": 2.9 }
+        ],
+        "expectedDomainScores": { "d": 97 },
+        "expectedTrackScore": 97
+      },
+      {
+        "name": "multi-domain-weighted",
+        "trackId": "az-104",
+        "domains": [
+          { "domainId": "a", "weight": 2, "conceptsInDomain": 2 },
+          { "domainId": "b", "weight": 1, "conceptsInDomain": 1 }
+        ],
+        "masteries": [
+          { "conceptId": "a1", "domainId": "a", "masteryScore": 1.0, "reps": 3, "lastReviewedAtOffsetDays": 0 },
+          { "conceptId": "b1", "domainId": "b", "masteryScore": 0.5, "reps": 2, "lastReviewedAtOffsetDays": 0 }
+        ],
+        "expectedDomainScores": { "a": 71, "b": 50 },
+        "expectedTrackScore": 64
+      }
+    ]
+  },
+  "cortexOnly": {
+    "sessionPlanner": [
+      {
+        "name": "interleaved-lanes",
+        "size": 10,
+        "states": [
+          { "conceptId": "d1", "masteryScore": 0.8, "reps": 3, "dueAtOffsetDays": -2, "lastReviewedAtOffsetDays": 2 },
+          { "conceptId": "d2", "masteryScore": 0.8, "reps": 3, "dueAtOffsetDays": -1, "lastReviewedAtOffsetDays": 1 },
+          { "conceptId": "w1", "masteryScore": 0.2, "reps": 3, "dueAtOffsetDays": 5, "lastReviewedAtOffsetDays": 1 },
+          { "conceptId": "r1", "masteryScore": 0.7, "reps": 3, "dueAtOffsetDays": 5, "lastReviewedAtOffsetDays": 1 }
+        ],
+        "candidateNewConceptIds": ["n1", "n2"],
+        "expectedOrder": ["d1", "d2", "w1", "n1", "n2", "r1"]
+      }
+    ]
+  }
+}

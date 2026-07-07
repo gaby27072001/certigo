@@ -5,6 +5,7 @@
 /// fully unit-testable and mirrors the .NET backend implementation 1:1.
 library cortex;
 
+export 'src/cortex_algo_version.dart';
 export 'src/review_grade.dart';
 export 'src/concept_mastery.dart';
 export 'src/review_scheduler.dart';

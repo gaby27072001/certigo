@@ -247,8 +247,8 @@ work_packages:
     precondition: "Recenser les règles métier dupliquées client/serveur et l'existence d'un contrôle de parité. Idempotent : si un gate de parité existe déjà, le lot est déjà fait."
     dod: "Un jeu de vecteurs de test partagé vérifie l'équivalence des décisions client/serveur ; toute divergence échoue le job CI dédié ; gate vert sur main."
     rollback: "Abandon de la branche ; aucun gate ajouté à la CI."
-    status: todo
-    notes: "Vague V1 · voie code."
+    status: in_review
+    notes: "Vague V1 · voie code. PR #216 (draft)."
 
   - id: wp-p1-10-mobile-crash-reporting
     phase: 1

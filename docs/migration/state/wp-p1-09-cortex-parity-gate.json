@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-09-cortex-parity-gate",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
-  "pr": null,
+  "status": "in_review",
+  "session_id": "6957c3da-a7d6-4c19-a908-05f49482e5e5",
+  "branch": "gchambaud-microsoft-wp-p1-09-cortex-parity-gate",
+  "pr": 216,
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "in_progress->in_review",
+    "note": "Gate de parite Cortex implemente et pousse. Golden vectors centralises (test/golden/cortex_golden_vectors.json, source unique Dart+.NET). cortexAlgoVersion=1.0.0 (Dart cortex_algo_version.dart + .NET CortexAlgo.Version). Tests hermetiques verts sur vecteurs partages : Dart 12 (scheduler+dueAt, weakness, readiness, sessionPlanner) via dart test test/cortex_golden_test.dart ; .NET 4 facts (scheduler+dueAt, weakness IsWeak, readiness, version) via dotnet test --filter CortexParityTests. Gate CI bloquant .github/workflows/ci-cortex-parity.yml rejoue les deux implementations et echoue si divergence. Perimetre cortex-only ; infra intouche. PR draft #216.",
+    "at": "2026-07-07T11:18:00+01:00"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-07-07T11:18:00+01:00",
   "history_ref": "log.jsonl"
 }
