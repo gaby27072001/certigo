@@ -319,7 +319,7 @@ work_packages:
     precondition: "Auditer les gains de gamification (XP/gems/streak) pour l'idempotence et les plafonds anti-abus. Idempotent : si les gardes anti-triche + plafonds existent déjà, le lot est déjà fait."
     dod: "Les gains XP/gems/streak sont idempotents (rejeu sans double-crédit) et plafonnés/anti-abus côté serveur ; tests anti-rejeu et de plafond verts."
     rollback: "Abandon de la branche ; retour au comportement de gamification antérieur."
-    status: todo
+    status: in_progress
     notes: "Vague V3 · voie code."
 
   # --- Phases 1–5 — placeholders (à décomposer au lancement) ---------------

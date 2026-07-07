@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-15-gamification-integrity",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
+  "status": "in_progress",
+  "session_id": "8fa74783-9aa0-4e13-92e1-1f14c19e64bc",
+  "branch": "gchambaud-microsoft-wp-p1-15-gamification-integrity",
   "pr": null,
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "in-progress",
+    "note": "Lot de CONFIRMATION démarré : audit intégrité gamification (idempotence XP/gems/streak + plafonds anti-abus RateWindow). Base origin/main propre, diff backend attendu vide. Preuves fichier:ligne en cours de consignation (ADR).",
+    "at": "2026-07-07T10:38:10+01:00"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-07-07T10:38:10+01:00",
   "history_ref": "log.jsonl"
 }
