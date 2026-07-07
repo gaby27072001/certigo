@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-15-gamification-integrity",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
-  "pr": null,
+  "status": "in_review",
+  "session_id": "8fa74783-9aa0-4e13-92e1-1f14c19e64bc",
+  "branch": "gchambaud-microsoft-wp-p1-15-gamification-integrity",
+  "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/214",
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "pr-opened",
+    "note": "Lot de CONFIRMATION : durcissement economie/gamification deja en place sur main (deps wp-p0-02 ETag + wp-p0-06 server-authoritative merges). Diff origin/main -- apps infra backend VIDE (docs-only). ADR-012 ajoute a ARCHITECTURE.md (tableau section 11 + section 12.2) prouvant fichier:ligne les 5 findings : ETag/OptimisticConcurrency sur ecritures economie (GamificationServices.cs), TransactionalBatch multi-doc (CosmosProgressRepository.cs:50), plafonds RateWindow en enforcement (AttemptIntegrity.cs + CosmosAttemptRepository.cs:44 via QuizService/ExamService), userId issu du JWT partout (userContext.UserId), idempotence rewards/achats par ids deterministes (purchase::{ClientPurchaseId}, attempt::{ClientAttemptId}). Non-regression ciblee VERTE : dotnet build Certigo.sln -c Release = 0 avertissement / 0 erreur ; AttemptIntegrityEvaluatorTests = 18/18 ; ShopServiceTests+QuestServiceTests+SeasonServiceTests+StreakRepairServiceTests+QuizServiceTests+ExamServiceTests+ConcurrencyAndAuthTests+AntiCheatWiringTests = 44/44. PR draft #214 (base main, non mergee). Hors perimetre : cortex p1-09, renderer p1-01.",
+    "at": "2026-07-07T10:47:21+01:00"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-07-07T10:47:21+01:00",
   "history_ref": "log.jsonl"
 }

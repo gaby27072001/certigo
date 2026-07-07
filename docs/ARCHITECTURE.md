@@ -240,6 +240,7 @@ chaîne iOS active passe par Codemagic.
 | ADR-05 | Pas de codegen Dart au départ | fichiers auto-suffisants, squelette robuste ; migration freezed possible plus tard |
 | ADR-06 | Pas de cœurs / vies dans la gamification | éviter la frustration ; motiver la régularité, pas la punition |
 | ADR-011 | Intégrité serveur-autoritatif : `userId` **toujours** issu du JWT (jamais du corps de requête) + idempotence par `clientAttemptId` et ids déterministes sur récompenses/achats | empêcher l'usurpation d'identité côté client et le double-crédit sur rejeu réseau (voir §12.1) |
+| ADR-012 | Intégrité de la gamification : **ETag sur toutes les écritures d'économie**, progression multi-document **atomique** (`TransactionalBatch`), et **plafonds anti-abus `RateWindow` en enforcement** (XP/tentatives sur 1 h, lus du conteneur réel) | rendre les plafonds de cadence effectifs (plus dormants) et confirmer la non-régression du durcissement économie/gamification (voir §12.2) |
 
 ---
 
@@ -306,3 +307,68 @@ la décision et **verrouille** la non-régression par les tests anti-rejeu.
 propre, pas de lost update silencieux) **n'entre pas** dans le DoD de ce lot, strictement limité aux
 écritures **économie/quiz**. Le retry des notifications est **différé** en Phase 1+ et **non**
 implémenté ici.
+
+### 12.2 ADR-012 — Intégrité de la gamification (plafonds & rejeu, confirmation `wp-p1-15`)
+
+**Décision.** L'intégrité de l'économie et de la gamification (XP, gemmes, série, quêtes,
+saison, boutique) repose sur trois garanties **serveur-autoritatives** : (1) toute écriture de
+profil passe par la **concurrence optimiste ETag** (`OptimisticConcurrency`), (2) la progression
+multi-document est **atomique** (`TransactionalBatch` mono-partition), (3) les **plafonds de
+cadence** (`RateWindow`) sont **appliqués** (enforcement), alimentés par une fenêtre **réelle**
+lue du conteneur `attempts`. Confirmé par l'audit du lot `wp-p1-15-gamification-integrity` : le
+backend était **déjà conforme** (dépendances `wp-p0-02` ETag et `wp-p0-06` server-authoritative
+**mergées**). Ce lot **consigne** la preuve fichier:ligne et **n'introduit aucun code** ; il
+complète l'ADR-011 (§12.1) sur l'axe **plafonds anti-abus**.
+
+**1. ETag sur toutes les écritures d'économie.** Chaque mutation de profil est encapsulée dans
+`OptimisticConcurrency.ExecuteAsync` (relit le profil et **ré-évalue** la règle métier sur 412) :
+
+| Écriture | Site |
+|---|---|
+| Boutique (`PurchaseAsync`) | `GamificationServices.cs:47` |
+| Quête quotidienne (`ClaimAsync`) | `GamificationServices.cs:139` |
+| Saison (`ClaimBadgeAsync`) | `GamificationServices.cs:253` |
+| Réparation de série (`RepairAsync`) | `GamificationServices.cs:428` |
+| Scoring quiz (crédit profil) | `QuizService.cs` (voir §12.1) |
+
+**2. `TransactionalBatch` multi-document.** La progression de leçon écrit *profil + tentative +
+événements* dans **un seul batch** transactionnel, sur la partition `userId` :
+`CosmosProgressRepository.cs:50` — `context.Progress.CreateTransactionalBatch(new PartitionKey(userId))`.
+Aucune écriture partielle possible (tout ou rien).
+
+**3. Plafonds `RateWindow` — enforcement (pas shadow).** La fenêtre de cadence est **lue du
+conteneur réel** (`attempts`), pas un stub dormant :
+
+- `QuizService.cs:172` et `ExamService.cs:299` appellent `BuildRateWindowAsync`, défini en
+  `QuizService.cs:368` / `ExamService.cs:426` : `attempts.GetRecentActivityAsync(userContext.UserId,
+  now - RateWindowDuration, …)` avec `RateWindowDuration = 1 h` (`QuizService.cs:366`,
+  `ExamService.cs:424`). Implémentation réelle : `CosmosAttemptRepository.cs:44`.
+- Politique par défaut (`AttemptIntegrity.cs`) : record `RateWindow` (`:79`) ; champs
+  `MaxXpPerWindow` (`:95`) / `MaxAttemptsPerWindow` (`:96`) ; `IntegrityPolicy.Default`
+  = **600 XP** (`:121`) et **40 tentatives** (`:122`) par heure.
+- Application dans `Evaluate` : dépassement XP → `flags.Add(IntegrityFlag.XpRateExceeded)`
+  (`AttemptIntegrity.cs:236`, gardé par le `if` L234) ; dépassement tentatives →
+  `IntegrityFlag.AttemptRateExceeded` (`AttemptIntegrity.cs:244`, gardé L242). Ces flags alimentent
+  le score de risque et peuvent **rejeter** l'attribution des récompenses.
+
+**4. `userId` exclusivement issu du JWT.** Confirmé §12.1 pour l'identité. Les fenêtres de cadence
+elles-mêmes emploient `userContext.UserId` (`QuizService.cs:370`, `ExamService.cs:428`) : aucun DTO
+gamification ne transporte de `userId` client — impossible de plafonner « l'identité d'un autre ».
+
+**5. Idempotence récompenses & achats (ids déterministes).** Confirmé §12.1 (réserver-avant-créditer,
+sens d'échec sûr). Ancres propres à ce lot : boutique — garde `GetByClientPurchaseIdAsync`
+(`GamificationServices.cs:52`) → id `purchase::{ClientPurchaseId}` (`GamificationServices.cs:83`) →
+`CreateAsync` (`:90`) ; réparation de série — garde (`:432`) → `CreateAsync` (`:477`) ; scoring quiz —
+garde amont `prior.Result` (`QuizService.cs:35`/`:38`), id `attempt::{ClientAttemptId}` (`:243`),
+`DuplicateRecordException` → relecture du gagnant (`:255`/`:257`), sinon `ConcurrencyConflictException`
+(`:263`). Au pire une récompense est *rejouable*, **jamais** double-créditée.
+
+**Tests anti-régression.** Couverts par les suites listées en §12.1 (`QuizServiceTests`,
+`ExamServiceTests`, `ShopServiceTests`, `QuestServiceTests`, `SeasonServiceTests`,
+`StreakRepairServiceTests` : idempotence par clé cliente) ; les plafonds de cadence sont vérifiés par
+`AttemptIntegrityEvaluatorTests` (dépassement XP/tentatives → flags `IntegrityFlag.*RateExceeded`).
+
+**Hors périmètre.** `cortex` (`wp-p1-09`) et le renderer contenu (`wp-p1-01`) ne sont **pas** touchés ;
+la réserve `wp-p0-02` sur `NotificationService.UpsertAsync` reste **différée** (cf. §12.1). Ce lot est
+strictement **backend économie/gamification** et **sans changement de code** (`git diff origin/main`
+limité au registre de migration et à ce document).
