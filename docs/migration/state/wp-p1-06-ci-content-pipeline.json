@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-06-ci-content-pipeline",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
-  "pr": null,
+  "status": "in_review",
+  "session_id": "40b41f1f-7ec7-40a9-87ff-2b9a0997e82b",
+  "branch": "wp-p1-06-ci-content-pipeline",
+  "pr": "https://github.com/gchambaud_microsoft/certigo-content/pull/1",
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "bookkeeping-in_progress-to-in_review",
+    "note": "Pipeline CI de validation du contenu livre dans le depot separe gchambaud_microsoft/certigo-content (cross-repo ; le code n'est PAS dans Certigo). Branche wp-p1-06-ci-content-pipeline, PR#code certigo-content#1 (draft). Preuves fichier:ligne : schemas/question.schema.json L7 additionalProperties:false (anti-fuite structurel interdisant correct/rationale cote public), L8 required id/schemaVersion/kind/prompt/choices ; schemas/solution.schema.json L8 required id/schemaVersion/kind/correct/rationale, L20+L24 correct+rationale string ; tools/validate_content.mjs L41 strip BOM UTF-8 avant JSON.parse, L30 FORBIDDEN_PUBLIC_KEYS correct/rationale, L77-L84 anti-fuite parsed+raw byte scan, L149 integrite referentielle 0 orphelin, L151 exit 0 ; .github/workflows/ci-content.yml L29 fork-guard CI-01, L30 environment pr-ci, L31 runner labels configurables PR_RUNNER_LABELS. DoD locale VERTE : npm install --no-save ajv ajv-formats glob puis node tools/validate_content.mjs => exit 0, 4/4 checks sur le corpus reel (couple demo-0001). Perimetre certigo-content = schemas/ + tools/ + .github/workflows/ (content/** intact).",
+    "at": "2026-07-07T15:19:30Z"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-07-07T15:19:30Z",
   "history_ref": "log.jsonl"
 }
