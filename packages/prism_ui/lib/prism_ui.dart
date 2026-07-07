@@ -74,3 +74,9 @@ export 'src/components/prism_rich_text.dart';
 // Async / state surfaces
 export 'src/components/prism_skeleton.dart';
 export 'src/components/prism_status_view.dart';
+
+// Dynamic content rendering (ADR-003)
+export 'src/rendering/content_block.dart';
+export 'src/rendering/block_fallback.dart';
+export 'src/rendering/renderer_registry.dart';
+export 'src/rendering/standard_renderers.dart';

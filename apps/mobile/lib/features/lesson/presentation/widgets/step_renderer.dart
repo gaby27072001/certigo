@@ -2,6 +2,7 @@ import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import '../../application/lesson_renderer.dart';
 import '../../application/lesson_session_state.dart';
 import '../../application/lesson_step.dart';
 import 'check_step_widget.dart';
@@ -32,21 +33,29 @@ class StepRenderer extends StatelessWidget {
     if (step == null || lesson == null) return const SizedBox.shrink();
     final LessonBlock? block = step.block;
 
-    final Widget content = switch (step.kind) {
-      LessonStepKind.intro => LessonIntroView(lesson: lesson),
-      LessonStepKind.hook => HookBlock(text: block?.body ?? ''),
-      LessonStepKind.concept => ConceptBlock(title: block?.title, body: block?.body ?? ''),
-      LessonStepKind.example => ScenarioBlock(body: block?.body ?? ''),
-      LessonStepKind.code => CodeBlock(code: block?.code ?? '', language: block?.language),
-      LessonStepKind.recap => KeyTakeawayBlock(body: block?.body ?? ''),
-      LessonStepKind.check => _buildCheck(step.item!),
-      LessonStepKind.quiz => const CalloutBlock(
-          kind: CalloutKind.info,
-          title: 'Checkpoint',
-          text: 'Le checkpoint d\'unité arrive bientôt.',
-        ),
-      LessonStepKind.result => const SizedBox.shrink(),
-    };
+    // ADR-003: passive content steps flow through the dynamic renderer, which
+    // guarantees a visible fallback for unknown/malformed blocks. Flip
+    // `kUseDynamicRenderer` to false to roll back to the static switch below.
+    final Widget content;
+    if (kUseDynamicRenderer && isDynamicContentKind(step.kind)) {
+      content = lessonRendererRegistry.build(context, contentBlockFor(step));
+    } else {
+      content = switch (step.kind) {
+        LessonStepKind.intro => LessonIntroView(lesson: lesson),
+        LessonStepKind.hook => HookBlock(text: block?.body ?? ''),
+        LessonStepKind.concept => ConceptBlock(title: block?.title, body: block?.body ?? ''),
+        LessonStepKind.example => ScenarioBlock(body: block?.body ?? ''),
+        LessonStepKind.code => CodeBlock(code: block?.code ?? '', language: block?.language),
+        LessonStepKind.recap => KeyTakeawayBlock(body: block?.body ?? ''),
+        LessonStepKind.check => _buildCheck(step.item!),
+        LessonStepKind.quiz => const CalloutBlock(
+            kind: CalloutKind.info,
+            title: 'Checkpoint',
+            text: 'Le checkpoint d\'unité arrive bientôt.',
+          ),
+        LessonStepKind.result => const SizedBox.shrink(),
+      };
+    }
 
     return ListView(
       padding: PrismSpacing.screen,
