@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-14-opentelemetry-correlation",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
+  "status": "in_progress",
+  "session_id": "d54a0def-4cfa-453f-98f8-bebd34140489",
+  "branch": "gchambaud-microsoft-wp-p1-14-opentelemetry-correlation",
   "pr": null,
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "mobile-correlation-id-emission",
+    "note": "Audit idempotence : backend deja autoritaire (ExceptionMiddleware.cs honore/mint x-correlation-id format n + scope log CorrelationId ; Program.cs App Insights worker service). Delta = mobile n'emettait PAS x-correlation-id. Ajout CorrelationIdInterceptor branche en premier dans ApiClient.",
+    "at": "2026-07-07T11:00:00+01:00"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-07-07T11:00:00+01:00",
   "history_ref": "log.jsonl"
 }

@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:core/core.dart';
 
+import 'correlation_interceptor.dart';
+
 /// Supplies a fresh access token for outbound requests. Implemented by the auth
 /// feature (Entra External ID) and injected so `data` stays auth-agnostic.
 typedef TokenProvider = Future<String?> Function();
@@ -25,6 +27,7 @@ class ApiClient {
     UnauthorizedHandler? onUnauthorized,
     String? baseUrl,
     DebugLogger? debugLog,
+    CorrelationIdGenerator? correlationIdGenerator,
   })  : _dio = dio ?? Dio(),
         _debugLog = debugLog {
     _dio.options
@@ -32,6 +35,16 @@ class ApiClient {
       ..connectTimeout = const Duration(seconds: 12)
       ..receiveTimeout = const Duration(seconds: 20)
       ..contentType = 'application/json';
+
+    // Stamp every request with an `x-correlation-id` so a single id links
+    // client → backend → App Insights (ADR-013). Registered first so the id is
+    // present before any other interceptor runs and can be traced below.
+    _dio.interceptors.add(
+      CorrelationIdInterceptor(
+        generate: correlationIdGenerator,
+        debugLog: debugLog,
+      ),
+    );
 
     // Trace HTTP requests/responses/errors so the login flow is visible in
     // `flutter run` / `adb logcat` — Dio rides on dart:io and emits nothing by
