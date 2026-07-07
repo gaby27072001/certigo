@@ -50,9 +50,36 @@ final catalogRepositoryProvider = Provider<CatalogRepository>(
   ),
 );
 
-final lessonRepositoryProvider = Provider<LessonRepository>(
-  (Ref ref) => RemoteLessonRepository(ref.watch(apiClientProvider)),
+/// Opt-in feature flag for the offline study cache (wp-p1-08).
+///
+/// Defaults to `false`: online-only is the default behaviour. Compile with
+/// `--dart-define=OFFLINE_STUDY_CACHE=true` to make study sessions downloadable
+/// and readable offline. Rollback is simply not enabling the flag.
+final offlineStudyCacheEnabledProvider = Provider<bool>(
+  (Ref ref) => const bool.fromEnvironment('OFFLINE_STUDY_CACHE', defaultValue: false),
 );
+
+/// Current content manifest version, used as the single cache-invalidation key
+/// for the offline lesson cache. Bumping it (via
+/// `--dart-define=CONTENT_MANIFEST_VERSION=...`) invalidates every cached lesson.
+final contentManifestVersionProvider = Provider<String>(
+  (Ref ref) => const String.fromEnvironment('CONTENT_MANIFEST_VERSION', defaultValue: 'v1'),
+);
+
+/// Backing store for the offline lesson cache. Defaults to in-memory so tests
+/// need no platform channels; [bootstrap] overrides it with a
+/// SharedPreferences-backed store so downloaded lessons survive app restarts.
+final lessonStoreProvider = Provider<LessonCacheStore>((Ref ref) => InMemoryLessonCacheStore());
+
+final lessonRepositoryProvider = Provider<LessonRepository>((Ref ref) {
+  final LessonRepository remote = RemoteLessonRepository(ref.watch(apiClientProvider));
+  if (!ref.watch(offlineStudyCacheEnabledProvider)) return remote;
+  return OfflineLessonRepository(
+    remote,
+    ref.watch(lessonStoreProvider),
+    ref.watch(contentManifestVersionProvider),
+  );
+});
 
 /// Persistent queue of idempotent offline actions.
 ///
@@ -126,9 +153,7 @@ final examRepositoryProvider = Provider<ExamRepository>(
 );
 
 /// User-controlled theme mode (persisted by settings later). System by default.
-final themeModeProvider = StateProvider<ThemeMode>(
-  (Ref ref) => ThemeMode.system,
-);
+final themeModeProvider = StateProvider<ThemeMode>((Ref ref) => ThemeMode.system);
 
 /// Audio-haptic feedback for lesson checks (§3.14). Real haptics by default;
 /// tests / reduce-motion override this with [SilentLessonFeedback].
@@ -159,9 +184,7 @@ final activeTrackProvider = StateProvider<String>((Ref ref) => 'az-900');
 
 /// The catalog of certification tracks the app offers, for the course picker.
 /// Auto-disposed: it is only loaded while the picker sheet is open.
-final catalogProvider = FutureProvider.autoDispose<List<TrackSummary>>((
-  Ref ref,
-) async {
+final catalogProvider = FutureProvider.autoDispose<List<TrackSummary>>((Ref ref) async {
   return _orThrow(await ref.watch(catalogRepositoryProvider).getCatalog());
 });
 
@@ -172,9 +195,7 @@ final nextBestProvider = FutureProvider.autoDispose.family<NextBest, String>((
   Ref ref,
   String trackId,
 ) async {
-  return _orThrow(
-    await ref.watch(recommendationRepositoryProvider).getNextBest(trackId),
-  );
+  return _orThrow(await ref.watch(recommendationRepositoryProvider).getNextBest(trackId));
 });
 
 /// The learner's current weekly league standings.
@@ -190,52 +211,34 @@ final seasonProvider = FutureProvider.autoDispose<Season>((Ref ref) async {
 
 /// Today's daily quest board with progress and claimable rewards. Auto-disposed;
 /// refreshed after a claim via `ref.invalidate`.
-final questBoardProvider = FutureProvider.autoDispose<QuestBoard>((
-  Ref ref,
-) async {
+final questBoardProvider = FutureProvider.autoDispose<QuestBoard>((Ref ref) async {
   return _orThrow(await ref.watch(questRepositoryProvider).getQuests());
 });
 
 /// The learner's achievements with per-achievement progress. Read-only.
-final achievementBoardProvider = FutureProvider.autoDispose<AchievementBoard>((
-  Ref ref,
-) async {
-  return _orThrow(
-    await ref.watch(achievementRepositoryProvider).getAchievements(),
-  );
+final achievementBoardProvider = FutureProvider.autoDispose<AchievementBoard>((Ref ref) async {
+  return _orThrow(await ref.watch(achievementRepositoryProvider).getAchievements());
 });
 
 /// The gem shop catalog plus the learner's current gem balance. Auto-disposed;
 /// refreshed after a purchase via `ref.invalidate`.
-final shopCatalogProvider = FutureProvider.autoDispose<ShopCatalog>((
-  Ref ref,
-) async {
+final shopCatalogProvider = FutureProvider.autoDispose<ShopCatalog>((Ref ref) async {
   return _orThrow(await ref.watch(shopRepositoryProvider).getShop());
 });
 
 /// The learner's friends list. Auto-disposed; refreshed after add/remove.
-final friendListProvider = FutureProvider.autoDispose<FriendList>((
-  Ref ref,
-) async {
+final friendListProvider = FutureProvider.autoDispose<FriendList>((Ref ref) async {
   return _orThrow(await ref.watch(friendRepositoryProvider).getFriends());
 });
 
 /// The friends-only weekly leaderboard, highlighting the learner. Auto-disposed.
-final friendLeaderboardProvider = FutureProvider.autoDispose<FriendLeaderboard>(
-  (Ref ref) async {
-    return _orThrow(
-      await ref.watch(friendRepositoryProvider).getFriendLeaderboard(),
-    );
-  },
-);
+final friendLeaderboardProvider = FutureProvider.autoDispose<FriendLeaderboard>((Ref ref) async {
+  return _orThrow(await ref.watch(friendRepositoryProvider).getFriendLeaderboard());
+});
 
 /// The server-authoritative daily share payload for the current learner.
-final dailyShareCardProvider = FutureProvider.autoDispose<ShareCard>((
-  Ref ref,
-) async {
-  return _orThrow(
-    await ref.watch(shareCardRepositoryProvider).getDailyShareCard(),
-  );
+final dailyShareCardProvider = FutureProvider.autoDispose<ShareCard>((Ref ref) async {
+  return _orThrow(await ref.watch(shareCardRepositoryProvider).getDailyShareCard());
 });
 
 /// A freshly generated mock exam for the [activeTrackProvider] track: blueprint,

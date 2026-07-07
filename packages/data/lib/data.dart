@@ -34,4 +34,6 @@ export 'src/sync/sync_engine.dart';
 export 'src/sync/offline_quiz_repository.dart';
 export 'src/sync/catalog_cache_store.dart';
 export 'src/sync/offline_catalog_repository.dart';
+export 'src/sync/lesson_cache_store.dart';
+export 'src/sync/offline_lesson_repository.dart';
 export 'src/sync/api_sync_sender.dart';

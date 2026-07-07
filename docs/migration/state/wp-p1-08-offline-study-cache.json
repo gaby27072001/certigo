@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-08-offline-study-cache",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
-  "pr": null,
+  "status": "in_review",
+  "session_id": "a6fc8495-da9a-4904-9c1c-73e053ca46f1",
+  "branch": "gchambaud-microsoft-wp-p1-08-offline-study-cache",
+  "pr": 231,
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "pr-draft-opened-in_review",
+    "note": "Implementation livree, flag-gardee (OFFLINE_STUDY_CACHE, defaut OFF, offline opt-in). DoD: (a) OfflineLessonRepository decorateur write-through/read-cache sur RemoteLessonRepository ; (b) LessonCacheStore version-aware (In-Memory + JSON) keyed par manifestVersion => purge/invalidation au changement de version ; (c) 6 tests hermetiques offline VERTS (packages/data/test/offline_lesson_cache_test.dart, sans google_fonts, sans reseau). Cablage : providers.dart (offlineStudyCacheEnabledProvider OFF defaut, contentManifestVersionProvider 'v1', lessonRepositoryProvider decore si flag ON), bootstrap.dart override lessonStoreProvider avec prefsLessonCacheStore(SharedPreferences), inerte si flag OFF. Vérifs locales VERTES : dart test (6/6), dart analyze --fatal-infos (No issues found sur fichiers data), dart format --line-length 100 conforme sur blobs LF committes. Perimetre borne : git diff origin/main -- backend infra VIDE. PR#231 draft base main. Reserve : flutter analyze/test complets non joues localement (anti-hang baseline google_fonts rouge) => valides par CI.",
+    "at": "2026-07-08T00:00:00Z"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-07-08T00:00:00Z",
   "history_ref": "log.jsonl"
 }

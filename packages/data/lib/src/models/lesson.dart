@@ -17,6 +17,18 @@ BlockType _blockTypeFrom(String? raw) => switch (raw) {
       _ => BlockType.unknown,
     };
 
+/// Serialises a [BlockType] back to its wire string. Symmetric with the private
+/// decoder above; public so the offline cache can round-trip a lesson to JSON.
+String blockTypeToWire(BlockType t) => switch (t) {
+      BlockType.hook => 'hook',
+      BlockType.concept => 'concept',
+      BlockType.example => 'example',
+      BlockType.code => 'code',
+      BlockType.check => 'check',
+      BlockType.recap => 'recap',
+      BlockType.unknown => 'unknown',
+    };
+
 class Lesson {
   const Lesson({
     required this.id,
@@ -47,6 +59,19 @@ class Lesson {
             .map((e) => LessonBlock.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
+
+  /// Serialises the lesson to a JSON-ready map, symmetric with [Lesson.fromJson].
+  /// Used by the offline lesson cache to persist a full session for airplane-mode
+  /// reading; not sent to the server (lessons are read-only for the client).
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'trackId': trackId,
+        'unitId': unitId,
+        'domainId': domainId,
+        'title': title,
+        'estMinutes': estMinutes,
+        'blocks': blocks.map((LessonBlock b) => b.toJson()).toList(),
+      };
 }
 
 /// A single block of a lesson. Polymorphic but flattened into one class for
@@ -88,6 +113,18 @@ class LessonBlock {
         check:
             json['check'] == null ? null : QuizItem.fromJson(json['check'] as Map<String, dynamic>),
       );
+
+  /// Serialises the block, symmetric with [LessonBlock.fromJson]. Optional
+  /// fields are omitted when null so the round-trip decodes back identically.
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'type': blockTypeToWire(type),
+        'conceptId': conceptId,
+        if (title != null) 'title': title,
+        if (body != null) 'body': body,
+        if (code != null) 'code': code,
+        if (language != null) 'language': language,
+        if (check != null) 'check': check!.toJson(),
+      };
 }
 
 /// The interaction types supported by the quiz engine.
@@ -157,6 +194,17 @@ class QuizItem {
             .map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
+
+  /// Serialises the public quiz item, symmetric with [QuizItem.fromJson]. Still
+  /// answer-free — this only persists what the server already sent to the client.
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'conceptId': conceptId,
+        'type': itemTypeToWire(type),
+        'stem': stem,
+        'options': options.map((QuizOption o) => o.toJson()).toList(),
+        'matches': matches.map((QuizOption o) => o.toJson()).toList(),
+      };
 }
 
 class QuizOption {
@@ -165,8 +213,9 @@ class QuizOption {
   final String id;
   final String label;
 
-  factory QuizOption.fromJson(Map<String, dynamic> json) => QuizOption(
-        id: json['id'] as String,
-        label: json['label'] as String? ?? '',
-      );
+  factory QuizOption.fromJson(Map<String, dynamic> json) =>
+      QuizOption(id: json['id'] as String, label: json['label'] as String? ?? '');
+
+  /// Serialises the option, symmetric with [QuizOption.fromJson].
+  Map<String, dynamic> toJson() => <String, dynamic>{'id': id, 'label': label};
 }
