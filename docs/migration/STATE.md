@@ -22,7 +22,7 @@
 | `wp-p1-04-certigo-content-repo` | 1 | S | todo | `wp-p1-00-decomposition` | — |
 | `wp-p1-05-content-migration` | 1 | M | in_progress | `wp-p1-04-certigo-content-repo`, `wp-p1-02-content-schemas-v2` | [certigo-content#2](https://github.com/gchambaud_microsoft/certigo-content/pull/2) |
 | `wp-p1-06-ci-content-pipeline` | 1 | M | in_review | `wp-p1-04-certigo-content-repo` | [#1](https://github.com/gchambaud_microsoft/certigo-content/pull/1) |
-| `wp-p1-07-content-manifest-immutable` | 1 | S | todo | `wp-p1-06-ci-content-pipeline` | — |
+| `wp-p1-07-content-manifest-immutable` | 1 | S | in_progress | `wp-p1-06-ci-content-pipeline` | [#3](https://github.com/gchambaud_microsoft/certigo-content/pull/3) |
 | `wp-p1-08-offline-study-cache` | 1 | M | todo | `wp-p1-07-content-manifest-immutable` | — |
 | `wp-p1-09-cortex-parity-gate` | 1 | M | in_review | `wp-p1-00-decomposition` | [#216] |
 | `wp-p1-10-mobile-crash-reporting` | 1 | S | in_review | `wp-p1-00-decomposition` | [#213] |

@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-07-content-manifest-immutable",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
-  "pr": null,
+  "status": "in_progress",
+  "session_id": "4cd2ad98-d1c1-4463-88f4-a8d2ef1b699f",
+  "branch": "wp-p1-07-content-manifest-immutable",
+  "pr": "https://github.com/gchambaud_microsoft/certigo-content/pull/3",
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "bookkeeping-todo-to-in_progress",
+    "note": "Manifeste de contenu immuable & adressable par hash livre cross-repo dans gchambaud_microsoft/certigo-content (le code n'est PAS dans Certigo). Branche wp-p1-07-content-manifest-immutable, PR#code certigo-content#3 (draft), head f4305ac. Livrables : tools/gen_manifest.mjs generateur deterministe (canonicalisation json-sorted-keys-compact-utf8, SHA-256 par item, rootHash + manifestId=sha256:<rootHash>, SANS horodatage donc reproductible) ; tools/manifest_selfcheck.mjs gate CI content-INDEPENDANT (determinisme + golden vector fb3c178e + adressage par hash + schema) ; schemas/manifest.schema.json certigo.content.manifest/v1 ; tools/__fixtures__/manifest/ corpus fige du golden vector ; .github/workflows/ci-content-manifest.yml workflow dedie (runner self-hosted labels configurables PR_RUNNER_LABELS, fork-guard, environment pr-ci, node20, manifeste live en artifact content-manifest) ; docs/adr/ADR-0001-content-manifest-immutable.md (immuabilite append-only, integrite cote client, contrat de service CDN + hash) ; docs/examples/manifest.example.json (illustratif, non-gate). CONTENT-AGNOSTIQUE (concurrence wp-p1-05) : le manifeste live n'est PAS committe (content/manifest.json = artifact CI), le gate strict ne depend que des fixtures figees, l'etape committe==regenere reste inerte tant qu'aucun content/manifest.json n'est suivi. DoD locale VERTE : node tools/manifest_selfcheck.mjs => exit 0, 4/4 verifications. Perimetre certigo-content = tools/ + schemas/ + .github/workflows/ + docs/ (content/** et ci-content.yml intacts). Cette PR Certigo = bookkeeping additif docs/migration/ seulement.",
+    "at": "2026-07-07T21:49:34Z"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-07-07T21:49:34Z",
   "history_ref": "log.jsonl"
 }
