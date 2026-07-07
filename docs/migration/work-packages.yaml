@@ -151,7 +151,7 @@ work_packages:
     precondition: "Inspecter le renderer de contenu mobile : présence d'un registre de types de blocs et d'un comportement de repli. Idempotent : si le registre + fallback existent déjà, le lot est déjà fait."
     dod: "Chaque type de bloc connu est rendu par son composant enregistré ; un bloc de type inconnu affiche un fallback non bloquant (aucun crash) ; tests widget verts."
     rollback: "Abandon de la branche (aucun merge) ; le renderer précédent reste en place."
-    status: todo
+    status: in_review
     notes: "Vague V1 · voie Flutter."
 
   - id: wp-p1-02-content-schemas-v2
