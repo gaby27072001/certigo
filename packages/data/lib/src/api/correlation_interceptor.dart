@@ -50,8 +50,7 @@ class CorrelationIdInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     final existing = options.headers[kCorrelationIdHeader];
-    final correlationId =
-        (existing is String && existing.isNotEmpty) ? existing : _generate();
+    final correlationId = (existing is String && existing.isNotEmpty) ? existing : _generate();
     options.headers[kCorrelationIdHeader] = correlationId;
     _debugLog?.call('[cid] ${options.method} ${options.path} → $correlationId');
     handler.next(options);
