@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-09-cortex-parity-gate",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
+  "status": "in_progress",
+  "session_id": "6957c3da-a7d6-4c19-a908-05f49482e5e5",
+  "branch": "gchambaud-microsoft-wp-p1-09-cortex-parity-gate",
   "pr": null,
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "todo->in_progress",
+    "note": "Verdict idempotence IMPLEMENTATION : gate de parite Cortex partiel sur main (golden 2 vecteurs hardcodes dupliques Dart/.NET, sans source unique centralisee, sans couverture weakness/recommendations/integrity, sans cortexAlgoVersion, sans job CI de parite bloquant). Implementation en cours.",
+    "at": "2026-07-07T11:07:15+01:00"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-07-07T11:07:15+01:00",
   "history_ref": "log.jsonl"
 }
