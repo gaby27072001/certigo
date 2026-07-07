@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://certigo.dev/schemas/content/v2/block.schema.json",
+  "title": "Certigo canonical content block (v2)",
+  "description": "Canonical, versioned envelope for a single lesson content block. The wire `type` selects the payload shape carried by `data`. Coherent with the wp-p1-01 renderer contract (`renderer/N` via schemaVersion). `x-contentSchemaVersion` pins the content-schema generation; the Dart catalogue in packages/prism_ui/lib/src/rendering/content_schema.dart mirrors this file and a coherence test keeps them in lock-step.",
+  "x-contentSchemaVersion": 2,
+  "type": "object",
+  "required": ["type", "data"],
+  "properties": {
+    "type": {
+      "description": "Canonical block type (wire string).",
+      "enum": [
+        "hero",
+        "concept",
+        "example",
+        "diagram",
+        "quiz.multipleChoice",
+        "quiz.trueFalse",
+        "quiz.matching",
+        "scenario",
+        "caseStudy",
+        "labStep",
+        "aiTutorPrompt",
+        "examQuestion",
+        "summary"
+      ]
+    },
+    "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
+    "schema": { "$ref": "#/$defs/schemaVersion" },
+    "version": { "$ref": "#/$defs/schemaVersion" },
+    "tenantId": { "$ref": "#/$defs/tenantId" },
+    "data": {
+      "description": "The block payload; its shape is constrained per `type` by oneOf below.",
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "type": { "const": "hero" },
+        "data": { "$ref": "#/$defs/data_hero" }
+      },
+      "required": ["type", "data"]
+    },
+    {
+      "properties": {
+        "type": { "const": "concept" },
+        "data": { "$ref": "#/$defs/data_concept" }
+      },
+      "required": ["type", "data"]
+    },
+    {
+      "properties": {
+        "type": { "const": "example" },
+        "data": { "$ref": "#/$defs/data_example" }
+      },
+      "required": ["type", "data"]
+    },
+    {
+      "properties": {
+        "type": { "const": "diagram" },
+        "data": { "$ref": "#/$defs/data_diagram" }
+      },
+      "required": ["type", "data"]
+    },
+    {
+      "properties": {
+        "type": { "const": "quiz.multipleChoice" },
+        "data": { "$ref": "#/$defs/data_quiz_multipleChoice" }
+      },
+      "required": ["type", "data"]
+    },
+    {
+      "properties": {
+        "type": { "const": "quiz.trueFalse" },
+        "data": { "$ref": "#/$defs/data_quiz_trueFalse" }
+      },
+      "required": ["type", "data"]
+    },
+    {
+      "properties": {
+        "type": { "const": "quiz.matching" },
+        "data": { "$ref": "#/$defs/data_quiz_matching" }
+      },
+      "required": ["type", "data"]
+    },
+    {
+      "properties": {
+        "type": { "const": "scenario" },
+        "data": { "$ref": "#/$defs/data_scenario" }
+      },
+      "required": ["type", "data"]
+    },
+    {
+      "properties": {
+        "type": { "const": "caseStudy" },
+        "data": { "$ref": "#/$defs/data_caseStudy" }
+      },
+      "required": ["type", "data"]
+    },
+    {
+      "properties": {
+        "type": { "const": "labStep" },
+        "data": { "$ref": "#/$defs/data_labStep" }
+      },
+      "required": ["type", "data"]
+    },
+    {
+      "properties": {
+        "type": { "const": "aiTutorPrompt" },
+        "data": { "$ref": "#/$defs/data_aiTutorPrompt" }
+      },
+      "required": ["type", "data"]
+    },
+    {
+      "properties": {
+        "type": { "const": "examQuestion" },
+        "data": { "$ref": "#/$defs/data_examQuestion" }
+      },
+      "required": ["type", "data"]
+    },
+    {
+      "properties": {
+        "type": { "const": "summary" },
+        "data": { "$ref": "#/$defs/data_summary" }
+      },
+      "required": ["type", "data"]
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "schemaVersion": {
+      "description": "Renderer contract version this block targets. Integer >= 1, a bare integer string, or the `renderer/N` wire tag (coherent with wp-p1-01 RendererSchema).",
+      "oneOf": [
+        { "type": "integer", "minimum": 1 },
+        { "type": "string", "pattern": "^[0-9]+$" },
+        { "type": "string", "pattern": "^renderer/[0-9]+$" }
+      ]
+    },
+    "tenantId": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "RESERVE (Partie 28, frontiere B2B future). Champ d'enveloppe optionnel : accepte mais NON consomme par le renderer v2. NE PAS implementer de logique B2B ici; ce champ ne fait que reserver le nom.",
+      "description": "Reserved future multi-tenant (B2B) discriminator; not consumed by renderer v2."
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "data_hero": {
+      "type": "object",
+      "required": ["title"],
+      "properties": {
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "subtitle": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "data_concept": {
+      "type": "object",
+      "required": ["title", "body"],
+      "properties": {
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "body": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "data_example": {
+      "type": "object",
+      "required": ["title", "body"],
+      "properties": {
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "body": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "data_diagram": {
+      "type": "object",
+      "required": ["title", "source"],
+      "properties": {
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "source": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "data_quiz_multipleChoice": {
+      "type": "object",
+      "required": ["prompt", "options"],
+      "properties": {
+        "prompt": { "$ref": "#/$defs/nonEmptyString" },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": ["string", "object"] }
+        }
+      },
+      "additionalProperties": true
+    },
+    "data_quiz_trueFalse": {
+      "type": "object",
+      "required": ["prompt", "answer"],
+      "properties": {
+        "prompt": { "$ref": "#/$defs/nonEmptyString" },
+        "answer": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "data_quiz_matching": {
+      "type": "object",
+      "required": ["prompt", "pairs"],
+      "properties": {
+        "prompt": { "$ref": "#/$defs/nonEmptyString" },
+        "pairs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "object" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "data_scenario": {
+      "type": "object",
+      "required": ["title", "body"],
+      "properties": {
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "body": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "data_caseStudy": {
+      "type": "object",
+      "required": ["title", "body"],
+      "properties": {
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "body": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "data_labStep": {
+      "type": "object",
+      "required": ["title", "instructions"],
+      "properties": {
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "instructions": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "data_aiTutorPrompt": {
+      "type": "object",
+      "required": ["prompt"],
+      "properties": {
+        "prompt": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "data_examQuestion": {
+      "type": "object",
+      "required": ["prompt", "options", "answer"],
+      "properties": {
+        "prompt": { "$ref": "#/$defs/nonEmptyString" },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": ["string", "object"] }
+        },
+        "answer": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "data_summary": {
+      "type": "object",
+      "required": ["title", "points"],
+      "properties": {
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}
