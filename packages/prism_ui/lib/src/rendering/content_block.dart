@@ -39,8 +39,7 @@ abstract final class RendererSchema {
         return direct;
       }
       if (value.startsWith('$prefix/')) {
-        final int? tagged =
-            int.tryParse(value.substring(prefix.length + 1).trim());
+        final int? tagged = int.tryParse(value.substring(prefix.length + 1).trim());
         if (tagged != null) {
           return tagged;
         }
@@ -72,8 +71,7 @@ class ContentBlock {
     final Map<String, dynamic> data = switch (rawData) {
       final Map<String, dynamic> typed => typed,
       final Map<Object?, Object?> loose => loose.map(
-          (Object? key, Object? value) =>
-              MapEntry<String, dynamic>(key.toString(), value),
+          (Object? key, Object? value) => MapEntry<String, dynamic>(key.toString(), value),
         ),
       _ => const <String, dynamic>{},
     };

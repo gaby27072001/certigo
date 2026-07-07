@@ -20,13 +20,11 @@ import 'renderer_registry.dart';
 RendererRegistry standardRendererRegistry({
   int schemaVersion = RendererSchema.current,
 }) {
-  final RendererRegistry registry =
-      RendererRegistry(schemaVersion: schemaVersion);
+  final RendererRegistry registry = RendererRegistry(schemaVersion: schemaVersion);
 
   registry.register(
     'hook',
-    (BuildContext context, ContentBlock block) =>
-        HookBlock(text: block.requireString('body')),
+    (BuildContext context, ContentBlock block) => HookBlock(text: block.requireString('body')),
   );
 
   registry.register(
@@ -42,9 +40,7 @@ RendererRegistry standardRendererRegistry({
     (BuildContext context, ContentBlock block) {
       final String? title = block.optionalString('title');
       final String body = block.requireString('body');
-      return title != null
-          ? ScenarioBlock(title: title, body: body)
-          : ScenarioBlock(body: body);
+      return title != null ? ScenarioBlock(title: title, body: body) : ScenarioBlock(body: body);
     },
   );
 

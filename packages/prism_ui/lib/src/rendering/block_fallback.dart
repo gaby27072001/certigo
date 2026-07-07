@@ -125,8 +125,7 @@ class PrismBlockFallback extends StatelessWidget {
       BlockFallbackReason.unknownType => blockType != null && blockType!.isNotEmpty
           ? 'Ce type de bloc ("$blockType") n\'est pas pris en charge par cette version.'
           : 'Ce type de bloc n\'est pas pris en charge par cette version.',
-      BlockFallbackReason.malformed =>
-        'Les données de ce bloc sont incomplètes ou invalides.',
+      BlockFallbackReason.malformed => 'Les données de ce bloc sont incomplètes ou invalides.',
       BlockFallbackReason.unsupportedSchema => schemaVersion != null
           ? 'Ce contenu (renderer/$schemaVersion) nécessite une version plus récente de l\'application.'
           : 'Ce contenu nécessite une version plus récente de l\'application.',

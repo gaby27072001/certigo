@@ -18,8 +18,7 @@ typedef BlockRenderer = Widget Function(
 /// unsupported schema versions all degrade to a visible [PrismBlockFallback],
 /// so a bad block can never take down a lesson.
 class RendererRegistry {
-  RendererRegistry({int schemaVersion = RendererSchema.current})
-      : _schemaVersion = schemaVersion;
+  RendererRegistry({int schemaVersion = RendererSchema.current}) : _schemaVersion = schemaVersion;
 
   final int _schemaVersion;
   final Map<String, BlockRenderer> _renderers = <String, BlockRenderer>{};

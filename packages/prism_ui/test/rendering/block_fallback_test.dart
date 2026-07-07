@@ -16,8 +16,7 @@ Future<void> pumpFallback(WidgetTester tester, Widget child) async {
 
 void main() {
   group('PrismBlockFallback', () {
-    testWidgets('renders visibly for every reason without throwing',
-        (WidgetTester tester) async {
+    testWidgets('renders visibly for every reason without throwing', (WidgetTester tester) async {
       for (final BlockFallbackReason reason in BlockFallbackReason.values) {
         await pumpFallback(
           tester,
@@ -35,8 +34,7 @@ void main() {
       }
     });
 
-    testWidgets('names the offending block type for an unknown type',
-        (WidgetTester tester) async {
+    testWidgets('names the offending block type for an unknown type', (WidgetTester tester) async {
       await pumpFallback(
         tester,
         const PrismBlockFallback(
@@ -61,8 +59,7 @@ void main() {
       expect(find.textContaining('renderer/9'), findsOneWidget);
     });
 
-    testWidgets('shows diagnostic detail when provided',
-        (WidgetTester tester) async {
+    testWidgets('shows diagnostic detail when provided', (WidgetTester tester) async {
       await pumpFallback(
         tester,
         const PrismBlockFallback(
@@ -74,8 +71,7 @@ void main() {
       expect(find.textContaining('missing body'), findsOneWidget);
     });
 
-    testWidgets('carries an accessibility label',
-        (WidgetTester tester) async {
+    testWidgets('carries an accessibility label', (WidgetTester tester) async {
       await pumpFallback(
         tester,
         const PrismBlockFallback(reason: BlockFallbackReason.malformed),

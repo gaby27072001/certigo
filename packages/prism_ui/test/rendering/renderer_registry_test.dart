@@ -28,8 +28,7 @@ RendererRegistry _probeRegistry({int schemaVersion = RendererSchema.current}) {
   return RendererRegistry(schemaVersion: schemaVersion)
     ..register(
       'hook',
-      (BuildContext context, ContentBlock block) =>
-          _ProbeBlock(block.requireString('body')),
+      (BuildContext context, ContentBlock block) => _ProbeBlock(block.requireString('body')),
     );
 }
 
@@ -108,8 +107,7 @@ void main() {
       expect(find.byKey(PrismBlockFallback.rootKey), findsNothing);
     });
 
-    testWidgets('falls back for an unknown block type',
-        (WidgetTester tester) async {
+    testWidgets('falls back for an unknown block type', (WidgetTester tester) async {
       await _pumpBlock(
         tester,
         _probeRegistry(),
@@ -172,13 +170,11 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('never throws even when a renderer itself misbehaves',
-        (WidgetTester tester) async {
+    testWidgets('never throws even when a renderer itself misbehaves', (WidgetTester tester) async {
       final RendererRegistry registry = RendererRegistry()
         ..register(
           'boom',
-          (BuildContext context, ContentBlock block) =>
-              throw StateError('renderer exploded'),
+          (BuildContext context, ContentBlock block) => throw StateError('renderer exploded'),
         );
 
       await _pumpBlock(
