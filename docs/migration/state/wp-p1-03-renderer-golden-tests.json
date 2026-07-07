@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-03-renderer-golden-tests",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
+  "status": "in_progress",
+  "session_id": "1ed20cb1-b26d-4061-ba08-db3a4c72049a",
+  "branch": "gchambaud-microsoft-wp-p1-03-renderer-golden-tests",
   "pr": null,
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "demarrage-golden-tests",
+    "note": "Idempotence: aucun golden test ne couvre les types de blocs rendus et aucun job CI ne lance les tests prism_ui (ci-mobile.yml jobs changes/packages/app n'invoquent jamais packages/prism_ui). Delta reel: golden tests hermetiques par type de bloc + gate CI dedie. Push precoce.",
+    "at": "2026-07-07T11:54:12Z"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-07-07T11:54:12Z",
   "history_ref": "log.jsonl"
 }
