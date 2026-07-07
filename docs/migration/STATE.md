@@ -20,7 +20,7 @@
 | `wp-p1-02-content-schemas-v2` | 1 | M | in_review | `wp-p1-01-renderer-registry-fallback` | [#217](https://github.com/gchambaud_microsoft/Certigo/pull/217) |
 | `wp-p1-03-renderer-golden-tests` | 1 | S | in_review | `wp-p1-01-renderer-registry-fallback`, `wp-p1-02-content-schemas-v2` | [#219](https://github.com/gchambaud_microsoft/Certigo/pull/219) |
 | `wp-p1-04-certigo-content-repo` | 1 | S | todo | `wp-p1-00-decomposition` | — |
-| `wp-p1-05-content-migration` | 1 | M | todo | `wp-p1-04-certigo-content-repo`, `wp-p1-02-content-schemas-v2` | — |
+| `wp-p1-05-content-migration` | 1 | M | in_progress | `wp-p1-04-certigo-content-repo`, `wp-p1-02-content-schemas-v2` | [certigo-content#2](https://github.com/gchambaud_microsoft/certigo-content/pull/2) |
 | `wp-p1-06-ci-content-pipeline` | 1 | M | in_review | `wp-p1-04-certigo-content-repo` | [#1](https://github.com/gchambaud_microsoft/certigo-content/pull/1) |
 | `wp-p1-07-content-manifest-immutable` | 1 | S | todo | `wp-p1-06-ci-content-pipeline` | — |
 | `wp-p1-08-offline-study-cache` | 1 | M | todo | `wp-p1-07-content-manifest-immutable` | — |
