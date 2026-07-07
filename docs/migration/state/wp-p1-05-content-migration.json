@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-05-content-migration",
-  "status": "in_progress",
-  "session_id": "1ad05804-81c7-4535-9efe-8a00ba279245",
-  "branch": "wp-p1-05-content-migration",
-  "pr": "https://github.com/gchambaud_microsoft/certigo-content/pull/2",
+  "status": "in_review",
+  "session_id": "b3f6bc7e-c101-469b-9bf2-95312a1f586a",
+  "branch": "gchambaud-microsoft-upgraded-parakeet",
+  "pr": "https://github.com/gchambaud_microsoft/certigo-content/pull/4",
   "checkpoint": {
-    "step": "content-migrated-validator-green-pr-draft",
-    "note": "Migration deterministe du materiel d'evaluation (blocs check type mcq) du monorepo Certigo (content/*/lessons/*.lesson.yaml) vers gchambaud_microsoft/certigo-content au format v2 (cross-repo ; le contenu migre n'est PAS dans Certigo). Branche certigo-content wp-p1-05-content-migration, PR certigo-content#2 (draft), commits cfbd309 (migrateur tools/migrate_p1_05.mjs) + 8f03b7f (290 fichiers content + suppression demo-0001). Inventaire reconcilie 0 perte : 146 lecons analysees, 146 blocs check, 145 mcq eligibles migres, 145 paires public/answerKey (290 JSON), 1 exclu signale az900-l-shared-responsibility-check-1 (check.type=scenario, non-mcq, content/az-900/lessons/shared-responsibility.lesson.yaml) ; 0 erreur parsing, 0 multi-reponses, 0 label duplique, 0 collision id (146 = 145 + 1). Transformation : prompt<-stem, choices<-options[].label (labels seuls, ordre preserve), answerKey.correct=label de l'id in check.correct, rationale<-explanation ; anti-leak garanti par additionalProperties:false cote public. Placeholder demo-0001 (public+answerKey) supprime, bijection intacte. DoD locale VERTE : node tools/validate_content.mjs => exit 0, 4/4 checks (schema question, schema solution, bijection 145 paires 0 orphelin, anti-fuite correct/rationale). Cette PR Certigo = bookkeeping additif docs/migration/ seulement.",
-    "at": "2026-07-07T21:43:54Z"
+    "step": "migration-completed-bijection-146-validator-green",
+    "note": "Completion du lot : la migration initiale (certigo-content PR#2, MERGEE, 145 paires) filtrait check.type=='mcq' et excluait donc l'unique bloc check de type scenario (az900-l-shared-responsibility-check-1, content/az-900/lessons/shared-responsibility.lesson.yaml) — structurellement un QCM (4 options, correct [c], explanation). Cette session complete la bijection en ajoutant SEULEMENT cette paire manquante (public + answerKey) au format v2, en calquant byte-exact la convention de la paire soeur sc900-l-shared-responsibility-check-1 (prompt<-stem, choices<-options[].label ordre source, correct=label de l'option correcte, rationale<-explanation ; LF, sans BOM, sans newline final, additionalProperties:false, anti-fuite garantie cote public). Regle multi-reponses documentee = jointure ' ; ' (ici mono-reponse). Inventaire reconcilie 0 perte : 146 blocs check source == 146 questions publiques == 146 solutions answerKey. certigo-content branche wp-p1-05-complete-scenario-check, PR certigo-content#4 (draft), CI validate + manifest VERTES. Validateur local node tools/validate_content.mjs => OK 4/4 (schema question, schema solution, bijection 146 paires 0 orphelin, anti-fuite correct/rationale). Les 145 paires deja mergees (PR#2) et le placeholder demo-0001 (supprime par PR#2) NON touches. Cette PR Certigo = bookkeeping additif docs/migration/ seulement.",
+    "at": "2026-07-08T00:00:00Z"
   },
-  "updated_at": "2026-07-07T21:43:54Z",
+  "updated_at": "2026-07-08T00:00:00Z",
   "history_ref": "log.jsonl"
 }
