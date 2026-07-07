@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-02-content-schemas-v2",
-  "status": "in_progress",
+  "status": "in_review",
   "session_id": "d66304d4-5c1a-4cf2-a8c4-c4fb019bc102",
   "branch": "gchambaud-microsoft-wp-p1-02-content-schemas-v2",
-  "pr": null,
+  "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/217",
   "checkpoint": {
-    "step": "bookkeeping-todo-to-in_progress",
-    "note": "Idempotence VERIFIEE : aucun dossier schemas/ sur main, aucun schema JSON de blocs v2, tenantId non reserve cote contenu (present uniquement dans infra/modules/keyvault.bicep). wp-p1-01 a livre le pipeline renderer (content_block.dart RendererSchema.current=1, renderer_registry.dart) mais PAS de schemas canoniques ni validateur. Verdict : DELTA reel a implementer. Push precoce avant travail long.",
-    "at": "2026-07-07T11:25:14+01:00"
+    "step": "bookkeeping-in_progress-to-in_review",
+    "note": "Livraison schemas de blocs canoniques v2 + validateur sans dependance + reservation tenantId. Preuves : packages/prism_ui/lib/src/rendering/content_schema.dart L20 kContentSchemaVersion=2, L23 kReservedTenantIdField='tenantId', enum CanonicalBlockType 13 types (hero, concept, example, diagram, quiz.multipleChoice, quiz.trueFalse, quiz.matching, scenario, caseStudy, labStep, aiTutorPrompt, examQuestion, summary), ContentSchemaRegistry.canonicalV2 (13 schemas), ContentBlockValidator.validate. Artefact portable AJV : packages/prism_ui/schemas/content/v2/block.schema.json (draft 2020-12, requis byte-match Dart). Tests hermetiques : packages/prism_ui/test/rendering/content_schema_test.dart 32/32 VERTS (import direct src/rendering, sans google_fonts). Export barrel : packages/prism_ui/lib/prism_ui.dart L83. dart format --line-length 100 = 0 changed sur fichiers du lot ; dart analyze = No issues. git diff origin/main -- backend infra = VIDE. Merge origin/main (PR #215 wp-p1-14) resync : union additive log.jsonl.",
+    "at": "2026-07-07T11:42:00+01:00"
   },
-  "updated_at": "2026-07-07T11:25:14+01:00",
+  "updated_at": "2026-07-07T11:42:00+01:00",
   "history_ref": "log.jsonl"
 }
