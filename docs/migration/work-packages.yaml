@@ -211,7 +211,7 @@ work_packages:
     precondition: "Vérifier l'existence d'un pipeline CI validant le contenu de certigo-content. Idempotent : si le pipeline valide + publie déjà, le lot est déjà fait."
     dod: "Chaque PR sur certigo-content déclenche la validation des schémas ; un manifeste de contenu versionné est produit en artefact ; job vert sur la branche par défaut."
     rollback: "Abandon de la branche ; aucun workflow CI ajouté."
-    status: todo
+    status: in_review
     notes: "Vague V3 · voie CI."
 
   - id: wp-p1-07-content-manifest-immutable
