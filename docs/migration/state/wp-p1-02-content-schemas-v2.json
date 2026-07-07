@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-02-content-schemas-v2",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
+  "status": "in_progress",
+  "session_id": "d66304d4-5c1a-4cf2-a8c4-c4fb019bc102",
+  "branch": "gchambaud-microsoft-wp-p1-02-content-schemas-v2",
   "pr": null,
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "bookkeeping-todo-to-in_progress",
+    "note": "Idempotence VERIFIEE : aucun dossier schemas/ sur main, aucun schema JSON de blocs v2, tenantId non reserve cote contenu (present uniquement dans infra/modules/keyvault.bicep). wp-p1-01 a livre le pipeline renderer (content_block.dart RendererSchema.current=1, renderer_registry.dart) mais PAS de schemas canoniques ni validateur. Verdict : DELTA reel a implementer. Push precoce avant travail long.",
+    "at": "2026-07-07T11:25:14+01:00"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-07-07T11:25:14+01:00",
   "history_ref": "log.jsonl"
 }
