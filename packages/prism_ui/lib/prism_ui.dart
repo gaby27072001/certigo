@@ -80,3 +80,4 @@ export 'src/rendering/content_block.dart';
 export 'src/rendering/block_fallback.dart';
 export 'src/rendering/renderer_registry.dart';
 export 'src/rendering/standard_renderers.dart';
+export 'src/rendering/content_schema.dart';

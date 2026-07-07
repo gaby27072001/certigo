@@ -163,7 +163,7 @@ work_packages:
     precondition: "Recenser les schémas de contenu existants et leur version. Idempotent : si les schémas v2 versionnés + validateur existent déjà, le lot est déjà fait."
     dod: "Les schémas de blocs v2 sont versionnés ; un validateur rejette tout contenu non conforme ; couverture de test des cas valides/invalides verte."
     rollback: "Abandon de la branche ; les schémas v1 restent la référence."
-    status: todo
+    status: in_review
     notes: "Vague V2 · voie code/contenu."
 
   - id: wp-p1-03-renderer-golden-tests
