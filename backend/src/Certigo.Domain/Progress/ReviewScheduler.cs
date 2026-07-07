@@ -17,6 +17,13 @@ public sealed record ConceptMastery(
         var now = DateTimeOffset.UtcNow;
         return new ConceptMastery(userId, trackId, conceptId, 0, 1, 5, now, 0, 0, now);
     }
+
+    /// <summary>
+    /// A concept is "weak" once it has been reviewed at least once yet its mastery
+    /// is still below 0.5. Mirrors the Dart <c>ConceptMastery.isWeak</c> getter and
+    /// is asserted by the shared weakness golden vectors.
+    /// </summary>
+    public bool IsWeak => Reps > 0 && MasteryScore < 0.5;
 }
 
 public enum ReviewGrade
