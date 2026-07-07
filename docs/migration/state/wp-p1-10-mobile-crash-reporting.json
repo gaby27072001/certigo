@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-10-mobile-crash-reporting",
-  "status": "in_progress",
+  "status": "in_review",
   "session_id": "3dee5e42-1c4d-464a-a9e3-4dff3dbea5e7",
   "branch": "gchambaud-microsoft-wp-p1-10-mobile-crash-reporting",
-  "pr": null,
+  "pr": 213,
   "checkpoint": {
-    "step": "bootstrap",
-    "note": "Idempotence: NON fait (bootstrap.dart:42-45 = FlutterError.onError presentError-only + TODO(observability), aucun PlatformDispatcher.onError / runZonedGuarded / sink). Implementation MOB-CRASH demarree.",
-    "at": "2026-07-07T10:21:16+01:00"
+    "step": "in_review",
+    "note": "MOB-CRASH implemente. crash_reporting.dart: interface CrashReporter + LoggingCrashReporter (log structure + hook symbolisation), installCrashReporting (FlutterError.onError:framework + PlatformDispatcher.instance.onError:async retourne true), runGuarded (runZonedGuarded:zone), flag rollback kCrashReportingEnabled (crash_reporting.dart:18). bootstrap.dart enveloppe init+runApp dans runGuarded + installCrashReporting. Tests hermetiques test/crash_reporter_test.dart: 5 passed. dart format L100 --set-exit-if-changed: 0 changed. git diff origin/main -- backend infra: vide. PR draft #213.",
+    "at": "2026-07-07T10:47:32+01:00"
   },
-  "updated_at": "2026-07-07T10:21:16+01:00",
+  "updated_at": "2026-07-07T10:47:32+01:00",
   "history_ref": "log.jsonl"
 }
