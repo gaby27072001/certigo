@@ -25,7 +25,7 @@
 | `wp-p1-07-content-manifest-immutable` | 1 | S | todo | `wp-p1-06-ci-content-pipeline` | — |
 | `wp-p1-08-offline-study-cache` | 1 | M | todo | `wp-p1-07-content-manifest-immutable` | — |
 | `wp-p1-09-cortex-parity-gate` | 1 | M | todo | `wp-p1-00-decomposition` | — |
-| `wp-p1-10-mobile-crash-reporting` | 1 | S | todo | `wp-p1-00-decomposition` | — |
+| `wp-p1-10-mobile-crash-reporting` | 1 | S | in_review | `wp-p1-00-decomposition` | [#213] |
 | `wp-p1-11-ci-spof-runners` | 1 | S | todo | `wp-p1-00-decomposition` | — |
 | `wp-p1-12-iac-drift-import` | 1 | M | todo | `wp-p1-00-decomposition` | — |
 | `wp-p1-13-staging-environment` | 1 | S | todo | `wp-p1-12-iac-drift-import` | — |
