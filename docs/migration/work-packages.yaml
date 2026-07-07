@@ -223,7 +223,7 @@ work_packages:
     precondition: "Vérifier que le manifeste publié est immuable (hash/version figée). Idempotent : si l'immuabilité + résolution par hash existent déjà, le lot est déjà fait."
     dod: "Chaque version de manifeste est immuable et adressable par hash ; l'app résout le contenu par version figée ; test de non-régression (même hash ⇒ même contenu) vert."
     rollback: "Abandon de la branche ; l'app continue de résoudre le contenu comme avant."
-    status: todo
+    status: in_progress
     notes: "Vague V4 · voie code/contenu."
 
   - id: wp-p1-08-offline-study-cache
