@@ -199,7 +199,7 @@ work_packages:
     precondition: "Inventorier le contenu à migrer et son format actuel. Idempotent : si tout le contenu est déjà migré et conforme v2, le lot est déjà fait."
     dod: "Tout le contenu ciblé est migré vers certigo-content au format v2 et passe le validateur ; inventaire avant/après réconcilié (0 perte)."
     rollback: "Abandon de la branche ; le contenu source d'origine reste intact et fait foi."
-    status: todo
+    status: in_progress
     notes: "Vague V4 · voie contenu."
 
   - id: wp-p1-06-ci-content-pipeline
