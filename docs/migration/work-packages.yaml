@@ -175,7 +175,7 @@ work_packages:
     precondition: "Vérifier l'existence de golden tests couvrant les types de blocs rendus. Idempotent : si les goldens + le gate CI existent déjà, le lot est déjà fait."
     dod: "Chaque type de bloc a un golden test ; toute régression visuelle échoue le job CI dédié ; suite golden verte sur main."
     rollback: "Abandon de la branche ; aucun golden ajouté au gate."
-    status: todo
+    status: in_review
     notes: "Vague V3 · voie code/CI."
 
   - id: wp-p1-04-certigo-content-repo

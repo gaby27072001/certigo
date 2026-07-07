@@ -174,3 +174,79 @@ jobs:
           name: mobile-coverage
           path: apps/mobile/coverage/lcov.info
           if-no-files-found: ignore
+
+  prism-goldens:
+    name: Prism UI renderer goldens
+    needs: [changes]
+    # prism_ui déclare `flutter_lints ^6.0.0` (dev_dependency) qui exige Dart SDK
+    # ^3.8.0. Le `FLUTTER_VERSION: 3.27.4` partagé au niveau workflow embarque
+    # Dart 3.6.2 → `flutter pub get` échoue à la résolution AVANT même de rendre
+    # les goldens. On surcharge la version Flutter UNIQUEMENT pour CE job (valeur
+    # recommandée par le solveur pub, fournit Dart >= 3.8.0) sans toucher aux jobs
+    # `packages`/`app` volontairement épinglés sur Dart 3.6.x.
+    env:
+      FLUTTER_VERSION: "3.44.5"
+    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
+    # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
+    # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
+    # évènements push/dispatch passent inchangés → zéro régression.
+    # CI-08 : `always()` neutralise le skip hérité de `needs.changes` ; le fork-guard reste
+    # (clause 2) ; on ne skippe QUE si paths-filter dit explicitement `false` (clause 3, PR
+    # seulement). Un output vide/erreur de filtre (!= 'false') => le vrai job tourne (sûr).
+    if: >-
+      always()
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name != 'pull_request' || needs.changes.outputs.relevant != 'false')
+    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
+    # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure CI prerequisites (unzip, jq, zip, xz)
+        run: |
+          set -e
+          missing=""
+          for t in unzip zip jq xz; do
+            command -v "$t" >/dev/null 2>&1 || missing="$missing $t"
+          done
+          if [ -n "$missing" ]; then
+            echo "Installing missing tools:$missing"
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y unzip zip jq xz-utils
+          else
+            echo "All prerequisites already present."
+          fi
+      - name: Clear corrupted Flutter tool cache
+        run: |
+          # subosito/flutter-action caches Flutter under _work/_tool/flutter.
+          # If a previous download was interrupted, the extracted dir exists but
+          # bin/internal/shared.sh is missing, causing every subsequent run to
+          # fail. Detect and remove such entries so the action downloads fresh.
+          TOOL_DIR="/home/runner/actions-runner/_work/_tool/flutter"
+          TOOL_DIR2="/home/runner/actions-runner-2/_work/_tool/flutter"
+          for BASE in "$TOOL_DIR" "$TOOL_DIR2"; do
+            if [ -d "$BASE" ]; then
+              for DIR in "$BASE"/stable-*; do
+                if [ -d "$DIR" ] && [ ! -f "$DIR/flutter/bin/internal/shared.sh" ]; then
+                  echo "Removing corrupted Flutter install: $DIR"
+                  rm -rf "$DIR"
+                fi
+              done
+            fi
+          done
+        continue-on-error: true
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      # Gate de régression visuelle : rejoue les golden tests par type de bloc
+      # rendu. Toute divergence au-delà de la tolérance du comparateur fait
+      # échouer CE job — c'est le gate dédié exigé par la DoD.
+      - name: Pub get (prism_ui)
+        working-directory: packages/prism_ui
+        run: flutter pub get
+      - name: Golden tests (prism_ui renderer)
+        working-directory: packages/prism_ui
+        run: flutter test test/rendering/renderer_golden_test.dart
