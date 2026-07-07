@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-10-mobile-crash-reporting",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
+  "status": "in_progress",
+  "session_id": "3dee5e42-1c4d-464a-a9e3-4dff3dbea5e7",
+  "branch": "gchambaud-microsoft-wp-p1-10-mobile-crash-reporting",
   "pr": null,
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "bootstrap",
+    "note": "Idempotence: NON fait (bootstrap.dart:42-45 = FlutterError.onError presentError-only + TODO(observability), aucun PlatformDispatcher.onError / runZonedGuarded / sink). Implementation MOB-CRASH demarree.",
+    "at": "2026-07-07T10:21:16+01:00"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-07-07T10:21:16+01:00",
   "history_ref": "log.jsonl"
 }
