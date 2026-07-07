@@ -6,7 +6,7 @@ import 'package:test/test.dart';
 ///
 /// These are deliberately network-free and platform-free: the "remote" is a
 /// scripted fake and the durable store is a [JsonLessonCacheStore] backed by an
-/// in-memory string. No SharedPreferences, no HTTP, no google_fonts — so they
+/// in-memory string. No SharedPreferences, no HTTP, no google_fonts ? so they
 /// run fast under a targeted `dart test` without touching the (red) app build.
 
 /// A [LessonRepository] fake that returns queued results in order, repeating the
@@ -29,16 +29,12 @@ class _ScriptedLessonRepository implements LessonRepository {
 }
 
 /// A mutable string cell so a [JsonLessonCacheStore] can persist across calls
-/// without any platform channel — this is the hermetic stand-in for disk.
+/// without any platform channel ? this is the hermetic stand-in for disk.
 class _StringCell {
   String? value;
 }
 
-Lesson _lesson({
-  String id = 'intro',
-  String trackId = 'az-900',
-  String title = 'Cloud concepts',
-}) =>
+Lesson _lesson({String id = 'intro', String trackId = 'az-900', String title = 'Cloud concepts'}) =>
     Lesson(
       id: id,
       trackId: trackId,
@@ -57,9 +53,9 @@ Lesson _lesson({
     );
 
 JsonLessonCacheStore _jsonStore(_StringCell cell) => JsonLessonCacheStore(
-      read: () async => cell.value,
-      write: (String json) async => cell.value = json,
-    );
+  read: () async => cell.value,
+  write: (String json) async => cell.value = json,
+);
 
 void main() {
   group('OfflineLessonRepository (offline study cache)', () {
@@ -70,18 +66,14 @@ void main() {
         const Err<Lesson>(NetworkFailure()),
       ]);
       final _StringCell cell = _StringCell();
-      final OfflineLessonRepository repo = OfflineLessonRepository(
-        inner,
-        _jsonStore(cell),
-        'v1',
-      );
+      final OfflineLessonRepository repo = OfflineLessonRepository(inner, _jsonStore(cell), 'v1');
 
       // Download for offline.
       final Result<Lesson> downloaded = await repo.prefetch(trackId: 'az-900', lessonId: 'intro');
       expect(downloaded.isSuccess, isTrue);
       expect(cell.value, isNotNull, reason: 'prefetch should persist the lesson to the cache');
 
-      // Now read with the network gone — must come from the cache.
+      // Now read with the network gone ? must come from the cache.
       final Result<Lesson> offline = await repo.getLesson(trackId: 'az-900', lessonId: 'intro');
       expect(offline.isSuccess, isTrue);
       final Lesson lesson = (offline as Success<Lesson>).value;
@@ -123,7 +115,10 @@ void main() {
     test('a lesson cached under an older manifest version is a miss', () async {
       final _StringCell cell = _StringCell();
       final JsonLessonCacheStore store = _jsonStore(cell);
-      await store.write(manifestVersion: 'v1', lesson: _lesson(id: 'a'));
+      await store.write(
+        manifestVersion: 'v1',
+        lesson: _lesson(id: 'a'),
+      );
 
       // Same lesson, newer manifest => invalidated.
       expect(await store.read(manifestVersion: 'v2', trackId: 'az-900', lessonId: 'a'), isNull);
@@ -134,7 +129,10 @@ void main() {
     test('serves cache on a transient failure', () async {
       final _StringCell cell = _StringCell();
       final JsonLessonCacheStore store = _jsonStore(cell);
-      await store.write(manifestVersion: 'v1', lesson: _lesson(id: 'intro', title: 'Cached'));
+      await store.write(
+        manifestVersion: 'v1',
+        lesson: _lesson(id: 'intro', title: 'Cached'),
+      );
 
       final OfflineLessonRepository repo = OfflineLessonRepository(
         _ScriptedLessonRepository(<Result<Lesson>>[const Err<Lesson>(NetworkFailure())]),
@@ -150,7 +148,10 @@ void main() {
     test('propagates a permanent failure even when a cache entry exists', () async {
       final _StringCell cell = _StringCell();
       final JsonLessonCacheStore store = _jsonStore(cell);
-      await store.write(manifestVersion: 'v1', lesson: _lesson(id: 'intro'));
+      await store.write(
+        manifestVersion: 'v1',
+        lesson: _lesson(id: 'intro'),
+      );
 
       final OfflineLessonRepository repo = OfflineLessonRepository(
         _ScriptedLessonRepository(<Result<Lesson>>[const Err<Lesson>(NotFoundFailure())]),
