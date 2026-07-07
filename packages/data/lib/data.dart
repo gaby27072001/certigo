@@ -21,6 +21,7 @@ export 'src/models/exam.dart';
 export 'src/models/share_card.dart';
 
 export 'src/api/api_client.dart';
+export 'src/api/correlation_interceptor.dart';
 
 export 'src/repositories/repositories.dart';
 export 'src/repositories/remote_repositories.dart';

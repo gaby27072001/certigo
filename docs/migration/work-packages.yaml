@@ -307,7 +307,7 @@ work_packages:
     precondition: "Vérifier l'instrumentation OTel et la propagation du correlation id de bout en bout. Idempotent : si le traçage distribué + corrélation existent déjà, le lot est déjà fait."
     dod: "Les requêtes mobile→backend portent un correlation id propagé ; les traces OTel sont exportées et corrélées (une trace de bout en bout visible) ; tests d'instrumentation verts."
     rollback: "Abandon de la branche ; l'instrumentation additive est désactivable (aucun changement de comportement métier)."
-    status: todo
+    status: in_review
     notes: "Vague V2 · voie code."
 
   - id: wp-p1-15-gamification-integrity
