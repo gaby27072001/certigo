@@ -8,6 +8,7 @@ import '../app/app.dart';
 import '../app/mascots.dart';
 import '../app/offline/offline_sync_scope.dart';
 import '../app/offline/prefs_catalog_store.dart';
+import '../app/offline/prefs_lesson_cache_store.dart';
 import '../app/offline/prefs_sync_store.dart';
 import '../app/providers.dart';
 import 'config_error_app.dart';
@@ -67,6 +68,7 @@ Future<void> bootstrap() async {
       ProviderScope(
         overrides: <Override>[
           catalogStoreProvider.overrideWithValue(prefsCatalogCacheStore(prefs)),
+          lessonStoreProvider.overrideWithValue(prefsLessonCacheStore(prefs)),
           syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
         ],
         child: const OfflineSyncScope(child: CertigoApp()),
