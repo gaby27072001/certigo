@@ -32,9 +32,9 @@ param cosmosLocation = 'northeurope'
 // Use the tenant-GUID subdomain (<tenant-guid>.ciamlogin.com), NOT a vanity domain:
 // flutter_appauth validates the issuer strictly against the OIDC discovery document.
 // ============================================================================
-param entraAuthority = 'https://certigo.ciamlogin.com/<tenant-guid>/v2.0'
+param entraAuthority = 'https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0'
 // Audience = Application ID URI of the staging backend app registration.
-param entraAudience = 'api://<api-client-id>'
+param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
 
 // Email notified on 401/403/5xx spikes (optional but recommended pre-prod).
 param alertEmail = ''

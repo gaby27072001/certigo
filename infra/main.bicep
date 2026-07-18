@@ -73,6 +73,10 @@ param enablePrivateNetworking bool = false
 
 // Deterministic, collision-resistant suffix per environment/subscription.
 var suffix = uniqueString(subscription().id, appName, env)
+// Key Vault max name length is 24. Reserve the fixed prefix 'kv-${appName}-${env}-'
+// and cap the unique suffix at 6, shrinking it only when the prefix leaves less room
+// (staging => 5). dev/prod prefixes are short enough that this still yields 6.
+var kvSuffixLen = min(6, 24 - length('kv-${appName}-${env}-'))
 var rgName = 'rg-${appName}-${env}'
 // Dev token bypass is allowed ONLY in the dev environment; staging/prod enforce
 // Entra token validation ("prod" signals to the backend that Entra is required).
@@ -153,7 +157,11 @@ module vault 'modules/keyvault.bicep' = {
   scope: rg
   name: 'keyvault'
   params: {
-    name: 'kv-${appName}-${env}-${take(suffix, 6)}'
+    // Key Vault names are capped at 24 chars. 'kv-${appName}-${env}-' is 12+len(env)
+    // chars, so a fixed 6-char suffix overflows for longer env names (staging => 25).
+    // Adapt the suffix length so staging fits in 24 while dev/prod stay byte-identical
+    // (both already resolve to 6, so their live vault names are unchanged).
+    name: 'kv-${appName}-${env}-${take(suffix, kvSuffixLen)}'
     location: location
     enablePurgeProtection: hardened
     softDeleteRetentionInDays: hardened ? 90 : 7

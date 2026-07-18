@@ -1,14 +1,18 @@
 {
   "id": "wp-p1-13-staging-environment",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
-  "pr": null,
-  "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+  "status": "in_review",
+  "session_id": "3a7e6f1c-db41-4342-9907-f75a1daad567",
+  "branch": "gchambaud-microsoft-p1-13-staging-entra-config",
+  "pr": {
+    "number": 232,
+    "url": "https://github.com/gchambaud_microsoft/Certigo/pull/232"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "head": "4d65d61559e6cac4534433a21c88d137cb9cafc8",
+  "checkpoint": {
+    "step": "fix_kv_naming",
+    "note": "Fix infra: nom Key Vault staging depassait 24 car. (kv-certigo-staging- + suffixe 6 = 25). Suffixe adaptatif min(6, 24-len(prefix)) => staging 5 car. (nom 24 valide), dev/prod inchanges (6 car., vaults live intacts). az bicep build exit 0. Correctif sur main.bicep uniquement, PR #232 (ready for review).",
+    "at": "2026-07-18T15:59:08+01:00"
+  },
+  "updated_at": "2026-07-18T15:59:08+01:00",
   "history_ref": "log.jsonl"
 }
