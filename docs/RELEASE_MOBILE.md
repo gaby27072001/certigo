@@ -32,7 +32,7 @@ Documentation opérationnelle pour publier les bêtas Certigo.
 | Nom affiché | Certigo |
 | versionName | lu depuis `apps/mobile/pubspec.yaml` (`version:` → partie avant `+`) |
 | versionCode / build number | `github.run_number` (auto-incrémenté), override possible |
-| Workflows | `release-android.yml` (actif), `release-ios.yml` + `sync-ios-certs.yml` (historiques/désactivés) ; iOS actif géré par Codemagic |
+| Workflows | `release-android.yml` (actif), `release-ios.yml` + `sync-ios-certs.yml` (legacy, inertes par défaut, opt-in manuel) ; iOS actif géré par Codemagic |
 | CI inchangée | `ci-mobile.yml` (format/analyze/test) — aucune régression |
 
 > ⚠️ **`com.certigo.mobileapp` est l'identifiant unifié** (Android `applicationId`
@@ -361,7 +361,8 @@ git push origin v0.1.0
 > **signature automatique Codemagic** (§4.0), **aucun** de ces secrets n'est
 > nécessaire : Codemagic gère certificats et profils via l'API App Store
 > Connect. Conservé uniquement à titre historique pour les workflows
-> `release-ios.yml` / `sync-ios-certs.yml` (désactivés, `workflow_dispatch`).
+> `release-ios.yml` / `sync-ios-certs.yml` (`workflow_dispatch` avec opt-in
+> `enable_legacy_workflow=true`).
 > **Ne pas créer ces secrets pour une release Codemagic.**
 
 <details>
@@ -426,7 +427,8 @@ gh secret set ASC_KEY_P8_BASE64               < authkey.b64
 > profils iOS nativement via l'**App Store Connect API** (signature automatique).
 > Les secrets `IOS_MATCH_GIT_URL`, `IOS_MATCH_PASSWORD`, `IOS_MATCH_GIT_AUTH`
 > et les workflows `release-ios` / `sync-ios-certs` GitHub Actions sont
-> désactivés (`if: false`) et conservés uniquement comme référence historique.
+> legacy, inertes par défaut et exécutables uniquement par opt-in manuel
+> `enable_legacy_workflow=true`.
 
 **Pourquoi Codemagic remplace match :**
 - Pas de repo de certificats à maintenir.
@@ -617,4 +619,3 @@ promotion de la précédente version stable. La config étant compile-time, un
 4. **Décision** — sous seuil → rollback (halt staged rollout) ; sinon correctif +
    nouveau build passant CI (`ci-mobile` : format/analyze/test) + garde-fou config.
 5. **Post-mortem** — ajouter un test de non-régression pour la cause racine.
-

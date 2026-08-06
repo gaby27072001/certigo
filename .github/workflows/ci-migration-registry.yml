@@ -1,0 +1,38 @@
+name: Validate migration registry
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "docs/migration/**"
+      - "tools/validate_migration_registry.py"
+      - ".github/workflows/ci-migration-registry.yml"
+  pull_request:
+    paths:
+      - "docs/migration/**"
+      - "tools/validate_migration_registry.py"
+      - ".github/workflows/ci-migration-registry.yml"
+
+concurrency:
+  group: ci-migration-registry-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate migration registry
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
+    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validator dependency
+        run: python -m pip install PyYAML==6.0.2
+      - name: Validate registry
+        run: python tools/validate_migration_registry.py

@@ -1,0 +1,14 @@
+{
+  "id": "wp-p2-09",
+  "status": "in_progress",
+  "session_id": "61372222-4fbf-4aa1-801b-58f6fe226513",
+  "branch": "gchambaud-microsoft-migrate-icons-fonts",
+  "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/252",
+  "checkpoint": {
+    "step": "review-fixes-in-progress",
+    "note": "PR #252 ouverte ; alignement Flutter/Dart, dépendances et documentation en cours de correction.",
+    "at": "2026-08-06T10:08:32Z"
+  },
+  "updated_at": "2026-08-06T10:08:32Z",
+  "history_ref": "log.jsonl"
+}

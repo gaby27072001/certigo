@@ -66,13 +66,13 @@ Principes que le dispositif incarne :
 ## Validation machine (DoD du registre)
 
 ```bash
-# YAML
-python -c "import yaml; yaml.safe_load(open('docs/migration/work-packages.yaml', encoding='utf-8'))"
-# JSON (chaque fichier de state)
-python -c "import json,glob; [json.load(open(f,encoding='utf-8')) for f in glob.glob('docs/migration/state/*.json')]"
-# JSONL (chaque ligne)
-python -c "import json; [json.loads(l) for l in open('docs/migration/log.jsonl',encoding='utf-8') if l.strip()]"
+python -m pip install PyYAML
+python tools/validate_migration_registry.py
 ```
+
+Le validateur parse les quatre représentations, compare leurs statuts, vérifie les références
+`state/`, les dépendances et l'absence de cycle. La gate
+`.github/workflows/ci-migration-registry.yml` rejoue ce contrôle à chaque changement du registre.
 
 ## Suivi GitHub (optionnel)
 

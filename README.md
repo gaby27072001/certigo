@@ -36,7 +36,7 @@ un **Readiness Score** (0–100, la métrique nord) — porté par une gamificat
 | Moteur pédagogique | **Cortex** — *mastery-based* + **FSRS** (répétition espacée), code Dart **et** .NET identiques *(partagent la même logique ; des divergences mineures sur `dueAt`/`recency` feront l'objet de golden tests dédiés)* |
 | Design system | **Prism** — *Liquid-Glass-inspired* : translucidité, profondeur, matériaux lumineux |
 | Gamification | **Momentum** — XP, niveaux, streak, ligues, badges. **Pas de cœurs / vies** |
-| Contenu | **Content-as-code** — YAML versionné + schéma JSON + validation CI |
+| Contenu | **Content-as-code** — [`certigo-content`](https://github.com/gchambaud_microsoft/certigo-content) est la source éditoriale active ; schémas, validation et manifeste y sont versionnés |
 
 ---
 
@@ -59,8 +59,8 @@ certigo/
 │  │  └─ Certigo.Infrastructure/ # Cosmos DB, validation token Entra
 │  └─ tests/               # Tests de domaine (xUnit)
 ├─ infra/                  # Infrastructure as Code (Bicep) : Cosmos, Storage, Functions, KV, AI
-├─ content/                # Tracks & leçons en YAML + schémas (89 certifications actives)
-├─ tools/                  # Validateur de contenu (Node) + seed Cosmos (Python)
+├─ content/                # Instantané historique du corpus monorepo (lecture/compatibilité uniquement)
+├─ tools/                  # Outils historiques de validation/seed + validateur du registre
 ├─ docs/                   # Architecture & ADRs
 └─ .github/workflows/      # CI : mobile · backend · content · infra
 ```
@@ -132,15 +132,20 @@ cd src/Certigo.Api && func start
 
 ### 3) Contenu
 
+Le corpus migré est édité et publié depuis
+[`gchambaud_microsoft/certigo-content`](https://github.com/gchambaud_microsoft/certigo-content).
+Le dossier local `content/` est un instantané historique conservé pour compatibilité ; il ne doit
+plus recevoir de changements éditoriaux.
+
 ```bash
+# Dans un clone de certigo-content, suivre son README et ses gates CI.
+# Contrôle ponctuel de l'instantané historique de ce monorepo :
 npm install --no-save ajv ajv-formats yaml glob
-node tools/validate_content.mjs     # valide tracks + leçons vs schémas + intégrité référentielle
-python tools/seed_content.py        # compile YAML → documents Cosmos dans tools/seed_output/
-python tools/seed_content.py --cosmos   # + upsert dans Cosmos (COSMOS_ENDPOINT / COSMOS_KEY)
+node tools/validate_content.mjs
 ```
 
-> Le seed sépare le **payload public** (sans réponse) de la **clé de correction**
-> (document `answerKey` côté serveur) : la notation des quiz reste autoritative côté API.
+> Dans `certigo-content`, les payloads publics sont séparés des `answerKey` privés : la notation
+> des quiz reste autoritative côté API.
 
 ### 4) Infra
 
@@ -191,7 +196,8 @@ API principale :
 |---|---|---|
 | `ci-mobile`  | `apps/**`, `packages/**` | `dart format`, `flutter analyze`, `flutter test` |
 | `ci-backend` | `backend/**` | `dotnet build -warnaserror`, `dotnet test` |
-| `ci-content` | `content/**`, `tools/validate_content.mjs` | schémas + intégrité + somme des poids = 1.0 |
+| `ci-content` | instantané historique `content/**` | schémas + intégrité + somme des poids = 1.0 |
+| `ci-migration-registry` | `docs/migration/**`, validateur Python | statuts, états, dépendances et absence de cycle |
 | `ci-infra`   | `infra/**` | `az bicep build` (lint des templates) |
 | `cd-backend` | push / workflow manuel | déploiement backend vers l'environnement cible |
 | `codeql` | schedule / push | analyse statique de sécurité |
@@ -199,8 +205,9 @@ API principale :
 | `release-android` | manuel / tag `v*` | **AAB signé** + publication Google Play (gates `analyze`/`test`) |
 | `security-scan` | schedule / push | scan sécurité complémentaire (NuGet + Bicep) |
 
-> `release-ios.yml` et `sync-ios-certs.yml` sont des références historiques
-> désactivées (`if: false`). La chaîne iOS active passe par Codemagic.
+> `release-ios.yml` et `sync-ios-certs.yml` sont des workflows legacy, inertes par
+> défaut et exécutables uniquement par opt-in manuel `enable_legacy_workflow=true`.
+> La chaîne iOS active passe par Codemagic.
 
 > Publication des bêtas mobiles (signature, secrets, runbooks Android & iOS,
 > rollback, checklist) : voir [`docs/RELEASE_MOBILE.md`](docs/RELEASE_MOBILE.md).
@@ -209,6 +216,10 @@ API principale :
 > Les workflows utilisent un runner **self-hosted** avec labels
 > `[self-hosted, Linux, X64, certigo-ci]` (les runners hébergés par GitHub sont
 > désactivés par la politique d'entreprise EMU sur ce dépôt).
+>
+> Ces labels doivent désigner un pool d'au moins deux runners. Le routage, le drill
+> de panne et le repli hébergé conditionnel sont détaillés dans
+> [`docs/CI_RUNNER_RESILIENCE.md`](docs/CI_RUNNER_RESILIENCE.md).
 >
 >  
 > Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `certigo-ci`.

@@ -5,10 +5,10 @@
   "branch": "gchambaud-microsoft-wp-p1-10-mobile-crash-reporting",
   "pr": 213,
   "checkpoint": {
-    "step": "in_review",
-    "note": "MOB-CRASH implemente. crash_reporting.dart: interface CrashReporter + LoggingCrashReporter (log structure + hook symbolisation), installCrashReporting (FlutterError.onError:framework + PlatformDispatcher.instance.onError:async retourne true), runGuarded (runZonedGuarded:zone), flag rollback kCrashReportingEnabled (crash_reporting.dart:18). bootstrap.dart enveloppe init+runApp dans runGuarded + installCrashReporting. Tests hermetiques test/crash_reporter_test.dart: 5 passed. dart format L100 --set-exit-if-changed: 0 changed. git diff origin/main -- backend infra: vide. PR draft #213.",
-    "at": "2026-07-07T10:47:32+01:00"
+    "step": "ci-fix-applied",
+    "note": "PR #213 couvre la capture locale, mais la DoD reste incomplète : sink production, upload des symboles et crash visible dans le tableau de bord non prouvés.",
+    "at": "2026-07-07T10:52:10+01:00"
   },
-  "updated_at": "2026-07-07T10:47:32+01:00",
+  "updated_at": "2026-08-05T20:52:00+01:00",
   "history_ref": "log.jsonl"
 }

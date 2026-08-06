@@ -1,0 +1,70 @@
+name: Runner resilience drill
+
+# Manual, non-destructive proof that the shared runner pool or the hosted
+# break-glass path remains usable. See docs/CI_RUNNER_RESILIENCE.md.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Resilience path to prove"
+        type: choice
+        required: true
+        default: self-hosted-failover
+        options:
+          - self-hosted-failover
+          - github-hosted-break-glass
+      expected_offline_runner:
+        description: "Runner name intentionally stopped (required for self-hosted failover)"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runner-resilience-drill
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Probe selected resilience path
+    runs-on: ${{ inputs.mode == 'github-hosted-break-glass' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    steps:
+      - name: Validate runner selection
+        shell: bash
+        env:
+          DRILL_MODE: ${{ inputs.mode }}
+          EXPECTED_OFFLINE_RUNNER: ${{ inputs.expected_offline_runner }}
+          CURRENT_RUNNER_NAME: ${{ runner.name }}
+          RUNNER_KIND: ${{ runner.environment }}
+        run: |
+          set -euo pipefail
+
+          if [ "$DRILL_MODE" = "self-hosted-failover" ]; then
+            if [ -z "$EXPECTED_OFFLINE_RUNNER" ]; then
+              echo "::error::expected_offline_runner is required for a self-hosted failover drill."
+              exit 1
+            fi
+            if [ "$RUNNER_KIND" != "self-hosted" ]; then
+              echo "::error::Expected a self-hosted runner, got $RUNNER_KIND."
+              exit 1
+            fi
+            if [ "$CURRENT_RUNNER_NAME" = "$EXPECTED_OFFLINE_RUNNER" ]; then
+              echo "::error::Runner $EXPECTED_OFFLINE_RUNNER was expected to be offline."
+              exit 1
+            fi
+          elif [ "$RUNNER_KIND" != "github-hosted" ]; then
+            echo "::error::Expected a GitHub-hosted runner, got $RUNNER_KIND."
+            exit 1
+          fi
+
+          {
+            echo "### Runner resilience drill"
+            echo
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Mode | \`$DRILL_MODE\` |"
+            echo "| Runner | \`$CURRENT_RUNNER_NAME\` |"
+            echo "| Environment | \`$RUNNER_KIND\` |"
+            echo "| Expected offline runner | \`${EXPECTED_OFFLINE_RUNNER:-n/a}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

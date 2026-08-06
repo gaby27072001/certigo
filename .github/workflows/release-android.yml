@@ -67,7 +67,9 @@ env:
 jobs:
   release:
     name: Build AAB signé + publication Play
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    # Android reste sur le pool self-hosted redondé : l'accès Key Vault par identité
+    # managée n'est pas disponible sur un runner GitHub-hosted.
+    runs-on: ${{ vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
     permissions:
       contents: read
     # Approval gate: configure required reviewers on the "beta" environment

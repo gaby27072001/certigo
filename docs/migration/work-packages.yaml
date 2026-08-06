@@ -32,7 +32,7 @@ work_packages:
     precondition: "Vérifier l'absence de docs/migration/ committé. Idempotent : si le registre existe déjà, ne rien réécrire — reprendre au dernier checkpoint enregistré dans state/."
     dod: "docs/migration/ contient README.md, work-packages.yaml, STATE.md, log.jsonl, state/_TEMPLATE.json, state/wp-000-amorcage-registre.json, templates/session-kickoff.md, templates/work-package.md ; le YAML, tous les JSON et chaque ligne JSONL parsent ; branche poussée + PR ouverte."
     rollback: "Purement additif sous docs/migration/ : rollback = supprimer le dossier et fermer la PR (aucun code applicatif touché)."
-    status: in_review
+    status: done
 
   # --- Phase 0 — Stabilisation (bloquant) ---------------------------------
   # Tous dépendent de l'amorçage du registre.
@@ -139,7 +139,7 @@ work_packages:
     precondition: "Vérifier que les lots wp-p1-* ne sont pas déjà présents dans work-packages.yaml. Idempotent : si la décomposition existe déjà, ne rien réécrire — compléter seulement ce qui manque."
     dod: "Les 15 lots wp-p1-01..15 sont inscrits (id, phase, taille, dépendances, précondition, DoD, rollback, status) ; chaque state/wp-p1-*.json parse ; les 8 lots P0 sont passés à done ; YAML/JSON/JSONL valides ; git diff code/infra vide ; PR draft ouverte."
     rollback: "Purement additif sous docs/migration/ : abandon de la branche et fermeture de la PR (aucun code applicatif touché)."
-    status: in_review
+    status: done
     notes: "Vague V0 · voie registre/bookkeeping. Les placeholders wp-phase-1..5 sont laissés intacts (additif)."
 
   - id: wp-p1-01-renderer-registry-fallback
@@ -151,7 +151,7 @@ work_packages:
     precondition: "Inspecter le renderer de contenu mobile : présence d'un registre de types de blocs et d'un comportement de repli. Idempotent : si le registre + fallback existent déjà, le lot est déjà fait."
     dod: "Chaque type de bloc connu est rendu par son composant enregistré ; un bloc de type inconnu affiche un fallback non bloquant (aucun crash) ; tests widget verts."
     rollback: "Abandon de la branche (aucun merge) ; le renderer précédent reste en place."
-    status: in_review
+    status: done
     notes: "Vague V1 · voie Flutter."
 
   - id: wp-p1-02-content-schemas-v2
@@ -163,7 +163,7 @@ work_packages:
     precondition: "Recenser les schémas de contenu existants et leur version. Idempotent : si les schémas v2 versionnés + validateur existent déjà, le lot est déjà fait."
     dod: "Les schémas de blocs v2 sont versionnés ; un validateur rejette tout contenu non conforme ; couverture de test des cas valides/invalides verte."
     rollback: "Abandon de la branche ; les schémas v1 restent la référence."
-    status: in_review
+    status: done
     notes: "Vague V2 · voie code/contenu."
 
   - id: wp-p1-03-renderer-golden-tests
@@ -175,7 +175,7 @@ work_packages:
     precondition: "Vérifier l'existence de golden tests couvrant les types de blocs rendus. Idempotent : si les goldens + le gate CI existent déjà, le lot est déjà fait."
     dod: "Chaque type de bloc a un golden test ; toute régression visuelle échoue le job CI dédié ; suite golden verte sur main."
     rollback: "Abandon de la branche ; aucun golden ajouté au gate."
-    status: in_review
+    status: done
     notes: "Vague V3 · voie code/CI."
 
   - id: wp-p1-04-certigo-content-repo
@@ -187,8 +187,8 @@ work_packages:
     precondition: "Vérifier l'existence d'un dépôt de contenu séparé et sa structure. Idempotent : si certigo-content existe déjà avec sa structure, le lot est déjà fait."
     dod: "Dépôt certigo-content créé avec arborescence + CODEOWNERS + README de contribution ; contenu de démonstration présent et validable."
     rollback: "Abandon de la branche ; le dépôt de contenu (le cas échéant) reste isolé et non référencé."
-    status: todo
-    notes: "Vague V2 · voie ops/live."
+    status: done
+    notes: "Vague V2 · voie ops/live. Preuve d'existence : https://github.com/gchambaud_microsoft/certigo-content ; la PR #1 atteste son utilisation opérationnelle."
 
   - id: wp-p1-05-content-migration
     phase: 1
@@ -199,8 +199,8 @@ work_packages:
     precondition: "Inventorier le contenu à migrer et son format actuel. Idempotent : si tout le contenu est déjà migré et conforme v2, le lot est déjà fait."
     dod: "Tout le contenu ciblé est migré vers certigo-content au format v2 et passe le validateur ; inventaire avant/après réconcilié (0 perte)."
     rollback: "Abandon de la branche ; le contenu source d'origine reste intact et fait foi."
-    status: in_progress
-    notes: "Vague V4 · voie contenu."
+    status: done
+    notes: "Vague V4 · voie contenu. Preuves de merge : PR #2 (145/146 questions) puis PR #4 (question manquante) dans gchambaud_microsoft/certigo-content."
 
   - id: wp-p1-06-ci-content-pipeline
     phase: 1
@@ -211,20 +211,20 @@ work_packages:
     precondition: "Vérifier l'existence d'un pipeline CI validant le contenu de certigo-content. Idempotent : si le pipeline valide + publie déjà, le lot est déjà fait."
     dod: "Chaque PR sur certigo-content déclenche la validation des schémas ; un manifeste de contenu versionné est produit en artefact ; job vert sur la branche par défaut."
     rollback: "Abandon de la branche ; aucun workflow CI ajouté."
-    status: in_review
-    notes: "Vague V3 · voie CI."
+    status: done
+    notes: "Vague V3 · voie CI. Preuve de merge : https://github.com/gchambaud_microsoft/certigo-content/pull/1."
 
   - id: wp-p1-07-content-manifest-immutable
     phase: 1
-    title: "Manifeste de contenu immuable : versions figées + résolution côté app par hash"
+    title: "Manifeste de contenu immuable : versions figées et adressables par hash"
     size: S
     effort_pweeks: 0.5
     depends_on: [wp-p1-06-ci-content-pipeline]
-    precondition: "Vérifier que le manifeste publié est immuable (hash/version figée). Idempotent : si l'immuabilité + résolution par hash existent déjà, le lot est déjà fait."
-    dod: "Chaque version de manifeste est immuable et adressable par hash ; l'app résout le contenu par version figée ; test de non-régression (même hash ⇒ même contenu) vert."
+    precondition: "Vérifier que le manifeste publié est immuable, déterministe et adressable par hash. Idempotent : si ces garanties et leurs tests existent déjà côté contenu, le lot est déjà fait."
+    dod: "Chaque version de manifeste est immuable et adressable par hash ; le générateur déterministe et le test de non-régression (même hash ⇒ même contenu) sont verts. La résolution runtime par l'app relève de wp-p2-05."
     rollback: "Abandon de la branche ; l'app continue de résoudre le contenu comme avant."
-    status: in_progress
-    notes: "Vague V4 · voie code/contenu."
+    status: done
+    notes: "Vague V4 · voie contenu. Preuve de merge : https://github.com/gchambaud_microsoft/certigo-content/pull/3. Le contrat et les contrôles côté contenu sont livrés ; la consommation mobile reste suivie par wp-p2-05."
 
   - id: wp-p1-08-offline-study-cache
     phase: 1
@@ -235,7 +235,7 @@ work_packages:
     precondition: "Vérifier la présence d'un cache de contenu hors-ligne côté mobile. Idempotent : si le cache offline existe déjà et est fonctionnel, le lot est déjà fait."
     dod: "Le contenu d'une session d'étude est téléchargeable et consultable hors-ligne (mode avion) ; invalidation à la nouvelle version de manifeste ; tests d'intégration offline verts."
     rollback: "Abandon de la branche ; le mode en-ligne reste le comportement par défaut."
-    status: todo
+    status: done
     notes: "Vague V5 · voie Flutter."
 
   - id: wp-p1-09-cortex-parity-gate
@@ -247,7 +247,7 @@ work_packages:
     precondition: "Recenser les règles métier dupliquées client/serveur et l'existence d'un contrôle de parité. Idempotent : si un gate de parité existe déjà, le lot est déjà fait."
     dod: "Un jeu de vecteurs de test partagé vérifie l'équivalence des décisions client/serveur ; toute divergence échoue le job CI dédié ; gate vert sur main."
     rollback: "Abandon de la branche ; aucun gate ajouté à la CI."
-    status: in_review
+    status: done
     notes: "Vague V1 · voie code. PR #216 (draft)."
 
   - id: wp-p1-10-mobile-crash-reporting
@@ -307,7 +307,7 @@ work_packages:
     precondition: "Vérifier l'instrumentation OTel et la propagation du correlation id de bout en bout. Idempotent : si le traçage distribué + corrélation existent déjà, le lot est déjà fait."
     dod: "Les requêtes mobile→backend portent un correlation id propagé ; les traces OTel sont exportées et corrélées (une trace de bout en bout visible) ; tests d'instrumentation verts."
     rollback: "Abandon de la branche ; l'instrumentation additive est désactivable (aucun changement de comportement métier)."
-    status: in_review
+    status: done
     notes: "Vague V2 · voie code."
 
   - id: wp-p1-15-gamification-integrity
@@ -319,24 +319,172 @@ work_packages:
     precondition: "Auditer les gains de gamification (XP/gems/streak) pour l'idempotence et les plafonds anti-abus. Idempotent : si les gardes anti-triche + plafonds existent déjà, le lot est déjà fait."
     dod: "Les gains XP/gems/streak sont idempotents (rejeu sans double-crédit) et plafonnés/anti-abus côté serveur ; tests anti-rejeu et de plafond verts."
     rollback: "Abandon de la branche ; retour au comportement de gamification antérieur."
-    status: in_review
+    status: done
     notes: "Vague V3 · voie code."
 
-  # --- Phase 2 — migrations de dépendances majeures -------------------------
-  # Chaque famille majeure reste un lot/une PR autonome. Ce lot ne modifie aucun
-  # workflow afin de ne pas empiéter sur wp-p1-11 / issue #249.
+  # --- Phase 2 — Search & AI Tutor (programme séquentiel) -------------------
 
-  - id: wp-p2-09-dependency-icons-fonts
+  - id: wp-p2-01
     phase: 2
-    title: "#155 — Dépendances icônes/polices : suppression des packages incompatibles et polices OFL embarquées dans Prism"
+    title: "Réconcilier le registre de migration et la documentation"
     size: S
     effort_pweeks: 0.5
-    depends_on: [wp-p0-08-e2e-auth-health-release]
-    precondition: "Inventorier les imports GoogleFonts/FontAwesome et les contraintes Flutter des jobs app/Prism. Idempotent : si aucun package google_fonts/font_awesome_flutter n'est résolu, que les trois familles Prism sont embarquées avec licences OFL et checksums, le lot est déjà fait."
-    dod: "apps/mobile et packages/prism_ui ne déclarent ni google_fonts ni font_awesome_flutter ; Plus Jakarta Sans, Inter et JetBrains Mono sont embarquées, licenciées et contrôlées par SHA-256 ; le lockfile Prism ne résout plus google_fonts ; le contrat structurel et les tests de typographie Prism passent ; aucun fichier .github/workflows n'est modifié."
-    rollback: "Revert de la PR puis flutter pub get dans apps/mobile et packages/prism_ui ; les anciens manifests, appels GoogleFonts et résolutions du lockfile Prism sont restaurés."
+    depends_on: [wp-p1-00-decomposition]
+    precondition: "Comparer les statuts du manifeste, des fichiers state et de STATE.md à l'état de fusion réel des PR Phase 1 ; relever les faits obsolètes dans ETAT_DU_PROJET.md. Idempotent : ne modifier que les écarts avérés et ne jamais réécrire log.jsonl."
+    steps:
+      - "Réconcilier work-packages.yaml, STATE.md, state/*.json et log.jsonl avec les PR certigo-content #1 à #4 fusionnées."
+      - "Mettre à jour l'issue de suivi #197 avec les mêmes statuts et preuves."
+      - "Désigner certigo-content comme source éditoriale active dans README.md, ARCHITECTURE.md et ETAT_DU_PROJET.md."
+      - "Ajouter le validateur du registre et sa gate CI dédiée."
+      - "Inscrire wp-p2-01..09 avec leurs préconditions, étapes, DoD et rollback."
+    dod: "Les lots Phase 1 dont la DoD complète est satisfaite sont à done dans work-packages.yaml, state/*.json et STATE.md ; les lots incomplets restent ouverts même si une PR associée a été fusionnée ; chaque transition de réconciliation est ajoutée à log.jsonl ; ETAT_DU_PROJET.md reflète l'état courant ; YAML, tous les JSON et chaque ligne JSONL parsent ; aucun code applicatif, IaC, dépendance ou test n'est modifié ; branche poussée et PR prête pour revue."
+    rollback: "Revert du commit documentaire de réconciliation ; aucun code, aucune infrastructure et aucune donnée applicative ne sont touchés."
     status: in_review
-    notes: "Issue #248, sous-lot #155. L'alignement Flutter/Dart + lockfile app, l'élargissement du job Prism à toute sa suite de tests, tout rafraîchissement futur des fontes et toute évolution de runners restent des lots séparés."
+    notes: "Premier lot Phase 2 ; wp-p2-02..09 ont été enregistrés initialement à todo. Les transitions ultérieures sont réconciliées séparément dans le registre."
+
+  - id: wp-p2-02
+    phase: 2
+    title: "Rendre l'outillage de contenu reproductible"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p1-00-decomposition]
+    precondition: "Si un lockfile suivi existe, que tous les workflows utilisent npm ci et que les tests couvrent les invariants du lot, considérer le lot comme terminé."
+    steps:
+      - "Ajouter package.json et package-lock.json, épingler Node 20 et les versions d'AJV, ajv-formats et glob."
+      - "Ajouter les scripts validate, manifest:check, manifest:generate, package et test."
+      - "Remplacer les npm install --no-save des workflows par npm ci."
+      - "Tester BOM, JSON invalide, doublons, orphelins, fuite publique, déterminisme et vecteur golden."
+      - "Ajouter un scan OSV/npm, un SBOM de l'outillage et documenter l'exécution locale."
+    dod: "npm ci, npm test, npm run validate et npm run manifest:check sont verts ; le même commit résout le même graphe de dépendances ; la CI ne contient plus d'installation Node non verrouillée ; le README documente contribution, validation et modèle public/privé."
+    rollback: "Revert de la PR ; les scripts .mjs actuels restent inchangés fonctionnellement."
+    status: done
+    notes: "Source : gchambaud_microsoft/certigo-content#6. PR #7 fusionnée (194f88e2de867c5f4aaf3238a32530fdb0f4751e) après validation des trois checks requis. Lot indépendant de wp-p2-01."
+
+  - id: wp-p2-03
+    phase: 2
+    title: "Séparer réellement les artefacts de contenu public et privé"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p2-02]
+    precondition: "Si les deux artefacts sont déjà produits séparément, reproductibles et couverts par une gate anti-fuite sur la sortie finale, le lot est terminé."
+    steps:
+      - "Ajouter tools/package_content.mjs et générer dist/public, dist/private et dist/reports dans une zone propre."
+      - "Produire des manifestes et hashes distincts pour les deux canaux."
+      - "Inspecter récursivement l'artefact public et interdire les chemins answerKey et les clés correct/rationale."
+      - "Vérifier la déclaration et le hash de chaque fichier, puis publier deux artefacts nommés avec leur manifestId."
+      - "Interdire au workflow mobile l'artefact privé et documenter rétention, immutabilité et publication."
+    dod: "Une commande produit deux paquets séparés ; deux exécutions sur le même commit sont byte-identical ; une fuite injectée dans dist/public fait échouer la CI ; l'artefact public ne contient aucun corrigé ; le paquet privé n'est accessible à aucun job mobile."
+    rollback: "Désactiver le nouveau workflow et revenir au manifeste indicatif actuel ; aucune release n'est activée automatiquement."
+    status: done
+    notes: "Source : gchambaud_microsoft/certigo-content#5. PR #8 fusionnée (470acdbf100e7f7faf9911015662bee6118b8bf5) après validation des six checks requis."
+
+  - id: wp-p2-04
+    phase: 2
+    title: "Importer les releases de contenu dans le backend avec rollback par manifestId"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p2-03]
+    precondition: "Si le backend importe déjà une release vérifiée, idempotente et restaurable par manifeste, le lot est terminé."
+    steps:
+      - "Définir et versionner le contrat d'import public/privé, puis vérifier tous les SHA-256 avant écriture."
+      - "Rendre l'import idempotent par manifestId et séparer les accès aux questions publiques et corrigés."
+      - "Enregistrer les versions active et précédente, ajouter promotion staging vers prod et rollback N-1."
+      - "Exposer uniquement le manifeste public actif et tester qu'aucun endpoint ne sérialise answerKey, correct ou rationale."
+      - "Instrumenter import, promotion, rejet et rollback dans Application Insights."
+    dod: "Import répété sans doublon ; hash invalide rejeté avant mutation ; rollback N-1 testé en staging ; tests HTTP anti-fuite verts ; le backend expose le manifestId public actif."
+    rollback: "Réactiver le manifeste précédent ; conserver les artefacts immuables et ne supprimer aucune version pendant le lot."
+    status: in_progress
+    notes: "Source : gchambaud_microsoft/Certigo#244. Implémentation active dans la session dédiée 5cf299a4-4f53-453a-8d1d-671f70f54913."
+
+  - id: wp-p2-05
+    phase: 2
+    title: "Faire du manifeste public le contrat offline-first du client mobile"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p2-04]
+    precondition: "Précondition locale au registre : vérifier si le client compare déjà le manifestId, télécharge les deltas vérifiés et active atomiquement un cache restaurable ; si ces garanties et leurs tests existent, le lot est terminé."
+    steps:
+      - "Récupérer le manifeste public actif, comparer son manifestId au cache et télécharger uniquement les éléments absents ou modifiés."
+      - "Vérifier SHA-256 et taille, écrire en zone temporaire puis activer atomiquement."
+      - "Conserver le dernier manifeste valide et continuer hors ligne après un échec de téléchargement ou validation."
+      - "Préserver l'idempotence d'une soumission créée sur une version antérieure et ajouter une télémétrie sans contenu sensible."
+      - "Tester perte réseau, hash invalide, manifeste incomplet, cache partiel, rollback, redémarrage et absence d'answerKey."
+    dod: "Téléchargement différentiel et activation atomique ; dernier cache valide utilisable hors ligne ; tests unitaires et intégration verts ; aucun corrigé dans le paquet ou le cache mobile."
+    rollback: "Feature flag vers l'ancien repository de contenu/cache ; données du nouveau cache isolées par version."
+    status: todo
+    notes: "Source : gchambaud_microsoft/Certigo#243. La précondition est une formulation locale, absente de l'issue."
+
+  - id: wp-p2-06
+    phase: 2
+    title: "Aligner les formats pédagogiques réels entre contenu, serveur et Prism"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p2-05]
+    precondition: "Précondition locale au registre : inventorier mcq, multiSelect, scenario, ordering, matching, fillBlank et spotIssue sur les schémas, modèles, correction et renderers ; le lot est terminé seulement si chaque type couvre déjà toute la chaîne et les tests anti-fuite."
+    steps:
+      - "Introduire une union discriminée questionType rétrocompatible ou migrable et stabiliser les IDs d'options/éléments."
+      - "Définir pour chaque type un payload public et une règle de correction privée."
+      - "Étendre validateur, manifestes, migrateur, modèles et parsing Dart/C#."
+      - "Implémenter la correction serveur autoritaire, les renderers Prism et leurs fallbacks."
+      - "Ajouter contrats cross-repo, tests unitaires, goldens Flutter et migrer le corpus sans perte."
+    dod: "Pour chaque type : schéma public, schéma privé, validation, modèle Dart, modèle C#, correction serveur, renderer, test unitaire, golden test et test anti-fuite."
+    rollback: "Conserver la lecture v2/QCM derrière compatibilité de schéma et ne promouvoir v3 qu'après validation staging."
+    status: todo
+    notes: "Source : gchambaud_microsoft/Certigo#245. La précondition est une formulation locale, absente de l'issue."
+
+  - id: wp-p2-07
+    phase: 2
+    title: "Supprimer le SPOF des runners self-hosted"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p1-00-decomposition]
+    precondition: "Précondition locale au registre : inventorier la capacité et simuler la perte d'un runner ; si les gates basculent et qu'un runner est reconstruisible depuis une définition versionnée, le lot est terminé."
+    steps:
+      - "Inventorier runners, labels, versions SDK et workflows critiques, puis ajouter une sonde quotidienne des dépendances externes, du disque et des SDK."
+      - "Provisionner au moins deux runners Linux interchangeables avec image ou bootstrap complet et idempotent."
+      - "Séparer la capacité PR non fiable de la capacité de déploiement production."
+      - "Vérifier les binaires par checksum/provenance et documenter panne, rotation, reconstruction et révocation."
+      - "Exécuter et consigner un exercice arrêt, basculement et reconstruction depuis zéro."
+    dod: "La perte d'un runner ne bloque pas les gates critiques ; un runner est reconstruisible depuis la définition versionnée ; l'exercice de reprise est consigné avec durée et preuves ; permissions, fork guards et environnements restent actifs."
+    rollback: "Conserver l'ancien runner pendant la validation ; revenir aux labels précédents sans changement applicatif."
+    status: in_progress
+    notes: "Source : gchambaud_microsoft/Certigo#249. PR #250 fusionnée ; failover validé, mais bootstrap/IaC versionné et reconstruction depuis zéro restent requis. Ce lot est indépendant de la chaîne de contenu."
+
+  - id: wp-p2-08
+    phase: 2
+    title: "Générer l'état observable du projet pour empêcher le drift documentaire"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-p2-01]
+    precondition: "Précondition locale au registre : régénérer l'état observable et comparer generated à committed ; si versions, workflows, tests, corpus, types, date et commit sont déjà générés et gardés en CI, le lot est terminé."
+    steps:
+      - "Générer versions Flutter/.NET/Node, workflows, tests découverts, corpus, types pédagogiques et commit analysé."
+      - "Écrire les valeurs entre marqueurs GENERATED:PROJECT-STATE."
+      - "Ajouter une commande locale et une gate CI generated == committed."
+      - "Vérifier l'alignement Flutter entre CI, Codemagic et documentation."
+      - "Séparer les faits générés des affirmations narratives et exiger une preuve pour tout statut opérationnel."
+    dod: "Les métriques techniques de ETAT_DU_PROJET.md sont générées ; une modification de version ou corpus sans régénération échoue en CI ; aucun compteur majeur n'est maintenu manuellement ; date et commit de référence sont exacts."
+    rollback: "Revert de la génération et conservation du document précédent ; aucun impact runtime."
+    status: todo
+    notes: "Source : gchambaud_microsoft/Certigo#247. La précondition est une formulation locale, absente de l'issue."
+
+  - id: wp-p2-09
+    phase: 2
+    title: "Organiser les migrations de dépendances majeures"
+    size: M
+    effort_pweeks: 1
+    depends_on: [wp-p1-00-decomposition]
+    precondition: "Précondition locale au registre : inventorier les mises à jour majeures et leurs PR ; si chaque domaine possède un lot isolé, des versions alignées, des tests staging/appareil et un rollback indépendant, le lot est terminé."
+    steps:
+      - "Choisir une version Flutter cible et aligner local, ci-mobile et Codemagic."
+      - "Découper SDK/toolchain, auth/secure storage, navigation, notifications et UI/icônes ; réutiliser l'issue #155 pour icônes/polices."
+      - "Remplacer les PR Dependabot groupées par des PR ciblées et isoler Microsoft.Azure.Functions.Worker.Sdk 2.x."
+      - "Valider Functions par metadata, func start, publish, staging, health, routes, middleware et App Insights."
+      - "Valider mobile sur Android/iOS réel, OIDC, secure storage, notifications et build store, avec rollback par major."
+    dod: "Une PR ne mélange pas plusieurs migrations majeures sans lien ; Flutter est identique dans les environnements supportés ; tests CI, staging et appareils réels verts ; PR Dependabot obsolètes fusionnées, remplacées ou fermées avec justification."
+    rollback: "Pins et lockfiles antérieurs conservés par lot ; rollback indépendant pour chaque groupe fonctionnel."
+    status: in_progress
+    notes: "Source : gchambaud_microsoft/Certigo#248. PR #252 ouverte et en correction. Ce lot est indépendant de la chaîne de contenu."
 
   # --- Phases 1–5 — placeholders (à décomposer au lancement) ---------------
   # Chaîne séquentielle. Chaque placeholder sera éclaté en lots XS–M au démarrage

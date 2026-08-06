@@ -15,10 +15,9 @@ name: dependency-vuln-scan
 # REPORT-ONLY STRICT : aucune étape ne fait échouer une PR (continue-on-error + if: always()).
 # On passera éventuellement en bloquant plus tard.
 #
-# RUNNER : self-hosted ["self-hosted","Linux","X64","certigo-ci"] (même label/forme que les autres
-# workflows du repo). Les runners GitHub-hosted (ubuntu-latest) sont DÉSACTIVÉS sur ce repo par la
-# policy enterprise (EMU) -> un job ubuntu-latest fait un startup failure ("hosted runners are
-# disabled for this repository"). On reste donc sur le runner self-hosted persistant.
+# RUNNER : pool self-hosted ["self-hosted","Linux","X64","certigo-ci"] par défaut. Les runners
+# GitHub-hosted sont DÉSACTIVÉS par la policy EMU ; le repli ubuntu-latest ne devient utilisable
+# qu'après une exception explicite et l'activation de CI_GITHUB_HOSTED_FALLBACK.
 # CI-01 (fork-guard) : une garde same-repo au niveau job empêche une PR de FORK d'exécuter ce scan
 # sur le runner self-hosted ; schedule + workflow_dispatch + PR internes passent normalement.
 
@@ -46,7 +45,8 @@ jobs:
     # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable -> elle NE doit PAS toucher le
     # runner self-hosted persistant. schedule / workflow_dispatch / PR interne passent ; PR de fork skip.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
+    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -107,7 +107,8 @@ jobs:
     name: .NET packages vulnérables (NuGet/GitHub Advisory)
     # CI-01 (fork-guard) : idem osv-scan — pas de code de PR de fork sur le runner self-hosted.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
+    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
     # CI-09 : le runner-2 a /usr/share/dotnet NON écrivable. On force setup-dotnet à
     # installer le SDK dans un répertoire écrivable ($RUNNER_TEMP) pour éviter l'échec.
     env:
