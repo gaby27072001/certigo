@@ -3,12 +3,12 @@
   "status": "in_review",
   "session_id": "f1b4af0d-274b-46c4-ba66-e212e7463432",
   "branch": "gchambaud-microsoft-deliver-backend-releases",
-  "pr": null,
+  "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/257",
   "checkpoint": {
-    "step": "local-validation-complete",
-    "note": "Implémentation, re-revue indépendante et gates locaux terminés : build Release sans avertissement, 559 tests réussis, 7 intégrations Cosmos ignorées faute d'émulateur, registre valide et Bicep compilé. La preuve staging du rollback N-1 reste manuelle avant passage à done.",
-    "at": "2026-08-06T17:15:27+01:00"
+    "step": "pull-request-opened",
+    "note": "PR #257 publiée au commit c4578766965aa7cc4090a6890a6fdcc1162900c8 après build Release sans avertissement, 559 tests réussis, registre valide, Bicep compilé et re-revue indépendante sans finding bloquant. La preuve staging du rollback N-1 reste manuelle avant passage à done.",
+    "at": "2026-08-06T17:39:28+01:00"
   },
-  "updated_at": "2026-08-06T17:15:27+01:00",
+  "updated_at": "2026-08-06T17:39:28+01:00",
   "history_ref": "log.jsonl"
 }
