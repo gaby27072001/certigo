@@ -38,7 +38,7 @@ jobs:
   deploy-infra:
     name: Deploy infrastructure (${{ inputs.environment || 'dev' }})
     environment: ${{ inputs.environment || 'dev' }}
-    runs-on: ${{ vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
     permissions:
       id-token: write
       contents: read
@@ -68,7 +68,7 @@ jobs:
   deploy-backend:
     name: Deploy backend code (${{ inputs.environment || 'dev' }})
     environment: ${{ inputs.environment || 'dev' }}
-    runs-on: ${{ vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
     needs: deploy-infra
     permissions:
       id-token: write

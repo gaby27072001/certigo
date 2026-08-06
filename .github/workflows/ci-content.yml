@@ -28,7 +28,7 @@ jobs:
     # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
     # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
     environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v6

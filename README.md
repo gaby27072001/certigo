@@ -210,6 +210,10 @@ API principale :
 > `[self-hosted, Linux, X64, certigo-ci]` (les runners hébergés par GitHub sont
 > désactivés par la politique d'entreprise EMU sur ce dépôt).
 >
+> Ces labels doivent désigner un pool d'au moins deux runners. Le routage, le drill
+> de panne et le repli hébergé conditionnel sont détaillés dans
+> [`docs/CI_RUNNER_RESILIENCE.md`](docs/CI_RUNNER_RESILIENCE.md).
+>
 >  
 > Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `certigo-ci`.
 

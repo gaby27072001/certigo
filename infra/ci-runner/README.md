@@ -7,10 +7,12 @@ avec le reste des livrables ; les noms de ressources Azure reprennent ceux du po
 ## Pourquoi
 
 Les runners hébergés par GitHub sont **désactivés par la politique d'entreprise EMU**.
-La CI s'exécute donc sur une machine virtuelle Azure auto-hébergée
-(`vm-certigo-runner`, dans le groupe de ressources `rg-certigo-ci`). Cette
-machine **n'a aucune IP publique propre** : son seul accès à Internet passe par une
-**Passerelle NAT (NAT Gateway)** attachée à son sous-réseau.
+La CI s'exécute donc sur un pool de machines virtuelles Azure auto-hébergées
+(dont `vm-certigo-runner`, dans le groupe de ressources `rg-certigo-ci`). Ces
+machines **n'ont aucune IP publique propre** : leur seul accès à Internet passe par une
+**Passerelle NAT (NAT Gateway)** attachée à leur sous-réseau. Le runbook de redondance,
+de failover et de preuve opérationnelle est dans
+[`docs/CI_RUNNER_RESILIENCE.md`](../../docs/CI_RUNNER_RESILIENCE.md).
 
 Ce chemin a d'abord été créé **manuellement** (az CLI) pour débloquer la CI en urgence.
 Tant qu'il n'existait que « à la main », un futur redéploiement ou une correction de
