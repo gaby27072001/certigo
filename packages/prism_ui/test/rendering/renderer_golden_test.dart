@@ -48,8 +48,7 @@ void main() {
   /// captures it against `goldens/<name>.png`. Uses a single 16ms frame (never
   /// `pumpAndSettle`) so stateful blocks such as [CodeBlock] settle without
   /// waiting on their tap-triggered timers.
-  Future<void> pumpGolden(
-      WidgetTester tester, Widget child, Type finderType, String name) async {
+  Future<void> pumpGolden(WidgetTester tester, Widget child, Type finderType, String name) async {
     await tester.pumpWidget(
       MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -59,8 +58,7 @@ void main() {
           body: Center(
             child: SizedBox(
               width: _kBlockWidth,
-              child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16), child: child),
+              child: SingleChildScrollView(padding: const EdgeInsets.all(16), child: child),
             ),
           ),
         ),
@@ -68,8 +66,7 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 16));
 
-    await expectLater(
-        find.byType(finderType), matchesGoldenFile('goldens/block_$name.png'));
+    await expectLater(find.byType(finderType), matchesGoldenFile('goldens/block_$name.png'));
   }
 
   testWidgets('hook block golden', (tester) async {
@@ -175,8 +172,7 @@ void main() {
   testWidgets('fallback block golden — unknownType', (tester) async {
     await pumpGolden(
       tester,
-      const PrismBlockFallback(
-          reason: BlockFallbackReason.unknownType, blockType: 'mystere'),
+      const PrismBlockFallback(reason: BlockFallbackReason.unknownType, blockType: 'mystere'),
       PrismBlockFallback,
       'fallback_unknown_type',
     );

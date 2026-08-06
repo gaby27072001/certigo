@@ -40,8 +40,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
 /// [_kGoldenDiffTolerance], and otherwise fails exactly like the default
 /// comparator (writing the usual failure artefacts for triage).
 class _TolerantGoldenComparator extends LocalFileComparator {
-  _TolerantGoldenComparator(Uri basedir)
-      : super(Uri.parse('$basedir/flutter_test_config.dart'));
+  _TolerantGoldenComparator(Uri basedir) : super(Uri.parse('$basedir/flutter_test_config.dart'));
 
   @override
   Future<bool> compare(Uint8List imageBytes, Uri golden) async {

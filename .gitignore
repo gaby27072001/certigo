@@ -34,12 +34,8 @@ appsettings.Development.json
 build/
 .flutter-plugins
 .flutter-plugins-dependencies
-# Lockfiles: Dart libraries (packages/*) commit their pubspec.lock for reproducible
-# CI builds. The app (apps/mobile) lockfile is intentionally NOT tracked because
-# the Flutter SDK version differs between CI (3.27.4) and local dev (3.44.x),
-# causing incompatible intl resolutions. Regenerate and commit once Flutter
-# versions are aligned across all environments.
-apps/mobile/pubspec.lock
+# Flutter apps and Dart packages commit their pubspec.lock for reproducible CI
+# and release builds. Regenerate lockfiles only with the pinned Flutter toolchain.
 **/doc/api/
 coverage/
 *.iml

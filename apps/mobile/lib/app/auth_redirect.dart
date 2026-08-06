@@ -11,15 +11,11 @@ import '../features/auth/application/auth_state.dart';
 /// Les valeurs sont la **source de vérité** consommée par `router.dart`, qui
 /// vérifie par ailleurs (assert) que `OnboardingRoutes` reste synchronisé.
 abstract class AuthShellRoutes {
-  static const String splash =
-      '/splash'; // splash d'auth (restauration de session)
-  static const String landing =
-      '/landing'; // écran d'ouverture façon Luma (hero + sheet)
-  static const String auth =
-      '/auth'; // écran de connexion e-mail (ouvert depuis la sheet)
+  static const String splash = '/splash'; // splash d'auth (restauration de session)
+  static const String landing = '/landing'; // écran d'ouverture façon Luma (hero + sheet)
+  static const String auth = '/auth'; // écran de connexion e-mail (ouvert depuis la sheet)
   static const String home = '/home'; // accueil (dans le shell)
-  static const String onboardingSplash =
-      '/onboarding/splash'; // ≠ [splash] (cf. #154)
+  static const String onboardingSplash = '/onboarding/splash'; // ≠ [splash] (cf. #154)
 
   /// Ensemble des routes du flux de démarrage (hors shell), doit rester
   /// synchronisé avec `OnboardingRoutes.all` (asserté dans `router.dart`).
@@ -71,8 +67,7 @@ abstract class AuthShellRoutes {
 
   /// Vrai pour toute route du flux d'inscription progressif (préfixe
   /// `/register`). Distinct du préfixe `/onboarding`.
-  static bool isRegisterFlow(String location) =>
-      location.startsWith('/register');
+  static bool isRegisterFlow(String location) => location.startsWith('/register');
 }
 
 /// Décision de redirection d'authentification, **pure et testable**.
@@ -126,9 +121,7 @@ String? resolveAuthRedirect({
   }
   // Authentifié : ne jamais rester sur une surface d'auth (splash, landing, auth).
   if (atAuthSplash || atLanding || atAuth) {
-    return onboardingCompleted
-        ? AuthShellRoutes.home
-        : AuthShellRoutes.onboardingSplash;
+    return onboardingCompleted ? AuthShellRoutes.home : AuthShellRoutes.onboardingSplash;
   }
   // Authentifié mais onboarding non terminé : forcer le flux de démarrage.
   if (!onboardingCompleted) {

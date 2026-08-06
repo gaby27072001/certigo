@@ -11,9 +11,8 @@ import 'package:prism_ui/prism_ui.dart';
 /// none of which depend on the font family — so we keep Material's default text
 /// theme and stay fully hermetic.
 ThemeData _prismTestTheme(Brightness brightness) {
-  final PrismColorScheme scheme = brightness == Brightness.dark
-      ? PrismColorScheme.dark
-      : PrismColorScheme.light;
+  final PrismColorScheme scheme =
+      brightness == Brightness.dark ? PrismColorScheme.dark : PrismColorScheme.light;
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
@@ -33,9 +32,7 @@ Future<void> pumpPrism(
     MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: _prismTestTheme(brightness),
-      home: Scaffold(
-        body: Center(child: child),
-      ),
+      home: Scaffold(body: Center(child: child)),
     ),
   );
 }

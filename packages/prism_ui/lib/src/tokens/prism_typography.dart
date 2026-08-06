@@ -17,8 +17,7 @@ class PrismTypography {
   static const String _monoFontFamily = 'JetBrainsMono';
 
   static TextTheme build(Color primary, Color secondary) {
-    TextStyle display(double size, FontWeight weight, double height) =>
-        TextStyle(
+    TextStyle display(double size, FontWeight weight, double height) => TextStyle(
           fontFamily: _displayFontFamily,
           package: 'prism_ui',
           fontSize: size,
@@ -28,13 +27,7 @@ class PrismTypography {
           letterSpacing: -0.2,
         );
 
-    TextStyle body(
-      double size,
-      FontWeight weight,
-      Color color,
-      double height,
-    ) =>
-        TextStyle(
+    TextStyle body(double size, FontWeight weight, Color color, double height) => TextStyle(
           fontFamily: _bodyFontFamily,
           package: 'prism_ui',
           fontSize: size,

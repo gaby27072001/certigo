@@ -26,22 +26,15 @@ RendererRegistry _probeRegistry({int schemaVersion = RendererSchema.current}) {
   return RendererRegistry(schemaVersion: schemaVersion)
     ..register(
       'hook',
-      (BuildContext context, ContentBlock block) =>
-          _ProbeBlock(block.requireString('body')),
+      (BuildContext context, ContentBlock block) => _ProbeBlock(block.requireString('body')),
     );
 }
 
-Future<void> _pumpBlock(
-  WidgetTester tester,
-  RendererRegistry registry,
-  ContentBlock block,
-) async {
+Future<void> _pumpBlock(WidgetTester tester, RendererRegistry registry, ContentBlock block) async {
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
-        body: Builder(
-          builder: (BuildContext context) => registry.build(context, block),
-        ),
+        body: Builder(builder: (BuildContext context) => registry.build(context, block)),
       ),
     ),
   );
@@ -90,15 +83,13 @@ void main() {
   });
 
   group('RendererRegistry.build', () {
-    testWidgets('paints the registered widget for a known, well-formed block',
-        (WidgetTester tester) async {
+    testWidgets('paints the registered widget for a known, well-formed block', (
+      WidgetTester tester,
+    ) async {
       await _pumpBlock(
         tester,
         _probeRegistry(),
-        const ContentBlock(
-          type: 'hook',
-          data: <String, dynamic>{'body': 'Bienvenue sur Azure'},
-        ),
+        const ContentBlock(type: 'hook', data: <String, dynamic>{'body': 'Bienvenue sur Azure'}),
       );
 
       expect(find.byType(_ProbeBlock), findsOneWidget);
@@ -106,15 +97,11 @@ void main() {
       expect(find.byKey(PrismBlockFallback.rootKey), findsNothing);
     });
 
-    testWidgets('falls back for an unknown block type',
-        (WidgetTester tester) async {
+    testWidgets('falls back for an unknown block type', (WidgetTester tester) async {
       await _pumpBlock(
         tester,
         _probeRegistry(),
-        const ContentBlock(
-          type: 'totally-unknown',
-          data: <String, dynamic>{'body': 'x'},
-        ),
+        const ContentBlock(type: 'totally-unknown', data: <String, dynamic>{'body': 'x'}),
       );
 
       expect(find.byKey(PrismBlockFallback.rootKey), findsOneWidget);
@@ -122,8 +109,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('falls back for a malformed payload (missing required field)',
-        (WidgetTester tester) async {
+    testWidgets('falls back for a malformed payload (missing required field)', (
+      WidgetTester tester,
+    ) async {
       await _pumpBlock(
         tester,
         _probeRegistry(),
@@ -137,8 +125,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('falls back for an unsupported (future) schema version',
-        (WidgetTester tester) async {
+    testWidgets('falls back for an unsupported (future) schema version', (
+      WidgetTester tester,
+    ) async {
       await _pumpBlock(
         tester,
         _probeRegistry(),
@@ -154,36 +143,27 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('falls back for an invalid (below-range) schema version',
-        (WidgetTester tester) async {
+    testWidgets('falls back for an invalid (below-range) schema version', (
+      WidgetTester tester,
+    ) async {
       await _pumpBlock(
         tester,
         _probeRegistry(),
-        const ContentBlock(
-          type: 'hook',
-          data: <String, dynamic>{'body': 'x'},
-          schemaVersion: 0,
-        ),
+        const ContentBlock(type: 'hook', data: <String, dynamic>{'body': 'x'}, schemaVersion: 0),
       );
 
       expect(find.byKey(PrismBlockFallback.rootKey), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('never throws even when a renderer itself misbehaves',
-        (WidgetTester tester) async {
+    testWidgets('never throws even when a renderer itself misbehaves', (WidgetTester tester) async {
       final RendererRegistry registry = RendererRegistry()
         ..register(
           'boom',
-          (BuildContext context, ContentBlock block) =>
-              throw StateError('renderer exploded'),
+          (BuildContext context, ContentBlock block) => throw StateError('renderer exploded'),
         );
 
-      await _pumpBlock(
-        tester,
-        registry,
-        const ContentBlock(type: 'boom'),
-      );
+      await _pumpBlock(tester, registry, const ContentBlock(type: 'boom'));
 
       expect(find.byKey(PrismBlockFallback.rootKey), findsOneWidget);
       expect(tester.takeException(), isNull);

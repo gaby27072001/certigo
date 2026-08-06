@@ -58,8 +58,7 @@ class LandingScreen extends StatefulWidget {
   State<LandingScreen> createState() => _LandingScreenState();
 }
 
-class _LandingScreenState extends State<LandingScreen>
-    with SingleTickerProviderStateMixin {
+class _LandingScreenState extends State<LandingScreen> with SingleTickerProviderStateMixin {
   late final AnimationController _reveal = AnimationController(
     vsync: this,
     duration: PrismMotion.celebrate,
@@ -86,30 +85,85 @@ class _LandingScreenState extends State<LandingScreen>
     // Couleurs = teinte de marque de chaque logo (glow de la puce).
     final List<_OrbitSpec> specs = <_OrbitSpec>[
       // Anneau interne — les trois hyperscalers en tête.
-      _OrbitSpec.brand(PrismBrandIcons.microsoft, const Color(0xFF0067B8),
-          ring: 0, angle: deg(-90), size: 52),
-      _OrbitSpec.brand(PrismBrandIcons.aws, const Color(0xFFFF9900),
-          ring: 0, angle: deg(40), size: 46),
-      _OrbitSpec.brand(PrismBrandIcons.google, const Color(0xFF4285F4),
-          ring: 0, angle: deg(165), size: 46),
+      _OrbitSpec.brand(
+        PrismBrandIcons.microsoft,
+        const Color(0xFF0067B8),
+        ring: 0,
+        angle: deg(-90),
+        size: 52,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.aws,
+        const Color(0xFFFF9900),
+        ring: 0,
+        angle: deg(40),
+        size: 46,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.google,
+        const Color(0xFF4285F4),
+        ring: 0,
+        angle: deg(165),
+        size: 46,
+      ),
       // Anneau médian — outils & plateformes IT.
-      _OrbitSpec.brand(PrismBrandIcons.docker, const Color(0xFF2496ED),
-          ring: 1, angle: deg(-58), size: 48),
-      _OrbitSpec.brand(PrismBrandIcons.python, const Color(0xFF3776AB),
-          ring: 1, angle: deg(8), size: 44),
-      _OrbitSpec.brand(PrismBrandIcons.linux, const Color(0xFF1F2937),
-          ring: 1, angle: deg(118), size: 48),
-      _OrbitSpec.brand(PrismBrandIcons.github, const Color(0xFF181717),
-          ring: 1, angle: deg(210), size: 44),
+      _OrbitSpec.brand(
+        PrismBrandIcons.docker,
+        const Color(0xFF2496ED),
+        ring: 1,
+        angle: deg(-58),
+        size: 48,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.python,
+        const Color(0xFF3776AB),
+        ring: 1,
+        angle: deg(8),
+        size: 44,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.linux,
+        const Color(0xFF1F2937),
+        ring: 1,
+        angle: deg(118),
+        size: 48,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.github,
+        const Color(0xFF181717),
+        ring: 1,
+        angle: deg(210),
+        size: 44,
+      ),
       // Anneau externe — langages & écosystèmes.
-      _OrbitSpec.brand(PrismBrandIcons.apple, const Color(0xFF111111),
-          ring: 2, angle: deg(-100), size: 46),
-      _OrbitSpec.brand(PrismBrandIcons.java, const Color(0xFFE76F00),
-          ring: 2, angle: deg(-20), size: 46),
-      _OrbitSpec.brand(PrismBrandIcons.android, const Color(0xFF3DDC84),
-          ring: 2, angle: deg(70), size: 44),
-      _OrbitSpec.brand(PrismBrandIcons.node, const Color(0xFF339933),
-          ring: 2, angle: deg(160), size: 46),
+      _OrbitSpec.brand(
+        PrismBrandIcons.apple,
+        const Color(0xFF111111),
+        ring: 2,
+        angle: deg(-100),
+        size: 46,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.java,
+        const Color(0xFFE76F00),
+        ring: 2,
+        angle: deg(-20),
+        size: 46,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.android,
+        const Color(0xFF3DDC84),
+        ring: 2,
+        angle: deg(70),
+        size: 44,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.node,
+        const Color(0xFF339933),
+        ring: 2,
+        angle: deg(160),
+        size: 46,
+      ),
     ];
 
     final int n = specs.length;
@@ -140,8 +194,7 @@ class _LandingScreenState extends State<LandingScreen>
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
-    final bool reduceMotion =
-        MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
     // Entrée : joue une fois. En reduced-motion, on saute directement à la fin.
     if (!_started) {
@@ -176,8 +229,7 @@ class _LandingScreenState extends State<LandingScreen>
                           floatAmplitude: 5,
                           center: _RevealIn(
                             controller: _reveal,
-                            interval: const Interval(0, 0.5,
-                                curve: PrismMotion.decelerate),
+                            interval: const Interval(0, 0.5, curve: PrismMotion.decelerate),
                             child: const _HeroAnchor(),
                           ),
                           items: _orbitItems(),
@@ -227,16 +279,13 @@ class _LandingScreenState extends State<LandingScreen>
                               'Des micro-leçons pour décrocher tes certifications '
                               'Microsoft, AWS, Google Cloud… et suivre ta readiness.',
                               textAlign: TextAlign.center,
-                              style: text.titleMedium
-                                  ?.copyWith(color: p.textSecondary),
+                              style: text.titleMedium?.copyWith(color: p.textSecondary),
                             ),
                           ),
                           const SizedBox(height: PrismSpacing.lg),
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 420),
-                            child: _CommencerButton(
-                              onPressed: () => showGetStartedSheet(context),
-                            ),
+                            child: _CommencerButton(onPressed: () => showGetStartedSheet(context)),
                           ),
                           const SizedBox(height: PrismSpacing.xs),
                           TextButton(
@@ -287,18 +336,19 @@ class _LandingBackdrop extends StatelessWidget {
       child: Stack(
         children: <Widget>[
           Positioned(
-              top: -140,
-              left: -90,
-              child: _Glow(color: p.primary.withOpacity(0.22), size: 360)),
+            top: -140,
+            left: -90,
+            child: _Glow(color: p.primary.withOpacity(0.22), size: 360),
+          ),
           Positioned(
-              top: -40,
-              right: -120,
-              child: _Glow(color: p.ember.withOpacity(0.16), size: 320)),
+            top: -40,
+            right: -120,
+            child: _Glow(color: p.ember.withOpacity(0.16), size: 320),
+          ),
           Positioned(
             bottom: -160,
             left: 10,
-            child: _Glow(
-                color: const Color(0xFF8C5CF6).withOpacity(0.16), size: 380),
+            child: _Glow(color: const Color(0xFF8C5CF6).withOpacity(0.16), size: 380),
           ),
         ],
       ),
@@ -321,8 +371,7 @@ class _Glow extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient:
-              RadialGradient(colors: <Color>[color, color.withOpacity(0)]),
+          gradient: RadialGradient(colors: <Color>[color, color.withOpacity(0)]),
         ),
       ),
     );
@@ -333,8 +382,7 @@ class _Glow extends StatelessWidget {
 /// Google, Docker…). Corps blanc laqué façon tuile d'app pour que le logo
 /// ressorte, halo teinté à la couleur de la marque.
 class _BrandChip extends StatelessWidget {
-  const _BrandChip(
-      {required this.icon, required this.tint, required this.size});
+  const _BrandChip({required this.icon, required this.tint, required this.size});
 
   final IconData icon;
   final Color tint;
@@ -345,8 +393,7 @@ class _BrandChip extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     // Corps clair pour que les logos de marque restent lisibles (y compris les
     // logos sombres : GitHub, Apple, Linux).
-    final Color body =
-        Color.alphaBlend(Colors.white.withOpacity(0.86), p.surface);
+    final Color body = Color.alphaBlend(Colors.white.withOpacity(0.86), p.surface);
     return Container(
       width: size,
       height: size,
@@ -355,10 +402,7 @@ class _BrandChip extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[
-            Color.alphaBlend(Colors.white.withOpacity(0.5), body),
-            body,
-          ],
+          colors: <Color>[Color.alphaBlend(Colors.white.withOpacity(0.5), body), body],
         ),
         border: Border.all(color: Colors.white.withOpacity(0.7)),
         boxShadow: <BoxShadow>[
@@ -401,8 +445,7 @@ class _HeroAnchor extends StatelessWidget {
           alignment: Alignment.center,
           child: const Text(
             'C',
-            style: TextStyle(
-                color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),
+            style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),
           ),
         ),
       _CenterAnchor.star => const SizedBox(
@@ -457,8 +500,7 @@ class _StarPainter extends CustomPainter {
     }
     path.close();
     final Paint paint = Paint()
-      ..shader = _kBrandGradient
-          .createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+      ..shader = _kBrandGradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height));
     canvas.drawPath(path, paint);
   }
 
@@ -490,8 +532,7 @@ class _CommencerButtonState extends State<_CommencerButton> {
     };
     final Color baseDark = switch (_kCtaStyle) {
       _CtaStyle.azure => p.primaryDark,
-      _CtaStyle.ink =>
-        Color.alphaBlend(Colors.black.withOpacity(0.4), p.textPrimary),
+      _CtaStyle.ink => Color.alphaBlend(Colors.black.withOpacity(0.4), p.textPrimary),
     };
 
     return Semantics(
@@ -529,10 +570,9 @@ class _CommencerButtonState extends State<_CommencerButton> {
             ),
             child: Text(
               'Commencer',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
             ),
           ),
         ),
@@ -557,8 +597,7 @@ class _RevealIn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Animation<double> t =
-        CurvedAnimation(parent: controller, curve: interval);
+    final Animation<double> t = CurvedAnimation(parent: controller, curve: interval);
     return AnimatedBuilder(
       animation: t,
       builder: (BuildContext context, Widget? child) {

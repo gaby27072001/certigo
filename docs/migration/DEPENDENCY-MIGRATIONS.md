@@ -11,7 +11,7 @@ aux workflows de runners.
 
 L'application utilisait `font_awesome_flutter 10.7.0` pour onze logos de marque
 et `google_fonts 6.2.1` pour sa typographie. Ces versions ne compilent pas avec
-le SDK Flutter 3.44.5 du job Prism. Le lot :
+Flutter 3.44.4 / Dart 3.12.2. Le lot :
 
 - retire les deux packages incompatibles des résolutions Dart ;
 - embarque Plus Jakarta Sans, Inter et JetBrains Mono dans `packages/prism_ui`
@@ -20,11 +20,17 @@ le SDK Flutter 3.44.5 du job Prism. Le lot :
   onze glyphes utilisés via `PrismBrandIcons`, sans dépendre de son API Dart ;
 - conserve l'icône e-mail via Material Icons ;
 - versionne les licences et les sommes SHA-256 des quatre fontes ;
-- met à jour le lockfile Prism et ajoute des contrats structurels.
+- aligne CI, releases et Codemagic sur Flutter 3.44.4 / Dart 3.12.2 ;
+- relève les contraintes SDK des packages au même plancher pour stabiliser le
+  formateur et la résolution de dépendances ;
+- versionne les lockfiles app et Prism et ajoute des contrats structurels.
 
-Le lockfile de l'application reste volontairement non suivi tant que les SDK
-Flutter app et Prism divergent, conformément à `.gitignore`. Le lockfile de
-Prism reste commité et prouve l'absence des deux packages retirés.
+La gate de format conserve temporairement le binaire Dart 3.6.0 afin d'éviter
+de mélanger une normalisation mécanique de tout le monorepo à cette migration.
+Compilation, analyse et tests utilisent bien Dart 3.12.2.
+
+Les lockfiles de l'application et de Prism sont générés avec Flutter 3.44.4,
+commités et prouvent l'absence des deux packages retirés.
 
 Sources figées :
 
@@ -38,6 +44,8 @@ Sources figées :
 ### Validation
 
 ```bash
+flutter --version # Flutter 3.44.4, Dart 3.12.2
+
 cd packages/prism_ui
 flutter pub get
 flutter test test/tokens/prism_typography_test.dart test/tokens/prism_brand_icons_test.dart
@@ -50,10 +58,15 @@ flutter analyze
 
 ### Rollback
 
-Revert de la PR, puis régénération des résolutions restaure les packages, leurs
-imports et le lockfile antérieurs :
+Le retour temporaire à l'ancienne API exige aussi son toolchain compatible.
+Revert de la PR, épinglage Flutter 3.27.4 / Dart 3.6.x dans les jobs et releases,
+et abaissement de `flutter_lints` Prism à `^5.0.0` forment un rollback atomique :
 
 ```bash
+# Exécuter avec Flutter 3.27.4 / Dart 3.6.x après avoir appliqué les pins
+# workflow/release et `flutter_lints: ^5.0.0` dans Prism.
+flutter --version
+
 cd packages/prism_ui
 flutter pub get
 flutter test test/tokens/prism_typography_test.dart
@@ -66,7 +79,7 @@ flutter pub get
 
 | Lot à ouvrir | Précondition | Pourquoi il reste séparé |
 |---|---|---|
-| Alignement Flutter/Dart + suivi de `apps/mobile/pubspec.lock` | Coordonner avec #249 sans modifier son infrastructure runners | Ce lot touche les workflows, caches SDK, la politique de lockfile et devra exécuter toute la suite de tests Prism en CI. |
+| Prochaine montée Flutter/Dart après 3.44.4 / 3.12.2 | Support requis par une dépendance ou fin de support du SDK | Chaque future montée doit garder CI, releases, Codemagic et lockfiles synchronisés sans modifier les labels/runners. |
 | Rafraîchissement des fontes embarquées | Nouvelle version ou nouveaux glyphes explicitement requis | Les binaires, licences, checksums et goldens doivent évoluer ensemble. |
 | Adoption éventuelle de Font Awesome 11 | Un besoin produit dépasse les onze glyphes locaux | La majeure exige Dart >= 3.9 et Flutter >= 3.27 ; son API `FaIconData` est distincte d'`IconData`. |
 | Migrations majeures backend, contenu ou IaC | Inventaire et tests propres à chaque écosystème | Leurs runtimes et rollbacks n'ont aucun lien avec Flutter/Prism. |

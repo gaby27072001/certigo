@@ -101,11 +101,9 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
   @override
   Widget build(BuildContext context) {
     final _ProviderBrand brand = _brandFor(context);
-    final TextStyle labelStyle =
-        Theme.of(context).textTheme.titleMedium!.copyWith(
-              color: brand.foreground,
-              fontWeight: FontWeight.w700,
-            );
+    final TextStyle labelStyle = Theme.of(
+      context,
+    ).textTheme.titleMedium!.copyWith(color: brand.foreground, fontWeight: FontWeight.w700);
 
     return Semantics(
       button: true,
@@ -129,9 +127,7 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
               decoration: BoxDecoration(
                 color: brand.background,
                 borderRadius: const BorderRadius.all(Radius.circular(16)),
-                border: brand.border == null
-                    ? null
-                    : Border.all(color: brand.border!),
+                border: brand.border == null ? null : Border.all(color: brand.border!),
                 boxShadow: _down
                     ? null
                     : <BoxShadow>[
@@ -155,8 +151,7 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                    brand.foreground),
+                                valueColor: AlwaysStoppedAnimation<Color>(brand.foreground),
                               ),
                             )
                           : Icon(brand.icon, size: 20, color: brand.iconColor),
