@@ -31,7 +31,7 @@
 | `wp-p1-13-staging-environment` | 1 | S | in_review | `wp-p1-12-iac-drift-import` | [#232](https://github.com/gchambaud_microsoft/Certigo/pull/232) |
 | `wp-p1-14-opentelemetry-correlation` | 1 | M | in_review | `wp-p1-00-decomposition` | [#215](https://github.com/gchambaud_microsoft/Certigo/pull/215) |
 | `wp-p1-15-gamification-integrity` | 1 | M | in_review | `wp-p0-02-etag-concurrency`, `wp-p0-06-server-authoritative-integrity` | [#214](https://github.com/gchambaud_microsoft/Certigo/pull/214) |
-| `wp-p2-09-dependency-icons-fonts` | 2 | S | in_review | `wp-p0-08-e2e-auth-health-release` | — |
+| `wp-p2-09-dependency-icons-fonts` | 2 | S | in_review | `wp-p0-08-e2e-auth-health-release` | [#252](https://github.com/gchambaud_microsoft/Certigo/pull/252) |
 | `wp-phase-1-contenu-renderer` | 1 | L | planned | `wp-p0-08-e2e-auth-health-release` | — |
 | `wp-phase-2-search-ai-tutor` | 2 | L | planned | `wp-phase-1-contenu-renderer` | — |
 | `wp-phase-3-admin-ops` | 3 | L | planned | `wp-phase-2-search-ai-tutor` | — |

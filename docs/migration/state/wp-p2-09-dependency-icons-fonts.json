@@ -3,7 +3,7 @@
   "status": "in_review",
   "session_id": "61372222-4fbf-4aa1-801b-58f6fe226513",
   "branch": "gchambaud-microsoft-migrate-icons-fonts",
-  "pr": null,
+  "pr": 252,
   "checkpoint": {
     "step": "validation-complete",
     "note": "Flutter 3.44.4 : suites Prism et mobile complètes vertes, analyses app et fichiers du lot vertes, checksums vérifiés et métadonnées valides. Aucun workflow ni runner modifié.",
