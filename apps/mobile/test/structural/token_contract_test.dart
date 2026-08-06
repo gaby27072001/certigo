@@ -15,11 +15,8 @@
 // deliberate, reviewed decision — never an accident.
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-// Direct src imports (not the barrel) so these contract tests never compile
-// prism_typography.dart, whose google_fonts dependency has a const-eval bug that
-// breaks compilation on some local toolchains. PrismSpacing/PrismRadii live in
-// leaf token files that import only flutter/widgets, so the net stays green both
-// locally and in CI.
+// Direct leaf imports keep these token contracts independent from unrelated
+// theme and component compilation.
 import 'package:prism_ui/src/tokens/prism_radii.dart';
 import 'package:prism_ui/src/tokens/prism_spacing.dart';
 

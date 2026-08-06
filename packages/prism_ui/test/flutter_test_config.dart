@@ -9,10 +9,8 @@
 // percentage threshold still fails hard on real, structural visual changes,
 // which is exactly what the `ci-mobile` golden gate must catch.
 //
-// This file imports only `flutter_test` + core Dart libraries. It never touches
-// the package barrel or `google_fonts`, so it does not perturb the hermetic
-// compilation units the rest of the suite relies on. For non-golden tests the
-// swapped comparator is inert (they never call `matchesGoldenFile`).
+// This file imports only `flutter_test` + core Dart libraries. For non-golden
+// tests the swapped comparator is inert (they never call `matchesGoldenFile`).
 import 'dart:async';
 import 'dart:typed_data';
 

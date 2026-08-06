@@ -1,11 +1,9 @@
 // Hermetic tests for the canonical content-schema catalogue + validator (v2).
 //
 // These tests import the schema primitives directly and exercise them as plain
-// Dart. They deliberately avoid the prism harness and the package barrel, both
-// of which transitively pull `google_fonts` — which fails to compile under this
-// toolchain's Dart version. The portable AJV artifact
-// (`schemas/content/v2/block.schema.json`) is loaded from disk so a coherence
-// test can prove the Dart catalogue and the JSON Schema never silently drift.
+// Dart. The portable AJV artifact (`schemas/content/v2/block.schema.json`) is
+// loaded from disk so a coherence test can prove the Dart catalogue and the
+// JSON Schema never silently drift.
 import 'dart:convert';
 import 'dart:io';
 

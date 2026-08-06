@@ -5,8 +5,6 @@ import 'package:prism_ui/prism_ui.dart';
 import '../support/prism_harness.dart';
 
 void main() {
-  setUpAll(disableGoogleFontsFetching);
-
   group('StatPill', () {
     testWidgets('streak factory shows the day count, flame and semantics',
         (WidgetTester tester) async {

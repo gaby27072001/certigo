@@ -5,8 +5,6 @@ import 'package:prism_ui/prism_ui.dart';
 import '../support/prism_harness.dart';
 
 void main() {
-  setUpAll(disableGoogleFontsFetching);
-
   group('context.prism', () {
     testWidgets('resolves the registered scheme under a Prism dark theme',
         (WidgetTester tester) async {

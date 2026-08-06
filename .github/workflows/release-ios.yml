@@ -57,7 +57,7 @@ permissions:
   contents: read
 
 env:
-  FLUTTER_VERSION: "3.27.4"
+  FLUTTER_VERSION: "3.44.4"
   BUNDLE_ID: "com.certigo.mobileapp"
 
 jobs:

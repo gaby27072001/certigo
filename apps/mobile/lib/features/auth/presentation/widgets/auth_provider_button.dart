@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../application/auth_state.dart';
@@ -62,7 +61,7 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
       case AuthProvider.microsoft:
         return _ProviderBrand(
           label: 'Continuer avec Microsoft',
-          icon: FontAwesomeIcons.microsoft,
+          icon: PrismBrandIcons.microsoft,
           background: isDark ? const Color(0xFF2B2B2B) : Colors.white,
           foreground: isDark ? Colors.white : const Color(0xFF1B1B1F),
           iconColor: const Color(0xFF0067B8),
@@ -71,7 +70,7 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
       case AuthProvider.google:
         return _ProviderBrand(
           label: 'Continuer avec Google',
-          icon: FontAwesomeIcons.google,
+          icon: PrismBrandIcons.google,
           background: isDark ? const Color(0xFF2B2B2B) : Colors.white,
           foreground: isDark ? Colors.white : const Color(0xFF1B1B1F),
           iconColor: const Color(0xFFEA4335),
@@ -80,7 +79,7 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
       case AuthProvider.apple:
         return _ProviderBrand(
           label: 'Continuer avec Apple',
-          icon: FontAwesomeIcons.apple,
+          icon: PrismBrandIcons.apple,
           background: isDark ? Colors.white : Colors.black,
           foreground: isDark ? Colors.black : Colors.white,
           iconColor: isDark ? Colors.black : Colors.white,
@@ -90,7 +89,7 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
         // jamais ce bouton ; ce cas n'existe que pour l'exhaustivité du switch.
         return _ProviderBrand(
           label: 'Continuer avec un e-mail',
-          icon: FontAwesomeIcons.envelope,
+          icon: Icons.mail_outline_rounded,
           background: isDark ? const Color(0xFF2B2B2B) : Colors.white,
           foreground: isDark ? Colors.white : const Color(0xFF1B1B1F),
           iconColor: context.prism.primary,
@@ -102,10 +101,9 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
   @override
   Widget build(BuildContext context) {
     final _ProviderBrand brand = _brandFor(context);
-    final TextStyle labelStyle = Theme.of(context).textTheme.titleMedium!.copyWith(
-          color: brand.foreground,
-          fontWeight: FontWeight.w700,
-        );
+    final TextStyle labelStyle = Theme.of(
+      context,
+    ).textTheme.titleMedium!.copyWith(color: brand.foreground, fontWeight: FontWeight.w700);
 
     return Semantics(
       button: true,
@@ -156,7 +154,7 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
                                 valueColor: AlwaysStoppedAnimation<Color>(brand.foreground),
                               ),
                             )
-                          : FaIcon(brand.icon, size: 20, color: brand.iconColor),
+                          : Icon(brand.icon, size: 20, color: brand.iconColor),
                     ),
                   ),
                   Expanded(

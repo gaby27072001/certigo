@@ -139,7 +139,7 @@ workflows:
     integrations:
       app_store_connect: AppStoreConnect
     environment:
-      flutter: 3.27.4          # Aligned with .github/workflows/ci-mobile.yml (test<->release parity).
+      flutter: 3.44.4          # Aligned with .github/workflows/ci-mobile.yml (test<->release parity).
       xcode: latest
       cocoapods: default
       groups:
@@ -200,7 +200,7 @@ workflows:
     integrations:
       app_store_connect: AppStoreConnect
     environment:
-      flutter: 3.27.4
+      flutter: 3.44.4
       xcode: latest
       cocoapods: default
       groups:

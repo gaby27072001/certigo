@@ -5,8 +5,6 @@ import 'package:prism_ui/prism_ui.dart';
 import '../support/prism_harness.dart';
 
 void main() {
-  setUpAll(disableGoogleFontsFetching);
-
   const Color accent = Color(0xFF0078D4);
 
   group('ChapterSectionCard', () {

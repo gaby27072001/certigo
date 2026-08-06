@@ -37,7 +37,7 @@ abstract interface class LessonFeedback {
 /// Every haptic call is best-effort — wrapped so a missing platform channel
 /// (e.g. in a pure unit test) can never break a lesson.
 class HapticLessonFeedback implements LessonFeedback {
-  const HapticLessonFeedback({SoundPlayer sound = const NullSoundPlayer()}) : _sound = sound;
+  const HapticLessonFeedback({this._sound = const NullSoundPlayer()});
 
   final SoundPlayer _sound;
 

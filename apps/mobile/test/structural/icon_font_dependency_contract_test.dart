@@ -1,0 +1,64 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('Prism exclusively owns the icon and font dependencies', () {
+    final String appPubspec = File('pubspec.yaml').readAsStringSync();
+    final String appLock = File('pubspec.lock').readAsStringSync();
+    final String prismPubspec = File('../../packages/prism_ui/pubspec.yaml').readAsStringSync();
+    final String prismLock = File('../../packages/prism_ui/pubspec.lock').readAsStringSync();
+    final File checksums = File('../../packages/prism_ui/assets/fonts/SHA256SUMS');
+    final List<File> fontAssets = <File>[
+      File('../../packages/prism_ui/assets/fonts/PlusJakartaSans-Variable.ttf'),
+      File('../../packages/prism_ui/assets/fonts/Inter-Variable.ttf'),
+      File('../../packages/prism_ui/assets/fonts/JetBrainsMono-Variable.ttf'),
+      File('../../packages/prism_ui/assets/fonts/FontAwesomeBrands-400.ttf'),
+    ];
+
+    expect(appPubspec, isNot(contains('\n  google_fonts:')));
+    expect(appPubspec, isNot(contains('\n  font_awesome_flutter:')));
+    expect(appPubspec, contains('\n  prism_ui:'));
+    expect(appLock, isNot(contains('name: google_fonts')));
+    expect(appLock, isNot(contains('name: font_awesome_flutter')));
+    expect(appLock, contains('dart: ">=3.12.2 <4.0.0"'));
+    expect(appLock, contains('flutter: ">=3.44.4"'));
+
+    expect(prismPubspec, isNot(contains('\n  google_fonts:')));
+    expect(prismLock, isNot(contains('name: google_fonts')));
+    expect(prismLock, contains('dart: ">=3.12.2 <4.0.0"'));
+    expect(prismLock, contains('flutter: ">=3.44.4"'));
+    for (final File asset in fontAssets) {
+      expect(asset.existsSync(), isTrue, reason: '${asset.path} must be bundled');
+      expect(asset.lengthSync(), greaterThan(100000));
+      expect(prismPubspec, contains(asset.uri.pathSegments.last));
+    }
+    expect(checksums.existsSync(), isTrue);
+    expect(checksums.readAsLinesSync(), hasLength(4));
+  });
+
+  test('Flutter and Dart pins stay aligned across CI and releases', () {
+    final String ciMobile = File('../../.github/workflows/ci-mobile.yml').readAsStringSync();
+    final String cortexParity = File(
+      '../../.github/workflows/ci-cortex-parity.yml',
+    ).readAsStringSync();
+    final String androidRelease = File(
+      '../../.github/workflows/release-android.yml',
+    ).readAsStringSync();
+    final String iosRelease = File('../../.github/workflows/release-ios.yml').readAsStringSync();
+    final String securityScan = File(
+      '../../.github/workflows/security-scan.yml',
+    ).readAsStringSync();
+    final String codemagic = File('../../codemagic.yaml').readAsStringSync();
+
+    expect(ciMobile, contains('FLUTTER_VERSION: "3.44.4"'));
+    expect(ciMobile, contains('sdk: "3.12.2"'));
+    expect(ciMobile, isNot(contains('FLUTTER_VERSION: "3.27.4"')));
+    expect(ciMobile, isNot(contains('FLUTTER_VERSION: "3.44.5"')));
+    expect(cortexParity, contains('sdk: "3.12.2"'));
+    expect(androidRelease, contains('FLUTTER_VERSION: "3.44.4"'));
+    expect(iosRelease, contains('FLUTTER_VERSION: "3.44.4"'));
+    expect(securityScan, contains('flutter-version: "3.44.4"'));
+    expect('flutter: 3.44.4'.allMatches(codemagic), hasLength(2));
+  });
+}
