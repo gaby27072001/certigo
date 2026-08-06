@@ -34,6 +34,13 @@ public sealed class EmptyCatalogException()
 public sealed class TrackNotFoundException(string trackId)
     : Exception($"Track '{trackId}' was not found in the catalog.");
 
+/// Raised when a content artifact violates the versioned import contract or an
+/// integrity/private-boundary invariant. Messages never include artifact bytes.
+public sealed class ContentReleaseValidationException(string message) : Exception(message);
+
+public sealed class ContentReleaseNotFoundException(string manifestId)
+    : Exception($"Content release '{manifestId}' was not found.");
+
 public interface IUserContext
 {
     string UserId { get; }
@@ -73,6 +80,103 @@ public interface IContentRepository
     // doc per track, each in its own /trackId partition), so callers should
     // treat it as a low-frequency catalog read, not a hot path.
     Task<IReadOnlyList<Track>> ListTracksAsync(CancellationToken cancellationToken = default);
+}
+
+public interface IContentReleaseRepository
+{
+    Task<ContentReleaseReceipt?> GetReceiptAsync(
+        string manifestId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> ImportAsync(
+        VerifiedContentRelease release,
+        CancellationToken cancellationToken = default);
+
+    Task<ContentReleaseState?> GetStateAsync(
+        string environment,
+        CancellationToken cancellationToken = default);
+
+    Task<ContentReleasePromotionResult> PromoteAsync(
+        string environment,
+        string manifestId,
+        ContentReleaseOperation operation,
+        DateTimeOffset changedAt,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IPublicContentReleaseRepository
+{
+    Task<StoredContentReleaseFile?> GetActivePublicFileAsync(
+        string environment,
+        string path,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IPrivateContentReleaseRepository
+{
+    // Server-only seam for authoritative grading. Deliberately absent from the
+    // public release service and therefore from every HTTP/mobile function.
+    Task<StoredContentReleaseFile?> GetActivePrivateFileAsync(
+        string environment,
+        string path,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed record VerifiedContentRelease(
+    string ManifestId,
+    string PublicManifestId,
+    string Fingerprint,
+    ContentArtifactManifest PublicManifest,
+    ContentArtifactManifest PrivateManifest,
+    IReadOnlyList<VerifiedContentReleaseFile> Files,
+    DateTimeOffset ImportedAt);
+
+public sealed record VerifiedContentReleaseFile(
+    string Channel,
+    string Id,
+    string Path,
+    string Hash,
+    long Size,
+    byte[] Content);
+
+public sealed record ContentReleaseReceipt(
+    string ManifestId,
+    string PublicManifestId,
+    string Fingerprint,
+    ContentArtifactManifest PublicManifest,
+    DateTimeOffset ImportedAt);
+
+public enum ContentReleaseOperation
+{
+    Promote,
+    Rollback
+}
+
+public sealed record ContentReleaseHistoryEntry(
+    string ManifestId,
+    ContentReleaseOperation Operation,
+    DateTimeOffset ChangedAt);
+
+public sealed record ContentReleaseState(
+    string Environment,
+    string ActiveManifestId,
+    string? PreviousManifestId,
+    DateTimeOffset ChangedAt,
+    ContentReleaseOperation Operation,
+    IReadOnlyList<ContentReleaseHistoryEntry> History);
+
+public sealed record ContentReleasePromotionResult(
+    ContentReleaseState State,
+    bool Changed);
+
+public sealed record StoredContentReleaseFile(string Path, byte[] Content);
+
+public interface IContentReleaseTelemetry
+{
+    void TrackImported(string manifestId, bool alreadyImported, int publicFiles, int privateFiles);
+    void TrackPromoted(string environment, string manifestId);
+    void TrackRolledBack(string environment, string manifestId);
+    void TrackRejected(string reason);
 }
 
 public interface IProgressRepository

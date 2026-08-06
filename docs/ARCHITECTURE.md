@@ -130,12 +130,14 @@ En local : `local.settings.json` (gabarit `.example` fourni, fichier réel gitig
 
 ## 5. Données — Cosmos DB
 
-Base `certigo`, mode **serverless**. Huit containers, partitionnés pour la localité des accès :
+Base `certigo`, mode **serverless**. Dix containers, partitionnés pour la localité des accès :
 
 | Container | Partition key | Contenu |
 |---|---|---|
 | `users` | `/id` | profil, stats lifetime (avec ETag pour la concurrence optimiste) |
 | `content` | `/trackId` | tracks, leçons publiques, clés de réponse |
+| `content-releases-public` | `/partitionKey` | reçus immuables, fichiers publics et pointeur actif/précédent |
+| `content-releases-private` | `/partitionKey` | corrigés immuables, sans accès HTTP/mobile |
 | `progress` | `/userId` | maîtrise par concept, état FSRS |
 | `attempts` | `/userId` | tentatives de quiz/examen (id déterministe `attempt::{clientAttemptId}` → idempotence atomique) |
 | `events` | `/userId` | événements analytics |
@@ -184,6 +186,10 @@ Certigo/content/             # instantané historique, non éditorial
   les `answerKey` restent côté serveur.
 - **Validation et publication** : la CI du dépôt éditorial valide les schémas et l'intégrité,
   puis produit un manifeste immuable adressable par hash.
+- **Activation backend** : les paquets public/privé sont vérifiés octet par octet, importés de
+  façon idempotente puis activés par un pointeur Cosmos atomique (`active/previous/history`).
+  Seul le manifeste public actif et ses fichiers ont une route mobile ; rollback N-1 par
+  `manifestId`. Voir [`content-releases.md`](content-releases.md).
 - **Compatibilité** : `Certigo/content/` et ses outils de seed historiques restent disponibles
   pendant la transition, sans constituer une source éditoriale concurrente.
 

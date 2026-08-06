@@ -155,6 +155,13 @@ var host = new HostBuilder()
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IUserRepository, CosmosUserRepository>();
         services.AddScoped<IContentRepository, CosmosContentRepository>();
+        services.AddScoped<CosmosContentReleaseRepository>();
+        services.AddScoped<IContentReleaseRepository>(
+            sp => sp.GetRequiredService<CosmosContentReleaseRepository>());
+        services.AddScoped<IPublicContentReleaseRepository>(
+            sp => sp.GetRequiredService<CosmosContentReleaseRepository>());
+        services.AddScoped<IPrivateContentReleaseRepository>(
+            sp => sp.GetRequiredService<CosmosContentReleaseRepository>());
         services.AddScoped<IProgressRepository, CosmosProgressRepository>();
         services.AddScoped<IAttemptRepository, CosmosAttemptRepository>();
         services.AddScoped<IExamAttemptRepository, CosmosExamAttemptRepository>();
@@ -164,6 +171,10 @@ var host = new HostBuilder()
         services.AddScoped<IFriendRepository, CosmosFriendRepository>();
         services.AddScoped<ILearnerModelRepository, CosmosLearnerModelRepository>();
         services.AddSingleton<ITutorLlmTelemetry, NullTutorLlmTelemetry>();
+        services.AddSingleton<IContentReleaseTelemetry, ApplicationInsightsContentReleaseTelemetry>();
+        services.AddSingleton(new ContentReleaseOptions(
+            configuration["CONTENT_RELEASE_ENVIRONMENT"]
+            ?? context.HostingEnvironment.EnvironmentName));
         var tutorLlmEnabled = string.Equals(configuration["TUTOR_LLM_ENABLED"], "true", StringComparison.OrdinalIgnoreCase);
         if (tutorLlmEnabled)
         {
@@ -183,6 +194,7 @@ var host = new HostBuilder()
         }
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IContentService, ContentService>();
+        services.AddScoped<IContentReleaseService, ContentReleaseService>();
         services.AddScoped<IQuizService, QuizService>();
         services.AddScoped<ILeaderboardService, LeaderboardService>();
         services.AddScoped<IPathService, PathService>();

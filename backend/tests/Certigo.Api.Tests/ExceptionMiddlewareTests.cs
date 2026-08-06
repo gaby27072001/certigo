@@ -52,6 +52,23 @@ public sealed class ExceptionMiddlewareTests
     }
 
     [Fact]
+    public async Task ForbiddenException_MapsTo403_ProblemDetails()
+    {
+        var middleware = CreateMiddleware();
+        var invocation = FunctionTestHarness.CreateHttp();
+
+        await middleware.Invoke(invocation.Context, _ => throw new ForbiddenException("Operator role required."));
+
+        invocation.Response.Should().NotBeNull();
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var problem = await invocation.ReadProblemAsync();
+        problem!.Status.Should().Be(403);
+        problem.Title.Should().Be("Forbidden");
+        problem.Detail.Should().Be("Operator role required.");
+    }
+
+    [Fact]
     public async Task RateLimitedException_MapsTo429_ProblemDetails()
     {
         var middleware = CreateMiddleware();

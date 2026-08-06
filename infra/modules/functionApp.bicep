@@ -6,6 +6,10 @@
 param functionAppName string
 param location string
 
+@description('Logical content release environment. It scopes the atomic active-manifest pointer.')
+@allowed(['dev', 'staging', 'prod'])
+param environmentName string
+
 @description('Storage account (in this RG) used by the Functions runtime.')
 param storageAccountName string
 
@@ -25,7 +29,7 @@ param keyVaultName string
 param cosmosAccountName string
 
 @description('Authentication mode. "dev" enables the permissive dev token validator (safe default for local/dev); "prod" enforces Entra External ID token validation. Set to "prod" in staging/production once the Entra External ID tenant is configured. Any value other than "dev" also enables Entra validation.')
-@allowed([ 'dev', 'prod', '' ])
+@allowed(['dev', 'prod', ''])
 param authMode string = 'dev'
 
 @description('Entra External ID authority URL. Format: https://<domain>.ciamlogin.com/<tenant-id>/v2.0. Replace with the value from Azure Portal → External ID tenant → Overview. Leave empty until the tenant is created.')
@@ -59,7 +63,7 @@ param tutorLlmMaxOutputTokens int = 400
 param tags object = {}
 
 @description('CORS allowed origins. Native mobile clients are not subject to CORS, so this can be [] (none) for staging/prod; dev passes ["*"] for browser-based tooling.')
-param allowedCorsOrigins array = [ '*' ]
+param allowedCorsOrigins array = ['*']
 
 @description('Azure Communication Services Email data-plane endpoint. Empty disables managed-identity email sending (the API then uses a logging no-op, so sign-up still works).')
 param acsEmailEndpoint string = ''
@@ -137,6 +141,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         // local.settings.json.example): COSMOS_ENDPOINT, ENTRA_AUTHORITY, etc.
         { name: 'COSMOS_ENDPOINT', value: cosmosEndpoint }
         { name: 'COSMOS_DATABASE', value: 'certigo' }
+        { name: 'CONTENT_RELEASE_ENVIRONMENT', value: environmentName }
         // "dev" => permissive DevTokenValidator (dev env only); "prod" (or any non-"dev" value) => Entra.
         { name: 'AUTH_MODE', value: authMode }
         // Azure Functions defaults the hosting environment to "Production", so the dev-validator
@@ -224,24 +229,43 @@ resource vaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 }
 
 // Grant the Function App's managed identity Cosmos DB data-plane access via the
-// built-in "Cosmos DB Built-in Data Contributor" SQL role. Required because the
-// API authenticates to Cosmos with its managed identity (DefaultAzureCredential),
-// not account keys. Without this assignment every Cosmos call returns 403.
+// built-in "Cosmos DB Built-in Data Contributor" SQL role, scoped independently
+// to each application container. This avoids the former account-wide grant and
+// makes the private answer-key boundary explicit in RBAC as well as storage.
 resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' existing = {
   name: cosmosAccountName
 }
 
 var cosmosDataContributorRoleId = '${cosmosAccount.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+var legacyCosmosDataAccessName = guid(cosmosAccount.id, functionApp.id, '00000000-0000-0000-0000-000000000002')
+var cosmosContainerNames = [
+  'users'
+  'content'
+  'content-releases-public'
+  'content-releases-private'
+  'progress'
+  'attempts'
+  'events'
+  'leaderboard'
+  'economy'
+  'friends'
+]
 
-resource cosmosDataAccess 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-11-15' = {
-  parent: cosmosAccount
-  name: guid(cosmosAccount.id, functionApp.id, '00000000-0000-0000-0000-000000000002')
-  properties: {
-    roleDefinitionId: cosmosDataContributorRoleId
-    principalId: functionApp.identity.principalId
-    scope: cosmosAccount.id
+resource cosmosDataAccess 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-11-15' = [
+  for containerName in cosmosContainerNames: {
+    parent: cosmosAccount
+    // Reuse the former account-wide assignment identity so incremental deployments
+    // narrow it instead of leaving an orphaned broad grant.
+    name: containerName == 'users'
+      ? legacyCosmosDataAccessName
+      : guid(cosmosAccount.id, functionApp.id, '00000000-0000-0000-0000-000000000002', containerName)
+    properties: {
+      roleDefinitionId: cosmosDataContributorRoleId
+      principalId: functionApp.identity.principalId
+      scope: '${cosmosAccount.id}/dbs/certigo/colls/${containerName}'
+    }
   }
-}
+]
 
 output functionAppName string = functionApp.name
 output defaultHostName string = functionApp.properties.defaultHostName

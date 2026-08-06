@@ -35,6 +35,11 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
             logger.LogInformation("Authentication failed in function {FunctionName}.", context.FunctionDefinition.Name);
             await WriteProblemAsync(context, HttpStatusCode.Unauthorized, "Unauthorized", ex.Message, correlationId);
         }
+        catch (ForbiddenException ex)
+        {
+            logger.LogWarning("Forbidden request in function {FunctionName}.", context.FunctionDefinition.Name);
+            await WriteProblemAsync(context, HttpStatusCode.Forbidden, "Forbidden", ex.Message, correlationId);
+        }
         catch (RateLimitedException ex)
         {
             logger.LogWarning("Rate limit hit in function {FunctionName}.", context.FunctionDefinition.Name);
@@ -61,6 +66,14 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
         catch (TrackNotFoundException ex)
         {
             await WriteProblemAsync(context, HttpStatusCode.NotFound, "Track not found", ex.Message, correlationId);
+        }
+        catch (ContentReleaseValidationException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.BadRequest, "Invalid content release", ex.Message, correlationId);
+        }
+        catch (ContentReleaseNotFoundException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.NotFound, "Content release not found", ex.Message, correlationId);
         }
         catch (Exception ex)
         {

@@ -64,6 +64,8 @@ resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15
 var containers = [
   { name: 'users', pk: '/id' }
   { name: 'content', pk: '/trackId' }
+  { name: 'content-releases-public', pk: '/partitionKey' }
+  { name: 'content-releases-private', pk: '/partitionKey' }
   { name: 'progress', pk: '/userId' }
   { name: 'attempts', pk: '/userId' }
   { name: 'events', pk: '/userId' }
@@ -87,6 +89,15 @@ resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
         indexingPolicy: {
           indexingMode: 'consistent'
           automatic: true
+          excludedPaths: c.name == 'content-releases-public' ? [
+            { path: '/contentBase64/?' }
+            { path: '/history/*' }
+          ] : contains([
+              'content'
+              'content-releases-private'
+            ], c.name) ? [
+              { path: '/contentBase64/?' }
+            ] : []
         }
       }
     }

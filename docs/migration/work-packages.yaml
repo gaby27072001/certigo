@@ -393,8 +393,8 @@ work_packages:
       - "Instrumenter import, promotion, rejet et rollback dans Application Insights."
     dod: "Import répété sans doublon ; hash invalide rejeté avant mutation ; rollback N-1 testé en staging ; tests HTTP anti-fuite verts ; le backend expose le manifestId public actif."
     rollback: "Réactiver le manifeste précédent ; conserver les artefacts immuables et ne supprimer aucune version pendant le lot."
-    status: in_progress
-    notes: "Source : gchambaud_microsoft/Certigo#244. Implémentation active dans la session dédiée 5cf299a4-4f53-453a-8d1d-671f70f54913."
+    status: in_review
+    notes: "Source : gchambaud_microsoft/Certigo#244. Implémentation, re-revue indépendante et gates locaux terminés sur gchambaud-microsoft-deliver-backend-releases : build Release sans avertissement, 559 tests réussis, 7 intégrations Cosmos ignorées faute d'émulateur, registre valide et Bicep compilé. La preuve staging du rollback N-1 reste requise avant done."
 
   - id: wp-p2-05
     phase: 2

@@ -34,20 +34,26 @@ internal sealed class TestFunctionContext : FunctionContext
         set => _items = value;
     }
 
-    public static TestFunctionContext Authenticated(string userId = "user-1", string displayName = "Tester")
+    public static TestFunctionContext Authenticated(
+        string userId = "user-1",
+        string displayName = "Tester",
+        params string[] roles)
     {
         var context = new TestFunctionContext();
-        context.Items["User"] = CreatePrincipal(userId, displayName);
+        context.Items["User"] = CreatePrincipal(userId, displayName, roles);
         return context;
     }
 
-    private static ClaimsPrincipal CreatePrincipal(string userId, string displayName)
+    private static ClaimsPrincipal CreatePrincipal(
+        string userId,
+        string displayName,
+        IReadOnlyList<string> roles)
         => new(new ClaimsIdentity(
             new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, userId),
                 new Claim(ClaimTypes.Name, displayName),
-            },
+            }.Concat(roles.Select(role => new Claim(ClaimTypes.Role, role))),
             authenticationType: "test"));
 }
 

@@ -49,6 +49,7 @@ public sealed class EntraTokenValidator : ITokenValidator
                 ValidateIssuer = true,
                 ValidateIssuerSigningKey = true,
                 ValidateLifetime = true,
+                RoleClaimType = "roles",
                 ClockSkew = TimeSpan.FromMinutes(2)
             }, out _);
 

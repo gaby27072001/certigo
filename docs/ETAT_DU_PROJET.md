@@ -21,10 +21,10 @@
 | 📅 Rafraîchi le | **2026‑08‑06** (réconciliation du registre avec les PR content #7/#8 et les lots actifs) |
 | 🔖 Reflète | `origin/main` à **0e30b7a** + les transitions documentaires de la branche `wp-p2-01` ; voir `docs/migration/STATE.md` pour le détail des lots |
 | 🌿 Branche du doc | `gchambaud-microsoft-reconcile-migration-docs` |
-| 📈 Activité | Phase 1 réconciliée ; `wp-p2-02` et `wp-p2-03` terminés ; `wp-p2-04`, `wp-p2-07` et `wp-p2-09` en cours |
+| 📈 Activité | Phase 1 réconciliée ; `wp-p2-02` et `wp-p2-03` terminés ; `wp-p2-04` bloqué par le runner local avant validation/livraison ; `wp-p2-07` et `wp-p2-09` en cours |
 | 🧪 Tests | Suites backend, mobile, contenu, Cortex et infrastructure exécutées par les workflows dédiés ; tests Cosmos émulateur‑gated |
-| 🧩 API | **18 groupes** de Functions (+ `GET /health`) · **34 endpoints** HTTP |
-| 🗄️ Données | **8 containers Cosmos DB** (serverless ; profil avec **ETag** concurrence optimiste) |
+| 🧩 API | **19 groupes** de Functions (+ `GET /health`) · **39 endpoints** HTTP |
+| 🗄️ Données | **10 containers Cosmos DB** (serverless ; releases public/privé séparées et profil avec **ETag** concurrence optimiste) |
 | 🏗️ Infra | **8 modules Bicep** + params **dev/staging/prod** — `dev`, `prod` et CI déployés ; `staging` reste à provisionner |
 | 🤖 CI/CD | **17 workflows** GitHub Actions (15 actifs + 2 legacy iOS manuels inertes par défaut), dont les gates backend, mobile, contenu, registre de migration, Cortex, infra, sécurité, résilience runners et déploiement |
 | 🔒 Durcissement | Idempotence atomique · ETag · garde auth dev · `/health` + correlation id · CORS/KV/Storage par env |
@@ -35,7 +35,7 @@
 
 | Brique | Statut | Où | En clair |
 |---|:---:|---|---|
-| **API backend** | 🟢 | `backend/src/Certigo.Api` | Azure Functions .NET 8 isolé, **18 groupes / 34 endpoints**. |
+| **API backend** | 🟢 | `backend/src/Certigo.Api` | Azure Functions .NET 8 isolé, **19 groupes / 39 endpoints**. |
 | **Moteurs métier** | 🟢 | `backend/src/Certigo.Domain` | Logique **pure & testée** : contenu, progression, gamification, examen, tuteur, reco, notifications, intégrité. |
 | **Contenu pédagogique** | 🟢 | [`certigo-content`](https://github.com/gchambaud_microsoft/certigo-content) | Source éditoriale active du corpus migré : contenu public, `answerKey`, schémas et manifeste immuable. `content/` est un instantané historique. |
 | **Gamification** | 🟢 | Domain `Gamification/` | XP, streak (+réparation), ligues hebdo, **saisons**, quêtes, succès, boutique, amis. |
@@ -130,6 +130,7 @@ flowchart LR
 | **Notifications intelligentes** | 🟢 | 🟡 | `GET /me/notifications/plan` + réglages ; meilleure heure d'envoi estimée. |
 | **Anti‑triche / intégrité** | 🟢 | — | Évaluateur déterministe (mode détection, événement `attempt.flagged`). **Fenêtre de cadence** (XP/tentatives sur 1 h, conteneur `attempts`) câblée pour **quiz et examens** → détecteurs de débit actifs. |
 | **Offline‑first** | 🟢 | 🟢 | Synchro idempotente rejouable, backoff. |
+| **Releases de contenu** | 🟡 | — | Implémentation en branche : import public/privé vérifié, promotion atomique par environnement, historique et rollback N-1 par `manifestId`, aucune route privée mobile. Validation et PR bloquées par le runner local. |
 | **Authentification** | 🟢 | 🟢 | Microsoft / Google / Apple via Entra External ID (Android + iOS natifs câblés). |
 
 > **Lecture clé :** l'écart backend ↔ UI est désormais **comblé pour la gamification** : saisons, quêtes,
@@ -155,7 +156,7 @@ présenté ni utilisé comme source éditoriale active.
 
 ---
 
-## 6 · Surface API (34 endpoints · 18 groupes)
+## 6 · Surface API (39 endpoints · 19 groupes)
 
 ```mermaid
 graph TD
