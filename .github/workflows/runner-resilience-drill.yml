@@ -28,17 +28,30 @@ concurrency:
 jobs:
   probe:
     name: Probe selected resilience path
-    runs-on: ${{ inputs.mode == 'github-hosted-break-glass' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    # workflow_dispatch can target another ref. Refuse branch-modified workflow
+    # code on the persistent runner; drills are always launched from main.
+    if: ${{ github.ref == 'refs/heads/main' }}
+    # A hosted runner is selected only after an explicit EMU exception has been
+    # recorded in the break-glass variable. Otherwise the self-hosted job fails
+    # closed in the validation step without consuming hosted capacity.
+    runs-on: ${{ inputs.mode == 'github-hosted-break-glass' && vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
     steps:
       - name: Validate runner selection
         shell: bash
         env:
           DRILL_MODE: ${{ inputs.mode }}
+          HOSTED_FALLBACK_ENABLED: ${{ vars.CI_GITHUB_HOSTED_FALLBACK }}
           EXPECTED_OFFLINE_RUNNER: ${{ inputs.expected_offline_runner }}
           CURRENT_RUNNER_NAME: ${{ runner.name }}
           RUNNER_KIND: ${{ runner.environment }}
         run: |
           set -euo pipefail
+
+          if [ "$DRILL_MODE" = "github-hosted-break-glass" ] &&
+            [ "$HOSTED_FALLBACK_ENABLED" != "true" ]; then
+            echo "::error::CI_GITHUB_HOSTED_FALLBACK must be true after an approved EMU exception."
+            exit 1
+          fi
 
           if [ "$DRILL_MODE" = "self-hosted-failover" ]; then
             if [ -z "$EXPECTED_OFFLINE_RUNNER" ]; then

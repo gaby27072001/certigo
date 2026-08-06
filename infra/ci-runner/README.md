@@ -1,14 +1,15 @@
-# Egress réseau du runner CI — Infrastructure-as-Code
+# Runners CI — Infrastructure-as-Code
 
-Ce dossier réconcilie en Bicep le **chemin d'egress (sortie Internet) du runner GitHub
-Actions auto-hébergé** de Certigo. Tout y est nommé en français pour rester aligné
+Ce dossier réconcilie en Bicep les **VM GitHub Actions auto-hébergées** de Certigo et
+leur **chemin d'egress (sortie Internet)**. Tout y est nommé en français pour rester aligné
 avec le reste des livrables ; les noms de ressources Azure reprennent ceux du portail.
 
 ## Pourquoi
 
 Les runners hébergés par GitHub sont **désactivés par la politique d'entreprise EMU**.
 La CI s'exécute donc sur un pool de machines virtuelles Azure auto-hébergées
-(dont `vm-certigo-runner`, dans le groupe de ressources `rg-certigo-ci`). Ces
+(dont `vm-certigo-runner` et `vm-certigo-runner-2`, dans le groupe de ressources
+`rg-certigo-ci`). Ces
 machines **n'ont aucune IP publique propre** : leur seul accès à Internet passe par une
 **Passerelle NAT (NAT Gateway)** attachée à leur sous-réseau. Le runbook de redondance,
 de failover et de preuve opérationnelle est dans
@@ -42,33 +43,53 @@ Passerelle NAT nat-certigo  ──►  IP publique pip-certigo-nat (20.86.156.64
 | `snet-runners` | Sous-réseau (`10.42.1.0/24`) | La carte réseau du runner s'y rattache ; associé à la Passerelle NAT + NSG |
 | `vnet-certigo-ci-snet-runners-nsg-westeurope` | Groupe de sécurité réseau (NSG) | Vide (règles Azure par défaut) ; conservé pour matcher l'état réel |
 
-## Ce qui n'est **pas** géré ici (volontairement)
+## Périmètre IaC
 
-Un déploiement de **groupe de ressources** est **incrémentiel** : les ressources non
-déclarées ne sont **jamais** touchées. Sont donc laissées à leur gestion propre :
-la machine virtuelle `vm-certigo-runner`, sa carte réseau, son disque OS.
+Deux modèles complémentaires sont versionnés :
+
+- `network.bicep` réconcilie l'egress partagé sans toucher aux VM existantes ;
+- `runner.bicep` reconstruit une VM, sa NIC privée, son disque et son identité managée.
+  Il référence le sous-réseau existant et exécute `bootstrap.sh` au premier démarrage.
+
+`runner.bicep` sert à créer une nouvelle instance ou à reconstruire une instance
+préalablement supprimée. **Ne pas l'appliquer au nom d'une VM vivante** : les propriétés
+de profil OS d'une VM existante sont immuables. Le runbook de reconstruction, les preuves
+et le rollback sont dans
+[`docs/CI_RUNNER_RESILIENCE.md`](../../docs/CI_RUNNER_RESILIENCE.md).
 
 > ⚠️ **Ne jamais déployer ce modèle en mode « complet » (Complete)** : il supprimerait
 > tout ce qui n'est pas listé (dont la VM, sa carte réseau et son disque).
 
-## Drift IaC — finding G de l'audit
+## Configuration reproductible et provenance
 
-L'audit de sécurité (finding **G**) relève que l'infrastructure CI est déployée **hors
-IaC**. Cette réconciliation ne couvre volontairement que le **chemin d'egress réseau**
-(les 5 ressources du tableau ci-dessus) ; les **machines virtuelles runners** restent
-gérées à la main. Ce périmètre est un choix assumé :
+La reconstruction n'utilise ni image mutable implicite, ni jeton dans l'IaC :
 
-- **Réseau en IaC** (`network.bicep`) : figé en code, car sa destruction accidentelle
-  casserait la CI de façon permanente. C'est le risque prioritaire.
-- **VMs runners hors IaC** (drift **documenté, non résolu ici**) : les capturer en Bicep
-  sans leur configuration vivante (image, taille, cloud-init, enregistrement du runner
-  GitHub, secrets d'inscription) produirait une IaC **inexacte** — plus risqué que le
-  drift actuel. Réconciliation reportée en **Phase 2** (module VM dédié + `what-if`).
-- **Écart d'inventaire** : le finding mentionne « **2 VMs** » alors que ce README ne
-  décrit qu'un seul runner (`vm-certigo-runner`). À lever avant tout module VM :
-  inventorier le groupe (`az vm list -g rg-certigo-ci -o table`) pour confirmer le nombre
-  réel de runners et rapprocher la liste des candidats au nettoyage (section « Dérive
-  constatée » ci-dessous).
+- `imageVersion` est obligatoire et doit être une version Marketplace exacte ;
+- les tags et sorties Azure enregistrent la version d'image et le SHA-256 du bootstrap
+  réellement incorporé ;
+- Ubuntu 24.04, Trusted Launch, Secure Boot, vTPM et un disque Premium de 128 Gio sont
+  déclarés ;
+- `availabilityZone` permet de répartir les instances redondantes entre zones ;
+- le runner GitHub `2.336.0` est téléchargé depuis la release officielle et vérifié avec
+  son SHA-256 publié dans l'API GitHub ; la mise à jour automatique est désactivée et une
+  nouvelle version épinglée est réconciliée lors de la réexécution du bootstrap ;
+- Azure CLI `2.89.0` vient du dépôt APT Microsoft signé ; la clé initiale est refusée si
+  son empreinte ne correspond pas à l'empreinte versionnée ;
+- les téléchargements directs de Bicep et d'actionlint dans les workflows sont eux aussi
+  refusés si leur SHA-256 officiel ne correspond pas ;
+- les actions tierces du probe quotidien et les checkouts des workflows modifiés sont
+  épinglés à leur SHA de commit complet, avec le tag majeur conservé en commentaire ;
+- le jeton d'enregistrement GitHub, éphémère, n'entre jamais dans Bicep, `customData`, un
+  fichier ou l'historique de commande ;
+- le bootstrap est idempotent : paquets, binaire, configuration et service sont
+  réconciliés, tandis qu'un changement implicite de dépôt ou de nom est refusé ;
+- l'utilisateur de service dispose de `sudo` sans mot de passe, nécessaire aux jobs qui
+  installent des prérequis ; le fork-guard et l'approbation `pr-ci` restent donc des
+  contrôles obligatoires avant toute exécution de code de PR.
+
+Les SDK de workload restent épinglés par les actions de setup de chaque workflow. Le
+workflow quotidien `runner-health.yml` les installe puis vérifie GitHub, NuGet, pub.dev,
+npm, Azure, l'espace disque et les commandes nécessaires.
 
 > À noter : le compte **Azure OpenAI** (`certigo-openai`), autre ressource en drift citée
 > par le finding G, est lui **réintégré en IaC** dans ce livrable via
@@ -123,5 +144,5 @@ Les fausses différences réglables (`ddosSettings` héritée du VNet sur l'IP p
 `privateEndpointVNetPolicies` sur le réseau virtuel) ont déjà été **explicitées** dans le
 modèle : le réseau virtuel et le NSG ressortent donc en **« aucun changement »**.
 
-La compilation est aussi vérifiée automatiquement en CI par le pipeline `ci-infra`
-(`az bicep build --file infra/ci-runner/network.bicep`).
+La compilation des deux modèles, la syntaxe Bash et les tests du probe sont vérifiés par
+`ci-infra`.
