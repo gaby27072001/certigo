@@ -10,15 +10,11 @@
 //   example -> ScenarioBlock        <unmatched / malformed> -> PrismBlockFallback
 //   code    -> CodeBlock                                       (3 reasons)
 //
-// HERMETICITY (critical): the shared toolchain cannot compile `google_fonts`,
-// which is pulled in *only* by `lib/src/tokens/prism_typography.dart`. So this
-// suite imports each concrete component from `package:prism_ui/src/...`
-// directly and NEVER goes through the package barrel, the renderer registry, or
-// any test harness that would transitively load typography. Blocks are pumped
-// in a plain [MaterialApp] whose text theme is Flutter's default test font
-// (uniform placeholder glyphs) — that IS the font neutralisation that keeps the
-// captures deterministic across platforms. Shadows are disabled and a tolerant
-// comparator (see `test/flutter_test_config.dart`) absorbs sub-pixel jitter.
+// HERMETICITY: this suite imports each concrete component directly and pumps
+// blocks in a plain [MaterialApp] whose text theme is Flutter's default test
+// font. Keeping global typography out of these captures makes them deterministic
+// across platforms. Shadows are disabled and a tolerant comparator (see
+// `test/flutter_test_config.dart`) absorbs sub-pixel jitter.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

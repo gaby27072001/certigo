@@ -23,10 +23,8 @@
 // is a no-op on geometry — the ISO guarantee the migration must hold.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-// Direct src import (not the barrel) so this test never compiles
-// prism_typography.dart, whose google_fonts dependency has a const-eval bug that
-// breaks compilation on some local toolchains. prism_spacing.dart is a leaf
-// token file importing only flutter, so the net stays green locally and in CI.
+// Direct leaf import keeps this geometry contract independent from unrelated
+// theme and component compilation.
 import 'package:prism_ui/src/tokens/prism_spacing.dart';
 
 Widget _host(Widget child, {required Brightness brightness}) {

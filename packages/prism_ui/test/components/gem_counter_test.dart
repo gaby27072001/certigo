@@ -5,8 +5,6 @@ import 'package:prism_ui/prism_ui.dart';
 import '../support/prism_harness.dart';
 
 void main() {
-  setUpAll(disableGoogleFontsFetching);
-
   group('GemCounter', () {
     testWidgets('renders the gem total verbatim under a thousand', (WidgetTester tester) async {
       await pumpPrism(tester, const GemCounter(gems: 500));

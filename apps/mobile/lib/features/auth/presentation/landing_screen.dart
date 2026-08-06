@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import 'widgets/get_started_sheet.dart';
@@ -86,30 +85,85 @@ class _LandingScreenState extends State<LandingScreen> with SingleTickerProvider
     // Couleurs = teinte de marque de chaque logo (glow de la puce).
     final List<_OrbitSpec> specs = <_OrbitSpec>[
       // Anneau interne — les trois hyperscalers en tête.
-      _OrbitSpec.brand(FontAwesomeIcons.microsoft, const Color(0xFF0067B8),
-          ring: 0, angle: deg(-90), size: 52),
-      _OrbitSpec.brand(FontAwesomeIcons.aws, const Color(0xFFFF9900),
-          ring: 0, angle: deg(40), size: 46),
-      _OrbitSpec.brand(FontAwesomeIcons.google, const Color(0xFF4285F4),
-          ring: 0, angle: deg(165), size: 46),
+      _OrbitSpec.brand(
+        PrismBrandIcons.microsoft,
+        const Color(0xFF0067B8),
+        ring: 0,
+        angle: deg(-90),
+        size: 52,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.aws,
+        const Color(0xFFFF9900),
+        ring: 0,
+        angle: deg(40),
+        size: 46,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.google,
+        const Color(0xFF4285F4),
+        ring: 0,
+        angle: deg(165),
+        size: 46,
+      ),
       // Anneau médian — outils & plateformes IT.
-      _OrbitSpec.brand(FontAwesomeIcons.docker, const Color(0xFF2496ED),
-          ring: 1, angle: deg(-58), size: 48),
-      _OrbitSpec.brand(FontAwesomeIcons.python, const Color(0xFF3776AB),
-          ring: 1, angle: deg(8), size: 44),
-      _OrbitSpec.brand(FontAwesomeIcons.linux, const Color(0xFF1F2937),
-          ring: 1, angle: deg(118), size: 48),
-      _OrbitSpec.brand(FontAwesomeIcons.github, const Color(0xFF181717),
-          ring: 1, angle: deg(210), size: 44),
+      _OrbitSpec.brand(
+        PrismBrandIcons.docker,
+        const Color(0xFF2496ED),
+        ring: 1,
+        angle: deg(-58),
+        size: 48,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.python,
+        const Color(0xFF3776AB),
+        ring: 1,
+        angle: deg(8),
+        size: 44,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.linux,
+        const Color(0xFF1F2937),
+        ring: 1,
+        angle: deg(118),
+        size: 48,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.github,
+        const Color(0xFF181717),
+        ring: 1,
+        angle: deg(210),
+        size: 44,
+      ),
       // Anneau externe — langages & écosystèmes.
-      _OrbitSpec.brand(FontAwesomeIcons.apple, const Color(0xFF111111),
-          ring: 2, angle: deg(-100), size: 46),
-      _OrbitSpec.brand(FontAwesomeIcons.java, const Color(0xFFE76F00),
-          ring: 2, angle: deg(-20), size: 46),
-      _OrbitSpec.brand(FontAwesomeIcons.android, const Color(0xFF3DDC84),
-          ring: 2, angle: deg(70), size: 44),
-      _OrbitSpec.brand(FontAwesomeIcons.node, const Color(0xFF339933),
-          ring: 2, angle: deg(160), size: 46),
+      _OrbitSpec.brand(
+        PrismBrandIcons.apple,
+        const Color(0xFF111111),
+        ring: 2,
+        angle: deg(-100),
+        size: 46,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.java,
+        const Color(0xFFE76F00),
+        ring: 2,
+        angle: deg(-20),
+        size: 46,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.android,
+        const Color(0xFF3DDC84),
+        ring: 2,
+        angle: deg(70),
+        size: 44,
+      ),
+      _OrbitSpec.brand(
+        PrismBrandIcons.node,
+        const Color(0xFF339933),
+        ring: 2,
+        angle: deg(160),
+        size: 46,
+      ),
     ];
 
     final int n = specs.length;
@@ -231,9 +285,7 @@ class _LandingScreenState extends State<LandingScreen> with SingleTickerProvider
                           const SizedBox(height: PrismSpacing.lg),
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 420),
-                            child: _CommencerButton(
-                              onPressed: () => showGetStartedSheet(context),
-                            ),
+                            child: _CommencerButton(onPressed: () => showGetStartedSheet(context)),
                           ),
                           const SizedBox(height: PrismSpacing.xs),
                           TextButton(
@@ -284,9 +336,15 @@ class _LandingBackdrop extends StatelessWidget {
       child: Stack(
         children: <Widget>[
           Positioned(
-              top: -140, left: -90, child: _Glow(color: p.primary.withOpacity(0.22), size: 360)),
+            top: -140,
+            left: -90,
+            child: _Glow(color: p.primary.withOpacity(0.22), size: 360),
+          ),
           Positioned(
-              top: -40, right: -120, child: _Glow(color: p.ember.withOpacity(0.16), size: 320)),
+            top: -40,
+            right: -120,
+            child: _Glow(color: p.ember.withOpacity(0.16), size: 320),
+          ),
           Positioned(
             bottom: -160,
             left: 10,
@@ -344,10 +402,7 @@ class _BrandChip extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[
-            Color.alphaBlend(Colors.white.withOpacity(0.5), body),
-            body,
-          ],
+          colors: <Color>[Color.alphaBlend(Colors.white.withOpacity(0.5), body), body],
         ),
         border: Border.all(color: Colors.white.withOpacity(0.7)),
         boxShadow: <BoxShadow>[
@@ -360,7 +415,7 @@ class _BrandChip extends StatelessWidget {
         ],
       ),
       alignment: Alignment.center,
-      child: FaIcon(icon, size: size * 0.46, color: tint),
+      child: Icon(icon, size: size * 0.46, color: tint),
     );
   }
 }
@@ -515,10 +570,9 @@ class _CommencerButtonState extends State<_CommencerButton> {
             ),
             child: Text(
               'Commencer',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
             ),
           ),
         ),

@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 env:
-  FLUTTER_VERSION: "3.27.4"
+  FLUTTER_VERSION: "3.44.4"
   NON_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","certigo-ci"]' }}
 
 jobs:
@@ -83,8 +83,8 @@ jobs:
       - uses: dart-lang/setup-dart@v1
         with:
           # Pinned for reproducible CI (matches the Dart bundled with Flutter
-          # 3.27.4). Bump deliberately alongside FLUTTER_VERSION.
-          sdk: "3.6.0"
+          # 3.44.4). Bump deliberately alongside FLUTTER_VERSION.
+          sdk: "3.12.2"
       - name: Get dependencies
         working-directory: packages/${{ matrix.package }}
         run: dart pub get
@@ -148,13 +148,18 @@ jobs:
             fi
           done
         continue-on-error: true
+      - name: Set up repository formatter
+        uses: dart-lang/setup-dart@v1
+        with:
+          # Formatting normalization is intentionally a separate migration.
+          sdk: "3.6.0"
+      - name: Format check
+        run: dart format --line-length 100 --set-exit-if-changed apps packages
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      - name: Format check
-        run: dart format --line-length 100 --set-exit-if-changed apps packages
       - name: Pub get (app)
         working-directory: apps/mobile
         run: flutter pub get
@@ -178,14 +183,8 @@ jobs:
   prism-goldens:
     name: Prism UI renderer goldens
     needs: [changes]
-    # prism_ui déclare `flutter_lints ^6.0.0` (dev_dependency) qui exige Dart SDK
-    # ^3.8.0. Le `FLUTTER_VERSION: 3.27.4` partagé au niveau workflow embarque
-    # Dart 3.6.2 → `flutter pub get` échoue à la résolution AVANT même de rendre
-    # les goldens. On surcharge la version Flutter UNIQUEMENT pour CE job (valeur
-    # recommandée par le solveur pub, fournit Dart >= 3.8.0) sans toucher aux jobs
-    # `packages`/`app` volontairement épinglés sur Dart 3.6.x.
-    env:
-      FLUTTER_VERSION: "3.44.5"
+    # Uses the same Flutter/Dart toolchain as the app and package jobs so
+    # dependency resolution and golden rendering cannot drift independently.
     # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
     # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
     # n'autorise le job QUE si la PR vient du même repo (branche interne). Les

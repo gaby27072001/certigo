@@ -1,0 +1,72 @@
+name: Runner daily health
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runner-daily-health
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Egress, disk and SDK probe
+    # A dispatch against a feature/fork ref must not execute branch code on the
+    # persistent runner. Scheduled and approved manual probes use main only.
+    if: ${{ github.ref == 'refs/heads/main' }}
+    timeout-minutes: 45
+    env:
+      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
+    # EMU policy keeps this on the redundant self-hosted pool. There is no PR
+    # trigger, so untrusted fork code cannot reach a persistent runner.
+    runs-on: ${{ vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1
+        with:
+          sdk: "3.6.0"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: "3.27.4"
+          channel: stable
+          cache: true
+
+      - name: Install verified Bicep CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          BICEP_DIR="$RUNNER_TEMP/bicep"
+          BICEP_FILE="$BICEP_DIR/bicep"
+          mkdir -p "$BICEP_DIR"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$BICEP_FILE" \
+            https://github.com/Azure/bicep/releases/download/v0.44.1/bicep-linux-x64
+          echo "e17dc9a9888184886bb0c0051a3230b83b19f342749999f707bc571c3dfd2f45  $BICEP_FILE" \
+            | sha256sum --check --strict
+          chmod +x "$BICEP_FILE"
+          echo "$BICEP_DIR" >> "$GITHUB_PATH"
+
+      - name: Probe GitHub, package registries, Azure, disk and tools
+        shell: bash
+        env:
+          MIN_FREE_GB: "10"
+        run: bash infra/ci-runner/health-probe.sh

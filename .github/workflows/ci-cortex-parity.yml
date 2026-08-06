@@ -93,9 +93,9 @@ jobs:
           fi
       - uses: dart-lang/setup-dart@v1
         with:
-          # Epingle pour une CI reproductible (Dart livre avec Flutter 3.27.4).
+          # Epingle pour une CI reproductible (Dart livre avec Flutter 3.44.4).
           # A bumper deliberement avec FLUTTER_VERSION de ci-mobile.
-          sdk: "3.6.0"
+          sdk: "3.12.2"
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"

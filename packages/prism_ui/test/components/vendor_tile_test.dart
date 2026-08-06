@@ -5,8 +5,6 @@ import 'package:prism_ui/prism_ui.dart';
 import '../support/prism_harness.dart';
 
 void main() {
-  setUpAll(disableGoogleFontsFetching);
-
   group('VendorLogo', () {
     testWidgets('draws a stylised mark for every vendor', (WidgetTester tester) async {
       await pumpPrism(

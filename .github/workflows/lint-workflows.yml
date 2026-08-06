@@ -26,13 +26,31 @@ jobs:
     environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
     runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install actionlint
         run: |
-          curl -sSfL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
-            | tar xz -C /tmp
-          chmod +x /tmp/actionlint
+          set -euo pipefail
+          ACTIONLINT_DIR="$RUNNER_TEMP/actionlint"
+          ACTIONLINT_ARCHIVE="$ACTIONLINT_DIR/actionlint.tar.gz"
+          mkdir -p "$ACTIONLINT_DIR"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$ACTIONLINT_ARCHIVE" \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $ACTIONLINT_ARCHIVE" \
+            | sha256sum --check --strict
+          tar xzf "$ACTIONLINT_ARCHIVE" -C "$ACTIONLINT_DIR"
+          chmod +x "$ACTIONLINT_DIR/actionlint"
+          echo "$ACTIONLINT_DIR" >> "$GITHUB_PATH"
 
       - name: Validate all workflows
-        run: /tmp/actionlint .github/workflows/*.yml
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          workflows=(.github/workflows/*.yml .github/workflows/*.yaml)
+          if [ "${#workflows[@]}" -eq 0 ]; then
+            echo "::error::No workflow files found under .github/workflows."
+            exit 1
+          fi
+          /tmp/actionlint "${workflows[@]}"

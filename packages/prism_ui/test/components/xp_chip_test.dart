@@ -5,8 +5,6 @@ import 'package:prism_ui/prism_ui.dart';
 import '../support/prism_harness.dart';
 
 void main() {
-  setUpAll(disableGoogleFontsFetching);
-
   group('XpChip', () {
     testWidgets('abbreviates large totals', (WidgetTester tester) async {
       await pumpPrism(tester, const XpChip(xp: 1200));

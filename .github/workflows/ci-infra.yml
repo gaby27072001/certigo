@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
-    paths: [ "infra/**", ".github/workflows/ci-infra.yml" ]
+    paths: [ "infra/**", ".github/workflows/ci-infra.yml", ".github/workflows/runner-health.yml" ]
   pull_request:
-    paths: [ "infra/**", ".github/workflows/ci-infra.yml" ]
+    paths: [ "infra/**", ".github/workflows/ci-infra.yml", ".github/workflows/runner-health.yml" ]
 
 concurrency:
   group: ci-infra-${{ github.ref }}
@@ -29,15 +29,20 @@ jobs:
     environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
     runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       # CI-09 : le runner-2 n'a PAS l'Azure CLI (`az`). On installe le CLI Bicep
       # standalone dans un répertoire écrivable ($RUNNER_TEMP) et on l'ajoute au PATH,
       # de sorte que le lint fonctionne à l'identique sur les DEUX runners.
       - name: Install Bicep CLI
         run: |
+          set -euo pipefail
           BICEP_DIR="$RUNNER_TEMP/bicep"
           mkdir -p "$BICEP_DIR"
-          curl -sSL -o "$BICEP_DIR/bicep" https://github.com/Azure/bicep/releases/download/v0.44.1/bicep-linux-x64
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$BICEP_DIR/bicep" \
+            https://github.com/Azure/bicep/releases/download/v0.44.1/bicep-linux-x64
+          echo "e17dc9a9888184886bb0c0051a3230b83b19f342749999f707bc571c3dfd2f45  $BICEP_DIR/bicep" \
+            | sha256sum --check --strict
           chmod +x "$BICEP_DIR/bicep"
           echo "$BICEP_DIR" >> "$GITHUB_PATH"
           "$BICEP_DIR/bicep" --version
@@ -45,6 +50,10 @@ jobs:
         run: bicep build infra/main.bicep --stdout > /dev/null
       - name: Build ci-runner network.bicep
         run: bicep build infra/ci-runner/network.bicep --stdout > /dev/null
+      - name: Build ci-runner runner.bicep
+        run: bicep build infra/ci-runner/runner.bicep --stdout > /dev/null
+      - name: Validate ci-runner bootstrap and health probe
+        run: bash infra/ci-runner/validate.sh
       - name: Lint params
         run: bicep build-params infra/params/dev.bicepparam --stdout > /dev/null
       - name: Lint params (staging)

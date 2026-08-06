@@ -20,11 +20,11 @@ param cosmosLocation string = ''
 @description('Base name used to derive resource names. Lowercase, no spaces.')
 param appName string = 'certigo'
 
-@description('Entra External ID authority URL. Format: https://<domain>.ciamlogin.com/<tenant-id>/v2.0. Replace with the value from Azure Portal → External ID tenant → Overview. Leave empty until the tenant is created.')
+@description('Entra External ID authority URL. Format: https://<domain>.ciamlogin.com/<tenant-id>/v2.0. Replace with the value from Azure Portal -> External ID tenant -> Overview. Leave empty until the tenant is created.')
 @secure()
 param entraAuthority string = ''
 
-@description('Entra External ID application (audience) client ID — the App Registration client ID. Replace with the value from Azure Portal → External ID → App registrations → <your-app> → Overview. Leave empty until configured.')
+@description('Entra External ID application (audience) client ID — the App Registration client ID. Replace with the value from Azure Portal -> External ID -> App registrations -> <your-app> -> Overview. Leave empty until configured.')
 @secure()
 param entraAudience string = ''
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')

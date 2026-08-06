@@ -12,18 +12,15 @@
 // it is a stable ISO guarantee for the migrations rather than a brittle golden.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-// Direct src imports (not the barrel) so this test never compiles
-// prism_typography.dart, whose google_fonts dependency has a const-eval bug that
-// breaks compilation on some local toolchains. PrismCard and PrismColorScheme both
-// import only flutter + leaf token files, so the net stays green locally and in CI.
+// Direct imports keep this geometry contract independent from unrelated
+// typography and component compilation.
 import 'package:prism_ui/src/components/prism_card.dart';
 import 'package:prism_ui/src/theme/prism_color_scheme.dart';
 import 'package:prism_ui/src/tokens/prism_radii.dart';
 
-// Builds the theme via the PrismColorScheme extension directly instead of
-// PrismTheme.light()/.dark(), which would pull in typography (google_fonts).
-// PrismCard reads geometry-relevant state from `context.prism`, which resolves the
-// extension below — so the card's shape is exercised without the typography layer.
+// Builds the minimum theme via PrismColorScheme. PrismCard reads
+// geometry-relevant state from `context.prism`, so the card's shape is exercised
+// without coupling this contract to the complete application theme.
 Widget _host(Widget child, {required Brightness brightness}) {
   final PrismColorScheme scheme =
       brightness == Brightness.dark ? PrismColorScheme.dark : PrismColorScheme.light;

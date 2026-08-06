@@ -5,8 +5,6 @@ import 'package:prism_ui/prism_ui.dart';
 import '../support/prism_harness.dart';
 
 void main() {
-  setUpAll(disableGoogleFontsFetching);
-
   Widget buildField({bool reduceMotion = true}) {
     return MediaQuery(
       data: MediaQueryData(disableAnimations: reduceMotion),
