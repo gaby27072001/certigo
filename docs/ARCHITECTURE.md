@@ -16,8 +16,10 @@ Ce document décrit l'architecture de référence du monorepo : frontend Flutter
    testables sans I/O, dupliquées à l'identique client/serveur.
 3. **Le serveur est l'autorité.** La notation des quiz, le calcul du Readiness Score et
    l'attribution d'XP sont recalculés côté API ; le client n'en fait qu'une projection optimiste.
-4. **Le contenu est du code.** Tracks et leçons sont du YAML versionné, validé en CI, compilé
-   vers Cosmos par un pipeline de seed.
+4. **Le contenu est du code.** Le dépôt
+   [`certigo-content`](https://github.com/gchambaud_microsoft/certigo-content) est la source
+   éditoriale active : contenu public, clés de correction, schémas et manifeste y sont versionnés
+   et validés avant publication. Le dossier `content/` de ce monorepo est historique.
 5. **Le design est un package.** Prism est isolé (`packages/prism_ui`) et réutilisable.
 
 ---
@@ -168,25 +170,22 @@ Exemple AZ-900 — poids des domaines : `cloud-concepts 0.28`, `architecture-ser
 ## 7. Contenu *as-code*
 
 ```
-content/
-├─ schema/
-│  ├─ track.schema.json     # structure d'un track (domaines pondérés, unités, leçons)
-│  └─ lesson.schema.json    # structure d'une leçon (blocs typés + checks)
-└─ az-900/
-   ├─ track.yaml
-   └─ lessons/
-      ├─ capex-opex.lesson.yaml
-      ├─ shared-responsibility.lesson.yaml
-      └─ cloud-models.lesson.yaml
+certigo-content/             # dépôt éditorial actif
+├─ content/public/questions/ # payloads publics, sans réponses
+├─ content/answerKey/solutions/ # clés de correction privées
+├─ schemas/                  # contrats versionnés
+└─ tools/                    # validation et génération du manifeste immuable
+
+Certigo/content/             # instantané historique, non éditorial
 ```
 
-- **Blocs de leçon typés** : `hook → concept → example → code → check → recap` — la boucle
-  pédagogique matérialisée dans la donnée.
-- **Validation CI** (`tools/validate_content.mjs`, ajv) : conformité aux schémas, intégrité
-  référentielle (chaque leçon citée existe), et **somme des poids de domaine = 1.0**.
-- **Pipeline de seed** (`tools/seed_content.py`) : compile le YAML en documents Cosmos et
-  **sépare la clé de réponse** dans un document `answerKey` côté serveur. Le document `lesson`
-  livré au client est dépouillé de `correct`/`explanation`.
+- **Source de vérité** : toute évolution éditoriale passe par une PR dans `certigo-content`.
+- **Séparation public/privé** : les payloads servis au client ne contiennent aucune réponse ;
+  les `answerKey` restent côté serveur.
+- **Validation et publication** : la CI du dépôt éditorial valide les schémas et l'intégrité,
+  puis produit un manifeste immuable adressable par hash.
+- **Compatibilité** : `Certigo/content/` et ses outils de seed historiques restent disponibles
+  pendant la transition, sans constituer une source éditoriale concurrente.
 
 ---
 
@@ -221,11 +220,13 @@ modules. `params/dev.bicepparam` porte les valeurs d'environnement.
 
 ## 10. CI/CD
 
-Douze workflows au total (10 actifs, 2 historiques iOS désactivés) ciblés par chemin ou par événement (voir `.github/workflows/`) :
-`ci-mobile`, `ci-backend`, `ci-content`, `ci-infra`, `cd-backend`, `codeql`,
-`lint-workflows`, `release-android`, `security-scan`, `promote-backend-staging-prod`. Les workflows iOS GitHub Actions
-`release-ios` et `sync-ios-certs` sont désactivés et conservés comme historique ; la
-chaîne iOS active passe par Codemagic.
+17 workflows au total (15 actifs, 2 legacy iOS manuels et inertes par défaut) ciblés par chemin ou par événement (voir `.github/workflows/`) :
+`ci-mobile`, `ci-backend`, `ci-content`, `ci-cortex-parity`, `ci-infra`,
+`ci-migration-registry`, `cd-backend`, `codeql`, `dependency-vuln-scan`,
+`deploy-privacy-policy`, `lint-workflows`, `release-android`, `security-scan`,
+`promote-backend-staging-prod`, `runner-resilience-drill`. Les workflows iOS GitHub Actions
+`release-ios` et `sync-ios-certs` sont conservés comme historique ; ils exigent
+l'opt-in manuel `enable_legacy_workflow=true`. La chaîne iOS active passe par Codemagic.
 
 ---
 
@@ -236,7 +237,7 @@ chaîne iOS active passe par Codemagic.
 | ADR-01 | Azure Functions isolated plutôt qu'un service hébergé permanent | coût serverless, scaling à zéro, alignement « jobs » |
 | ADR-02 | Cosmos DB plutôt que SQL relationnel | données documentaires (leçons/progression), partition par utilisateur, latence faible |
 | ADR-03 | Cortex dupliqué client/serveur | UX optimiste sans sacrifier l'autorité serveur |
-| ADR-04 | Contenu *as-code* YAML | revue par PR, validation CI, pas de CMS à maintenir au départ |
+| ADR-04 | Contenu *as-code* dans `certigo-content` | source éditoriale dédiée, revue par PR, validation CI, pas de CMS à maintenir |
 | ADR-05 | Pas de codegen Dart au départ | fichiers auto-suffisants, squelette robuste ; migration freezed possible plus tard |
 | ADR-06 | Pas de cœurs / vies dans la gamification | éviter la frustration ; motiver la régularité, pas la punition |
 | ADR-011 | Intégrité serveur-autoritatif : `userId` **toujours** issu du JWT (jamais du corps de requête) + idempotence par `clientAttemptId` et ids déterministes sur récompenses/achats | empêcher l'usurpation d'identité côté client et le double-crédit sur rejeu réseau (voir §12.1) |

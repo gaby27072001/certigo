@@ -1,6 +1,6 @@
 {
   "id": "wp-p1-13-staging-environment",
-  "status": "in_review",
+  "status": "todo",
   "session_id": "3a7e6f1c-db41-4342-9907-f75a1daad567",
   "branch": "gchambaud-microsoft-p1-13-staging-entra-config",
   "pr": {
@@ -9,10 +9,10 @@
   },
   "head": "4d65d61559e6cac4534433a21c88d137cb9cafc8",
   "checkpoint": {
-    "step": "fix_kv_naming",
-    "note": "Fix infra: nom Key Vault staging depassait 24 car. (kv-certigo-staging- + suffixe 6 = 25). Suffixe adaptatif min(6, 24-len(prefix)) => staging 5 car. (nom 24 valide), dev/prod inchanges (6 car., vaults live intacts). az bicep build exit 0. Correctif sur main.bicep uniquement, PR #232 (ready for review).",
-    "at": "2026-07-18T15:59:08+01:00"
+    "step": "live-dod-not-satisfied",
+    "note": "PR #232 fournit une configuration IaC partielle, mais staging n'est pas déployé, /health n'est pas vérifié et la dépendance wp-p1-12 reste todo.",
+    "at": "2026-08-05T20:52:00+01:00"
   },
-  "updated_at": "2026-07-18T15:59:08+01:00",
+  "updated_at": "2026-08-05T20:52:00+01:00",
   "history_ref": "log.jsonl"
 }

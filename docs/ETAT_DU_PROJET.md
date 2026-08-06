@@ -4,7 +4,7 @@
 
 **Le « Duolingo des certifications Microsoft » — apprendre Azure / IA / sécurité par micro‑leçons gamifiées.**
 
-`🟢 Backend riche` · `🟢 Contenu 89 certifs` · `🟢 Gamification` · `🟡 Tuteur IA (LLM réel ⏳ validation live)` · `🟢 Offline‑first` · `🟢 Mobile : écrans branchés` · `🟡 Infra non déployée`
+`🟢 Backend riche` · `🟢 Contenu migré (certigo-content)` · `🟢 Gamification` · `🟡 Tuteur IA (LLM réel ⏳ validation live)` · `🟢 Offline‑first` · `🟢 Mobile : écrans branchés` · `🟢 Infra dev/prod/CI` · `🟡 Staging à provisionner`
 
 </div>
 
@@ -18,15 +18,15 @@
 
 | Repère | Valeur |
 |---|---|
-| 📅 Rafraîchi le | **2026‑06‑29** (CI qualité : builds reproductibles · scan CVE pub · Checkov hard-fail · validateur contenu renforcé · protection branche main) |
-| 🔖 Reflète | HEAD post‑audit + **D8 examen** + **écrans mobiles gamification** + **P2 CI qualité** — voir `AUDIT_CERTIGO.md` §M (remédiation appliquée) |
-| 🌿 Branche du doc | `gchambaud-microsoft-ci-quality-builds-cve-content-doc` |
-| 📈 Activité | **163+ commits**, du 2026‑06‑19 au 2026‑06‑29 — rythme très soutenu |
-| 🧪 Tests | backend **325** exécutés (xUnit, dont concurrence/auth/parité/anti‑triche) + **6** d'intégration Cosmos (émulateur‑gated) · Dart **185** (unit + widget, dont golden Cortex) |
-| 🧩 API | **18 groupes** de Functions (+ `GET /health`) · **≈ 29 endpoints** HTTP |
+| 📅 Rafraîchi le | **2026‑08‑06** (réconciliation du registre avec les PR content #7/#8 et les lots actifs) |
+| 🔖 Reflète | `origin/main` à **0e30b7a** + les transitions documentaires de la branche `wp-p2-01` ; voir `docs/migration/STATE.md` pour le détail des lots |
+| 🌿 Branche du doc | `gchambaud-microsoft-reconcile-migration-docs` |
+| 📈 Activité | Phase 1 réconciliée ; `wp-p2-02` et `wp-p2-03` terminés ; `wp-p2-04`, `wp-p2-07` et `wp-p2-09` en cours |
+| 🧪 Tests | Suites backend, mobile, contenu, Cortex et infrastructure exécutées par les workflows dédiés ; tests Cosmos émulateur‑gated |
+| 🧩 API | **18 groupes** de Functions (+ `GET /health`) · **34 endpoints** HTTP |
 | 🗄️ Données | **8 containers Cosmos DB** (serverless ; profil avec **ETag** concurrence optimiste) |
-| 🏗️ Infra | **9 modules Bicep** + params **dev/staging/prod** — durcie par env, **pas encore déployée** |
-| 🤖 CI/CD | **12 workflows** GitHub Actions (10 actifs + 2 historiques iOS désactivés) : backend · mobile · contenu · infra · CD backend · CodeQL · lint-workflows · release-android · security-scan · promote-staging-prod (runner self-hosted Azure ; SBOM + gate release) |
+| 🏗️ Infra | **8 modules Bicep** + params **dev/staging/prod** — `dev`, `prod` et CI déployés ; `staging` reste à provisionner |
+| 🤖 CI/CD | **17 workflows** GitHub Actions (15 actifs + 2 legacy iOS manuels inertes par défaut), dont les gates backend, mobile, contenu, registre de migration, Cortex, infra, sécurité, résilience runners et déploiement |
 | 🔒 Durcissement | Idempotence atomique · ETag · garde auth dev · `/health` + correlation id · CORS/KV/Storage par env |
 
 ---
@@ -35,9 +35,9 @@
 
 | Brique | Statut | Où | En clair |
 |---|:---:|---|---|
-| **API backend** | 🟢 | `backend/src/Certigo.Api` | Azure Functions .NET 8 isolé, **17 groupes / ≈ 28 endpoints**. |
+| **API backend** | 🟢 | `backend/src/Certigo.Api` | Azure Functions .NET 8 isolé, **18 groupes / 34 endpoints**. |
 | **Moteurs métier** | 🟢 | `backend/src/Certigo.Domain` | Logique **pure & testée** : contenu, progression, gamification, examen, tuteur, reco, notifications, intégrité. |
-| **Contenu pédagogique** | 🟢 | `content/` | **89 certifications actives · 144 leçons** en YAML, validées par schémas JSON. |
+| **Contenu pédagogique** | 🟢 | [`certigo-content`](https://github.com/gchambaud_microsoft/certigo-content) | Source éditoriale active du corpus migré : contenu public, `answerKey`, schémas et manifeste immuable. `content/` est un instantané historique. |
 | **Gamification** | 🟢 | Domain `Gamification/` | XP, streak (+réparation), ligues hebdo, **saisons**, quêtes, succès, boutique, amis. |
 | **Tuteur IA** | 🟡 | Domain `Tutor/` + mobile `features/tutor` | Explications ancrées sur le contenu — **branché côté serveur ET mobile** (`tutor_sheet`). LLM réel **Azure OpenAI / Microsoft Foundry** (`AzureOpenAiTutorCompletion`, déploiement `gpt-5.4-mini`, surface API **v1**, auth **Entra ID** clé désactivée) derrière `ITutorCompletion`, activé par `TUTOR_LLM_ENABLED=true` (sinon repli déterministe `NullTutorCompletion`) ; **code prêt, compilé, couvert par `TutorCompletionTests`**. **RBAC à accorder en `dev`** (rôle _Cognitive Services OpenAI User_ sur `certigo-openai`, identité managée de `func-certigo-dev`) et **activé en `dev`** via `infra/params/dev.bicepparam` ; reste à valider **un appel réel** (`POST /tutor/explain` → 200 + explication LLM authentique) avant de basculer en 🟢. Voir H19. |
 | **Recommandation + coach** | 🟢 | Domain `Recommendation/` + `home/coach_section` | Moteur « next best » + coach IA sur l'accueil. |
@@ -46,10 +46,10 @@
 | **Offline‑first** | 🟢 | `packages/data` (sync) + `app/offline` | File de synchro idempotente, backoff, rejouable — **câblée dans l'app**. *(Seule la leçon en cours est disponible hors‑ligne pour l'instant ; la synchronisation complète du catalogue est planifiée — P3.)* |
 | **Authentification** | 🟢 | API `Middleware/` + mobile `features/auth` | **Microsoft / Google / Apple** fédérés derrière **Entra External ID**, JWT validé serveur. |
 | **Design system (Prism)** | 🟢 | `packages/prism_ui` | **28 composants** + tokens + thèmes (look « néon doux »). |
-| **App mobile (Flutter)** | 🟢 | `apps/mobile` | **62 fichiers Dart**, 15 features. Tous les moteurs de gamification (saisons, quêtes, succès, boutique, amis, examens) désormais **branchés en écran** + tests widget. Reste la validation E2E sur appareil. |
+| **App mobile (Flutter)** | 🟢 | `apps/mobile` | 15 features. Tous les moteurs de gamification (saisons, quêtes, succès, boutique, amis, examens) sont **branchés en écran** + tests widget. Reste la validation E2E sur appareil. |
 | **Cortex (algos partagés)** | 🟢 | `packages/cortex` | SRS, scoring, fil pédagogique — partagé client/serveur. |
 | **Infrastructure (Bicep)** | 🟢 | `infra/` | 8 modules (Functions, Cosmos, Key Vault, App Insights, **Defender, Policy, Diagnostics**, Storage). **Déployée en `dev`** (`rg-certigo-dev`, westeurope). |
-| **CI / qualité** | 🟢 | `.github/workflows` | **12 workflows** (10 actifs + 2 historiques iOS désactivés) : backend · mobile · contenu · infra · CD backend · CodeQL · lint-workflows · release-android · security-scan · promote-staging-prod. **Builds reproductibles** : SDK Dart épinglé `3.5.0` · .NET épinglé `8.0.x`. **Scan CVE** : NuGet + Flutter pub (nightly). **Checkov hard-fail** (skip justifiés dans `.checkov.yaml`). |
+| **CI / qualité** | 🟢 | `.github/workflows` | **17 workflows** (15 actifs + 2 legacy iOS manuels inertes par défaut) : gates backend, mobile, contenu, registre de migration, Cortex, infra, sécurité, dépendances, résilience runners et déploiement. **Checkov hard-fail** (skip justifiés dans `.checkov.yaml`). |
 
 **Légende :** 🟢 opérationnel & testé · 🟡 partiel / en cours · 🔴 absent.
 
@@ -64,14 +64,15 @@ graph TD
     ROOT --> BE["⚙️ backend/<br/>Azure Functions .NET 8"]
     ROOT --> APP["📱 apps/mobile/<br/>App Flutter"]
     ROOT --> PKG["🧩 packages/<br/>Paquets Dart partagés"]
-    ROOT --> CNT["📚 content/<br/>89 certifs · 144 leçons (YAML)"]
+    ROOT -.-> CNT["📚 certigo-content<br/>source éditoriale active"]
+    ROOT --> HIST["content/<br/>instantané historique"]
     ROOT --> INF["🏗️ infra/<br/>8 modules Bicep"]
-    ROOT --> CI[".github/workflows/<br/>12 workflows (10 actifs + 2 historiques)"]
+    ROOT --> CI[".github/workflows/<br/>17 workflows (15 actifs + 2 legacy opt-in)"]
     ROOT --> DOC["📄 docs/<br/>README · ARCHITECTURE · ÉTAT"]
 
-    BE --> API["Certigo.Api<br/>17 groupes de Functions"]
+    BE --> API["Certigo.Api<br/>18 groupes de Functions"]
     BE --> DOM["Certigo.Domain<br/>moteurs métier purs"]
-    BE --> TST["Certigo.Tests<br/>325 tests (+6 Cosmos émulateur)"]
+    BE --> TST["Certigo.Tests<br/>unitaires + intégration Cosmos gated"]
 
     PKG --> CORE["core/ — base commune"]
     PKG --> CORTEX["cortex/ — SRS & scoring"]
@@ -141,20 +142,20 @@ flowchart LR
 
 ```mermaid
 graph LR
-    C["📚 content/"] --> ACT["89 certifications actives"]
-    C --> RICH["5 tracks complets<br/>AZ-900 · AZ-104 · AI-900 · DP-900 · SC-900"]
-    C --> MIN["84 tracks catalogue<br/>1 leçon d'amorçage chacun"]
+    E["📚 certigo-content<br/>source éditoriale active"] --> P["Payloads publics"]
+    E --> K["answerKey privés"]
+    E --> S["Schémas versionnés"]
+    E --> M["Manifeste immuable<br/>adressable par hash"]
+    H["Certigo/content/<br/>instantané historique"] -. "compatibilité seulement" .-> E
 ```
 
-| Couverture | Domaines | Leçons | Format |
-|---|:---:|:---:|---|
-| **Tracks complets existants** | 21 (cumul) | 60 | `content/{az-900,az-104,ai-900,dp-900,sc-900}` |
-| **Tracks catalogue ajoutés** | 1 chacun | 84 | `content/<certification-active>/track.yaml` + `lessons/*.lesson.yaml` |
-| **Total** | — | **144** | **89 certifications actives** validées par `content/schema/{lesson,track}.schema.json` |
+Les PR éditoriales, la validation des schémas et la publication du manifeste sont réalisées dans
+`gchambaud_microsoft/certigo-content`. Le dossier `content/` de ce monorepo ne doit plus être
+présenté ni utilisé comme source éditoriale active.
 
 ---
 
-## 6 · Surface API (≈ 28 endpoints · 17 groupes)
+## 6 · Surface API (34 endpoints · 18 groupes)
 
 ```mermaid
 graph TD
@@ -264,19 +265,25 @@ graph TD
 
 | Workflow | Rôle |
 |---|---|
-| `ci-backend.yml` | Build + **325 tests** xUnit (.NET 8) + **6** d'intégration Cosmos (émulateur‑gated). |
-| `ci-mobile.yml` | Analyse + **185 tests** Dart (unit + widget) ; Flutter **3.24.0** / Dart **3.5.0** épinglés. |
+| `ci-backend.yml` | Build + tests xUnit (.NET 8) + intégration Cosmos émulateur‑gated. |
+| `ci-mobile.yml` | Analyse + tests Dart unitaires/widget, dont le gate de golden tests Prism. |
 | `ci-content.yml` | Validation des leçons/certifs contre les schémas JSON. |
+| `ci-migration-registry.yml` | Cohérence des statuts, états et dépendances du registre de migration. |
+| `ci-cortex-parity.yml` | Parité des règles Cortex entre Dart et .NET sur vecteurs partagés. |
 | `ci-infra.yml` | Lint / what‑if Bicep. |
+| `runner-resilience-drill.yml` | Drill manuel de bascule du pool self-hosted ou du repli break-glass autorisé. |
 | `cd-backend.yml` | Déploiement backend vers l'environnement cible. |
 | `codeql.yml` | Analyse statique de sécurité. |
+| `dependency-vuln-scan.yml` | Scan des vulnérabilités de dépendances. |
+| `deploy-privacy-policy.yml` | Publication de la politique de confidentialité. |
 | `lint-workflows.yml` | Lint des workflows GitHub Actions du dépôt. |
+| `promote-backend-staging-prod.yml` | Promotion contrôlée du backend staging → prod. |
 | `release-android.yml` | AAB Android signé + publication Google Play. |
 | `security-scan.yml` | Scan sécurité complémentaire (NuGet + Bicep). |
 
 > `release-ios.yml` et `sync-ios-certs.yml` sont conservés comme références
-> historiques mais sont désactivés ; la chaîne iOS active est gérée par
-> Codemagic.
+> historiques. Ils sont inertes par défaut et exigent l'opt-in manuel
+> `enable_legacy_workflow=true` ; la chaîne iOS active est gérée par Codemagic.
 
 > ⚠️ CI exécutée **uniquement sur le runner self‑hosted Azure** (`certigo-ci`) — les runners
 > GitHub‑hébergés sont désactivés par la politique d'entreprise. Egress via NAT Gateway `nat-certigo` (RG `rg-certigo-ci`).
@@ -296,6 +303,8 @@ graph TD
 
 | Date | Évolution |
 |---|---|
+| 2026‑08‑06 | 📦 **Phase 2 avancée** : `wp-p2-02` et `wp-p2-03` sont `done` après fusion des PR `certigo-content` #7/#8 ; `wp-p2-04`, `wp-p2-07` et `wp-p2-09` sont en cours dans leurs sessions dédiées. |
+| 2026‑08‑05 | 📚 **Registre de migration réconcilié** : seuls les lots Phase 1 dont la DoD complète est satisfaite sont alignés à `done` dans le manifeste, les états JSON et la vue humaine ; les lots incomplets restent ouverts même si une PR associée a été fusionnée. Démarrage de `wp-p2-01` documentaire ; `wp-p2-02..09` ont alors été enregistrés à `todo`, avant leur exécution dans des sessions distinctes. |
 | 2026‑06‑29 | 🧪 **Tests Cosmos exécutés sur émulateur réel** : 6 cas `Certigo.Infrastructure.Tests` lancés (0 ignoré) sur l'émulateur Docker `vnext-preview` (ARM64, HTTPS) → **5/6 verts** ; le 6e (agrégat `GetRecentActivityAsync`) bute sur une limite _vnext-preview_ (`RewrittenAggregateProjections`), pas un bug prod (classic amd64 inutilisable sur ARM64 : `exec format error` / segfault QEMU). ✅ **Couverture HTTP des 15 Functions** restantes ajoutée (faux services + harness) → suite globale **496** verte. |
 | 2026‑06‑28 | 🛟 **Repli CI backend (audit #1)** : repli `ubuntu-latest` pré‑câblé (inerte par défaut) sur le job `build-test` de `ci-backend.yml`, piloté par la variable repo `BACKEND_CI_FALLBACK` — comportement self‑hosted inchangé ; activation conditionnée à la réactivation des runners GitHub‑hébergés (cf. §11). |
 | 2026‑06‑24 | 📱 **Écrans gamification mobile** : saisons · quêtes · succès · boutique · amis · examens blancs branchés (couche data + providers + router) → 6 écrans + 6 tests widget ; suite Dart **185** verte. 🧪 **Tests d'intégration Cosmos** (`Certigo.Infrastructure.Tests`, 6 cas émulateur‑gated, skippés proprement hors émulateur). |
@@ -329,7 +338,7 @@ graph TD
 - 🟡 Streak‑repair, ligues, notifications : partiellement exposés.
 
 **Chantiers techniques :**
-- 🏗️ **Déployer l'infra** Bicep sur un environnement reproductible (aujourd'hui décrite seulement).
+- 🏗️ **Provisionner `staging`** par Bicep et valider `/health` ; `dev`, `prod` et CI sont déjà déployés.
 - 🔐 **Valider l'auth de bout en bout** sur un vrai tenant Entra External ID (E2E).
 - 🔍 **Faire passer l'anti‑triche** du mode détection au mode application des sanctions (lot suivant) — la **fenêtre de cadence** (débit XP/tentatives sur 1 h) est désormais câblée pour **quiz et examens** ; reste la calibration puis la bascule en mode sanction.
 - ✅ **Tests d'intégration Cosmos exécutés sur émulateur réel** (le projet `Certigo.Infrastructure.Tests` est gated `CERTIGO_COSMOS_TESTS=1`). Les **6 cas ont tourné** (0 ignoré) contre l'émulateur Docker `mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview` (ARM64, HTTPS) : **5/6 verts**. Le 6e — `Attempt_recent_activity_aggregates_count_and_xp_within_window` (`CosmosAttemptRepository.GetRecentActivityAsync`, agrégat `COUNT(1)`/`SUM` projeté en objet `VALUE { … }`) — échoue **uniquement** sur l'émulateur _vnext-preview_ (back‑end PostgreSQL) avec `RewrittenAggregateProjections was not an array for a value aggregate query`. **Ce n'est pas un bug de production** : la requête est valide contre Cosmos réel et l'émulateur classic ; on **ne réécrit pas** la requête pour contourner une limite de l'émulateur preview. L'émulateur **classic amd64** est **inutilisable sur cet hôte ARM64** (`exec format error` sans QEMU ; `segfault signal 11` même avec QEMU x86_64 binfmt installé), d'où la cible 6/6 hors de portée localement — à confirmer en CI/Cosmos réel.
@@ -348,6 +357,6 @@ le même commit / la même PR** : en‑tête (date + commit reflété), Vue d'en
 fonctionnalités, contenu, API, données et **Journal d'évolution**. Pas de workflow autonome —
 la mise à jour fait partie du travail.
 
-_Dernier rafraîchissement : 2026‑06‑29 · Cosmos exécuté sur émulateur réel (5/6, vnext‑preview ARM64) + couverture HTTP des 15 Functions (suite globale 496 verts)._
+_Dernier rafraîchissement : 2026‑08‑06 · registre réconcilié avec les PR content #7/#8 et les lots Phase 2 actifs._
 
 </div>

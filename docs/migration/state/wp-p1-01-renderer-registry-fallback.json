@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-01-renderer-registry-fallback",
-  "status": "in_review",
+  "status": "done",
   "session_id": "80890459-25f1-423d-b832-3ce4fc44a4e2",
   "branch": "gchambaud-microsoft-wp-p1-01-renderer-registry-fallback",
   "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/212",
   "checkpoint": {
-    "step": "code+tests livrés (commit e23c98c) ; PR draft #212 ouverte (base main)",
-    "note": "RendererRegistry dynamique + fallback robuste (ADR-003). Cœur non-throw : packages/prism_ui/lib/src/rendering/renderer_registry.dart (build() garanti sans exception → repli pour type inconnu / données malformées / schéma non supporté). Fallback visible keyé : packages/prism_ui/lib/src/rendering/block_fallback.dart (PrismBlockFallback.rootKey, block_fallback.dart:60). schemaVersion honoré via RendererSchema 'renderer/N' : packages/prism_ui/lib/src/rendering/content_block.dart. Câblage app flag-guardé (rollback) : apps/mobile/lib/features/lesson/application/lesson_renderer.dart (kUseDynamicRenderer) + apps/mobile/lib/features/lesson/presentation/widgets/step_renderer.dart. Tests hermétiques verts (+18) : packages/prism_ui/test/rendering/renderer_registry_test.dart + block_fallback_test.dart. Baseline google_fonts ROUGE pré-existante (Dart 3.12.2, hors périmètre). Diff backend/infra vide (Flutter-only).",
-    "at": "2026-07-07T01:21:37+01:00"
+    "step": "merged-pr-reconciled",
+    "note": "PR Certigo #212 fusionnée ; état réconcilié sur done par wp-p2-01.",
+    "at": "2026-08-05T19:45:16+01:00"
   },
-  "updated_at": "2026-07-07T01:21:37+01:00",
+  "updated_at": "2026-08-05T19:45:16+01:00",
   "history_ref": "log.jsonl"
 }
