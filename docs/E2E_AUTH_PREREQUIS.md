@@ -153,20 +153,9 @@ Tests **verts** exécutables via `flutter test` dans `apps/mobile` +
 - `core_test.dart` — `AppEnv.validateConfig` (prod/dev, Entra manquant/partiel,
   URL dev en prod, schéma de redirection…).
 
-**Blocage connu (skew d'environnement local, PAS un bug du dépôt)** : les tests
-**widget** ne compilent pas sur **cette machine locale** (Flutter **3.44.4** /
-Dart 3.12) parce que `IconData` y est devenu `final` et que `FontWeight` a perdu
-son `==` primitif — ce qui casse `font_awesome_flutter` 10.7.0 et `google_fonts`
-6.2.1. **Mais la CI de test (`ci-mobile.yml`) utilise Flutter 3.27.4**, où les
-pins actuels **compilent** : les tests widget (dont `sign_in_screen_test.dart`)
-sont **verts en CI**. Le pin `font_awesome_flutter: 10.7.0` est **intentionnel**
-(voir commentaire `apps/mobile/pubspec.yaml`).
-
-Correctif **non trivial** : le seul `font_awesome_flutter` réparant `IconData`
-final est la **majeure v11** (Font Awesome 7.2.0), avec **breaking changes**
-(`FaIconData` n'implémente plus `IconData` ; `FaIcon` exige `FaIconData` ;
-`find.byIcon` requiert `.data`) → migration de tous les usages d'icônes +
-`google_fonts` ≥ 6.3 + montée coordonnée de `FLUTTER_VERSION`. Hors périmètre
-auth. **Recommandé** : exécuter les tests widget en CI (3.27.4) ou installer
-Flutter 3.27.4 en local (fvm), plutôt qu'un bump de dépendances.
-
+**Blocage historique résolu par le sous-lot #155** : les tests widget échouaient
+sous Flutter 3.44.x à cause de `font_awesome_flutter 10.7.0` (`IconData final`)
+et `google_fonts 6.2.1` (`FontWeight` sans opérateur primitif). Prism embarque
+désormais les trois familles typographiques et la seule police de marques
+nécessaire, avec licences et checksums. Les écrans d'auth ne dépendent donc plus
+de ces deux packages et restent compilables sur les SDK app et Prism.

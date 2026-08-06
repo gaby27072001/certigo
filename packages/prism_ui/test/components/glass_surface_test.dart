@@ -5,8 +5,6 @@ import 'package:prism_ui/prism_ui.dart';
 import '../support/prism_harness.dart';
 
 void main() {
-  setUpAll(disableGoogleFontsFetching);
-
   group('GlassSurface', () {
     testWidgets('renders its child and blurs by default', (WidgetTester tester) async {
       await pumpPrism(tester, const GlassSurface(child: Text('Frosted')));

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// Prism typography — a three-voice type system.
 ///
@@ -13,8 +12,15 @@ import 'package:google_fonts/google_fonts.dart';
 class PrismTypography {
   const PrismTypography._();
 
+  static const String _displayFontFamily = 'PlusJakartaSans';
+  static const String _bodyFontFamily = 'Inter';
+  static const String _monoFontFamily = 'JetBrainsMono';
+
   static TextTheme build(Color primary, Color secondary) {
-    TextStyle display(double size, FontWeight weight, double height) => GoogleFonts.plusJakartaSans(
+    TextStyle display(double size, FontWeight weight, double height) =>
+        TextStyle(
+          fontFamily: _displayFontFamily,
+          package: 'prism_ui',
           fontSize: size,
           fontWeight: weight,
           height: height,
@@ -22,7 +28,15 @@ class PrismTypography {
           letterSpacing: -0.2,
         );
 
-    TextStyle body(double size, FontWeight weight, Color color, double height) => GoogleFonts.inter(
+    TextStyle body(
+      double size,
+      FontWeight weight,
+      Color color,
+      double height,
+    ) =>
+        TextStyle(
+          fontFamily: _bodyFontFamily,
+          package: 'prism_ui',
           fontSize: size,
           fontWeight: weight,
           height: height,
@@ -46,6 +60,11 @@ class PrismTypography {
   }
 
   /// Monospace style for code blocks and inline tokens.
-  static TextStyle mono(Color color, {double size = 14}) =>
-      GoogleFonts.jetBrainsMono(fontSize: size, height: 1.5, color: color);
+  static TextStyle mono(Color color, {double size = 14}) => TextStyle(
+        fontFamily: _monoFontFamily,
+        package: 'prism_ui',
+        fontSize: size,
+        height: 1.5,
+        color: color,
+      );
 }

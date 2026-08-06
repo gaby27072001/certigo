@@ -1,11 +1,9 @@
 // Hermetic tests for the dynamic renderer core (ADR-003).
 //
 // These tests import the rendering primitives directly and pump them inside a
-// plain [MaterialApp]. They deliberately avoid the prism harness and the
-// package barrel, both of which transitively pull `google_fonts` — which fails
-// to compile under this toolchain's Dart version. The concrete `standard`
-// wiring (which does reach the real, font-backed blocks) is covered by
-// `flutter analyze` and the app integration instead.
+// plain [MaterialApp] to keep registry behavior independent from the complete
+// theme. The concrete `standard` wiring is covered by `flutter analyze` and the
+// app integration instead.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prism_ui/src/rendering/block_fallback.dart';
@@ -28,7 +26,8 @@ RendererRegistry _probeRegistry({int schemaVersion = RendererSchema.current}) {
   return RendererRegistry(schemaVersion: schemaVersion)
     ..register(
       'hook',
-      (BuildContext context, ContentBlock block) => _ProbeBlock(block.requireString('body')),
+      (BuildContext context, ContentBlock block) =>
+          _ProbeBlock(block.requireString('body')),
     );
 }
 
@@ -107,7 +106,8 @@ void main() {
       expect(find.byKey(PrismBlockFallback.rootKey), findsNothing);
     });
 
-    testWidgets('falls back for an unknown block type', (WidgetTester tester) async {
+    testWidgets('falls back for an unknown block type',
+        (WidgetTester tester) async {
       await _pumpBlock(
         tester,
         _probeRegistry(),
@@ -170,11 +170,13 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('never throws even when a renderer itself misbehaves', (WidgetTester tester) async {
+    testWidgets('never throws even when a renderer itself misbehaves',
+        (WidgetTester tester) async {
       final RendererRegistry registry = RendererRegistry()
         ..register(
           'boom',
-          (BuildContext context, ContentBlock block) => throw StateError('renderer exploded'),
+          (BuildContext context, ContentBlock block) =>
+              throw StateError('renderer exploded'),
         );
 
       await _pumpBlock(

@@ -1,11 +1,9 @@
 // Hermetic tests for the canonical content-schema catalogue + validator (v2).
 //
 // These tests import the schema primitives directly and exercise them as plain
-// Dart. They deliberately avoid the prism harness and the package barrel, both
-// of which transitively pull `google_fonts` — which fails to compile under this
-// toolchain's Dart version. The portable AJV artifact
-// (`schemas/content/v2/block.schema.json`) is loaded from disk so a coherence
-// test can prove the Dart catalogue and the JSON Schema never silently drift.
+// Dart. The portable AJV artifact (`schemas/content/v2/block.schema.json`) is
+// loaded from disk so a coherence test can prove the Dart catalogue and the
+// JSON Schema never silently drift.
 import 'dart:convert';
 import 'dart:io';
 
@@ -17,7 +15,8 @@ import 'package:prism_ui/src/rendering/content_schema.dart';
 ///
 /// The catalogue-coverage test asserts every [CanonicalBlockType] appears here,
 /// so a new type cannot be added without a matching valid fixture.
-const Map<CanonicalBlockType, ContentBlock> _validFixtures = <CanonicalBlockType, ContentBlock>{
+const Map<CanonicalBlockType, ContentBlock> _validFixtures =
+    <CanonicalBlockType, ContentBlock>{
   CanonicalBlockType.hero: ContentBlock(
     type: 'hero',
     data: <String, dynamic>{'title': 'Bienvenue'},
@@ -104,7 +103,8 @@ Map<String, dynamic> _loadBlockSchema() {
 }
 
 /// The `$defs` key that describes [type]'s payload in the JSON Schema.
-String _dataDefKey(CanonicalBlockType type) => 'data_${type.wire.replaceAll('.', '_')}';
+String _dataDefKey(CanonicalBlockType type) =>
+    'data_${type.wire.replaceAll('.', '_')}';
 
 void main() {
   final ContentBlockValidator validator = ContentBlockValidator();
@@ -119,7 +119,8 @@ void main() {
 
     test('exposes a schema for every canonical type', () {
       for (final CanonicalBlockType type in CanonicalBlockType.values) {
-        expect(registry.schemaFor(type), isNotNull, reason: 'aucun schema pour ${type.wire}');
+        expect(registry.schemaFor(type), isNotNull,
+            reason: 'aucun schema pour ${type.wire}');
       }
     });
 
@@ -141,13 +142,16 @@ void main() {
       expect(_validFixtures.keys, unorderedEquals(CanonicalBlockType.values));
     });
 
-    for (final MapEntry<CanonicalBlockType, ContentBlock> entry in _validFixtures.entries) {
+    for (final MapEntry<CanonicalBlockType, ContentBlock> entry
+        in _validFixtures.entries) {
       test('accepts a minimal ${entry.key.wire} block', () {
         final SchemaValidationResult result = validator.validate(entry.value);
         expect(
           result.isValid,
           isTrue,
-          reason: result.violations.map((SchemaViolation v) => v.toString()).join('; '),
+          reason: result.violations
+              .map((SchemaViolation v) => v.toString())
+              .join('; '),
         );
         expect(validator.isValid(entry.value), isTrue);
       });
@@ -177,7 +181,8 @@ void main() {
       expect(result.isValid, isFalse);
       expect(
         result.violations.any(
-          (SchemaViolation v) => v.kind == SchemaViolationKind.missingField && v.field == 'body',
+          (SchemaViolation v) =>
+              v.kind == SchemaViolationKind.missingField && v.field == 'body',
         ),
         isTrue,
       );
@@ -191,7 +196,8 @@ void main() {
       final SchemaValidationResult result = validator.validate(block);
       expect(
         result.violations.any(
-          (SchemaViolation v) => v.kind == SchemaViolationKind.wrongFieldType && v.field == 'body',
+          (SchemaViolation v) =>
+              v.kind == SchemaViolationKind.wrongFieldType && v.field == 'body',
         ),
         isTrue,
       );
@@ -206,7 +212,8 @@ void main() {
       expect(
         result.violations.any(
           (SchemaViolation v) =>
-              v.kind == SchemaViolationKind.wrongFieldType && v.field == 'options',
+              v.kind == SchemaViolationKind.wrongFieldType &&
+              v.field == 'options',
         ),
         isTrue,
       );
@@ -221,7 +228,8 @@ void main() {
       expect(
         result.violations.any(
           (SchemaViolation v) =>
-              v.kind == SchemaViolationKind.wrongFieldType && v.field == 'answer',
+              v.kind == SchemaViolationKind.wrongFieldType &&
+              v.field == 'answer',
         ),
         isTrue,
       );
@@ -271,9 +279,13 @@ void main() {
     });
 
     test('still checks the reserved field for an unknown type', () {
-      const ContentBlock block = ContentBlock(type: 'nope', data: <String, dynamic>{'tenantId': 7});
-      final Set<SchemaViolationKind> kinds =
-          validator.validate(block).violations.map((SchemaViolation v) => v.kind).toSet();
+      const ContentBlock block =
+          ContentBlock(type: 'nope', data: <String, dynamic>{'tenantId': 7});
+      final Set<SchemaViolationKind> kinds = validator
+          .validate(block)
+          .violations
+          .map((SchemaViolation v) => v.kind)
+          .toSet();
       expect(kinds, contains(SchemaViolationKind.unknownType));
       expect(kinds, contains(SchemaViolationKind.reservedFieldMisuse));
     });
@@ -284,7 +296,8 @@ void main() {
     final ContentSchemaRegistry registry = ContentSchemaRegistry.canonicalV2();
 
     test('is a draft 2020-12 schema pinned to v2', () {
-      expect(schema[r'$schema'], 'https://json-schema.org/draft/2020-12/schema');
+      expect(
+          schema[r'$schema'], 'https://json-schema.org/draft/2020-12/schema');
       expect(schema['x-contentSchemaVersion'], 2);
       expect(
         (schema['required'] as List<dynamic>).cast<String>(),
@@ -297,25 +310,31 @@ void main() {
       expect(branches, hasLength(13));
       final List<String> consts = <String>[];
       for (final dynamic branch in branches) {
-        final Map<String, dynamic> properties =
-            (branch as Map<String, dynamic>)['properties'] as Map<String, dynamic>;
-        final Map<String, dynamic> typeSchema = properties['type'] as Map<String, dynamic>;
+        final Map<String, dynamic> properties = (branch
+            as Map<String, dynamic>)['properties'] as Map<String, dynamic>;
+        final Map<String, dynamic> typeSchema =
+            properties['type'] as Map<String, dynamic>;
         consts.add(typeSchema['const'] as String);
       }
       expect(
         consts,
         unorderedEquals(<String>[
-          for (final CanonicalBlockType type in CanonicalBlockType.values) type.wire,
+          for (final CanonicalBlockType type in CanonicalBlockType.values)
+            type.wire,
         ]),
       );
     });
 
     test('each data required array matches the Dart catalogue', () {
-      final Map<String, dynamic> defs = schema[r'$defs'] as Map<String, dynamic>;
+      final Map<String, dynamic> defs =
+          schema[r'$defs'] as Map<String, dynamic>;
       for (final CanonicalBlockType type in CanonicalBlockType.values) {
-        final Map<String, dynamic> def = defs[_dataDefKey(type)] as Map<String, dynamic>;
-        final List<String> jsonRequired = (def['required'] as List<dynamic>).cast<String>();
-        final List<String> dartRequired = registry.schemaFor(type)!.requiredFieldNames;
+        final Map<String, dynamic> def =
+            defs[_dataDefKey(type)] as Map<String, dynamic>;
+        final List<String> jsonRequired =
+            (def['required'] as List<dynamic>).cast<String>();
+        final List<String> dartRequired =
+            registry.schemaFor(type)!.requiredFieldNames;
         expect(
           jsonRequired,
           unorderedEquals(dartRequired),
@@ -325,8 +344,10 @@ void main() {
     });
 
     test('reserves tenantId as an optional string (Partie 28)', () {
-      final Map<String, dynamic> defs = schema[r'$defs'] as Map<String, dynamic>;
-      final Map<String, dynamic> tenantId = defs[kReservedTenantIdField] as Map<String, dynamic>;
+      final Map<String, dynamic> defs =
+          schema[r'$defs'] as Map<String, dynamic>;
+      final Map<String, dynamic> tenantId =
+          defs[kReservedTenantIdField] as Map<String, dynamic>;
       expect(tenantId['type'], 'string');
       expect(tenantId['minLength'], 1);
       expect(tenantId.containsKey(r'$comment'), isTrue);

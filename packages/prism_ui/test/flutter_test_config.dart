@@ -9,10 +9,8 @@
 // percentage threshold still fails hard on real, structural visual changes,
 // which is exactly what the `ci-mobile` golden gate must catch.
 //
-// This file imports only `flutter_test` + core Dart libraries. It never touches
-// the package barrel or `google_fonts`, so it does not perturb the hermetic
-// compilation units the rest of the suite relies on. For non-golden tests the
-// swapped comparator is inert (they never call `matchesGoldenFile`).
+// This file imports only `flutter_test` + core Dart libraries. For non-golden
+// tests the swapped comparator is inert (they never call `matchesGoldenFile`).
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -42,7 +40,8 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
 /// [_kGoldenDiffTolerance], and otherwise fails exactly like the default
 /// comparator (writing the usual failure artefacts for triage).
 class _TolerantGoldenComparator extends LocalFileComparator {
-  _TolerantGoldenComparator(Uri basedir) : super(Uri.parse('$basedir/flutter_test_config.dart'));
+  _TolerantGoldenComparator(Uri basedir)
+      : super(Uri.parse('$basedir/flutter_test_config.dart'));
 
   @override
   Future<bool> compare(Uint8List imageBytes, Uri golden) async {

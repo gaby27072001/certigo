@@ -28,13 +28,11 @@ dependencies:
   go_router: ^14.2.0
 
   # Platform
-  google_fonts: ">=5.0.0 <6.3.0"
   intl: ">=0.19.0 <0.21.0"
 
   # Auth — Entra External ID broker (Microsoft / Google / Apple), OIDC + PKCE
   flutter_appauth: ^8.0.0
   flutter_secure_storage: ^9.2.2
-  font_awesome_flutter: 10.7.0 # épinglé : 10.8+ exige Flutter 3.27 (Color.withValues) ; SDK CI = 3.24. 10.12 incompatible avec SDK local 3.44 (IconData final) → tests widget = CI only
 
   # Offline-first persistence & connectivity (iOS + Android)
   shared_preferences: ^2.3.0

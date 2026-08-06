@@ -5,8 +5,6 @@ import 'package:prism_ui/prism_ui.dart';
 import '../support/prism_harness.dart';
 
 void main() {
-  setUpAll(disableGoogleFontsFetching);
-
   group('PrismButton', () {
     testWidgets('fires onPressed when tapped', (WidgetTester tester) async {
       int taps = 0;

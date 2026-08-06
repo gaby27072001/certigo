@@ -10,15 +10,11 @@
 //   example -> ScenarioBlock        <unmatched / malformed> -> PrismBlockFallback
 //   code    -> CodeBlock                                       (3 reasons)
 //
-// HERMETICITY (critical): the shared toolchain cannot compile `google_fonts`,
-// which is pulled in *only* by `lib/src/tokens/prism_typography.dart`. So this
-// suite imports each concrete component from `package:prism_ui/src/...`
-// directly and NEVER goes through the package barrel, the renderer registry, or
-// any test harness that would transitively load typography. Blocks are pumped
-// in a plain [MaterialApp] whose text theme is Flutter's default test font
-// (uniform placeholder glyphs) — that IS the font neutralisation that keeps the
-// captures deterministic across platforms. Shadows are disabled and a tolerant
-// comparator (see `test/flutter_test_config.dart`) absorbs sub-pixel jitter.
+// HERMETICITY: this suite imports each concrete component directly and pumps
+// blocks in a plain [MaterialApp] whose text theme is Flutter's default test
+// font. Keeping global typography out of these captures makes them deterministic
+// across platforms. Shadows are disabled and a tolerant comparator (see
+// `test/flutter_test_config.dart`) absorbs sub-pixel jitter.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -52,7 +48,8 @@ void main() {
   /// captures it against `goldens/<name>.png`. Uses a single 16ms frame (never
   /// `pumpAndSettle`) so stateful blocks such as [CodeBlock] settle without
   /// waiting on their tap-triggered timers.
-  Future<void> pumpGolden(WidgetTester tester, Widget child, Type finderType, String name) async {
+  Future<void> pumpGolden(
+      WidgetTester tester, Widget child, Type finderType, String name) async {
     await tester.pumpWidget(
       MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -62,7 +59,8 @@ void main() {
           body: Center(
             child: SizedBox(
               width: _kBlockWidth,
-              child: SingleChildScrollView(padding: const EdgeInsets.all(16), child: child),
+              child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16), child: child),
             ),
           ),
         ),
@@ -70,7 +68,8 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 16));
 
-    await expectLater(find.byType(finderType), matchesGoldenFile('goldens/block_$name.png'));
+    await expectLater(
+        find.byType(finderType), matchesGoldenFile('goldens/block_$name.png'));
   }
 
   testWidgets('hook block golden', (tester) async {
@@ -176,7 +175,8 @@ void main() {
   testWidgets('fallback block golden — unknownType', (tester) async {
     await pumpGolden(
       tester,
-      const PrismBlockFallback(reason: BlockFallbackReason.unknownType, blockType: 'mystere'),
+      const PrismBlockFallback(
+          reason: BlockFallbackReason.unknownType, blockType: 'mystere'),
       PrismBlockFallback,
       'fallback_unknown_type',
     );

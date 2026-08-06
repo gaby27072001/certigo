@@ -2,8 +2,7 @@
 //
 // [PrismBlockFallback] is intentionally theme-free (it only depends on
 // `material.dart`), so these tests pump it inside a plain [MaterialApp] rather
-// than the prism harness. Avoiding the harness/barrel keeps `google_fonts` out
-// of the compilation unit, which the current toolchain cannot build.
+// than the Prism harness and keep this unit focused on fallback behavior.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prism_ui/src/rendering/block_fallback.dart';
@@ -16,7 +15,8 @@ Future<void> pumpFallback(WidgetTester tester, Widget child) async {
 
 void main() {
   group('PrismBlockFallback', () {
-    testWidgets('renders visibly for every reason without throwing', (WidgetTester tester) async {
+    testWidgets('renders visibly for every reason without throwing',
+        (WidgetTester tester) async {
       for (final BlockFallbackReason reason in BlockFallbackReason.values) {
         await pumpFallback(
           tester,
@@ -34,7 +34,8 @@ void main() {
       }
     });
 
-    testWidgets('names the offending block type for an unknown type', (WidgetTester tester) async {
+    testWidgets('names the offending block type for an unknown type',
+        (WidgetTester tester) async {
       await pumpFallback(
         tester,
         const PrismBlockFallback(
@@ -59,7 +60,8 @@ void main() {
       expect(find.textContaining('renderer/9'), findsOneWidget);
     });
 
-    testWidgets('shows diagnostic detail when provided', (WidgetTester tester) async {
+    testWidgets('shows diagnostic detail when provided',
+        (WidgetTester tester) async {
       await pumpFallback(
         tester,
         const PrismBlockFallback(

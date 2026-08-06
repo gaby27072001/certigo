@@ -322,6 +322,22 @@ work_packages:
     status: in_review
     notes: "Vague V3 · voie code."
 
+  # --- Phase 2 — migrations de dépendances majeures -------------------------
+  # Chaque famille majeure reste un lot/une PR autonome. Ce lot ne modifie aucun
+  # workflow afin de ne pas empiéter sur wp-p1-11 / issue #249.
+
+  - id: wp-p2-09-dependency-icons-fonts
+    phase: 2
+    title: "#155 — Dépendances icônes/polices : suppression des packages incompatibles et polices OFL embarquées dans Prism"
+    size: S
+    effort_pweeks: 0.5
+    depends_on: [wp-p0-08-e2e-auth-health-release]
+    precondition: "Inventorier les imports GoogleFonts/FontAwesome et les contraintes Flutter des jobs app/Prism. Idempotent : si aucun package google_fonts/font_awesome_flutter n'est résolu, que les trois familles Prism sont embarquées avec licences OFL et checksums, le lot est déjà fait."
+    dod: "apps/mobile et packages/prism_ui ne déclarent ni google_fonts ni font_awesome_flutter ; Plus Jakarta Sans, Inter et JetBrains Mono sont embarquées, licenciées et contrôlées par SHA-256 ; le lockfile Prism ne résout plus google_fonts ; le contrat structurel et les tests de typographie Prism passent ; aucun fichier .github/workflows n'est modifié."
+    rollback: "Revert de la PR puis flutter pub get dans apps/mobile et packages/prism_ui ; les anciens manifests, appels GoogleFonts et résolutions du lockfile Prism sont restaurés."
+    status: in_review
+    notes: "Issue #248, sous-lot #155. L'alignement Flutter/Dart + lockfile app, l'élargissement du job Prism à toute sa suite de tests, tout rafraîchissement futur des fontes et toute évolution de runners restent des lots séparés."
+
   # --- Phases 1–5 — placeholders (à décomposer au lancement) ---------------
   # Chaîne séquentielle. Chaque placeholder sera éclaté en lots XS–M au démarrage
   # de sa phase ; les DoD ci-dessous restent à préciser par sous-lot.
