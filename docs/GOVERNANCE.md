@@ -20,7 +20,8 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | `require_code_owner_reviews` (revue d'un code owner) | `false` | ⚠️ durcissement possible |
 | `require_last_push_approval` | `false` | — |
 | Checks de statut requis | ✅ oui, `strict = true` | **DoD : checks requis** |
-| Contextes requis | `Build & test`, `Flutter app + UI packages` | ✅ |
+| Contextes requis constatés avant réconciliation | `Build & test`, `Flutter app + UI packages` | ⚠️ ajouter la gate d'état |
+| Contexte cible supplémentaire | `Generated state equals committed state` | Vérifié sur chaque PR par `ci-project-state.yml` |
 | `allow_force_pushes` (push forcé) | `false` | **DoD : push direct interdit** |
 | `allow_deletions` (suppression de branche) | `false` | ✅ |
 | `enforce_admins` (appliquer aux admins) | `false` | ⚠️ durcissement possible |
@@ -36,12 +37,14 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | --- | --- | --- |
 | `Build & test` | [`.github/workflows/ci-backend.yml`](../.github/workflows/ci-backend.yml) | `Build & test` |
 | `Flutter app + UI packages` | [`.github/workflows/ci-mobile.yml`](../.github/workflows/ci-mobile.yml) | `Flutter app + UI packages` |
+| `Generated state equals committed state` | [`.github/workflows/ci-project-state.yml`](../.github/workflows/ci-project-state.yml) | `Generated state equals committed state` |
 
 ### Conclusion DoD
 
-Le **cœur de la DoD est SATISFAIT** : `main` exige une PR avec **≥ 1 revue**, des **checks
-stricts** (`Build & test` + `Flutter app + UI packages`) et **interdit le push direct**
-(`allow_force_pushes=false` + revue obligatoire ⇒ pas de `git push` direct sur `main`).
+Le **cœur de la DoD est SATISFAIT** : `main` exige une PR avec **≥ 1 revue**, des checks stricts et
+interdit le push direct (`allow_force_pushes=false` + revue obligatoire ⇒ pas de `git push` direct
+sur `main`). L'état cible versionné ajoute `Generated state equals committed state` aux deux
+contextes existants ; sa réconciliation live doit utiliser uniquement le `PATCH` étroit du §4.
 
 Restent des **gaps de durcissement** (facultatifs pour la DoD mais recommandés) traités
 en **réserve admin** au §4.
@@ -81,18 +84,16 @@ par domaine (backend, mobile, infra, `.github`, docs, registre de migration…).
 ## 4. Réserve admin — (ré)appliquer / durcir la protection
 
 > ⚠️ **Réserve** : les réglages ci-dessous nécessitent des **droits ADMIN** sur le dépôt.
-> Le lot wp-p0-07 **ne mute pas** la protection en live (choix délibéré : un changement à
-> privilèges admin n'est pas capturé dans une PR *reviewable* et pourrait perturber
-> l'orchestration). L'état cible est **versionné** dans
-> [`.github/branch-protection-main.json`](../.github/branch-protection-main.json) et
-> s'applique par la procédure suivante.
+> Ne jamais appliquer le document durci complet avec `PUT`. Une mise à jour des checks doit rester
+> limitée à `/protection/required_status_checks`, après lecture de l'état live, en conservant
+> `strict` et tous les contextes existants.
 
 ### Fichier de capture ré-appliquable
 
-[`.github/branch-protection-main.json`](../.github/branch-protection-main.json) contient
-l'**état cible durci** : identique à l'actuel, mais avec
-`enforce_admins = true`, `require_code_owner_reviews = true` et
-`required_conversation_resolution = true`.
+[`.github/branch-protection-main.json`](../.github/branch-protection-main.json) contient un
+**état cible pour revue**, incluant le contexte `Generated state equals committed state`. Ce fichier
+n'est pas une charge utile à envoyer en bloc : les champs de durcissement restent des réserves
+séparées, et seuls les checks requis sont réconciliés ici.
 
 ### Procédure pas-à-pas (admin)
 
@@ -106,13 +107,22 @@ l'**état cible durci** : identique à l'actuel, mais avec
      -H "Accept: application/vnd.github+json"
    ```
 
-3. **Appliquer l'état cible durci** (idempotent — rejoue l'ensemble de la protection) :
+3. Après que le contexte a été créé par un run de PR, **réconcilier uniquement les checks requis** :
 
    ```bash
-   gh api --method PUT \
-     repos/gchambaud_microsoft/Certigo/branches/main/protection \
+   gh api --method PATCH \
+     repos/gchambaud_microsoft/Certigo/branches/main/protection/required_status_checks \
      -H "Accept: application/vnd.github+json" \
-     --input .github/branch-protection-main.json
+     --input - <<'JSON'
+   {
+     "strict": true,
+     "contexts": [
+       "Build & test",
+       "Flutter app + UI packages",
+       "Generated state equals committed state"
+     ]
+   }
+   JSON
    ```
 
 4. **Vérifier** :
@@ -122,11 +132,12 @@ l'**état cible durci** : identique à l'actuel, mais avec
      --jq '{admins:.enforce_admins.enabled, code_owners:.required_pull_request_reviews.require_code_owner_reviews, convo:.required_conversation_resolution.enabled, checks:.required_status_checks.contexts}'
    ```
 
-   Attendu : `admins=true`, `code_owners=true`, `convo=true`,
-   `checks=["Build & test","Flutter app + UI packages"]`.
+   Attendu pour les checks :
+   `strict=true` et
+   `checks=["Build & test","Flutter app + UI packages","Generated state equals committed state"]`.
 
-> **Rollback** : rejouer l'étape 3 avec une variante du JSON remettant les champs concernés
-> à `false` (ou restaurer l'état antérieur capturé à l'étape 2).
+> **Rollback des checks seulement** : rejouer le même endpoint `PATCH` avec `strict` inchangé et la
+> liste de contextes antérieure. Ne jamais utiliser `PUT` avec le JSON durci complet.
 
 ### Détail des durcissements proposés (réserves)
 
@@ -168,5 +179,5 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
 - [ ] Activer `required_conversation_resolution = true`.
 - [ ] *(Optionnel, à arbitrer)* `required_linear_history = true`.
 
-Toutes applicables en une seule commande via
-`gh api --method PUT … --input .github/branch-protection-main.json` (voir §4).
+Ces réserves ne doivent pas être appliquées implicitement avec le JSON complet. Les traiter
+séparément, avec revue admin et lecture préalable de l'état live.

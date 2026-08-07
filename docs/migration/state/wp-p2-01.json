@@ -1,14 +1,14 @@
 {
   "id": "wp-p2-01",
-  "status": "in_review",
+  "status": "done",
   "session_id": "d08ce54e-6de3-4586-985f-d7218b353292",
   "branch": "gchambaud-microsoft-reconcile-migration-docs",
   "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/251",
   "checkpoint": {
-    "step": "tracker-reconciled",
-    "note": "Tracker #197 relu après écriture : les 39 identifiants de STATE.md sont présents avec leurs statuts et preuves alignés ; preuve issuecomment-5203992032.",
-    "at": "2026-08-06T12:21:29+01:00"
+    "step": "merged",
+    "note": "PR #251 fusionnée dans origin/main au commit 90933206abf02557d34aea6dfd5ae41f7cd0b774 ; dépendance wp-p2-08 débloquée.",
+    "at": "2026-08-06T13:10:43+01:00"
   },
-  "updated_at": "2026-08-06T12:21:29+01:00",
+  "updated_at": "2026-08-06T13:10:43+01:00",
   "history_ref": "log.jsonl"
 }

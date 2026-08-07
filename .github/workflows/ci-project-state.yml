@@ -1,0 +1,99 @@
+name: Validate generated project state
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 4 * * *"
+
+concurrency:
+  group: ci-project-state-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CONTENT_APP_ID: ${{ secrets.CERTIGO_CONTENT_APP_ID }}
+  CONTENT_APP_PRIVATE_KEY: ${{ secrets.CERTIGO_CONTENT_APP_PRIVATE_KEY }}
+  # Prefer a dedicated read-only credential; retain the existing repository
+  # automation token as a compatibility fallback until one is provisioned.
+  CONTENT_READ_TOKEN: ${{ secrets.CERTIGO_CONTENT_READ_TOKEN || secrets.AUTOMERGE_TOKEN }}
+
+jobs:
+  validate:
+    name: Generated state equals committed state
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
+    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test project-state generator
+        run: python -m unittest discover -s tools/tests -p "test_*.py" -v
+      - name: Reject stale generated state
+        run: python tools/project_state.py --check
+      - name: Validate certigo-content credential configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if { [ -n "$CONTENT_APP_ID" ] && [ -z "$CONTENT_APP_PRIVATE_KEY" ]; } ||
+             { [ -z "$CONTENT_APP_ID" ] && [ -n "$CONTENT_APP_PRIVATE_KEY" ]; }; then
+            echo "::error::CERTIGO_CONTENT_APP_ID and CERTIGO_CONTENT_APP_PRIVATE_KEY must be configured together."
+            exit 1
+          fi
+          if [ -z "$CONTENT_APP_ID" ] && [ -z "$CONTENT_READ_TOKEN" ]; then
+            echo "::error::Configure the read-only certigo-content GitHub App credentials or CERTIGO_CONTENT_READ_TOKEN."
+            exit 1
+          fi
+      - name: Mint read-only certigo-content GitHub App token
+        id: content-app-token
+        if: env.CONTENT_APP_ID != '' && env.CONTENT_APP_PRIVATE_KEY != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ env.CONTENT_APP_ID }}
+          private-key: ${{ env.CONTENT_APP_PRIVATE_KEY }}
+          owner: gchambaud_microsoft
+          repositories: certigo-content
+          permission-contents: read
+      - name: Select certigo-content read credential
+        id: content-auth
+        shell: bash
+        env:
+          APP_TOKEN: ${{ steps.content-app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          token="${APP_TOKEN:-$CONTENT_READ_TOKEN}"
+          if [ -z "$token" ]; then
+            echo "::error::No read credential was produced for certigo-content."
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+      - name: Checkout current certigo-content main
+        uses: actions/checkout@v4
+        with:
+          repository: gchambaud_microsoft/certigo-content
+          ref: main
+          token: ${{ steps.content-auth.outputs.token }}
+          path: .active-content
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20.20.2"
+          cache: npm
+          cache-dependency-path: .active-content/package-lock.json
+      - name: Build active content packages
+        working-directory: .active-content
+        run: |
+          npm ci
+          npm run package
+      - name: Reject stale active content reference
+        run: python tools/project_state.py --validate-active-content .active-content

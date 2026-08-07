@@ -339,8 +339,8 @@ work_packages:
       - "Inscrire wp-p2-01..09 avec leurs préconditions, étapes, DoD et rollback."
     dod: "Les lots Phase 1 dont la DoD complète est satisfaite sont à done dans work-packages.yaml, state/*.json et STATE.md ; les lots incomplets restent ouverts même si une PR associée a été fusionnée ; chaque transition de réconciliation est ajoutée à log.jsonl ; ETAT_DU_PROJET.md reflète l'état courant ; YAML, tous les JSON et chaque ligne JSONL parsent ; aucun code applicatif, IaC, dépendance ou test n'est modifié ; branche poussée et PR prête pour revue."
     rollback: "Revert du commit documentaire de réconciliation ; aucun code, aucune infrastructure et aucune donnée applicative ne sont touchés."
-    status: in_review
-    notes: "Premier lot Phase 2 ; wp-p2-02..09 ont été enregistrés initialement à todo. Les transitions ultérieures sont réconciliées séparément dans le registre."
+    status: done
+    notes: "Premier lot Phase 2 ; PR #251 fusionnée dans origin/main au commit 90933206abf02557d34aea6dfd5ae41f7cd0b774. wp-p2-02..09 ont été enregistrés initialement à todo ; leurs transitions ultérieures sont réconciliées séparément."
 
   - id: wp-p2-02
     phase: 2
@@ -465,8 +465,8 @@ work_packages:
       - "Séparer les faits générés des affirmations narratives et exiger une preuve pour tout statut opérationnel."
     dod: "Les métriques techniques de ETAT_DU_PROJET.md sont générées ; une modification de version ou corpus sans régénération échoue en CI ; aucun compteur majeur n'est maintenu manuellement ; date et commit de référence sont exacts."
     rollback: "Revert de la génération et conservation du document précédent ; aucun impact runtime."
-    status: todo
-    notes: "Source : gchambaud_microsoft/Certigo#247. La précondition est une formulation locale, absente de l'issue."
+    status: in_review
+    notes: "Source : gchambaud_microsoft/Certigo#247. Générateur stdlib, tests unitaires et gate generated==committed implémentés ; validations vertes, référence exacte sur le commit source 33b34a64ae2f6de2de73679328cee49881207794 et PR #254 ouverte."
 
   - id: wp-p2-09
     phase: 2
