@@ -1,0 +1,14 @@
+{
+  "id": "wp-p2-02",
+  "status": "done",
+  "session_id": "2a7ca0a5-8b5a-4c02-b83a-770baca5bdca",
+  "branch": "gchambaud-microsoft-reproductible-content-tooling",
+  "pr": "https://github.com/gchambaud_microsoft/certigo-content/pull/7",
+  "checkpoint": {
+    "step": "merged-dod-validated",
+    "note": "PR #7 fusionnée ; les checks manifest, validate et test-and-supply-chain sont verts.",
+    "at": "2026-08-06T09:22:17Z"
+  },
+  "updated_at": "2026-08-06T09:22:17Z",
+  "history_ref": "log.jsonl"
+}

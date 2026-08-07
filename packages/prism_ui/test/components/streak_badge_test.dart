@@ -5,8 +5,6 @@ import 'package:prism_ui/prism_ui.dart';
 import '../support/prism_harness.dart';
 
 void main() {
-  setUpAll(disableGoogleFontsFetching);
-
   group('StreakBadge', () {
     testWidgets('renders the day count with a flame', (WidgetTester tester) async {
       await pumpPrism(tester, const StreakBadge(days: 7));

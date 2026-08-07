@@ -42,10 +42,8 @@
 // must hold.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-// Direct src imports (not the barrel) so this test never compiles
-// prism_typography.dart, whose google_fonts dependency has a const-eval bug that
-// breaks compilation on some local toolchains. Both token files are leaf files
-// importing only flutter, so the net stays green locally and in CI.
+// Direct leaf imports keep this geometry contract independent from unrelated
+// theme and component compilation.
 import 'package:prism_ui/src/tokens/prism_radii.dart';
 import 'package:prism_ui/src/tokens/prism_spacing.dart';
 

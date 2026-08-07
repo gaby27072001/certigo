@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-00-decomposition",
-  "status": "in_review",
+  "status": "done",
   "session_id": "d1ee6fe8-bd01-4ba3-9cbc-174fe41ee8d9",
   "branch": "gchambaud-microsoft-wp-p1-00-decomposition",
   "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/211",
   "checkpoint": {
-    "step": "pr-ouverte",
-    "note": "Décomposition Phase 1 (15 lots inscrits) + clôture P0 (8 lots in_review→done). PR draft ouverte.",
-    "at": "2026-07-07T00:16:20+01:00"
+    "step": "merged-pr-reconciled",
+    "note": "PR Certigo #211 fusionnée ; état réconcilié sur done par wp-p2-01.",
+    "at": "2026-08-05T19:45:16+01:00"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-08-05T19:45:16+01:00",
   "history_ref": "log.jsonl"
 }

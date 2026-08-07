@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-14-opentelemetry-correlation",
-  "status": "in_review",
+  "status": "done",
   "session_id": "d54a0def-4cfa-453f-98f8-bebd34140489",
   "branch": "gchambaud-microsoft-wp-p1-14-opentelemetry-correlation",
   "pr": 215,
   "checkpoint": {
-    "step": "in_review",
-    "note": "Audit idempotence : backend deja autoritaire (ExceptionMiddleware.cs l.76-90 honore/mint x-correlation-id format n + scope log CorrelationId l.20-21 ; Program.cs l.37-38 App Insights worker service). Delta = mobile n'emettait PAS x-correlation-id. Ajout CorrelationIdInterceptor branche en premier dans ApiClient (packages/data). Tests hermetiques 6/6 verts ; dart format L100 0 changed. ADR-013 + section D-10 (Dart non supporte par CodeQL, cf codeql.yml l.3-7). Backend non modifie. PR draft #215.",
-    "at": "2026-07-07T11:20:00+01:00"
+    "step": "merged-pr-reconciled",
+    "note": "PR Certigo #215 fusionnée ; état réconcilié sur done par wp-p2-01.",
+    "at": "2026-08-05T19:45:16+01:00"
   },
-  "updated_at": "2026-07-07T11:20:00+01:00",
+  "updated_at": "2026-08-05T19:45:16+01:00",
   "history_ref": "log.jsonl"
 }

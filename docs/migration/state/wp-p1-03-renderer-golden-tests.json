@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-03-renderer-golden-tests",
-  "status": "in_review",
+  "status": "done",
   "session_id": "1ed20cb1-b26d-4061-ba08-db3a4c72049a",
   "branch": "gchambaud-microsoft-wp-p1-03-renderer-golden-tests",
   "pr": 219,
   "checkpoint": {
-    "step": "in-review-pr-ouverte",
-    "note": "11 golden tests hermetiques verts en local (7 types de blocs: hook/concept/example/code/recap/callout x3/fallback x3), imports directs package:prism_ui/src/... sans google_fonts, police de test + debugDisableShadows + comparateur tolerant 0.5%. Gate CI dedie prism-goldens ajoute a ci-mobile.yml. PR draft #219 base main. Perimetre: backend/infra VIDE. Caveat: goldens generes en Dart 3.12.2 local vs Flutter 3.27.4 CI, regenerer sur runner si gate rouge au 1er run.",
-    "at": "2026-07-07T12:04:02Z"
+    "step": "merged-pr-reconciled",
+    "note": "PR Certigo #219 fusionnée ; état réconcilié sur done par wp-p2-01.",
+    "at": "2026-08-05T19:45:16+01:00"
   },
-  "updated_at": "2026-07-07T12:04:02Z",
+  "updated_at": "2026-08-05T19:45:16+01:00",
   "history_ref": "log.jsonl"
 }

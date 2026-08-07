@@ -1,14 +1,14 @@
 {
   "id": "wp-000-amorcage-registre",
-  "status": "in_review",
+  "status": "done",
   "session_id": "b0faa7db-afd9-4078-ae8f-bdc5a3680b99",
   "branch": "gchambaud-microsoft-wp-000-migration-registry",
   "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/196",
   "checkpoint": {
-    "step": "pr-opened",
-    "note": "docs/migration/ créé (README, work-packages.yaml, STATE.md, log.jsonl, state/, templates/) ; validations YAML/JSON/JSONL vertes ; PR draft #196 ouverte. En attente de revue (ne pas merger).",
-    "at": "2026-07-06T17:08:05+01:00"
+    "step": "merged-pr-reconciled",
+    "note": "PR Certigo #196 fusionnée ; état réconcilié sur done par wp-p2-01.",
+    "at": "2026-08-05T19:45:16+01:00"
   },
-  "updated_at": "2026-07-06T17:08:05+01:00",
+  "updated_at": "2026-08-05T19:45:16+01:00",
   "history_ref": "log.jsonl"
 }

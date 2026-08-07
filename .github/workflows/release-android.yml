@@ -59,7 +59,7 @@ permissions:
   contents: read
 
 env:
-  FLUTTER_VERSION: "3.27.4"
+  FLUTTER_VERSION: "3.44.4"
   # ⚠️ Doit correspondre à applicationId dans apps/mobile/android/app/build.gradle
   PLAY_PACKAGE_NAME: "com.certigo.mobileapp"
   AAB_PATH: "apps/mobile/build/app/outputs/bundle/release/app-release.aab"

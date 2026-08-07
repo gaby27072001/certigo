@@ -28,12 +28,11 @@ class QuizSubmission {
 /// the end and rewards come from server grading (with a local fallback).
 class QuizController extends ChangeNotifier {
   QuizController({
-    required LessonRepository lessons,
-    required QuizRepository quiz,
+    required this._lessons,
+    required this._quiz,
     required this.trackId,
     required this.lessonId,
-  })  : _lessons = lessons,
-        _quiz = quiz {
+  }) {
     unawaited(loadItems());
   }
 
@@ -65,10 +64,7 @@ class QuizController extends ChangeNotifier {
   int get correctCount => _correctCount;
 
   Future<void> loadItems() async {
-    final Result<Lesson> lesson = await _lessons.getLesson(
-      trackId: trackId,
-      lessonId: lessonId,
-    );
+    final Result<Lesson> lesson = await _lessons.getLesson(trackId: trackId, lessonId: lessonId);
 
     final List<QuizEntry> entries = lesson.when(
       success: (Lesson l) {
@@ -155,11 +151,7 @@ class QuizController extends ChangeNotifier {
     _submitting = false;
     notifyListeners();
 
-    return QuizSubmission(
-      result: result,
-      pendingSync: pendingSync,
-      totalQuestions: _items.length,
-    );
+    return QuizSubmission(result: result, pendingSync: pendingSync, totalQuestions: _items.length);
   }
 
   SubmitQuizResult _localFallbackResult({

@@ -1,14 +1,17 @@
 # Dependabot — automated dependency & GitHub Actions updates.
 # Keeps NuGet (backend), pub (Flutter/Dart) and workflow actions patched, which
 # is the first line of defence for supply-chain CVEs. Grouped to limit PR noise.
+#
+# Volumétrie volontairement basse : le parc de runners self-hosted est petit
+# (2 VM). Des limites élevées saturent la file d'attente et bloquent la CI.
 version: 2
 updates:
   # .NET 8 backend (Azure Functions API + domain/application/infrastructure).
   - package-ecosystem: "nuget"
     directory: "/backend"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
+      interval: "monthly"
+    open-pull-requests-limit: 2
     groups:
       backend-dependencies:
         patterns: [ "*" ]
@@ -20,8 +23,8 @@ updates:
       - "/apps/mobile"
       - "/packages/*"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
+      interval: "monthly"
+    open-pull-requests-limit: 2
     groups:
       dart-dependencies:
         patterns: [ "*" ]
@@ -31,12 +34,18 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    groups:
+      github-actions:
+        patterns: [ "*" ]
 
   # Outillage npm racine (scripts de validation de contenu / lint workflow).
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    groups:
+      npm-tooling:
+        patterns: [ "*" ]

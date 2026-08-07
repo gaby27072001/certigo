@@ -5,8 +5,6 @@ import 'package:prism_ui/prism_ui.dart';
 import '../support/prism_harness.dart';
 
 void main() {
-  setUpAll(disableGoogleFontsFetching);
-
   group('CertificationCard', () {
     testWidgets('renders code, title, level chip and lesson/chapter counts',
         (WidgetTester tester) async {

@@ -5,8 +5,7 @@ import '../features/auth/application/auth_state.dart';
 ///
 /// Pourquoi ce fichier séparé : [resolveAuthRedirect] doit être testable
 /// unitairement (non-régression #154). Importer `router.dart` tirerait tout
-/// l'arbre d'écrans (et donc `google_fonts` / `font_awesome_flutter`), ce qui
-/// empêche la compilation des tests dans certains environnements SDK. Ici on ne
+/// l'arbre d'écrans et transformerait ce test de garde en test widget. Ici on ne
 /// dépend que de [AuthState] (Dart pur).
 ///
 /// Les valeurs sont la **source de vérité** consommée par `router.dart`, qui

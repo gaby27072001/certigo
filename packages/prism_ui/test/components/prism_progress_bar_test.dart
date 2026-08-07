@@ -4,8 +4,6 @@ import 'package:prism_ui/prism_ui.dart';
 import '../support/prism_harness.dart';
 
 void main() {
-  setUpAll(disableGoogleFontsFetching);
-
   group('PrismProgressBar', () {
     testWidgets('exposes its percentage through semantics', (WidgetTester tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();

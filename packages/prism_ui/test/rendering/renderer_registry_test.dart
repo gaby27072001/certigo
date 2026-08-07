@@ -1,11 +1,9 @@
 // Hermetic tests for the dynamic renderer core (ADR-003).
 //
 // These tests import the rendering primitives directly and pump them inside a
-// plain [MaterialApp]. They deliberately avoid the prism harness and the
-// package barrel, both of which transitively pull `google_fonts` — which fails
-// to compile under this toolchain's Dart version. The concrete `standard`
-// wiring (which does reach the real, font-backed blocks) is covered by
-// `flutter analyze` and the app integration instead.
+// plain [MaterialApp] to keep registry behavior independent from the complete
+// theme. The concrete `standard` wiring is covered by `flutter analyze` and the
+// app integration instead.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prism_ui/src/rendering/block_fallback.dart';
@@ -32,17 +30,11 @@ RendererRegistry _probeRegistry({int schemaVersion = RendererSchema.current}) {
     );
 }
 
-Future<void> _pumpBlock(
-  WidgetTester tester,
-  RendererRegistry registry,
-  ContentBlock block,
-) async {
+Future<void> _pumpBlock(WidgetTester tester, RendererRegistry registry, ContentBlock block) async {
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
-        body: Builder(
-          builder: (BuildContext context) => registry.build(context, block),
-        ),
+        body: Builder(builder: (BuildContext context) => registry.build(context, block)),
       ),
     ),
   );
@@ -91,15 +83,13 @@ void main() {
   });
 
   group('RendererRegistry.build', () {
-    testWidgets('paints the registered widget for a known, well-formed block',
-        (WidgetTester tester) async {
+    testWidgets('paints the registered widget for a known, well-formed block', (
+      WidgetTester tester,
+    ) async {
       await _pumpBlock(
         tester,
         _probeRegistry(),
-        const ContentBlock(
-          type: 'hook',
-          data: <String, dynamic>{'body': 'Bienvenue sur Azure'},
-        ),
+        const ContentBlock(type: 'hook', data: <String, dynamic>{'body': 'Bienvenue sur Azure'}),
       );
 
       expect(find.byType(_ProbeBlock), findsOneWidget);
@@ -111,10 +101,7 @@ void main() {
       await _pumpBlock(
         tester,
         _probeRegistry(),
-        const ContentBlock(
-          type: 'totally-unknown',
-          data: <String, dynamic>{'body': 'x'},
-        ),
+        const ContentBlock(type: 'totally-unknown', data: <String, dynamic>{'body': 'x'}),
       );
 
       expect(find.byKey(PrismBlockFallback.rootKey), findsOneWidget);
@@ -122,8 +109,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('falls back for a malformed payload (missing required field)',
-        (WidgetTester tester) async {
+    testWidgets('falls back for a malformed payload (missing required field)', (
+      WidgetTester tester,
+    ) async {
       await _pumpBlock(
         tester,
         _probeRegistry(),
@@ -137,8 +125,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('falls back for an unsupported (future) schema version',
-        (WidgetTester tester) async {
+    testWidgets('falls back for an unsupported (future) schema version', (
+      WidgetTester tester,
+    ) async {
       await _pumpBlock(
         tester,
         _probeRegistry(),
@@ -154,16 +143,13 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('falls back for an invalid (below-range) schema version',
-        (WidgetTester tester) async {
+    testWidgets('falls back for an invalid (below-range) schema version', (
+      WidgetTester tester,
+    ) async {
       await _pumpBlock(
         tester,
         _probeRegistry(),
-        const ContentBlock(
-          type: 'hook',
-          data: <String, dynamic>{'body': 'x'},
-          schemaVersion: 0,
-        ),
+        const ContentBlock(type: 'hook', data: <String, dynamic>{'body': 'x'}, schemaVersion: 0),
       );
 
       expect(find.byKey(PrismBlockFallback.rootKey), findsOneWidget);
@@ -177,11 +163,7 @@ void main() {
           (BuildContext context, ContentBlock block) => throw StateError('renderer exploded'),
         );
 
-      await _pumpBlock(
-        tester,
-        registry,
-        const ContentBlock(type: 'boom'),
-      );
+      await _pumpBlock(tester, registry, const ContentBlock(type: 'boom'));
 
       expect(find.byKey(PrismBlockFallback.rootKey), findsOneWidget);
       expect(tester.takeException(), isNull);

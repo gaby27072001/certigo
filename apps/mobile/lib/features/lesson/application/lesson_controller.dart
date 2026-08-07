@@ -24,14 +24,11 @@ import 'sample_lesson.dart';
 /// `cortex` package so client and backend mastery never diverge.
 class LessonController extends StateNotifier<LessonSessionState> {
   LessonController({
-    required LessonRepository lessons,
-    required QuizRepository quiz,
+    required this._lessons,
+    required this._quiz,
     required this.args,
-    LessonFeedback feedback = const HapticLessonFeedback(),
-  })  : _lessons = lessons,
-        _quiz = quiz,
-        _feedback = feedback,
-        super(const LessonSessionState()) {
+    this._feedback = const HapticLessonFeedback(),
+  }) : super(const LessonSessionState()) {
     unawaited(load());
   }
 
@@ -168,11 +165,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
     }
     final int next = state.index + 1;
     if (next >= state.steps.length) return;
-    state = state.copyWith(
-      status: LessonStatus.ready,
-      index: next,
-      selection: const <String>[],
-    );
+    state = state.copyWith(status: LessonStatus.ready, index: next, selection: const <String>[]);
     _stepShownAt = DateTime.now();
   }
 
@@ -287,14 +280,12 @@ class LessonController extends StateNotifier<LessonSessionState> {
 
 /// Family provider keyed by [LessonArgs]; auto-disposed so leaving a lesson
 /// resets its session.
-final lessonControllerProvider =
-    StateNotifierProvider.autoDispose.family<LessonController, LessonSessionState, LessonArgs>(
-  (Ref ref, LessonArgs args) {
-    return LessonController(
-      lessons: ref.watch(lessonRepositoryProvider),
-      quiz: ref.watch(quizRepositoryProvider),
-      args: args,
-      feedback: ref.watch(lessonFeedbackProvider),
-    );
-  },
-);
+final lessonControllerProvider = StateNotifierProvider.autoDispose
+    .family<LessonController, LessonSessionState, LessonArgs>((Ref ref, LessonArgs args) {
+  return LessonController(
+    lessons: ref.watch(lessonRepositoryProvider),
+    quiz: ref.watch(quizRepositoryProvider),
+    args: args,
+    feedback: ref.watch(lessonFeedbackProvider),
+  );
+});

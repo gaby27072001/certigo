@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-04-certigo-content-repo",
-  "status": "todo",
+  "status": "done",
   "session_id": null,
   "branch": null,
   "pr": null,
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "repository-existence-reconciled",
+    "note": "Dépôt certigo-content créé et opérationnel ; la PR #1 atteste son utilisation par la CI. État réconcilié sur done par wp-p2-01 sans attribuer la création à une PR.",
+    "at": "2026-08-05T19:45:16+01:00"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-08-05T19:45:16+01:00",
   "history_ref": "log.jsonl"
 }
