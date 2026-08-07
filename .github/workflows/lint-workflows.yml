@@ -53,4 +53,4 @@ jobs:
             echo "::error::No workflow files found under .github/workflows."
             exit 1
           fi
-          /tmp/actionlint "${workflows[@]}"
+          actionlint "${workflows[@]}"

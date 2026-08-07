@@ -5,7 +5,7 @@
 **Apprenez, révisez et validez vos certifications Microsoft — par micro-leçons premium.**
 
 Micro-learning mobile (iOS + Android) pour maîtriser des **concepts techniques & cloud réels**
-et atteindre la *readiness* certification sur **89 certifications Microsoft actives**
+et atteindre la *readiness* certification sur un catalogue Microsoft
 (dont AZ-900 · AZ-104 · AI-900 · DP-900 · SC-900).
 
 `Flutter` · `.NET 8 isolated Functions` · `Cosmos DB` · `Entra External ID` · `Bicep`
@@ -71,6 +71,27 @@ Détail complet : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 > 🧭 **Pour voir l'état réel et à jour du projet** (ce qui est *réellement* construit, fonctionnalité
 > par fonctionnalité), consultez le tableau de bord vivant : [`docs/ETAT_DU_PROJET.md`](docs/ETAT_DU_PROJET.md).
 
+Les faits techniques observables (versions, workflows, tests, corpus historique, types
+pédagogiques, référence Git analysée et packages actifs de `certigo-content`) y sont générés
+depuis le dépôt :
+
+```bash
+# Après avoir commité les sources observables :
+python tools/project_state.py --refresh-reference
+python tools/project_state.py --check   # contrôle local identique à la gate CI
+python -m unittest discover -s tools/tests -p "test_*.py" -v
+```
+
+La régénération suit volontairement deux commits : le premier contient les sources observables,
+le second la référence exacte et le bloc généré. La référence conserve le commit et la date
+capturés, puis lie les sources par un SHA-256 déterministe des noms de chemins triés et des octets
+exacts. Elle ne dépend donc ni de l'existence locale de l'objet Git ni de son ascendance après un
+squash équivalent, tout en évitant qu'un document tente de référencer son propre commit.
+
+Le reste du document est narratif : toute affirmation « opérationnelle » doit pointer vers un
+workflow automatisé, un test, un runbook ou un audit daté ; sinon elle est étiquetée
+**non vérifiée / manuelle**.
+
 ---
 
 ## 🧱 Stack technique
@@ -80,13 +101,13 @@ Détail complet : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | Mobile | Flutter / Dart, Riverpod, go_router, monorepo **Melos** |
 | Design | Prism (Material 3 sous-jacent, `BackdropFilter`, gradients, `CustomPaint`) |
 | API | **Azure Functions .NET 8 isolated**, HTTP triggers, Clean Architecture |
-| Données | **Azure Cosmos DB** (serverless, 6 containers) |
+| Données | **Azure Cosmos DB** (serverless) |
 | Médias | **Azure Blob Storage** (`lesson-assets`) |
 | Identité | **Microsoft Entra External ID** (JWT validé côté Functions) |
 | Secrets | **Azure Key Vault** (accès via *managed identity*) |
 | Observabilité | **Application Insights** (workspace-based) |
 | IaC | **Bicep** (subscription-scoped, modules composables) |
-| CI/CD | **GitHub Actions** (4 pipelines ciblés par dossier) |
+| CI/CD | **GitHub Actions** (pipelines ciblés par dossier) |
 
 ---
 
@@ -96,7 +117,7 @@ Détail complet : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 | Outil | Version | Usage |
 |---|---|---|
-| Flutter SDK | ≥ 3.22 (Dart ≥ 3.4) | app mobile + packages |
+| Flutter SDK | **3.44.4** | app mobile, packages et goldens ; pin CI/release aligné |
 | Melos | `dart pub global activate melos` | orchestration monorepo Dart |
 | .NET SDK | **8.0** | backend Functions |
 | Azure Functions Core Tools | v4 | exécution locale des Functions |
@@ -136,6 +157,19 @@ Le corpus migré est édité et publié depuis
 [`gchambaud_microsoft/certigo-content`](https://github.com/gchambaud_microsoft/certigo-content).
 Le dossier local `content/` est un instantané historique conservé pour compatibilité ; il ne doit
 plus recevoir de changements éditoriaux.
+
+La révision active est épinglée dans
+[`docs/active-content-reference.json`](docs/active-content-reference.json) et vérifiée sur chaque
+PR ainsi que quotidiennement. À la référence du **2026-08-06** :
+
+| Package actif | Fichiers | Manifest ID |
+|---|---:|---|
+| Public (`public/public`) | **146** | `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
+| Privé (`answerKey/private`) | **146** | `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
+
+Ces valeurs décrivent les packages actifs du commit
+`470acdbf100e7f7faf9911015662bee6118b8bf5`. Les compteurs issus de `content/` restent
+explicitement **historiques**.
 
 ```bash
 # Dans un clone de certigo-content, suivre son README et ses gates CI.
@@ -198,6 +232,7 @@ API principale :
 | `ci-backend` | `backend/**` | `dotnet build -warnaserror`, `dotnet test` |
 | `ci-content` | instantané historique `content/**` | schémas + intégrité + somme des poids = 1.0 |
 | `ci-migration-registry` | `docs/migration/**`, validateur Python | statuts, états, dépendances et absence de cycle |
+| `ci-project-state` | chaque PR, `main`, quotidien | état généré identique, référence active `certigo-content` et manifestes public/privé exacts |
 | `ci-infra`   | `infra/**` | `az bicep build` (lint des templates) |
 | `cd-backend` | push / workflow manuel | déploiement backend vers l'environnement cible |
 | `codeql` | schedule / push | analyse statique de sécurité |
@@ -213,9 +248,11 @@ API principale :
 > rollback, checklist) : voir [`docs/RELEASE_MOBILE.md`](docs/RELEASE_MOBILE.md).
 
 > [!NOTE]
-> Les workflows utilisent un runner **self-hosted** avec labels
+> Les workflows applicatifs utilisent un runner **self-hosted** avec labels
 > `[self-hosted, Linux, X64, certigo-ci]` (les runners hébergés par GitHub sont
 > désactivés par la politique d'entreprise EMU sur ce dépôt).
+> La gate obligatoire `ci-project-state` utilise explicitement `ubuntu-latest` afin d'émettre le
+> contexte `Generated state equals committed state` sur chaque PR.
 >
 > Ces labels doivent désigner un pool d'au moins deux runners. Le routage, le drill
 > de panne et le repli hébergé conditionnel sont détaillés dans

@@ -4,30 +4,68 @@
 
 **Le « Duolingo des certifications Microsoft » — apprendre Azure / IA / sécurité par micro‑leçons gamifiées.**
 
-`🟢 Backend riche` · `🟢 Contenu migré (certigo-content)` · `🟢 Gamification` · `🟡 Tuteur IA (LLM réel ⏳ validation live)` · `🟢 Offline‑first` · `🟢 Mobile : écrans branchés` · `🟢 Infra dev/prod/CI` · `🟡 Staging à provisionner`
+Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leurs preuves
+(workflow, test, runbook ou audit daté). Sans preuve citée, ils sont **non vérifiés / manuels**.
 
 </div>
 
 > [!NOTE]
-> **Ce document est le miroir de la réalité du code à l'instant T.** Il est rafraîchi à chaque évolution
-> traitée, dans le même changement. Trois documents complémentaires :
+> **Ce document combine des faits générés et une lecture narrative.** Trois documents complémentaires :
 > - **`README.md`** → la **vision** et le pitch produit.
 > - **`docs/ARCHITECTURE.md`** → le **design de référence / la cible** technique.
-> - **`docs/ETAT_DU_PROJET.md`** (ce fichier) → **ce qui existe vraiment** maintenant. En cas de
->   divergence entre les trois, **c'est ce document qui fait foi.**
+> - **`docs/ETAT_DU_PROJET.md`** (ce fichier) → faits observables générés, puis contexte narratif.
+>
+> Le bloc suivant est la seule source documentaire des compteurs techniques majeurs. Sa référence
+> (`docs/project-state-reference.json`) conserve le commit/date capturés et le SHA-256 déterministe
+> des noms de chemins triés et des octets observés. Le bloc généré et la référence sont committés
+> séparément pour éviter tout cycle d'auto-référence.
 
-| Repère | Valeur |
+<!-- GENERATED:PROJECT-STATE:START -->
+
+## État technique généré
+
+> Ne pas modifier ce bloc à la main. Sources et commande sont documentées juste après.
+
+| Fait observable | Valeur générée |
 |---|---|
-| 📅 Rafraîchi le | **2026‑08‑06** (réconciliation du registre avec les PR content #7/#8 et les lots actifs) |
-| 🔖 Reflète | `origin/main` à **0e30b7a** + les transitions documentaires de la branche `wp-p2-01` ; voir `docs/migration/STATE.md` pour le détail des lots |
-| 🌿 Branche du doc | `gchambaud-microsoft-reconcile-migration-docs` |
-| 📈 Activité | Phase 1 réconciliée ; `wp-p2-02` et `wp-p2-03` terminés ; `wp-p2-04`, `wp-p2-07` et `wp-p2-09` en cours |
-| 🧪 Tests | Suites backend, mobile, contenu, Cortex et infrastructure exécutées par les workflows dédiés ; tests Cosmos émulateur‑gated |
-| 🧩 API | **18 groupes** de Functions (+ `GET /health`) · **34 endpoints** HTTP |
-| 🗄️ Données | **8 containers Cosmos DB** (serverless ; profil avec **ETag** concurrence optimiste) |
-| 🏗️ Infra | **8 modules Bicep** + params **dev/staging/prod** — `dev`, `prod` et CI déployés ; `staging` reste à provisionner |
-| 🤖 CI/CD | **17 workflows** GitHub Actions (15 actifs + 2 legacy iOS manuels inertes par défaut), dont les gates backend, mobile, contenu, registre de migration, Cortex, infra, sécurité, résilience runners et déploiement |
-| 🔒 Durcissement | Idempotence atomique · ETag · garde auth dev · `/health` + correlation id · CORS/KV/Storage par env |
+| Date de référence analysée | **2026-08-07** |
+| Commit de référence analysé | `9dd03d39143502c61227b99e005c6fc177fbe80e` |
+| Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
+| .NET CI | **8.0.x** |
+| Node.js outillage | **>=20** (`package.json#engines`) |
+| Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `663f32b4818964e307cf7e084cd09a9c6af91429` du **2026-08-06** |
+| Package public actif | **146 fichiers** — `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
+| Package privé actif (`answerKey`) | **146 fichiers** — `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
+| Workflows GitHub Actions | **20** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-project-state.yml`, `codeql.yml`, `copilot-auto-merge.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `lint-workflows.yml`, `promote-backend-staging-prod.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
+| Tests découverts | **147 fichiers** — .NET : 4 projets / 63 fichiers ; Flutter/Dart : 6 racines / 83 fichiers ; Python : 1 racine / 1 fichier |
+| Corpus **historique** local | **91 pistes**, **146 leçons** sous `content/` — instantané de compatibilité, non actif |
+| Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
+
+<!-- GENERATED:PROJECT-STATE:END -->
+
+### Régénération et politique de preuve
+
+```bash
+# Après avoir commité les sources observables :
+python tools/project_state.py --refresh-reference
+python tools/project_state.py --check
+python -m unittest discover -s tools/tests -p "test_*.py" -v
+```
+
+Sources canoniques : pins des workflows GitHub/Codemagic, `package.json`, arborescences de
+workflows/tests/corpus, `lesson.schema.json`, `ContentModels.cs`,
+`docs/active-content-reference.json` et `docs/project-state-reference.json`. La gate
+`ci-project-state.yml` teste le générateur, impose **generated == committed**, reconstruit les
+packages du `main` courant de `certigo-content`, puis vérifie la révision, la date et les deux
+manifestes. Elle tourne sur chaque PR et quotidiennement : toute dérive amont rend l'état obsolète
+et échoue explicitement. Les sections restantes expliquent le contexte ; « opérationnel » exige une
+preuve automatisée ou une référence explicite, sinon l'affirmation est **non vérifiée / manuelle**.
+
+Le commit et la date de référence sont capturés au premier commit. La correspondance des sources
+est ensuite vérifiée par SHA-256 sur les noms de chemins UTF-8 triés et les octets exacts, avec
+longueurs encadrées sans ambiguïté ; `docs/project-state-reference.json` est exclu. Le contrôle ne
+dépend ni de l'objet Git capturé ni de son ascendance et reste donc valide après un squash/root
+équivalent. Une source modifiée ou non committée change l'empreinte et bloque la génération.
 
 ---
 
@@ -35,7 +73,7 @@
 
 | Brique | Statut | Où | En clair |
 |---|:---:|---|---|
-| **API backend** | 🟢 | `backend/src/Certigo.Api` | Azure Functions .NET 8 isolé, **18 groupes / 34 endpoints**. |
+| **API backend** | 🟢 | `backend/src/Certigo.Api` | Azure Functions .NET 8 isolé ; couvert par `ci-backend.yml`. |
 | **Moteurs métier** | 🟢 | `backend/src/Certigo.Domain` | Logique **pure & testée** : contenu, progression, gamification, examen, tuteur, reco, notifications, intégrité. |
 | **Contenu pédagogique** | 🟢 | [`certigo-content`](https://github.com/gchambaud_microsoft/certigo-content) | Source éditoriale active du corpus migré : contenu public, `answerKey`, schémas et manifeste immuable. `content/` est un instantané historique. |
 | **Gamification** | 🟢 | Domain `Gamification/` | XP, streak (+réparation), ligues hebdo, **saisons**, quêtes, succès, boutique, amis. |
@@ -45,13 +83,14 @@
 | **Anti‑triche / intégrité** | 🟢 (shadow) | Domain `Integrity/` | Évaluateur déterministe des tentatives — **mode détection** (signale, ne sanctionne pas encore). |
 | **Offline‑first** | 🟢 | `packages/data` (sync) + `app/offline` | File de synchro idempotente, backoff, rejouable — **câblée dans l'app**. *(Seule la leçon en cours est disponible hors‑ligne pour l'instant ; la synchronisation complète du catalogue est planifiée — P3.)* |
 | **Authentification** | 🟢 | API `Middleware/` + mobile `features/auth` | **Microsoft / Google / Apple** fédérés derrière **Entra External ID**, JWT validé serveur. |
-| **Design system (Prism)** | 🟢 | `packages/prism_ui` | **28 composants** + tokens + thèmes (look « néon doux »). |
-| **App mobile (Flutter)** | 🟢 | `apps/mobile` | 15 features. Tous les moteurs de gamification (saisons, quêtes, succès, boutique, amis, examens) sont **branchés en écran** + tests widget. Reste la validation E2E sur appareil. |
+| **Design system (Prism)** | 🟢 | `packages/prism_ui` | Composants + tokens + thèmes ; tests/goldens dans `ci-mobile.yml`. |
+| **App mobile (Flutter)** | 🟢 | `apps/mobile` | Les moteurs de gamification sont branchés en écran + tests widget (`ci-mobile.yml`). Validation E2E appareil : **non vérifiée / manuelle**. |
 | **Cortex (algos partagés)** | 🟢 | `packages/cortex` | SRS, scoring, fil pédagogique — partagé client/serveur. |
-| **Infrastructure (Bicep)** | 🟢 | `infra/` | 8 modules (Functions, Cosmos, Key Vault, App Insights, **Defender, Policy, Diagnostics**, Storage). **Déployée en `dev`** (`rg-certigo-dev`, westeurope). |
-| **CI / qualité** | 🟢 | `.github/workflows` | **17 workflows** (15 actifs + 2 legacy iOS manuels inertes par défaut) : gates backend, mobile, contenu, registre de migration, Cortex, infra, sécurité, dépendances, résilience runners et déploiement. **Checkov hard-fail** (skip justifiés dans `.checkov.yaml`). |
+| **Infrastructure (Bicep)** | 🟢 | `infra/` | Modules Functions, Cosmos, Key Vault, App Insights, Defender, Policy, Diagnostics et Storage ; état live référencé par `AUDIT_Certigo.md`. |
+| **CI / qualité** | 🟢 | `.github/workflows` | Inventaire généré ci-dessus ; gates référencées dans les workflows versionnés. |
 
-**Légende :** 🟢 opérationnel & testé · 🟡 partiel / en cours · 🔴 absent.
+**Légende narrative :** 🟢 implémenté avec référence indiquée · 🟡 partiel / en cours · 🔴 absent.
+Un statut sans référence vérifiable reste **non vérifié / manuel**.
 
 ---
 
@@ -66,20 +105,20 @@ graph TD
     ROOT --> PKG["🧩 packages/<br/>Paquets Dart partagés"]
     ROOT -.-> CNT["📚 certigo-content<br/>source éditoriale active"]
     ROOT --> HIST["content/<br/>instantané historique"]
-    ROOT --> INF["🏗️ infra/<br/>8 modules Bicep"]
-    ROOT --> CI[".github/workflows/<br/>17 workflows (15 actifs + 2 legacy opt-in)"]
+    ROOT --> INF["🏗️ infra/<br/>modules Bicep"]
+    ROOT --> CI[".github/workflows/<br/>inventaire généré ci-dessus"]
     ROOT --> DOC["📄 docs/<br/>README · ARCHITECTURE · ÉTAT"]
 
-    BE --> API["Certigo.Api<br/>18 groupes de Functions"]
+    BE --> API["Certigo.Api<br/>Functions HTTP"]
     BE --> DOM["Certigo.Domain<br/>moteurs métier purs"]
     BE --> TST["Certigo.Tests<br/>unitaires + intégration Cosmos gated"]
 
     PKG --> CORE["core/ — base commune"]
     PKG --> CORTEX["cortex/ — SRS & scoring"]
     PKG --> DATA["data/ — modèles, réseau, offline, reco, tutor"]
-    PKG --> PRISM["prism_ui/ — 28 composants"]
+    PKG --> PRISM["prism_ui/ — composants & tokens"]
 
-    APP --> FEAT["features/ (15)<br/>auth · home · path · lesson · quiz · tutor · leaderboard · profile · onboarding · seasons · quests · achievements · shop · friends · exam"]
+    APP --> FEAT["features/<br/>auth · home · path · lesson · quiz · tutor · gamification"]
     APP --> OFF["app/offline/<br/>synchro offline-first"]
 ```
 
@@ -98,7 +137,7 @@ flowchart LR
     FUNC --> MW
     MW --> DOM["🧠 Domain<br/>(scoring · XP · streak · ligue · intégrité)"]
     DOM --> INTEG["🔍 AttemptIntegrity<br/>verdict + score de risque"]
-    DOM --> COSMOS[("🗄️ Cosmos DB<br/>8 containers")]
+    DOM --> COSMOS[("🗄️ Cosmos DB<br/>containers versionnés")]
     DOM -->|"réponse : score, XP, paliers"| MOB
     MOB -->|"feedback son + haptique"| U
 ```
@@ -153,9 +192,24 @@ Les PR éditoriales, la validation des schémas et la publication du manifeste s
 `gchambaud_microsoft/certigo-content`. Le dossier `content/` de ce monorepo ne doit plus être
 présenté ni utilisé comme source éditoriale active.
 
+Référence active vérifiée : `certigo-content@main`
+`470acdbf100e7f7faf9911015662bee6118b8bf5`, commit du
+`2026-08-06T09:57:19Z`.
+
+| Canal / artefact actif | Nombre de fichiers | Manifest ID |
+|---|---:|---|
+| `public/public` | **146** | `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
+| `answerKey/private` | **146** | `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
+
+Le contrat `certigo.content.package-manifest/v1` utilise `sha256` et la sérialisation
+`json-sorted-keys-compact-utf8-lf`. Le corps canonique contient uniquement `schema`, `channel`,
+`artifact`, `algorithm`, `serialization`, `fileCount` et `files` ; `manifestId` et `rootHash` sont
+exclus du calcul. Les **91 pistes / 146 leçons** sous `content/` restent des métriques
+**historiques** et ne décrivent pas la source active.
+
 ---
 
-## 6 · Surface API (34 endpoints · 18 groupes)
+## 6 · Surface API (inventaire narratif)
 
 ```mermaid
 graph TD
@@ -219,7 +273,7 @@ les décisions serveur‑autoritaires.
 
 ---
 
-## 9 · Données — Cosmos DB (8 containers)
+## 9 · Données — Cosmos DB
 
 | Container | Clé de partition | Contenu |
 |---|---|---|
@@ -241,12 +295,12 @@ les décisions serveur‑autoritaires.
 
 ---
 
-## 10 · Infrastructure (Bicep) — déployée (dev / prod / CI), staging à provisionner
+## 10 · Infrastructure (Bicep) — état live référencé par l'audit
 
 ```mermaid
 graph TD
     M["infra/main.bicep"] --> F["functionApp<br/>Flex Consumption"]
-    M --> C["cosmos<br/>8 containers serverless"]
+    M --> C["cosmos<br/>containers serverless"]
     M --> K["keyvault<br/>secrets"]
     M --> A["appInsights<br/>télémétrie"]
     M --> S["storage<br/>AzureWebJobs"]
@@ -255,7 +309,9 @@ graph TD
     M --> G["diagnostics<br/>logs/metrics"]
 ```
 
-**8 modules** prêts. Les environnements **`dev`**, **`prod`** et **CI** sont déployés sur Azure (subscription MCAPS Hybrid `b8952c8c`) — `rg-certigo-dev`, `rg-certigo-prod` (**entièrement en réseau privé**) et `rg-certigo-ci`. **Seul `staging` n'est pas déployé** (bien que `infra/params/staging.bicepparam` existe).
+La présence des modules et paramètres est observable dans `infra/` et contrôlée par
+`ci-infra.yml`. L'état des environnements Azure est une observation externe, datée et référencée
+dans l'audit ci-dessous ; il n'est pas déduit du seul code.
 
 > ℹ️ État d'infra vérifié le **2026-07-04** — voir [`AUDIT_Certigo.md`](../AUDIT_Certigo.md) (source de vérité de l'état d'infra).
 
@@ -263,27 +319,11 @@ graph TD
 
 ## 11 · Qualité & CI
 
-| Workflow | Rôle |
-|---|---|
-| `ci-backend.yml` | Build + tests xUnit (.NET 8) + intégration Cosmos émulateur‑gated. |
-| `ci-mobile.yml` | Analyse + tests Dart unitaires/widget, dont le gate de golden tests Prism. |
-| `ci-content.yml` | Validation des leçons/certifs contre les schémas JSON. |
-| `ci-migration-registry.yml` | Cohérence des statuts, états et dépendances du registre de migration. |
-| `ci-cortex-parity.yml` | Parité des règles Cortex entre Dart et .NET sur vecteurs partagés. |
-| `ci-infra.yml` | Lint / what‑if Bicep. |
-| `runner-resilience-drill.yml` | Drill manuel de bascule du pool self-hosted ou du repli break-glass autorisé. |
-| `cd-backend.yml` | Déploiement backend vers l'environnement cible. |
-| `codeql.yml` | Analyse statique de sécurité. |
-| `dependency-vuln-scan.yml` | Scan des vulnérabilités de dépendances. |
-| `deploy-privacy-policy.yml` | Publication de la politique de confidentialité. |
-| `lint-workflows.yml` | Lint des workflows GitHub Actions du dépôt. |
-| `promote-backend-staging-prod.yml` | Promotion contrôlée du backend staging → prod. |
-| `release-android.yml` | AAB Android signé + publication Google Play. |
-| `security-scan.yml` | Scan sécurité complémentaire (NuGet + Bicep). |
-
-> `release-ios.yml` et `sync-ios-certs.yml` sont conservés comme références
-> historiques. Ils sont inertes par défaut et exigent l'opt-in manuel
-> `enable_legacy_workflow=true` ; la chaîne iOS active est gérée par Codemagic.
+L'inventaire exhaustif des workflows est généré dans **État technique généré**. Les preuves
+automatisées principales sont `ci-backend.yml`, `ci-mobile.yml`, `ci-content.yml`,
+`ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml` et
+`ci-project-state.yml`. Les deux références iOS GitHub historiques restent opt-in ; la chaîne iOS
+déclarée est dans `codemagic.yaml`.
 
 > ⚠️ CI exécutée **uniquement sur le runner self‑hosted Azure** (`certigo-ci`) — les runners
 > GitHub‑hébergés sont désactivés par la politique d'entreprise. Egress via NAT Gateway `nat-certigo` (RG `rg-certigo-ci`).
@@ -300,9 +340,12 @@ graph TD
 ## 12 · Journal d'évolution
 
 > Du plus récent au plus ancien. Mis à jour à chaque session de travail sur le projet.
+> Les nombres de ce journal sont des observations historiques datées, pas les compteurs courants ;
+> les compteurs courants existent uniquement dans le bloc généré.
 
 | Date | Évolution |
 |---|---|
+| 2026‑08‑06 | 🤖 **État observable généré (#247)** : versions, workflows, tests, corpus historique, types pédagogiques et référence analysée sont désormais produits par `tools/project_state.py` et gardés par `ci-project-state.yml`. `wp-p2-01` est clôturé après fusion de la PR #251 ; `wp-p2-08` est en revue dans la PR #254. |
 | 2026‑08‑06 | 📦 **Phase 2 avancée** : `wp-p2-02` et `wp-p2-03` sont `done` après fusion des PR `certigo-content` #7/#8 ; `wp-p2-04`, `wp-p2-07` et `wp-p2-09` sont en cours dans leurs sessions dédiées. |
 | 2026‑08‑05 | 📚 **Registre de migration réconcilié** : seuls les lots Phase 1 dont la DoD complète est satisfaite sont alignés à `done` dans le manifeste, les états JSON et la vue humaine ; les lots incomplets restent ouverts même si une PR associée a été fusionnée. Démarrage de `wp-p2-01` documentaire ; `wp-p2-02..09` ont alors été enregistrés à `todo`, avant leur exécution dans des sessions distinctes. |
 | 2026‑06‑29 | 🧪 **Tests Cosmos exécutés sur émulateur réel** : 6 cas `Certigo.Infrastructure.Tests` lancés (0 ignoré) sur l'émulateur Docker `vnext-preview` (ARM64, HTTPS) → **5/6 verts** ; le 6e (agrégat `GetRecentActivityAsync`) bute sur une limite _vnext-preview_ (`RewrittenAggregateProjections`), pas un bug prod (classic amd64 inutilisable sur ARM64 : `exec format error` / segfault QEMU). ✅ **Couverture HTTP des 15 Functions** restantes ajoutée (faux services + harness) → suite globale **496** verte. |
@@ -352,11 +395,10 @@ graph TD
 
 ### 🔄 Comment ce document reste à jour
 
-À chaque évolution traitée dans une session de travail sur Certigo, ce fichier est **rafraîchi dans
-le même commit / la même PR** : en‑tête (date + commit reflété), Vue d'ensemble, inventaire des
-fonctionnalités, contenu, API, données et **Journal d'évolution**. Pas de workflow autonome —
-la mise à jour fait partie du travail.
-
-_Dernier rafraîchissement : 2026‑08‑06 · registre réconcilié avec les PR content #7/#8 et les lots Phase 2 actifs._
+Après avoir commité une modification de source observable, exécuter
+`python tools/project_state.py --refresh-reference`, puis committer la référence et le document.
+La gate `ci-project-state.yml` rejoue les tests unitaires et `--check`; une version, un fichier de
+corpus, un type, un workflow ou un test ajouté sans régénération fait échouer la vérification. Le
+journal et les statuts fonctionnels restent narratifs et doivent citer leur preuve.
 
 </div>

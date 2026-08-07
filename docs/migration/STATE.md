@@ -31,14 +31,14 @@
 | `wp-p1-13-staging-environment` | 1 | S | todo | `wp-p1-12-iac-drift-import` | [#232 (IaC partielle)](https://github.com/gchambaud_microsoft/Certigo/pull/232) |
 | `wp-p1-14-opentelemetry-correlation` | 1 | M | done | `wp-p1-00-decomposition` | [#215](https://github.com/gchambaud_microsoft/Certigo/pull/215) |
 | `wp-p1-15-gamification-integrity` | 1 | M | done | `wp-p0-02-etag-concurrency`, `wp-p0-06-server-authoritative-integrity` | [#214](https://github.com/gchambaud_microsoft/Certigo/pull/214) |
-| `wp-p2-01` | 2 | S | in_review | `wp-p1-00-decomposition` | [#251](https://github.com/gchambaud_microsoft/Certigo/pull/251) |
+| `wp-p2-01` | 2 | S | done | `wp-p1-00-decomposition` | [#251](https://github.com/gchambaud_microsoft/Certigo/pull/251) |
 | `wp-p2-02` | 2 | M | done | `wp-p1-00-decomposition` | [certigo-content#7](https://github.com/gchambaud_microsoft/certigo-content/pull/7) |
 | `wp-p2-03` | 2 | M | done | `wp-p2-02` | [certigo-content#8](https://github.com/gchambaud_microsoft/certigo-content/pull/8) |
 | `wp-p2-04` | 2 | M | in_progress | `wp-p2-03` | [#244](https://github.com/gchambaud_microsoft/Certigo/issues/244) |
 | `wp-p2-05` | 2 | M | todo | `wp-p2-04` | [#243](https://github.com/gchambaud_microsoft/Certigo/issues/243) |
 | `wp-p2-06` | 2 | M | todo | `wp-p2-05` | [#245](https://github.com/gchambaud_microsoft/Certigo/issues/245) |
 | `wp-p2-07` | 2 | M | in_progress | `wp-p1-00-decomposition` | [#249](https://github.com/gchambaud_microsoft/Certigo/issues/249) · [PR #250](https://github.com/gchambaud_microsoft/Certigo/pull/250) |
-| `wp-p2-08` | 2 | S | todo | `wp-p2-01` | [#247](https://github.com/gchambaud_microsoft/Certigo/issues/247) |
+| `wp-p2-08` | 2 | S | in_review | `wp-p2-01` | [#247](https://github.com/gchambaud_microsoft/Certigo/issues/247) · [PR #254](https://github.com/gchambaud_microsoft/Certigo/pull/254) |
 | `wp-p2-09` | 2 | M | in_progress | `wp-p1-00-decomposition` | [#248](https://github.com/gchambaud_microsoft/Certigo/issues/248) · [PR #252](https://github.com/gchambaud_microsoft/Certigo/pull/252) |
 | `wp-phase-1-contenu-renderer` | 1 | L | planned | `wp-p0-08-e2e-auth-health-release` | — |
 | `wp-phase-2-search-ai-tutor` | 2 | L | planned | `wp-phase-1-contenu-renderer` | — |
@@ -51,7 +51,7 @@
 - **todo** — pas encore commencé ; prêt si toutes les dépendances sont `done`.
 - **in_progress** — en cours dans une session active (`session_id` + `branch` renseignés).
 - **blocked** — bloqué (timeout, échec, dépendance externe) ; note dans `state/` + `log.jsonl`.
-- **in_review** — travail terminé, PR ouverte, en attente de revue/merge.
+- **in_review** — travail terminé, en attente de revue/merge ; le champ PR est renseigné dès son ouverture.
 - **done** — mergé et DoD verte.
 - **rolled_back** — annulé via son rollback documenté.
 - **planned** — placeholder de phase, à décomposer en lots XS–M au lancement de la phase.
