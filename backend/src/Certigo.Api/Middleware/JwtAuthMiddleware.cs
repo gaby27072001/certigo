@@ -19,6 +19,8 @@ public sealed class JwtAuthMiddleware(ITokenValidator tokenValidator) : IFunctio
         "/api/auth/resend-verification"
     };
 
+    private const string FunctionKeyProtectedContentAdminPath = "/api/admin/content/releases";
+
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
     {
         var request = await context.GetHttpRequestDataAsync();
@@ -72,6 +74,12 @@ public sealed class JwtAuthMiddleware(ITokenValidator tokenValidator) : IFunctio
             path = path.TrimEnd('/');
         }
 
-        return AnonymousPaths.Contains(path);
+        // These automation endpoints are protected by the Azure Functions host key
+        // (AuthorizationLevel.Function), not by an interactive learner JWT.
+        return AnonymousPaths.Contains(path)
+               || path.Equals(FunctionKeyProtectedContentAdminPath, StringComparison.OrdinalIgnoreCase)
+               || path.StartsWith(
+                   $"{FunctionKeyProtectedContentAdminPath}/",
+                   StringComparison.OrdinalIgnoreCase);
     }
 }

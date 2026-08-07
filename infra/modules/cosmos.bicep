@@ -70,6 +70,9 @@ var containers = [
   { name: 'leaderboard', pk: '/periodLeagueId' }
   { name: 'economy', pk: '/userId' }
   { name: 'friends', pk: '/userId' }
+  { name: 'content-public', pk: '/releaseId' }
+  { name: 'content-private', pk: '/releaseId' }
+  { name: 'content-releases', pk: '/scope' }
 ]
 
 resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [

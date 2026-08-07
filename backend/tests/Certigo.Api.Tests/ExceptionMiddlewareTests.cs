@@ -86,6 +86,37 @@ public sealed class ExceptionMiddlewareTests
     }
 
     [Fact]
+    public async Task ContentReleaseValidationException_MapsTo400()
+    {
+        var middleware = CreateMiddleware();
+        var invocation = FunctionTestHarness.CreateHttp();
+
+        await middleware.Invoke(
+            invocation.Context,
+            _ => throw new ContentReleaseValidationException("Manifest hash mismatch."));
+
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var problem = await invocation.ReadProblemAsync();
+        problem!.Title.Should().Be("Invalid content release");
+        problem.Detail.Should().Be("Manifest hash mismatch.");
+    }
+
+    [Fact]
+    public async Task ActiveContentManifestUnavailableException_MapsTo503()
+    {
+        var middleware = CreateMiddleware();
+        var invocation = FunctionTestHarness.CreateHttp();
+
+        await middleware.Invoke(
+            invocation.Context,
+            _ => throw new ActiveContentManifestUnavailableException());
+
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        var problem = await invocation.ReadProblemAsync();
+        problem!.Title.Should().Be("Content unavailable");
+    }
+
+    [Fact]
     public async Task ConcurrencyConflictException_MapsTo409_WithGenericDetail_AndDoesNotLeakInternals()
     {
         var middleware = CreateMiddleware();

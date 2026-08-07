@@ -36,6 +36,42 @@ public sealed class JwtAuthMiddlewareTests
         invocation.Context.Items.Should().NotContainKey("User");
     }
 
+    [Theory]
+    [InlineData("/api/admin/content/releases/import")]
+    [InlineData("/api/admin/content/releases/sha256:abc/promote")]
+    [InlineData("/api/admin/content/releases/sha256:abc/rollback")]
+    public async Task Function_key_protected_content_admin_path_skips_learner_jwt(string path)
+    {
+        var validator = FakeTokenValidator.Failing();
+        var middleware = new JwtAuthMiddleware(validator);
+        var invocation = FunctionTestHarness.CreateHttp(method: "POST", path: path);
+
+        var nextCalled = false;
+        await middleware.Invoke(invocation.Context, _ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        nextCalled.Should().BeTrue();
+        validator.CallCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Content_admin_prefix_without_route_boundary_remains_jwt_protected()
+    {
+        var validator = FakeTokenValidator.Failing();
+        var middleware = new JwtAuthMiddleware(validator);
+        var invocation = FunctionTestHarness.CreateHttp(
+            method: "POST",
+            path: "/api/admin/content/releases-impersonated");
+
+        await middleware.Invoke(invocation.Context, _ => Task.CompletedTask);
+
+        invocation.Response.Should().NotBeNull();
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     [Fact]
     public async Task AnonymousPath_WithTrailingSlash_IsStillAnonymous()
     {

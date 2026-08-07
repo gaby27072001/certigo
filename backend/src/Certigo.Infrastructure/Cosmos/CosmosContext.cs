@@ -16,4 +16,7 @@ public sealed class CosmosContext(CosmosClient client, string? databaseName = nu
     public Container Leaderboard => _database.GetContainer(CosmosContainers.Leaderboard);
     public Container Economy => _database.GetContainer(CosmosContainers.Economy);
     public Container Friends => _database.GetContainer(CosmosContainers.Friends);
+    public Container ContentPublic => _database.GetContainer(CosmosContainers.ContentPublic);
+    public Container ContentPrivate => _database.GetContainer(CosmosContainers.ContentPrivate);
+    public Container ContentReleases => _database.GetContainer(CosmosContainers.ContentReleases);
 }

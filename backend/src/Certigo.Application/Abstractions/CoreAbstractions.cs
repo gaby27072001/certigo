@@ -34,6 +34,18 @@ public sealed class EmptyCatalogException()
 public sealed class TrackNotFoundException(string trackId)
     : Exception($"Track '{trackId}' was not found in the catalog.");
 
+public sealed class ContentReleaseValidationException(string message) : Exception(message);
+
+public sealed class ContentReleaseNotFoundException(string manifestId)
+    : Exception($"Content release '{manifestId}' was not found.");
+
+public sealed class ContentReleaseConflictException(string message) : Exception(message);
+
+public sealed class ActiveContentManifestUnavailableException(ContentReleaseEnvironment? environment = null)
+    : Exception(environment is null
+        ? "No public content manifest is active in production."
+        : $"No content manifest is active in {environment}.");
+
 public interface IUserContext
 {
     string UserId { get; }
@@ -73,6 +85,54 @@ public interface IContentRepository
     // doc per track, each in its own /trackId partition), so callers should
     // treat it as a low-frequency catalog read, not a hot path.
     Task<IReadOnlyList<Track>> ListTracksAsync(CancellationToken cancellationToken = default);
+}
+
+public interface IContentReleaseRepository
+{
+    Task<ContentReleaseRecord?> GetReleaseAsync(
+        string manifestId,
+        CancellationToken cancellationToken = default);
+
+    Task<ContentReleaseStateRecord?> GetStateAsync(
+        ContentReleaseEnvironment environment,
+        CancellationToken cancellationToken = default);
+
+    Task WritePublicPackageAsync(
+        ContentPackageDto package,
+        CancellationToken cancellationToken = default);
+
+    Task WritePrivatePackageAsync(
+        ContentPackageDto package,
+        CancellationToken cancellationToken = default);
+
+    Task CommitImportAsync(
+        ContentReleaseRecord release,
+        ContentReleaseStateRecord stagingState,
+        CancellationToken cancellationToken = default);
+
+    Task<ContentReleaseStateRecord> UpdateStateAsync(
+        ContentReleaseStateRecord state,
+        CancellationToken cancellationToken = default);
+
+    Task<ContentPackageManifestDto?> GetPublicManifestAsync(
+        string manifestId,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IContentReleaseTelemetry
+{
+    void TrackImported(string manifestId, bool replayed);
+    void TrackPromoted(string manifestId, bool changed);
+    void TrackRejected(string reason);
+    void TrackRolledBack(string manifestId, ContentReleaseEnvironment environment, bool changed);
+}
+
+public sealed class NullContentReleaseTelemetry : IContentReleaseTelemetry
+{
+    public void TrackImported(string manifestId, bool replayed) { }
+    public void TrackPromoted(string manifestId, bool changed) { }
+    public void TrackRejected(string reason) { }
+    public void TrackRolledBack(string manifestId, ContentReleaseEnvironment environment, bool changed) { }
 }
 
 public interface IProgressRepository

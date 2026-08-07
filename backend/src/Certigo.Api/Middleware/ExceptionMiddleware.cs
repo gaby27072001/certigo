@@ -62,6 +62,30 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
         {
             await WriteProblemAsync(context, HttpStatusCode.NotFound, "Track not found", ex.Message, correlationId);
         }
+        catch (ContentReleaseValidationException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.BadRequest, "Invalid content release", ex.Message, correlationId);
+        }
+        catch (ContentReleaseNotFoundException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.NotFound, "Content release not found", ex.Message, correlationId);
+        }
+        catch (ContentReleaseConflictException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Conflict, "Content release conflict", ex.Message, correlationId);
+        }
+        catch (ActiveContentManifestUnavailableException ex)
+        {
+            logger.LogWarning(
+                "Active content manifest unavailable in function {FunctionName}.",
+                context.FunctionDefinition.Name);
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.ServiceUnavailable,
+                "Content unavailable",
+                ex.Message,
+                correlationId);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Unhandled exception in function {FunctionName}.", context.FunctionDefinition.Name);
