@@ -30,8 +30,8 @@ jobs:
     environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
     runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "20"
       - name: Install validator deps

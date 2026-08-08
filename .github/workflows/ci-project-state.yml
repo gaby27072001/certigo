@@ -18,9 +18,7 @@ permissions:
 env:
   CONTENT_APP_ID: ${{ secrets.CERTIGO_CONTENT_APP_ID }}
   CONTENT_APP_PRIVATE_KEY: ${{ secrets.CERTIGO_CONTENT_APP_PRIVATE_KEY }}
-  # Prefer a dedicated read-only credential; retain the existing repository
-  # automation token as a compatibility fallback until one is provisioned.
-  CONTENT_READ_TOKEN: ${{ secrets.CERTIGO_CONTENT_READ_TOKEN || secrets.AUTOMERGE_TOKEN }}
+  CONTENT_READ_TOKEN: ${{ secrets.CERTIGO_CONTENT_READ_TOKEN }}
 
 jobs:
   validate:
@@ -29,11 +27,11 @@ jobs:
     environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
     runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - name: Test project-state generator
@@ -56,7 +54,7 @@ jobs:
       - name: Mint read-only certigo-content GitHub App token
         id: content-app-token
         if: env.CONTENT_APP_ID != '' && env.CONTENT_APP_PRIVATE_KEY != ''
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
         with:
           app-id: ${{ env.CONTENT_APP_ID }}
           private-key: ${{ env.CONTENT_APP_PRIVATE_KEY }}
@@ -78,14 +76,14 @@ jobs:
           echo "::add-mask::$token"
           echo "token=$token" >> "$GITHUB_OUTPUT"
       - name: Checkout current certigo-content main
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: gchambaud_microsoft/certigo-content
           ref: main
           token: ${{ steps.content-auth.outputs.token }}
           path: .active-content
           persist-credentials: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "20.20.2"
           cache: npm

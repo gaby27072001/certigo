@@ -5,7 +5,9 @@
     "contexts": [
       "Build & test",
       "Flutter app + UI packages",
-      "Generated state equals committed state"
+      "Generated state equals committed state",
+      "Validate workflow YAML",
+      "CodeQL / Security gate"
     ]
   },
   "enforce_admins": true,

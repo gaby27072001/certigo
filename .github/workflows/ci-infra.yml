@@ -29,7 +29,7 @@ jobs:
     environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
     runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # CI-09 : le runner-2 n'a PAS l'Azure CLI (`az`). On installe le CLI Bicep
       # standalone dans un répertoire écrivable ($RUNNER_TEMP) et on l'ajoute au PATH,
       # de sorte que le lint fonctionne à l'identique sur les DEUX runners.

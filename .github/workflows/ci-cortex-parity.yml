@@ -76,7 +76,7 @@ jobs:
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Ensure CI prerequisites (unzip, jq, zip, xz)
         run: |
           set -e
@@ -91,12 +91,12 @@ jobs:
           else
             echo "All prerequisites already present."
           fi
-      - uses: dart-lang/setup-dart@v1
+      - uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
         with:
           # Epingle pour une CI reproductible (Dart livre avec Flutter 3.44.4).
           # A bumper deliberement avec FLUTTER_VERSION de ci-mobile.
           sdk: "3.12.2"
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: "8.0.x"
       # --- Cote Dart : rejoue les golden vectors partages via package:cortex ---

@@ -8,10 +8,7 @@ name: deploy-privacy-policy
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: {}
 
 concurrency:
   group: pages-privacy-policy
@@ -26,9 +23,12 @@ jobs:
     # CI-01 : approbation humaine requise pour les PR avant execution sur le runner self-hosted.
     environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
     runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    permissions:
+      contents: read
+      pages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       - name: Build static privacy policy page
         run: |
           mkdir -p _site/privacy-policy
@@ -62,7 +62,7 @@ jobs:
           )
           PY
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
           path: _site
 
@@ -74,6 +74,9 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

@@ -14,15 +14,23 @@ concurrency:
 jobs:
   deploy-staging:
     name: Promote backend to staging
+    if: ${{ github.ref == 'refs/heads/main' }}
     uses: ./.github/workflows/cd-backend.yml
     with:
       environment: staging
-    secrets: inherit
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
   deploy-prod:
     name: Promote backend to prod
     needs: deploy-staging
+    if: ${{ github.ref == 'refs/heads/main' }}
     uses: ./.github/workflows/cd-backend.yml
     with:
       environment: prod
-    secrets: inherit
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}

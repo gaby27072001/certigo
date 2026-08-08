@@ -6,44 +6,141 @@ name: codeql
 # in ci-mobile plus dependency scanning. Buildless ("none") mode is used so the
 # scan never depends on a successful compile.
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   schedule:
-    # Nightly scan to reduce daytime pressure on self-hosted runners.
-    - cron: "17 2 * * *"
+    # Weekly full scan; PR/push runs are path-scoped and language-scoped below.
+    - cron: "17 2 * * 0"
   workflow_dispatch:
 
 concurrency:
   group: codeql-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
+  changes:
+    name: Select CodeQL languages
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
+    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      has_changes: ${{ steps.matrix.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Detect language paths
+        id: filter
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        with:
+          filters: |
+            csharp:
+              - 'backend/**'
+            javascript:
+              - 'tools/**/*.js'
+              - 'tools/**/*.mjs'
+              - 'package.json'
+              - 'package-lock.json'
+            python:
+              - 'tools/**/*.py'
+            workflow:
+              - '.github/workflows/codeql.yml'
+      - name: Build minimal language matrix
+        id: matrix
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CSHARP_CHANGED: ${{ steps.filter.outputs.csharp }}
+          JAVASCRIPT_CHANGED: ${{ steps.filter.outputs.javascript }}
+          PYTHON_CHANGED: ${{ steps.filter.outputs.python }}
+          WORKFLOW_CHANGED: ${{ steps.filter.outputs.workflow }}
+        run: |
+          set -euo pipefail
+          include=()
+          if [ "$EVENT_NAME" = "schedule" ] || [ "$EVENT_NAME" = "workflow_dispatch" ] ||
+            [ "$WORKFLOW_CHANGED" = "true" ]; then
+            CSHARP_CHANGED=true
+            JAVASCRIPT_CHANGED=true
+            PYTHON_CHANGED=true
+          fi
+          [ "$CSHARP_CHANGED" = "true" ] &&
+            include+=('{"language":"csharp","build-mode":"none"}')
+          [ "$JAVASCRIPT_CHANGED" = "true" ] &&
+            include+=('{"language":"javascript-typescript","build-mode":"none"}')
+          [ "$PYTHON_CHANGED" = "true" ] &&
+            include+=('{"language":"python","build-mode":"none"}')
+
+          if [ "${#include[@]}" -eq 0 ]; then
+            echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
+            echo 'has_changes=false' >> "$GITHUB_OUTPUT"
+          else
+            joined=$(IFS=,; echo "${include[*]}")
+            echo "matrix={\"include\":[$joined]}" >> "$GITHUB_OUTPUT"
+            echo 'has_changes=true' >> "$GITHUB_OUTPUT"
+          fi
+
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    needs: changes
+    if: ${{ needs.changes.outputs.has_changes == 'true' }}
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
+    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
     permissions:
       security-events: write
       actions: read
       contents: read
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - language: csharp
-            build-mode: none
-          - language: javascript-typescript
-            build-mode: none
-          - language: python
-            build-mode: none
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-and-quality
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           category: "/language:${{ matrix.language }}"
+
+  security-gate:
+    name: CodeQL / Security gate
+    needs: [changes, analyze]
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
+    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    permissions: {}
+    steps:
+      - name: Enforce CodeQL result
+        shell: bash
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          ANALYZE_RESULT: ${{ needs.analyze.result }}
+        run: |
+          set -euo pipefail
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "::error::CodeQL path selection did not succeed."
+            exit 1
+          fi
+          case "$ANALYZE_RESULT" in
+            success|skipped) ;;
+            *)
+              echo "::error::At least one required CodeQL analysis failed."
+              exit 1
+              ;;
+          esac

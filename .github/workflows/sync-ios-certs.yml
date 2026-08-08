@@ -37,11 +37,11 @@ env:
 
 jobs:
   sync:
-    if: ${{ inputs.enable_legacy_workflow }}
+    if: ${{ inputs.enable_legacy_workflow && github.ref == 'refs/heads/main' }}
     name: fastlane match (création / renouvellement)
     runs-on: [self-hosted, macOS]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Résoudre les secrets (Key Vault → repli secrets)
         shell: bash

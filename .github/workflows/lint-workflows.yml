@@ -7,8 +7,6 @@ name: Lint GitHub Actions workflows
 on:
   pull_request:
     branches: [main]
-    paths:
-      - ".github/workflows/**"
 
 permissions:
   contents: read
@@ -26,7 +24,7 @@ jobs:
     environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
     runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install actionlint
         run: |
@@ -54,3 +52,6 @@ jobs:
             exit 1
           fi
           actionlint "${workflows[@]}"
+
+      - name: Enforce workflow security policy
+        run: node .github/scripts/validate-workflow-security.mjs

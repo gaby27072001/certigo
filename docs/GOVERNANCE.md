@@ -20,8 +20,8 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | `require_code_owner_reviews` (revue d'un code owner) | `false` | ⚠️ durcissement possible |
 | `require_last_push_approval` | `false` | — |
 | Checks de statut requis | ✅ oui, `strict = true` | **DoD : checks requis** |
-| Contextes requis constatés avant réconciliation | `Build & test`, `Flutter app + UI packages` | ⚠️ ajouter la gate d'état |
-| Contexte cible supplémentaire | `Generated state equals committed state` | Vérifié sur chaque PR par `ci-project-state.yml` |
+| Contextes requis constatés avant réconciliation | `Build & test`, `Flutter app + UI packages` | ⚠️ réconcilier les cinq gates cibles |
+| Contextes cibles supplémentaires | `Generated state equals committed state`, `Validate workflow YAML`, `CodeQL / Security gate` | Vérifiés sur chaque PR |
 | `allow_force_pushes` (push forcé) | `false` | **DoD : push direct interdit** |
 | `allow_deletions` (suppression de branche) | `false` | ✅ |
 | `enforce_admins` (appliquer aux admins) | `false` | ⚠️ durcissement possible |
@@ -38,13 +38,15 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | `Build & test` | [`.github/workflows/ci-backend.yml`](../.github/workflows/ci-backend.yml) | `Build & test` |
 | `Flutter app + UI packages` | [`.github/workflows/ci-mobile.yml`](../.github/workflows/ci-mobile.yml) | `Flutter app + UI packages` |
 | `Generated state equals committed state` | [`.github/workflows/ci-project-state.yml`](../.github/workflows/ci-project-state.yml) | `Generated state equals committed state` |
+| `Validate workflow YAML` | [`.github/workflows/lint-workflows.yml`](../.github/workflows/lint-workflows.yml) | `Validate workflow YAML` |
+| `CodeQL / Security gate` | [`.github/workflows/codeql.yml`](../.github/workflows/codeql.yml) | `CodeQL / Security gate` |
 
 ### Conclusion DoD
 
 Le **cœur de la DoD est SATISFAIT** : `main` exige une PR avec **≥ 1 revue**, des checks stricts et
 interdit le push direct (`allow_force_pushes=false` + revue obligatoire ⇒ pas de `git push` direct
-sur `main`). L'état cible versionné ajoute `Generated state equals committed state` aux deux
-contextes existants ; sa réconciliation live doit utiliser uniquement le `PATCH` étroit du §4.
+sur `main`). L'état cible versionné ajoute trois gates aux deux contextes existants ; sa
+réconciliation live doit utiliser uniquement le `PATCH` étroit du §4.
 
 Restent des **gaps de durcissement** (facultatifs pour la DoD mais recommandés) traités
 en **réserve admin** au §4.
@@ -91,7 +93,7 @@ par domaine (backend, mobile, infra, `.github`, docs, registre de migration…).
 ### Fichier de capture ré-appliquable
 
 [`.github/branch-protection-main.json`](../.github/branch-protection-main.json) contient un
-**état cible pour revue**, incluant le contexte `Generated state equals committed state`. Ce fichier
+**état cible pour revue**, incluant les cinq contextes du §4. Ce fichier
 n'est pas une charge utile à envoyer en bloc : les champs de durcissement restent des réserves
 séparées, et seuls les checks requis sont réconciliés ici.
 
@@ -119,7 +121,9 @@ séparées, et seuls les checks requis sont réconciliés ici.
      "contexts": [
        "Build & test",
        "Flutter app + UI packages",
-       "Generated state equals committed state"
+       "Generated state equals committed state",
+       "Validate workflow YAML",
+       "CodeQL / Security gate"
      ]
    }
    JSON
@@ -134,7 +138,7 @@ séparées, et seuls les checks requis sont réconciliés ici.
 
    Attendu pour les checks :
    `strict=true` et
-   `checks=["Build & test","Flutter app + UI packages","Generated state equals committed state"]`.
+   `checks=["Build & test","Flutter app + UI packages","Generated state equals committed state","Validate workflow YAML","CodeQL / Security gate"]`.
 
 > **Rollback des checks seulement** : rejouer le même endpoint `PATCH` avec `strict` inchangé et la
 > liste de contextes antérieure. Ne jamais utiliser `PUT` avec le JSON durci complet.
@@ -178,6 +182,25 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
 - [ ] Activer `require_code_owner_reviews = true` (après merge de `CODEOWNERS` sur `main`).
 - [ ] Activer `required_conversation_resolution = true`.
 - [ ] *(Optionnel, à arbitrer)* `required_linear_history = true`.
+- [ ] Réconcilier les checks requis avec les cinq contextes du §4, en gardant
+      `strict=true`.
+- [ ] Dans **Settings → Actions → General**, conserver le token par défaut en
+      lecture seule, désactiver l'autorisation pour GitHub Actions d'approuver
+      des PR et restreindre les Actions autorisées. Activer la politique
+      d'épinglage par SHA complet si elle est disponible au niveau entreprise.
+- [ ] Supprimer le secret `AUTOMERGE_TOKEN`, révoquer le PAT correspondant et
+      désactiver **Allow auto-merge** si aucun autre usage gouverné ne le justifie.
+- [ ] Protéger l'environnement `beta` avec reviewers obligatoires, interdiction
+      d'auto-approbation et branches/tags de déploiement limités à `main` et
+      `v*`. Stocker ses secrets de signature/publication dans cet environnement.
+- [ ] Protéger `staging` et `prod` avec reviewers obligatoires, interdiction
+      d'auto-approbation et déploiement limité à `main`. Conserver les secrets
+      OIDC `AZURE_*` au niveau environnement, pas au niveau dépôt.
+- [ ] Créer un ruleset de tags `v*` interdisant suppression et modification, et
+      limitant la création aux mainteneurs de release.
+- [ ] Activer Code scanning, Dependabot alerts et Dependabot security updates
+      lorsque la politique Enterprise Managed Users l'autorise. Le workflow OSV
+      bloquant reste le filet de sécurité indépendant.
 
 Ces réserves ne doivent pas être appliquées implicitement avec le JSON complet. Les traiter
 séparément, avec revue admin et lecture préalable de l'état live.

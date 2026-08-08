@@ -133,9 +133,9 @@ Utilisé automatiquement si `AZURE_KEYVAULT_NAME` n'est **pas** définie.
 | `ASC_ISSUER_ID` | iOS | App Store Connect Issuer ID |
 | `ASC_KEY_P8_BASE64` | iOS | Clé API App Store Connect (.p8) en base64 |
 
-> Tant que `PLAY_SERVICE_ACCOUNT_JSON` est absent, le workflow **construit quand
-> même l'AAB signé** (téléchargeable en artefact) et **saute** proprement la
-> publication.
+> `PLAY_SERVICE_ACCOUNT_JSON` est obligatoire pour toute exécution non
+> `dry_run`. Son absence fait échouer le workflow avant publication. Un dry-run
+> peut construire l'AAB sans ce compte de service.
 
 ### 2.3 Configuration app (dart-define) — social login & API ⚙️
 
@@ -170,10 +170,12 @@ noms sont référencés dans le code.
   Actions → Variables → New repository variable` pour chaque `MOBILE_*`
   ci-dessus. (Onglet **Variables**, pas **Secrets**.)
 
-> 🟡 **Comportement warn-only** : si `API_BASE_URL`, `ENTRA_CLIENT_ID` ou
-> `ENTRA_AUTHORITY` est vide, l'étape `appconfig` émet un `::warning::` mais
-> **ne casse pas** le build beta (l'AAB est produit avec social/login
-> désactivés). Renseigner les valeurs pour un login fonctionnel.
+> 🔒 **Gate bloquant de publication** : pour toute exécution non `dry_run`, les
+> cinq valeurs sont obligatoires et validées strictement (URL API HTTPS en
+> `/api`, GUID client, authority External ID, scope `api://...`, environnement
+> `dev|staging|prod`). Un dry-run invalide reste autorisé avec configuration
+> neutralisée et ne peut pas publier. La piste `production` exige en plus
+> `MOBILE_CERTIGO_ENV=prod`.
 
 **iOS — groupe de variables Codemagic `certigo_mobile_config`**
 
@@ -265,6 +267,8 @@ gh secret set ANDROID_KEY_PASSWORD      --body '<mot_de_passe_cle>'
    - **dry_run** : `false` (mettre `true` pour builder sans publier).
 3. Le workflow exécute les **gates** (`analyze` + `test`), construit l'**AAB
    signé**, l'**uploade** sur la piste choisie, puis nettoie les secrets.
+   `version_name` doit être un SemVer strict, `build_number` un entier positif
+   ≤ 2 100 000 000 et `track` l'une de `internal|alpha|beta|production`.
 4. Dans la Play Console, ajouter les testeurs (e-mails ou liste) et partager le
    **lien d'opt-in** de la piste de test interne.
 5. Les testeurs acceptent l'invitation puis installent depuis le lien.
@@ -272,12 +276,13 @@ gh secret set ANDROID_KEY_PASSWORD      --body '<mot_de_passe_cle>'
 ### 3.6 Runbook — Release par tag
 
 ```bash
-git tag v0.1.0
+git tag -a v0.1.0 -m "Release v0.1.0"
 git push origin v0.1.0
 ```
 
-→ déclenche `release-android` qui publie automatiquement sur la piste
-**internal** (versionName = `0.1.0` déduit du tag).
+→ déclenche `release-android` sur la piste **internal** (versionName = `0.1.0`
+déduit du tag), après approbation de l'environnement `beta`. Le workflow vérifie
+que le tag correspond exactement à `v<SemVer>` et pointe sur un commit de `main`.
 
 ### 3.7 Promouvoir Internal → Closed testing (beta)
 
@@ -395,7 +400,7 @@ gh secret set ASC_KEY_P8_BASE64               < authkey.b64
    - Pour un dry run (IPA sans upload) : choisir **`ios-release-dry`**.
    - Pour distribuer aux testeurs externes : modifier `beta_groups` dans
      `codemagic.yaml` avant de lancer.
-3. Ou pousser un **tag git `v*`** (ex: `git tag v1.2.3+45 && git push --tags`) ;
+3. Ou pousser un **tag git `v*`** (ex: `git tag -a v1.2.3 -m "Release v1.2.3" && git push --tags`) ;
    cela déclenche automatiquement `ios-release`.
 4. Le workflow : `analyze`/`test` → signature automatique via App Store Connect
    API → `flutter build ipa` → upload TestFlight.
