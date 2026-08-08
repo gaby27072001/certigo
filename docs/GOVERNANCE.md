@@ -20,8 +20,8 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | `require_code_owner_reviews` (revue d'un code owner) | `false` | ⚠️ durcissement possible |
 | `require_last_push_approval` | `false` | — |
 | Checks de statut requis | ✅ oui, `strict = true` | **DoD : checks requis** |
-| Contextes requis constatés avant réconciliation | `Build & test`, `Flutter app + UI packages` | ⚠️ réconcilier les cinq gates cibles |
-| Contextes cibles supplémentaires | `Generated state equals committed state`, `Validate workflow YAML`, `CodeQL / Security gate` | Vérifiés sur chaque PR |
+| Contextes requis constatés avant réconciliation | `Build & test`, `Flutter app + UI packages` | ⚠️ réconcilier les six gates cibles |
+| Contextes cibles supplémentaires | `Generated state equals committed state`, `Validate workflow YAML`, `CodeQL / Security gate`, `Security / Required gate` | Vérifiés sur chaque PR |
 | `allow_force_pushes` (push forcé) | `false` | **DoD : push direct interdit** |
 | `allow_deletions` (suppression de branche) | `false` | ✅ |
 | `enforce_admins` (appliquer aux admins) | `false` | ⚠️ durcissement possible |
@@ -40,6 +40,7 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | `Generated state equals committed state` | [`.github/workflows/ci-project-state.yml`](../.github/workflows/ci-project-state.yml) | `Generated state equals committed state` |
 | `Validate workflow YAML` | [`.github/workflows/lint-workflows.yml`](../.github/workflows/lint-workflows.yml) | `Validate workflow YAML` |
 | `CodeQL / Security gate` | [`.github/workflows/codeql.yml`](../.github/workflows/codeql.yml) | `CodeQL / Security gate` |
+| `Security / Required gate` | [`.github/workflows/security-gate.yml`](../.github/workflows/security-gate.yml) | `Security / Required gate` |
 
 ### Conclusion DoD
 
@@ -93,7 +94,7 @@ par domaine (backend, mobile, infra, `.github`, docs, registre de migration…).
 ### Fichier de capture ré-appliquable
 
 [`.github/branch-protection-main.json`](../.github/branch-protection-main.json) contient un
-**état cible pour revue**, incluant les cinq contextes du §4. Ce fichier
+**état cible pour revue**, incluant les six contextes du §4. Ce fichier
 n'est pas une charge utile à envoyer en bloc : les champs de durcissement restent des réserves
 séparées, et seuls les checks requis sont réconciliés ici.
 
@@ -123,7 +124,8 @@ séparées, et seuls les checks requis sont réconciliés ici.
        "Flutter app + UI packages",
        "Generated state equals committed state",
        "Validate workflow YAML",
-       "CodeQL / Security gate"
+       "CodeQL / Security gate",
+       "Security / Required gate"
      ]
    }
    JSON
@@ -138,7 +140,7 @@ séparées, et seuls les checks requis sont réconciliés ici.
 
    Attendu pour les checks :
    `strict=true` et
-   `checks=["Build & test","Flutter app + UI packages","Generated state equals committed state","Validate workflow YAML","CodeQL / Security gate"]`.
+   `checks=["Build & test","Flutter app + UI packages","Generated state equals committed state","Validate workflow YAML","CodeQL / Security gate","Security / Required gate"]`.
 
 > **Rollback des checks seulement** : rejouer le même endpoint `PATCH` avec `strict` inchangé et la
 > liste de contextes antérieure. Ne jamais utiliser `PUT` avec le JSON durci complet.
@@ -182,12 +184,15 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
 - [ ] Activer `require_code_owner_reviews = true` (après merge de `CODEOWNERS` sur `main`).
 - [ ] Activer `required_conversation_resolution = true`.
 - [ ] *(Optionnel, à arbitrer)* `required_linear_history = true`.
-- [ ] Réconcilier les checks requis avec les cinq contextes du §4, en gardant
+- [ ] Réconcilier les checks requis avec les six contextes du §4, en gardant
       `strict=true`.
 - [ ] Dans **Settings → Actions → General**, conserver le token par défaut en
       lecture seule, désactiver l'autorisation pour GitHub Actions d'approuver
       des PR et restreindre les Actions autorisées. Activer la politique
       d'épinglage par SHA complet si elle est disponible au niveau entreprise.
+- [ ] Autoriser les runners GitHub-hosted pour les workflows de validation des
+      PR de forks ; ces jobs sont sans secrets, sans environnement et n'utilisent
+      jamais le runner self-hosted persistant.
 - [ ] Supprimer le secret `AUTOMERGE_TOKEN`, révoquer le PAT correspondant et
       désactiver **Allow auto-merge** si aucun autre usage gouverné ne le justifie.
 - [ ] Protéger l'environnement `beta` avec reviewers obligatoires, interdiction

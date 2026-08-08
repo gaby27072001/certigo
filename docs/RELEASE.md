@@ -127,7 +127,7 @@ gh workflow run promote-backend-staging-prod.yml
    - [ ] `main` à jour, PR de release mergée (revue + checks verts).
    - [ ] CI verte : `Build & test`, `Flutter app + UI packages`,
          `Generated state equals committed state`, `Validate workflow YAML` et
-         `CodeQL / Security gate`.
+         `CodeQL / Security gate`, plus `Security / Required gate`.
    - [ ] Version décidée (SemVer) et reflétée dans `apps/mobile/pubspec.yaml`.
    - [ ] Notes de version / changelog préparés.
 2. **Backend**

@@ -112,11 +112,21 @@ function validateWorkflow(file) {
   return errors;
 }
 
-function validateReleaseInvariants() {
+function validateRepositoryInvariants() {
   const errors = [];
   const android = fs.readFileSync(path.join(workflowsDir, 'release-android.yml'), 'utf8');
   const backend = fs.readFileSync(path.join(workflowsDir, 'cd-backend.yml'), 'utf8');
   const codeql = fs.readFileSync(path.join(workflowsDir, 'codeql.yml'), 'utf8');
+  const lint = fs.readFileSync(path.join(workflowsDir, 'lint-workflows.yml'), 'utf8');
+  const securityGate = fs.readFileSync(path.join(workflowsDir, 'security-gate.yml'), 'utf8');
+  const dependencyScan = fs.readFileSync(
+    path.join(workflowsDir, 'dependency-vuln-scan.yml'),
+    'utf8',
+  );
+  const iacScan = fs.readFileSync(path.join(workflowsDir, 'security-scan.yml'), 'utf8');
+  const branchProtection = JSON.parse(
+    fs.readFileSync(path.join(root, '.github', 'branch-protection-main.json'), 'utf8'),
+  );
   const androidRequirements = new Map([
     ['fixed beta environment', 'environment: beta'],
     [
@@ -165,6 +175,71 @@ function validateReleaseInvariants() {
   if (!codeql.includes('CodeQL / Security gate')) {
     errors.push('codeql.yml: stable security gate is missing');
   }
+  if (
+    !codeql.includes(
+      "runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest'",
+    ) ||
+    !codeql.includes("&& 'never' || 'always' }}")
+  ) {
+    errors.push('codeql.yml: fork pull requests must analyze on GitHub-hosted runners');
+  }
+  if (
+    codeql.includes(
+      "if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}",
+    )
+  ) {
+    errors.push('codeql.yml: required CodeQL jobs must not skip fork pull requests');
+  }
+  if (!lint.includes('name: Validate workflow YAML') || !lint.includes('runs-on: ubuntu-latest')) {
+    errors.push('lint-workflows.yml: required lint must run on a GitHub-hosted runner');
+  }
+  if (lint.includes('environment:') || lint.includes('head.repo.full_name == github.repository')) {
+    errors.push('lint-workflows.yml: required lint must not skip or gate fork pull requests');
+  }
+  for (const marker of [
+    'name: Security / Required gate',
+    'needs: [changes, osv, nuget, checkov]',
+    'uses: ./.github/workflows/dependency-vuln-scan.yml',
+    'uses: ./.github/workflows/security-scan.yml',
+    'if: ${{ always() }}',
+  ]) {
+    if (!securityGate.includes(marker)) {
+      errors.push(`security-gate.yml: missing required invariant ${marker}`);
+    }
+  }
+  if (securityGate.includes('\n    paths:')) {
+    errors.push('security-gate.yml: required workflow triggers must not be path-scoped');
+  }
+  for (const dependencyInput of [
+    "'**/Directory.Build.props'",
+    "'**/Directory.Build.targets'",
+    "'**/NuGet.Config'",
+    "'**/.npmrc'",
+    "'**/pubspec_overrides.yaml'",
+  ]) {
+    if (!securityGate.includes(dependencyInput)) {
+      errors.push(`security-gate.yml: dependency filter omits ${dependencyInput}`);
+    }
+  }
+  for (const [fileName, workflow] of [
+    ['dependency-vuln-scan.yml', dependencyScan],
+    ['security-scan.yml', iacScan],
+  ]) {
+    if (!workflow.includes('workflow_call:')) {
+      errors.push(`${fileName}: scanner must be callable by the stable security gate`);
+    }
+    if (!workflow.includes("github.event_name == 'pull_request' && 'ubuntu-latest'")) {
+      errors.push(`${fileName}: fork pull requests must use a GitHub-hosted runner`);
+    }
+    if (workflow.includes('environment:')) {
+      errors.push(`${fileName}: fork-safe scanners must not use protected environments`);
+    }
+  }
+  if (
+    !branchProtection.required_status_checks.contexts.includes('Security / Required gate')
+  ) {
+    errors.push('branch-protection-main.json: stable security gate is not required');
+  }
   return errors;
 }
 
@@ -178,7 +253,7 @@ const errors = [
     ? ['copilot-auto-merge.yml: privileged auto-merge workflow must remain removed']
     : []),
   ...workflowFiles.flatMap(validateWorkflow),
-  ...validateReleaseInvariants(),
+  ...validateRepositoryInvariants(),
 ];
 
 if (errors.length > 0) {

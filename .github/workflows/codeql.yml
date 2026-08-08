@@ -24,9 +24,8 @@ permissions: {}
 jobs:
   changes:
     name: Select CodeQL languages
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    # Pull requests, including forks, run only on an ephemeral GitHub-hosted runner.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
     permissions:
       contents: read
       pull-requests: read
@@ -92,8 +91,7 @@ jobs:
     name: Analyze (${{ matrix.language }})
     needs: changes
     if: ${{ needs.changes.outputs.has_changes == 'true' }}
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
     permissions:
       security-events: write
       actions: read
@@ -117,19 +115,21 @@ jobs:
         uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           category: "/language:${{ matrix.language }}"
+          # Fork tokens cannot write security events; analysis still runs and gates locally.
+          upload: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'never' || 'always' }}
 
   security-gate:
     name: CodeQL / Security gate
     needs: [changes, analyze]
-    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    if: ${{ always() }}
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
     permissions: {}
     steps:
       - name: Enforce CodeQL result
         shell: bash
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
+          HAS_CHANGES: ${{ needs.changes.outputs.has_changes }}
           ANALYZE_RESULT: ${{ needs.analyze.result }}
         run: |
           set -euo pipefail
@@ -137,10 +137,11 @@ jobs:
             echo "::error::CodeQL path selection did not succeed."
             exit 1
           fi
-          case "$ANALYZE_RESULT" in
-            success|skipped) ;;
-            *)
-              echo "::error::At least one required CodeQL analysis failed."
-              exit 1
-              ;;
-          esac
+          if [ "$HAS_CHANGES" = "true" ] && [ "$ANALYZE_RESULT" != "success" ]; then
+            echo "::error::At least one applicable CodeQL analysis did not succeed."
+            exit 1
+          fi
+          if [ "$HAS_CHANGES" = "false" ] && [ "$ANALYZE_RESULT" != "skipped" ]; then
+            echo "::error::CodeQL analysis ran despite no applicable language changes."
+            exit 1
+          fi

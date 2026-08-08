@@ -1,70 +1,42 @@
 name: dependency-vuln-scan
 
-# CI-07a — Gate de vulnérabilités indépendant de Dependabot.
-#
-# POURQUOI : l'activation de Dependabot (alerts + security-updates) est VERROUILLÉE par une
-# policy enterprise (compte EMU) : l'API renvoie HTTP 422 sur PUT vulnerability-alerts /
-# PATCH dependabot_security_updates malgré des droits admin repo + GHAS. Le fichier
-# .github/dependabot.yml reste donc inerte. Ce workflow restaure la même valeur métier
-# (détection de dépendances vulnérables) 100% côté repo, SANS dépendre de l'enterprise.
-#
-# POINT CLÉ : OSV-Scanner n'utilise PAS le dependency graph GitHub -> il n'est PAS bloqué par
-# la policy EMU. Les résultats SARIF sont remontés dans l'onglet Security > Code scanning
-# (déjà actif sur ce repo) : équivalent visuel de Dependabot.
-#
-# Les vulnérabilités ou l'impossibilité d'exécuter le scanner bloquent les PR et
-# push pertinents ; le SARIF reste envoyé avant l'échec final.
-#
-# RUNNER : pool self-hosted ["self-hosted","Linux","X64","certigo-ci"] par défaut. Les runners
-# GitHub-hosted sont DÉSACTIVÉS par la policy EMU ; le repli ubuntu-latest ne devient utilisable
-# qu'après une exception explicite et l'activation de CI_GITHUB_HOSTED_FALLBACK.
-# CI-01 (fork-guard) : une garde same-repo au niveau job empêche une PR de FORK d'exécuter ce scan
-# sur le runner self-hosted ; schedule + workflow_dispatch + PR internes passent normalement.
-
+# Reusable scanners called by security-gate.yml only when dependency files change.
+# Pull requests, including forks, run on an ephemeral GitHub-hosted runner.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "**/*.csproj"
-      - "**/packages.lock.json"
-      - "**/pubspec.yaml"
-      - "**/pubspec.lock"
-      - "**/Directory.Packages.props"
-      - "**/package.json"
-      - "**/package-lock.json"
-      - ".github/workflows/dependency-vuln-scan.yml"
-  schedule:
-    # Scan hebdomadaire : tous les lundis à 06:00 UTC.
-    - cron: "0 6 * * 1"
-  pull_request:
-    branches: [ main ]
-    paths:
-      - "**/*.csproj"
-      - "**/packages.lock.json"
-      - "**/pubspec.yaml"
-      - "**/pubspec.lock"
-      - "**/Directory.Packages.props"
-      - "**/package.json"
-      - "**/package-lock.json"
-      - ".github/workflows/dependency-vuln-scan.yml"
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      scanner:
+        description: Dependency scanner to execute (osv or nuget).
+        required: true
+        type: string
 
-concurrency:
-  group: dependency-vuln-scan-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
-# CI-03 — Moindre privilège : lecture du code + écriture des résultats de sécurité
-# (security-events: write est requis pour l'upload SARIF). Aucune autre permission.
 permissions: {}
 
 jobs:
+  validate-input:
+    name: Validate scanner selection
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    permissions: {}
+    steps:
+      - name: Validate scanner
+        shell: bash
+        env:
+          SCANNER: ${{ inputs.scanner }}
+        run: |
+          set -euo pipefail
+          case "$SCANNER" in
+            osv|nuget) ;;
+            *)
+              echo "::error::Unsupported dependency scanner."
+              exit 1
+              ;;
+          esac
+
   osv-scan:
-    name: OSV-Scanner (toutes dépendances, SARIF)
-    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable -> elle NE doit PAS toucher le
-    # runner self-hosted persistant. schedule / workflow_dispatch / PR interne passent ; PR de fork skip.
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    name: OSV-Scanner (all dependencies, SARIF)
+    needs: validate-input
+    if: ${{ inputs.scanner == 'osv' }}
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
     permissions:
       contents: read
       security-events: write
@@ -73,13 +45,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # POURQUOI le BINAIRE CLI et pas l'action `google/osv-scanner-action` :
-      # cette action est une *container action* dont l'image (ghcr.io/google/osv-scanner-action)
-      # est pré-tirée par le runner avant les steps. Le runner certigo-ci ne peut pas
-      # tirer cette image GHCR ; le binaire vérifié garde le scan explicite et bloquant.
-      # Épinglage : version figée v2.4.0 + vérification du SHA256 officiel (équivalent du SHA-pin
-      # de l'action). Si le download ou la vérif échoue, le step n'interrompt pas le job.
-      - name: Télécharger le binaire OSV-Scanner (v2.4.0, vérifié SHA256)
+      - name: Download OSV-Scanner (v2.4.0, verified SHA256)
         run: |
           set -euo pipefail
           OSV_VERSION="v2.4.0"
@@ -90,34 +56,21 @@ jobs:
           echo "${OSV_SHA256}  osv-scanner" | sha256sum --check --strict
           chmod +x osv-scanner
 
-      # Scan récursif de TOUT le repo : OSV-Scanner lit automatiquement les lockfiles présents
-      # (pubspec.lock Flutter/Dart, package-lock.json npm) et les manifests .NET (PackageReference).
-      # CLI v2 : `osv-scanner scan -r ./` (sous-commande `scan`, source par défaut). Le SARIF est
-      # émis sur stdout puis redirigé vers le fichier (évite l'ambiguïté --output/--output-file de v2) ;
-      # les logs partent sur stderr (osv-scan.log) pour ne pas polluer le SARIF.
-      # OSV renvoie un exit non-zéro lorsqu'une vulnérabilité est trouvée. Le step
-      # continue pour uploader le SARIF, puis le gate final restitue l'échec.
-      - name: OSV-Scanner (SARIF)
+      - name: Run OSV-Scanner
         id: osv-scan
         continue-on-error: true
         run: |
           ./osv-scanner scan --format=sarif --recursive ./ > osv-results.sarif 2> osv-scan.log
 
-      # Garantit qu'un fichier SARIF valide existe TOUJOURS pour l'upload, même si le binaire n'a
-      # pas pu être téléchargé/exécuté (réseau, etc.). Évite un échec d'upload sur fichier manquant
-      # ou vide afin que l'upload puis le gate final restent déterministes.
-      - name: Garantir un SARIF valide (fallback)
-        if: always()
+      - name: Ensure valid SARIF
+        if: ${{ always() }}
         run: |
           if [ ! -s osv-results.sarif ]; then
             printf '%s' '{"$schema":"https://json.schemastore.org/sarif-2.1.0.json","version":"2.1.0","runs":[{"tool":{"driver":{"name":"osv-scanner","informationUri":"https://github.com/google/osv-scanner","rules":[]}},"results":[]}]}' > osv-results.sarif
           fi
 
-      # Remontée des résultats dans Security > Code scanning. `category` distincte pour NE PAS
-      # interférer avec l'analyse CodeQL existante (les deux sources coexistent).
-      # if: always() -> upload même si des vulnérabilités ont été trouvées (exit non-zéro ci-dessus).
-      - name: Upload SARIF vers Code scanning
-        if: always()
+      - name: Upload SARIF to code scanning
+        if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           sarif_file: osv-results.sarif
@@ -127,19 +80,16 @@ jobs:
         if: ${{ always() && steps.osv-scan.outcome == 'failure' }}
         run: |
           cat osv-scan.log >&2
-          echo "::error::OSV-Scanner a détecté une vulnérabilité ou n'a pas pu terminer."
+          echo "::error::OSV-Scanner found a vulnerability or could not complete."
           exit 1
 
   dotnet-vuln:
-    name: .NET packages vulnérables (NuGet/GitHub Advisory)
-    # CI-01 (fork-guard) : idem osv-scan — pas de code de PR de fork sur le runner self-hosted.
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    name: Vulnerable .NET packages (NuGet/GitHub Advisory)
+    needs: validate-input
+    if: ${{ inputs.scanner == 'nuget' }}
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
     permissions:
       contents: read
-    # CI-09 : le runner-2 a /usr/share/dotnet NON écrivable. On force setup-dotnet à
-    # installer le SDK dans un répertoire écrivable ($RUNNER_TEMP) pour éviter l'échec.
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     steps:
@@ -150,14 +100,10 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      # Restore nécessaire pour que `dotnet list --vulnerable` résolve le graphe complet.
       - name: Restore
         run: dotnet restore backend/Certigo.sln
 
-      # Complément .NET indépendant de la policy Dependabot (données NuGet/GitHub Advisory).
-      # `dotnet list ... --vulnerable` n'échoue pas sur vulnérabilité ; la sortie est
-      # inspectée explicitement pour transformer toute détection en gate bloquant.
-      - name: dotnet list package --vulnerable
+      - name: Check vulnerable packages
         run: |
           set -euo pipefail
           dotnet list backend/Certigo.sln package --vulnerable --include-transitive | tee dotnet-vulnerable.log
