@@ -2,8 +2,10 @@ using System.Net;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
+using Certigo.Application.Dtos;
 
 namespace Certigo.Api.Http;
 
@@ -15,6 +17,21 @@ public static class HttpExtensions
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        var resolver = new DefaultJsonTypeInfoResolver();
+        resolver.Modifiers.Add(typeInfo =>
+        {
+            if (typeInfo.Type != typeof(UserProfileDto))
+            {
+                return;
+            }
+
+            foreach (var property in typeInfo.Properties.Where(property =>
+                         property.Name is "economyReceipts" or "appliedEconomyOperations"))
+            {
+                property.ShouldSerialize = static (_, _) => false;
+            }
+        });
+        options.TypeInfoResolver = resolver;
         return options;
     }
 

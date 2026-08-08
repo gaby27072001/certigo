@@ -153,6 +153,9 @@ public sealed class SeasonServiceTests
         var profile = await inner.GetAsync("user-1");
         profile!.Gems.Should().Be(220); // credited exactly once (100 + 120)
         profile.SeasonBadges!.Count(b => b == "season-renouveau-cloud").Should().Be(1); // badge granted once
+        result.GemsBalance.Should().Be(profile.Gems);
+        events.Events.Single(e => e.Type == "season.claimed").Payload
+            .Should().BeEquivalentTo(result);
         events.Events.Count(e => e.Type == "season.claimed").Should().Be(1);
     }
 

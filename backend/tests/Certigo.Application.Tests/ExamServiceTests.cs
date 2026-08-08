@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
@@ -277,6 +278,7 @@ public sealed class ExamServiceTests
         var leaderboard = new InMemoryLeaderboardRepository();
         var operations = new InMemoryEconomyOperationRepository();
         var examAttempts = new InMemoryExamAttemptRepository();
+        var events = new InMemoryEventRepository();
         var exams = new InMemoryExamRepository();
         var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
         exams.Seed(ExamServiceHarness.IssuedExam("exam-1", "user-1", clock.UtcNow));
@@ -288,7 +290,7 @@ public sealed class ExamServiceTests
             examAttempts,
             exams,
             new InMemoryAttemptRepository(),
-            new InMemoryEventRepository(),
+            events,
             users,
             new FailOnceLeaderboardRepository(leaderboard),
             operations);
@@ -309,6 +311,17 @@ public sealed class ExamServiceTests
         afterRetry.Gems.Should().Be(afterFailure.Gems);
         leaderboard.Xp["user-1"].Should().Be(result.Rewards.XpEarned);
         examAttempts.CreateCount.Should().Be(1);
+        (await examAttempts.GetByExamIdAsync("user-1", "exam-1"))!.Result
+            .Should().BeEquivalentTo(result);
+        events.Events.Single(candidate => candidate.Type == "exam.submitted").Payload
+            .Should().BeEquivalentTo(result);
+        var operation = await operations.GetAsync(
+            "user-1",
+            EconomyOperationRecord.IdFor("exam", "exam-1"));
+        JsonSerializer.Deserialize<MockExamResultDto>(
+            operation!.OutcomeJson!,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            .Should().BeEquivalentTo(result);
     }
 
     [Fact]
@@ -412,6 +425,37 @@ public sealed class ExamServiceTests
         // Cadence = signal mou (Flag) : détection sans sanction. Récompenses conservées.
         result.Rewards.XpEarned.Should().BeGreaterThan(0);
         h.Leaderboard.Xp[h.UserId].Should().Be(result.Rewards.XpEarned);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_integrity_rejection_persists_audit_without_profile_progress()
+    {
+        var h = new ExamServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId) with
+        {
+            Xp = 25,
+            Gems = 7,
+            DailyCorrectAnswers = 9,
+        });
+        var request = ExamServiceHarness.Submit(
+            "rejected-profile",
+            "exam-1",
+            ExamServiceHarness.Answer("l1-i1", "a"),
+            ExamServiceHarness.Answer("l2-i1", "a"),
+            ExamServiceHarness.Answer("l3-i1", "a")) with
+        {
+            StartedAt = h.Clock.UtcNow.AddMinutes(1),
+        };
+
+        var result = await h.Build().SubmitAsync(request);
+        var profile = await h.Users.GetAsync(h.UserId);
+
+        result.Rewards.XpEarned.Should().Be(0);
+        profile!.Xp.Should().Be(25);
+        profile.Gems.Should().Be(7);
+        profile.DailyCorrectAnswers.Should().Be(9);
+        profile.EconomyReceipts.Should().ContainSingle();
+        h.Leaderboard.Xp.Should().BeEmpty();
     }
 
     [Fact]

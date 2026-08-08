@@ -147,6 +147,11 @@ public interface IEconomyOperationRepository
         string operationId,
         string failureCode,
         CancellationToken cancellationToken = default);
+    Task<EconomyOperationRecord> SetOutcomeAsync(
+        string userId,
+        string operationId,
+        string outcomeJson,
+        CancellationToken cancellationToken = default);
 }
 
 // The per-(user, track) behavioural memory that makes the tutor a continuously
@@ -288,7 +293,9 @@ public sealed record EconomyOperationRecord(
     string Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    string? FailureCode = null)
+    string? FailureCode = null,
+    string? OutcomeJson = null,
+    int Ttl = -1)
 {
     public const string PendingStatus = "pending";
     public const string CompletedStatus = "completed";

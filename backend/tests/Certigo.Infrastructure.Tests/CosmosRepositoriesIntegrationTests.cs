@@ -184,10 +184,16 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
             now);
 
         var created = await repository.GetOrCreateAsync(candidate);
+        var withOutcome = await repository.SetOutcomeAsync(
+            userId,
+            created.Id,
+            "{\"attemptId\":\"result-1\"}");
         var afterProfile = await repository.MarkStepCompletedAsync(userId, created.Id, "profile");
         var completed = await repository.MarkStepCompletedAsync(userId, created.Id, "events");
 
         created.ETag.Should().NotBeNullOrEmpty();
+        withOutcome.OutcomeJson.Should().Be("{\"attemptId\":\"result-1\"}");
+        withOutcome.Ttl.Should().Be(-1);
         afterProfile.Status.Should().Be(EconomyOperationRecord.PendingStatus);
         completed.Status.Should().Be(EconomyOperationRecord.CompletedStatus);
         completed.CompletedSteps.Should().BeEquivalentTo(["profile", "events"]);

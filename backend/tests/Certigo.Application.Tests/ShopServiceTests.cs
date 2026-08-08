@@ -127,8 +127,14 @@ public sealed class ShopServiceTests
         var profile = await inner.GetAsync("user-1");
         profile!.Gems.Should().Be(100); // debited exactly once, not doubled
         profile.FreezeTokens.Should().Be(1);
+        result.GemsBalance.Should().Be(profile.Gems);
+        result.FreezeTokens.Should().Be(profile.FreezeTokens);
         purchases.CreateCount.Should().Be(1); // ledger written once
+        (await purchases.GetByClientPurchaseIdAsync("user-1", "p1"))!.Result
+            .Should().BeEquivalentTo(result);
         events.Events.Count(e => e.Type == "shop.purchased").Should().Be(1);
+        events.Events.Single(e => e.Type == "shop.purchased").Payload
+            .Should().BeEquivalentTo(result);
     }
 
     [Fact]

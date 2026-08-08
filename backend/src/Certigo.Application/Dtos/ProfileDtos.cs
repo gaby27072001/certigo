@@ -2,6 +2,11 @@ using System.Text.Json.Serialization;
 
 namespace Certigo.Application.Dtos;
 
+public sealed record EconomyProfileReceipt(
+    string OperationId,
+    DateTimeOffset AppliedAt,
+    string OutcomeJson);
+
 public sealed record UserProfileDto(
     string Id,
     string DisplayName,
@@ -30,9 +35,13 @@ public sealed record UserProfileDto(
     int MonthlyLessonsCompleted = 0,
     int MonthlyPerfectLessons = 0,
     List<string>? SeasonBadges = null,
-    // Permanent per-user deduplication markers for economy profile mutations.
-    // Cross-container operation records may be replayed after any partial failure;
-    // this list makes the profile effect itself exactly-once.
+    // Bounded receipts protect profile mutations from ambiguous cross-container
+    // retries. Completed operation journals are retained indefinitely, allowing
+    // old receipts to be compacted without losing idempotence.
+    List<EconomyProfileReceipt>? EconomyReceipts = null,
+    // Read-only migration bridge for profiles written before bounded receipts.
+    // New operations never append to this list; matching entries are migrated
+    // to EconomyReceipts when their durable journal is resumed.
     List<string>? AppliedEconomyOperations = null)
 {
     /// Cosmos optimistic-concurrency token (the system `_etag`). Null for freshly

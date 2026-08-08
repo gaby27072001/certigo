@@ -83,8 +83,14 @@ public sealed class StreakRepairServiceTests
         var profile = await inner.GetAsync(UserId);
         profile!.Gems.Should().Be(50); // debited exactly once (100 - 50)
         profile.LastActiveDate.Should().Be(Today.AddDays(-1)); // bridged
+        result.GemsBalance.Should().Be(profile.Gems);
+        result.LastActiveDate.Should().Be(profile.LastActiveDate);
         purchases.CreateCount.Should().Be(1); // ledger written once
+        (await purchases.GetByClientPurchaseIdAsync(UserId, "r1"))!.Result.GemsBalance
+            .Should().Be(result.GemsBalance);
         events.Events.Count(e => e.Type == "streak.repaired").Should().Be(1);
+        events.Events.Single(e => e.Type == "streak.repaired").Payload
+            .Should().BeEquivalentTo(result);
     }
 
     [Fact]

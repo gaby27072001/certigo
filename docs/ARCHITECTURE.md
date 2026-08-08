@@ -322,8 +322,8 @@ backend était **déjà conforme** (dépendances `wp-p0-02` ETag et `wp-p0-06` s
 complète l'ADR-011 (§12.1) sur l'axe **plafonds anti-abus**.
 
 **1. ETag sur toutes les écritures d'économie.** Chaque mutation de profil est encapsulée dans
-`DurableEconomy.ApplyProfileOnceAsync`, qui relit le profil, vérifie le marqueur global
-`AppliedEconomyOperations`, puis réessaie l'écriture conditionnelle sur 412 :
+`DurableEconomy.ApplyProfileOnceAsync`, qui relit le profil, vérifie le reçu d'opération borné,
+puis réessaie l'écriture conditionnelle sur 412 :
 
 | Écriture | Site |
 |---|---|
@@ -335,13 +335,27 @@ complète l'ADR-011 (§12.1) sur l'axe **plafonds anti-abus**.
 
 **2. État durable, sans fausse transaction cross-container.** Chaque quiz, examen et mutation de
 gamification crée un `EconomyOperationRecord` déterministe dans le conteneur `economy`. Le record
-conserve le payload immuable, les étapes requises et les étapes terminées. Une reprise rejoue
+conserve le payload immuable, l'issue réconciliée, les étapes requises et les étapes terminées.
+Les journaux ont `ttl = -1` et sont donc retenus : une reprise relit l'issue durable et rejoue
 uniquement les projections manquantes :
 
-- profil : marqueur d'opération écrit avec la mutation sous ETag ;
+- profil : reçu `{ operationId, appliedAt, outcomeJson }` écrit avec la mutation sous ETag ;
 - classement : XP + marqueur écrits ensemble sous ETag dans l'entrée hebdomadaire ;
 - événements : ids déterministes, un conflit Cosmos 409 signifie que la projection existe déjà ;
 - tentative/ledger/progression : créations ou upserts idempotents, puis étape acquittée.
+
+Les reçus profil sont limités à 128 et à 256 Kio sérialisés. Ils ne conservent que l'issue minimale
+nécessaire à la reprise (par exemple `RewardsDto`, jamais les réponses ou explications d'examen).
+Avant d'en ajouter un, les plus anciens ne sont compactés que si leur journal durable est terminal
+(`completed` ou `failed`). Un journal non terminal n'est jamais compacté ; si les limites sont
+atteintes uniquement par des opérations non terminales, la mutation échoue explicitement et doit
+être réconciliée. Ces reçus et les marqueurs de migration sont filtrés des réponses HTTP. Pour quiz
+et examen, tentative persistée, profil,
+classement, réponse et événements utilisent tous la même issue réconciliée stockée dans le journal.
+Les soldes réconciliés de boutique, quêtes, saisons et réparation de série suivent la même règle
+pour le ledger, la réponse et les événements. Les anciens marqueurs
+`AppliedEconomyOperations` restent lisibles uniquement comme pont de migration : ils ne sont plus
+alimentés et sont convertis en reçus sans réappliquer la mutation lors de la reprise du journal.
 
 Il ne s'agit **pas** d'une transaction cross-container. Une panne peut laisser une opération
 `pending`, mais le retry la réconcilie sans double crédit. Le seul `TransactionalBatch` est celui de

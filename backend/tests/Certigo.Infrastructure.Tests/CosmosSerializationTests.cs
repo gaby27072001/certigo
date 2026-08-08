@@ -18,7 +18,7 @@ public sealed class CosmosSerializationTests
     }
 
     [Fact]
-    public void User_profile_round_trips_camel_case_etag_and_economy_markers()
+    public void User_profile_round_trips_camel_case_etag_and_bounded_economy_receipts()
     {
         var profile = new UserProfileDto(
             "user-1",
@@ -33,7 +33,13 @@ public sealed class CosmosSerializationTests
             20,
             40,
             "az-900",
-            AppliedEconomyOperations: ["operation::quiz::a1"])
+            EconomyReceipts:
+            [
+                new EconomyProfileReceipt(
+                    "operation::quiz::a1",
+                    new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero),
+                    "{\"attemptId\":\"result-1\"}"),
+            ])
         {
             ETag = "\"etag-1\"",
         };
@@ -44,8 +50,39 @@ public sealed class CosmosSerializationTests
         json.Should().Contain("\"displayName\"");
         using var document = JsonDocument.Parse(json);
         document.RootElement.GetProperty("_etag").GetString().Should().Be("\"etag-1\"");
-        json.Should().Contain("\"appliedEconomyOperations\"");
+        json.Should().Contain("\"economyReceipts\"");
+        document.RootElement.GetProperty("appliedEconomyOperations").ValueKind
+            .Should().Be(JsonValueKind.Null);
         restored.Should().BeEquivalentTo(profile);
+    }
+
+    [Fact]
+    public void Legacy_profile_markers_remain_readable_for_safe_receipt_migration()
+    {
+        const string legacyJson = """
+            {
+              "id": "user-1",
+              "displayName": "Tester",
+              "handle": "tester",
+              "xp": 10,
+              "level": 1,
+              "streakDays": 0,
+              "freezeTokens": 0,
+              "dailyGoalXp": 20,
+              "dailyXpEarned": 0,
+              "weeklyXp": 10,
+              "activeTrackId": "az-900",
+              "appliedEconomyOperations": ["operation::quiz::legacy"]
+            }
+            """;
+
+        var restored = JsonSerializer.Deserialize<UserProfileDto>(
+            legacyJson,
+            SerializerOptions());
+
+        restored!.AppliedEconomyOperations.Should()
+            .ContainSingle("operation::quiz::legacy");
+        restored.EconomyReceipts.Should().BeNull();
     }
 
     [Fact]
@@ -85,7 +122,8 @@ public sealed class CosmosSerializationTests
             ["profile"],
             EconomyOperationRecord.PendingStatus,
             now,
-            now)
+            now,
+            OutcomeJson: "{\"attemptId\":\"result-1\"}")
         {
             ETag = "\"etag-operation\"",
         };
@@ -95,6 +133,8 @@ public sealed class CosmosSerializationTests
 
         json.Should().Contain("\"requiredSteps\"");
         json.Should().Contain("\"completedSteps\"");
+        json.Should().Contain("\"outcomeJson\"");
+        json.Should().Contain("\"ttl\":-1");
         json.Should().Contain("\"_etag\"");
         restored.Should().BeEquivalentTo(operation);
     }

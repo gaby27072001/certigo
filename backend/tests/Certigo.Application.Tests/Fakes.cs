@@ -402,6 +402,11 @@ internal sealed class InMemoryEconomyOperationRepository : IEconomyOperationRepo
         {
             var key = Key(userId, operationId);
             var current = _store[key];
+            if (current.Status == EconomyOperationRecord.FailedStatus)
+            {
+                throw new ConcurrencyConflictException("failed operation cannot complete a step");
+            }
+
             if (current.HasCompleted(step))
             {
                 return Task.FromResult(current);
@@ -433,7 +438,20 @@ internal sealed class InMemoryEconomyOperationRepository : IEconomyOperationRepo
         lock (_gate)
         {
             var key = Key(userId, operationId);
-            var failed = _store[key] with
+            var current = _store[key];
+            if (current.Status == EconomyOperationRecord.FailedStatus)
+            {
+                return Task.FromResult(current);
+            }
+
+            if (current.Status == EconomyOperationRecord.CompletedStatus
+                || current.OutcomeJson is not null)
+            {
+                throw new ConcurrencyConflictException(
+                    "operation already committed a successful outcome");
+            }
+
+            var failed = current with
             {
                 Status = EconomyOperationRecord.FailedStatus,
                 FailureCode = failureCode,
@@ -445,7 +463,52 @@ internal sealed class InMemoryEconomyOperationRepository : IEconomyOperationRepo
         }
     }
 
+    public Task<EconomyOperationRecord> SetOutcomeAsync(
+        string userId,
+        string operationId,
+        string outcomeJson,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            var key = Key(userId, operationId);
+            var current = _store[key];
+            if (current.Status == EconomyOperationRecord.FailedStatus)
+            {
+                throw new ConcurrencyConflictException(
+                    "failed operation cannot commit an outcome");
+            }
+
+            if (current.OutcomeJson is not null)
+            {
+                if (!string.Equals(current.OutcomeJson, outcomeJson, StringComparison.Ordinal))
+                {
+                    throw new ConcurrencyConflictException("different durable outcome");
+                }
+
+                return Task.FromResult(current);
+            }
+
+            var updated = current with
+            {
+                OutcomeJson = outcomeJson,
+                UpdatedAt = DateTimeOffset.UtcNow,
+                ETag = NextETag(),
+            };
+            _store[key] = updated;
+            return Task.FromResult(updated);
+        }
+    }
+
     private static string Key(string userId, string operationId) => $"{userId}|{operationId}";
+
+    public void Seed(EconomyOperationRecord operation)
+    {
+        lock (_gate)
+        {
+            _store[Key(operation.UserId, operation.Id)] = operation with { ETag = NextETag() };
+        }
+    }
     private string NextETag() => $"\"{Interlocked.Increment(ref _version)}\"";
 }
 
@@ -488,6 +551,13 @@ internal sealed class MutateOnceOnEconomyCreateRepository(
         string failureCode,
         CancellationToken cancellationToken = default) =>
         inner.MarkFailedAsync(userId, operationId, failureCode, cancellationToken);
+
+    public Task<EconomyOperationRecord> SetOutcomeAsync(
+        string userId,
+        string operationId,
+        string outcomeJson,
+        CancellationToken cancellationToken = default) =>
+        inner.SetOutcomeAsync(userId, operationId, outcomeJson, cancellationToken);
 }
 
 internal sealed class InMemoryPurchaseRepository : IPurchaseRepository

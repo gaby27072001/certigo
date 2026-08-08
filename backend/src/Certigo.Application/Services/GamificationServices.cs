@@ -122,33 +122,75 @@ public sealed class ShopService(
 
         try
         {
+            var profileOutcome = await DurableEconomy.ApplyProfileOutcomeStepAsync(
+                economyOperations,
+                users,
+                userContext.UserId,
+                userContext.DisplayName,
+                operation,
+                profile =>
+                {
+                    if (profile.Gems < payload.Record.GemsSpent)
+                    {
+                        throw new EconomyOperationRejectedException("insufficientGems");
+                    }
+
+                    var updated = profile with
+                    {
+                        Gems = profile.Gems - payload.Record.GemsSpent,
+                        FreezeTokens = profile.FreezeTokens + payload.FreezeTokensGranted,
+                    };
+                    return (updated, payload.Record.Result with
+                    {
+                        GemsBalance = updated.Gems,
+                        FreezeTokens = updated.FreezeTokens,
+                    });
+                },
+                payload.Record.Result,
+                cancellationToken);
+            operation = profileOutcome.Operation;
+            var result = profileOutcome.Outcome;
+            var record = payload.Record with { Result = result };
+
             operation = await DurableEconomy.RunStepAsync(
                 economyOperations,
                 operation,
-                "profile",
+                "ledger",
                 async () =>
                 {
-                    await DurableEconomy.ApplyProfileOnceAsync(
-                        users,
-                        userContext.UserId,
-                        userContext.DisplayName,
-                        operation.Id,
-                        profile =>
+                    try
+                    {
+                        await purchases.CreateAsync(record, cancellationToken);
+                    }
+                    catch (DuplicateRecordException)
+                    {
+                        var existing = await purchases.GetByClientPurchaseIdAsync(
+                            userContext.UserId,
+                            record.ClientPurchaseId,
+                            cancellationToken);
+                        if (existing?.ItemId != record.ItemId)
                         {
-                            if (profile.Gems < payload.Record.GemsSpent)
-                            {
-                                throw new EconomyOperationRejectedException("insufficientGems");
-                            }
-
-                            return profile with
-                            {
-                                Gems = profile.Gems - payload.Record.GemsSpent,
-                                FreezeTokens = profile.FreezeTokens + payload.FreezeTokensGranted,
-                            };
-                        },
-                        cancellationToken);
+                            throw new ConcurrencyConflictException(
+                                $"Purchase '{record.ClientPurchaseId}' conflicts with another item.");
+                        }
+                    }
                 },
                 cancellationToken);
+
+            await DurableEconomy.RunStepAsync(
+                economyOperations,
+                operation,
+                "events",
+                () => events.AddAsync(
+                    new LearningEvent(
+                        DurableEconomy.EventId(operation.Id, "shop.purchased"),
+                        userContext.UserId,
+                        "shop.purchased",
+                        record.PurchasedAt,
+                        result),
+                    cancellationToken),
+                cancellationToken);
+            return result;
         }
         catch (EconomyOperationRejectedException ex)
         {
@@ -159,47 +201,6 @@ public sealed class ShopService(
                 cancellationToken);
             return await FailedPurchaseAsync(payload, operation.FailureCode, cancellationToken);
         }
-
-        operation = await DurableEconomy.RunStepAsync(
-            economyOperations,
-            operation,
-            "ledger",
-            async () =>
-            {
-                try
-                {
-                    await purchases.CreateAsync(payload.Record, cancellationToken);
-                }
-                catch (DuplicateRecordException)
-                {
-                    var existing = await purchases.GetByClientPurchaseIdAsync(
-                        userContext.UserId,
-                        payload.Record.ClientPurchaseId,
-                        cancellationToken);
-                    if (existing?.ItemId != payload.Record.ItemId)
-                    {
-                        throw new ConcurrencyConflictException(
-                            $"Purchase '{payload.Record.ClientPurchaseId}' conflicts with another item.");
-                    }
-                }
-            },
-            cancellationToken);
-
-        await DurableEconomy.RunStepAsync(
-            economyOperations,
-            operation,
-            "events",
-            () => events.AddAsync(
-                new LearningEvent(
-                    DurableEconomy.EventId(operation.Id, "shop.purchased"),
-                    userContext.UserId,
-                    "shop.purchased",
-                    payload.Record.PurchasedAt,
-                    payload.Record.Result),
-                cancellationToken),
-            cancellationToken);
-
-        return payload.Record.Result;
     }
 
     private async Task<PurchaseResultDto> FailedPurchaseAsync(
@@ -329,38 +330,35 @@ public sealed class QuestService(
         CancellationToken cancellationToken)
     {
         var payload = DurableEconomy.ReadPayload<QuestEconomyPayload>(operation);
-        operation = await DurableEconomy.RunStepAsync(
+        var profileOutcome = await DurableEconomy.ApplyProfileOutcomeStepAsync(
             economyOperations,
+            users,
+            userContext.UserId,
+            userContext.DisplayName,
             operation,
-            "profile",
-            async () =>
+            profile =>
             {
-                await DurableEconomy.ApplyProfileOnceAsync(
-                    users,
-                    userContext.UserId,
-                    userContext.DisplayName,
-                    operation.Id,
-                    profile =>
-                    {
-                        var claims = profile.DailyXpDate == payload.Date
-                            ? new List<string>(profile.DailyQuestClaims ?? [])
-                            : null;
-                        if (claims is not null
-                            && !claims.Contains(payload.QuestId, StringComparer.Ordinal))
-                        {
-                            claims.Add(payload.QuestId);
-                        }
+                var claims = profile.DailyXpDate == payload.Date
+                    ? new List<string>(profile.DailyQuestClaims ?? [])
+                    : null;
+                if (claims is not null
+                    && !claims.Contains(payload.QuestId, StringComparer.Ordinal))
+                {
+                    claims.Add(payload.QuestId);
+                }
 
-                        return profile with
-                        {
-                            Gems = profile.Gems + payload.RewardGems,
-                            DailyXpDate = claims is null ? profile.DailyXpDate : payload.Date,
-                            DailyQuestClaims = claims ?? profile.DailyQuestClaims,
-                        };
-                    },
-                    cancellationToken);
+                var updated = profile with
+                {
+                    Gems = profile.Gems + payload.RewardGems,
+                    DailyXpDate = claims is null ? profile.DailyXpDate : payload.Date,
+                    DailyQuestClaims = claims ?? profile.DailyQuestClaims,
+                };
+                return (updated, payload.Result with { GemsBalance = updated.Gems });
             },
+            payload.Result,
             cancellationToken);
+        operation = profileOutcome.Operation;
+        var result = profileOutcome.Outcome;
 
         await DurableEconomy.RunStepAsync(
             economyOperations,
@@ -372,10 +370,10 @@ public sealed class QuestService(
                     userContext.UserId,
                     "quest.claimed",
                     operation.CreatedAt,
-                    payload.Result),
+                    result),
                 cancellationToken),
             cancellationToken);
-        return payload.Result;
+        return result;
     }
 
     private sealed record QuestEconomyPayload(
@@ -521,36 +519,33 @@ public sealed class SeasonService(
         CancellationToken cancellationToken)
     {
         var payload = DurableEconomy.ReadPayload<SeasonEconomyPayload>(operation);
-        operation = await DurableEconomy.RunStepAsync(
+        var profileOutcome = await DurableEconomy.ApplyProfileOutcomeStepAsync(
             economyOperations,
+            users,
+            userContext.UserId,
+            userContext.DisplayName,
             operation,
-            "profile",
-            async () =>
+            profile =>
             {
-                await DurableEconomy.ApplyProfileOnceAsync(
-                    users,
-                    userContext.UserId,
-                    userContext.DisplayName,
-                    operation.Id,
-                    profile =>
-                    {
-                        var badges = profile.SeasonBadges is null
-                            ? new List<string>()
-                            : new List<string>(profile.SeasonBadges);
-                        if (!badges.Contains(payload.BadgeId, StringComparer.Ordinal))
-                        {
-                            badges.Add(payload.BadgeId);
-                        }
+                var badges = profile.SeasonBadges is null
+                    ? new List<string>()
+                    : new List<string>(profile.SeasonBadges);
+                if (!badges.Contains(payload.BadgeId, StringComparer.Ordinal))
+                {
+                    badges.Add(payload.BadgeId);
+                }
 
-                        return profile with
-                        {
-                            Gems = profile.Gems + payload.RewardGems,
-                            SeasonBadges = badges,
-                        };
-                    },
-                    cancellationToken);
+                var updated = profile with
+                {
+                    Gems = profile.Gems + payload.RewardGems,
+                    SeasonBadges = badges,
+                };
+                return (updated, payload.Result with { GemsBalance = updated.Gems });
             },
+            payload.Result,
             cancellationToken);
+        operation = profileOutcome.Operation;
+        var result = profileOutcome.Outcome;
 
         await DurableEconomy.RunStepAsync(
             economyOperations,
@@ -562,10 +557,10 @@ public sealed class SeasonService(
                     userContext.UserId,
                     "season.claimed",
                     operation.CreatedAt,
-                    payload.Result),
+                    result),
                 cancellationToken),
             cancellationToken);
-        return payload.Result;
+        return result;
     }
 
     private sealed record SeasonEconomyPayload(
@@ -792,39 +787,87 @@ public sealed class StreakRepairService(
 
         try
         {
+            var profileOutcome = await DurableEconomy.ApplyProfileOutcomeStepAsync(
+                economyOperations,
+                users,
+                userContext.UserId,
+                userContext.DisplayName,
+                operation,
+                profile =>
+                {
+                    if (profile.Gems < payload.Record.GemsSpent)
+                    {
+                        throw new EconomyOperationRejectedException("insufficientGems");
+                    }
+
+                    if (profile.LastActiveDate is { } lastActive
+                        && lastActive >= payload.BridgeTo)
+                    {
+                        throw new EconomyOperationRejectedException("noLongerRepairable");
+                    }
+
+                    var updated = profile with
+                    {
+                        Gems = profile.Gems - payload.Record.GemsSpent,
+                        LastActiveDate = payload.BridgeTo,
+                    };
+                    return (updated, payload.Result with
+                    {
+                        GemsBalance = updated.Gems,
+                        LastActiveDate = updated.LastActiveDate,
+                    });
+                },
+                payload.Result,
+                cancellationToken);
+            operation = profileOutcome.Operation;
+            var result = profileOutcome.Outcome;
+            var record = payload.Record with
+            {
+                Result = payload.Record.Result with
+                {
+                    GemsBalance = result.GemsBalance,
+                },
+            };
+
             operation = await DurableEconomy.RunStepAsync(
                 economyOperations,
                 operation,
-                "profile",
+                "ledger",
                 async () =>
                 {
-                    await DurableEconomy.ApplyProfileOnceAsync(
-                        users,
-                        userContext.UserId,
-                        userContext.DisplayName,
-                        operation.Id,
-                        profile =>
+                    try
+                    {
+                        await purchases.CreateAsync(record, cancellationToken);
+                    }
+                    catch (DuplicateRecordException)
+                    {
+                        var existing = await purchases.GetByClientPurchaseIdAsync(
+                            userContext.UserId,
+                            record.ClientPurchaseId,
+                            cancellationToken);
+                        if (existing?.ItemId != "streak-repair")
                         {
-                            if (profile.Gems < payload.Record.GemsSpent)
-                            {
-                                throw new EconomyOperationRejectedException("insufficientGems");
-                            }
-
-                            if (profile.LastActiveDate is { } lastActive
-                                && lastActive >= payload.BridgeTo)
-                            {
-                                throw new EconomyOperationRejectedException("noLongerRepairable");
-                            }
-
-                            return profile with
-                            {
-                                Gems = profile.Gems - payload.Record.GemsSpent,
-                                LastActiveDate = payload.BridgeTo,
-                            };
-                        },
-                        cancellationToken);
+                            throw new ConcurrencyConflictException(
+                                $"Streak repair '{record.ClientPurchaseId}' conflicts with another purchase.");
+                        }
+                    }
                 },
                 cancellationToken);
+
+            await DurableEconomy.RunStepAsync(
+                economyOperations,
+                operation,
+                "events",
+                () => events.AddAsync(
+                    new LearningEvent(
+                        DurableEconomy.EventId(operation.Id, "streak.repaired"),
+                        userContext.UserId,
+                        "streak.repaired",
+                        record.PurchasedAt,
+                        result),
+                    cancellationToken),
+                cancellationToken);
+            return result;
         }
         catch (EconomyOperationRejectedException ex)
         {
@@ -835,46 +878,6 @@ public sealed class StreakRepairService(
                 cancellationToken);
             return await FailedRepairAsync(payload, operation.FailureCode, cancellationToken);
         }
-
-        operation = await DurableEconomy.RunStepAsync(
-            economyOperations,
-            operation,
-            "ledger",
-            async () =>
-            {
-                try
-                {
-                    await purchases.CreateAsync(payload.Record, cancellationToken);
-                }
-                catch (DuplicateRecordException)
-                {
-                    var existing = await purchases.GetByClientPurchaseIdAsync(
-                        userContext.UserId,
-                        payload.Record.ClientPurchaseId,
-                        cancellationToken);
-                    if (existing?.ItemId != "streak-repair")
-                    {
-                        throw new ConcurrencyConflictException(
-                            $"Streak repair '{payload.Record.ClientPurchaseId}' conflicts with another purchase.");
-                    }
-                }
-            },
-            cancellationToken);
-
-        await DurableEconomy.RunStepAsync(
-            economyOperations,
-            operation,
-            "events",
-            () => events.AddAsync(
-                new LearningEvent(
-                    DurableEconomy.EventId(operation.Id, "streak.repaired"),
-                    userContext.UserId,
-                    "streak.repaired",
-                    payload.Record.PurchasedAt,
-                    payload.Result),
-                cancellationToken),
-            cancellationToken);
-        return payload.Result;
     }
 
     private async Task<StreakRepairResultDto> FailedRepairAsync(

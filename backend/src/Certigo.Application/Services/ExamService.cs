@@ -53,7 +53,7 @@ public sealed class ExamService(
     IEconomyOperationRepository economyOperations) : IExamService
 {
     private static readonly string[] EconomySteps =
-        ["attempt", "progress", "profile", "leaderboard", "events"];
+        ["profile", "attempt", "progress", "leaderboard", "events"];
 
     public async Task<MockExamDto> GenerateAsync(MockExamRequest request, CancellationToken cancellationToken = default)
     {
@@ -420,7 +420,11 @@ public sealed class ExamService(
                 userContext.UserId,
                 "exam",
                 request.ExamId,
-                new ExamEconomyPayload(rejectedAttempt, Array.Empty<ConceptMastery>(), signal),
+                new ExamEconomyPayload(
+                    rejectedAttempt,
+                    Array.Empty<ConceptMastery>(),
+                    signal,
+                    ProfileMutationAllowed: false),
                 EconomySteps,
                 now,
                 cancellationToken);
@@ -456,6 +460,39 @@ public sealed class ExamService(
         CancellationToken cancellationToken)
     {
         var payload = DurableEconomy.ReadPayload<ExamEconomyPayload>(operation);
+        var profileMutationAllowed = payload.ProfileMutationAllowed
+            ?? !string.Equals(
+                payload.IntegritySignal?.Decision,
+                IntegrityDecision.Reject.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+        MockExamResultDto? persistedLegacyResult = null;
+        if (operation.HasCompleted("attempt")
+            && string.IsNullOrWhiteSpace(operation.OutcomeJson))
+        {
+            persistedLegacyResult = (await examAttempts.GetByExamIdAsync(
+                userContext.UserId,
+                payload.Attempt.ExamId,
+                cancellationToken))?.Result;
+        }
+
+        var canonicalLegacyResult = persistedLegacyResult ?? payload.Attempt.Result;
+        var profileOutcome = await DurableEconomy.ApplyProfileOutcomeStepAsync(
+            economyOperations,
+            users,
+            userContext.UserId,
+            userContext.DisplayName,
+            operation,
+            profile => profileMutationAllowed
+                ? ApplyExamProfile(profile, payload.Attempt, persistedLegacyResult)
+                : (profile, canonicalLegacyResult),
+            outcome => outcome.Rewards,
+            rewards => canonicalLegacyResult with { Rewards = rewards },
+            canonicalLegacyResult,
+            cancellationToken);
+        operation = profileOutcome.Operation;
+        var result = profileOutcome.Outcome;
+        var reconciledAttempt = payload.Attempt with { Result = result };
+
         operation = await DurableEconomy.RunStepAsync(
             economyOperations,
             operation,
@@ -464,7 +501,7 @@ public sealed class ExamService(
             {
                 try
                 {
-                    await examAttempts.CreateAsync(payload.Attempt, cancellationToken);
+                    await examAttempts.CreateAsync(reconciledAttempt, cancellationToken);
                 }
                 catch (DuplicateRecordException)
                 {
@@ -472,7 +509,7 @@ public sealed class ExamService(
                         userContext.UserId,
                         payload.Attempt.ExamId,
                         cancellationToken);
-                    if (existing?.Result.AttemptId != payload.Attempt.Result.AttemptId)
+                    if (existing?.Result.AttemptId != result.AttemptId)
                     {
                         throw new ConcurrencyConflictException(
                             $"Exam '{payload.Attempt.ExamId}' conflicts with another result.");
@@ -495,32 +532,12 @@ public sealed class ExamService(
         operation = await DurableEconomy.RunStepAsync(
             economyOperations,
             operation,
-            "profile",
-            async () =>
-            {
-                if (payload.Attempt.Result.Rewards.XpEarned > 0
-                    || payload.Attempt.Result.Rewards.GemsEarned > 0)
-                {
-                    await DurableEconomy.ApplyProfileOnceAsync(
-                        users,
-                        userContext.UserId,
-                        userContext.DisplayName,
-                        operation.Id,
-                        profile => ApplyExamProfile(profile, payload.Attempt),
-                        cancellationToken);
-                }
-            },
-            cancellationToken);
-
-        operation = await DurableEconomy.RunStepAsync(
-            economyOperations,
-            operation,
             "leaderboard",
-            () => payload.Attempt.Result.Rewards.XpEarned <= 0
+            () => result.Rewards.XpEarned <= 0
                 ? Task.CompletedTask
                 : leaderboard.AddXpAsync(
                     userContext.UserId,
-                    payload.Attempt.Result.Rewards.XpEarned,
+                    result.Rewards.XpEarned,
                     operation.Id,
                     payload.Attempt.SubmittedAt,
                     cancellationToken),
@@ -538,7 +555,7 @@ public sealed class ExamService(
                         userContext.UserId,
                         "exam.submitted",
                         payload.Attempt.SubmittedAt,
-                        payload.Attempt.Result),
+                        result),
                     cancellationToken);
                 if (payload.IntegritySignal is not null)
                 {
@@ -554,12 +571,15 @@ public sealed class ExamService(
             },
             cancellationToken);
 
-        return payload.Attempt.Result;
+        return result;
     }
 
-    private static UserProfileDto ApplyExamProfile(UserProfileDto profile, ExamAttemptRecord attempt)
+    private static (UserProfileDto Profile, MockExamResultDto Outcome) ApplyExamProfile(
+        UserProfileDto profile,
+        ExamAttemptRecord attempt,
+        MockExamResultDto? fixedOutcome = null)
     {
-        var result = attempt.Result;
+        var result = fixedOutcome ?? attempt.Result;
         var xpEarned = result.Rewards.XpEarned;
         var today = DateOnly.FromDateTime(attempt.SubmittedAt.UtcDateTime);
         var sameDay = profile.DailyXpDate == today;
@@ -583,7 +603,7 @@ public sealed class ExamService(
         var applyMonth = profile.MonthlyAnchor is null || profile.MonthlyAnchor <= monthAnchor;
         var newXp = profile.Xp + xpEarned;
 
-        return profile with
+        var updatedProfile = profile with
         {
             Xp = newXp,
             Level = XpEngine.LevelFromXp(newXp),
@@ -607,12 +627,23 @@ public sealed class ExamService(
                 : profile.MonthlyPerfectLessons,
             Gems = profile.Gems + result.Rewards.GemsEarned,
         };
+        var outcome = fixedOutcome ?? result with
+        {
+            Rewards = result.Rewards with
+            {
+                NewXp = newXp,
+                LevelUp = XpEngine.LevelFromXp(newXp) > profile.Level,
+                StreakExtended = streak.StreakDays > profile.StreakDays,
+            },
+        };
+        return (updatedProfile, outcome);
     }
 
     private sealed record ExamEconomyPayload(
         ExamAttemptRecord Attempt,
         IReadOnlyList<ConceptMastery> Masteries,
-        AttemptIntegritySignal? IntegritySignal);
+        AttemptIntegritySignal? IntegritySignal,
+        bool? ProfileMutationAllowed = null);
 
     // Fenêtre de cadence anti-triche : nombre + XP des tentatives antérieures de l'apprenant
     // (leçons ET examens) sur la dernière heure, lues depuis le conteneur « attempts » (pas de

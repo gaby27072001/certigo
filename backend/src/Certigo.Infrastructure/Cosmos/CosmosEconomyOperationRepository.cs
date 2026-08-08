@@ -45,6 +45,12 @@ public sealed class CosmosEconomyOperationRepository(CosmosContext context) : IE
         {
             var current = await GetAsync(userId, operationId, cancellationToken)
                 ?? throw new InvalidOperationException($"Economy operation '{operationId}' was not found.");
+            if (current.Status == EconomyOperationRecord.FailedStatus)
+            {
+                throw new ConcurrencyConflictException(
+                    $"Failed economy operation '{operationId}' cannot complete step '{step}'.");
+            }
+
             if (current.HasCompleted(step))
             {
                 return current;
@@ -95,6 +101,13 @@ public sealed class CosmosEconomyOperationRepository(CosmosContext context) : IE
                 return current;
             }
 
+            if (current.Status == EconomyOperationRecord.CompletedStatus
+                || current.OutcomeJson is not null)
+            {
+                throw new ConcurrencyConflictException(
+                    $"Economy operation '{operationId}' already committed a successful outcome.");
+            }
+
             var failed = current with
             {
                 Status = EconomyOperationRecord.FailedStatus,
@@ -105,6 +118,56 @@ public sealed class CosmosEconomyOperationRepository(CosmosContext context) : IE
             {
                 var response = await context.Economy.ReplaceItemAsync(
                     failed,
+                    operationId,
+                    new PartitionKey(userId),
+                    new ItemRequestOptions { IfMatchEtag = current.ETag },
+                    cancellationToken);
+                return response.Resource;
+            }
+            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
+            {
+                throw new ConcurrencyConflictException(
+                    $"Economy operation '{operationId}' was modified concurrently.");
+            }
+        }, cancellationToken: cancellationToken);
+    }
+
+    public async Task<EconomyOperationRecord> SetOutcomeAsync(
+        string userId,
+        string operationId,
+        string outcomeJson,
+        CancellationToken cancellationToken = default)
+    {
+        return await OptimisticConcurrency.ExecuteAsync(async () =>
+        {
+            var current = await GetAsync(userId, operationId, cancellationToken)
+                ?? throw new InvalidOperationException($"Economy operation '{operationId}' was not found.");
+            if (current.Status == EconomyOperationRecord.FailedStatus)
+            {
+                throw new ConcurrencyConflictException(
+                    $"Failed economy operation '{operationId}' cannot commit an outcome.");
+            }
+
+            if (current.OutcomeJson is not null)
+            {
+                if (!string.Equals(current.OutcomeJson, outcomeJson, StringComparison.Ordinal))
+                {
+                    throw new ConcurrencyConflictException(
+                        $"Economy operation '{operationId}' already has a different outcome.");
+                }
+
+                return current;
+            }
+
+            var updated = current with
+            {
+                OutcomeJson = outcomeJson,
+                UpdatedAt = DateTimeOffset.UtcNow,
+            };
+            try
+            {
+                var response = await context.Economy.ReplaceItemAsync(
+                    updated,
                     operationId,
                     new PartitionKey(userId),
                     new ItemRequestOptions { IfMatchEtag = current.ETag },

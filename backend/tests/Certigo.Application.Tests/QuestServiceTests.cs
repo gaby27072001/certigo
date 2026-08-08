@@ -143,6 +143,9 @@ public sealed class QuestServiceTests
         users.UpsertCalls.Should().BeGreaterThanOrEqualTo(2); // conflicted once, then re-applied
         var profile = await inner.GetAsync("user-1");
         profile!.Gems.Should().Be(100 + quest.RewardGems); // credited exactly once
+        result.GemsBalance.Should().Be(profile.Gems);
+        events.Events.Single(e => e.Type == "quest.claimed").Payload
+            .Should().BeEquivalentTo(result);
         profile.DailyQuestClaims!.Count(id => id == quest.Id).Should().Be(1); // claim recorded once
         events.Events.Count(e => e.Type == "quest.claimed").Should().Be(1);
     }

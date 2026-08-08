@@ -32,7 +32,7 @@ public sealed class QuizService(
     IEconomyOperationRepository economyOperations) : IQuizService
 {
     private static readonly string[] EconomySteps =
-        ["attempt", "progress", "learnerModel", "profile", "leaderboard", "events"];
+        ["profile", "attempt", "progress", "learnerModel", "leaderboard", "events"];
 
     public async Task<SubmitQuizResult> SubmitAsync(string lessonId, SubmitQuizRequest request, CancellationToken cancellationToken = default)
     {
@@ -230,7 +230,12 @@ public sealed class QuizService(
                 userContext.UserId,
                 "quiz",
                 request.ClientAttemptId,
-                new QuizEconomyPayload(rejectedAttempt, Array.Empty<ConceptMastery>(), null, signal),
+                new QuizEconomyPayload(
+                    rejectedAttempt,
+                    Array.Empty<ConceptMastery>(),
+                    null,
+                    signal,
+                    ProfileMutationAllowed: false),
                 EconomySteps,
                 now,
                 cancellationToken);
@@ -312,6 +317,39 @@ public sealed class QuizService(
         CancellationToken cancellationToken)
     {
         var payload = DurableEconomy.ReadPayload<QuizEconomyPayload>(operation);
+        var profileMutationAllowed = payload.ProfileMutationAllowed
+            ?? !string.Equals(
+                payload.IntegritySignal?.Decision,
+                IntegrityDecision.Reject.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+        SubmitQuizResult? persistedLegacyResult = null;
+        if (operation.HasCompleted("attempt")
+            && string.IsNullOrWhiteSpace(operation.OutcomeJson))
+        {
+            persistedLegacyResult = (await attempts.GetByClientAttemptIdAsync(
+                userContext.UserId,
+                payload.Attempt.ClientAttemptId,
+                cancellationToken))?.Result;
+        }
+
+        var canonicalLegacyResult = persistedLegacyResult ?? payload.Attempt.Result;
+        var profileOutcome = await DurableEconomy.ApplyProfileOutcomeStepAsync(
+            economyOperations,
+            users,
+            userContext.UserId,
+            userContext.DisplayName,
+            operation,
+            profile => profileMutationAllowed
+                ? ApplyQuizProfile(profile, payload.Attempt, persistedLegacyResult)
+                : (profile, canonicalLegacyResult),
+            outcome => outcome.Rewards,
+            rewards => canonicalLegacyResult with { Rewards = rewards },
+            canonicalLegacyResult,
+            cancellationToken);
+        operation = profileOutcome.Operation;
+        var result = profileOutcome.Outcome;
+        var reconciledAttempt = payload.Attempt with { Result = result };
+
         operation = await DurableEconomy.RunStepAsync(
             economyOperations,
             operation,
@@ -320,7 +358,7 @@ public sealed class QuizService(
             {
                 try
                 {
-                    await attempts.CreateAsync(payload.Attempt, cancellationToken);
+                    await attempts.CreateAsync(reconciledAttempt, cancellationToken);
                 }
                 catch (DuplicateRecordException)
                 {
@@ -328,7 +366,7 @@ public sealed class QuizService(
                         userContext.UserId,
                         payload.Attempt.ClientAttemptId,
                         cancellationToken);
-                    if (existing?.Result.AttemptId != payload.Attempt.Result.AttemptId)
+                    if (existing?.Result.AttemptId != result.AttemptId)
                     {
                         throw new ConcurrencyConflictException(
                             $"Attempt '{payload.Attempt.ClientAttemptId}' conflicts with another result.");
@@ -363,33 +401,12 @@ public sealed class QuizService(
         operation = await DurableEconomy.RunStepAsync(
             economyOperations,
             operation,
-            "profile",
-            async () =>
-            {
-                if (payload.Attempt.Result.Rewards.XpEarned > 0
-                    || payload.Attempt.Result.Rewards.GemsEarned > 0
-                    || payload.Attempt.Result.Rewards.AchievementsUnlocked.Count > 0)
-                {
-                    await DurableEconomy.ApplyProfileOnceAsync(
-                        users,
-                        userContext.UserId,
-                        userContext.DisplayName,
-                        operation.Id,
-                        profile => ApplyQuizProfile(profile, payload.Attempt),
-                        cancellationToken);
-                }
-            },
-            cancellationToken);
-
-        operation = await DurableEconomy.RunStepAsync(
-            economyOperations,
-            operation,
             "leaderboard",
-            () => payload.Attempt.Result.Rewards.XpEarned <= 0
+            () => result.Rewards.XpEarned <= 0
                 ? Task.CompletedTask
                 : leaderboard.AddXpAsync(
                     userContext.UserId,
-                    payload.Attempt.Result.Rewards.XpEarned,
+                    result.Rewards.XpEarned,
                     operation.Id,
                     payload.Attempt.SubmittedAt,
                     cancellationToken),
@@ -407,7 +424,7 @@ public sealed class QuizService(
                         userContext.UserId,
                         "quiz.submitted",
                         payload.Attempt.SubmittedAt,
-                        payload.Attempt.Result),
+                        result),
                     cancellationToken);
                 if (payload.IntegritySignal is not null)
                 {
@@ -421,7 +438,7 @@ public sealed class QuizService(
                         cancellationToken);
                 }
 
-                if (payload.Attempt.Result.Rewards.AchievementsUnlocked.Count > 0)
+                if (result.Rewards.AchievementsUnlocked.Count > 0)
                 {
                     await events.AddAsync(
                         new LearningEvent(
@@ -429,18 +446,21 @@ public sealed class QuizService(
                             userContext.UserId,
                             "achievement.unlocked",
                             payload.Attempt.SubmittedAt,
-                            payload.Attempt.Result.Rewards.AchievementsUnlocked),
+                            result.Rewards.AchievementsUnlocked),
                         cancellationToken);
                 }
             },
             cancellationToken);
 
-        return payload.Attempt.Result;
+        return result;
     }
 
-    private static UserProfileDto ApplyQuizProfile(UserProfileDto profile, AttemptRecord attempt)
+    private static (UserProfileDto Profile, SubmitQuizResult Outcome) ApplyQuizProfile(
+        UserProfileDto profile,
+        AttemptRecord attempt,
+        SubmitQuizResult? fixedOutcome = null)
     {
-        var result = attempt.Result;
+        var result = fixedOutcome ?? attempt.Result;
         var xpEarned = result.Rewards.XpEarned;
         var correctCount = result.Results.Count(item => item.Correct);
         var perfect = result.Results.Count > 0 && correctCount == result.Results.Count;
@@ -479,13 +499,18 @@ public sealed class QuizService(
             lifetimeLessons,
             lifetimePerfect,
             baseGems);
-        var newlyAppliedAchievements = AchievementEngine.NewlyUnlocked(
-            achievementSnapshot,
-            achievements);
+        var newlyAppliedAchievements = fixedOutcome is null
+            ? AchievementEngine.NewlyUnlocked(achievementSnapshot, achievements)
+            : AchievementEngine.Tiers
+                .Where(tier => fixedOutcome.Rewards.AchievementsUnlocked.Contains(
+                        tier.Id,
+                        StringComparer.Ordinal)
+                    && !achievements.Contains(tier.Id, StringComparer.Ordinal))
+                .ToArray();
         achievements.AddRange(newlyAppliedAchievements.Select(tier => tier.Id));
         var achievementGems = newlyAppliedAchievements.Sum(tier => tier.RewardGems);
 
-        return profile with
+        var updatedProfile = profile with
         {
             Xp = newXp,
             Level = newLevel,
@@ -519,13 +544,27 @@ public sealed class QuizService(
                 ? (sameMonth ? profile.MonthlyPerfectLessons : 0) + (perfect ? 1 : 0)
                 : profile.MonthlyPerfectLessons,
         };
+        var outcome = fixedOutcome ?? result with
+        {
+            Rewards = result.Rewards with
+            {
+                NewXp = newXp,
+                LevelUp = newLevel > profile.Level,
+                StreakExtended = streak.StreakDays > profile.StreakDays,
+                AchievementsUnlocked = newlyAppliedAchievements
+                    .Select(tier => tier.Id)
+                    .ToList(),
+            },
+        };
+        return (updatedProfile, outcome);
     }
 
     private sealed record QuizEconomyPayload(
         AttemptRecord Attempt,
         IReadOnlyList<ConceptMastery> Masteries,
         LearnerModelRecord? LearnerModel,
-        AttemptIntegritySignal? IntegritySignal);
+        AttemptIntegritySignal? IntegritySignal,
+        bool? ProfileMutationAllowed = null);
 
     // Anti-cheat rate window: count + XP of the learner's prior attempts (lesson and
     // exam) over the trailing hour, sourced from the attempts container (no Redis).
