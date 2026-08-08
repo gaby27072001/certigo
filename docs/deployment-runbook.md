@@ -314,22 +314,23 @@ gh workflow run cd-backend.yml --repo "$GH_ORG/$GH_REPO" \
 - `entraAuthority` / `entraAudience` = **placeholders** : **OK en dev** car `authMode='dev'`
   ⇒ `DevTokenValidator` (Entra non appliqué). Renseigner les vraies valeurs pour staging/prod.
 
-### Storage `publicNetworkAccess` — dérive réconciliée (cette PR)
+### Storage FC1 et posture réseau
 
-Le module `infra/modules/storage.bicep` ne fixait **pas** `publicNetworkAccess` ; le compte de
-stockage `dev` live avait dérivé vers `Disabled`. En **Flex Consumption**, la plateforme **tire le
-package applicatif via l'endpoint public** du Storage : avec `Disabled` et **sans private endpoint**,
-le déploiement échoue (observé cette session : `403 InaccessibleStorageException` au config-zip).
-Le paramètre est désormais **explicite, défaut `Enabled`**, et câblé `Enabled` depuis `main.bicep`
-(le durcissement par private endpoints est une tâche **P1**). Le `what-if` prouve que c'est un
-**no-op non destructif** (le storage passe de `modify` à `no change`).
+Le seul mode accepté est `networkAccessMode='public-rbac'`. Storage, Cosmos et Key Vault gardent
+leurs endpoints publics tant que l'intégration VNet, les private endpoints et les zones DNS privées
+ne sont pas déployés ensemble. Aucun commutateur partiel ne peut désactiver les endpoints et rendre
+le backend indisponible.
+
+Le package FC1 et `AzureWebJobsStorage` utilisent une identité managée **utilisateur** créée avant
+la Function App. Ses rôles Blob Owner/Contributor, Queue Contributor et Table Contributor sont
+provisionnés avant l'application, ce qui supprime la course de propagation qui provoquait
+`InaccessibleStorageException`/403 avec une identité système créée en même temps que l'application.
 
 > ⚠️ **Flags policy-enforced — ne pas « corriger ».** `allowSharedKeyAccess: false` et
 > `allowBlobPublicAccess: false` sont **imposés au niveau org** par des Azure Policy
 > (`StorageAccount_DisableLocalAuth_Modify`, `StorageAccount_BlobAnonymousAccess_Modify`). Le
-> `what-if` peut les afficher en `modify` : c'est attendu et **aucune** policy n'impose
-> `publicNetworkAccess`. L'accès au blob se fait via **identité managée** (RBAC `Storage Blob Data
-> Owner`), pas par clé partagée.
+> `what-if` peut les afficher en `modify` : c'est attendu. L'accès au blob se fait via identité
+> managée et RBAC, jamais par clé partagée.
 
 ---
 
@@ -341,7 +342,8 @@ Le paramètre est désormais **explicite, défaut `Enabled`**, et câblé `Enabl
 `AUTH_MODE=dev` est interdit en Production sauf `AUTH_ALLOW_DEV=true`.
 
 Le middleware `JwtAuthMiddleware` exige `Authorization: Bearer …` **sauf** sur
-`/api/health`, `/api/auth/register`, `/api/auth/login`, `/api/auth/refresh`.
+`/api/health`, `/api/health/live`, `/api/health/ready`, `/api/auth/register`,
+`/api/auth/login`, `/api/auth/refresh`.
 
 ### Chemin 1 — Login local JWT (auto-suffisant, sans Entra) — recommandé pour valider `dev`
 

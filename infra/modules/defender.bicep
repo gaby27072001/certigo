@@ -11,6 +11,9 @@ targetScope = 'subscription'
 @description('Enable paid Microsoft Defender for Cloud plans. Default false: only the free foundational CSPM stays on.')
 param enablePaidPlans bool = false
 
+@description('Manage Defender pricing at subscription scope. Keep false unless this deployment owns the subscription-wide setting.')
+param managePlans bool = false
+
 @description('Defender plan names switched to Standard when enablePaidPlans is true.')
 param plans array = [
   'AppServices'
@@ -19,9 +22,12 @@ param plans array = [
   'CosmosDbs'
 ]
 
-resource defenderPlans 'Microsoft.Security/pricings@2024-01-01' = [ for plan in plans: if (enablePaidPlans) {
+resource defenderPlans 'Microsoft.Security/pricings@2024-01-01' = [ for plan in plans: if (managePlans) {
   name: plan
   properties: {
-    pricingTier: 'Standard'
+    pricingTier: enablePaidPlans ? 'Standard' : 'Free'
   }
 }]
+
+output managed bool = managePlans
+output pricingTier string = enablePaidPlans ? 'Standard' : 'Free'

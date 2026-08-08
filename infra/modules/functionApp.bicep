@@ -1,7 +1,7 @@
 // Azure Functions (Linux Flex Consumption, .NET 8 isolated worker) hosting the
-// Certigo API. Uses a system-assigned managed identity for Key Vault, Cosmos
-// data-plane, and identity-based storage access — NO account keys anywhere
-// (the platform's storage accounts have shared-key auth disabled by policy).
+// Certigo API. Uses a preprovisioned user-assigned identity for FC1 host storage,
+// Key Vault references and Application Insights, plus a system-assigned identity
+// for Cosmos data-plane access. No storage account keys are used.
 @description('Function App name (globally unique).')
 param functionAppName string
 param location string
@@ -14,6 +14,9 @@ param deploymentContainerName string = 'app-package'
 
 @description('Application Insights connection string.')
 param appInsightsConnectionString string
+
+@description('Application Insights component name, used for managed-identity telemetry ingestion.')
+param appInsightsName string
 
 @description('Cosmos DB account endpoint.')
 param cosmosEndpoint string
@@ -78,7 +81,108 @@ resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
   name: storageAccountName
 }
 
-resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
+resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
+  name: appInsightsName
+}
+
+resource vault 'Microsoft.KeyVault/vaults@2024-04-01-preview' existing = {
+  name: keyVaultName
+}
+
+// A user-assigned identity breaks the FC1 deployment bootstrap cycle: it and its
+// data-plane roles exist before the Function App tries to read the package.
+resource hostStorageIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: 'id-${functionAppName}-host'
+  location: location
+  tags: tags
+}
+
+var storageBlobDataOwner = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+)
+var storageBlobDataContributor = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+)
+var storageQueueDataContributor = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
+)
+var storageTableDataContributor = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
+)
+var monitoringMetricsPublisher = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '3913510d-42f4-4e42-8a64-420c390055eb'
+)
+var keyVaultSecretsUser = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '4633458b-17de-408a-b874-0445c86b69e6'
+)
+
+resource deploymentBlobAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: storage
+  name: guid(storage.id, hostStorageIdentity.id, storageBlobDataContributor)
+  properties: {
+    principalId: hostStorageIdentity.properties.principalId
+    roleDefinitionId: storageBlobDataContributor
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource hostBlobAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: storage
+  name: guid(storage.id, hostStorageIdentity.id, storageBlobDataOwner)
+  properties: {
+    principalId: hostStorageIdentity.properties.principalId
+    roleDefinitionId: storageBlobDataOwner
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource hostQueueAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: storage
+  name: guid(storage.id, hostStorageIdentity.id, storageQueueDataContributor)
+  properties: {
+    principalId: hostStorageIdentity.properties.principalId
+    roleDefinitionId: storageQueueDataContributor
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource hostTableAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: storage
+  name: guid(storage.id, hostStorageIdentity.id, storageTableDataContributor)
+  properties: {
+    principalId: hostStorageIdentity.properties.principalId
+    roleDefinitionId: storageTableDataContributor
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource appInsightsPublisherAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: appInsights
+  name: guid(appInsights.id, hostStorageIdentity.id, monitoringMetricsPublisher)
+  properties: {
+    principalId: hostStorageIdentity.properties.principalId
+    roleDefinitionId: monitoringMetricsPublisher
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource hostVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: vault
+  name: guid(vault.id, hostStorageIdentity.id, keyVaultSecretsUser)
+  properties: {
+    principalId: hostStorageIdentity.properties.principalId
+    roleDefinitionId: keyVaultSecretsUser
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: 'plan-${functionAppName}'
   location: location
   tags: tags
@@ -89,15 +193,21 @@ resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   properties: { reserved: true } // Linux
 }
 
-resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
+resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
   name: functionAppName
   location: location
   tags: tags
   kind: 'functionapp,linux'
-  identity: { type: 'SystemAssigned' }
+  identity: {
+    type: 'SystemAssigned, UserAssigned'
+    userAssignedIdentities: {
+      '${hostStorageIdentity.id}': {}
+    }
+  }
   properties: {
     serverFarmId: plan.id
     httpsOnly: true
+    keyVaultReferenceIdentity: hostStorageIdentity.id
     // Flex Consumption: runtime + deployment are declared in functionAppConfig.
     // The deployment package is pulled from blob storage using the app's managed
     // identity (no shared key — compatible with allowSharedKeyAccess=false).
@@ -107,7 +217,8 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           type: 'blobContainer'
           value: '${storage.properties.primaryEndpoints.blob}${deploymentContainerName}'
           authentication: {
-            type: 'SystemAssignedIdentity'
+            type: 'UserAssignedIdentity'
+            userAssignedIdentityResourceId: hostStorageIdentity.id
           }
         }
       }
@@ -132,11 +243,22 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         // Identity-based AzureWebJobsStorage (no key). The managed identity is
         // granted Blob/Queue data roles on the storage account below.
         { name: 'AzureWebJobsStorage__accountName', value: storage.name }
+        { name: 'AzureWebJobsStorage__credential', value: 'managedidentity' }
+        { name: 'AzureWebJobsStorage__clientId', value: hostStorageIdentity.properties.clientId }
         { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
+        {
+          name: 'APPLICATIONINSIGHTS_AUTHENTICATION_STRING'
+          value: 'ClientId=${hostStorageIdentity.properties.clientId};Authorization=AAD'
+        }
         // App config consumed by the API. Keys are FLAT (match Program.cs /
         // local.settings.json.example): COSMOS_ENDPOINT, ENTRA_AUTHORITY, etc.
         { name: 'COSMOS_ENDPOINT', value: cosmosEndpoint }
         { name: 'COSMOS_DATABASE', value: 'certigo' }
+        { name: 'BLOB_ENDPOINT', value: storage.properties.primaryEndpoints.blob }
+        { name: 'DEPLOYMENT_CONTAINER_NAME', value: deploymentContainerName }
+        { name: 'HEALTH_PROBE_TIMEOUT_SECONDS', value: '5' }
+        { name: 'HEALTH_PLATFORM_CLIENT_ID', value: hostStorageIdentity.properties.clientId }
+        { name: 'KeyVault__HealthSecretName', value: 'AUTH-JWT-SIGNING-KEY' }
         // "dev" => permissive DevTokenValidator (dev env only); "prod" (or any non-"dev" value) => Entra.
         { name: 'AUTH_MODE', value: authMode }
         // Azure Functions defaults the hosting environment to "Production", so the dev-validator
@@ -165,62 +287,14 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       ]
     }
   }
-}
-
-// Identity-based storage access for the Functions host (deployment package +
-// AzureWebJobsStorage). Required because the storage account has shared-key auth
-// disabled — the runtime authenticates with the app's managed identity.
-// Storage Blob Data Contributor (read/write) suffices for the Functions runtime;
-// Data Owner (which additionally grants POSIX ACL / RBAC management on blobs) is
-// over-privileged for this workload (finding R-03).
-var storageBlobDataContributor = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
-)
-
-resource storageBlobAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: storage
-  name: guid(storage.id, functionApp.id, storageBlobDataContributor)
-  properties: {
-    principalId: functionApp.identity.principalId
-    roleDefinitionId: storageBlobDataContributor
-    principalType: 'ServicePrincipal'
-  }
-}
-
-var storageQueueDataContributor = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
-)
-
-resource storageQueueAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: storage
-  name: guid(storage.id, functionApp.id, storageQueueDataContributor)
-  properties: {
-    principalId: functionApp.identity.principalId
-    roleDefinitionId: storageQueueDataContributor
-    principalType: 'ServicePrincipal'
-  }
-}
-
-// Grant the Function App's managed identity read access to Key Vault secrets.
-resource vault 'Microsoft.KeyVault/vaults@2024-04-01-preview' existing = {
-  name: keyVaultName
-}
-
-var keyVaultSecretsUser = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  '4633458b-17de-408a-b874-0445c86b69e6'
-)
-
-resource vaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: vault
-  name: guid(vault.id, functionApp.id, keyVaultSecretsUser)
-  properties: {
-    principalId: functionApp.identity.principalId
-    roleDefinitionId: keyVaultSecretsUser
-    principalType: 'ServicePrincipal'
-  }
+  dependsOn: [
+    deploymentBlobAccess
+    hostBlobAccess
+    hostQueueAccess
+    hostTableAccess
+    appInsightsPublisherAccess
+    hostVaultAccess
+  ]
 }
 
 // Grant the Function App's managed identity Cosmos DB data-plane access via the
@@ -246,3 +320,4 @@ resource cosmosDataAccess 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignme
 output functionAppName string = functionApp.name
 output defaultHostName string = functionApp.properties.defaultHostName
 output principalId string = functionApp.identity.principalId
+output hostStoragePrincipalId string = hostStorageIdentity.properties.principalId
