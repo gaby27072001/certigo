@@ -2,6 +2,11 @@ using System.Text.Json.Serialization;
 
 namespace Certigo.Application.Abstractions;
 
+/// Raised when persistence rejects a write before it can commit. Callers may
+/// safely roll back a reservation; transport/time-out failures must not use it.
+public sealed class DefinitivePersistenceException(string message, Exception innerException)
+    : Exception(message, innerException);
+
 /// Raised when an email/password authentication attempt fails (unknown email,
 /// wrong password, or an expired/invalid refresh token). Mapped to 401 by the
 /// API so the client can prompt the learner to retry or sign up. The message is
@@ -13,6 +18,12 @@ public sealed class AuthFailedException(string message) : Exception(message);
 /// Mapped to HTTP 429 (Too Many Requests) so the client can surface a distinct
 /// "try again later" message and back off.
 public sealed class RateLimitedException(string message) : Exception(message);
+
+public enum CredentialProvisioningState
+{
+    Pending,
+    Active,
+}
 
 /// One stored email/password credential. Lives in the Users container in its own
 /// partition (id = <c>credential::{emailLower}</c>, which is also the partition
@@ -40,7 +51,12 @@ public sealed record UserCredentialRecord(
     // SHA-256 (Base64) hash of the outstanding verification token — never the raw
     // token — so a database reader cannot harvest a live confirmation link.
     string? VerificationTokenHash = null,
-    DateTimeOffset? VerificationTokenExpiresAt = null)
+    DateTimeOffset? VerificationTokenExpiresAt = null,
+    // Null means active for credentials created before atomic canonical
+    // reservations shipped. New registrations stay pending until their profile
+    // has been provisioned, which makes an interrupted sign-up recoverable.
+    CredentialProvisioningState? ProvisioningState = null,
+    DateTimeOffset? ProvisioningLeaseExpiresAt = null)
 {
     /// Discriminator persisted alongside the document; combined with the id
     /// prefix it keeps credential docs unambiguously separate from profiles.
@@ -50,12 +66,19 @@ public sealed record UserCredentialRecord(
     /// the already-normalised (trimmed, lower-cased) email.
     public static string IdFor(string emailLower) => $"credential::{emailLower}";
 
+    /// Canonical reservation id. All provider aliases for one mailbox map to the
+    /// same Cosmos id/partition key, so CreateItem is the uniqueness arbiter.
+    public static string CanonicalIdFor(string canonicalEmail) => $"credential::canonical::{canonicalEmail}";
+
     /// Whether the account counts as verified. A grandfathered credential (null
     /// flag) is treated as verified so pre-feature accounts keep working; only an
     /// explicit <c>false</c> means "pending confirmation". Never persisted (it is
     /// derived), so it can't drift from <see cref="EmailVerified"/>.
     [JsonIgnore]
     public bool IsEmailVerified => EmailVerified != false;
+
+    [JsonIgnore]
+    public bool IsProvisioning => ProvisioningState == CredentialProvisioningState.Pending;
 
     /// Cosmos optimistic-concurrency token (`_etag`). Populated on reads and used
     /// on updates to prevent concurrent lockout/password state from being
@@ -82,11 +105,15 @@ public interface IUserCredentialRepository
     /// Atomically creates the credential. Throws <see cref="DuplicateRecordException"/>
     /// when a credential for the same email already exists (turns the legacy
     /// check-then-create race into a single guarded write).
-    Task CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default);
+    Task<UserCredentialRecord> CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default);
 
     /// Replaces an existing credential document (used to update the failed-login
     /// counter, lockout window, and password hash) using optimistic concurrency.
     Task UpdateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default);
+
+    /// Conditionally removes an incomplete reservation. A concurrent recovery
+    /// that advanced the ETag wins and leaves the reservation in place.
+    Task<bool> DeletePendingAsync(UserCredentialRecord record, CancellationToken cancellationToken = default);
 }
 
 /// One-way password hashing. The implementation is a salted, iterated KDF; verify

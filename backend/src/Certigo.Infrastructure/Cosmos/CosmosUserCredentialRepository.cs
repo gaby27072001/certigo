@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Azure.Cosmos;
 using Certigo.Application.Abstractions;
+using Certigo.Application.Services;
 
 namespace Certigo.Infrastructure.Cosmos;
 
@@ -10,10 +11,18 @@ namespace Certigo.Infrastructure.Cosmos;
 /// staying isolated from profile documents (whose id is the userId).
 public sealed class CosmosUserCredentialRepository(CosmosContext context) : IUserCredentialRepository
 {
-    public Task<UserCredentialRecord?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
+    public async Task<UserCredentialRecord?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var id = UserCredentialRecord.IdFor(Normalize(email));
-        return context.Users.ReadOrDefaultAsync<UserCredentialRecord>(id, new PartitionKey(id), cancellationToken);
+        var normalized = Normalize(email);
+        var legacyId = UserCredentialRecord.IdFor(normalized);
+        var legacy = await context.Users.ReadOrDefaultAsync<UserCredentialRecord>(
+            legacyId,
+            new PartitionKey(legacyId),
+            cancellationToken);
+        return legacy
+            ?? await FindByCanonicalEmailAsync(
+                AuthRules.CanonicalizeEmail(normalized),
+                cancellationToken);
     }
 
     public async Task<UserCredentialRecord?> FindByCanonicalEmailAsync(string canonicalEmail, CancellationToken cancellationToken = default)
@@ -23,10 +32,19 @@ public sealed class CosmosUserCredentialRepository(CosmosContext context) : IUse
             return null;
         }
 
-        // Cross-partition query (credential docs are keyed by id = the exact email),
-        // hit only on register and login misses — never on the hot login path. The
-        // type discriminator keeps it isolated from profile documents that share
-        // the Users container.
+        var canonicalId = UserCredentialRecord.CanonicalIdFor(canonicalEmail);
+        var canonical = await context.Users.ReadOrDefaultAsync<UserCredentialRecord>(
+            canonicalId,
+            new PartitionKey(canonicalId),
+            cancellationToken);
+        if (canonical is not null)
+        {
+            return canonical;
+        }
+
+        // Compatibility lookup for credentials written before canonical ids were
+        // introduced. New registrations never depend on this query for uniqueness:
+        // their canonical CreateItem remains the atomic arbiter.
         var query = new QueryDefinition(
                 "SELECT * FROM c WHERE c.type = 'credential' AND c.canonicalEmail = @canonical")
             .WithParameter("@canonical", canonicalEmail);
@@ -45,11 +63,15 @@ public sealed class CosmosUserCredentialRepository(CosmosContext context) : IUse
         return null;
     }
 
-    public async Task CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
+    public async Task<UserCredentialRecord> CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
     {
         try
         {
-            await context.Users.CreateItemAsync(record, new PartitionKey(record.Id), cancellationToken: cancellationToken);
+            var response = await context.Users.CreateItemAsync(
+                record,
+                new PartitionKey(record.Id),
+                cancellationToken: cancellationToken);
+            return response.Resource;
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
         {
@@ -76,6 +98,30 @@ public sealed class CosmosUserCredentialRepository(CosmosContext context) : IUse
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
         {
             throw new ConcurrencyConflictException($"Credential '{record.Id}' was modified concurrently.");
+        }
+    }
+
+    public async Task<bool> DeletePendingAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default)
+    {
+        if (!record.IsProvisioning || string.IsNullOrWhiteSpace(record.ETag))
+        {
+            return false;
+        }
+
+        try
+        {
+            await context.Users.DeleteItemAsync<UserCredentialRecord>(
+                record.Id,
+                new PartitionKey(record.Id),
+                new ItemRequestOptions { IfMatchEtag = record.ETag },
+                cancellationToken);
+            return true;
+        }
+        catch (CosmosException ex) when (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.PreconditionFailed)
+        {
+            return false;
         }
     }
 

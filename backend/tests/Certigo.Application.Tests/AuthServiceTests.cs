@@ -9,9 +9,20 @@ namespace Certigo.Application.Tests;
 internal sealed class InMemoryUserCredentialRepository : IUserCredentialRepository
 {
     private readonly Dictionary<string, UserCredentialRecord> _store = new(StringComparer.Ordinal);
+    private readonly object _gate = new();
+    private long _version;
 
     public Task<UserCredentialRecord?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
-        => Task.FromResult(_store.GetValueOrDefault(UserCredentialRecord.IdFor(email.Trim().ToLowerInvariant())));
+    {
+        lock (_gate)
+        {
+            var normalized = AuthRules.NormalizeEmail(email);
+            var match = _store.GetValueOrDefault(UserCredentialRecord.IdFor(normalized))
+                ?? _store.GetValueOrDefault(
+                    UserCredentialRecord.CanonicalIdFor(AuthRules.CanonicalizeEmail(normalized)));
+            return Task.FromResult(match);
+        }
+    }
 
     public Task<UserCredentialRecord?> FindByCanonicalEmailAsync(string canonicalEmail, CancellationToken cancellationToken = default)
     {
@@ -20,25 +31,61 @@ internal sealed class InMemoryUserCredentialRepository : IUserCredentialReposito
             return Task.FromResult<UserCredentialRecord?>(null);
         }
 
-        var match = _store.Values.FirstOrDefault(r => string.Equals(r.CanonicalEmail, canonicalEmail, StringComparison.Ordinal));
-        return Task.FromResult<UserCredentialRecord?>(match);
+        lock (_gate)
+        {
+            var canonicalId = UserCredentialRecord.CanonicalIdFor(canonicalEmail);
+            var match = _store.GetValueOrDefault(canonicalId)
+                ?? _store.Values.FirstOrDefault(r => string.Equals(r.CanonicalEmail, canonicalEmail, StringComparison.Ordinal));
+            return Task.FromResult<UserCredentialRecord?>(match);
+        }
     }
 
-    public Task CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
+    public Task<UserCredentialRecord> CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
     {
-        if (!_store.TryAdd(record.Id, record))
+        lock (_gate)
         {
-            throw new DuplicateRecordException($"A credential for '{record.Email}' already exists.");
-        }
+            if (_store.ContainsKey(record.Id))
+            {
+                throw new DuplicateRecordException($"A credential for '{record.Email}' already exists.");
+            }
 
-        return Task.CompletedTask;
+            var stored = record with { ETag = NextETag() };
+            _store.Add(record.Id, stored);
+            return Task.FromResult(stored);
+        }
     }
 
     public Task UpdateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
     {
-        _store[record.Id] = record;
-        return Task.CompletedTask;
+        lock (_gate)
+        {
+            if (!_store.TryGetValue(record.Id, out var current)
+                || !string.Equals(record.ETag, current.ETag, StringComparison.Ordinal))
+            {
+                throw new ConcurrencyConflictException("stale credential");
+            }
+
+            _store[record.Id] = record with { ETag = NextETag() };
+            return Task.CompletedTask;
+        }
     }
+
+    public Task<bool> DeletePendingAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            if (!_store.TryGetValue(record.Id, out var current)
+                || !current.IsProvisioning
+                || !string.Equals(record.ETag, current.ETag, StringComparison.Ordinal))
+            {
+                return Task.FromResult(false);
+            }
+
+            return Task.FromResult(_store.Remove(record.Id));
+        }
+    }
+
+    private string NextETag() => $"\"{Interlocked.Increment(ref _version)}\"";
 }
 
 /// Captures the emails an <see cref="AuthService"/> would send so verification
@@ -78,6 +125,53 @@ internal sealed class FakeTokenIssuer : ITokenIssuer
 
         var parts = refreshToken["refresh:".Length..].Split('|');
         return new RefreshTokenPrincipal(parts[0], parts.ElementAtOrDefault(1) ?? string.Empty, parts.ElementAtOrDefault(2) ?? string.Empty);
+    }
+}
+
+internal sealed class FailingProfileProvisionRepository : IUserRepository
+{
+    public Task<UserProfileDto?> GetAsync(string userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<UserProfileDto?>(null);
+
+    public Task<UserProfileDto?> FindByHandleAsync(string handle, CancellationToken cancellationToken = default) =>
+        Task.FromResult<UserProfileDto?>(null);
+
+    public Task<UserProfileDto> UpsertAsync(
+        UserProfileDto profile,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<UserProfileDto>(
+            new DefinitivePersistenceException(
+                "simulated profile provisioning failure",
+                new InvalidOperationException("rejected before commit")));
+}
+
+internal sealed class CommitThenThrowProfileProvisionRepository(InMemoryUserRepository inner)
+    : IUserRepository
+{
+    private bool _thrown;
+
+    public Task<UserProfileDto?> GetAsync(
+        string userId,
+        CancellationToken cancellationToken = default) =>
+        inner.GetAsync(userId, cancellationToken);
+
+    public Task<UserProfileDto?> FindByHandleAsync(
+        string handle,
+        CancellationToken cancellationToken = default) =>
+        inner.FindByHandleAsync(handle, cancellationToken);
+
+    public async Task<UserProfileDto> UpsertAsync(
+        UserProfileDto profile,
+        CancellationToken cancellationToken = default)
+    {
+        var committed = await inner.UpsertAsync(profile, cancellationToken);
+        if (!_thrown)
+        {
+            _thrown = true;
+            throw new InvalidOperationException("simulated lost profile response");
+        }
+
+        return committed;
     }
 }
 
@@ -172,6 +266,112 @@ public sealed class AuthServiceTests
         var act = async () => await service.RegisterAsync(new RegisterRequest("DUP@Example.com", "password123", null));
 
         await act.Should().ThrowAsync<DuplicateRecordException>().WithMessage("*déjà utilisée*");
+    }
+
+    [Fact]
+    public async Task Concurrent_canonical_variants_create_one_identity()
+    {
+        var (service, _, credentials) = Build();
+        var requests = new[]
+        {
+            new RegisterRequest("first.last+one@gmail.com", "password123", "First"),
+            new RegisterRequest("firstlast@gmail.com", "password123", "Second"),
+        };
+
+        var outcomes = await Task.WhenAll(requests.Select(async request =>
+        {
+            try
+            {
+                return (Result: await service.RegisterAsync(request), Error: (Exception?)null);
+            }
+            catch (Exception error)
+            {
+                return (Result: (AuthResultDto?)null, Error: error);
+            }
+        }));
+
+        outcomes.Count(outcome => outcome.Result is not null).Should().Be(1);
+        outcomes.Count(outcome => outcome.Error is DuplicateRecordException).Should().Be(1);
+        var stored = await credentials.FindByCanonicalEmailAsync("firstlast@gmail.com");
+        stored.Should().NotBeNull();
+        stored!.IsProvisioning.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Register_rolls_back_pending_identity_when_profile_provisioning_fails()
+    {
+        var credentials = new InMemoryUserCredentialRepository();
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new FailingProfileProvisionRepository(),
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+
+        var act = () => service.RegisterAsync(
+            new RegisterRequest("rollback@example.com", "password123", "Rollback"));
+
+        await act.Should().ThrowAsync<DefinitivePersistenceException>();
+        (await credentials.FindByCanonicalEmailAsync("rollback@example.com")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Register_recovers_when_profile_commits_but_its_response_is_lost()
+    {
+        var users = new InMemoryUserRepository();
+        var credentials = new InMemoryUserCredentialRepository();
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new CommitThenThrowProfileProvisionRepository(users),
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+
+        var result = await service.RegisterAsync(
+            new RegisterRequest("ambiguous@example.com", "password123", "Ambiguous"));
+
+        (await users.GetAsync(result.Profile.Id)).Should().NotBeNull();
+        var credential = await credentials.FindByCanonicalEmailAsync("ambiguous@example.com");
+        credential.Should().NotBeNull();
+        credential!.IsProvisioning.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Register_recovers_an_expired_pending_identity()
+    {
+        var now = new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero);
+        var credentials = new InMemoryUserCredentialRepository();
+        await credentials.CreateAsync(new UserCredentialRecord(
+            UserCredentialRecord.CanonicalIdFor("recover@example.com"),
+            "recover@example.com",
+            "reserved-user",
+            "Recover",
+            "h:password123",
+            now.AddMinutes(-10),
+            CanonicalEmail: "recover@example.com",
+            EmailVerified: false,
+            ProvisioningState: CredentialProvisioningState.Pending,
+            ProvisioningLeaseExpiresAt: now.AddMinutes(-5)));
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new InMemoryUserRepository(),
+            new FakeClock(now),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+
+        var result = await service.RegisterAsync(
+            new RegisterRequest("recover@example.com", "password123", "Recovered"));
+
+        result.Profile.Id.Should().Be("reserved-user");
+        var recovered = await credentials.FindByCanonicalEmailAsync("recover@example.com");
+        recovered!.IsProvisioning.Should().BeFalse();
+        recovered.ProvisioningLeaseExpiresAt.Should().BeNull();
     }
 
     [Fact]
