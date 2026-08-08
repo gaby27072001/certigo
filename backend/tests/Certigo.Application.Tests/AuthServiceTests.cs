@@ -88,6 +88,49 @@ internal sealed class InMemoryUserCredentialRepository : IUserCredentialReposito
     private string NextETag() => $"\"{Interlocked.Increment(ref _version)}\"";
 }
 
+internal sealed class CompleteRegistrationBeforeDeleteCredentialRepository(
+    InMemoryUserCredentialRepository inner,
+    InMemoryUserRepository users) : IUserCredentialRepository
+{
+    public Task<UserCredentialRecord?> FindByEmailAsync(
+        string email,
+        CancellationToken cancellationToken = default) =>
+        inner.FindByEmailAsync(email, cancellationToken);
+
+    public Task<UserCredentialRecord?> FindByCanonicalEmailAsync(
+        string canonicalEmail,
+        CancellationToken cancellationToken = default) =>
+        inner.FindByCanonicalEmailAsync(canonicalEmail, cancellationToken);
+
+    public Task<UserCredentialRecord> CreateAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default) =>
+        inner.CreateAsync(record, cancellationToken);
+
+    public Task UpdateAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default) =>
+        inner.UpdateAsync(record, cancellationToken);
+
+    public async Task<bool> DeletePendingAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default)
+    {
+        users.Seed(TestContent.NewProfile(record.UserId));
+        var current = await inner.FindByCanonicalEmailAsync(
+            record.CanonicalEmail!,
+            cancellationToken);
+        await inner.UpdateAsync(
+            current! with
+            {
+                ProvisioningState = CredentialProvisioningState.Active,
+                ProvisioningLeaseExpiresAt = null,
+            },
+            cancellationToken);
+        return await inner.DeletePendingAsync(record, cancellationToken);
+    }
+}
+
 /// Captures the emails an <see cref="AuthService"/> would send so verification
 /// tests can pull the confirmation link out of the outbox.
 internal sealed class CapturingEmailSender : IEmailSender
@@ -145,7 +188,9 @@ internal sealed class FailingProfileProvisionRepository : IUserRepository
                 new InvalidOperationException("rejected before commit")));
 }
 
-internal sealed class CommitThenThrowProfileProvisionRepository(InMemoryUserRepository inner)
+internal sealed class CommitThenThrowProfileProvisionRepository(
+    InMemoryUserRepository inner,
+    Exception? failure = null)
     : IUserRepository
 {
     private bool _thrown;
@@ -168,11 +213,49 @@ internal sealed class CommitThenThrowProfileProvisionRepository(InMemoryUserRepo
         if (!_thrown)
         {
             _thrown = true;
-            throw new InvalidOperationException("simulated lost profile response");
+            throw failure ?? new InvalidOperationException("simulated lost profile response");
         }
 
         return committed;
     }
+}
+
+internal sealed class BlockingProfileProvisionRepository(InMemoryUserRepository inner)
+    : IUserRepository
+{
+    private readonly TaskCompletionSource _entered =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _release =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _getCalls;
+
+    public int GetCalls => Volatile.Read(ref _getCalls);
+    public Task Entered => _entered.Task;
+
+    public void Release() => _release.TrySetResult();
+
+    public async Task<UserProfileDto?> GetAsync(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.Increment(ref _getCalls) == 1)
+        {
+            _entered.TrySetResult();
+            await _release.Task.WaitAsync(cancellationToken);
+        }
+
+        return await inner.GetAsync(userId, cancellationToken);
+    }
+
+    public Task<UserProfileDto?> FindByHandleAsync(
+        string handle,
+        CancellationToken cancellationToken = default) =>
+        inner.FindByHandleAsync(handle, cancellationToken);
+
+    public Task<UserProfileDto> UpsertAsync(
+        UserProfileDto profile,
+        CancellationToken cancellationToken = default) =>
+        inner.UpsertAsync(profile, cancellationToken);
 }
 
 public sealed class AuthRulesTests
@@ -298,6 +381,39 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
+    public async Task Login_rejects_pending_registration_until_profile_is_active()
+    {
+        var users = new BlockingProfileProvisionRepository(new InMemoryUserRepository());
+        var credentials = new InMemoryUserCredentialRepository();
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            users,
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+        var request = new RegisterRequest("race@example.com", "password123", "Race");
+
+        var registration = service.RegisterAsync(request);
+        await users.Entered;
+
+        var pendingLogin = () => service.LoginAsync(
+            new LoginRequest(request.Email, request.Password));
+        await pendingLogin.Should().ThrowAsync<AuthFailedException>()
+            .WithMessage("E-mail ou mot de passe incorrect.");
+        users.GetCalls.Should().Be(1);
+
+        users.Release();
+        await registration;
+        var activeLogin = await service.LoginAsync(
+            new LoginRequest(request.Email, request.Password));
+
+        activeLogin.AccessToken.Should().StartWith("access:");
+        users.GetCalls.Should().Be(2);
+    }
+
+    [Fact]
     public async Task Register_rolls_back_pending_identity_when_profile_provisioning_fails()
     {
         var credentials = new InMemoryUserCredentialRepository();
@@ -338,6 +454,62 @@ public sealed class AuthServiceTests
         var credential = await credentials.FindByCanonicalEmailAsync("ambiguous@example.com");
         credential.Should().NotBeNull();
         credential!.IsProvisioning.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Register_does_not_delete_reservation_when_profile_committed_concurrently()
+    {
+        var users = new InMemoryUserRepository();
+        var credentials = new InMemoryUserCredentialRepository();
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new CommitThenThrowProfileProvisionRepository(
+                users,
+                new DefinitivePersistenceException(
+                    "simulated rejected response",
+                    new InvalidOperationException("race"))),
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+
+        var result = await service.RegisterAsync(
+            new RegisterRequest("rollback-race@example.com", "password123", "Race"));
+
+        (await users.GetAsync(result.Profile.Id)).Should().NotBeNull();
+        var credential = await credentials.FindByCanonicalEmailAsync(
+            "rollback-race@example.com");
+        credential.Should().NotBeNull();
+        credential!.IsProvisioning.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Register_rollback_etag_cannot_delete_a_concurrently_completed_identity()
+    {
+        var users = new InMemoryUserRepository();
+        var innerCredentials = new InMemoryUserCredentialRepository();
+        var credentials = new CompleteRegistrationBeforeDeleteCredentialRepository(
+            innerCredentials,
+            users);
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new FailingProfileProvisionRepository(),
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+
+        var act = () => service.RegisterAsync(
+            new RegisterRequest("rollback-etag@example.com", "password123", "Race"));
+
+        await act.Should().ThrowAsync<DefinitivePersistenceException>();
+        var credential = await innerCredentials.FindByCanonicalEmailAsync(
+            "rollback-etag@example.com");
+        credential.Should().NotBeNull();
+        credential!.IsProvisioning.Should().BeFalse();
+        (await users.GetAsync(credential.UserId)).Should().NotBeNull();
     }
 
     [Fact]

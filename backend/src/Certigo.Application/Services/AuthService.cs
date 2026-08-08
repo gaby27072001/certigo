@@ -194,8 +194,14 @@ public sealed class AuthService(
         }
         catch (DefinitivePersistenceException)
         {
-            await credentials.DeletePendingAsync(reservation, cancellationToken);
-            throw;
+            var committedProfile = await users.GetAsync(reservation.UserId, cancellationToken);
+            if (committedProfile is null)
+            {
+                await credentials.DeletePendingAsync(reservation, cancellationToken);
+                throw;
+            }
+
+            profile = committedProfile;
         }
         catch
         {
@@ -262,6 +268,14 @@ public sealed class AuthService(
         // Unknown email: same generic failure (no enumeration). There is no
         // account document to throttle against, so nothing is recorded.
         if (credential is null)
+        {
+            throw new AuthFailedException("E-mail ou mot de passe incorrect.");
+        }
+
+        // A canonical credential is only a reservation until profile provisioning
+        // transitions it to Active. Never mint tokens or create/read a profile for
+        // an in-flight registration.
+        if (credential.IsProvisioning)
         {
             throw new AuthFailedException("E-mail ou mot de passe incorrect.");
         }
