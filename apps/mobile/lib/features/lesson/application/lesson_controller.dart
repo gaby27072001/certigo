@@ -70,10 +70,26 @@ class LessonController extends StateNotifier<LessonSessionState> {
       return;
     }
 
+    final List<QuizItem?> checks = lesson.blocks
+        .where((LessonBlock block) => block.type == BlockType.check)
+        .map((LessonBlock block) => block.check)
+        .toList();
+    if (checks.isEmpty ||
+        checks.any(
+          (QuizItem? check) => check == null || !isAnswerableCheck(check),
+        )) {
+      state = state.copyWith(
+        status: LessonStatus.error,
+        errorMessage: 'Le contenu est indisponible. Réessaie ou lance la démo.',
+      );
+      return;
+    }
+
+    final List<LessonStep> steps = buildLessonSteps(lesson);
     state = state.copyWith(
       status: LessonStatus.ready,
       lesson: lesson,
-      steps: buildLessonSteps(lesson),
+      steps: steps,
       index: 0,
       selection: const <String>[],
       isDemo: false,

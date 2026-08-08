@@ -11,6 +11,7 @@ import '../app/offline/prefs_catalog_store.dart';
 import '../app/offline/prefs_lesson_cache_store.dart';
 import '../app/offline/prefs_sync_store.dart';
 import '../app/providers.dart';
+import '../features/notifications/notification_lifecycle_scope.dart';
 import '../features/notifications/notification_service.dart';
 import 'config_error_app.dart';
 import 'crash_reporting.dart';
@@ -88,7 +89,9 @@ Future<void> bootstrap() async {
           lessonStoreProvider.overrideWithValue(prefsLessonCacheStore(prefs)),
           syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
         ],
-        child: const OfflineSyncScope(child: CertigoApp()),
+        child: const NotificationLifecycleScope(
+          child: OfflineSyncScope(child: CertigoApp()),
+        ),
       ),
     );
   }, crashReporter);

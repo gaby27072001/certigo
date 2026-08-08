@@ -21,6 +21,94 @@ class _OfflineLessonRepo implements LessonRepository {
   }) async => const Err<Lesson>(NetworkFailure());
 }
 
+class _NoCheckLessonRepo implements LessonRepository {
+  @override
+  Future<Result<Lesson>> getLesson({
+    required String trackId,
+    required String lessonId,
+  }) async {
+    return Success<Lesson>(
+      Lesson(
+        id: lessonId,
+        trackId: trackId,
+        unitId: 'unit',
+        domainId: 'domain',
+        title: 'Lecture seule',
+        estMinutes: 5,
+        blocks: const <LessonBlock>[
+          LessonBlock(
+            type: BlockType.concept,
+            conceptId: 'concept',
+            body: 'Contenu valide sans contrôle.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UnusableCheckLessonRepo implements LessonRepository {
+  @override
+  Future<Result<Lesson>> getLesson({
+    required String trackId,
+    required String lessonId,
+  }) async {
+    return Success<Lesson>(
+      Lesson(
+        id: lessonId,
+        trackId: trackId,
+        unitId: 'unit',
+        domainId: 'domain',
+        title: 'Contrôle inutilisable',
+        estMinutes: 5,
+        blocks: const <LessonBlock>[
+          LessonBlock(
+            type: BlockType.check,
+            conceptId: 'concept',
+            check: QuizItem(
+              id: 'broken-cloze',
+              conceptId: 'concept',
+              type: ItemType.cloze,
+              stem: 'Aucun emplacement à compléter.',
+              options: <QuizOption>[QuizOption(id: 'answer', label: 'Réponse')],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MixedMalformedCheckLessonRepo implements LessonRepository {
+  @override
+  Future<Result<Lesson>> getLesson({
+    required String trackId,
+    required String lessonId,
+  }) async {
+    final QuizItem validCheck = sampleLesson(
+      'valid',
+    ).blocks.firstWhere((LessonBlock block) => block.check != null).check!;
+    return Success<Lesson>(
+      Lesson(
+        id: lessonId,
+        trackId: trackId,
+        unitId: 'unit',
+        domainId: 'domain',
+        title: 'Contrôles partiellement invalides',
+        estMinutes: 5,
+        blocks: <LessonBlock>[
+          LessonBlock(
+            type: BlockType.check,
+            conceptId: validCheck.conceptId,
+            check: validCheck,
+          ),
+          const LessonBlock(type: BlockType.check, conceptId: 'broken'),
+        ],
+      ),
+    );
+  }
+}
+
 class _OfflineQuizRepo implements QuizRepository {
   int calls = 0;
 
@@ -211,6 +299,104 @@ void main() {
         expect(state.isDemo, isFalse);
       },
     );
+
+    test(
+      'treats server content without checks as unavailable and exposes demo',
+      () async {
+        final ProviderContainer noCheckContainer = ProviderContainer(
+          overrides: <Override>[
+            lessonRepositoryProvider.overrideWithValue(_NoCheckLessonRepo()),
+            quizRepositoryProvider.overrideWithValue(quiz),
+            lessonFeedbackProvider.overrideWithValue(
+              const SilentLessonFeedback(),
+            ),
+          ],
+        );
+        addTearDown(noCheckContainer.dispose);
+        final LessonController controller = noCheckContainer.read(
+          lessonControllerProvider(args).notifier,
+        );
+
+        await controller.load();
+        expect(
+          noCheckContainer.read(lessonControllerProvider(args)).status,
+          LessonStatus.error,
+        );
+
+        controller.startDemo();
+        final LessonSessionState state = noCheckContainer.read(
+          lessonControllerProvider(args),
+        );
+        expect(state.status, LessonStatus.ready);
+        expect(state.isDemo, isTrue);
+        expect(state.lesson?.id, 'certigo-demo');
+        expect(state.checksTotal, 7);
+      },
+    );
+
+    test('rejects a present check that can never be submitted', () async {
+      final ProviderContainer unusableContainer = ProviderContainer(
+        overrides: <Override>[
+          lessonRepositoryProvider.overrideWithValue(
+            _UnusableCheckLessonRepo(),
+          ),
+          quizRepositoryProvider.overrideWithValue(quiz),
+          lessonFeedbackProvider.overrideWithValue(
+            const SilentLessonFeedback(),
+          ),
+        ],
+      );
+      addTearDown(unusableContainer.dispose);
+      final LessonController controller = unusableContainer.read(
+        lessonControllerProvider(args).notifier,
+      );
+
+      await controller.load();
+      expect(
+        unusableContainer.read(lessonControllerProvider(args)).status,
+        LessonStatus.error,
+      );
+
+      controller.startDemo();
+      final LessonSessionState state = unusableContainer.read(
+        lessonControllerProvider(args),
+      );
+      expect(state.status, LessonStatus.ready);
+      expect(state.isDemo, isTrue);
+      expect(state.lesson?.id, 'certigo-demo');
+    });
+
+    test('rejects a missing check item mixed with a valid check', () async {
+      final ProviderContainer malformedContainer = ProviderContainer(
+        overrides: <Override>[
+          lessonRepositoryProvider.overrideWithValue(
+            _MixedMalformedCheckLessonRepo(),
+          ),
+          quizRepositoryProvider.overrideWithValue(quiz),
+          lessonFeedbackProvider.overrideWithValue(
+            const SilentLessonFeedback(),
+          ),
+        ],
+      );
+      addTearDown(malformedContainer.dispose);
+      final LessonController controller = malformedContainer.read(
+        lessonControllerProvider(args).notifier,
+      );
+
+      await controller.load();
+      expect(
+        malformedContainer.read(lessonControllerProvider(args)).status,
+        LessonStatus.error,
+      );
+
+      controller.startDemo();
+      final LessonSessionState state = malformedContainer.read(
+        lessonControllerProvider(args),
+      );
+      expect(state.status, LessonStatus.ready);
+      expect(state.isDemo, isTrue);
+      expect(state.lesson?.id, 'certigo-demo');
+    });
 
     test('starts bundled content only through explicit demo mode', () async {
       final LessonController controller = notifier();

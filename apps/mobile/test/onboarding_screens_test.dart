@@ -180,7 +180,51 @@ void main() {
     );
     expect(find.text('Reste régulier grâce aux rappels'), findsOneWidget);
     expect(find.text('ACTIVER LES RAPPELS'), findsOneWidget);
+    expect(find.textContaining('chaque jour à 19 h'), findsOneWidget);
   });
+
+  testWidgets(
+    'NotificationsScreen schedules and persists the 19:00 default after permission',
+    (WidgetTester tester) async {
+      TimeOfDay? scheduledTime;
+      TimeOfDay? savedTime;
+      String? savedTimezone;
+      NotificationService.debugConfigure(
+        loadLocalTimezone: () async => 'Europe/Paris',
+        initializePlugin: (_) async => true,
+        requestPlatformPermission: () async => true,
+        loadReminderTime: () async => null,
+        cancelReminder: () async {},
+        scheduleReminder: (date, _) async {
+          scheduledTime = TimeOfDay(hour: date.hour, minute: date.minute);
+        },
+        saveReminder: (TimeOfDay time, String timezone) async {
+          savedTime = time;
+          savedTimezone = timezone;
+        },
+      );
+      final ProviderContainer container = await pumpScreen(
+        tester,
+        '/onboarding/notifications',
+        const NotificationsScreen(),
+        extraRoutes: <GoRoute>[
+          GoRoute(
+            path: '/onboarding/widget',
+            builder: (_, __) => const Scaffold(body: Text('WIDGET_STUB')),
+          ),
+        ],
+      );
+
+      await tester.tap(find.text('ACTIVER LES RAPPELS'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(onboardingControllerProvider).reminders, isTrue);
+      expect(scheduledTime, NotificationService.defaultReminderTime);
+      expect(savedTime, NotificationService.defaultReminderTime);
+      expect(savedTimezone, 'Europe/Paris');
+      expect(find.text('WIDGET_STUB'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'NotificationsScreen records a denied OS permission and continues',

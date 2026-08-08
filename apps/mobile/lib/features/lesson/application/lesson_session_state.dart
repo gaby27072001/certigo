@@ -4,6 +4,32 @@ import 'answer_grading.dart';
 import 'check_outcome.dart';
 import 'lesson_step.dart';
 
+bool isAnswerableCheck(QuizItem item) {
+  bool hasUniqueIds(List<QuizOption> options) =>
+      options.map((QuizOption option) => option.id).toSet().length ==
+      options.length;
+
+  if (!hasUniqueIds(item.options)) return false;
+  switch (item.type) {
+    case ItemType.ordering:
+    case ItemType.applied:
+      return item.options.isNotEmpty;
+    case ItemType.matchPairs:
+      return item.options.isNotEmpty &&
+          item.matches.length >= item.options.length &&
+          hasUniqueIds(item.matches);
+    case ItemType.cloze:
+      final int blanks = clozeBlankCount(item.stem);
+      return blanks > 0 && item.options.length >= blanks;
+    case ItemType.mcq:
+    case ItemType.multi:
+    case ItemType.scenario:
+    case ItemType.spotTheIssue:
+    case ItemType.unknown:
+      return item.options.isNotEmpty;
+  }
+}
+
 /// Lifecycle of a lesson-playing session.
 enum LessonStatus { idle, loading, ready, graded, submitting, finished, error }
 

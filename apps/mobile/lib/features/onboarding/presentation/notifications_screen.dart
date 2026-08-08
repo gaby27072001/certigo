@@ -26,10 +26,13 @@ class NotificationsScreen extends ConsumerWidget {
       primaryLabel: 'ACTIVER LES RAPPELS',
       onPrimary: () async {
         try {
-          final bool granted = await NotificationService.requestPermission();
-          c.setReminders(granted);
+          final bool scheduled =
+              await NotificationService.scheduleDailyReminder(
+                NotificationService.defaultReminderTime,
+              );
+          c.setReminders(scheduled);
           if (!context.mounted) return;
-          if (!granted) {
+          if (!scheduled) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
@@ -90,7 +93,8 @@ class NotificationsScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Text(
             'Un petit rappel par jour, et la régularité fait le reste. '
-            'On te proposera le moment idéal pour ta leçon.',
+            'En l’activant, il sera programmé chaque jour à 19 h. '
+            'Tu pourras modifier cette heure dans ton profil.',
             textAlign: TextAlign.center,
             style: t.bodyMedium?.copyWith(color: p.textSecondary, height: 1.45),
           ),

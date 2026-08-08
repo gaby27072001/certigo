@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -15,10 +16,16 @@ class NotificationService {
   static const int _dailyReminderId = 1;
   static const String _channelId = 'daily_reminder';
   static const String _channelName = 'Rappels quotidiens';
+  static const String _reminderScheduleKey = 'daily_reminder_schedule';
+  static const String _legacyReminderTimeKey = 'daily_reminder_time';
+
+  /// Default chosen during onboarding when the learner enables reminders.
+  static const TimeOfDay defaultReminderTime = TimeOfDay(hour: 19, minute: 0);
 
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   static Future<void>? _initialization;
+  static Future<void> _mutationTail = Future<void>.value();
 
   static Future<bool?> Function(InitializationSettings settings)
   _initializePlugin = _plugin.initialize;
@@ -36,6 +43,12 @@ class NotificationService {
   )
   _scheduleReminder = _scheduleWithPlugin;
   static tz.TZDateTime Function(tz.Location location) _now = tz.TZDateTime.now;
+  static Future<TimeOfDay?> Function() _loadReminderTime =
+      _loadReminderTimeFromPreferences;
+  static Future<String?> Function() _loadReminderTimezone =
+      _loadReminderTimezoneFromPreferences;
+  static Future<void> Function(TimeOfDay time, String timezone) _saveReminder =
+      _saveReminderToPreferences;
 
   static Future<void> initialize() {
     final Future<void>? running = _initialization;
@@ -55,8 +68,7 @@ class NotificationService {
 
   static Future<void> _initialize() async {
     tz.initializeTimeZones();
-    final String timezoneName = await _loadLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timezoneName));
+    await _refreshLocalTimezone();
 
     const AndroidInitializationSettings android = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
@@ -82,11 +94,41 @@ class NotificationService {
 
   static Future<bool> scheduleDailyReminder(TimeOfDay time) async {
     await initialize();
-    if (!await requestPermission()) return false;
-    await cancelDailyReminder();
+    return _serializeMutation(() async {
+      await _refreshLocalTimezone();
+      if (await _requestPlatformPermission() == false) return false;
 
+      final TimeOfDay? previousTime = await _loadReminderTime();
+      await _replaceScheduledReminder(time);
+      try {
+        await _saveReminder(time, tz.local.name);
+      } on Object catch (error, stackTrace) {
+        try {
+          if (previousTime == null) {
+            await _cancelReminder();
+          } else {
+            await _replaceScheduledReminder(previousTime);
+          }
+        } on Object catch (rollbackError, rollbackStackTrace) {
+          FlutterError.reportError(
+            FlutterErrorDetails(
+              exception: rollbackError,
+              stack: rollbackStackTrace,
+              library: 'certigo.notifications',
+              context: ErrorDescription(
+                'while restoring a reminder after persistence failure',
+              ),
+            ),
+          );
+        }
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      return true;
+    });
+  }
+
+  static Future<void> _replaceScheduledReminder(TimeOfDay time) async {
     final tz.TZDateTime scheduledDate = _nextInstanceOf(time);
-
     const AndroidNotificationDetails android = AndroidNotificationDetails(
       _channelId,
       _channelName,
@@ -99,7 +141,43 @@ class NotificationService {
     );
 
     await _scheduleReminder(scheduledDate, details);
-    return true;
+  }
+
+  /// Refreshes the device timezone and reschedules an existing reminder only
+  /// when its persisted timezone differs. This never requests permission.
+  static Future<bool> refreshTimezoneAndReschedule() async {
+    await initialize();
+    return _serializeMutation(() async {
+      await _refreshLocalTimezone();
+      final TimeOfDay? time = await _loadReminderTime();
+      if (time == null) return false;
+
+      final String? scheduledTimezone = await _loadReminderTimezone();
+      if (scheduledTimezone == tz.local.name) return false;
+
+      await _replaceScheduledReminder(time);
+      await _saveReminder(time, tz.local.name);
+      return true;
+    });
+  }
+
+  static Future<TimeOfDay?> loadDailyReminderTime() =>
+      _serializeMutation(_loadReminderTime);
+
+  static Future<T> _serializeMutation<T>(Future<T> Function() operation) {
+    final Future<T> result = _mutationTail.then<T>((_) => operation());
+    _mutationTail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return result;
+  }
+
+  static Future<bool> _refreshLocalTimezone() async {
+    final String timezoneName = await _loadLocalTimezone();
+    final bool changed = tz.local.name != timezoneName;
+    if (changed) tz.setLocalLocation(tz.getLocation(timezoneName));
+    return changed;
   }
 
   static Future<void> _scheduleWithPlugin(
@@ -121,7 +199,51 @@ class NotificationService {
 
   static Future<void> cancelDailyReminder() async {
     await initialize();
-    await _cancelReminder();
+    await _serializeMutation(_cancelReminder);
+  }
+
+  static Future<TimeOfDay?> _loadReminderTimeFromPreferences() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? stored =
+        prefs.getString(_reminderScheduleKey) ??
+        prefs.getString(_legacyReminderTimeKey);
+    if (stored == null) return null;
+    final List<String> parts = stored.split('|').first.split(':');
+    if (parts.length != 2) return null;
+    final int? hour = int.tryParse(parts[0]);
+    final int? minute = int.tryParse(parts[1]);
+    if (hour == null ||
+        minute == null ||
+        hour < 0 ||
+        hour > 23 ||
+        minute < 0 ||
+        minute > 59) {
+      return null;
+    }
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  static Future<String?> _loadReminderTimezoneFromPreferences() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? stored = prefs.getString(_reminderScheduleKey);
+    if (stored == null) return null;
+    final List<String> parts = stored.split('|');
+    return parts.length == 2 && parts[1].isNotEmpty ? parts[1] : null;
+  }
+
+  static Future<void> _saveReminderToPreferences(
+    TimeOfDay time,
+    String timezone,
+  ) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final bool saved = await prefs.setString(
+      _reminderScheduleKey,
+      '${time.hour}:${time.minute}|$timezone',
+    );
+    if (!saved) {
+      throw StateError('Daily reminder preference could not be persisted');
+    }
+    await prefs.remove(_legacyReminderTimeKey);
   }
 
   static Future<bool?> _requestPermissionFromPlugin() async {
@@ -176,8 +298,12 @@ class NotificationService {
     )?
     scheduleReminder,
     tz.TZDateTime Function(tz.Location location)? now,
+    Future<TimeOfDay?> Function()? loadReminderTime,
+    Future<String?> Function()? loadReminderTimezone,
+    Future<void> Function(TimeOfDay time, String timezone)? saveReminder,
   }) {
     _initialization = null;
+    _mutationTail = Future<void>.value();
     _initializePlugin = initializePlugin ?? _plugin.initialize;
     _requestPlatformPermission =
         requestPlatformPermission ?? _requestPermissionFromPlugin;
@@ -190,5 +316,9 @@ class NotificationService {
     _cancelReminder = cancelReminder ?? () => _plugin.cancel(_dailyReminderId);
     _scheduleReminder = scheduleReminder ?? _scheduleWithPlugin;
     _now = now ?? tz.TZDateTime.now;
+    _loadReminderTime = loadReminderTime ?? _loadReminderTimeFromPreferences;
+    _loadReminderTimezone =
+        loadReminderTimezone ?? _loadReminderTimezoneFromPreferences;
+    _saveReminder = saveReminder ?? _saveReminderToPreferences;
   }
 }
