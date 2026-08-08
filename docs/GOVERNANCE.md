@@ -42,6 +42,13 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | `CodeQL / Security gate` | [`.github/workflows/codeql.yml`](../.github/workflows/codeql.yml) | `CodeQL / Security gate` |
 | `Security / Required gate` | [`.github/workflows/security-gate.yml`](../.github/workflows/security-gate.yml) | `Security / Required gate` |
 
+Le gate CodeQL ne se contente pas du statut d'exécution de l'analyse. Chaque langue produit un
+SARIF évalué localement : les sévérités de sécurité `high`/`critical` (score >= 7.0) et les
+résultats SARIF de niveau `error` sans score bloquent le job. Le SARIF est conservé 30 jours
+comme artefact sur toutes les PR, forks inclus, puis envoyé à Code Scanning lorsque le token
+dispose de `security-events: write`. Ainsi, l'absence d'upload autorisé depuis un fork ne
+neutralise pas le gate et ne supprime pas les findings.
+
 ### Conclusion DoD
 
 Le **cœur de la DoD est SATISFAIT** : `main` exige une PR avec **≥ 1 revue**, des checks stricts et

@@ -149,6 +149,29 @@ devient `repo:<org>/<repo>:environment:<env>`. On crée donc **une federated cre
 environnement** (dev/staging/prod). Une FC supplémentaire pour `push` sur `main` est optionnelle
 (le push déclenche l'environnement `dev`, déjà couvert par la FC `dev`).
 
+### Secret de signature JWT par environnement
+
+Créer `AUTH_JWT_SIGNING_KEY` comme **secret d'environnement** dans `staging` et
+`prod`, avec une valeur aléatoire durable et différente par environnement. Ne pas
+le créer au niveau dépôt et ne pas le passer depuis le workflow appelant :
+`cd-backend.yml` le lit après l'entrée dans l'environnement protégé. `dev` n'exige
+pas ce secret et conserve sa dérivation non-production déterministe.
+
+Le workflow compile d'abord le `.bicepparam`, fusionne la valeur dans un unique
+fichier ARM temporaire en permissions `0600`, ne place jamais la valeur dans les
+arguments `az` ou les logs, puis supprime les fichiers temporaires à la fin du
+déploiement.
+
+Ordre de mise en service inter-branches :
+
+1. déployer d'abord la version de `cd-backend.yml` qui injecte le paramètre sécurisé ;
+2. créer les secrets d'environnement `staging` et `prod` ;
+3. fusionner puis déployer le durcissement Bicep qui rend
+   `authJwtSigningKey` obligatoire hors `dev`.
+
+Cet ordre est compatible avec le template actuel, où le paramètre existe déjà mais
+reste facultatif, et avec le template durci de la PR #263.
+
 ### Commandes
 
 ```bash

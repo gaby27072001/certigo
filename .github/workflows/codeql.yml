@@ -96,6 +96,9 @@ jobs:
       security-events: write
       actions: read
       contents: read
+    env:
+      CODEQL_RESULTS_DIR: codeql-results/${{ matrix.language }}
+      CODEQL_BLOCKING_SECURITY_SEVERITY: "7.0"
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
@@ -112,11 +115,32 @@ jobs:
           queries: security-and-quality
 
       - name: Perform CodeQL analysis
+        id: codeql-analysis
         uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           category: "/language:${{ matrix.language }}"
-          # Fork tokens cannot write security events; analysis still runs and gates locally.
-          upload: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'never' || 'always' }}
+          output: ${{ env.CODEQL_RESULTS_DIR }}
+          upload: never
+
+      - name: Preserve CodeQL SARIF
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: ${{ env.CODEQL_RESULTS_DIR }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload CodeQL SARIF to code scanning
+        if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        with:
+          sarif_file: ${{ env.CODEQL_RESULTS_DIR }}
+          category: "/language:${{ matrix.language }}"
+
+      - name: Enforce CodeQL severity threshold
+        if: ${{ always() }}
+        run: node .github/scripts/enforce-codeql-sarif.mjs "$CODEQL_RESULTS_DIR"
 
   security-gate:
     name: CodeQL / Security gate
