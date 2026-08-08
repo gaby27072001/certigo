@@ -7,40 +7,67 @@ import 'package:certigo/features/quiz/application/quiz_controller.dart';
 /// game-loop can be exercised deterministically without a network or a widget.
 class _OfflineLessonRepo implements LessonRepository {
   @override
-  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) async =>
-      const Err<Lesson>(NetworkFailure());
+  Future<Result<Lesson>> getLesson({
+    required String trackId,
+    required String lessonId,
+  }) async => const Err<Lesson>(NetworkFailure());
 }
 
 class _OfflineQuizRepo implements QuizRepository {
+  int calls = 0;
+  SubmitQuizRequest? lastRequest;
+
   @override
   Future<Result<SubmitQuizResult>> submit({
     required String lessonId,
     required SubmitQuizRequest request,
-  }) async =>
-      const Err<SubmitQuizResult>(NetworkFailure());
+  }) async {
+    calls++;
+    lastRequest = request;
+    return const Err<SubmitQuizResult>(NetworkFailure());
+  }
 }
 
 void main() {
   /// Builds a controller on the offline fallback and drains the microtask queue
   /// so the constructor's `loadItems()` has completed before assertions run.
-  Future<QuizController> loadedController() async {
+  Future<QuizController> loadedController({
+    bool startDemo = true,
+    _OfflineQuizRepo? quiz,
+  }) async {
     final QuizController controller = QuizController(
       lessons: _OfflineLessonRepo(),
-      quiz: _OfflineQuizRepo(),
+      quiz: quiz ?? _OfflineQuizRepo(),
       trackId: 'az-900',
       lessonId: 'sample',
     );
     addTearDown(controller.dispose);
     await Future<void>.delayed(Duration.zero);
+    if (startDemo) controller.startDemo();
     return controller;
   }
 
   group('QuizController — offline load', () {
-    test('falls back to the bundled sample quiz when the API fails', () async {
+    test(
+      'keeps the network failure explicit until demo is requested',
+      () async {
+        final QuizController controller = await loadedController(
+          startDemo: false,
+        );
+
+        expect(controller.loading, isFalse);
+        expect(controller.loadFailed, isTrue);
+        expect(controller.items, isEmpty);
+        expect(controller.isDemo, isFalse);
+      },
+    );
+
+    test('starts bundled content only through explicit demo mode', () async {
       final QuizController controller = await loadedController();
 
-      expect(controller.loading, isFalse);
+      expect(controller.loadFailed, isFalse);
       expect(controller.items.length, 3);
+      expect(controller.isDemo, isTrue);
       expect(controller.index, 0);
       expect(controller.current.item.id, 'q-capex-1');
       expect(controller.graded, isFalse);
@@ -123,8 +150,9 @@ void main() {
   });
 
   group('QuizController — submit', () {
-    test('a full correct run returns a locally-graded QuizSubmission', () async {
-      final QuizController controller = await loadedController();
+    test('a full demo run is never submitted and grants no rewards', () async {
+      final _OfflineQuizRepo quiz = _OfflineQuizRepo();
+      final QuizController controller = await loadedController(quiz: quiz);
 
       // Answer all three correctly: q-capex-1 → b, q-capex-2 → c, q-capex-3 → a.
       controller.select('b');
@@ -143,21 +171,27 @@ void main() {
 
       expect(submission, isNotNull);
       expect(submission!.totalQuestions, 3);
-      // A local answer-key exists, so the offline failure is not a pending sync.
       expect(submission.pendingSync, isFalse);
+      expect(submission.isDemo, isTrue);
+      expect(submission.submissionFailed, isFalse);
       expect(submission.result.scorePct, 100);
-      expect(submission.result.rewards.xpEarned, 50); // 20 + 3 * 10
+      expect(submission.result.rewards.xpEarned, 0);
+      expect(submission.result.rewards.newXp, 0);
+      expect(quiz.calls, 0);
       expect(controller.submitting, isFalse);
     });
 
-    test('submit is re-entrancy guarded while a submission is in flight', () async {
-      final QuizController controller = await loadedController();
+    test(
+      'submit is re-entrancy guarded while a submission is in flight',
+      () async {
+        final QuizController controller = await loadedController();
 
-      final Future<QuizSubmission?> first = controller.submit();
-      final QuizSubmission? second = await controller.submit();
-      await first;
+        final Future<QuizSubmission?> first = controller.submit();
+        final QuizSubmission? second = await controller.submit();
+        await first;
 
-      expect(second, isNull, reason: 'a second concurrent submit is ignored');
-    });
+        expect(second, isNull, reason: 'a second concurrent submit is ignored');
+      },
+    );
   });
 }

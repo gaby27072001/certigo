@@ -15,17 +15,23 @@ import 'package:certigo/features/lesson/application/sample_lesson.dart';
 /// (bundled sample lesson + embedded answer key + locally computed result).
 class _OfflineLessonRepo implements LessonRepository {
   @override
-  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) async =>
-      const Err<Lesson>(NetworkFailure());
+  Future<Result<Lesson>> getLesson({
+    required String trackId,
+    required String lessonId,
+  }) async => const Err<Lesson>(NetworkFailure());
 }
 
 class _OfflineQuizRepo implements QuizRepository {
+  int calls = 0;
+
   @override
   Future<Result<SubmitQuizResult>> submit({
     required String lessonId,
     required SubmitQuizRequest request,
-  }) async =>
-      const Err<SubmitQuizResult>(NetworkFailure());
+  }) async {
+    calls++;
+    return const Err<SubmitQuizResult>(NetworkFailure());
+  }
 }
 
 /// Answers the current check **correctly**, dispatching by exercise type:
@@ -99,7 +105,9 @@ void main() {
       expect(steps.last.kind, LessonStepKind.result);
       expect(steps.length, lesson.blocks.length + 2);
 
-      final List<LessonStep> checks = steps.where((LessonStep s) => s.isCheck).toList();
+      final List<LessonStep> checks = steps
+          .where((LessonStep s) => s.isCheck)
+          .toList();
       expect(checks.length, 7);
       expect(checks.every((LessonStep s) => s.item != null), isTrue);
       expect(
@@ -125,29 +133,44 @@ void main() {
     final EmbeddedKeyGrader grader = EmbeddedKeyGrader(sampleAnswerKey());
 
     test('marks the exact single answer correct', () {
-      final CheckOutcome o = grader.grade(itemId: 'chk-shared-1', selected: <String>['a']);
+      final CheckOutcome o = grader.grade(
+        itemId: 'chk-shared-1',
+        selected: <String>['a'],
+      );
       expect(o.correct, isTrue);
       expect(o.correctAnswer, <String>['a']);
       expect(o.explanation, isNotEmpty);
     });
 
     test('marks a wrong single answer incorrect', () {
-      final CheckOutcome o = grader.grade(itemId: 'chk-shared-1', selected: <String>['b']);
+      final CheckOutcome o = grader.grade(
+        itemId: 'chk-shared-1',
+        selected: <String>['b'],
+      );
       expect(o.correct, isFalse);
     });
 
     test('multi-select is order-independent', () {
-      final CheckOutcome o = grader.grade(itemId: 'chk-shared-2', selected: <String>['b', 'a']);
+      final CheckOutcome o = grader.grade(
+        itemId: 'chk-shared-2',
+        selected: <String>['b', 'a'],
+      );
       expect(o.correct, isTrue);
     });
 
     test('a partial multi-select answer is incorrect', () {
-      final CheckOutcome o = grader.grade(itemId: 'chk-shared-2', selected: <String>['a']);
+      final CheckOutcome o = grader.grade(
+        itemId: 'chk-shared-2',
+        selected: <String>['a'],
+      );
       expect(o.correct, isFalse);
     });
 
     test('an unknown item yields the empty outcome', () {
-      final CheckOutcome o = grader.grade(itemId: 'nope', selected: <String>['a']);
+      final CheckOutcome o = grader.grade(
+        itemId: 'nope',
+        selected: <String>['a'],
+      );
       expect(o.correct, isFalse);
       expect(o.correctAnswer, isEmpty);
     });
@@ -156,28 +179,49 @@ void main() {
   group('LessonController (offline path)', () {
     const LessonArgs args = LessonArgs(trackId: 'az-900', lessonId: 'sample');
     late ProviderContainer container;
+    late _OfflineQuizRepo quiz;
 
     setUp(() {
+      quiz = _OfflineQuizRepo();
       container = ProviderContainer(
         overrides: <Override>[
           lessonRepositoryProvider.overrideWithValue(_OfflineLessonRepo()),
-          quizRepositoryProvider.overrideWithValue(_OfflineQuizRepo()),
-          lessonFeedbackProvider.overrideWithValue(const SilentLessonFeedback()),
+          quizRepositoryProvider.overrideWithValue(quiz),
+          lessonFeedbackProvider.overrideWithValue(
+            const SilentLessonFeedback(),
+          ),
         ],
       );
       addTearDown(container.dispose);
     });
 
-    LessonController notifier() => container.read(lessonControllerProvider(args).notifier);
+    LessonController notifier() =>
+        container.read(lessonControllerProvider(args).notifier);
     LessonSessionState read() => container.read(lessonControllerProvider(args));
 
-    test('falls back to bundled sample content when the repo fails', () async {
+    test(
+      'keeps a repository failure explicit until demo is requested',
+      () async {
+        final LessonController controller = notifier();
+        await controller.load();
+
+        final LessonSessionState state = read();
+        expect(state.status, LessonStatus.error);
+        expect(state.lesson, isNull);
+        expect(state.isDemo, isFalse);
+      },
+    );
+
+    test('starts bundled content only through explicit demo mode', () async {
       final LessonController controller = notifier();
       await controller.load();
+      controller.startDemo();
 
       final LessonSessionState state = read();
       expect(state.status, LessonStatus.ready);
       expect(state.lesson, isNotNull);
+      expect(state.lesson!.id, 'certigo-demo');
+      expect(state.isDemo, isTrue);
       expect(state.steps.first.kind, LessonStepKind.intro);
       expect(state.checksTotal, 7);
     });
@@ -185,6 +229,7 @@ void main() {
     test('grades a check inline and reveals the outcome', () async {
       final LessonController controller = notifier();
       await controller.load();
+      controller.startDemo();
 
       while (!(read().current?.isCheck ?? false)) {
         await controller.advance();
@@ -198,9 +243,10 @@ void main() {
       expect(state.currentOutcome?.correct, isTrue);
     });
 
-    test('completes the lesson and computes a local result offline', () async {
+    test('completes demo locally without submission or rewards', () async {
       final LessonController controller = notifier();
       await controller.load();
+      controller.startDemo();
       final Map<String, CheckOutcome> key = sampleAnswerKey();
 
       var guard = 0;
@@ -221,12 +267,16 @@ void main() {
       expect(state.result!.scorePct, 100);
       expect(state.result!.weakConcepts, isEmpty);
       expect(state.result!.results.length, 7);
-      expect(state.result!.rewards.xpEarned, greaterThan(0));
+      expect(state.result!.rewards.xpEarned, 0);
+      expect(state.result!.rewards.newXp, 0);
+      expect(state.pendingSync, isFalse);
+      expect(quiz.calls, 0);
     });
 
     test('a wrong answer surfaces the concept as weak in the result', () async {
       final LessonController controller = notifier();
       await controller.load();
+      controller.startDemo();
       final Map<String, CheckOutcome> key = sampleAnswerKey();
 
       var guard = 0;

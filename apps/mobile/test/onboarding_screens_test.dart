@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import 'package:certigo/features/onboarding/application/onboarding_controller.dart';
+import 'package:certigo/features/notifications/notification_service.dart';
 import 'package:certigo/features/onboarding/presentation/attribution_screen.dart';
 import 'package:certigo/features/onboarding/presentation/certification_screen.dart';
 import 'package:certigo/features/onboarding/presentation/intro_screen.dart';
@@ -40,7 +41,10 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp.router(theme: PrismTheme.light(), routerConfig: router),
+        child: MaterialApp.router(
+          theme: PrismTheme.light(),
+          routerConfig: router,
+        ),
       ),
     );
     await tester.pump();
@@ -62,24 +66,31 @@ void main() {
     await tester.tap(find.text('AZ-900'));
     await tester.pump();
     // Selection recorded → the CTA is no longer disabled.
-    expect(c.read(onboardingControllerProvider).targetCertification, TargetCertification.az900);
-  });
-
-  testWidgets('AttributionScreen shows the "bientôt" tag and records a choice', (
-    WidgetTester tester,
-  ) async {
-    final ProviderContainer c = await pumpScreen(
-      tester,
-      '/onboarding/attribution',
-      const AttributionScreen(),
+    expect(
+      c.read(onboardingControllerProvider).targetCertification,
+      TargetCertification.az900,
     );
-    expect(find.text('Comment nous as-tu connus ?'), findsOneWidget);
-    expect(find.byType(SoonTag), findsOneWidget);
-
-    await tester.tap(find.text('YouTube'));
-    await tester.pump();
-    expect(c.read(onboardingControllerProvider).attributionSource, AttributionSource.youtube);
   });
+
+  testWidgets(
+    'AttributionScreen shows the "bientôt" tag and records a choice',
+    (WidgetTester tester) async {
+      final ProviderContainer c = await pumpScreen(
+        tester,
+        '/onboarding/attribution',
+        const AttributionScreen(),
+      );
+      expect(find.text('Comment nous as-tu connus ?'), findsOneWidget);
+      expect(find.byType(SoonTag), findsOneWidget);
+
+      await tester.tap(find.text('YouTube'));
+      await tester.pump();
+      expect(
+        c.read(onboardingControllerProvider).attributionSource,
+        AttributionSource.youtube,
+      );
+    },
+  );
 
   testWidgets('PaywallScreen renders both plans with a RECOMMANDÉ badge', (
     WidgetTester tester,
@@ -94,10 +105,15 @@ void main() {
 
     await tester.tap(find.text('Certigo Premium'));
     await tester.pump();
-    expect(c.read(onboardingControllerProvider).premiumChoice, PremiumChoice.premium);
+    expect(
+      c.read(onboardingControllerProvider).premiumChoice,
+      PremiumChoice.premium,
+    );
   });
 
-  testWidgets('MascotReactionScreen renders its message and CTA', (WidgetTester tester) async {
+  testWidgets('MascotReactionScreen renders its message and CTA', (
+    WidgetTester tester,
+  ) async {
     await pumpScreen(
       tester,
       '/r',
@@ -108,7 +124,9 @@ void main() {
     expect(find.text('CONTINUER'), findsOneWidget);
   });
 
-  testWidgets('ValueListScreen renders its benefits', (WidgetTester tester) async {
+  testWidgets('ValueListScreen renders its benefits', (
+    WidgetTester tester,
+  ) async {
     await pumpScreen(
       tester,
       '/v',
@@ -117,8 +135,16 @@ void main() {
         primaryLabel: 'CONTINUER',
         onPrimary: () {},
         benefits: const <ValueBenefit>[
-          ValueBenefit(icon: Icons.hub_rounded, title: 'Bénéfice A', subtitle: 'sous-titre A'),
-          ValueBenefit(icon: Icons.quiz_rounded, title: 'Bénéfice B', subtitle: 'sous-titre B'),
+          ValueBenefit(
+            icon: Icons.hub_rounded,
+            title: 'Bénéfice A',
+            subtitle: 'sous-titre A',
+          ),
+          ValueBenefit(
+            icon: Icons.quiz_rounded,
+            title: 'Bénéfice B',
+            subtitle: 'sous-titre B',
+          ),
         ],
       ),
     );
@@ -127,7 +153,9 @@ void main() {
     expect(find.text('Bénéfice B'), findsOneWidget);
   });
 
-  testWidgets('NimbusIntroScreen types its message without exception', (WidgetTester tester) async {
+  testWidgets('NimbusIntroScreen types its message without exception', (
+    WidgetTester tester,
+  ) async {
     await pumpScreen(
       tester,
       '/i',
@@ -142,21 +170,58 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('NotificationsScreen renders the primer', (WidgetTester tester) async {
-    await pumpScreen(tester, '/onboarding/notifications', const NotificationsScreen());
+  testWidgets('NotificationsScreen renders the primer', (
+    WidgetTester tester,
+  ) async {
+    await pumpScreen(
+      tester,
+      '/onboarding/notifications',
+      const NotificationsScreen(),
+    );
     expect(find.text('Reste régulier grâce aux rappels'), findsOneWidget);
     expect(find.text('ACTIVER LES RAPPELS'), findsOneWidget);
   });
 
-  testWidgets('WidgetPromoScreen renders the placeholder with a "bientôt" tag', (
+  testWidgets(
+    'NotificationsScreen records a denied OS permission and continues',
+    (WidgetTester tester) async {
+      NotificationService.debugConfigure(
+        loadLocalTimezone: () async => 'UTC',
+        initializePlugin: (_) async => true,
+        requestPlatformPermission: () async => false,
+      );
+      final ProviderContainer container = await pumpScreen(
+        tester,
+        '/onboarding/notifications',
+        const NotificationsScreen(),
+        extraRoutes: <GoRoute>[
+          GoRoute(
+            path: '/onboarding/widget',
+            builder: (_, __) => const Scaffold(body: Text('WIDGET_STUB')),
+          ),
+        ],
+      );
+
+      await tester.tap(find.text('ACTIVER LES RAPPELS'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(onboardingControllerProvider).reminders, isFalse);
+      expect(find.text('WIDGET_STUB'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'WidgetPromoScreen renders the placeholder with a "bientôt" tag',
+    (WidgetTester tester) async {
+      await pumpScreen(tester, '/onboarding/widget', const WidgetPromoScreen());
+      expect(find.byType(SoonTag), findsOneWidget);
+      expect(find.text('AJOUTER LE WIDGET'), findsOneWidget);
+    },
+  );
+
+  testWidgets('PathBuildingScreen auto-advances to attribution', (
     WidgetTester tester,
   ) async {
-    await pumpScreen(tester, '/onboarding/widget', const WidgetPromoScreen());
-    expect(find.byType(SoonTag), findsOneWidget);
-    expect(find.text('AJOUTER LE WIDGET'), findsOneWidget);
-  });
-
-  testWidgets('PathBuildingScreen auto-advances to attribution', (WidgetTester tester) async {
     await pumpScreen(
       tester,
       '/onboarding/building',

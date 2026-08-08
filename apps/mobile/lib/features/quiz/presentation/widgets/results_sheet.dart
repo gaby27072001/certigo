@@ -12,6 +12,8 @@ class ResultsSheet extends ConsumerStatefulWidget {
     required this.result,
     required this.totalQuestions,
     required this.pendingSync,
+    required this.isDemo,
+    required this.submissionFailed,
     required this.trackId,
     required this.lessonId,
     required this.onDone,
@@ -21,6 +23,8 @@ class ResultsSheet extends ConsumerStatefulWidget {
   final SubmitQuizResult result;
   final int totalQuestions;
   final bool pendingSync;
+  final bool isDemo;
+  final bool submissionFailed;
   final String trackId;
   final String lessonId;
   final VoidCallback onDone;
@@ -37,7 +41,12 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
   void initState() {
     super.initState();
     _confetti = ConfettiController(duration: const Duration(seconds: 3));
-    if (widget.result.scorePct >= 60) _confetti.play();
+    if (!widget.isDemo &&
+        !widget.pendingSync &&
+        !widget.submissionFailed &&
+        widget.result.scorePct >= 60) {
+      _confetti.play();
+    }
   }
 
   @override
@@ -47,8 +56,12 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
   }
 
   String? _findNextLessonId(LearningPath path, String currentLessonId) {
-    final List<PathLesson> lessons = path.units.expand((PathUnit u) => u.lessons).toList();
-    final int idx = lessons.indexWhere((PathLesson l) => l.id == currentLessonId);
+    final List<PathLesson> lessons = path.units
+        .expand((PathUnit u) => u.lessons)
+        .toList();
+    final int idx = lessons.indexWhere(
+      (PathLesson l) => l.id == currentLessonId,
+    );
     if (idx == -1 || idx >= lessons.length - 1) return null;
     return lessons[idx + 1].id;
   }
@@ -59,14 +72,19 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
     final TextTheme t = Theme.of(context).textTheme;
     final SubmitQuizResult result = widget.result;
     final int scorePct = result.scorePct;
-    final int correct = result.results.where((ItemResult item) => item.correct).length;
+    final int correct = result.results
+        .where((ItemResult item) => item.correct)
+        .length;
     final bool strong = scorePct >= 80;
     final int xp = result.rewards.xpEarned;
 
-    final AsyncValue<LearningPath> pathAsync = ref.watch(pathProvider(widget.trackId));
+    final AsyncValue<LearningPath> pathAsync = ref.watch(
+      pathProvider(widget.trackId),
+    );
     final bool pathLoaded = pathAsync.hasValue;
-    final String? nextLessonId =
-        pathLoaded ? _findNextLessonId(pathAsync.requireValue, widget.lessonId) : null;
+    final String? nextLessonId = pathLoaded
+        ? _findNextLessonId(pathAsync.requireValue, widget.lessonId)
+        : null;
 
     return Stack(
       alignment: Alignment.topCenter,
@@ -74,7 +92,9 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
         Container(
           decoration: BoxDecoration(
             color: p.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(PrismRadii.debt28)),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(PrismRadii.debt28),
+            ),
             border: Border.all(color: p.border),
           ),
           padding: const EdgeInsets.fromLTRB(
@@ -89,7 +109,10 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
               Container(
                 width: 44,
                 height: 5,
-                decoration: BoxDecoration(color: p.border, borderRadius: PrismRadii.pillAll),
+                decoration: BoxDecoration(
+                  color: p.border,
+                  borderRadius: PrismRadii.pillAll,
+                ),
               ),
               const SizedBox(height: 24),
               Icon(
@@ -101,34 +124,50 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
               Text(
                 widget.pendingSync
                     ? 'Soumis hors ligne'
+                    : widget.submissionFailed
+                    ? 'Envoi impossible'
+                    : widget.isDemo
+                    ? 'Démo terminée'
                     : (strong ? 'Excellent !' : 'Bonne progression'),
                 style: t.headlineMedium,
               ),
               Text(
                 widget.pendingSync
                     ? 'Tes réponses sont enregistrées et seront synchronisées automatiquement.'
+                    : widget.submissionFailed
+                    ? 'Aucune progression ni récompense n’a été enregistrée.'
+                    : widget.isDemo
+                    ? '$scorePct% · aucune synchronisation ni récompense'
                     : '${correct > 0 || result.results.isNotEmpty ? '$correct / ${widget.totalQuestions} correct · ' : ''}$scorePct%',
                 style: t.bodyLarge?.copyWith(color: p.textSecondary),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  XpChip(xp: xp),
-                  const SizedBox(width: 12),
-                  StreakBadge(days: result.rewards.streakExtended ? 7 : 0),
-                ],
-              ),
+              if (!widget.isDemo &&
+                  !widget.pendingSync &&
+                  !widget.submissionFailed)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    XpChip(xp: xp),
+                    const SizedBox(width: 12),
+                    StreakBadge(days: result.rewards.streakExtended ? 7 : 0),
+                  ],
+                ),
               const SizedBox(height: 24),
-              if (pathLoaded && nextLessonId != null) ...<Widget>[
+              if (!widget.submissionFailed &&
+                  pathLoaded &&
+                  nextLessonId != null) ...<Widget>[
                 PrismButton(
                   label: 'Continuer → Leçon suivante',
                   icon: Icons.arrow_forward_rounded,
                   onPressed: () => widget.onNextLesson(nextLessonId),
                 ),
                 const SizedBox(height: 12),
-                PrismButton.secondary(label: 'Terminer', onPressed: widget.onDone),
+                PrismButton.secondary(
+                  label: 'Terminer',
+                  onPressed: widget.onDone,
+                ),
               ] else ...<Widget>[
                 PrismButton(label: 'Terminer', onPressed: widget.onDone),
                 if (pathLoaded) ...<Widget>[

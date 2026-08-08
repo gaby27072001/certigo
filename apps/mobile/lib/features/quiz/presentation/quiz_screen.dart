@@ -16,8 +16,8 @@ import 'widgets/results_sheet.dart';
 /// Quiz player — one item at a time. Questions are loaded from the lesson API,
 /// answers are submitted at the end, and rewards come from server grading.
 ///
-/// If the API is unavailable, the screen falls back to a local sample quiz so
-/// the learning flow still works offline.
+/// Genuine cached lessons continue to work offline. Bundled sample content is
+/// entered only through the explicit, non-synchronizable demo action.
 class QuizScreen extends ConsumerStatefulWidget {
   const QuizScreen({super.key, required this.trackId, required this.lessonId});
 
@@ -73,6 +73,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         result: submission.result,
         totalQuestions: submission.totalQuestions,
         pendingSync: submission.pendingSync,
+        isDemo: submission.isDemo,
+        submissionFailed: submission.submissionFailed,
         trackId: widget.trackId,
         lessonId: widget.lessonId,
         onDone: () {
@@ -89,11 +91,15 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
   QuizOptionState _stateFor(String optionId) {
     if (!_controller.graded) {
-      return optionId == _controller.selectedId ? QuizOptionState.selected : QuizOptionState.idle;
+      return optionId == _controller.selectedId
+          ? QuizOptionState.selected
+          : QuizOptionState.idle;
     }
     final QuizEntry entry = _controller.current;
     if (!entry.hasLocalCorrection) {
-      return optionId == _controller.selectedId ? QuizOptionState.selected : QuizOptionState.idle;
+      return optionId == _controller.selectedId
+          ? QuizOptionState.selected
+          : QuizOptionState.idle;
     }
     final bool isCorrect = optionId == entry.correctOptionId;
     final bool isPicked = optionId == _controller.selectedId;
@@ -107,6 +113,26 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   Widget build(BuildContext context) {
     if (_controller.loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_controller.loadFailed) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              PrismStatusView.error(
+                message:
+                    'Réessaie quand la connexion revient, ou lance une démo sans synchronisation.',
+                onRetry: () => unawaited(_controller.loadItems()),
+              ),
+              PrismButton.ghost(
+                label: 'Essayer la démo',
+                onPressed: _controller.startDemo,
+              ),
+            ],
+          ),
+        ),
+      );
     }
     if (_controller.items.isEmpty) {
       return Scaffold(
@@ -147,7 +173,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   ),
                   Expanded(
                     child: PrismProgressBar(
-                      value: (_controller.index + (_controller.graded ? 1 : 0)) /
+                      value:
+                          (_controller.index + (_controller.graded ? 1 : 0)) /
                           _controller.items.length,
                       height: 8,
                       semanticLabel: 'Progression du quiz',
@@ -170,6 +197,15 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   PrismSpacing.lg,
                 ),
                 children: <Widget>[
+                  if (_controller.isDemo) ...<Widget>[
+                    const CalloutBlock(
+                      kind: CalloutKind.info,
+                      title: 'Mode démo',
+                      text:
+                          'Cette session ne sera pas synchronisée et ne rapporte aucune récompense.',
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   Text(item.stem, style: t.titleLarge?.copyWith(height: 1.4)),
                   const SizedBox(height: 20),
                   for (int i = 0; i < item.options.length; i++) ...<Widget>[
@@ -198,13 +234,19 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
               ),
               child: _controller.graded
                   ? PrismButton(
-                      label: _controller.isLast ? 'Voir mon résultat' : 'Continuer',
+                      label: _controller.isLast
+                          ? 'Voir mon résultat'
+                          : 'Continuer',
                       icon: Icons.arrow_forward_rounded,
-                      onPressed: _controller.submitting ? null : () => unawaited(_next()),
+                      onPressed: _controller.submitting
+                          ? null
+                          : () => unawaited(_next()),
                     )
                   : PrismButton(
                       label: 'Valider',
-                      onPressed: _controller.selectedId == null || _controller.submitting
+                      onPressed:
+                          _controller.selectedId == null ||
+                              _controller.submitting
                           ? null
                           : _controller.grade,
                     ),

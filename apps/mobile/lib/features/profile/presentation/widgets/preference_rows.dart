@@ -61,19 +61,30 @@ class _NotificationPrefRowState extends State<NotificationPrefRow> {
   }
 
   Future<void> _loadSavedTime() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String? stored = prefs.getString(_kPrefKey);
-    if (stored != null) {
-      final List<String> parts = stored.split(':');
-      if (parts.length == 2) {
-        final int? h = int.tryParse(parts[0]);
-        final int? m = int.tryParse(parts[1]);
-        if (h != null && m != null) {
-          setState(() => _time = TimeOfDay(hour: h, minute: m));
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final String? stored = prefs.getString(_kPrefKey);
+      if (stored != null) {
+        final List<String> parts = stored.split(':');
+        if (parts.length == 2) {
+          final int? h = int.tryParse(parts[0]);
+          final int? m = int.tryParse(parts[1]);
+          if (h != null && m != null && mounted) {
+            setState(() => _time = TimeOfDay(hour: h, minute: m));
+          }
         }
       }
+    } on Object catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'certigo.notifications',
+          context: ErrorDescription('while restoring reminder preference'),
+        ),
+      );
     }
-    setState(() => _loaded = true);
+    if (mounted) setState(() => _loaded = true);
   }
 
   Future<void> _pickTime() async {
@@ -83,10 +94,38 @@ class _NotificationPrefRowState extends State<NotificationPrefRow> {
     );
     if (picked == null || !mounted) return;
 
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kPrefKey, '${picked.hour}:${picked.minute}');
-    await NotificationService.scheduleDailyReminder(picked);
-    setState(() => _time = picked);
+    try {
+      final bool scheduled = await NotificationService.scheduleDailyReminder(
+        picked,
+      );
+      if (!scheduled) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Autorise les notifications pour activer ce rappel.'),
+          ),
+        );
+        return;
+      }
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kPrefKey, '${picked.hour}:${picked.minute}');
+      if (mounted) setState(() => _time = picked);
+    } on Object catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'certigo.notifications',
+          context: ErrorDescription('while scheduling daily reminder'),
+        ),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de programmer ce rappel pour le moment.'),
+        ),
+      );
+    }
   }
 
   String get _trailingLabel {

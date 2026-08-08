@@ -8,11 +8,13 @@ import 'package:certigo/features/lesson/application/lesson_controller.dart';
 import 'package:certigo/features/lesson/application/lesson_feedback.dart';
 import 'package:certigo/features/lesson/application/lesson_session_state.dart';
 
-/// Repositories that always fail, forcing the controller's offline path.
+/// Repositories that always fail so tests enter explicit demo mode.
 class _OfflineLessonRepo implements LessonRepository {
   @override
-  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) async =>
-      const Err<Lesson>(NetworkFailure());
+  Future<Result<Lesson>> getLesson({
+    required String trackId,
+    required String lessonId,
+  }) async => const Err<Lesson>(NetworkFailure());
 }
 
 class _OfflineQuizRepo implements QuizRepository {
@@ -20,8 +22,7 @@ class _OfflineQuizRepo implements QuizRepository {
   Future<Result<SubmitQuizResult>> submit({
     required String lessonId,
     required SubmitQuizRequest request,
-  }) async =>
-      const Err<SubmitQuizResult>(NetworkFailure());
+  }) async => const Err<SubmitQuizResult>(NetworkFailure());
 }
 
 /// A [LessonFeedback] that records *when* the controller fires haptic/sound
@@ -55,13 +56,15 @@ void main() {
     addTearDown(container.dispose);
   });
 
-  LessonController notifier() => container.read(lessonControllerProvider(args).notifier);
+  LessonController notifier() =>
+      container.read(lessonControllerProvider(args).notifier);
   LessonSessionState read() => container.read(lessonControllerProvider(args));
 
   /// Walks the reader to the check whose item id is [id] without grading it.
   /// Safe because no target check is the step *before* the result, so advancing
   /// here never triggers the finish-and-submit path.
   Future<void> advanceToItem(LessonController controller, String id) async {
+    if (read().status == LessonStatus.error) controller.startDemo();
     var guard = 0;
     while (read().current?.item?.id != id && guard++ < 60) {
       await controller.advance();
@@ -70,42 +73,52 @@ void main() {
   }
 
   group('feedback seam (§3.14 son & haptique)', () {
-    test('graded(correct: true) fires once when a correct check is submitted', () async {
-      final LessonController controller = notifier();
-      await controller.load();
-      await advanceToItem(controller, 'chk-shared-1');
+    test(
+      'graded(correct: true) fires once when a correct check is submitted',
+      () async {
+        final LessonController controller = notifier();
+        await controller.load();
+        await advanceToItem(controller, 'chk-shared-1');
 
-      controller.toggleOption('a'); // the correct pick
-      controller.submitCheck();
+        controller.toggleOption('a'); // the correct pick
+        controller.submitCheck();
 
-      expect(feedback.gradedEvents, <bool>[true]);
-      expect(feedback.completedCount, 0);
-    });
+        expect(feedback.gradedEvents, <bool>[true]);
+        expect(feedback.completedCount, 0);
+      },
+    );
 
-    test('graded(correct: false) fires when a wrong check is submitted', () async {
-      final LessonController controller = notifier();
-      await controller.load();
-      await advanceToItem(controller, 'chk-shared-1');
+    test(
+      'graded(correct: false) fires when a wrong check is submitted',
+      () async {
+        final LessonController controller = notifier();
+        await controller.load();
+        await advanceToItem(controller, 'chk-shared-1');
 
-      controller.toggleOption('b'); // a wrong but submittable pick
-      controller.submitCheck();
+        controller.toggleOption('b'); // a wrong but submittable pick
+        controller.submitCheck();
 
-      expect(feedback.gradedEvents, <bool>[false]);
-    });
+        expect(feedback.gradedEvents, <bool>[false]);
+      },
+    );
 
-    test('submitCheck is inert until the check is actually submittable', () async {
-      final LessonController controller = notifier();
-      await controller.load();
-      await advanceToItem(controller, 'chk-order-1'); // needs all 4 slots
+    test(
+      'submitCheck is inert until the check is actually submittable',
+      () async {
+        final LessonController controller = notifier();
+        await controller.load();
+        await advanceToItem(controller, 'chk-order-1'); // needs all 4 slots
 
-      controller.submitCheck(); // nothing selected → must be a no-op
-      expect(feedback.gradedEvents, isEmpty);
-      expect(read().currentAnswered, isFalse);
-    });
+        controller.submitCheck(); // nothing selected → must be a no-op
+        expect(feedback.gradedEvents, isEmpty);
+        expect(read().currentAnswered, isFalse);
+      },
+    );
 
     test('completed() fires exactly once at the end of the lesson', () async {
       final LessonController controller = notifier();
       await controller.load();
+      controller.startDemo();
 
       var guard = 0;
       while (read().status != LessonStatus.finished && guard++ < 60) {
@@ -120,7 +133,11 @@ void main() {
 
       expect(read().status, LessonStatus.finished);
       expect(feedback.completedCount, 1);
-      expect(feedback.gradedEvents.length, 7, reason: 'one graded cue per check');
+      expect(
+        feedback.gradedEvents.length,
+        7,
+        reason: 'one graded cue per check',
+      );
       expect(feedback.gradedEvents.every((bool c) => c), isTrue);
     });
   });

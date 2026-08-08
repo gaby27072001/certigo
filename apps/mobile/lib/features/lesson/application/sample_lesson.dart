@@ -2,7 +2,7 @@ import 'package:data/data.dart';
 
 import 'check_outcome.dart';
 
-/// Offline fallback content for the lesson player (P0).
+/// Bundled content for the explicit, non-synchronizable demo mode.
 ///
 /// A complete, original AZ-900 micro-lesson on the shared responsibility model,
 /// with two graded checks. Replaced by `lessonRepository.getLesson(...)` once the

@@ -21,6 +21,9 @@ class LessonSessionState {
     this.outcomes = const <String, CheckOutcome>{},
     this.result,
     this.errorMessage,
+    this.isDemo = false,
+    this.pendingSync = false,
+    this.submissionFailed = false,
   });
 
   final LessonStatus status;
@@ -39,8 +42,12 @@ class LessonSessionState {
   /// Server (or locally computed) result, once submitted.
   final SubmitQuizResult? result;
   final String? errorMessage;
+  final bool isDemo;
+  final bool pendingSync;
+  final bool submissionFailed;
 
-  LessonStep? get current => (index >= 0 && index < steps.length) ? steps[index] : null;
+  LessonStep? get current =>
+      (index >= 0 && index < steps.length) ? steps[index] : null;
 
   QuizItem? get currentItem => current?.item;
 
@@ -69,9 +76,11 @@ class LessonSessionState {
     switch (item.type) {
       case ItemType.ordering:
       case ItemType.applied:
-        return item.options.isNotEmpty && selection.length == item.options.length;
+        return item.options.isNotEmpty &&
+            selection.length == item.options.length;
       case ItemType.matchPairs:
-        return item.options.isNotEmpty && selection.length == item.options.length;
+        return item.options.isNotEmpty &&
+            selection.length == item.options.length;
       case ItemType.cloze:
         final int blanks = clozeBlankCount(item.stem);
         return blanks > 0 && selection.length == blanks;
@@ -110,6 +119,9 @@ class LessonSessionState {
     Map<String, CheckOutcome>? outcomes,
     SubmitQuizResult? result,
     String? errorMessage,
+    bool? isDemo,
+    bool? pendingSync,
+    bool? submissionFailed,
   }) {
     return LessonSessionState(
       status: status ?? this.status,
@@ -122,6 +134,9 @@ class LessonSessionState {
       outcomes: outcomes ?? this.outcomes,
       result: result ?? this.result,
       errorMessage: errorMessage ?? this.errorMessage,
+      isDemo: isDemo ?? this.isDemo,
+      pendingSync: pendingSync ?? this.pendingSync,
+      submissionFailed: submissionFailed ?? this.submissionFailed,
     );
   }
 }

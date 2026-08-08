@@ -29,7 +29,8 @@ class SyncStatus {
   int get hashCode => Object.hash(pending, dead, syncing);
 
   @override
-  String toString() => 'SyncStatus(pending: $pending, dead: $dead, syncing: $syncing)';
+  String toString() =>
+      'SyncStatus(pending: $pending, dead: $dead, syncing: $syncing)';
 }
 
 /// Result of a single [SyncEngine.flush] pass.
@@ -61,7 +62,8 @@ class SyncFlushReport {
   bool get isIdle => dispatched == 0;
 
   @override
-  String toString() => 'SyncFlushReport(dispatched: $dispatched, succeeded: $succeeded, '
+  String toString() =>
+      'SyncFlushReport(dispatched: $dispatched, succeeded: $succeeded, '
       'retried: $retried, deadLettered: $deadLettered, pendingRemaining: $pendingRemaining)';
 }
 
@@ -94,12 +96,12 @@ class SyncEngine {
     this.maxAttempts = 6,
     this.doneRetention = const Duration(hours: 24),
     this.deadRetention = const Duration(days: 7),
-  })  : assert(maxAttempts >= 1, 'maxAttempts must be at least 1'),
-        _store = store,
-        _sender = sender,
-        _clock = clock ?? DateTime.now,
-        _backoff = backoff ?? exponentialBackoff(),
-        _idGenerator = idGenerator;
+  }) : assert(maxAttempts >= 1, 'maxAttempts must be at least 1'),
+       _store = store,
+       _sender = sender,
+       _clock = clock ?? DateTime.now,
+       _backoff = backoff ?? exponentialBackoff(),
+       _idGenerator = idGenerator;
 
   final SyncQueueStore _store;
   final SyncSender _sender;
@@ -118,9 +120,14 @@ class SyncEngine {
 
   final List<SyncAction> _queue = <SyncAction>[];
   bool _loaded = false;
+  bool _disposed = false;
   int _idSeq = 0;
-  final StreamController<SyncStatus> _status = StreamController<SyncStatus>.broadcast();
+  final StreamController<SyncStatus> _status =
+      StreamController<SyncStatus>.broadcast();
+  Future<void>? _loadFuture;
+  Future<void> _persistTail = Future<void>.value();
   Future<SyncFlushReport>? _inFlight;
+  Future<void>? _disposing;
 
   /// Health updates for UI badges ("3 leçons en attente de synchronisation").
   Stream<SyncStatus> get status => _status.stream;
@@ -135,14 +142,27 @@ class SyncEngine {
   List<SyncAction> get actions => List<SyncAction>.unmodifiable(_queue);
 
   /// Lazily loads the persisted queue exactly once.
-  Future<void> ensureLoaded() async {
-    if (_loaded) return;
-    final List<SyncAction> persisted = await _store.load();
-    _queue
-      ..clear()
-      ..addAll(persisted);
-    _loaded = true;
-    _emit();
+  Future<void> ensureLoaded() {
+    _ensureActive();
+    if (_loaded) return Future<void>.value();
+    final Future<void>? running = _loadFuture;
+    if (running != null) return running;
+    final Future<void> loading = _load();
+    _loadFuture = loading;
+    return loading;
+  }
+
+  Future<void> _load() async {
+    try {
+      final List<SyncAction> persisted = await _store.load();
+      _queue
+        ..clear()
+        ..addAll(persisted);
+      _loaded = true;
+      _emit();
+    } finally {
+      _loadFuture = null;
+    }
   }
 
   /// Enqueues an action, deduping by [idempotencyKey].
@@ -155,6 +175,7 @@ class SyncEngine {
     required Map<String, dynamic> payload,
     required String idempotencyKey,
   }) async {
+    _ensureActive();
     await ensureLoaded();
     final SyncAction? live = _findLiveByKey(idempotencyKey);
     if (live != null) return live;
@@ -177,9 +198,12 @@ class SyncEngine {
   ///
   /// Concurrent calls coalesce into the single in-flight pass.
   Future<SyncFlushReport> flush() {
+    _ensureActive();
     final Future<SyncFlushReport>? running = _inFlight;
     if (running != null) return running;
-    final Future<SyncFlushReport> pass = _flush().whenComplete(() => _inFlight = null);
+    final Future<SyncFlushReport> pass = _flush().whenComplete(
+      () => _inFlight = null,
+    );
     _inFlight = pass;
     return pass;
   }
@@ -189,8 +213,10 @@ class SyncEngine {
     _emit(syncing: true);
 
     final DateTime now = _clock();
-    final List<String> dueIds =
-        _queue.where((SyncAction a) => a.isDue(now)).map((SyncAction a) => a.id).toList();
+    final List<String> dueIds = _queue
+        .where((SyncAction a) => a.isDue(now))
+        .map((SyncAction a) => a.id)
+        .toList();
 
     var dispatched = 0;
     var succeeded = 0;
@@ -282,7 +308,25 @@ class SyncEngine {
 
   /// Releases the status stream. After this the engine must not be reused.
   Future<void> dispose() async {
-    await _status.close();
+    final Future<void>? running = _disposing;
+    if (running != null) return running;
+    final Future<void> disposing = _dispose();
+    _disposing = disposing;
+    return disposing;
+  }
+
+  Future<void> _dispose() async {
+    _disposed = true;
+    final List<Future<Object?>> pending = <Future<Object?>>[_persistTail];
+    final Future<void>? loading = _loadFuture;
+    if (loading != null) pending.add(loading);
+    final Future<SyncFlushReport>? flushing = _inFlight;
+    if (flushing != null) pending.add(flushing);
+    try {
+      await Future.wait<Object?>(pending);
+    } finally {
+      await _status.close();
+    }
   }
 
   SyncAction? _findLiveByKey(String idempotencyKey) {
@@ -320,7 +364,13 @@ class SyncEngine {
     });
   }
 
-  Future<void> _persist() => _store.save(List<SyncAction>.of(_queue));
+  Future<void> _persist() {
+    final Future<void> operation = _persistTail
+        .catchError((Object _, StackTrace __) {})
+        .then((_) => _store.save(List<SyncAction>.of(_queue)));
+    _persistTail = operation;
+    return operation;
+  }
 
   String _nextId() {
     final String Function()? gen = _idGenerator;
@@ -331,6 +381,12 @@ class SyncEngine {
 
   void _emit({bool syncing = false}) {
     if (_status.isClosed) return;
-    _status.add(SyncStatus(pending: pendingCount, dead: deadCount, syncing: syncing));
+    _status.add(
+      SyncStatus(pending: pendingCount, dead: deadCount, syncing: syncing),
+    );
+  }
+
+  void _ensureActive() {
+    if (_disposed) throw StateError('SyncEngine has been disposed');
   }
 }

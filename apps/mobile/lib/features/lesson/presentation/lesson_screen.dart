@@ -21,7 +21,11 @@ import 'widgets/step_renderer.dart';
 /// declarative shell over [LessonSessionState]. The public constructor is
 /// unchanged so the router needs no edit.
 class LessonScreen extends ConsumerWidget {
-  const LessonScreen({super.key, required this.trackId, required this.lessonId});
+  const LessonScreen({
+    super.key,
+    required this.trackId,
+    required this.lessonId,
+  });
 
   final String trackId;
   final String lessonId;
@@ -30,15 +34,30 @@ class LessonScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final LessonArgs args = LessonArgs(trackId: trackId, lessonId: lessonId);
     final LessonSessionState state = ref.watch(lessonControllerProvider(args));
-    final LessonController controller = ref.read(lessonControllerProvider(args).notifier);
+    final LessonController controller = ref.read(
+      lessonControllerProvider(args).notifier,
+    );
 
     return AuroraBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
           child: switch (state.status) {
-            LessonStatus.idle || LessonStatus.loading => const _LessonLoadingView(),
-            LessonStatus.error => PrismStatusView.error(onRetry: controller.load),
+            LessonStatus.idle ||
+            LessonStatus.loading => const _LessonLoadingView(),
+            LessonStatus.error => Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                PrismStatusView.error(
+                  message: state.errorMessage,
+                  onRetry: controller.load,
+                ),
+                PrismButton.ghost(
+                  label: 'Essayer la démo',
+                  onPressed: controller.startDemo,
+                ),
+              ],
+            ),
             _ => _LessonRunningView(state: state, controller: controller),
           },
         ),
@@ -69,6 +88,9 @@ class _LessonRunningView extends StatelessWidget {
         trackId: controller.args.trackId,
         lessonId: controller.args.lessonId,
         answers: state.answers,
+        isDemo: state.isDemo,
+        pendingSync: state.pendingSync,
+        submissionFailed: state.submissionFailed,
         onContinue: () => context.go(Routes.home),
         onReview: () => context.go(Routes.path),
       );
