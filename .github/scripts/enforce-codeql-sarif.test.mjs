@@ -83,3 +83,23 @@ test('rejects structurally invalid SARIF runs', () => {
   );
   assert.throws(() => evaluateSarif(directory, 7), /missing tool\.driver\.name/);
 });
+
+test('rejects invalid result level values and types', () => {
+  for (const level of ['fatal', '', 3, { value: 'error' }]) {
+    const directory = fixture([{ ruleId: 'invalid-level', level }]);
+    assert.throws(() => evaluateSarif(directory, 7), /SARIF level .* is invalid/);
+  }
+});
+
+test('rejects an invalid default rule level', () => {
+  const directory = fixture(
+    [{ ruleId: 'invalid-default-level' }],
+    [
+      {
+        id: 'invalid-default-level',
+        defaultConfiguration: { level: 'fatal' },
+      },
+    ],
+  );
+  assert.throws(() => evaluateSarif(directory, 7), /SARIF level 'fatal' is invalid/);
+});

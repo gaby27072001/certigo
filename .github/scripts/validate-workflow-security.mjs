@@ -253,6 +253,7 @@ function validateRepositoryInvariants() {
     "level === 'error'",
     'No SARIF files found',
     'SARIF run is missing tool.driver.name',
+    "['none', 'note', 'warning', 'error'].includes(level)",
   ]) {
     if (!codeqlEnforcer.includes(marker)) {
       errors.push(`enforce-codeql-sarif.mjs: missing fail-closed invariant ${marker}`);

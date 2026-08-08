@@ -111,6 +111,12 @@ export function evaluateSarif(directory, threshold) {
         const rule = rules.get(result.ruleId);
         const securitySeverity = numericSeverity(result, rule);
         const level = result.level ?? rule?.defaultConfiguration?.level ?? 'warning';
+        if (!['none', 'note', 'warning', 'error'].includes(level)) {
+          throw new Error(
+            `${file}: SARIF level '${String(level)}' is invalid for rule ` +
+              `${result.ruleId ?? 'unknown'}.`,
+          );
+        }
         const location = resultLocation(result);
         findings.push({
           blocking:
