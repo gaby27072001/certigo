@@ -56,6 +56,7 @@ jobs:
               - '**/npm-shrinkwrap.json'
               - 'global.json'
               - '.github/workflows/dependency-vuln-scan.yml'
+              - '.github/workflows/nuget-vuln-scan.yml'
               - '.github/workflows/security-gate.yml'
             iac:
               - 'infra/**'
@@ -93,8 +94,6 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.dependencies == 'true' }}
     uses: ./.github/workflows/dependency-vuln-scan.yml
-    with:
-      scanner: osv
     permissions:
       contents: read
       security-events: write
@@ -103,9 +102,7 @@ jobs:
     name: NuGet dependency scan
     needs: changes
     if: ${{ needs.changes.outputs.dependencies == 'true' }}
-    uses: ./.github/workflows/dependency-vuln-scan.yml
-    with:
-      scanner: nuget
+    uses: ./.github/workflows/nuget-vuln-scan.yml
     permissions:
       contents: read
 

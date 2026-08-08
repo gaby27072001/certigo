@@ -123,6 +123,7 @@ function validateRepositoryInvariants() {
     path.join(workflowsDir, 'dependency-vuln-scan.yml'),
     'utf8',
   );
+  const nugetScan = fs.readFileSync(path.join(workflowsDir, 'nuget-vuln-scan.yml'), 'utf8');
   const iacScan = fs.readFileSync(path.join(workflowsDir, 'security-scan.yml'), 'utf8');
   const branchProtection = JSON.parse(
     fs.readFileSync(path.join(root, '.github', 'branch-protection-main.json'), 'utf8'),
@@ -200,6 +201,7 @@ function validateRepositoryInvariants() {
     'name: Security / Required gate',
     'needs: [changes, osv, nuget, checkov]',
     'uses: ./.github/workflows/dependency-vuln-scan.yml',
+    'uses: ./.github/workflows/nuget-vuln-scan.yml',
     'uses: ./.github/workflows/security-scan.yml',
     'if: ${{ always() }}',
   ]) {
@@ -223,6 +225,7 @@ function validateRepositoryInvariants() {
   }
   for (const [fileName, workflow] of [
     ['dependency-vuln-scan.yml', dependencyScan],
+    ['nuget-vuln-scan.yml', nugetScan],
     ['security-scan.yml', iacScan],
   ]) {
     if (!workflow.includes('workflow_call:')) {

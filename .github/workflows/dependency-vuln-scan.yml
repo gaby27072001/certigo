@@ -1,41 +1,15 @@
 name: dependency-vuln-scan
 
-# Reusable scanners called by security-gate.yml only when dependency files change.
+# Reusable OSV scanner called by security-gate.yml only when dependency files change.
 # Pull requests, including forks, run on an ephemeral GitHub-hosted runner.
 on:
   workflow_call:
-    inputs:
-      scanner:
-        description: Dependency scanner to execute (osv or nuget).
-        required: true
-        type: string
 
 permissions: {}
 
 jobs:
-  validate-input:
-    name: Validate scanner selection
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
-    permissions: {}
-    steps:
-      - name: Validate scanner
-        shell: bash
-        env:
-          SCANNER: ${{ inputs.scanner }}
-        run: |
-          set -euo pipefail
-          case "$SCANNER" in
-            osv|nuget) ;;
-            *)
-              echo "::error::Unsupported dependency scanner."
-              exit 1
-              ;;
-          esac
-
   osv-scan:
     name: OSV-Scanner (all dependencies, SARIF)
-    needs: validate-input
-    if: ${{ inputs.scanner == 'osv' }}
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
     permissions:
       contents: read
@@ -82,32 +56,3 @@ jobs:
           cat osv-scan.log >&2
           echo "::error::OSV-Scanner found a vulnerability or could not complete."
           exit 1
-
-  dotnet-vuln:
-    name: Vulnerable .NET packages (NuGet/GitHub Advisory)
-    needs: validate-input
-    if: ${{ inputs.scanner == 'nuget' }}
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
-    permissions:
-      contents: read
-    env:
-      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
-        with:
-          dotnet-version: "8.0.x"
-
-      - name: Restore
-        run: dotnet restore backend/Certigo.sln
-
-      - name: Check vulnerable packages
-        run: |
-          set -euo pipefail
-          dotnet list backend/Certigo.sln package --vulnerable --include-transitive | tee dotnet-vulnerable.log
-          if grep -qi "has the following vulnerable" dotnet-vulnerable.log; then
-            echo "::error::Vulnerable NuGet packages detected."
-            exit 1
-          fi
