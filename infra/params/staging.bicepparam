@@ -36,6 +36,9 @@ param entraAuthority = 'https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.c
 // Audience = Application ID URI of the staging backend app registration.
 param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
 
+// authJwtSigningKey must be supplied out-of-band as a secure deployment parameter.
+// main.bicep rejects staging deployments when it is omitted; never commit its value.
+
 // Email notified on 401/403/5xx spikes (optional but recommended pre-prod).
 param alertEmail = ''
 

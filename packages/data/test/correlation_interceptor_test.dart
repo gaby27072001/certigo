@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:dio/dio.dart';
 import 'package:test/test.dart';
@@ -8,6 +9,9 @@ import 'package:test/test.dart';
 /// an empty JSON body. Lets tests assert on request headers with no real network
 /// and no Flutter dependency (hermetic — safe to run via `dart test`).
 class _CapturingAdapter implements HttpClientAdapter {
+  _CapturingAdapter({this.statusCode = 200});
+
+  final int statusCode;
   RequestOptions? lastOptions;
 
   @override
@@ -19,7 +23,7 @@ class _CapturingAdapter implements HttpClientAdapter {
     lastOptions = options;
     return ResponseBody.fromString(
       '{}',
-      200,
+      statusCode,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
       },
@@ -69,13 +73,16 @@ void main() {
     ApiClient buildClient(
       _CapturingAdapter adapter, {
       CorrelationIdGenerator? generator,
+      TokenProvider? tokenProvider,
+      UnauthorizedHandler? onUnauthorized,
     }) {
       final dio = Dio();
       dio.httpClientAdapter = adapter;
       return ApiClient(
         dio: dio,
         baseUrl: 'https://example.test',
-        tokenProvider: () async => null,
+        tokenProvider: tokenProvider ?? () async => null,
+        onUnauthorized: onUnauthorized,
         correlationIdGenerator: generator,
       );
     }
@@ -95,5 +102,79 @@ void main() {
       await client.getJson<Map<String, dynamic>>('/ping', (json) => json);
       expect(adapter.lastOptions?.headers[kCorrelationIdHeader], 'b' * 32);
     });
+
+    test(
+      'sends the exact bearer authorization header for a non-empty token',
+      () async {
+        final adapter = _CapturingAdapter();
+        final client = buildClient(
+          adapter,
+          tokenProvider: () async => 'access-token',
+        );
+
+        await client.getJson<Map<String, dynamic>>('/ping', (json) => json);
+
+        expect(
+          adapter.lastOptions?.headers['Authorization'],
+          'Bearer access-token',
+        );
+      },
+    );
+
+    test('omits the authorization header when the token is empty', () async {
+      final adapter = _CapturingAdapter();
+      final dio = Dio(
+        BaseOptions(headers: <String, dynamic>{'Authorization': 'stale-token'}),
+      );
+      dio.httpClientAdapter = adapter;
+      final client = ApiClient(
+        dio: dio,
+        baseUrl: 'https://example.test',
+        tokenProvider: () async => '',
+      );
+
+      await client.getJson<Map<String, dynamic>>('/ping', (json) => json);
+
+      expect(adapter.lastOptions?.headers, isNot(contains('Authorization')));
+    });
+
+    test(
+      'omits the authorization header when the token is whitespace',
+      () async {
+        final adapter = _CapturingAdapter();
+        final client = buildClient(adapter, tokenProvider: () async => '   ');
+
+        await client.getJson<Map<String, dynamic>>('/ping', (json) => json);
+
+        expect(adapter.lastOptions?.headers, isNot(contains('Authorization')));
+      },
+    );
+
+    test(
+      'invokes the unauthorized handler and maps a 401 to AuthFailure',
+      () async {
+        final adapter = _CapturingAdapter(statusCode: 401);
+        var unauthorizedCalls = 0;
+        final client = buildClient(
+          adapter,
+          tokenProvider: () async => 'access-token',
+          onUnauthorized: () async {
+            unauthorizedCalls++;
+          },
+        );
+
+        final result = await client.getJson<Map<String, dynamic>>(
+          '/ping',
+          (json) => json,
+        );
+
+        expect(unauthorizedCalls, 1);
+        expect(result, isA<Err<Map<String, dynamic>>>());
+        expect(
+          (result as Err<Map<String, dynamic>>).failure,
+          isA<AuthFailure>(),
+        );
+      },
+    );
   });
 }

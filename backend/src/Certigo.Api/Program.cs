@@ -158,6 +158,7 @@ var host = new HostBuilder()
         services.AddScoped<IProgressRepository, CosmosProgressRepository>();
         services.AddScoped<IAttemptRepository, CosmosAttemptRepository>();
         services.AddScoped<IExamAttemptRepository, CosmosExamAttemptRepository>();
+        services.AddScoped<IExamRepository, CosmosExamRepository>();
         services.AddScoped<IEventRepository, CosmosEventRepository>();
         services.AddScoped<ILeaderboardRepository, CosmosLeaderboardRepository>();
         services.AddScoped<IPurchaseRepository, CosmosPurchaseRepository>();

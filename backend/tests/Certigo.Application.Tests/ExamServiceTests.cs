@@ -14,6 +14,7 @@ internal sealed class ExamServiceHarness
     public InMemoryLeaderboardRepository Leaderboard { get; } = new();
     public InMemoryEventRepository Events { get; } = new();
     public InMemoryExamAttemptRepository ExamAttempts { get; } = new();
+    public InMemoryExamRepository Exams { get; } = new();
     public InMemoryAttemptRepository Attempts { get; } = new();
     public FakeClock Clock { get; } = new(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
     public string UserId { get; } = "user-1";
@@ -22,7 +23,18 @@ internal sealed class ExamServiceHarness
     {
         var content = TestContent.Build();
         var context = new FakeUserContext(UserId, "Tester");
-        return new ExamService(context, Clock, content, Progress, ExamAttempts, Attempts, Events, Users, Leaderboard);
+        Exams.Seed(IssuedExam("exam-1", UserId, Clock.UtcNow));
+        return new ExamService(
+            context,
+            Clock,
+            content,
+            Progress,
+            ExamAttempts,
+            Exams,
+            Attempts,
+            Events,
+            Users,
+            Leaderboard);
     }
 
     public static SubmitMockExamRequest Submit(string attemptId, string examId, params AnswerDto[] answers)
@@ -30,6 +42,23 @@ internal sealed class ExamServiceHarness
 
     public static AnswerDto Answer(string itemId, params string[] selected)
         => new(itemId, ItemType.Mcq, selected.ToList(), 5_000);
+
+    public static ExamRecord IssuedExam(
+        string examId,
+        string userId,
+        DateTimeOffset createdAt,
+        IReadOnlyList<string>? itemIds = null,
+        int durationSeconds = 300)
+        => new(
+            $"exam::{examId}",
+            userId,
+            examId,
+            TestContent.TrackId,
+            itemIds ?? ["l1-i1", "l2-i1", "l3-i1"],
+            createdAt,
+            durationSeconds,
+            createdAt.AddSeconds(durationSeconds),
+            Math.Max(durationSeconds, 1));
 }
 
 public sealed class ExamServiceTests
@@ -49,6 +78,105 @@ public sealed class ExamServiceTests
         exam.Items.Should().OnlyContain(i => !string.IsNullOrWhiteSpace(i.Stem) && i.Options.Count == 2);
         exam.Blueprint.Sum(b => b.ItemCount).Should().Be(3);
         exam.TimeLimitSeconds.Should().Be(3 * 75);
+
+        var stored = h.Exams.Records.Single(record => record.ExamId == exam.ExamId);
+        stored.UserId.Should().Be(h.UserId);
+        stored.TrackId.Should().Be(TestContent.TrackId);
+        stored.ItemIds.Should().BeEquivalentTo(exam.Items.Select(item => item.ItemId));
+        stored.CreatedAt.Should().Be(h.Clock.UtcNow);
+        stored.DurationSeconds.Should().Be(exam.TimeLimitSeconds);
+        stored.ExpiresAt.Should().Be(
+            h.Clock.UtcNow.AddSeconds(exam.TimeLimitSeconds + (5 * 60)));
+        stored.Ttl.Should().Be(
+            exam.TimeLimitSeconds + (5 * 60) + (int)TimeSpan.FromDays(1).TotalSeconds);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_rejects_duplicate_item_ids_before_rewards()
+    {
+        var h = new ExamServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        var service = h.Build();
+
+        var act = () => service.SubmitAsync(ExamServiceHarness.Submit(
+            "duplicate-items",
+            "exam-1",
+            ExamServiceHarness.Answer("l1-i1", "a"),
+            ExamServiceHarness.Answer("L1-I1", "a")));
+
+        await act.Should().ThrowAsync<RequestValidationException>()
+            .WithMessage("*Duplicate item id*");
+        var profile = await h.Users.GetAsync(h.UserId);
+        profile!.Xp.Should().Be(0);
+        profile.Gems.Should().Be(0);
+        h.Leaderboard.Xp.Should().NotContainKey(h.UserId);
+        h.ExamAttempts.CreateCount.Should().Be(0);
+        h.Events.Events.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SubmitAsync_rejects_an_item_not_issued_for_the_exam()
+    {
+        var h = new ExamServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        var service = h.Build();
+        h.Exams.Seed(ExamServiceHarness.IssuedExam(
+            "exam-1",
+            h.UserId,
+            h.Clock.UtcNow,
+            itemIds: ["l1-i1"]));
+
+        var act = () => service.SubmitAsync(ExamServiceHarness.Submit(
+            "unissued-item",
+            "exam-1",
+            ExamServiceHarness.Answer("l2-i1", "a")));
+
+        await act.Should().ThrowAsync<RequestValidationException>()
+            .WithMessage("*not issued*");
+        h.ExamAttempts.CreateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_rejects_an_expired_exam()
+    {
+        var h = new ExamServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        var service = h.Build();
+        h.Exams.Seed(ExamServiceHarness.IssuedExam(
+            "expired",
+            h.UserId,
+            h.Clock.UtcNow.AddMinutes(-10),
+            durationSeconds: 60));
+
+        var act = () => service.SubmitAsync(ExamServiceHarness.Submit(
+            "expired-attempt",
+            "expired",
+            ExamServiceHarness.Answer("l1-i1", "a")));
+
+        await act.Should().ThrowAsync<RequestValidationException>()
+            .WithMessage("*expired*");
+        h.ExamAttempts.CreateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_rejects_an_exam_owned_by_another_user()
+    {
+        var h = new ExamServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        var service = h.Build();
+        h.Exams.Seed(ExamServiceHarness.IssuedExam(
+            "other-user-exam",
+            "other-user",
+            h.Clock.UtcNow));
+
+        var act = () => service.SubmitAsync(ExamServiceHarness.Submit(
+            "foreign-attempt",
+            "other-user-exam",
+            ExamServiceHarness.Answer("l1-i1", "a")));
+
+        await act.Should().ThrowAsync<RequestValidationException>()
+            .WithMessage("*does not belong*");
+        h.ExamAttempts.CreateCount.Should().Be(0);
     }
 
     [Fact]
@@ -96,6 +224,49 @@ public sealed class ExamServiceTests
 
         second.AttemptId.Should().Be(first.AttemptId);
         h.ExamAttempts.CreateCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_is_single_use_even_with_a_new_client_attempt_id()
+    {
+        var h = new ExamServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        var service = h.Build();
+        var firstRequest = ExamServiceHarness.Submit(
+            "first-client-attempt",
+            "exam-1",
+            ExamServiceHarness.Answer("l1-i1", "a"),
+            ExamServiceHarness.Answer("l2-i1", "a"),
+            ExamServiceHarness.Answer("l3-i1", "a"));
+        var secondRequest = firstRequest with { ClientAttemptId = "second-client-attempt" };
+
+        var first = await service.SubmitAsync(firstRequest);
+        var second = await service.SubmitAsync(secondRequest);
+
+        second.AttemptId.Should().Be(first.AttemptId);
+        h.ExamAttempts.CreateCount.Should().Be(1);
+        var profile = await h.Users.GetAsync(h.UserId);
+        profile!.Xp.Should().Be(first.Rewards.XpEarned);
+        profile.Gems.Should().Be(first.Rewards.GemsEarned);
+        h.Leaderboard.Xp[h.UserId].Should().Be(first.Rewards.XpEarned);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_scores_unanswered_issued_items_as_incorrect()
+    {
+        var h = new ExamServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        var service = h.Build();
+
+        var result = await service.SubmitAsync(ExamServiceHarness.Submit(
+            "partial-answer-set",
+            "exam-1",
+            ExamServiceHarness.Answer("l1-i1", "a")));
+
+        result.Correct.Should().Be(1);
+        result.Total.Should().Be(3);
+        result.Passed.Should().BeFalse();
+        result.Rewards.GemsEarned.Should().Be(0);
     }
 
     [Fact]
@@ -173,6 +344,8 @@ public sealed class ExamServiceTests
         var users = new ConflictOnceUserRepository(inner);
         var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
         var examAttempts = new InMemoryExamAttemptRepository();
+        var exams = new InMemoryExamRepository();
+        exams.Seed(ExamServiceHarness.IssuedExam("exam-1", "user-1", clock.UtcNow));
         var leaderboard = new InMemoryLeaderboardRepository();
         var service = new ExamService(
             new FakeUserContext("user-1", "Tester"),
@@ -180,6 +353,7 @@ public sealed class ExamServiceTests
             TestContent.Build(),
             new InMemoryProgressRepository(),
             examAttempts,
+            exams,
             new InMemoryAttemptRepository(),
             new InMemoryEventRepository(),
             users,
@@ -211,6 +385,8 @@ public sealed class ExamServiceTests
         var users = new BumpThenConflictUserRepository(inner, p => p with { Xp = p.Xp + 100 });
         var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
         var examAttempts = new InMemoryExamAttemptRepository();
+        var exams = new InMemoryExamRepository();
+        exams.Seed(ExamServiceHarness.IssuedExam("exam-1", "user-1", clock.UtcNow));
         var leaderboard = new InMemoryLeaderboardRepository();
         var service = new ExamService(
             new FakeUserContext("user-1", "Tester"),
@@ -218,6 +394,7 @@ public sealed class ExamServiceTests
             TestContent.Build(),
             new InMemoryProgressRepository(),
             examAttempts,
+            exams,
             new InMemoryAttemptRepository(),
             new InMemoryEventRepository(),
             users,

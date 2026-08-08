@@ -17,6 +17,10 @@ public sealed class ConcurrencyConflictException(string message) : Exception(mes
 /// replayed or concurrent submission can never be applied twice.
 public sealed class DuplicateRecordException(string message) : Exception(message);
 
+/// Raised when a structurally valid request violates an application invariant.
+/// API hosts map it to HTTP 400 without introducing an Application -> API dependency.
+public sealed class RequestValidationException(string message) : Exception(message);
+
 /// Raised when the optional tutor LLM cannot be reached or returns a runtime
 /// service error. Callers may deliberately fall back to the grounded tutor
 /// explanation, but unexpected coding/configuration bugs should still surface.
@@ -101,7 +105,16 @@ public sealed record RecentActivity(int Attempts, int Xp);
 public interface IExamAttemptRepository
 {
     Task<ExamAttemptRecord?> GetByClientAttemptIdAsync(string userId, string clientAttemptId, CancellationToken cancellationToken = default);
+    Task<ExamAttemptRecord?> GetByExamIdAsync(string userId, string examId, CancellationToken cancellationToken = default);
     Task CreateAsync(ExamAttemptRecord attempt, CancellationToken cancellationToken = default);
+}
+
+/// Server-issued mock exams. Records share the attempts container and are scoped
+/// by /userId so an exam id can never be resolved across learner partitions.
+public interface IExamRepository
+{
+    Task CreateAsync(ExamRecord exam, CancellationToken cancellationToken = default);
+    Task<ExamRecord?> GetAsync(string userId, string examId, CancellationToken cancellationToken = default);
 }
 
 public interface IEventRepository
@@ -207,6 +220,22 @@ public sealed record ExamAttemptRecord(
     MockExamResultDto Result)
 {
     public string Kind => "exam";
+}
+
+// The server-side authority for a generated exam. Ttl is serialized as Cosmos'
+// per-item "ttl" field; DurationSeconds/ExpiresAt remain explicit for validation.
+public sealed record ExamRecord(
+    string Id,
+    string UserId,
+    string ExamId,
+    string TrackId,
+    IReadOnlyList<string> ItemIds,
+    DateTimeOffset CreatedAt,
+    int DurationSeconds,
+    DateTimeOffset ExpiresAt,
+    int Ttl)
+{
+    public string Kind => "exam-issued";
 }
 
 public sealed record LearningEvent(

@@ -44,7 +44,7 @@ param tutorLlmApiVersion string = '2024-10-21'
 @description('Optional explicit Azure OpenAI API key for the tutor. Leave empty to use the Function App managed identity instead.')
 @secure()
 param tutorLlmApiKey string = ''
-@description('Signing key for email/password JWTs. Empty in dev/staging => a deterministic guid() is derived (stable across redeploys, not stored in the repo). Provide a real secret in prod to override.')
+@description('Signing key for email/password JWTs. Dev may derive a stable non-production value. Staging/prod must receive a non-empty secret through a secure deployment parameter.')
 @secure()
 param authJwtSigningKey string = ''
 @description('Maximum output tokens requested from the tutor LLM.')
@@ -81,13 +81,18 @@ var rgName = 'rg-${appName}-${env}'
 // Dev token bypass is allowed ONLY in the dev environment; staging/prod enforce
 // Entra token validation ("prod" signals to the backend that Entra is required).
 var authMode = env == 'dev' ? 'dev' : 'prod'
-// Email/password JWT signing key. When not supplied, derive a deterministic value so
-// tokens stay valid across redeploys without storing a secret in the repo or Key Vault.
-var effectiveAuthJwtSigningKey = empty(authJwtSigningKey) ? guid(subscription().id, appName, env, 'auth-jwt-signing-key') : authJwtSigningKey
 // Production-grade hardening is on for every non-dev environment: Cosmos RBAC-only
 // auth, Key Vault purge protection + 90-day soft delete, geo-redundant + versioned
 // storage, and a locked-down CORS origin set.
 var hardened = env != 'dev'
+// The deterministic fallback is intentionally restricted to dev. fail() stops
+// staging/prod deployment evaluation with a clear error before any derivable key
+// can be provisioned.
+var effectiveAuthJwtSigningKey = empty(authJwtSigningKey)
+  ? (hardened
+    ? fail('authJwtSigningKey must be supplied securely for staging and production deployments.')
+    : guid(subscription().id, appName, env, 'auth-jwt-signing-key'))
+  : authJwtSigningKey
 // Subscription-scoped MCSB policy needs Owner-level rights; skip it in dev so a
 // Contributor can run the dev smoke-test deploy without friction.
 var assignPolicy = forcePolicyAssignment || env != 'dev'

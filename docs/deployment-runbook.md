@@ -284,6 +284,19 @@ az deployment sub create \
   --query 'properties.outputs.functionAppName.value' -o tsv
 ```
 
+### Clé de signature JWT en staging/prod
+
+`infra/main.bicep` autorise le mécanisme déterministe uniquement en `dev`. Pour
+`staging` et `prod`, le déploiement échoue si `authJwtSigningKey` n'est pas fourni
+via un paramètre sécurisé externe. Ne jamais placer cette valeur dans un fichier
+`.bicepparam` versionné, une sortie de commande ou les logs du pipeline. La même
+valeur doit être réutilisée à chaque déploiement, sinon les jetons applicatifs déjà
+émis deviennent invalides.
+
+Déployer l'infrastructure avant le backend qui persiste les examens : le conteneur
+Cosmos `attempts` doit d'abord être configuré avec `defaultTtl: -1` pour que le TTL
+par examen soit actif sans expirer les tentatives existantes.
+
 **Option B — via le pipeline** (une fois T0.1 + T0.3 prêts) :
 
 ```bash

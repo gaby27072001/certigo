@@ -35,6 +35,31 @@ internal sealed class QuizServiceHarness
 public sealed class QuizServiceTests
 {
     [Fact]
+    public async Task SubmitAsync_rejects_duplicate_item_ids_before_rewards()
+    {
+        var h = new QuizServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        var service = h.Build();
+
+        var act = () => service.SubmitAsync(
+            "l1",
+            QuizServiceHarness.Request(
+                "duplicate-items",
+                QuizServiceHarness.Answer("l1-i1", "a"),
+                QuizServiceHarness.Answer("L1-I1", "a")));
+
+        await act.Should().ThrowAsync<RequestValidationException>()
+            .WithMessage("*Duplicate item id*");
+        var profile = await h.Users.GetAsync(h.UserId);
+        profile!.Xp.Should().Be(0);
+        profile.Gems.Should().Be(0);
+        h.Leaderboard.Xp.Should().NotContainKey(h.UserId);
+        h.Events.Events.Should().BeEmpty();
+        (await h.Progress.GetMasteryAsync(h.UserId, TestContent.TrackId, "c1"))
+            .Should().BeNull();
+    }
+
+    [Fact]
     public async Task SubmitAsync_correct_answer_awards_xp_gems_and_updates_leaderboard()
     {
         var h = new QuizServiceHarness();

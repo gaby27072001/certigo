@@ -62,14 +62,16 @@ resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15
 
 // Locked container topology: name -> partition key.
 var containers = [
-  { name: 'users', pk: '/id' }
-  { name: 'content', pk: '/trackId' }
-  { name: 'progress', pk: '/userId' }
-  { name: 'attempts', pk: '/userId' }
-  { name: 'events', pk: '/userId' }
-  { name: 'leaderboard', pk: '/periodLeagueId' }
-  { name: 'economy', pk: '/userId' }
-  { name: 'friends', pk: '/userId' }
+  { name: 'users', pk: '/id', defaultTtl: null }
+  { name: 'content', pk: '/trackId', defaultTtl: null }
+  { name: 'progress', pk: '/userId', defaultTtl: null }
+  // Existing attempts remain durable because their documents omit "ttl"; issued
+  // exam documents opt in with a positive per-item TTL.
+  { name: 'attempts', pk: '/userId', defaultTtl: -1 }
+  { name: 'events', pk: '/userId', defaultTtl: null }
+  { name: 'leaderboard', pk: '/periodLeagueId', defaultTtl: null }
+  { name: 'economy', pk: '/userId', defaultTtl: null }
+  { name: 'friends', pk: '/userId', defaultTtl: null }
 ]
 
 resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [
@@ -79,6 +81,7 @@ resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
     properties: {
       resource: {
         id: c.name
+        defaultTtl: c.defaultTtl
         partitionKey: {
           paths: [ c.pk ]
           kind: 'Hash'

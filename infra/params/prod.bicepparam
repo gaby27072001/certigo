@@ -61,11 +61,9 @@ param enableDefenderPlans = true
 // falls back to the deterministic grounded tutor. Provide tutorLlmEnabled = true
 // + tutorLlmEndpoint/tutorLlmDeployment when a prod OpenAI resource exists.
 
-// Email/password JWT signing key: intentionally NOT set here. main.bicep derives a
-// deterministic guid() (stable across redeploys) when empty, so email/password
-// login works for the beta without committing a secret to the repo. For a hardened
-// prod, inject a real authJwtSigningKey out-of-band (secure param / Key Vault),
-// never committed in this file.
+// Email/password JWT signing key: intentionally NOT set here. Supply
+// authJwtSigningKey out-of-band as a secure deployment parameter. main.bicep rejects
+// production deployments when it is omitted; never commit its value in this file.
 
 // ============================================================================
 // Network posture (public network access) — BETA trade-off.
@@ -82,4 +80,3 @@ param enableDefenderPlans = true
 // Phase 2: provision private endpoints + VNet integration for the Function App, then
 // add here:  param enablePrivateNetworking = true  to close the public endpoints.
 // ============================================================================
-

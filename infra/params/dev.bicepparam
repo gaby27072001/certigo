@@ -32,6 +32,9 @@ param cosmosLocation = 'northeurope'
 param entraAuthority = 'https://certigo.ciamlogin.com/00000000-0000-0000-0000-000000000000/v2.0'
 param entraAudience = '00000000-0000-0000-0000-000000000000'
 
+// authJwtSigningKey is intentionally omitted in dev. main.bicep derives a stable
+// value that is explicitly gated to the non-hardened dev environment.
+
 // AI tutor (Azure OpenAI / Microsoft Foundry). Enabled in dev.
 // The dev resource "certigo-openai" (deployment gpt-5.4-mini, v1 project-scoped
 // endpoint) is provisioned, and the "Cognitive Services OpenAI User" role is now granted

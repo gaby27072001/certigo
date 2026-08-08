@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
@@ -144,6 +145,37 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
         future.Xp.Should().Be(0);
     }
 
+    [CosmosEmulatorFact]
+    public async Task Issued_exam_round_trips_with_ttl_and_is_user_scoped()
+    {
+        var context = await fixture.GetContextAsync();
+        var repository = new CosmosExamRepository(context);
+        var userId = $"user-{Guid.NewGuid():N}";
+        var now = DateTimeOffset.UtcNow;
+        var exam = NewExam(userId, now);
+
+        await repository.CreateAsync(exam);
+
+        var loaded = await repository.GetAsync(userId, exam.ExamId);
+        loaded.Should().BeEquivalentTo(exam);
+        loaded!.Kind.Should().Be("exam-issued");
+        loaded.Ttl.Should().Be(86_700);
+        (await repository.GetAsync("different-user", exam.ExamId)).Should().BeNull();
+
+        using var rawResponse = await context.Attempts.ReadItemStreamAsync(
+            exam.Id,
+            new Microsoft.Azure.Cosmos.PartitionKey(userId));
+        using var rawDocument = await JsonDocument.ParseAsync(rawResponse.Content);
+        rawDocument.RootElement.TryGetProperty("ttl", out var ttlProperty).Should().BeTrue();
+        ttlProperty.GetInt32().Should().Be(86_700);
+
+        var container = await context.Attempts.ReadContainerAsync();
+        container.Resource.DefaultTimeToLive.Should().Be(-1);
+
+        Func<Task> duplicate = () => repository.CreateAsync(exam);
+        await duplicate.Should().ThrowAsync<DuplicateRecordException>();
+    }
+
     private static UserProfileDto NewProfile() => new(
         Id: $"user-{Guid.NewGuid():N}",
         DisplayName: "Integration Tester",
@@ -184,5 +216,21 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
             StartedAt: submittedAt.AddMinutes(-1),
             SubmittedAt: submittedAt,
             Result: result);
+    }
+
+    private static ExamRecord NewExam(string userId, DateTimeOffset createdAt)
+    {
+        var examId = Guid.NewGuid().ToString("N");
+        const int durationSeconds = 300;
+        return new ExamRecord(
+            Id: $"exam::{examId}",
+            UserId: userId,
+            ExamId: examId,
+            TrackId: "az-900",
+            ItemIds: ["item-1", "item-2"],
+            CreatedAt: createdAt,
+            DurationSeconds: durationSeconds,
+            ExpiresAt: createdAt.AddSeconds(durationSeconds),
+            Ttl: durationSeconds + (int)TimeSpan.FromDays(1).TotalSeconds);
     }
 }

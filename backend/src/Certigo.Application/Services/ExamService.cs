@@ -22,6 +22,8 @@ internal static class ExamConstants
     public const int SecondsPerItem = 75;
     public const int PassingScore = 700;
     public const int PassGemBonus = 20;
+    public const int SubmissionGraceSeconds = 5 * 60;
+    public const int RetentionAfterExpirySeconds = 24 * 60 * 60;
 }
 
 public interface IExamService
@@ -32,7 +34,8 @@ public interface IExamService
 
 /// Adaptive mock-exam engine: composes a weighted, gap-targeting practice exam
 /// from a track's answer keys and grades it server-authoritatively into a
-/// Microsoft-style scaled score. Generation is read-only; submission mirrors
+/// Microsoft-style scaled score. Generation persists the server-issued item set;
+/// submission mirrors
 /// <see cref="QuizService"/>'s reward pipeline (XP, mastery, streak, leaderboard)
 /// with idempotency, but pays a flat gem bonus only on a pass and does not touch
 /// lesson/achievement counters (an exam is assessment, not a lesson).
@@ -42,6 +45,7 @@ public sealed class ExamService(
     IContentRepository content,
     IProgressRepository progress,
     IExamAttemptRepository examAttempts,
+    IExamRepository exams,
     IAttemptRepository attempts,
     IEventRepository events,
     IUserRepository users,
@@ -49,6 +53,7 @@ public sealed class ExamService(
 {
     public async Task<MockExamDto> GenerateAsync(MockExamRequest request, CancellationToken cancellationToken = default)
     {
+        var now = clock.UtcNow;
         var track = await content.GetTrackAsync(request.TrackId, cancellationToken)
             ?? throw new InvalidOperationException($"Track '{request.TrackId}' was not found.");
 
@@ -60,8 +65,16 @@ public sealed class ExamService(
 
         if (pool.Length == 0)
         {
+            var emptyExamId = Guid.NewGuid().ToString("n");
+            await PersistGeneratedExamAsync(
+                emptyExamId,
+                track.Id,
+                Array.Empty<string>(),
+                0,
+                now,
+                cancellationToken);
             return new MockExamDto(
-                Guid.NewGuid().ToString("n"), track.Id, track.Code, track.Title,
+                emptyExamId, track.Id, track.Code, track.Title,
                 0, ExamConstants.PassingScore,
                 Array.Empty<MockExamBlueprintDomainDto>(), Array.Empty<MockExamItemDto>());
         }
@@ -77,7 +90,7 @@ public sealed class ExamService(
 
         var domains = track.Domains.Select(d => (d.Id, d.Name, d.Weight)).ToArray();
         var allocation = MockExamBlueprint.Apportion(domains, length);
-        var seed = StableSeed(userContext.UserId, request.TrackId, DateOnly.FromDateTime(clock.UtcNow.UtcDateTime));
+        var seed = StableSeed(userContext.UserId, request.TrackId, DateOnly.FromDateTime(now.UtcDateTime));
         var chosen = MockExamComposer.Compose(pool, allocation, masteryByConcept, seed);
 
         // Join chosen items to their public checks (stem + options live on the
@@ -124,12 +137,13 @@ public sealed class ExamService(
         var examId = Guid.NewGuid().ToString("n");
         var timeLimit = items.Count * ExamConstants.SecondsPerItem;
 
-        await events.AddAsync(new LearningEvent(
-            Guid.NewGuid().ToString("n"),
-            userContext.UserId,
-            "exam.generated",
-            clock.UtcNow,
-            new { examId, trackId = track.Id, length = items.Count }), cancellationToken);
+        await PersistGeneratedExamAsync(
+            examId,
+            track.Id,
+            items.Select(item => item.ItemId).ToArray(),
+            timeLimit,
+            now,
+            cancellationToken);
 
         return new MockExamDto(
             examId, track.Id, track.Code, track.Title,
@@ -142,6 +156,45 @@ public sealed class ExamService(
         if (prior is not null)
         {
             return prior.Result;
+        }
+
+        var priorExamAttempt = await examAttempts.GetByExamIdAsync(
+            userContext.UserId,
+            request.ExamId,
+            cancellationToken);
+        if (priorExamAttempt is not null)
+        {
+            return priorExamAttempt.Result;
+        }
+
+        var now = clock.UtcNow;
+        var exam = await exams.GetAsync(userContext.UserId, request.ExamId, cancellationToken)
+            ?? throw new RequestValidationException(
+                $"Exam '{request.ExamId}' is invalid or does not belong to the current user.");
+        if (!string.Equals(exam.TrackId, request.TrackId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new RequestValidationException(
+                $"Exam '{request.ExamId}' was not issued for track '{request.TrackId}'.");
+        }
+
+        if (now >= exam.ExpiresAt)
+        {
+            throw new RequestValidationException($"Exam '{request.ExamId}' has expired.");
+        }
+
+        SubmissionValidation.EnsureDistinctItemIds(request.Answers);
+        var issuedItemIds = new HashSet<string>(exam.ItemIds, StringComparer.OrdinalIgnoreCase);
+        var unissuedItemIds = request.Answers
+            .Where(answer => !issuedItemIds.Contains(answer.ItemId))
+            .Select(answer => answer.ItemId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(itemId => itemId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (unissuedItemIds.Length > 0)
+        {
+            throw new RequestValidationException(
+                $"Item id(s) were not issued for exam '{request.ExamId}': " +
+                $"{string.Join(", ", unissuedItemIds)}.");
         }
 
         var track = await content.GetTrackAsync(request.TrackId, cancellationToken)
@@ -157,11 +210,35 @@ public sealed class ExamService(
             }
         }
 
-        var now = clock.UtcNow;
+        var missingAnswerKeyItemIds = exam.ItemIds
+            .Where(itemId => !keyItemById.ContainsKey(itemId))
+            .OrderBy(itemId => itemId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (missingAnswerKeyItemIds.Length > 0)
+        {
+            throw new RequestValidationException(
+                $"Exam '{request.ExamId}' can no longer be graded because its answer key changed.");
+        }
+
         var itemResults = new List<ItemResultDto>();
         var updatedMasteries = new Dictionary<string, ConceptMastery>(StringComparer.OrdinalIgnoreCase);
-        var correctByItemId = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
-        var examItems = new List<ExamItemRef>();
+        var correctByItemId = exam.ItemIds.ToDictionary(
+            itemId => itemId,
+            _ => false,
+            StringComparer.OrdinalIgnoreCase);
+        var examItems = exam.ItemIds
+            .Select(itemId =>
+            {
+                var entry = keyItemById[itemId];
+                return new ExamItemRef(
+                    entry.Item.ItemId,
+                    entry.LessonId,
+                    entry.DomainId,
+                    entry.Item.ConceptId,
+                    entry.Item.Type,
+                    entry.Item.Difficulty);
+            })
+            .ToArray();
         var xpEarned = 0;
         var correctCount = 0;
 
@@ -175,7 +252,6 @@ public sealed class ExamService(
             var item = entry.Item;
             var correct = IsCorrect(item, answer);
             correctByItemId[item.ItemId] = correct;
-            examItems.Add(new ExamItemRef(item.ItemId, entry.LessonId, entry.DomainId, item.ConceptId, item.Type, item.Difficulty));
             if (correct)
             {
                 correctCount++;
@@ -317,7 +393,7 @@ public sealed class ExamService(
                 Rewards = new RewardsDto(0, profile.Xp, false, false, 0, new List<string>())
             };
             var rejectedAttempt = new ExamAttemptRecord(
-                $"examattempt::{request.ClientAttemptId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
+                $"examattempt::{request.ExamId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
                 request.StartedAt, now, suppressedResult);
             try
             {
@@ -325,7 +401,10 @@ public sealed class ExamService(
             }
             catch (DuplicateRecordException)
             {
-                var existing = await examAttempts.GetByClientAttemptIdAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
+                var existing = await examAttempts.GetByExamIdAsync(
+                    userContext.UserId,
+                    request.ExamId,
+                    cancellationToken);
                 if (existing is not null)
                 {
                     return existing.Result;
@@ -352,7 +431,7 @@ public sealed class ExamService(
         }
 
         var attempt = new ExamAttemptRecord(
-            $"examattempt::{request.ClientAttemptId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
+            $"examattempt::{request.ExamId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
             request.StartedAt, now, result);
         try
         {
@@ -360,7 +439,10 @@ public sealed class ExamService(
         }
         catch (DuplicateRecordException)
         {
-            var existing = await examAttempts.GetByClientAttemptIdAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
+            var existing = await examAttempts.GetByExamIdAsync(
+                userContext.UserId,
+                request.ExamId,
+                cancellationToken);
             if (existing is not null)
             {
                 return existing.Result;
@@ -427,6 +509,36 @@ public sealed class ExamService(
     {
         var recent = await attempts.GetRecentActivityAsync(userContext.UserId, now - RateWindowDuration, cancellationToken);
         return new RateWindow(RateWindowDuration, recent.Xp, recent.Attempts);
+    }
+
+    private async Task PersistGeneratedExamAsync(
+        string examId,
+        string trackId,
+        IReadOnlyList<string> itemIds,
+        int durationSeconds,
+        DateTimeOffset createdAt,
+        CancellationToken cancellationToken)
+    {
+        var validitySeconds = Math.Max(durationSeconds, 0) + ExamConstants.SubmissionGraceSeconds;
+        var expiresAt = createdAt.AddSeconds(validitySeconds);
+        var record = new ExamRecord(
+            $"exam::{examId}",
+            userContext.UserId,
+            examId,
+            trackId,
+            itemIds,
+            createdAt,
+            durationSeconds,
+            expiresAt,
+            validitySeconds + ExamConstants.RetentionAfterExpirySeconds);
+        await exams.CreateAsync(record, cancellationToken);
+        await events.AddAsync(new LearningEvent(
+            Guid.NewGuid().ToString("n"),
+            userContext.UserId,
+            "exam.generated",
+            createdAt,
+            new { examId, trackId, length = itemIds.Count, durationSeconds, expiresAt }),
+            cancellationToken);
     }
 
     private static int StableSeed(string userId, string trackId, DateOnly date)

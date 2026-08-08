@@ -38,6 +38,8 @@ public sealed class QuizService(
             return prior.Result;
         }
 
+        SubmissionValidation.EnsureDistinctItemIds(request.Answers);
+
         var answerKey = await content.GetAnswerKeyAsync(request.TrackId, lessonId, cancellationToken)
             ?? throw new InvalidOperationException($"Answer key for lesson '{lessonId}' was not found.");
         var itemById = answerKey.Items.ToDictionary(i => i.ItemId, StringComparer.OrdinalIgnoreCase);

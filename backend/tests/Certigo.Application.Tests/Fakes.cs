@@ -215,6 +215,12 @@ internal sealed class InMemoryExamAttemptRepository : IExamAttemptRepository
     public Task<ExamAttemptRecord?> GetByClientAttemptIdAsync(string userId, string clientAttemptId, CancellationToken cancellationToken = default)
         => Task.FromResult(_store.FirstOrDefault(a => a.UserId == userId && a.ClientAttemptId == clientAttemptId));
 
+    public Task<ExamAttemptRecord?> GetByExamIdAsync(
+        string userId,
+        string examId,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.FirstOrDefault(a => a.UserId == userId && a.ExamId == examId));
+
     public Task CreateAsync(ExamAttemptRecord attempt, CancellationToken cancellationToken = default)
     {
         if (_store.Any(a => string.Equals(a.Id, attempt.Id, StringComparison.Ordinal)))
@@ -226,6 +232,35 @@ internal sealed class InMemoryExamAttemptRepository : IExamAttemptRepository
         CreateCount++;
         return Task.CompletedTask;
     }
+}
+
+internal sealed class InMemoryExamRepository : IExamRepository
+{
+    private readonly Dictionary<string, ExamRecord> _store = new(StringComparer.OrdinalIgnoreCase);
+
+    public IReadOnlyCollection<ExamRecord> Records => _store.Values;
+
+    private static string Key(string userId, string examId) => $"{userId}|{examId}";
+
+    public void Seed(ExamRecord exam) => _store[Key(exam.UserId, exam.ExamId)] = exam;
+
+    public Task CreateAsync(ExamRecord exam, CancellationToken cancellationToken = default)
+    {
+        var key = Key(exam.UserId, exam.ExamId);
+        if (_store.ContainsKey(key))
+        {
+            throw new DuplicateRecordException($"Exam '{exam.Id}' already exists.");
+        }
+
+        _store[key] = exam;
+        return Task.CompletedTask;
+    }
+
+    public Task<ExamRecord?> GetAsync(
+        string userId,
+        string examId,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.GetValueOrDefault(Key(userId, examId)));
 }
 
 internal sealed class InMemoryEventRepository : IEventRepository

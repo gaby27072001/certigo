@@ -17,7 +17,7 @@ public static class CosmosContainers
         new(Users, "/id"),
         new(Content, "/trackId"),
         new(Progress, "/userId"),
-        new(Attempts, "/userId"),
+        new(Attempts, "/userId", DefaultTimeToLive: -1),
         new(Events, "/userId"),
         new(Leaderboard, "/periodLeagueId"),
         new(Economy, "/userId"),
@@ -25,4 +25,7 @@ public static class CosmosContainers
     ];
 }
 
-public sealed record CosmosContainerDefinition(string Name, string PartitionKeyPath);
+public sealed record CosmosContainerDefinition(
+    string Name,
+    string PartitionKeyPath,
+    int? DefaultTimeToLive = null);
