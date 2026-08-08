@@ -17,7 +17,13 @@ public sealed class StreakRepairServiceTests
         var purchases = new InMemoryPurchaseRepository();
         var events = new InMemoryEventRepository();
         var context = new FakeUserContext(UserId, "Tester");
-        var service = new StreakRepairService(context, new FakeClock(Now), users, purchases, events);
+        var service = new StreakRepairService(
+            context,
+            new FakeClock(Now),
+            users,
+            purchases,
+            events,
+            new InMemoryEconomyOperationRepository());
         return (service, users, purchases, events);
     }
 
@@ -62,7 +68,13 @@ public sealed class StreakRepairServiceTests
         var users = new ConflictOnceUserRepository(inner);
         var purchases = new InMemoryPurchaseRepository();
         var events = new InMemoryEventRepository();
-        var service = new StreakRepairService(new FakeUserContext(UserId, "Tester"), new FakeClock(Now), users, purchases, events);
+        var service = new StreakRepairService(
+            new FakeUserContext(UserId, "Tester"),
+            new FakeClock(Now),
+            users,
+            purchases,
+            events,
+            new InMemoryEconomyOperationRepository());
 
         var result = await service.RepairAsync(new StreakRepairRequest("r1"));
 

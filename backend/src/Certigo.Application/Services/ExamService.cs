@@ -49,8 +49,12 @@ public sealed class ExamService(
     IAttemptRepository attempts,
     IEventRepository events,
     IUserRepository users,
-    ILeaderboardRepository leaderboard) : IExamService
+    ILeaderboardRepository leaderboard,
+    IEconomyOperationRepository economyOperations) : IExamService
 {
+    private static readonly string[] EconomySteps =
+        ["attempt", "progress", "profile", "leaderboard", "events"];
+
     public async Task<MockExamDto> GenerateAsync(MockExamRequest request, CancellationToken cancellationToken = default)
     {
         var now = clock.UtcNow;
@@ -152,6 +156,16 @@ public sealed class ExamService(
 
     public async Task<MockExamResultDto> SubmitAsync(SubmitMockExamRequest request, CancellationToken cancellationToken = default)
     {
+        var operationId = EconomyOperationRecord.IdFor("exam", request.ExamId);
+        var existingOperation = await economyOperations.GetAsync(
+            userContext.UserId,
+            operationId,
+            cancellationToken);
+        if (existingOperation is not null)
+        {
+            return await ResumeEconomyOperationAsync(existingOperation, cancellationToken);
+        }
+
         var prior = await examAttempts.GetByClientAttemptIdAsync(userContext.UserId, request.ClientAttemptId, cancellationToken);
         if (prior is not null)
         {
@@ -336,7 +350,6 @@ public sealed class ExamService(
         }
 
         var outcome = ComputeOutcome(profile);
-        var updatedProfile = outcome.Updated;
         var newXp = outcome.NewXp;
         var newLevel = outcome.NewLevel;
         var streakExtended = outcome.StreakExtended;
@@ -395,110 +408,211 @@ public sealed class ExamService(
             var rejectedAttempt = new ExamAttemptRecord(
                 $"examattempt::{request.ExamId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
                 request.StartedAt, now, suppressedResult);
-            try
-            {
-                await examAttempts.CreateAsync(rejectedAttempt, cancellationToken);
-            }
-            catch (DuplicateRecordException)
-            {
-                var existing = await examAttempts.GetByExamIdAsync(
-                    userContext.UserId,
-                    request.ExamId,
-                    cancellationToken);
-                if (existing is not null)
-                {
-                    return existing.Result;
-                }
-
-                throw;
-            }
-
-            await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "exam.submitted", now, suppressedResult), cancellationToken);
-            await events.AddAsync(new LearningEvent(
-                Guid.NewGuid().ToString("n"),
+            var signal = new AttemptIntegritySignal(
+                "exam",
+                request.ExamId,
+                attemptId,
+                integrity.Decision.ToString(),
+                integrity.RiskScore,
+                integrity.Flags.Select(f => f.ToString()).ToList());
+            var rejectedOperation = await DurableEconomy.StartAsync(
+                economyOperations,
                 userContext.UserId,
-                "attempt.flagged",
+                "exam",
+                request.ExamId,
+                new ExamEconomyPayload(rejectedAttempt, Array.Empty<ConceptMastery>(), signal),
+                EconomySteps,
                 now,
-                new AttemptIntegritySignal(
-                    "exam",
-                    request.ExamId,
-                    attemptId,
-                    integrity.Decision.ToString(),
-                    integrity.RiskScore,
-                    integrity.Flags.Select(f => f.ToString()).ToList())), cancellationToken);
-
-            return suppressedResult;
+                cancellationToken);
+            return await ResumeEconomyOperationAsync(rejectedOperation, cancellationToken);
         }
 
         var attempt = new ExamAttemptRecord(
             $"examattempt::{request.ExamId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
             request.StartedAt, now, result);
-        try
-        {
-            await examAttempts.CreateAsync(attempt, cancellationToken);
-        }
-        catch (DuplicateRecordException)
-        {
-            var existing = await examAttempts.GetByExamIdAsync(
-                userContext.UserId,
+        var integritySignal = integrity.IsClean
+            ? null
+            : new AttemptIntegritySignal(
+                "exam",
                 request.ExamId,
-                cancellationToken);
-            if (existing is not null)
-            {
-                return existing.Result;
-            }
-
-            throw;
-        }
-
-        // Concurrence optimiste (R-01) : le repo envoie déjà l'IfMatchEtag et traduit un
-        // 412 en ConcurrencyConflictException. L'attempt idempotent étant créé JUSTE au-dessus
-        // (avant l'upsert), une exception non rattrapée laisserait l'attempt en base mais le
-        // profil non crédité → le rejeu client renverrait le résultat caché SANS re-créditer,
-        // perdant définitivement la récompense. On rattrape donc le conflit et on retente en
-        // relisant le profil frais puis en ré-appliquant le même gain déterministe (retry borné).
-        try
-        {
-            await users.UpsertAsync(updatedProfile, cancellationToken);
-        }
-        catch (ConcurrencyConflictException)
-        {
-            await OptimisticConcurrency.ExecuteAsync(async () =>
-            {
-                var latest = await users.GetAsync(userContext.UserId, cancellationToken)
-                    ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
-                await users.UpsertAsync(ComputeOutcome(latest).Updated, cancellationToken);
-            }, cancellationToken: cancellationToken);
-        }
-
-        await progress.UpsertMasteryBatchAsync(userContext.UserId, updatedMasteries.Values.ToArray(), cancellationToken);
-
-        if (xpEarned > 0)
-        {
-            await leaderboard.AddXpAsync(userContext.UserId, xpEarned, cancellationToken);
-        }
-
-        await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "exam.submitted", now, result), cancellationToken);
-
-        // Flag (cadence) : récompenses conservées, on signale la tentative (détection conservée).
-        if (!integrity.IsClean)
-        {
-            await events.AddAsync(new LearningEvent(
-                Guid.NewGuid().ToString("n"),
-                userContext.UserId,
-                "attempt.flagged",
-                now,
-                new AttemptIntegritySignal(
-                    "exam",
-                    request.ExamId,
-                    attemptId,
-                    integrity.Decision.ToString(),
-                    integrity.RiskScore,
-                    integrity.Flags.Select(f => f.ToString()).ToList())), cancellationToken);
-        }
-
-        return result;
+                attemptId,
+                integrity.Decision.ToString(),
+                integrity.RiskScore,
+                integrity.Flags.Select(f => f.ToString()).ToList());
+        var operation = await DurableEconomy.StartAsync(
+            economyOperations,
+            userContext.UserId,
+            "exam",
+            request.ExamId,
+            new ExamEconomyPayload(attempt, updatedMasteries.Values.ToArray(), integritySignal),
+            EconomySteps,
+            now,
+            cancellationToken);
+        return await ResumeEconomyOperationAsync(operation, cancellationToken);
     }
+
+    private async Task<MockExamResultDto> ResumeEconomyOperationAsync(
+        EconomyOperationRecord operation,
+        CancellationToken cancellationToken)
+    {
+        var payload = DurableEconomy.ReadPayload<ExamEconomyPayload>(operation);
+        operation = await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "attempt",
+            async () =>
+            {
+                try
+                {
+                    await examAttempts.CreateAsync(payload.Attempt, cancellationToken);
+                }
+                catch (DuplicateRecordException)
+                {
+                    var existing = await examAttempts.GetByExamIdAsync(
+                        userContext.UserId,
+                        payload.Attempt.ExamId,
+                        cancellationToken);
+                    if (existing?.Result.AttemptId != payload.Attempt.Result.AttemptId)
+                    {
+                        throw new ConcurrencyConflictException(
+                            $"Exam '{payload.Attempt.ExamId}' conflicts with another result.");
+                    }
+                }
+            },
+            cancellationToken);
+
+        operation = await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "progress",
+            () => DurableEconomy.UpsertMasteriesWithoutRegressionAsync(
+                progress,
+                userContext.UserId,
+                payload.Masteries,
+                cancellationToken),
+            cancellationToken);
+
+        operation = await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "profile",
+            async () =>
+            {
+                if (payload.Attempt.Result.Rewards.XpEarned > 0
+                    || payload.Attempt.Result.Rewards.GemsEarned > 0)
+                {
+                    await DurableEconomy.ApplyProfileOnceAsync(
+                        users,
+                        userContext.UserId,
+                        userContext.DisplayName,
+                        operation.Id,
+                        profile => ApplyExamProfile(profile, payload.Attempt),
+                        cancellationToken);
+                }
+            },
+            cancellationToken);
+
+        operation = await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "leaderboard",
+            () => payload.Attempt.Result.Rewards.XpEarned <= 0
+                ? Task.CompletedTask
+                : leaderboard.AddXpAsync(
+                    userContext.UserId,
+                    payload.Attempt.Result.Rewards.XpEarned,
+                    operation.Id,
+                    payload.Attempt.SubmittedAt,
+                    cancellationToken),
+            cancellationToken);
+
+        await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "events",
+            async () =>
+            {
+                await events.AddAsync(
+                    new LearningEvent(
+                        DurableEconomy.EventId(operation.Id, "exam.submitted"),
+                        userContext.UserId,
+                        "exam.submitted",
+                        payload.Attempt.SubmittedAt,
+                        payload.Attempt.Result),
+                    cancellationToken);
+                if (payload.IntegritySignal is not null)
+                {
+                    await events.AddAsync(
+                        new LearningEvent(
+                            DurableEconomy.EventId(operation.Id, "attempt.flagged"),
+                            userContext.UserId,
+                            "attempt.flagged",
+                            payload.Attempt.SubmittedAt,
+                            payload.IntegritySignal),
+                        cancellationToken);
+                }
+            },
+            cancellationToken);
+
+        return payload.Attempt.Result;
+    }
+
+    private static UserProfileDto ApplyExamProfile(UserProfileDto profile, ExamAttemptRecord attempt)
+    {
+        var result = attempt.Result;
+        var xpEarned = result.Rewards.XpEarned;
+        var today = DateOnly.FromDateTime(attempt.SubmittedAt.UtcDateTime);
+        var sameDay = profile.DailyXpDate == today;
+        var applyDaily = (profile.DailyXpDate is null || profile.DailyXpDate <= today)
+            && (profile.LastActiveDate is null || profile.LastActiveDate <= today);
+        var newDailyXp = applyDaily
+            ? (sameDay ? profile.DailyXpEarned : 0) + xpEarned
+            : profile.DailyXpEarned;
+        var goalMet = applyDaily && profile.DailyGoalXp > 0 && newDailyXp >= profile.DailyGoalXp;
+        var stats = new GamificationStats(
+            profile.Xp,
+            profile.Level,
+            profile.StreakDays,
+            profile.LastActiveDate ?? DateOnly.MinValue,
+            profile.FreezeTokens,
+            profile.DailyGoalXp,
+            sameDay ? profile.DailyXpEarned : 0);
+        var streak = StreakService.UpdateStreak(stats, today, goalMet);
+        var monthAnchor = new DateOnly(today.Year, today.Month, 1);
+        var sameMonth = profile.MonthlyAnchor == monthAnchor;
+        var applyMonth = profile.MonthlyAnchor is null || profile.MonthlyAnchor <= monthAnchor;
+        var newXp = profile.Xp + xpEarned;
+
+        return profile with
+        {
+            Xp = newXp,
+            Level = XpEngine.LevelFromXp(newXp),
+            StreakDays = goalMet ? streak.StreakDays : profile.StreakDays,
+            FreezeTokens = goalMet ? streak.FreezeTokens : profile.FreezeTokens,
+            LastActiveDate = goalMet ? streak.LastActiveDate : profile.LastActiveDate,
+            DailyXpEarned = newDailyXp,
+            DailyXpDate = applyDaily ? today : profile.DailyXpDate,
+            DailyCorrectAnswers = applyDaily
+                ? (sameDay ? profile.DailyCorrectAnswers : 0) + result.Correct
+                : profile.DailyCorrectAnswers,
+            MonthlyAnchor = applyMonth ? monthAnchor : profile.MonthlyAnchor,
+            MonthlyXpEarned = applyMonth
+                ? (sameMonth ? profile.MonthlyXpEarned : 0) + xpEarned
+                : profile.MonthlyXpEarned,
+            MonthlyLessonsCompleted = applyMonth
+                ? (sameMonth ? profile.MonthlyLessonsCompleted : 0)
+                : profile.MonthlyLessonsCompleted,
+            MonthlyPerfectLessons = applyMonth
+                ? (sameMonth ? profile.MonthlyPerfectLessons : 0)
+                : profile.MonthlyPerfectLessons,
+            Gems = profile.Gems + result.Rewards.GemsEarned,
+        };
+    }
+
+    private sealed record ExamEconomyPayload(
+        ExamAttemptRecord Attempt,
+        IReadOnlyList<ConceptMastery> Masteries,
+        AttemptIntegritySignal? IntegritySignal);
 
     // Fenêtre de cadence anti-triche : nombre + XP des tentatives antérieures de l'apprenant
     // (leçons ET examens) sur la dernière heure, lues depuis le conteneur « attempts » (pas de

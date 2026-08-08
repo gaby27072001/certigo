@@ -29,7 +29,11 @@ public sealed record UserProfileDto(
     int MonthlyXpEarned = 0,
     int MonthlyLessonsCompleted = 0,
     int MonthlyPerfectLessons = 0,
-    List<string>? SeasonBadges = null)
+    List<string>? SeasonBadges = null,
+    // Permanent per-user deduplication markers for economy profile mutations.
+    // Cross-container operation records may be replayed after any partial failure;
+    // this list makes the profile effect itself exactly-once.
+    List<string>? AppliedEconomyOperations = null)
 {
     /// Cosmos optimistic-concurrency token (the system `_etag`). Null for freshly
     /// constructed or in-memory profiles; populated on read and honoured on write

@@ -123,6 +123,77 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
     }
 
     [CosmosEmulatorFact]
+    public async Task Canonical_email_reservation_has_one_concurrent_winner()
+    {
+        var context = await fixture.GetContextAsync();
+        var repository = new CosmosUserCredentialRepository(context);
+        var canonical = $"test-{Guid.NewGuid():N}@gmail.com";
+        var id = UserCredentialRecord.CanonicalIdFor(canonical);
+        var now = DateTimeOffset.UtcNow;
+        var first = new UserCredentialRecord(
+            id,
+            $"t.e.s.t+one-{Guid.NewGuid():N}@gmail.com",
+            $"user-{Guid.NewGuid():N}",
+            "First",
+            "hash",
+            now,
+            CanonicalEmail: canonical,
+            ProvisioningState: CredentialProvisioningState.Pending,
+            ProvisioningLeaseExpiresAt: now.AddMinutes(2));
+        var second = first with
+        {
+            Email = canonical,
+            UserId = $"user-{Guid.NewGuid():N}",
+            DisplayName = "Second",
+        };
+
+        var outcomes = await Task.WhenAll(new[] { first, second }.Select(async record =>
+        {
+            try
+            {
+                await repository.CreateAsync(record);
+                return true;
+            }
+            catch (DuplicateRecordException)
+            {
+                return false;
+            }
+        }));
+
+        outcomes.Should().ContainSingle(success => success);
+        (await repository.FindByCanonicalEmailAsync(canonical))!.Id.Should().Be(id);
+    }
+
+    [CosmosEmulatorFact]
+    public async Task Durable_economy_operation_resumes_steps_with_etag()
+    {
+        var context = await fixture.GetContextAsync();
+        var repository = new CosmosEconomyOperationRepository(context);
+        var userId = $"user-{Guid.NewGuid():N}";
+        var now = DateTimeOffset.UtcNow;
+        var candidate = new EconomyOperationRecord(
+            EconomyOperationRecord.IdFor("quiz", Guid.NewGuid().ToString("N")),
+            userId,
+            "quiz",
+            "attempt",
+            "{}",
+            ["profile", "events"],
+            [],
+            EconomyOperationRecord.PendingStatus,
+            now,
+            now);
+
+        var created = await repository.GetOrCreateAsync(candidate);
+        var afterProfile = await repository.MarkStepCompletedAsync(userId, created.Id, "profile");
+        var completed = await repository.MarkStepCompletedAsync(userId, created.Id, "events");
+
+        created.ETag.Should().NotBeNullOrEmpty();
+        afterProfile.Status.Should().Be(EconomyOperationRecord.PendingStatus);
+        completed.Status.Should().Be(EconomyOperationRecord.CompletedStatus);
+        completed.CompletedSteps.Should().BeEquivalentTo(["profile", "events"]);
+    }
+
+    [CosmosEmulatorFact]
     public async Task Attempt_recent_activity_aggregates_count_and_xp_within_window()
     {
         var context = await fixture.GetContextAsync();

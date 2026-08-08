@@ -25,8 +25,11 @@ public sealed class ShopService(
     IClock clock,
     IUserRepository users,
     IPurchaseRepository purchases,
-    IEventRepository events) : IShopService
+    IEventRepository events,
+    IEconomyOperationRepository economyOperations) : IShopService
 {
+    private static readonly string[] EconomySteps = ["ledger", "profile", "events"];
+
     public async Task<ShopCatalogDto> GetCatalogAsync(CancellationToken cancellationToken = default)
     {
         var profile = await users.GetAsync(userContext.UserId, cancellationToken);
@@ -38,61 +41,184 @@ public sealed class ShopService(
 
     public async Task<PurchaseResultDto> PurchaseAsync(PurchaseRequest request, CancellationToken cancellationToken = default)
     {
-        // Concurrence optimiste (R-01) : opération CONDITIONNELLE (débit de gems gardé par le
-        // solde). Sur conflit 412 à l'upsert, il ne suffit pas de réécrire : il faut relire le
-        // profil ET ré-évaluer la règle métier sur le solde frais (un writer concurrent a pu
-        // vider les gems entre-temps). On enveloppe donc tout le corps — garde d'idempotence,
-        // lecture, évaluation, upsert, ledger/event — dans un retry borné. Les retours d'échec
-        // ou d'idempotence ne lèvent pas et ne déclenchent donc aucun retry.
-        return await OptimisticConcurrency.ExecuteAsync(async () =>
+        var operationId = EconomyOperationRecord.IdFor("shop", request.ClientPurchaseId);
+        var existingOperation = await economyOperations.GetAsync(
+            userContext.UserId,
+            operationId,
+            cancellationToken);
+        if (existingOperation is not null)
         {
-            // Only successful (side-effecting) purchases are recorded, so this guard
-            // prevents double-charging an idempotent retry without blocking re-tries
-            // of a previously failed purchase.
-            var prior = await purchases.GetByClientPurchaseIdAsync(userContext.UserId, request.ClientPurchaseId, cancellationToken);
-            if (prior is not null)
-            {
-                return prior.Result;
-            }
+            return await ResumePurchaseAsync(existingOperation, cancellationToken);
+        }
 
-            var profile = await users.GetAsync(userContext.UserId, cancellationToken)
-                ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+        var prior = await purchases.GetByClientPurchaseIdAsync(
+            userContext.UserId,
+            request.ClientPurchaseId,
+            cancellationToken);
+        if (prior is not null)
+        {
+            return prior.Result;
+        }
 
-            var item = ShopCatalog.Find(request.ItemId);
-            if (item is null)
-            {
-                return new PurchaseResultDto(false, request.ItemId, 0, profile.Gems, profile.FreezeTokens, "unknownItem");
-            }
+        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+        var item = ShopCatalog.Find(request.ItemId);
+        if (item is null)
+        {
+            return new PurchaseResultDto(false, request.ItemId, 0, profile.Gems, profile.FreezeTokens, "unknownItem");
+        }
 
-            var evaluation = ShopEngine.Evaluate(new PurchaseState(profile.Gems, profile.FreezeTokens), item);
-            if (!evaluation.Success)
-            {
-                return new PurchaseResultDto(false, item.Id, 0, profile.Gems, profile.FreezeTokens, ErrorCode(evaluation.Error));
-            }
+        var evaluation = ShopEngine.Evaluate(new PurchaseState(profile.Gems, profile.FreezeTokens), item);
+        if (!evaluation.Success)
+        {
+            return new PurchaseResultDto(false, item.Id, 0, profile.Gems, profile.FreezeTokens, ErrorCode(evaluation.Error));
+        }
 
-            var updated = profile with
-            {
-                Gems = evaluation.State.Gems,
-                FreezeTokens = evaluation.State.FreezeTokens,
-            };
-            await users.UpsertAsync(updated, cancellationToken);
-
-            var result = new PurchaseResultDto(true, item.Id, evaluation.GemsSpent, updated.Gems, updated.FreezeTokens, null);
-            var now = clock.UtcNow;
-            var record = new PurchaseRecord(
-                $"purchase::{request.ClientPurchaseId}",
-                userContext.UserId,
-                request.ClientPurchaseId,
-                item.Id,
-                evaluation.GemsSpent,
-                now,
-                result);
-            await purchases.CreateAsync(record, cancellationToken);
-            await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "shop.purchased", now, result), cancellationToken);
-
-            return result;
-        }, cancellationToken: cancellationToken);
+        var result = new PurchaseResultDto(
+            true,
+            item.Id,
+            evaluation.GemsSpent,
+            evaluation.State.Gems,
+            evaluation.State.FreezeTokens,
+            null);
+        var record = new PurchaseRecord(
+            $"purchase::{request.ClientPurchaseId}",
+            userContext.UserId,
+            request.ClientPurchaseId,
+            item.Id,
+            evaluation.GemsSpent,
+            clock.UtcNow,
+            result);
+        var operation = await StartPurchaseOperationAsync(
+            record,
+            evaluation.State.FreezeTokens - profile.FreezeTokens,
+            cancellationToken);
+        return await ResumePurchaseAsync(operation, cancellationToken);
     }
+
+    private Task<EconomyOperationRecord> StartPurchaseOperationAsync(
+        PurchaseRecord record,
+        int freezeTokensGranted,
+        CancellationToken cancellationToken) =>
+        DurableEconomy.StartAsync(
+            economyOperations,
+            userContext.UserId,
+            "shop",
+            record.ClientPurchaseId,
+            new ShopEconomyPayload(record, freezeTokensGranted),
+            EconomySteps,
+            record.PurchasedAt,
+            cancellationToken);
+
+    private async Task<PurchaseResultDto> ResumePurchaseAsync(
+        EconomyOperationRecord operation,
+        CancellationToken cancellationToken)
+    {
+        var payload = DurableEconomy.ReadPayload<ShopEconomyPayload>(operation);
+        if (operation.Status == EconomyOperationRecord.FailedStatus)
+        {
+            return await FailedPurchaseAsync(payload, operation.FailureCode, cancellationToken);
+        }
+
+        try
+        {
+            operation = await DurableEconomy.RunStepAsync(
+                economyOperations,
+                operation,
+                "profile",
+                async () =>
+                {
+                    await DurableEconomy.ApplyProfileOnceAsync(
+                        users,
+                        userContext.UserId,
+                        userContext.DisplayName,
+                        operation.Id,
+                        profile =>
+                        {
+                            if (profile.Gems < payload.Record.GemsSpent)
+                            {
+                                throw new EconomyOperationRejectedException("insufficientGems");
+                            }
+
+                            return profile with
+                            {
+                                Gems = profile.Gems - payload.Record.GemsSpent,
+                                FreezeTokens = profile.FreezeTokens + payload.FreezeTokensGranted,
+                            };
+                        },
+                        cancellationToken);
+                },
+                cancellationToken);
+        }
+        catch (EconomyOperationRejectedException ex)
+        {
+            operation = await economyOperations.MarkFailedAsync(
+                userContext.UserId,
+                operation.Id,
+                ex.FailureCode,
+                cancellationToken);
+            return await FailedPurchaseAsync(payload, operation.FailureCode, cancellationToken);
+        }
+
+        operation = await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "ledger",
+            async () =>
+            {
+                try
+                {
+                    await purchases.CreateAsync(payload.Record, cancellationToken);
+                }
+                catch (DuplicateRecordException)
+                {
+                    var existing = await purchases.GetByClientPurchaseIdAsync(
+                        userContext.UserId,
+                        payload.Record.ClientPurchaseId,
+                        cancellationToken);
+                    if (existing?.ItemId != payload.Record.ItemId)
+                    {
+                        throw new ConcurrencyConflictException(
+                            $"Purchase '{payload.Record.ClientPurchaseId}' conflicts with another item.");
+                    }
+                }
+            },
+            cancellationToken);
+
+        await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "events",
+            () => events.AddAsync(
+                new LearningEvent(
+                    DurableEconomy.EventId(operation.Id, "shop.purchased"),
+                    userContext.UserId,
+                    "shop.purchased",
+                    payload.Record.PurchasedAt,
+                    payload.Record.Result),
+                cancellationToken),
+            cancellationToken);
+
+        return payload.Record.Result;
+    }
+
+    private async Task<PurchaseResultDto> FailedPurchaseAsync(
+        ShopEconomyPayload payload,
+        string? failureCode,
+        CancellationToken cancellationToken)
+    {
+        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+        return new PurchaseResultDto(
+            false,
+            payload.Record.ItemId,
+            0,
+            profile.Gems,
+            profile.FreezeTokens,
+            failureCode ?? "conflict");
+    }
+
+    private sealed record ShopEconomyPayload(PurchaseRecord Record, int FreezeTokensGranted);
 
     private static string ErrorCode(PurchaseError error) => error switch
     {
@@ -113,8 +239,11 @@ public sealed class QuestService(
     IUserContext userContext,
     IClock clock,
     IUserRepository users,
-    IEventRepository events) : IQuestService
+    IEventRepository events,
+    IEconomyOperationRepository economyOperations) : IQuestService
 {
+    private static readonly string[] EconomySteps = ["profile", "events"];
+
     public async Task<QuestBoardDto> GetTodayAsync(CancellationToken cancellationToken = default)
     {
         var profile = await users.GetAsync(userContext.UserId, cancellationToken)
@@ -132,57 +261,128 @@ public sealed class QuestService(
 
     public async Task<ClaimQuestResultDto> ClaimAsync(ClaimQuestRequest request, CancellationToken cancellationToken = default)
     {
-        // Concurrence optimiste (R-01) : le claim crédite des gems une seule fois (garde
-        // d'idempotence sur DailyQuestClaims). Sur conflit 412 à l'upsert, on relit le profil
-        // à jour et on re-vérifie la garde avant de réécrire, pour ne jamais double-créditer
-        // ni perdre un crédit concurrent distinct.
-        return await OptimisticConcurrency.ExecuteAsync(async () =>
+        var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
+        var operationKey = $"{today:yyyyMMdd}:{request.QuestId}";
+        var operationId = EconomyOperationRecord.IdFor("quest", operationKey);
+        var existingOperation = await economyOperations.GetAsync(
+            userContext.UserId,
+            operationId,
+            cancellationToken);
+        if (existingOperation is not null)
         {
-            var profile = await users.GetAsync(userContext.UserId, cancellationToken)
-                ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
-
-            var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
-            var (signals, claims) = DailyState(profile, today);
-
-            var template = QuestEngine.DailyQuests(today, userContext.UserId).FirstOrDefault(t => t.Id == request.QuestId);
-            if (template is null)
+            var resumed = await ResumeClaimAsync(existingOperation, cancellationToken);
+            if (existingOperation.Status == EconomyOperationRecord.CompletedStatus)
             {
-                return new ClaimQuestResultDto(false, request.QuestId, 0, profile.Gems, false, "unknownQuest");
+                var current = await users.GetAsync(userContext.UserId, cancellationToken);
+                return resumed with
+                {
+                    GemsAwarded = 0,
+                    GemsBalance = current?.Gems ?? resumed.GemsBalance,
+                };
             }
 
-            // Already claimed today: idempotent no-op so a retried claim never
-            // double-awards gems.
-            if (claims.Contains(template.Id))
-            {
-                return new ClaimQuestResultDto(true, template.Id, 0, profile.Gems, true, null);
-            }
+            return resumed;
+        }
 
-            var status = QuestEngine.Evaluate(template, signals);
-            if (!status.Completed)
-            {
-                return new ClaimQuestResultDto(false, template.Id, 0, profile.Gems, false, "notCompleted");
-            }
+        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+        var (signals, claims) = DailyState(profile, today);
+        var template = QuestEngine.DailyQuests(today, userContext.UserId)
+            .FirstOrDefault(t => t.Id == request.QuestId);
+        if (template is null)
+        {
+            return new ClaimQuestResultDto(false, request.QuestId, 0, profile.Gems, false, "unknownQuest");
+        }
 
-            var updatedClaims = new List<string>(claims) { template.Id };
-            var updated = profile with
-            {
-                Gems = profile.Gems + template.RewardGems,
-                DailyXpDate = today,
-                DailyQuestClaims = updatedClaims,
-            };
-            await users.UpsertAsync(updated, cancellationToken);
+        if (claims.Contains(template.Id))
+        {
+            return new ClaimQuestResultDto(true, template.Id, 0, profile.Gems, true, null);
+        }
 
-            var result = new ClaimQuestResultDto(true, template.Id, template.RewardGems, updated.Gems, true, null);
-            await events.AddAsync(new LearningEvent(
-                Guid.NewGuid().ToString("n"),
-                userContext.UserId,
-                "quest.claimed",
-                clock.UtcNow,
-                result), cancellationToken);
+        var status = QuestEngine.Evaluate(template, signals);
+        if (!status.Completed)
+        {
+            return new ClaimQuestResultDto(false, template.Id, 0, profile.Gems, false, "notCompleted");
+        }
 
-            return result;
-        }, cancellationToken: cancellationToken);
+        var result = new ClaimQuestResultDto(
+            true,
+            template.Id,
+            template.RewardGems,
+            profile.Gems + template.RewardGems,
+            true,
+            null);
+        var operation = await DurableEconomy.StartAsync(
+            economyOperations,
+            userContext.UserId,
+            "quest",
+            operationKey,
+            new QuestEconomyPayload(today, template.Id, template.RewardGems, result),
+            EconomySteps,
+            clock.UtcNow,
+            cancellationToken);
+        return await ResumeClaimAsync(operation, cancellationToken);
     }
+
+    private async Task<ClaimQuestResultDto> ResumeClaimAsync(
+        EconomyOperationRecord operation,
+        CancellationToken cancellationToken)
+    {
+        var payload = DurableEconomy.ReadPayload<QuestEconomyPayload>(operation);
+        operation = await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "profile",
+            async () =>
+            {
+                await DurableEconomy.ApplyProfileOnceAsync(
+                    users,
+                    userContext.UserId,
+                    userContext.DisplayName,
+                    operation.Id,
+                    profile =>
+                    {
+                        var claims = profile.DailyXpDate == payload.Date
+                            ? new List<string>(profile.DailyQuestClaims ?? [])
+                            : null;
+                        if (claims is not null
+                            && !claims.Contains(payload.QuestId, StringComparer.Ordinal))
+                        {
+                            claims.Add(payload.QuestId);
+                        }
+
+                        return profile with
+                        {
+                            Gems = profile.Gems + payload.RewardGems,
+                            DailyXpDate = claims is null ? profile.DailyXpDate : payload.Date,
+                            DailyQuestClaims = claims ?? profile.DailyQuestClaims,
+                        };
+                    },
+                    cancellationToken);
+            },
+            cancellationToken);
+
+        await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "events",
+            () => events.AddAsync(
+                new LearningEvent(
+                    DurableEconomy.EventId(operation.Id, "quest.claimed"),
+                    userContext.UserId,
+                    "quest.claimed",
+                    operation.CreatedAt,
+                    payload.Result),
+                cancellationToken),
+            cancellationToken);
+        return payload.Result;
+    }
+
+    private sealed record QuestEconomyPayload(
+        DateOnly Date,
+        string QuestId,
+        int RewardGems,
+        ClaimQuestResultDto Result);
 
     // Daily counters reset at the day boundary. When the profile's recorded day
     // is not today the learner has no activity yet, so signals and claims are
@@ -229,8 +429,11 @@ public sealed class SeasonService(
     IUserContext userContext,
     IClock clock,
     IUserRepository users,
-    IEventRepository events) : ISeasonService
+    IEventRepository events,
+    IEconomyOperationRepository economyOperations) : ISeasonService
 {
+    private static readonly string[] EconomySteps = ["profile", "events"];
+
     public async Task<SeasonDto> GetCurrentAsync(CancellationToken cancellationToken = default)
     {
         var profile = await users.GetAsync(userContext.UserId, cancellationToken)
@@ -246,61 +449,129 @@ public sealed class SeasonService(
 
     public async Task<ClaimSeasonResultDto> ClaimAsync(ClaimSeasonRequest request, CancellationToken cancellationToken = default)
     {
-        // Concurrence optimiste (R-01) : le claim crédite le badge et des gems une seule fois
-        // (garde d'idempotence sur SeasonBadges). Sur conflit 412 à l'upsert, on relit le profil
-        // à jour et on re-vérifie la garde avant de réécrire, pour ne jamais double-créditer ni
-        // perdre un crédit concurrent distinct.
-        return await OptimisticConcurrency.ExecuteAsync(async () =>
+        var operationId = EconomyOperationRecord.IdFor("season", request.SeasonId);
+        var existingOperation = await economyOperations.GetAsync(
+            userContext.UserId,
+            operationId,
+            cancellationToken);
+        if (existingOperation is not null)
         {
-            var profile = await users.GetAsync(userContext.UserId, cancellationToken)
-                ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
-
-            var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
-            var season = SeasonEngine.ForDate(today);
-            var badgeId = season.Challenge.BadgeId;
-            var badges = profile.SeasonBadges ?? new List<string>();
-
-            // A learner can only claim the season the request actually targets, and
-            // only while it is the current month. Claiming a past or future season is
-            // rejected rather than silently redirected to the active one.
-            if (!string.Equals(request.SeasonId, season.Id, StringComparison.Ordinal))
+            var resumed = await ResumeClaimAsync(existingOperation, cancellationToken);
+            if (existingOperation.Status == EconomyOperationRecord.CompletedStatus)
             {
-                return new ClaimSeasonResultDto(false, request.SeasonId, null, 0, profile.Gems, false, "wrongSeason");
+                var current = await users.GetAsync(userContext.UserId, cancellationToken);
+                return resumed with
+                {
+                    GemsAwarded = 0,
+                    GemsBalance = current?.Gems ?? resumed.GemsBalance,
+                };
             }
 
-            // Already earned this season's badge: idempotent no-op so a retried claim
-            // never double-awards gems.
-            if (badges.Contains(badgeId))
-            {
-                return new ClaimSeasonResultDto(true, season.Id, badgeId, 0, profile.Gems, true, null);
-            }
+            return resumed;
+        }
 
-            var signals = MonthlySignalsFor(profile, today);
-            var status = SeasonEngine.Evaluate(season, signals);
-            if (!status.Completed)
-            {
-                return new ClaimSeasonResultDto(false, season.Id, null, 0, profile.Gems, false, "notCompleted");
-            }
+        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+        var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
+        var season = SeasonEngine.ForDate(today);
+        var badgeId = season.Challenge.BadgeId;
+        var badges = profile.SeasonBadges ?? new List<string>();
+        if (!string.Equals(request.SeasonId, season.Id, StringComparison.Ordinal))
+        {
+            return new ClaimSeasonResultDto(false, request.SeasonId, null, 0, profile.Gems, false, "wrongSeason");
+        }
 
-            var updatedBadges = new List<string>(badges) { badgeId };
-            var updated = profile with
-            {
-                Gems = profile.Gems + season.Challenge.RewardGems,
-                SeasonBadges = updatedBadges,
-            };
-            await users.UpsertAsync(updated, cancellationToken);
+        if (badges.Contains(badgeId))
+        {
+            return new ClaimSeasonResultDto(true, season.Id, badgeId, 0, profile.Gems, true, null);
+        }
 
-            var result = new ClaimSeasonResultDto(true, season.Id, badgeId, season.Challenge.RewardGems, updated.Gems, true, null);
-            await events.AddAsync(new LearningEvent(
-                Guid.NewGuid().ToString("n"),
-                userContext.UserId,
-                "season.claimed",
-                clock.UtcNow,
-                result), cancellationToken);
+        var signals = MonthlySignalsFor(profile, today);
+        var status = SeasonEngine.Evaluate(season, signals);
+        if (!status.Completed)
+        {
+            return new ClaimSeasonResultDto(false, season.Id, null, 0, profile.Gems, false, "notCompleted");
+        }
 
-            return result;
-        }, cancellationToken: cancellationToken);
+        var result = new ClaimSeasonResultDto(
+            true,
+            season.Id,
+            badgeId,
+            season.Challenge.RewardGems,
+            profile.Gems + season.Challenge.RewardGems,
+            true,
+            null);
+        var operation = await DurableEconomy.StartAsync(
+            economyOperations,
+            userContext.UserId,
+            "season",
+            request.SeasonId,
+            new SeasonEconomyPayload(
+                badgeId,
+                season.Challenge.RewardGems,
+                result),
+            EconomySteps,
+            clock.UtcNow,
+            cancellationToken);
+        return await ResumeClaimAsync(operation, cancellationToken);
     }
+
+    private async Task<ClaimSeasonResultDto> ResumeClaimAsync(
+        EconomyOperationRecord operation,
+        CancellationToken cancellationToken)
+    {
+        var payload = DurableEconomy.ReadPayload<SeasonEconomyPayload>(operation);
+        operation = await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "profile",
+            async () =>
+            {
+                await DurableEconomy.ApplyProfileOnceAsync(
+                    users,
+                    userContext.UserId,
+                    userContext.DisplayName,
+                    operation.Id,
+                    profile =>
+                    {
+                        var badges = profile.SeasonBadges is null
+                            ? new List<string>()
+                            : new List<string>(profile.SeasonBadges);
+                        if (!badges.Contains(payload.BadgeId, StringComparer.Ordinal))
+                        {
+                            badges.Add(payload.BadgeId);
+                        }
+
+                        return profile with
+                        {
+                            Gems = profile.Gems + payload.RewardGems,
+                            SeasonBadges = badges,
+                        };
+                    },
+                    cancellationToken);
+            },
+            cancellationToken);
+
+        await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "events",
+            () => events.AddAsync(
+                new LearningEvent(
+                    DurableEconomy.EventId(operation.Id, "season.claimed"),
+                    userContext.UserId,
+                    "season.claimed",
+                    operation.CreatedAt,
+                    payload.Result),
+                cancellationToken),
+            cancellationToken);
+        return payload.Result;
+    }
+
+    private sealed record SeasonEconomyPayload(
+        string BadgeId,
+        int RewardGems,
+        ClaimSeasonResultDto Result);
 
     // Monthly counters reset at the month boundary. When the profile's recorded
     // month anchor is not the current month the learner has no activity yet, so
@@ -401,8 +672,11 @@ public sealed class StreakRepairService(
     IClock clock,
     IUserRepository users,
     IPurchaseRepository purchases,
-    IEventRepository events) : IStreakRepairService
+    IEventRepository events,
+    IEconomyOperationRepository economyOperations) : IStreakRepairService
 {
+    private static readonly string[] EconomySteps = ["ledger", "profile", "events"];
+
     public async Task<StreakStatusDto> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         var profile = await users.GetAsync(userContext.UserId, cancellationToken)
@@ -420,64 +694,207 @@ public sealed class StreakRepairService(
 
     public async Task<StreakRepairResultDto> RepairAsync(StreakRepairRequest request, CancellationToken cancellationToken = default)
     {
-        // Concurrence optimiste (R-01) : réparation gardée par le solde de gems (débit
-        // conditionnel). Sur conflit 412 à l'upsert, on relit le profil à jour et on RE-VÉRIFIE
-        // `Gems >= CostGems` avant de réécrire — un writer concurrent a pu vider les gems, auquel
-        // cas la réparation échoue proprement plutôt que de débiter en négatif. Le ledger d'achat
-        // sert d'idempotence : re-vérifié en tête pour ne jamais débiter deux fois.
-        return await OptimisticConcurrency.ExecuteAsync(async () =>
+        var operationId = EconomyOperationRecord.IdFor("streakRepair", request.ClientRepairId);
+        var existingOperation = await economyOperations.GetAsync(
+            userContext.UserId,
+            operationId,
+            cancellationToken);
+        if (existingOperation is not null)
         {
-            // Reuse the purchase ledger for idempotency so a double-tap repairs and
-            // charges exactly once (mirrors ShopService.PurchaseAsync).
-            var prior = await purchases.GetByClientPurchaseIdAsync(userContext.UserId, request.ClientRepairId, cancellationToken);
-            if (prior is not null)
-            {
-                var existing = await users.GetAsync(userContext.UserId, cancellationToken);
-                return new StreakRepairResultDto(
-                    true,
-                    existing?.StreakDays ?? 0,
-                    prior.GemsSpent,
-                    prior.Result.GemsBalance,
-                    existing?.LastActiveDate,
-                    null);
-            }
+            return await ResumeRepairAsync(existingOperation, cancellationToken);
+        }
 
-            var profile = await users.GetAsync(userContext.UserId, cancellationToken)
-                ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
-            var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
-            var assessment = StreakRepairPolicy.Assess(profile.StreakDays, profile.LastActiveDate, today);
+        var prior = await purchases.GetByClientPurchaseIdAsync(
+            userContext.UserId,
+            request.ClientRepairId,
+            cancellationToken);
+        if (prior is not null)
+        {
+            var existing = await users.GetAsync(userContext.UserId, cancellationToken);
+            return new StreakRepairResultDto(
+                true,
+                existing?.StreakDays ?? 0,
+                prior.GemsSpent,
+                prior.Result.GemsBalance,
+                existing?.LastActiveDate,
+                null);
+        }
 
-            if (!assessment.Repairable)
-            {
-                return new StreakRepairResultDto(false, profile.StreakDays, 0, profile.Gems, profile.LastActiveDate, assessment.Reason);
-            }
+        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+        var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
+        var assessment = StreakRepairPolicy.Assess(profile.StreakDays, profile.LastActiveDate, today);
+        if (!assessment.Repairable)
+        {
+            return new StreakRepairResultDto(
+                false,
+                profile.StreakDays,
+                0,
+                profile.Gems,
+                profile.LastActiveDate,
+                assessment.Reason);
+        }
 
-            if (profile.Gems < assessment.CostGems)
-            {
-                return new StreakRepairResultDto(false, profile.StreakDays, 0, profile.Gems, profile.LastActiveDate, "insufficientGems");
-            }
+        if (profile.Gems < assessment.CostGems)
+        {
+            return new StreakRepairResultDto(
+                false,
+                profile.StreakDays,
+                0,
+                profile.Gems,
+                profile.LastActiveDate,
+                "insufficientGems");
+        }
 
-            var updated = profile with
-            {
-                Gems = profile.Gems - assessment.CostGems,
-                LastActiveDate = assessment.BridgeTo,
-            };
-            await users.UpsertAsync(updated, cancellationToken);
-
-            var now = clock.UtcNow;
-            var result = new StreakRepairResultDto(true, updated.StreakDays, assessment.CostGems, updated.Gems, updated.LastActiveDate, null);
-            var record = new PurchaseRecord(
-                $"streakrepair::{request.ClientRepairId}",
-                userContext.UserId,
-                request.ClientRepairId,
+        var now = clock.UtcNow;
+        var result = new StreakRepairResultDto(
+            true,
+            profile.StreakDays,
+            assessment.CostGems,
+            profile.Gems - assessment.CostGems,
+            assessment.BridgeTo,
+            null);
+        var record = new PurchaseRecord(
+            $"streakrepair::{request.ClientRepairId}",
+            userContext.UserId,
+            request.ClientRepairId,
+            "streak-repair",
+            assessment.CostGems,
+            now,
+            new PurchaseResultDto(
+                true,
                 "streak-repair",
                 assessment.CostGems,
-                now,
-                new PurchaseResultDto(true, "streak-repair", assessment.CostGems, updated.Gems, updated.FreezeTokens, null));
-            await purchases.CreateAsync(record, cancellationToken);
-            await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "streak.repaired", now, result), cancellationToken);
-
-            return result;
-        }, cancellationToken: cancellationToken);
+                result.GemsBalance,
+                profile.FreezeTokens,
+                null));
+        var operation = await DurableEconomy.StartAsync(
+            economyOperations,
+            userContext.UserId,
+            "streakRepair",
+            request.ClientRepairId,
+            new StreakRepairEconomyPayload(record, assessment.BridgeTo, result),
+            EconomySteps,
+            now,
+            cancellationToken);
+        return await ResumeRepairAsync(operation, cancellationToken);
     }
+
+    private async Task<StreakRepairResultDto> ResumeRepairAsync(
+        EconomyOperationRecord operation,
+        CancellationToken cancellationToken)
+    {
+        var payload = DurableEconomy.ReadPayload<StreakRepairEconomyPayload>(operation);
+        if (operation.Status == EconomyOperationRecord.FailedStatus)
+        {
+            return await FailedRepairAsync(payload, operation.FailureCode, cancellationToken);
+        }
+
+        try
+        {
+            operation = await DurableEconomy.RunStepAsync(
+                economyOperations,
+                operation,
+                "profile",
+                async () =>
+                {
+                    await DurableEconomy.ApplyProfileOnceAsync(
+                        users,
+                        userContext.UserId,
+                        userContext.DisplayName,
+                        operation.Id,
+                        profile =>
+                        {
+                            if (profile.Gems < payload.Record.GemsSpent)
+                            {
+                                throw new EconomyOperationRejectedException("insufficientGems");
+                            }
+
+                            if (profile.LastActiveDate is { } lastActive
+                                && lastActive >= payload.BridgeTo)
+                            {
+                                throw new EconomyOperationRejectedException("noLongerRepairable");
+                            }
+
+                            return profile with
+                            {
+                                Gems = profile.Gems - payload.Record.GemsSpent,
+                                LastActiveDate = payload.BridgeTo,
+                            };
+                        },
+                        cancellationToken);
+                },
+                cancellationToken);
+        }
+        catch (EconomyOperationRejectedException ex)
+        {
+            operation = await economyOperations.MarkFailedAsync(
+                userContext.UserId,
+                operation.Id,
+                ex.FailureCode,
+                cancellationToken);
+            return await FailedRepairAsync(payload, operation.FailureCode, cancellationToken);
+        }
+
+        operation = await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "ledger",
+            async () =>
+            {
+                try
+                {
+                    await purchases.CreateAsync(payload.Record, cancellationToken);
+                }
+                catch (DuplicateRecordException)
+                {
+                    var existing = await purchases.GetByClientPurchaseIdAsync(
+                        userContext.UserId,
+                        payload.Record.ClientPurchaseId,
+                        cancellationToken);
+                    if (existing?.ItemId != "streak-repair")
+                    {
+                        throw new ConcurrencyConflictException(
+                            $"Streak repair '{payload.Record.ClientPurchaseId}' conflicts with another purchase.");
+                    }
+                }
+            },
+            cancellationToken);
+
+        await DurableEconomy.RunStepAsync(
+            economyOperations,
+            operation,
+            "events",
+            () => events.AddAsync(
+                new LearningEvent(
+                    DurableEconomy.EventId(operation.Id, "streak.repaired"),
+                    userContext.UserId,
+                    "streak.repaired",
+                    payload.Record.PurchasedAt,
+                    payload.Result),
+                cancellationToken),
+            cancellationToken);
+        return payload.Result;
+    }
+
+    private async Task<StreakRepairResultDto> FailedRepairAsync(
+        StreakRepairEconomyPayload payload,
+        string? failureCode,
+        CancellationToken cancellationToken)
+    {
+        var profile = await users.GetAsync(userContext.UserId, cancellationToken)
+            ?? ProfileDefaults.New(userContext.UserId, userContext.DisplayName);
+        return new StreakRepairResultDto(
+            false,
+            profile.StreakDays,
+            0,
+            profile.Gems,
+            profile.LastActiveDate,
+            failureCode ?? "conflict");
+    }
+
+    private sealed record StreakRepairEconomyPayload(
+        PurchaseRecord Record,
+        DateOnly BridgeTo,
+        StreakRepairResultDto Result);
 }

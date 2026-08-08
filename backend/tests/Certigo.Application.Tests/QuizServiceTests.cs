@@ -3,6 +3,7 @@ using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
 using Certigo.Application.Services;
 using Certigo.Domain.Content;
+using Certigo.Domain.Progress;
 using Xunit;
 
 namespace Certigo.Application.Tests;
@@ -15,6 +16,7 @@ internal sealed class QuizServiceHarness
     public InMemoryEventRepository Events { get; } = new();
     public InMemoryAttemptRepository Attempts { get; } = new();
     public InMemoryLearnerModelRepository LearnerModels { get; } = new();
+    public InMemoryEconomyOperationRepository EconomyOperations { get; } = new();
     public FakeClock Clock { get; } = new(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
     public string UserId { get; } = "user-1";
 
@@ -22,7 +24,17 @@ internal sealed class QuizServiceHarness
     {
         var content = TestContent.Build();
         var context = new FakeUserContext(UserId, "Tester");
-        return new QuizService(context, Clock, content, Progress, Attempts, Events, Users, Leaderboard, LearnerModels);
+        return new QuizService(
+            context,
+            Clock,
+            content,
+            Progress,
+            Attempts,
+            Events,
+            Users,
+            Leaderboard,
+            LearnerModels,
+            EconomyOperations);
     }
 
     public static SubmitQuizRequest Request(string attemptId, params AnswerDto[] answers)
@@ -99,6 +111,147 @@ public sealed class QuizServiceTests
         var profile = await h.Users.GetAsync(h.UserId);
         profile!.Xp.Should().Be(first.Rewards.XpEarned); // not doubled
         h.Leaderboard.Xp[h.UserId].Should().Be(first.Rewards.XpEarned);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_returns_legacy_attempt_without_reapplying_rewards()
+    {
+        var h = new QuizServiceHarness();
+        var result = new SubmitQuizResult(
+            "legacy-result",
+            100,
+            new List<ItemResultDto>(),
+            new RewardsDto(10, 10, false, false, 6, new List<string>()),
+            new List<string>(),
+            null);
+        h.Users.Seed(TestContent.NewProfile(h.UserId) with { Xp = 10, Gems = 6 });
+        h.Attempts.Seed(new AttemptRecord(
+            "attempt::legacy",
+            h.UserId,
+            "legacy",
+            TestContent.TrackId,
+            "l1",
+            h.Clock.UtcNow.AddMinutes(-1),
+            h.Clock.UtcNow,
+            result));
+
+        var replay = await h.Build().SubmitAsync(
+            "l1",
+            QuizServiceHarness.Request("legacy", QuizServiceHarness.Answer("l1-i1", "a")));
+
+        replay.Should().BeEquivalentTo(result);
+        var profile = await h.Users.GetAsync(h.UserId);
+        profile!.Xp.Should().Be(10);
+        profile.Gems.Should().Be(6);
+        h.Leaderboard.Xp.Should().BeEmpty();
+        (await h.EconomyOperations.GetAsync(
+            h.UserId,
+            EconomyOperationRecord.IdFor("quiz", "legacy"))).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SubmitAsync_reconciles_after_event_failure_without_double_rewards()
+    {
+        var users = new InMemoryUserRepository();
+        users.Seed(TestContent.NewProfile("user-1"));
+        var events = new InMemoryEventRepository();
+        var leaderboard = new InMemoryLeaderboardRepository();
+        var operations = new InMemoryEconomyOperationRepository();
+        var service = new QuizService(
+            new FakeUserContext("user-1", "Tester"),
+            new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero)),
+            TestContent.Build(),
+            new InMemoryProgressRepository(),
+            new InMemoryAttemptRepository(),
+            new FailOnceEventRepository(events),
+            users,
+            leaderboard,
+            new InMemoryLearnerModelRepository(),
+            operations);
+        var request = QuizServiceHarness.Request(
+            "event-retry",
+            QuizServiceHarness.Answer("l1-i1", "a"));
+
+        var first = () => service.SubmitAsync("l1", request);
+        await first.Should().ThrowAsync<InvalidOperationException>();
+        var afterFailure = await users.GetAsync("user-1");
+        var result = await service.SubmitAsync("l1", request);
+        var afterRetry = await users.GetAsync("user-1");
+
+        afterRetry!.Xp.Should().Be(afterFailure!.Xp);
+        afterRetry.Gems.Should().Be(afterFailure.Gems);
+        afterRetry.Xp.Should().Be(result.Rewards.XpEarned);
+        leaderboard.Xp["user-1"].Should().Be(result.Rewards.XpEarned);
+        events.Events.Count(e => e.Type == "quiz.submitted").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_reconciliation_preserves_newer_periods_and_progress()
+    {
+        var users = new InMemoryUserRepository();
+        users.Seed(TestContent.NewProfile("user-1") with { LifetimePerfectLessons = 3 });
+        var progress = new InMemoryProgressRepository();
+        var operations = new InMemoryEconomyOperationRepository();
+        var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
+        var service = new QuizService(
+            new FakeUserContext("user-1", "Tester"),
+            clock,
+            TestContent.Build(),
+            progress,
+            new InMemoryAttemptRepository(),
+            new InMemoryEventRepository(),
+            users,
+            new InMemoryLeaderboardRepository(),
+            new InMemoryLearnerModelRepository(),
+            new MutateOnceOnEconomyCreateRepository(
+                operations,
+                () =>
+                {
+                    users.ForceConcurrentWrite("user-1", profile => profile with
+                    {
+                        DailyXpDate = new DateOnly(2025, 1, 7),
+                        DailyXpEarned = 77,
+                        DailyLessonsCompleted = 7,
+                        DailyCorrectAnswers = 7,
+                        DailyPerfectLessons = 7,
+                        LastActiveDate = new DateOnly(2025, 1, 7),
+                        MonthlyAnchor = new DateOnly(2025, 2, 1),
+                        MonthlyXpEarned = 88,
+                        MonthlyLessonsCompleted = 8,
+                        MonthlyPerfectLessons = 8,
+                        LifetimePerfectLessons = 4,
+                    });
+                    progress.Seed(
+                        "user-1",
+                        new ConceptMastery(
+                            "user-1",
+                            TestContent.TrackId,
+                            "c1",
+                            0.9,
+                            10,
+                            3,
+                            clock.UtcNow.AddDays(2),
+                            10,
+                            0,
+                            clock.UtcNow.AddDays(1)));
+                }));
+
+        var result = await service.SubmitAsync(
+            "l1",
+            QuizServiceHarness.Request("delayed", QuizServiceHarness.Answer("l1-i1", "a")));
+
+        result.Rewards.AchievementsUnlocked.Should().BeEmpty();
+        var profile = await users.GetAsync("user-1");
+        profile!.DailyXpDate.Should().Be(new DateOnly(2025, 1, 7));
+        profile.DailyXpEarned.Should().Be(77);
+        profile.DailyLessonsCompleted.Should().Be(7);
+        profile.MonthlyAnchor.Should().Be(new DateOnly(2025, 2, 1));
+        profile.MonthlyXpEarned.Should().Be(88);
+        profile.LifetimePerfectLessons.Should().Be(5);
+        profile.Achievements.Should().Contain("flawless-5");
+        var mastery = await progress.GetMasteryAsync("user-1", TestContent.TrackId, "c1");
+        mastery!.Reps.Should().Be(10);
+        mastery.LastReviewedAt.Should().Be(clock.UtcNow.AddDays(1));
     }
 
     [Fact]
@@ -185,7 +338,8 @@ public sealed class QuizServiceTests
             new InMemoryEventRepository(),
             users,
             leaderboard,
-            new InMemoryLearnerModelRepository());
+            new InMemoryLearnerModelRepository(),
+            new InMemoryEconomyOperationRepository());
 
         var result = await service.SubmitAsync(
             "l1",

@@ -9,13 +9,14 @@ internal sealed class QuestServiceHarness
 {
     public InMemoryUserRepository Users { get; } = new();
     public InMemoryEventRepository Events { get; } = new();
+    public InMemoryEconomyOperationRepository EconomyOperations { get; } = new();
     public FakeClock Clock { get; } = new(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
     public string UserId { get; } = "user-1";
 
     public DateOnly Today => DateOnly.FromDateTime(Clock.UtcNow.UtcDateTime);
 
     public QuestService Build()
-        => new(new FakeUserContext(UserId, "Tester"), Clock, Users, Events);
+        => new(new FakeUserContext(UserId, "Tester"), Clock, Users, Events, EconomyOperations);
 
     public void SeedAllQuestsCompleted(int gems = 0)
     {
@@ -127,7 +128,12 @@ public sealed class QuestServiceTests
         var users = new ConflictOnceUserRepository(inner);
         var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
         var events = new InMemoryEventRepository();
-        var service = new QuestService(new FakeUserContext("user-1", "Tester"), clock, users, events);
+        var service = new QuestService(
+            new FakeUserContext("user-1", "Tester"),
+            clock,
+            users,
+            events,
+            new InMemoryEconomyOperationRepository());
 
         var quest = (await service.GetTodayAsync()).Quests[0];
         var result = await service.ClaimAsync(new ClaimQuestRequest(quest.Id));
