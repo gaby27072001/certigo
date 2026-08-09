@@ -28,15 +28,15 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 
 | Fait observable | Valeur générée |
 |---|---|
-| Date de référence analysée | **2026-08-07** |
-| Commit de référence analysé | `9dd03d39143502c61227b99e005c6fc177fbe80e` |
+| Date de référence analysée | **2026-08-09** |
+| Commit de référence analysé | `c435f3eed0f4be0ddc338c30705de557501a28ba` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
 | Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `663f32b4818964e307cf7e084cd09a9c6af91429` du **2026-08-06** |
 | Package public actif | **146 fichiers** — `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
 | Package privé actif (`answerKey`) | **146 fichiers** — `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
-| Workflows GitHub Actions | **20** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-project-state.yml`, `codeql.yml`, `copilot-auto-merge.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `lint-workflows.yml`, `promote-backend-staging-prod.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
+| Workflows GitHub Actions | **21** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-project-state.yml`, `codeql.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `lint-workflows.yml`, `nuget-vuln-scan.yml`, `promote-backend-staging-prod.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
 | Tests découverts | **147 fichiers** — .NET : 4 projets / 63 fichiers ; Flutter/Dart : 6 racines / 83 fichiers ; Python : 1 racine / 1 fichier |
 | Corpus **historique** local | **91 pistes**, **146 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
