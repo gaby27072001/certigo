@@ -26,16 +26,16 @@ class LessonStep {
 }
 
 LessonStepKind _kindFor(BlockType type) => switch (type) {
-  BlockType.hook => LessonStepKind.hook,
-  BlockType.concept => LessonStepKind.concept,
-  BlockType.example => LessonStepKind.example,
-  BlockType.code => LessonStepKind.code,
-  BlockType.recap => LessonStepKind.recap,
-  // A check block with no item is malformed; degrade to read-only concept
-  // so the flow never dead-ends.
-  BlockType.check => LessonStepKind.concept,
-  BlockType.unknown => LessonStepKind.concept,
-};
+      BlockType.hook => LessonStepKind.hook,
+      BlockType.concept => LessonStepKind.concept,
+      BlockType.example => LessonStepKind.example,
+      BlockType.code => LessonStepKind.code,
+      BlockType.recap => LessonStepKind.recap,
+      // A check block with no item is malformed; degrade to read-only concept
+      // so the flow never dead-ends.
+      BlockType.check => LessonStepKind.concept,
+      BlockType.unknown => LessonStepKind.concept,
+    };
 
 /// Flattens a [Lesson] into the ordered list of player steps:
 /// intro → (one step per block) → result.

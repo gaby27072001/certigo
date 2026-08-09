@@ -38,22 +38,22 @@ class TrackSummary {
   final int lessonCount;
 
   factory TrackSummary.fromJson(Map<String, dynamic> json) => TrackSummary(
-    id: json['id'] as String,
-    code: json['code'] as String? ?? '',
-    title: json['title'] as String? ?? '',
-    level: json['level'] as String? ?? '',
-    summary: json['summary'] as String? ?? '',
-    unitCount: (json['unitCount'] as num?)?.toInt() ?? 0,
-    lessonCount: (json['lessonCount'] as num?)?.toInt() ?? 0,
-  );
+        id: json['id'] as String,
+        code: json['code'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        level: json['level'] as String? ?? '',
+        summary: json['summary'] as String? ?? '',
+        unitCount: (json['unitCount'] as num?)?.toInt() ?? 0,
+        lessonCount: (json['lessonCount'] as num?)?.toInt() ?? 0,
+      );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-    'id': id,
-    'code': code,
-    'title': title,
-    'level': level,
-    'summary': summary,
-    'unitCount': unitCount,
-    'lessonCount': lessonCount,
-  };
+        'id': id,
+        'code': code,
+        'title': title,
+        'level': level,
+        'summary': summary,
+        'unitCount': unitCount,
+        'lessonCount': lessonCount,
+      };
 }

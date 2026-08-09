@@ -32,13 +32,13 @@ enum AuthDiagnosticStep {
 extension AuthDiagnosticStepX on AuthDiagnosticStep {
   /// Libellé FR court, aligné sur les étapes attendues côté diagnostic.
   String get label => switch (this) {
-    AuthDiagnosticStep.authorizeOpened => 'authorize ouvert',
-    AuthDiagnosticStep.callbackReturned => 'code reçu / callback revenu',
-    AuthDiagnosticStep.tokenExchangeStarted => 'échange jeton en cours',
-    AuthDiagnosticStep.tokenReceived => 'jeton reçu',
-    AuthDiagnosticStep.sessionWritten => 'session écrite',
-    AuthDiagnosticStep.failed => 'échec',
-  };
+        AuthDiagnosticStep.authorizeOpened => 'authorize ouvert',
+        AuthDiagnosticStep.callbackReturned => 'code reçu / callback revenu',
+        AuthDiagnosticStep.tokenExchangeStarted => 'échange jeton en cours',
+        AuthDiagnosticStep.tokenReceived => 'jeton reçu',
+        AuthDiagnosticStep.sessionWritten => 'session écrite',
+        AuthDiagnosticStep.failed => 'échec',
+      };
 }
 
 /// Une entrée **horodatée** de la trace de diagnostic d'auth sociale.
@@ -106,5 +106,5 @@ class AuthDiagnosticsNotifier extends Notifier<List<AuthDiagnosticEntry>>
 /// alimentée par la passerelle OIDC + le contrôleur.
 final authDiagnosticsProvider =
     NotifierProvider<AuthDiagnosticsNotifier, List<AuthDiagnosticEntry>>(
-      AuthDiagnosticsNotifier.new,
-    );
+  AuthDiagnosticsNotifier.new,
+);

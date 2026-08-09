@@ -53,5 +53,5 @@ final class UnknownFailure extends Failure {
 /// UI should surface an actionable message instead of silently showing an empty list.
 final class CatalogEmptyFailure extends Failure {
   const CatalogEmptyFailure([super.message = 'Aucune certification disponible'])
-    : super(code: 'catalog_empty');
+      : super(code: 'catalog_empty');
 }

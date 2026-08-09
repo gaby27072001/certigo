@@ -29,8 +29,7 @@ class AnswerChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final _ChipStyle s = _styleFor(p, state);
-    final bool graded =
-        state == QuizOptionState.correct ||
+    final bool graded = state == QuizOptionState.correct ||
         state == QuizOptionState.incorrect ||
         state == QuizOptionState.missed;
 
@@ -65,9 +64,9 @@ class AnswerChip extends StatelessWidget {
                 child: Text(
                   label,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: p.textPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
               ),
               if (graded) ...<Widget>[

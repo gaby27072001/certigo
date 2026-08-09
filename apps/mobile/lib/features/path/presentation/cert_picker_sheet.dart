@@ -92,8 +92,7 @@ class CertPickerSheet extends ConsumerWidget {
                   ),
                   loading: () => const _CertLoading(),
                   error: (Object err, StackTrace __) {
-                    final bool isEmptyCatalog =
-                        err is CatalogEmptyFailure ||
+                    final bool isEmptyCatalog = err is CatalogEmptyFailure ||
                         (err is ServerFailure && err.statusCode == 503);
                     return _CertError(
                       title: isEmptyCatalog ? 'Catalogue vide' : 'Catalogue indisponible',

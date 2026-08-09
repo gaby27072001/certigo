@@ -147,8 +147,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   ),
                   Expanded(
                     child: PrismProgressBar(
-                      value:
-                          (_controller.index + (_controller.graded ? 1 : 0)) /
+                      value: (_controller.index + (_controller.graded ? 1 : 0)) /
                           _controller.items.length,
                       height: 8,
                       semanticLabel: 'Progression du quiz',

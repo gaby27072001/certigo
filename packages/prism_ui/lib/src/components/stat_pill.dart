@@ -17,19 +17,19 @@ class StatPill extends StatelessWidget {
 
   /// Streak pill (ember flame).
   factory StatPill.streak(int days, {Color? color}) => StatPill(
-    icon: Icons.local_fire_department_rounded,
-    value: '$days',
-    color: color ?? const Color(0xFFFF7A45),
-    semanticLabel: 'Série de $days jours',
-  );
+        icon: Icons.local_fire_department_rounded,
+        value: '$days',
+        color: color ?? const Color(0xFFFF7A45),
+        semanticLabel: 'Série de $days jours',
+      );
 
   /// XP pill (gold bolt).
   factory StatPill.xp(int xp, {Color? color}) => StatPill(
-    icon: Icons.bolt_rounded,
-    value: _compact(xp),
-    color: color ?? const Color(0xFFFFC24B),
-    semanticLabel: '$xp points d\'expérience',
-  );
+        icon: Icons.bolt_rounded,
+        value: _compact(xp),
+        color: color ?? const Color(0xFFFFC24B),
+        semanticLabel: '$xp points d\'expérience',
+      );
 
   final IconData icon;
   final String value;

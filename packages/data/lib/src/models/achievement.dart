@@ -28,16 +28,16 @@ class Achievement {
   final bool unlocked;
 
   factory Achievement.fromJson(Map<String, dynamic> json) => Achievement(
-    id: json['id'] as String,
-    kind: json['kind'] as String? ?? '',
-    name: json['name'] as String? ?? '',
-    description: json['description'] as String? ?? '',
-    tier: json['tier'] as String? ?? '',
-    threshold: (json['threshold'] as num?)?.toInt() ?? 0,
-    progress: (json['progress'] as num?)?.toInt() ?? 0,
-    rewardGems: (json['rewardGems'] as num?)?.toInt() ?? 0,
-    unlocked: json['unlocked'] as bool? ?? false,
-  );
+        id: json['id'] as String,
+        kind: json['kind'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        tier: json['tier'] as String? ?? '',
+        threshold: (json['threshold'] as num?)?.toInt() ?? 0,
+        progress: (json['progress'] as num?)?.toInt() ?? 0,
+        rewardGems: (json['rewardGems'] as num?)?.toInt() ?? 0,
+        unlocked: json['unlocked'] as bool? ?? false,
+      );
 }
 
 /// The learner's full achievements board with an unlocked/total tally.
@@ -49,10 +49,10 @@ class AchievementBoard {
   final List<Achievement> achievements;
 
   factory AchievementBoard.fromJson(Map<String, dynamic> json) => AchievementBoard(
-    unlocked: (json['unlocked'] as num?)?.toInt() ?? 0,
-    total: (json['total'] as num?)?.toInt() ?? 0,
-    achievements: (json['achievements'] as List<dynamic>? ?? <dynamic>[])
-        .map((e) => Achievement.fromJson(e as Map<String, dynamic>))
-        .toList(),
-  );
+        unlocked: (json['unlocked'] as num?)?.toInt() ?? 0,
+        total: (json['total'] as num?)?.toInt() ?? 0,
+        achievements: (json['achievements'] as List<dynamic>? ?? <dynamic>[])
+            .map((e) => Achievement.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
 }

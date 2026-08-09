@@ -12,9 +12,9 @@ import 'package:prism_ui/prism_ui.dart';
 /// and urgency affordances render, and that taps fire.
 void main() {
   Widget host(Widget child) => MaterialApp(
-    theme: PrismTheme.light(),
-    home: Scaffold(body: Center(child: child)),
-  );
+        theme: PrismTheme.light(),
+        home: Scaffold(body: Center(child: child)),
+      );
 
   Recommendation rec({
     RecommendationKind kind = RecommendationKind.review,

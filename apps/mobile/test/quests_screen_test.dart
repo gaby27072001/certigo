@@ -17,22 +17,22 @@ import 'package:prism_ui/prism_ui.dart';
 /// settles.
 void main() {
   QuestBoard fakeBoard() => const QuestBoard(
-    date: '2025-01-01',
-    gems: 10,
-    quests: <Quest>[
-      Quest(
-        id: 'q1',
-        kind: 'lessons',
-        title: 'Termine 3 leçons',
-        target: 3,
-        current: 1,
-        rewardGems: 15,
-        completed: false,
-        claimed: false,
-        claimable: false,
-      ),
-    ],
-  );
+        date: '2025-01-01',
+        gems: 10,
+        quests: <Quest>[
+          Quest(
+            id: 'q1',
+            kind: 'lessons',
+            title: 'Termine 3 leçons',
+            target: 3,
+            current: 1,
+            rewardGems: 15,
+            completed: false,
+            claimed: false,
+            claimable: false,
+          ),
+        ],
+      );
 
   Future<void> pumpQuests(WidgetTester tester) async {
     final GoRouter router = GoRouter(

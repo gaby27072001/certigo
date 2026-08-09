@@ -10,9 +10,9 @@ import 'package:prism_ui/prism_ui.dart';
 /// can assert the French labels, status visuals and tap affordances directly.
 void main() {
   Widget host(Widget child) => MaterialApp(
-    theme: PrismTheme.light(),
-    home: Scaffold(body: Center(child: child)),
-  );
+        theme: PrismTheme.light(),
+        home: Scaffold(body: Center(child: child)),
+      );
 
   group('PathNode', () {
     testWidgets('available lesson shows its star + caption and fires onTap', (tester) async {

@@ -36,8 +36,7 @@ class UnitHeader extends StatelessWidget {
 
     return Semantics(
       header: true,
-      label:
-          'Unité $index, $title${domainName != null ? ', $domainName' : ''}, '
+      label: 'Unité $index, $title${domainName != null ? ', $domainName' : ''}, '
           '$completed sur $total leçons',
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),

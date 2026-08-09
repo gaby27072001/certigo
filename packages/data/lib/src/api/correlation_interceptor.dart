@@ -41,8 +41,8 @@ class CorrelationIdInterceptor extends Interceptor {
   CorrelationIdInterceptor({
     CorrelationIdGenerator? generate,
     void Function(String message)? debugLog,
-  }) : _generate = generate ?? generateCorrelationId,
-       _debugLog = debugLog;
+  })  : _generate = generate ?? generateCorrelationId,
+        _debugLog = debugLog;
 
   final CorrelationIdGenerator _generate;
   final void Function(String message)? _debugLog;
