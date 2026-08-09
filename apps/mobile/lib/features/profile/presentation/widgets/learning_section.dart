@@ -37,10 +37,7 @@ class _LearningSectionState extends ConsumerState<LearningSection> {
                 .toList(),
           ),
           actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(ctx2).pop(),
-              child: const Text('Annuler'),
-            ),
+            TextButton(onPressed: () => Navigator.of(ctx2).pop(), child: const Text('Annuler')),
             TextButton(
               onPressed: () => Navigator.of(ctx2).pop(current),
               child: const Text('Enregistrer'),
@@ -77,10 +74,7 @@ class _LearningSectionState extends ConsumerState<LearningSection> {
                 .toList(),
           ),
           actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(ctx2).pop(),
-              child: const Text('Annuler'),
-            ),
+            TextButton(onPressed: () => Navigator.of(ctx2).pop(), child: const Text('Annuler')),
             TextButton(
               onPressed: () => Navigator.of(ctx2).pop(current),
               child: const Text('Enregistrer'),
@@ -124,10 +118,7 @@ class _LearningSectionState extends ConsumerState<LearningSection> {
             ),
           ),
           actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(ctx2).pop(),
-              child: const Text('Annuler'),
-            ),
+            TextButton(onPressed: () => Navigator.of(ctx2).pop(), child: const Text('Annuler')),
             TextButton(
               onPressed: () => Navigator.of(ctx2).pop(current),
               child: const Text('Enregistrer'),

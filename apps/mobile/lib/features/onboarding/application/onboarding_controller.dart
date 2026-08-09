@@ -28,30 +28,30 @@ enum TargetCertification { az900, ai900, dp900, sc900, az104 }
 extension TargetCertificationInfo on TargetCertification {
   /// Exam code shown as the bold tile label (e.g. "AZ-900").
   String get code => switch (this) {
-        TargetCertification.az900 => 'AZ-900',
-        TargetCertification.ai900 => 'AI-900',
-        TargetCertification.dp900 => 'DP-900',
-        TargetCertification.sc900 => 'SC-900',
-        TargetCertification.az104 => 'AZ-104',
-      };
+    TargetCertification.az900 => 'AZ-900',
+    TargetCertification.ai900 => 'AI-900',
+    TargetCertification.dp900 => 'DP-900',
+    TargetCertification.sc900 => 'SC-900',
+    TargetCertification.az104 => 'AZ-104',
+  };
 
   /// Human-readable exam title (the tile subtitle / trailing caption).
   String get title => switch (this) {
-        TargetCertification.az900 => 'Azure Fundamentals',
-        TargetCertification.ai900 => 'AI Fundamentals',
-        TargetCertification.dp900 => 'Data Fundamentals',
-        TargetCertification.sc900 => 'Security Fundamentals',
-        TargetCertification.az104 => 'Azure Administrator',
-      };
+    TargetCertification.az900 => 'Azure Fundamentals',
+    TargetCertification.ai900 => 'AI Fundamentals',
+    TargetCertification.dp900 => 'Data Fundamentals',
+    TargetCertification.sc900 => 'Security Fundamentals',
+    TargetCertification.az104 => 'Azure Administrator',
+  };
 
   /// Index into `PrismColors.domainAccents` used for the leading accent chip.
   int get domainIndex => switch (this) {
-        TargetCertification.az900 => 0,
-        TargetCertification.ai900 => 3,
-        TargetCertification.dp900 => 4,
-        TargetCertification.sc900 => 5,
-        TargetCertification.az104 => 1,
-      };
+    TargetCertification.az900 => 0,
+    TargetCertification.ai900 => 3,
+    TargetCertification.dp900 => 4,
+    TargetCertification.sc900 => 5,
+    TargetCertification.az104 => 1,
+  };
 }
 
 /// How the learner first heard about Certigo (single-select attribution).
@@ -65,26 +65,26 @@ enum StartMode { scratch, findLevel }
 
 extension DailyGoalOptionInfo on DailyGoalOption {
   int get minutes => switch (this) {
-        DailyGoalOption.chill => 3,
-        DailyGoalOption.regular => 10,
-        DailyGoalOption.serious => 15,
-        DailyGoalOption.intense => 30,
-      };
+    DailyGoalOption.chill => 3,
+    DailyGoalOption.regular => 10,
+    DailyGoalOption.serious => 15,
+    DailyGoalOption.intense => 30,
+  };
 
   /// XP goal roughly proportional to the minute target.
   int get xp => switch (this) {
-        DailyGoalOption.chill => 20,
-        DailyGoalOption.regular => 50,
-        DailyGoalOption.serious => 80,
-        DailyGoalOption.intense => 150,
-      };
+    DailyGoalOption.chill => 20,
+    DailyGoalOption.regular => 50,
+    DailyGoalOption.serious => 80,
+    DailyGoalOption.intense => 150,
+  };
 
   String get label => switch (this) {
-        DailyGoalOption.chill => 'Tranquille',
-        DailyGoalOption.regular => 'Sérieux',
-        DailyGoalOption.serious => 'Intensif',
-        DailyGoalOption.intense => 'Extrême',
-      };
+    DailyGoalOption.chill => 'Tranquille',
+    DailyGoalOption.regular => 'Sérieux',
+    DailyGoalOption.serious => 'Intensif',
+    DailyGoalOption.intense => 'Extrême',
+  };
 }
 
 /// Holds the answers gathered during the startup flow and the single
@@ -195,12 +195,12 @@ class OnboardingController extends ChangeNotifier {
   /// powers the closing "tu démarres à X !" reaction. A learner who already
   /// knows some notions never starts from zero.
   int get readinessScore => switch (_level) {
-        KnowledgeLevel.beginner => 8,
-        KnowledgeLevel.intermediate => 22,
-        KnowledgeLevel.advanced => 40,
-        KnowledgeLevel.expert => 58,
-        null => 5,
-      };
+    KnowledgeLevel.beginner => 8,
+    KnowledgeLevel.intermediate => 22,
+    KnowledgeLevel.advanced => 40,
+    KnowledgeLevel.expert => 58,
+    null => 5,
+  };
 
   /// Number of new notions promised for the first week, derived from the daily
   /// goal — used by the "≈ N notions cette semaine" promise screen.

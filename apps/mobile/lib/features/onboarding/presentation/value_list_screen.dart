@@ -75,10 +75,7 @@ class _BenefitRow extends StatelessWidget {
         Container(
           width: 46,
           height: 46,
-          decoration: BoxDecoration(
-            color: a.withOpacity(0.12),
-            borderRadius: PrismRadii.cardMd,
-          ),
+          decoration: BoxDecoration(color: a.withOpacity(0.12), borderRadius: PrismRadii.cardMd),
           alignment: Alignment.center,
           child: Icon(benefit.icon, color: a, size: 24),
         ),
@@ -87,10 +84,7 @@ class _BenefitRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                benefit.title,
-                style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-              ),
+              Text(benefit.title, style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 2),
               Text(
                 benefit.subtitle,

@@ -43,9 +43,7 @@ void main() {
     });
 
     test('produces distinct ids across calls', () {
-      final ids = <String>{
-        for (var i = 0; i < 200; i++) generateCorrelationId(),
-      };
+      final ids = <String>{for (var i = 0; i < 200; i++) generateCorrelationId()};
       expect(ids, hasLength(200));
     });
   });
@@ -103,29 +101,18 @@ void main() {
       expect(adapter.lastOptions?.headers[kCorrelationIdHeader], 'b' * 32);
     });
 
-    test(
-      'sends the exact bearer authorization header for a non-empty token',
-      () async {
-        final adapter = _CapturingAdapter();
-        final client = buildClient(
-          adapter,
-          tokenProvider: () async => 'access-token',
-        );
+    test('sends the exact bearer authorization header for a non-empty token', () async {
+      final adapter = _CapturingAdapter();
+      final client = buildClient(adapter, tokenProvider: () async => 'access-token');
 
-        await client.getJson<Map<String, dynamic>>('/ping', (json) => json);
+      await client.getJson<Map<String, dynamic>>('/ping', (json) => json);
 
-        expect(
-          adapter.lastOptions?.headers['Authorization'],
-          'Bearer access-token',
-        );
-      },
-    );
+      expect(adapter.lastOptions?.headers['Authorization'], 'Bearer access-token');
+    });
 
     test('omits the authorization header when the token is empty', () async {
       final adapter = _CapturingAdapter();
-      final dio = Dio(
-        BaseOptions(headers: <String, dynamic>{'Authorization': 'stale-token'}),
-      );
+      final dio = Dio(BaseOptions(headers: <String, dynamic>{'Authorization': 'stale-token'}));
       dio.httpClientAdapter = adapter;
       final client = ApiClient(
         dio: dio,
@@ -138,43 +125,31 @@ void main() {
       expect(adapter.lastOptions?.headers, isNot(contains('Authorization')));
     });
 
-    test(
-      'omits the authorization header when the token is whitespace',
-      () async {
-        final adapter = _CapturingAdapter();
-        final client = buildClient(adapter, tokenProvider: () async => '   ');
+    test('omits the authorization header when the token is whitespace', () async {
+      final adapter = _CapturingAdapter();
+      final client = buildClient(adapter, tokenProvider: () async => '   ');
 
-        await client.getJson<Map<String, dynamic>>('/ping', (json) => json);
+      await client.getJson<Map<String, dynamic>>('/ping', (json) => json);
 
-        expect(adapter.lastOptions?.headers, isNot(contains('Authorization')));
-      },
-    );
+      expect(adapter.lastOptions?.headers, isNot(contains('Authorization')));
+    });
 
-    test(
-      'invokes the unauthorized handler and maps a 401 to AuthFailure',
-      () async {
-        final adapter = _CapturingAdapter(statusCode: 401);
-        var unauthorizedCalls = 0;
-        final client = buildClient(
-          adapter,
-          tokenProvider: () async => 'access-token',
-          onUnauthorized: () async {
-            unauthorizedCalls++;
-          },
-        );
+    test('invokes the unauthorized handler and maps a 401 to AuthFailure', () async {
+      final adapter = _CapturingAdapter(statusCode: 401);
+      var unauthorizedCalls = 0;
+      final client = buildClient(
+        adapter,
+        tokenProvider: () async => 'access-token',
+        onUnauthorized: () async {
+          unauthorizedCalls++;
+        },
+      );
 
-        final result = await client.getJson<Map<String, dynamic>>(
-          '/ping',
-          (json) => json,
-        );
+      final result = await client.getJson<Map<String, dynamic>>('/ping', (json) => json);
 
-        expect(unauthorizedCalls, 1);
-        expect(result, isA<Err<Map<String, dynamic>>>());
-        expect(
-          (result as Err<Map<String, dynamic>>).failure,
-          isA<AuthFailure>(),
-        );
-      },
-    );
+      expect(unauthorizedCalls, 1);
+      expect(result, isA<Err<Map<String, dynamic>>>());
+      expect((result as Err<Map<String, dynamic>>).failure, isA<AuthFailure>());
+    });
   });
 }

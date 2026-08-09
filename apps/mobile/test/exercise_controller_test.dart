@@ -11,10 +11,7 @@ import 'package:certigo/features/lesson/application/lesson_session_state.dart';
 /// Repositories that always fail, forcing the controller's offline path.
 class _OfflineLessonRepo implements LessonRepository {
   @override
-  Future<Result<Lesson>> getLesson({
-    required String trackId,
-    required String lessonId,
-  }) async =>
+  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) async =>
       const Err<Lesson>(NetworkFailure());
 }
 
@@ -23,8 +20,7 @@ class _OfflineQuizRepo implements QuizRepository {
   Future<Result<SubmitQuizResult>> submit({
     required String lessonId,
     required SubmitQuizRequest request,
-  }) async =>
-      const Err<SubmitQuizResult>(NetworkFailure());
+  }) async => const Err<SubmitQuizResult>(NetworkFailure());
 }
 
 /// A [LessonFeedback] that records *when* the controller fires haptic/sound

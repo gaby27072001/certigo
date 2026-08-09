@@ -6,8 +6,9 @@ import '../support/prism_harness.dart';
 
 void main() {
   group('StatPill', () {
-    testWidgets('streak factory shows the day count, flame and semantics',
-        (WidgetTester tester) async {
+    testWidgets('streak factory shows the day count, flame and semantics', (
+      WidgetTester tester,
+    ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpPrism(tester, StatPill.streak(3));
 

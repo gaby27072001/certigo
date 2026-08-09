@@ -35,10 +35,10 @@ const double _kBlockWidth = 360;
 /// `context.prism`. No typography is configured, so Flutter's default test font
 /// is used for every glyph.
 ThemeData _theme() => ThemeData(
-      brightness: Brightness.light,
-      useMaterial3: true,
-      extensions: const <ThemeExtension<dynamic>>[PrismColorScheme.light],
-    );
+  brightness: Brightness.light,
+  useMaterial3: true,
+  extensions: const <ThemeExtension<dynamic>>[PrismColorScheme.light],
+);
 
 void main() {
   setUpAll(() => debugDisableShadows = true);
@@ -83,7 +83,8 @@ void main() {
       tester,
       const ConceptBlock(
         title: 'Idempotence',
-        body: 'Une opération idempotente produit le même effet '
+        body:
+            'Une opération idempotente produit le même effet '
             'qu\'elle soit appliquée une ou plusieurs fois.',
       ),
       ConceptBlock,
@@ -96,7 +97,8 @@ void main() {
       tester,
       const ScenarioBlock(
         title: 'Exemple Azure',
-        body: 'Déployez une Function App puis rejouez le pipeline : '
+        body:
+            'Déployez une Function App puis rejouez le pipeline : '
             'le résultat reste stable.',
       ),
       ScenarioBlock,
@@ -109,7 +111,8 @@ void main() {
       tester,
       const CodeBlock(
         language: 'bash',
-        code: 'az group create \\\n'
+        code:
+            'az group create \\\n'
             '  --name certigo-rg \\\n'
             '  --location westeurope',
       ),

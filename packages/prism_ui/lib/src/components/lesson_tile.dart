@@ -82,18 +82,12 @@ class LessonTile extends StatelessWidget {
                       ),
                     ),
                     if (subtitle != null)
-                      Text(
-                        subtitle!,
-                        style: t.labelSmall?.copyWith(color: p.textSecondary),
-                      ),
+                      Text(subtitle!, style: t.labelSmall?.copyWith(color: p.textSecondary)),
                   ],
                 ),
               ),
               if (!locked && minutes != null)
-                Text(
-                  '$minutes min',
-                  style: t.labelSmall?.copyWith(color: p.textSecondary),
-                ),
+                Text('$minutes min', style: t.labelSmall?.copyWith(color: p.textSecondary)),
             ],
           ),
         ),

@@ -16,18 +16,18 @@ import 'package:prism_ui/prism_ui.dart';
 /// [WidgetTester.pumpAndSettle] — the aurora background never settles.
 void main() {
   ShopCatalog fakeCatalog() => const ShopCatalog(
-        gems: 50,
-        items: <ShopItem>[
-          ShopItem(
-            id: 'freeze',
-            name: 'Gel de série',
-            description: 'Protège ta série un jour sans activité.',
-            priceGems: 30,
-            kind: 'streakFreeze',
-            amount: 1,
-          ),
-        ],
-      );
+    gems: 50,
+    items: <ShopItem>[
+      ShopItem(
+        id: 'freeze',
+        name: 'Gel de série',
+        description: 'Protège ta série un jour sans activité.',
+        priceGems: 30,
+        kind: 'streakFreeze',
+        amount: 1,
+      ),
+    ],
+  );
 
   Future<void> pumpShop(WidgetTester tester) async {
     final GoRouter router = GoRouter(
@@ -42,13 +42,8 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          shopCatalogProvider.overrideWith((Ref ref) async => fakeCatalog()),
-        ],
-        child: MaterialApp.router(
-          theme: PrismTheme.light(),
-          routerConfig: router,
-        ),
+        overrides: <Override>[shopCatalogProvider.overrideWith((Ref ref) async => fakeCatalog())],
+        child: MaterialApp.router(theme: PrismTheme.light(), routerConfig: router),
       ),
     );
 

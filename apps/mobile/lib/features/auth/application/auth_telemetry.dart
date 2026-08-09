@@ -8,21 +8,21 @@ enum AuthMethod { email, register, microsoft, google, apple, restore, refresh }
 
 extension AuthMethodX on AuthMethod {
   String get label => switch (this) {
-        AuthMethod.email => 'email',
-        AuthMethod.register => 'register',
-        AuthMethod.microsoft => 'microsoft',
-        AuthMethod.google => 'google',
-        AuthMethod.apple => 'apple',
-        AuthMethod.restore => 'restore',
-        AuthMethod.refresh => 'refresh',
-      };
+    AuthMethod.email => 'email',
+    AuthMethod.register => 'register',
+    AuthMethod.microsoft => 'microsoft',
+    AuthMethod.google => 'google',
+    AuthMethod.apple => 'apple',
+    AuthMethod.restore => 'restore',
+    AuthMethod.refresh => 'refresh',
+  };
 
   static AuthMethod fromProvider(AuthProvider provider) => switch (provider) {
-        AuthProvider.microsoft => AuthMethod.microsoft,
-        AuthProvider.google => AuthMethod.google,
-        AuthProvider.apple => AuthMethod.apple,
-        AuthProvider.email => AuthMethod.email,
-      };
+    AuthProvider.microsoft => AuthMethod.microsoft,
+    AuthProvider.google => AuthMethod.google,
+    AuthProvider.apple => AuthMethod.apple,
+    AuthProvider.email => AuthMethod.email,
+  };
 }
 
 /// Abstraction d'événements d'authentification.
@@ -78,8 +78,8 @@ class DebugAuthTelemetry implements AuthTelemetry {
 
   @override
   void authFailure(AuthMethod method, AuthFailureCause cause, {int? durationMs}) => debugPrint(
-        '[auth] failure method=${method.label} cause=${cause.name} durationMs=${durationMs ?? '-'}',
-      );
+    '[auth] failure method=${method.label} cause=${cause.name} durationMs=${durationMs ?? '-'}',
+  );
 }
 
 /// Puits de télémétrie d'auth injecté dans le contrôleur.

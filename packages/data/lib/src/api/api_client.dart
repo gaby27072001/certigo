@@ -40,10 +40,7 @@ class ApiClient {
     // client → backend → App Insights (ADR-013). Registered first so the id is
     // present before any other interceptor runs and can be traced below.
     _dio.interceptors.add(
-      CorrelationIdInterceptor(
-        generate: correlationIdGenerator,
-        debugLog: debugLog,
-      ),
+      CorrelationIdInterceptor(generate: correlationIdGenerator, debugLog: debugLog),
     );
 
     // Trace HTTP requests/responses/errors so the login flow is visible in
@@ -52,22 +49,18 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
-          options.extra['__loginDbgStart'] =
-              DateTime.now().microsecondsSinceEpoch;
-          _debugLog?.call(
-            '[LOGIN-DBG] HTTP → ${options.method} ${options.path}',
-          );
+          options.extra['__loginDbgStart'] = DateTime.now().microsecondsSinceEpoch;
+          _debugLog?.call('[LOGIN-DBG] HTTP → ${options.method} ${options.path}');
           handler.next(options);
         },
-        onResponse:
-            (Response<dynamic> response, ResponseInterceptorHandler handler) {
-              final int ms = _elapsedMs(response.requestOptions);
-              _debugLog?.call(
-                '[LOGIN-DBG] HTTP ← ${response.statusCode} '
-                '${response.requestOptions.path} (${ms}ms)',
-              );
-              handler.next(response);
-            },
+        onResponse: (Response<dynamic> response, ResponseInterceptorHandler handler) {
+          final int ms = _elapsedMs(response.requestOptions);
+          _debugLog?.call(
+            '[LOGIN-DBG] HTTP ← ${response.statusCode} '
+            '${response.requestOptions.path} (${ms}ms)',
+          );
+          handler.next(response);
+        },
         onError: (DioException e, ErrorInterceptorHandler handler) {
           final int ms = _elapsedMs(e.requestOptions);
           _debugLog?.call(
@@ -81,16 +74,15 @@ class ApiClient {
 
     _dio.interceptors.add(
       InterceptorsWrapper(
-        onRequest:
-            (RequestOptions options, RequestInterceptorHandler handler) async {
-              final String? normalizedToken = (await tokenProvider())?.trim();
-              if (normalizedToken != null && normalizedToken.isNotEmpty) {
-                options.headers['Authorization'] = 'Bearer $normalizedToken';
-              } else {
-                options.headers.remove('Authorization');
-              }
-              handler.next(options);
-            },
+        onRequest: (RequestOptions options, RequestInterceptorHandler handler) async {
+          final String? normalizedToken = (await tokenProvider())?.trim();
+          if (normalizedToken != null && normalizedToken.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $normalizedToken';
+          } else {
+            options.headers.remove('Authorization');
+          }
+          handler.next(options);
+        },
         onError: (DioException e, ErrorInterceptorHandler handler) async {
           if (e.response?.statusCode == 401 && onUnauthorized != null) {
             await onUnauthorized();
@@ -110,10 +102,7 @@ class ApiClient {
     Map<String, dynamic>? query,
   }) async {
     return _guard(() async {
-      final Response<dynamic> res = await _dio.get<dynamic>(
-        path,
-        queryParameters: query,
-      );
+      final Response<dynamic> res = await _dio.get<dynamic>(path, queryParameters: query);
       return parse(_asMap(res.data));
     });
   }
@@ -129,10 +118,7 @@ class ApiClient {
     });
   }
 
-  Future<Result<T>> deleteJson<T>(
-    String path,
-    T Function(Map<String, dynamic> json) parse,
-  ) async {
+  Future<Result<T>> deleteJson<T>(String path, T Function(Map<String, dynamic> json) parse) async {
     return _guard(() async {
       final Response<dynamic> res = await _dio.delete<dynamic>(path);
       return parse(_asMap(res.data));
@@ -183,9 +169,6 @@ class ApiClient {
     if (status != null && status >= 500) {
       return ServerFailure(detail ?? 'Erreur serveur', statusCode: status);
     }
-    return ServerFailure(
-      detail ?? e.message ?? 'Requête échouée',
-      statusCode: status,
-    );
+    return ServerFailure(detail ?? e.message ?? 'Requête échouée', statusCode: status);
   }
 }

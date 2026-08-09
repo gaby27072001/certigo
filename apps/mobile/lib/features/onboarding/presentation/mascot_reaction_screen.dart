@@ -94,10 +94,7 @@ class _MascotReactionScreenState extends State<MascotReactionScreen> {
               style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600, height: 1.3),
             ),
           ),
-          if (widget.highlight != null) ...<Widget>[
-            const SizedBox(height: 28),
-            widget.highlight!,
-          ],
+          if (widget.highlight != null) ...<Widget>[const SizedBox(height: 28), widget.highlight!],
           const Spacer(flex: 3),
         ],
       ),

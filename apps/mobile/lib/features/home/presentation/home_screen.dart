@@ -26,9 +26,8 @@ class HomeScreen extends ConsumerWidget {
         child: async.when(
           data: (HomeData data) => _HomeContent(data: data),
           loading: () => const _HomeLoading(),
-          error: (Object error, StackTrace _) => PrismStatusView.error(
-            onRetry: () => ref.invalidate(homeDataProvider),
-          ),
+          error: (Object error, StackTrace _) =>
+              PrismStatusView.error(onRetry: () => ref.invalidate(homeDataProvider)),
         ),
       ),
     );
@@ -49,10 +48,7 @@ class _HomeContent extends StatelessWidget {
     final PathLesson? next = data.nextLesson;
     final DomainProgress? weak = data.weakestDomain;
     final String firstName = me.displayName.split(' ').first;
-    final int previous = (path.readinessScore - path.readinessTrend7d).clamp(
-      0,
-      100,
-    );
+    final int previous = (path.readinessScore - path.readinessTrend7d).clamp(0, 100);
 
     return ListView(
       padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
@@ -84,10 +80,7 @@ class _HomeContent extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: PrismSpacing.lg),
           child: Column(
             children: <Widget>[
-              ReadinessGauge(
-                score: path.readinessScore,
-                previousScore: previous,
-              ),
+              ReadinessGauge(score: path.readinessScore, previousScore: previous),
               const SizedBox(height: 8),
               Text(
                 path.exam.isEmpty ? 'Score de préparation' : 'Score de préparation — ${path.exam}',
@@ -101,11 +94,7 @@ class _HomeContent extends StatelessWidget {
         const SizedBox(height: 16),
 
         // Daily goal -----------------------------------------------------
-        _DailyGoalCard(
-          progress: me.dailyProgress,
-          earned: me.dailyXpEarned,
-          goal: me.dailyGoalXp,
-        ),
+        _DailyGoalCard(progress: me.dailyProgress, earned: me.dailyXpEarned, goal: me.dailyGoalXp),
         const SizedBox(height: 16),
         _DailyShareEntryCard(
           goalMet: me.dailyGoalXp > 0 && me.dailyXpEarned >= me.dailyGoalXp,
@@ -123,10 +112,7 @@ class _HomeContent extends StatelessWidget {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Text('📍', style: TextStyle(fontSize: 22)),
-          title: Text(
-            next?.title ?? 'Aucune leçon en cours',
-            style: t.bodyLarge,
-          ),
+          title: Text(next?.title ?? 'Aucune leçon en cours', style: t.bodyLarge),
         ),
         const SizedBox(height: 24),
 
@@ -142,10 +128,7 @@ class _HomeContent extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: <Widget>[
               Text('À renforcer', style: t.titleLarge),
-              Text(
-                '${weak.score}/100',
-                style: t.labelMedium?.copyWith(color: p.ember),
-              ),
+              Text('${weak.score}/100', style: t.labelMedium?.copyWith(color: p.ember)),
             ],
           ),
           const SizedBox(height: 12),
@@ -246,10 +229,7 @@ class _TrendLabel extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
     if (trend == 0) {
-      return Text(
-        'Stable cette semaine',
-        style: t.labelMedium?.copyWith(color: p.textSecondary),
-      );
+      return Text('Stable cette semaine', style: t.labelMedium?.copyWith(color: p.textSecondary));
     }
     final bool up = trend > 0;
     return Text(
@@ -260,11 +240,7 @@ class _TrendLabel extends StatelessWidget {
 }
 
 class _DailyGoalCard extends StatelessWidget {
-  const _DailyGoalCard({
-    required this.progress,
-    required this.earned,
-    required this.goal,
-  });
+  const _DailyGoalCard({required this.progress, required this.earned, required this.goal});
 
   final double progress;
   final int earned;
@@ -285,10 +261,7 @@ class _DailyGoalCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text('Objectif du jour', style: t.titleMedium),
               const Spacer(),
-              Text(
-                '$earned / $goal XP',
-                style: t.labelLarge?.copyWith(color: p.textSecondary),
-              ),
+              Text('$earned / $goal XP', style: t.labelLarge?.copyWith(color: p.textSecondary)),
             ],
           ),
           const SizedBox(height: 12),
@@ -305,11 +278,7 @@ class _DailyGoalCard extends StatelessWidget {
 }
 
 class _DailyShareEntryCard extends StatelessWidget {
-  const _DailyShareEntryCard({
-    required this.goalMet,
-    required this.trackCode,
-    required this.onTap,
-  });
+  const _DailyShareEntryCard({required this.goalMet, required this.trackCode, required this.onTap});
 
   final bool goalMet;
   final String trackCode;
@@ -347,10 +316,7 @@ class _DailyShareEntryCard extends StatelessWidget {
                   goalMet
                       ? 'Ton objectif est atteint — partage ta progression ${trackCode.isEmpty ? '' : trackCode}.'
                       : 'Transforme tes progrès du jour en carte de partage prête a envoyer.',
-                  style: t.bodySmall?.copyWith(
-                    color: p.textSecondary,
-                    height: 1.35,
-                  ),
+                  style: t.bodySmall?.copyWith(color: p.textSecondary, height: 1.35),
                 ),
               ],
             ),
@@ -449,24 +415,14 @@ class _ExploreSection extends StatelessWidget {
         tone: p.primary,
         route: Routes.seasons,
       ),
-      _ExploreItem(
-        icon: Icons.flag_rounded,
-        label: 'Quêtes',
-        tone: p.ember,
-        route: Routes.quests,
-      ),
+      _ExploreItem(icon: Icons.flag_rounded, label: 'Quêtes', tone: p.ember, route: Routes.quests),
       _ExploreItem(
         icon: Icons.storefront_rounded,
         label: 'Boutique',
         tone: p.success,
         route: Routes.shop,
       ),
-      _ExploreItem(
-        icon: Icons.group_rounded,
-        label: 'Amis',
-        tone: p.info,
-        route: Routes.friends,
-      ),
+      _ExploreItem(icon: Icons.group_rounded, label: 'Amis', tone: p.info, route: Routes.friends),
       _ExploreItem(
         icon: Icons.workspace_premium_rounded,
         label: 'Examen blanc',
@@ -522,7 +478,9 @@ class _ExploreCard extends StatelessWidget {
       child: PrismCard(
         borderRadius: PrismRadii.cardLg,
         padding: const EdgeInsets.symmetric(
-            horizontal: PrismSpacing.md, vertical: PrismSpacing.cardInset),
+          horizontal: PrismSpacing.md,
+          vertical: PrismSpacing.cardInset,
+        ),
         child: Row(
           children: <Widget>[
             Container(

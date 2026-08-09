@@ -191,9 +191,7 @@ class _CategorySection extends StatelessWidget {
               lessonCount: track.lessonCount,
               unitCount: track.unitCount,
               accent: accent,
-              onTap: () => context.push(
-                '${Routes.library}/vendor/${vendor.id}/cert/${track.id}',
-              ),
+              onTap: () => context.push('${Routes.library}/vendor/${vendor.id}/cert/${track.id}'),
             ),
           ),
       ],
@@ -263,17 +261,9 @@ class _ErrorView extends StatelessWidget {
       padding: const EdgeInsets.all(PrismSpacing.gutter),
       children: <Widget>[
         const SizedBox(height: PrismSpacing.md),
-        CalloutBlock(
-          kind: CalloutKind.warning,
-          title: 'Catalogue indisponible',
-          text: message,
-        ),
+        CalloutBlock(kind: CalloutKind.warning, title: 'Catalogue indisponible', text: message),
         const SizedBox(height: PrismSpacing.md),
-        PrismButton.secondary(
-          label: 'Réessayer',
-          icon: Icons.refresh_rounded,
-          onPressed: onRetry,
-        ),
+        PrismButton.secondary(label: 'Réessayer', icon: Icons.refresh_rounded, onPressed: onRetry),
       ],
     );
   }

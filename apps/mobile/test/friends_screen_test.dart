@@ -18,19 +18,19 @@ import 'package:prism_ui/prism_ui.dart';
 /// background never settles.
 void main() {
   FriendList fakeFriends() => FriendList(
-        count: 1,
-        friends: <Friend>[
-          Friend(
-            userId: 'u-alex',
-            displayName: 'Alex Martin',
-            handle: 'alex#1234',
-            level: 7,
-            streakDays: 12,
-            xp: 3400,
-            friendsSince: DateTime(2024, 1, 1),
-          ),
-        ],
-      );
+    count: 1,
+    friends: <Friend>[
+      Friend(
+        userId: 'u-alex',
+        displayName: 'Alex Martin',
+        handle: 'alex#1234',
+        level: 7,
+        streakDays: 12,
+        xp: 3400,
+        friendsSince: DateTime(2024, 1, 1),
+      ),
+    ],
+  );
 
   Future<void> pumpFriends(WidgetTester tester) async {
     final GoRouter router = GoRouter(
@@ -45,13 +45,8 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          friendListProvider.overrideWith((Ref ref) async => fakeFriends()),
-        ],
-        child: MaterialApp.router(
-          theme: PrismTheme.light(),
-          routerConfig: router,
-        ),
+        overrides: <Override>[friendListProvider.overrideWith((Ref ref) async => fakeFriends())],
+        child: MaterialApp.router(theme: PrismTheme.light(), routerConfig: router),
       ),
     );
 

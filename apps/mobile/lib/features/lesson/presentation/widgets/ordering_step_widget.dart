@@ -48,8 +48,9 @@ class OrderingStepWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
-    final List<QuizOption> bank =
-        item.options.where((QuizOption o) => !selection.contains(o.id)).toList();
+    final List<QuizOption> bank = item.options
+        .where((QuizOption o) => !selection.contains(o.id))
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,10 +61,7 @@ class OrderingStepWidget extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               'Mets dans le bon ordre',
-              style: text.labelLarge?.copyWith(
-                color: p.primary,
-                fontWeight: FontWeight.w700,
-              ),
+              style: text.labelLarge?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -124,10 +122,7 @@ class OrderingStepWidget extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 20),
-          AnswerFeedbackCard(
-            correct: outcome!.correct,
-            explanation: outcome!.explanation,
-          ),
+          AnswerFeedbackCard(correct: outcome!.correct, explanation: outcome!.explanation),
         ],
       ],
     );
@@ -145,10 +140,10 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       text.toUpperCase(),
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.6,
-          ),
+        color: color,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.6,
+      ),
     );
   }
 }

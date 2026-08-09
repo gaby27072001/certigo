@@ -32,10 +32,7 @@ class ReadinessGauge extends StatelessWidget {
     final Color zone = _zoneColor(p, score);
 
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(
-        begin: (previousScore ?? score).toDouble(),
-        end: score.toDouble(),
-      ),
+      tween: Tween<double>(begin: (previousScore ?? score).toDouble(), end: score.toDouble()),
       duration: const Duration(milliseconds: 900),
       curve: Curves.easeOutCubic,
       builder: (BuildContext context, double value, _) {
@@ -55,14 +52,15 @@ class ReadinessGauge extends StatelessWidget {
                   Text(
                     value.round().toString(),
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                          color: p.textPrimary,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   Text(
                     label,
-                    style:
-                        Theme.of(context).textTheme.labelMedium?.copyWith(color: p.textSecondary),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelMedium?.copyWith(color: p.textSecondary),
                   ),
                 ],
               ),
@@ -81,11 +79,7 @@ class ReadinessGauge extends StatelessWidget {
 }
 
 class _GaugePainter extends CustomPainter {
-  _GaugePainter({
-    required this.value,
-    required this.track,
-    required this.gradient,
-  });
+  _GaugePainter({required this.value, required this.track, required this.gradient});
 
   final double value; // 0..1
   final Color track;

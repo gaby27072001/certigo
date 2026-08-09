@@ -36,8 +36,9 @@ void main() {
   ];
 
   group('VendorCatalogScreen', () {
-    testWidgets('renders real vendors with counts and showcase "Bientôt" tiles',
-        (WidgetTester tester) async {
+    testWidgets('renders real vendors with counts and showcase "Bientôt" tiles', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: <Override>[
@@ -70,20 +71,17 @@ void main() {
     Future<void> pumpCerts(WidgetTester tester) async {
       await tester.pumpWidget(
         ProviderScope(
-          overrides: <Override>[
-            catalogProvider.overrideWith((Ref ref) async => fakeCatalog),
-          ],
-          child: const MaterialApp(
-            home: VendorCertificationsScreen(vendor: VendorBrand.microsoft),
-          ),
+          overrides: <Override>[catalogProvider.overrideWith((Ref ref) async => fakeCatalog)],
+          child: const MaterialApp(home: VendorCertificationsScreen(vendor: VendorBrand.microsoft)),
         ),
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 60));
     }
 
-    testWidgets('groups Microsoft tracks by category and hides other vendors',
-        (WidgetTester tester) async {
+    testWidgets('groups Microsoft tracks by category and hides other vendors', (
+      WidgetTester tester,
+    ) async {
       await pumpCerts(tester);
 
       expect(find.text('Azure'), findsOneWidget);
@@ -110,67 +108,66 @@ void main() {
 
   group('CertificationChaptersScreen', () {
     LearningPath fakePath() => const LearningPath(
-          trackId: 'az-900',
-          trackName: 'Fondamentaux Azure',
-          exam: 'AZ-900',
-          readinessScore: 60,
-          readinessTrend7d: 4,
-          units: <PathUnit>[
-            PathUnit(
-              id: 'u1',
-              title: 'Concepts du cloud',
-              domainId: 'd1',
+      trackId: 'az-900',
+      trackName: 'Fondamentaux Azure',
+      exam: 'AZ-900',
+      readinessScore: 60,
+      readinessTrend7d: 4,
+      units: <PathUnit>[
+        PathUnit(
+          id: 'u1',
+          title: 'Concepts du cloud',
+          domainId: 'd1',
+          status: NodeStatus.completed,
+          lessons: <PathLesson>[
+            PathLesson(
+              id: 'l1',
+              title: 'Le cloud',
               status: NodeStatus.completed,
-              lessons: <PathLesson>[
-                PathLesson(
-                  id: 'l1',
-                  title: 'Le cloud',
-                  status: NodeStatus.completed,
-                  estMinutes: 5,
-                  masteryPct: 100,
-                ),
-              ],
-            ),
-            PathUnit(
-              id: 'u2',
-              title: 'Architecture Azure',
-              domainId: 'd2',
-              status: NodeStatus.inProgress,
-              lessons: <PathLesson>[
-                PathLesson(
-                  id: 'l2',
-                  title: 'Régions',
-                  status: NodeStatus.available,
-                  estMinutes: 5,
-                  masteryPct: 0,
-                ),
-              ],
-            ),
-            PathUnit(
-              id: 'u3',
-              title: 'Gouvernance',
-              domainId: 'd3',
-              status: NodeStatus.locked,
-              lessons: <PathLesson>[
-                PathLesson(
-                  id: 'l3',
-                  title: 'Coûts',
-                  status: NodeStatus.locked,
-                  estMinutes: 5,
-                  masteryPct: 0,
-                ),
-              ],
+              estMinutes: 5,
+              masteryPct: 100,
             ),
           ],
-          domains: <DomainProgress>[],
-        );
+        ),
+        PathUnit(
+          id: 'u2',
+          title: 'Architecture Azure',
+          domainId: 'd2',
+          status: NodeStatus.inProgress,
+          lessons: <PathLesson>[
+            PathLesson(
+              id: 'l2',
+              title: 'Régions',
+              status: NodeStatus.available,
+              estMinutes: 5,
+              masteryPct: 0,
+            ),
+          ],
+        ),
+        PathUnit(
+          id: 'u3',
+          title: 'Gouvernance',
+          domainId: 'd3',
+          status: NodeStatus.locked,
+          lessons: <PathLesson>[
+            PathLesson(
+              id: 'l3',
+              title: 'Coûts',
+              status: NodeStatus.locked,
+              estMinutes: 5,
+              masteryPct: 0,
+            ),
+          ],
+        ),
+      ],
+      domains: <DomainProgress>[],
+    );
 
-    testWidgets('renders chapters with real lock/progress and navigates on start',
-        (WidgetTester tester) async {
+    testWidgets('renders chapters with real lock/progress and navigates on start', (
+      WidgetTester tester,
+    ) async {
       final ProviderContainer container = ProviderContainer(
-        overrides: <Override>[
-          pathProvider('az-900').overrideWith((Ref ref) async => fakePath()),
-        ],
+        overrides: <Override>[pathProvider('az-900').overrideWith((Ref ref) async => fakePath())],
       );
       addTearDown(container.dispose);
 
@@ -217,9 +214,7 @@ void main() {
     testWidgets('renders the shared CertificationCard for each track', (WidgetTester tester) async {
       await tester.pumpWidget(
         ProviderScope(
-          overrides: <Override>[
-            catalogProvider.overrideWith((Ref ref) async => fakeCatalog),
-          ],
+          overrides: <Override>[catalogProvider.overrideWith((Ref ref) async => fakeCatalog)],
           child: MaterialApp(
             theme: PrismTheme.light(),
             home: const Scaffold(body: CertPickerSheet()),

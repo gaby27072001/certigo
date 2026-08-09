@@ -44,7 +44,8 @@ class QuizOptionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final _OptionStyle s = _styleFor(p, state);
-    final bool graded = state == QuizOptionState.correct ||
+    final bool graded =
+        state == QuizOptionState.correct ||
         state == QuizOptionState.incorrect ||
         state == QuizOptionState.missed;
 
@@ -78,9 +79,9 @@ class QuizOptionTile extends StatelessWidget {
                 child: Text(
                   label,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               if (graded) ...<Widget>[
@@ -168,16 +169,12 @@ class _LeadingChip extends StatelessWidget {
       width: 30,
       height: 30,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.14),
-        borderRadius: PrismRadii.cardSm,
-      ),
+      decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: PrismRadii.cardSm),
       child: Text(
         text,
-        style: Theme.of(context)
-            .textTheme
-            .labelLarge
-            ?.copyWith(color: color, fontWeight: FontWeight.w800),
+        style: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(color: color, fontWeight: FontWeight.w800),
       ),
     );
   }

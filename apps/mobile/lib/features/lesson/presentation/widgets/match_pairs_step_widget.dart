@@ -142,10 +142,7 @@ class _MatchPairsStepWidgetState extends State<MatchPairsStepWidget> {
             const SizedBox(width: 8),
             Text(
               'Associe les paires',
-              style: text.labelLarge?.copyWith(
-                color: p.primary,
-                fontWeight: FontWeight.w700,
-              ),
+              style: text.labelLarge?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
             ),
           ],
         ),

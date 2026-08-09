@@ -10,11 +10,7 @@ import 'prism_rich_text.dart';
 /// Info-tinted so it reads as "here is where this shows up in real work". The
 /// applied example is what turns recall into transferable understanding.
 class ScenarioBlock extends StatelessWidget {
-  const ScenarioBlock({
-    super.key,
-    required this.body,
-    this.title = 'Exemple Azure',
-  });
+  const ScenarioBlock({super.key, required this.body, this.title = 'Exemple Azure'});
 
   final String body;
   final String title;

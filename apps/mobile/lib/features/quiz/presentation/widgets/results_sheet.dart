@@ -65,8 +65,9 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
 
     final AsyncValue<LearningPath> pathAsync = ref.watch(pathProvider(widget.trackId));
     final bool pathLoaded = pathAsync.hasValue;
-    final String? nextLessonId =
-        pathLoaded ? _findNextLessonId(pathAsync.requireValue, widget.lessonId) : null;
+    final String? nextLessonId = pathLoaded
+        ? _findNextLessonId(pathAsync.requireValue, widget.lessonId)
+        : null;
 
     return Stack(
       alignment: Alignment.topCenter,

@@ -54,14 +54,10 @@ class _TutorSheetState extends ConsumerState<_TutorSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.86,
-        ),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.86),
         decoration: BoxDecoration(
           color: p.background,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(PrismRadii.debt26),
-          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(PrismRadii.debt26)),
           border: Border.all(color: p.border),
         ),
         child: SafeArea(
@@ -72,11 +68,7 @@ class _TutorSheetState extends ConsumerState<_TutorSheet> {
               const _Grip(),
               _Header(correct: widget.correct, explanation: state.explanation),
               Flexible(
-                child: _TutorBody(
-                  state: state,
-                  correct: widget.correct,
-                  onRetry: _fetch,
-                ),
+                child: _TutorBody(state: state, correct: widget.correct, onRetry: _fetch),
               ),
             ],
           ),
@@ -141,10 +133,7 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  'Tuteur IA',
-                  style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                ),
+                Text('Tuteur IA', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                 Text(
                   ai ? 'Explication personnalisée' : 'Explication vérifiée',
                   style: text.labelSmall?.copyWith(color: p.textSecondary),
@@ -164,11 +153,7 @@ class _Header extends StatelessWidget {
 }
 
 class _TutorBody extends StatelessWidget {
-  const _TutorBody({
-    required this.state,
-    required this.correct,
-    required this.onRetry,
-  });
+  const _TutorBody({required this.state, required this.correct, required this.onRetry});
 
   final TutorState state;
   final bool correct;
@@ -247,11 +232,7 @@ class _TutorError extends StatelessWidget {
           text: message ?? 'Réessaie dans un instant.',
         ),
         const SizedBox(height: 18),
-        PrismButton.secondary(
-          label: 'Réessayer',
-          icon: Icons.refresh_rounded,
-          onPressed: onRetry,
-        ),
+        PrismButton.secondary(label: 'Réessayer', icon: Icons.refresh_rounded, onPressed: onRetry),
       ],
     );
   }
@@ -342,11 +323,7 @@ class _PersonalizationStrip extends StatelessWidget {
 
     // First time seeing the concept: nothing learned yet, so stay quiet.
     if (tp.attempts <= 0) {
-      return _Chip(
-        icon: Icons.fiber_new_rounded,
-        label: 'Nouveau concept pour toi',
-        color: p.info,
-      );
+      return _Chip(icon: Icons.fiber_new_rounded, label: 'Nouveau concept pour toi', color: p.info);
     }
 
     final List<Widget> chips = <Widget>[
@@ -363,31 +340,15 @@ class _PersonalizationStrip extends StatelessWidget {
     ];
 
     if (tp.recurringStruggle) {
-      chips.add(_Chip(
-        icon: Icons.priority_high_rounded,
-        label: 'Piège récurrent',
-        color: p.error,
-      ));
+      chips.add(_Chip(icon: Icons.priority_high_rounded, label: 'Piège récurrent', color: p.error));
     }
     if (tp.isImproving) {
-      chips.add(_Chip(
-        icon: Icons.trending_up_rounded,
-        label: 'Retour gagnant',
-        color: p.success,
-      ));
+      chips.add(_Chip(icon: Icons.trending_up_rounded, label: 'Retour gagnant', color: p.success));
     } else if (tp.isSlipping) {
-      chips.add(_Chip(
-        icon: Icons.trending_down_rounded,
-        label: 'À consolider',
-        color: p.warning,
-      ));
+      chips.add(_Chip(icon: Icons.trending_down_rounded, label: 'À consolider', color: p.warning));
     }
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: chips,
-    );
+    return Wrap(spacing: 8, runSpacing: 8, children: chips);
   }
 }
 
@@ -419,10 +380,7 @@ class _Chip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: text.labelMedium?.copyWith(
-              color: p.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
+            style: text.labelMedium?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -451,9 +409,7 @@ class _PointRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        Expanded(
-          child: Text(text, style: textTheme.bodyMedium?.copyWith(height: 1.4)),
-        ),
+        Expanded(child: Text(text, style: textTheme.bodyMedium?.copyWith(height: 1.4))),
       ],
     );
   }

@@ -36,9 +36,8 @@ class PathScreen extends ConsumerWidget {
         child: async.when(
           data: (LearningPath path) => _PathContent(path: path, trackId: trackId, me: me),
           loading: () => const _PathLoading(),
-          error: (Object error, StackTrace _) => PrismStatusView.error(
-            onRetry: () => ref.invalidate(pathProvider(trackId)),
-          ),
+          error: (Object error, StackTrace _) =>
+              PrismStatusView.error(onRetry: () => ref.invalidate(pathProvider(trackId))),
         ),
       ),
     );
@@ -427,10 +426,7 @@ class _PathBannerDelegate extends SliverPersistentHeaderDelegate {
                   horizontal: PrismSpacing.debt9,
                   vertical: PrismSpacing.debt3,
                 ),
-                decoration: BoxDecoration(
-                  color: p.primarySoft,
-                  borderRadius: PrismRadii.pillAll,
-                ),
+                decoration: BoxDecoration(color: p.primarySoft, borderRadius: PrismRadii.pillAll),
                 child: Text(
                   exam,
                   style: t.labelSmall?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
@@ -530,10 +526,7 @@ class _ReadinessChip extends StatelessWidget {
         horizontal: PrismSpacing.sm,
         vertical: PrismSpacing.debt7,
       ),
-      decoration: BoxDecoration(
-        color: p.primarySoft,
-        borderRadius: PrismRadii.pillAll,
-      ),
+      decoration: BoxDecoration(color: p.primarySoft, borderRadius: PrismRadii.pillAll),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[

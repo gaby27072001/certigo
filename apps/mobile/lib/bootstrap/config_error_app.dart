@@ -120,19 +120,14 @@ class _IssueTile extends StatelessWidget {
           children: <Widget>[
             Row(
               children: <Widget>[
-                Icon(
-                  blocking ? Icons.block : Icons.warning_amber_rounded,
-                  size: 18,
-                  color: accent,
-                ),
+                Icon(blocking ? Icons.block : Icons.warning_amber_rounded, size: 18, color: accent),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     issue.key,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.copyWith(color: accent, fontWeight: FontWeight.w700),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleSmall?.copyWith(color: accent, fontWeight: FontWeight.w700),
                   ),
                 ),
               ],

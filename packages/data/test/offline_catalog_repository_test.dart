@@ -15,16 +15,15 @@ TrackSummary _track({
   String id = 'az-900',
   String code = 'AZ-900',
   String title = 'Microsoft Azure Fundamentals',
-}) =>
-    TrackSummary(
-      id: id,
-      code: code,
-      title: title,
-      level: 'fundamentals',
-      summary: 'Summary',
-      unitCount: 4,
-      lessonCount: 20,
-    );
+}) => TrackSummary(
+  id: id,
+  code: code,
+  title: title,
+  level: 'fundamentals',
+  summary: 'Summary',
+  unitCount: 4,
+  lessonCount: 20,
+);
 
 void main() {
   group('OfflineCatalogRepository', () {
@@ -34,10 +33,7 @@ void main() {
         Success<List<TrackSummary>>(remoteTracks),
       );
       final InMemoryCatalogCacheStore store = InMemoryCatalogCacheStore();
-      final OfflineCatalogRepository repo = OfflineCatalogRepository(
-        inner,
-        store,
-      );
+      final OfflineCatalogRepository repo = OfflineCatalogRepository(inner, store);
 
       final Result<List<TrackSummary>> result = await repo.getCatalog();
       final List<TrackSummary>? cached = await store.read();
@@ -53,16 +49,9 @@ void main() {
         const Err<List<TrackSummary>>(NetworkFailure()),
       );
       final InMemoryCatalogCacheStore store = InMemoryCatalogCacheStore(<TrackSummary>[
-        _track(
-          id: 'dp-900',
-          code: 'DP-900',
-          title: 'Microsoft Azure Data Fundamentals',
-        ),
+        _track(id: 'dp-900', code: 'DP-900', title: 'Microsoft Azure Data Fundamentals'),
       ]);
-      final OfflineCatalogRepository repo = OfflineCatalogRepository(
-        inner,
-        store,
-      );
+      final OfflineCatalogRepository repo = OfflineCatalogRepository(inner, store);
 
       final Result<List<TrackSummary>> result = await repo.getCatalog();
 
@@ -76,39 +65,25 @@ void main() {
         const Err<List<TrackSummary>>(NetworkFailure()),
       );
       final InMemoryCatalogCacheStore store = InMemoryCatalogCacheStore();
-      final OfflineCatalogRepository repo = OfflineCatalogRepository(
-        inner,
-        store,
-      );
+      final OfflineCatalogRepository repo = OfflineCatalogRepository(inner, store);
 
       final Result<List<TrackSummary>> result = await repo.getCatalog();
 
       expect(result.isFailure, isTrue);
-      expect(
-        (result as Err<List<TrackSummary>>).failure,
-        isA<NetworkFailure>(),
-      );
+      expect((result as Err<List<TrackSummary>>).failure, isA<NetworkFailure>());
     });
 
     test('returns original permanent failure even when cache exists', () async {
       final _ScriptedCatalogRepository inner = _ScriptedCatalogRepository(
         const Err<List<TrackSummary>>(NotFoundFailure()),
       );
-      final InMemoryCatalogCacheStore store = InMemoryCatalogCacheStore(
-        <TrackSummary>[_track()],
-      );
-      final OfflineCatalogRepository repo = OfflineCatalogRepository(
-        inner,
-        store,
-      );
+      final InMemoryCatalogCacheStore store = InMemoryCatalogCacheStore(<TrackSummary>[_track()]);
+      final OfflineCatalogRepository repo = OfflineCatalogRepository(inner, store);
 
       final Result<List<TrackSummary>> result = await repo.getCatalog();
 
       expect(result.isFailure, isTrue);
-      expect(
-        (result as Err<List<TrackSummary>>).failure,
-        isA<NotFoundFailure>(),
-      );
+      expect((result as Err<List<TrackSummary>>).failure, isA<NotFoundFailure>());
     });
   });
 }

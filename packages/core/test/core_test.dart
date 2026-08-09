@@ -102,16 +102,15 @@ void main() {
       String entraRedirectUri = 'certigo://auth/',
       String entraApiScope = 'api://client-123/user_impersonation',
       bool entraOptional = false,
-    }) =>
-        AppEnv.validateConfig(
-          flavor: flavor,
-          apiBaseUrl: apiBaseUrl,
-          entraClientId: entraClientId,
-          entraAuthority: entraAuthority,
-          entraRedirectUri: entraRedirectUri,
-          entraApiScope: entraApiScope,
-          entraOptional: entraOptional,
-        );
+    }) => AppEnv.validateConfig(
+      flavor: flavor,
+      apiBaseUrl: apiBaseUrl,
+      entraClientId: entraClientId,
+      entraAuthority: entraAuthority,
+      entraRedirectUri: entraRedirectUri,
+      entraApiScope: entraApiScope,
+      entraOptional: entraOptional,
+    );
 
     bool hasError(AppConfigReport r, String key) =>
         r.errors.any((AppConfigIssue i) => i.key == key);

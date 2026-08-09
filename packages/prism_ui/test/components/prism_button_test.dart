@@ -8,10 +8,7 @@ void main() {
   group('PrismButton', () {
     testWidgets('fires onPressed when tapped', (WidgetTester tester) async {
       int taps = 0;
-      await pumpPrism(
-        tester,
-        PrismButton(label: 'Continuer', onPressed: () => taps++),
-      );
+      await pumpPrism(tester, PrismButton(label: 'Continuer', onPressed: () => taps++));
 
       await tester.tap(find.byType(PrismButton));
       await tester.pumpAndSettle();
@@ -24,11 +21,7 @@ void main() {
       int taps = 0;
       await pumpPrism(
         tester,
-        PrismButton(
-          label: 'Chargement',
-          onPressed: () => taps++,
-          loading: true,
-        ),
+        PrismButton(label: 'Chargement', onPressed: () => taps++, loading: true),
       );
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
@@ -49,19 +42,16 @@ void main() {
       // separately via find.text.
       expect(
         tester.getSemantics(find.byType(PrismButton)),
-        containsSemantics(
-          isButton: true,
-          hasEnabledState: true,
-          isEnabled: false,
-        ),
+        containsSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
       );
       expect(find.text('Indispo'), findsOneWidget);
 
       handle.dispose();
     });
 
-    testWidgets('secondary and ghost variants build and show their label',
-        (WidgetTester tester) async {
+    testWidgets('secondary and ghost variants build and show their label', (
+      WidgetTester tester,
+    ) async {
       await pumpPrism(
         tester,
         const Column(

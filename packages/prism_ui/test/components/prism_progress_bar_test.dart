@@ -7,10 +7,7 @@ void main() {
   group('PrismProgressBar', () {
     testWidgets('exposes its percentage through semantics', (WidgetTester tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
-      await pumpPrism(
-        tester,
-        const PrismProgressBar(value: 0.5, semanticLabel: 'Progression'),
-      );
+      await pumpPrism(tester, const PrismProgressBar(value: 0.5, semanticLabel: 'Progression'));
       await tester.pumpAndSettle();
 
       expect(

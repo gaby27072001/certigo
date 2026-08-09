@@ -14,10 +14,7 @@ void main() {
       expect(theme.labelSmall, isNotNull);
       expect(theme.displayLarge?.fontFamily, isNotEmpty);
       expect(theme.bodyLarge?.fontFamily, isNotEmpty);
-      expect(
-        theme.displayLarge?.fontFamily,
-        isNot(theme.bodyLarge?.fontFamily),
-      );
+      expect(theme.displayLarge?.fontFamily, isNot(theme.bodyLarge?.fontFamily));
     });
 
     test('body text uses the primary color', () {
@@ -35,14 +32,8 @@ void main() {
 
     test('font sizes descend from display to label', () {
       final TextTheme theme = PrismTypography.build(primary, secondary);
-      expect(
-        theme.displayLarge!.fontSize,
-        greaterThan(theme.bodyLarge!.fontSize!),
-      );
-      expect(
-        theme.bodyLarge!.fontSize,
-        greaterThan(theme.labelSmall!.fontSize!),
-      );
+      expect(theme.displayLarge!.fontSize, greaterThan(theme.bodyLarge!.fontSize!));
+      expect(theme.bodyLarge!.fontSize, greaterThan(theme.labelSmall!.fontSize!));
     });
   });
 

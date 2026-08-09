@@ -65,8 +65,8 @@ typedef LessonJsonWrite = Future<void> Function(String json);
 /// `{"manifestVersion": "<v>", "lessons": {"<track>/<lesson>": {..lesson..}}}`.
 class JsonLessonCacheStore implements LessonCacheStore {
   JsonLessonCacheStore({required LessonJsonRead read, required LessonJsonWrite write})
-      : _read = read,
-        _write = write;
+    : _read = read,
+      _write = write;
 
   final LessonJsonRead _read;
   final LessonJsonWrite _write;
@@ -114,8 +114,8 @@ class JsonLessonCacheStore implements LessonCacheStore {
     // start fresh so content from a previous manifest version is purged.
     final Map<String, dynamic> lessons =
         (doc != null && doc['manifestVersion'] == manifestVersion && doc['lessons'] is Map)
-            ? Map<String, dynamic>.from(doc['lessons'] as Map)
-            : <String, dynamic>{};
+        ? Map<String, dynamic>.from(doc['lessons'] as Map)
+        : <String, dynamic>{};
 
     lessons[_lessonKey(lesson.trackId, lesson.id)] = lesson.toJson();
 

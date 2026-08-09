@@ -51,19 +51,14 @@ class PrismStepSwitcher extends StatelessWidget {
       layoutBuilder: (Widget? current, List<Widget> previous) {
         return Stack(
           alignment: alignment,
-          children: <Widget>[
-            ...previous,
-            if (current != null) current,
-          ],
+          children: <Widget>[...previous, if (current != null) current],
         );
       },
       transitionBuilder: (Widget child, Animation<double> animation) {
         final Animation<Offset> offset = Tween<Offset>(
           begin: Offset(slideExtent, 0),
           end: Offset.zero,
-        ).animate(
-          CurvedAnimation(parent: animation, curve: PrismMotion.decelerate),
-        );
+        ).animate(CurvedAnimation(parent: animation, curve: PrismMotion.decelerate));
         return FadeTransition(
           opacity: animation,
           child: SlideTransition(position: offset, child: child),

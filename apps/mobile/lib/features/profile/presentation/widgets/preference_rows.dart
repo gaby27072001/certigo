@@ -23,18 +23,12 @@ class ThemeRow extends StatelessWidget {
         SegmentedButton<ThemeMode>(
           style: const ButtonStyle(visualDensity: VisualDensity.compact),
           segments: const <ButtonSegment<ThemeMode>>[
-            ButtonSegment<ThemeMode>(
-              value: ThemeMode.light,
-              icon: Icon(Icons.light_mode_rounded),
-            ),
+            ButtonSegment<ThemeMode>(value: ThemeMode.light, icon: Icon(Icons.light_mode_rounded)),
             ButtonSegment<ThemeMode>(
               value: ThemeMode.system,
               icon: Icon(Icons.brightness_auto_rounded),
             ),
-            ButtonSegment<ThemeMode>(
-              value: ThemeMode.dark,
-              icon: Icon(Icons.dark_mode_rounded),
-            ),
+            ButtonSegment<ThemeMode>(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_rounded)),
           ],
           selected: <ThemeMode>{mode},
           onSelectionChanged: (Set<ThemeMode> s) => onChanged(s.first),
@@ -115,10 +109,7 @@ class _NotificationPrefRowState extends State<NotificationPrefRow> {
           Icon(Icons.notifications_rounded, color: p.textSecondary, size: 20),
           const SizedBox(width: 12),
           Expanded(child: Text('Rappels quotidiens', style: t.bodyLarge)),
-          Text(
-            _trailingLabel,
-            style: t.labelMedium?.copyWith(color: p.primary),
-          ),
+          Text(_trailingLabel, style: t.labelMedium?.copyWith(color: p.primary)),
           const SizedBox(width: 4),
           Icon(Icons.chevron_right_rounded, color: p.textSecondary, size: 18),
         ],
@@ -188,10 +179,7 @@ class LanguagePrefRow extends StatelessWidget {
           ],
         ),
         actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Fermer'),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Fermer')),
         ],
       ),
     );
@@ -233,9 +221,7 @@ class _ComingSoonChip extends StatelessWidget {
       ),
       child: Text(
         'Bientôt',
-        style: Theme.of(
-          context,
-        ).textTheme.labelSmall?.copyWith(color: p.textSecondary),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textSecondary),
       ),
     );
   }

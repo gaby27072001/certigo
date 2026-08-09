@@ -75,8 +75,9 @@ void main() {
     test('goes loading then ready and forwards the request unchanged', () async {
       final _FakeTutorRepo repo = _FakeTutorRepo(const Success<TutorExplanation>(_explanation));
       final ProviderContainer container = containerWith(repo);
-      final TutorController controller =
-          container.read(tutorControllerProvider(_req.itemId).notifier);
+      final TutorController controller = container.read(
+        tutorControllerProvider(_req.itemId).notifier,
+      );
 
       final Future<void> pending = controller.explain(_req);
       expect(container.read(tutorControllerProvider(_req.itemId)).status, TutorStatus.loading);
@@ -95,8 +96,9 @@ void main() {
       final ProviderContainer container = containerWith(
         _FakeTutorRepo(const Err<TutorExplanation>(NetworkFailure())),
       );
-      final TutorController controller =
-          container.read(tutorControllerProvider(_req.itemId).notifier);
+      final TutorController controller = container.read(
+        tutorControllerProvider(_req.itemId).notifier,
+      );
 
       await controller.explain(_req);
 
@@ -110,8 +112,9 @@ void main() {
     test('ignores a second call while a request is already in flight', () async {
       final _FakeTutorRepo repo = _FakeTutorRepo(const Success<TutorExplanation>(_explanation));
       final ProviderContainer container = containerWith(repo);
-      final TutorController controller =
-          container.read(tutorControllerProvider(_req.itemId).notifier);
+      final TutorController controller = container.read(
+        tutorControllerProvider(_req.itemId).notifier,
+      );
 
       final Future<void> first = controller.explain(_req);
       // Second call lands while the first is mid-flight → must be dropped.

@@ -45,7 +45,8 @@ class _EmailVerificationBannerState extends ConsumerState<EmailVerificationBanne
   @override
   Widget build(BuildContext context) {
     final AuthState state = ref.watch(authControllerProvider);
-    final bool show = state is Authenticated &&
+    final bool show =
+        state is Authenticated &&
         state.session.provider == AuthProvider.email &&
         !state.session.emailVerified;
     if (!show) return const SizedBox.shrink();
@@ -74,8 +75,10 @@ class _EmailVerificationBannerState extends ConsumerState<EmailVerificationBanne
                 Expanded(
                   child: Text(
                     'Confirme ton adresse e-mail',
-                    style: text.titleSmall
-                        ?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700),
+                    style: text.titleSmall?.copyWith(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],

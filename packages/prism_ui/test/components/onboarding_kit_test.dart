@@ -22,9 +22,7 @@ void main() {
           home: MediaQuery(
             data: const MediaQueryData(disableAnimations: true),
             child: Theme(
-              data: ThemeData(
-                extensions: <ThemeExtension<dynamic>>[PrismColorScheme.light],
-              ),
+              data: ThemeData(extensions: <ThemeExtension<dynamic>>[PrismColorScheme.light]),
               child: const Scaffold(body: TypewriterText('Bonjour')),
             ),
           ),
@@ -37,10 +35,7 @@ void main() {
 
     testWidgets('fires onComplete', (WidgetTester tester) async {
       var done = false;
-      await pumpPrism(
-        tester,
-        TypewriterText('Hi', onComplete: () => done = true),
-      );
+      await pumpPrism(tester, TypewriterText('Hi', onComplete: () => done = true));
       await tester.pumpAndSettle();
       expect(done, isTrue);
     });
@@ -67,20 +62,14 @@ void main() {
     });
 
     testWidgets('hides the badge when not recommended', (WidgetTester tester) async {
-      await pumpPrism(
-        tester,
-        const RecommendedOptionCard(title: 'Gratuit'),
-      );
+      await pumpPrism(tester, const RecommendedOptionCard(title: 'Gratuit'));
       expect(find.text('RECOMMANDÉ'), findsNothing);
     });
   });
 
   group('SignalBars', () {
     testWidgets('paints without exception', (WidgetTester tester) async {
-      await pumpPrism(
-        tester,
-        const SignalBars(level: 2, color: Color(0xFF0078D4)),
-      );
+      await pumpPrism(tester, const SignalBars(level: 2, color: Color(0xFF0078D4)));
       expect(find.byType(SignalBars), findsOneWidget);
       expect(tester.takeException(), isNull);
     });

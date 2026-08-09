@@ -12,9 +12,9 @@ import 'package:prism_ui/prism_ui.dart';
 /// and urgency affordances render, and that taps fire.
 void main() {
   Widget host(Widget child) => MaterialApp(
-        theme: PrismTheme.light(),
-        home: Scaffold(body: Center(child: child)),
-      );
+    theme: PrismTheme.light(),
+    home: Scaffold(body: Center(child: child)),
+  );
 
   Recommendation rec({
     RecommendationKind kind = RecommendationKind.review,
@@ -44,13 +44,7 @@ void main() {
   testWidgets('prominent card shows label, title, reason, time and fires onTap', (tester) async {
     var tapped = false;
     await tester.pumpWidget(
-      host(
-        CoachCard(
-          item: rec(),
-          prominent: true,
-          onTap: () => tapped = true,
-        ),
-      ),
+      host(CoachCard(item: rec(), prominent: true, onTap: () => tapped = true)),
     );
 
     expect(find.text('À RÉVISER'), findsOneWidget);

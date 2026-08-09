@@ -17,9 +17,7 @@ import 'renderer_registry.dart';
 /// payload defensively via [ContentBlock]; a missing required field raises a
 /// [FormatException] that [RendererRegistry.build] converts into a
 /// malformed-data fallback, so a bad payload can never crash a lesson.
-RendererRegistry standardRendererRegistry({
-  int schemaVersion = RendererSchema.current,
-}) {
+RendererRegistry standardRendererRegistry({int schemaVersion = RendererSchema.current}) {
   final RendererRegistry registry = RendererRegistry(schemaVersion: schemaVersion);
 
   registry.register(
@@ -29,39 +27,29 @@ RendererRegistry standardRendererRegistry({
 
   registry.register(
     'concept',
-    (BuildContext context, ContentBlock block) => ConceptBlock(
-      title: block.optionalString('title'),
-      body: block.requireString('body'),
-    ),
+    (BuildContext context, ContentBlock block) =>
+        ConceptBlock(title: block.optionalString('title'), body: block.requireString('body')),
   );
 
-  registry.register(
-    'example',
-    (BuildContext context, ContentBlock block) {
-      final String? title = block.optionalString('title');
-      final String body = block.requireString('body');
-      return title != null ? ScenarioBlock(title: title, body: body) : ScenarioBlock(body: body);
-    },
-  );
+  registry.register('example', (BuildContext context, ContentBlock block) {
+    final String? title = block.optionalString('title');
+    final String body = block.requireString('body');
+    return title != null ? ScenarioBlock(title: title, body: body) : ScenarioBlock(body: body);
+  });
 
   registry.register(
     'code',
-    (BuildContext context, ContentBlock block) => CodeBlock(
-      code: block.requireString('code'),
-      language: block.optionalString('language'),
-    ),
+    (BuildContext context, ContentBlock block) =>
+        CodeBlock(code: block.requireString('code'), language: block.optionalString('language')),
   );
 
-  registry.register(
-    'recap',
-    (BuildContext context, ContentBlock block) {
-      final String? title = block.optionalString('title');
-      final String body = block.requireString('body');
-      return title != null
-          ? KeyTakeawayBlock(title: title, body: body)
-          : KeyTakeawayBlock(body: body);
-    },
-  );
+  registry.register('recap', (BuildContext context, ContentBlock block) {
+    final String? title = block.optionalString('title');
+    final String body = block.requireString('body');
+    return title != null
+        ? KeyTakeawayBlock(title: title, body: body)
+        : KeyTakeawayBlock(body: body);
+  });
 
   registry.register(
     'callout',

@@ -80,10 +80,9 @@ class _PrismButtonState extends State<PrismButton> {
     final bool depth = widget.variant != PrismButtonVariant.ghost;
     final double lip = depth ? 4 : 0;
     final double sink = depth && _down ? lip : 0;
-    final TextStyle labelStyle = Theme.of(context).textTheme.labelLarge!.copyWith(
-          color: _foreground(p),
-          fontWeight: FontWeight.w700,
-        );
+    final TextStyle labelStyle = Theme.of(
+      context,
+    ).textTheme.labelLarge!.copyWith(color: _foreground(p), fontWeight: FontWeight.w700);
 
     final Widget content = Row(
       mainAxisSize: widget.expand ? MainAxisSize.max : MainAxisSize.min,
@@ -103,7 +102,9 @@ class _PrismButtonState extends State<PrismButton> {
             Icon(widget.icon, size: 20, color: _foreground(p)),
             const SizedBox(width: 8),
           ],
-          Flexible(child: Text(widget.label, style: labelStyle, overflow: TextOverflow.ellipsis)),
+          Flexible(
+            child: Text(widget.label, style: labelStyle, overflow: TextOverflow.ellipsis),
+          ),
         ],
       ],
     );
@@ -129,10 +130,7 @@ class _PrismButtonState extends State<PrismButton> {
                     top: lip,
                     left: 0,
                     right: 0,
-                    child: Container(
-                      height: 54,
-                      decoration: _baseDecoration(p),
-                    ),
+                    child: Container(height: 54, decoration: _baseDecoration(p)),
                   ),
                 AnimatedPositioned(
                   duration: fast,
@@ -162,10 +160,10 @@ class _PrismButtonState extends State<PrismButton> {
   }
 
   Color _foreground(PrismColorScheme p) => switch (widget.variant) {
-        PrismButtonVariant.primary => Colors.white,
-        PrismButtonVariant.secondary => widget.tone ?? p.primary,
-        PrismButtonVariant.ghost => widget.tone ?? p.textSecondary,
-      };
+    PrismButtonVariant.primary => Colors.white,
+    PrismButtonVariant.secondary => widget.tone ?? p.primary,
+    PrismButtonVariant.ghost => widget.tone ?? p.textSecondary,
+  };
 
   BoxDecoration _topDecoration(PrismColorScheme p) {
     final Color tone = widget.tone ?? p.primary;
@@ -185,9 +183,7 @@ class _PrismButtonState extends State<PrismButton> {
               ? const <BoxShadow>[]
               : <BoxShadow>[
                   BoxShadow(
-                    color: tone.withOpacity(
-                      p.brightness == Brightness.dark ? 0.42 : 0.32,
-                    ),
+                    color: tone.withOpacity(p.brightness == Brightness.dark ? 0.42 : 0.32),
                     blurRadius: 26,
                     offset: const Offset(0, 12),
                     spreadRadius: -6,
@@ -215,10 +211,7 @@ class _PrismButtonState extends State<PrismButton> {
         final Color base = widget.tone == null
             ? p.primaryDark
             : Color.alphaBlend(Colors.black.withOpacity(0.24), tone);
-        return BoxDecoration(
-          borderRadius: PrismRadii.buttonAll,
-          color: base,
-        );
+        return BoxDecoration(borderRadius: PrismRadii.buttonAll, color: base);
       case PrismButtonVariant.secondary:
         final Color base = Color.alphaBlend(
           tone.withOpacity(p.brightness == Brightness.dark ? 0.34 : 0.24),

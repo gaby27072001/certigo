@@ -5,9 +5,9 @@ import 'package:prism_ui/prism_ui.dart';
 /// Smoke tests for the playful "Duo kit" onboarding primitives.
 void main() {
   Widget host(Widget child) => MaterialApp(
-        theme: PrismTheme.light(),
-        home: Scaffold(body: Center(child: child)),
-      );
+    theme: PrismTheme.light(),
+    home: Scaffold(body: Center(child: child)),
+  );
 
   testWidgets('SpeechBubble paints and shows its child', (tester) async {
     await tester.pumpWidget(host(const SpeechBubble(child: Text('Salut !'))));

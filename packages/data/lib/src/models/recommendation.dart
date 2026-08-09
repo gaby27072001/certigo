@@ -7,11 +7,7 @@ library;
 /// active struggles and the skill-path frontier. The client renders [items] as
 /// an ordered shelf of cards; [top] is the single highest-leverage action.
 class NextBest {
-  const NextBest({
-    required this.trackId,
-    required this.generatedAt,
-    required this.items,
-  });
+  const NextBest({required this.trackId, required this.generatedAt, required this.items});
 
   final String trackId;
   final DateTime generatedAt;
@@ -26,7 +22,8 @@ class NextBest {
   factory NextBest.fromJson(Map<String, dynamic> json) {
     return NextBest(
       trackId: json['trackId'] as String? ?? '',
-      generatedAt: DateTime.tryParse(json['generatedAt'] as String? ?? '')?.toUtc() ??
+      generatedAt:
+          DateTime.tryParse(json['generatedAt'] as String? ?? '')?.toUtc() ??
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
       items: (json['items'] as List<dynamic>? ?? <dynamic>[])
           .whereType<Map<String, dynamic>>()

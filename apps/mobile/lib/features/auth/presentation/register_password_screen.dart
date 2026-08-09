@@ -52,7 +52,9 @@ class _RegisterPasswordScreenState extends ConsumerState<RegisterPasswordScreen>
     draftCtrl.setPassword(_password.text);
     final RegisterDraft draft = ref.read(registerDraftProvider);
     setState(() => _submitting = true);
-    ref.read(authControllerProvider.notifier).registerWithEmail(
+    ref
+        .read(authControllerProvider.notifier)
+        .registerWithEmail(
           email: draft.email,
           password: draft.password,
           displayName: draft.displayName.isEmpty ? null : draft.displayName,

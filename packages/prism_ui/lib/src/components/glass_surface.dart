@@ -101,11 +101,7 @@ class GlassSurface extends StatelessWidget {
 
 /// Lightweight scale-on-press wrapper used across tappable glass surfaces.
 class _Pressable extends StatefulWidget {
-  const _Pressable({
-    required this.child,
-    required this.onTap,
-    required this.borderRadius,
-  });
+  const _Pressable({required this.child, required this.onTap, required this.borderRadius});
 
   final Widget child;
   final VoidCallback onTap;

@@ -12,23 +12,20 @@ class _ScriptedQuiz implements QuizRepository {
   Future<Result<SubmitQuizResult>> submit({
     required String lessonId,
     required SubmitQuizRequest request,
-  }) async =>
-      result;
+  }) async => result;
 }
 
 SubmitQuizRequest _request(String key) => SubmitQuizRequest(
-      clientAttemptId: key,
-      trackId: 'az-900',
-      startedAt: DateTime.utc(2026),
-      answers: const <QuizAnswer>[],
-    );
+  clientAttemptId: key,
+  trackId: 'az-900',
+  startedAt: DateTime.utc(2026),
+  answers: const <QuizAnswer>[],
+);
 
 Future<SyncDispatch> _alwaysSucceed(SyncAction _) async => SyncDispatch.success;
 
-SyncEngine _engine({SyncSender? sender}) => SyncEngine(
-      store: InMemorySyncQueueStore(),
-      sender: sender ?? _alwaysSucceed,
-    );
+SyncEngine _engine({SyncSender? sender}) =>
+    SyncEngine(store: InMemorySyncQueueStore(), sender: sender ?? _alwaysSucceed);
 
 void main() {
   group('OfflineQuizRepository', () {
@@ -38,8 +35,10 @@ void main() {
       final SyncEngine engine = _engine();
       final OfflineQuizRepository repo = OfflineQuizRepository(inner, engine);
 
-      final Result<SubmitQuizResult> result =
-          await repo.submit(lessonId: 'L1', request: _request('k1'));
+      final Result<SubmitQuizResult> result = await repo.submit(
+        lessonId: 'L1',
+        request: _request('k1'),
+      );
 
       expect(result.isSuccess, isTrue);
       expect(engine.pendingCount, 0);
@@ -51,8 +50,10 @@ void main() {
       final SyncEngine engine = _engine();
       final OfflineQuizRepository repo = OfflineQuizRepository(inner, engine);
 
-      final Result<SubmitQuizResult> result =
-          await repo.submit(lessonId: 'L1', request: _request('k1'));
+      final Result<SubmitQuizResult> result = await repo.submit(
+        lessonId: 'L1',
+        request: _request('k1'),
+      );
 
       expect(result.isFailure, isTrue);
       expect(engine.pendingCount, 1);
@@ -70,8 +71,10 @@ void main() {
       final SyncEngine engine = _engine();
       final OfflineQuizRepository repo = OfflineQuizRepository(inner, engine);
 
-      final Result<SubmitQuizResult> result =
-          await repo.submit(lessonId: 'L1', request: _request('k1'));
+      final Result<SubmitQuizResult> result = await repo.submit(
+        lessonId: 'L1',
+        request: _request('k1'),
+      );
 
       expect(result.isFailure, isTrue);
       expect(engine.pendingCount, 0);

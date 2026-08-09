@@ -41,9 +41,7 @@ class CertPickerSheet extends ConsumerWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.82,
-        ),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.82),
         decoration: BoxDecoration(
           color: p.background,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
@@ -94,7 +92,8 @@ class CertPickerSheet extends ConsumerWidget {
                   ),
                   loading: () => const _CertLoading(),
                   error: (Object err, StackTrace __) {
-                    final bool isEmptyCatalog = err is CatalogEmptyFailure ||
+                    final bool isEmptyCatalog =
+                        err is CatalogEmptyFailure ||
                         (err is ServerFailure && err.statusCode == 503);
                     return _CertError(
                       title: isEmptyCatalog ? 'Catalogue vide' : 'Catalogue indisponible',
@@ -116,11 +115,7 @@ class CertPickerSheet extends ConsumerWidget {
 }
 
 class _CertList extends StatelessWidget {
-  const _CertList({
-    required this.tracks,
-    required this.activeId,
-    required this.onSelect,
-  });
+  const _CertList({required this.tracks, required this.activeId, required this.onSelect});
 
   final List<TrackSummary> tracks;
   final String activeId;
@@ -173,10 +168,7 @@ class _Grip extends StatelessWidget {
       width: 44,
       height: 5,
       margin: const EdgeInsets.only(top: 12, bottom: 6),
-      decoration: BoxDecoration(
-        color: p.border,
-        borderRadius: BorderRadius.circular(3),
-      ),
+      decoration: BoxDecoration(color: p.border, borderRadius: BorderRadius.circular(3)),
     );
   }
 }
@@ -221,17 +213,9 @@ class _CertError extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: <Widget>[
-        CalloutBlock(
-          kind: calloutKind,
-          title: title,
-          text: message,
-        ),
+        CalloutBlock(kind: calloutKind, title: title, text: message),
         const SizedBox(height: 18),
-        PrismButton.secondary(
-          label: 'Réessayer',
-          icon: Icons.refresh_rounded,
-          onPressed: onRetry,
-        ),
+        PrismButton.secondary(label: 'Réessayer', icon: Icons.refresh_rounded, onPressed: onRetry),
       ],
     );
   }

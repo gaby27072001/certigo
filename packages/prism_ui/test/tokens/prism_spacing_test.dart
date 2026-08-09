@@ -32,10 +32,7 @@ void main() {
     });
 
     test('screen padding uses the gutter and lg tokens', () {
-      expect(
-        PrismSpacing.screen,
-        const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      );
+      expect(PrismSpacing.screen, const EdgeInsets.symmetric(horizontal: 20, vertical: 24));
     });
 
     test('card padding is a symmetric md inset', () {

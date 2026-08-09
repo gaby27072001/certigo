@@ -31,10 +31,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
           decoration: const InputDecoration(labelText: 'Nom d\'affichage'),
         ),
         actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Annuler'),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Annuler')),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(ctrl.text),
             child: const Text('Enregistrer'),
@@ -63,10 +60,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
               TextField(
                 controller: ctrl,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Pseudo',
-                  prefixText: '@',
-                ),
+                decoration: const InputDecoration(labelText: 'Pseudo', prefixText: '@'),
                 onChanged: (String v) {
                   final bool valid = RegExp(r'^[a-z0-9_]*$').hasMatch(v);
                   setDialogState(() {
@@ -79,19 +73,13 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
                   padding: const EdgeInsets.only(top: PrismSpacing.debt6),
                   child: Text(
                     validationError!,
-                    style: TextStyle(
-                      color: Theme.of(ctx2).colorScheme.error,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Theme.of(ctx2).colorScheme.error, fontSize: 12),
                   ),
                 ),
             ],
           ),
           actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(ctx2).pop(),
-              child: const Text('Annuler'),
-            ),
+            TextButton(onPressed: () => Navigator.of(ctx2).pop(), child: const Text('Annuler')),
             TextButton(
               onPressed: validationError == null ? () => Navigator.of(ctx2).pop(ctrl.text) : null,
               child: const Text('Enregistrer'),
@@ -114,10 +102,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
           'Cette action est irréversible. Toutes vos données seront supprimées définitivement.',
         ),
         actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Annuler'),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Annuler')),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             onPressed: () => Navigator.of(ctx).pop(true),

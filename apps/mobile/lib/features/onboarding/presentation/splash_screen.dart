@@ -83,17 +83,17 @@ class _SplashScreenState extends State<SplashScreen> {
                           Text(
                             'Certigo',
                             style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.5,
-                                ),
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5,
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             'Tes certifs Microsoft, leçon par leçon',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white.withOpacity(0.85),
-                                ),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(color: Colors.white.withOpacity(0.85)),
                           ),
                         ],
                       ),

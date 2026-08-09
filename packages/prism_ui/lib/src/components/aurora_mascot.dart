@@ -51,48 +51,48 @@ enum MascotShape { disc, free }
 extension AuroraMascotInfo on AuroraMascot {
   /// Short display name shown on banners and headers.
   String get displayName => switch (this) {
-        AuroraMascot.nimbus => 'Nimbus',
-        AuroraMascot.volt => 'Volt',
-        AuroraMascot.cosmo => 'Cosmo',
-        AuroraMascot.sentinel => 'Sentinel',
-        AuroraMascot.bicky => 'Bicky',
-        AuroraMascot.pixel => 'Pixel',
-        AuroraMascot.pip => 'Pip',
-      };
+    AuroraMascot.nimbus => 'Nimbus',
+    AuroraMascot.volt => 'Volt',
+    AuroraMascot.cosmo => 'Cosmo',
+    AuroraMascot.sentinel => 'Sentinel',
+    AuroraMascot.bicky => 'Bicky',
+    AuroraMascot.pixel => 'Pixel',
+    AuroraMascot.pip => 'Pip',
+  };
 
   /// Pedagogical role, used for accessibility labels.
   String get role => switch (this) {
-        AuroraMascot.nimbus => 'la mascotte Azure',
-        AuroraMascot.volt => 'Azure Functions',
-        AuroraMascot.cosmo => 'Azure Cosmos DB',
-        AuroraMascot.sentinel => 'Microsoft Defender',
-        AuroraMascot.bicky => 'Bicep',
-        AuroraMascot.pixel => 'Azure AI',
-        AuroraMascot.pip => 'Stockage Blob',
-      };
+    AuroraMascot.nimbus => 'la mascotte Azure',
+    AuroraMascot.volt => 'Azure Functions',
+    AuroraMascot.cosmo => 'Azure Cosmos DB',
+    AuroraMascot.sentinel => 'Microsoft Defender',
+    AuroraMascot.bicky => 'Bicep',
+    AuroraMascot.pixel => 'Azure AI',
+    AuroraMascot.pip => 'Stockage Blob',
+  };
 
   /// Signature color — stable per member, color-blind aware.
   Color get color => switch (this) {
-        AuroraMascot.nimbus => const Color(0xFF0078D4),
-        AuroraMascot.volt => const Color(0xFFFFB020),
-        AuroraMascot.cosmo => const Color(0xFF8C5CF6),
-        AuroraMascot.sentinel => const Color(0xFF0EA5A5),
-        AuroraMascot.bicky => const Color(0xFFFF7A45),
-        AuroraMascot.pixel => const Color(0xFFF0476A),
-        AuroraMascot.pip => const Color(0xFF0078D4),
-      };
+    AuroraMascot.nimbus => const Color(0xFF0078D4),
+    AuroraMascot.volt => const Color(0xFFFFB020),
+    AuroraMascot.cosmo => const Color(0xFF8C5CF6),
+    AuroraMascot.sentinel => const Color(0xFF0EA5A5),
+    AuroraMascot.bicky => const Color(0xFFFF7A45),
+    AuroraMascot.pixel => const Color(0xFFF0476A),
+    AuroraMascot.pip => const Color(0xFF0078D4),
+  };
 
   /// Service / concept icon shown on the mascot's badge — echoes the real Azure
   /// service the mascot gamifies (used by the procedural fallback face).
   IconData get icon => switch (this) {
-        AuroraMascot.nimbus => Icons.cloud_rounded,
-        AuroraMascot.volt => Icons.bolt_rounded,
-        AuroraMascot.cosmo => Icons.bubble_chart_rounded,
-        AuroraMascot.sentinel => Icons.shield_rounded,
-        AuroraMascot.bicky => Icons.fitness_center_rounded,
-        AuroraMascot.pixel => Icons.auto_awesome_rounded,
-        AuroraMascot.pip => Icons.water_drop_rounded,
-      };
+    AuroraMascot.nimbus => Icons.cloud_rounded,
+    AuroraMascot.volt => Icons.bolt_rounded,
+    AuroraMascot.cosmo => Icons.bubble_chart_rounded,
+    AuroraMascot.sentinel => Icons.shield_rounded,
+    AuroraMascot.bicky => Icons.fitness_center_rounded,
+    AuroraMascot.pixel => Icons.auto_awesome_rounded,
+    AuroraMascot.pip => Icons.water_drop_rounded,
+  };
 }
 
 /// A stylised mascot avatar: a luminous gradient disc with a friendly face and
@@ -251,9 +251,7 @@ class MascotAvatar extends StatelessWidget {
             ),
           ),
           // Friendly face.
-          Positioned.fill(
-            child: CustomPaint(painter: _MascotFacePainter(mood)),
-          ),
+          Positioned.fill(child: CustomPaint(painter: _MascotFacePainter(mood))),
           // Service badge.
           if (showBadge) _badge(dark),
         ],

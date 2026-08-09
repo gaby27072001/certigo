@@ -48,21 +48,22 @@ class ShareCard {
   String get formattedHandle => handle.trim().isEmpty ? '' : '@${handle.trim()}';
 
   factory ShareCard.fromJson(Map<String, dynamic> json) => ShareCard(
-        shareId: json['shareId'] as String? ?? '',
-        displayName: json['displayName'] as String? ?? 'Apprenant',
-        handle: json['handle'] as String? ?? '',
-        streakDays: (json['streakDays'] as num?)?.toInt() ?? 0,
-        level: (json['level'] as num?)?.toInt() ?? 1,
-        dailyXp: (json['dailyXp'] as num?)?.toInt() ?? 0,
-        dailyGoalXp: (json['dailyGoalXp'] as num?)?.toInt() ?? 0,
-        goalMet: json['goalMet'] as bool? ?? false,
-        readinessScore: (json['readinessScore'] as num?)?.toInt() ?? 0,
-        trackCode: json['trackCode'] as String? ?? '',
-        mascot: json['mascot'] as String? ?? '',
-        headline: json['headline'] as String? ?? '',
-        caption: json['caption'] as String? ?? '',
-        referralCode: json['referralCode'] as String? ?? '',
-        generatedAt: DateTime.tryParse(json['generatedAt'] as String? ?? '')?.toUtc() ??
-            DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
-      );
+    shareId: json['shareId'] as String? ?? '',
+    displayName: json['displayName'] as String? ?? 'Apprenant',
+    handle: json['handle'] as String? ?? '',
+    streakDays: (json['streakDays'] as num?)?.toInt() ?? 0,
+    level: (json['level'] as num?)?.toInt() ?? 1,
+    dailyXp: (json['dailyXp'] as num?)?.toInt() ?? 0,
+    dailyGoalXp: (json['dailyGoalXp'] as num?)?.toInt() ?? 0,
+    goalMet: json['goalMet'] as bool? ?? false,
+    readinessScore: (json['readinessScore'] as num?)?.toInt() ?? 0,
+    trackCode: json['trackCode'] as String? ?? '',
+    mascot: json['mascot'] as String? ?? '',
+    headline: json['headline'] as String? ?? '',
+    caption: json['caption'] as String? ?? '',
+    referralCode: json['referralCode'] as String? ?? '',
+    generatedAt:
+        DateTime.tryParse(json['generatedAt'] as String? ?? '')?.toUtc() ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+  );
 }
