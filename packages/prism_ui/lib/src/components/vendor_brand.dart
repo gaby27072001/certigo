@@ -34,12 +34,12 @@ enum VendorBrand {
 extension VendorBrandInfo on VendorBrand {
   /// Brand name shown under the tile (kept in the vendor's own wording).
   String get label => switch (this) {
-        VendorBrand.microsoft => 'Microsoft',
-        VendorBrand.github => 'GitHub',
-        VendorBrand.google => 'Google',
-        VendorBrand.aws => 'AWS',
-        VendorBrand.openai => 'OpenAI',
-      };
+    VendorBrand.microsoft => 'Microsoft',
+    VendorBrand.github => 'GitHub',
+    VendorBrand.google => 'Google',
+    VendorBrand.aws => 'AWS',
+    VendorBrand.openai => 'OpenAI',
+  };
 
   /// A stable id, used for routing (`/library/vendor/:vendorId`).
   String get id => name;
@@ -47,19 +47,19 @@ extension VendorBrandInfo on VendorBrand {
   /// Signature brand color — a representative single hue for chips, borders and
   /// accent washes. The multi-color logos are drawn by [VendorLogo].
   Color get brandColor => switch (this) {
-        VendorBrand.microsoft => const Color(0xFF0078D4),
-        VendorBrand.github => const Color(0xFF24292F),
-        VendorBrand.google => const Color(0xFF4285F4),
-        VendorBrand.aws => const Color(0xFFFF9900),
-        VendorBrand.openai => const Color(0xFF10A37F),
-      };
+    VendorBrand.microsoft => const Color(0xFF0078D4),
+    VendorBrand.github => const Color(0xFF24292F),
+    VendorBrand.google => const Color(0xFF4285F4),
+    VendorBrand.aws => const Color(0xFFFF9900),
+    VendorBrand.openai => const Color(0xFF10A37F),
+  };
 
   /// Resolves a [VendorBrand] from its [id]; falls back to Microsoft, the
   /// flagship vendor, for unknown ids.
   static VendorBrand fromId(String id) => VendorBrand.values.firstWhere(
-        (VendorBrand v) => v.id == id,
-        orElse: () => VendorBrand.microsoft,
-      );
+    (VendorBrand v) => v.id == id,
+    orElse: () => VendorBrand.microsoft,
+  );
 }
 
 /// A trademark-safe, hand-drawn vendor "logo" pastille.

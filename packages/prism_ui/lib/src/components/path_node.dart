@@ -164,12 +164,7 @@ class _PathNodeState extends State<PathNode> with SingleTickerProviderStateMixin
       ],
     );
 
-    return Semantics(
-      button: _tappable,
-      enabled: _tappable,
-      label: _semanticLabel(),
-      child: node,
-    );
+    return Semantics(button: _tappable, enabled: _tappable, label: _semanticLabel(), child: node);
   }
 
   Widget _buildBubble(_NodeVisual v, double lip) {
@@ -247,12 +242,12 @@ class _PathNodeState extends State<PathNode> with SingleTickerProviderStateMixin
   }
 
   String _statusLabel() => switch (widget.status) {
-        PathNodeStatus.mastered => 'maîtrisée',
-        PathNodeStatus.completed => 'terminée',
-        PathNodeStatus.inProgress => 'en cours',
-        PathNodeStatus.available => 'disponible',
-        PathNodeStatus.locked => 'verrouillée',
-      };
+    PathNodeStatus.mastered => 'maîtrisée',
+    PathNodeStatus.completed => 'terminée',
+    PathNodeStatus.inProgress => 'en cours',
+    PathNodeStatus.available => 'disponible',
+    PathNodeStatus.locked => 'verrouillée',
+  };
 
   _NodeVisual _visualFor(
     PathNodeStatus status,
@@ -412,11 +407,7 @@ class _CallOut extends StatelessWidget {
             color: accent,
             borderRadius: BorderRadius.circular(999),
             boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: accent.withOpacity(0.4),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
+              BoxShadow(color: accent.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4)),
             ],
           ),
           child: Text(

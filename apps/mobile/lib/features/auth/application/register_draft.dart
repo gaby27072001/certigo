@@ -24,12 +24,7 @@ class RegisterDraft {
   /// famille étant facultatif, on retombe proprement sur le seul prénom).
   String get displayName => '$firstName $lastName'.trim();
 
-  RegisterDraft copyWith({
-    String? firstName,
-    String? lastName,
-    String? email,
-    String? password,
-  }) {
+  RegisterDraft copyWith({String? firstName, String? lastName, String? email, String? password}) {
     return RegisterDraft(
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
@@ -57,5 +52,6 @@ class RegisterDraftController extends Notifier<RegisterDraft> {
 }
 
 /// Provider du brouillon d'inscription (feature `auth`).
-final registerDraftProvider =
-    NotifierProvider<RegisterDraftController, RegisterDraft>(RegisterDraftController.new);
+final registerDraftProvider = NotifierProvider<RegisterDraftController, RegisterDraft>(
+  RegisterDraftController.new,
+);

@@ -93,10 +93,7 @@ class PrismCard extends StatelessWidget {
         border = Border.all(color: p.border);
         shadow = _shadowFor(elevation, p.brightness);
       case PrismCardVariant.tonal:
-        fill = Color.alphaBlend(
-          accent.withOpacity(isDark ? 0.20 : 0.10),
-          p.surface,
-        );
+        fill = Color.alphaBlend(accent.withOpacity(isDark ? 0.20 : 0.10), p.surface);
         border = Border.all(color: accent.withOpacity(isDark ? 0.34 : 0.20));
         shadow = _shadowFor(elevation, p.brightness);
       case PrismCardVariant.outlined:
@@ -108,10 +105,7 @@ class PrismCard extends StatelessWidget {
         grad ??= LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[
-            accent,
-            Color.alphaBlend(Colors.black.withOpacity(0.18), accent),
-          ],
+          colors: <Color>[accent, Color.alphaBlend(Colors.black.withOpacity(0.18), accent)],
         );
         border = null;
         shadow = elevation <= 0
@@ -138,30 +132,22 @@ class PrismCard extends StatelessWidget {
     );
 
     if (onTap != null) {
-      surface = _PressableCard(
-        borderRadius: borderRadius,
-        onTap: onTap!,
-        child: surface,
-      );
+      surface = _PressableCard(borderRadius: borderRadius, onTap: onTap!, child: surface);
     }
     return surface;
   }
 
   static List<BoxShadow> _shadowFor(int elevation, Brightness b) => switch (elevation) {
-        <= 0 => PrismElevation.level0,
-        1 => PrismElevation.level1(b),
-        2 => PrismElevation.level2(b),
-        _ => PrismElevation.level2(b),
-      };
+    <= 0 => PrismElevation.level0,
+    1 => PrismElevation.level1(b),
+    2 => PrismElevation.level2(b),
+    _ => PrismElevation.level2(b),
+  };
 }
 
 /// Scale-on-press wrapper for tappable [PrismCard]s, mirroring the glass one.
 class _PressableCard extends StatefulWidget {
-  const _PressableCard({
-    required this.child,
-    required this.onTap,
-    required this.borderRadius,
-  });
+  const _PressableCard({required this.child, required this.onTap, required this.borderRadius});
 
   final Widget child;
   final VoidCallback onTap;

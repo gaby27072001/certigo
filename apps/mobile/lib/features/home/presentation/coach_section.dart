@@ -35,8 +35,10 @@ class CoachSection extends ConsumerWidget {
     final TextTheme t = Theme.of(context).textTheme;
     final PrismColorScheme p = context.prism;
     final Recommendation top = next.items.first;
-    final List<Recommendation> rest =
-        next.items.skip(1).take(_maxSecondary).toList(growable: false);
+    final List<Recommendation> rest = next.items
+        .skip(1)
+        .take(_maxSecondary)
+        .toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -54,11 +56,7 @@ class CoachSection extends ConsumerWidget {
           style: t.bodySmall?.copyWith(color: p.textSecondary),
         ),
         const SizedBox(height: 12),
-        CoachCard(
-          item: top,
-          prominent: true,
-          onTap: () => _open(context, top),
-        ),
+        CoachCard(item: top, prominent: true, onTap: () => _open(context, top)),
         for (final Recommendation item in rest) ...<Widget>[
           const SizedBox(height: 10),
           CoachCard(item: item, onTap: () => _open(context, item)),
@@ -81,12 +79,7 @@ class CoachSection extends ConsumerWidget {
 /// tested in isolation. [prominent] renders the hero (filled gradient) treatment
 /// for the top action; the rest use the lighter tonal treatment.
 class CoachCard extends StatelessWidget {
-  const CoachCard({
-    required this.item,
-    required this.onTap,
-    this.prominent = false,
-    super.key,
-  });
+  const CoachCard({required this.item, required this.onTap, this.prominent = false, super.key});
 
   final Recommendation item;
   final VoidCallback onTap;
@@ -127,10 +120,7 @@ class CoachCard extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       v.label.toUpperCase(),
-                      style: t.labelSmall?.copyWith(
-                        color: Colors.white70,
-                        letterSpacing: 0.8,
-                      ),
+                      style: t.labelSmall?.copyWith(color: Colors.white70, letterSpacing: 0.8),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -271,14 +261,26 @@ class _CoachVisual {
 
   static _CoachVisual of(RecommendationKind kind, PrismColorScheme p) {
     return switch (kind) {
-      RecommendationKind.practice =>
-        _CoachVisual(label: 'À pratiquer', icon: Icons.bolt_rounded, accent: p.ember),
-      RecommendationKind.review =>
-        _CoachVisual(label: 'À réviser', icon: Icons.history_rounded, accent: p.primary),
-      RecommendationKind.resume =>
-        _CoachVisual(label: 'Reprendre', icon: Icons.play_arrow_rounded, accent: p.primary),
-      RecommendationKind.start =>
-        _CoachVisual(label: 'Démarrer', icon: Icons.flag_rounded, accent: p.success),
+      RecommendationKind.practice => _CoachVisual(
+        label: 'À pratiquer',
+        icon: Icons.bolt_rounded,
+        accent: p.ember,
+      ),
+      RecommendationKind.review => _CoachVisual(
+        label: 'À réviser',
+        icon: Icons.history_rounded,
+        accent: p.primary,
+      ),
+      RecommendationKind.resume => _CoachVisual(
+        label: 'Reprendre',
+        icon: Icons.play_arrow_rounded,
+        accent: p.primary,
+      ),
+      RecommendationKind.start => _CoachVisual(
+        label: 'Démarrer',
+        icon: Icons.flag_rounded,
+        accent: p.success,
+      ),
     };
   }
 }

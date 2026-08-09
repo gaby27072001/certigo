@@ -24,11 +24,11 @@ class TutorExplainRequest {
   final List<String> selected;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'trackId': trackId,
-        'lessonId': lessonId,
-        'itemId': itemId,
-        'selected': selected,
-      };
+    'trackId': trackId,
+    'lessonId': lessonId,
+    'itemId': itemId,
+    'selected': selected,
+  };
 }
 
 /// What the tutor learned about this learner for the concept under test, surfaced
@@ -68,14 +68,14 @@ class TutorPersonalization {
   bool get isSlipping => trend == 'slipping';
 
   factory TutorPersonalization.fromJson(Map<String, dynamic> json) => TutorPersonalization(
-        attempts: (json['attempts'] as num?)?.toInt() ?? 0,
-        errors: (json['errors'] as num?)?.toInt() ?? 0,
-        accuracyPct: (json['accuracyPct'] as num?)?.toInt() ?? 0,
-        recurringStruggle: json['recurringStruggle'] as bool? ?? false,
-        masteredBefore: json['masteredBefore'] as bool? ?? false,
-        trend: json['trend'] as String? ?? 'steady',
-        topConfusedOption: json['topConfusedOption'] as String?,
-      );
+    attempts: (json['attempts'] as num?)?.toInt() ?? 0,
+    errors: (json['errors'] as num?)?.toInt() ?? 0,
+    accuracyPct: (json['accuracyPct'] as num?)?.toInt() ?? 0,
+    recurringStruggle: json['recurringStruggle'] as bool? ?? false,
+    masteredBefore: json['masteredBefore'] as bool? ?? false,
+    trend: json['trend'] as String? ?? 'steady',
+    topConfusedOption: json['topConfusedOption'] as String?,
+  );
 }
 
 /// A grounded, personalised tutor explanation for one answered item.
@@ -121,19 +121,19 @@ class TutorExplanation {
   bool get isAiGenerated => source == 'ai';
 
   factory TutorExplanation.fromJson(Map<String, dynamic> json) => TutorExplanation(
-        itemId: json['itemId'] as String? ?? '',
-        conceptId: json['conceptId'] as String? ?? '',
-        correct: json['correct'] as bool? ?? false,
-        headline: json['headline'] as String? ?? '',
-        points: (json['points'] as List<dynamic>? ?? <dynamic>[]).map((e) => e as String).toList(),
-        encouragement: json['encouragement'] as String? ?? '',
-        recommendation: json['recommendation'] as String? ?? '',
-        citedConceptIds: (json['citedConceptIds'] as List<dynamic>? ?? <dynamic>[])
-            .map((e) => e as String)
-            .toList(),
-        source: json['source'] as String? ?? 'grounded',
-        personalization: TutorPersonalization.fromJson(
-          json['personalization'] as Map<String, dynamic>? ?? <String, dynamic>{},
-        ),
-      );
+    itemId: json['itemId'] as String? ?? '',
+    conceptId: json['conceptId'] as String? ?? '',
+    correct: json['correct'] as bool? ?? false,
+    headline: json['headline'] as String? ?? '',
+    points: (json['points'] as List<dynamic>? ?? <dynamic>[]).map((e) => e as String).toList(),
+    encouragement: json['encouragement'] as String? ?? '',
+    recommendation: json['recommendation'] as String? ?? '',
+    citedConceptIds: (json['citedConceptIds'] as List<dynamic>? ?? <dynamic>[])
+        .map((e) => e as String)
+        .toList(),
+    source: json['source'] as String? ?? 'grounded',
+    personalization: TutorPersonalization.fromJson(
+      json['personalization'] as Map<String, dynamic>? ?? <String, dynamic>{},
+    ),
+  );
 }

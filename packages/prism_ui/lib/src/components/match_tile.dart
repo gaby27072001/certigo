@@ -36,7 +36,8 @@ class MatchTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final _TileStyle s = _styleFor(p, state);
-    final bool graded = state == QuizOptionState.correct ||
+    final bool graded =
+        state == QuizOptionState.correct ||
         state == QuizOptionState.incorrect ||
         state == QuizOptionState.missed;
     final Color badgeColor = this.badgeColor ?? p.primary;
@@ -71,9 +72,9 @@ class MatchTile extends StatelessWidget {
                 child: Text(
                   label,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               if (graded) ...<Widget>[
@@ -164,10 +165,9 @@ class _PairBadge extends StatelessWidget {
       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       child: Text(
         '$value',
-        style: Theme.of(context)
-            .textTheme
-            .labelMedium
-            ?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+        style: Theme.of(
+          context,
+        ).textTheme.labelMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
       ),
     );
   }

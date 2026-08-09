@@ -5,26 +5,11 @@ import 'package:data/data.dart';
 /// Content kinds map 1:1 to [BlockType]; [intro] and [result] are synthetic
 /// bookends; [quiz] is reserved for future unit checkpoints and is never emitted
 /// by [buildLessonSteps] (kept so the renderer switch stays exhaustive).
-enum LessonStepKind {
-  intro,
-  hook,
-  concept,
-  example,
-  code,
-  check,
-  recap,
-  quiz,
-  result,
-}
+enum LessonStepKind { intro, hook, concept, example, code, check, recap, quiz, result }
 
 /// One screen in the lesson flow.
 class LessonStep {
-  const LessonStep({
-    required this.kind,
-    required this.index,
-    this.block,
-    this.item,
-  });
+  const LessonStep({required this.kind, required this.index, this.block, this.item});
 
   final LessonStepKind kind;
 
@@ -41,16 +26,16 @@ class LessonStep {
 }
 
 LessonStepKind _kindFor(BlockType type) => switch (type) {
-      BlockType.hook => LessonStepKind.hook,
-      BlockType.concept => LessonStepKind.concept,
-      BlockType.example => LessonStepKind.example,
-      BlockType.code => LessonStepKind.code,
-      BlockType.recap => LessonStepKind.recap,
-      // A check block with no item is malformed; degrade to read-only concept
-      // so the flow never dead-ends.
-      BlockType.check => LessonStepKind.concept,
-      BlockType.unknown => LessonStepKind.concept,
-    };
+  BlockType.hook => LessonStepKind.hook,
+  BlockType.concept => LessonStepKind.concept,
+  BlockType.example => LessonStepKind.example,
+  BlockType.code => LessonStepKind.code,
+  BlockType.recap => LessonStepKind.recap,
+  // A check block with no item is malformed; degrade to read-only concept
+  // so the flow never dead-ends.
+  BlockType.check => LessonStepKind.concept,
+  BlockType.unknown => LessonStepKind.concept,
+};
 
 /// Flattens a [Lesson] into the ordered list of player steps:
 /// intro → (one step per block) → result.

@@ -35,10 +35,7 @@ class NotificationsScreen extends ConsumerWidget {
           c.setReminders(false);
           go();
         },
-        child: Text(
-          'Plus tard',
-          style: t.labelLarge?.copyWith(color: p.textSecondary),
-        ),
+        child: Text('Plus tard', style: t.labelLarge?.copyWith(color: p.textSecondary)),
       ),
       scrollable: false,
       child: Column(
@@ -47,10 +44,7 @@ class NotificationsScreen extends ConsumerWidget {
           Container(
             width: 96,
             height: 96,
-            decoration: BoxDecoration(
-              color: p.primary.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: p.primary.withOpacity(0.12), shape: BoxShape.circle),
             alignment: Alignment.center,
             child: Icon(Icons.notifications_active_rounded, color: p.primary, size: 46),
           ),

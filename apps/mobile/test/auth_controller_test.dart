@@ -176,13 +176,12 @@ void main() {
     String accessToken = 'access',
     String? refreshToken = 'refresh',
     DateTime? expiry,
-  }) =>
-      AuthSession(
-        accessToken: accessToken,
-        refreshToken: refreshToken,
-        accessTokenExpiry: expiry,
-        provider: AuthProvider.microsoft,
-      );
+  }) => AuthSession(
+    accessToken: accessToken,
+    refreshToken: refreshToken,
+    accessTokenExpiry: expiry,
+    provider: AuthProvider.microsoft,
+  );
 
   group('restauration au démarrage (auto-connexion)', () {
     test('sans session stockée → Unauthenticated', () async {
@@ -350,8 +349,9 @@ void main() {
       container.read(authControllerProvider);
       await settle();
 
-      final String? token =
-          await container.read(authControllerProvider.notifier).currentAccessToken();
+      final String? token = await container
+          .read(authControllerProvider.notifier)
+          .currentAccessToken();
 
       expect(token, 'nouveau');
       expect(gateway.refreshCalls, hasLength(1));
@@ -425,8 +425,9 @@ void main() {
       container.read(authControllerProvider);
       await settle();
 
-      final String? token =
-          await container.read(authControllerProvider.notifier).currentAccessToken();
+      final String? token = await container
+          .read(authControllerProvider.notifier)
+          .currentAccessToken();
       expect(token, AppEnv.devAuthToken);
     });
   });
@@ -540,8 +541,9 @@ void main() {
           .read(authControllerProvider.notifier)
           .signInWithEmail(email: 'pending@b.com', password: 'password123');
 
-      final bool ok =
-          await container.read(authControllerProvider.notifier).resendVerificationEmail();
+      final bool ok = await container
+          .read(authControllerProvider.notifier)
+          .resendVerificationEmail();
 
       expect(ok, isTrue);
       expect(credentials.resendCalls, <String>['pending@b.com']);
@@ -583,8 +585,9 @@ void main() {
       expect((state as Authenticated).session.accessToken, 'jeton-2');
       expect(state.session.email, 'pending@b.com'); // reporté malgré l'absence côté API
 
-      final bool ok =
-          await container.read(authControllerProvider.notifier).resendVerificationEmail();
+      final bool ok = await container
+          .read(authControllerProvider.notifier)
+          .resendVerificationEmail();
       expect(ok, isTrue);
       expect(credentials.resendCalls, <String>['pending@b.com']);
     });

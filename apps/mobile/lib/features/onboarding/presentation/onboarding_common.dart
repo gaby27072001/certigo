@@ -117,7 +117,7 @@ class _MascotPromptState extends State<MascotPrompt> {
     final Duration d = reduceMotion ? Duration.zero : PrismMotion.base;
     final TextStyle bubbleStyle =
         t.titleMedium?.copyWith(height: 1.3, fontWeight: FontWeight.w600) ??
-            const TextStyle(fontWeight: FontWeight.w600);
+        const TextStyle(fontWeight: FontWeight.w600);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[

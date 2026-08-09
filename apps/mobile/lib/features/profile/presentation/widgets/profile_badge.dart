@@ -38,15 +38,9 @@ class ProfileBadge extends StatelessWidget {
             decoration: BoxDecoration(
               color: locked ? p.surfaceAlt : color.withOpacity(0.14),
               shape: BoxShape.circle,
-              border: Border.all(
-                color: locked ? p.border : color.withOpacity(0.4),
-              ),
+              border: Border.all(color: locked ? p.border : color.withOpacity(0.4)),
             ),
-            child: Icon(
-              icon,
-              color: locked ? p.textSecondary : color,
-              size: 28,
-            ),
+            child: Icon(icon, color: locked ? p.textSecondary : color, size: 28),
           ),
           const SizedBox(height: 6),
           Text(

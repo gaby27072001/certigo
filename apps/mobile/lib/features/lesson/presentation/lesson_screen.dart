@@ -96,9 +96,7 @@ class _LessonRunningView extends StatelessWidget {
           minutes: state.lesson?.estMinutes ?? 0,
           onClose: () => context.go(Routes.path),
         ),
-        Expanded(
-          child: PrismStepSwitcher(child: body),
-        ),
+        Expanded(child: PrismStepSwitcher(child: body)),
         if (!isResult)
           LessonDock(
             state: state,

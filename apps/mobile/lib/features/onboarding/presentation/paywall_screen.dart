@@ -22,8 +22,9 @@ class PaywallScreen extends ConsumerWidget {
       progress: 0.92,
       onBack: () => context.go(OnboardingRoutes.promise),
       primaryLabel: 'CONTINUER',
-      onPrimary:
-          c.premiumChoice == null ? null : () => context.go(OnboardingRoutes.paywallReaction),
+      onPrimary: c.premiumChoice == null
+          ? null
+          : () => context.go(OnboardingRoutes.paywallReaction),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

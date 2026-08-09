@@ -12,20 +12,20 @@ class LessonIntroView extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
-    final int checks =
-        lesson.blocks.where((LessonBlock b) => b.type == BlockType.check && b.check != null).length;
+    final int checks = lesson.blocks
+        .where((LessonBlock b) => b.type == BlockType.check && b.check != null)
+        .length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const SizedBox(height: 8),
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.debt6),
-          decoration: BoxDecoration(
-            color: p.primarySoft,
-            borderRadius: PrismRadii.pillAll,
+          padding: const EdgeInsets.symmetric(
+            horizontal: PrismSpacing.sm,
+            vertical: PrismSpacing.debt6,
           ),
+          decoration: BoxDecoration(color: p.primarySoft, borderRadius: PrismRadii.pillAll),
           child: Text(
             lesson.domainId.toUpperCase(),
             style: text.labelSmall?.copyWith(
@@ -93,10 +93,7 @@ class _MetaPill extends StatelessWidget {
         children: <Widget>[
           Icon(icon, size: 16, color: p.textSecondary),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: text.labelMedium?.copyWith(color: p.textSecondary),
-          ),
+          Text(label, style: text.labelMedium?.copyWith(color: p.textSecondary)),
         ],
       ),
     );
@@ -122,9 +119,7 @@ class _Bullet extends StatelessWidget {
             child: Icon(Icons.circle, size: 6, color: p.primary),
           ),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text(text, style: textTheme.bodyMedium?.copyWith(height: 1.4)),
-          ),
+          Expanded(child: Text(text, style: textTheme.bodyMedium?.copyWith(height: 1.4))),
         ],
       ),
     );

@@ -23,10 +23,7 @@ class StatTile extends StatelessWidget {
       child: PrismCard(
         variant: PrismCardVariant.tonal,
         accent: color,
-        padding: const EdgeInsets.symmetric(
-          vertical: PrismSpacing.md,
-          horizontal: PrismSpacing.sm,
-        ),
+        padding: const EdgeInsets.symmetric(vertical: PrismSpacing.md, horizontal: PrismSpacing.sm),
         child: Column(
           children: <Widget>[
             Icon(icon, color: color, size: 22),

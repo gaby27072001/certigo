@@ -64,14 +64,14 @@ class SpeechBubble extends StatelessWidget {
         radius: radius,
         tailSize: tailSize,
       ),
-      child: Padding(
-        padding: padding.add(reserve),
-        child: child,
-      ),
+      child: Padding(padding: padding.add(reserve), child: child),
     );
 
     if (maxWidth != null) {
-      bubble = ConstrainedBox(constraints: BoxConstraints(maxWidth: maxWidth!), child: bubble);
+      bubble = ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth!),
+        child: bubble,
+      );
     }
     return bubble;
   }

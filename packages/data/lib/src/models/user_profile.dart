@@ -41,32 +41,32 @@ class UserProfile {
       dailyGoalXp == 0 ? 0 : (dailyXpEarned / dailyGoalXp).clamp(0, 1).toDouble();
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
-        id: json['id'] as String,
-        displayName: json['displayName'] as String? ?? 'Apprenant',
-        handle: json['handle'] as String? ?? '',
-        avatarUrl: json['avatarUrl'] as String?,
-        xp: (json['xp'] as num?)?.toInt() ?? 0,
-        level: (json['level'] as num?)?.toInt() ?? 1,
-        streakDays: (json['streakDays'] as num?)?.toInt() ?? 0,
-        freezeTokens: (json['freezeTokens'] as num?)?.toInt() ?? 0,
-        gems: (json['gems'] as num?)?.toInt() ?? 0,
-        dailyGoalXp: (json['dailyGoalXp'] as num?)?.toInt() ?? 50,
-        dailyXpEarned: (json['dailyXpEarned'] as num?)?.toInt() ?? 0,
-        activeTrackId: json['activeTrackId'] as String?,
-      );
+    id: json['id'] as String,
+    displayName: json['displayName'] as String? ?? 'Apprenant',
+    handle: json['handle'] as String? ?? '',
+    avatarUrl: json['avatarUrl'] as String?,
+    xp: (json['xp'] as num?)?.toInt() ?? 0,
+    level: (json['level'] as num?)?.toInt() ?? 1,
+    streakDays: (json['streakDays'] as num?)?.toInt() ?? 0,
+    freezeTokens: (json['freezeTokens'] as num?)?.toInt() ?? 0,
+    gems: (json['gems'] as num?)?.toInt() ?? 0,
+    dailyGoalXp: (json['dailyGoalXp'] as num?)?.toInt() ?? 50,
+    dailyXpEarned: (json['dailyXpEarned'] as num?)?.toInt() ?? 0,
+    activeTrackId: json['activeTrackId'] as String?,
+  );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'displayName': displayName,
-        'handle': handle,
-        'avatarUrl': avatarUrl,
-        'xp': xp,
-        'level': level,
-        'streakDays': streakDays,
-        'freezeTokens': freezeTokens,
-        'gems': gems,
-        'dailyGoalXp': dailyGoalXp,
-        'dailyXpEarned': dailyXpEarned,
-        'activeTrackId': activeTrackId,
-      };
+    'id': id,
+    'displayName': displayName,
+    'handle': handle,
+    'avatarUrl': avatarUrl,
+    'xp': xp,
+    'level': level,
+    'streakDays': streakDays,
+    'freezeTokens': freezeTokens,
+    'gems': gems,
+    'dailyGoalXp': dailyGoalXp,
+    'dailyXpEarned': dailyXpEarned,
+    'activeTrackId': activeTrackId,
+  };
 }

@@ -31,10 +31,7 @@ class ExamScreen extends ConsumerWidget {
               child: async.when(
                 data: (MockExam exam) => exam.items.isEmpty
                     ? const _ExamEmpty()
-                    : _ExamRunner(
-                        key: ValueKey<String>(exam.examId),
-                        exam: exam,
-                      ),
+                    : _ExamRunner(key: ValueKey<String>(exam.examId), exam: exam),
                 loading: () => const _ExamLoading(),
                 error: (Object error, StackTrace _) => Padding(
                   padding: const EdgeInsets.fromLTRB(
@@ -151,8 +148,9 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
       answers: answers,
     );
 
-    final Result<MockExamResult> result =
-        await ref.read(examRepositoryProvider).submitExam(request);
+    final Result<MockExamResult> result = await ref
+        .read(examRepositoryProvider)
+        .submitExam(request);
     if (!mounted) return;
 
     result.when(
@@ -211,10 +209,7 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
                 ),
               ),
               const SizedBox(width: 12),
-              Text(
-                '${_index + 1}/$total',
-                style: t.labelMedium?.copyWith(color: p.textSecondary),
-              ),
+              Text('${_index + 1}/$total', style: t.labelMedium?.copyWith(color: p.textSecondary)),
             ],
           ),
         ),
@@ -331,10 +326,7 @@ class _ExamResultView extends StatelessWidget {
       padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: <Widget>[
         Center(
-          child: ReadinessGauge(
-            score: result.pct.clamp(0, 100),
-            label: 'Score',
-          ),
+          child: ReadinessGauge(score: result.pct.clamp(0, 100), label: 'Score'),
         ),
         const SizedBox(height: 16),
         PrismCard(
@@ -381,11 +373,7 @@ class _ExamResultView extends StatelessWidget {
             XpChip(xp: rewards.xpEarned),
             GemCounter(gems: rewards.gemsEarned),
             if (rewards.levelUp)
-              _Pill(
-                icon: Icons.trending_up_rounded,
-                label: 'Niveau supérieur',
-                color: p.primary,
-              ),
+              _Pill(icon: Icons.trending_up_rounded, label: 'Niveau supérieur', color: p.primary),
             if (rewards.streakExtended)
               _Pill(
                 icon: Icons.local_fire_department_rounded,
@@ -415,11 +403,7 @@ class _ExamResultView extends StatelessWidget {
             runSpacing: 8,
             children: <Widget>[
               for (final String concept in result.weakConcepts)
-                _Pill(
-                  icon: Icons.menu_book_rounded,
-                  label: concept,
-                  color: p.warning,
-                ),
+                _Pill(icon: Icons.menu_book_rounded, label: concept, color: p.warning),
             ],
           ),
         ],
@@ -428,19 +412,12 @@ class _ExamResultView extends StatelessWidget {
           Text('Revois tes réponses', style: t.titleMedium),
           const SizedBox(height: 12),
           for (final ItemResult item in result.results) ...<Widget>[
-            _ItemReviewCard(
-              result: item,
-              stem: stems[item.itemId] ?? '',
-            ),
+            _ItemReviewCard(result: item, stem: stems[item.itemId] ?? ''),
             const SizedBox(height: 12),
           ],
         ],
         const SizedBox(height: 12),
-        PrismButton(
-          label: 'Terminer',
-          icon: Icons.check_rounded,
-          onPressed: onHome,
-        ),
+        PrismButton(label: 'Terminer', icon: Icons.check_rounded, onPressed: onHome),
         const SizedBox(height: 12),
         PrismButton(
           label: 'Refaire un examen',
@@ -480,10 +457,7 @@ class _DomainScoreRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Text(
-                '${score.pct}%',
-                style: t.labelLarge?.copyWith(color: p.primary),
-              ),
+              Text('${score.pct}%', style: t.labelLarge?.copyWith(color: p.primary)),
             ],
           ),
           const SizedBox(height: 6),
@@ -520,16 +494,9 @@ class _ItemReviewCard extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(
-                ok ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                color: accent,
-                size: 20,
-              ),
+              Icon(ok ? Icons.check_circle_rounded : Icons.cancel_rounded, color: accent, size: 20),
               const SizedBox(width: 8),
-              Text(
-                ok ? 'Correct' : 'Incorrect',
-                style: t.titleSmall?.copyWith(color: accent),
-              ),
+              Text(ok ? 'Correct' : 'Incorrect', style: t.titleSmall?.copyWith(color: accent)),
             ],
           ),
           if (stem.isNotEmpty) ...<Widget>[
@@ -537,10 +504,7 @@ class _ItemReviewCard extends StatelessWidget {
             Text(stem, style: t.bodyMedium?.copyWith(height: 1.4)),
           ],
           const SizedBox(height: 8),
-          PrismRichText(
-            result.explanation,
-            style: t.bodyMedium?.copyWith(height: 1.5),
-          ),
+          PrismRichText(result.explanation, style: t.bodyMedium?.copyWith(height: 1.5)),
         ],
       ),
     );
@@ -548,11 +512,7 @@ class _ItemReviewCard extends StatelessWidget {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  const _Pill({required this.icon, required this.label, required this.color});
 
   final IconData icon;
   final String label;
@@ -562,10 +522,7 @@ class _Pill extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: PrismSpacing.sm,
-        vertical: PrismSpacing.xs,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.xs),
       decoration: BoxDecoration(
         color: color.withOpacity(0.14),
         borderRadius: PrismRadii.pillAll,

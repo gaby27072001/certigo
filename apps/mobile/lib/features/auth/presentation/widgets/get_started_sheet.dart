@@ -213,10 +213,9 @@ class _RecommendedTag extends StatelessWidget {
         ),
         child: Text(
           'Recommandé',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w700,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w700),
         ),
       ),
     );

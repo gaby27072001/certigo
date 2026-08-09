@@ -22,13 +22,11 @@ import 'package:prism_ui/src/tokens/prism_radii.dart';
 // geometry-relevant state from `context.prism`, so the card's shape is exercised
 // without coupling this contract to the complete application theme.
 Widget _host(Widget child, {required Brightness brightness}) {
-  final PrismColorScheme scheme =
-      brightness == Brightness.dark ? PrismColorScheme.dark : PrismColorScheme.light;
+  final PrismColorScheme scheme = brightness == Brightness.dark
+      ? PrismColorScheme.dark
+      : PrismColorScheme.light;
   return MaterialApp(
-    theme: ThemeData(
-      brightness: brightness,
-      extensions: <ThemeExtension<dynamic>>[scheme],
-    ),
+    theme: ThemeData(brightness: brightness, extensions: <ThemeExtension<dynamic>>[scheme]),
     home: Scaffold(body: Center(child: child)),
   );
 }
@@ -60,8 +58,9 @@ void main() {
       expect(_cardDecoration(tester).borderRadius, PrismRadii.cardXl);
     });
 
-    testWidgets('PrismCard surface variant — bordered, shadowed, no gradient ($mode)',
-        (WidgetTester tester) async {
+    testWidgets('PrismCard surface variant — bordered, shadowed, no gradient ($mode)', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         _host(const PrismCard(child: SizedBox.shrink()), brightness: brightness),
       );
@@ -72,8 +71,9 @@ void main() {
       expect(d.boxShadow, isNotEmpty);
     });
 
-    testWidgets('PrismCard tonal variant — bordered, shadowed, no gradient ($mode)',
-        (WidgetTester tester) async {
+    testWidgets('PrismCard tonal variant — bordered, shadowed, no gradient ($mode)', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         _host(
           const PrismCard(variant: PrismCardVariant.tonal, child: SizedBox.shrink()),
@@ -87,8 +87,9 @@ void main() {
       expect(d.boxShadow, isNotEmpty);
     });
 
-    testWidgets('PrismCard outlined variant — bordered (1.5), no shadow ($mode)',
-        (WidgetTester tester) async {
+    testWidgets('PrismCard outlined variant — bordered (1.5), no shadow ($mode)', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         _host(
           const PrismCard(variant: PrismCardVariant.outlined, child: SizedBox.shrink()),
@@ -102,8 +103,9 @@ void main() {
       expect(d.boxShadow, isEmpty);
     });
 
-    testWidgets('PrismCard filled variant — gradient, no border ($mode)',
-        (WidgetTester tester) async {
+    testWidgets('PrismCard filled variant — gradient, no border ($mode)', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         _host(
           const PrismCard(variant: PrismCardVariant.filled, child: SizedBox.shrink()),

@@ -18,9 +18,6 @@ SyncSender apiSyncSender(ApiClient api) {
       action.payload,
       (Map<String, dynamic> json) => json,
     );
-    return result.when(
-      success: (_) => SyncDispatch.success,
-      failure: classifyFailure,
-    );
+    return result.when(success: (_) => SyncDispatch.success, failure: classifyFailure);
   };
 }

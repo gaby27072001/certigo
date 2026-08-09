@@ -8,11 +8,7 @@ import '../theme/prism_color_scheme.dart';
 /// Static by default (cheap). Set [animate] true on hero screens for a gentle
 /// drift; it auto-disables when the platform requests reduced motion.
 class AuroraBackground extends StatelessWidget {
-  const AuroraBackground({
-    super.key,
-    required this.child,
-    this.animate = false,
-  });
+  const AuroraBackground({super.key, required this.child, this.animate = false});
 
   final Widget child;
   final bool animate;
@@ -60,9 +56,7 @@ class _Glow extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: <Color>[color, color.withOpacity(0)],
-          ),
+          gradient: RadialGradient(colors: <Color>[color, color.withOpacity(0)]),
         ),
       ),
     );

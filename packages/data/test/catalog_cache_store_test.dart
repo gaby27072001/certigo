@@ -5,16 +5,15 @@ TrackSummary _track({
   String id = 'az-900',
   String code = 'AZ-900',
   String title = 'Microsoft Azure Fundamentals',
-}) =>
-    TrackSummary(
-      id: id,
-      code: code,
-      title: title,
-      level: 'fundamentals',
-      summary: 'Summary',
-      unitCount: 4,
-      lessonCount: 20,
-    );
+}) => TrackSummary(
+  id: id,
+  code: code,
+  title: title,
+  level: 'fundamentals',
+  summary: 'Summary',
+  unitCount: 4,
+  lessonCount: 20,
+);
 
 void main() {
   group('JsonCatalogCacheStore', () {
@@ -38,11 +37,7 @@ void main() {
 
       await store.write(<TrackSummary>[
         _track(),
-        _track(
-          id: 'sc-900',
-          code: 'SC-900',
-          title: 'Microsoft Security Fundamentals',
-        ),
+        _track(id: 'sc-900', code: 'SC-900', title: 'Microsoft Security Fundamentals'),
       ]);
 
       final List<TrackSummary>? loaded = await store.read();

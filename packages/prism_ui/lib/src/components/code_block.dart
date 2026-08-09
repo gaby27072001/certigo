@@ -51,10 +51,7 @@ class _CodeBlockState extends State<CodeBlock> {
               if (widget.language != null)
                 Text(
                   widget.language!.toUpperCase(),
-                  style: t.labelSmall?.copyWith(
-                    color: Colors.white54,
-                    letterSpacing: 1,
-                  ),
+                  style: t.labelSmall?.copyWith(color: Colors.white54, letterSpacing: 1),
                 ),
               const Spacer(),
               _CopyButton(copied: _copied, onTap: _copy),

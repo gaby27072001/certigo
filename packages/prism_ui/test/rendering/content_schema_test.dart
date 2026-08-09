@@ -270,8 +270,11 @@ void main() {
 
     test('still checks the reserved field for an unknown type', () {
       const ContentBlock block = ContentBlock(type: 'nope', data: <String, dynamic>{'tenantId': 7});
-      final Set<SchemaViolationKind> kinds =
-          validator.validate(block).violations.map((SchemaViolation v) => v.kind).toSet();
+      final Set<SchemaViolationKind> kinds = validator
+          .validate(block)
+          .violations
+          .map((SchemaViolation v) => v.kind)
+          .toSet();
       expect(kinds, contains(SchemaViolationKind.unknownType));
       expect(kinds, contains(SchemaViolationKind.reservedFieldMisuse));
     });

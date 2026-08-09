@@ -19,10 +19,7 @@ abstract interface class CredentialsGateway {
   });
 
   /// Connecte un compte existant et renvoie la session.
-  Future<AuthSession> login({
-    required String email,
-    required String password,
-  });
+  Future<AuthSession> login({required String email, required String password});
 
   /// Réémet une session à partir du `refresh_token` local.
   Future<AuthSession> refresh(String refreshToken);
@@ -39,7 +36,7 @@ abstract interface class CredentialsGateway {
 /// anonymes — c'est précisément eux qui produisent le premier jeton.
 class HttpCredentialsGateway implements CredentialsGateway {
   HttpCredentialsGateway({ApiClient? client})
-      : _client = client ?? ApiClient(tokenProvider: _noToken, debugLog: debugPrint);
+    : _client = client ?? ApiClient(tokenProvider: _noToken, debugLog: debugPrint);
 
   final ApiClient _client;
 
@@ -51,23 +48,17 @@ class HttpCredentialsGateway implements CredentialsGateway {
     required String password,
     String? displayName,
   }) async {
-    final Result<AuthSession> result = await _client.postJson<AuthSession>(
-      '/auth/register',
-      <String, dynamic>{
-        'email': email,
-        'password': password,
-        if (displayName != null && displayName.isNotEmpty) 'displayName': displayName,
-      },
-      (Map<String, dynamic> json) => _sessionFrom(json, email: email),
-    );
+    final Result<AuthSession> result = await _client
+        .postJson<AuthSession>('/auth/register', <String, dynamic>{
+          'email': email,
+          'password': password,
+          if (displayName != null && displayName.isNotEmpty) 'displayName': displayName,
+        }, (Map<String, dynamic> json) => _sessionFrom(json, email: email));
     return _unwrap(result);
   }
 
   @override
-  Future<AuthSession> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<AuthSession> login({required String email, required String password}) async {
     final Result<AuthSession> result = await _client.postJson<AuthSession>(
       '/auth/login',
       <String, dynamic>{'email': email, 'password': password},
@@ -90,19 +81,18 @@ class HttpCredentialsGateway implements CredentialsGateway {
   Future<void> resendVerification(String email) async {
     // Le backend répond toujours de façon générique ({message}) ; on ignore le
     // corps et on ne propage pas d'échec bloquant (best-effort).
-    await _client.postJson<bool>(
-      '/auth/resend-verification',
-      <String, dynamic>{'email': email},
-      (Map<String, dynamic> json) => true,
-    );
+    await _client.postJson<bool>('/auth/resend-verification', <String, dynamic>{
+      'email': email,
+    }, (Map<String, dynamic> json) => true);
   }
 
   /// Convertit l'`AuthResultDto` JSON du backend en [AuthSession] locale.
   /// L'e-mail n'est pas renvoyé par l'API : on conserve celui saisi (best-effort).
   AuthSession _sessionFrom(Map<String, dynamic> json, {String? email}) {
     final Object? profile = json['profile'];
-    final String? displayName =
-        profile is Map<String, dynamic> ? profile['displayName'] as String? : null;
+    final String? displayName = profile is Map<String, dynamic>
+        ? profile['displayName'] as String?
+        : null;
     final Object? expiryRaw = json['accessTokenExpiresAt'];
     return AuthSession(
       accessToken: (json['accessToken'] as String?) ?? '',
@@ -116,12 +106,12 @@ class HttpCredentialsGateway implements CredentialsGateway {
   }
 
   AuthSession _unwrap(Result<AuthSession> result) => result.when(
-        success: (AuthSession session) => session,
-        failure: (Failure f) {
-          final ({String message, AuthFailureCause cause}) described = _describeFor(f);
-          throw AuthGatewayException(described.message, cause: described.cause);
-        },
-      );
+    success: (AuthSession session) => session,
+    failure: (Failure f) {
+      final ({String message, AuthFailureCause cause}) described = _describeFor(f);
+      throw AuthGatewayException(described.message, cause: described.cause);
+    },
+  );
 
   /// Traduit une [Failure] (mappée par [ApiClient] depuis le code HTTP) en
   /// message clair FR **et** en [AuthFailureCause] normalisée. Le backend renvoie
@@ -142,21 +132,21 @@ class HttpCredentialsGateway implements CredentialsGateway {
     if (failure is ServerFailure) {
       return switch (failure.statusCode) {
         429 => (
-            message: 'Trop de tentatives de connexion. Réessayez dans quelques minutes.',
-            cause: AuthFailureCause.providerError,
-          ),
+          message: 'Trop de tentatives de connexion. Réessayez dans quelques minutes.',
+          cause: AuthFailureCause.providerError,
+        ),
         409 => (
-            message: 'Cette adresse e-mail est déjà utilisée.',
-            cause: AuthFailureCause.invalidCredentials,
-          ),
+          message: 'Cette adresse e-mail est déjà utilisée.',
+          cause: AuthFailureCause.invalidCredentials,
+        ),
         400 => (
-            message: 'Vérifiez votre e-mail et un mot de passe d’au moins 8 caractères.',
-            cause: AuthFailureCause.invalidCredentials,
-          ),
+          message: 'Vérifiez votre e-mail et un mot de passe d’au moins 8 caractères.',
+          cause: AuthFailureCause.invalidCredentials,
+        ),
         _ => (
-            message: 'Le service est momentanément indisponible. Réessayez.',
-            cause: AuthFailureCause.providerError,
-          ),
+          message: 'Le service est momentanément indisponible. Réessayez.',
+          cause: AuthFailureCause.providerError,
+        ),
       };
     }
     return (message: 'Une erreur est survenue. Réessayez.', cause: AuthFailureCause.unknown);

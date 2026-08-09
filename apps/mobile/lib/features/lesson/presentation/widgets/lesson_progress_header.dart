@@ -44,10 +44,7 @@ class LessonProgressHeader extends StatelessWidget {
           const SizedBox(width: 12),
           Icon(Icons.schedule_rounded, size: 15, color: p.textSecondary),
           const SizedBox(width: 4),
-          Text(
-            '$minutes min',
-            style: text.labelMedium?.copyWith(color: p.textSecondary),
-          ),
+          Text('$minutes min', style: text.labelMedium?.copyWith(color: p.textSecondary)),
         ],
       ),
     );

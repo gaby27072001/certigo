@@ -7,11 +7,7 @@ import 'sync_queue_store.dart';
 
 /// Snapshot of the queue's health, emitted on [SyncEngine.status].
 class SyncStatus {
-  const SyncStatus({
-    required this.pending,
-    required this.dead,
-    required this.syncing,
-  });
+  const SyncStatus({required this.pending, required this.dead, required this.syncing});
 
   /// Number of actions awaiting (or backing off before) dispatch.
   final int pending;
@@ -65,7 +61,8 @@ class SyncFlushReport {
   bool get isIdle => dispatched == 0;
 
   @override
-  String toString() => 'SyncFlushReport(dispatched: $dispatched, succeeded: $succeeded, '
+  String toString() =>
+      'SyncFlushReport(dispatched: $dispatched, succeeded: $succeeded, '
       'retried: $retried, deadLettered: $deadLettered, pendingRemaining: $pendingRemaining)';
 }
 
@@ -98,12 +95,12 @@ class SyncEngine {
     this.maxAttempts = 6,
     this.doneRetention = const Duration(hours: 24),
     this.deadRetention = const Duration(days: 7),
-  })  : assert(maxAttempts >= 1, 'maxAttempts must be at least 1'),
-        _store = store,
-        _sender = sender,
-        _clock = clock ?? DateTime.now,
-        _backoff = backoff ?? exponentialBackoff(),
-        _idGenerator = idGenerator;
+  }) : assert(maxAttempts >= 1, 'maxAttempts must be at least 1'),
+       _store = store,
+       _sender = sender,
+       _clock = clock ?? DateTime.now,
+       _backoff = backoff ?? exponentialBackoff(),
+       _idGenerator = idGenerator;
 
   final SyncQueueStore _store;
   final SyncSender _sender;
@@ -193,8 +190,10 @@ class SyncEngine {
     _emit(syncing: true);
 
     final DateTime now = _clock();
-    final List<String> dueIds =
-        _queue.where((SyncAction a) => a.isDue(now)).map((SyncAction a) => a.id).toList();
+    final List<String> dueIds = _queue
+        .where((SyncAction a) => a.isDue(now))
+        .map((SyncAction a) => a.id)
+        .toList();
 
     var dispatched = 0;
     var succeeded = 0;

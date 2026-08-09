@@ -38,8 +38,9 @@ class _OfflineSyncScopeState extends ConsumerState<OfflineSyncScope> with Widget
   }
 
   void _onConnectivityChanged(List<ConnectivityResult> results) {
-    final bool isOnline =
-        results.any((ConnectivityResult result) => result != ConnectivityResult.none);
+    final bool isOnline = results.any(
+      (ConnectivityResult result) => result != ConnectivityResult.none,
+    );
     if (isOnline) {
       _flush();
     }

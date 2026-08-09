@@ -8,26 +8,26 @@ library;
 enum BlockType { hook, concept, example, code, check, recap, unknown }
 
 BlockType _blockTypeFrom(String? raw) => switch (raw) {
-      'hook' => BlockType.hook,
-      'concept' => BlockType.concept,
-      'example' => BlockType.example,
-      'code' => BlockType.code,
-      'check' => BlockType.check,
-      'recap' => BlockType.recap,
-      _ => BlockType.unknown,
-    };
+  'hook' => BlockType.hook,
+  'concept' => BlockType.concept,
+  'example' => BlockType.example,
+  'code' => BlockType.code,
+  'check' => BlockType.check,
+  'recap' => BlockType.recap,
+  _ => BlockType.unknown,
+};
 
 /// Serialises a [BlockType] back to its wire string. Symmetric with the private
 /// decoder above; public so the offline cache can round-trip a lesson to JSON.
 String blockTypeToWire(BlockType t) => switch (t) {
-      BlockType.hook => 'hook',
-      BlockType.concept => 'concept',
-      BlockType.example => 'example',
-      BlockType.code => 'code',
-      BlockType.check => 'check',
-      BlockType.recap => 'recap',
-      BlockType.unknown => 'unknown',
-    };
+  BlockType.hook => 'hook',
+  BlockType.concept => 'concept',
+  BlockType.example => 'example',
+  BlockType.code => 'code',
+  BlockType.check => 'check',
+  BlockType.recap => 'recap',
+  BlockType.unknown => 'unknown',
+};
 
 class Lesson {
   const Lesson({
@@ -49,29 +49,29 @@ class Lesson {
   final List<LessonBlock> blocks;
 
   factory Lesson.fromJson(Map<String, dynamic> json) => Lesson(
-        id: json['id'] as String,
-        trackId: json['trackId'] as String? ?? '',
-        unitId: json['unitId'] as String? ?? '',
-        domainId: json['domainId'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        estMinutes: (json['estMinutes'] as num?)?.toInt() ?? 5,
-        blocks: (json['blocks'] as List<dynamic>? ?? <dynamic>[])
-            .map((e) => LessonBlock.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+    id: json['id'] as String,
+    trackId: json['trackId'] as String? ?? '',
+    unitId: json['unitId'] as String? ?? '',
+    domainId: json['domainId'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    estMinutes: (json['estMinutes'] as num?)?.toInt() ?? 5,
+    blocks: (json['blocks'] as List<dynamic>? ?? <dynamic>[])
+        .map((e) => LessonBlock.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
 
   /// Serialises the lesson to a JSON-ready map, symmetric with [Lesson.fromJson].
   /// Used by the offline lesson cache to persist a full session for airplane-mode
   /// reading; not sent to the server (lessons are read-only for the client).
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'trackId': trackId,
-        'unitId': unitId,
-        'domainId': domainId,
-        'title': title,
-        'estMinutes': estMinutes,
-        'blocks': blocks.map((LessonBlock b) => b.toJson()).toList(),
-      };
+    'id': id,
+    'trackId': trackId,
+    'unitId': unitId,
+    'domainId': domainId,
+    'title': title,
+    'estMinutes': estMinutes,
+    'blocks': blocks.map((LessonBlock b) => b.toJson()).toList(),
+  };
 }
 
 /// A single block of a lesson. Polymorphic but flattened into one class for
@@ -104,55 +104,54 @@ class LessonBlock {
   final QuizItem? check;
 
   factory LessonBlock.fromJson(Map<String, dynamic> json) => LessonBlock(
-        type: _blockTypeFrom(json['type'] as String?),
-        conceptId: json['conceptId'] as String? ?? '',
-        title: json['title'] as String?,
-        body: json['body'] as String?,
-        code: json['code'] as String?,
-        language: json['language'] as String?,
-        check:
-            json['check'] == null ? null : QuizItem.fromJson(json['check'] as Map<String, dynamic>),
-      );
+    type: _blockTypeFrom(json['type'] as String?),
+    conceptId: json['conceptId'] as String? ?? '',
+    title: json['title'] as String?,
+    body: json['body'] as String?,
+    code: json['code'] as String?,
+    language: json['language'] as String?,
+    check: json['check'] == null ? null : QuizItem.fromJson(json['check'] as Map<String, dynamic>),
+  );
 
   /// Serialises the block, symmetric with [LessonBlock.fromJson]. Optional
   /// fields are omitted when null so the round-trip decodes back identically.
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'type': blockTypeToWire(type),
-        'conceptId': conceptId,
-        if (title != null) 'title': title,
-        if (body != null) 'body': body,
-        if (code != null) 'code': code,
-        if (language != null) 'language': language,
-        if (check != null) 'check': check!.toJson(),
-      };
+    'type': blockTypeToWire(type),
+    'conceptId': conceptId,
+    if (title != null) 'title': title,
+    if (body != null) 'body': body,
+    if (code != null) 'code': code,
+    if (language != null) 'language': language,
+    if (check != null) 'check': check!.toJson(),
+  };
 }
 
 /// The interaction types supported by the quiz engine.
 enum ItemType { mcq, multi, scenario, cloze, ordering, matchPairs, spotTheIssue, applied, unknown }
 
 ItemType itemTypeFrom(String? raw) => switch (raw) {
-      'mcq' => ItemType.mcq,
-      'multi' => ItemType.multi,
-      'scenario' => ItemType.scenario,
-      'cloze' => ItemType.cloze,
-      'ordering' => ItemType.ordering,
-      'matchPairs' => ItemType.matchPairs,
-      'spotTheIssue' => ItemType.spotTheIssue,
-      'applied' => ItemType.applied,
-      _ => ItemType.unknown,
-    };
+  'mcq' => ItemType.mcq,
+  'multi' => ItemType.multi,
+  'scenario' => ItemType.scenario,
+  'cloze' => ItemType.cloze,
+  'ordering' => ItemType.ordering,
+  'matchPairs' => ItemType.matchPairs,
+  'spotTheIssue' => ItemType.spotTheIssue,
+  'applied' => ItemType.applied,
+  _ => ItemType.unknown,
+};
 
 String itemTypeToWire(ItemType t) => switch (t) {
-      ItemType.mcq => 'mcq',
-      ItemType.multi => 'multi',
-      ItemType.scenario => 'scenario',
-      ItemType.cloze => 'cloze',
-      ItemType.ordering => 'ordering',
-      ItemType.matchPairs => 'matchPairs',
-      ItemType.spotTheIssue => 'spotTheIssue',
-      ItemType.applied => 'applied',
-      ItemType.unknown => 'unknown',
-    };
+  ItemType.mcq => 'mcq',
+  ItemType.multi => 'multi',
+  ItemType.scenario => 'scenario',
+  ItemType.cloze => 'cloze',
+  ItemType.ordering => 'ordering',
+  ItemType.matchPairs => 'matchPairs',
+  ItemType.spotTheIssue => 'spotTheIssue',
+  ItemType.applied => 'applied',
+  ItemType.unknown => 'unknown',
+};
 
 /// A *public* quiz item — sent to the client WITHOUT the correct answer.
 class QuizItem {
@@ -183,28 +182,28 @@ class QuizItem {
   final List<QuizOption> matches;
 
   factory QuizItem.fromJson(Map<String, dynamic> json) => QuizItem(
-        id: json['id'] as String,
-        conceptId: json['conceptId'] as String? ?? '',
-        type: itemTypeFrom(json['type'] as String?),
-        stem: json['stem'] as String? ?? '',
-        options: (json['options'] as List<dynamic>? ?? <dynamic>[])
-            .map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        matches: (json['matches'] as List<dynamic>? ?? <dynamic>[])
-            .map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+    id: json['id'] as String,
+    conceptId: json['conceptId'] as String? ?? '',
+    type: itemTypeFrom(json['type'] as String?),
+    stem: json['stem'] as String? ?? '',
+    options: (json['options'] as List<dynamic>? ?? <dynamic>[])
+        .map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    matches: (json['matches'] as List<dynamic>? ?? <dynamic>[])
+        .map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
 
   /// Serialises the public quiz item, symmetric with [QuizItem.fromJson]. Still
   /// answer-free — this only persists what the server already sent to the client.
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'conceptId': conceptId,
-        'type': itemTypeToWire(type),
-        'stem': stem,
-        'options': options.map((QuizOption o) => o.toJson()).toList(),
-        'matches': matches.map((QuizOption o) => o.toJson()).toList(),
-      };
+    'id': id,
+    'conceptId': conceptId,
+    'type': itemTypeToWire(type),
+    'stem': stem,
+    'options': options.map((QuizOption o) => o.toJson()).toList(),
+    'matches': matches.map((QuizOption o) => o.toJson()).toList(),
+  };
 }
 
 class QuizOption {

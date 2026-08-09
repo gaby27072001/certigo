@@ -93,10 +93,16 @@ void main() {
   group('SessionPlanner', () {
     test('prioritizes due concepts and fills to requested size', () {
       final List<ConceptMastery> states = <ConceptMastery>[
-        ConceptMastery.fresh(conceptId: 'due1', trackId: 't', now: now)
-            .copyWith(reps: 2, dueAt: now.subtract(const Duration(days: 1))),
-        ConceptMastery.fresh(conceptId: 'weak1', trackId: 't', now: now)
-            .copyWith(reps: 2, masteryScore: 0.2, dueAt: now.add(const Duration(days: 5))),
+        ConceptMastery.fresh(
+          conceptId: 'due1',
+          trackId: 't',
+          now: now,
+        ).copyWith(reps: 2, dueAt: now.subtract(const Duration(days: 1))),
+        ConceptMastery.fresh(
+          conceptId: 'weak1',
+          trackId: 't',
+          now: now,
+        ).copyWith(reps: 2, masteryScore: 0.2, dueAt: now.add(const Duration(days: 5))),
       ];
 
       final List<String> plan = const SessionPlanner().plan(

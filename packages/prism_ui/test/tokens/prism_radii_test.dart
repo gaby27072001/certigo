@@ -18,18 +18,9 @@ void main() {
     });
 
     test('BorderRadius helpers map to their scalar tokens', () {
-      expect(
-        PrismRadii.cardLg,
-        const BorderRadius.all(Radius.circular(PrismRadii.lg)),
-      );
-      expect(
-        PrismRadii.buttonAll,
-        const BorderRadius.all(Radius.circular(PrismRadii.button)),
-      );
-      expect(
-        PrismRadii.pillAll,
-        const BorderRadius.all(Radius.circular(PrismRadii.pill)),
-      );
+      expect(PrismRadii.cardLg, const BorderRadius.all(Radius.circular(PrismRadii.lg)));
+      expect(PrismRadii.buttonAll, const BorderRadius.all(Radius.circular(PrismRadii.button)));
+      expect(PrismRadii.pillAll, const BorderRadius.all(Radius.circular(PrismRadii.pill)));
     });
   });
 }

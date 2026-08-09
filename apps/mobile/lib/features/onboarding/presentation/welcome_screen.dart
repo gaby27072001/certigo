@@ -22,11 +22,7 @@ class WelcomeScreen extends StatelessWidget {
           child: Column(
             children: <Widget>[
               const Spacer(flex: 2),
-              const MascotHero(
-                mascot: AuroraMascot.nimbus,
-                mood: MascotMood.celebrate,
-                size: 168,
-              ),
+              const MascotHero(mascot: AuroraMascot.nimbus, mood: MascotMood.celebrate, size: 168),
               const SizedBox(height: 28),
               Text(
                 'Apprends Azure\nsans y penser',

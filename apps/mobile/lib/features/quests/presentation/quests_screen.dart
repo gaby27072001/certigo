@@ -29,9 +29,8 @@ class QuestsScreen extends ConsumerWidget {
               child: async.when(
                 data: (QuestBoard board) => _QuestsContent(board: board),
                 loading: () => const _QuestsLoading(),
-                error: (Object error, StackTrace _) => PrismStatusView.error(
-                  onRetry: () => ref.invalidate(questBoardProvider),
-                ),
+                error: (Object error, StackTrace _) =>
+                    PrismStatusView.error(onRetry: () => ref.invalidate(questBoardProvider)),
               ),
             ),
           ],
@@ -59,9 +58,9 @@ class _QuestsContentState extends ConsumerState<_QuestsContent> {
       _claimingId = quest.id;
       _error = null;
     });
-    final Result<ClaimQuestResult> result = await ref.read(questRepositoryProvider).claimQuest(
-          ClaimQuestRequest(questId: quest.id),
-        );
+    final Result<ClaimQuestResult> result = await ref
+        .read(questRepositoryProvider)
+        .claimQuest(ClaimQuestRequest(questId: quest.id));
     if (!mounted) {
       return;
     }
@@ -125,10 +124,7 @@ class _QuestsContentState extends ConsumerState<_QuestsContent> {
             ],
           ),
         ),
-        if (_error != null) ...<Widget>[
-          const SizedBox(height: 14),
-          InlineError(message: _error!),
-        ],
+        if (_error != null) ...<Widget>[const SizedBox(height: 14), InlineError(message: _error!)],
         const SizedBox(height: 16),
         for (final Quest quest in board.quests) ...<Widget>[
           _QuestCard(
@@ -193,10 +189,7 @@ class _QuestCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     '+${quest.rewardGems}',
-                    style: t.labelMedium?.copyWith(
-                      color: p.info,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: t.labelMedium?.copyWith(color: p.info, fontWeight: FontWeight.w700),
                   ),
                 ],
               ),

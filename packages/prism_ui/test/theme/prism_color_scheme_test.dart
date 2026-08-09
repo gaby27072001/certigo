@@ -16,10 +16,7 @@ void main() {
 
     test('light and dark differ by background, not brand primary', () {
       expect(PrismColorScheme.light.primary, PrismColorScheme.dark.primary);
-      expect(
-        PrismColorScheme.light.background,
-        isNot(PrismColorScheme.dark.background),
-      );
+      expect(PrismColorScheme.light.background, isNot(PrismColorScheme.dark.background));
     });
 
     test('accentFor wraps around the six domain accents', () {

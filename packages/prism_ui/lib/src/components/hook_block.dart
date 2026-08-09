@@ -25,12 +25,7 @@ class HookBlock extends StatelessWidget {
         children: <Widget>[
           Icon(Icons.bolt_rounded, color: p.ember),
           const SizedBox(width: 12),
-          Expanded(
-            child: PrismRichText(
-              text,
-              style: t.titleMedium?.copyWith(height: 1.35),
-            ),
-          ),
+          Expanded(child: PrismRichText(text, style: t.titleMedium?.copyWith(height: 1.35))),
         ],
       ),
     );

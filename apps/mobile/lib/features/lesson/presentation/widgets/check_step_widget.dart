@@ -53,10 +53,7 @@ class CheckStepWidget extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               f.label,
-              style: text.labelLarge?.copyWith(
-                color: f.color,
-                fontWeight: FontWeight.w700,
-              ),
+              style: text.labelLarge?.copyWith(color: f.color, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -81,10 +78,7 @@ class CheckStepWidget extends StatelessWidget {
         ],
         if (_graded) ...<Widget>[
           const SizedBox(height: 20),
-          AnswerFeedbackCard(
-            correct: outcome!.correct,
-            explanation: outcome!.explanation,
-          ),
+          AnswerFeedbackCard(correct: outcome!.correct, explanation: outcome!.explanation),
         ],
       ],
     );

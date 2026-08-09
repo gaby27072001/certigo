@@ -19,9 +19,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
   }
 
-  testWidgets('signed-out launch lands on the sign-in form', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('signed-out launch lands on the sign-in form', (WidgetTester tester) async {
     await pumpApp(tester);
 
     expect(find.text('Certigo'), findsOneWidget);
@@ -30,9 +28,7 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Se connecter'), findsOneWidget);
   });
 
-  testWidgets('sign-in screen can switch into registration mode', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('sign-in screen can switch into registration mode', (WidgetTester tester) async {
     await pumpApp(tester);
 
     await tester.tap(find.byKey(const Key('toggle-mode')));
@@ -40,9 +36,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.byKey(const Key('name-field')), findsOneWidget);
-    expect(
-      find.widgetWithText(FilledButton, 'Créer un compte'),
-      findsOneWidget,
-    );
+    expect(find.widgetWithText(FilledButton, 'Créer un compte'), findsOneWidget);
   });
 }
