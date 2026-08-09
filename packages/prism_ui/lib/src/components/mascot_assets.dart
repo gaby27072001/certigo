@@ -10,23 +10,23 @@ import 'aurora_mascot.dart';
 /// produce are defined in one obvious place.
 extension AuroraMascotId on AuroraMascot {
   String get id => switch (this) {
-        AuroraMascot.nimbus => 'nimbus',
-        AuroraMascot.volt => 'volt',
-        AuroraMascot.cosmo => 'cosmo',
-        AuroraMascot.sentinel => 'sentinel',
-        AuroraMascot.bicky => 'bicky',
-        AuroraMascot.pixel => 'pixel',
-        AuroraMascot.pip => 'pip',
-      };
+    AuroraMascot.nimbus => 'nimbus',
+    AuroraMascot.volt => 'volt',
+    AuroraMascot.cosmo => 'cosmo',
+    AuroraMascot.sentinel => 'sentinel',
+    AuroraMascot.bicky => 'bicky',
+    AuroraMascot.pixel => 'pixel',
+    AuroraMascot.pip => 'pip',
+  };
 }
 
 extension MascotMoodId on MascotMood {
   String get id => switch (this) {
-        MascotMood.idle => 'idle',
-        MascotMood.happy => 'happy',
-        MascotMood.celebrate => 'celebrate',
-        MascotMood.sad => 'sad',
-      };
+    MascotMood.idle => 'idle',
+    MascotMood.happy => 'happy',
+    MascotMood.celebrate => 'celebrate',
+    MascotMood.sad => 'sad',
+  };
 }
 
 /// A resolved piece of mascot artwork: the image asset to paint, plus the owning
@@ -96,11 +96,7 @@ class MascotRegistry {
   /// ```dart
   /// MascotRegistry.instance.useImageAssets(); // assets/mascots/<id>/<mood>.png
   /// ```
-  void useImageAssets({
-    String base = 'assets/mascots',
-    String extension = 'png',
-    String? package,
-  }) {
+  void useImageAssets({String base = 'assets/mascots', String extension = 'png', String? package}) {
     final String ext = extension.startsWith('.') ? extension.substring(1) : extension;
     _convention = (AuroraMascot mascot, MascotMood mood) =>
         MascotArt('$base/${mascot.id}/${mood.id}.$ext', package: package);
@@ -114,12 +110,7 @@ class MascotRegistry {
   }
 
   /// Register one image for a single (mascot, mood) pair — highest priority.
-  void registerMood(
-    AuroraMascot mascot,
-    MascotMood mood,
-    String assetPath, {
-    String? package,
-  }) {
+  void registerMood(AuroraMascot mascot, MascotMood mood, String assetPath, {String? package}) {
     (_moodArt[mascot] ??= <MascotMood, MascotArt>{})[mood] = MascotArt(assetPath, package: package);
   }
 

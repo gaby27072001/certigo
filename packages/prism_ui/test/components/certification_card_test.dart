@@ -6,8 +6,9 @@ import '../support/prism_harness.dart';
 
 void main() {
   group('CertificationCard', () {
-    testWidgets('renders code, title, level chip and lesson/chapter counts',
-        (WidgetTester tester) async {
+    testWidgets('renders code, title, level chip and lesson/chapter counts', (
+      WidgetTester tester,
+    ) async {
       await pumpPrism(
         tester,
         const SizedBox(

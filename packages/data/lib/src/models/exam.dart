@@ -15,9 +15,9 @@ class MockExamRequest {
   final int? length;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'trackId': trackId,
-        if (length != null) 'length': length,
-      };
+    'trackId': trackId,
+    if (length != null) 'length': length,
+  };
 }
 
 /// A *public*, answer-free exam item: stem + options come from a lesson's public
@@ -40,15 +40,15 @@ class MockExamItem {
   final List<QuizOption> options;
 
   factory MockExamItem.fromJson(Map<String, dynamic> json) => MockExamItem(
-        itemId: json['itemId'] as String,
-        lessonId: json['lessonId'] as String? ?? '',
-        domainId: json['domainId'] as String? ?? '',
-        type: itemTypeFrom(json['type'] as String?),
-        stem: json['stem'] as String? ?? '',
-        options: (json['options'] as List<dynamic>? ?? <dynamic>[])
-            .map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+    itemId: json['itemId'] as String,
+    lessonId: json['lessonId'] as String? ?? '',
+    domainId: json['domainId'] as String? ?? '',
+    type: itemTypeFrom(json['type'] as String?),
+    stem: json['stem'] as String? ?? '',
+    options: (json['options'] as List<dynamic>? ?? <dynamic>[])
+        .map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
 }
 
 /// One row of the exam blueprint: how many items a domain contributes and its
@@ -67,11 +67,11 @@ class MockExamBlueprintDomain {
   final int itemCount;
 
   factory MockExamBlueprintDomain.fromJson(Map<String, dynamic> json) => MockExamBlueprintDomain(
-        domainId: json['domainId'] as String? ?? '',
-        name: json['name'] as String? ?? '',
-        weight: (json['weight'] as num?)?.toDouble() ?? 0,
-        itemCount: (json['itemCount'] as num?)?.toInt() ?? 0,
-      );
+    domainId: json['domainId'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    weight: (json['weight'] as num?)?.toDouble() ?? 0,
+    itemCount: (json['itemCount'] as num?)?.toInt() ?? 0,
+  );
 }
 
 /// A generated mock exam: blueprint + the ordered, answer-free items to run.
@@ -97,19 +97,19 @@ class MockExam {
   final List<MockExamItem> items;
 
   factory MockExam.fromJson(Map<String, dynamic> json) => MockExam(
-        examId: json['examId'] as String,
-        trackId: json['trackId'] as String? ?? '',
-        trackCode: json['trackCode'] as String? ?? '',
-        trackTitle: json['trackTitle'] as String? ?? '',
-        timeLimitSeconds: (json['timeLimitSeconds'] as num?)?.toInt() ?? 0,
-        passingScore: (json['passingScore'] as num?)?.toInt() ?? 0,
-        blueprint: (json['blueprint'] as List<dynamic>? ?? <dynamic>[])
-            .map((e) => MockExamBlueprintDomain.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        items: (json['items'] as List<dynamic>? ?? <dynamic>[])
-            .map((e) => MockExamItem.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+    examId: json['examId'] as String,
+    trackId: json['trackId'] as String? ?? '',
+    trackCode: json['trackCode'] as String? ?? '',
+    trackTitle: json['trackTitle'] as String? ?? '',
+    timeLimitSeconds: (json['timeLimitSeconds'] as num?)?.toInt() ?? 0,
+    passingScore: (json['passingScore'] as num?)?.toInt() ?? 0,
+    blueprint: (json['blueprint'] as List<dynamic>? ?? <dynamic>[])
+        .map((e) => MockExamBlueprintDomain.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    items: (json['items'] as List<dynamic>? ?? <dynamic>[])
+        .map((e) => MockExamItem.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
 }
 
 /// Request body for `POST /exam/submit`. [clientAttemptId] makes submission
@@ -130,12 +130,12 @@ class SubmitMockExamRequest {
   final List<QuizAnswer> answers;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'clientAttemptId': clientAttemptId,
-        'trackId': trackId,
-        'examId': examId,
-        'startedAt': startedAt.toUtc().toIso8601String(),
-        'answers': answers.map((a) => a.toJson()).toList(),
-      };
+    'clientAttemptId': clientAttemptId,
+    'trackId': trackId,
+    'examId': examId,
+    'startedAt': startedAt.toUtc().toIso8601String(),
+    'answers': answers.map((a) => a.toJson()).toList(),
+  };
 }
 
 /// Per-domain breakdown of an exam result.
@@ -157,13 +157,13 @@ class ExamDomainScore {
   final int pct;
 
   factory ExamDomainScore.fromJson(Map<String, dynamic> json) => ExamDomainScore(
-        domainId: json['domainId'] as String? ?? '',
-        name: json['name'] as String? ?? '',
-        weight: (json['weight'] as num?)?.toDouble() ?? 0,
-        correct: (json['correct'] as num?)?.toInt() ?? 0,
-        total: (json['total'] as num?)?.toInt() ?? 0,
-        pct: (json['pct'] as num?)?.toInt() ?? 0,
-      );
+    domainId: json['domainId'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    weight: (json['weight'] as num?)?.toDouble() ?? 0,
+    correct: (json['correct'] as num?)?.toInt() ?? 0,
+    total: (json['total'] as num?)?.toInt() ?? 0,
+    pct: (json['pct'] as num?)?.toInt() ?? 0,
+  );
 }
 
 /// Server-graded result of a mock exam: scaled score, pass/fail, per-domain
@@ -198,25 +198,23 @@ class MockExamResult {
   final List<String> weakConcepts;
 
   factory MockExamResult.fromJson(Map<String, dynamic> json) => MockExamResult(
-        attemptId: json['attemptId'] as String? ?? '',
-        examId: json['examId'] as String? ?? '',
-        scaledScore: (json['scaledScore'] as num?)?.toInt() ?? 0,
-        pct: (json['pct'] as num?)?.toInt() ?? 0,
-        passed: json['passed'] as bool? ?? false,
-        passingScore: (json['passingScore'] as num?)?.toInt() ?? 0,
-        correct: (json['correct'] as num?)?.toInt() ?? 0,
-        total: (json['total'] as num?)?.toInt() ?? 0,
-        domains: (json['domains'] as List<dynamic>? ?? <dynamic>[])
-            .map((e) => ExamDomainScore.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        results: (json['results'] as List<dynamic>? ?? <dynamic>[])
-            .map((e) => ItemResult.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        rewards: QuizRewards.fromJson(
-          json['rewards'] as Map<String, dynamic>? ?? <String, dynamic>{},
-        ),
-        weakConcepts: (json['weakConcepts'] as List<dynamic>? ?? <dynamic>[])
-            .map((e) => e as String)
-            .toList(),
-      );
+    attemptId: json['attemptId'] as String? ?? '',
+    examId: json['examId'] as String? ?? '',
+    scaledScore: (json['scaledScore'] as num?)?.toInt() ?? 0,
+    pct: (json['pct'] as num?)?.toInt() ?? 0,
+    passed: json['passed'] as bool? ?? false,
+    passingScore: (json['passingScore'] as num?)?.toInt() ?? 0,
+    correct: (json['correct'] as num?)?.toInt() ?? 0,
+    total: (json['total'] as num?)?.toInt() ?? 0,
+    domains: (json['domains'] as List<dynamic>? ?? <dynamic>[])
+        .map((e) => ExamDomainScore.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    results: (json['results'] as List<dynamic>? ?? <dynamic>[])
+        .map((e) => ItemResult.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    rewards: QuizRewards.fromJson(json['rewards'] as Map<String, dynamic>? ?? <String, dynamic>{}),
+    weakConcepts: (json['weakConcepts'] as List<dynamic>? ?? <dynamic>[])
+        .map((e) => e as String)
+        .toList(),
+  );
 }

@@ -16,28 +16,28 @@ import 'package:prism_ui/prism_ui.dart';
 /// [WidgetTester.pumpAndSettle] — the shared aurora background loops forever.
 void main() {
   Season fakeSeason() => const Season(
-        id: '2025-01',
-        year: 2025,
-        month: 1,
-        theme: 'Forge cosmique',
-        tagline: 'Allume les étoiles, une leçon à la fois.',
-        mascot: 'nova',
-        accent: '#7C5CFC',
-        badgeId: 'badge-jan',
-        badgeTitle: 'Forgeron stellaire',
-        gems: 120,
-        badgesEarned: 1,
-        challenge: SeasonChallenge(
-          kind: 'lessons',
-          title: 'Termine 30 leçons',
-          target: 30,
-          current: 12,
-          rewardGems: 80,
-          completed: false,
-          claimed: false,
-          claimable: false,
-        ),
-      );
+    id: '2025-01',
+    year: 2025,
+    month: 1,
+    theme: 'Forge cosmique',
+    tagline: 'Allume les étoiles, une leçon à la fois.',
+    mascot: 'nova',
+    accent: '#7C5CFC',
+    badgeId: 'badge-jan',
+    badgeTitle: 'Forgeron stellaire',
+    gems: 120,
+    badgesEarned: 1,
+    challenge: SeasonChallenge(
+      kind: 'lessons',
+      title: 'Termine 30 leçons',
+      target: 30,
+      current: 12,
+      rewardGems: 80,
+      completed: false,
+      claimed: false,
+      claimable: false,
+    ),
+  );
 
   Future<void> pumpSeasons(WidgetTester tester) async {
     final GoRouter router = GoRouter(
@@ -52,13 +52,8 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          seasonProvider.overrideWith((Ref ref) async => fakeSeason()),
-        ],
-        child: MaterialApp.router(
-          theme: PrismTheme.light(),
-          routerConfig: router,
-        ),
+        overrides: <Override>[seasonProvider.overrideWith((Ref ref) async => fakeSeason())],
+        child: MaterialApp.router(theme: PrismTheme.light(), routerConfig: router),
       ),
     );
 

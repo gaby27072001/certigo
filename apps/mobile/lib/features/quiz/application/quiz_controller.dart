@@ -141,7 +141,8 @@ class QuizController extends ChangeNotifier {
 
     final bool hasLocalKey = _items.any((QuizEntry entry) => entry.hasLocalCorrection);
     final bool pendingSync = submission.isFailure && !hasLocalKey;
-    final SubmitQuizResult result = submission.valueOrNull ??
+    final SubmitQuizResult result =
+        submission.valueOrNull ??
         _localFallbackResult(
           clientAttemptId: clientAttemptId,
           total: _items.length,
@@ -159,8 +160,9 @@ class QuizController extends ChangeNotifier {
     required int total,
     required bool hasLocalCorrection,
   }) {
-    final int scorePct =
-        hasLocalCorrection ? (total == 0 ? 0 : ((_correctCount / total) * 100).round()) : 0;
+    final int scorePct = hasLocalCorrection
+        ? (total == 0 ? 0 : ((_correctCount / total) * 100).round())
+        : 0;
     final int xp = hasLocalCorrection ? (20 + _correctCount * 10) : 0;
     return SubmitQuizResult(
       attemptId: 'local-$clientAttemptId',

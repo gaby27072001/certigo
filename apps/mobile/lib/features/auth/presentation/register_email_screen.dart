@@ -54,8 +54,9 @@ class _RegisterEmailScreenState extends ConsumerState<RegisterEmailScreen> {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
     final String firstName = ref.watch(registerDraftProvider).firstName;
-    final String greeting =
-        firstName.isEmpty ? 'Ton adresse e-mail ?' : 'Ton adresse e-mail, $firstName ?';
+    final String greeting = firstName.isEmpty
+        ? 'Ton adresse e-mail ?'
+        : 'Ton adresse e-mail, $firstName ?';
     final String? suggestion = suggestEmailCorrection(_email.text);
 
     return OnboardingScaffold(

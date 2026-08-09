@@ -56,8 +56,8 @@ abstract interface class AuthGateway {
 /// External ID.
 class AppAuthGateway implements AuthGateway {
   AppAuthGateway({FlutterAppAuth? appAuth, AuthDiagnostics? diagnostics})
-      : _appAuth = appAuth ?? const FlutterAppAuth(),
-        _diagnostics = diagnostics ?? const NoopAuthDiagnostics();
+    : _appAuth = appAuth ?? const FlutterAppAuth(),
+      _diagnostics = diagnostics ?? const NoopAuthDiagnostics();
 
   final FlutterAppAuth _appAuth;
 
@@ -65,9 +65,9 @@ class AppAuthGateway implements AuthGateway {
   final AuthDiagnostics _diagnostics;
 
   List<String> get _scopes => <String>[
-        ...AppEnv.entraScopes,
-        if (AppEnv.entraApiScope.isNotEmpty) AppEnv.entraApiScope,
-      ];
+    ...AppEnv.entraScopes,
+    if (AppEnv.entraApiScope.isNotEmpty) AppEnv.entraApiScope,
+  ];
 
   /// Agent externe préféré pour l'ouverture du navigateur système.
   ///
@@ -83,8 +83,8 @@ class AppAuthGateway implements AuthGateway {
   /// fonctionne déjà et cet enum n'y est de toute façon pas appliqué.
   ExternalUserAgent get _preferredUserAgent =>
       (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS)
-          ? ExternalUserAgent.ephemeralAsWebAuthenticationSession
-          : ExternalUserAgent.asWebAuthenticationSession;
+      ? ExternalUserAgent.ephemeralAsWebAuthenticationSession
+      : ExternalUserAgent.asWebAuthenticationSession;
 
   @override
   Future<AuthSession> signIn(AuthProvider provider) async {
@@ -124,7 +124,8 @@ class AppAuthGateway implements AuthGateway {
         throw const AuthGatewayException(
           'La connexion n\'a pas renvoyé de code d\'autorisation.',
           cause: AuthFailureCause.providerError,
-          diagnostic: 'authorize() est revenu sans authorizationCode '
+          diagnostic:
+              'authorize() est revenu sans authorizationCode '
               '(étape : callback / autorisation). Le navigateur est revenu à '
               'l\'app mais sans code exploitable.',
         );
@@ -150,7 +151,8 @@ class AppAuthGateway implements AuthGateway {
       // Étape 4 — jetons reçus (longueurs seulement, jamais les jetons).
       _diagnostics.mark(
         AuthDiagnosticStep.tokenReceived,
-        detail: 'access len=${result.accessToken?.length ?? 0}, '
+        detail:
+            'access len=${result.accessToken?.length ?? 0}, '
             'id len=${result.idToken?.length ?? 0}',
       );
 
@@ -170,8 +172,9 @@ class AppAuthGateway implements AuthGateway {
     } on PlatformException catch (e) {
       final ({String message, AuthFailureCause cause}) described = _describeError(e, provider);
       // Annulation : on garde le message propre, sans bruit technique.
-      final String? diagnostic =
-          described.cause == AuthFailureCause.cancelled ? null : _platformDiagnostic(e);
+      final String? diagnostic = described.cause == AuthFailureCause.cancelled
+          ? null
+          : _platformDiagnostic(e);
       _diagnostics.mark(AuthDiagnosticStep.failed, detail: diagnostic ?? described.message);
       throw AuthGatewayException(described.message, cause: described.cause, diagnostic: diagnostic);
     } catch (e) {

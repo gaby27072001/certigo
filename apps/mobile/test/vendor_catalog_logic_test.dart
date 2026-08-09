@@ -7,14 +7,14 @@ import 'package:prism_ui/prism_ui.dart';
 /// catalogue. No widgets, no providers — just the classification rules.
 void main() {
   TrackSummary track(String id, String code, {String level = 'fundamentals'}) => TrackSummary(
-        id: id,
-        code: code,
-        title: '$code title',
-        level: level,
-        summary: 'summary of $code',
-        unitCount: 5,
-        lessonCount: 20,
-      );
+    id: id,
+    code: code,
+    title: '$code title',
+    level: level,
+    summary: 'summary of $code',
+    unitCount: 5,
+    lessonCount: 20,
+  );
 
   group('vendorOf', () {
     test('maps GitHub tracks by id/code prefix and everything else to Microsoft', () {
@@ -72,10 +72,11 @@ void main() {
 
     test('groups into ordered, non-empty sections', () {
       final List<CertSection> sections = groupIntoSections(tracks);
-      expect(
-        sections.map((CertSection s) => s.category),
-        <CertCategory>[CertCategory.azure, CertCategory.security, CertCategory.dataAi],
-      );
+      expect(sections.map((CertSection s) => s.category), <CertCategory>[
+        CertCategory.azure,
+        CertCategory.security,
+        CertCategory.dataAi,
+      ]);
       expect(sections.first.tracks.length, 2); // AZ-900 + AZ-104
     });
 

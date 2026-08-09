@@ -14,15 +14,15 @@ class AttributionScreen extends ConsumerWidget {
 
   static const List<(AttributionSource, String, String)> _options =
       <(AttributionSource, String, String)>[
-    (AttributionSource.search, '🔎', 'Recherche Google / Bing'),
-    (AttributionSource.friendsFamily, '👋', 'Proches ou collègues'),
-    (AttributionSource.youtube, '▶️', 'YouTube'),
-    (AttributionSource.tiktok, '🎵', 'TikTok'),
-    (AttributionSource.social, '💬', 'Réseaux sociaux'),
-    (AttributionSource.appStore, '🛍️', 'App Store / Play Store'),
-    (AttributionSource.newsBlog, '📰', 'Presse ou blog'),
-    (AttributionSource.other, '✨', 'Autre'),
-  ];
+        (AttributionSource.search, '🔎', 'Recherche Google / Bing'),
+        (AttributionSource.friendsFamily, '👋', 'Proches ou collègues'),
+        (AttributionSource.youtube, '▶️', 'YouTube'),
+        (AttributionSource.tiktok, '🎵', 'TikTok'),
+        (AttributionSource.social, '💬', 'Réseaux sociaux'),
+        (AttributionSource.appStore, '🛍️', 'App Store / Play Store'),
+        (AttributionSource.newsBlog, '📰', 'Presse ou blog'),
+        (AttributionSource.other, '✨', 'Autre'),
+      ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

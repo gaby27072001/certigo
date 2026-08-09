@@ -21,11 +21,12 @@ abstract interface class SessionStore {
 /// l'utilisateur** sans redemander de connexion.
 class SecureSessionStore implements SessionStore {
   SecureSessionStore({FlutterSecureStorage? storage})
-      : _storage = storage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
-              iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
-            );
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            aOptions: AndroidOptions(encryptedSharedPreferences: true),
+            iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+          );
 
   static const String _key = 'certigo.session.v1';
 

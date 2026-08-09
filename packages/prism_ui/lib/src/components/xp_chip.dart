@@ -9,11 +9,7 @@ import '../tokens/prism_radii.dart';
 /// totals are abbreviated (1.2k, 3.4M). An optional [delta] surfaces XP just
 /// earned (e.g. `+30`) in the success tone for a quick reward beat.
 class XpChip extends StatelessWidget {
-  const XpChip({
-    super.key,
-    required this.xp,
-    this.delta,
-  });
+  const XpChip({super.key, required this.xp, this.delta});
 
   /// Total experience points.
   final int xp;
@@ -42,19 +38,13 @@ class XpChip extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               _compact(xp),
-              style: t.labelLarge?.copyWith(
-                color: p.textPrimary,
-                fontWeight: FontWeight.w800,
-              ),
+              style: t.labelLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800),
             ),
             if (delta != null && delta! > 0) ...<Widget>[
               const SizedBox(width: 6),
               Text(
                 '+${_compact(delta!)}',
-                style: t.labelMedium?.copyWith(
-                  color: p.success,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: t.labelMedium?.copyWith(color: p.success, fontWeight: FontWeight.w700),
               ),
             ],
           ],

@@ -26,21 +26,15 @@ class TutorController extends StateNotifier<TutorState> {
     if (!mounted) return;
 
     state = res.when(
-      success: (TutorExplanation e) => TutorState(
-        status: TutorStatus.ready,
-        explanation: e,
-      ),
-      failure: (Failure f) => TutorState(
-        status: TutorStatus.error,
-        errorMessage: f.message,
-      ),
+      success: (TutorExplanation e) => TutorState(status: TutorStatus.ready, explanation: e),
+      failure: (Failure f) => TutorState(status: TutorStatus.error, errorMessage: f.message),
     );
   }
 }
 
 /// One tutor controller per answered item, auto-disposed when its sheet closes
 /// so each consultation starts fresh (and re-reads the latest personalisation).
-final tutorControllerProvider =
-    StateNotifierProvider.autoDispose.family<TutorController, TutorState, String>(
-  (Ref ref, String itemId) => TutorController(ref.watch(tutorRepositoryProvider)),
-);
+final tutorControllerProvider = StateNotifierProvider.autoDispose
+    .family<TutorController, TutorState, String>(
+      (Ref ref, String itemId) => TutorController(ref.watch(tutorRepositoryProvider)),
+    );

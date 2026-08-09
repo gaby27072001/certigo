@@ -13,11 +13,7 @@ class ReviewScheduler {
   const ReviewScheduler._();
 
   /// Apply a graded review to [m] and return the updated memory state.
-  static ConceptMastery apply(
-    ConceptMastery m,
-    ReviewGrade grade,
-    DateTime now,
-  ) {
+  static ConceptMastery apply(ConceptMastery m, ReviewGrade grade, DateTime now) {
     final bool again = grade == ReviewGrade.again;
 
     final double difficulty = (m.difficulty + (again ? 0.8 : -0.15)).clamp(1.0, 10.0);

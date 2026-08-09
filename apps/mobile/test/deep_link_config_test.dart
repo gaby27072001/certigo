@@ -52,10 +52,7 @@ void main() {
   test('la validation de config n\'émet aucune erreur de redirection par défaut', () {
     // Config par défaut (dev) : le schéma de redirection est cohérent.
     final AppConfigReport report = AppEnv.validate();
-    expect(
-      report.issues.any((AppConfigIssue i) => i.key == 'ENTRA_REDIRECT_URI'),
-      isFalse,
-    );
+    expect(report.issues.any((AppConfigIssue i) => i.key == 'ENTRA_REDIRECT_URI'), isFalse);
   });
 
   test('le fournisseur e-mail ne dépend pas du deep-link natif', () {

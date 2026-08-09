@@ -246,11 +246,7 @@ class _OrbitFieldState extends State<OrbitField> with SingleTickerProviderStateM
 
 /// Paints thin concentric circles for the orbit rings.
 class _OrbitRingsPainter extends CustomPainter {
-  const _OrbitRingsPainter({
-    required this.radii,
-    required this.color,
-    required this.strokeWidth,
-  });
+  const _OrbitRingsPainter({required this.radii, required this.color, required this.strokeWidth});
 
   final List<double> radii;
   final Color color;

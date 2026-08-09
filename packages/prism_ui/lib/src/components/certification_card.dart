@@ -71,10 +71,7 @@ class CertificationCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? accent.withOpacity(0.10) : p.surface,
             borderRadius: PrismRadii.cardXl,
-            border: Border.all(
-              color: selected ? accent : p.border,
-              width: selected ? 2 : 1,
-            ),
+            border: Border.all(color: selected ? accent : p.border, width: selected ? 2 : 1),
           ),
           child: Row(
             children: <Widget>[
@@ -183,12 +180,11 @@ class _MetaChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: PrismSpacing.xs, vertical: PrismSpacing.debt3),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.14),
-        borderRadius: PrismRadii.pillAll,
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.xs,
+        vertical: PrismSpacing.debt3,
       ),
+      decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: PrismRadii.pillAll),
       child: Text(
         label,
         style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 11),

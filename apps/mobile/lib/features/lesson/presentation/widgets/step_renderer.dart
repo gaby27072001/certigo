@@ -49,10 +49,10 @@ class StepRenderer extends StatelessWidget {
         LessonStepKind.recap => KeyTakeawayBlock(body: block?.body ?? ''),
         LessonStepKind.check => _buildCheck(step.item!),
         LessonStepKind.quiz => const CalloutBlock(
-            kind: CalloutKind.info,
-            title: 'Checkpoint',
-            text: 'Le checkpoint d\'unité arrive bientôt.',
-          ),
+          kind: CalloutKind.info,
+          title: 'Checkpoint',
+          text: 'Le checkpoint d\'unité arrive bientôt.',
+        ),
         LessonStepKind.result => const SizedBox.shrink(),
       };
     }

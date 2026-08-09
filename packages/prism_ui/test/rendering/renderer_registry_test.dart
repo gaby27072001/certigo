@@ -23,11 +23,10 @@ class _ProbeBlock extends StatelessWidget {
 /// Builds a registry whose only renderer reads a required `body` field, so we
 /// can exercise the known / malformed paths without any real block widget.
 RendererRegistry _probeRegistry({int schemaVersion = RendererSchema.current}) {
-  return RendererRegistry(schemaVersion: schemaVersion)
-    ..register(
-      'hook',
-      (BuildContext context, ContentBlock block) => _ProbeBlock(block.requireString('body')),
-    );
+  return RendererRegistry(schemaVersion: schemaVersion)..register(
+    'hook',
+    (BuildContext context, ContentBlock block) => _ProbeBlock(block.requireString('body')),
+  );
 }
 
 Future<void> _pumpBlock(WidgetTester tester, RendererRegistry registry, ContentBlock block) async {

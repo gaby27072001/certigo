@@ -302,7 +302,7 @@ class SchemaValidationResult {
 class ContentBlockValidator {
   /// Validates against [registry], defaulting to the canonical v2 catalogue.
   ContentBlockValidator([ContentSchemaRegistry? registry])
-      : _registry = registry ?? ContentSchemaRegistry.canonicalV2();
+    : _registry = registry ?? ContentSchemaRegistry.canonicalV2();
 
   final ContentSchemaRegistry _registry;
 
@@ -331,7 +331,8 @@ class ContentBlockValidator {
         SchemaViolation(
           kind: SchemaViolationKind.unsupportedSchema,
           field: 'schemaVersion',
-          message: 'Version de schema non supportee : ${block.schemaVersion} '
+          message:
+              'Version de schema non supportee : ${block.schemaVersion} '
               '(supporte 1..${RendererSchema.current}).',
         ),
       );
@@ -386,7 +387,8 @@ class ContentBlockValidator {
         const SchemaViolation(
           kind: SchemaViolationKind.reservedFieldMisuse,
           field: kReservedTenantIdField,
-          message: 'Champ reserve "$kReservedTenantIdField" (Partie 28) doit '
+          message:
+              'Champ reserve "$kReservedTenantIdField" (Partie 28) doit '
               'etre une chaine ; accepte mais non consomme par le renderer v2.',
         ),
       );

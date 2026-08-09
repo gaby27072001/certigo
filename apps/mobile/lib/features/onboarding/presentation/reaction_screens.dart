@@ -46,10 +46,7 @@ class GoalReactionScreen extends ConsumerWidget {
       message: 'À ce rythme, tu vas apprendre vite !',
       onBack: () => context.go(OnboardingRoutes.goal),
       onPrimary: () => context.go(OnboardingRoutes.notifications),
-      highlight: MetricBadge(
-        value: '≈ ${c.weeklyNotions}',
-        label: 'notions ta 1re semaine',
-      ),
+      highlight: MetricBadge(value: '≈ ${c.weeklyNotions}', label: 'notions ta 1re semaine'),
     );
   }
 }
@@ -100,10 +97,7 @@ class StartReactionScreen extends ConsumerWidget {
         c.complete();
         context.go('/home');
       },
-      highlight: MetricBadge(
-        value: '${c.readinessScore}',
-        label: 'Readiness Score de départ',
-      ),
+      highlight: MetricBadge(value: '${c.readinessScore}', label: 'Readiness Score de départ'),
     );
   }
 }

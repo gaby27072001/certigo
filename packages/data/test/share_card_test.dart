@@ -46,10 +46,7 @@ void main() {
       expect(card.level, 1);
       expect(card.dailyGoalXp, 0);
       expect(card.goalProgress, 0);
-      expect(
-        card.generatedAt,
-        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
-      );
+      expect(card.generatedAt, DateTime.fromMillisecondsSinceEpoch(0, isUtc: true));
     });
   });
 }

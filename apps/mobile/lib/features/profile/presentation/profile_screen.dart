@@ -46,11 +46,7 @@ class ProfileScreen extends ConsumerWidget {
 }
 
 class _ProfileContent extends ConsumerWidget {
-  const _ProfileContent({
-    required this.me,
-    required this.mode,
-    required this.onMode,
-  });
+  const _ProfileContent({required this.me, required this.mode, required this.onMode});
 
   final UserProfile me;
   final ThemeMode mode;
@@ -65,25 +61,10 @@ class _ProfileContent extends ConsumerWidget {
     final String displayName = nameOverride ?? me.displayName;
     final String handle = handleOverride ?? me.handle;
     final List<BadgeData> badges = <BadgeData>[
-      BadgeData(
-        Icons.rocket_launch_rounded,
-        'Premier décollage',
-        p.primary,
-        me.xp > 0,
-      ),
-      BadgeData(
-        Icons.local_fire_department_rounded,
-        'Série de 7 j',
-        p.ember,
-        me.streakDays >= 7,
-      ),
+      BadgeData(Icons.rocket_launch_rounded, 'Premier décollage', p.primary, me.xp > 0),
+      BadgeData(Icons.local_fire_department_rounded, 'Série de 7 j', p.ember, me.streakDays >= 7),
       BadgeData(Icons.bolt_rounded, '1 000 XP', p.xpGold, me.xp >= 1000),
-      BadgeData(
-        Icons.diamond_rounded,
-        'Collectionneur',
-        p.info,
-        me.gems >= 100,
-      ),
+      BadgeData(Icons.diamond_rounded, 'Collectionneur', p.info, me.gems >= 100),
     ];
 
     return ListView(
@@ -99,10 +80,7 @@ class _ProfileContent extends ConsumerWidget {
                 backgroundColor: p.primarySoft,
                 child: Text(
                   _initials(displayName),
-                  style: t.titleLarge?.copyWith(
-                    color: p.primary,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: t.titleLarge?.copyWith(color: p.primary, fontWeight: FontWeight.w800),
                 ),
               ),
               const SizedBox(width: 16),
@@ -157,12 +135,7 @@ class _ProfileContent extends ConsumerWidget {
           runSpacing: 12,
           children: <Widget>[
             for (final BadgeData b in badges)
-              ProfileBadge(
-                icon: b.icon,
-                label: b.label,
-                color: b.color,
-                locked: !b.unlocked,
-              ),
+              ProfileBadge(icon: b.icon, label: b.label, color: b.color, locked: !b.unlocked),
           ],
         ),
         const SizedBox(height: 12),
@@ -240,8 +213,11 @@ String _subtitleFromParts(String handle, int level) {
 }
 
 String _initials(String name) {
-  final List<String> parts =
-      name.trim().split(RegExp(r'\s+')).where((String s) => s.isNotEmpty).toList();
+  final List<String> parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((String s) => s.isNotEmpty)
+      .toList();
   if (parts.isEmpty) return '?';
   final String a = parts.first.substring(0, 1);
   final String b = parts.length > 1 ? parts[1].substring(0, 1) : '';

@@ -29,10 +29,7 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpPrism(tester, const XpChip(xp: 1200));
 
-      expect(
-        find.bySemanticsLabel(RegExp("1200 points d'expérience")),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel(RegExp("1200 points d'expérience")), findsOneWidget);
 
       handle.dispose();
     });

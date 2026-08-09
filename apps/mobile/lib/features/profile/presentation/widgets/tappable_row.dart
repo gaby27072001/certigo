@@ -29,10 +29,7 @@ class TappableRow extends StatelessWidget {
           Icon(icon, color: trailingColor ?? p.textSecondary, size: 20),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              label,
-              style: t.bodyLarge?.copyWith(color: trailingColor),
-            ),
+            child: Text(label, style: t.bodyLarge?.copyWith(color: trailingColor)),
           ),
           if (trailing != null) Text(trailing!, style: t.labelMedium?.copyWith(color: p.primary)),
           const SizedBox(width: 4),

@@ -6,8 +6,9 @@ import '../support/prism_harness.dart';
 
 void main() {
   group('context.prism', () {
-    testWidgets('resolves the registered scheme under a Prism dark theme',
-        (WidgetTester tester) async {
+    testWidgets('resolves the registered scheme under a Prism dark theme', (
+      WidgetTester tester,
+    ) async {
       late PrismColorScheme captured;
       await pumpPrism(
         tester,
@@ -24,8 +25,9 @@ void main() {
       expect(captured.brightness, Brightness.dark);
     });
 
-    testWidgets('falls back to the light scheme without a registered extension',
-        (WidgetTester tester) async {
+    testWidgets('falls back to the light scheme without a registered extension', (
+      WidgetTester tester,
+    ) async {
       late PrismColorScheme captured;
       await tester.pumpWidget(
         MaterialApp(

@@ -114,9 +114,9 @@ class _NavItem extends StatelessWidget {
                 Text(
                   tab.label,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: selected ? color.primary : color.textSecondary,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      ),
+                    color: selected ? color.primary : color.textSecondary,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
                 ),
               ],
             ),

@@ -432,27 +432,27 @@ class _HeroAnchor extends StatelessWidget {
 
     final Widget core = switch (_kCenterAnchor) {
       _CenterAnchor.brandC => Container(
-          width: outer * 0.56,
-          height: outer * 0.56,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(outer * 0.18),
-            gradient: LinearGradient(
-              colors: <Color>[p.primary, p.ember],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          alignment: Alignment.center,
-          child: const Text(
-            'C',
-            style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),
+        width: outer * 0.56,
+        height: outer * 0.56,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(outer * 0.18),
+          gradient: LinearGradient(
+            colors: <Color>[p.primary, p.ember],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
+        alignment: Alignment.center,
+        child: const Text(
+          'C',
+          style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),
+        ),
+      ),
       _CenterAnchor.star => const SizedBox(
-          width: outer * 0.56,
-          height: outer * 0.56,
-          child: CustomPaint(painter: _StarPainter()),
-        ),
+        width: outer * 0.56,
+        height: outer * 0.56,
+        child: CustomPaint(painter: _StarPainter()),
+      ),
     };
 
     // Anneau glass lumineux autour du cœur.

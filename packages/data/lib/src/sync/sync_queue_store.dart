@@ -16,7 +16,7 @@ abstract interface class SyncQueueStore {
 /// storage is wired. Loses data on restart (acceptable only for tests).
 class InMemorySyncQueueStore implements SyncQueueStore {
   InMemorySyncQueueStore([List<SyncAction>? seed])
-      : _actions = List<SyncAction>.of(seed ?? const <SyncAction>[]);
+    : _actions = List<SyncAction>.of(seed ?? const <SyncAction>[]);
 
   List<SyncAction> _actions;
 
@@ -43,8 +43,8 @@ typedef JsonWrite = Future<void> Function(String json);
 /// fully unit-testable by closing over an in-memory string.
 class JsonSyncQueueStore implements SyncQueueStore {
   JsonSyncQueueStore({required JsonRead read, required JsonWrite write})
-      : _read = read,
-        _write = write;
+    : _read = read,
+      _write = write;
 
   final JsonRead _read;
   final JsonWrite _write;

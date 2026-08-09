@@ -15,13 +15,7 @@ import 'quiz_option_tile.dart';
 /// Fires a selection haptic on tap (iOS + Android) and animates state changes,
 /// keeping interactions "juicy" without per-screen boilerplate.
 class AnswerChip extends StatelessWidget {
-  const AnswerChip({
-    super.key,
-    required this.label,
-    required this.state,
-    this.onTap,
-    this.order,
-  });
+  const AnswerChip({super.key, required this.label, required this.state, this.onTap, this.order});
 
   final String label;
   final QuizOptionState state;
@@ -35,7 +29,8 @@ class AnswerChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final _ChipStyle s = _styleFor(p, state);
-    final bool graded = state == QuizOptionState.correct ||
+    final bool graded =
+        state == QuizOptionState.correct ||
         state == QuizOptionState.incorrect ||
         state == QuizOptionState.missed;
 
@@ -70,9 +65,9 @@ class AnswerChip extends StatelessWidget {
                 child: Text(
                   label,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               if (graded) ...<Widget>[
@@ -160,16 +155,12 @@ class _OrderBadge extends StatelessWidget {
       width: 22,
       height: 22,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.16),
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: color.withOpacity(0.16), shape: BoxShape.circle),
       child: Text(
         '$order',
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
-            ?.copyWith(color: color, fontWeight: FontWeight.w800),
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w800),
       ),
     );
   }

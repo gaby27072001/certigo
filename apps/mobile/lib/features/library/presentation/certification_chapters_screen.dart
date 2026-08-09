@@ -138,10 +138,7 @@ class _PathHeader extends StatelessWidget {
                   horizontal: PrismSpacing.sm,
                   vertical: PrismSpacing.xxs,
                 ),
-                decoration: BoxDecoration(
-                  color: p.primary,
-                  borderRadius: PrismRadii.pillAll,
-                ),
+                decoration: BoxDecoration(color: p.primary, borderRadius: PrismRadii.pillAll),
                 child: Text(
                   path.exam,
                   style: const TextStyle(
@@ -162,10 +159,7 @@ class _PathHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: PrismSpacing.sm),
-          Text(
-            path.trackName,
-            style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-          ),
+          Text(path.trackName, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
           const SizedBox(height: PrismSpacing.sm),
           PrismProgressBar(
             value: (path.readinessScore / 100).clamp(0.0, 1.0),
@@ -235,17 +229,9 @@ class _ErrorView extends StatelessWidget {
       padding: const EdgeInsets.all(PrismSpacing.gutter),
       children: <Widget>[
         const SizedBox(height: PrismSpacing.md),
-        CalloutBlock(
-          kind: CalloutKind.warning,
-          title: 'Chapitres indisponibles',
-          text: message,
-        ),
+        CalloutBlock(kind: CalloutKind.warning, title: 'Chapitres indisponibles', text: message),
         const SizedBox(height: PrismSpacing.md),
-        PrismButton.secondary(
-          label: 'Réessayer',
-          icon: Icons.refresh_rounded,
-          onPressed: onRetry,
-        ),
+        PrismButton.secondary(label: 'Réessayer', icon: Icons.refresh_rounded, onPressed: onRetry),
       ],
     );
   }

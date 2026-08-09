@@ -48,8 +48,9 @@ void main() {
       expect(taps, 1);
     });
 
-    testWidgets('showcase vendor is locked, shows "Bientôt" and ignores taps',
-        (WidgetTester tester) async {
+    testWidgets('showcase vendor is locked, shows "Bientôt" and ignores taps', (
+      WidgetTester tester,
+    ) async {
       int taps = 0;
       await pumpPrism(
         tester,

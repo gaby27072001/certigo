@@ -22,9 +22,8 @@ class LeaderboardScreen extends ConsumerWidget {
         child: async.when(
           data: (League league) => _LeagueContent(league: league),
           loading: () => const _LeaderboardLoading(),
-          error: (Object error, StackTrace _) => PrismStatusView.error(
-            onRetry: () => ref.invalidate(leagueProvider),
-          ),
+          error: (Object error, StackTrace _) =>
+              PrismStatusView.error(onRetry: () => ref.invalidate(leagueProvider)),
         ),
       ),
     );
@@ -251,8 +250,11 @@ String _endsInLabel(DateTime endsAt) {
 }
 
 String _initials(String name) {
-  final List<String> parts =
-      name.trim().split(RegExp(r'\s+')).where((String s) => s.isNotEmpty).toList();
+  final List<String> parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((String s) => s.isNotEmpty)
+      .toList();
   if (parts.isEmpty) {
     return '?';
   }

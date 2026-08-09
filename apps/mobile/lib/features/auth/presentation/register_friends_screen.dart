@@ -90,11 +90,7 @@ class _Avatar extends StatelessWidget {
       decoration: BoxDecoration(color: friend.color, shape: BoxShape.circle),
       child: Text(
         friend.name.characters.first,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w800,
-          fontSize: 15,
-        ),
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
       ),
     );
   }

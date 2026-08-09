@@ -20,10 +20,7 @@ class OfflineCatalogRepository implements CatalogRepository {
   Future<Result<List<TrackSummary>>> getCatalog() async {
     final Result<List<TrackSummary>> result = await _inner.getCatalog();
 
-    if (result
-        case Success<List<TrackSummary>>(
-          :final List<TrackSummary> value,
-        )) {
+    if (result case Success<List<TrackSummary>>(:final List<TrackSummary> value)) {
       await _cacheStore.write(value);
       return result;
     }

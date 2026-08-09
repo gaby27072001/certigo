@@ -11,12 +11,7 @@ enum CalloutKind { info, warning, success }
 /// lesson. Distinct from [HookBlock] / [ScenarioBlock]: this is a short aside,
 /// not a primary teaching surface — perfect for "Common mistake" or "Exam tip".
 class CalloutBlock extends StatelessWidget {
-  const CalloutBlock({
-    super.key,
-    required this.kind,
-    required this.text,
-    this.title,
-  });
+  const CalloutBlock({super.key, required this.kind, required this.text, this.title});
 
   final CalloutKind kind;
   final String text;

@@ -71,8 +71,8 @@ class ContentBlock {
     final Map<String, dynamic> data = switch (rawData) {
       final Map<String, dynamic> typed => typed,
       final Map<Object?, Object?> loose => loose.map(
-          (Object? key, Object? value) => MapEntry<String, dynamic>(key.toString(), value),
-        ),
+        (Object? key, Object? value) => MapEntry<String, dynamic>(key.toString(), value),
+      ),
       _ => const <String, dynamic>{},
     };
     return ContentBlock(
@@ -102,10 +102,7 @@ class ContentBlock {
     if (value is String && value.isNotEmpty) {
       return value;
     }
-    throw FormatException(
-      'ContentBlock("$type") requires a non-empty string field "$key"',
-      data,
-    );
+    throw FormatException('ContentBlock("$type") requires a non-empty string field "$key"', data);
   }
 
   /// Reads [key] as a non-empty [String] when present, otherwise `null`.

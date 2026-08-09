@@ -28,9 +28,8 @@ class AchievementsScreen extends ConsumerWidget {
               child: async.when(
                 data: (AchievementBoard board) => _AchievementsContent(board: board),
                 loading: () => const _AchievementsLoading(),
-                error: (Object error, StackTrace _) => PrismStatusView.error(
-                  onRetry: () => ref.invalidate(achievementBoardProvider),
-                ),
+                error: (Object error, StackTrace _) =>
+                    PrismStatusView.error(onRetry: () => ref.invalidate(achievementBoardProvider)),
               ),
             ),
           ],
@@ -72,15 +71,10 @@ class _AchievementsContent extends StatelessWidget {
                 children: <Widget>[
                   Icon(Icons.emoji_events_rounded, color: p.xpGold, size: 26),
                   const SizedBox(width: 10),
-                  Expanded(
-                    child: Text('Trophées débloqués', style: t.titleMedium),
-                  ),
+                  Expanded(child: Text('Trophées débloqués', style: t.titleMedium)),
                   Text(
                     '${board.unlocked}/${board.total}',
-                    style: t.titleLarge?.copyWith(
-                      color: p.xpGold,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: t.titleLarge?.copyWith(color: p.xpGold, fontWeight: FontWeight.w800),
                   ),
                 ],
               ),
@@ -228,10 +222,7 @@ class _TierTag extends StatelessWidget {
         horizontal: PrismSpacing.debt10,
         vertical: PrismSpacing.xxs,
       ),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.16),
-        borderRadius: PrismRadii.pillAll,
-      ),
+      decoration: BoxDecoration(color: color.withOpacity(0.16), borderRadius: PrismRadii.pillAll),
       child: Text(
         _tierLabel(tier),
         style: t.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w800),

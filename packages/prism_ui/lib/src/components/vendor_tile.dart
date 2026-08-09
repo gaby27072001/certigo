@@ -60,15 +60,9 @@ class VendorTile extends StatelessWidget {
             ],
           ),
           const SizedBox(height: PrismSpacing.md),
-          Text(
-            brand.label,
-            style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-          ),
+          Text(brand.label, style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
           const SizedBox(height: PrismSpacing.xxs),
-          Text(
-            subtitle,
-            style: text.labelMedium?.copyWith(color: p.textSecondary),
-          ),
+          Text(subtitle, style: text.labelMedium?.copyWith(color: p.textSecondary)),
         ],
       ),
     );

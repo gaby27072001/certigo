@@ -98,8 +98,9 @@ void main() {
       );
       expect(immediate.isDue(now), isTrue);
 
-      final SyncAction gated =
-          immediate.copyWith(nextAttemptAt: now.add(const Duration(seconds: 10)));
+      final SyncAction gated = immediate.copyWith(
+        nextAttemptAt: now.add(const Duration(seconds: 10)),
+      );
       expect(gated.isDue(now), isFalse);
       expect(gated.isDue(now.add(const Duration(seconds: 10))), isTrue);
 

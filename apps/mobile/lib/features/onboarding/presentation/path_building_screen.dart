@@ -32,10 +32,7 @@ class _PathBuildingScreenState extends ConsumerState<PathBuildingScreen>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    );
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800));
   }
 
   @override
@@ -85,8 +82,10 @@ class _PathBuildingScreenState extends ConsumerState<PathBuildingScreen>
                 animation: _controller,
                 builder: (BuildContext context, _) {
                   final int pct = (_controller.value * 100).round();
-                  final int stepIndex =
-                      (_controller.value * _steps.length).floor().clamp(0, _steps.length - 1);
+                  final int stepIndex = (_controller.value * _steps.length).floor().clamp(
+                    0,
+                    _steps.length - 1,
+                  );
                   return Column(
                     children: <Widget>[
                       SizedBox(
@@ -165,10 +164,7 @@ class _SocialProof extends StatelessWidget {
           Icon(Icons.groups_rounded, color: p.primary, size: 22),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              text,
-              style: t.bodySmall?.copyWith(color: p.textSecondary, height: 1.35),
-            ),
+            child: Text(text, style: t.bodySmall?.copyWith(color: p.textSecondary, height: 1.35)),
           ),
         ],
       ),

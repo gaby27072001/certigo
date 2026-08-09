@@ -83,8 +83,7 @@ class RemoteQuizRepository implements QuizRepository {
   Future<Result<SubmitQuizResult>> submit({
     required String lessonId,
     required SubmitQuizRequest request,
-  }) =>
-      _api.postJson('/quiz/$lessonId/submit', request.toJson(), SubmitQuizResult.fromJson);
+  }) => _api.postJson('/quiz/$lessonId/submit', request.toJson(), SubmitQuizResult.fromJson);
 }
 
 class RemoteLeaderboardRepository implements LeaderboardRepository {

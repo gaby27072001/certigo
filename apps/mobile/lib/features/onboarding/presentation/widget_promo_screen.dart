@@ -31,10 +31,7 @@ class WidgetPromoScreen extends StatelessWidget {
       child: Column(
         children: <Widget>[
           const SizedBox(height: 8),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[SoonTag()],
-          ),
+          const Row(mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[SoonTag()]),
           const SizedBox(height: 12),
           Text(
             'Garde ta série sous les yeux',
@@ -123,11 +120,7 @@ class _PhoneMockup extends StatelessWidget {
                   ),
                   child: Row(
                     children: <Widget>[
-                      const MascotAvatar(
-                        mascot: AuroraMascot.nimbus,
-                        size: 40,
-                        showBadge: false,
-                      ),
+                      const MascotAvatar(mascot: AuroraMascot.nimbus, size: 40, showBadge: false),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
