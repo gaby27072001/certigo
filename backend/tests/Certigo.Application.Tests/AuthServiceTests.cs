@@ -131,6 +131,48 @@ internal sealed class CompleteRegistrationBeforeDeleteCredentialRepository(
     }
 }
 
+internal sealed class CoordinatedLegacyLookupCredentialRepository(
+    InMemoryUserCredentialRepository inner,
+    int participants) : IUserCredentialRepository
+{
+    private readonly TaskCompletionSource _release =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _entered;
+
+    public async Task<UserCredentialRecord?> FindByEmailAsync(
+        string email,
+        CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.Increment(ref _entered) == participants)
+        {
+            _release.TrySetResult();
+        }
+
+        await _release.Task.WaitAsync(cancellationToken);
+        return await inner.FindByEmailAsync(email, cancellationToken);
+    }
+
+    public Task<UserCredentialRecord?> FindByCanonicalEmailAsync(
+        string canonicalEmail,
+        CancellationToken cancellationToken = default) =>
+        inner.FindByCanonicalEmailAsync(canonicalEmail, cancellationToken);
+
+    public Task<UserCredentialRecord> CreateAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default) =>
+        inner.CreateAsync(record, cancellationToken);
+
+    public Task UpdateAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default) =>
+        inner.UpdateAsync(record, cancellationToken);
+
+    public Task<bool> DeletePendingAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default) =>
+        inner.DeletePendingAsync(record, cancellationToken);
+}
+
 /// Captures the emails an <see cref="AuthService"/> would send so verification
 /// tests can pull the confirmation link out of the outbox.
 internal sealed class CapturingEmailSender : IEmailSender
@@ -349,6 +391,87 @@ public sealed class AuthServiceTests
         var act = async () => await service.RegisterAsync(new RegisterRequest("DUP@Example.com", "password123", null));
 
         await act.Should().ThrowAsync<DuplicateRecordException>().WithMessage("*déjà utilisée*");
+    }
+
+    [Theory]
+    [InlineData("legacy@example.com")]
+    [InlineData("LEGACY@Example.COM")]
+    public async Task Register_rejects_an_exact_legacy_credential_without_mutating_it(string attemptedEmail)
+    {
+        var credentials = new InMemoryUserCredentialRepository();
+        var createdAt = new DateTimeOffset(2024, 3, 2, 10, 0, 0, TimeSpan.Zero);
+        var legacy = await credentials.CreateAsync(new UserCredentialRecord(
+            UserCredentialRecord.IdFor("legacy@example.com"),
+            "legacy@example.com",
+            "legacy-user",
+            "Legacy",
+            "h:original-password",
+            createdAt));
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new InMemoryUserRepository(),
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+
+        var act = () => service.RegisterAsync(
+            new RegisterRequest(attemptedEmail, "different-password", "Attacker"));
+
+        await act.Should().ThrowAsync<DuplicateRecordException>().WithMessage("*déjà utilisée*");
+        var unchanged = await credentials.FindByEmailAsync("legacy@example.com");
+        unchanged.Should().BeEquivalentTo(legacy);
+        (await credentials.FindByCanonicalEmailAsync("legacy@example.com")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Concurrent_registrations_cannot_replace_an_exact_legacy_credential()
+    {
+        var innerCredentials = new InMemoryUserCredentialRepository();
+        var legacy = await innerCredentials.CreateAsync(new UserCredentialRecord(
+            UserCredentialRecord.IdFor("legacy-race@example.com"),
+            "legacy-race@example.com",
+            "legacy-race-user",
+            "Legacy Race",
+            "h:original-password",
+            new DateTimeOffset(2024, 3, 2, 10, 0, 0, TimeSpan.Zero)));
+        var credentials = new CoordinatedLegacyLookupCredentialRepository(
+            innerCredentials,
+            participants: 3);
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new InMemoryUserRepository(),
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+        var attemptedEmails = new[]
+        {
+            "legacy-race@example.com",
+            "LEGACY-RACE@EXAMPLE.COM",
+            "Legacy-Race@Example.Com",
+        };
+
+        var outcomes = await Task.WhenAll(attemptedEmails.Select(async attemptedEmail =>
+        {
+            try
+            {
+                await service.RegisterAsync(
+                    new RegisterRequest(attemptedEmail, "different-password", "Replacement"));
+                return (Exception?)null;
+            }
+            catch (Exception error)
+            {
+                return error;
+            }
+        }));
+
+        outcomes.Should().OnlyContain(error => error is DuplicateRecordException);
+        var unchanged = await innerCredentials.FindByEmailAsync("legacy-race@example.com");
+        unchanged.Should().BeEquivalentTo(legacy);
+        (await innerCredentials.FindByCanonicalEmailAsync("legacy-race@example.com")).Should().BeNull();
     }
 
     [Fact]

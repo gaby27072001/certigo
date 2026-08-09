@@ -116,7 +116,11 @@ public sealed class AuthService(
         }
 
         var canonicalEmail = AuthRules.CanonicalizeEmail(email);
-        var legacy = await credentials.FindByCanonicalEmailAsync(canonicalEmail, cancellationToken);
+        // The exact lookup must come first: pre-canonical credentials use the
+        // normalized email as their id and have no CanonicalEmail value. Because
+        // that document already exists, rejecting it before CreateItem preserves
+        // its identity/hash and closes the legacy check-then-create gap.
+        var legacy = await credentials.FindByEmailAsync(email, cancellationToken);
         if (legacy is not null && !legacy.IsProvisioning)
         {
             throw new DuplicateRecordException("Cette adresse e-mail est déjà utilisée.");

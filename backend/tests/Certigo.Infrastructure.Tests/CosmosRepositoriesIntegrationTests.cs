@@ -165,6 +165,30 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
     }
 
     [CosmosEmulatorFact]
+    public async Task Legacy_credential_is_found_by_normalized_email_before_canonical_fallback()
+    {
+        var context = await fixture.GetContextAsync();
+        var repository = new CosmosUserCredentialRepository(context);
+        var email = $"legacy-{Guid.NewGuid():N}@example.com";
+        var legacy = await repository.CreateAsync(new UserCredentialRecord(
+            UserCredentialRecord.IdFor(email),
+            email,
+            $"user-{Guid.NewGuid():N}",
+            "Legacy",
+            "original-hash",
+            DateTimeOffset.UtcNow));
+
+        var found = await repository.FindByEmailAsync(email.ToUpperInvariant());
+
+        found.Should().NotBeNull();
+        found!.Id.Should().Be(legacy.Id);
+        found.UserId.Should().Be(legacy.UserId);
+        found.PasswordHash.Should().Be(legacy.PasswordHash);
+        found.ETag.Should().Be(legacy.ETag);
+        (await repository.FindByCanonicalEmailAsync(email)).Should().BeNull();
+    }
+
+    [CosmosEmulatorFact]
     public async Task Durable_economy_operation_resumes_steps_with_etag()
     {
         var context = await fixture.GetContextAsync();
