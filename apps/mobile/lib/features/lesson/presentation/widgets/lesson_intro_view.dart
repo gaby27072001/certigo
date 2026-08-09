@@ -12,9 +12,8 @@ class LessonIntroView extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
-    final int checks = lesson.blocks
-        .where((LessonBlock b) => b.type == BlockType.check && b.check != null)
-        .length;
+    final int checks =
+        lesson.blocks.where((LessonBlock b) => b.type == BlockType.check && b.check != null).length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

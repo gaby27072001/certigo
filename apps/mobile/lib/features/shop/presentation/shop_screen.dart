@@ -59,9 +59,7 @@ class _ShopContentState extends ConsumerState<_ShopContent> {
       _buyingId = item.id;
       _error = null;
     });
-    final Result<PurchaseResult> result = await ref
-        .read(shopRepositoryProvider)
-        .purchase(
+    final Result<PurchaseResult> result = await ref.read(shopRepositoryProvider).purchase(
           PurchaseRequest(
             itemId: item.id,
             clientPurchaseId: DateTime.now().microsecondsSinceEpoch.toString(),

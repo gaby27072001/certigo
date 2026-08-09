@@ -44,8 +44,7 @@ class QuizOptionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final _OptionStyle s = _styleFor(p, state);
-    final bool graded =
-        state == QuizOptionState.correct ||
+    final bool graded = state == QuizOptionState.correct ||
         state == QuizOptionState.incorrect ||
         state == QuizOptionState.missed;
 
@@ -79,9 +78,9 @@ class QuizOptionTile extends StatelessWidget {
                 child: Text(
                   label,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: p.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
               ),
               if (graded) ...<Widget>[

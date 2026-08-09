@@ -52,9 +52,9 @@ class ReadinessGauge extends StatelessWidget {
                   Text(
                     value.round().toString(),
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                      color: p.textPrimary,
-                      fontWeight: FontWeight.w800,
-                    ),
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w800,
+                        ),
                   ),
                   Text(
                     label,

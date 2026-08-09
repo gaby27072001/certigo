@@ -54,8 +54,8 @@ void main() {
           // Fractional-day scheduling. Tolerance (1ms) absorbs cross-language
           // float rounding while still ruling out whole-day ceil() drift.
           final int actualMicros = m.dueAt.difference(now).inMicroseconds;
-          final int expectedMicros = (_d(v['dueAtOffsetSeconds']) * Duration.microsecondsPerSecond)
-              .round();
+          final int expectedMicros =
+              (_d(v['dueAtOffsetSeconds']) * Duration.microsecondsPerSecond).round();
           expect((actualMicros - expectedMicros).abs(), lessThanOrEqualTo(1000), reason: 'dueAt');
         }
       });
@@ -83,8 +83,8 @@ void main() {
         final List<dynamic> masteryVectors = v['masteries'] as List<dynamic>;
         final Map<String, int> expectedDomainScores =
             (v['expectedDomainScores'] as Map<String, dynamic>).map(
-              (String k, dynamic val) => MapEntry<String, int>(k, val as int),
-            );
+          (String k, dynamic val) => MapEntry<String, int>(k, val as int),
+        );
 
         final List<DomainReadiness> domains = <DomainReadiness>[];
         for (final dynamic dRaw in v['domains'] as List<dynamic>) {
@@ -123,8 +123,8 @@ void main() {
             .cast<Map<String, dynamic>>()
             .map((Map<String, dynamic> sv) => _plannerState(sv, now))
             .toList();
-        final List<String> candidateNew = (v['candidateNewConceptIds'] as List<dynamic>)
-            .cast<String>();
+        final List<String> candidateNew =
+            (v['candidateNewConceptIds'] as List<dynamic>).cast<String>();
         final List<String> expectedOrder = (v['expectedOrder'] as List<dynamic>).cast<String>();
 
         final List<String> order = planner.plan(

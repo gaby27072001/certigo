@@ -57,42 +57,42 @@ enum CertCategory {
 extension CertCategoryInfo on CertCategory {
   /// French section title.
   String get label => switch (this) {
-    CertCategory.azure => 'Azure',
-    CertCategory.security => 'Sécurité',
-    CertCategory.dataAi => 'Data & IA',
-    CertCategory.microsoft365 => 'Microsoft 365',
-    CertCategory.powerPlatform => 'Power Platform',
-    CertCategory.dynamics365 => 'Dynamics 365',
-    CertCategory.mos => 'Microsoft Office',
-    CertCategory.github => 'GitHub',
-    CertCategory.other => 'Autres',
-  };
+        CertCategory.azure => 'Azure',
+        CertCategory.security => 'Sécurité',
+        CertCategory.dataAi => 'Data & IA',
+        CertCategory.microsoft365 => 'Microsoft 365',
+        CertCategory.powerPlatform => 'Power Platform',
+        CertCategory.dynamics365 => 'Dynamics 365',
+        CertCategory.mos => 'Microsoft Office',
+        CertCategory.github => 'GitHub',
+        CertCategory.other => 'Autres',
+      };
 
   /// Stable index into `PrismColors.domainAccents` for the section accent.
   int get accentIndex => switch (this) {
-    CertCategory.azure => 0,
-    CertCategory.security => 5,
-    CertCategory.dataAi => 3,
-    CertCategory.microsoft365 => 4,
-    CertCategory.powerPlatform => 2,
-    CertCategory.dynamics365 => 1,
-    CertCategory.mos => 4,
-    CertCategory.github => 1,
-    CertCategory.other => 2,
-  };
+        CertCategory.azure => 0,
+        CertCategory.security => 5,
+        CertCategory.dataAi => 3,
+        CertCategory.microsoft365 => 4,
+        CertCategory.powerPlatform => 2,
+        CertCategory.dynamics365 => 1,
+        CertCategory.mos => 4,
+        CertCategory.github => 1,
+        CertCategory.other => 2,
+      };
 
   /// Display order of the sections on the certifications screen.
   int get order => switch (this) {
-    CertCategory.azure => 0,
-    CertCategory.security => 1,
-    CertCategory.dataAi => 2,
-    CertCategory.microsoft365 => 3,
-    CertCategory.powerPlatform => 4,
-    CertCategory.dynamics365 => 5,
-    CertCategory.mos => 6,
-    CertCategory.github => 7,
-    CertCategory.other => 8,
-  };
+        CertCategory.azure => 0,
+        CertCategory.security => 1,
+        CertCategory.dataAi => 2,
+        CertCategory.microsoft365 => 3,
+        CertCategory.powerPlatform => 4,
+        CertCategory.dynamics365 => 5,
+        CertCategory.mos => 6,
+        CertCategory.github => 7,
+        CertCategory.other => 8,
+      };
 }
 
 /// Classifies a track into a [CertCategory] from its exam-code / id prefix.
@@ -119,11 +119,11 @@ CertCategory categoryOf(TrackSummary track) {
 
 /// French label for an authoring level (`fundamentals`/`associate`/`expert`).
 String levelLabelOf(String level) => switch (level) {
-  'fundamentals' => 'Fondamentaux',
-  'associate' => 'Associé',
-  'expert' => 'Expert',
-  _ => level,
-};
+      'fundamentals' => 'Fondamentaux',
+      'associate' => 'Associé',
+      'expert' => 'Expert',
+      _ => level,
+    };
 
 /// A category section: its [category] and the tracks it contains, in order.
 class CertSection {

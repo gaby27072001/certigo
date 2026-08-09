@@ -26,15 +26,15 @@ class SeasonChallenge {
   final bool claimable;
 
   factory SeasonChallenge.fromJson(Map<String, dynamic> json) => SeasonChallenge(
-    kind: json['kind'] as String? ?? '',
-    title: json['title'] as String? ?? '',
-    target: (json['target'] as num?)?.toInt() ?? 0,
-    current: (json['current'] as num?)?.toInt() ?? 0,
-    rewardGems: (json['rewardGems'] as num?)?.toInt() ?? 0,
-    completed: json['completed'] as bool? ?? false,
-    claimed: json['claimed'] as bool? ?? false,
-    claimable: json['claimable'] as bool? ?? false,
-  );
+        kind: json['kind'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        target: (json['target'] as num?)?.toInt() ?? 0,
+        current: (json['current'] as num?)?.toInt() ?? 0,
+        rewardGems: (json['rewardGems'] as num?)?.toInt() ?? 0,
+        completed: json['completed'] as bool? ?? false,
+        claimed: json['claimed'] as bool? ?? false,
+        claimable: json['claimable'] as bool? ?? false,
+      );
 }
 
 /// The active monthly season: theme, mascot, accent + this month's challenge.
@@ -70,21 +70,21 @@ class Season {
   final SeasonChallenge challenge;
 
   factory Season.fromJson(Map<String, dynamic> json) => Season(
-    id: json['id'] as String,
-    year: (json['year'] as num?)?.toInt() ?? 0,
-    month: (json['month'] as num?)?.toInt() ?? 0,
-    theme: json['theme'] as String? ?? '',
-    tagline: json['tagline'] as String? ?? '',
-    mascot: json['mascot'] as String? ?? '',
-    accent: json['accent'] as String? ?? '',
-    badgeId: json['badgeId'] as String? ?? '',
-    badgeTitle: json['badgeTitle'] as String? ?? '',
-    gems: (json['gems'] as num?)?.toInt() ?? 0,
-    badgesEarned: (json['badgesEarned'] as num?)?.toInt() ?? 0,
-    challenge: SeasonChallenge.fromJson(
-      json['challenge'] as Map<String, dynamic>? ?? <String, dynamic>{},
-    ),
-  );
+        id: json['id'] as String,
+        year: (json['year'] as num?)?.toInt() ?? 0,
+        month: (json['month'] as num?)?.toInt() ?? 0,
+        theme: json['theme'] as String? ?? '',
+        tagline: json['tagline'] as String? ?? '',
+        mascot: json['mascot'] as String? ?? '',
+        accent: json['accent'] as String? ?? '',
+        badgeId: json['badgeId'] as String? ?? '',
+        badgeTitle: json['badgeTitle'] as String? ?? '',
+        gems: (json['gems'] as num?)?.toInt() ?? 0,
+        badgesEarned: (json['badgesEarned'] as num?)?.toInt() ?? 0,
+        challenge: SeasonChallenge.fromJson(
+          json['challenge'] as Map<String, dynamic>? ?? <String, dynamic>{},
+        ),
+      );
 }
 
 /// Request body for `POST /season/claim`.
@@ -117,12 +117,12 @@ class ClaimSeasonResult {
   final String? error;
 
   factory ClaimSeasonResult.fromJson(Map<String, dynamic> json) => ClaimSeasonResult(
-    success: json['success'] as bool? ?? false,
-    seasonId: json['seasonId'] as String? ?? '',
-    badgeId: json['badgeId'] as String?,
-    gemsAwarded: (json['gemsAwarded'] as num?)?.toInt() ?? 0,
-    gemsBalance: (json['gemsBalance'] as num?)?.toInt() ?? 0,
-    claimed: json['claimed'] as bool? ?? false,
-    error: json['error'] as String?,
-  );
+        success: json['success'] as bool? ?? false,
+        seasonId: json['seasonId'] as String? ?? '',
+        badgeId: json['badgeId'] as String?,
+        gemsAwarded: (json['gemsAwarded'] as num?)?.toInt() ?? 0,
+        gemsBalance: (json['gemsBalance'] as num?)?.toInt() ?? 0,
+        claimed: json['claimed'] as bool? ?? false,
+        error: json['error'] as String?,
+      );
 }

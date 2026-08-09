@@ -13,9 +13,9 @@ sealed class Result<T> {
 
   /// Value if success, else null.
   T? get valueOrNull => switch (this) {
-    Success<T>(:final T value) => value,
-    Err<T>() => null,
-  };
+        Success<T>(:final T value) => value,
+        Err<T>() => null,
+      };
 
   /// Exhaustive handling of both branches.
   R when<R>({required R Function(T value) success, required R Function(Failure failure) failure}) {

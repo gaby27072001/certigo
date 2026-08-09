@@ -108,60 +108,60 @@ void main() {
 
   group('CertificationChaptersScreen', () {
     LearningPath fakePath() => const LearningPath(
-      trackId: 'az-900',
-      trackName: 'Fondamentaux Azure',
-      exam: 'AZ-900',
-      readinessScore: 60,
-      readinessTrend7d: 4,
-      units: <PathUnit>[
-        PathUnit(
-          id: 'u1',
-          title: 'Concepts du cloud',
-          domainId: 'd1',
-          status: NodeStatus.completed,
-          lessons: <PathLesson>[
-            PathLesson(
-              id: 'l1',
-              title: 'Le cloud',
+          trackId: 'az-900',
+          trackName: 'Fondamentaux Azure',
+          exam: 'AZ-900',
+          readinessScore: 60,
+          readinessTrend7d: 4,
+          units: <PathUnit>[
+            PathUnit(
+              id: 'u1',
+              title: 'Concepts du cloud',
+              domainId: 'd1',
               status: NodeStatus.completed,
-              estMinutes: 5,
-              masteryPct: 100,
+              lessons: <PathLesson>[
+                PathLesson(
+                  id: 'l1',
+                  title: 'Le cloud',
+                  status: NodeStatus.completed,
+                  estMinutes: 5,
+                  masteryPct: 100,
+                ),
+              ],
             ),
-          ],
-        ),
-        PathUnit(
-          id: 'u2',
-          title: 'Architecture Azure',
-          domainId: 'd2',
-          status: NodeStatus.inProgress,
-          lessons: <PathLesson>[
-            PathLesson(
-              id: 'l2',
-              title: 'Régions',
-              status: NodeStatus.available,
-              estMinutes: 5,
-              masteryPct: 0,
+            PathUnit(
+              id: 'u2',
+              title: 'Architecture Azure',
+              domainId: 'd2',
+              status: NodeStatus.inProgress,
+              lessons: <PathLesson>[
+                PathLesson(
+                  id: 'l2',
+                  title: 'Régions',
+                  status: NodeStatus.available,
+                  estMinutes: 5,
+                  masteryPct: 0,
+                ),
+              ],
             ),
-          ],
-        ),
-        PathUnit(
-          id: 'u3',
-          title: 'Gouvernance',
-          domainId: 'd3',
-          status: NodeStatus.locked,
-          lessons: <PathLesson>[
-            PathLesson(
-              id: 'l3',
-              title: 'Coûts',
+            PathUnit(
+              id: 'u3',
+              title: 'Gouvernance',
+              domainId: 'd3',
               status: NodeStatus.locked,
-              estMinutes: 5,
-              masteryPct: 0,
+              lessons: <PathLesson>[
+                PathLesson(
+                  id: 'l3',
+                  title: 'Coûts',
+                  status: NodeStatus.locked,
+                  estMinutes: 5,
+                  masteryPct: 0,
+                ),
+              ],
             ),
           ],
-        ),
-      ],
-      domains: <DomainProgress>[],
-    );
+          domains: <DomainProgress>[],
+        );
 
     testWidgets('renders chapters with real lock/progress and navigates on start', (
       WidgetTester tester,

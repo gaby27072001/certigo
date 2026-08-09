@@ -24,7 +24,8 @@ class _OfflineQuizRepo implements QuizRepository {
   Future<Result<SubmitQuizResult>> submit({
     required String lessonId,
     required SubmitQuizRequest request,
-  }) async => const Err<SubmitQuizResult>(NetworkFailure());
+  }) async =>
+      const Err<SubmitQuizResult>(NetworkFailure());
 }
 
 /// Answers the current check **correctly**, dispatching by exercise type:

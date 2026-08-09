@@ -17,29 +17,30 @@ import 'package:prism_ui/prism_ui.dart';
 /// [WidgetTester.pumpAndSettle] — the aurora background never settles.
 void main() {
   MockExam fakeExam() => const MockExam(
-    examId: 'exam-1',
-    trackId: 'az-900',
-    trackCode: 'AZ-900',
-    trackTitle: 'Fondamentaux Azure',
-    timeLimitSeconds: 3600,
-    passingScore: 700,
-    blueprint: <MockExamBlueprintDomain>[
-      MockExamBlueprintDomain(domainId: 'd1', name: 'Concepts du cloud', weight: 0.3, itemCount: 1),
-    ],
-    items: <MockExamItem>[
-      MockExamItem(
-        itemId: 'i1',
-        lessonId: 'l1',
-        domainId: 'd1',
-        type: ItemType.mcq,
-        stem: 'Quel modèle de service fournit des machines virtuelles ?',
-        options: <QuizOption>[
-          QuizOption(id: 'a', label: 'IaaS'),
-          QuizOption(id: 'b', label: 'SaaS'),
+        examId: 'exam-1',
+        trackId: 'az-900',
+        trackCode: 'AZ-900',
+        trackTitle: 'Fondamentaux Azure',
+        timeLimitSeconds: 3600,
+        passingScore: 700,
+        blueprint: <MockExamBlueprintDomain>[
+          MockExamBlueprintDomain(
+              domainId: 'd1', name: 'Concepts du cloud', weight: 0.3, itemCount: 1),
         ],
-      ),
-    ],
-  );
+        items: <MockExamItem>[
+          MockExamItem(
+            itemId: 'i1',
+            lessonId: 'l1',
+            domainId: 'd1',
+            type: ItemType.mcq,
+            stem: 'Quel modèle de service fournit des machines virtuelles ?',
+            options: <QuizOption>[
+              QuizOption(id: 'a', label: 'IaaS'),
+              QuizOption(id: 'b', label: 'SaaS'),
+            ],
+          ),
+        ],
+      );
 
   Future<void> pumpExam(WidgetTester tester) async {
     final GoRouter router = GoRouter(

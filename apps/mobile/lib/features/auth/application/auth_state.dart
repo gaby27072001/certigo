@@ -44,33 +44,33 @@ enum AuthFailureCause {
 /// Les passerelles peuvent fournir un message plus spécifique (ex. redirection
 /// invalide) tout en taguant la même cause ; ceci est le repli normalisé.
 String authMessageForCause(AuthFailureCause cause) => switch (cause) {
-  AuthFailureCause.cancelled => 'Connexion annulée.',
-  AuthFailureCause.timeout => 'La connexion a expiré. Réessayez.',
-  AuthFailureCause.network => 'Pas de connexion. Vérifiez votre réseau puis réessayez.',
-  AuthFailureCause.providerError => 'La connexion a échoué. Réessayez.',
-  AuthFailureCause.invalidCredentials => 'E-mail ou mot de passe incorrect.',
-  AuthFailureCause.configError =>
-    'Configuration d\'authentification invalide. Contactez le support.',
-  AuthFailureCause.unknown => 'Une erreur est survenue. Réessayez.',
-};
+      AuthFailureCause.cancelled => 'Connexion annulée.',
+      AuthFailureCause.timeout => 'La connexion a expiré. Réessayez.',
+      AuthFailureCause.network => 'Pas de connexion. Vérifiez votre réseau puis réessayez.',
+      AuthFailureCause.providerError => 'La connexion a échoué. Réessayez.',
+      AuthFailureCause.invalidCredentials => 'E-mail ou mot de passe incorrect.',
+      AuthFailureCause.configError =>
+        'Configuration d\'authentification invalide. Contactez le support.',
+      AuthFailureCause.unknown => 'Une erreur est survenue. Réessayez.',
+    };
 
 /// Indice de domaine (`domain_hint`) éventuel transmis à Entra pour pré-router
 /// l'utilisateur vers le bon fournisseur fédéré.
 extension AuthProviderX on AuthProvider {
   String get id => switch (this) {
-    AuthProvider.microsoft => 'microsoft',
-    AuthProvider.google => 'google',
-    AuthProvider.apple => 'apple',
-    AuthProvider.email => 'email',
-  };
+        AuthProvider.microsoft => 'microsoft',
+        AuthProvider.google => 'google',
+        AuthProvider.apple => 'apple',
+        AuthProvider.email => 'email',
+      };
 
   static AuthProvider? fromId(String? value) => switch (value) {
-    'microsoft' => AuthProvider.microsoft,
-    'google' => AuthProvider.google,
-    'apple' => AuthProvider.apple,
-    'email' => AuthProvider.email,
-    _ => null,
-  };
+        'microsoft' => AuthProvider.microsoft,
+        'google' => AuthProvider.google,
+        'apple' => AuthProvider.apple,
+        'email' => AuthProvider.email,
+        _ => null,
+      };
 }
 
 /// Session authentifiée persistée localement (stockage sécurisé).
@@ -141,15 +141,15 @@ class AuthSession {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-    'accessToken': accessToken,
-    'refreshToken': refreshToken,
-    'idToken': idToken,
-    'accessTokenExpiry': accessTokenExpiry?.toIso8601String(),
-    'displayName': displayName,
-    'email': email,
-    'provider': provider?.id,
-    'emailVerified': emailVerified,
-  };
+        'accessToken': accessToken,
+        'refreshToken': refreshToken,
+        'idToken': idToken,
+        'accessTokenExpiry': accessTokenExpiry?.toIso8601String(),
+        'displayName': displayName,
+        'email': email,
+        'provider': provider?.id,
+        'emailVerified': emailVerified,
+      };
 
   static AuthSession? fromJson(Map<String, dynamic> json) {
     final Object? token = json['accessToken'];

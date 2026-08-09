@@ -49,9 +49,8 @@ class ClozeStepWidget extends StatelessWidget {
     final TextTheme text = Theme.of(context).textTheme;
     final List<String> segments = clozeSegments(item.stem);
     final int blanks = segments.length - 1;
-    final List<QuizOption> bank = item.options
-        .where((QuizOption o) => !selection.contains(o.id))
-        .toList();
+    final List<QuizOption> bank =
+        item.options.where((QuizOption o) => !selection.contains(o.id)).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

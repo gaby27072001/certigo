@@ -53,9 +53,9 @@ Lesson _lesson({String id = 'intro', String trackId = 'az-900', String title = '
     );
 
 JsonLessonCacheStore _jsonStore(_StringCell cell) => JsonLessonCacheStore(
-  read: () async => cell.value,
-  write: (String json) async => cell.value = json,
-);
+      read: () async => cell.value,
+      write: (String json) async => cell.value = json,
+    );
 
 void main() {
   group('OfflineLessonRepository (offline study cache)', () {

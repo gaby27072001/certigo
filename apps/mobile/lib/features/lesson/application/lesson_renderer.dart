@@ -24,32 +24,35 @@ final RendererRegistry lessonRendererRegistry = standardRendererRegistry();
 /// [LessonStepKind.check], [LessonStepKind.quiz], [LessonStepKind.result]) keep
 /// their bespoke widgets and are intentionally excluded.
 bool isDynamicContentKind(LessonStepKind kind) => switch (kind) {
-  LessonStepKind.hook ||
-  LessonStepKind.concept ||
-  LessonStepKind.example ||
-  LessonStepKind.code ||
-  LessonStepKind.recap => true,
-  LessonStepKind.intro ||
-  LessonStepKind.check ||
-  LessonStepKind.quiz ||
-  LessonStepKind.result => false,
-};
+      LessonStepKind.hook ||
+      LessonStepKind.concept ||
+      LessonStepKind.example ||
+      LessonStepKind.code ||
+      LessonStepKind.recap =>
+        true,
+      LessonStepKind.intro ||
+      LessonStepKind.check ||
+      LessonStepKind.quiz ||
+      LessonStepKind.result =>
+        false,
+    };
 
 /// The registered content block `type` for a passive [kind].
 ///
 /// Anything that is not a known passive kind maps to `'unknown'`, which the
 /// registry resolves to a visible fallback rather than a crash.
 String dynamicBlockType(LessonStepKind kind) => switch (kind) {
-  LessonStepKind.hook => 'hook',
-  LessonStepKind.concept => 'concept',
-  LessonStepKind.example => 'example',
-  LessonStepKind.code => 'code',
-  LessonStepKind.recap => 'recap',
-  LessonStepKind.intro ||
-  LessonStepKind.check ||
-  LessonStepKind.quiz ||
-  LessonStepKind.result => 'unknown',
-};
+      LessonStepKind.hook => 'hook',
+      LessonStepKind.concept => 'concept',
+      LessonStepKind.example => 'example',
+      LessonStepKind.code => 'code',
+      LessonStepKind.recap => 'recap',
+      LessonStepKind.intro ||
+      LessonStepKind.check ||
+      LessonStepKind.quiz ||
+      LessonStepKind.result =>
+        'unknown',
+    };
 
 /// Projects a [LessonStep] onto the schema-tagged [ContentBlock] consumed by
 /// [lessonRendererRegistry].

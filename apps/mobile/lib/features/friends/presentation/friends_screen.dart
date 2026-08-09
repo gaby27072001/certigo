@@ -42,9 +42,8 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
       _adding = true;
       _error = null;
     });
-    final Result<FriendActionResult> result = await ref
-        .read(friendRepositoryProvider)
-        .addFriend(AddFriendRequest(handle: handle));
+    final Result<FriendActionResult> result =
+        await ref.read(friendRepositoryProvider).addFriend(AddFriendRequest(handle: handle));
     if (!mounted) {
       return;
     }
@@ -75,9 +74,8 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
       _removingId = friend.userId;
       _error = null;
     });
-    final Result<FriendActionResult> result = await ref
-        .read(friendRepositoryProvider)
-        .removeFriend(friend.userId);
+    final Result<FriendActionResult> result =
+        await ref.read(friendRepositoryProvider).removeFriend(friend.userId);
     if (!mounted) {
       return;
     }
@@ -379,11 +377,8 @@ class _FriendsLoading extends StatelessWidget {
 }
 
 String _initials(String name) {
-  final List<String> parts = name
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((String s) => s.isNotEmpty)
-      .toList();
+  final List<String> parts =
+      name.trim().split(RegExp(r'\s+')).where((String s) => s.isNotEmpty).toList();
   if (parts.isEmpty) {
     return '?';
   }

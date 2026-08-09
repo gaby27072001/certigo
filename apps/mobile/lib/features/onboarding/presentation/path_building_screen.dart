@@ -83,9 +83,9 @@ class _PathBuildingScreenState extends ConsumerState<PathBuildingScreen>
                 builder: (BuildContext context, _) {
                   final int pct = (_controller.value * 100).round();
                   final int stepIndex = (_controller.value * _steps.length).floor().clamp(
-                    0,
-                    _steps.length - 1,
-                  );
+                        0,
+                        _steps.length - 1,
+                      );
                   return Column(
                     children: <Widget>[
                       SizedBox(

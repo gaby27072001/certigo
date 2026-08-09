@@ -18,23 +18,23 @@ class PrismTypography {
 
   static TextTheme build(Color primary, Color secondary) {
     TextStyle display(double size, FontWeight weight, double height) => TextStyle(
-      fontFamily: _displayFontFamily,
-      package: 'prism_ui',
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      color: primary,
-      letterSpacing: -0.2,
-    );
+          fontFamily: _displayFontFamily,
+          package: 'prism_ui',
+          fontSize: size,
+          fontWeight: weight,
+          height: height,
+          color: primary,
+          letterSpacing: -0.2,
+        );
 
     TextStyle body(double size, FontWeight weight, Color color, double height) => TextStyle(
-      fontFamily: _bodyFontFamily,
-      package: 'prism_ui',
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      color: color,
-    );
+          fontFamily: _bodyFontFamily,
+          package: 'prism_ui',
+          fontSize: size,
+          fontWeight: weight,
+          height: height,
+          color: color,
+        );
 
     return TextTheme(
       displayLarge: display(34, FontWeight.w800, 1.12),
@@ -54,10 +54,10 @@ class PrismTypography {
 
   /// Monospace style for code blocks and inline tokens.
   static TextStyle mono(Color color, {double size = 14}) => TextStyle(
-    fontFamily: _monoFontFamily,
-    package: 'prism_ui',
-    fontSize: size,
-    height: 1.5,
-    color: color,
-  );
+        fontFamily: _monoFontFamily,
+        package: 'prism_ui',
+        fontSize: size,
+        height: 1.5,
+        color: color,
+      );
 }

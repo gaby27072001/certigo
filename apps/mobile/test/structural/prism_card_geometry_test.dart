@@ -22,9 +22,8 @@ import 'package:prism_ui/src/tokens/prism_radii.dart';
 // geometry-relevant state from `context.prism`, so the card's shape is exercised
 // without coupling this contract to the complete application theme.
 Widget _host(Widget child, {required Brightness brightness}) {
-  final PrismColorScheme scheme = brightness == Brightness.dark
-      ? PrismColorScheme.dark
-      : PrismColorScheme.light;
+  final PrismColorScheme scheme =
+      brightness == Brightness.dark ? PrismColorScheme.dark : PrismColorScheme.light;
   return MaterialApp(
     theme: ThemeData(brightness: brightness, extensions: <ThemeExtension<dynamic>>[scheme]),
     home: Scaffold(body: Center(child: child)),
