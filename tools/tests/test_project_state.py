@@ -525,6 +525,9 @@ class ProjectStateTests(unittest.TestCase):
                 "Build & test",
                 "Flutter app + UI packages",
                 "Generated state equals committed state",
+                "Validate workflow YAML",
+                "CodeQL / Security gate",
+                "Security / Required gate",
             ],
             protection["required_status_checks"]["contexts"],
         )

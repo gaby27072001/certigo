@@ -46,9 +46,6 @@ void main() {
       '../../.github/workflows/release-android.yml',
     ).readAsStringSync();
     final String iosRelease = File('../../.github/workflows/release-ios.yml').readAsStringSync();
-    final String securityScan = File(
-      '../../.github/workflows/security-scan.yml',
-    ).readAsStringSync();
     final String codemagic = File('../../codemagic.yaml').readAsStringSync();
 
     expect(ciMobile, contains('FLUTTER_VERSION: "3.44.4"'));
@@ -58,7 +55,6 @@ void main() {
     expect(cortexParity, contains('sdk: "3.12.2"'));
     expect(androidRelease, contains('FLUTTER_VERSION: "3.44.4"'));
     expect(iosRelease, contains('FLUTTER_VERSION: "3.44.4"'));
-    expect(securityScan, contains('flutter-version: "3.44.4"'));
     expect('flutter: 3.44.4'.allMatches(codemagic), hasLength(2));
   });
 }
