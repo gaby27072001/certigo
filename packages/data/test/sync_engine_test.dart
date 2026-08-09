@@ -26,8 +26,7 @@ class _RecordingSender {
     return _respond(action);
   }
 
-  List<String> get keys =>
-      calls.map((SyncAction a) => a.idempotencyKey).toList();
+  List<String> get keys => calls.map((SyncAction a) => a.idempotencyKey).toList();
 }
 
 class _BlockedLoadStore implements SyncQueueStore {
@@ -292,11 +291,11 @@ void main() {
     test('JsonSyncQueueStore survives across engine instances', () async {
       String? raw;
       JsonSyncQueueStore makeStore() => JsonSyncQueueStore(
-        read: () async => raw,
-        write: (String s) async {
-          raw = s;
-        },
-      );
+            read: () async => raw,
+            write: (String s) async {
+              raw = s;
+            },
+          );
 
       final _RecordingSender noop = _RecordingSender(
         (_) => SyncDispatch.retryable,

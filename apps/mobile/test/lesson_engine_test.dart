@@ -18,7 +18,8 @@ class _OfflineLessonRepo implements LessonRepository {
   Future<Result<Lesson>> getLesson({
     required String trackId,
     required String lessonId,
-  }) async => const Err<Lesson>(NetworkFailure());
+  }) async =>
+      const Err<Lesson>(NetworkFailure());
 }
 
 class _NoCheckLessonRepo implements LessonRepository {
@@ -193,9 +194,7 @@ void main() {
       expect(steps.last.kind, LessonStepKind.result);
       expect(steps.length, lesson.blocks.length + 2);
 
-      final List<LessonStep> checks = steps
-          .where((LessonStep s) => s.isCheck)
-          .toList();
+      final List<LessonStep> checks = steps.where((LessonStep s) => s.isCheck).toList();
       expect(checks.length, 7);
       expect(checks.every((LessonStep s) => s.item != null), isTrue);
       expect(
@@ -283,8 +282,7 @@ void main() {
       addTearDown(container.dispose);
     });
 
-    LessonController notifier() =>
-        container.read(lessonControllerProvider(args).notifier);
+    LessonController notifier() => container.read(lessonControllerProvider(args).notifier);
     LessonSessionState read() => container.read(lessonControllerProvider(args));
 
     test(

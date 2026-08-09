@@ -141,8 +141,7 @@ void main() {
         captured = date;
       },
       saveReminder: (_, __) async {},
-      now: (tz.Location location) =>
-          tz.TZDateTime(location, 2024, DateTime.march, 30, 10),
+      now: (tz.Location location) => tz.TZDateTime(location, 2024, DateTime.march, 30, 10),
     );
 
     await NotificationService.scheduleDailyReminder(
@@ -182,8 +181,7 @@ void main() {
         },
       );
 
-      final bool rescheduled =
-          await NotificationService.refreshTimezoneAndReschedule();
+      final bool rescheduled = await NotificationService.refreshTimezoneAndReschedule();
 
       expect(rescheduled, isTrue);
       expect(permissionRequests, 0);
@@ -212,8 +210,7 @@ void main() {
         scheduleReminder: (_, __) async => schedules++,
       );
 
-      final bool rescheduled =
-          await NotificationService.refreshTimezoneAndReschedule();
+      final bool rescheduled = await NotificationService.refreshTimezoneAndReschedule();
 
       expect(rescheduled, isFalse);
       expect(permissionRequests, 0);
@@ -251,8 +248,7 @@ void main() {
         },
       );
 
-      final Future<bool> reconcile =
-          NotificationService.refreshTimezoneAndReschedule();
+      final Future<bool> reconcile = NotificationService.refreshTimezoneAndReschedule();
       await Future<void>.delayed(Duration.zero);
       final Future<bool> explicit = NotificationService.scheduleDailyReminder(
         const TimeOfDay(hour: 21, minute: 0),

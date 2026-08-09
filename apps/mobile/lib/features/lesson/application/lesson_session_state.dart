@@ -6,8 +6,7 @@ import 'lesson_step.dart';
 
 bool isAnswerableCheck(QuizItem item) {
   bool hasUniqueIds(List<QuizOption> options) =>
-      options.map((QuizOption option) => option.id).toSet().length ==
-      options.length;
+      options.map((QuizOption option) => option.id).toSet().length == options.length;
 
   if (!hasUniqueIds(item.options)) return false;
   switch (item.type) {
@@ -72,8 +71,7 @@ class LessonSessionState {
   final bool pendingSync;
   final bool submissionFailed;
 
-  LessonStep? get current =>
-      (index >= 0 && index < steps.length) ? steps[index] : null;
+  LessonStep? get current => (index >= 0 && index < steps.length) ? steps[index] : null;
 
   QuizItem? get currentItem => current?.item;
 
@@ -102,11 +100,9 @@ class LessonSessionState {
     switch (item.type) {
       case ItemType.ordering:
       case ItemType.applied:
-        return item.options.isNotEmpty &&
-            selection.length == item.options.length;
+        return item.options.isNotEmpty && selection.length == item.options.length;
       case ItemType.matchPairs:
-        return item.options.isNotEmpty &&
-            selection.length == item.options.length;
+        return item.options.isNotEmpty && selection.length == item.options.length;
       case ItemType.cloze:
         final int blanks = clozeBlankCount(item.stem);
         return blanks > 0 && selection.length == blanks;

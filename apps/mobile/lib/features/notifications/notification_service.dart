@@ -22,31 +22,25 @@ class NotificationService {
   /// Default chosen during onboarding when the learner enables reminders.
   static const TimeOfDay defaultReminderTime = TimeOfDay(hour: 19, minute: 0);
 
-  static final FlutterLocalNotificationsPlugin _plugin =
-      FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   static Future<void>? _initialization;
   static Future<void> _mutationTail = Future<void>.value();
 
-  static Future<bool?> Function(InitializationSettings settings)
-  _initializePlugin = _plugin.initialize;
-  static Future<bool?> Function() _requestPlatformPermission =
-      _requestPermissionFromPlugin;
+  static Future<bool?> Function(InitializationSettings settings) _initializePlugin =
+      _plugin.initialize;
+  static Future<bool?> Function() _requestPlatformPermission = _requestPermissionFromPlugin;
   static Future<String> Function() _loadLocalTimezone = () async {
     final TimezoneInfo info = await FlutterTimezone.getLocalTimezone();
     return info.identifier;
   };
-  static Future<void> Function() _cancelReminder = () =>
-      _plugin.cancel(_dailyReminderId);
+  static Future<void> Function() _cancelReminder = () => _plugin.cancel(_dailyReminderId);
   static Future<void> Function(
     tz.TZDateTime scheduledDate,
     NotificationDetails details,
-  )
-  _scheduleReminder = _scheduleWithPlugin;
+  ) _scheduleReminder = _scheduleWithPlugin;
   static tz.TZDateTime Function(tz.Location location) _now = tz.TZDateTime.now;
-  static Future<TimeOfDay?> Function() _loadReminderTime =
-      _loadReminderTimeFromPreferences;
-  static Future<String?> Function() _loadReminderTimezone =
-      _loadReminderTimezoneFromPreferences;
+  static Future<TimeOfDay?> Function() _loadReminderTime = _loadReminderTimeFromPreferences;
+  static Future<String?> Function() _loadReminderTimezone = _loadReminderTimezoneFromPreferences;
   static Future<void> Function(TimeOfDay time, String timezone) _saveReminder =
       _saveReminderToPreferences;
 
@@ -161,8 +155,7 @@ class NotificationService {
     });
   }
 
-  static Future<TimeOfDay?> loadDailyReminderTime() =>
-      _serializeMutation(_loadReminderTime);
+  static Future<TimeOfDay?> loadDailyReminderTime() => _serializeMutation(_loadReminderTime);
 
   static Future<T> _serializeMutation<T>(Future<T> Function() operation) {
     final Future<T> result = _mutationTail.then<T>((_) => operation());
@@ -191,8 +184,7 @@ class NotificationService {
       scheduledDate,
       details,
       androidScheduleMode: AndroidScheduleMode.inexact,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
@@ -205,19 +197,13 @@ class NotificationService {
   static Future<TimeOfDay?> _loadReminderTimeFromPreferences() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? stored =
-        prefs.getString(_reminderScheduleKey) ??
-        prefs.getString(_legacyReminderTimeKey);
+        prefs.getString(_reminderScheduleKey) ?? prefs.getString(_legacyReminderTimeKey);
     if (stored == null) return null;
     final List<String> parts = stored.split('|').first.split(':');
     if (parts.length != 2) return null;
     final int? hour = int.tryParse(parts[0]);
     final int? minute = int.tryParse(parts[1]);
-    if (hour == null ||
-        minute == null ||
-        hour < 0 ||
-        hour > 23 ||
-        minute < 0 ||
-        minute > 59) {
+    if (hour == null || minute == null || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
       return null;
     }
     return TimeOfDay(hour: hour, minute: minute);
@@ -247,16 +233,12 @@ class NotificationService {
   }
 
   static Future<bool?> _requestPermissionFromPlugin() async {
-    final AndroidFlutterLocalNotificationsPlugin? android = _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+    final AndroidFlutterLocalNotificationsPlugin? android =
+        _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (android != null) return android.requestNotificationsPermission();
 
-    final IOSFlutterLocalNotificationsPlugin? ios = _plugin
-        .resolvePlatformSpecificImplementation<
-          IOSFlutterLocalNotificationsPlugin
-        >();
+    final IOSFlutterLocalNotificationsPlugin? ios =
+        _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
     if (ios != null) {
       return ios.requestPermissions(alert: true, badge: true, sound: true);
     }
@@ -295,8 +277,7 @@ class NotificationService {
     Future<void> Function(
       tz.TZDateTime scheduledDate,
       NotificationDetails details,
-    )?
-    scheduleReminder,
+    )? scheduleReminder,
     tz.TZDateTime Function(tz.Location location)? now,
     Future<TimeOfDay?> Function()? loadReminderTime,
     Future<String?> Function()? loadReminderTimezone,
@@ -305,10 +286,8 @@ class NotificationService {
     _initialization = null;
     _mutationTail = Future<void>.value();
     _initializePlugin = initializePlugin ?? _plugin.initialize;
-    _requestPlatformPermission =
-        requestPlatformPermission ?? _requestPermissionFromPlugin;
-    _loadLocalTimezone =
-        loadLocalTimezone ??
+    _requestPlatformPermission = requestPlatformPermission ?? _requestPermissionFromPlugin;
+    _loadLocalTimezone = loadLocalTimezone ??
         () async {
           final TimezoneInfo info = await FlutterTimezone.getLocalTimezone();
           return info.identifier;
@@ -317,8 +296,7 @@ class NotificationService {
     _scheduleReminder = scheduleReminder ?? _scheduleWithPlugin;
     _now = now ?? tz.TZDateTime.now;
     _loadReminderTime = loadReminderTime ?? _loadReminderTimeFromPreferences;
-    _loadReminderTimezone =
-        loadReminderTimezone ?? _loadReminderTimezoneFromPreferences;
+    _loadReminderTimezone = loadReminderTimezone ?? _loadReminderTimezoneFromPreferences;
     _saveReminder = saveReminder ?? _saveReminderToPreferences;
   }
 }

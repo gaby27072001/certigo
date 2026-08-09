@@ -91,15 +91,11 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
   QuizOptionState _stateFor(String optionId) {
     if (!_controller.graded) {
-      return optionId == _controller.selectedId
-          ? QuizOptionState.selected
-          : QuizOptionState.idle;
+      return optionId == _controller.selectedId ? QuizOptionState.selected : QuizOptionState.idle;
     }
     final QuizEntry entry = _controller.current;
     if (!entry.hasLocalCorrection) {
-      return optionId == _controller.selectedId
-          ? QuizOptionState.selected
-          : QuizOptionState.idle;
+      return optionId == _controller.selectedId ? QuizOptionState.selected : QuizOptionState.idle;
     }
     final bool isCorrect = optionId == entry.correctOptionId;
     final bool isPicked = optionId == _controller.selectedId;
@@ -173,8 +169,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   ),
                   Expanded(
                     child: PrismProgressBar(
-                      value:
-                          (_controller.index + (_controller.graded ? 1 : 0)) /
+                      value: (_controller.index + (_controller.graded ? 1 : 0)) /
                           _controller.items.length,
                       height: 8,
                       semanticLabel: 'Progression du quiz',
@@ -234,19 +229,13 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
               ),
               child: _controller.graded
                   ? PrismButton(
-                      label: _controller.isLast
-                          ? 'Voir mon résultat'
-                          : 'Continuer',
+                      label: _controller.isLast ? 'Voir mon résultat' : 'Continuer',
                       icon: Icons.arrow_forward_rounded,
-                      onPressed: _controller.submitting
-                          ? null
-                          : () => unawaited(_next()),
+                      onPressed: _controller.submitting ? null : () => unawaited(_next()),
                     )
                   : PrismButton(
                       label: 'Valider',
-                      onPressed:
-                          _controller.selectedId == null ||
-                              _controller.submitting
+                      onPressed: _controller.selectedId == null || _controller.submitting
                           ? null
                           : _controller.grade,
                     ),

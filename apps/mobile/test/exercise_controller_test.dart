@@ -14,7 +14,8 @@ class _OfflineLessonRepo implements LessonRepository {
   Future<Result<Lesson>> getLesson({
     required String trackId,
     required String lessonId,
-  }) async => const Err<Lesson>(NetworkFailure());
+  }) async =>
+      const Err<Lesson>(NetworkFailure());
 }
 
 class _OfflineQuizRepo implements QuizRepository {
@@ -22,7 +23,8 @@ class _OfflineQuizRepo implements QuizRepository {
   Future<Result<SubmitQuizResult>> submit({
     required String lessonId,
     required SubmitQuizRequest request,
-  }) async => const Err<SubmitQuizResult>(NetworkFailure());
+  }) async =>
+      const Err<SubmitQuizResult>(NetworkFailure());
 }
 
 /// A [LessonFeedback] that records *when* the controller fires haptic/sound
@@ -56,8 +58,7 @@ void main() {
     addTearDown(container.dispose);
   });
 
-  LessonController notifier() =>
-      container.read(lessonControllerProvider(args).notifier);
+  LessonController notifier() => container.read(lessonControllerProvider(args).notifier);
   LessonSessionState read() => container.read(lessonControllerProvider(args));
 
   /// Walks the reader to the check whose item id is [id] without grading it.

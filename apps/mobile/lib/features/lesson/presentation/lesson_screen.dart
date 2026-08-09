@@ -43,21 +43,20 @@ class LessonScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         body: SafeArea(
           child: switch (state.status) {
-            LessonStatus.idle ||
-            LessonStatus.loading => const _LessonLoadingView(),
+            LessonStatus.idle || LessonStatus.loading => const _LessonLoadingView(),
             LessonStatus.error => Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                PrismStatusView.error(
-                  message: state.errorMessage,
-                  onRetry: controller.load,
-                ),
-                PrismButton.ghost(
-                  label: 'Essayer la démo',
-                  onPressed: controller.startDemo,
-                ),
-              ],
-            ),
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  PrismStatusView.error(
+                    message: state.errorMessage,
+                    onRetry: controller.load,
+                  ),
+                  PrismButton.ghost(
+                    label: 'Essayer la démo',
+                    onPressed: controller.startDemo,
+                  ),
+                ],
+              ),
             _ => _LessonRunningView(state: state, controller: controller),
           },
         ),

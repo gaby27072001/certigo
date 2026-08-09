@@ -58,8 +58,7 @@ class _NotificationPrefRowState extends State<NotificationPrefRow> {
 
   Future<void> _loadSavedTime() async {
     try {
-      final TimeOfDay? stored =
-          await NotificationService.loadDailyReminderTime();
+      final TimeOfDay? stored = await NotificationService.loadDailyReminderTime();
       if (stored != null && mounted) setState(() => _time = stored);
     } on Object catch (error, stackTrace) {
       FlutterError.reportError(

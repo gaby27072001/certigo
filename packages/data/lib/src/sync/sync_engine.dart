@@ -29,8 +29,7 @@ class SyncStatus {
   int get hashCode => Object.hash(pending, dead, syncing);
 
   @override
-  String toString() =>
-      'SyncStatus(pending: $pending, dead: $dead, syncing: $syncing)';
+  String toString() => 'SyncStatus(pending: $pending, dead: $dead, syncing: $syncing)';
 }
 
 /// Result of a single [SyncEngine.flush] pass.
@@ -62,8 +61,7 @@ class SyncFlushReport {
   bool get isIdle => dispatched == 0;
 
   @override
-  String toString() =>
-      'SyncFlushReport(dispatched: $dispatched, succeeded: $succeeded, '
+  String toString() => 'SyncFlushReport(dispatched: $dispatched, succeeded: $succeeded, '
       'retried: $retried, deadLettered: $deadLettered, pendingRemaining: $pendingRemaining)';
 }
 
@@ -96,12 +94,12 @@ class SyncEngine {
     this.maxAttempts = 6,
     this.doneRetention = const Duration(hours: 24),
     this.deadRetention = const Duration(days: 7),
-  }) : assert(maxAttempts >= 1, 'maxAttempts must be at least 1'),
-       _store = store,
-       _sender = sender,
-       _clock = clock ?? DateTime.now,
-       _backoff = backoff ?? exponentialBackoff(),
-       _idGenerator = idGenerator;
+  })  : assert(maxAttempts >= 1, 'maxAttempts must be at least 1'),
+        _store = store,
+        _sender = sender,
+        _clock = clock ?? DateTime.now,
+        _backoff = backoff ?? exponentialBackoff(),
+        _idGenerator = idGenerator;
 
   final SyncQueueStore _store;
   final SyncSender _sender;
@@ -122,8 +120,7 @@ class SyncEngine {
   bool _loaded = false;
   bool _disposed = false;
   int _idSeq = 0;
-  final StreamController<SyncStatus> _status =
-      StreamController<SyncStatus>.broadcast();
+  final StreamController<SyncStatus> _status = StreamController<SyncStatus>.broadcast();
   Future<void>? _loadFuture;
   Future<void> _persistTail = Future<void>.value();
   Future<SyncFlushReport>? _inFlight;
@@ -213,10 +210,8 @@ class SyncEngine {
     _emit(syncing: true);
 
     final DateTime now = _clock();
-    final List<String> dueIds = _queue
-        .where((SyncAction a) => a.isDue(now))
-        .map((SyncAction a) => a.id)
-        .toList();
+    final List<String> dueIds =
+        _queue.where((SyncAction a) => a.isDue(now)).map((SyncAction a) => a.id).toList();
 
     var dispatched = 0;
     var succeeded = 0;

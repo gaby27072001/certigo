@@ -94,8 +94,14 @@ Lesson sampleLesson(String lessonId) => Lesson(
                 'machine virtuelle Azure, de la première à la dernière.',
             options: <QuizOption>[
               QuizOption(id: 's1', label: 'Créer la VM dans un réseau virtuel'),
-              QuizOption(id: 's2', label: 'Restreindre les ports entrants avec un NSG'),
-              QuizOption(id: 's3', label: 'Activer MFA sur le compte administrateur'),
+              QuizOption(
+                id: 's2',
+                label: 'Restreindre les ports entrants avec un NSG',
+              ),
+              QuizOption(
+                id: 's3',
+                label: 'Activer MFA sur le compte administrateur',
+              ),
               QuizOption(id: 's4', label: 'Stocker les secrets dans Key Vault'),
             ],
           ),
@@ -169,7 +175,10 @@ Lesson sampleLesson(String lessonId) => Lesson(
                 label: 'Ouvrir le port RDP (3389) à tout '
                     'internet (0.0.0.0/0)',
               ),
-              QuizOption(id: 'b', label: 'Activer MFA sur le compte administrateur'),
+              QuizOption(
+                id: 'b',
+                label: 'Activer MFA sur le compte administrateur',
+              ),
               QuizOption(id: 'c', label: 'Restreindre les accès avec un NSG'),
               QuizOption(id: 'd', label: 'Stocker les secrets dans Key Vault'),
             ],

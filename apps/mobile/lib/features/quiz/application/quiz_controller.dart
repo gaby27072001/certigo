@@ -127,9 +127,7 @@ class QuizController extends ChangeNotifier {
     _graded = true;
     final String pickedId = _selectedId!;
     _answersByItem[current.item.id] = <String>[pickedId];
-    _latencyByItem[current.item.id] = DateTime.now()
-        .difference(_shownAt)
-        .inMilliseconds;
+    _latencyByItem[current.item.id] = DateTime.now().difference(_shownAt).inMilliseconds;
     if (current.hasLocalCorrection) {
       final bool ok = pickedId == current.correctOptionId;
       current.lastAnswerCorrect = ok;
@@ -153,8 +151,7 @@ class QuizController extends ChangeNotifier {
     await Future<void>.value();
     if (_disposed) return null;
 
-    final String clientAttemptId = DateTime.now().microsecondsSinceEpoch
-        .toString();
+    final String clientAttemptId = DateTime.now().microsecondsSinceEpoch.toString();
     if (_isDemo) {
       final SubmitQuizResult result = _localDemoResult(
         clientAttemptId: clientAttemptId,
@@ -219,12 +216,10 @@ class QuizController extends ChangeNotifier {
       success: (SubmitQuizResult _) => null,
       failure: (Failure failure) => failure,
     );
-    final bool pendingSync =
-        failure != null && classifyFailure(failure) == SyncDispatch.retryable;
+    final bool pendingSync = failure != null && classifyFailure(failure) == SyncDispatch.retryable;
     final bool submissionFailed = failure != null && !pendingSync;
     final SubmitQuizResult result =
-        submission.valueOrNull ??
-        _pendingResult(clientAttemptId: clientAttemptId);
+        submission.valueOrNull ?? _pendingResult(clientAttemptId: clientAttemptId);
 
     _submitting = false;
     notifyListeners();
@@ -248,9 +243,7 @@ class QuizController extends ChangeNotifier {
     required String clientAttemptId,
     required int total,
   }) {
-    final int scorePct = total == 0
-        ? 0
-        : ((_correctCount / total) * 100).round();
+    final int scorePct = total == 0 ? 0 : ((_correctCount / total) * 100).round();
     return SubmitQuizResult(
       attemptId: 'demo-$clientAttemptId',
       scorePct: scorePct,

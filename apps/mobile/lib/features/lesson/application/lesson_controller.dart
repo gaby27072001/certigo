@@ -140,9 +140,8 @@ class LessonController extends StateNotifier<LessonSessionState> {
         if (next.contains(optionId)) {
           next.remove(optionId);
         } else {
-          final int cap = item.type == ItemType.cloze
-              ? clozeBlankCount(item.stem)
-              : item.options.length;
+          final int cap =
+              item.type == ItemType.cloze ? clozeBlankCount(item.stem) : item.options.length;
           if (next.length < cap) next.add(optionId);
         }
       case ItemType.mcq:
@@ -182,9 +181,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
     final QuizItem? item = state.currentItem;
     if (item == null || !state.canSubmitCurrent) return;
 
-    final int latencyMs = DateTime.now()
-        .difference(_stepShownAt)
-        .inMilliseconds;
+    final int latencyMs = DateTime.now().difference(_stepShownAt).inMilliseconds;
     final List<String> selected = List<String>.unmodifiable(state.selection);
     final CheckOutcome outcome = _grader.grade(
       itemId: item.id,
@@ -284,8 +281,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
       success: (SubmitQuizResult _) => null,
       failure: (Failure failure) => failure,
     );
-    final bool pendingSync =
-        failure != null && classifyFailure(failure) == SyncDispatch.retryable;
+    final bool pendingSync = failure != null && classifyFailure(failure) == SyncDispatch.retryable;
     final bool submissionFailed = failure != null && !pendingSync;
     final SubmitQuizResult result = res.valueOrNull ?? _pendingResult();
     _feedback.completed();
@@ -304,8 +300,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
     int correctCount = 0;
 
     for (final QuizAnswer answer in answers) {
-      final CheckOutcome outcome =
-          state.outcomes[answer.itemId] ?? CheckOutcome.empty;
+      final CheckOutcome outcome = state.outcomes[answer.itemId] ?? CheckOutcome.empty;
       final ReviewGrade grade = gradeFromAnswer(
         correct: outcome.correct,
         latencyMs: answer.latencyMs,
@@ -335,9 +330,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
     }
 
     final int total = results.length;
-    final int scorePct = total == 0
-        ? 100
-        : ((correctCount / total) * 100).round();
+    final int scorePct = total == 0 ? 100 : ((correctCount / total) * 100).round();
     return SubmitQuizResult(
       attemptId: 'demo-$_clientAttemptId',
       scorePct: scorePct,
@@ -393,15 +386,15 @@ class LessonController extends StateNotifier<LessonSessionState> {
 
 /// Family provider keyed by [LessonArgs]; auto-disposed so leaving a lesson
 /// resets its session.
-final lessonControllerProvider = StateNotifierProvider.autoDispose
-    .family<LessonController, LessonSessionState, LessonArgs>((
-      Ref ref,
-      LessonArgs args,
-    ) {
-      return LessonController(
-        lessons: ref.watch(lessonRepositoryProvider),
-        quiz: ref.watch(quizRepositoryProvider),
-        args: args,
-        feedback: ref.watch(lessonFeedbackProvider),
-      );
-    });
+final lessonControllerProvider =
+    StateNotifierProvider.autoDispose.family<LessonController, LessonSessionState, LessonArgs>((
+  Ref ref,
+  LessonArgs args,
+) {
+  return LessonController(
+    lessons: ref.watch(lessonRepositoryProvider),
+    quiz: ref.watch(quizRepositoryProvider),
+    args: args,
+    feedback: ref.watch(lessonFeedbackProvider),
+  );
+});

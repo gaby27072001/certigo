@@ -12,8 +12,7 @@ class NotificationLifecycleScope extends StatefulWidget {
   final Widget child;
 
   @override
-  State<NotificationLifecycleScope> createState() =>
-      _NotificationLifecycleScopeState();
+  State<NotificationLifecycleScope> createState() => _NotificationLifecycleScopeState();
 }
 
 class _NotificationLifecycleScopeState extends State<NotificationLifecycleScope>

@@ -26,8 +26,7 @@ class OfflineSyncScope extends ConsumerStatefulWidget {
   ConsumerState<OfflineSyncScope> createState() => _OfflineSyncScopeState();
 }
 
-class _OfflineSyncScopeState extends ConsumerState<OfflineSyncScope>
-    with WidgetsBindingObserver {
+class _OfflineSyncScopeState extends ConsumerState<OfflineSyncScope> with WidgetsBindingObserver {
   StreamSubscription<List<ConnectivityResult>>? _connectivity;
   late final SyncEngine _engine;
   bool _disposed = false;

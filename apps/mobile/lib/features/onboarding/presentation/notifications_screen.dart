@@ -26,10 +26,9 @@ class NotificationsScreen extends ConsumerWidget {
       primaryLabel: 'ACTIVER LES RAPPELS',
       onPrimary: () async {
         try {
-          final bool scheduled =
-              await NotificationService.scheduleDailyReminder(
-                NotificationService.defaultReminderTime,
-              );
+          final bool scheduled = await NotificationService.scheduleDailyReminder(
+            NotificationService.defaultReminderTime,
+          );
           c.setReminders(scheduled);
           if (!context.mounted) return;
           if (!scheduled) {

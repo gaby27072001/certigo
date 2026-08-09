@@ -56,9 +56,7 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
   }
 
   String? _findNextLessonId(LearningPath path, String currentLessonId) {
-    final List<PathLesson> lessons = path.units
-        .expand((PathUnit u) => u.lessons)
-        .toList();
+    final List<PathLesson> lessons = path.units.expand((PathUnit u) => u.lessons).toList();
     final int idx = lessons.indexWhere(
       (PathLesson l) => l.id == currentLessonId,
     );
@@ -72,9 +70,7 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
     final TextTheme t = Theme.of(context).textTheme;
     final SubmitQuizResult result = widget.result;
     final int scorePct = result.scorePct;
-    final int correct = result.results
-        .where((ItemResult item) => item.correct)
-        .length;
+    final int correct = result.results.where((ItemResult item) => item.correct).length;
     final bool strong = scorePct >= 80;
     final int xp = result.rewards.xpEarned;
 
@@ -82,9 +78,8 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
       pathProvider(widget.trackId),
     );
     final bool pathLoaded = pathAsync.hasValue;
-    final String? nextLessonId = pathLoaded
-        ? _findNextLessonId(pathAsync.requireValue, widget.lessonId)
-        : null;
+    final String? nextLessonId =
+        pathLoaded ? _findNextLessonId(pathAsync.requireValue, widget.lessonId) : null;
 
     return Stack(
       alignment: Alignment.topCenter,
@@ -125,27 +120,25 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
                 widget.pendingSync
                     ? 'Soumis hors ligne'
                     : widget.submissionFailed
-                    ? 'Envoi impossible'
-                    : widget.isDemo
-                    ? 'Démo terminée'
-                    : (strong ? 'Excellent !' : 'Bonne progression'),
+                        ? 'Envoi impossible'
+                        : widget.isDemo
+                            ? 'Démo terminée'
+                            : (strong ? 'Excellent !' : 'Bonne progression'),
                 style: t.headlineMedium,
               ),
               Text(
                 widget.pendingSync
                     ? 'Tes réponses sont enregistrées et seront synchronisées automatiquement.'
                     : widget.submissionFailed
-                    ? 'Aucune progression ni récompense n’a été enregistrée.'
-                    : widget.isDemo
-                    ? '$scorePct% · aucune synchronisation ni récompense'
-                    : '${correct > 0 || result.results.isNotEmpty ? '$correct / ${widget.totalQuestions} correct · ' : ''}$scorePct%',
+                        ? 'Aucune progression ni récompense n’a été enregistrée.'
+                        : widget.isDemo
+                            ? '$scorePct% · aucune synchronisation ni récompense'
+                            : '${correct > 0 || result.results.isNotEmpty ? '$correct / ${widget.totalQuestions} correct · ' : ''}$scorePct%',
                 style: t.bodyLarge?.copyWith(color: p.textSecondary),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              if (!widget.isDemo &&
-                  !widget.pendingSync &&
-                  !widget.submissionFailed)
+              if (!widget.isDemo && !widget.pendingSync && !widget.submissionFailed)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
@@ -155,9 +148,7 @@ class _ResultsSheetState extends ConsumerState<ResultsSheet> {
                   ],
                 ),
               const SizedBox(height: 24),
-              if (!widget.submissionFailed &&
-                  pathLoaded &&
-                  nextLessonId != null) ...<Widget>[
+              if (!widget.submissionFailed && pathLoaded && nextLessonId != null) ...<Widget>[
                 PrismButton(
                   label: 'Continuer → Leçon suivante',
                   icon: Icons.arrow_forward_rounded,

@@ -10,7 +10,8 @@ class _OfflineLessonRepo implements LessonRepository {
   Future<Result<Lesson>> getLesson({
     required String trackId,
     required String lessonId,
-  }) async => const Err<Lesson>(NetworkFailure());
+  }) async =>
+      const Err<Lesson>(NetworkFailure());
 }
 
 class _OfflineQuizRepo implements QuizRepository {
