@@ -9,14 +9,14 @@ PathUnit _unit(String id, NodeStatus status, List<PathLesson> lessons) =>
     PathUnit(id: id, title: id, domainId: 'd', status: status, lessons: lessons);
 
 LearningPath _path(List<PathUnit> units) => LearningPath(
-  trackId: 'az-900',
-  trackName: 'AZ-900',
-  exam: 'AZ-900',
-  readinessScore: 0,
-  readinessTrend7d: 0,
-  units: units,
-  domains: const <DomainProgress>[],
-);
+      trackId: 'az-900',
+      trackName: 'AZ-900',
+      exam: 'AZ-900',
+      readinessScore: 0,
+      readinessTrend7d: 0,
+      units: units,
+      domains: const <DomainProgress>[],
+    );
 
 void main() {
   group('currentLessonIdOf', () {

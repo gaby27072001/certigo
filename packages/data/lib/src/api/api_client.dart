@@ -28,8 +28,8 @@ class ApiClient {
     String? baseUrl,
     DebugLogger? debugLog,
     CorrelationIdGenerator? correlationIdGenerator,
-  }) : _dio = dio ?? Dio(),
-       _debugLog = debugLog {
+  })  : _dio = dio ?? Dio(),
+        _debugLog = debugLog {
     _dio.options
       ..baseUrl = baseUrl ?? AppEnv.apiBaseUrl
       ..connectTimeout = const Duration(seconds: 12)

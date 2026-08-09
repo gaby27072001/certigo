@@ -15,11 +15,11 @@ class LevelScreen extends ConsumerWidget {
 
   static const List<(KnowledgeLevel, int, String, String)> _options =
       <(KnowledgeLevel, int, String, String)>[
-        (KnowledgeLevel.beginner, 1, 'Débutant', 'Je débute en Cloud / Azure'),
-        (KnowledgeLevel.intermediate, 2, 'Intermédiaire', 'Je connais les bases du Cloud'),
-        (KnowledgeLevel.advanced, 3, 'Avancé', 'J\'utilise Azure au quotidien'),
-        (KnowledgeLevel.expert, 4, 'Expert', 'Je prépare des certifications avancées'),
-      ];
+    (KnowledgeLevel.beginner, 1, 'Débutant', 'Je débute en Cloud / Azure'),
+    (KnowledgeLevel.intermediate, 2, 'Intermédiaire', 'Je connais les bases du Cloud'),
+    (KnowledgeLevel.advanced, 3, 'Avancé', 'J\'utilise Azure au quotidien'),
+    (KnowledgeLevel.expert, 4, 'Expert', 'Je prépare des certifications avancées'),
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

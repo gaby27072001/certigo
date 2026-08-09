@@ -92,13 +92,13 @@ class ChapterSectionCard extends StatelessWidget {
     final Color fill = locked
         ? p.surfaceAlt
         : completed
-        ? Color.alphaBlend(accent.withOpacity(isDark ? 0.18 : 0.08), p.surface)
-        : p.surface;
+            ? Color.alphaBlend(accent.withOpacity(isDark ? 0.18 : 0.08), p.surface)
+            : p.surface;
     final Color border = locked
         ? p.border
         : completed
-        ? accent.withOpacity(0.30)
-        : accent.withOpacity(0.45);
+            ? accent.withOpacity(0.30)
+            : accent.withOpacity(0.45);
     final Color titleColor = locked ? p.textSecondary : p.textPrimary;
 
     final double progress = lessonsTotal == 0 ? 0 : lessonsCompleted / lessonsTotal;

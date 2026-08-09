@@ -34,7 +34,7 @@ class TutorController extends StateNotifier<TutorState> {
 
 /// One tutor controller per answered item, auto-disposed when its sheet closes
 /// so each consultation starts fresh (and re-reads the latest personalisation).
-final tutorControllerProvider = StateNotifierProvider.autoDispose
-    .family<TutorController, TutorState, String>(
-      (Ref ref, String itemId) => TutorController(ref.watch(tutorRepositoryProvider)),
-    );
+final tutorControllerProvider =
+    StateNotifierProvider.autoDispose.family<TutorController, TutorState, String>(
+  (Ref ref, String itemId) => TutorController(ref.watch(tutorRepositoryProvider)),
+);

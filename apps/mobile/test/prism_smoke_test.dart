@@ -9,9 +9,9 @@ import 'package:prism_ui/prism_ui.dart';
 /// the cheapest guard against a broken design-system API.
 void main() {
   Widget host(Widget child) => MaterialApp(
-    theme: PrismTheme.light(),
-    home: Scaffold(body: Center(child: child)),
-  );
+        theme: PrismTheme.light(),
+        home: Scaffold(body: Center(child: child)),
+      );
 
   testWidgets('PrismButton renders its label and fires onPressed', (tester) async {
     var tapped = false;

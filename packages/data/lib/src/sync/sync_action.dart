@@ -23,16 +23,16 @@ enum SyncActionStatus {
 }
 
 SyncActionStatus _statusFromWire(String? value) => switch (value) {
-  'done' => SyncActionStatus.done,
-  'dead' => SyncActionStatus.dead,
-  _ => SyncActionStatus.pending,
-};
+      'done' => SyncActionStatus.done,
+      'dead' => SyncActionStatus.dead,
+      _ => SyncActionStatus.pending,
+    };
 
 String _statusToWire(SyncActionStatus status) => switch (status) {
-  SyncActionStatus.pending => 'pending',
-  SyncActionStatus.done => 'done',
-  SyncActionStatus.dead => 'dead',
-};
+      SyncActionStatus.pending => 'pending',
+      SyncActionStatus.done => 'done',
+      SyncActionStatus.dead => 'dead',
+    };
 
 /// An immutable, durably-persisted unit of offline work.
 class SyncAction {
@@ -121,32 +121,32 @@ class SyncAction {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-    'id': id,
-    'kind': kind,
-    'endpoint': endpoint,
-    'payload': payload,
-    'idempotencyKey': idempotencyKey,
-    'createdAt': createdAt.toUtc().toIso8601String(),
-    'status': _statusToWire(status),
-    'attempts': attempts,
-    if (nextAttemptAt != null) 'nextAttemptAt': nextAttemptAt!.toUtc().toIso8601String(),
-    if (lastError != null) 'lastError': lastError,
-    if (completedAt != null) 'completedAt': completedAt!.toUtc().toIso8601String(),
-  };
+        'id': id,
+        'kind': kind,
+        'endpoint': endpoint,
+        'payload': payload,
+        'idempotencyKey': idempotencyKey,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'status': _statusToWire(status),
+        'attempts': attempts,
+        if (nextAttemptAt != null) 'nextAttemptAt': nextAttemptAt!.toUtc().toIso8601String(),
+        if (lastError != null) 'lastError': lastError,
+        if (completedAt != null) 'completedAt': completedAt!.toUtc().toIso8601String(),
+      };
 
   factory SyncAction.fromJson(Map<String, dynamic> json) => SyncAction(
-    id: json['id'] as String,
-    kind: json['kind'] as String,
-    endpoint: json['endpoint'] as String,
-    payload: Map<String, dynamic>.from(json['payload'] as Map<dynamic, dynamic>),
-    idempotencyKey: json['idempotencyKey'] as String,
-    createdAt: DateTime.parse(json['createdAt'] as String),
-    status: _statusFromWire(json['status'] as String?),
-    attempts: (json['attempts'] as num?)?.toInt() ?? 0,
-    nextAttemptAt: json['nextAttemptAt'] == null
-        ? null
-        : DateTime.parse(json['nextAttemptAt'] as String),
-    lastError: json['lastError'] as String?,
-    completedAt: json['completedAt'] == null ? null : DateTime.parse(json['completedAt'] as String),
-  );
+        id: json['id'] as String,
+        kind: json['kind'] as String,
+        endpoint: json['endpoint'] as String,
+        payload: Map<String, dynamic>.from(json['payload'] as Map<dynamic, dynamic>),
+        idempotencyKey: json['idempotencyKey'] as String,
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        status: _statusFromWire(json['status'] as String?),
+        attempts: (json['attempts'] as num?)?.toInt() ?? 0,
+        nextAttemptAt:
+            json['nextAttemptAt'] == null ? null : DateTime.parse(json['nextAttemptAt'] as String),
+        lastError: json['lastError'] as String?,
+        completedAt:
+            json['completedAt'] == null ? null : DateTime.parse(json['completedAt'] as String),
+      );
 }

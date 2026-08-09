@@ -148,9 +148,8 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
       answers: answers,
     );
 
-    final Result<MockExamResult> result = await ref
-        .read(examRepositoryProvider)
-        .submitExam(request);
+    final Result<MockExamResult> result =
+        await ref.read(examRepositoryProvider).submitExam(request);
     if (!mounted) return;
 
     result.when(

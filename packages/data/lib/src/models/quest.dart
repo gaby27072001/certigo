@@ -27,16 +27,16 @@ class Quest {
   final bool claimable;
 
   factory Quest.fromJson(Map<String, dynamic> json) => Quest(
-    id: json['id'] as String,
-    kind: json['kind'] as String? ?? '',
-    title: json['title'] as String? ?? '',
-    target: (json['target'] as num?)?.toInt() ?? 0,
-    current: (json['current'] as num?)?.toInt() ?? 0,
-    rewardGems: (json['rewardGems'] as num?)?.toInt() ?? 0,
-    completed: json['completed'] as bool? ?? false,
-    claimed: json['claimed'] as bool? ?? false,
-    claimable: json['claimable'] as bool? ?? false,
-  );
+        id: json['id'] as String,
+        kind: json['kind'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        target: (json['target'] as num?)?.toInt() ?? 0,
+        current: (json['current'] as num?)?.toInt() ?? 0,
+        rewardGems: (json['rewardGems'] as num?)?.toInt() ?? 0,
+        completed: json['completed'] as bool? ?? false,
+        claimed: json['claimed'] as bool? ?? false,
+        claimable: json['claimable'] as bool? ?? false,
+      );
 }
 
 /// The learner's quest board for one day.
@@ -49,12 +49,12 @@ class QuestBoard {
   final List<Quest> quests;
 
   factory QuestBoard.fromJson(Map<String, dynamic> json) => QuestBoard(
-    date: json['date'] as String? ?? '',
-    gems: (json['gems'] as num?)?.toInt() ?? 0,
-    quests: (json['quests'] as List<dynamic>? ?? <dynamic>[])
-        .map((e) => Quest.fromJson(e as Map<String, dynamic>))
-        .toList(),
-  );
+        date: json['date'] as String? ?? '',
+        gems: (json['gems'] as num?)?.toInt() ?? 0,
+        quests: (json['quests'] as List<dynamic>? ?? <dynamic>[])
+            .map((e) => Quest.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
 }
 
 /// Request body for `POST /quests/claim`.
@@ -85,11 +85,11 @@ class ClaimQuestResult {
   final String? error;
 
   factory ClaimQuestResult.fromJson(Map<String, dynamic> json) => ClaimQuestResult(
-    success: json['success'] as bool? ?? false,
-    questId: json['questId'] as String? ?? '',
-    gemsAwarded: (json['gemsAwarded'] as num?)?.toInt() ?? 0,
-    gemsBalance: (json['gemsBalance'] as num?)?.toInt() ?? 0,
-    claimed: json['claimed'] as bool? ?? false,
-    error: json['error'] as String?,
-  );
+        success: json['success'] as bool? ?? false,
+        questId: json['questId'] as String? ?? '',
+        gemsAwarded: (json['gemsAwarded'] as num?)?.toInt() ?? 0,
+        gemsBalance: (json['gemsBalance'] as num?)?.toInt() ?? 0,
+        claimed: json['claimed'] as bool? ?? false,
+        error: json['error'] as String?,
+      );
 }

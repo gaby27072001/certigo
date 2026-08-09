@@ -242,12 +242,12 @@ class _PathNodeState extends State<PathNode> with SingleTickerProviderStateMixin
   }
 
   String _statusLabel() => switch (widget.status) {
-    PathNodeStatus.mastered => 'maîtrisée',
-    PathNodeStatus.completed => 'terminée',
-    PathNodeStatus.inProgress => 'en cours',
-    PathNodeStatus.available => 'disponible',
-    PathNodeStatus.locked => 'verrouillée',
-  };
+        PathNodeStatus.mastered => 'maîtrisée',
+        PathNodeStatus.completed => 'terminée',
+        PathNodeStatus.inProgress => 'en cours',
+        PathNodeStatus.available => 'disponible',
+        PathNodeStatus.locked => 'verrouillée',
+      };
 
   _NodeVisual _visualFor(
     PathNodeStatus status,

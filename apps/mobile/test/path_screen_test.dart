@@ -21,62 +21,62 @@ import 'auth_controller_test.dart' show FakeSessionStore;
 /// runs a looping bounce animation that would never settle.
 void main() {
   LearningPath fakePath() => const LearningPath(
-    trackId: 'az-900',
-    trackName: 'Fondamentaux Azure',
-    exam: 'Examen AZ-900',
-    readinessScore: 72,
-    readinessTrend7d: 5,
-    units: <PathUnit>[
-      PathUnit(
-        id: 'u1',
-        title: 'Concepts du cloud',
-        domainId: 'd1',
-        status: NodeStatus.inProgress,
-        lessons: <PathLesson>[
-          PathLesson(
-            id: 'l1',
-            title: 'Le cloud',
-            status: NodeStatus.completed,
-            estMinutes: 5,
-            masteryPct: 100,
-          ),
-          PathLesson(
-            id: 'l2',
-            title: 'Modèles de service',
+        trackId: 'az-900',
+        trackName: 'Fondamentaux Azure',
+        exam: 'Examen AZ-900',
+        readinessScore: 72,
+        readinessTrend7d: 5,
+        units: <PathUnit>[
+          PathUnit(
+            id: 'u1',
+            title: 'Concepts du cloud',
+            domainId: 'd1',
             status: NodeStatus.inProgress,
-            estMinutes: 5,
-            masteryPct: 40,
+            lessons: <PathLesson>[
+              PathLesson(
+                id: 'l1',
+                title: 'Le cloud',
+                status: NodeStatus.completed,
+                estMinutes: 5,
+                masteryPct: 100,
+              ),
+              PathLesson(
+                id: 'l2',
+                title: 'Modèles de service',
+                status: NodeStatus.inProgress,
+                estMinutes: 5,
+                masteryPct: 40,
+              ),
+              PathLesson(
+                id: 'l3',
+                title: 'Avantages',
+                status: NodeStatus.available,
+                estMinutes: 5,
+                masteryPct: 0,
+              ),
+            ],
           ),
-          PathLesson(
-            id: 'l3',
-            title: 'Avantages',
-            status: NodeStatus.available,
-            estMinutes: 5,
-            masteryPct: 0,
-          ),
-        ],
-      ),
-      PathUnit(
-        id: 'u2',
-        title: 'Gouvernance',
-        domainId: 'd2',
-        status: NodeStatus.locked,
-        lessons: <PathLesson>[
-          PathLesson(
-            id: 'l4',
-            title: 'Maîtrise des coûts',
+          PathUnit(
+            id: 'u2',
+            title: 'Gouvernance',
+            domainId: 'd2',
             status: NodeStatus.locked,
-            estMinutes: 5,
-            masteryPct: 0,
+            lessons: <PathLesson>[
+              PathLesson(
+                id: 'l4',
+                title: 'Maîtrise des coûts',
+                status: NodeStatus.locked,
+                estMinutes: 5,
+                masteryPct: 0,
+              ),
+            ],
           ),
         ],
-      ),
-    ],
-    domains: <DomainProgress>[
-      DomainProgress(id: 'd1', name: 'Concepts cloud', weight: 0.3, score: 70),
-      DomainProgress(id: 'd2', name: 'Gouvernance et conformité', weight: 0.3, score: 40),
-    ],
-  );
+        domains: <DomainProgress>[
+          DomainProgress(id: 'd1', name: 'Concepts cloud', weight: 0.3, score: 70),
+          DomainProgress(id: 'd2', name: 'Gouvernance et conformité', weight: 0.3, score: 40),
+        ],
+      );
 
   Future<void> pumpPath(WidgetTester tester) async {
     final GoRouter router = GoRouter(

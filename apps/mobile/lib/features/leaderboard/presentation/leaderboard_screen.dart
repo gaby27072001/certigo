@@ -250,11 +250,8 @@ String _endsInLabel(DateTime endsAt) {
 }
 
 String _initials(String name) {
-  final List<String> parts = name
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((String s) => s.isNotEmpty)
-      .toList();
+  final List<String> parts =
+      name.trim().split(RegExp(r'\s+')).where((String s) => s.isNotEmpty).toList();
   if (parts.isEmpty) {
     return '?';
   }

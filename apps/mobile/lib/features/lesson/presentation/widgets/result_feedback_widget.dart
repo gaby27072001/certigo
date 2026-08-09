@@ -128,8 +128,7 @@ class ResultFeedbackWidget extends StatelessWidget {
           CalloutBlock(
             kind: CalloutKind.warning,
             title: 'À renforcer',
-            text:
-                'On replanifiera ${result.weakConcepts.length} concept(s) en '
+            text: 'On replanifiera ${result.weakConcepts.length} concept(s) en '
                 'révision pour bien les ancrer.',
           ),
         ],

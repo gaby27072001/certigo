@@ -202,11 +202,11 @@ class AuthController extends Notifier<AuthState> {
 
   /// Libellé lisible du fournisseur, inséré dans les messages d'erreur.
   String _providerLabel(AuthProvider provider) => switch (provider) {
-    AuthProvider.microsoft => 'Microsoft',
-    AuthProvider.google => 'Google',
-    AuthProvider.apple => 'Apple',
-    AuthProvider.email => 'e-mail',
-  };
+        AuthProvider.microsoft => 'Microsoft',
+        AuthProvider.google => 'Google',
+        AuthProvider.apple => 'Apple',
+        AuthProvider.email => 'e-mail',
+      };
 
   /// Connexion par e-mail + mot de passe (compte géré par notre backend).
   Future<void> signInWithEmail({required String email, required String password}) async {
@@ -214,9 +214,8 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthLoading();
     final Stopwatch sw = Stopwatch()..start();
     try {
-      final AuthSession session = await _credentials
-          .login(email: email, password: password)
-          .timeout(_emailTimeout);
+      final AuthSession session =
+          await _credentials.login(email: email, password: password).timeout(_emailTimeout);
       if (session.accessToken.isEmpty) {
         _telemetry.authFailure(
           AuthMethod.email,

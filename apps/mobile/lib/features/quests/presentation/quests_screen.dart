@@ -58,9 +58,8 @@ class _QuestsContentState extends ConsumerState<_QuestsContent> {
       _claimingId = quest.id;
       _error = null;
     });
-    final Result<ClaimQuestResult> result = await ref
-        .read(questRepositoryProvider)
-        .claimQuest(ClaimQuestRequest(questId: quest.id));
+    final Result<ClaimQuestResult> result =
+        await ref.read(questRepositoryProvider).claimQuest(ClaimQuestRequest(questId: quest.id));
     if (!mounted) {
       return;
     }

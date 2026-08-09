@@ -160,10 +160,10 @@ class _PrismButtonState extends State<PrismButton> {
   }
 
   Color _foreground(PrismColorScheme p) => switch (widget.variant) {
-    PrismButtonVariant.primary => Colors.white,
-    PrismButtonVariant.secondary => widget.tone ?? p.primary,
-    PrismButtonVariant.ghost => widget.tone ?? p.textSecondary,
-  };
+        PrismButtonVariant.primary => Colors.white,
+        PrismButtonVariant.secondary => widget.tone ?? p.primary,
+        PrismButtonVariant.ghost => widget.tone ?? p.textSecondary,
+      };
 
   BoxDecoration _topDecoration(PrismColorScheme p) {
     final Color tone = widget.tone ?? p.primary;

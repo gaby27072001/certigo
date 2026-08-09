@@ -36,15 +36,14 @@ class ReadinessCalculator {
     final double avgMastery = masteries.isEmpty
         ? 0
         : masteries.map((ConceptMastery m) => m.masteryScore).reduce((a, b) => a + b) /
-              masteries.length;
+            masteries.length;
 
     final double recency = masteries.isEmpty
         ? 0
         : masteries.map((ConceptMastery m) => _recencyWeight(m, now)).reduce((a, b) => a + b) /
-              masteries.length;
+            masteries.length;
 
-    final num raw =
-        100 *
+    final num raw = 100 *
         math.pow(coverage, _coverageExp) *
         math.pow(avgMastery, _masteryExp) *
         math.pow(recency, _recencyExp);
@@ -63,9 +62,8 @@ class ReadinessCalculator {
     if (domains.isEmpty) return 0;
     final double totalWeight = domains.map((DomainReadiness d) => d.weight).reduce((a, b) => a + b);
     if (totalWeight <= 0) return 0;
-    final double weighted = domains
-        .map((DomainReadiness d) => d.score * d.weight)
-        .reduce((a, b) => a + b);
+    final double weighted =
+        domains.map((DomainReadiness d) => d.score * d.weight).reduce((a, b) => a + b);
     return (weighted / totalWeight).round();
   }
 
@@ -74,9 +72,9 @@ class ReadinessCalculator {
   static double _recencyWeight(ConceptMastery m, DateTime now) {
     final double days =
         (now.difference(m.lastReviewedAt).inMicroseconds / Duration.microsecondsPerDay).clamp(
-          0.0,
-          double.infinity,
-        );
+      0.0,
+      double.infinity,
+    );
     return math.exp(-days / 30).clamp(0.0, 1.0);
   }
 }

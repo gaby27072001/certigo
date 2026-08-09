@@ -12,15 +12,16 @@ class _ScriptedQuiz implements QuizRepository {
   Future<Result<SubmitQuizResult>> submit({
     required String lessonId,
     required SubmitQuizRequest request,
-  }) async => result;
+  }) async =>
+      result;
 }
 
 SubmitQuizRequest _request(String key) => SubmitQuizRequest(
-  clientAttemptId: key,
-  trackId: 'az-900',
-  startedAt: DateTime.utc(2026),
-  answers: const <QuizAnswer>[],
-);
+      clientAttemptId: key,
+      trackId: 'az-900',
+      startedAt: DateTime.utc(2026),
+      answers: const <QuizAnswer>[],
+    );
 
 Future<SyncDispatch> _alwaysSucceed(SyncAction _) async => SyncDispatch.success;
 

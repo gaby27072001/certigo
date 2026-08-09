@@ -22,8 +22,7 @@ class NextBest {
   factory NextBest.fromJson(Map<String, dynamic> json) {
     return NextBest(
       trackId: json['trackId'] as String? ?? '',
-      generatedAt:
-          DateTime.tryParse(json['generatedAt'] as String? ?? '')?.toUtc() ??
+      generatedAt: DateTime.tryParse(json['generatedAt'] as String? ?? '')?.toUtc() ??
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
       items: (json['items'] as List<dynamic>? ?? <dynamic>[])
           .whereType<Map<String, dynamic>>()

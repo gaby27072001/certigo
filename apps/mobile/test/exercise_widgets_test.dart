@@ -18,9 +18,9 @@ void main() {
   // scroll prevents height overflow. The width is the full 800px test surface
   // (the test font renders each glyph ~1em wide, so headers need the room).
   Widget host(Widget child) => MaterialApp(
-    theme: PrismTheme.light(),
-    home: Scaffold(body: SingleChildScrollView(child: child)),
-  );
+        theme: PrismTheme.light(),
+        home: Scaffold(body: SingleChildScrollView(child: child)),
+      );
 
   group('OrderingStepWidget', () {
     testWidgets('shows the ordering framing and returns a bank chip via onToggle', (tester) async {

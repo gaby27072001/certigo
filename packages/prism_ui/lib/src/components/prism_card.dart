@@ -138,11 +138,11 @@ class PrismCard extends StatelessWidget {
   }
 
   static List<BoxShadow> _shadowFor(int elevation, Brightness b) => switch (elevation) {
-    <= 0 => PrismElevation.level0,
-    1 => PrismElevation.level1(b),
-    2 => PrismElevation.level2(b),
-    _ => PrismElevation.level2(b),
-  };
+        <= 0 => PrismElevation.level0,
+        1 => PrismElevation.level1(b),
+        2 => PrismElevation.level2(b),
+        _ => PrismElevation.level2(b),
+      };
 }
 
 /// Scale-on-press wrapper for tappable [PrismCard]s, mirroring the glass one.

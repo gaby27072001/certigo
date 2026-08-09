@@ -10,23 +10,23 @@ import 'aurora_mascot.dart';
 /// produce are defined in one obvious place.
 extension AuroraMascotId on AuroraMascot {
   String get id => switch (this) {
-    AuroraMascot.nimbus => 'nimbus',
-    AuroraMascot.volt => 'volt',
-    AuroraMascot.cosmo => 'cosmo',
-    AuroraMascot.sentinel => 'sentinel',
-    AuroraMascot.bicky => 'bicky',
-    AuroraMascot.pixel => 'pixel',
-    AuroraMascot.pip => 'pip',
-  };
+        AuroraMascot.nimbus => 'nimbus',
+        AuroraMascot.volt => 'volt',
+        AuroraMascot.cosmo => 'cosmo',
+        AuroraMascot.sentinel => 'sentinel',
+        AuroraMascot.bicky => 'bicky',
+        AuroraMascot.pixel => 'pixel',
+        AuroraMascot.pip => 'pip',
+      };
 }
 
 extension MascotMoodId on MascotMood {
   String get id => switch (this) {
-    MascotMood.idle => 'idle',
-    MascotMood.happy => 'happy',
-    MascotMood.celebrate => 'celebrate',
-    MascotMood.sad => 'sad',
-  };
+        MascotMood.idle => 'idle',
+        MascotMood.happy => 'happy',
+        MascotMood.celebrate => 'celebrate',
+        MascotMood.sad => 'sad',
+      };
 }
 
 /// A resolved piece of mascot artwork: the image asset to paint, plus the owning

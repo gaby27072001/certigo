@@ -35,10 +35,8 @@ class CoachSection extends ConsumerWidget {
     final TextTheme t = Theme.of(context).textTheme;
     final PrismColorScheme p = context.prism;
     final Recommendation top = next.items.first;
-    final List<Recommendation> rest = next.items
-        .skip(1)
-        .take(_maxSecondary)
-        .toList(growable: false);
+    final List<Recommendation> rest =
+        next.items.skip(1).take(_maxSecondary).toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,25 +260,25 @@ class _CoachVisual {
   static _CoachVisual of(RecommendationKind kind, PrismColorScheme p) {
     return switch (kind) {
       RecommendationKind.practice => _CoachVisual(
-        label: 'À pratiquer',
-        icon: Icons.bolt_rounded,
-        accent: p.ember,
-      ),
+          label: 'À pratiquer',
+          icon: Icons.bolt_rounded,
+          accent: p.ember,
+        ),
       RecommendationKind.review => _CoachVisual(
-        label: 'À réviser',
-        icon: Icons.history_rounded,
-        accent: p.primary,
-      ),
+          label: 'À réviser',
+          icon: Icons.history_rounded,
+          accent: p.primary,
+        ),
       RecommendationKind.resume => _CoachVisual(
-        label: 'Reprendre',
-        icon: Icons.play_arrow_rounded,
-        accent: p.primary,
-      ),
+          label: 'Reprendre',
+          icon: Icons.play_arrow_rounded,
+          accent: p.primary,
+        ),
       RecommendationKind.start => _CoachVisual(
-        label: 'Démarrer',
-        icon: Icons.flag_rounded,
-        accent: p.success,
-      ),
+          label: 'Démarrer',
+          icon: Icons.flag_rounded,
+          accent: p.success,
+        ),
     };
   }
 }

@@ -358,14 +358,14 @@ class _TagPill extends StatelessWidget {
 }
 
 AuroraMascot _mascotFrom(String raw) => switch (raw.toLowerCase()) {
-  'volt' => AuroraMascot.volt,
-  'cosmo' => AuroraMascot.cosmo,
-  'sentinel' => AuroraMascot.sentinel,
-  'bicky' => AuroraMascot.bicky,
-  'pixel' => AuroraMascot.pixel,
-  'pip' => AuroraMascot.pip,
-  _ => AuroraMascot.nimbus,
-};
+      'volt' => AuroraMascot.volt,
+      'cosmo' => AuroraMascot.cosmo,
+      'sentinel' => AuroraMascot.sentinel,
+      'bicky' => AuroraMascot.bicky,
+      'pixel' => AuroraMascot.pixel,
+      'pip' => AuroraMascot.pip,
+      _ => AuroraMascot.nimbus,
+    };
 
 String _shareMessage(ShareCard card) {
   final String ref = Uri.encodeComponent(card.referralCode);

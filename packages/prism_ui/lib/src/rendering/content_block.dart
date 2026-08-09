@@ -71,8 +71,8 @@ class ContentBlock {
     final Map<String, dynamic> data = switch (rawData) {
       final Map<String, dynamic> typed => typed,
       final Map<Object?, Object?> loose => loose.map(
-        (Object? key, Object? value) => MapEntry<String, dynamic>(key.toString(), value),
-      ),
+          (Object? key, Object? value) => MapEntry<String, dynamic>(key.toString(), value),
+        ),
       _ => const <String, dynamic>{},
     };
     return ContentBlock(

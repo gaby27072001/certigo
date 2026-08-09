@@ -17,33 +17,33 @@ import 'package:prism_ui/prism_ui.dart';
 /// the shared aurora background runs a looping animation that never settles.
 void main() {
   AchievementBoard fakeBoard() => const AchievementBoard(
-    unlocked: 1,
-    total: 2,
-    achievements: <Achievement>[
-      Achievement(
-        id: 'streak-7',
-        kind: 'streak',
-        name: 'Série de feu',
-        description: 'Atteins une série de 7 jours.',
-        tier: 'gold',
-        threshold: 7,
-        progress: 7,
-        rewardGems: 50,
-        unlocked: true,
-      ),
-      Achievement(
-        id: 'lessons-50',
-        kind: 'lessons',
-        name: 'Marathonien',
-        description: 'Termine 50 leçons.',
-        tier: 'silver',
-        threshold: 50,
-        progress: 12,
-        rewardGems: 30,
-        unlocked: false,
-      ),
-    ],
-  );
+        unlocked: 1,
+        total: 2,
+        achievements: <Achievement>[
+          Achievement(
+            id: 'streak-7',
+            kind: 'streak',
+            name: 'Série de feu',
+            description: 'Atteins une série de 7 jours.',
+            tier: 'gold',
+            threshold: 7,
+            progress: 7,
+            rewardGems: 50,
+            unlocked: true,
+          ),
+          Achievement(
+            id: 'lessons-50',
+            kind: 'lessons',
+            name: 'Marathonien',
+            description: 'Termine 50 leçons.',
+            tier: 'silver',
+            threshold: 50,
+            progress: 12,
+            rewardGems: 30,
+            unlocked: false,
+          ),
+        ],
+      );
 
   Future<void> pumpAchievements(WidgetTester tester) async {
     final GoRouter router = GoRouter(
