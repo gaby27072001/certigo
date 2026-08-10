@@ -19,6 +19,20 @@ plus la CI. Les protections existantes restent inchangées :
   `prod`, `beta`, `github-pages`) et leurs approbations ;
 - le chemin hébergé par GitHub est désactivé par défaut conformément à la politique EMU.
 
+## Capacité et stratégie de cycle de vie
+
+Chaque VM Linux est une `Standard_D4s_v5` qui exécute un seul job à la fois : deux VMs
+`online` offrent donc deux slots de CI concurrents. Il n'y a pas d'autoscaling. Une file
+d'attente persistante impose de démarrer les deux VMs ou de planifier une troisième
+reconstruction ; ne pas contourner ce signal en diminuant le niveau de redondance.
+
+La stratégie normale est **démarrer les deux VMs avant une session CI, attendre deux
+runners `online`, puis déallouer les deux VMs seulement quand tous sont `busy: false`**.
+Pendant une session, conserver les deux slots permet à l'un d'absorber une panne ou une
+maintenance de l'autre. Les commandes sont strictement opérateur dans
+[`docs/runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md) : l'IaC et les scripts locaux ne
+démarrent, n'arrêtent, ne déallouent ni ne détruisent aucune ressource live.
+
 ## Variables du dépôt
 
 Configurer dans **Settings > Secrets and variables > Actions > Variables** :
@@ -68,17 +82,24 @@ labels, la date et l'URL du drill décrit ci-dessous.
 
 ## Bootstrap idempotent des runners
 
-Le dépôt ne versionne pas les machines virtuelles runners elles-mêmes : le bootstrap
-reste donc une procédure opérateur. Pour éviter les dérives, appliquer toujours le
-bootstrap de façon **idempotente** sur chaque VM du pool (`vm-certigo-runner`,
-`vm-certigo-runner-2`) :
+Le dépôt versionne le modèle de reconstruction et le bootstrap, mais ne réconcilie jamais
+une VM runner active : le bootstrap reste donc une procédure opérateur. Pour éviter les
+dérives, appliquer toujours le bootstrap de façon **idempotente** sur chaque VM du pool
+(`vm-certigo-runner`, `vm-certigo-runner-2`) :
 
-1. installer ou vérifier les prérequis des workflows (`git`, `curl`, `jq`, `zip`,
-   `unzip`, `xz`, `python3`, `pip`, `node` 20+, `.NET` 8, Azure CLI, Flutter/Dart,
-   Java 17 + Android SDK si la VM porte aussi les releases Android) ;
+1. installer ou vérifier le socle versionné (`git`, `curl`, `jq`, `zip`, `unzip`, `xz`,
+   `sudo`, le binaire GitHub runner et Azure CLI) ; les SDK de workload (Node, .NET,
+   Flutter/Dart, Java/Android, Bicep) sont épinglés et provisionnés par les workflows ;
 2. vérifier que le service `actions.runner.*` existe et redémarre automatiquement ;
-3. réappliquer les labels communs `self-hosted`, `Linux`, `X64`, `certigo-ci` ;
+3. réappliquer le label personnalisé `certigo-ci` (GitHub ajoute `self-hosted`, `Linux` et
+   `X64`) ;
 4. tester la connectivité sortante via la NAT Gateway avant d'approuver une PR.
+
+Le compte de service `runner` n'a pas de privilège administrateur général. Son allow-list
+`sudo` est limitée à `apt-get update`, à l'installation exacte de `unzip zip jq xz-utils`
+requise par les workflows, et au redémarrage sans argument de son unique service runner.
+Toute installation hors liste, modification système ou réenregistrement est réalisée par le
+compte administrateur break-glass.
 
 Les commandes exactes de cycle de vie et de dépannage restent dans
 [`docs/runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md).
@@ -106,6 +127,13 @@ Points à vérifier :
 - NAT Gateway et association du sous-réseau intactes ;
 - espace disque suffisant sur chaque runner (conserver une marge opérationnelle pour
   Flutter, .NET, Android SDK et artefacts de build).
+
+La sonde `infra/ci-runner/health-probe.sh` est non destructive : elle teste les endpoints,
+les versions des commandes et l'espace disque, affiche son résumé, puis l'ajoute à
+`GITHUB_STEP_SUMMARY` lorsque cette variable est fournie. Elle retourne non-zéro en cas
+d'échec. La lancer avec `bash infra/ci-runner/health-probe.sh` depuis le runner après
+provisioning de ses SDK ; les tests locaux `test-health-probe.sh` emploient des commandes
+factices et n'appellent aucun service live.
 
 ## Vérification de checksum et de provenance
 
@@ -187,26 +215,27 @@ Ces opérations Azure/GitHub sont externes au commit. Toujours garder l'autre ru
 
 3. Attendre `Provisioning succeeded`, ouvrir une session privée (Bastion/VPN), attendre
    explicitement la fin de cloud-init, puis générer un jeton d'enregistrement valable une
-   heure dans une autre session et le saisir sans l'écrire sur disque ni dans
-   l'historique :
+   heure. Le flux ci-dessous le transmet par entrée standard : il ne l'écrit ni dans un
+   fichier, ni dans une variable d'environnement, ni dans l'historique de commandes.
+   Désactiver tout `set -x` avant de l'exécuter :
 
    ```bash
    sudo cloud-init status --wait
    sudo test -x /usr/local/sbin/certigo-runner-bootstrap
+
+   # Depuis le poste opérateur, via Bastion/VPN vers l'adresse privée de la VM :
    gh api --method POST \
      repos/gchambaud_microsoft/Certigo/actions/runners/registration-token \
-     --jq .token
-   # Sur la VM, saisir la valeur à l'invite :
-   read -rsp 'Ephemeral runner token: ' RUNNER_TOKEN; echo
-   sudo RUNNER_TOKEN="$RUNNER_TOKEN" \
-     RUNNER_NAME="$(hostname)" \
-     /usr/local/sbin/certigo-runner-bootstrap
-   unset RUNNER_TOKEN
+     --jq .token |
+     ssh <BREAK_GLASS_ADMIN>@<PRIVATE_VM_ADDRESS> \
+       'sudo /usr/local/sbin/certigo-runner-bootstrap --register --token-stdin'
    ```
 
-   Conserver la clé SSH privée dans le coffre break-glass approuvé pendant la vie du
-   runner, puis la détruire lors de sa suppression ou la renouveler immédiatement en cas
-   de compromission.
+   Le bootstrap lit le jeton une seule fois, le transmet à `config.sh`, puis l'efface de
+   son environnement. Ne pas employer `RUNNER_TOKEN=...`, `--token ...`, `tee`, un
+   redirecteur, un copier-coller dans un ticket ou un journal. Conserver la clé SSH privée
+   dans le coffre break-glass approuvé pendant la vie du runner, puis la détruire lors de
+   sa suppression ou la renouveler immédiatement en cas de compromission.
 
 4. Vérifier la configuration, puis lancer les probes :
 

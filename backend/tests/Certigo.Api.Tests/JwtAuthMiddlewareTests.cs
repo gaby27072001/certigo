@@ -14,6 +14,8 @@ public sealed class JwtAuthMiddlewareTests
 
     [Theory]
     [InlineData("/api/health")]
+    [InlineData("/api/health/live")]
+    [InlineData("/api/health/ready")]
     [InlineData("/api/auth/register")]
     [InlineData("/api/auth/login")]
     [InlineData("/api/auth/refresh")]

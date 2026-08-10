@@ -23,6 +23,19 @@ using '../main.bicep'
 param env = 'dev'
 param location = 'westeurope'
 param appName = 'certigo'
+param networkAccessMode = 'public-rbac'
+
+// Explicit periodic backup for disposable development data.
+param cosmosBackupMode = 'Periodic'
+param cosmosPeriodicBackupIntervalMinutes = 240
+param cosmosPeriodicBackupRetentionHours = 8
+param cosmosPeriodicBackupStorageRedundancy = 'Local'
+
+// Subscription-wide controls are owned by the production deployment.
+param deployMcsbPolicyAssignment = false
+param mcsbEnforcementMode = 'DoNotEnforce'
+param manageDefenderPlans = false
+param enableDefenderPlans = false
 
 // Cosmos DB deployed in northeurope — westeurope has AZ-capacity limits.
 param cosmosLocation = 'northeurope'

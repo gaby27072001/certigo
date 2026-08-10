@@ -50,7 +50,7 @@ param authJwtSigningKey string = ''
 @description('Maximum output tokens requested from the tutor LLM.')
 param tutorLlmMaxOutputTokens int = 400
 
-@description('Optional email notified on security alerts (401/403/5xx spikes). Empty = no receiver.')
+@description('Email notified on security and readiness alerts. Required outside dev.')
 param alertEmail string = ''
 
 @description('Data residency for the Azure Communication Services Email resource (e.g. Europe, United States).')
@@ -59,8 +59,15 @@ param emailDataLocation string = 'Europe'
 @description('Enable paid Microsoft Defender for Cloud plans (per-resource cost). Default false — only free CSPM stays on.')
 param enableDefenderPlans bool = false
 
-@description('Force-assign the subscription-scoped MCSB policy even in dev (needs Owner / role-assignment rights at subscription scope). Default false; staging/prod assign it automatically.')
-param forcePolicyAssignment bool = false
+@description('Manage subscription-wide Defender pricing. Requires Security Admin or equivalent and must have one IaC owner per subscription.')
+param manageDefenderPlans bool = false
+
+@description('Deploy the subscription-scoped MCSB policy assignment.')
+param deployMcsbPolicyAssignment bool = false
+
+@description('MCSB policy enforcement mode. Only audit-only DoNotEnforce is supported until remediation identities and exemptions are designed.')
+@allowed([ 'DoNotEnforce' ])
+param mcsbEnforcementMode string = 'DoNotEnforce'
 
 @description('Object (principal) id of the CI release runner managed identity. When set, it is granted read access (Key Vault Secrets User) to the Key Vault so the mobile release workflows can pull signing secrets — no signing secret in GitHub. Empty = skip (needs role-assignment rights to set).')
 param ciRunnerPrincipalId string = ''
@@ -68,8 +75,31 @@ param ciRunnerPrincipalId string = ''
 @description('When true, the security log-search alerts get a system-assigned identity + least-privilege Log Analytics Reader role on the workspace (most robust). Default false: creating that role assignment needs Microsoft.Authorization/roleAssignments/write at the workspace scope, which the deployer may lack — off keeps the deployment guaranteed to succeed. Turn on once the deployer has role-assignment rights.')
 param grantAlertReaderRole bool = false
 
-@description('Private-networking posture for the data resources (Storage, Cosmos DB, Key Vault). When true, their PUBLIC network endpoints are Disabled (and Storage/Key Vault network ACLs default to Deny), which assumes private endpoints + VNet integration are in place. Default false keeps the public endpoints Enabled so the Flex Consumption (FC1) Function App can reach Storage (deployment-package pull), Key Vault (secrets at startup) and Cosmos over the public endpoint via its managed identity. IMPORTANT: this flag is DECOUPLED from `hardened` on purpose — flipping it to true WITHOUT first provisioning private endpoints (Phase 2) takes the backend fully offline (503/timeout: the Function host cannot pull its package or read secrets). Security is unaffected either way: RBAC-only data access (Cosmos disableLocalAuth, Storage allowSharedKeyAccess=false, Key Vault RBAC) stays on regardless of this flag — only the public NETWORK filter is governed here.')
-param enablePrivateNetworking bool = false
+@description('Network posture. Only public-rbac is accepted until VNet integration, private endpoints and private DNS are delivered atomically.')
+@allowed([ 'public-rbac' ])
+param networkAccessMode string = 'public-rbac'
+
+@description('Explicit Cosmos backup mode.')
+@allowed([ 'Periodic', 'Continuous' ])
+param cosmosBackupMode string
+
+@description('Cosmos continuous backup retention tier.')
+@allowed([ 'Continuous7Days', 'Continuous30Days' ])
+param cosmosContinuousBackupTier string = 'Continuous7Days'
+
+@description('Cosmos periodic backup interval in minutes.')
+@minValue(60)
+@maxValue(1440)
+param cosmosPeriodicBackupIntervalMinutes int = 240
+
+@description('Cosmos periodic backup retention in hours.')
+@minValue(8)
+@maxValue(720)
+param cosmosPeriodicBackupRetentionHours int = 8
+
+@description('Cosmos periodic backup storage redundancy.')
+@allowed([ 'Local', 'Geo', 'Zone' ])
+param cosmosPeriodicBackupStorageRedundancy string = 'Geo'
 
 // Deterministic, collision-resistant suffix per environment/subscription.
 var suffix = uniqueString(subscription().id, appName, env)
@@ -93,9 +123,9 @@ var effectiveAuthJwtSigningKey = empty(authJwtSigningKey)
     ? fail('authJwtSigningKey must be supplied securely for staging and production deployments.')
     : guid(subscription().id, appName, env, 'auth-jwt-signing-key'))
   : authJwtSigningKey
-// Subscription-scoped MCSB policy needs Owner-level rights; skip it in dev so a
-// Contributor can run the dev smoke-test deploy without friction.
-var assignPolicy = forcePolicyAssignment || env != 'dev'
+var effectiveAlertEmail = env != 'dev' && empty(alertEmail)
+  ? fail('alertEmail is required for staging and production deployments.')
+  : alertEmail
 // Cosmos may live in a different region than the rest when the primary region
 // is capacity-constrained for Cosmos (cross-region Functions->Cosmos is fine).
 var cosmosRegion = empty(cosmosLocation) ? location : cosmosLocation
@@ -117,6 +147,7 @@ module monitoring 'modules/appInsights.bicep' = {
   params: {
     name: 'appi-${appName}-${env}'
     location: location
+    retentionInDays: hardened ? 90 : 30
     tags: tags
   }
 }
@@ -129,9 +160,12 @@ module data 'modules/cosmos.bicep' = {
     location: cosmosRegion
     databaseName: 'certigo'
     disableLocalAuth: hardened
-    enablePrivateNetworking: enablePrivateNetworking
-    // PITR (Continuous) for every non-dev env; dev stays Periodic (simplicity/cost).
-    enableContinuousBackup: hardened
+    networkAccessMode: networkAccessMode
+    backupMode: cosmosBackupMode
+    continuousBackupTier: cosmosContinuousBackupTier
+    periodicBackupIntervalMinutes: cosmosPeriodicBackupIntervalMinutes
+    periodicBackupRetentionHours: cosmosPeriodicBackupRetentionHours
+    periodicBackupStorageRedundancy: cosmosPeriodicBackupStorageRedundancy
     tags: tags
   }
 }
@@ -147,13 +181,7 @@ module storage 'modules/storage.bicep' = {
     enableVersioning: hardened
     blobSoftDeleteDays: hardened ? 30 : 7
     containerSoftDeleteDays: hardened ? 30 : 7
-    // Public network access is governed by enablePrivateNetworking (default false =>
-    // Enabled), NOT by `hardened`. The Flex Consumption Function App pulls its deployment
-    // package (app-package container) over the public endpoint via its managed identity, so
-    // the endpoint MUST stay reachable until private endpoints exist (Phase 2). Locking it
-    // down previously caused a 403 (InaccessibleStorageException) on the package pull.
-    // RBAC-only access is enforced independently (allowSharedKeyAccess=false in storage.bicep).
-    enablePrivateNetworking: enablePrivateNetworking
+    networkAccessMode: networkAccessMode
     tags: tags
   }
 }
@@ -170,7 +198,7 @@ module vault 'modules/keyvault.bicep' = {
     location: location
     enablePurgeProtection: hardened
     softDeleteRetentionInDays: hardened ? 90 : 7
-    enablePrivateNetworking: enablePrivateNetworking
+    networkAccessMode: networkAccessMode
     jwtSigningKey: effectiveAuthJwtSigningKey
     tags: tags
   }
@@ -198,6 +226,7 @@ module api 'modules/functionApp.bicep' = {
     storageAccountName: storage.outputs.accountName
     deploymentContainerName: storage.outputs.deploymentContainerName
     appInsightsConnectionString: monitoring.outputs.connectionString
+    appInsightsName: monitoring.outputs.name
     cosmosEndpoint: data.outputs.endpoint
     cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
@@ -250,9 +279,10 @@ module diagnostics 'modules/diagnostics.bicep' = if (env != 'dev') {
     functionAppName: api.outputs.functionAppName
     cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
+    storageAccountName: storage.outputs.accountName
     workspaceId: monitoring.outputs.workspaceId
     location: location
-    alertEmail: alertEmail
+    alertEmail: effectiveAlertEmail
     grantAlertReaderRole: grantAlertReaderRole
     tags: tags
   }
@@ -264,14 +294,16 @@ module defender 'modules/defender.bicep' = {
   name: 'defender'
   params: {
     enablePaidPlans: enableDefenderPlans
+    managePlans: manageDefenderPlans
   }
 }
 
 // Continuous compliance: MCSB initiative in audit-only mode (subscription scope).
-module policy 'modules/policy.bicep' = if (assignPolicy) {
+module policy 'modules/policy.bicep' = if (deployMcsbPolicyAssignment) {
   name: 'policy'
   params: {
     assignmentLocation: location
+    enforcementMode: mcsbEnforcementMode
   }
 }
 
@@ -294,3 +326,5 @@ output functionAppHostName string = api.outputs.defaultHostName
 output cosmosEndpoint string = data.outputs.endpoint
 output storageAccount string = storage.outputs.accountName
 output keyVaultName string = vault.outputs.name
+output networkAccessMode string = networkAccessMode
+output cosmosBackupMode string = cosmosBackupMode

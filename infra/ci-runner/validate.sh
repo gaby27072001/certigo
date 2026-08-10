@@ -28,6 +28,29 @@ if [[ "${declared_bootstrap_sha}" != "${actual_bootstrap_sha}" ]]; then
 fi
 
 grep -F "toLower(imageVersion) == 'latest'" "${runner_bicep}" >/dev/null
+grep -F "type: 'SystemAssigned'" "${runner_bicep}" >/dev/null
+grep -F "disablePasswordAuthentication: true" "${runner_bicep}" >/dev/null
+if grep -Fq "publicIPAddress" "${runner_bicep}"; then
+  echo "A runner NIC must not declare a public IP address." >&2
+  exit 1
+fi
+
+if grep -Fq "NOPASSWD:ALL" "${bootstrap}"; then
+  echo "The runner account must not receive unrestricted passwordless sudo." >&2
+  exit 1
+fi
+grep -F 'NOPASSWD: /usr/local/sbin/certigo-runner-restart' "${bootstrap}" >/dev/null
+grep -F '/usr/bin/apt-get update' "${bootstrap}" >/dev/null
+grep -F '/usr/bin/apt-get install -y unzip zip jq xz-utils' "${bootstrap}" >/dev/null
+grep -F 'env_keep += "DEBIAN_FRONTEND"' "${bootstrap}" >/dev/null
+grep -F 'read -r -s -p "Ephemeral GitHub runner registration token: " RUNNER_TOKEN' "${bootstrap}" >/dev/null
+grep -F '"--register" || "$2" != "--token-stdin"' "${bootstrap}" >/dev/null
+grep -F 'trap '\''unset RUNNER_TOKEN'\'' EXIT' "${bootstrap}" >/dev/null
+if sed -n '/^cat > \/etc\/certigo-runner-bootstrap\.env <<EOF$/,/^EOF$/p' "${bootstrap}" |
+  grep -Fq "RUNNER_TOKEN"; then
+  echo "The registration token must not be persisted in the bootstrap environment file." >&2
+  exit 1
+fi
 
 for endpoint in api.github.com api.nuget.org pub.dev registry.npmjs.org management.azure.com; do
   grep -F "${endpoint}" "${health}" >/dev/null

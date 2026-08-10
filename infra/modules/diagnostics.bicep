@@ -19,14 +19,18 @@ param cosmosAccountName string
 @description('Key Vault name — secret AuditEvent logs.')
 param keyVaultName string
 
+@description('Storage account name — host and deployment storage logs.')
+param storageAccountName string
+
 @description('Log Analytics workspace resource id to send diagnostics to and to scope the log-search alerts on.')
 param workspaceId string
 
 @description('Azure region for the log-search alert rules — must match the workspace region (both are created in the same primary location).')
 param location string
 
-@description('Optional email address notified on security alerts. Empty disables the receiver AND leaves the alerts action-less (still no deployment failure).')
-param alertEmail string = ''
+@description('Required email address notified on security and readiness alerts.')
+@minLength(3)
+param alertEmail string
 
 @description('When true, each log-search alert gets a system-assigned identity granted the least-privilege Log Analytics Reader role on the workspace (most robust: the rule no longer inherits the last editor\'s permissions). Default false because creating the role assignment requires Microsoft.Authorization/roleAssignments/write at the workspace scope, which the deploying principal may not have — keeping it off guarantees the deployment succeeds. Turn on once the deployer has role-assignment rights.')
 param grantAlertReaderRole bool = false
@@ -43,6 +47,25 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' existing = {
 
 resource vault 'Microsoft.KeyVault/vaults@2024-04-01-preview' existing = {
   name: keyVaultName
+}
+
+resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
+  name: storageAccountName
+}
+
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2024-01-01' existing = {
+  parent: storage
+  name: 'default'
+}
+
+resource queueService 'Microsoft.Storage/storageAccounts/queueServices@2024-01-01' existing = {
+  parent: storage
+  name: 'default'
+}
+
+resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2024-01-01' existing = {
+  parent: storage
+  name: 'default'
 }
 
 // The Log Analytics workspace, referenced (not created) so the alerts can scope
@@ -88,11 +111,48 @@ resource vaultDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = 
   }
 }
 
+resource storageDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  scope: storage
+  name: 'security-to-law'
+  properties: {
+    workspaceId: workspaceId
+    metrics: [ { category: 'Transaction', enabled: true } ]
+  }
+}
+
+resource blobServiceDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  scope: blobService
+  name: 'security-to-law'
+  properties: {
+    workspaceId: workspaceId
+    logs: [ { categoryGroup: 'allLogs', enabled: true } ]
+    metrics: [ { category: 'Transaction', enabled: true } ]
+  }
+}
+
+resource queueServiceDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  scope: queueService
+  name: 'security-to-law'
+  properties: {
+    workspaceId: workspaceId
+    logs: [ { categoryGroup: 'allLogs', enabled: true } ]
+    metrics: [ { category: 'Transaction', enabled: true } ]
+  }
+}
+
+resource tableServiceDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  scope: tableService
+  name: 'security-to-law'
+  properties: {
+    workspaceId: workspaceId
+    logs: [ { categoryGroup: 'allLogs', enabled: true } ]
+    metrics: [ { category: 'Transaction', enabled: true } ]
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Action group (email) + log-search alerts on authn/authz failure & 5xx spikes
 // ---------------------------------------------------------------------------
-var hasEmail = !empty(alertEmail)
-
 resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
   name: 'ag-certigo-security'
   location: 'global'
@@ -100,13 +160,13 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
   properties: {
     groupShortName: 'mlsec'
     enabled: true
-    emailReceivers: hasEmail ? [
+    emailReceivers: [
       {
         name: 'secops'
         emailAddress: alertEmail
         useCommonAlertSchema: true
       }
-    ] : []
+    ]
   }
 }
 
@@ -123,6 +183,13 @@ var logAlerts = [
     threshold: 25
     severity: 2
     desc: 'Spike of 401 Unauthorized responses — possible credential probing / token abuse.'
+  }
+  {
+    name: 'readiness-failure'
+    query: 'AppRequests | where Url endswith "/api/health/ready" and ResultCode != "200"'
+    threshold: 0
+    severity: 1
+    desc: 'Readiness endpoint is failing; inspect dependency checks for Cosmos, Storage and Key Vault.'
   }
   {
     name: 'http403-spike'
@@ -175,11 +242,8 @@ resource httpAlerts 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = [ for 
         }
       ]
     }
-    // Attach the email action group only when an email is configured; otherwise
-    // no action (the rule still evaluates, it just notifies nobody). Either way
-    // the deployment never fails on an empty alertEmail.
     actions: {
-      actionGroups: hasEmail ? [ actionGroup.id ] : []
+      actionGroups: [ actionGroup.id ]
     }
   }
 }]
