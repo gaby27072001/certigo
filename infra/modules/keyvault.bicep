@@ -14,8 +14,9 @@ param enablePurgeProtection bool = false
 @maxValue(90)
 param softDeleteRetentionInDays int = 7
 
-@description('Private-networking posture. When true, the Key Vault public network endpoint is Disabled and the network ACL default action is Deny (assumes private endpoints exist — Phase 2). Default false keeps public access Enabled + default action Allow so the Function App managed identity can read secrets at startup. Decoupled from data hardening: RBAC authorization (enableRbacAuthorization=true) is enforced independently.')
-param enablePrivateNetworking bool = false
+@description('Network posture. Only public-rbac is supported until VNet integration, private endpoints and private DNS are deployed together.')
+@allowed([ 'public-rbac' ])
+param networkAccessMode string = 'public-rbac'
 
 @description('Email/password JWT signing key, stored as a Key Vault secret. The Function App reads it via a KV reference (@Microsoft.KeyVault). @secure: never logged.')
 @secure()
@@ -36,10 +37,10 @@ resource vault 'Microsoft.KeyVault/vaults@2024-04-01-preview' = {
     softDeleteRetentionInDays: softDeleteRetentionInDays
     // Null (not false) when disabled: ARM rejects an explicit `false`.
     enablePurgeProtection: enablePurgeProtection ? true : null
-    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
+    publicNetworkAccess: 'Enabled'
     networkAcls: {
       bypass: 'AzureServices'
-      defaultAction: enablePrivateNetworking ? 'Deny' : 'Allow'
+      defaultAction: 'Allow'
     }
   }
 }
@@ -60,3 +61,4 @@ resource jwtSecret 'Microsoft.KeyVault/vaults/secrets@2024-04-01-preview' = {
 
 @description('Versionless URI of the JWT signing secret, for the Function App KV reference.')
 output jwtSecretUri string = jwtSecret.properties.secretUri
+output networkAccessMode string = networkAccessMode

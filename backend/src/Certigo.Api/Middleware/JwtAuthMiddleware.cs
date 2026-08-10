@@ -12,6 +12,8 @@ public sealed class JwtAuthMiddleware(ITokenValidator tokenValidator) : IFunctio
     private static readonly HashSet<string> AnonymousPaths = new(StringComparer.OrdinalIgnoreCase)
     {
         "/api/health",
+        "/api/health/live",
+        "/api/health/ready",
         "/api/auth/register",
         "/api/auth/login",
         "/api/auth/refresh",

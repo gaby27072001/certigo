@@ -53,7 +53,41 @@ var host = new HostBuilder()
         services.AddSingleton(sp => new CosmosContext(
             sp.GetRequiredService<CosmosClient>(),
             configuration["COSMOS_DATABASE"] ?? CosmosContainers.DatabaseName));
-        services.AddSingleton<IHealthProbe, CosmosHealthProbe>();
+        services.AddHttpClient("HealthProbe", client => client.Timeout = Timeout.InfiniteTimeSpan);
+        services.AddSingleton<IHealthProbe>(sp =>
+        {
+            var blobEndpoint = configuration["BLOB_ENDPOINT"]
+                ?? throw new InvalidOperationException("BLOB_ENDPOINT is required.");
+            var deploymentContainerName = configuration["DEPLOYMENT_CONTAINER_NAME"]
+                ?? throw new InvalidOperationException("DEPLOYMENT_CONTAINER_NAME is required.");
+            var keyVaultUri = configuration["KeyVault__Uri"]
+                ?? throw new InvalidOperationException("KeyVault__Uri is required.");
+            var keyVaultHealthSecretName = configuration["KeyVault__HealthSecretName"]
+                ?? "AUTH-JWT-SIGNING-KEY";
+            var defaultCredential = sp.GetRequiredService<TokenCredential>();
+            var platformClientId = configuration["HEALTH_PLATFORM_CLIENT_ID"];
+            TokenCredential storageCredential = string.IsNullOrWhiteSpace(platformClientId)
+                ? defaultCredential
+                : new ManagedIdentityCredential(
+                    ManagedIdentityId.FromUserAssignedClientId(platformClientId));
+            var timeoutSeconds = int.TryParse(
+                configuration["HEALTH_PROBE_TIMEOUT_SECONDS"],
+                out var configuredTimeoutSeconds)
+                && configuredTimeoutSeconds > 0
+                ? configuredTimeoutSeconds
+                : 5;
+
+            return new AzureDependencyHealthProbe(
+                sp.GetRequiredService<CosmosContext>(),
+                storageCredential,
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient("HealthProbe"),
+                new Uri(blobEndpoint, UriKind.Absolute),
+                deploymentContainerName,
+                new Uri(keyVaultUri, UriKind.Absolute),
+                keyVaultHealthSecretName,
+                TimeSpan.FromSeconds(timeoutSeconds),
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AzureDependencyHealthProbe>>());
+        });
 
         // Locally-issued JWT settings shared by the issuer and the local validator.
         // The signing key is mandatory in a hardened environment (Production or

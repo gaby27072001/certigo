@@ -214,7 +214,7 @@ modules. `params/dev.bicepparam` porte les valeurs d'environnement.
 | `storage.bicep` | StorageV2 + container `lesson-assets` |
 | `appInsights.bicep` | Application Insights *workspace-based* |
 | `keyvault.bicep` | Key Vault (modèle RBAC) |
-| `functionApp.bicep` | plan Y1 Linux, `dotnet-isolated` 8.0, *managed identity*, rôle *Key Vault Secrets User*, app settings |
+| `functionApp.bicep` | plan FC1 Linux, `dotnet-isolated` 8.0, identité système Cosmos et identité utilisateur préprovisionnée pour stockage/KV/App Insights |
 
 ---
 
