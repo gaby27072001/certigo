@@ -25,6 +25,78 @@ const validateLesson = ajv.compile(readJson('content/schema/lesson.schema.json')
 
 const errors = [];
 const fail = (file, msg) => errors.push(`✗ ${path.relative(root, file)}: ${msg}`);
+const catalog = [];
+
+export function validateCatalogMembership(entries) {
+  const integrityErrors = [];
+  const lessonOwners = new Map();
+  const itemOwners = new Map();
+  const add = (file, message) => integrityErrors.push({ file, message });
+
+  for (const { trackFile, track, lessons } of entries) {
+    const lessonsById = new Map();
+    for (const { file, lesson } of lessons) {
+      const lessonKey = lesson.id.toLowerCase();
+      const priorLesson = lessonOwners.get(lessonKey);
+      if (priorLesson) {
+        add(file, `DUPLICATE_LESSON_ID: lesson "${lesson.id}" is also declared in ${priorLesson}`);
+      } else {
+        lessonOwners.set(lessonKey, file);
+      }
+      if (lessonsById.has(lessonKey)) {
+        add(file, `DUPLICATE_LESSON_ID: lesson "${lesson.id}" is declared more than once in track "${track.id}"`);
+      } else {
+        lessonsById.set(lessonKey, { file, lesson });
+      }
+
+      for (const block of lesson.blocks) {
+        const item = block.check;
+        if (!item) continue;
+        const itemKey = item.id.toLowerCase();
+        const priorItem = itemOwners.get(itemKey);
+        if (priorItem) {
+          add(file, `DUPLICATE_ITEM_ID: item "${item.id}" is also declared in ${priorItem}`);
+        } else {
+          itemOwners.set(itemKey, file);
+        }
+      }
+    }
+
+    const references = new Map();
+    for (const unit of track.units) {
+      for (const lessonId of unit.lessons) {
+        const lessonKey = lessonId.toLowerCase();
+        references.set(lessonKey, (references.get(lessonKey) ?? 0) + 1);
+        const entry = lessonsById.get(lessonKey);
+        if (!entry) {
+          add(trackFile, `unit ${unit.id} references missing lesson "${lessonId}"`);
+          continue;
+        }
+        if (entry.lesson.id !== lessonId) {
+          add(trackFile, `unit ${unit.id} must reference lesson id "${entry.lesson.id}" with exact casing`);
+        }
+        if (entry.lesson.unitId !== unit.id) {
+          add(trackFile, `lesson ${lessonId}.unitId "${entry.lesson.unitId}" != unit "${unit.id}"`);
+        }
+        if (entry.lesson.domainId !== unit.domainId) {
+          add(trackFile, `lesson ${lessonId}.domainId "${entry.lesson.domainId}" != unit domain "${unit.domainId}"`);
+        }
+      }
+    }
+
+    for (const [lessonKey, entry] of lessonsById) {
+      const count = references.get(lessonKey) ?? 0;
+      if (count !== 1) {
+        add(
+          entry.file,
+          `lesson "${entry.lesson.id}" must belong to exactly one track unit (found ${count} references)`,
+        );
+      }
+    }
+  }
+
+  return integrityErrors;
+}
 
 const trackFiles = globSync('content/*/track.yaml', { cwd: root, absolute: true });
 if (trackFiles.length === 0) fail('content', 'no track.yaml found');
@@ -44,9 +116,7 @@ for (const trackFile of trackFiles) {
 
   const domainIds = new Set(track.domains.map((d) => d.id));
 
-  // Load lessons and index by id.
-  const lessonsById = new Map();
-  const seenItemIds = new Set();
+  const lessons = [];
   for (const lf of globSync('lessons/*.lesson.yaml', { cwd: trackDir, absolute: true })) {
     const lesson = readYaml(lf);
     if (!validateLesson(lesson)) {
@@ -55,7 +125,7 @@ for (const trackFile of trackFiles) {
     }
     if (lesson.trackId !== track.id) fail(lf, `trackId "${lesson.trackId}" != "${track.id}"`);
     if (!domainIds.has(lesson.domainId)) fail(lf, `unknown domainId "${lesson.domainId}"`);
-    lessonsById.set(lesson.id, lesson);
+    lessons.push({ file: lf, lesson });
 
     // Quiz-item integrity. The schema checks shape; these checks catch authoring
     // mistakes the schema can't — a `correct` answer that points at a non-existent
@@ -64,10 +134,6 @@ for (const trackFile of trackFiles) {
     for (const block of lesson.blocks) {
       const item = block.check;
       if (!item) continue;
-      if (seenItemIds.has(item.id)) {
-        fail(lf, `DUPLICATE_ITEM_ID: item "${item.id}" is not unique within the track`);
-      }
-      seenItemIds.add(item.id);
       const optionIds = item.options.map((o) => o.id);
       const optionIdSet = new Set(optionIds);
       if (optionIdSet.size !== optionIds.length) {
@@ -95,18 +161,15 @@ for (const trackFile of trackFiles) {
     }
   }
 
-  // Every lesson referenced by a unit must exist and map to the unit's domain.
   for (const unit of track.units) {
     if (!domainIds.has(unit.domainId)) fail(trackFile, `unit ${unit.id}: unknown domainId`);
-    for (const lessonId of unit.lessons) {
-      const lesson = lessonsById.get(lessonId);
-      if (!lesson) {
-        fail(trackFile, `unit ${unit.id} references missing lesson "${lessonId}"`);
-      } else if (lesson.unitId !== unit.id) {
-        fail(trackFile, `lesson ${lessonId}.unitId "${lesson.unitId}" != unit "${unit.id}"`);
-      }
-    }
   }
+
+  catalog.push({ trackFile, track, lessons });
+}
+
+for (const integrityError of validateCatalogMembership(catalog)) {
+  fail(integrityError.file, integrityError.message);
 }
 
 if (errors.length > 0) {

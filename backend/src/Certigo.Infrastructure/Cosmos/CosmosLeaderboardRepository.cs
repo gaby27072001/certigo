@@ -35,9 +35,14 @@ public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeader
         return new LeagueDto(periodLeagueId, Tier, period.EndsAt, PromoteCount, userId, entries);
     }
 
-    public async Task AddXpAsync(string userId, int xp, CancellationToken cancellationToken = default)
+    public async Task AddXpAsync(
+        string userId,
+        int xp,
+        string operationId,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken = default)
     {
-        var periodLeagueId = LeaguePeriods.ForInstant(DateTimeOffset.UtcNow).Compose(Tier);
+        var periodLeagueId = LeaguePeriods.ForInstant(occurredAt).Compose(Tier);
         var id = $"{periodLeagueId}:{userId}";
         var profile = await context.Users.ReadOrDefaultAsync<UserProfileDto>(userId, new PartitionKey(userId), cancellationToken);
         var displayName = profile?.DisplayName ?? userId;
@@ -47,11 +52,28 @@ public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeader
         for (var attempt = 1; attempt <= 3; attempt++)
         {
             var existing = await context.Leaderboard.ReadOrDefaultAsync<LeaderboardEntryDocument>(id, partitionKey, cancellationToken);
-            var updated = (existing ?? new LeaderboardEntryDocument(id, periodLeagueId, userId, displayName, avatarUrl, 0)) with
+            if (existing?.AppliedOperationIds?.Contains(operationId, StringComparer.Ordinal) == true)
+            {
+                return;
+            }
+
+            var appliedOperationIds = existing?.AppliedOperationIds is null
+                ? new List<string>()
+                : new List<string>(existing.AppliedOperationIds);
+            appliedOperationIds.Add(operationId);
+            var updated = (existing ?? new LeaderboardEntryDocument(
+                id,
+                periodLeagueId,
+                userId,
+                displayName,
+                avatarUrl,
+                0,
+                null)) with
             {
                 DisplayName = displayName,
                 AvatarUrl = avatarUrl,
-                Xp = (existing?.Xp ?? 0) + xp
+                Xp = (existing?.Xp ?? 0) + xp,
+                AppliedOperationIds = appliedOperationIds,
             };
 
             try
@@ -81,7 +103,14 @@ public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeader
         throw new ConcurrencyConflictException($"Leaderboard entry '{id}' was modified concurrently.");
     }
 
-    private sealed record LeaderboardEntryDocument(string Id, string PeriodLeagueId, string UserId, string DisplayName, string? AvatarUrl, int Xp)
+    private sealed record LeaderboardEntryDocument(
+        string Id,
+        string PeriodLeagueId,
+        string UserId,
+        string DisplayName,
+        string? AvatarUrl,
+        int Xp,
+        List<string>? AppliedOperationIds)
     {
         [JsonPropertyName("_etag")]
         public string? ETag { get; init; }

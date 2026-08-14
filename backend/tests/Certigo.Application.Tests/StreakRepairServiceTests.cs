@@ -17,7 +17,13 @@ public sealed class StreakRepairServiceTests
         var purchases = new InMemoryPurchaseRepository();
         var events = new InMemoryEventRepository();
         var context = new FakeUserContext(UserId, "Tester");
-        var service = new StreakRepairService(context, new FakeClock(Now), users, purchases, events);
+        var service = new StreakRepairService(
+            context,
+            new FakeClock(Now),
+            users,
+            purchases,
+            events,
+            new InMemoryEconomyOperationRepository());
         return (service, users, purchases, events);
     }
 
@@ -62,7 +68,13 @@ public sealed class StreakRepairServiceTests
         var users = new ConflictOnceUserRepository(inner);
         var purchases = new InMemoryPurchaseRepository();
         var events = new InMemoryEventRepository();
-        var service = new StreakRepairService(new FakeUserContext(UserId, "Tester"), new FakeClock(Now), users, purchases, events);
+        var service = new StreakRepairService(
+            new FakeUserContext(UserId, "Tester"),
+            new FakeClock(Now),
+            users,
+            purchases,
+            events,
+            new InMemoryEconomyOperationRepository());
 
         var result = await service.RepairAsync(new StreakRepairRequest("r1"));
 
@@ -71,8 +83,14 @@ public sealed class StreakRepairServiceTests
         var profile = await inner.GetAsync(UserId);
         profile!.Gems.Should().Be(50); // debited exactly once (100 - 50)
         profile.LastActiveDate.Should().Be(Today.AddDays(-1)); // bridged
+        result.GemsBalance.Should().Be(profile.Gems);
+        result.LastActiveDate.Should().Be(profile.LastActiveDate);
         purchases.CreateCount.Should().Be(1); // ledger written once
+        (await purchases.GetByClientPurchaseIdAsync(UserId, "r1"))!.Result.GemsBalance
+            .Should().Be(result.GemsBalance);
         events.Events.Count(e => e.Type == "streak.repaired").Should().Be(1);
+        events.Events.Single(e => e.Type == "streak.repaired").Payload
+            .Should().BeEquivalentTo(result);
     }
 
     [Fact]

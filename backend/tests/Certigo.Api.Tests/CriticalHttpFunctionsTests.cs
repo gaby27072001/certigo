@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using FluentAssertions;
 using Certigo.Api.Functions;
 using Certigo.Api.Http;
@@ -111,6 +112,20 @@ public sealed class CriticalHttpFunctionsTests
     public async Task Register_accepts_an_anonymous_request_and_returns_created()
     {
         var expected = AuthResult("alice@example.com");
+        expected = expected with
+        {
+            Profile = expected.Profile with
+            {
+                EconomyReceipts =
+                [
+                    new EconomyProfileReceipt(
+                        "operation::quiz::internal",
+                        DateTimeOffset.UtcNow,
+                        "{\"xpEarned\":10}"),
+                ],
+                AppliedEconomyOperations = ["operation::quiz::legacy"],
+            },
+        };
         var service = new FakeAuthService { RegisterResult = expected };
         var function = new AuthFunctions(service);
         var context = new TestFunctionContext();
@@ -125,7 +140,12 @@ public sealed class CriticalHttpFunctionsTests
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         service.RegisterCalls.Should().ContainSingle();
         service.RegisterCalls[0].Email.Should().Be("alice@example.com");
-        var payload = await response.ReadJsonAsync<AuthResultDto>();
+        var rawPayload = await response.ReadBodyAsStringAsync();
+        rawPayload.Should().NotContain("economyReceipts");
+        rawPayload.Should().NotContain("appliedEconomyOperations");
+        var payload = JsonSerializer.Deserialize<AuthResultDto>(
+            rawPayload,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         payload.AccessToken.Should().Be(expected.AccessToken);
         payload.Profile.DisplayName.Should().Be("Alice");
     }

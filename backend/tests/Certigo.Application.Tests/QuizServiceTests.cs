@@ -1,8 +1,11 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using FluentAssertions;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
 using Certigo.Application.Services;
 using Certigo.Domain.Content;
+using Certigo.Domain.Progress;
 using Xunit;
 
 namespace Certigo.Application.Tests;
@@ -15,6 +18,7 @@ internal sealed class QuizServiceHarness
     public InMemoryEventRepository Events { get; } = new();
     public InMemoryAttemptRepository Attempts { get; } = new();
     public InMemoryLearnerModelRepository LearnerModels { get; } = new();
+    public InMemoryEconomyOperationRepository EconomyOperations { get; } = new();
     public FakeClock Clock { get; } = new(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
     public string UserId { get; } = "user-1";
 
@@ -22,7 +26,17 @@ internal sealed class QuizServiceHarness
     {
         var content = TestContent.Build();
         var context = new FakeUserContext(UserId, "Tester");
-        return new QuizService(context, Clock, content, Progress, Attempts, Events, Users, Leaderboard, LearnerModels);
+        return new QuizService(
+            context,
+            Clock,
+            content,
+            Progress,
+            Attempts,
+            Events,
+            Users,
+            Leaderboard,
+            LearnerModels,
+            EconomyOperations);
     }
 
     public static SubmitQuizRequest Request(string attemptId, params AnswerDto[] answers)
@@ -99,6 +113,403 @@ public sealed class QuizServiceTests
         var profile = await h.Users.GetAsync(h.UserId);
         profile!.Xp.Should().Be(first.Rewards.XpEarned); // not doubled
         h.Leaderboard.Xp[h.UserId].Should().Be(first.Rewards.XpEarned);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_returns_legacy_attempt_without_reapplying_rewards()
+    {
+        var h = new QuizServiceHarness();
+        var result = new SubmitQuizResult(
+            "legacy-result",
+            100,
+            new List<ItemResultDto>(),
+            new RewardsDto(10, 10, false, false, 6, new List<string>()),
+            new List<string>(),
+            null);
+        h.Users.Seed(TestContent.NewProfile(h.UserId) with { Xp = 10, Gems = 6 });
+        h.Attempts.Seed(new AttemptRecord(
+            "attempt::legacy",
+            h.UserId,
+            "legacy",
+            TestContent.TrackId,
+            "l1",
+            h.Clock.UtcNow.AddMinutes(-1),
+            h.Clock.UtcNow,
+            result));
+
+        var replay = await h.Build().SubmitAsync(
+            "l1",
+            QuizServiceHarness.Request("legacy", QuizServiceHarness.Answer("l1-i1", "a")));
+
+        replay.Should().BeEquivalentTo(result);
+        var profile = await h.Users.GetAsync(h.UserId);
+        profile!.Xp.Should().Be(10);
+        profile.Gems.Should().Be(6);
+        h.Leaderboard.Xp.Should().BeEmpty();
+        (await h.EconomyOperations.GetAsync(
+            h.UserId,
+            EconomyOperationRecord.IdFor("quiz", "legacy"))).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SubmitAsync_reconciles_after_event_failure_without_double_rewards()
+    {
+        var users = new InMemoryUserRepository();
+        users.Seed(TestContent.NewProfile("user-1"));
+        var events = new InMemoryEventRepository();
+        var leaderboard = new InMemoryLeaderboardRepository();
+        var operations = new InMemoryEconomyOperationRepository();
+        var service = new QuizService(
+            new FakeUserContext("user-1", "Tester"),
+            new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero)),
+            TestContent.Build(),
+            new InMemoryProgressRepository(),
+            new InMemoryAttemptRepository(),
+            new FailOnceEventRepository(events),
+            users,
+            leaderboard,
+            new InMemoryLearnerModelRepository(),
+            operations);
+        var request = QuizServiceHarness.Request(
+            "event-retry",
+            QuizServiceHarness.Answer("l1-i1", "a"));
+
+        var first = () => service.SubmitAsync("l1", request);
+        await first.Should().ThrowAsync<InvalidOperationException>();
+        var afterFailure = await users.GetAsync("user-1");
+        var result = await service.SubmitAsync("l1", request);
+        var afterRetry = await users.GetAsync("user-1");
+
+        afterRetry!.Xp.Should().Be(afterFailure!.Xp);
+        afterRetry.Gems.Should().Be(afterFailure.Gems);
+        afterRetry.Xp.Should().Be(result.Rewards.XpEarned);
+        leaderboard.Xp["user-1"].Should().Be(result.Rewards.XpEarned);
+        events.Events.Count(e => e.Type == "quiz.submitted").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_reconciliation_preserves_newer_periods_and_progress()
+    {
+        var users = new InMemoryUserRepository();
+        users.Seed(TestContent.NewProfile("user-1") with { LifetimePerfectLessons = 3 });
+        var progress = new InMemoryProgressRepository();
+        var operations = new InMemoryEconomyOperationRepository();
+        var attempts = new InMemoryAttemptRepository();
+        var events = new InMemoryEventRepository();
+        var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
+        var service = new QuizService(
+            new FakeUserContext("user-1", "Tester"),
+            clock,
+            TestContent.Build(),
+            progress,
+            attempts,
+            events,
+            users,
+            new InMemoryLeaderboardRepository(),
+            new InMemoryLearnerModelRepository(),
+            new MutateOnceOnEconomyCreateRepository(
+                operations,
+                () =>
+                {
+                    users.ForceConcurrentWrite("user-1", profile => profile with
+                    {
+                        DailyXpDate = new DateOnly(2025, 1, 7),
+                        DailyXpEarned = 77,
+                        DailyLessonsCompleted = 7,
+                        DailyCorrectAnswers = 7,
+                        DailyPerfectLessons = 7,
+                        LastActiveDate = new DateOnly(2025, 1, 7),
+                        MonthlyAnchor = new DateOnly(2025, 2, 1),
+                        MonthlyXpEarned = 88,
+                        MonthlyLessonsCompleted = 8,
+                        MonthlyPerfectLessons = 8,
+                        LifetimePerfectLessons = 4,
+                    });
+                    progress.Seed(
+                        "user-1",
+                        new ConceptMastery(
+                            "user-1",
+                            TestContent.TrackId,
+                            "c1",
+                            0.9,
+                            10,
+                            3,
+                            clock.UtcNow.AddDays(2),
+                            10,
+                            0,
+                            clock.UtcNow.AddDays(1)));
+                }));
+
+        var result = await service.SubmitAsync(
+            "l1",
+            QuizServiceHarness.Request("delayed", QuizServiceHarness.Answer("l1-i1", "a")));
+
+        result.Rewards.AchievementsUnlocked.Should().ContainSingle().Which.Should().Be("flawless-5");
+        var profile = await users.GetAsync("user-1");
+        profile!.DailyXpDate.Should().Be(new DateOnly(2025, 1, 7));
+        profile.DailyXpEarned.Should().Be(77);
+        profile.DailyLessonsCompleted.Should().Be(7);
+        profile.MonthlyAnchor.Should().Be(new DateOnly(2025, 2, 1));
+        profile.MonthlyXpEarned.Should().Be(88);
+        profile.LifetimePerfectLessons.Should().Be(5);
+        profile.Achievements.Should().Contain("flawless-5");
+        var receipt = profile.EconomyReceipts.Should().ContainSingle().Subject;
+        receipt.OutcomeJson.Should().NotContain("results");
+        JsonSerializer.Deserialize<RewardsDto>(
+            receipt.OutcomeJson,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            .Should().BeEquivalentTo(result.Rewards);
+        var storedAttempt = await attempts.GetByClientAttemptIdAsync("user-1", "delayed");
+        storedAttempt!.Result.Should().BeEquivalentTo(result);
+        var submittedEvent = events.Events.Single(candidate => candidate.Type == "quiz.submitted");
+        submittedEvent.Payload.Should().BeEquivalentTo(result);
+        var operation = await operations.GetAsync(
+            "user-1",
+            EconomyOperationRecord.IdFor("quiz", "delayed"));
+        JsonSerializer.Deserialize<SubmitQuizResult>(
+            operation!.OutcomeJson!,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            .Should().BeEquivalentTo(result);
+        var mastery = await progress.GetMasteryAsync("user-1", TestContent.TrackId, "c1");
+        mastery!.Reps.Should().Be(10);
+        mastery.LastReviewedAt.Should().Be(clock.UtcNow.AddDays(1));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_migrates_legacy_profile_marker_without_reapplying_reward()
+    {
+        const string clientAttemptId = "legacy-marker";
+        var users = new InMemoryUserRepository();
+        users.Seed(TestContent.NewProfile("user-1"));
+        var operations = new InMemoryEconomyOperationRepository();
+        var operationId = EconomyOperationRecord.IdFor("quiz", clientAttemptId);
+        var service = new QuizService(
+            new FakeUserContext("user-1", "Tester"),
+            new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero)),
+            TestContent.Build(),
+            new InMemoryProgressRepository(),
+            new InMemoryAttemptRepository(),
+            new InMemoryEventRepository(),
+            users,
+            new InMemoryLeaderboardRepository(),
+            new InMemoryLearnerModelRepository(),
+            new MutateOnceOnEconomyCreateRepository(
+                operations,
+                () => users.ForceConcurrentWrite(
+                    "user-1",
+                    profile => profile with
+                    {
+                        Xp = 17,
+                        Gems = 6,
+                        LifetimeLessonsCompleted = 1,
+                        LifetimePerfectLessons = 1,
+                        AppliedEconomyOperations = [operationId],
+                    })));
+
+        var result = await service.SubmitAsync(
+            "l1",
+            QuizServiceHarness.Request(
+                clientAttemptId,
+                QuizServiceHarness.Answer("l1-i1", "a")));
+        var profile = await users.GetAsync("user-1");
+
+        result.Rewards.NewXp.Should().Be(17);
+        profile!.Xp.Should().Be(17);
+        profile.Gems.Should().Be(6);
+        profile.LifetimeLessonsCompleted.Should().Be(1);
+        profile.AppliedEconomyOperations.Should().BeNull();
+        profile.EconomyReceipts.Should().ContainSingle(
+            receipt => receipt.OperationId == operationId);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_backfills_outcome_for_completed_legacy_journal()
+    {
+        const string clientAttemptId = "legacy-completed";
+        var source = new QuizServiceHarness();
+        source.Users.Seed(TestContent.NewProfile(source.UserId));
+        var request = QuizServiceHarness.Request(
+            clientAttemptId,
+            QuizServiceHarness.Answer("l1-i1", "a"));
+        var expected = await source.Build().SubmitAsync("l1", request);
+        var operationId = EconomyOperationRecord.IdFor("quiz", clientAttemptId);
+        var legacyOperation = await source.EconomyOperations.GetAsync(
+            source.UserId,
+            operationId);
+        var migratedOperations = new InMemoryEconomyOperationRepository();
+        migratedOperations.Seed(legacyOperation! with { OutcomeJson = null });
+        var migratedUsers = new InMemoryUserRepository();
+        migratedUsers.Seed((await source.Users.GetAsync(source.UserId))!);
+        var service = new QuizService(
+            new FakeUserContext(source.UserId, "Tester"),
+            source.Clock,
+            TestContent.Build(),
+            new InMemoryProgressRepository(),
+            new InMemoryAttemptRepository(),
+            new InMemoryEventRepository(),
+            migratedUsers,
+            new InMemoryLeaderboardRepository(),
+            new InMemoryLearnerModelRepository(),
+            migratedOperations);
+
+        var result = await service.SubmitAsync("l1", request);
+        var migrated = await migratedOperations.GetAsync(source.UserId, operationId);
+
+        result.Should().BeEquivalentTo(expected);
+        migrated!.OutcomeJson.Should().NotBeNullOrWhiteSpace();
+        migrated.Status.Should().Be(EconomyOperationRecord.CompletedStatus);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_legacy_partial_attempt_keeps_persisted_reward_set_canonical()
+    {
+        const string clientAttemptId = "legacy-partial";
+        var source = new QuizServiceHarness();
+        source.Users.Seed(TestContent.NewProfile(source.UserId));
+        var request = QuizServiceHarness.Request(
+            clientAttemptId,
+            QuizServiceHarness.Answer("l1-i1", "a"));
+        await source.Build().SubmitAsync("l1", request);
+        var operationId = EconomyOperationRecord.IdFor("quiz", clientAttemptId);
+        var sourceOperation = await source.EconomyOperations.GetAsync(source.UserId, operationId);
+        var persistedAttempt = await source.Attempts.GetByClientAttemptIdAsync(
+            source.UserId,
+            clientAttemptId);
+        var operations = new InMemoryEconomyOperationRepository();
+        operations.Seed(sourceOperation! with
+        {
+            CompletedSteps = ["attempt"],
+            Status = EconomyOperationRecord.PendingStatus,
+            OutcomeJson = null,
+        });
+        var users = new InMemoryUserRepository();
+        users.Seed(TestContent.NewProfile(source.UserId) with { LifetimePerfectLessons = 4 });
+        var attempts = new InMemoryAttemptRepository();
+        attempts.Seed(persistedAttempt!);
+        var events = new InMemoryEventRepository();
+        var service = new QuizService(
+            new FakeUserContext(source.UserId, "Tester"),
+            source.Clock,
+            TestContent.Build(),
+            new InMemoryProgressRepository(),
+            attempts,
+            events,
+            users,
+            new InMemoryLeaderboardRepository(),
+            new InMemoryLearnerModelRepository(),
+            operations);
+
+        var result = await service.SubmitAsync("l1", request);
+        var profile = await users.GetAsync(source.UserId);
+        var operation = await operations.GetAsync(source.UserId, operationId);
+
+        result.Should().BeEquivalentTo(persistedAttempt!.Result);
+        profile!.LifetimePerfectLessons.Should().Be(5);
+        profile.Achievements.Should().BeNullOrEmpty();
+        events.Events.Single(candidate => candidate.Type == "quiz.submitted").Payload
+            .Should().BeEquivalentTo(persistedAttempt.Result);
+        JsonSerializer.Deserialize<SubmitQuizResult>(
+            operation!.OutcomeJson!,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            .Should().BeEquivalentTo(persistedAttempt.Result);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_legacy_rejected_payload_cannot_mutate_profile()
+    {
+        const string clientAttemptId = "legacy-rejected";
+        var source = new QuizServiceHarness();
+        source.Users.Seed(TestContent.NewProfile(source.UserId));
+        var request = QuizServiceHarness.Request(
+            clientAttemptId,
+            QuizServiceHarness.Answer("l1-i1", "a")) with
+        {
+            StartedAt = source.Clock.UtcNow.AddMinutes(1),
+        };
+        await source.Build().SubmitAsync("l1", request);
+        var operationId = EconomyOperationRecord.IdFor("quiz", clientAttemptId);
+        var sourceOperation = await source.EconomyOperations.GetAsync(source.UserId, operationId);
+        var legacyPayload = JsonNode.Parse(sourceOperation!.PayloadJson)!.AsObject();
+        legacyPayload.Remove("profileMutationAllowed");
+        var persistedAttempt = await source.Attempts.GetByClientAttemptIdAsync(
+            source.UserId,
+            clientAttemptId);
+        var operations = new InMemoryEconomyOperationRepository();
+        operations.Seed(sourceOperation with
+        {
+            PayloadJson = legacyPayload.ToJsonString(),
+            CompletedSteps = ["attempt"],
+            Status = EconomyOperationRecord.PendingStatus,
+            OutcomeJson = null,
+        });
+        var users = new InMemoryUserRepository();
+        users.Seed(TestContent.NewProfile(source.UserId) with
+        {
+            Xp = 25,
+            Gems = 7,
+            LifetimeLessonsCompleted = 9,
+            LifetimePerfectLessons = 4,
+        });
+        var attempts = new InMemoryAttemptRepository();
+        attempts.Seed(persistedAttempt!);
+        var service = new QuizService(
+            new FakeUserContext(source.UserId, "Tester"),
+            source.Clock,
+            TestContent.Build(),
+            new InMemoryProgressRepository(),
+            attempts,
+            new InMemoryEventRepository(),
+            users,
+            new InMemoryLeaderboardRepository(),
+            new InMemoryLearnerModelRepository(),
+            operations);
+
+        var result = await service.SubmitAsync("l1", request);
+        var profile = await users.GetAsync(source.UserId);
+
+        result.Should().BeEquivalentTo(persistedAttempt!.Result);
+        profile!.Xp.Should().Be(25);
+        profile.Gems.Should().Be(7);
+        profile.LifetimeLessonsCompleted.Should().Be(9);
+        profile.LifetimePerfectLessons.Should().Be(4);
+        profile.Achievements.Should().BeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task SubmitAsync_compacts_completed_profile_receipts_and_keeps_old_retries_idempotent()
+    {
+        var h = new QuizServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        var service = h.Build();
+        var firstRequest = QuizServiceHarness.Request(
+            "receipt-0",
+            QuizServiceHarness.Answer("l1-i1", "a"));
+        var first = await service.SubmitAsync("l1", firstRequest);
+
+        for (var index = 1; index <= 130; index++)
+        {
+            await service.SubmitAsync(
+                "l1",
+                QuizServiceHarness.Request(
+                    $"receipt-{index}",
+                    QuizServiceHarness.Answer("l1-i1", "b")));
+        }
+
+        var beforeRetry = await h.Users.GetAsync(h.UserId);
+        beforeRetry!.EconomyReceipts.Should().HaveCount(128);
+        beforeRetry.EconomyReceipts.Should().NotContain(
+            receipt => receipt.OperationId == EconomyOperationRecord.IdFor("quiz", "receipt-0"));
+        var oldestJournal = await h.EconomyOperations.GetAsync(
+            h.UserId,
+            EconomyOperationRecord.IdFor("quiz", "receipt-0"));
+        oldestJournal!.Status.Should().Be(EconomyOperationRecord.CompletedStatus);
+        oldestJournal.Ttl.Should().Be(-1);
+
+        var replay = await service.SubmitAsync("l1", firstRequest);
+        var afterRetry = await h.Users.GetAsync(h.UserId);
+
+        replay.Should().BeEquivalentTo(first);
+        afterRetry.Should().BeEquivalentTo(beforeRetry);
     }
 
     [Fact]
@@ -185,7 +596,8 @@ public sealed class QuizServiceTests
             new InMemoryEventRepository(),
             users,
             leaderboard,
-            new InMemoryLearnerModelRepository());
+            new InMemoryLearnerModelRepository(),
+            new InMemoryEconomyOperationRepository());
 
         var result = await service.SubmitAsync(
             "l1",
@@ -227,6 +639,37 @@ public sealed class QuizServiceTests
         // Les récompenses restent créditées, le leaderboard est mis à jour.
         result.Rewards.XpEarned.Should().BeGreaterThan(0);
         h.Leaderboard.Xp[h.UserId].Should().Be(result.Rewards.XpEarned);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_integrity_rejection_persists_audit_without_profile_progress()
+    {
+        var h = new QuizServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId) with
+        {
+            Xp = 25,
+            Gems = 7,
+            LifetimeLessonsCompleted = 9,
+            LifetimePerfectLessons = 4,
+        });
+        var request = QuizServiceHarness.Request(
+            "rejected-profile",
+            QuizServiceHarness.Answer("l1-i1", "a")) with
+        {
+            StartedAt = h.Clock.UtcNow.AddMinutes(1),
+        };
+
+        var result = await h.Build().SubmitAsync("l1", request);
+        var profile = await h.Users.GetAsync(h.UserId);
+
+        result.Rewards.XpEarned.Should().Be(0);
+        profile!.Xp.Should().Be(25);
+        profile.Gems.Should().Be(7);
+        profile.LifetimeLessonsCompleted.Should().Be(9);
+        profile.LifetimePerfectLessons.Should().Be(4);
+        profile.Achievements.Should().BeNullOrEmpty();
+        profile.EconomyReceipts.Should().ContainSingle();
+        h.Leaderboard.Xp.Should().BeEmpty();
     }
 }
 

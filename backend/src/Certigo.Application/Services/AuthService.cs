@@ -100,6 +100,8 @@ public sealed class AuthService(
     /// Random bytes behind a verification token before Base64Url encoding.
     private const int VerificationTokenBytes = 32;
 
+    private static readonly TimeSpan ProvisioningLease = TimeSpan.FromMinutes(2);
+
     public async Task<AuthResultDto> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
         var email = AuthRules.NormalizeEmail(request.Email);
@@ -113,24 +115,24 @@ public sealed class AuthService(
             throw new AuthFailedException($"Le mot de passe doit contenir au moins {AuthRules.MinPasswordLength} caractères.");
         }
 
-        // Reject a second account that maps to the same real mailbox (Gmail
-        // dot/"+tag" variants). The exact-id create below already guards the
-        // identical address; this closes the canonical-variant gap for accounts
-        // created since this feature shipped. (Pre-feature docs carry no canonical
-        // email, so they can't be matched here — a known, documented limitation.)
         var canonicalEmail = AuthRules.CanonicalizeEmail(email);
-        if (await credentials.FindByCanonicalEmailAsync(canonicalEmail, cancellationToken) is not null)
+        // The exact lookup must come first: pre-canonical credentials use the
+        // normalized email as their id and have no CanonicalEmail value. Because
+        // that document already exists, rejecting it before CreateItem preserves
+        // its identity/hash and closes the legacy check-then-create gap.
+        var legacy = await credentials.FindByEmailAsync(email, cancellationToken);
+        if (legacy is not null && !legacy.IsProvisioning)
         {
             throw new DuplicateRecordException("Cette adresse e-mail est déjà utilisée.");
         }
 
-        var userId = Guid.NewGuid().ToString("n");
+        var userId = legacy?.UserId ?? Guid.NewGuid().ToString("n");
         var displayName = ResolveDisplayName(request.DisplayName, email);
         var passwordHash = passwordHasher.Hash(request.Password);
         var (rawToken, tokenHash) = NewVerificationToken();
 
         var credential = new UserCredentialRecord(
-            Id: UserCredentialRecord.IdFor(email),
+            Id: UserCredentialRecord.CanonicalIdFor(canonicalEmail),
             Email: email,
             UserId: userId,
             DisplayName: displayName,
@@ -139,24 +141,119 @@ public sealed class AuthService(
             CanonicalEmail: canonicalEmail,
             EmailVerified: false,
             VerificationTokenHash: tokenHash,
-            VerificationTokenExpiresAt: clock.UtcNow + emailOptions.TokenLifetime);
+            VerificationTokenExpiresAt: clock.UtcNow + emailOptions.TokenLifetime,
+            ProvisioningState: CredentialProvisioningState.Pending,
+            ProvisioningLeaseExpiresAt: clock.UtcNow + ProvisioningLease);
 
+        UserCredentialRecord reservation;
+        if (legacy is not null)
+        {
+            if (!legacy.IsProvisioning
+                || legacy.ProvisioningLeaseExpiresAt is { } lease && lease > clock.UtcNow
+                || !passwordHasher.Verify(request.Password, legacy.PasswordHash))
+            {
+                throw new DuplicateRecordException("Cette adresse e-mail est déjà utilisée.");
+            }
+
+            reservation = legacy with
+            {
+                Email = email,
+                DisplayName = displayName,
+                VerificationTokenHash = tokenHash,
+                VerificationTokenExpiresAt = clock.UtcNow + emailOptions.TokenLifetime,
+                ProvisioningLeaseExpiresAt = clock.UtcNow + ProvisioningLease,
+            };
+            await credentials.UpdateAsync(reservation, cancellationToken);
+            reservation = await credentials.FindByCanonicalEmailAsync(canonicalEmail, cancellationToken)
+                ?? throw new ConcurrencyConflictException("La réservation e-mail a disparu pendant sa récupération.");
+        }
+        else
+        {
+            try
+            {
+                reservation = await credentials.CreateAsync(credential, cancellationToken);
+            }
+            catch (DuplicateRecordException)
+            {
+                var winner = await credentials.FindByCanonicalEmailAsync(canonicalEmail, cancellationToken);
+                if (winner is null
+                    || !winner.IsProvisioning
+                    || winner.ProvisioningLeaseExpiresAt is { } lease && lease > clock.UtcNow
+                    || !passwordHasher.Verify(request.Password, winner.PasswordHash))
+                {
+                    throw new DuplicateRecordException("Cette adresse e-mail est déjà utilisée.");
+                }
+
+                reservation = winner;
+            }
+        }
+
+        UserProfileDto profile;
         try
         {
-            await credentials.CreateAsync(credential, cancellationToken);
+            profile = await users.GetAsync(reservation.UserId, cancellationToken)
+                ?? await users.UpsertAsync(
+                    ProfileDefaults.New(reservation.UserId, reservation.DisplayName),
+                    cancellationToken);
         }
-        catch (DuplicateRecordException)
+        catch (DefinitivePersistenceException)
         {
-            // Re-shaped to a clear, user-facing French message; still a 409.
-            throw new DuplicateRecordException("Cette adresse e-mail est déjà utilisée.");
+            var committedProfile = await users.GetAsync(reservation.UserId, cancellationToken);
+            if (committedProfile is null)
+            {
+                await credentials.DeletePendingAsync(reservation, cancellationToken);
+                throw;
+            }
+
+            profile = committedProfile;
+        }
+        catch
+        {
+            UserProfileDto? committedProfile;
+            try
+            {
+                committedProfile = await users.GetAsync(reservation.UserId, cancellationToken);
+            }
+            catch
+            {
+                // The profile write may have committed even though its response was
+                // lost. Keep the leased reservation so a later registration can
+                // recover it rather than creating a second identity.
+                throw;
+            }
+
+            if (committedProfile is null)
+            {
+                // A null read does not prove absence without the failed write's
+                // session token. Retain the leased reservation for safe recovery.
+                throw;
+            }
+
+            profile = committedProfile;
         }
 
-        // Provision the profile eagerly so the home screen has data immediately.
-        var profile = await users.UpsertAsync(ProfileDefaults.New(userId, displayName), cancellationToken);
+        if (reservation.IsProvisioning)
+        {
+            try
+            {
+                await credentials.UpdateAsync(
+                    reservation with
+                    {
+                        ProvisioningState = CredentialProvisioningState.Active,
+                        ProvisioningLeaseExpiresAt = null,
+                    },
+                    cancellationToken);
+            }
+            catch (ConcurrencyConflictException)
+            {
+                var current = await credentials.FindByCanonicalEmailAsync(canonicalEmail, cancellationToken);
+                if (current?.IsProvisioning != false)
+                {
+                    throw;
+                }
+            }
+        }
 
-        // Fire the confirmation email, but never let a mail failure fail sign-up:
-        // verification is non-blocking, so the learner is signed in regardless and
-        // can resend later.
         await TrySendVerificationEmailAsync(email, displayName, rawToken, cancellationToken);
 
         return BuildResult(profile, email, emailVerified: false);
@@ -175,6 +272,14 @@ public sealed class AuthService(
         // Unknown email: same generic failure (no enumeration). There is no
         // account document to throttle against, so nothing is recorded.
         if (credential is null)
+        {
+            throw new AuthFailedException("E-mail ou mot de passe incorrect.");
+        }
+
+        // A canonical credential is only a reservation until profile provisioning
+        // transitions it to Active. Never mint tokens or create/read a profile for
+        // an in-flight registration.
+        if (credential.IsProvisioning)
         {
             throw new AuthFailedException("E-mail ou mot de passe incorrect.");
         }

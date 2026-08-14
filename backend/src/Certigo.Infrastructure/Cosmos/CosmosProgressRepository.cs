@@ -1,4 +1,6 @@
 using Microsoft.Azure.Cosmos;
+using System.Net;
+using System.Text.Json.Serialization;
 using Certigo.Application.Abstractions;
 using Certigo.Domain.Progress;
 
@@ -47,20 +49,84 @@ public sealed class CosmosProgressRepository(CosmosContext context) : IProgressR
             return;
         }
 
-        var batch = context.Progress.CreateTransactionalBatch(new PartitionKey(userId));
-        foreach (var mastery in masteries)
+        var partitionKey = new PartitionKey(userId);
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            batch.UpsertItem(new ConceptMasteryDocument(Id(mastery.TrackId, mastery.ConceptId), userId, mastery.TrackId, mastery.ConceptId, mastery));
-        }
+            var writes = new List<(ConceptMastery Mastery, ConceptMasteryDocument? Existing)>();
+            foreach (var mastery in masteries)
+            {
+                var existing = await context.Progress.ReadOrDefaultAsync<ConceptMasteryDocument>(
+                    Id(mastery.TrackId, mastery.ConceptId),
+                    partitionKey,
+                    cancellationToken);
+                if (existing is null
+                    || mastery.LastReviewedAt > existing.Mastery.LastReviewedAt
+                    || mastery.LastReviewedAt == existing.Mastery.LastReviewedAt
+                        && mastery.Reps > existing.Mastery.Reps)
+                {
+                    writes.Add((mastery, existing));
+                }
+            }
 
-        using var response = await batch.ExecuteAsync(cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new CosmosException($"Progress batch failed: {response.StatusCode}", response.StatusCode, 0, response.ActivityId, response.RequestCharge);
+            if (writes.Count == 0)
+            {
+                return;
+            }
+
+            var batch = context.Progress.CreateTransactionalBatch(partitionKey);
+            foreach (var (mastery, existing) in writes)
+            {
+                var document = new ConceptMasteryDocument(
+                    Id(mastery.TrackId, mastery.ConceptId),
+                    userId,
+                    mastery.TrackId,
+                    mastery.ConceptId,
+                    mastery);
+                if (existing is null)
+                {
+                    batch.CreateItem(document);
+                }
+                else
+                {
+                    batch.ReplaceItem(
+                        document.Id,
+                        document,
+                        new TransactionalBatchItemRequestOptions
+                        {
+                            IfMatchEtag = existing.ETag,
+                        });
+                }
+            }
+
+            using var response = await batch.ExecuteAsync(cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            if (attempt == 3
+                || response.StatusCode is not (HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed))
+            {
+                throw new CosmosException(
+                    $"Progress batch failed: {response.StatusCode}",
+                    response.StatusCode,
+                    0,
+                    response.ActivityId,
+                    response.RequestCharge);
+            }
         }
     }
 
     private static string Id(string trackId, string conceptId) => $"{trackId}:{conceptId}";
 
-    private sealed record ConceptMasteryDocument(string Id, string UserId, string TrackId, string ConceptId, ConceptMastery Mastery);
+    private sealed record ConceptMasteryDocument(
+        string Id,
+        string UserId,
+        string TrackId,
+        string ConceptId,
+        ConceptMastery Mastery)
+    {
+        [JsonPropertyName("_etag")]
+        public string? ETag { get; init; }
+    }
 }

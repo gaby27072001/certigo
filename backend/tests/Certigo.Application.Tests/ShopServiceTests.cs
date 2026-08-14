@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
 using Certigo.Application.Services;
 using Xunit;
@@ -10,11 +11,18 @@ internal sealed class ShopServiceHarness
     public InMemoryUserRepository Users { get; } = new();
     public InMemoryPurchaseRepository Purchases { get; } = new();
     public InMemoryEventRepository Events { get; } = new();
+    public InMemoryEconomyOperationRepository EconomyOperations { get; } = new();
     public FakeClock Clock { get; } = new(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
     public string UserId { get; } = "user-1";
 
     public ShopService Build()
-        => new(new FakeUserContext(UserId, "Tester"), Clock, Users, Purchases, Events);
+        => new(
+            new FakeUserContext(UserId, "Tester"),
+            Clock,
+            Users,
+            Purchases,
+            Events,
+            EconomyOperations);
 
     public UserProfileDto SeedProfile(int gems, int freezeTokens)
     {
@@ -65,6 +73,32 @@ public sealed class ShopServiceTests
     }
 
     [Fact]
+    public async Task PurchaseAsync_returns_legacy_ledger_without_debiting_again()
+    {
+        var h = new ShopServiceHarness();
+        h.SeedProfile(gems: 100, freezeTokens: 1);
+        var result = new PurchaseResultDto(true, "streak-freeze", 200, 100, 1, null);
+        await h.Purchases.CreateAsync(new PurchaseRecord(
+            "purchase::legacy",
+            h.UserId,
+            "legacy",
+            "streak-freeze",
+            200,
+            h.Clock.UtcNow,
+            result));
+
+        var replay = await h.Build().PurchaseAsync(new PurchaseRequest("streak-freeze", "legacy"));
+
+        replay.Should().BeEquivalentTo(result);
+        var profile = await h.Users.GetAsync(h.UserId);
+        profile!.Gems.Should().Be(100);
+        profile.FreezeTokens.Should().Be(1);
+        (await h.EconomyOperations.GetAsync(
+            h.UserId,
+            EconomyOperationRecord.IdFor("shop", "legacy"))).Should().BeNull();
+    }
+
+    [Fact]
     public async Task PurchaseAsync_charges_exactly_once_when_the_profile_write_conflicts_once()
     {
         // Concurrence optimiste (R-01) : un writer concurrent distinct bouscule le profil
@@ -77,7 +111,13 @@ public sealed class ShopServiceTests
         var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
         var purchases = new InMemoryPurchaseRepository();
         var events = new InMemoryEventRepository();
-        var service = new ShopService(new FakeUserContext("user-1", "Tester"), clock, users, purchases, events);
+        var service = new ShopService(
+            new FakeUserContext("user-1", "Tester"),
+            clock,
+            users,
+            purchases,
+            events,
+            new InMemoryEconomyOperationRepository());
 
         var result = await service.PurchaseAsync(new PurchaseRequest("streak-freeze", "p1"));
 
@@ -87,8 +127,76 @@ public sealed class ShopServiceTests
         var profile = await inner.GetAsync("user-1");
         profile!.Gems.Should().Be(100); // debited exactly once, not doubled
         profile.FreezeTokens.Should().Be(1);
+        result.GemsBalance.Should().Be(profile.Gems);
+        result.FreezeTokens.Should().Be(profile.FreezeTokens);
         purchases.CreateCount.Should().Be(1); // ledger written once
+        (await purchases.GetByClientPurchaseIdAsync("user-1", "p1"))!.Result
+            .Should().BeEquivalentTo(result);
         events.Events.Count(e => e.Type == "shop.purchased").Should().Be(1);
+        events.Events.Single(e => e.Type == "shop.purchased").Payload
+            .Should().BeEquivalentTo(result);
+    }
+
+    [Fact]
+    public async Task PurchaseAsync_reconciles_event_failure_without_double_debit()
+    {
+        var users = new InMemoryUserRepository();
+        users.Seed(TestContent.NewProfile("user-1") with { Gems = 300 });
+        var purchases = new InMemoryPurchaseRepository();
+        var events = new InMemoryEventRepository();
+        var service = new ShopService(
+            new FakeUserContext("user-1", "Tester"),
+            new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero)),
+            users,
+            purchases,
+            new FailOnceEventRepository(events),
+            new InMemoryEconomyOperationRepository());
+        var request = new PurchaseRequest("streak-freeze", "event-retry");
+
+        var first = () => service.PurchaseAsync(request);
+        await first.Should().ThrowAsync<InvalidOperationException>();
+        var afterFailure = await users.GetAsync("user-1");
+        var result = await service.PurchaseAsync(request);
+        var afterRetry = await users.GetAsync("user-1");
+
+        result.Success.Should().BeTrue();
+        afterRetry!.Gems.Should().Be(afterFailure!.Gems);
+        afterRetry.FreezeTokens.Should().Be(afterFailure.FreezeTokens);
+        purchases.CreateCount.Should().Be(1);
+        events.Events.Count(e => e.Type == "shop.purchased").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task PurchaseAsync_rejects_a_stale_concurrent_debit_without_later_reapplying_it()
+    {
+        var users = new InMemoryUserRepository();
+        users.Seed(TestContent.NewProfile("user-1") with { Gems = 300 });
+        var operations = new InMemoryEconomyOperationRepository();
+        var purchases = new InMemoryPurchaseRepository();
+        var service = new ShopService(
+            new FakeUserContext("user-1", "Tester"),
+            new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero)),
+            users,
+            purchases,
+            new InMemoryEventRepository(),
+            new MutateOnceOnEconomyCreateRepository(
+                operations,
+                () => users.ForceConcurrentWrite("user-1", profile => profile with { Gems = 100 })));
+        var request = new PurchaseRequest("streak-freeze", "stale-debit");
+
+        var first = await service.PurchaseAsync(request);
+        users.ForceConcurrentWrite("user-1", profile => profile with { Gems = 500 });
+        var retry = await service.PurchaseAsync(request);
+
+        first.Success.Should().BeFalse();
+        first.Error.Should().Be("insufficientGems");
+        retry.Should().BeEquivalentTo(first, options => options.Excluding(result => result.GemsBalance));
+        (await users.GetAsync("user-1"))!.Gems.Should().Be(500);
+        purchases.CreateCount.Should().Be(0);
+        var operation = await operations.GetAsync(
+            "user-1",
+            EconomyOperationRecord.IdFor("shop", "stale-debit"));
+        operation!.Status.Should().Be(EconomyOperationRecord.FailedStatus);
     }
 
     [Fact]

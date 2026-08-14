@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json.Serialization;
 using Certigo.Application.Dtos;
 using Certigo.Domain.Content;
 using Certigo.Domain.Gamification;
@@ -122,6 +123,37 @@ public interface IEventRepository
     Task AddAsync(LearningEvent learningEvent, CancellationToken cancellationToken = default);
 }
 
+/// Durable state for a cross-container economy workflow. The record is stored in
+/// the Economy container and only coordinates/reconciles independently idempotent
+/// effects; it is not a cross-container transaction.
+public interface IEconomyOperationRepository
+{
+    Task<EconomyOperationRecord?> GetAsync(
+        string userId,
+        string operationId,
+        CancellationToken cancellationToken = default);
+
+    Task<EconomyOperationRecord> GetOrCreateAsync(
+        EconomyOperationRecord operation,
+        CancellationToken cancellationToken = default);
+
+    Task<EconomyOperationRecord> MarkStepCompletedAsync(
+        string userId,
+        string operationId,
+        string step,
+        CancellationToken cancellationToken = default);
+    Task<EconomyOperationRecord> MarkFailedAsync(
+        string userId,
+        string operationId,
+        string failureCode,
+        CancellationToken cancellationToken = default);
+    Task<EconomyOperationRecord> SetOutcomeAsync(
+        string userId,
+        string operationId,
+        string outcomeJson,
+        CancellationToken cancellationToken = default);
+}
+
 // The per-(user, track) behavioural memory that makes the tutor a continuously
 // learning agent. Stored in the progress container (PK = /userId) under an
 // "learnermodel::{trackId}" id discriminator, so no new container is needed.
@@ -162,7 +194,12 @@ public sealed class NullTutorLlmTelemetry : ITutorLlmTelemetry
 public interface ILeaderboardRepository
 {
     Task<LeagueDto> GetLeagueAsync(string userId, CancellationToken cancellationToken = default);
-    Task AddXpAsync(string userId, int xp, CancellationToken cancellationToken = default);
+    Task AddXpAsync(
+        string userId,
+        int xp,
+        string operationId,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IPurchaseRepository
@@ -244,6 +281,35 @@ public sealed record LearningEvent(
     string Type,
     DateTimeOffset OccurredAt,
     object Payload);
+
+public sealed record EconomyOperationRecord(
+    string Id,
+    string UserId,
+    string Kind,
+    string OperationKey,
+    string PayloadJson,
+    IReadOnlyList<string> RequiredSteps,
+    IReadOnlyList<string> CompletedSteps,
+    string Status,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    string? FailureCode = null,
+    string? OutcomeJson = null,
+    int Ttl = -1)
+{
+    public const string PendingStatus = "pending";
+    public const string CompletedStatus = "completed";
+    public const string FailedStatus = "failed";
+
+    [JsonPropertyName("_etag")]
+    public string? ETag { get; init; }
+
+    public bool HasCompleted(string step) =>
+        CompletedSteps.Contains(step, StringComparer.Ordinal);
+
+    public static string IdFor(string kind, string operationKey) =>
+        $"operation::{kind}::{operationKey}";
+}
 
 // The persisted learner model: every concept the user has touched on a track,
 // with the running per-concept stats the tutor personalises on. Carried as a

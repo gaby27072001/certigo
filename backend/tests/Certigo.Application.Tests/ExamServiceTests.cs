@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
@@ -16,6 +17,7 @@ internal sealed class ExamServiceHarness
     public InMemoryExamAttemptRepository ExamAttempts { get; } = new();
     public InMemoryExamRepository Exams { get; } = new();
     public InMemoryAttemptRepository Attempts { get; } = new();
+    public InMemoryEconomyOperationRepository EconomyOperations { get; } = new();
     public FakeClock Clock { get; } = new(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
     public string UserId { get; } = "user-1";
 
@@ -34,7 +36,8 @@ internal sealed class ExamServiceHarness
             Attempts,
             Events,
             Users,
-            Leaderboard);
+            Leaderboard,
+            EconomyOperations);
     }
 
     public static SubmitMockExamRequest Submit(string attemptId, string examId, params AnswerDto[] answers)
@@ -227,6 +230,101 @@ public sealed class ExamServiceTests
     }
 
     [Fact]
+    public async Task SubmitAsync_returns_legacy_exam_attempt_without_reapplying_rewards()
+    {
+        var h = new ExamServiceHarness();
+        var result = new MockExamResultDto(
+            "legacy-result",
+            "exam-1",
+            900,
+            100,
+            true,
+            700,
+            3,
+            3,
+            Array.Empty<ExamDomainScoreDto>(),
+            new List<ItemResultDto>(),
+            new RewardsDto(30, 30, false, false, 20, new List<string>()),
+            new List<string>());
+        h.Users.Seed(TestContent.NewProfile(h.UserId) with { Xp = 30, Gems = 20 });
+        await h.ExamAttempts.CreateAsync(new ExamAttemptRecord(
+            "examattempt::exam-1",
+            h.UserId,
+            "legacy",
+            TestContent.TrackId,
+            "exam-1",
+            h.Clock.UtcNow.AddMinutes(-1),
+            h.Clock.UtcNow,
+            result));
+
+        var replay = await h.Build().SubmitAsync(
+            ExamServiceHarness.Submit("legacy", "exam-1"));
+
+        replay.Should().BeEquivalentTo(result);
+        var profile = await h.Users.GetAsync(h.UserId);
+        profile!.Xp.Should().Be(30);
+        profile.Gems.Should().Be(20);
+        h.Leaderboard.Xp.Should().BeEmpty();
+        (await h.EconomyOperations.GetAsync(
+            h.UserId,
+            EconomyOperationRecord.IdFor("exam", "exam-1"))).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SubmitAsync_reconciles_after_leaderboard_failure_without_double_rewards()
+    {
+        var users = new InMemoryUserRepository();
+        users.Seed(TestContent.NewProfile("user-1"));
+        var leaderboard = new InMemoryLeaderboardRepository();
+        var operations = new InMemoryEconomyOperationRepository();
+        var examAttempts = new InMemoryExamAttemptRepository();
+        var events = new InMemoryEventRepository();
+        var exams = new InMemoryExamRepository();
+        var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
+        exams.Seed(ExamServiceHarness.IssuedExam("exam-1", "user-1", clock.UtcNow));
+        var service = new ExamService(
+            new FakeUserContext("user-1", "Tester"),
+            clock,
+            TestContent.Build(),
+            new InMemoryProgressRepository(),
+            examAttempts,
+            exams,
+            new InMemoryAttemptRepository(),
+            events,
+            users,
+            new FailOnceLeaderboardRepository(leaderboard),
+            operations);
+        var request = ExamServiceHarness.Submit(
+            "leaderboard-retry",
+            "exam-1",
+            ExamServiceHarness.Answer("l1-i1", "a"),
+            ExamServiceHarness.Answer("l2-i1", "a"),
+            ExamServiceHarness.Answer("l3-i1", "a"));
+
+        var first = () => service.SubmitAsync(request);
+        await first.Should().ThrowAsync<InvalidOperationException>();
+        var afterFailure = await users.GetAsync("user-1");
+        var result = await service.SubmitAsync(request);
+        var afterRetry = await users.GetAsync("user-1");
+
+        afterRetry!.Xp.Should().Be(afterFailure!.Xp);
+        afterRetry.Gems.Should().Be(afterFailure.Gems);
+        leaderboard.Xp["user-1"].Should().Be(result.Rewards.XpEarned);
+        examAttempts.CreateCount.Should().Be(1);
+        (await examAttempts.GetByExamIdAsync("user-1", "exam-1"))!.Result
+            .Should().BeEquivalentTo(result);
+        events.Events.Single(candidate => candidate.Type == "exam.submitted").Payload
+            .Should().BeEquivalentTo(result);
+        var operation = await operations.GetAsync(
+            "user-1",
+            EconomyOperationRecord.IdFor("exam", "exam-1"));
+        JsonSerializer.Deserialize<MockExamResultDto>(
+            operation!.OutcomeJson!,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            .Should().BeEquivalentTo(result);
+    }
+
+    [Fact]
     public async Task SubmitAsync_is_single_use_even_with_a_new_client_attempt_id()
     {
         var h = new ExamServiceHarness();
@@ -330,6 +428,37 @@ public sealed class ExamServiceTests
     }
 
     [Fact]
+    public async Task SubmitAsync_integrity_rejection_persists_audit_without_profile_progress()
+    {
+        var h = new ExamServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId) with
+        {
+            Xp = 25,
+            Gems = 7,
+            DailyCorrectAnswers = 9,
+        });
+        var request = ExamServiceHarness.Submit(
+            "rejected-profile",
+            "exam-1",
+            ExamServiceHarness.Answer("l1-i1", "a"),
+            ExamServiceHarness.Answer("l2-i1", "a"),
+            ExamServiceHarness.Answer("l3-i1", "a")) with
+        {
+            StartedAt = h.Clock.UtcNow.AddMinutes(1),
+        };
+
+        var result = await h.Build().SubmitAsync(request);
+        var profile = await h.Users.GetAsync(h.UserId);
+
+        result.Rewards.XpEarned.Should().Be(0);
+        profile!.Xp.Should().Be(25);
+        profile.Gems.Should().Be(7);
+        profile.DailyCorrectAnswers.Should().Be(9);
+        profile.EconomyReceipts.Should().ContainSingle();
+        h.Leaderboard.Xp.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task SubmitAsync_recovers_the_reward_when_the_profile_write_conflicts_once()
     {
         // Un writer concurrent distinct (ex. un achat boutique) fait muter le profil
@@ -357,7 +486,8 @@ public sealed class ExamServiceTests
             new InMemoryAttemptRepository(),
             new InMemoryEventRepository(),
             users,
-            leaderboard);
+            leaderboard,
+            new InMemoryEconomyOperationRepository());
 
         var result = await service.SubmitAsync(ExamServiceHarness.Submit(
             "a1", "exam-1",
@@ -398,7 +528,8 @@ public sealed class ExamServiceTests
             new InMemoryAttemptRepository(),
             new InMemoryEventRepository(),
             users,
-            leaderboard);
+            leaderboard,
+            new InMemoryEconomyOperationRepository());
 
         var result = await service.SubmitAsync(ExamServiceHarness.Submit(
             "a1", "exam-1",

@@ -196,6 +196,7 @@ var host = new HostBuilder()
         services.AddScoped<IEventRepository, CosmosEventRepository>();
         services.AddScoped<ILeaderboardRepository, CosmosLeaderboardRepository>();
         services.AddScoped<IPurchaseRepository, CosmosPurchaseRepository>();
+        services.AddScoped<IEconomyOperationRepository, CosmosEconomyOperationRepository>();
         services.AddScoped<IFriendRepository, CosmosFriendRepository>();
         services.AddScoped<ILearnerModelRepository, CosmosLearnerModelRepository>();
         services.AddSingleton<ITutorLlmTelemetry, NullTutorLlmTelemetry>();
