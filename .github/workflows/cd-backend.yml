@@ -5,6 +5,11 @@ name: cd-backend
 #
 # Required OIDC federated-identity secrets (repo/env settings):
 #   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+# Required staging/prod environment configuration:
+#   secret AUTH_JWT_SIGNING_KEY + variable AUTH_JWT_SIGNING_KEY_EXPIRES_ON
+# Optional only during a planned overlap:
+#   secret AUTH_JWT_PREVIOUS_SIGNING_KEY
+#   variable AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON
 on:
   workflow_call:
     inputs:
@@ -56,12 +61,25 @@ jobs:
 
       - name: Deploy infrastructure and capture outputs
         id: deploy-bicep
+        env:
+          AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}
+          AUTH_JWT_SIGNING_KEY_EXPIRES_ON: ${{ vars.AUTH_JWT_SIGNING_KEY_EXPIRES_ON }}
+          AUTH_JWT_PREVIOUS_SIGNING_KEY: ${{ secrets.AUTH_JWT_PREVIOUS_SIGNING_KEY }}
+          AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON: ${{ vars.AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON }}
+          BASE_PARAMETERS_FILE: ${{ runner.temp }}/certigo-base-parameters.json
+          AUTH_PARAMETERS_FILE: ${{ runner.temp }}/certigo-auth-parameters.json
         run: |
+          set -euo pipefail
+          trap 'rm -f -- "$BASE_PARAMETERS_FILE" "$AUTH_PARAMETERS_FILE"' EXIT
+          az bicep build-params \
+            --file "infra/params/$TARGET_ENV.bicepparam" \
+            --outfile "$BASE_PARAMETERS_FILE"
+          node .github/scripts/write-secure-bicep-parameters.mjs
           FUNCTION_APP_NAME=$(az deployment sub create \
             --name certigo-$TARGET_ENV \
             --location westeurope \
             --template-file infra/main.bicep \
-            --parameters infra/params/$TARGET_ENV.bicepparam \
+            --parameters "@$AUTH_PARAMETERS_FILE" \
             --query 'properties.outputs.functionAppName.value' -o tsv)
           echo "functionAppName=$FUNCTION_APP_NAME" >> $GITHUB_OUTPUT
 

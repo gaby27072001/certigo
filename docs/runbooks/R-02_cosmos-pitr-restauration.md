@@ -4,7 +4,7 @@
 |---|---|
 | **Finding** | R-02 (🟠 Moyen) |
 | **Constat audit** | Cosmos prod en backup **Periodic** à l'origine (aucun `backupPolicy` dans le Bicep → défaut Periodic). Pas de PITR : récupération limitée aux snapshots périodiques en cas de corruption/suppression prod. |
-| **Remédiation IaC** | ✅ **DÉJÀ EN PLACE** — `backupPolicy` **Continuous** (tier `Continuous7Days`) activé en IaC via **PR #178** (commit `4899a66`). `infra/main.bicep` : `enableContinuousBackup: hardened` (`hardened = env != 'dev'`) → **staging + prod = Continuous** ; **dev = Periodic** (choix coût assumé). |
+| **Remédiation IaC** | `cosmosBackupMode` est explicite par environnement : staging/prod `Continuous` + `Continuous7Days`, dev `Periodic` avec intervalle, rétention et redondance déclarés. |
 | **Objet de ce runbook** | Documenter la **procédure de restauration** PITR (gate audit : « preuve d'un restore Cosmos »). |
 | **Cible** | Compte `cosmos-certigo-<env>-<suffixe>`, base `certigo`, RG `rg-certigo-<env>` (staging/prod). |
 
@@ -162,13 +162,12 @@ az cosmosdb delete --resource-group "$RG" --name "$TARGET_ACCT" --yes
 - **Fenêtre 7 jours** : tier `Continuous7Days`. Pour une rétention 30 jours, basculer sur `Continuous30Days`
   dans `infra/modules/cosmos.bicep` (`continuousModeProperties.tier`) — impact coût.
 - **`dev` = Periodic** : PITR **indisponible** en dev, par design (coût). Ne pas tenter de restore PITR sur dev.
-- **Bascule Periodic → Continuous IRRÉVERSIBLE** : documentée dans `infra/modules/cosmos.bicep` (param
-  `enableContinuousBackup`). Un compte déjà Continuous ne peut pas revenir à Periodic.
+- **Bascule Periodic → Continuous IRRÉVERSIBLE** : documentée dans `infra/modules/cosmos.bicep`
+  (`backupMode`). Un compte déjà Continuous ne peut pas revenir à Periodic.
 - **Serverless** : le compte Certigo est en `Serverless` / API SQL (`kind GlobalDocumentDB`) — le PITR
   Continuous est **supporté**.
-- **Idempotence de la remédiation** : `enableContinuousBackup: hardened` est **déjà** appliqué (PR #178,
-  commit `4899a66`) ; `az bicep build infra/main.bicep` est **vert**. Aucune modification IaC n'est requise
-  par ce lot — ce runbook **complète** la remédiation par la procédure de reprise manquante.
+- **Idempotence de la remédiation** : les trois fichiers `.bicepparam` fixent la politique ; le
+  validateur `infra/validate.sh` compile les templates et refuse une posture implicite.
 - **Réserve d'exécution** : l'agent ne dispose **pas** de credentials Azure → le test de restore réel n'a pas
   été exécuté ici. La remédiation IaC est validée statiquement par le build Bicep ; ce runbook fournit la
   procédure **vérifiable par l'opérateur** pour clore le volet « restauration test » du DoD.

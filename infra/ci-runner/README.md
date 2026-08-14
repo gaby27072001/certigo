@@ -69,6 +69,8 @@ La reconstruction n'utilise ni image mutable implicite, ni jeton dans l'IaC :
   réellement incorporé ;
 - Ubuntu 24.04, Trusted Launch, Secure Boot, vTPM et un disque Premium de 128 Gio sont
   déclarés ;
+- `allowExtensionOperations: false` interdit l'installation d'extensions VM ; le bootstrap
+  cloud-init versionné reste l'unique mécanisme de configuration de l'instance ;
 - `availabilityZone` permet de répartir les instances redondantes entre zones ;
 - le runner GitHub `2.336.0` est téléchargé depuis la release officielle et vérifié avec
   son SHA-256 publié dans l'API GitHub ; la mise à jour automatique est désactivée et une
@@ -80,16 +82,39 @@ La reconstruction n'utilise ni image mutable implicite, ni jeton dans l'IaC :
 - les actions tierces du probe quotidien et les checkouts des workflows modifiés sont
   épinglés à leur SHA de commit complet, avec le tag majeur conservé en commentaire ;
 - le jeton d'enregistrement GitHub, éphémère, n'entre jamais dans Bicep, `customData`, un
-  fichier ou l'historique de commande ;
+  fichier, l'environnement du service ou l'historique de commande ; il est lu au moment de
+  l'enregistrement depuis le terminal ou l'entrée standard et détruit dès que `config.sh`
+  termine ;
 - le bootstrap est idempotent : paquets, binaire, configuration et service sont
   réconciliés, tandis qu'un changement implicite de dépôt ou de nom est refusé ;
-- l'utilisateur de service dispose de `sudo` sans mot de passe, nécessaire aux jobs qui
-  installent des prérequis ; le fork-guard et l'approbation `pr-ci` restent donc des
+- l'utilisateur de service ne dispose d'aucun accès administrateur général. Sa seule
+  allow-list `sudo` sans mot de passe contient `apt-get update`, l'installation exacte de
+  `unzip zip jq xz-utils` requise par les jobs existants (avec uniquement
+  `DEBIAN_FRONTEND` conservé), et `/usr/local/sbin/certigo-runner-restart`, un programme
+  root-owned sans argument qui ne redémarre que l'unique service `actions.runner.*`.
+  Les installations de paquets hors cette liste et les enregistrements sont réservés au
+  compte administrateur break-glass ; le fork-guard et l'approbation `pr-ci` restent des
   contrôles obligatoires avant toute exécution de code de PR.
 
 Les SDK de workload restent épinglés par les actions de setup de chaque workflow. Le
 workflow quotidien `runner-health.yml` les installe puis vérifie GitHub, NuGet, pub.dev,
 npm, Azure, l'espace disque et les commandes nécessaires.
+
+## Capacité et cycle de vie
+
+Chaque VM créée par `runner.bicep` est une `Standard_D4s_v5` et exécute un seul job GitHub
+Actions à la fois. La capacité nominale du pool Linux est donc **deux jobs concurrents**,
+à condition que les deux VMs soient `running`, que les deux runners soient `online` et
+qu'ils portent `certigo-ci`. Il n'y a pas d'autoscaling : une file d'attente est un signal
+opérationnel de démarrer les deux VMs ou d'ajouter une troisième instance via une
+reconstruction planifiée.
+
+Le démarrage et la déallocation sont des opérations humaines décrites dans
+[`docs/runbooks/CI_RUNNERS.md`](../../docs/runbooks/CI_RUNNERS.md) ; l'IaC, le bootstrap
+et les validations locales ne démarrent, n'arrêtent ni ne suppriment de ressource Azure.
+Avant de déallouer une VM, l'opérateur vérifie que son runner est `online` et `busy: false`.
+Pendant une session CI, conserver les deux instances disponibles : l'une absorbe la perte
+ou la maintenance de l'autre.
 
 > À noter : le compte **Azure OpenAI** (`certigo-openai`), autre ressource en drift citée
 > par le finding G, est lui **réintégré en IaC** dans ce livrable via

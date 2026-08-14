@@ -53,7 +53,41 @@ var host = new HostBuilder()
         services.AddSingleton(sp => new CosmosContext(
             sp.GetRequiredService<CosmosClient>(),
             configuration["COSMOS_DATABASE"] ?? CosmosContainers.DatabaseName));
-        services.AddSingleton<IHealthProbe, CosmosHealthProbe>();
+        services.AddHttpClient("HealthProbe", client => client.Timeout = Timeout.InfiniteTimeSpan);
+        services.AddSingleton<IHealthProbe>(sp =>
+        {
+            var blobEndpoint = configuration["BLOB_ENDPOINT"]
+                ?? throw new InvalidOperationException("BLOB_ENDPOINT is required.");
+            var deploymentContainerName = configuration["DEPLOYMENT_CONTAINER_NAME"]
+                ?? throw new InvalidOperationException("DEPLOYMENT_CONTAINER_NAME is required.");
+            var keyVaultUri = configuration["KeyVault__Uri"]
+                ?? throw new InvalidOperationException("KeyVault__Uri is required.");
+            var keyVaultHealthSecretName = configuration["KeyVault__HealthSecretName"]
+                ?? "AUTH-JWT-SIGNING-KEY";
+            var defaultCredential = sp.GetRequiredService<TokenCredential>();
+            var platformClientId = configuration["HEALTH_PLATFORM_CLIENT_ID"];
+            TokenCredential storageCredential = string.IsNullOrWhiteSpace(platformClientId)
+                ? defaultCredential
+                : new ManagedIdentityCredential(
+                    ManagedIdentityId.FromUserAssignedClientId(platformClientId));
+            var timeoutSeconds = int.TryParse(
+                configuration["HEALTH_PROBE_TIMEOUT_SECONDS"],
+                out var configuredTimeoutSeconds)
+                && configuredTimeoutSeconds > 0
+                ? configuredTimeoutSeconds
+                : 5;
+
+            return new AzureDependencyHealthProbe(
+                sp.GetRequiredService<CosmosContext>(),
+                storageCredential,
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient("HealthProbe"),
+                new Uri(blobEndpoint, UriKind.Absolute),
+                deploymentContainerName,
+                new Uri(keyVaultUri, UriKind.Absolute),
+                keyVaultHealthSecretName,
+                TimeSpan.FromSeconds(timeoutSeconds),
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AzureDependencyHealthProbe>>());
+        });
 
         // Locally-issued JWT settings shared by the issuer and the local validator.
         // The signing key is mandatory in a hardened environment (Production or
@@ -63,6 +97,11 @@ var host = new HostBuilder()
         // of the box locally. The decision is a pure, unit-tested function.
         var signingSecret = JwtSigningKeyGuard.ResolveSigningSecret(
             configuration["AUTH_JWT_SIGNING_KEY"],
+            context.HostingEnvironment.IsProduction(),
+            configuration["AUTH_MODE"]);
+        var previousSigningSecret = JwtSigningKeyGuard.ResolvePreviousSigningSecret(
+            configuration["AUTH_JWT_PREVIOUS_SIGNING_KEY"],
+            signingSecret,
             context.HostingEnvironment.IsProduction(),
             configuration["AUTH_MODE"]);
         var jwtIssuer = configuration["AUTH_JWT_ISSUER"] ?? "certigo";
@@ -77,7 +116,8 @@ var host = new HostBuilder()
             {
                 new LocalJwtTokenValidator(
                     signingSecret, jwtIssuer, jwtAudience,
-                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LocalJwtTokenValidator>>())
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LocalJwtTokenValidator>>(),
+                    previousSigningSecret)
             };
 
             // Hard production guard: the dev validator accepts any bearer token as a
@@ -110,7 +150,11 @@ var host = new HostBuilder()
         });
 
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
-        services.AddSingleton<ITokenIssuer>(_ => new JwtTokenIssuer(signingSecret, jwtIssuer, jwtAudience));
+        services.AddSingleton<ITokenIssuer>(_ => new JwtTokenIssuer(
+            signingSecret,
+            jwtIssuer,
+            jwtAudience,
+            previousSigningSecret: previousSigningSecret));
         services.AddScoped<IUserCredentialRepository, CosmosUserCredentialRepository>();
 
         // Email verification for email/password accounts. Non-blocking: the default
@@ -158,9 +202,11 @@ var host = new HostBuilder()
         services.AddScoped<IProgressRepository, CosmosProgressRepository>();
         services.AddScoped<IAttemptRepository, CosmosAttemptRepository>();
         services.AddScoped<IExamAttemptRepository, CosmosExamAttemptRepository>();
+        services.AddScoped<IExamRepository, CosmosExamRepository>();
         services.AddScoped<IEventRepository, CosmosEventRepository>();
         services.AddScoped<ILeaderboardRepository, CosmosLeaderboardRepository>();
         services.AddScoped<IPurchaseRepository, CosmosPurchaseRepository>();
+        services.AddScoped<IEconomyOperationRepository, CosmosEconomyOperationRepository>();
         services.AddScoped<IFriendRepository, CosmosFriendRepository>();
         services.AddScoped<ILearnerModelRepository, CosmosLearnerModelRepository>();
         services.AddSingleton<ITutorLlmTelemetry, NullTutorLlmTelemetry>();

@@ -58,8 +58,8 @@ internal sealed class InMemoryUserRepository : IUserRepository
     {
         // Model Cosmos optimistic concurrency: a write carrying a stale ETag loses.
         if (_store.TryGetValue(profile.Id, out var current)
-            && !string.IsNullOrEmpty(profile.ETag)
-            && !string.Equals(profile.ETag, current.ETag, StringComparison.Ordinal))
+            && (string.IsNullOrEmpty(profile.ETag)
+                || !string.Equals(profile.ETag, current.ETag, StringComparison.Ordinal)))
         {
             throw new ConcurrencyConflictException($"User profile '{profile.Id}' was modified concurrently.");
         }
@@ -172,7 +172,14 @@ internal sealed class InMemoryProgressRepository : IProgressRepository
     {
         foreach (var mastery in masteries)
         {
-            _store[Key(userId, mastery.TrackId, mastery.ConceptId)] = mastery;
+            var key = Key(userId, mastery.TrackId, mastery.ConceptId);
+            var existing = _store.GetValueOrDefault(key);
+            if (existing is null
+                || mastery.LastReviewedAt > existing.LastReviewedAt
+                || mastery.LastReviewedAt == existing.LastReviewedAt && mastery.Reps > existing.Reps)
+            {
+                _store[key] = mastery;
+            }
         }
 
         return Task.CompletedTask;
@@ -215,6 +222,12 @@ internal sealed class InMemoryExamAttemptRepository : IExamAttemptRepository
     public Task<ExamAttemptRecord?> GetByClientAttemptIdAsync(string userId, string clientAttemptId, CancellationToken cancellationToken = default)
         => Task.FromResult(_store.FirstOrDefault(a => a.UserId == userId && a.ClientAttemptId == clientAttemptId));
 
+    public Task<ExamAttemptRecord?> GetByExamIdAsync(
+        string userId,
+        string examId,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.FirstOrDefault(a => a.UserId == userId && a.ExamId == examId));
+
     public Task CreateAsync(ExamAttemptRecord attempt, CancellationToken cancellationToken = default)
     {
         if (_store.Any(a => string.Equals(a.Id, attempt.Id, StringComparison.Ordinal)))
@@ -228,14 +241,63 @@ internal sealed class InMemoryExamAttemptRepository : IExamAttemptRepository
     }
 }
 
+internal sealed class InMemoryExamRepository : IExamRepository
+{
+    private readonly Dictionary<string, ExamRecord> _store = new(StringComparer.OrdinalIgnoreCase);
+
+    public IReadOnlyCollection<ExamRecord> Records => _store.Values;
+
+    private static string Key(string userId, string examId) => $"{userId}|{examId}";
+
+    public void Seed(ExamRecord exam) => _store[Key(exam.UserId, exam.ExamId)] = exam;
+
+    public Task CreateAsync(ExamRecord exam, CancellationToken cancellationToken = default)
+    {
+        var key = Key(exam.UserId, exam.ExamId);
+        if (_store.ContainsKey(key))
+        {
+            throw new DuplicateRecordException($"Exam '{exam.Id}' already exists.");
+        }
+
+        _store[key] = exam;
+        return Task.CompletedTask;
+    }
+
+    public Task<ExamRecord?> GetAsync(
+        string userId,
+        string examId,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(_store.GetValueOrDefault(Key(userId, examId)));
+}
+
 internal sealed class InMemoryEventRepository : IEventRepository
 {
     public List<LearningEvent> Events { get; } = new();
 
     public Task AddAsync(LearningEvent learningEvent, CancellationToken cancellationToken = default)
     {
-        Events.Add(learningEvent);
+        if (Events.All(existing => !string.Equals(existing.Id, learningEvent.Id, StringComparison.Ordinal)))
+        {
+            Events.Add(learningEvent);
+        }
+
         return Task.CompletedTask;
+    }
+}
+
+internal sealed class FailOnceEventRepository(InMemoryEventRepository inner) : IEventRepository
+{
+    private bool _failed;
+
+    public Task AddAsync(LearningEvent learningEvent, CancellationToken cancellationToken = default)
+    {
+        if (!_failed)
+        {
+            _failed = true;
+            throw new InvalidOperationException("simulated event projection failure");
+        }
+
+        return inner.AddAsync(learningEvent, cancellationToken);
     }
 }
 
@@ -252,11 +314,250 @@ internal sealed class InMemoryLeaderboardRepository : ILeaderboardRepository
         return Task.FromResult(new LeagueDto("weekly:test:bronze", "bronze", DateTimeOffset.UtcNow.AddDays(7), 10, userId, entries));
     }
 
-    public Task AddXpAsync(string userId, int xp, CancellationToken cancellationToken = default)
+    private readonly HashSet<string> _appliedOperations = new(StringComparer.Ordinal);
+
+    public Task AddXpAsync(
+        string userId,
+        int xp,
+        string operationId,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken = default)
     {
+        if (!_appliedOperations.Add(operationId))
+        {
+            return Task.CompletedTask;
+        }
+
         Xp[userId] = Xp.GetValueOrDefault(userId) + xp;
         return Task.CompletedTask;
     }
+}
+
+internal sealed class FailOnceLeaderboardRepository(InMemoryLeaderboardRepository inner) : ILeaderboardRepository
+{
+    private bool _failed;
+
+    public Task<LeagueDto> GetLeagueAsync(string userId, CancellationToken cancellationToken = default) =>
+        inner.GetLeagueAsync(userId, cancellationToken);
+
+    public Task AddXpAsync(
+        string userId,
+        int xp,
+        string operationId,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_failed)
+        {
+            _failed = true;
+            throw new InvalidOperationException("simulated leaderboard projection failure");
+        }
+
+        return inner.AddXpAsync(userId, xp, operationId, occurredAt, cancellationToken);
+    }
+}
+
+internal sealed class InMemoryEconomyOperationRepository : IEconomyOperationRepository
+{
+    private readonly Dictionary<string, EconomyOperationRecord> _store = new(StringComparer.Ordinal);
+    private readonly object _gate = new();
+    private long _version;
+
+    public Task<EconomyOperationRecord?> GetAsync(
+        string userId,
+        string operationId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            return Task.FromResult(_store.GetValueOrDefault(Key(userId, operationId)));
+        }
+    }
+
+    public Task<EconomyOperationRecord> GetOrCreateAsync(
+        EconomyOperationRecord operation,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            var key = Key(operation.UserId, operation.Id);
+            if (_store.TryGetValue(key, out var existing))
+            {
+                return Task.FromResult(existing);
+            }
+
+            var stored = operation with { ETag = NextETag() };
+            _store.Add(key, stored);
+            return Task.FromResult(stored);
+        }
+    }
+
+    public Task<EconomyOperationRecord> MarkStepCompletedAsync(
+        string userId,
+        string operationId,
+        string step,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            var key = Key(userId, operationId);
+            var current = _store[key];
+            if (current.Status == EconomyOperationRecord.FailedStatus)
+            {
+                throw new ConcurrencyConflictException("failed operation cannot complete a step");
+            }
+
+            if (current.HasCompleted(step))
+            {
+                return Task.FromResult(current);
+            }
+
+            var completedSteps = current.CompletedSteps.Append(step).ToArray();
+            var status = current.RequiredSteps.All(
+                required => completedSteps.Contains(required, StringComparer.Ordinal))
+                ? EconomyOperationRecord.CompletedStatus
+                : EconomyOperationRecord.PendingStatus;
+            var updated = current with
+            {
+                CompletedSteps = completedSteps,
+                Status = status,
+                UpdatedAt = DateTimeOffset.UtcNow,
+                ETag = NextETag(),
+            };
+            _store[key] = updated;
+            return Task.FromResult(updated);
+        }
+    }
+
+    public Task<EconomyOperationRecord> MarkFailedAsync(
+        string userId,
+        string operationId,
+        string failureCode,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            var key = Key(userId, operationId);
+            var current = _store[key];
+            if (current.Status == EconomyOperationRecord.FailedStatus)
+            {
+                return Task.FromResult(current);
+            }
+
+            if (current.Status == EconomyOperationRecord.CompletedStatus
+                || current.OutcomeJson is not null)
+            {
+                throw new ConcurrencyConflictException(
+                    "operation already committed a successful outcome");
+            }
+
+            var failed = current with
+            {
+                Status = EconomyOperationRecord.FailedStatus,
+                FailureCode = failureCode,
+                UpdatedAt = DateTimeOffset.UtcNow,
+                ETag = NextETag(),
+            };
+            _store[key] = failed;
+            return Task.FromResult(failed);
+        }
+    }
+
+    public Task<EconomyOperationRecord> SetOutcomeAsync(
+        string userId,
+        string operationId,
+        string outcomeJson,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            var key = Key(userId, operationId);
+            var current = _store[key];
+            if (current.Status == EconomyOperationRecord.FailedStatus)
+            {
+                throw new ConcurrencyConflictException(
+                    "failed operation cannot commit an outcome");
+            }
+
+            if (current.OutcomeJson is not null)
+            {
+                if (!string.Equals(current.OutcomeJson, outcomeJson, StringComparison.Ordinal))
+                {
+                    throw new ConcurrencyConflictException("different durable outcome");
+                }
+
+                return Task.FromResult(current);
+            }
+
+            var updated = current with
+            {
+                OutcomeJson = outcomeJson,
+                UpdatedAt = DateTimeOffset.UtcNow,
+                ETag = NextETag(),
+            };
+            _store[key] = updated;
+            return Task.FromResult(updated);
+        }
+    }
+
+    private static string Key(string userId, string operationId) => $"{userId}|{operationId}";
+
+    public void Seed(EconomyOperationRecord operation)
+    {
+        lock (_gate)
+        {
+            _store[Key(operation.UserId, operation.Id)] = operation with { ETag = NextETag() };
+        }
+    }
+    private string NextETag() => $"\"{Interlocked.Increment(ref _version)}\"";
+}
+
+internal sealed class MutateOnceOnEconomyCreateRepository(
+    InMemoryEconomyOperationRepository inner,
+    Action mutation) : IEconomyOperationRepository
+{
+    private bool _mutated;
+
+    public Task<EconomyOperationRecord?> GetAsync(
+        string userId,
+        string operationId,
+        CancellationToken cancellationToken = default) =>
+        inner.GetAsync(userId, operationId, cancellationToken);
+
+    public async Task<EconomyOperationRecord> GetOrCreateAsync(
+        EconomyOperationRecord operation,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await inner.GetOrCreateAsync(operation, cancellationToken);
+        if (!_mutated)
+        {
+            _mutated = true;
+            mutation();
+        }
+
+        return result;
+    }
+
+    public Task<EconomyOperationRecord> MarkStepCompletedAsync(
+        string userId,
+        string operationId,
+        string step,
+        CancellationToken cancellationToken = default) =>
+        inner.MarkStepCompletedAsync(userId, operationId, step, cancellationToken);
+
+    public Task<EconomyOperationRecord> MarkFailedAsync(
+        string userId,
+        string operationId,
+        string failureCode,
+        CancellationToken cancellationToken = default) =>
+        inner.MarkFailedAsync(userId, operationId, failureCode, cancellationToken);
+
+    public Task<EconomyOperationRecord> SetOutcomeAsync(
+        string userId,
+        string operationId,
+        string outcomeJson,
+        CancellationToken cancellationToken = default) =>
+        inner.SetOutcomeAsync(userId, operationId, outcomeJson, cancellationToken);
 }
 
 internal sealed class InMemoryPurchaseRepository : IPurchaseRepository
@@ -324,7 +625,18 @@ internal sealed class InMemoryLearnerModelRepository : ILearnerModelRepository
 
     public Task UpsertAsync(LearnerModelRecord model, CancellationToken cancellationToken = default)
     {
-        _store[Key(model.UserId, model.TrackId)] = model;
+        var key = Key(model.UserId, model.TrackId);
+        var current = _store.GetValueOrDefault(key);
+        var currentAttempts = current?.Concepts.Sum(concept => concept.Attempts) ?? -1;
+        var incomingAttempts = model.Concepts.Sum(concept => concept.Attempts);
+        if (current is not null
+            && (current.UpdatedAt > model.UpdatedAt
+                || current.UpdatedAt == model.UpdatedAt && currentAttempts >= incomingAttempts))
+        {
+            return Task.CompletedTask;
+        }
+
+        _store[key] = model;
         UpsertCount++;
         return Task.CompletedTask;
     }

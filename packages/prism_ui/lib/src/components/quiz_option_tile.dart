@@ -168,16 +168,12 @@ class _LeadingChip extends StatelessWidget {
       width: 30,
       height: 30,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.14),
-        borderRadius: PrismRadii.cardSm,
-      ),
+      decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: PrismRadii.cardSm),
       child: Text(
         text,
-        style: Theme.of(context)
-            .textTheme
-            .labelLarge
-            ?.copyWith(color: color, fontWeight: FontWeight.w800),
+        style: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(color: color, fontWeight: FontWeight.w800),
       ),
     );
   }

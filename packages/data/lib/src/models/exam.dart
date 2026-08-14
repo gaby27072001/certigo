@@ -212,9 +212,8 @@ class MockExamResult {
         results: (json['results'] as List<dynamic>? ?? <dynamic>[])
             .map((e) => ItemResult.fromJson(e as Map<String, dynamic>))
             .toList(),
-        rewards: QuizRewards.fromJson(
-          json['rewards'] as Map<String, dynamic>? ?? <String, dynamic>{},
-        ),
+        rewards:
+            QuizRewards.fromJson(json['rewards'] as Map<String, dynamic>? ?? <String, dynamic>{}),
         weakConcepts: (json['weakConcepts'] as List<dynamic>? ?? <dynamic>[])
             .map((e) => e as String)
             .toList(),

@@ -30,9 +30,8 @@ class SeasonsScreen extends ConsumerWidget {
               child: async.when(
                 data: (Season season) => _SeasonContent(season: season),
                 loading: () => const _SeasonLoading(),
-                error: (Object error, StackTrace _) => PrismStatusView.error(
-                  onRetry: () => ref.invalidate(seasonProvider),
-                ),
+                error: (Object error, StackTrace _) =>
+                    PrismStatusView.error(onRetry: () => ref.invalidate(seasonProvider)),
               ),
             ),
           ],
@@ -60,9 +59,9 @@ class _SeasonContentState extends ConsumerState<_SeasonContent> {
       _claiming = true;
       _error = null;
     });
-    final Result<ClaimSeasonResult> result = await ref.read(seasonRepositoryProvider).claimSeason(
-          ClaimSeasonRequest(seasonId: widget.season.id),
-        );
+    final Result<ClaimSeasonResult> result = await ref
+        .read(seasonRepositoryProvider)
+        .claimSeason(ClaimSeasonRequest(seasonId: widget.season.id));
     if (!mounted) {
       return;
     }
@@ -116,10 +115,7 @@ class _SeasonContentState extends ConsumerState<_SeasonContent> {
                       color: accent.withOpacity(0.18),
                       borderRadius: PrismRadii.cardMd,
                     ),
-                    child: Text(
-                      season.mascot,
-                      style: const TextStyle(fontSize: 28),
-                    ),
+                    child: Text(season.mascot, style: const TextStyle(fontSize: 28)),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -231,10 +227,7 @@ class _BadgePill extends StatelessWidget {
         horizontal: PrismSpacing.debt10,
         vertical: PrismSpacing.xxs,
       ),
-      decoration: BoxDecoration(
-        color: accent.withOpacity(0.16),
-        borderRadius: PrismRadii.pillAll,
-      ),
+      decoration: BoxDecoration(color: accent.withOpacity(0.16), borderRadius: PrismRadii.pillAll),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[

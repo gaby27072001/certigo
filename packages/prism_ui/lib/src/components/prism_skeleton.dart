@@ -9,12 +9,7 @@ import '../tokens/prism_radii.dart';
 /// fill. Compose several to sketch the shape of incoming content (a lesson
 /// header, option tiles…) so loading never feels like a blank screen.
 class PrismSkeleton extends StatefulWidget {
-  const PrismSkeleton({
-    super.key,
-    this.width,
-    this.height = 16,
-    this.radius,
-  });
+  const PrismSkeleton({super.key, this.width, this.height = 16, this.radius});
 
   final double? width;
   final double height;

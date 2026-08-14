@@ -84,9 +84,8 @@ class FriendActionResult {
         success: json['success'] as bool? ?? false,
         friendUserId: json['friendUserId'] as String?,
         error: json['error'] as String?,
-        friends: FriendList.fromJson(
-          json['friends'] as Map<String, dynamic>? ?? <String, dynamic>{},
-        ),
+        friends:
+            FriendList.fromJson(json['friends'] as Map<String, dynamic>? ?? <String, dynamic>{}),
       );
 }
 

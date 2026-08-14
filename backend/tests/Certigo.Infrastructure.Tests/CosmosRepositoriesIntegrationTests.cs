@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
@@ -122,6 +123,107 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
     }
 
     [CosmosEmulatorFact]
+    public async Task Canonical_email_reservation_has_one_concurrent_winner()
+    {
+        var context = await fixture.GetContextAsync();
+        var repository = new CosmosUserCredentialRepository(context);
+        var canonical = $"test-{Guid.NewGuid():N}@gmail.com";
+        var id = UserCredentialRecord.CanonicalIdFor(canonical);
+        var now = DateTimeOffset.UtcNow;
+        var first = new UserCredentialRecord(
+            id,
+            $"t.e.s.t+one-{Guid.NewGuid():N}@gmail.com",
+            $"user-{Guid.NewGuid():N}",
+            "First",
+            "hash",
+            now,
+            CanonicalEmail: canonical,
+            ProvisioningState: CredentialProvisioningState.Pending,
+            ProvisioningLeaseExpiresAt: now.AddMinutes(2));
+        var second = first with
+        {
+            Email = canonical,
+            UserId = $"user-{Guid.NewGuid():N}",
+            DisplayName = "Second",
+        };
+
+        var outcomes = await Task.WhenAll(new[] { first, second }.Select(async record =>
+        {
+            try
+            {
+                await repository.CreateAsync(record);
+                return true;
+            }
+            catch (DuplicateRecordException)
+            {
+                return false;
+            }
+        }));
+
+        outcomes.Should().ContainSingle(success => success);
+        (await repository.FindByCanonicalEmailAsync(canonical))!.Id.Should().Be(id);
+    }
+
+    [CosmosEmulatorFact]
+    public async Task Legacy_credential_is_found_by_normalized_email_before_canonical_fallback()
+    {
+        var context = await fixture.GetContextAsync();
+        var repository = new CosmosUserCredentialRepository(context);
+        var email = $"legacy-{Guid.NewGuid():N}@example.com";
+        var legacy = await repository.CreateAsync(new UserCredentialRecord(
+            UserCredentialRecord.IdFor(email),
+            email,
+            $"user-{Guid.NewGuid():N}",
+            "Legacy",
+            "original-hash",
+            DateTimeOffset.UtcNow));
+
+        var found = await repository.FindByEmailAsync(email.ToUpperInvariant());
+
+        found.Should().NotBeNull();
+        found!.Id.Should().Be(legacy.Id);
+        found.UserId.Should().Be(legacy.UserId);
+        found.PasswordHash.Should().Be(legacy.PasswordHash);
+        found.ETag.Should().Be(legacy.ETag);
+        (await repository.FindByCanonicalEmailAsync(email)).Should().BeNull();
+    }
+
+    [CosmosEmulatorFact]
+    public async Task Durable_economy_operation_resumes_steps_with_etag()
+    {
+        var context = await fixture.GetContextAsync();
+        var repository = new CosmosEconomyOperationRepository(context);
+        var userId = $"user-{Guid.NewGuid():N}";
+        var now = DateTimeOffset.UtcNow;
+        var candidate = new EconomyOperationRecord(
+            EconomyOperationRecord.IdFor("quiz", Guid.NewGuid().ToString("N")),
+            userId,
+            "quiz",
+            "attempt",
+            "{}",
+            ["profile", "events"],
+            [],
+            EconomyOperationRecord.PendingStatus,
+            now,
+            now);
+
+        var created = await repository.GetOrCreateAsync(candidate);
+        var withOutcome = await repository.SetOutcomeAsync(
+            userId,
+            created.Id,
+            "{\"attemptId\":\"result-1\"}");
+        var afterProfile = await repository.MarkStepCompletedAsync(userId, created.Id, "profile");
+        var completed = await repository.MarkStepCompletedAsync(userId, created.Id, "events");
+
+        created.ETag.Should().NotBeNullOrEmpty();
+        withOutcome.OutcomeJson.Should().Be("{\"attemptId\":\"result-1\"}");
+        withOutcome.Ttl.Should().Be(-1);
+        afterProfile.Status.Should().Be(EconomyOperationRecord.PendingStatus);
+        completed.Status.Should().Be(EconomyOperationRecord.CompletedStatus);
+        completed.CompletedSteps.Should().BeEquivalentTo(["profile", "events"]);
+    }
+
+    [CosmosEmulatorFact]
     public async Task Attempt_recent_activity_aggregates_count_and_xp_within_window()
     {
         var context = await fixture.GetContextAsync();
@@ -142,6 +244,37 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
         var future = await repository.GetRecentActivityAsync(userId, now.AddMinutes(5));
         future.Attempts.Should().Be(0);
         future.Xp.Should().Be(0);
+    }
+
+    [CosmosEmulatorFact]
+    public async Task Issued_exam_round_trips_with_ttl_and_is_user_scoped()
+    {
+        var context = await fixture.GetContextAsync();
+        var repository = new CosmosExamRepository(context);
+        var userId = $"user-{Guid.NewGuid():N}";
+        var now = DateTimeOffset.UtcNow;
+        var exam = NewExam(userId, now);
+
+        await repository.CreateAsync(exam);
+
+        var loaded = await repository.GetAsync(userId, exam.ExamId);
+        loaded.Should().BeEquivalentTo(exam);
+        loaded!.Kind.Should().Be("exam-issued");
+        loaded.Ttl.Should().Be(86_700);
+        (await repository.GetAsync("different-user", exam.ExamId)).Should().BeNull();
+
+        using var rawResponse = await context.Attempts.ReadItemStreamAsync(
+            exam.Id,
+            new Microsoft.Azure.Cosmos.PartitionKey(userId));
+        using var rawDocument = await JsonDocument.ParseAsync(rawResponse.Content);
+        rawDocument.RootElement.TryGetProperty("ttl", out var ttlProperty).Should().BeTrue();
+        ttlProperty.GetInt32().Should().Be(86_700);
+
+        var container = await context.Attempts.ReadContainerAsync();
+        container.Resource.DefaultTimeToLive.Should().Be(-1);
+
+        Func<Task> duplicate = () => repository.CreateAsync(exam);
+        await duplicate.Should().ThrowAsync<DuplicateRecordException>();
     }
 
     private static UserProfileDto NewProfile() => new(
@@ -184,5 +317,21 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
             StartedAt: submittedAt.AddMinutes(-1),
             SubmittedAt: submittedAt,
             Result: result);
+    }
+
+    private static ExamRecord NewExam(string userId, DateTimeOffset createdAt)
+    {
+        var examId = Guid.NewGuid().ToString("N");
+        const int durationSeconds = 300;
+        return new ExamRecord(
+            Id: $"exam::{examId}",
+            UserId: userId,
+            ExamId: examId,
+            TrackId: "az-900",
+            ItemIds: ["item-1", "item-2"],
+            CreatedAt: createdAt,
+            DurationSeconds: durationSeconds,
+            ExpiresAt: createdAt.AddSeconds(durationSeconds),
+            Ttl: durationSeconds + (int)TimeSpan.FromDays(1).TotalSeconds);
     }
 }

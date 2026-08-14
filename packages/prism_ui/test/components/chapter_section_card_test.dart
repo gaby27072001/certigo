@@ -8,8 +8,9 @@ void main() {
   const Color accent = Color(0xFF0078D4);
 
   group('ChapterSectionCard', () {
-    testWidgets('available chapter shows counter, progress and "Commencer ici"',
-        (WidgetTester tester) async {
+    testWidgets('available chapter shows counter, progress and "Commencer ici"', (
+      WidgetTester tester,
+    ) async {
       int starts = 0;
       await pumpPrism(
         tester,
@@ -36,8 +37,9 @@ void main() {
       expect(starts, 1);
     });
 
-    testWidgets('locked chapter shows the padlock hint and ignores taps',
-        (WidgetTester tester) async {
+    testWidgets('locked chapter shows the padlock hint and ignores taps', (
+      WidgetTester tester,
+    ) async {
       int starts = 0;
       await pumpPrism(
         tester,
@@ -65,8 +67,9 @@ void main() {
       expect(starts, 0);
     });
 
-    testWidgets('completed chapter shows the check emblem and no start link',
-        (WidgetTester tester) async {
+    testWidgets('completed chapter shows the check emblem and no start link', (
+      WidgetTester tester,
+    ) async {
       await pumpPrism(
         tester,
         const SizedBox(
@@ -87,8 +90,9 @@ void main() {
       expect(find.text('5/5 leçons'), findsOneWidget);
     });
 
-    testWidgets('renders the intercalated mascot bubble when provided',
-        (WidgetTester tester) async {
+    testWidgets('renders the intercalated mascot bubble when provided', (
+      WidgetTester tester,
+    ) async {
       await pumpPrism(
         tester,
         const SizedBox(

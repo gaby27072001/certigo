@@ -42,11 +42,7 @@ class Achievement {
 
 /// The learner's full achievements board with an unlocked/total tally.
 class AchievementBoard {
-  const AchievementBoard({
-    required this.unlocked,
-    required this.total,
-    required this.achievements,
-  });
+  const AchievementBoard({required this.unlocked, required this.total, required this.achievements});
 
   final int unlocked;
   final int total;

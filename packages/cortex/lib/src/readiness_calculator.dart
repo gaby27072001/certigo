@@ -71,8 +71,10 @@ class ReadinessCalculator {
   /// days (not truncated) so it matches the backend's `TotalDays`-based decay.
   static double _recencyWeight(ConceptMastery m, DateTime now) {
     final double days =
-        (now.difference(m.lastReviewedAt).inMicroseconds / Duration.microsecondsPerDay)
-            .clamp(0.0, double.infinity);
+        (now.difference(m.lastReviewedAt).inMicroseconds / Duration.microsecondsPerDay).clamp(
+      0.0,
+      double.infinity,
+    );
     return math.exp(-days / 30).clamp(0.0, 1.0);
   }
 }

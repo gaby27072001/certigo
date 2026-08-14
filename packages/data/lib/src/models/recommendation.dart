@@ -7,11 +7,7 @@ library;
 /// active struggles and the skill-path frontier. The client renders [items] as
 /// an ordered shelf of cards; [top] is the single highest-leverage action.
 class NextBest {
-  const NextBest({
-    required this.trackId,
-    required this.generatedAt,
-    required this.items,
-  });
+  const NextBest({required this.trackId, required this.generatedAt, required this.items});
 
   final String trackId;
   final DateTime generatedAt;

@@ -168,10 +168,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Padding(
-                    padding: const EdgeInsets.only(
-                      left: PrismSpacing.sm,
-                      top: PrismSpacing.xs,
-                    ),
+                    padding: const EdgeInsets.only(left: PrismSpacing.sm, top: PrismSpacing.xs),
                     child: _AuthBackButton(onTap: () => context.go('/landing')),
                   ),
                 ),
@@ -290,8 +287,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                                               height: 22,
                                               child: CircularProgressIndicator(
                                                 strokeWidth: 2.4,
-                                                valueColor:
-                                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                                                valueColor: AlwaysStoppedAnimation<Color>(
+                                                  Colors.white,
+                                                ),
                                               ),
                                             )
                                           : Text(registering ? 'Créer un compte' : 'Se connecter'),
@@ -469,10 +467,7 @@ class _DiagnosticCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: PrismSpacing.xs),
-          SelectableText(
-            trace,
-            style: text.bodySmall?.copyWith(color: p.textPrimary, height: 1.4),
-          ),
+          SelectableText(trace, style: text.bodySmall?.copyWith(color: p.textPrimary, height: 1.4)),
           const SizedBox(height: PrismSpacing.xs),
           Text(
             'Capture ces étapes : la dernière ligne indique où le flux s\'est arrêté.',

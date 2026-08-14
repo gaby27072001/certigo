@@ -11,10 +11,7 @@ import 'package:certigo/features/lesson/application/lesson_session_state.dart';
 /// Repositories that always fail, forcing the controller's offline path.
 class _OfflineLessonRepo implements LessonRepository {
   @override
-  Future<Result<Lesson>> getLesson({
-    required String trackId,
-    required String lessonId,
-  }) async =>
+  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) async =>
       const Err<Lesson>(NetworkFailure());
 }
 

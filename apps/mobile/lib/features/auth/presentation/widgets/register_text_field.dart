@@ -43,10 +43,9 @@ class RegisterTextField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
-    final TextStyle textStyle = Theme.of(context).textTheme.titleMedium!.copyWith(
-          color: p.textPrimary,
-          fontWeight: FontWeight.w600,
-        );
+    final TextStyle textStyle = Theme.of(
+      context,
+    ).textTheme.titleMedium!.copyWith(color: p.textPrimary, fontWeight: FontWeight.w600);
     final OutlineInputBorder base = OutlineInputBorder(
       borderRadius: PrismRadii.cardLg,
       borderSide: BorderSide(color: p.border, width: 1.5),

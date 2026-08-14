@@ -70,9 +70,7 @@ void main() {
     });
 
     test('tolerates a minimal payload with safe defaults', () {
-      final TutorExplanation exp = TutorExplanation.fromJson(<String, dynamic>{
-        'itemId': 'item-1',
-      });
+      final TutorExplanation exp = TutorExplanation.fromJson(<String, dynamic>{'itemId': 'item-1'});
 
       expect(exp.conceptId, '');
       expect(exp.correct, isFalse);

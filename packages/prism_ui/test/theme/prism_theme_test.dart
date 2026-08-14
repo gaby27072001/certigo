@@ -21,14 +21,8 @@ void main() {
     test('themes register the matching PrismColorScheme extension', () {
       final ThemeData light = PrismTheme.light();
       final ThemeData dark = PrismTheme.dark();
-      expect(
-        identical(light.extension<PrismColorScheme>(), PrismColorScheme.light),
-        isTrue,
-      );
-      expect(
-        identical(dark.extension<PrismColorScheme>(), PrismColorScheme.dark),
-        isTrue,
-      );
+      expect(identical(light.extension<PrismColorScheme>(), PrismColorScheme.light), isTrue);
+      expect(identical(dark.extension<PrismColorScheme>(), PrismColorScheme.dark), isTrue);
     });
   });
 }

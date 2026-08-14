@@ -19,17 +19,15 @@ class NotificationService {
   static Future<void> initialize() async {
     tz.initializeTimeZones();
 
-    const AndroidInitializationSettings android =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const AndroidInitializationSettings android = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const DarwinInitializationSettings ios = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
-    const InitializationSettings settings = InitializationSettings(
-      android: android,
-      iOS: ios,
-    );
+    const InitializationSettings settings = InitializationSettings(android: android, iOS: ios);
     await _plugin.initialize(settings);
   }
 

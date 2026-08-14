@@ -22,9 +22,8 @@ class LeaderboardScreen extends ConsumerWidget {
         child: async.when(
           data: (League league) => _LeagueContent(league: league),
           loading: () => const _LeaderboardLoading(),
-          error: (Object error, StackTrace _) => PrismStatusView.error(
-            onRetry: () => ref.invalidate(leagueProvider),
-          ),
+          error: (Object error, StackTrace _) =>
+              PrismStatusView.error(onRetry: () => ref.invalidate(leagueProvider)),
         ),
       ),
     );

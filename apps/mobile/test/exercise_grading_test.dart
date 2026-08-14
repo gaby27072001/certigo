@@ -49,14 +49,8 @@ void main() {
     });
 
     test('applied: behaves like ordering (order-sensitive)', () {
-      expect(
-        gradeSelection(ItemType.applied, <String>['a', 'b'], <String>['a', 'b']),
-        isTrue,
-      );
-      expect(
-        gradeSelection(ItemType.applied, <String>['b', 'a'], <String>['a', 'b']),
-        isFalse,
-      );
+      expect(gradeSelection(ItemType.applied, <String>['a', 'b'], <String>['a', 'b']), isTrue);
+      expect(gradeSelection(ItemType.applied, <String>['b', 'a'], <String>['a', 'b']), isFalse);
     });
   });
 

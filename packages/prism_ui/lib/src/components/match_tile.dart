@@ -164,10 +164,9 @@ class _PairBadge extends StatelessWidget {
       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       child: Text(
         '$value',
-        style: Theme.of(context)
-            .textTheme
-            .labelMedium
-            ?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+        style: Theme.of(
+          context,
+        ).textTheme.labelMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
       ),
     );
   }

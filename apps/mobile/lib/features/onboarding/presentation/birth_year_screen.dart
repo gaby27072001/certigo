@@ -121,10 +121,7 @@ class _YearWheel extends StatelessWidget {
             decoration: BoxDecoration(
               color: p.primary.withOpacity(0.10),
               borderRadius: PrismRadii.cardMd,
-              border: Border.all(
-                color: p.primary.withOpacity(0.30),
-                width: 1.5,
-              ),
+              border: Border.all(color: p.primary.withOpacity(0.30), width: 1.5),
             ),
           ),
         ),

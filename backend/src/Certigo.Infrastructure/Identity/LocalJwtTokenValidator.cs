@@ -13,7 +13,7 @@ namespace Certigo.Infrastructure.Identity;
 /// explicitly rejected here so they can never be used to call the API directly.
 public sealed class LocalJwtTokenValidator : ITokenValidator
 {
-    private readonly SymmetricSecurityKey _key;
+    private readonly IReadOnlyList<SecurityKey> _validationKeys;
     private readonly string _issuer;
     private readonly string _audience;
     private readonly ILogger<LocalJwtTokenValidator> _logger;
@@ -23,9 +23,13 @@ public sealed class LocalJwtTokenValidator : ITokenValidator
         string signingSecret,
         string issuer,
         string audience,
-        ILogger<LocalJwtTokenValidator>? logger = null)
+        ILogger<LocalJwtTokenValidator>? logger = null,
+        string? previousSigningSecret = null)
     {
-        _key = LocalJwtSigning.DeriveKey(signingSecret);
+        var activeKey = LocalJwtSigning.DeriveKey(signingSecret);
+        _validationKeys = string.IsNullOrWhiteSpace(previousSigningSecret)
+            ? [activeKey]
+            : [activeKey, LocalJwtSigning.DeriveKey(previousSigningSecret)];
         _issuer = string.IsNullOrWhiteSpace(issuer) ? "certigo" : issuer;
         _audience = string.IsNullOrWhiteSpace(audience) ? "certigo" : audience;
         _logger = logger ?? NullLogger<LocalJwtTokenValidator>.Instance;
@@ -39,7 +43,7 @@ public sealed class LocalJwtTokenValidator : ITokenValidator
             {
                 ValidIssuer = _issuer,
                 ValidAudience = _audience,
-                IssuerSigningKey = _key,
+                IssuerSigningKeys = _validationKeys,
                 ValidateIssuer = true,
                 ValidateAudience = true,
                 ValidateIssuerSigningKey = true,

@@ -7,10 +7,7 @@ import 'package:certigo/features/quiz/application/quiz_controller.dart';
 /// game-loop can be exercised deterministically without a network or a widget.
 class _OfflineLessonRepo implements LessonRepository {
   @override
-  Future<Result<Lesson>> getLesson({
-    required String trackId,
-    required String lessonId,
-  }) async =>
+  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) async =>
       const Err<Lesson>(NetworkFailure());
 }
 

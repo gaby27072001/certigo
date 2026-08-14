@@ -16,13 +16,9 @@ param containerSoftDeleteDays int = 7
 @description('Enable blob versioning (recommended for prod).')
 param enableVersioning bool = false
 
-@description('''Private-networking posture. When true, public network access is Disabled and the
-network ACL default action is Deny (assumes private endpoints exist — Phase 2). Default false keeps
-the public endpoint Enabled + default action Allow so the Flex Consumption Function App can pull its
-deployment package (app-package container) over the public endpoint via its managed identity (an
-unset/Disabled value previously broke the package pull with a 403 InaccessibleStorageException).
-Decoupled from data hardening: RBAC-only access is enforced separately via allowSharedKeyAccess=false.''')
-param enablePrivateNetworking bool = false
+@description('Network posture. Only public-rbac is supported until VNet integration, private endpoints and private DNS are deployed together.')
+@allowed([ 'public-rbac' ])
+param networkAccessMode string = 'public-rbac'
 
 resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
   name: accountName
@@ -36,10 +32,10 @@ resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
     allowSharedKeyAccess: false
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
-    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
+    publicNetworkAccess: 'Enabled'
     networkAcls: {
       bypass: 'AzureServices'
-      defaultAction: enablePrivateNetworking ? 'Deny' : 'Allow'
+      defaultAction: 'Allow'
     }
   }
 }
@@ -76,3 +72,4 @@ resource appPackage 'Microsoft.Storage/storageAccounts/blobServices/containers@2
 output accountName string = storage.name
 output deploymentContainerName string = appPackage.name
 output primaryBlobEndpoint string = storage.properties.primaryEndpoints.blob
+output networkAccessMode string = networkAccessMode

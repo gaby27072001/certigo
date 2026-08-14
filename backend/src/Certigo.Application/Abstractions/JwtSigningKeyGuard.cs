@@ -27,7 +27,8 @@ public static class JwtSigningKeyGuard
 
         var trimmed = configuredSecret?.Trim();
         var isStrongKey = !string.IsNullOrEmpty(trimmed)
-            && !string.Equals(trimmed, DevelopmentSigningKey, StringComparison.Ordinal);
+            && !string.Equals(trimmed, DevelopmentSigningKey, StringComparison.Ordinal)
+            && !IsUnresolvedKeyVaultReference(trimmed);
 
         if (hardened && !isStrongKey)
         {
@@ -42,4 +43,45 @@ public static class JwtSigningKeyGuard
         // Development tolerates an absent key by falling back to the development placeholder.
         return string.IsNullOrWhiteSpace(configuredSecret) ? DevelopmentSigningKey : configuredSecret;
     }
+
+    /// Returns the optional previous signing secret used only to validate tokens during
+    /// a planned rotation overlap. Hardened environments reject the public development
+    /// key here as strictly as they reject it for the active signer.
+    public static string? ResolvePreviousSigningSecret(
+        string? configuredSecret,
+        string activeSigningSecret,
+        bool isProduction,
+        string? authMode)
+    {
+        if (string.IsNullOrWhiteSpace(configuredSecret))
+        {
+            return null;
+        }
+
+        var hardened = isProduction
+            || string.Equals(authMode?.Trim(), "prod", StringComparison.OrdinalIgnoreCase);
+        var trimmed = configuredSecret.Trim();
+        if (IsUnresolvedKeyVaultReference(trimmed))
+        {
+            throw new InvalidOperationException(
+                "AUTH_JWT_PREVIOUS_SIGNING_KEY contains an unresolved Key Vault reference.");
+        }
+        if (hardened
+            && string.Equals(trimmed, DevelopmentSigningKey, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "AUTH_JWT_PREVIOUS_SIGNING_KEY cannot use the built-in development key " +
+                "in a hardened environment.");
+        }
+        if (string.Equals(configuredSecret, activeSigningSecret, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "AUTH_JWT_PREVIOUS_SIGNING_KEY must differ from the active signing key.");
+        }
+
+        return configuredSecret;
+    }
+
+    private static bool IsUnresolvedKeyVaultReference(string value)
+        => value.StartsWith("@Microsoft.KeyVault(", StringComparison.OrdinalIgnoreCase);
 }

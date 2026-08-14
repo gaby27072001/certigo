@@ -19,10 +19,7 @@ abstract interface class CredentialsGateway {
   });
 
   /// Connecte un compte existant et renvoie la session.
-  Future<AuthSession> login({
-    required String email,
-    required String password,
-  });
+  Future<AuthSession> login({required String email, required String password});
 
   /// Réémet une session à partir du `refresh_token` local.
   Future<AuthSession> refresh(String refreshToken);
@@ -52,22 +49,18 @@ class HttpCredentialsGateway implements CredentialsGateway {
     String? displayName,
   }) async {
     final Result<AuthSession> result = await _client.postJson<AuthSession>(
-      '/auth/register',
-      <String, dynamic>{
-        'email': email,
-        'password': password,
-        if (displayName != null && displayName.isNotEmpty) 'displayName': displayName,
-      },
-      (Map<String, dynamic> json) => _sessionFrom(json, email: email),
-    );
+        '/auth/register',
+        <String, dynamic>{
+          'email': email,
+          'password': password,
+          if (displayName != null && displayName.isNotEmpty) 'displayName': displayName,
+        },
+        (Map<String, dynamic> json) => _sessionFrom(json, email: email));
     return _unwrap(result);
   }
 
   @override
-  Future<AuthSession> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<AuthSession> login({required String email, required String password}) async {
     final Result<AuthSession> result = await _client.postJson<AuthSession>(
       '/auth/login',
       <String, dynamic>{'email': email, 'password': password},
@@ -91,10 +84,11 @@ class HttpCredentialsGateway implements CredentialsGateway {
     // Le backend répond toujours de façon générique ({message}) ; on ignore le
     // corps et on ne propage pas d'échec bloquant (best-effort).
     await _client.postJson<bool>(
-      '/auth/resend-verification',
-      <String, dynamic>{'email': email},
-      (Map<String, dynamic> json) => true,
-    );
+        '/auth/resend-verification',
+        <String, dynamic>{
+          'email': email,
+        },
+        (Map<String, dynamic> json) => true);
   }
 
   /// Convertit l'`AuthResultDto` JSON du backend en [AuthSession] locale.

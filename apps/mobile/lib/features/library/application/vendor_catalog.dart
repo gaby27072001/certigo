@@ -23,10 +23,7 @@ VendorBrand vendorOf(TrackSummary track) {
 }
 
 /// The vendors that have real, browsable catalogues today.
-const List<VendorBrand> kRealVendors = <VendorBrand>[
-  VendorBrand.microsoft,
-  VendorBrand.github,
-];
+const List<VendorBrand> kRealVendors = <VendorBrand>[VendorBrand.microsoft, VendorBrand.github];
 
 /// The showcase ("bientôt") vendors — displayed locked, with no tracks yet.
 const List<VendorBrand> kShowcaseVendors = <VendorBrand>[
@@ -144,10 +141,12 @@ List<CertSection> groupIntoSections(List<TrackSummary> tracks, {String query = '
   final String q = query.trim().toLowerCase();
   final Iterable<TrackSummary> filtered = q.isEmpty
       ? tracks
-      : tracks.where((TrackSummary t) =>
-          t.code.toLowerCase().contains(q) ||
-          t.title.toLowerCase().contains(q) ||
-          t.summary.toLowerCase().contains(q));
+      : tracks.where(
+          (TrackSummary t) =>
+              t.code.toLowerCase().contains(q) ||
+              t.title.toLowerCase().contains(q) ||
+              t.summary.toLowerCase().contains(q),
+        );
 
   final Map<CertCategory, List<TrackSummary>> byCategory = <CertCategory, List<TrackSummary>>{};
   for (final TrackSummary track in filtered) {

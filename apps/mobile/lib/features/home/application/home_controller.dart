@@ -43,9 +43,7 @@ class HomeData {
     if (path.domains.isEmpty) {
       return null;
     }
-    return path.domains.reduce(
-      (DomainProgress a, DomainProgress b) => a.score <= b.score ? a : b,
-    );
+    return path.domains.reduce((DomainProgress a, DomainProgress b) => a.score <= b.score ? a : b);
   }
 }
 

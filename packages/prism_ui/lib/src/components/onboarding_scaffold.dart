@@ -68,10 +68,7 @@ class OnboardingScaffold extends StatelessWidget {
     final Widget body = Padding(
       padding: padding,
       child: scrollable
-          ? SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: child,
-            )
+          ? SingleChildScrollView(physics: const BouncingScrollPhysics(), child: child)
           : child,
     );
 
@@ -260,17 +257,9 @@ class _StickyCta extends StatelessWidget {
             scale: enabled ? 1 : 0.985,
             duration: d,
             curve: PrismMotion.decelerate,
-            child: PrismButton(
-              label: label,
-              tone: tone,
-              loading: loading,
-              onPressed: onPressed,
-            ),
+            child: PrismButton(label: label, tone: tone, loading: loading, onPressed: onPressed),
           ),
-          if (secondary != null) ...<Widget>[
-            const SizedBox(height: 6),
-            secondary!,
-          ],
+          if (secondary != null) ...<Widget>[const SizedBox(height: 6), secondary!],
         ],
       ),
     );

@@ -66,9 +66,7 @@ void main() {
           _lesson('l1', NodeStatus.completed),
           _lesson('l2', NodeStatus.mastered),
         ]),
-        _unit('u2', NodeStatus.locked, <PathLesson>[
-          _lesson('l3', NodeStatus.locked),
-        ]),
+        _unit('u2', NodeStatus.locked, <PathLesson>[_lesson('l3', NodeStatus.locked)]),
       ]);
 
       expect(currentLessonIdOf(path), isNull);

@@ -38,17 +38,11 @@ class AnswerFeedbackCard extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(
-                correct ? Icons.verified_rounded : Icons.info_rounded,
-                color: color,
-              ),
+              Icon(correct ? Icons.verified_rounded : Icons.info_rounded, color: color),
               const SizedBox(width: 8),
               Text(
                 correct ? correctTitle : incorrectTitle,
-                style: t.titleMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: t.titleMedium?.copyWith(color: color, fontWeight: FontWeight.w800),
               ),
             ],
           ),

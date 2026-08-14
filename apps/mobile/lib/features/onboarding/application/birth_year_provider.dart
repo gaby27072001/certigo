@@ -33,6 +33,4 @@ class BirthYearNotifier extends AsyncNotifier<int?> {
 ///
 /// Read this anywhere in the app to check whether the birth year has been
 /// collected and what its value is.
-final birthYearProvider = AsyncNotifierProvider<BirthYearNotifier, int?>(
-  BirthYearNotifier.new,
-);
+final birthYearProvider = AsyncNotifierProvider<BirthYearNotifier, int?>(BirthYearNotifier.new);

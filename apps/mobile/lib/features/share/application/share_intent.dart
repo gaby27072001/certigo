@@ -16,6 +16,4 @@ class SharePlusIntent implements ShareIntent {
   }
 }
 
-final shareIntentProvider = Provider<ShareIntent>(
-  (Ref ref) => const SharePlusIntent(),
-);
+final shareIntentProvider = Provider<ShareIntent>((Ref ref) => const SharePlusIntent());

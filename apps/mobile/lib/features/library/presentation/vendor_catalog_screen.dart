@@ -35,10 +35,7 @@ class VendorCatalogScreen extends ConsumerWidget {
           children: <Widget>[
             _ResourceBar(home: home),
             const SizedBox(height: PrismSpacing.md),
-            Text(
-              'Bibliothèque',
-              style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
+            Text('Bibliothèque', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: PrismSpacing.lg),
             _PourToiSection(home: home),
             const SizedBox(height: PrismSpacing.xl),
@@ -71,10 +68,7 @@ class _ResourceBar extends StatelessWidget {
       ),
       data: (HomeData data) => Row(
         children: <Widget>[
-          StreakBadge(
-            days: data.profile.streakDays,
-            active: data.profile.dailyProgress >= 1,
-          ),
+          StreakBadge(days: data.profile.streakDays, active: data.profile.dailyProgress >= 1),
           const SizedBox(width: PrismSpacing.xs),
           GemCounter(gems: data.profile.gems),
           const Spacer(),
@@ -105,10 +99,7 @@ class _PourToiSection extends StatelessWidget {
           children: <Widget>[
             Icon(Icons.auto_awesome_rounded, size: 20, color: p.primary),
             const SizedBox(width: PrismSpacing.xs),
-            Text(
-              'Pour toi',
-              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
+            Text('Pour toi', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
           ],
         ),
         const SizedBox(height: PrismSpacing.md),
@@ -168,10 +159,7 @@ class _VendorSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          'Éditeurs',
-          style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        ),
+        Text('Éditeurs', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
         const SizedBox(height: PrismSpacing.xxs),
         Text(
           'Choisis un éditeur pour explorer ses certifications',
@@ -189,11 +177,7 @@ class _VendorSection extends StatelessWidget {
             for (final VendorBrand vendor in kRealVendors)
               _RealVendorTile(vendor: vendor, catalog: catalog),
             for (final VendorBrand vendor in kShowcaseVendors)
-              VendorTile(
-                brand: vendor,
-                subtitle: 'Bientôt',
-                locked: true,
-              ),
+              VendorTile(brand: vendor, subtitle: 'Bientôt', locked: true),
           ],
         ),
       ],

@@ -9,6 +9,7 @@ internal sealed class SeasonServiceHarness
 {
     public InMemoryUserRepository Users { get; } = new();
     public InMemoryEventRepository Events { get; } = new();
+    public InMemoryEconomyOperationRepository EconomyOperations { get; } = new();
 
     // 6 January 2025 → active season "2025-01" (Renouveau Cloud, EarnXp 1200).
     public FakeClock Clock { get; } = new(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
@@ -18,7 +19,7 @@ internal sealed class SeasonServiceHarness
     public DateOnly Today => DateOnly.FromDateTime(Clock.UtcNow.UtcDateTime);
 
     public SeasonService Build()
-        => new(new FakeUserContext(UserId, "Tester"), Clock, Users, Events);
+        => new(new FakeUserContext(UserId, "Tester"), Clock, Users, Events, EconomyOperations);
 
     public void SeedNoActivity(int gems = 0)
     {
@@ -137,7 +138,12 @@ public sealed class SeasonServiceTests
         var users = new ConflictOnceUserRepository(inner);
         var clock = new FakeClock(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
         var events = new InMemoryEventRepository();
-        var service = new SeasonService(new FakeUserContext("user-1", "Tester"), clock, users, events);
+        var service = new SeasonService(
+            new FakeUserContext("user-1", "Tester"),
+            clock,
+            users,
+            events,
+            new InMemoryEconomyOperationRepository());
 
         var result = await service.ClaimAsync(new ClaimSeasonRequest("2025-01"));
 
@@ -147,6 +153,9 @@ public sealed class SeasonServiceTests
         var profile = await inner.GetAsync("user-1");
         profile!.Gems.Should().Be(220); // credited exactly once (100 + 120)
         profile.SeasonBadges!.Count(b => b == "season-renouveau-cloud").Should().Be(1); // badge granted once
+        result.GemsBalance.Should().Be(profile.Gems);
+        events.Events.Single(e => e.Type == "season.claimed").Payload
+            .Should().BeEquivalentTo(result);
         events.Events.Count(e => e.Type == "season.claimed").Should().Be(1);
     }
 

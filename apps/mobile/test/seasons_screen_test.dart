@@ -52,13 +52,8 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          seasonProvider.overrideWith((Ref ref) async => fakeSeason()),
-        ],
-        child: MaterialApp.router(
-          theme: PrismTheme.light(),
-          routerConfig: router,
-        ),
+        overrides: <Override>[seasonProvider.overrideWith((Ref ref) async => fakeSeason())],
+        child: MaterialApp.router(theme: PrismTheme.light(), routerConfig: router),
       ),
     );
 

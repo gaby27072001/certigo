@@ -48,14 +48,12 @@ void main() {
       );
 
       // ISO: pre-migration literal was fromLTRB(20, 12, 20, 120).
-      expect(
-        _resolvedPadding(tester, key),
-        const EdgeInsets.fromLTRB(20, 12, 20, 120),
-      );
+      expect(_resolvedPadding(tester, key), const EdgeInsets.fromLTRB(20, 12, 20, 120));
     });
 
-    testWidgets('home readiness hero vertical padding is token-exact ($mode)',
-        (WidgetTester tester) async {
+    testWidgets('home readiness hero vertical padding is token-exact ($mode)', (
+      WidgetTester tester,
+    ) async {
       const Key key = Key('home_readiness_card');
       await tester.pumpWidget(
         _host(
@@ -69,10 +67,7 @@ void main() {
       );
 
       // ISO: pre-migration literal was symmetric(vertical: 24).
-      expect(
-        _resolvedPadding(tester, key),
-        const EdgeInsets.symmetric(vertical: 24),
-      );
+      expect(_resolvedPadding(tester, key), const EdgeInsets.symmetric(vertical: 24));
     });
 
     testWidgets('home explore card padding is token-exact ($mode)', (WidgetTester tester) async {

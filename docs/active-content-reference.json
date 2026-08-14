@@ -2,9 +2,9 @@
   "schema": "certigo.active-content-reference/v1",
   "repository": "gchambaud_microsoft/certigo-content",
   "branch": "main",
-  "revision": "663f32b4818964e307cf7e084cd09a9c6af91429",
-  "date": "2026-08-06",
-  "committedAt": "2026-08-06T15:59:29Z",
+  "revision": "55a512821dabbea8b65d3403f9c83571b4a33ed8",
+  "date": "2026-08-14",
+  "committedAt": "2026-08-14T21:42:01Z",
   "packageContract": {
     "schema": "certigo.content.package-manifest/v1",
     "algorithm": "sha256",

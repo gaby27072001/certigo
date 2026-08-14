@@ -66,8 +66,11 @@ void main() {
     for (final dynamic raw in parity['weakness'] as List<dynamic>) {
       final Map<String, dynamic> v = raw as Map<String, dynamic>;
       test(v['name'] as String, () {
-        final ConceptMastery m = ConceptMastery.fresh(conceptId: 'c', trackId: 't', now: now)
-            .copyWith(reps: v['reps'] as int, masteryScore: _d(v['masteryScore']));
+        final ConceptMastery m = ConceptMastery.fresh(
+          conceptId: 'c',
+          trackId: 't',
+          now: now,
+        ).copyWith(reps: v['reps'] as int, masteryScore: _d(v['masteryScore']));
         expect(m.isWeak, v['expectedIsWeak'] as bool);
       });
     }
@@ -79,8 +82,9 @@ void main() {
       test(v['name'] as String, () {
         final List<dynamic> masteryVectors = v['masteries'] as List<dynamic>;
         final Map<String, int> expectedDomainScores =
-            (v['expectedDomainScores'] as Map<String, dynamic>)
-                .map((String k, dynamic val) => MapEntry<String, int>(k, val as int));
+            (v['expectedDomainScores'] as Map<String, dynamic>).map(
+          (String k, dynamic val) => MapEntry<String, int>(k, val as int),
+        );
 
         final List<DomainReadiness> domains = <DomainReadiness>[];
         for (final dynamic dRaw in v['domains'] as List<dynamic>) {

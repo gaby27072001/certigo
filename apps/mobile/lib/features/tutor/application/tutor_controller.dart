@@ -26,14 +26,8 @@ class TutorController extends StateNotifier<TutorState> {
     if (!mounted) return;
 
     state = res.when(
-      success: (TutorExplanation e) => TutorState(
-        status: TutorStatus.ready,
-        explanation: e,
-      ),
-      failure: (Failure f) => TutorState(
-        status: TutorStatus.error,
-        errorMessage: f.message,
-      ),
+      success: (TutorExplanation e) => TutorState(status: TutorStatus.ready, explanation: e),
+      failure: (Failure f) => TutorState(status: TutorStatus.error, errorMessage: f.message),
     );
   }
 }

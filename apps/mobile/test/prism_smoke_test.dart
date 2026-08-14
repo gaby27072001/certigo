@@ -15,14 +15,7 @@ void main() {
 
   testWidgets('PrismButton renders its label and fires onPressed', (tester) async {
     var tapped = false;
-    await tester.pumpWidget(
-      host(
-        PrismButton(
-          label: 'Continuer',
-          onPressed: () => tapped = true,
-        ),
-      ),
-    );
+    await tester.pumpWidget(host(PrismButton(label: 'Continuer', onPressed: () => tapped = true)));
 
     expect(find.text('Continuer'), findsOneWidget);
 
@@ -35,10 +28,7 @@ void main() {
     await tester.pumpWidget(
       host(
         const GlassSurface(
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Readiness'),
-          ),
+          child: Padding(padding: EdgeInsets.all(16), child: Text('Readiness')),
         ),
       ),
     );

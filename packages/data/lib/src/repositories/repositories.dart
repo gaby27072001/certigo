@@ -35,10 +35,7 @@ abstract interface class CatalogRepository {
 }
 
 abstract interface class LessonRepository {
-  Future<Result<Lesson>> getLesson({
-    required String trackId,
-    required String lessonId,
-  });
+  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId});
 }
 
 abstract interface class QuizRepository {

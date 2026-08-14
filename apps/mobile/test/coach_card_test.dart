@@ -44,13 +44,7 @@ void main() {
   testWidgets('prominent card shows label, title, reason, time and fires onTap', (tester) async {
     var tapped = false;
     await tester.pumpWidget(
-      host(
-        CoachCard(
-          item: rec(),
-          prominent: true,
-          onTap: () => tapped = true,
-        ),
-      ),
+      host(CoachCard(item: rec(), prominent: true, onTap: () => tapped = true)),
     );
 
     expect(find.text('À RÉVISER'), findsOneWidget);

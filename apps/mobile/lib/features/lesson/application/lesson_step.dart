@@ -5,26 +5,11 @@ import 'package:data/data.dart';
 /// Content kinds map 1:1 to [BlockType]; [intro] and [result] are synthetic
 /// bookends; [quiz] is reserved for future unit checkpoints and is never emitted
 /// by [buildLessonSteps] (kept so the renderer switch stays exhaustive).
-enum LessonStepKind {
-  intro,
-  hook,
-  concept,
-  example,
-  code,
-  check,
-  recap,
-  quiz,
-  result,
-}
+enum LessonStepKind { intro, hook, concept, example, code, check, recap, quiz, result }
 
 /// One screen in the lesson flow.
 class LessonStep {
-  const LessonStep({
-    required this.kind,
-    required this.index,
-    this.block,
-    this.item,
-  });
+  const LessonStep({required this.kind, required this.index, this.block, this.item});
 
   final LessonStepKind kind;
 

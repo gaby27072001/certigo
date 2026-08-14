@@ -14,10 +14,7 @@ void main() {
     });
 
     testWidgets('drops the blur when disabled but keeps the child', (WidgetTester tester) async {
-      await pumpPrism(
-        tester,
-        const GlassSurface(blurEnabled: false, child: Text('Solid')),
-      );
+      await pumpPrism(tester, const GlassSurface(blurEnabled: false, child: Text('Solid')));
 
       expect(find.text('Solid'), findsOneWidget);
       expect(find.byType(BackdropFilter), findsNothing);
@@ -25,13 +22,7 @@ void main() {
 
     testWidgets('invokes onTap when pressed', (WidgetTester tester) async {
       int taps = 0;
-      await pumpPrism(
-        tester,
-        GlassSurface(
-          onTap: () => taps++,
-          child: const Text('Tap me'),
-        ),
-      );
+      await pumpPrism(tester, GlassSurface(onTap: () => taps++, child: const Text('Tap me')));
 
       await tester.tap(find.text('Tap me'));
       await tester.pumpAndSettle();

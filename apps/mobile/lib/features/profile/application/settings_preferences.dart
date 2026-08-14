@@ -80,9 +80,7 @@ class DailyGoalNotifier extends StateNotifier<DailyGoalOption> {
 }
 
 final StateNotifierProvider<DailyGoalNotifier, DailyGoalOption> dailyGoalProvider =
-    StateNotifierProvider<DailyGoalNotifier, DailyGoalOption>(
-  (_) => DailyGoalNotifier(),
-);
+    StateNotifierProvider<DailyGoalNotifier, DailyGoalOption>((_) => DailyGoalNotifier());
 
 // ---------------------------------------------------------------------------
 // KnowledgeLevel
@@ -109,9 +107,7 @@ class KnowledgeLevelNotifier extends StateNotifier<KnowledgeLevel> {
 }
 
 final StateNotifierProvider<KnowledgeLevelNotifier, KnowledgeLevel> knowledgeLevelProvider =
-    StateNotifierProvider<KnowledgeLevelNotifier, KnowledgeLevel>(
-  (_) => KnowledgeLevelNotifier(),
-);
+    StateNotifierProvider<KnowledgeLevelNotifier, KnowledgeLevel>((_) => KnowledgeLevelNotifier());
 
 // ---------------------------------------------------------------------------
 // AzureDomains
@@ -146,9 +142,7 @@ class DomainsNotifier extends StateNotifier<Set<AzureDomain>> {
 }
 
 final StateNotifierProvider<DomainsNotifier, Set<AzureDomain>> domainsProvider =
-    StateNotifierProvider<DomainsNotifier, Set<AzureDomain>>(
-  (_) => DomainsNotifier(),
-);
+    StateNotifierProvider<DomainsNotifier, Set<AzureDomain>>((_) => DomainsNotifier());
 
 // ---------------------------------------------------------------------------
 // SoundsEnabled
@@ -172,9 +166,7 @@ class SoundsEnabledNotifier extends StateNotifier<bool> {
 }
 
 final StateNotifierProvider<SoundsEnabledNotifier, bool> soundsEnabledProvider =
-    StateNotifierProvider<SoundsEnabledNotifier, bool>(
-  (_) => SoundsEnabledNotifier(),
-);
+    StateNotifierProvider<SoundsEnabledNotifier, bool>((_) => SoundsEnabledNotifier());
 
 // ---------------------------------------------------------------------------
 // StreakReminder
@@ -198,9 +190,7 @@ class StreakReminderNotifier extends StateNotifier<bool> {
 }
 
 final StateNotifierProvider<StreakReminderNotifier, bool> streakReminderProvider =
-    StateNotifierProvider<StreakReminderNotifier, bool>(
-  (_) => StreakReminderNotifier(),
-);
+    StateNotifierProvider<StreakReminderNotifier, bool>((_) => StreakReminderNotifier());
 
 // ---------------------------------------------------------------------------
 // DisplayName override
@@ -229,9 +219,7 @@ class DisplayNameNotifier extends StateNotifier<String?> {
 }
 
 final StateNotifierProvider<DisplayNameNotifier, String?> displayNameOverrideProvider =
-    StateNotifierProvider<DisplayNameNotifier, String?>(
-  (_) => DisplayNameNotifier(),
-);
+    StateNotifierProvider<DisplayNameNotifier, String?>((_) => DisplayNameNotifier());
 
 // ---------------------------------------------------------------------------
 // Handle override
@@ -260,9 +248,7 @@ class HandleNotifier extends StateNotifier<String?> {
 }
 
 final StateNotifierProvider<HandleNotifier, String?> handleOverrideProvider =
-    StateNotifierProvider<HandleNotifier, String?>(
-  (_) => HandleNotifier(),
-);
+    StateNotifierProvider<HandleNotifier, String?>((_) => HandleNotifier());
 
 // ---------------------------------------------------------------------------
 // AppLanguage
@@ -286,6 +272,4 @@ class AppLanguageNotifier extends StateNotifier<String> {
 }
 
 final StateNotifierProvider<AppLanguageNotifier, String> appLanguageProvider =
-    StateNotifierProvider<AppLanguageNotifier, String>(
-  (_) => AppLanguageNotifier(),
-);
+    StateNotifierProvider<AppLanguageNotifier, String>((_) => AppLanguageNotifier());

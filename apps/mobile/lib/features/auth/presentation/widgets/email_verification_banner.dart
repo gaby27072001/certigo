@@ -74,8 +74,10 @@ class _EmailVerificationBannerState extends ConsumerState<EmailVerificationBanne
                 Expanded(
                   child: Text(
                     'Confirme ton adresse e-mail',
-                    style: text.titleSmall
-                        ?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700),
+                    style: text.titleSmall?.copyWith(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],

@@ -165,9 +165,10 @@ Lesson sampleLesson(String lessonId) => Lesson(
                 'affaiblit la sécurité au lieu de la renforcer ?',
             options: <QuizOption>[
               QuizOption(
-                  id: 'a',
-                  label: 'Ouvrir le port RDP (3389) à tout '
-                      'internet (0.0.0.0/0)'),
+                id: 'a',
+                label: 'Ouvrir le port RDP (3389) à tout '
+                    'internet (0.0.0.0/0)',
+              ),
               QuizOption(id: 'b', label: 'Activer MFA sur le compte administrateur'),
               QuizOption(id: 'c', label: 'Restreindre les accès avec un NSG'),
               QuizOption(id: 'd', label: 'Stocker les secrets dans Key Vault'),

@@ -28,6 +28,10 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
         {
             await WriteProblemAsync(context, HttpStatusCode.BadRequest, "Invalid request", ex.Message, correlationId);
         }
+        catch (RequestValidationException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.BadRequest, "Invalid request", ex.Message, correlationId);
+        }
         catch (AuthFailedException ex)
         {
             // Authentication failures (wrong credentials, expired refresh token).

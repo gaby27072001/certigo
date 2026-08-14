@@ -35,17 +35,35 @@ public sealed class CosmosUserRepository(CosmosContext context) : IUserRepositor
         // Honour the optimistic-concurrency token when present so two concurrent
         // economy mutations (e.g. a quiz submit and a shop purchase) can't clobber
         // each other; a 412 surfaces as a domain-level ConcurrencyConflictException.
-        var options = string.IsNullOrEmpty(profile.ETag)
-            ? null
-            : new ItemRequestOptions { IfMatchEtag = profile.ETag };
         try
         {
-            var response = await context.Users.UpsertItemAsync(profile, new PartitionKey(profile.Id), options, cancellationToken);
+            var response = string.IsNullOrEmpty(profile.ETag)
+                ? await context.Users.CreateItemAsync(
+                    profile,
+                    new PartitionKey(profile.Id),
+                    cancellationToken: cancellationToken)
+                : await context.Users.ReplaceItemAsync(
+                    profile,
+                    profile.Id,
+                    new PartitionKey(profile.Id),
+                    new ItemRequestOptions { IfMatchEtag = profile.ETag },
+                    cancellationToken);
             return response.Resource;
         }
-        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
+        catch (CosmosException ex) when (
+            ex.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed)
         {
             throw new ConcurrencyConflictException($"User profile '{profile.Id}' was modified concurrently.");
+        }
+        catch (CosmosException ex) when (
+            ex.StatusCode is HttpStatusCode.BadRequest
+                or HttpStatusCode.Unauthorized
+                or HttpStatusCode.Forbidden
+                or HttpStatusCode.RequestEntityTooLarge)
+        {
+            throw new DefinitivePersistenceException(
+                $"User profile '{profile.Id}' was rejected before commit.",
+                ex);
         }
     }
 }

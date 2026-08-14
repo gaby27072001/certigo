@@ -223,7 +223,12 @@ public sealed class LeaderboardServiceTests
         public Task<LeagueDto> GetLeagueAsync(string userId, CancellationToken cancellationToken = default)
             => Task.FromResult(league);
 
-        public Task AddXpAsync(string userId, int xp, CancellationToken cancellationToken = default)
+        public Task AddXpAsync(
+            string userId,
+            int xp,
+            string operationId,
+            DateTimeOffset occurredAt,
+            CancellationToken cancellationToken = default)
             => Task.CompletedTask;
     }
 }

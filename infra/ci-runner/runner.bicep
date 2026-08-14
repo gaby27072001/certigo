@@ -53,7 +53,7 @@ param tags object = {
 var bootstrapContent = loadTextContent('bootstrap.sh')
 // Bicep cannot compute a cryptographic digest. The repository validator keeps this
 // immutable tag value synchronized with the exact file embedded in customData.
-var bootstrapSha256 = 'f7c38af3c553291af6bdbbe42e52bd33afab7ecbfc4bd9b3025703efa2bf6b15'
+var bootstrapSha256 = '526d63afa5c5da4657c6df57873dfa0c5d161400fc5d48e5f713861cd44fbd74'
 // Azure accepts "latest", so turn that mutable value into a deliberately invalid
 // Marketplace version while keeping the template compatible with stable Bicep.
 var pinnedImageVersion = toLower(imageVersion) == 'latest' ? 'mutable-latest-is-not-allowed' : imageVersion
@@ -119,6 +119,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-07-01' = {
       computerName: runnerName
       adminUsername: adminUsername
       customData: base64(bootstrapContent)
+      allowExtensionOperations: false
       linuxConfiguration: {
         disablePasswordAuthentication: true
         provisionVMAgent: true

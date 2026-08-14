@@ -45,13 +45,8 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          friendListProvider.overrideWith((Ref ref) async => fakeFriends()),
-        ],
-        child: MaterialApp.router(
-          theme: PrismTheme.light(),
-          routerConfig: router,
-        ),
+        overrides: <Override>[friendListProvider.overrideWith((Ref ref) async => fakeFriends())],
+        child: MaterialApp.router(theme: PrismTheme.light(), routerConfig: router),
       ),
     );
 

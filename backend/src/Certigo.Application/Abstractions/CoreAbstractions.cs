@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json.Serialization;
 using Certigo.Application.Dtos;
 using Certigo.Domain.Content;
 using Certigo.Domain.Gamification;
@@ -16,6 +17,10 @@ public sealed class ConcurrencyConflictException(string message) : Exception(mes
 /// Used to turn the legacy "check-then-create" race into an atomic guard so a
 /// replayed or concurrent submission can never be applied twice.
 public sealed class DuplicateRecordException(string message) : Exception(message);
+
+/// Raised when a structurally valid request violates an application invariant.
+/// API hosts map it to HTTP 400 without introducing an Application -> API dependency.
+public sealed class RequestValidationException(string message) : Exception(message);
 
 /// Raised when the optional tutor LLM cannot be reached or returns a runtime
 /// service error. Callers may deliberately fall back to the grounded tutor
@@ -101,12 +106,52 @@ public sealed record RecentActivity(int Attempts, int Xp);
 public interface IExamAttemptRepository
 {
     Task<ExamAttemptRecord?> GetByClientAttemptIdAsync(string userId, string clientAttemptId, CancellationToken cancellationToken = default);
+    Task<ExamAttemptRecord?> GetByExamIdAsync(string userId, string examId, CancellationToken cancellationToken = default);
     Task CreateAsync(ExamAttemptRecord attempt, CancellationToken cancellationToken = default);
+}
+
+/// Server-issued mock exams. Records share the attempts container and are scoped
+/// by /userId so an exam id can never be resolved across learner partitions.
+public interface IExamRepository
+{
+    Task CreateAsync(ExamRecord exam, CancellationToken cancellationToken = default);
+    Task<ExamRecord?> GetAsync(string userId, string examId, CancellationToken cancellationToken = default);
 }
 
 public interface IEventRepository
 {
     Task AddAsync(LearningEvent learningEvent, CancellationToken cancellationToken = default);
+}
+
+/// Durable state for a cross-container economy workflow. The record is stored in
+/// the Economy container and only coordinates/reconciles independently idempotent
+/// effects; it is not a cross-container transaction.
+public interface IEconomyOperationRepository
+{
+    Task<EconomyOperationRecord?> GetAsync(
+        string userId,
+        string operationId,
+        CancellationToken cancellationToken = default);
+
+    Task<EconomyOperationRecord> GetOrCreateAsync(
+        EconomyOperationRecord operation,
+        CancellationToken cancellationToken = default);
+
+    Task<EconomyOperationRecord> MarkStepCompletedAsync(
+        string userId,
+        string operationId,
+        string step,
+        CancellationToken cancellationToken = default);
+    Task<EconomyOperationRecord> MarkFailedAsync(
+        string userId,
+        string operationId,
+        string failureCode,
+        CancellationToken cancellationToken = default);
+    Task<EconomyOperationRecord> SetOutcomeAsync(
+        string userId,
+        string operationId,
+        string outcomeJson,
+        CancellationToken cancellationToken = default);
 }
 
 // The per-(user, track) behavioural memory that makes the tutor a continuously
@@ -149,7 +194,12 @@ public sealed class NullTutorLlmTelemetry : ITutorLlmTelemetry
 public interface ILeaderboardRepository
 {
     Task<LeagueDto> GetLeagueAsync(string userId, CancellationToken cancellationToken = default);
-    Task AddXpAsync(string userId, int xp, CancellationToken cancellationToken = default);
+    Task AddXpAsync(
+        string userId,
+        int xp,
+        string operationId,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IPurchaseRepository
@@ -209,12 +259,57 @@ public sealed record ExamAttemptRecord(
     public string Kind => "exam";
 }
 
+// The server-side authority for a generated exam. Ttl is serialized as Cosmos'
+// per-item "ttl" field; DurationSeconds/ExpiresAt remain explicit for validation.
+public sealed record ExamRecord(
+    string Id,
+    string UserId,
+    string ExamId,
+    string TrackId,
+    IReadOnlyList<string> ItemIds,
+    DateTimeOffset CreatedAt,
+    int DurationSeconds,
+    DateTimeOffset ExpiresAt,
+    int Ttl)
+{
+    public string Kind => "exam-issued";
+}
+
 public sealed record LearningEvent(
     string Id,
     string UserId,
     string Type,
     DateTimeOffset OccurredAt,
     object Payload);
+
+public sealed record EconomyOperationRecord(
+    string Id,
+    string UserId,
+    string Kind,
+    string OperationKey,
+    string PayloadJson,
+    IReadOnlyList<string> RequiredSteps,
+    IReadOnlyList<string> CompletedSteps,
+    string Status,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    string? FailureCode = null,
+    string? OutcomeJson = null,
+    int Ttl = -1)
+{
+    public const string PendingStatus = "pending";
+    public const string CompletedStatus = "completed";
+    public const string FailedStatus = "failed";
+
+    [JsonPropertyName("_etag")]
+    public string? ETag { get; init; }
+
+    public bool HasCompleted(string step) =>
+        CompletedSteps.Contains(step, StringComparer.Ordinal);
+
+    public static string IdFor(string kind, string operationKey) =>
+        $"operation::{kind}::{operationKey}";
+}
 
 // The persisted learner model: every concept the user has touched on a track,
 // with the running per-concept stats the tutor personalises on. Carried as a
