@@ -20,8 +20,8 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | `require_code_owner_reviews` (revue d'un code owner) | `false` | ⚠️ durcissement possible |
 | `require_last_push_approval` | `false` | — |
 | Checks de statut requis | ✅ oui, `strict = true` | **DoD : checks requis** |
-| Contextes requis constatés avant réconciliation | `Build & test`, `Flutter app + UI packages` | ⚠️ réconcilier les six gates cibles |
-| Contextes cibles supplémentaires | `Generated state equals committed state`, `Validate workflow YAML`, `CodeQL / Security gate`, `Security / Required gate` | Vérifiés sur chaque PR |
+| Contextes requis constatés avant réconciliation | `Build & test`, `Flutter app + UI packages` | ⚠️ réconcilier les sept gates cibles |
+| Contextes cibles supplémentaires | `Generated state equals committed state`, `Validate workflow YAML`, `CodeQL / Security gate`, `Security / Required gate`, `Fork PR policy / Required gate` | Vérifiés sur chaque PR |
 | `allow_force_pushes` (push forcé) | `false` | **DoD : push direct interdit** |
 | `allow_deletions` (suppression de branche) | `false` | ✅ |
 | `enforce_admins` (appliquer aux admins) | `false` | ⚠️ durcissement possible |
@@ -41,19 +41,20 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | `Validate workflow YAML` | [`.github/workflows/lint-workflows.yml`](../.github/workflows/lint-workflows.yml) | `Validate workflow YAML` |
 | `CodeQL / Security gate` | [`.github/workflows/codeql.yml`](../.github/workflows/codeql.yml) | `CodeQL / Security gate` |
 | `Security / Required gate` | [`.github/workflows/security-gate.yml`](../.github/workflows/security-gate.yml) | `Security / Required gate` |
+| `Fork PR policy / Required gate` | [`.github/workflows/fork-pr-policy.yml`](../.github/workflows/fork-pr-policy.yml) | `Fork PR policy / Required gate` |
 
 Le gate CodeQL ne se contente pas du statut d'exécution de l'analyse. Chaque langue produit un
 SARIF évalué localement : les sévérités de sécurité `high`/`critical` (score >= 7.0) et les
 résultats SARIF de niveau `error` sans score bloquent le job. Le SARIF est conservé 30 jours
-comme artefact sur toutes les PR, forks inclus, puis envoyé à Code Scanning lorsque le token
-dispose de `security-events: write`. Ainsi, l'absence d'upload autorisé depuis un fork ne
-neutralise pas le gate et ne supprime pas les findings.
+comme artefact pour chaque PR interne, puis envoyé à Code Scanning. Les forks ne sont pas
+supportés : la gate de confiance chargée depuis `main` échoue sans checkout, tandis qu'aucun
+workflow contrôlé par le fork ne peut atteindre le pool Azure persistant.
 
 ### Conclusion DoD
 
 Le **cœur de la DoD est SATISFAIT** : `main` exige une PR avec **≥ 1 revue**, des checks stricts et
 interdit le push direct (`allow_force_pushes=false` + revue obligatoire ⇒ pas de `git push` direct
-sur `main`). L'état cible versionné ajoute trois gates aux deux contextes existants ; sa
+sur `main`). L'état cible versionné ajoute cinq gates aux deux contextes existants ; sa
 réconciliation live doit utiliser uniquement le `PATCH` étroit du §4.
 
 Restent des **gaps de durcissement** (facultatifs pour la DoD mais recommandés) traités
@@ -147,7 +148,7 @@ séparées, et seuls les checks requis sont réconciliés ici.
 
    Attendu pour les checks :
    `strict=true` et
-   `checks=["Build & test","Flutter app + UI packages","Generated state equals committed state","Validate workflow YAML","CodeQL / Security gate","Security / Required gate"]`.
+   `   checks=["Build & test","Flutter app + UI packages","Generated state equals committed state","Validate workflow YAML","CodeQL / Security gate","Security / Required gate","Fork PR policy / Required gate"]`.
 
 > **Rollback des checks seulement** : rejouer le même endpoint `PATCH` avec `strict` inchangé et la
 > liste de contextes antérieure. Ne jamais utiliser `PUT` avec le JSON durci complet.
@@ -191,15 +192,15 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
 - [ ] Activer `require_code_owner_reviews = true` (après merge de `CODEOWNERS` sur `main`).
 - [ ] Activer `required_conversation_resolution = true`.
 - [ ] *(Optionnel, à arbitrer)* `required_linear_history = true`.
-- [ ] Réconcilier les checks requis avec les six contextes du §4, en gardant
+- [ ] Réconcilier les checks requis avec les sept contextes du §4, en gardant
       `strict=true`.
 - [ ] Dans **Settings → Actions → General**, conserver le token par défaut en
       lecture seule, désactiver l'autorisation pour GitHub Actions d'approuver
       des PR et restreindre les Actions autorisées. Activer la politique
       d'épinglage par SHA complet si elle est disponible au niveau entreprise.
-- [ ] Autoriser les runners GitHub-hosted pour les workflows de validation des
-      PR de forks ; ces jobs sont sans secrets, sans environnement et n'utilisent
-      jamais le runner self-hosted persistant.
+- [ ] Ajouter `Fork PR policy / Required gate` aux contextes requis. Les PR de forks
+      restent non supportées et échouent fermement sans checkout ; seules les PR internes
+      peuvent exécuter leur SHA de tête sur le pool Azure `certigo-ci`.
 - [ ] Supprimer le secret `AUTOMERGE_TOKEN`, révoquer le PAT correspondant et
       désactiver **Allow auto-merge** si aucun autre usage gouverné ne le justifie.
 - [ ] Protéger l'environnement `beta` avec reviewers obligatoires, interdiction

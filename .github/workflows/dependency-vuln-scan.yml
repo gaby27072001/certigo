@@ -1,7 +1,6 @@
 name: dependency-vuln-scan
 
-# Reusable OSV scanner called by security-gate.yml only when dependency files change.
-# Pull requests, including forks, run on an ephemeral GitHub-hosted runner.
+# Reusable OSV scanner called by security-gate.yml only for trusted source refs.
 on:
   workflow_call:
 
@@ -10,13 +9,14 @@ permissions: {}
 jobs:
   osv-scan:
     name: OSV-Scanner (all dependencies, SARIF)
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions:
       contents: read
       security-events: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Download OSV-Scanner (v2.4.0, verified SHA256)
@@ -44,7 +44,7 @@ jobs:
           fi
 
       - name: Upload SARIF to code scanning
-        if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        if: ${{ always() }}
         uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           sarif_file: osv-results.sarif

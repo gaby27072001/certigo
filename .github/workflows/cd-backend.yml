@@ -48,7 +48,7 @@ jobs:
   validate-target:
     name: Validate deployment target
     if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions: {}
     outputs:
       target: ${{ steps.target.outputs.environment }}
@@ -74,7 +74,7 @@ jobs:
     name: Deploy infrastructure (${{ needs.validate-target.outputs.target }})
     needs: validate-target
     environment: ${{ needs.validate-target.outputs.target }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions:
       id-token: write
       contents: read
@@ -123,7 +123,7 @@ jobs:
   deploy-backend:
     name: Deploy backend code (${{ needs.validate-target.outputs.target }})
     environment: ${{ needs.validate-target.outputs.target }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    runs-on: [self-hosted, Linux, X64, certigo-ci]
     needs: [validate-target, deploy-infra]
     permissions:
       id-token: write

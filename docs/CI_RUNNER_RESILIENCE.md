@@ -17,24 +17,20 @@ plus la CI. Les protections existantes restent inchangées :
 - les PR internes restent soumises à l'environnement `pr-ci` ;
 - les déploiements et releases conservent leurs environnements (`dev`, `staging`,
   `prod`, `beta`, `github-pages`) et leurs approbations ;
-- le chemin hébergé par GitHub est désactivé par défaut conformément à la politique EMU.
-
-## Variables du dépôt
-
-Configurer dans **Settings > Secrets and variables > Actions > Variables** :
-
-| Variable | Valeur normale | Usage |
-|---|---|---|
-| `MAIN_CRITICAL_RUNNER_LABELS` | `["self-hosted","Linux","X64","certigo-ci"]` | Push `main`, schedules, déploiements et releases |
-| `PR_RUNNER_LABELS` | `["self-hosted","Linux","X64","certigo-ci"]` | PR internes |
-| `CI_GITHUB_HOSTED_FALLBACK` | `false` | Repli d'urgence global, seulement après exception EMU |
-
-`BACKEND_CI_FALLBACK` reste reconnu par `ci-backend` et `ci-cortex-parity` pour
-compatibilité. Il doit être retiré après migration vers `CI_GITHUB_HOSTED_FALLBACK`.
+- les runners hébergés par GitHub sont durablement indisponibles ; aucun fallback n'est
+  configuré ou accepté.
 
 La release Android reste volontairement sur le pool self-hosted redondé. Elle peut
-utiliser l'identité managée Azure du runner pour lire Key Vault, capacité absente d'un
-runner GitHub-hosted.
+utiliser l'identité managée Azure du runner pour lire Key Vault.
+
+## Politique des pull requests
+
+Les workflows PR sont chargés depuis `main` avec `pull_request_target`. Pour une PR
+interne, ils vérifient `head.repo.full_name == github.repository`, puis checkoutent
+explicitement le SHA de tête avant toute exécution. Une PR de fork n'est pas supportée :
+`fork-pr-policy.yml`, lui aussi chargé depuis `main`, n'effectue aucun checkout et fait
+échouer `Fork PR policy / Required gate`. Ce contexte requis empêche tout faux vert lié
+aux autres jobs non applicables, sans exécuter une seule instruction du fork.
 
 ## Actions d'infrastructure externes
 
@@ -341,7 +337,6 @@ secret et refuse toute ref autre que `main`. Pour prouver le failover self-hoste
 
    ```bash
    gh workflow run runner-resilience-drill.yml \
-     -f mode=self-hosted-failover \
      -f expected_offline_runner=<RUNNER_ARRETE>
    ```
 
@@ -359,24 +354,14 @@ n'est pas exécuté sur un runner self-hosted. L'attente en file n'est pas limit
 `timeout-minutes` ; l'absence de démarrage reste donc une preuve opérationnelle d'un
 pool insuffisant et doit être interrompue manuellement.
 
-## Repli hébergé et contrainte EMU
+## Résilience exclusivement Azure
 
-Ne jamais positionner `CI_GITHUB_HOSTED_FALLBACK=true` tant que l'organisation EMU
-interdit les runners GitHub-hosted. Une fois une exception explicite accordée :
-
-1. obtenir et consigner l'exception EMU explicite ;
-2. positionner `CI_GITHUB_HOSTED_FALLBACK=true` uniquement pendant l'incident ;
-3. lancer `Runner resilience drill` avec `mode=github-hosted-break-glass` ;
-4. vérifier que le résumé indique `Environment = github-hosted` ;
-5. relancer les workflows critiques ;
-6. remettre la variable à `false` dès que le pool self-hosted est rétabli.
-
-Le workflow refuse le chemin hébergé tant que la variable n'est pas exactement `true` :
-il reste alors sur le pool auto-hébergé et échoue avant le probe.
-
-Le fork-guard et les environments restent évalués même en mode hébergé. Si aucune
-exception EMU n'est accordée, le second runner self-hosted est le seul mécanisme de
-failover supporté.
+Les runners hébergés par GitHub sont durablement indisponibles et aucun chemin de
+break-glass ne doit les cibler. Le failover supporté consiste exclusivement à conserver
+au moins deux runners Azure interchangeables portant
+`self-hosted`, `Linux`, `X64`, `certigo-ci`. Si le pool entier est indisponible, la CI
+reste bloquée jusqu'à restauration d'une VM saine ; elle ne change jamais de classe de
+runner automatiquement.
 
 ## Reconstruction, rotation et révocation
 
@@ -393,6 +378,6 @@ failover supporté.
 
 ## Rollback
 
-Remettre `CI_GITHUB_HOSTED_FALLBACK=false`, restaurer les deux variables de labels avec
-le JSON par défaut, puis réactiver les runners. Ne supprimer une VM ou un enregistrement
-GitHub qu'après avoir confirmé qu'au moins deux autres runners compatibles sont en ligne.
+Réactiver ou reconstruire les runners Azure avec le jeu de labels fixe. Ne supprimer une
+VM ou un enregistrement GitHub qu'après avoir confirmé qu'au moins deux autres runners
+compatibles sont en ligne.

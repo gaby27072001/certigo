@@ -8,7 +8,7 @@ name: codeql
 on:
   push:
     branches: [main]
-  pull_request:
+  pull_request_target:
     branches: [main]
   schedule:
     # Weekly full scan; PR/push runs are path-scoped and language-scoped below.
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: codeql-${{ github.ref }}
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions: {}
@@ -24,8 +24,9 @@ permissions: {}
 jobs:
   changes:
     name: Select CodeQL languages
-    # Pull requests, including forks, run only on an ephemeral GitHub-hosted runner.
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository }}
+    environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}
+    runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions:
       contents: read
       pull-requests: read
@@ -35,10 +36,11 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Detect language paths
         id: filter
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        if: ${{ github.event_name == 'pull_request_target' || github.event_name == 'push' }}
         uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         with:
           filters: |
@@ -91,7 +93,7 @@ jobs:
     name: Analyze (${{ matrix.language }})
     needs: changes
     if: ${{ needs.changes.outputs.has_changes == 'true' }}
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions:
       security-events: write
       actions: read
@@ -105,6 +107,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Initialize CodeQL
@@ -132,7 +135,7 @@ jobs:
           retention-days: 30
 
       - name: Upload CodeQL SARIF to code scanning
-        if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        if: ${{ always() }}
         uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           sarif_file: ${{ env.CODEQL_RESULTS_DIR }}
@@ -145,8 +148,8 @@ jobs:
   security-gate:
     name: CodeQL / Security gate
     needs: [changes, analyze]
-    if: ${{ always() }}
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    if: ${{ always() && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions: {}
     steps:
       - name: Enforce CodeQL result

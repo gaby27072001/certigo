@@ -6,7 +6,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 > **Pourquoi ce runbook ?** Le pipeline `.github/workflows/cd-backend.yml` est un pipeline de
 > déploiement complet (infra Bicep + code Functions). Le chemin critique est désormais
 > **compatible EMU (self-hosted obligatoire)** :
-> 1. les jobs critiques backend restent sur self-hosted (GitHub-hosted est bloqué par policy EMU) ;
+> 1. les jobs critiques backend restent sur le pool Azure self-hosted `certigo-ci` ;
 > 2. la capacité CI est séparée entre flux critiques `main` (`certigo-ci`) et flux PR/non-critiques (`certigo-ci`) ;
 > 3. l'auth Azure reste via OIDC (`azure/login@v2`) avec permissions minimales.
 >
@@ -67,18 +67,12 @@ Conséquence : les workflows critiques `main` ciblent `certigo-ci` et les workfl
 critiques ciblent `certigo-ci`, ce qui réserve la capacité sans éditer les YAML à chaque
 ajustement.
 
-### Variables repo de pilotage runners
+### Sélection immuable des runners
 
-Les workflows lisent des variables Actions **optionnelles** pour éviter les edits récurrents :
-
-- `MAIN_CRITICAL_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","certigo-ci"]`
-- `PR_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","certigo-ci"]`
-
-Exemple de valeur valide :
-
-```json
-["self-hosted","Linux","X64","certigo-ci"]
-```
+Les workflows Linux ciblent directement les labels
+`[self-hosted, Linux, X64, certigo-ci]`. Aucune variable de sélection ni aucun fallback
+hébergé n'est accepté : la résilience repose exclusivement sur plusieurs runners Azure
+portant le même jeu de labels.
 
 ### Politique scans lourds (CodeQL / security-scan)
 
@@ -94,7 +88,7 @@ Compromis assumé : plus de scan automatique à chaque PR/push ; la détection s
 ### Risque / rollback (chemin critique EMU)
 
 - **Risque principal** : aucun runner self-hosted online avec le label `certigo-ci`.
-- **Rollback repo** : ajuster (ou supprimer) `MAIN_CRITICAL_RUNNER_LABELS` / `PR_RUNNER_LABELS` pour revenir aux defaults sans modifier les workflows.
+- **Rollback repo** : restaurer le dernier YAML validé sans modifier les labels de sécurité.
 - **Rollback opérationnel** : démarrer/maintenir online la VM runner Azure (ou activer un auto-start), puis redéclencher le workflow.
 
 ---
@@ -217,8 +211,8 @@ gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPT
 
 **Côté repo :**
 - les jobs critiques de `cd-backend.yml` (`deploy-infra`, `deploy-backend`) ciblent
-  `MAIN_CRITICAL_RUNNER_LABELS` (défaut `["self-hosted","Linux","X64","certigo-ci"]`) ;
-- `ci-backend.yml` cible le même pool sur `main` et le pool `PR_RUNNER_LABELS` sur PR/non-main ;
+  `[self-hosted, Linux, X64, certigo-ci]` ;
+- `ci-backend.yml` cible le même pool Azure pour `main` et les PR internes ;
 - le chemin critique reste compatible avec la contrainte EMU (self-hosted obligatoire).
 
 ### Isolement des dépendances runner
@@ -477,7 +471,7 @@ Aucune n'a fait indexer les functions.
 - **SCM basic auth désactivée** (AAD-only). Pour interroger le hostruntime, passer par le proxy ARM
   `…/hostruntime/admin/...` avec un token `az account get-access-token --resource
   https://management.azure.com` (construire l'URI par concaténation : PowerShell mange `?api-version`).
-- **EMU bloque `ubuntu-latest`** (cf. ci-dessus) — le CI/CD critique doit cibler self-hosted `certigo-ci`.
+- **EMU bloque les runners hébergés** (cf. ci-dessus) — le CI/CD doit cibler le pool Azure `certigo-ci`.
 
 ### Résiduel strict (hors périmètre repo)
 

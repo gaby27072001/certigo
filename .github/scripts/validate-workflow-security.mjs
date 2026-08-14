@@ -11,12 +11,28 @@ const versionPattern = /^v[0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z.-]+)?$/;
 const usesPattern =
   /^\s*(?:-\s+)?uses:\s*(?<value>[^#\s]+)(?:\s+#\s*(?<version>\S+))?\s*$/;
 const runPattern = /^(?<indent>\s*)(?:-\s+)?run:\s*(?<value>.*)$/;
+const azureLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-ci]';
+const allowedRunnerLines = new Set([
+  azureLinuxRunner,
+  'runs-on: [self-hosted, macOS]',
+]);
+const forbiddenRunnerConfiguration = [
+  'CI_GITHUB_HOSTED_FALLBACK',
+  'BACKEND_CI_FALLBACK',
+  'MAIN_CRITICAL_RUNNER_LABELS',
+  'PR_RUNNER_LABELS',
+];
 const forbiddenAutomation = [
   'AUTOMERGE_TOKEN',
   'enablePullRequestAutoMerge',
   '/reviews',
   'gh pr merge',
 ];
+const reusableScannerFiles = new Set([
+  'dependency-vuln-scan.yml',
+  'nuget-vuln-scan.yml',
+  'security-scan.yml',
+]);
 
 function shellExpressions(lines) {
   const findings = [];
@@ -67,8 +83,55 @@ function validateWorkflow(file) {
   if (!lines.some((line) => /^permissions:\s*(?:\{\})?\s*$/.test(line))) {
     errors.push(`${file}: missing explicit top-level permissions`);
   }
+  if (/^ {2}pull_request:\s*$/m.test(text)) {
+    errors.push(`${file}: pull_request workflows are forbidden because fork code must not control workflow execution`);
+  }
+  if (/^\s*runs-on:\s*\S+-latest\s*$/m.test(text)) {
+    errors.push(`${file}: GitHub-hosted *-latest runner labels are forbidden`);
+  }
+  for (const token of forbiddenRunnerConfiguration) {
+    if (text.includes(token)) {
+      errors.push(`${file}: forbidden mutable runner/fallback configuration ${token}`);
+    }
+  }
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('runs-on:') && !allowedRunnerLines.has(trimmed)) {
+      errors.push(`${file}: runner must use a fixed Azure self-hosted label set`);
+    }
+  }
   if (text.includes('pull_request_target:')) {
-    errors.push(`${file}: pull_request_target is forbidden`);
+    const isForkPolicy = path.basename(file) === 'fork-pr-policy.yml';
+    if (isForkPolicy) {
+      if (
+        text.includes('actions/checkout@') ||
+        text.includes('github.event.pull_request.head.sha') ||
+        !text.includes('Fork PR policy / Required gate') ||
+        !text.includes('HEAD_REPOSITORY') ||
+        !text.includes('HEAD_REPOSITORY" != "$BASE_REPOSITORY')
+      ) {
+        errors.push(`${file}: fork policy must fail closed from base code without checkout`);
+      }
+    } else {
+      if (!text.includes('github.event.pull_request.head.repo.full_name == github.repository')) {
+        errors.push(`${file}: pull_request_target jobs must be restricted to same-repository PRs`);
+      }
+      if (
+        text.includes('actions/checkout@') &&
+        !text.includes("ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}") &&
+        !text.includes('ref: ${{ github.event.pull_request.head.sha }}')
+      ) {
+        errors.push(`${file}: trusted PR workflow must explicitly checkout the internal head SHA`);
+      }
+    }
+  }
+  if (reusableScannerFiles.has(path.basename(file))) {
+    if (!text.includes('github.event.pull_request.head.sha')) {
+      errors.push(`${file}: reusable scanner must check out the same-repository PR head SHA`);
+    }
+    if (!text.includes('persist-credentials: false')) {
+      errors.push(`${file}: reusable scanner checkout must not persist GitHub credentials`);
+    }
   }
   if (/^\s*secrets:\s*inherit\s*$/m.test(text)) {
     errors.push(`${file}: reusable workflows must pass only explicit secrets`);
@@ -131,6 +194,7 @@ function validateRepositoryInvariants() {
   );
   const lint = fs.readFileSync(path.join(workflowsDir, 'lint-workflows.yml'), 'utf8');
   const securityGate = fs.readFileSync(path.join(workflowsDir, 'security-gate.yml'), 'utf8');
+  const forkPolicy = fs.readFileSync(path.join(workflowsDir, 'fork-pr-policy.yml'), 'utf8');
   const dependencyScan = fs.readFileSync(
     path.join(workflowsDir, 'dependency-vuln-scan.yml'),
     'utf8',
@@ -219,19 +283,15 @@ function validateRepositoryInvariants() {
   if (!codeql.includes('CodeQL / Security gate')) {
     errors.push('codeql.yml: stable security gate is missing');
   }
-  if (
-    !codeql.includes(
-      "runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest'",
-    )
-  ) {
-    errors.push('codeql.yml: fork pull requests must analyze on GitHub-hosted runners');
-  }
-  if (
-    /^ {4}if: \$\{\{ github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository \}\}$/m.test(
-      codeql,
-    )
-  ) {
-    errors.push('codeql.yml: required CodeQL jobs must not skip fork pull requests');
+  for (const marker of [
+    'pull_request_target:',
+    azureLinuxRunner,
+    "github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository",
+    "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
+  ]) {
+    if (!codeql.includes(marker)) {
+      errors.push(`codeql.yml: missing Azure/same-repository invariant ${marker}`);
+    }
   }
   for (const marker of [
     'CODEQL_BLOCKING_SECURITY_SEVERITY: "7.0"',
@@ -240,7 +300,7 @@ function validateRepositoryInvariants() {
     'name: Preserve CodeQL SARIF',
     'if-no-files-found: error',
     'name: Upload CodeQL SARIF to code scanning',
-    "if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}",
+    'if: ${{ always() }}',
     'name: Enforce CodeQL severity threshold',
     'node .github/scripts/enforce-codeql-sarif.mjs "$CODEQL_RESULTS_DIR"',
   ]) {
@@ -259,11 +319,16 @@ function validateRepositoryInvariants() {
       errors.push(`enforce-codeql-sarif.mjs: missing fail-closed invariant ${marker}`);
     }
   }
-  if (!lint.includes('name: Validate workflow YAML') || !lint.includes('runs-on: ubuntu-latest')) {
-    errors.push('lint-workflows.yml: required lint must run on a GitHub-hosted runner');
-  }
-  if (lint.includes('environment:') || lint.includes('head.repo.full_name == github.repository')) {
-    errors.push('lint-workflows.yml: required lint must not skip or gate fork pull requests');
+  for (const marker of [
+    'name: Validate workflow YAML',
+    'pull_request_target:',
+    azureLinuxRunner,
+    'github.event.pull_request.head.repo.full_name == github.repository',
+    'ref: ${{ github.event.pull_request.head.sha }}',
+  ]) {
+    if (!lint.includes(marker)) {
+      errors.push(`lint-workflows.yml: missing trusted Azure PR invariant ${marker}`);
+    }
   }
   if (!lint.includes('node --test .github/scripts/*.test.mjs')) {
     errors.push('lint-workflows.yml: workflow security script tests are not enforced');
@@ -274,7 +339,7 @@ function validateRepositoryInvariants() {
     'uses: ./.github/workflows/dependency-vuln-scan.yml',
     'uses: ./.github/workflows/nuget-vuln-scan.yml',
     'uses: ./.github/workflows/security-scan.yml',
-    'if: ${{ always() }}',
+    "if: ${{ always() && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) }}",
   ]) {
     if (!securityGate.includes(marker)) {
       errors.push(`security-gate.yml: missing required invariant ${marker}`);
@@ -302,17 +367,40 @@ function validateRepositoryInvariants() {
     if (!workflow.includes('workflow_call:')) {
       errors.push(`${fileName}: scanner must be callable by the stable security gate`);
     }
-    if (!workflow.includes("github.event_name == 'pull_request' && 'ubuntu-latest'")) {
-      errors.push(`${fileName}: fork pull requests must use a GitHub-hosted runner`);
+    if (!workflow.includes(azureLinuxRunner)) {
+      errors.push(`${fileName}: scanner must use the fixed Azure self-hosted pool`);
     }
     if (workflow.includes('environment:')) {
-      errors.push(`${fileName}: fork-safe scanners must not use protected environments`);
+      errors.push(`${fileName}: reusable scanners must not select deployment environments`);
     }
   }
   if (
     !branchProtection.required_status_checks.contexts.includes('Security / Required gate')
   ) {
     errors.push('branch-protection-main.json: stable security gate is not required');
+  }
+  for (const marker of [
+    'pull_request_target:',
+    'Fork PR policy / Required gate',
+    azureLinuxRunner,
+    'HEAD_REPOSITORY" != "$BASE_REPOSITORY',
+  ]) {
+    if (!forkPolicy.includes(marker)) {
+      errors.push(`fork-pr-policy.yml: missing fail-closed invariant ${marker}`);
+    }
+  }
+  if (
+    forkPolicy.includes('actions/checkout@') ||
+    forkPolicy.includes('github.event.pull_request.head.sha')
+  ) {
+    errors.push('fork-pr-policy.yml: fork gate must never checkout pull request code');
+  }
+  if (
+    !branchProtection.required_status_checks.contexts.includes(
+      'Fork PR policy / Required gate',
+    )
+  ) {
+    errors.push('branch-protection-main.json: fork policy gate is not required');
   }
   return errors;
 }

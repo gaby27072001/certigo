@@ -488,7 +488,8 @@ class ProjectStateTests(unittest.TestCase):
         workflow = (REPO_ROOT / ".github/workflows/ci-project-state.yml").read_text(
             encoding="utf-8"
         )
-        self.assertIn("pull_request:", workflow)
+        self.assertIn("pull_request_target:", workflow)
+        self.assertNotIn("\n  pull_request:\n", workflow)
         self.assertNotIn("paths:", workflow)
         self.assertIn("schedule:", workflow)
         self.assertIn('cron: "17 4 * * *"', workflow)
@@ -498,17 +499,19 @@ class ProjectStateTests(unittest.TestCase):
             workflow,
         )
         self.assertIn(
-            "environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}",
+            "environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}",
             workflow,
         )
-        self.assertIn("vars.CI_GITHUB_HOSTED_FALLBACK == 'true'", workflow)
-        self.assertIn("vars.MAIN_CRITICAL_RUNNER_LABELS", workflow)
-        self.assertIn("vars.PR_RUNNER_LABELS", workflow)
         self.assertIn(
-            'fromJSON(\'["self-hosted","Linux","X64","certigo-ci"]\')',
+            "runs-on: [self-hosted, Linux, X64, certigo-ci]",
             workflow,
         )
-        self.assertNotIn("\n    runs-on: ubuntu-latest\n", workflow)
+        self.assertIn(
+            "ref: ${{ github.event_name == 'pull_request_target' && "
+            "github.event.pull_request.head.sha || github.sha }}",
+            workflow,
+        )
+        self.assertNotIn("-latest", workflow)
         self.assertIn('node-version: "20.20.2"', workflow)
         self.assertIn("persist-credentials: false", workflow)
         self.assertIn("npm ci", workflow)
@@ -528,6 +531,7 @@ class ProjectStateTests(unittest.TestCase):
                 "Validate workflow YAML",
                 "CodeQL / Security gate",
                 "Security / Required gate",
+                "Fork PR policy / Required gate",
             ],
             protection["required_status_checks"]["contexts"],
         )

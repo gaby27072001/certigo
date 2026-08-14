@@ -8,7 +8,8 @@
       "Generated state equals committed state",
       "Validate workflow YAML",
       "CodeQL / Security gate",
-      "Security / Required gate"
+      "Security / Required gate",
+      "Fork PR policy / Required gate"
     ]
   },
   "enforce_admins": true,

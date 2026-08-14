@@ -1,0 +1,32 @@
+name: Pull request trust policy
+
+# This workflow is loaded from the base branch. It never checks out or executes
+# pull request code, so an unsupported fork cannot reach a persistent runner.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: fork-pr-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  trust-gate:
+    name: Fork PR policy / Required gate
+    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    steps:
+      - name: Enforce same-repository pull requests
+        shell: bash
+        env:
+          BASE_REPOSITORY: ${{ github.repository }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          if [ "$HEAD_REPOSITORY" != "$BASE_REPOSITORY" ]; then
+            echo "::error::Fork pull requests are not supported because GitHub-hosted runners are permanently unavailable and fork code must never execute on persistent Azure runners."
+            exit 1
+          fi
+          echo "Same-repository pull request accepted for Azure runner validation."

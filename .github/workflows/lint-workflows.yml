@@ -1,11 +1,9 @@
-# Valide la syntaxe de tous les workflows GitHub Actions a chaque PR sur main.
-# Bloque les PRs qui introduisent des workflows YAML malformes ou non conformes
-# au schema GitHub Actions (ex. doublon d'id:, champs inconnus, etc.).
-# Les PR, y compris les forks, utilisent un runner GitHub-hosted ephemere sans secrets.
+# Loaded from main through pull_request_target. Only same-repository pull
+# requests are checked out; fork policy is enforced by fork-pr-policy.yml.
 name: Lint GitHub Actions workflows
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [main]
 
 permissions:
@@ -14,10 +12,13 @@ permissions:
 jobs:
   validate:
     name: Validate workflow YAML
-    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    environment: pr-ci
+    runs-on: [self-hosted, Linux, X64, certigo-ci]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
       - name: Install actionlint

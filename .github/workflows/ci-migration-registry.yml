@@ -8,14 +8,14 @@ on:
       - "docs/migration/**"
       - "tools/validate_migration_registry.py"
       - ".github/workflows/ci-migration-registry.yml"
-  pull_request:
+  pull_request_target:
     paths:
       - "docs/migration/**"
       - "tools/validate_migration_registry.py"
       - ".github/workflows/ci-migration-registry.yml"
 
 concurrency:
-  group: ci-migration-registry-${{ github.ref }}
+  group: ci-migration-registry-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -24,11 +24,14 @@ permissions:
 jobs:
   validate:
     name: Validate migration registry
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository }}
+    environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}
+    runs-on: [self-hosted, Linux, X64, certigo-ci]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"

@@ -328,12 +328,9 @@ déclarée est dans `codemagic.yaml`.
 > ⚠️ CI exécutée **uniquement sur le runner self‑hosted Azure** (`certigo-ci`) — les runners
 > GitHub‑hébergés sont désactivés par la politique d'entreprise. Egress via NAT Gateway `nat-certigo` (RG `rg-certigo-ci`).
 
-> 🛟 **Repli CI backend (audit #1, SPOF runner)** — le job `build-test` de `ci-backend.yml` a un
-> repli `ubuntu-latest` **pré‑câblé mais inerte par défaut** (comportement inchangé = self‑hosted).
-> Pour l'activer en cas de panne du pool self‑hosted, **deux** prérequis : (1) définir la variable repo
-> `BACKEND_CI_FALLBACK = true` (Settings › Actions › Variables) ; (2) un admin doit **réactiver les
-> runners GitHub‑hébergés** pour le repo/org (désactivés par défaut ici). Repasser la variable à `false`
-> pour revenir au self‑hosted. Runbook détaillé en commentaire au‑dessus du `runs-on:` du job.
+> 🛟 **Résilience CI backend** — le job `build-test` cible exclusivement le pool Azure
+> `[self-hosted, Linux, X64, certigo-ci]`. La haute disponibilité est fournie par plusieurs
+> VMs portant ces labels ; aucun fallback hébergé ou piloté par variable n'est supporté.
 
 ---
 
@@ -349,7 +346,7 @@ déclarée est dans `codemagic.yaml`.
 | 2026‑08‑06 | 📦 **Phase 2 avancée** : `wp-p2-02` et `wp-p2-03` sont `done` après fusion des PR `certigo-content` #7/#8 ; `wp-p2-04`, `wp-p2-07` et `wp-p2-09` sont en cours dans leurs sessions dédiées. |
 | 2026‑08‑05 | 📚 **Registre de migration réconcilié** : seuls les lots Phase 1 dont la DoD complète est satisfaite sont alignés à `done` dans le manifeste, les états JSON et la vue humaine ; les lots incomplets restent ouverts même si une PR associée a été fusionnée. Démarrage de `wp-p2-01` documentaire ; `wp-p2-02..09` ont alors été enregistrés à `todo`, avant leur exécution dans des sessions distinctes. |
 | 2026‑06‑29 | 🧪 **Tests Cosmos exécutés sur émulateur réel** : 6 cas `Certigo.Infrastructure.Tests` lancés (0 ignoré) sur l'émulateur Docker `vnext-preview` (ARM64, HTTPS) → **5/6 verts** ; le 6e (agrégat `GetRecentActivityAsync`) bute sur une limite _vnext-preview_ (`RewrittenAggregateProjections`), pas un bug prod (classic amd64 inutilisable sur ARM64 : `exec format error` / segfault QEMU). ✅ **Couverture HTTP des 15 Functions** restantes ajoutée (faux services + harness) → suite globale **496** verte. |
-| 2026‑06‑28 | 🛟 **Repli CI backend (audit #1)** : repli `ubuntu-latest` pré‑câblé (inerte par défaut) sur le job `build-test` de `ci-backend.yml`, piloté par la variable repo `BACKEND_CI_FALLBACK` — comportement self‑hosted inchangé ; activation conditionnée à la réactivation des runners GitHub‑hébergés (cf. §11). |
+| 2026‑06‑28 | 🛟 **Ancienne expérimentation de repli CI backend** : un fallback hébergé avait été pré-câblé ; cette voie a depuis été entièrement supprimée au profit du pool Azure redondé (cf. §11). |
 | 2026‑06‑24 | 📱 **Écrans gamification mobile** : saisons · quêtes · succès · boutique · amis · examens blancs branchés (couche data + providers + router) → 6 écrans + 6 tests widget ; suite Dart **185** verte. 🧪 **Tests d'intégration Cosmos** (`Certigo.Infrastructure.Tests`, 6 cas émulateur‑gated, skippés proprement hors émulateur). |
 | 2026‑06‑24 | 🔐 **Connexion sociale iOS** : ajout du callback natif `certigo://auth` dans `Info.plist` + messages d'erreur login plus explicites (redirect/client/provider) côté mobile. |
 | 2026‑06‑24 | 🛡️ **Anti‑triche examen** : fenêtre de cadence (XP/tentatives sur 1 h, conteneur `attempts`) câblée dans `ExamService` — miroir de `QuizService` → détecteurs de débit actifs aussi pour les examens blancs ; test dédié `SubmitAsync_flags_submission_spam_via_the_rate_window`. Backend **325** tests verts. |

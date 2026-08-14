@@ -1,7 +1,6 @@
 name: nuget-vuln-scan
 
-# Reusable NuGet scanner called by security-gate.yml only when dependency files change.
-# Pull requests, including forks, run on an ephemeral GitHub-hosted runner.
+# Reusable NuGet scanner called by security-gate.yml only for trusted source refs.
 on:
   workflow_call:
 
@@ -10,7 +9,7 @@ permissions: {}
 jobs:
   dotnet-vuln:
     name: Vulnerable .NET packages (NuGet/GitHub Advisory)
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions:
       contents: read
     env:
@@ -18,6 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
