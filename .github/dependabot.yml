@@ -1,6 +1,5 @@
-# Dependabot — automated dependency & GitHub Actions updates.
-# Keeps NuGet (backend), pub (Flutter/Dart) and workflow actions patched, which
-# is the first line of defence for supply-chain CVEs. Grouped to limit PR noise.
+# Dependabot version updates only. Blocking security decisions are made by the
+# repository-local OSV, NuGet, Checkov and CodeQL gates on Azure runners.
 #
 # Volumétrie volontairement basse : le parc de runners self-hosted est petit
 # (2 VM). Des limites élevées saturent la file d'attente et bloquent la CI.

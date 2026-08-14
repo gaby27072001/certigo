@@ -514,6 +514,28 @@ class ProjectStateTests(unittest.TestCase):
         self.assertNotIn("-latest", workflow)
         self.assertIn('node-version: "20.20.2"', workflow)
         self.assertIn("persist-credentials: false", workflow)
+        self.assertIn(
+            "CONTENT_DEPLOY_KEY: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}",
+            workflow,
+        )
+        self.assertIn(
+            'if [ -z "${CONTENT_DEPLOY_KEY//[[:space:]]/}" ]',
+            workflow,
+        )
+        self.assertIn(
+            "ssh-key: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}",
+            workflow,
+        )
+        self.assertIn("ssh-strict: true", workflow)
+        self.assertIn("ssh-known-hosts: |", workflow)
+        self.assertIn("github.com ssh-ed25519 ", workflow)
+        self.assertIn("github.com ecdsa-sha2-nistp256 ", workflow)
+        self.assertIn("github.com ssh-rsa ", workflow)
+        self.assertNotIn("CERTIGO_CONTENT_APP_ID", workflow)
+        self.assertNotIn("CERTIGO_CONTENT_APP_PRIVATE_KEY", workflow)
+        self.assertNotIn("CERTIGO_CONTENT_READ_TOKEN", workflow)
+        self.assertNotIn("create-github-app-token", workflow)
+        self.assertNotIn("token: ${{", workflow)
         self.assertIn("npm ci", workflow)
         self.assertIn("npm run package", workflow)
         self.assertIn("--validate-active-content .active-content", workflow)

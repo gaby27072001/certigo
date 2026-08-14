@@ -4,7 +4,7 @@
 |---|---|
 | **Type** | Runbook opérationnel (CI / infra / coûts) |
 | **Objectif** | Exploiter la CI de Certigo sur ses **runners self-hosted** : **rallumer** les VMs avant une session de travail, les **déallouer** après (économie), **vérifier** l'état des runners et **dépanner** un runner hors ligne. |
-| **Voie officielle** | **Self-hosted** — 2 VMs Azure. Les runners **GitHub-hosted sont BLOQUÉS au niveau Enterprise (EMU)** : cf. §1 (verdict + preuve). |
+| **Voie officielle** | **Self-hosted** — 2 VMs Azure. Les runners GitHub-hosted sont indisponibles par politique d'organisation et ne sont pas une dépendance supportée. |
 | **Périmètre** | Repo `gchambaud_microsoft/Certigo` · RG `RG-CERTIGO-CI` · subscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**). |
 | **Statut** | **En vigueur** (voie pérenne de la CI Certigo). |
 
@@ -30,15 +30,12 @@ une **contrainte dure**, désormais **prouvée empiriquement**.
 hébergé par GitHub a été testée en conditions réelles :
 
 - **Échec immédiat** : `startup_failure` en **~4 secondes**.
-- **Annotation officielle GitHub** :
-  > *GitHub Actions hosted runners are disabled for this repository. For more information please contact
-  > your GitHub Enterprise Administrator.*
+- **Annotation GitHub** : les runners hébergés sont désactivés pour ce dépôt.
 - **Preuve** : run **`28782170300`** →
   <https://github.com/gchambaud_microsoft/Certigo/actions/runs/28782170300>.
 
-**Cause** : les runners GitHub-hosted sont **désactivés au niveau Enterprise (politique EMU —
-Enterprise Managed Users)**, pas seulement au niveau repo/org. Les réactiver relève d'un **admin GitHub
-Enterprise**, **hors de portée de l'équipe Certigo** et jugé **irréaliste** à ce jour.
+**Décision durable** : aucune réactivation ni validation par un propriétaire Enterprise ne sera
+sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur le pool Azure.
 
 > ✅ **Conclusion opérationnelle** : **self-hosted est la voie officielle et pérenne** de la CI Certigo.
 > Le reste de ce runbook décrit son exploitation au quotidien. Aucun chemin alternatif

@@ -95,7 +95,6 @@ jobs:
     if: ${{ needs.changes.outputs.has_changes == 'true' }}
     runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions:
-      security-events: write
       actions: read
       contents: read
     env:
@@ -133,13 +132,6 @@ jobs:
           path: ${{ env.CODEQL_RESULTS_DIR }}
           if-no-files-found: error
           retention-days: 30
-
-      - name: Upload CodeQL SARIF to code scanning
-        if: ${{ always() }}
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
-        with:
-          sarif_file: ${{ env.CODEQL_RESULTS_DIR }}
-          category: "/language:${{ matrix.language }}"
 
       - name: Enforce CodeQL severity threshold
         if: ${{ always() }}

@@ -45,8 +45,7 @@ fuite de données utilisateur, injection, falsification du score de quiz côté
 serveur, exposition de secrets, élévation de privilèges.
 
 Exemples **hors** périmètre : ingénierie sociale, déni de service volumétrique,
-rapports automatisés sans impact démontré, vulnérabilités de dépendances déjà
-suivies par Dependabot.
+rapports automatisés sans impact démontré.
 
 ## Bonnes pratiques appliquées
 
@@ -55,8 +54,11 @@ suivies par Dependabot.
 - **Identités managées** pour l'accès à Cosmos DB et Key Vault — pas de secrets
   applicatifs en clair.
 - Notation des quiz **autoritative côté serveur** (clé de correction non exposée).
-- Analyse continue : **CodeQL** (SAST), **Dependabot** (dépendances),
-  **Checkov** (IaC), et posture cloud via **Microsoft Defender for Cloud**.
+- Analyse continue bloquante sur runners Azure : **CodeQL** (SAST), **OSV** et
+  **NuGet** (dépendances), **Checkov** (IaC), et posture cloud via
+  **Microsoft Defender for Cloud**. Les SARIF/logs sont conservés comme artefacts.
+- `.github/dependabot.yml` propose uniquement des mises à jour de versions ; ce
+  service n'est pas une gate de sécurité.
 
 ## Contenu de certification
 

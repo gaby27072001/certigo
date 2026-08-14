@@ -99,7 +99,6 @@ jobs:
     uses: ./.github/workflows/dependency-vuln-scan.yml
     permissions:
       contents: read
-      security-events: write
 
   nuget:
     name: NuGet dependency scan

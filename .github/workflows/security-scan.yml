@@ -23,4 +23,23 @@ jobs:
       - name: Install pinned Checkov
         run: python -m pip install --disable-pip-version-check checkov==3.2.495
       - name: Run Checkov on infra/
-        run: checkov --directory infra --framework bicep --compact --quiet --config-file .checkov.yaml
+        run: |
+          set -euo pipefail
+          checkov --directory infra --framework bicep --compact --quiet \
+            --config-file .checkov.yaml 2>&1 | tee checkov-results.log
+
+      - name: Ensure Checkov findings log exists
+        if: ${{ always() }}
+        run: |
+          if [ ! -e checkov-results.log ]; then
+            echo "Checkov did not produce a findings log; inspect prior failed steps." > checkov-results.log
+          fi
+
+      - name: Preserve Checkov findings
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: checkov-findings
+          path: checkov-results.log
+          if-no-files-found: error
+          retention-days: 30

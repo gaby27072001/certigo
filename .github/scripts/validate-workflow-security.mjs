@@ -136,7 +136,7 @@ function validateWorkflow(file) {
   if (/^\s*secrets:\s*inherit\s*$/m.test(text)) {
     errors.push(`${file}: reusable workflows must pass only explicit secrets`);
   }
-  if (/^\s*(?:actions|checks|contents|pull-requests):\s*write\s*$/m.test(text)) {
+  if (/^\s*(?:actions|checks|contents|pull-requests|security-events):\s*write\s*$/m.test(text)) {
     errors.push(`${file}: privileged repository write permission is forbidden`);
   }
   for (const token of forbiddenAutomation) {
@@ -193,6 +193,10 @@ function validateRepositoryInvariants() {
     'utf8',
   );
   const lint = fs.readFileSync(path.join(workflowsDir, 'lint-workflows.yml'), 'utf8');
+  const projectState = fs.readFileSync(
+    path.join(workflowsDir, 'ci-project-state.yml'),
+    'utf8',
+  );
   const securityGate = fs.readFileSync(path.join(workflowsDir, 'security-gate.yml'), 'utf8');
   const forkPolicy = fs.readFileSync(path.join(workflowsDir, 'fork-pr-policy.yml'), 'utf8');
   const dependencyScan = fs.readFileSync(
@@ -204,6 +208,8 @@ function validateRepositoryInvariants() {
   const branchProtection = JSON.parse(
     fs.readFileSync(path.join(root, '.github', 'branch-protection-main.json'), 'utf8'),
   );
+  const governance = fs.readFileSync(path.join(root, 'docs', 'GOVERNANCE.md'), 'utf8');
+  const securityPolicy = fs.readFileSync(path.join(root, 'SECURITY.md'), 'utf8');
   const androidRequirements = new Map([
     ['fixed beta environment', 'environment: beta'],
     [
@@ -299,14 +305,18 @@ function validateRepositoryInvariants() {
     'upload: never',
     'name: Preserve CodeQL SARIF',
     'if-no-files-found: error',
-    'name: Upload CodeQL SARIF to code scanning',
-    'if: ${{ always() }}',
     'name: Enforce CodeQL severity threshold',
     'node .github/scripts/enforce-codeql-sarif.mjs "$CODEQL_RESULTS_DIR"',
   ]) {
     if (!codeql.includes(marker)) {
       errors.push(`codeql.yml: missing SARIF enforcement invariant ${marker}`);
     }
+  }
+  if (
+    codeql.includes('upload-sarif@') ||
+    codeql.includes('security-events: write')
+  ) {
+    errors.push('codeql.yml: local SARIF enforcement must not depend on GitHub Code Scanning');
   }
   for (const marker of [
     "securitySeverity >= threshold",
@@ -332,6 +342,31 @@ function validateRepositoryInvariants() {
   }
   if (!lint.includes('node --test .github/scripts/*.test.mjs')) {
     errors.push('lint-workflows.yml: workflow security script tests are not enforced');
+  }
+  for (const marker of [
+    'CONTENT_DEPLOY_KEY: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}',
+    'if [ -z "${CONTENT_DEPLOY_KEY//[[:space:]]/}" ]',
+    'ssh-key: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}',
+    'ssh-strict: true',
+    'ssh-known-hosts: |',
+    'github.com ssh-ed25519 ',
+    'github.com ecdsa-sha2-nistp256 ',
+    'github.com ssh-rsa ',
+  ]) {
+    if (!projectState.includes(marker)) {
+      errors.push(`ci-project-state.yml: missing strict deploy-key invariant ${marker}`);
+    }
+  }
+  for (const forbiddenMarker of [
+    'CERTIGO_CONTENT_APP_ID',
+    'CERTIGO_CONTENT_APP_PRIVATE_KEY',
+    'CERTIGO_CONTENT_READ_TOKEN',
+    'actions/create-github-app-token',
+    'token: ${{',
+  ]) {
+    if (projectState.includes(forbiddenMarker)) {
+      errors.push(`ci-project-state.yml: forbidden App/PAT fallback ${forbiddenMarker}`);
+    }
   }
   for (const marker of [
     'name: Security / Required gate',
@@ -373,6 +408,18 @@ function validateRepositoryInvariants() {
     if (workflow.includes('environment:')) {
       errors.push(`${fileName}: reusable scanners must not select deployment environments`);
     }
+    if (!workflow.includes('actions/upload-artifact@')) {
+      errors.push(`${fileName}: scanner findings must be preserved as an artifact`);
+    }
+    if (!workflow.includes('if-no-files-found: error')) {
+      errors.push(`${fileName}: scanner artifact upload must fail when findings are missing`);
+    }
+    if (
+      workflow.includes('upload-sarif@') ||
+      workflow.includes('security-events: write')
+    ) {
+      errors.push(`${fileName}: scanner must not depend on GitHub Code Scanning`);
+    }
   }
   if (
     !branchProtection.required_status_checks.contexts.includes('Security / Required gate')
@@ -401,6 +448,21 @@ function validateRepositoryInvariants() {
     )
   ) {
     errors.push('branch-protection-main.json: fork policy gate is not required');
+  }
+  for (const [fileName, document] of [
+    ['docs/GOVERNANCE.md', governance],
+    ['SECURITY.md', securityPolicy],
+  ]) {
+    for (const forbiddenMarker of [
+      'Dependabot alerts',
+      'Dependabot security updates',
+      'suivies par Dependabot',
+      '**Dependabot** (dépendances)',
+    ]) {
+      if (document.includes(forbiddenMarker)) {
+        errors.push(`${fileName}: security must not depend on ${forbiddenMarker}`);
+      }
+    }
   }
   return errors;
 }

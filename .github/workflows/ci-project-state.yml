@@ -15,11 +15,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  CONTENT_APP_ID: ${{ secrets.CERTIGO_CONTENT_APP_ID }}
-  CONTENT_APP_PRIVATE_KEY: ${{ secrets.CERTIGO_CONTENT_APP_PRIVATE_KEY }}
-  CONTENT_READ_TOKEN: ${{ secrets.CERTIGO_CONTENT_READ_TOKEN }}
-
 jobs:
   validate:
     name: Generated state equals committed state
@@ -27,6 +22,16 @@ jobs:
     environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}
     runs-on: [self-hosted, Linux, X64, certigo-ci]
     steps:
+      - name: Validate certigo-content deploy key
+        shell: bash
+        env:
+          CONTENT_DEPLOY_KEY: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CONTENT_DEPLOY_KEY//[[:space:]]/}" ]; then
+            echo "::error::CERTIGO_CONTENT_DEPLOY_KEY must contain the read-only certigo-content SSH deploy key."
+            exit 1
+          fi
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
@@ -39,49 +44,17 @@ jobs:
         run: python -m unittest discover -s tools/tests -p "test_*.py" -v
       - name: Reject stale generated state
         run: python tools/project_state.py --check
-      - name: Validate certigo-content credential configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          if { [ -n "$CONTENT_APP_ID" ] && [ -z "$CONTENT_APP_PRIVATE_KEY" ]; } ||
-             { [ -z "$CONTENT_APP_ID" ] && [ -n "$CONTENT_APP_PRIVATE_KEY" ]; }; then
-            echo "::error::CERTIGO_CONTENT_APP_ID and CERTIGO_CONTENT_APP_PRIVATE_KEY must be configured together."
-            exit 1
-          fi
-          if [ -z "$CONTENT_APP_ID" ] && [ -z "$CONTENT_READ_TOKEN" ]; then
-            echo "::error::Configure the read-only certigo-content GitHub App credentials or CERTIGO_CONTENT_READ_TOKEN."
-            exit 1
-          fi
-      - name: Mint read-only certigo-content GitHub App token
-        id: content-app-token
-        if: env.CONTENT_APP_ID != '' && env.CONTENT_APP_PRIVATE_KEY != ''
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
-        with:
-          app-id: ${{ env.CONTENT_APP_ID }}
-          private-key: ${{ env.CONTENT_APP_PRIVATE_KEY }}
-          owner: gchambaud_microsoft
-          repositories: certigo-content
-          permission-contents: read
-      - name: Select certigo-content read credential
-        id: content-auth
-        shell: bash
-        env:
-          APP_TOKEN: ${{ steps.content-app-token.outputs.token }}
-        run: |
-          set -euo pipefail
-          token="${APP_TOKEN:-$CONTENT_READ_TOKEN}"
-          if [ -z "$token" ]; then
-            echo "::error::No read credential was produced for certigo-content."
-            exit 1
-          fi
-          echo "::add-mask::$token"
-          echo "token=$token" >> "$GITHUB_OUTPUT"
       - name: Checkout current certigo-content main
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: gchambaud_microsoft/certigo-content
           ref: main
-          token: ${{ steps.content-auth.outputs.token }}
+          ssh-key: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}
+          ssh-strict: true
+          ssh-known-hosts: |
+            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+            github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+            github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
           path: .active-content
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0

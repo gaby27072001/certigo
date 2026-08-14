@@ -251,7 +251,7 @@ gh api -X PUT "repos/$GH_ORG/$GH_REPO/environments/prod" \
 Sur ce dépôt (privé, détenu par un **compte User**), l'ajout de **required reviewers** à un
 environnement renvoie **HTTP 422** : la fonctionnalité « environment protection rules » (reviewers
 requis, wait timer, branch policy) n'est disponible que pour les **dépôts publics** ou sous un plan
-payant **GitHub Pro / Team / Enterprise**. Conséquence cette session : les environnements
+GitHub payant compatible. Conséquence cette session : les environnements
 `dev` / `staging` / `prod` ont bien été **créés**, mais le **gate reviewer sur `prod` n'a pas pu
 être posé**. Résiduel admin : passer le repo sous un plan payant (ou le déplacer sous une org
 éligible), puis ré-exécuter le bloc `prod` ci-dessus.
@@ -419,9 +419,9 @@ documentation), et le **résiduel strict** qui nécessite une action hors périm
 - **T0.3 — Environments : ✅ PARTIEL.** `dev` / `staging` / `prod` créés. **Reviewer gate `prod`
   non posé** (billing GitHub 422, voir §T0.3). Branch protection `main` = résiduel admin.
 - **T0.2 — Runner : ✅ prémisse hosted réfutée en live.** Le run `28381092423` a été rejeté
-  immédiatement avec l'annotation GitHub :
-  "GitHub Actions hosted runners are disabled for this repository. For more information please contact your GitHub Enterprise Administrator."
-  ⇒ **GitHub-hosted bloqué par policy EMU**. Le chemin critique reste self-hosted (`certigo-ci`).
+  immédiatement car les runners GitHub-hosted sont désactivés pour ce dépôt.
+  Aucune validation Enterprise ne sera sollicitée : le chemin critique reste le pool Azure
+  self-hosted (`certigo-ci`).
 
 ### Ce qui est effectivement déployé
 

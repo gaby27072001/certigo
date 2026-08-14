@@ -34,3 +34,19 @@ jobs:
             echo "::error::Vulnerable NuGet packages detected."
             exit 1
           fi
+
+      - name: Ensure NuGet findings log exists
+        if: ${{ always() }}
+        run: |
+          if [ ! -e dotnet-vulnerable.log ]; then
+            echo "NuGet scan did not produce a findings log; inspect prior failed steps." > dotnet-vulnerable.log
+          fi
+
+      - name: Preserve NuGet findings
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nuget-findings
+          path: dotnet-vulnerable.log
+          if-no-files-found: error
+          retention-days: 30

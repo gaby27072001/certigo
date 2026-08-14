@@ -46,9 +46,16 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 Le gate CodeQL ne se contente pas du statut d'exécution de l'analyse. Chaque langue produit un
 SARIF évalué localement : les sévérités de sécurité `high`/`critical` (score >= 7.0) et les
 résultats SARIF de niveau `error` sans score bloquent le job. Le SARIF est conservé 30 jours
-comme artefact pour chaque PR interne, puis envoyé à Code Scanning. Les forks ne sont pas
-supportés : la gate de confiance chargée depuis `main` échoue sans checkout, tandis qu'aucun
-workflow contrôlé par le fork ne peut atteindre le pool Azure persistant.
+comme artefact pour chaque PR interne et évalué sans dépendre d'un service GitHub Enterprise.
+Les résultats OSV, NuGet et Checkov sont également conservés comme artefacts par leurs jobs
+Azure bloquants. Les forks ne sont pas supportés : la gate de confiance chargée depuis `main`
+échoue sans checkout, tandis qu'aucun workflow contrôlé par le fork ne peut atteindre le pool
+Azure persistant.
+
+La gate `Generated state equals committed state` accède au dépôt privé `certigo-content`
+uniquement avec la deploy key SSH en lecture seule stockée dans le secret Actions
+`CERTIGO_CONTENT_DEPLOY_KEY`. Le workflow refuse une clé absente, impose la vérification stricte
+des clés hôte `github.com` épinglées et n'accepte aucun PAT ni GitHub App en fallback.
 
 ### Conclusion DoD
 
@@ -102,7 +109,7 @@ par domaine (backend, mobile, infra, `.github`, docs, registre de migration…).
 ### Fichier de capture ré-appliquable
 
 [`.github/branch-protection-main.json`](../.github/branch-protection-main.json) contient un
-**état cible pour revue**, incluant les six contextes du §4. Ce fichier
+**état cible pour revue**, incluant les sept contextes du §4. Ce fichier
 n'est pas une charge utile à envoyer en bloc : les champs de durcissement restent des réserves
 séparées, et seuls les checks requis sont réconciliés ici.
 
@@ -133,7 +140,8 @@ séparées, et seuls les checks requis sont réconciliés ici.
        "Generated state equals committed state",
        "Validate workflow YAML",
        "CodeQL / Security gate",
-       "Security / Required gate"
+       "Security / Required gate",
+       "Fork PR policy / Required gate"
      ]
    }
    JSON
@@ -196,8 +204,8 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
       `strict=true`.
 - [ ] Dans **Settings → Actions → General**, conserver le token par défaut en
       lecture seule, désactiver l'autorisation pour GitHub Actions d'approuver
-      des PR et restreindre les Actions autorisées. Activer la politique
-      d'épinglage par SHA complet si elle est disponible au niveau entreprise.
+      des PR et restreindre les Actions autorisées. L'épinglage SHA complet est
+      contrôlé localement par `validate-workflow-security.mjs`.
 - [ ] Ajouter `Fork PR policy / Required gate` aux contextes requis. Les PR de forks
       restent non supportées et échouent fermement sans checkout ; seules les PR internes
       peuvent exécuter leur SHA de tête sur le pool Azure `certigo-ci`.
@@ -211,9 +219,14 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
       OIDC `AZURE_*` au niveau environnement, pas au niveau dépôt.
 - [ ] Créer un ruleset de tags `v*` interdisant suppression et modification, et
       limitant la création aux mainteneurs de release.
-- [ ] Activer Code scanning, Dependabot alerts et Dependabot security updates
-      lorsque la politique Enterprise Managed Users l'autorise. Le workflow OSV
-      bloquant reste le filet de sécurité indépendant.
+- [ ] Dans `certigo-content`, enregistrer la clé publique comme **Deploy key** sans
+      `Allow write access`, puis stocker la clé privée correspondante dans le secret
+      Actions `CERTIGO_CONTENT_DEPLOY_KEY` de Certigo. Aucun PAT/App ou réglage
+      Enterprise ne fait partie de ce contrôle.
+
+Les mises à jour de versions de `.github/dependabot.yml` restent une aide de maintenance.
+La décision de sécurité repose exclusivement sur les gates Azure bloquantes OSV, NuGet,
+Checkov et CodeQL, sans activation de fonctionnalité Enterprise.
 
 Ces réserves ne doivent pas être appliquées implicitement avec le JSON complet. Les traiter
 séparément, avec revue admin et lecture préalable de l'état live.
