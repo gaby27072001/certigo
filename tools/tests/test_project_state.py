@@ -351,10 +351,10 @@ class ProjectStateTests(unittest.TestCase):
     def test_active_content_reference_is_pinned_exactly(self) -> None:
         active = project_state.load_active_content_reference(REPO_ROOT)
         self.assertEqual(
-            "663f32b4818964e307cf7e084cd09a9c6af91429", active.revision
+            "55a512821dabbea8b65d3403f9c83571b4a33ed8", active.revision
         )
-        self.assertEqual("2026-08-06", active.date)
-        self.assertEqual("2026-08-06T15:59:29Z", active.committed_at)
+        self.assertEqual("2026-08-14", active.date)
+        self.assertEqual("2026-08-14T21:42:01Z", active.committed_at)
         self.assertEqual(146, active.public.file_count)
         self.assertEqual(
             "sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff",
