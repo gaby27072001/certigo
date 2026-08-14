@@ -208,9 +208,12 @@ def observable_sha256(root: Path) -> str:
         path_bytes = relative.as_posix().encode("utf-8")
         content = _read_bytes(root, relative)
         path_attributes = attributes[relative]
+        text_attribute = path_attributes.get("text")
+        is_text = text_attribute == "set" or (
+            text_attribute == "auto" and b"\0" not in content[:8000]
+        )
         if (
-            path_attributes.get("text") != "unset"
-            and path_attributes.get("eol") == "lf"
+            is_text and path_attributes.get("eol") == "lf"
         ):
             content = content.replace(b"\r\n", b"\n")
         digest.update(len(path_bytes).to_bytes(8, "big"))

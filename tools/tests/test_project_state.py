@@ -196,6 +196,14 @@ class ProjectStateTests(unittest.TestCase):
         source.write_bytes(original + b"# semantic change\n")
         self.assertNotEqual(expected, project_state.observable_sha256(self.root))
 
+    def test_observable_hash_does_not_normalize_auto_detected_binary(self) -> None:
+        source = self.root / "content/binary.dat"
+        source.write_bytes(b"\0binary\r\npayload")
+        crlf_hash = project_state.observable_sha256(self.root)
+
+        source.write_bytes(b"\0binary\npayload")
+        self.assertNotEqual(crlf_hash, project_state.observable_sha256(self.root))
+
     def test_equivalent_root_commit_does_not_require_reference_ancestry(self) -> None:
         captured_commit = project_state.load_reference(self.root)[1]
         self.fixture.git("checkout", "--orphan", "equivalent-root")
