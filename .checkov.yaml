@@ -53,11 +53,20 @@ skip-check:
   # Reason: paid Defender plans are optional and intentionally disabled by
   # default to avoid unexpected subscription cost in dev/test.
   - CKV_AZURE_87
+  # CKV_AZURE_19 / CKV_AZURE_84 — Defender Standard pricing.
+  # Reason: the shared module is parameterized so production enables paid plans
+  # while dev/staging can remain free until budget approval.
+  - CKV_AZURE_19
+  - CKV_AZURE_84
 
   # CKV_AZURE_35 — Storage default network action should be Deny.
   # Reason: public endpoint is intentionally enabled by default until private
   # endpoints are rolled out; hardened environments deny by default.
   - CKV_AZURE_35
+  # CKV_AZURE_59 — Storage public network access.
+  # Reason: public-rbac is the only supported atomic posture until VNet
+  # integration, private endpoints and private DNS are deployed together.
+  - CKV_AZURE_59
 
   # CKV_AZURE_206 — Storage should use geo-redundant replication.
   # Reason: default Standard_LRS is a deliberate dev cost/performance trade-off;
