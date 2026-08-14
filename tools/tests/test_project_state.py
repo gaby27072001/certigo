@@ -571,6 +571,13 @@ class ProjectStateTests(unittest.TestCase):
             protection["required_status_checks"]["contexts"],
         )
 
+    def test_codeql_covers_github_security_scripts(self) -> None:
+        workflow = (REPO_ROOT / ".github/workflows/codeql.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("- '.github/scripts/**/*.js'", workflow)
+        self.assertIn("- '.github/scripts/**/*.mjs'", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

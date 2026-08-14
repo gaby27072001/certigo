@@ -49,6 +49,8 @@ jobs:
             javascript:
               - 'tools/**/*.js'
               - 'tools/**/*.mjs'
+              - '.github/scripts/**/*.js'
+              - '.github/scripts/**/*.mjs'
               - 'package.json'
               - 'package-lock.json'
             python:

@@ -294,6 +294,8 @@ function validateRepositoryInvariants() {
     azureLinuxRunner,
     "github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository",
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
+    "- '.github/scripts/**/*.js'",
+    "- '.github/scripts/**/*.mjs'",
   ]) {
     if (!codeql.includes(marker)) {
       errors.push(`codeql.yml: missing Azure/same-repository invariant ${marker}`);
