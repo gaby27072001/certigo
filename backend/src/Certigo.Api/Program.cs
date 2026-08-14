@@ -99,6 +99,11 @@ var host = new HostBuilder()
             configuration["AUTH_JWT_SIGNING_KEY"],
             context.HostingEnvironment.IsProduction(),
             configuration["AUTH_MODE"]);
+        var previousSigningSecret = JwtSigningKeyGuard.ResolvePreviousSigningSecret(
+            configuration["AUTH_JWT_PREVIOUS_SIGNING_KEY"],
+            signingSecret,
+            context.HostingEnvironment.IsProduction(),
+            configuration["AUTH_MODE"]);
         var jwtIssuer = configuration["AUTH_JWT_ISSUER"] ?? "certigo";
         var jwtAudience = configuration["AUTH_JWT_AUDIENCE"] ?? "certigo";
 
@@ -111,7 +116,8 @@ var host = new HostBuilder()
             {
                 new LocalJwtTokenValidator(
                     signingSecret, jwtIssuer, jwtAudience,
-                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LocalJwtTokenValidator>>())
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LocalJwtTokenValidator>>(),
+                    previousSigningSecret)
             };
 
             // Hard production guard: the dev validator accepts any bearer token as a
@@ -144,7 +150,11 @@ var host = new HostBuilder()
         });
 
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
-        services.AddSingleton<ITokenIssuer>(_ => new JwtTokenIssuer(signingSecret, jwtIssuer, jwtAudience));
+        services.AddSingleton<ITokenIssuer>(_ => new JwtTokenIssuer(
+            signingSecret,
+            jwtIssuer,
+            jwtAudience,
+            previousSigningSecret: previousSigningSecret));
         services.AddScoped<IUserCredentialRepository, CosmosUserCredentialRepository>();
 
         // Email verification for email/password accounts. Non-blocking: the default

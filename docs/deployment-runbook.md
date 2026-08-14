@@ -23,7 +23,8 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | Jobs rattachés à un `environment:` | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Clarification placeholders Entra en dev | ✅ Fait (cette PR) | `infra/params/dev.bicepparam` |
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
-| 3 secrets GitHub | ✅ **Fait (session)** — déjà positionnés | §T0.1 |
+| 3 secrets GitHub OIDC | ✅ **Fait (session)** — déjà positionnés | §T0.1 |
+| Clé JWT + expiration par Environment | ⛔ **Humain** — obligatoire avant staging/prod | §T0.4 |
 | `publicNetworkAccess` storage épinglé `Enabled` (anti-dérive) | ✅ Fait (cette PR) | `infra/modules/storage.bicep` + `infra/main.bicep` |
 | GitHub Environments `dev`/`staging`/`prod` | ✅ **Fait (session)** — créés ; ⚠️ reviewers `prod` bloqués (billing 422) | §T0.3 |
 | Branch protection sur `main` | ⛔ **Humain** (admin repo) | §T0.3 |
@@ -36,6 +37,8 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 1. Déclencher `cd-backend.yml` avec `environment=dev|staging|prod` (aucun paramètre runner à fournir).
 2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `certigo-ci`.
 3. En cas d'échec Azure login, contrôler uniquement les 3 secrets repo : `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
+4. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
+   `AUTH_JWT_SIGNING_KEY` / `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`, sans afficher sa valeur.
 4. Pour une promotion, lancer `promote-backend-staging-prod.yml` (enchaînement staging puis prod).
 
 ### Pourquoi Azure-first (long terme)
@@ -288,10 +291,53 @@ az deployment sub create \
 
 `infra/main.bicep` autorise le mécanisme déterministe uniquement en `dev`. Pour
 `staging` et `prod`, le déploiement échoue si `authJwtSigningKey` n'est pas fourni
-via un paramètre sécurisé externe. Ne jamais placer cette valeur dans un fichier
-`.bicepparam` versionné, une sortie de commande ou les logs du pipeline. La même
-valeur doit être réutilisée à chaque déploiement, sinon les jetons applicatifs déjà
-émis deviennent invalides.
+via un paramètre sécurisé externe. L'expiration `authJwtSigningKeyExpiresOn` est un
+timestamp ISO 8601 absolu obligatoire. Elle n'est jamais calculée avec `utcNow()` :
+un redéploiement identique ne prolonge donc pas silencieusement la durée de vie du
+secret.
+
+Configurer dans chaque GitHub Environment `staging`/`prod` :
+
+- le secret `AUTH_JWT_SIGNING_KEY` ;
+- la variable non secrète `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`.
+
+Ne jamais placer la clé dans un fichier `.bicepparam` versionné, une sortie de
+commande ou les logs du pipeline. Le workflow refuse une clé sans expiration (et
+inversement). Le secret Key Vault reçoit aussi un `contentType` explicite et une URI
+épinglée sur sa version, afin que la Function App recharge immédiatement une
+rotation au lieu d'attendre le cache d'une référence versionless.
+
+Le CD compile d'abord le `.bicepparam` sans secret, injecte les valeurs en mémoire
+dans un JSON temporaire créé avec le mode `0600`, puis transmet uniquement
+`@<chemin-du-fichier>` à Azure CLI. Un `trap` supprime les deux fichiers temporaires
+à la sortie. Les valeurs JWT n'apparaissent donc jamais dans les arguments de
+processus.
+
+#### Rotation sans interruption
+
+Les refresh tokens locaux vivent 90 jours. Une rotation est donc un chevauchement
+explicite de deux clés, jamais un remplacement monoclè :
+
+1. Déployer une première fois cette version du backend sans changer la clé active,
+   pour activer la validation de la clé précédente.
+2. Dans le même GitHub Environment, copier la clé active actuelle vers le secret
+   `AUTH_JWT_PREVIOUS_SIGNING_KEY` et définir
+   `AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON` à au moins 90 jours et 2 minutes après
+   le début de la rotation.
+3. Remplacer `AUTH_JWT_SIGNING_KEY` par une nouvelle valeur aléatoire forte et
+   fixer une nouvelle expiration absolue dans `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`.
+   Le prévol refuse une clé précédente identique à la nouvelle clé active.
+4. Exécuter le CD puis vérifier login, refresh et `/health/ready`. Les nouveaux
+   jetons sont signés uniquement par la nouvelle clé ; les jetons non expirés de
+   l'ancienne clé restent acceptés pendant le chevauchement.
+5. Après la fenêtre de 90 jours et 2 minutes, supprimer les deux configurations
+   `AUTH_JWT_PREVIOUS_*` et redéployer. L'ancienne version Key Vault reste soumise à
+   son expiration et à la rétention du coffre.
+
+Ne jamais avancer uniquement l'expiration avec la même valeur : toute nouvelle
+expiration doit correspondre à une rotation de clé approuvée. Si l'expiration
+approche sans fenêtre de rotation disponible, suspendre le déploiement et planifier
+le chevauchement ; ne pas générer une date glissante.
 
 Déployer l'infrastructure avant le backend qui persiste les examens : le conteneur
 Cosmos `attempts` doit d'abord être configuré avec `defaultTtl: -1` pour que le TTL

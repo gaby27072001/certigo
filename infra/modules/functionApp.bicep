@@ -57,6 +57,8 @@ param tutorLlmApiVersion string = '2024-10-21'
 param tutorLlmApiKey string = ''
 @description('Key Vault secret URI holding the JWT signing key. Injected into the AUTH_JWT_SIGNING_KEY app setting as a KV reference, resolved at runtime by the managed identity.')
 param authJwtSigningKeySecretUri string
+@description('Optional Key Vault secret URI for the previous JWT signing key during a bounded rotation overlap.')
+param authJwtPreviousSigningKeySecretUri string = ''
 @description('Maximum output tokens requested from the tutor LLM.')
 param tutorLlmMaxOutputTokens int = 400
 param tags object = {}
@@ -267,6 +269,12 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
         // (dev env); 'false' elsewhere is inert because the guard short-circuits when AUTH_MODE!=dev.
         { name: 'AUTH_ALLOW_DEV', value: authMode == 'dev' ? 'true' : 'false' }
         { name: 'AUTH_JWT_SIGNING_KEY', value: '@Microsoft.KeyVault(SecretUri=${authJwtSigningKeySecretUri})' }
+        {
+          name: 'AUTH_JWT_PREVIOUS_SIGNING_KEY'
+          value: empty(authJwtPreviousSigningKeySecretUri)
+            ? ''
+            : '@Microsoft.KeyVault(SecretUri=${authJwtPreviousSigningKeySecretUri})'
+        }
         { name: 'ENTRA_AUTHORITY', value: entraAuthority }
         { name: 'ENTRA_AUDIENCE', value: entraAudience }
         { name: 'TUTOR_LLM_ENABLED', value: string(tutorLlmEnabled) }

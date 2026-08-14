@@ -11,6 +11,7 @@
     "HEALTH_PLATFORM_CLIENT_ID": "",
     "KeyVault__Uri": "https://<vault>.vault.azure.net/",
     "KeyVault__HealthSecretName": "AUTH-JWT-SIGNING-KEY",
+    "AUTH_JWT_PREVIOUS_SIGNING_KEY": "",
     "TUTOR_LLM_ENABLED": "true",
     "TUTOR_LLM_ENDPOINT": "https://certigo-openai.services.ai.azure.com/api/projects/certigo-dev/openai/v1/",
     "TUTOR_LLM_API_SURFACE": "v1",

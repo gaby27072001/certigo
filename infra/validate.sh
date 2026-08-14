@@ -31,6 +31,14 @@ for environment in dev staging prod; do
   grep -F 'param manageDefenderPlans =' "${params}" >/dev/null
 done
 
+grep -F "param authJwtSigningKeyExpiresOn = '2027-08-31T00:00:00Z'" \
+  "${root}/infra/params/dev.bicepparam" >/dev/null
+grep -F 'contentType:' "${root}/infra/modules/keyvault.bicep" >/dev/null
+grep -F 'exp: dateTimeToEpoch(jwtSigningKeyExpiresOn)' \
+  "${root}/infra/modules/keyvault.bicep" >/dev/null
+grep -F 'exp: dateTimeToEpoch(jwtPreviousSigningKeyExpiresOn)' \
+  "${root}/infra/modules/keyvaultPreviousJwtSecret.bicep" >/dev/null
+
 for environment in staging prod; do
   params="${root}/infra/params/${environment}.bicepparam"
   if grep -Eq "^param alertEmail = ''$" "${params}"; then

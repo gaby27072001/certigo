@@ -47,6 +47,13 @@ param tutorLlmApiKey string = ''
 @description('Signing key for email/password JWTs. Dev may derive a stable non-production value. Staging/prod must receive a non-empty secret through a secure deployment parameter.')
 @secure()
 param authJwtSigningKey string = ''
+@description('Absolute ISO 8601 expiration of the active JWT signing key. This value is explicit so repeated deployments cannot silently extend the secret lifetime.')
+param authJwtSigningKeyExpiresOn string = ''
+@description('Previous JWT signing key accepted only during a planned rotation overlap. Leave empty outside a rotation window.')
+@secure()
+param authJwtPreviousSigningKey string = ''
+@description('Absolute ISO 8601 expiration of the previous JWT signing key. Must be supplied together with authJwtPreviousSigningKey.')
+param authJwtPreviousSigningKeyExpiresOn string = ''
 @description('Maximum output tokens requested from the tutor LLM.')
 param tutorLlmMaxOutputTokens int = 400
 
@@ -123,6 +130,14 @@ var effectiveAuthJwtSigningKey = empty(authJwtSigningKey)
     ? fail('authJwtSigningKey must be supplied securely for staging and production deployments.')
     : guid(subscription().id, appName, env, 'auth-jwt-signing-key'))
   : authJwtSigningKey
+var effectiveAuthJwtSigningKeyExpiresOn = empty(authJwtSigningKeyExpiresOn)
+  ? fail('authJwtSigningKeyExpiresOn must be an explicit absolute ISO 8601 timestamp.')
+  : authJwtSigningKeyExpiresOn
+var hasPreviousJwtSigningKey = !empty(authJwtPreviousSigningKey)
+var hasPreviousJwtSigningKeyExpiration = !empty(authJwtPreviousSigningKeyExpiresOn)
+var usePreviousJwtSigningKey = hasPreviousJwtSigningKey == hasPreviousJwtSigningKeyExpiration
+  ? hasPreviousJwtSigningKey
+  : fail('authJwtPreviousSigningKey and authJwtPreviousSigningKeyExpiresOn must be supplied together.')
 var effectiveAlertEmail = env != 'dev' && empty(alertEmail)
   ? fail('alertEmail is required for staging and production deployments.')
   : alertEmail
@@ -200,7 +215,18 @@ module vault 'modules/keyvault.bicep' = {
     softDeleteRetentionInDays: hardened ? 90 : 7
     networkAccessMode: networkAccessMode
     jwtSigningKey: effectiveAuthJwtSigningKey
+    jwtSigningKeyExpiresOn: effectiveAuthJwtSigningKeyExpiresOn
     tags: tags
+  }
+}
+
+module previousJwtSecret 'modules/keyvaultPreviousJwtSecret.bicep' = if (usePreviousJwtSigningKey) {
+  scope: rg
+  name: 'keyvaultPreviousJwtSecret'
+  params: {
+    keyVaultName: vault.outputs.name
+    jwtPreviousSigningKey: authJwtPreviousSigningKey
+    jwtPreviousSigningKeyExpiresOn: authJwtPreviousSigningKeyExpiresOn
   }
 }
 
@@ -232,6 +258,7 @@ module api 'modules/functionApp.bicep' = {
     keyVaultName: vault.outputs.name
     authMode: authMode
     authJwtSigningKeySecretUri: vault.outputs.jwtSecretUri
+    authJwtPreviousSigningKeySecretUri: previousJwtSecret.?outputs.?jwtSecretUri ?? ''
     entraAuthority: entraAuthority
     entraAudience: entraAudience
     tutorLlmEnabled: tutorLlmEnabled

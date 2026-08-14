@@ -69,6 +69,8 @@ La reconstruction n'utilise ni image mutable implicite, ni jeton dans l'IaC :
   réellement incorporé ;
 - Ubuntu 24.04, Trusted Launch, Secure Boot, vTPM et un disque Premium de 128 Gio sont
   déclarés ;
+- `allowExtensionOperations: false` interdit l'installation d'extensions VM ; le bootstrap
+  cloud-init versionné reste l'unique mécanisme de configuration de l'instance ;
 - `availabilityZone` permet de répartir les instances redondantes entre zones ;
 - le runner GitHub `2.336.0` est téléchargé depuis la release officielle et vérifié avec
   son SHA-256 publié dans l'API GitHub ; la mise à jour automatique est désactivée et une

@@ -71,22 +71,38 @@ readiness `healthy` pour Cosmos, Storage et Key Vault.
 ## Prévol sans mutation
 
 ```bash
+PARAMETERS_DIRECTORY="$(mktemp -d)"
+chmod 700 "$PARAMETERS_DIRECTORY"
+BASE_PARAMETERS_FILE="$PARAMETERS_DIRECTORY/base.json"
+AUTH_PARAMETERS_FILE="$PARAMETERS_DIRECTORY/auth.json"
+trap 'rm -rf -- "$PARAMETERS_DIRECTORY"' EXIT
+
+# Charger AUTH_JWT_SIGNING_KEY et AUTH_JWT_SIGNING_KEY_EXPIRES_ON depuis le
+# gestionnaire de secrets autorisé, sans les écrire dans la ligne de commande.
+export TARGET_ENV="$ENV"
+export BASE_PARAMETERS_FILE AUTH_PARAMETERS_FILE
+az bicep build-params \
+  --file "infra/params/${ENV}.bicepparam" \
+  --outfile "$BASE_PARAMETERS_FILE"
+node .github/scripts/write-secure-bicep-parameters.mjs
 az deployment sub what-if \
   --name "certigo-${ENV}-preflight" \
   --location westeurope \
   --template-file infra/main.bicep \
-  --parameters "infra/params/${ENV}.bicepparam" \
-  --parameters authJwtSigningKey="<SECURE_VALUE>"
+  --parameters "@$AUTH_PARAMETERS_FILE"
 ```
 
 Refuser l'application si le what-if annonce une suppression, un remplacement du compte Cosmos,
 une fermeture réseau sans VNet/private endpoints/DNS, ou une baisse inattendue de Defender.
+La date d'expiration JWT est une entrée absolue auditée : ne pas utiliser `utcNow()`, ne pas la
+repousser sans changer la clé, et appliquer la procédure de chevauchement décrite dans
+`docs/deployment-runbook.md` avant toute rotation.
 
 ## Ordre de déploiement autorisé
 
 1. **Dev** : appliquer l'IaC, publier le backend, vérifier `/health/live` puis `/health/ready`.
-2. **Staging** : fournir la clé JWT sécurisée, appliquer l'IaC, attendre la propagation RBAC, publier,
-   tester alertes et restauration PITR vers un nouveau compte.
+2. **Staging** : fournir la clé JWT sécurisée et son expiration absolue, appliquer l'IaC, attendre
+   la propagation RBAC, publier, tester alertes et restauration PITR vers un nouveau compte.
 3. **Production** : fenêtre de changement approuvée, preuve du what-if, sauvegarde/PITR vérifiée,
    appliquer l'IaC puis publier ; ne jamais inverser cet ordre.
 4. **Runner CI** : le cycle start/stop reste une opération séparée et autorisée ; aucun script de

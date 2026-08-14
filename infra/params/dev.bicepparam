@@ -47,6 +47,8 @@ param entraAudience = '00000000-0000-0000-0000-000000000000'
 
 // authJwtSigningKey is intentionally omitted in dev. main.bicep derives a stable
 // value that is explicitly gated to the non-hardened dev environment.
+// Its expiration is fixed and reviewable: deployments do not extend it implicitly.
+param authJwtSigningKeyExpiresOn = '2027-08-31T00:00:00Z'
 
 // AI tutor (Azure OpenAI / Microsoft Foundry). Enabled in dev.
 // The dev resource "certigo-openai" (deployment gpt-5.4-mini, v1 project-scoped

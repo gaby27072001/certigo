@@ -111,6 +111,60 @@ public sealed class JwtTokenIssuerTests
 
         result.Succeeded.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task Previous_key_access_token_remains_valid_during_rotation()
+    {
+        const string previousSecret = "previous-signing-secret";
+        var previousTokens = new JwtTokenIssuer(previousSecret, Issuer, Audience)
+            .Issue("user-1", "Alice", "alice@example.com");
+        var validator = new LocalJwtTokenValidator(
+            Secret,
+            Issuer,
+            Audience,
+            previousSigningSecret: previousSecret);
+
+        var result = await validator.TryValidateAsync(previousTokens.AccessToken);
+
+        result.Succeeded.Should().BeTrue();
+        result.UserId.Should().Be("user-1");
+    }
+
+    [Fact]
+    public void Previous_key_refresh_token_remains_valid_during_rotation()
+    {
+        const string previousSecret = "previous-signing-secret";
+        var previousTokens = new JwtTokenIssuer(previousSecret, Issuer, Audience)
+            .Issue("user-1", "Alice", "alice@example.com");
+        var rotatingIssuer = new JwtTokenIssuer(
+            Secret,
+            Issuer,
+            Audience,
+            previousSigningSecret: previousSecret);
+
+        rotatingIssuer.ValidateRefreshToken(previousTokens.RefreshToken)
+            .Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Rotated_tokens_are_signed_only_with_the_active_key()
+    {
+        const string previousSecret = "previous-signing-secret";
+        var rotatingIssuer = new JwtTokenIssuer(
+            Secret,
+            Issuer,
+            Audience,
+            previousSigningSecret: previousSecret);
+        var tokens = rotatingIssuer.Issue("user-1", "Alice", "alice@example.com");
+
+        var previousOnlyResult = await new LocalJwtTokenValidator(
+            previousSecret,
+            Issuer,
+            Audience).TryValidateAsync(tokens.AccessToken);
+
+        previousOnlyResult.Succeeded.Should().BeFalse();
+        (await NewValidator().TryValidateAsync(tokens.AccessToken)).Succeeded.Should().BeTrue();
+    }
 }
 
 public sealed class CompositeTokenValidatorTests

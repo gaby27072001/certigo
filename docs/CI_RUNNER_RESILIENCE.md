@@ -210,8 +210,9 @@ Ces opérations Azure/GitHub sont externes au commit. Toujours garder l'autre ru
 
    Critère : uniquement la VM, `${RUNNER_NAME}-nic`, le disque OS géré et l'identité
    système associée sont créés ; aucune IP publique, la sortie `principalId` est non vide
-   et `bootstrapSha256` correspond au tag de la VM. `network.bicep` doit rester
-   `NoChange`.
+   et `bootstrapSha256` correspond au tag de la VM. Les extensions VM sont désactivées
+   (`allowExtensionOperations=false`) : toute évolution passe par une reconstruction avec
+   le bootstrap versionné. `network.bicep` doit rester `NoChange`.
 
 3. Attendre `Provisioning succeeded`, ouvrir une session privée (Bastion/VPN), attendre
    explicitement la fin de cloud-init, puis générer un jeton d'enregistrement valable une

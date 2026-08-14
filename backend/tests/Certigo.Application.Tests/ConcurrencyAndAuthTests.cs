@@ -81,6 +81,53 @@ public sealed class JwtSigningKeyGuardTests
     public void Development_honours_an_explicitly_configured_key()
         => JwtSigningKeyGuard.ResolveSigningSecret(StrongKey, isProduction: false, authMode: null)
             .Should().Be(StrongKey);
+
+    [Fact]
+    public void Production_accepts_a_strong_previous_rotation_key()
+        => JwtSigningKeyGuard.ResolvePreviousSigningSecret(
+                StrongKey,
+                "different-active-key",
+                isProduction: true,
+                authMode: "prod")
+            .Should().Be(StrongKey);
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Missing_previous_rotation_key_is_disabled(string? configured)
+        => JwtSigningKeyGuard.ResolvePreviousSigningSecret(
+                configured,
+                StrongKey,
+                isProduction: true,
+                authMode: "prod")
+            .Should().BeNull();
+
+    [Fact]
+    public void Production_rejects_the_development_key_as_a_previous_rotation_key()
+    {
+        var act = () => JwtSigningKeyGuard.ResolvePreviousSigningSecret(
+            JwtSigningKeyGuard.DevelopmentSigningKey,
+            StrongKey,
+            isProduction: true,
+            authMode: "prod");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*AUTH_JWT_PREVIOUS_SIGNING_KEY*");
+    }
+
+    [Fact]
+    public void Previous_rotation_key_must_differ_from_the_active_key()
+    {
+        var act = () => JwtSigningKeyGuard.ResolvePreviousSigningSecret(
+            StrongKey,
+            StrongKey,
+            isProduction: true,
+            authMode: "prod");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*must differ*");
+    }
 }
 
 public sealed class OptimisticConcurrencyTests

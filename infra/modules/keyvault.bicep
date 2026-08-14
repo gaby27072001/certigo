@@ -22,6 +22,9 @@ param networkAccessMode string = 'public-rbac'
 @secure()
 param jwtSigningKey string
 
+@description('Absolute ISO 8601 expiration timestamp for the active JWT signing secret.')
+param jwtSigningKeyExpiresOn string
+
 resource vault 'Microsoft.KeyVault/vaults@2024-04-01-preview' = {
   name: name
   location: location
@@ -56,9 +59,13 @@ resource jwtSecret 'Microsoft.KeyVault/vaults/secrets@2024-04-01-preview' = {
   name: 'AUTH-JWT-SIGNING-KEY'
   properties: {
     value: jwtSigningKey
+    contentType: 'application/x-certigo-jwt-signing-key'
+    attributes: {
+      exp: dateTimeToEpoch(jwtSigningKeyExpiresOn)
+    }
   }
 }
 
-@description('Versionless URI of the JWT signing secret, for the Function App KV reference.')
-output jwtSecretUri string = jwtSecret.properties.secretUri
+@description('Version-pinned URI of the active JWT signing secret. A rotation changes the Function App setting and forces immediate refresh.')
+output jwtSecretUri string = jwtSecret.properties.secretUriWithVersion
 output networkAccessMode string = networkAccessMode

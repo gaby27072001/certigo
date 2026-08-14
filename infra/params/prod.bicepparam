@@ -72,9 +72,10 @@ param grantAlertReaderRole = true
 // falls back to the deterministic grounded tutor. Provide tutorLlmEnabled = true
 // + tutorLlmEndpoint/tutorLlmDeployment when a prod OpenAI resource exists.
 
-// Email/password JWT signing key: intentionally NOT set here. Supply
-// authJwtSigningKey out-of-band as a secure deployment parameter. main.bicep rejects
-// production deployments when it is omitted; never commit its value in this file.
+// Email/password JWT signing key: intentionally NOT set here. CD supplies
+// authJwtSigningKey and authJwtSigningKeyExpiresOn out-of-band from the production
+// Environment secret/variable pair. main.bicep rejects either value when omitted;
+// never commit the key in this file.
 
 // ============================================================================
 // public-rbac is the only accepted network mode. A private mode is intentionally

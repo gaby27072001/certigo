@@ -30,6 +30,7 @@ fi
 grep -F "toLower(imageVersion) == 'latest'" "${runner_bicep}" >/dev/null
 grep -F "type: 'SystemAssigned'" "${runner_bicep}" >/dev/null
 grep -F "disablePasswordAuthentication: true" "${runner_bicep}" >/dev/null
+grep -F "allowExtensionOperations: false" "${runner_bicep}" >/dev/null
 if grep -Fq "publicIPAddress" "${runner_bicep}"; then
   echo "A runner NIC must not declare a public IP address." >&2
   exit 1

@@ -119,6 +119,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-07-01' = {
       computerName: runnerName
       adminUsername: adminUsername
       customData: base64(bootstrapContent)
+      allowExtensionOperations: false
       linuxConfiguration: {
         disablePasswordAuthentication: true
         provisionVMAgent: true
