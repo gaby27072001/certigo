@@ -108,6 +108,7 @@ class Fixture:
         self.write("backend/tests/Domain/RuleTests.cs", "class RuleTests {}\n")
         self.write("apps/mobile/test/widget_test.dart", "void main() {}\n")
         self.write(".gitignore", "__pycache__/\n*.pyc\n")
+        self.write(".gitattributes", "* text=auto eol=lf\n*.png binary\n")
         self.json(
             "docs/active-content-reference.json",
             {
@@ -182,6 +183,18 @@ class ProjectStateTests(unittest.TestCase):
         self.assertEqual("2026-08-06", first.reference_date)
         self.assertEqual(self.fixture.git("rev-parse", "HEAD"), first.reference_commit)
         self.assertEqual(project_state.render(first), project_state.render(second))
+
+    def test_observable_hash_normalizes_declared_lf_text(self) -> None:
+        source = self.root / ".github/workflows/ci-mobile.yml"
+        original = source.read_bytes().replace(b"\r\n", b"\n")
+        source.write_bytes(original)
+        expected = project_state.observable_sha256(self.root)
+
+        source.write_bytes(original.replace(b"\n", b"\r\n"))
+        self.assertEqual(expected, project_state.observable_sha256(self.root))
+
+        source.write_bytes(original + b"# semantic change\n")
+        self.assertNotEqual(expected, project_state.observable_sha256(self.root))
 
     def test_equivalent_root_commit_does_not_require_reference_ancestry(self) -> None:
         captured_commit = project_state.load_reference(self.root)[1]

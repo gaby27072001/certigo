@@ -158,14 +158,61 @@ def _observable_files(root: Path) -> tuple[Path, ...]:
     return tuple(sorted(paths, key=lambda path: path.as_posix()))
 
 
+def _git_text_attributes(
+    root: Path, paths: tuple[Path, ...]
+) -> dict[Path, dict[str, str]]:
+    input_bytes = b"".join(
+        path.as_posix().encode("utf-8") + b"\0" for path in paths
+    )
+    try:
+        result = subprocess.run(
+            ["git", "check-attr", "-z", "--stdin", "text", "eol"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            input=input_bytes,
+        )
+    except OSError as exc:
+        raise ProjectStateError(f"Cannot execute git: {exc}") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr.decode("utf-8", errors="replace").strip()
+        raise ProjectStateError(f"git check-attr failed: {detail}") from exc
+
+    fields = result.stdout.split(b"\0")
+    if fields and fields[-1] == b"":
+        fields.pop()
+    if len(fields) % 3 != 0:
+        raise ProjectStateError("git check-attr returned malformed NUL-delimited output.")
+
+    attributes: dict[Path, dict[str, str]] = {path: {} for path in paths}
+    for index in range(0, len(fields), 3):
+        relative = Path(fields[index].decode("utf-8"))
+        attribute = fields[index + 1].decode("utf-8")
+        value = fields[index + 2].decode("utf-8")
+        if relative not in attributes:
+            raise ProjectStateError(
+                f"git check-attr returned unexpected path {relative.as_posix()}."
+            )
+        attributes[relative][attribute] = value
+    return attributes
+
+
 def observable_sha256(root: Path) -> str:
-    """Hash observable path names and bytes with deterministic length framing."""
+    """Hash observable paths and Git-canonical content with length framing."""
 
     digest = hashlib.sha256()
     digest.update(OBSERVABLE_HASH_PREFIX)
-    for relative in _observable_files(root):
+    observable_files = _observable_files(root)
+    attributes = _git_text_attributes(root, observable_files)
+    for relative in observable_files:
         path_bytes = relative.as_posix().encode("utf-8")
         content = _read_bytes(root, relative)
+        path_attributes = attributes[relative]
+        if (
+            path_attributes.get("text") != "unset"
+            and path_attributes.get("eol") == "lf"
+        ):
+            content = content.replace(b"\r\n", b"\n")
         digest.update(len(path_bytes).to_bytes(8, "big"))
         digest.update(path_bytes)
         digest.update(len(content).to_bytes(8, "big"))
@@ -238,10 +285,10 @@ def refresh_reference(root: Path) -> None:
         "observableSha256": observable_sha256(root),
         "semantics": (
             "Captured source commit/date plus SHA-256 of stable-sorted observable UTF-8 path "
-            "names and exact file bytes, framed by unsigned 64-bit big-endian path/content "
-            "lengths. The generated document and this excluded reference are committed "
-            "separately, avoiding self-reference while remaining valid after an equivalent "
-            "squash or root commit."
+            "names and Git-canonical file bytes after declared text/eol normalization, framed "
+            "by unsigned 64-bit big-endian path/content lengths. The generated document and "
+            "this excluded reference are committed separately, avoiding self-reference while "
+            "remaining valid after an equivalent squash or root commit."
         ),
     }
     path = root / REFERENCE_FILE
