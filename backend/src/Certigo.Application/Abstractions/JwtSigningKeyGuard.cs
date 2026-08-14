@@ -27,7 +27,8 @@ public static class JwtSigningKeyGuard
 
         var trimmed = configuredSecret?.Trim();
         var isStrongKey = !string.IsNullOrEmpty(trimmed)
-            && !string.Equals(trimmed, DevelopmentSigningKey, StringComparison.Ordinal);
+            && !string.Equals(trimmed, DevelopmentSigningKey, StringComparison.Ordinal)
+            && !IsUnresolvedKeyVaultReference(trimmed);
 
         if (hardened && !isStrongKey)
         {
@@ -60,6 +61,11 @@ public static class JwtSigningKeyGuard
         var hardened = isProduction
             || string.Equals(authMode?.Trim(), "prod", StringComparison.OrdinalIgnoreCase);
         var trimmed = configuredSecret.Trim();
+        if (IsUnresolvedKeyVaultReference(trimmed))
+        {
+            throw new InvalidOperationException(
+                "AUTH_JWT_PREVIOUS_SIGNING_KEY contains an unresolved Key Vault reference.");
+        }
         if (hardened
             && string.Equals(trimmed, DevelopmentSigningKey, StringComparison.Ordinal))
         {
@@ -75,4 +81,7 @@ public static class JwtSigningKeyGuard
 
         return configuredSecret;
     }
+
+    private static bool IsUnresolvedKeyVaultReference(string value)
+        => value.StartsWith("@Microsoft.KeyVault(", StringComparison.OrdinalIgnoreCase);
 }
