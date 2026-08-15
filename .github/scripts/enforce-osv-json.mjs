@@ -12,17 +12,25 @@ function requiredString(value, source) {
 }
 
 export function evaluateOsvJson(file) {
-  if (!fs.existsSync(file) || fs.statSync(file).size === 0) {
-    throw new Error('OSV-Scanner did not produce JSON output.');
-  }
-
+  let descriptor;
   let report;
   try {
-    report = JSON.parse(fs.readFileSync(file, 'utf8'));
+    descriptor = fs.openSync(file, 'r');
+    if (fs.fstatSync(descriptor).size === 0) {
+      throw new Error('OSV-Scanner did not produce JSON output.');
+    }
+    report = JSON.parse(fs.readFileSync(descriptor, 'utf8'));
   } catch (error) {
+    if (error instanceof Error && error.message === 'OSV-Scanner did not produce JSON output.') {
+      throw error;
+    }
     throw new Error(
       `OSV-Scanner produced invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
     );
+  } finally {
+    if (descriptor !== undefined) {
+      fs.closeSync(descriptor);
+    }
   }
   if (
     typeof report !== 'object'
