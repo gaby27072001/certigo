@@ -9,6 +9,7 @@ using Microsoft.Azure.Functions.Worker.ApplicationInsights;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Certigo.Api;
 using Certigo.Api.Auth;
 using Certigo.Api.Functions;
 using Certigo.Api.Middleware;
@@ -60,9 +61,9 @@ var host = new HostBuilder()
                 ?? throw new InvalidOperationException("BLOB_ENDPOINT is required.");
             var deploymentContainerName = configuration["DEPLOYMENT_CONTAINER_NAME"]
                 ?? throw new InvalidOperationException("DEPLOYMENT_CONTAINER_NAME is required.");
-            var keyVaultUri = configuration["KeyVault__Uri"]
+            var keyVaultUri = configuration[ConfigurationKeys.KeyVaultUri]
                 ?? throw new InvalidOperationException("KeyVault__Uri is required.");
-            var keyVaultHealthSecretName = configuration["KeyVault__HealthSecretName"]
+            var keyVaultHealthSecretName = configuration[ConfigurationKeys.KeyVaultHealthSecretName]
                 ?? "AUTH-JWT-SIGNING-KEY";
             var defaultCredential = sp.GetRequiredService<TokenCredential>();
             var platformClientId = configuration["HEALTH_PLATFORM_CLIENT_ID"];

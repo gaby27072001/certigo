@@ -40,6 +40,7 @@ function createHarness() {
   const state = path.join(root, 'state');
   const shellState = bashPath(state);
   const shellPollState = `${shellState}.poll`;
+  const shellNumericState = `${shellState}.numeric`;
   const packagePath = path.join(root, 'publish.zip');
   writeFileSync(packagePath, 'deterministic-package', 'utf8');
 
@@ -188,6 +189,16 @@ if [[ "\${MOCK_LOCATION_EMPTY_202:-false}" == 'true' && ! -f "${shellPollState}"
   printf '202'
   exit 0
 fi
+if [[ "\${MOCK_NUMERIC_OPERATION_STATUS:-false}" == 'true' ]]; then
+  if [[ -f "${shellNumericState}" ]]; then
+    printf '{"status":4}\\n' >"$output_file"
+  else
+    touch "${shellNumericState}"
+    printf '{"status":2}\\n' >"$output_file"
+  fi
+  printf '200'
+  exit 0
+fi
 case "\${MOCK_OPERATION_STATUS:-Succeeded}" in
   Timeout)
     printf '{"status":"InProgress"}\\n' >"$output_file"
@@ -320,6 +331,20 @@ test('deploy script accepts an empty 202 while polling a Location fallback', () 
     result.stdout + result.stderr,
     /masked-arm-token|masked-test-token|\?sv=mock/,
   );
+});
+
+test('deploy script accepts numeric Kudu deployment statuses', () => {
+  const harness = createHarness();
+  const result = spawnSync('bash', [bashPath(deployScript)], {
+    env: {
+      ...harness.env,
+      MOCK_NUMERIC_OPERATION_STATUS: 'true',
+    },
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /passed liveness and readiness checks/);
 });
 
 for (const [name, environment, expected] of [
