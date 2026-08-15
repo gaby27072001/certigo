@@ -15,8 +15,9 @@ bash infra/ci-runner/validate.sh
 
 Le validateur compile tous les templates et tous les paramètres. Il impose des CIDR explicites et
 non partagés par environnement, l'accès public désactivé sur Storage / Cosmos / Key Vault, la
-topologie private endpoint/DNS complète, une politique Cosmos explicite, un destinataire d'alerte
-hors dev et l'identité utilisateur FC1 préprovisionnée.
+topologie private endpoint/DNS complète, le peering bidirectionnel avec le VNet CI, une politique
+Cosmos explicite, un destinataire d'alerte hors dev, l'identité utilisateur FC1 préprovisionnée et
+le rôle Blob minimal du principal OIDC de déploiement.
 
 ```bash
 node --test infra/tests/cosmos-indexing-policy.test.mjs \
@@ -50,7 +51,11 @@ APPI="$(az resource list -g "$RG" --resource-type Microsoft.Insights/components 
 
 az functionapp show -g "$RG" -n "$FUNC" \
   --query "{state:state,host:defaultHostName,identities:identity,config:properties.functionAppConfig}" -o json
-az role assignment list --scope "$(az storage account show -g "$RG" -n "$STORAGE" --query id -o tsv)" \
+STORAGE_ID="$(az storage account show -g "$RG" -n "$STORAGE" --query id -o tsv)"
+PACKAGE_SCOPE="${STORAGE_ID}/blobServices/default/containers/app-package"
+az role assignment list --scope "$STORAGE_ID" \
+  --query "[].{principalId:principalId,role:roleDefinitionName,scope:scope}" -o table
+az role assignment list --scope "$PACKAGE_SCOPE" \
   --query "[].{principalId:principalId,role:roleDefinitionName,scope:scope}" -o table
 az storage account show -g "$RG" -n "$STORAGE" \
   --query "{publicNetworkAccess:publicNetworkAccess,sharedKey:allowSharedKeyAccess,defaultAction:networkRuleSet.defaultAction}" -o table
@@ -67,7 +72,19 @@ az network vnet subnet show -g "$RG" --vnet-name "vnet-certigo-${ENV}" \
 az network private-endpoint list -g "$RG" \
   --query "[].{name:name,groupIds:privateLinkServiceConnections[0].groupIds,status:privateLinkServiceConnections[0].privateLinkServiceConnectionState.status}" \
   -o table
-az network private-dns zone list -g "$RG" --query "[].name" -o tsv
+az network private-dns zone list -g rg-certigo-ci --query "[].name" -o tsv
+az network vnet peering show -g "$RG" --vnet-name "vnet-certigo-${ENV}" \
+  -n peer-to-vnet-certigo-ci --query peeringState -o tsv
+az network vnet peering show -g rg-certigo-ci --vnet-name vnet-certigo-ci \
+  -n "peer-to-vnet-certigo-${ENV}" --query peeringState -o tsv
+CI_VNET_ID="$(az network vnet show -g rg-certigo-ci -n vnet-certigo-ci --query id -o tsv)"
+APP_VNET_ID="$(az network vnet show -g "$RG" -n "vnet-certigo-${ENV}" --query id -o tsv)"
+for ZONE in privatelink.blob.core.windows.net privatelink.queue.core.windows.net \
+  privatelink.table.core.windows.net privatelink.vaultcore.azure.net \
+  privatelink.documents.azure.com; do
+  az network private-dns link vnet list -g rg-certigo-ci -z "$ZONE" \
+    --query "[?virtualNetwork.id=='$CI_VNET_ID'||virtualNetwork.id=='$APP_VNET_ID'].{name:name,state:provisioningState}" -o table
+done
 az functionapp config show -g "$RG" -n "$FUNC" \
   --query "{routeAll:vnetRouteAllEnabled}" -o table
 az role assignment list \
@@ -85,10 +102,23 @@ curl --fail --show-error "https://${HOST}/api/health/live"
 curl --fail --show-error "https://${HOST}/api/health/ready"
 ```
 
-Résultats attendus : package `UserAssignedIdentity`, rôles Blob Data Owner/Contributor + Queue/Table
-Contributor, réseau `Disabled/Deny`, cinq connexions private endpoint `Approved`, cinq zones DNS,
-subnet FC1 délégué à `Microsoft.App/environments`, route-all désactivé, authentification locale
-Storage/Cosmos désactivée hors dev et readiness `healthy` pour Cosmos, Storage et Key Vault.
+Résultats attendus : package `UserAssignedIdentity`, rôles runtime Blob Data Owner/Contributor +
+Queue/Table Contributor, principal OIDC CI limité à `Storage Blob Data Contributor` sur
+`app-package` et `Storage Blob Delegator` sur le compte, réseau `Disabled/Deny`, cinq connexions
+private endpoint `Approved`, cinq zones DNS partagées dans `rg-certigo-ci` avec les liens CI et
+applicatif, deux peerings `Connected`, subnet FC1 délégué à `Microsoft.App/environments`, route-all
+désactivé, authentification locale Storage/Cosmos désactivée hors dev et readiness `healthy`.
+
+### Migration initiale des zones privées dev
+
+Avant la première application de ce hotfix, planifier une fenêtre de changement. Les cinq zones de
+`rg-certigo-dev` doivent être retirées avant de lier leurs remplaçantes de même namespace au VNet CI.
+Supprimer d'abord uniquement le zone group `default` de chacun des cinq private endpoints dev, puis
+les cinq zones de `rg-certigo-dev`; ne supprimer ni endpoint ni VNet. Appliquer immédiatement le
+template `dev`, qui recrée le jeu unique dans `rg-certigo-ci` et rattache les liens et zone groups.
+Conserver le `what-if`, suspendre le CD pendant l'opération et vérifier les dix liens (cinq CI, cinq
+dev) ainsi que la résolution privée avant reprise. Staging et production consomment ensuite ce jeu
+partagé.
 
 ## Prévol sans mutation
 
@@ -124,8 +154,10 @@ repousser sans changer la clé, et appliquer la procédure de chevauchement déc
 ## Ordre de déploiement autorisé
 
 1. **Dev** : appliquer l'IaC ; le module réseau doit terminer avant la Function App. Vérifier cinq
-   connexions privées approuvées, l'intégration `snet-functions` et route-all désactivé, puis
-   publier le backend et vérifier `/health/live` puis `/health/ready`.
+   connexions privées approuvées, les peerings, les liens DNS CI, l'intégration `snet-functions` et
+   route-all désactivé. Le CD publie ensuite via
+   `.github/scripts/deploy-flex-onedeploy.sh` et bloque tant que `/health/live` puis
+   `/health/ready` ne sont pas verts.
 2. **Staging** : fournir la clé JWT sécurisée et son expiration absolue, appliquer l'IaC, attendre
    la propagation RBAC, publier, tester alertes et restauration PITR vers un nouveau compte.
 3. **Production** : fenêtre de changement approuvée, preuve du what-if, sauvegarde/PITR vérifiée,
@@ -156,6 +188,19 @@ repousser sans changer la clé, et appliquer la procédure de chevauchement déc
   Defender, et MCSB reste `DoNotEnforce` tant que les exemptions/remédiations ne sont pas validées.
 - Ne jamais réintroduire de fallback public ou de toggle partiel : la policy Storage désactive
   l'accès public et l'application dépend de la topologie privée complète.
+- La purge protection Key Vault reste activée dans tous les environnements. Son activation est
+  irréversible et remplace l'ancienne exception Checkov de développement.
+- Ne jamais remplacer le SAS user delegation par une clé de compte. Le SAS lecture seule de
+  14 minutes n'accorde qu'une autorisation data-plane ; il ne contourne pas le pare-feu Storage.
+  Le runner doit résoudre le FQDN Blob vers l'IP du private endpoint avant tout upload, et le blob
+  `deployments/<commit-sha>.zip` ne peut être réutilisé que si son SHA-256 est identique. Le script
+  ne le supprime pas après OneDeploy : la policy lifecycle bornée à 30 jours cible exclusivement
+  `app-package/deployments/`.
+- OneDeploy est invoqué par PUT ARM direct. Ne jamais revenir à une corrélation par « dernier
+  déploiement » : seul l'en-tête `Azure-AsyncOperation` ou `Location` renvoyé par le PUT exact peut
+  être interrogé. L'absence d'en-tête, une URL hors `management.azure.com`, un statut inconnu ou un
+  timeout sont bloquants. Jeton ARM, SAS, corps, en-têtes et réponses restent dans des fichiers
+  temporaires `0600` détruits par `trap`.
 
 ## Interdictions opérationnelles
 

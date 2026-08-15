@@ -25,7 +25,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
 | 3 secrets GitHub OIDC | ✅ **Fait (session)** — déjà positionnés | §T0.1 |
 | Clé JWT + expiration par Environment | ⛔ **Humain** — obligatoire avant staging/prod | §T0.4 |
-| Réseau privé atomique Storage / Key Vault / Cosmos | ✅ Prêt dans l'IaC, non déployé | `infra/modules/privateNetwork.bicep` |
+| Réseau privé atomique Storage / Key Vault / Cosmos + peering CI | ✅ IaC + hotfix OneDeploy | `infra/modules/privateNetwork.bicep` |
 | GitHub Environments `dev`/`staging`/`prod` | ✅ **Fait (session)** — créés ; ⚠️ reviewers `prod` bloqués (billing 422) | §T0.3 |
 | Branch protection sur `main` | ⛔ **Humain** (admin repo) | §T0.3 |
 | Déploiement infra `dev` | ✅ **Fait (session)** — amorçage local réel | §T0.4 |
@@ -520,24 +520,74 @@ documentation), et le **résiduel strict** qui nécessite une action hors périm
 
 ### État live avant cette modification
 
-L'environnement `dev` live ne possède ni VNet, ni private endpoint, ni private DNS. La policy
-`StorageAccount_PublicNetwork_Modify` force néanmoins `publicNetworkAccess=Disabled` sur le Storage.
-Le deployment storage FC1 devient alors inaccessible et One Deploy/Kudu renvoie
-`403 InaccessibleStorageException`. Le code de cette modification corrige l'incohérence, mais
-**aucun déploiement Azure n'est réalisé par la PR**.
+Le VNet applicatif, les private endpoints et les zones DNS privées sont déployés. Le chemin
+`config-zip` reste néanmoins bloqué : Kudu reçoit le zip local puis tente de le transférer vers le
+conteneur de déploiement protégé, mais le service de plateforme n'a pas le chemin réseau nécessaire.
+Le contrôle `StorageAccessibleCheck` renvoie donc `403` même si l'identité FC1 peut lire le
+conteneur depuis le VNet applicatif.
+
+Le hotfix ne réactive aucun accès public. Il relie `vnet-certigo-ci` (`10.42.0.0/16`) au VNet de
+chaque environnement dans les deux sens. Un seul jeu de cinq zones DNS privées, détenu par le hub
+`rg-certigo-ci`, est lié au VNet CI et à chaque VNet applicatif. Le runner de confiance écrit le
+package par le chemin Blob privé. **Cette PR ne déploie aucune ressource Azure.**
+
+### Migration DNS privée unique (première application seulement)
+
+Les zones actuellement déployées dans `rg-certigo-dev` ne peuvent pas coexister avec les mêmes
+namespaces dans `rg-certigo-ci` lorsqu'elles sont liées aux mêmes VNets. Cette migration est une
+opération Azure manuelle avec une courte interruption DNS privée ; elle ne doit pas être lancée par
+la PR.
+
+1. Faire approuver la fenêtre de changement, conserver le résultat du `what-if` et suspendre les
+   déploiements backend.
+2. Dans `rg-certigo-dev`, supprimer le zone group `default` des cinq private endpoints (`blob`,
+   `queue`, `table`, `vault`, `Sql`), puis supprimer les cinq anciennes zones privées. Ne supprimer
+   ni private endpoint ni VNet.
+3. Appliquer immédiatement `infra/main.bicep` pour `dev`. Le module hub crée les zones dans
+   `rg-certigo-ci`, le lien CI unique, les liens applicatifs et rattache les zone groups aux nouveaux
+   identifiants de zone.
+4. Vérifier la résolution privée Blob depuis le runner, les cinq liens CI, les cinq liens dev et les
+   cinq connexions private endpoint avant de réactiver le CD. Staging et production réutilisent
+   ensuite ces mêmes zones ; ils n'en créent aucune copie.
 
 Avant toute application, exécuter le `what-if` et vérifier que l'ordre ARM est :
 
 1. Storage / Key Vault / Cosmos avec accès public désactivé ;
-2. VNet, subnets, cinq zones privées, liens, private endpoints et zone groups ;
-3. rôles data-plane de l'identité utilisateur ;
-4. Function App FC1 avec intégration VNet privée et egress public plateforme ;
-5. seulement après succès du job infra, publication du zip.
+2. jeu unique de cinq zones privées et liens CI dans `rg-certigo-ci` ;
+3. VNet, subnets, private endpoints, zone groups, peerings applicatif ↔ CI et liens DNS applicatifs ;
+4. rôles data-plane de l'identité utilisateur, Blob Data Contributor du principal OIDC CI limité au
+   conteneur `app-package`, et Storage Blob Delegator limité au compte ;
+5. Function App FC1 avec intégration VNet privée et egress public plateforme ;
+6. seulement après succès du job infra, publication URL-based du zip.
 
 ### Chemins de déploiement Flex (pièges rencontrés — à retenir)
 
-- **Utiliser `az functionapp deployment source config-zip`** (front-end One Deploy de Flex), après
-  validation automatique des cinq connexions privées, du subnet FC1 et de l'egress plateforme.
+- **Ne pas utiliser `config-zip`** avec le conteneur de déploiement privé : Kudu échoue au
+  `StorageAccessibleCheck` avant OneDeploy.
+- Le runner `certigo-trusted` charge `deployments/<commit-sha>.zip` avec
+  `az storage blob upload --auth-mode login --overwrite false`. Le principal OIDC
+  `15d2b34a-c0a0-4b5d-8360-b895a8164706` reçoit `Storage Blob Data Contributor` uniquement sur le
+  conteneur `app-package` et `Storage Blob Delegator` sur le compte, nécessaire à la clé de
+  délégation utilisateur. Il n'a aucun accès à `lesson-assets` et aucune clé de compte n'est
+  autorisée.
+- Le runner crée ensuite un SAS **user delegation**, HTTPS, lecture seule, valable 14 minutes,
+  masque immédiatement le token et l'URL, puis appelle directement l'extension ARM
+  `Microsoft.Web/sites/extensions/onedeploy` avec `packageUri`, `type=zip`, `async=true`,
+  `restart=true` et `clean=true`. Le SAS autorise la lecture du blob mais ne contourne pas
+  `publicNetworkAccess=Disabled` : OneDeploy doit toujours résoudre et joindre le private endpoint
+  via le VNet applicatif.
+- `.github/scripts/deploy-flex-onedeploy.sh` refuse toute résolution DNS publique, vérifie
+  l'identité utilisateur du deployment storage, obtient un jeton ARM court via Azure CLI et envoie
+  le PUT avec `curl`. Le bearer, le SAS, le corps et les réponses restent dans des fichiers
+  temporaires mode `0600`, supprimés par `trap`. La réponse asynchrone peut contenir `id: null` :
+  seule l'URL `Azure-AsyncOperation` (ou `Location`) de cette requête exacte est acceptée, après
+  validation du host `management.azure.com`. Si l'en-tête est absent/invalide, le statut est inconnu,
+  l'opération échoue ou le délai est dépassé, le déploiement échoue fermé. Le script exige ensuite
+  `/api/health/live` et `/api/health/ready`. Le blob source immuable n'est pas supprimé par le
+  script : la policy Storage supprime uniquement `app-package/deployments/` après 30 jours, sans
+  supposer que OneDeploy l'a copié.
+- La purge protection Key Vault est activée dans tous les environnements, y compris `dev`. Cette
+  protection est irréversible ; aucune procédure Certigo ne dépend de la purge d'un vault.
 - **`func` Core Tools cassé sur win-arm64** — l'éviter ; tout piloter via `az` / ARM.
 - **SCM basic auth désactivée** (AAD-only). Pour interroger le hostruntime, passer par le proxy ARM
   `…/hostruntime/admin/...` avec un token `az account get-access-token --resource
@@ -546,9 +596,11 @@ Avant toute application, exécuter le `what-if` et vérifier que l'ordre ARM est
 
 ### Résiduel strict (hors périmètre repo)
 
-1. **Opérateur Azure** — examiner le `what-if`, puis déployer `dev` dans une fenêtre autorisée.
-2. **Validation post-déploiement** — rejouer `/health/live`, `/health/ready`, auth 200/401 et le
-   smoke test.
+1. **Opérateur Azure** — exécuter la migration DNS unique ci-dessus, examiner le `what-if` des
+   peerings, liens DNS et attributions Blob, puis déployer `dev` dans une fenêtre autorisée.
+2. **Validation post-déploiement** — confirmer les deux peerings `Connected`, les cinq liens CI et
+   cinq liens applicatifs, l'absence d'accès public/clé partagée, puis rejouer auth 200/401 et le
+   smoke test. Le workflow traite déjà les deux sondes santé comme des gates bloquants.
 3. **GitHub plan payant** — poser le reviewer gate `prod` (limitation billing 422).
 4. **Exploitation runner Azure** — maintenir online la VM runner self-hosted sous EMU.
 

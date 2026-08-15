@@ -1,5 +1,6 @@
 // Dev environment parameters. Authority/audience point to the Certigo
 // Entra External ID app registration (replace placeholders before deploying).
+// Key Vault purge protection is enabled in every environment and is irreversible.
 // NOTE on Entra placeholders (audit finding F-02): the entraAuthority/entraAudience
 // values below are the all-zeros tenant placeholder (00000000-...). This is INTENTIONAL
 // and safe for dev, because dev runs on an explicit auth bypass — it never validates
@@ -23,6 +24,7 @@ using '../main.bicep'
 param env = 'dev'
 param location = 'westeurope'
 param appName = 'certigo'
+param ciDeploymentPrincipalId = '15d2b34a-c0a0-4b5d-8360-b895a8164706'
 param vnetAddressPrefix = '10.60.0.0/24'
 param functionIntegrationSubnetPrefix = '10.60.0.0/26'
 param privateEndpointSubnetPrefix = '10.60.0.64/26'

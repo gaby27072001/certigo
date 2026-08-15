@@ -28,10 +28,6 @@ skip-check:
   # disableLocalAuth=true through hardened configuration.
   - CKV_AZURE_140
 
-  # CKV_AZURE_42 — Key Vault recoverability.
-  # Reason: dev keeps purge protection optional; staging/prod enable it.
-  - CKV_AZURE_42
-
   # CKV_AZURE_87 — Defender for Cloud on Key Vault.
   # Reason: paid Defender plans are optional and intentionally disabled by
   # default to avoid unexpected subscription cost in dev/test.
