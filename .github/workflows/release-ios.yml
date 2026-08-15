@@ -25,29 +25,8 @@ name: release-ios
 # IOS_MATCH_PASSWORD et IOS_MATCH_GIT_AUTH (voir docs/RELEASE_MOBILE.md §4.6).
 
 on:
-  workflow_dispatch:
-    inputs:
-      version_name:
-        description: "versionName (ex: 0.1.0). Vide = pubspec.yaml"
-        type: string
-        required: false
-      build_number:
-        description: "build number (CFBundleVersion). Vide = numéro de run GitHub"
-        type: string
-        required: false
-      external:
-        description: "Distribuer aussi aux testeurs EXTERNES (sinon interne uniquement)"
-        type: boolean
-        default: false
-      dry_run:
-        description: "Construire l'IPA signé SANS uploader sur TestFlight"
-        type: boolean
-        default: false
-      enable_legacy_workflow:
-        description: "Exécuter exceptionnellement ce workflow historique (Codemagic est recommandé)"
-        type: boolean
-        required: false
-        default: false
+  repository_dispatch:
+    types: [release-ios-legacy]
 
 concurrency:
   group: release-ios-${{ github.ref }}
@@ -62,7 +41,7 @@ env:
 
 jobs:
   release:
-    if: ${{ inputs.enable_legacy_workflow && github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     name: Build IPA signé + upload TestFlight
     # Runner macOS self-hosted requis pour Xcode ; aucun fallback hébergé.
     runs-on: [self-hosted, macOS, certigo-trusted]
@@ -85,10 +64,27 @@ jobs:
         id: ver
         shell: bash
         env:
-          REQUESTED_VERSION_NAME: ${{ inputs.version_name }}
-          REQUESTED_BUILD_NUMBER: ${{ inputs.build_number }}
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+          REQUESTED_VERSION_NAME: ${{ github.event.client_payload.version_name }}
+          REQUESTED_BUILD_NUMBER: ${{ github.event.client_payload.build_number }}
+          REQUESTED_EXTERNAL: ${{ github.event.client_payload.external }}
+          REQUESTED_DRY_RUN: ${{ github.event.client_payload.dry_run }}
         run: |
           set -euo pipefail
+          if ! ruby -rjson -e '
+            p = JSON.parse(ENV.fetch("CLIENT_PAYLOAD_JSON"))
+            allowed = %w[build_number dry_run external version_name]
+            valid = p.is_a?(Hash) &&
+              (p.keys - allowed).empty? &&
+              (p["dry_run"].is_a?(TrueClass) || p["dry_run"].is_a?(FalseClass)) &&
+              (p["external"].is_a?(TrueClass) || p["external"].is_a?(FalseClass)) &&
+              (!p.key?("version_name") || p["version_name"].is_a?(String)) &&
+              (!p.key?("build_number") || p["build_number"].is_a?(String))
+            exit(valid ? 0 : 1)
+          '; then
+            echo "::error::client_payload iOS invalide ou contient des champs non autorisés."
+            exit 1
+          fi
           PUBSPEC_VERSION="$(grep -E '^version:' apps/mobile/pubspec.yaml | head -1 | awk '{print $2}')"
           PUBSPEC_NAME="${PUBSPEC_VERSION%%+*}"
           BUILD_NAME="${REQUESTED_VERSION_NAME:-$PUBSPEC_NAME}"
@@ -103,8 +99,17 @@ jobs:
             echo "::error::build_number doit être un entier positif."
             exit 1
           fi
+          case "$REQUESTED_EXTERNAL:$REQUESTED_DRY_RUN" in
+            true:true|true:false|false:true|false:false) ;;
+            *)
+              echo "::error::external et dry_run doivent être des booléens JSON."
+              exit 1
+              ;;
+          esac
           echo "build_name=$BUILD_NAME"     >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "external=$REQUESTED_EXTERNAL" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$REQUESTED_DRY_RUN" >> "$GITHUB_OUTPUT"
           echo "### Release iOS : $BUILD_NAME (+$BUILD_NUMBER) → TestFlight" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Résoudre les secrets + installer la signature (Key Vault → repli secrets)
@@ -224,11 +229,11 @@ jobs:
             --build-number="$BUILD_NUMBER"
 
       - name: Build IPA signé + upload TestFlight
-        if: ${{ inputs.dry_run != true && steps.signing.outputs.has_asc == 'true' }}
+        if: ${{ steps.ver.outputs.dry_run == 'false' && steps.signing.outputs.has_asc == 'true' }}
         working-directory: apps/mobile/ios
         env:
           # ASC_*, IOS_TEAM_ID et IOS_PROVISIONING_PROFILE_NAME proviennent de l'étape « signing » ($GITHUB_ENV).
-          TF_EXTERNAL: ${{ inputs.external }}
+          TF_EXTERNAL: ${{ steps.ver.outputs.external }}
           TF_CHANGELOG: "Bêta Certigo ${{ steps.ver.outputs.build_name }} (+${{ steps.ver.outputs.build_number }})"
         run: |
           set -euo pipefail
@@ -236,7 +241,7 @@ jobs:
           fastlane beta
 
       - name: Build IPA signé seul (dry-run / sans clé ASC)
-        if: ${{ inputs.dry_run == true || steps.signing.outputs.has_asc != 'true' }}
+        if: ${{ steps.ver.outputs.dry_run == 'true' || steps.signing.outputs.has_asc != 'true' }}
         working-directory: apps/mobile/ios
         run: |
           set -euo pipefail
@@ -270,10 +275,10 @@ jobs:
           if-no-files-found: error
 
       - name: Note — upload sauté
-        if: ${{ steps.signing.outputs.has_asc != 'true' || inputs.dry_run == true }}
+        if: ${{ steps.signing.outputs.has_asc != 'true' || steps.ver.outputs.dry_run == 'true' }}
         shell: bash
         env:
-          DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN: ${{ steps.ver.outputs.dry_run }}
           HAS_ASC: ${{ steps.signing.outputs.has_asc }}
         run: echo "::warning::Upload TestFlight sauté (dry_run=$DRY_RUN, clé ASC présente=$HAS_ASC). L'IPA signé reste disponible en artefact."
 

@@ -1,16 +1,11 @@
 name: Runner resilience drill
 
-# Manual, non-destructive proof that trusted operations survive PR-runner loss.
+# Repository-dispatched, non-destructive proof that trusted operations survive PR-runner loss.
 on:
-  workflow_dispatch:
-    inputs:
-      expected_offline_runner:
-        description: "Azure runner name intentionally stopped"
-        type: string
-        required: true
+  repository_dispatch:
+    types: [runner-resilience-drill]
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: runner-resilience-drill
@@ -19,22 +14,30 @@ concurrency:
 jobs:
   probe:
     name: Probe selected resilience path
-    # workflow_dispatch can target another ref. Refuse branch-modified workflow
-    # code on the persistent runner; drills are always launched from main.
+    # repository_dispatch always loads this workflow from the default branch.
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     steps:
       - name: Validate runner selection
         shell: bash
         env:
-          EXPECTED_OFFLINE_RUNNER: ${{ inputs.expected_offline_runner }}
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+          EXPECTED_OFFLINE_RUNNER: ${{ github.event.client_payload.expected_offline_runner }}
           CURRENT_RUNNER_NAME: ${{ runner.name }}
           RUNNER_KIND: ${{ runner.environment }}
         run: |
           set -euo pipefail
 
-          if [ -z "$EXPECTED_OFFLINE_RUNNER" ]; then
-            echo "::error::expected_offline_runner is required."
+          if ! jq -e '
+            type == "object"
+            and keys == ["expected_offline_runner"]
+            and (.expected_offline_runner | type == "string")
+          ' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+            echo "::error::client_payload must contain only expected_offline_runner as a string."
+            exit 1
+          fi
+          if [[ ! "$EXPECTED_OFFLINE_RUNNER" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
+            echo "::error::expected_offline_runner has an invalid format."
             exit 1
           fi
 

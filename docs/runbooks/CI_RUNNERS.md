@@ -218,7 +218,7 @@ Tous les workflows **exigent** une capacité self-hosted adaptée :
 | Workflow | Raison |
 |---|---|
 | [`cd-backend.yml`](../../.github/workflows/cd-backend.yml) | **Déploiement critique** du backend sur `certigo-trusted`. |
-| [`promote-backend-staging-prod.yml`](../../.github/workflows/promote-backend-staging-prod.yml) | Orchestrateur **manuel** (`workflow_dispatch`) qui **réutilise** `cd-backend.yml`. |
+| [`promote-backend-staging-prod.yml`](../../.github/workflows/promote-backend-staging-prod.yml) | Orchestrateur privilégié (`repository_dispatch` depuis `main`) qui **réutilise** `cd-backend.yml`. |
 | [`release-android.yml`](../../.github/workflows/release-android.yml) | Build **AAB lourd**, runner `[self-hosted, Linux, X64, certigo-trusted]`. |
 | [`release-ios.yml`](../../.github/workflows/release-ios.yml) | **iOS = Mac obligatoire**, runner `[self-hosted, macOS, certigo-trusted]`. |
 | [`sync-ios-certs.yml`](../../.github/workflows/sync-ios-certs.yml) | Certificats iOS, runner `[self-hosted, macOS, certigo-trusted]`. |
@@ -240,7 +240,10 @@ runs-on: [self-hosted, Linux, X64, certigo-trusted]
 
 Ces sélections ne sont ni paramétrables ni dotées d'un fallback. `certigo-pr` ne reçoit
 ni environnement, ni secret, ni identité cloud ; `certigo-trusted` ne checkout et
-n'analyse jamais de source PR.
+n'analyse jamais de source PR. Tout workflow contenant un job `certigo-trusted`
+interdit `workflow_dispatch` et les déclencheurs par tag : les opérations manuelles
+utilisent un type `repository_dispatch` dédié afin que GitHub charge le YAML depuis
+la branche par défaut.
 
 ---
 

@@ -13,7 +13,6 @@ on:
   schedule:
     # Weekly full scan; PR/push runs are path-scoped and language-scoped below.
     - cron: "17 2 * * 0"
-  workflow_dispatch:
 
 concurrency:
   group: codeql-${{ github.event.pull_request.number || github.ref }}
@@ -69,8 +68,7 @@ jobs:
         run: |
           set -euo pipefail
           include=()
-          if [ "$EVENT_NAME" = "schedule" ] || [ "$EVENT_NAME" = "workflow_dispatch" ] ||
-            [ "$WORKFLOW_CHANGED" = "true" ]; then
+          if [ "$EVENT_NAME" = "schedule" ] || [ "$WORKFLOW_CHANGED" = "true" ]; then
             CSHARP_CHANGED=true
             JAVASCRIPT_CHANGED=true
             PYTHON_CHANGED=true

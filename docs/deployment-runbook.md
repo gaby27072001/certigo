@@ -34,12 +34,14 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 
 ### Check-list d'exploitation (utilisateur non-admin)
 
-1. Déclencher `cd-backend.yml` avec `environment=dev|staging|prod` (aucun paramètre runner à fournir).
+1. Pour `dev`, merger sur `main` afin de déclencher `cd-backend.yml`. Pour
+   `staging` puis `prod`, envoyer le dispatch `promote-backend-staging-prod`.
 2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `certigo-trusted`.
 3. En cas d'échec Azure login, contrôler uniquement les 3 secrets repo : `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
 4. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
    `AUTH_JWT_SIGNING_KEY` / `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`, sans afficher sa valeur.
-4. Pour une promotion, lancer `promote-backend-staging-prod.yml` (enchaînement staging puis prod).
+4. Pour une promotion, utiliser le type `repository_dispatch`
+   `promote-backend-staging-prod` (enchaînement staging puis prod depuis `main`).
 
 ### Pourquoi Azure-first (long terme)
 
@@ -79,14 +81,9 @@ portant le même jeu de labels.
 
 ### Politique scans lourds (CodeQL / security-scan)
 
-Pour fluidifier la file CI en journée, les workflows `codeql.yml` et `security-scan.yml`
-déclenchent désormais :
-
-- en **nightly** (`schedule`) ;
-- en **manuel** (`workflow_dispatch`) pour un lancement ad-hoc.
-
-Compromis assumé : plus de scan automatique à chaque PR/push ; la détection se fait en nightly
-(ou sur déclenchement manuel en cas de besoin immédiat).
+`codeql.yml` et `security-gate.yml` exécutent les analyses pertinentes sur les PR
+internes et les push `main`, avec sélection par chemins, puis un scan complet
+planifié. Ils n'exposent aucun déclenchement manuel privilégié.
 
 ### Risque / rollback (chemin critique EMU)
 
@@ -363,8 +360,10 @@ par examen soit actif sans expirer les tentatives existantes.
 **Option B — via le pipeline** (une fois T0.1 + T0.3 prêts) :
 
 ```bash
-gh workflow run cd-backend.yml --repo "$GH_ORG/$GH_REPO" \
-  -f environment=dev
+# dev : merge/push protégé sur main déclenche cd-backend automatiquement.
+# staging puis prod : caller chargé depuis la branche par défaut.
+gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" \
+  -f event_type=promote-backend-staging-prod
 ```
 
 > Le job `deploy-infra` capture l'output `functionAppName`, réutilisé par `deploy-backend`

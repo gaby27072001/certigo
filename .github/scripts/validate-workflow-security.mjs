@@ -53,6 +53,7 @@ const reusableScannerFiles = new Set([
 const trustedOnlyWorkflowFiles = new Set([
   'cd-backend.yml',
   'deploy-privacy-policy.yml',
+  'promote-backend-staging-prod.yml',
   'release-android.yml',
   'release-ios.yml',
   'runner-health.yml',
@@ -63,6 +64,15 @@ const trustedAggregateJobs = new Map([
   ['ci-project-state.yml', new Set(['validate'])],
   ['codeql.yml', new Set(['security-gate'])],
   ['security-gate.yml', new Set(['security-gate'])],
+]);
+const privilegedDispatchTypes = new Map([
+  ['deploy-privacy-policy.yml', 'deploy-privacy-policy'],
+  ['promote-backend-staging-prod.yml', 'promote-backend-staging-prod'],
+  ['release-android.yml', 'release-android'],
+  ['release-ios.yml', 'release-ios-legacy'],
+  ['runner-health.yml', 'runner-health'],
+  ['runner-resilience-drill.yml', 'runner-resilience-drill'],
+  ['sync-ios-certs.yml', 'sync-ios-certs-legacy'],
 ]);
 
 function shellExpressions(lines) {
@@ -126,6 +136,8 @@ function validateWorkflow(file) {
   const text = fs.readFileSync(file, 'utf8');
   const lines = text.split(/\r?\n/);
   const errors = [];
+  const fileName = path.basename(file);
+  const hasTrustedJob = text.includes('certigo-trusted');
 
   if (!lines.some((line) => /^permissions:\s*(?:\{\})?\s*$/.test(line))) {
     errors.push(`${file}: missing explicit top-level permissions`);
@@ -150,8 +162,52 @@ function validateWorkflow(file) {
   if (text.includes('certigo-ci')) {
     errors.push(`${file}: legacy mixed-trust runner label certigo-ci is forbidden`);
   }
+  if (hasTrustedJob && /^ {2}workflow_dispatch:/m.test(text)) {
+    errors.push(`${file}: certigo-trusted workflows must not use workflow_dispatch`);
+  }
+  if (
+    hasTrustedJob
+    && (
+      /^ {4}tags(?:-ignore)?:/m.test(text)
+      || /^ {2}push:\s*\{[^\n}]*tags(?:-ignore)?\s*:/m.test(text)
+    )
+  ) {
+    errors.push(`${file}: certigo-trusted workflows must not run from mutable tag triggers`);
+  }
+  if (
+    hasTrustedJob
+    && /^ {2}push:/m.test(text)
+    && !/^ {4}branches:\s*/m.test(text)
+  ) {
+    errors.push(`${file}: certigo-trusted push triggers must be restricted to named branches`);
+  }
+  const expectedDispatchType = privilegedDispatchTypes.get(fileName);
+  if (
+    expectedDispatchType
+    && !text.includes(`repository_dispatch:\n    types: [${expectedDispatchType}]`)
+  ) {
+    errors.push(
+      `${file}: privileged dispatch must use the dedicated repository_dispatch type ${expectedDispatchType}`,
+    );
+  }
+  if (
+    expectedDispatchType
+    && (
+      !text.includes('CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}')
+      || !text.includes("github.ref == 'refs/heads/main'")
+    )
+  ) {
+    errors.push(
+      `${file}: privileged dispatch must validate client_payload from env and enforce main`,
+    );
+  }
+  if (
+    text.includes('repository_dispatch:')
+    && !/^ {4}types:\s*\[[a-z0-9-]+]\s*$/m.test(text)
+  ) {
+    errors.push(`${file}: repository_dispatch must use one explicit event type`);
+  }
   for (const job of jobBlocks(text)) {
-    const fileName = path.basename(file);
     if (
       trustedOnlyWorkflowFiles.has(fileName)
       && job.text.includes('runs-on:')
@@ -321,12 +377,10 @@ function validateRepositoryInvariants() {
   const securityPolicy = fs.readFileSync(path.join(root, 'SECURITY.md'), 'utf8');
   const androidRequirements = new Map([
     ['fixed beta environment', 'environment: beta'],
-    [
-      'main or tag provenance gate',
-      "github.ref == 'refs/heads/main' || github.ref_type == 'tag'",
-    ],
-    ['tag ancestry validation', 'git merge-base --is-ancestor'],
-    ['annotated tag validation', 'Le tag de release doit être annoté'],
+    ['default-branch repository dispatch', 'types: [release-android]'],
+    ['main provenance gate', "github.ref == 'refs/heads/main'"],
+    ['payload schema validation', 'client_payload Android invalide'],
+    ['explicit dry-run intent', 'has("dry_run") and (.dry_run | type == "boolean")'],
     ['strict track allowlist', 'internal|alpha|beta|production'],
     ['strict version validation', 'version_name doit être un SemVer strict'],
     [

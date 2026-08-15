@@ -631,6 +631,67 @@ class ProjectStateTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("GITHUB_STEP_SUMMARY", enforcer)
 
+    def test_trusted_workflows_use_default_branch_dispatch_only(self) -> None:
+        workflows = REPO_ROOT / ".github/workflows"
+        dispatch_types = {
+            "deploy-privacy-policy.yml": "deploy-privacy-policy",
+            "promote-backend-staging-prod.yml": "promote-backend-staging-prod",
+            "release-android.yml": "release-android",
+            "release-ios.yml": "release-ios-legacy",
+            "runner-health.yml": "runner-health",
+            "runner-resilience-drill.yml": "runner-resilience-drill",
+            "sync-ios-certs.yml": "sync-ios-certs-legacy",
+        }
+
+        trusted_workflows = []
+        for workflow_path in workflows.glob("*.yml"):
+            workflow = workflow_path.read_text(encoding="utf-8")
+            if "certigo-trusted" not in workflow:
+                continue
+            trusted_workflows.append(workflow_path.name)
+            self.assertNotIn(
+                "\n  workflow_dispatch:",
+                workflow,
+                f"{workflow_path.name} must load privileged runs from main",
+            )
+            self.assertNotRegex(
+                workflow,
+                r"(?m)^ {4}tags(?:-ignore)?:",
+                f"{workflow_path.name} must not run privileged jobs from tags",
+            )
+            if "\n  push:" in workflow:
+                self.assertIn(
+                    "\n    branches:",
+                    workflow,
+                    f"{workflow_path.name} push must be branch restricted",
+                )
+
+        self.assertGreater(len(trusted_workflows), 0)
+        for workflow_name, event_type in dispatch_types.items():
+            workflow = (workflows / workflow_name).read_text(encoding="utf-8")
+            self.assertIn(
+                f"repository_dispatch:\n    types: [{event_type}]",
+                workflow,
+            )
+            self.assertIn("CLIENT_PAYLOAD_JSON:", workflow)
+            self.assertIn("github.event.client_payload", workflow)
+
+        for workflow_name in [
+            "ci-project-state.yml",
+            "codeql.yml",
+            "security-gate.yml",
+        ]:
+            workflow = (workflows / workflow_name).read_text(encoding="utf-8")
+            self.assertNotIn("repository_dispatch:", workflow)
+            self.assertNotIn("workflow_dispatch:", workflow)
+
+        android = (workflows / "release-android.yml").read_text(encoding="utf-8")
+        self.assertNotIn("github.ref_type", android)
+        self.assertNotIn("github.ref_name", android)
+        self.assertNotIn("refs/tags/", android)
+        self.assertIn('has("dry_run")', android)
+        self.assertIn('has("track")', android)
+
     def test_security_scanners_are_independent_from_artifact_storage(self) -> None:
         expected_markers = {
             "dependency-vuln-scan.yml": [

@@ -14,8 +14,8 @@ Documentation opérationnelle pour publier les bêtas Certigo.
 
 ```
                     ┌─────────────────────────────────────────────────────┐
-  git push / tag /  │  GitHub Actions (runner self-hosted Linux)          │
-  Run workflow ────▶│  release-android.yml                                │
+  repo dispatch ───▶│  GitHub Actions (runner self-hosted Linux)          │
+  depuis main       │  release-android.yml                                │
                     │   1. JDK 17 + SDK Android + Flutter 3.24.0           │
                     │   2. gates BLOQUANTS : flutter analyze + test        │
                     │   3. secrets via Key Vault / GitHub → key.properties │
@@ -32,7 +32,7 @@ Documentation opérationnelle pour publier les bêtas Certigo.
 | Nom affiché | Certigo |
 | versionName | lu depuis `apps/mobile/pubspec.yaml` (`version:` → partie avant `+`) |
 | versionCode / build number | `github.run_number` (auto-incrémenté), override possible |
-| Workflows | `release-android.yml` (actif), `release-ios.yml` + `sync-ios-certs.yml` (legacy, inertes par défaut, opt-in manuel) ; iOS actif géré par Codemagic |
+| Workflows | `release-android.yml` (actif), `release-ios.yml` + `sync-ios-certs.yml` (legacy, opt-in par types `repository_dispatch` dédiés) ; iOS actif géré par Codemagic |
 | CI inchangée | `ci-mobile.yml` (format/analyze/test) — aucune régression |
 
 > ⚠️ **`com.certigo.mobileapp` est l'identifiant unifié** (Android `applicationId`
@@ -259,12 +259,23 @@ gh secret set ANDROID_KEY_PASSWORD      --body '<mot_de_passe_cle>'
 
 ### 3.5 Runbook — Lancer une beta Android (manuel) ✅
 
-1. Onglet **Actions** → workflow **release-android** → **Run workflow**.
-2. Renseigner :
-   - **track** : `internal` (puis `beta`/closed plus tard),
-   - **version_name** : vide (= pubspec) ou ex. `0.1.0`,
-   - **build_number** : vide (= numéro de run, auto-incrémenté),
-   - **dry_run** : `false` (mettre `true` pour builder sans publier).
+1. Depuis un compte autorisé en écriture, envoyer le dispatch chargé depuis la
+   branche par défaut :
+   ```bash
+   gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input - <<'JSON'
+   {
+     "event_type": "release-android",
+     "client_payload": {
+       "track": "internal",
+       "version_name": "0.1.0",
+       "dry_run": false
+     }
+   }
+   JSON
+   ```
+2. `track` et le booléen JSON `dry_run` sont obligatoires. `version_name` peut
+   être omis (= pubspec) et `build_number` peut être omis (= numéro de run).
+   Tout champ supplémentaire ou type incorrect fait échouer le run.
 3. Le workflow exécute les **gates** (`analyze` + `test`), construit l'**AAB
    signé**, l'**uploade** sur la piste choisie, puis nettoie les secrets.
    `version_name` doit être un SemVer strict, `build_number` un entier positif
@@ -273,16 +284,17 @@ gh secret set ANDROID_KEY_PASSWORD      --body '<mot_de_passe_cle>'
    **lien d'opt-in** de la piste de test interne.
 5. Les testeurs acceptent l'invitation puis installent depuis le lien.
 
-### 3.6 Runbook — Release par tag
+### 3.6 Point de version par tag, puis dispatch
 
 ```bash
 git tag -a v0.1.0 -m "Release v0.1.0"
 git push origin v0.1.0
 ```
 
-→ déclenche `release-android` sur la piste **internal** (versionName = `0.1.0`
-déduit du tag), après approbation de l'environnement `beta`. Le workflow vérifie
-que le tag correspond exactement à `v<SemVer>` et pointe sur un commit de `main`.
+Le tag reste une preuve de version et ne déclenche aucun job privilégié. Envoyer
+ensuite le dispatch §3.5 avec `version_name=0.1.0`. GitHub charge alors
+`release-android.yml` depuis `main`, puis l'environnement `beta` impose son
+approbation et sa restriction à `main`.
 
 ### 3.7 Promouvoir Internal → Closed testing (beta)
 
@@ -366,8 +378,8 @@ que le tag correspond exactement à `v<SemVer>` et pointe sur un commit de `main
 > **signature automatique Codemagic** (§4.0), **aucun** de ces secrets n'est
 > nécessaire : Codemagic gère certificats et profils via l'API App Store
 > Connect. Conservé uniquement à titre historique pour les workflows
-> `release-ios.yml` / `sync-ios-certs.yml` (`workflow_dispatch` avec opt-in
-> `enable_legacy_workflow=true`).
+> `release-ios.yml` / `sync-ios-certs.yml` (types `repository_dispatch`
+> `release-ios-legacy` et `sync-ios-certs-legacy`, chargés depuis `main`).
 > **Ne pas créer ces secrets pour une release Codemagic.**
 
 <details>

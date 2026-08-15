@@ -17,13 +17,8 @@ name: sync-ios-certs
 # (ou leurs équivalents dans Key Vault). Voir docs/RELEASE_MOBILE.md §4.6.
 
 on:
-  workflow_dispatch:
-    inputs:
-      enable_legacy_workflow:
-        description: "Exécuter exceptionnellement ce workflow historique (Codemagic est recommandé)"
-        type: boolean
-        required: false
-        default: false
+  repository_dispatch:
+    types: [sync-ios-certs-legacy]
 
 concurrency:
   group: sync-ios-certs
@@ -37,10 +32,23 @@ env:
 
 jobs:
   sync:
-    if: ${{ inputs.enable_legacy_workflow && github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     name: fastlane match (création / renouvellement)
     runs-on: [self-hosted, macOS, certigo-trusted]
     steps:
+      - name: Reject unexpected payload fields
+        shell: bash
+        env:
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          ruby -rjson -e '
+            p = JSON.parse(ENV.fetch("CLIENT_PAYLOAD_JSON"))
+            exit(p.is_a?(Hash) && p.empty? ? 0 : 1)
+          ' || {
+            echo "::error::sync-ios-certs-legacy does not accept client_payload fields."
+            exit 1
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Résoudre les secrets (Key Vault → repli secrets)

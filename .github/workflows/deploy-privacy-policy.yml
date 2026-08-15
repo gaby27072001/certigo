@@ -6,7 +6,8 @@ name: deploy-privacy-policy
 # Si le domaine certigo.app est configure ensuite, mapper le domaine sur GitHub Pages
 # et conserver le chemin /privacy-policy/ pour une bascule transparente.
 on:
-  workflow_dispatch:
+  repository_dispatch:
+    types: [deploy-privacy-policy]
 
 permissions: {}
 
@@ -23,6 +24,16 @@ jobs:
       contents: read
       pages: write
     steps:
+      - name: Reject unexpected payload fields
+        shell: bash
+        env:
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          if ! jq -e 'type == "object" and length == 0' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+            echo "::error::deploy-privacy-policy does not accept client_payload fields."
+            exit 1
+          fi
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       - name: Build static privacy policy page

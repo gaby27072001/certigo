@@ -265,13 +265,15 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
 - [ ] Supprimer le secret `AUTOMERGE_TOKEN`, révoquer le PAT correspondant et
       désactiver **Allow auto-merge** si aucun autre usage gouverné ne le justifie.
 - [ ] Protéger l'environnement `beta` avec reviewers obligatoires, interdiction
-      d'auto-approbation et branches/tags de déploiement limités à `main` et
-      `v*`. Stocker ses secrets de signature/publication dans cet environnement.
-- [ ] Protéger `staging` et `prod` avec reviewers obligatoires, interdiction
-      d'auto-approbation et déploiement limité à `main`. Conserver les secrets
-      OIDC `AZURE_*` au niveau environnement, pas au niveau dépôt.
-- [ ] Créer un ruleset de tags `v*` interdisant suppression et modification, et
-      limitant la création aux mainteneurs de release.
+      d'auto-approbation et déploiement limité à la branche `main` uniquement.
+      Stocker ses secrets de signature/publication dans cet environnement.
+- [ ] Limiter `dev`, `staging` et `prod` aux branches protégées. Ajouter des
+      reviewers obligatoires et interdire l'auto-approbation sur `staging` et
+      `prod`. Conserver les secrets OIDC `AZURE_*` au niveau environnement, pas
+      au niveau dépôt.
+- [ ] Supprimer toute règle de déploiement ou autorité de release fondée sur
+      `v*`. Les tags restent une métadonnée de traçabilité et ne déclenchent
+      aucun workflow privilégié.
 
 Les mises à jour de versions de `.github/dependabot.yml` restent une aide de maintenance.
 La décision de sécurité repose exclusivement sur les gates Azure bloquantes OSV (qui couvre

@@ -1,7 +1,7 @@
 name: release-android
 
 # Release beta Android : build AAB signé + publication Google Play.
-# Déclenchement manuel (workflow_dispatch) ou par tag de version (v*).
+# Déclenchement privilégié via repository_dispatch chargé depuis la branche par défaut.
 # Gates bloquants avant toute release : flutter analyze + flutter test.
 #
 # Secrets requis (Settings > Secrets and variables > Actions) :
@@ -24,32 +24,8 @@ name: release-android
 # Voir docs/RELEASE_MOBILE.md pour la génération des secrets (aucune valeur n'est committée).
 
 on:
-  workflow_dispatch:
-    inputs:
-      track:
-        description: "Piste Google Play de destination"
-        type: choice
-        default: internal
-        options:
-          - internal
-          - alpha
-          - beta
-          - production
-      version_name:
-        description: "versionName (ex: 0.1.0). Vide = lue depuis pubspec.yaml"
-        type: string
-        required: false
-      build_number:
-        description: "versionCode / build number. Vide = numéro de run GitHub (auto-incrémenté)"
-        type: string
-        required: false
-      dry_run:
-        description: "Construire l'AAB signé SANS publier sur le Play Store"
-        type: boolean
-        default: false
-  push:
-    tags:
-      - "v*"
+  repository_dispatch:
+    types: [release-android]
 
 concurrency:
   group: release-android-${{ github.ref }}
@@ -67,7 +43,7 @@ env:
 jobs:
   release:
     name: Build AAB signé + publication Play
-    if: ${{ github.ref == 'refs/heads/main' || github.ref_type == 'tag' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     # Android stays on the redundant Azure pool for managed-identity Key Vault access.
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions:
@@ -108,23 +84,31 @@ jobs:
         id: ver
         shell: bash
         env:
-          REQUESTED_VERSION_NAME: ${{ inputs.version_name }}
-          REQUESTED_BUILD_NUMBER: ${{ inputs.build_number }}
-          REQUESTED_TRACK: ${{ inputs.track }}
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+          REQUESTED_VERSION_NAME: ${{ github.event.client_payload.version_name }}
+          REQUESTED_BUILD_NUMBER: ${{ github.event.client_payload.build_number }}
+          REQUESTED_TRACK: ${{ github.event.client_payload.track }}
+          REQUESTED_DRY_RUN: ${{ github.event.client_payload.dry_run }}
         run: |
           set -euo pipefail
+          if ! jq -e '
+            type == "object"
+            and ((keys - ["build_number", "dry_run", "track", "version_name"]) | length == 0)
+            and has("track") and (.track | type == "string")
+            and has("dry_run") and (.dry_run | type == "boolean")
+            and (.version_name == null or (.version_name | type == "string"))
+            and (.build_number == null or (.build_number | type == "string"))
+          ' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+            echo "::error::client_payload Android invalide ou contient des champs non autorisés."
+            exit 1
+          fi
+
           PUBSPEC_VERSION="$(grep -E '^version:' apps/mobile/pubspec.yaml | head -1 | awk '{print $2}')"
           PUBSPEC_NAME="${PUBSPEC_VERSION%%+*}"
-
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            BUILD_NAME="${GITHUB_REF_NAME#v}"
-          else
-            BUILD_NAME="$REQUESTED_VERSION_NAME"
-          fi
-          BUILD_NAME="${BUILD_NAME:-$PUBSPEC_NAME}"
-
+          BUILD_NAME="${REQUESTED_VERSION_NAME:-$PUBSPEC_NAME}"
           BUILD_NUMBER="${REQUESTED_BUILD_NUMBER:-$GITHUB_RUN_NUMBER}"
-          TRACK="${REQUESTED_TRACK:-internal}"
+          TRACK="$REQUESTED_TRACK"
+          DRY_RUN="$REQUESTED_DRY_RUN"
 
           PRERELEASE_ID='(0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)'
           SEMVER_RE="^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-${PRERELEASE_ID}(\.${PRERELEASE_ID})*)?$"
@@ -144,26 +128,18 @@ jobs:
               exit 1
               ;;
           esac
-
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            if [ "$GITHUB_REF_NAME" != "v$BUILD_NAME" ]; then
-              echo "::error::Le tag doit correspondre exactement à v<SemVer>."
+          case "$DRY_RUN" in
+            true|false) ;;
+            *)
+              echo "::error::dry_run doit être un booléen JSON."
               exit 1
-            fi
-            if [ "$(git cat-file -t "refs/tags/$GITHUB_REF_NAME")" != "tag" ]; then
-              echo "::error::Le tag de release doit être annoté."
-              exit 1
-            fi
-            if ! git rev-parse --verify origin/main >/dev/null ||
-              ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-              echo "::error::Le tag de release doit pointer sur un commit présent dans main."
-              exit 1
-            fi
-          fi
+              ;;
+          esac
 
           echo "build_name=$BUILD_NAME"   >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
           echo "track=$TRACK"             >> "$GITHUB_OUTPUT"
+          echo "dry_run=$DRY_RUN"         >> "$GITHUB_OUTPUT"
           echo "### Release Android : $BUILD_NAME (+$BUILD_NUMBER) → piste \`$TRACK\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Récupérer les dépendances
@@ -183,7 +159,7 @@ jobs:
         shell: bash
         env:
           KV_NAME: ${{ vars.AZURE_KEYVAULT_NAME }}
-          DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN: ${{ steps.ver.outputs.dry_run }}
           # Repli si Key Vault non configuré (sinon valeurs vides) :
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -240,7 +216,7 @@ jobs:
         shell: bash
         env:
           KV_NAME: ${{ vars.AZURE_KEYVAULT_NAME }}
-          DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN: ${{ steps.ver.outputs.dry_run }}
           RELEASE_TRACK: ${{ steps.ver.outputs.track }}
           # Repli si Key Vault non configuré. Ce sont des variables (vars.*), pas des
           # secrets : ces valeurs sont embarquées en clair dans le binaire de l'app.
@@ -350,7 +326,7 @@ jobs:
           retention-days: 90
 
       - name: Publier sur Google Play (piste ${{ steps.ver.outputs.track }})
-        if: ${{ inputs.dry_run != true && steps.signing.outputs.has_play == 'true' && steps.appconfig.outputs.config_valid == 'true' }}
+        if: ${{ steps.ver.outputs.dry_run == 'false' && steps.signing.outputs.has_play == 'true' && steps.appconfig.outputs.config_valid == 'true' }}
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
           serviceAccountJson: ${{ env.PLAY_SA_FILE }}
@@ -361,10 +337,10 @@ jobs:
           whatsNewDirectory: apps/mobile/distribution/android/whatsnew
 
       - name: Note — publication sautée
-        if: ${{ steps.signing.outputs.has_play != 'true' || inputs.dry_run == true }}
+        if: ${{ steps.signing.outputs.has_play != 'true' || steps.ver.outputs.dry_run == 'true' }}
         shell: bash
         env:
-          DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN: ${{ steps.ver.outputs.dry_run }}
           HAS_PLAY: ${{ steps.signing.outputs.has_play }}
         run: |
           echo "::warning::Publication Play sautée (dry_run=$DRY_RUN, compte de service présent=$HAS_PLAY). L'AAB signé reste disponible en artefact."
@@ -376,7 +352,7 @@ jobs:
         env:
           BUILD_NAME: ${{ steps.ver.outputs.build_name }}
           BUILD_NUMBER: ${{ steps.ver.outputs.build_number }}
-          PUBLISHED: ${{ inputs.dry_run != true && steps.signing.outputs.has_play == 'true' && steps.appconfig.outputs.config_valid == 'true' }}
+          PUBLISHED: ${{ steps.ver.outputs.dry_run == 'false' && steps.signing.outputs.has_play == 'true' && steps.appconfig.outputs.config_valid == 'true' }}
         run: |
           if [ -f "$AAB_PATH" ]; then
             SIZE=$(du -h "$AAB_PATH" | cut -f1)

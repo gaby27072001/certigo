@@ -20,7 +20,8 @@
     d'un commit mergé via PR approuvée + checks verts.
 - **Un seul numéro de version produit** partagé (source : `apps/mobile/pubspec.yaml`
   pour le mobile ; le backend est déployé en continu par environnement — cf. §4).
-- **Traçabilité** : chaque tag `v*` déclenche automatiquement la release mobile (§3).
+- **Traçabilité** : le tag reste le point de version, mais toute opération GitHub
+  privilégiée est déclenchée par `repository_dispatch` depuis le workflow de `main` (§3).
 
 ---
 
@@ -35,8 +36,8 @@ git tag -a v1.2.3 -m "Release v1.2.3"
 git push origin v1.2.3
 ```
 
-- Format strict : `v` + SemVer (`v1.2.3`). Le workflow refuse tout tag qui ne
-  correspond pas exactement au SemVer résolu ou dont le commit n'appartient pas à `main`.
+- Format strict : `v` + SemVer (`v1.2.3`). Le tag ne déclenche aucun workflow
+  privilégié ; l'opérateur transmet explicitement la même version au dispatch Android.
 - Tags **annotés** (`-a`) obligatoires (portent l'auteur, la date et le message).
 
 ### Changelog
@@ -58,7 +59,7 @@ git push origin v1.2.3
 
 | Élément | Valeur |
 | --- | --- |
-| Déclencheurs | push d'un tag `v*` **ou** `workflow_dispatch` (manuel) |
+| Déclencheurs | `repository_dispatch` type `release-android`, chargé uniquement depuis la branche par défaut |
 | Gates bloquants | provenance `main`, SemVer/versionCode/track, `flutter analyze`, `flutter test`, signature, configuration API/Entra |
 | Approbation humaine | environnement GitHub **`beta`** (reviewers requis à configurer) |
 | Runner | self-hosted `certigo-trusted` |
@@ -76,12 +77,17 @@ neutralisée ; l'AAB signé est conservé 90 jours comme artefact.
 **Lancer une release mobile** :
 
 ```bash
-# Option A — par tag (recommandé, aligne mobile + point de version) :
-git tag -a v1.2.3 -m "Release v1.2.3" && git push origin v1.2.3
-
-# Option B — manuel (dry-run possible : build AAB signé sans publier) :
-gh workflow run release-android.yml \
-  -f track=internal -f version_name=1.2.3 -f dry_run=true
+# Après création éventuelle du tag de traçabilité, déclencher depuis main :
+gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input - <<'JSON'
+{
+  "event_type": "release-android",
+  "client_payload": {
+    "track": "internal",
+    "version_name": "1.2.3",
+    "dry_run": true
+  }
+}
+JSON
 ```
 
 > Détails complets (signature, tracks Play, Key Vault, iOS/Codemagic) :
@@ -95,8 +101,8 @@ Le backend suit un modèle **CD par environnement** (pas un tag applicatif) :
 
 | Workflow | Rôle | Déclencheur | Garde |
 | --- | --- | --- | --- |
-| [`cd-backend.yml`](../.github/workflows/cd-backend.yml) | Déploie `dev` | `push` sur `main` (auto), `workflow_dispatch`, `workflow_call` | environnement `dev` |
-| [`promote-backend-staging-prod.yml`](../.github/workflows/promote-backend-staging-prod.yml) | Promotion `staging` → `prod` | `workflow_dispatch` (manuel) | environnements `staging` puis `prod` (chaînés, `needs`) |
+| [`cd-backend.yml`](../.github/workflows/cd-backend.yml) | Déploie `dev` | `push` sur `main` (auto), `workflow_call` depuis le caller trusted de `main` | environnement `dev` |
+| [`promote-backend-staging-prod.yml`](../.github/workflows/promote-backend-staging-prod.yml) | Promotion `staging` → `prod` | `repository_dispatch` type `promote-backend-staging-prod` | environnements `staging` puis `prod` (chaînés, `needs`) |
 
 - **`dev`** : déploiement automatique à chaque merge sur `main` (via `cd-backend.yml`,
   OIDC + Bicep + `func` zip-deploy, runners self-hosted `certigo-trusted`).
@@ -110,7 +116,8 @@ Le backend suit un modèle **CD par environnement** (pas un tag applicatif) :
 **Promouvoir le backend** :
 
 ```bash
-gh workflow run promote-backend-staging-prod.yml
+gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
+  -f event_type=promote-backend-staging-prod
 ```
 
 > Détails infra/déploiement (OIDC, Bicep, runners, RBAC) :
@@ -132,13 +139,13 @@ gh workflow run promote-backend-staging-prod.yml
    - [ ] Notes de version / changelog préparés.
 2. **Backend**
    - [ ] `dev` déployé (auto au merge) et sain.
-   - [ ] `gh workflow run promote-backend-staging-prod.yml` → valider *gate* `staging`,
+   - [ ] Dispatch `promote-backend-staging-prod` → valider *gate* `staging`,
          puis *gate* `prod`.
 3. **Point de version (tag)**
    - [ ] `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`.
    - [ ] `gh release create vX.Y.Z --generate-notes` (optionnel mais recommandé).
 4. **Mobile**
-   - [ ] Le tag `v*` déclenche `release-android.yml` → valider la *gate* `beta`.
+   - [ ] Dispatch `release-android` avec le SemVer du tag → valider la *gate* `beta`.
    - [ ] iOS : lancer/valider la release TestFlight (Codemagic — cf. `RELEASE_MOBILE.md`).
 5. **Post-release**
    - [ ] Vérifier santé backend (`/api/health`) et publication mobile.
@@ -149,7 +156,7 @@ gh workflow run promote-backend-staging-prod.yml
 ## 6. Pré-requis de gouvernance
 
 Toute release part de `main`, qui doit être **protégée** : PR + ≥ 1 revue +
-checks stricts, pas de push direct. Les environnements `beta`, `staging` et
-`prod`, ainsi que les règles de tags `v*`, doivent également être protégés dans
-GitHub. Voir [`GOVERNANCE.md`](./GOVERNANCE.md) pour les réglages live à
-appliquer manuellement.
+checks stricts, pas de push direct. Les environnements `dev`, `staging` et
+`prod` doivent accepter uniquement les branches protégées ; `beta` doit accepter
+uniquement `main`. Aucune règle de déploiement `v*` ne doit subsister. Voir
+[`GOVERNANCE.md`](./GOVERNANCE.md) pour les réglages live à appliquer manuellement.

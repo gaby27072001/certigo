@@ -28,17 +28,6 @@ on:
         required: false
       AUTH_JWT_PREVIOUS_SIGNING_KEY:
         required: false
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Target environment'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
   push:
     branches: [ main ]
 

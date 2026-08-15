@@ -238,7 +238,8 @@ Ces opérations Azure/GitHub sont externes au commit. Toujours garder l'autre ru
    ```bash
    gh api repos/gchambaud_microsoft/Certigo/actions/runners \
      --jq '.runners[] | select(.name == "'"$RUNNER_NAME"'") | {status,busy,labels:[.labels[].name]}'
-   gh workflow run runner-health.yml
+   gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
+     -f event_type=runner-health
    gh run list --workflow runner-health.yml --limit 1
    ```
 
@@ -357,8 +358,9 @@ Le second résultat doit être vide avant suppression d'une VM compromise.
 
 ## Drill de perte d'un runner
 
-Le workflow manuel `Runner resilience drill` ne checkout aucun code, ne lit aucun
-secret et refuse toute ref autre que `main`. Il s'exécute sur `certigo-trusted` pour
+Le workflow `Runner resilience drill`, déclenché par un type
+`repository_dispatch` dédié, ne checkout aucun code et ne lit aucun secret. GitHub
+le charge depuis `main`. Il s'exécute sur `certigo-trusted` pour
 prouver que l'arrêt contrôlé du runner `certigo-pr` n'affecte pas les opérations trusted :
 
 1. Relever les deux runners en ligne.
@@ -366,8 +368,14 @@ prouver que l'arrêt contrôlé du runner `certigo-pr` n'affecte pas les opérat
 3. Déclencher le workflow :
 
    ```bash
-   gh workflow run runner-resilience-drill.yml \
-     -f expected_offline_runner=<RUNNER_ARRETE>
+   gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input - <<JSON
+   {
+     "event_type": "runner-resilience-drill",
+     "client_payload": {
+       "expected_offline_runner": "<RUNNER_ARRETE>"
+     }
+   }
+   JSON
    ```
 
 4. Vérifier que le job termine sur `vm-certigo-runner-2` (`certigo-trusted`) :
