@@ -42,6 +42,21 @@ param keyVaultPrivateEndpointName string
 @description('Existing Cosmos DB private endpoint name.')
 param cosmosPrivateEndpointName string
 
+@description('Existing Blob private DNS zone group name.')
+param storageBlobPrivateDnsZoneGroupName string = 'default'
+
+@description('Existing Queue private DNS zone group name.')
+param storageQueuePrivateDnsZoneGroupName string = 'default'
+
+@description('Existing Table private DNS zone group name.')
+param storageTablePrivateDnsZoneGroupName string = 'default'
+
+@description('Existing Key Vault private DNS zone group name.')
+param keyVaultPrivateDnsZoneGroupName string = 'default'
+
+@description('Existing Cosmos DB private DNS zone group name.')
+param cosmosPrivateDnsZoneGroupName string = 'default'
+
 @description('Resource group containing the trusted CI runner virtual network.')
 param ciVnetResourceGroupName string
 
@@ -235,7 +250,7 @@ resource cosmosEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
 
 resource storageBlobZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
   parent: storageBlobEndpoint
-  name: 'default'
+  name: storageBlobPrivateDnsZoneGroupName
   properties: {
     privateDnsZoneConfigs: [
       {
@@ -250,7 +265,7 @@ resource storageBlobZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZone
 
 resource storageQueueZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
   parent: storageQueueEndpoint
-  name: 'default'
+  name: storageQueuePrivateDnsZoneGroupName
   properties: {
     privateDnsZoneConfigs: [
       {
@@ -265,7 +280,7 @@ resource storageQueueZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZon
 
 resource storageTableZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
   parent: storageTableEndpoint
-  name: 'default'
+  name: storageTablePrivateDnsZoneGroupName
   properties: {
     privateDnsZoneConfigs: [
       {
@@ -280,7 +295,7 @@ resource storageTableZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZon
 
 resource vaultZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
   parent: vaultEndpoint
-  name: 'default'
+  name: keyVaultPrivateDnsZoneGroupName
   properties: {
     privateDnsZoneConfigs: [
       {
@@ -295,7 +310,7 @@ resource vaultZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups
 
 resource cosmosZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
   parent: cosmosEndpoint
-  name: 'default'
+  name: cosmosPrivateDnsZoneGroupName
   properties: {
     privateDnsZoneConfigs: [
       {

@@ -428,6 +428,18 @@ function validateRepositoryInvariants() {
     errors.push('cd-backend.yml: deployment environment is not sourced from validation');
   }
   for (const marker of [
+    'keys == ["environment"]',
+    '.environment == "staging" or .environment == "prod"',
+    'target=$(jq -r \'.environment // "staging-prod"\'',
+    "needs.validate-dispatch.outputs.target != 'prod'",
+    "needs.validate-dispatch.outputs.target == 'prod'",
+    "needs.validate-dispatch.outputs.target == 'staging-prod'",
+  ]) {
+    if (!promoteBackend.includes(marker)) {
+      errors.push(`promote-backend-staging-prod.yml: missing controlled promotion invariant ${marker}`);
+    }
+  }
+  for (const marker of [
     'dotnet restore backend/src/Certigo.Api/Certigo.Api.csproj',
     '--locked-mode',
     '--no-restore',

@@ -139,6 +139,16 @@ test('private endpoints and DNS cover every backend dependency', () => {
       (group) => group.properties.privateDnsZoneConfigs.length === 1,
     ),
   );
+  assert.deepEqual(
+    zoneGroups.map((group) => group.name).sort(),
+    [
+      "[format('{0}/{1}', parameters('cosmosPrivateEndpointName'), parameters('cosmosPrivateDnsZoneGroupName'))]",
+      "[format('{0}/{1}', parameters('keyVaultPrivateEndpointName'), parameters('keyVaultPrivateDnsZoneGroupName'))]",
+      "[format('{0}/{1}', parameters('storageBlobPrivateEndpointName'), parameters('storageBlobPrivateDnsZoneGroupName'))]",
+      "[format('{0}/{1}', parameters('storageQueuePrivateEndpointName'), parameters('storageQueuePrivateDnsZoneGroupName'))]",
+      "[format('{0}/{1}', parameters('storageTablePrivateEndpointName'), parameters('storageTablePrivateDnsZoneGroupName'))]",
+    ].sort(),
+  );
 });
 
 test('application and CI virtual networks are peered in both directions', () => {
@@ -319,6 +329,7 @@ test('environment parameters adopt the live subnets and private endpoints', () =
         'pep-kv-certigo-dev-bk3j5j-vault',
         'pep-cosmos-certigo-dev-bk3j5ja6vw23s-sql',
       ],
+      zoneGroups: [],
     },
     staging: {
       functionSubnet: 'snet-func-flex',
@@ -329,6 +340,10 @@ test('environment parameters adopt the live subnets and private endpoints', () =
         'pe-st-certigo-staging-table',
         'pe-kv-certigo-staging',
         'pe-cosmos-certigo-staging',
+      ],
+      zoneGroups: [
+        'pdzg-st-certigo-staging-blob',
+        'pdzg-kv-certigo-staging',
       ],
     },
     prod: {
@@ -341,6 +356,7 @@ test('environment parameters adopt the live subnets and private endpoints', () =
         'pe-kv-certigo-prod',
         'pe-cosmos-certigo-prod-sql',
       ],
+      zoneGroups: [],
     },
   };
 
@@ -359,6 +375,9 @@ test('environment parameters adopt the live subnets and private endpoints', () =
     );
     for (const endpoint of values.endpoints) {
       assert.ok(parameters.includes(`= '${endpoint}'`));
+    }
+    for (const zoneGroup of values.zoneGroups) {
+      assert.ok(parameters.includes(`= '${zoneGroup}'`));
     }
   }
 });

@@ -25,6 +25,11 @@ param storageQueuePrivateEndpointName = 'pe-st-certigo-staging-queue'
 param storageTablePrivateEndpointName = 'pe-st-certigo-staging-table'
 param keyVaultPrivateEndpointName = 'pe-kv-certigo-staging'
 param cosmosPrivateEndpointName = 'pe-cosmos-certigo-staging'
+param storageBlobPrivateDnsZoneGroupName = 'pdzg-st-certigo-staging-blob'
+param storageQueuePrivateDnsZoneGroupName = 'default'
+param storageTablePrivateDnsZoneGroupName = 'default'
+param keyVaultPrivateDnsZoneGroupName = 'pdzg-kv-certigo-staging'
+param cosmosPrivateDnsZoneGroupName = 'default'
 
 // Cosmos DB region. West Europe has AZ-capacity limits for Cosmos (the reason dev
 // and prod both deploy Cosmos in North Europe). We pin staging to North Europe too
