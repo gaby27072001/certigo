@@ -9,36 +9,72 @@ const repositoryRoot = path.resolve(
   '..',
   '..',
 );
+let cosmosTemplate;
 
-function collectIndexingPolicies(value, policies = []) {
-  if (value === null || typeof value !== 'object') {
-    return policies;
+function compileCosmosTemplate() {
+  if (cosmosTemplate) {
+    return cosmosTemplate;
   }
-  if (Object.hasOwn(value, 'indexingPolicy')) {
-    policies.push(value.indexingPolicy);
-  }
-  for (const child of Object.values(value)) {
-    collectIndexingPolicies(child, policies);
-  }
-  return policies;
-}
-
-test('Cosmos containers preserve the live default indexing policy', () => {
   const bicep = process.env.BICEP_CLI || 'bicep';
-  const template = JSON.parse(
+  cosmosTemplate = JSON.parse(
     execFileSync(
       bicep,
-      ['build', path.join(repositoryRoot, 'infra', 'main.bicep'), '--stdout'],
+      [
+        'build',
+        path.join(repositoryRoot, 'infra', 'modules', 'cosmos.bicep'),
+        '--stdout',
+      ],
       { encoding: 'utf8' },
     ),
   );
+  return cosmosTemplate;
+}
 
-  assert.deepEqual(collectIndexingPolicies(template), [
-    {
-      indexingMode: 'consistent',
-      automatic: true,
-      includedPaths: [{ path: '/*' }],
-      excludedPaths: [{ path: '/"_etag"/?' }],
-    },
+test('Cosmos containers preserve the live default indexing policy', () => {
+  const template = compileCosmosTemplate();
+  const containerResource = template.resources.find(
+    (resource) =>
+      resource.type ===
+      'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers',
+  );
+  assert.ok(containerResource);
+
+  const compiledResource = containerResource.properties.resource;
+  const indexingPolicy =
+    "'indexingPolicy', createObject('indexingMode', 'consistent', " +
+    "'automatic', true(), 'includedPaths', " +
+    "createArray(createObject('path', '/*')), 'excludedPaths', " +
+    "createArray(createObject('path', '/\"_etag\"/?')))";
+  assert.ok(compiledResource.includes(indexingPolicy));
+});
+
+test('compiled Cosmos ARM emits TTL only for attempts', () => {
+  const template = compileCosmosTemplate();
+  const containerResource = template.resources.find(
+    (resource) =>
+      resource.type ===
+      'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers',
+  );
+  assert.ok(containerResource);
+
+  const containers = template.variables.containers;
+  assert.deepEqual(containers, [
+    { name: 'users', pk: '/id' },
+    { name: 'content', pk: '/trackId' },
+    { name: 'progress', pk: '/userId' },
+    { name: 'attempts', pk: '/userId' },
+    { name: 'events', pk: '/userId' },
+    { name: 'leaderboard', pk: '/periodLeagueId' },
+    { name: 'economy', pk: '/userId' },
+    { name: 'friends', pk: '/userId' },
   ]);
+
+  const compiledResource = containerResource.properties.resource;
+  assert.equal(typeof compiledResource, 'string');
+  const ttlCondition =
+    "if(equals(variables('containers')[copyIndex()].name, 'attempts'), " +
+    "createObject('defaultTtl', -1), createObject())";
+  assert.ok(compiledResource.endsWith(`${ttlCondition})]`));
+  assert.equal(compiledResource.match(/defaultTtl/g)?.length, 1);
+  assert.doesNotMatch(JSON.stringify(template), /"defaultTtl":null/);
 });
