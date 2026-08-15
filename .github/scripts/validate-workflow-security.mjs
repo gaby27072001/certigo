@@ -453,7 +453,7 @@ function validateRepositoryInvariants() {
       'az bicep build-params',
       'node .github/scripts/write-secure-bicep-parameters.mjs',
       'DEPLOYMENT_OUTPUTS_FILE',
-      "trap 'rm -f -- \"$BASE_PARAMETERS_FILE\" \"$AUTH_PARAMETERS_FILE\" \"$DEPLOYMENT_OUTPUTS_FILE\"' EXIT",
+      "trap 'rm -f -- \"$BASE_PARAMETERS_FILE\" \"$AUTH_PARAMETERS_FILE\"' EXIT",
       '--parameters "@$AUTH_PARAMETERS_FILE"',
     ]) {
       if (!backend.includes(marker)) {
