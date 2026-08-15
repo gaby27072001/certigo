@@ -94,7 +94,7 @@ jobs:
       # --- Cote Dart : rejoue les golden vectors partages via package:cortex ---
       - name: Dart cortex get dependencies
         working-directory: packages/cortex
-        run: dart pub get
+        run: dart pub get --enforce-lockfile
       - name: Dart parity golden test
         working-directory: packages/cortex
         run: dart test test/cortex_golden_test.dart

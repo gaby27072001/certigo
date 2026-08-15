@@ -205,9 +205,13 @@ def _validate_content_hash(value: object, source: str) -> None:
     if not isinstance(value, str) or not value:
         raise NuGetLockError(f"{source}.contentHash: expected non-empty base64.")
     try:
-        base64.b64decode(value, validate=True)
+        decoded = base64.b64decode(value, validate=True)
     except (ValueError, binascii.Error) as exc:
         raise NuGetLockError(f"{source}.contentHash: invalid base64.") from exc
+    if len(decoded) != 64:
+        raise NuGetLockError(
+            f"{source}.contentHash: expected a 64-byte SHA-512 digest."
+        )
 
 
 def _validate_graph(
@@ -296,6 +300,27 @@ def _validate_graph(
                 raise NuGetLockError(
                     f"{source}.{package_name}.{dependency_name}: expected a version."
                 )
+    reachable = {
+        key
+        for key, (_, entry) in packages.items()
+        if entry.get("type") in {"Direct", "Project"}
+    }
+    pending = list(reachable)
+    while pending:
+        current = pending.pop()
+        dependencies = packages[current][1].get("dependencies", {})
+        assert isinstance(dependencies, dict)
+        for dependency_name in dependencies:
+            dependency_key = dependency_name.casefold()
+            if dependency_key not in reachable:
+                reachable.add(dependency_key)
+                pending.append(dependency_key)
+    unreachable = sorted(set(packages) - reachable)
+    if unreachable:
+        raise NuGetLockError(
+            f"{source}: package entries are unreachable from Direct/Project roots: "
+            f"{unreachable}."
+        )
     return len(packages)
 
 

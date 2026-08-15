@@ -31,8 +31,8 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "20"
-      - name: Install validator deps
-        run: npm install --no-save ajv ajv-formats yaml glob
+      - name: Install validator dependencies from lock
+        run: npm ci
       - name: Validate content
         run: node tools/validate_content.mjs
       - name: npm audit backend tools

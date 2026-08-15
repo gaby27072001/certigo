@@ -58,19 +58,36 @@ conclusion dépend uniquement du statut scanner, des findings et de la validité
 jamais du quota de stockage d'artefacts. Les forks ne sont pas supportés : la gate de confiance
 chargée depuis `main` échoue sans checkout, tandis qu'aucun workflow contrôlé par le fork ne peut
 atteindre le pool Azure persistant.
-OSV utilise `--no-ignore` : aucun `.gitignore` fourni par la PR ne peut masquer un manifeste ou
-lockfile, et toute modification d'un `.gitignore` déclenche le scan de dépendances.
+OSV utilise `--no-ignore --all-packages` : aucun `.gitignore` fourni par la PR ne peut masquer un
+manifeste ou lockfile, et toute modification d'un `.gitignore` déclenche le scan de dépendances.
+Le contrôleur trusted-base calcule d'abord l'inventaire Git attendu et rejette le rapport OSV si
+une seule source verrouillée suivie manque dans `results[].source.path`.
 Chaque `.csproj` suivi sous `backend/` doit avoir exactement un `packages.lock.json` adjacent.
 Le validateur statique trusted-base refuse les locks absents, orphelins ou malformés, les graphes
 incomplets et tout écart entre un `PackageReference` direct à version exacte et son entrée
-`Direct` demandée/résolue. La CI ne régénère jamais ces locks et n'évalue aucun MSBuild de PR.
+`Direct` demandée/résolue. Il rejette aussi les imports/SDK/conditions/versions indirectes non
+modélisés et exige que chaque `contentHash` soit un SHA-512 base64 de 64 octets.
 Après une modification de package, un mainteneur régénère les locks dans un environnement de
 développement de confiance avec
 `dotnet restore backend/Certigo.sln --use-lock-file --force-evaluate`, n'ajoute que les huit
 `packages.lock.json` adjacents aux projets (jamais `obj/**/WorkerExtensions/**`), puis exécute
 `python tools/validate_nuget_locks.py --root .` avant de commiter.
-Les builds CI et le déploiement backend restaurent ensuite en `--locked-mode` ; une dépendance
-importée ou un lock tronqué ne peut donc ni être fusionné ni produire l'artefact publié.
+La gate exécute ensuite un `dotnet restore backend/Certigo.sln --locked-mode` sans secret, depuis
+un SDK installé dans un chemin absolu isolé. Ce restore peut évaluer les projets de PR : il est
+donc le dernier traitement de code non fiable de son job, ne précède aucun job secret/trusted,
+et ses sources ainsi que son SDK sont supprimés avec des chemins de cleanup réinjectés au niveau
+de l'étape. Le risque résiduel propre au runner persistant reste contenu par cette absence de
+secrets et par le nettoyage ; la décision statique trusted-base demeure indépendante de MSBuild.
+Les builds CI et le déploiement backend restaurent aussi en `--locked-mode`, afin qu'une
+dépendance importée ou un lock tronqué ne puisse ni être fusionné ni produire l'artefact publié.
+
+Le même inventaire exige exactement un `package-lock.json` adjacent à chaque `package.json` et un
+`pubspec.lock` adjacent à chaque `pubspec.yaml`, hors répertoires générés et exemples ; manifestes
+et locks symboliques sont interdits. Le lock npm v3 doit reproduire les dépendances racine du
+manifest, tandis que les locks pub doivent conserver leur structure générée `packages`/`sdks`.
+La CI utilise exclusivement `npm ci` et `dart/flutter pub get --enforce-lockfile`. Toute
+régénération npm/pub s'effectue seulement dans un environnement de développement de confiance,
+puis `python tools/validate_dependency_locks.py --root .` doit réussir avant commit.
 
 La gate `Generated state equals committed state` n'accède à aucun dépôt externe et ne reçoit
 aucun secret. Le générateur du SHA immuable de base valide la référence locale
@@ -142,6 +159,8 @@ par domaine (backend, mobile, infra, `.github`, docs, registre de migration…).
 **état cible pour revue**, incluant les sept contextes du §4. Ce fichier
 n'est pas une charge utile à envoyer en bloc : les champs de durcissement restent des réserves
 séparées, et seuls les checks requis sont réconciliés ici.
+Ces sept noms sont uniquement les gates agrégées stables : aucun job enfant, variante de matrice
+ou contexte interne d'un workflow réutilisable ne doit être ajouté à la protection.
 
 ### Procédure pas-à-pas (admin)
 

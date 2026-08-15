@@ -11,7 +11,7 @@ function requiredString(value, source) {
   return value;
 }
 
-export function evaluateOsvJson(file) {
+export function evaluateOsvJson(file, options = {}) {
   let descriptor;
   let report;
   try {
@@ -44,6 +44,7 @@ export function evaluateOsvJson(file) {
   let packageCount = 0;
   let vulnerabilityCount = 0;
   const vulnerabilityIds = new Set();
+  const scannedSources = new Set();
   for (const [resultIndex, result] of report.results.entries()) {
     const source = `results[${resultIndex}]`;
     if (
@@ -59,6 +60,17 @@ export function evaluateOsvJson(file) {
     }
     requiredString(result.source.path, `${source}.source.path`);
     requiredString(result.source.type, `${source}.source.type`);
+    if (options.sourceRoot) {
+      const sourceRoot = path.resolve(options.sourceRoot);
+      const sourcePath = path.isAbsolute(result.source.path)
+        ? path.resolve(result.source.path)
+        : path.resolve(sourceRoot, result.source.path);
+      const relative = path.relative(sourceRoot, sourcePath);
+      if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        throw new Error(`${source}.source.path escapes the scanned repository.`);
+      }
+      scannedSources.add(relative.split(path.sep).join('/'));
+    }
 
     for (const [packageIndex, packageResult] of result.packages.entries()) {
       const packageSource = `${source}.packages[${packageIndex}]`;
@@ -69,11 +81,14 @@ export function evaluateOsvJson(file) {
         || typeof packageResult.package !== 'object'
         || packageResult.package === null
         || Array.isArray(packageResult.package)
-        || !Array.isArray(packageResult.vulnerabilities)
-        || !Array.isArray(packageResult.groups)
+        || (
+          packageResult.vulnerabilities !== undefined
+          && !Array.isArray(packageResult.vulnerabilities)
+        )
+        || (packageResult.groups !== undefined && !Array.isArray(packageResult.groups))
       ) {
         throw new Error(
-          `${packageSource} must contain package, vulnerabilities, and groups fields.`,
+          `${packageSource} must contain a package and valid vulnerability/group arrays.`,
         );
       }
       requiredString(packageResult.package.name, `${packageSource}.package.name`);
@@ -81,8 +96,9 @@ export function evaluateOsvJson(file) {
       requiredString(packageResult.package.ecosystem, `${packageSource}.package.ecosystem`);
 
       const packageVulnerabilityIds = new Set();
-      for (const [vulnerabilityIndex, vulnerability] of
-        packageResult.vulnerabilities.entries()) {
+      const vulnerabilities = packageResult.vulnerabilities ?? [];
+      const groups = packageResult.groups ?? [];
+      for (const [vulnerabilityIndex, vulnerability] of vulnerabilities.entries()) {
         if (
           typeof vulnerability !== 'object'
           || vulnerability === null
@@ -99,7 +115,7 @@ export function evaluateOsvJson(file) {
           ),
         );
       }
-      for (const [groupIndex, group] of packageResult.groups.entries()) {
+      for (const [groupIndex, group] of groups.entries()) {
         if (
           typeof group !== 'object'
           || group === null
@@ -123,18 +139,40 @@ export function evaluateOsvJson(file) {
         }
       }
       if (
-        packageResult.vulnerabilities.length > 0
-        && packageResult.groups.length === 0
+        vulnerabilities.length > 0
+        && groups.length === 0
       ) {
         throw new Error(`${packageSource} contains ungrouped vulnerabilities.`);
       }
       packageCount += 1;
-      vulnerabilityCount += packageResult.groups.length;
+      vulnerabilityCount += groups.length;
+    }
+  }
+  if (options.expectedSources !== undefined) {
+    if (!Array.isArray(options.expectedSources)) {
+      throw new Error('Expected OSV sources must be an array.');
+    }
+    const expectedSources = new Set();
+    for (const [index, value] of options.expectedSources.entries()) {
+      const expected = requiredString(value, `expectedSources[${index}]`);
+      if (path.isAbsolute(expected) || expected.split(/[\\/]/).includes('..')) {
+        throw new Error(`expectedSources[${index}] must be repository-relative.`);
+      }
+      expectedSources.add(expected.replaceAll('\\', '/'));
+    }
+    const missingSources = [...expectedSources]
+      .filter((source) => !scannedSources.has(source))
+      .sort();
+    if (missingSources.length > 0) {
+      throw new Error(
+        `OSV-Scanner omitted expected tracked lockfiles: ${missingSources.join(', ')}.`,
+      );
     }
   }
 
   return {
     resultCount: report.results.length,
+    sourceCount: scannedSources.size,
     packageCount,
     vulnerabilityCount,
     vulnerabilityIds: [...vulnerabilityIds].sort(),
@@ -143,13 +181,18 @@ export function evaluateOsvJson(file) {
 
 function main() {
   const file = process.argv[2];
-  if (!file) {
-    console.error('Usage: enforce-osv-json.mjs <osv-json-file>');
+  const expectedSourcesFile = process.argv[3];
+  const sourceRoot = process.argv[4];
+  if (!file || !expectedSourcesFile || !sourceRoot) {
+    console.error(
+      'Usage: enforce-osv-json.mjs <osv-json-file> <expected-sources-json> <source-root>',
+    );
     process.exitCode = 2;
     return;
   }
   try {
-    const evaluation = evaluateOsvJson(file);
+    const expectedSources = JSON.parse(fs.readFileSync(expectedSourcesFile, 'utf8'));
+    const evaluation = evaluateOsvJson(file, { expectedSources, sourceRoot });
     console.log(JSON.stringify(evaluation));
     if (evaluation.vulnerabilityCount > 0) {
       console.error(

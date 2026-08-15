@@ -81,7 +81,7 @@ jobs:
           sdk: "3.12.2"
       - name: Get dependencies
         working-directory: packages/${{ matrix.package }}
-        run: dart pub get
+        run: dart pub get --enforce-lockfile
       - name: Analyze
         working-directory: packages/${{ matrix.package }}
         run: dart analyze --fatal-infos
@@ -151,7 +151,7 @@ jobs:
           cache: true
       - name: Pub get (app)
         working-directory: apps/mobile
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
       - name: Dart pub outdated
         working-directory: apps/mobile
         run: flutter pub outdated --no-color || true
@@ -229,7 +229,7 @@ jobs:
       # échouer CE job — c'est le gate dédié exigé par la DoD.
       - name: Pub get (prism_ui)
         working-directory: packages/prism_ui
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
       - name: Golden tests (prism_ui renderer)
         working-directory: packages/prism_ui
         run: flutter test test/rendering/renderer_golden_test.dart

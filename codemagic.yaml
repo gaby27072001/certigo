@@ -56,7 +56,7 @@ definitions:
   steps:
     - &step_pub_get
       name: Flutter pub get
-      script: flutter pub get
+      script: flutter pub get --enforce-lockfile
       working_directory: apps/mobile
     - &step_analyze
       name: Static analysis (blocking gate)

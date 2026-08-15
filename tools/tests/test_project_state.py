@@ -639,12 +639,17 @@ class ProjectStateTests(unittest.TestCase):
                 "OSV-Scanner output is missing or malformed.",
                 "--format=json",
                 "--no-ignore",
-                'python -P "$TRUSTED_CONTROL_DIR/tools/validate_nuget_locks.py"',
+                "--all-packages",
+                'python -P "$TRUSTED_CONTROL_DIR/tools/validate_dependency_locks.py"',
                 '--root "$UNTRUSTED_SOURCE_DIR"',
+                '--write-expected-sources "$EXPECTED_LOCKS_FILE"',
                 '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
                 '--output-file "$output_temp"',
                 'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
-                '"$OSV_RESULTS_FILE" 2> "$OSV_ENFORCE_LOG"',
+                '"$EXPECTED_LOCKS_FILE"',
+                '"$UNTRUSTED_SOURCE_DIR" 2> "$OSV_ENFORCE_LOG"',
+                "name: NuGet locked restore (no secrets)",
+                '"$DOTNET_EXECUTABLE" restore "$RESTORE_SOLUTION" --locked-mode',
                 "finding_count",
             ],
             "security-scan.yml": [
@@ -684,8 +689,12 @@ class ProjectStateTests(unittest.TestCase):
         self.assertIn("- '.gitignore'", security_gate)
         self.assertIn("- '**/.gitignore'", security_gate)
         self.assertIn("- 'tools/validate_nuget_locks.py'", security_gate)
+        self.assertIn("- 'tools/validate_dependency_locks.py'", security_gate)
         self.assertIn(
             "- 'tools/tests/test_validate_nuget_locks.py'", security_gate
+        )
+        self.assertIn(
+            "- 'tools/tests/test_validate_dependency_locks.py'", security_gate
         )
         self.assertNotIn("nuget-vuln-scan", security_gate)
         self.assertNotIn("NUGET_RESULT", security_gate)

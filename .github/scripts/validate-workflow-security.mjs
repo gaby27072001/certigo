@@ -170,6 +170,9 @@ function validateWorkflow(file) {
       `${file}:${lineNumber}: GitHub expressions must pass through env before shell use`,
     );
   }
+  if (/(?:dart|flutter)\s+pub\s+get(?!\s+--enforce-lockfile)/.test(text)) {
+    errors.push(`${file}: Dart and Flutter dependency resolution must enforce lockfiles`);
+  }
 
   lines.forEach((line, index) => {
     const match = line.match(usesPattern);
@@ -216,6 +219,10 @@ function validateRepositoryInvariants() {
   );
   const nugetLockValidator = fs.readFileSync(
     path.join(root, 'tools', 'validate_nuget_locks.py'),
+    'utf8',
+  );
+  const dependencyLockValidator = fs.readFileSync(
+    path.join(root, 'tools', 'validate_dependency_locks.py'),
     'utf8',
   );
   const secureBicepWriter = fs.readFileSync(
@@ -487,7 +494,9 @@ function validateRepositoryInvariants() {
     "'**/.npmrc'",
     "'**/pubspec_overrides.yaml'",
     "'tools/validate_nuget_locks.py'",
+    "'tools/validate_dependency_locks.py'",
     "'tools/tests/test_validate_nuget_locks.py'",
+    "'tools/tests/test_validate_dependency_locks.py'",
   ]) {
     if (!securityGate.includes(dependencyInput)) {
       errors.push(`security-gate.yml: dependency filter omits ${dependencyInput}`);
@@ -540,12 +549,15 @@ function validateRepositoryInvariants() {
     'OSV-Scanner output is missing or malformed.',
     '--format=json',
     '--no-ignore',
-    'python -P "$TRUSTED_CONTROL_DIR/tools/validate_nuget_locks.py"',
+    '--all-packages',
+    'python -P "$TRUSTED_CONTROL_DIR/tools/validate_dependency_locks.py"',
     '--root "$UNTRUSTED_SOURCE_DIR"',
+    '--write-expected-sources "$EXPECTED_LOCKS_FILE"',
     '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
     '--output-file "$output_temp"',
     'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
-    '"$OSV_RESULTS_FILE" 2> "$OSV_ENFORCE_LOG"',
+    '"$EXPECTED_LOCKS_FILE"',
+    '"$UNTRUSTED_SOURCE_DIR" 2> "$OSV_ENFORCE_LOG"',
     'path: .untrusted-source',
     'path: .trusted-control',
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
@@ -560,6 +572,7 @@ function validateRepositoryInvariants() {
     'packageResult.vulnerabilities',
     'packageResult.groups',
     'references unknown vulnerability',
+    'omitted expected tracked lockfiles',
     'vulnerabilityCount',
   ]) {
     if (!osvEnforcer.includes(marker)) {
@@ -578,9 +591,54 @@ function validateRepositoryInvariants() {
     'Direct packages differ from the project',
     'expected requested',
     'is absent from the target graph',
+    'expected a 64-byte SHA-512 digest',
+    'unreachable from Direct/Project roots',
   ]) {
     if (!nugetLockValidator.includes(marker)) {
       errors.push(`validate_nuget_locks.py: missing fail-closed invariant ${marker}`);
+    }
+  }
+  for (const marker of [
+      'git ls-files',
+      'package-lock.json',
+      'pubspec.lock',
+      'packages.lock.json',
+      'lockfileVersion',
+      'root {field} differs',
+      'core.hooksPath=/dev/null',
+      'validate_nuget_locks.py',
+    ]) {
+      if (!dependencyLockValidator.includes(marker)) {
+        errors.push(`validate_dependency_locks.py: missing fail-closed invariant ${marker}`);
+      }
+    for (const marker of [
+      'name: NuGet locked restore (no secrets)',
+      'needs: osv-scan',
+      'actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1',
+      'DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet-locked',
+      'DOTNET_EXECUTABLE: ${{ github.workspace }}/.dotnet-locked/dotnet',
+      '"$DOTNET_EXECUTABLE" restore "$RESTORE_SOLUTION" --locked-mode',
+      'name: Remove untrusted restore state',
+      '/usr/bin/rm -rf -- "$CLEANUP_DOTNET_DIR" "$CLEANUP_SOURCE_DIR"',
+    ]) {
+      if (!dependencyScan.includes(marker)) {
+        errors.push(`dependency-vuln-scan.yml: missing isolated restore invariant ${marker}`);
+      }
+    }
+    if (dependencyScan.includes('secrets.')) {
+      errors.push('dependency-vuln-scan.yml: dependency jobs must not receive secrets');
+    }
+    const restoreJob = dependencyScan.indexOf('  locked-restore:');
+    const untrustedRestore = dependencyScan.indexOf('path: .untrusted-restore', restoreJob);
+    const lockedRestore = dependencyScan.indexOf('--locked-mode', untrustedRestore);
+    const cleanupRestore = dependencyScan.indexOf('name: Remove untrusted restore state', lockedRestore);
+    if (
+      restoreJob < 0
+      || untrustedRestore < restoreJob
+      || lockedRestore < untrustedRestore
+      || cleanupRestore < lockedRestore
+    ) {
+      errors.push('dependency-vuln-scan.yml: untrusted locked restore order is unsafe');
     }
   }
   for (const marker of [
@@ -598,6 +656,32 @@ function validateRepositoryInvariants() {
     !branchProtection.required_status_checks.contexts.includes('Security / Required gate')
   ) {
     errors.push('branch-protection-main.json: stable security gate is not required');
+  }
+  const stableContexts = [
+    'Build & test',
+    'Flutter app + UI packages',
+    'Generated state equals committed state',
+    'Validate workflow YAML',
+    'CodeQL / Security gate',
+    'Security / Required gate',
+    'Fork PR policy / Required gate',
+  ];
+  if (
+    JSON.stringify(branchProtection.required_status_checks.contexts)
+    !== JSON.stringify(stableContexts)
+    || !branchProtection._comment.includes('gates agreges stables')
+  ) {
+    errors.push(
+      'branch-protection-main.json: required checks must be the seven stable aggregate gates',
+    );
+  }
+  const contentWorkflow = fs.readFileSync(path.join(workflowsDir, 'ci-content.yml'), 'utf8');
+  if (!contentWorkflow.includes('run: npm ci') || contentWorkflow.includes('npm install')) {
+    errors.push('ci-content.yml: npm dependencies must be installed exclusively with npm ci');
+  }
+  const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');
+  if (/(?:dart|flutter)\s+pub\s+get(?!\s+--enforce-lockfile)/.test(codemagic)) {
+    errors.push('codemagic.yaml: Flutter dependency resolution must enforce the lockfile');
   }
   for (const marker of [
     'pull_request_target:',

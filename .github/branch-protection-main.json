@@ -1,5 +1,5 @@
 {
-  "_comment": "Certigo — Etat CIBLE (durci) de la protection de la branche main. Capture versionnable pour revue uniquement : ne jamais envoyer ce document complet avec PUT. Les checks requis se reconcilient exclusivement par PATCH de /branches/main/protection/required_status_checks en preservant strict et les contextes existants. Voir docs/GOVERNANCE.md.",
+  "_comment": "Certigo — Etat CIBLE (durci) de la protection de la branche main. Capture versionnable pour revue uniquement : ne jamais envoyer ce document complet avec PUT. Les sept contextes requis sont exclusivement des gates agreges stables; aucun job enfant, matrix ou workflow reusable ne doit etre requis. Reconciliation uniquement par PATCH de /branches/main/protection/required_status_checks en preservant strict. Voir docs/GOVERNANCE.md.",
   "required_status_checks": {
     "strict": true,
     "contexts": [

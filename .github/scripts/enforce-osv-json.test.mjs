@@ -16,6 +16,7 @@ const fixtureRoot = path.join(
 test('accepts a complete clean OSV JSON fixture', () => {
   assert.deepEqual(evaluateOsvJson(path.join(fixtureRoot, 'osv-clean.json')), {
     resultCount: 0,
+    sourceCount: 0,
     packageCount: 0,
     vulnerabilityCount: 0,
     vulnerabilityIds: [],
@@ -27,6 +28,7 @@ test('counts grouped vulnerabilities from a complete OSV JSON fixture', () => {
     evaluateOsvJson(path.join(fixtureRoot, 'osv-vulnerable.json')),
     {
       resultCount: 1,
+      sourceCount: 0,
       packageCount: 1,
       vulnerabilityCount: 1,
       vulnerabilityIds: ['GHSA-example-0000-0000'],
@@ -82,17 +84,65 @@ test('rejects OSV JSON with invalid nested field types', () => {
   assert.throws(() => evaluateOsvJson(file), /package\.version must be a non-empty string/);
 });
 
+test('requires every expected tracked lockfile in all-packages output', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-osv-sources-'));
+  const lockfile = path.join(directory, 'package-lock.json');
+  const file = path.join(directory, 'all-packages.json');
+  fs.writeFileSync(lockfile, '{}');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      results: [{
+        source: { path: lockfile, type: 'lockfile' },
+        packages: [{
+          package: { name: 'package', version: '1', ecosystem: 'npm' },
+        }],
+      }],
+    }),
+  );
+  assert.deepEqual(
+    evaluateOsvJson(file, {
+      expectedSources: ['package-lock.json'],
+      sourceRoot: directory,
+    }),
+    {
+      resultCount: 1,
+      sourceCount: 1,
+      packageCount: 1,
+      vulnerabilityCount: 0,
+      vulnerabilityIds: [],
+    },
+  );
+  assert.throws(
+    () => evaluateOsvJson(file, {
+      expectedSources: ['package-lock.json', 'missing.lock'],
+      sourceRoot: directory,
+    }),
+    /omitted expected tracked lockfiles/,
+  );
+});
+
 test('CLI exit codes distinguish clean, vulnerable, and invalid reports', () => {
   const script = path.join(path.dirname(fileURLToPath(import.meta.url)), 'enforce-osv-json.mjs');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-osv-cli-'));
+  const expectedSources = path.join(directory, 'expected.json');
+  fs.writeFileSync(expectedSources, '[]');
   const cases = [
     ['osv-clean.json', 0],
     ['osv-vulnerable.json', 1],
     ['osv-truncated.json', 2],
   ];
   for (const [fixture, expectedStatus] of cases) {
-    const result = spawnSync(process.execPath, [script, path.join(fixtureRoot, fixture)], {
-      encoding: 'utf8',
-    });
+    const result = spawnSync(
+      process.execPath,
+      [
+        script,
+        path.join(fixtureRoot, fixture),
+        expectedSources,
+        path.parse(fixtureRoot).root,
+      ],
+      { encoding: 'utf8' },
+    );
     assert.equal(result.status, expectedStatus, `${fixture}: ${result.stderr}`);
   }
 });

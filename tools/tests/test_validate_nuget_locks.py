@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+import base64
+import importlib.util
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from tools import validate_nuget_locks
+
+MODULE_PATH = Path(__file__).resolve().parents[1] / "validate_nuget_locks.py"
+SPEC = importlib.util.spec_from_file_location("validate_nuget_locks", MODULE_PATH)
+assert SPEC and SPEC.loader
+validate_nuget_locks = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = validate_nuget_locks
+SPEC.loader.exec_module(validate_nuget_locks)
 
 
 class NuGetLockValidatorTests(unittest.TestCase):
@@ -53,13 +62,13 @@ class NuGetLockValidatorTests(unittest.TestCase):
                         "type": "Direct",
                         "requested": requested,
                         "resolved": resolved,
-                        "contentHash": "YWJj",
+                        "contentHash": base64.b64encode(b"a" * 64).decode(),
                         "dependencies": {transitive_dependency: "4.5.6"},
                     },
                     "Example.Dependency": {
                         "type": "Transitive",
                         "resolved": "4.5.6",
-                        "contentHash": "ZGVm",
+                        "contentHash": base64.b64encode(b"b" * 64).decode(),
                     },
                 }
             },
@@ -114,6 +123,31 @@ class NuGetLockValidatorTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             validate_nuget_locks.NuGetLockError, "absent from the target graph"
+        ):
+            validate_nuget_locks.validate_repository(self.root)
+
+    def test_rejects_invalid_hash_lengths_and_unreachable_entries(self) -> None:
+        self.valid_fixture()
+        lock_path = self.root / "backend/App/packages.lock.json"
+        value = json.loads(lock_path.read_text(encoding="utf-8"))
+        value["dependencies"]["net8.0"]["Example.Package"]["contentHash"] = "YWJj"
+        lock_path.write_text(json.dumps(value), encoding="utf-8")
+        with self.assertRaisesRegex(
+            validate_nuget_locks.NuGetLockError, "64-byte SHA-512"
+        ):
+            validate_nuget_locks.validate_repository(self.root)
+
+        value["dependencies"]["net8.0"]["Example.Package"][
+            "contentHash"
+        ] = base64.b64encode(b"a" * 64).decode()
+        value["dependencies"]["net8.0"]["Orphan.Package"] = {
+            "type": "Transitive",
+            "resolved": "9.9.9",
+            "contentHash": base64.b64encode(b"c" * 64).decode(),
+        }
+        lock_path.write_text(json.dumps(value), encoding="utf-8")
+        with self.assertRaisesRegex(
+            validate_nuget_locks.NuGetLockError, "unreachable from Direct/Project"
         ):
             validate_nuget_locks.validate_repository(self.root)
 

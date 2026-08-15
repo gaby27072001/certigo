@@ -168,7 +168,7 @@ jobs:
 
       - name: Récupérer les dépendances
         working-directory: apps/mobile
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Analyze (gate bloquant)
         working-directory: apps/mobile
