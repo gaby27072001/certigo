@@ -9,6 +9,8 @@ on:
       - "infra/**"
       - ".github/scripts/write-secure-bicep-parameters.mjs"
       - ".github/scripts/write-secure-bicep-parameters.test.mjs"
+      - ".github/scripts/deploy-flex-onedeploy.sh"
+      - ".github/scripts/deploy-flex-onedeploy.test.mjs"
       - ".github/workflows/cd-backend.yml"
       - ".github/workflows/ci-infra.yml"
       - ".github/workflows/runner-health.yml"
@@ -17,6 +19,8 @@ on:
       - "infra/**"
       - ".github/scripts/write-secure-bicep-parameters.mjs"
       - ".github/scripts/write-secure-bicep-parameters.test.mjs"
+      - ".github/scripts/deploy-flex-onedeploy.sh"
+      - ".github/scripts/deploy-flex-onedeploy.test.mjs"
       - ".github/workflows/cd-backend.yml"
       - ".github/workflows/ci-infra.yml"
       - ".github/workflows/runner-health.yml"
@@ -64,3 +68,5 @@ jobs:
         run: node --test infra/tests/private-networking.test.mjs
       - name: Validate secure deployment parameter writer
         run: node --test .github/scripts/write-secure-bicep-parameters.test.mjs
+      - name: Validate private URL-based OneDeploy
+        run: node --test .github/scripts/deploy-flex-onedeploy.test.mjs

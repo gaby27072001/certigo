@@ -61,7 +61,7 @@ test('private network separates Flex integration from private endpoints', () => 
 });
 
 test('private endpoints and DNS cover every backend dependency', () => {
-  const template = compileTemplate('infra/modules/privateNetwork.bicep');
+  const template = compileTemplate('infra/modules/sharedPrivateDns.bicep');
   const zones = resourcesOfType(
     template,
     'Microsoft.Network/privateDnsZones',
@@ -86,9 +86,26 @@ test('private endpoints and DNS cover every backend dependency', () => {
         typeof link.properties.virtualNetwork.id === 'string',
     ),
   );
+  const ciLinks = links.filter((link) =>
+    String(link.name).includes("parameters('ciVnetName')"),
+  );
+  assert.equal(ciLinks.length, 5);
+
+  const appLinks = resourcesOfType(
+    compileTemplate('infra/modules/privateDnsAppLinks.bicep'),
+    'Microsoft.Network/privateDnsZones/virtualNetworkLinks',
+  );
+  assert.equal(appLinks.length, 5);
+  assert.ok(
+    appLinks.every(
+      (link) =>
+        link.properties.registrationEnabled === false &&
+        link.properties.virtualNetwork.id === "[parameters('appVnetId')]",
+    ),
+  );
 
   const endpoints = resourcesOfType(
-    template,
+    compileTemplate('infra/modules/privateNetwork.bicep'),
     'Microsoft.Network/privateEndpoints',
   );
   assert.equal(endpoints.length, 5);
@@ -99,7 +116,7 @@ test('private endpoints and DNS cover every backend dependency', () => {
   assert.deepEqual(groupIds, ['Sql', 'blob', 'queue', 'table', 'vault']);
 
   const zoneGroups = resourcesOfType(
-    template,
+    compileTemplate('infra/modules/privateNetwork.bicep'),
     'Microsoft.Network/privateEndpoints/privateDnsZoneGroups',
   );
   assert.equal(zoneGroups.length, 5);
@@ -107,6 +124,105 @@ test('private endpoints and DNS cover every backend dependency', () => {
     zoneGroups.every(
       (group) => group.properties.privateDnsZoneConfigs.length === 1,
     ),
+  );
+});
+
+test('application and CI virtual networks are peered in both directions', () => {
+  const appTemplate = compileTemplate('infra/modules/privateNetwork.bicep');
+  const [appPeering] = resourcesOfType(
+    appTemplate,
+    'Microsoft.Network/virtualNetworks/virtualNetworkPeerings',
+  );
+  assert.ok(appPeering);
+  assert.equal(appPeering.properties.allowVirtualNetworkAccess, true);
+  assert.equal(appPeering.properties.allowForwardedTraffic, false);
+  assert.equal(appPeering.properties.allowGatewayTransit, false);
+  assert.equal(appPeering.properties.useRemoteGateways, false);
+
+  const ciTemplate = compileTemplate('infra/modules/ciVnetPeering.bicep');
+  const [ciPeering] = resourcesOfType(
+    ciTemplate,
+    'Microsoft.Network/virtualNetworks/virtualNetworkPeerings',
+  );
+  assert.ok(ciPeering);
+  assert.equal(ciPeering.properties.allowVirtualNetworkAccess, true);
+  assert.equal(
+    ciPeering.properties.remoteVirtualNetwork.id,
+    "[parameters('appVnetId')]",
+  );
+});
+
+test('OIDC deployment principal receives container blob access and account delegation only', () => {
+  const template = compileTemplate('infra/modules/storage.bicep');
+  const assignments = resourcesOfType(
+    template,
+    'Microsoft.Authorization/roleAssignments',
+  );
+  assert.equal(assignments.length, 2);
+  assert.ok(
+    assignments.every(
+      (assignment) =>
+        assignment.properties.principalId ===
+          "[parameters('ciDeploymentPrincipalId')]" &&
+        assignment.properties.principalType === 'ServicePrincipal',
+    ),
+  );
+  const blobContributor = assignments.find(
+    (assignment) =>
+      assignment.properties.roleDefinitionId ===
+      "[variables('storageBlobDataContributor')]",
+  );
+  const blobDelegator = assignments.find(
+    (assignment) =>
+      assignment.properties.roleDefinitionId ===
+      "[variables('storageBlobDelegator')]",
+  );
+  assert.ok(blobContributor);
+  assert.match(blobContributor.scope, /blobServices\/containers/);
+  assert.match(blobContributor.scope, /app-package/);
+  assert.doesNotMatch(blobContributor.scope, /lesson-assets/);
+  assert.ok(blobDelegator);
+  assert.equal(
+    blobDelegator.scope,
+    "[resourceId('Microsoft.Storage/storageAccounts', parameters('accountName'))]",
+  );
+  assert.match(
+    template.variables.storageBlobDataContributor,
+    /ba92f5b4-2d11-453d-a403-e96b0029c9fe/,
+  );
+  assert.match(
+    template.variables.storageBlobDelegator,
+    /db58b8e5-c6ad-4a2a-8342-4190687cbf4a/,
+  );
+
+  for (const environment of ['dev', 'staging', 'prod']) {
+    const parameters = readFileSync(
+      path.join(repositoryRoot, 'infra', 'params', `${environment}.bicepparam`),
+      'utf8',
+    );
+    assert.match(
+      parameters,
+      /ciDeploymentPrincipalId = '15d2b34a-c0a0-4b5d-8360-b895a8164706'/,
+    );
+  }
+});
+
+test('deployment packages expire through a bounded prefix lifecycle policy', () => {
+  const template = compileTemplate('infra/modules/storage.bicep');
+  const [policy] = resourcesOfType(
+    template,
+    'Microsoft.Storage/storageAccounts/managementPolicies',
+  );
+  const [rule] = policy.properties.policy.rules;
+  assert.equal(rule.enabled, true);
+  assert.equal(rule.type, 'Lifecycle');
+  assert.deepEqual(rule.definition.filters.prefixMatch, [
+    'app-package/deployments/',
+  ]);
+  assert.deepEqual(rule.definition.filters.blobTypes, ['blockBlob']);
+  assert.equal(
+    rule.definition.actions.baseBlob.delete.daysAfterModificationGreaterThan,
+    30,
   );
 });
 
@@ -140,7 +256,11 @@ test('Function deployment waits for the complete private network deployment', ()
   assert.ok(networkDeployment.dependsOn.includes('storage'));
   assert.ok(networkDeployment.dependsOn.includes('vault'));
   assert.ok(networkDeployment.dependsOn.includes('data'));
+  assert.ok(networkDeployment.dependsOn.includes('sharedPrivateDns'));
   assert.ok(functionDeployment.dependsOn.includes('privateNetwork'));
+  assert.ok(functionDeployment.dependsOn.includes('privateDnsAppLinks'));
+  assert.ok(template.resources.privateDnsAppLinks.dependsOn.includes('privateNetwork'));
+  assert.ok(template.resources.ciVnetPeering.dependsOn.includes('privateNetwork'));
 });
 
 test('environment address spaces are unique and do not overlap the CI runner VNet', () => {

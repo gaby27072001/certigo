@@ -28,6 +28,8 @@ for environment in dev staging prod; do
   grep -F 'param vnetAddressPrefix =' "${params}" >/dev/null
   grep -F 'param functionIntegrationSubnetPrefix =' "${params}" >/dev/null
   grep -F 'param privateEndpointSubnetPrefix =' "${params}" >/dev/null
+  grep -F "param ciDeploymentPrincipalId = '15d2b34a-c0a0-4b5d-8360-b895a8164706'" \
+    "${params}" >/dev/null
   grep -F 'param cosmosBackupMode =' "${params}" >/dev/null
   grep -F 'param deployMcsbPolicyAssignment =' "${params}" >/dev/null
   grep -F 'param manageDefenderPlans =' "${params}" >/dev/null
@@ -66,6 +68,16 @@ grep -F "serviceName: 'Microsoft.App/environments'" \
   "${root}/infra/modules/privateNetwork.bicep" >/dev/null
 grep -F "privateEndpointNetworkPolicies: 'Disabled'" \
   "${root}/infra/modules/privateNetwork.bicep" >/dev/null
+grep -F "name: 'peer-to-\${ciVnetName}'" \
+  "${root}/infra/modules/privateNetwork.bicep" >/dev/null
+grep -F "name: 'peer-to-\${appVnetName}'" \
+  "${root}/infra/modules/ciVnetPeering.bicep" >/dev/null
+grep -F "name: '\${ciVnetName}-link'" \
+  "${root}/infra/modules/sharedPrivateDns.bicep" >/dev/null
+grep -F "name: '\${appVnetName}-link'" \
+  "${root}/infra/modules/privateDnsAppLinks.bicep" >/dev/null
+grep -F 'privateDnsZoneId: blobZoneId' \
+  "${root}/infra/modules/privateNetwork.bicep" >/dev/null
 grep -F 'virtualNetworkSubnetId: functionIntegrationSubnetId' \
   "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F 'vnetRouteAllEnabled: false' \
@@ -75,5 +87,8 @@ grep -F "type: 'UserAssignedIdentity'" "${root}/infra/modules/functionApp.bicep"
 grep -F 'userAssignedIdentityResourceId:' "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F "b7e6dc6d-f1e8-4753-8033-0f276bb0955b" "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3" "${root}/infra/modules/functionApp.bicep" >/dev/null
+grep -F "ba92f5b4-2d11-453d-a403-e96b0029c9fe" "${root}/infra/modules/storage.bicep" >/dev/null
+grep -F "db58b8e5-c6ad-4a2a-8342-4190687cbf4a" "${root}/infra/modules/storage.bicep" >/dev/null
+grep -F "'app-package/deployments/'" "${root}/infra/modules/storage.bicep" >/dev/null
 
 echo "Azure IaC validation passed (${index} parameter files)."

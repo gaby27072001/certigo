@@ -160,7 +160,11 @@ function validateWorkflow(file) {
       errors.push(`${file}: runner must use a fixed Azure self-hosted label set`);
     }
   }
-  if (text.includes('certigo-ci')) {
+  if (
+    lines.some(
+      (line) => line.trim().startsWith('runs-on:') && line.includes('certigo-ci'),
+    )
+  ) {
     errors.push(`${file}: legacy mixed-trust runner label certigo-ci is forbidden`);
   }
   errors.push(...validateTrustedCachePolicy(text, file));
@@ -368,6 +372,10 @@ function validateRepositoryInvariants() {
     path.join(root, '.github', 'scripts', 'write-secure-bicep-parameters.mjs'),
     'utf8',
   );
+  const flexOneDeploy = fs.readFileSync(
+    path.join(root, '.github', 'scripts', 'deploy-flex-onedeploy.sh'),
+    'utf8',
+  );
   const lint = fs.readFileSync(path.join(workflowsDir, 'lint-workflows.yml'), 'utf8');
   const projectState = fs.readFileSync(
     path.join(workflowsDir, 'ci-project-state.yml'),
@@ -444,7 +452,8 @@ function validateRepositoryInvariants() {
       'AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}',
       'az bicep build-params',
       'node .github/scripts/write-secure-bicep-parameters.mjs',
-      "trap 'rm -f -- \"$BASE_PARAMETERS_FILE\" \"$AUTH_PARAMETERS_FILE\"' EXIT",
+      'DEPLOYMENT_OUTPUTS_FILE',
+      "trap 'rm -f -- \"$BASE_PARAMETERS_FILE\" \"$AUTH_PARAMETERS_FILE\" \"$DEPLOYMENT_OUTPUTS_FILE\"' EXIT",
       '--parameters "@$AUTH_PARAMETERS_FILE"',
     ]) {
       if (!backend.includes(marker)) {
@@ -470,6 +479,44 @@ function validateRepositoryInvariants() {
         errors.push(`write-secure-bicep-parameters.mjs: missing invariant ${marker}`);
       }
     }
+  }
+  if (backend.includes('config-zip')) {
+    errors.push('cd-backend.yml: local config-zip is forbidden for private Flex storage');
+  }
+  for (const marker of [
+    'bash .github/scripts/deploy-flex-onedeploy.sh',
+    'STORAGE_BLOB_ENDPOINT',
+    'DEPLOYMENT_CONTAINER',
+    'COMMIT_SHA: ${{ github.sha }}',
+  ]) {
+    if (!backend.includes(marker)) {
+      errors.push(`cd-backend.yml: missing private OneDeploy invariant ${marker}`);
+    }
+  }
+  for (const marker of [
+    'az storage blob upload',
+    '--auth-mode login',
+    '--overwrite false',
+    'az storage blob generate-sas',
+    '--as-user',
+    '--permissions r',
+    '--https-only',
+    'az webapp deploy',
+    '--src-url',
+    '--async true',
+    'health_check \'health/live\'',
+    'health_check \'health/ready\'',
+    'retained for lifecycle cleanup',
+  ]) {
+    if (!flexOneDeploy.includes(marker)) {
+      errors.push(`deploy-flex-onedeploy.sh: missing deployment invariant ${marker}`);
+    }
+  }
+  if (/config-zip|--account-key|--sas-token/.test(flexOneDeploy)) {
+    errors.push('deploy-flex-onedeploy.sh: key-based or config-zip deployment is forbidden');
+  }
+  if (flexOneDeploy.includes('az storage blob delete')) {
+    errors.push('deploy-flex-onedeploy.sh: OneDeploy source must be retained for lifecycle cleanup');
   }
   if (!codeql.includes('CodeQL / Security gate')) {
     errors.push('codeql.yml: stable security gate is missing');

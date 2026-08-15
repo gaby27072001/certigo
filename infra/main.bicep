@@ -79,6 +79,15 @@ param mcsbEnforcementMode string = 'DoNotEnforce'
 @description('Object (principal) id of the CI release runner managed identity. When set, it is granted read access (Key Vault Secrets User) to the Key Vault so the mobile release workflows can pull signing secrets — no signing secret in GitHub. Empty = skip (needs role-assignment rights to set).')
 param ciRunnerPrincipalId string = ''
 
+@description('Object id of the GitHub Actions OIDC service principal granted container-scoped deployment upload and account-scoped user-delegation rights.')
+param ciDeploymentPrincipalId string
+
+@description('Resource group containing the trusted CI runner virtual network.')
+param ciVnetResourceGroupName string = 'rg-certigo-ci'
+
+@description('Trusted CI runner virtual network peered to each application environment.')
+param ciVnetName string = 'vnet-certigo-ci'
+
 @description('When true, the security log-search alerts get a system-assigned identity + least-privilege Log Analytics Reader role on the workspace (most robust). Default false: creating that role assignment needs Microsoft.Authorization/roleAssignments/write at the workspace scope, which the deployer may lack — off keeps the deployment guaranteed to succeed. Turn on once the deployer has role-assignment rights.')
 param grantAlertReaderRole bool = false
 
@@ -200,6 +209,7 @@ module storage 'modules/storage.bicep' = {
     enableVersioning: hardened
     blobSoftDeleteDays: hardened ? 30 : 7
     containerSoftDeleteDays: hardened ? 30 : 7
+    ciDeploymentPrincipalId: ciDeploymentPrincipalId
     tags: tags
   }
 }
@@ -222,9 +232,24 @@ module vault 'modules/keyvault.bicep' = {
   }
 }
 
-// Private networking is an atomic prerequisite for the Function App. The nested
-// deployment must finish all private endpoints, DNS zone groups and VNet links
-// before FC1 validates its private deployment storage.
+// One zone set in the CI hub is shared by all environments. Azure forbids
+// linking one VNet to duplicate private DNS namespaces.
+module sharedPrivateDns 'modules/sharedPrivateDns.bicep' = {
+  scope: resourceGroup(ciVnetResourceGroupName)
+  name: 'privateDns-${appName}-hub'
+  params: {
+    ciVnetId: resourceId(ciVnetResourceGroupName, 'Microsoft.Network/virtualNetworks', ciVnetName)
+    ciVnetName: ciVnetName
+    tags: {
+      product: 'Certigo'
+      managedBy: 'bicep'
+      scope: 'shared'
+    }
+  }
+}
+
+// Private endpoints consume the existing hub-zone ids directly. Per-environment
+// app VNet links are deployed separately in the hub resource group.
 module privateNetwork 'modules/privateNetwork.bicep' = {
   scope: rg
   name: 'privateNetwork'
@@ -237,7 +262,34 @@ module privateNetwork 'modules/privateNetwork.bicep' = {
     storageAccountName: storage.outputs.accountName
     keyVaultName: vault.outputs.name
     cosmosAccountName: data.outputs.accountName
+    ciVnetResourceGroupName: ciVnetResourceGroupName
+    ciVnetName: ciVnetName
+    blobZoneId: sharedPrivateDns.outputs.blobZoneId
+    queueZoneId: sharedPrivateDns.outputs.queueZoneId
+    tableZoneId: sharedPrivateDns.outputs.tableZoneId
+    vaultZoneId: sharedPrivateDns.outputs.vaultZoneId
+    cosmosZoneId: sharedPrivateDns.outputs.cosmosZoneId
     tags: tags
+  }
+}
+
+module privateDnsAppLinks 'modules/privateDnsAppLinks.bicep' = {
+  scope: resourceGroup(ciVnetResourceGroupName)
+  name: 'privateDnsLinks-${appName}-${env}'
+  params: {
+    appVnetId: privateNetwork.outputs.vnetId
+    appVnetName: privateNetwork.outputs.vnetName
+    tags: tags
+  }
+}
+
+module ciVnetPeering 'modules/ciVnetPeering.bicep' = {
+  scope: resourceGroup(ciVnetResourceGroupName)
+  name: 'peer-${appName}-${env}'
+  params: {
+    ciVnetName: ciVnetName
+    appVnetId: privateNetwork.outputs.vnetId
+    appVnetName: privateNetwork.outputs.vnetName
   }
 }
 
@@ -300,6 +352,9 @@ module api 'modules/functionApp.bicep' = {
     allowedCorsOrigins: env == 'dev' ? [ '*' ] : []
     tags: tags
   }
+  dependsOn: [
+    privateDnsAppLinks
+  ]
 }
 
 // Azure AI Services account for the LLM tutor. Brought under IaC to remove the
@@ -374,6 +429,9 @@ output functionAppName string = api.outputs.functionAppName
 output functionAppHostName string = api.outputs.defaultHostName
 output cosmosEndpoint string = data.outputs.endpoint
 output storageAccount string = storage.outputs.accountName
+output deploymentContainerName string = storage.outputs.deploymentContainerName
+output storageBlobEndpoint string = storage.outputs.primaryBlobEndpoint
+output privateDnsResourceGroup string = ciVnetResourceGroupName
 output keyVaultName string = vault.outputs.name
 output virtualNetworkId string = privateNetwork.outputs.vnetId
 output cosmosBackupMode string = cosmosBackupMode

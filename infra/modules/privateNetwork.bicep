@@ -21,6 +21,18 @@ param keyVaultName string
 @description('Cosmos DB for NoSQL account protected by a Sql private endpoint.')
 param cosmosAccountName string
 
+@description('Resource group containing the trusted CI runner virtual network.')
+param ciVnetResourceGroupName string
+
+@description('Trusted CI runner virtual network name.')
+param ciVnetName string
+
+param blobZoneId string
+param queueZoneId string
+param tableZoneId string
+param vaultZoneId string
+param cosmosZoneId string
+
 param tags object = {}
 
 resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
@@ -33,6 +45,11 @@ resource vault 'Microsoft.KeyVault/vaults@2024-04-01-preview' existing = {
 
 resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' existing = {
   name: cosmosAccountName
+}
+
+resource ciVnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  scope: resourceGroup(ciVnetResourceGroupName)
+  name: ciVnetName
 }
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
@@ -71,102 +88,16 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
   }
 }
 
-resource blobZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  #disable-next-line no-hardcoded-env-urls
-  name: 'privatelink.blob.core.windows.net'
-  location: 'global'
-  tags: tags
-}
-
-resource queueZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  #disable-next-line no-hardcoded-env-urls
-  name: 'privatelink.queue.core.windows.net'
-  location: 'global'
-  tags: tags
-}
-
-resource tableZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  #disable-next-line no-hardcoded-env-urls
-  name: 'privatelink.table.core.windows.net'
-  location: 'global'
-  tags: tags
-}
-
-resource vaultZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  #disable-next-line no-hardcoded-env-urls
-  name: 'privatelink.vaultcore.azure.net'
-  location: 'global'
-  tags: tags
-}
-
-resource cosmosZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  #disable-next-line no-hardcoded-env-urls
-  name: 'privatelink.documents.azure.com'
-  location: 'global'
-  tags: tags
-}
-
-resource blobZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  parent: blobZone
-  name: '${vnet.name}-link'
-  location: 'global'
-  tags: tags
+resource appToCiPeering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2024-05-01' = {
+  parent: vnet
+  name: 'peer-to-${ciVnetName}'
   properties: {
-    registrationEnabled: false
-    virtualNetwork: {
-      id: vnet.id
-    }
-  }
-}
-
-resource queueZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  parent: queueZone
-  name: '${vnet.name}-link'
-  location: 'global'
-  tags: tags
-  properties: {
-    registrationEnabled: false
-    virtualNetwork: {
-      id: vnet.id
-    }
-  }
-}
-
-resource tableZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  parent: tableZone
-  name: '${vnet.name}-link'
-  location: 'global'
-  tags: tags
-  properties: {
-    registrationEnabled: false
-    virtualNetwork: {
-      id: vnet.id
-    }
-  }
-}
-
-resource vaultZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  parent: vaultZone
-  name: '${vnet.name}-link'
-  location: 'global'
-  tags: tags
-  properties: {
-    registrationEnabled: false
-    virtualNetwork: {
-      id: vnet.id
-    }
-  }
-}
-
-resource cosmosZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  parent: cosmosZone
-  name: '${vnet.name}-link'
-  location: 'global'
-  tags: tags
-  properties: {
-    registrationEnabled: false
-    virtualNetwork: {
-      id: vnet.id
+    allowVirtualNetworkAccess: true
+    allowForwardedTraffic: false
+    allowGatewayTransit: false
+    useRemoteGateways: false
+    remoteVirtualNetwork: {
+      id: ciVnet.id
     }
   }
 }
@@ -193,24 +124,6 @@ resource storageBlobEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   }
 }
 
-resource storageBlobZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
-  parent: storageBlobEndpoint
-  name: 'default'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'blob'
-        properties: {
-          privateDnsZoneId: blobZone.id
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    blobZoneLink
-  ]
-}
-
 resource storageQueueEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: 'pep-${storageAccountName}-queue'
   location: location
@@ -231,24 +144,6 @@ resource storageQueueEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = 
       }
     ]
   }
-}
-
-resource storageQueueZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
-  parent: storageQueueEndpoint
-  name: 'default'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'queue'
-        properties: {
-          privateDnsZoneId: queueZone.id
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    queueZoneLink
-  ]
 }
 
 resource storageTableEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
@@ -273,24 +168,6 @@ resource storageTableEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = 
   }
 }
 
-resource storageTableZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
-  parent: storageTableEndpoint
-  name: 'default'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'table'
-        properties: {
-          privateDnsZoneId: tableZone.id
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    tableZoneLink
-  ]
-}
-
 resource vaultEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: 'pep-${keyVaultName}-vault'
   location: location
@@ -311,24 +188,6 @@ resource vaultEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
       }
     ]
   }
-}
-
-resource vaultZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
-  parent: vaultEndpoint
-  name: 'default'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'vault'
-        properties: {
-          privateDnsZoneId: vaultZone.id
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    vaultZoneLink
-  ]
 }
 
 resource cosmosEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
@@ -353,6 +212,66 @@ resource cosmosEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   }
 }
 
+resource storageBlobZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
+  parent: storageBlobEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'blob'
+        properties: {
+          privateDnsZoneId: blobZoneId
+        }
+      }
+    ]
+  }
+}
+
+resource storageQueueZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
+  parent: storageQueueEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'queue'
+        properties: {
+          privateDnsZoneId: queueZoneId
+        }
+      }
+    ]
+  }
+}
+
+resource storageTableZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
+  parent: storageTableEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'table'
+        properties: {
+          privateDnsZoneId: tableZoneId
+        }
+      }
+    ]
+  }
+}
+
+resource vaultZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
+  parent: vaultEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'vault'
+        properties: {
+          privateDnsZoneId: vaultZoneId
+        }
+      }
+    ]
+  }
+}
+
 resource cosmosZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
   parent: cosmosEndpoint
   name: 'default'
@@ -361,16 +280,14 @@ resource cosmosZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroup
       {
         name: 'sql'
         properties: {
-          privateDnsZoneId: cosmosZone.id
+          privateDnsZoneId: cosmosZoneId
         }
       }
     ]
   }
-  dependsOn: [
-    cosmosZoneLink
-  ]
 }
 
 output vnetId string = vnet.id
+output vnetName string = vnet.name
 output functionIntegrationSubnetId string = '${vnet.id}/subnets/snet-functions'
 output privateEndpointSubnetId string = '${vnet.id}/subnets/snet-private-endpoints'

@@ -16,6 +16,9 @@ param containerSoftDeleteDays int = 7
 @description('Enable blob versioning (recommended for prod).')
 param enableVersioning bool = false
 
+@description('Object id of the GitHub Actions OIDC service principal that uploads immutable deployment packages.')
+param ciDeploymentPrincipalId string
+
 resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
   name: accountName
   location: location
@@ -62,6 +65,69 @@ resource appPackage 'Microsoft.Storage/storageAccounts/blobServices/containers@2
   name: 'app-package'
   properties: {
     publicAccess: 'None'
+  }
+}
+
+resource deploymentRetention 'Microsoft.Storage/storageAccounts/managementPolicies@2024-01-01' = {
+  parent: storage
+  name: 'default'
+  properties: {
+    policy: {
+      rules: [
+        {
+          enabled: true
+          name: 'delete-expired-deployment-packages'
+          type: 'Lifecycle'
+          definition: {
+            actions: {
+              baseBlob: {
+                delete: {
+                  daysAfterModificationGreaterThan: 30
+                }
+              }
+            }
+            filters: {
+              blobTypes: [
+                'blockBlob'
+              ]
+              prefixMatch: [
+                'app-package/deployments/'
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+var storageBlobDataContributor = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+)
+
+var storageBlobDelegator = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  'db58b8e5-c6ad-4a2a-8342-4190687cbf4a'
+)
+
+resource ciDeploymentBlobAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: appPackage
+  name: guid(appPackage.id, ciDeploymentPrincipalId, storageBlobDataContributor)
+  properties: {
+    principalId: ciDeploymentPrincipalId
+    roleDefinitionId: storageBlobDataContributor
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource ciDeploymentDelegationAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: storage
+  name: guid(storage.id, ciDeploymentPrincipalId, storageBlobDelegator)
+  properties: {
+    principalId: ciDeploymentPrincipalId
+    roleDefinitionId: storageBlobDelegator
+    principalType: 'ServicePrincipal'
   }
 }
 
