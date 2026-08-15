@@ -23,6 +23,8 @@ jobs:
       EXPECTED_LOCKS_FILE: ${{ github.workspace }}/.scanner-state/expected-lockfiles.json
       UNTRUSTED_PUB_DIR: ${{ github.workspace }}/.untrusted-pub-restore
       PUB_CACHE: ${{ github.workspace }}/.scanner-state/pub-cache-${{ github.run_id }}-${{ github.run_attempt }}
+      FLUTTER_INSTALL_DIR: ${{ github.workspace }}/.scanner-state/flutter-sdk
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - name: Reset isolated dependency state
         run: |
@@ -59,20 +61,20 @@ jobs:
           path: .untrusted-pub-restore
           persist-credentials: false
 
-      - name: Configure pinned Flutter without shared caches
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          flutter-version: "3.44.4"
-          channel: stable
-          cache: false
+      - name: Install digest-verified Flutter without shared caches
+        shell: bash
+        run: |
+          bash "$TRUSTED_CONTROL_DIR/.github/scripts/install-verified-flutter.sh" \
+            "3.44.4" \
+            "$FLUTTER_INSTALL_DIR"
 
       - name: Resolve every Pub lock from trusted inventory
         shell: bash
         run: |
           set -euo pipefail
-          FLUTTER_EXECUTABLE="$(command -v flutter)"
-          if [ -z "$FLUTTER_EXECUTABLE" ]; then
-            echo "::error::Pinned Flutter executable is unavailable."
+          FLUTTER_EXECUTABLE="$FLUTTER_INSTALL_DIR/flutter/bin/flutter"
+          if [ ! -x "$FLUTTER_EXECUTABLE" ]; then
+            echo "::error::Digest-verified Flutter executable is unavailable."
             exit 1
           fi
           python -P "$TRUSTED_CONTROL_DIR/tools/verify_pub_locks.py" \
@@ -83,6 +85,15 @@ jobs:
 
       - name: Remove isolated Pub restore state
         run: /usr/bin/rm -rf -- "$UNTRUSTED_PUB_DIR" "$PUB_CACHE"
+
+      - name: Verify trusted controls remain immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$(git -C "$TRUSTED_CONTROL_DIR" status --porcelain --untracked-files=all)" ]; then
+            echo "::error::Pub resolution modified the immutable trusted-control checkout."
+            exit 1
+          fi
 
       - name: Download OSV-Scanner (v2.4.0, verified SHA256)
         run: |

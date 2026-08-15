@@ -16,7 +16,7 @@ Documentation opérationnelle pour publier les bêtas Certigo.
                     ┌─────────────────────────────────────────────────────┐
   repo dispatch ───▶│  GitHub Actions (runner self-hosted Linux)          │
   depuis main       │  release-android.yml                                │
-                    │   1. JDK 17 + SDK Android + Flutter 3.24.0           │
+                    │   1. JDK 17 + SDK Android + Flutter 3.44.4 vérifié  │
                     │   2. gates BLOQUANTS : flutter analyze + test        │
                     │   3. secrets via Key Vault / GitHub → key.properties │
                     │   4. flutter build appbundle (signé, versionné)      │
@@ -35,8 +35,10 @@ Documentation opérationnelle pour publier les bêtas Certigo.
 | Workflows | `release-android.yml` (actif), `release-ios.yml` + `sync-ios-certs.yml` (legacy, opt-in par types `repository_dispatch` dédiés) ; iOS actif géré par Codemagic |
 | CI inchangée | `ci-mobile.yml` (format/analyze/test) — aucune régression |
 
-Les workflows GitHub de release désactivent explicitement les caches Flutter/Pub :
-un cache produit par une analyse de PR ne peut jamais entrer dans une build signée.
+Les workflows GitHub de release n'utilisent aucune action de cache Flutter/Pub. Ils téléchargent
+Flutter dans un répertoire neuf, vérifient le SHA-256 figé de l'archive avant exécution, utilisent
+un `PUB_CACHE` propre au run et suppriment SDK/cache pendant le nettoyage. Un SDK ou cache produit
+par une analyse de PR ne peut donc jamais entrer dans une build signée.
 
 > ⚠️ **`com.certigo.mobileapp` est l'identifiant unifié** (Android `applicationId`
 > = iOS bundle id). Il est définitif une fois la première build store uploadée.
@@ -195,10 +197,10 @@ inline (`prod` pour `ios-release`, `dev` pour `ios-release-dry`).
 
 ### 3.1 Pré-requis du runner self-hosted
 
-Le runner `certigo-trusted` (Linux X64) doit disposer de Flutter/Dart (déjà requis
-par la CI). Le workflow installe lui-même **JDK 17** et le **SDK Android**
-(`android-actions/setup-android` + `sdkmanager`), donc aucune action manuelle
-supplémentaire n'est nécessaire. L'egress internet passe par la NAT Gateway
+Le runner `certigo-trusted` (Linux X64) ne réutilise aucun Flutter/Dart préinstallé : le workflow
+installe un SDK Flutter neuf dont l'archive est contrôlée par SHA-256. Il installe aussi
+**JDK 17** et le **SDK Android** (`android-actions/setup-android` + `sdkmanager`), donc aucune
+action manuelle supplémentaire n'est nécessaire. L'egress internet passe par la NAT Gateway
 `certigo-trusted` (voir le runbook CI).
 
 ### 3.2 Générer le keystore upload (one-time, en local)

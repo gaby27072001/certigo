@@ -55,11 +55,19 @@ jobs:
         with:
           sdk: "3.6.0"
 
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          flutter-version: "3.27.4"
-          channel: stable
-          cache: false
+      - name: Install digest-verified Flutter without shared caches
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLUTTER_INSTALL_DIR="$RUNNER_TEMP/certigo-flutter-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          PUB_CACHE="$RUNNER_TEMP/certigo-pub-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          rm -rf -- "$PUB_CACHE"
+          mkdir -p -- "$PUB_CACHE"
+          echo "FLUTTER_INSTALL_DIR=$FLUTTER_INSTALL_DIR" >> "$GITHUB_ENV"
+          echo "PUB_CACHE=$PUB_CACHE" >> "$GITHUB_ENV"
+          bash .github/scripts/install-verified-flutter.sh \
+            "3.44.4" \
+            "$FLUTTER_INSTALL_DIR"
 
       - name: Install verified Bicep CLI
         shell: bash
@@ -81,3 +89,10 @@ jobs:
         env:
           MIN_FREE_GB: "10"
         run: bash infra/ci-runner/health-probe.sh
+
+      - name: Remove isolated Flutter state
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          [ -z "${FLUTTER_INSTALL_DIR:-}" ] || rm -rf -- "$FLUTTER_INSTALL_DIR"
+          [ -z "${PUB_CACHE:-}" ] || rm -rf -- "$PUB_CACHE"

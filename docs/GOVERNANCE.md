@@ -88,16 +88,21 @@ Le même inventaire exige exactement un `package-lock.json` adjacent à chaque `
 et locks symboliques sont interdits. Le lock npm v3 doit reproduire les dépendances racine du
 manifest, tandis que les locks pub doivent conserver leur structure générée `packages`/`sdks`.
 La validation statique exporte en JSON la liste triée de tous les `pubspec.yaml` inclus. Sur
-`certigo-pr` uniquement, la gate installe Flutter épinglé sans cache partagé, exécute
-`flutter pub get --enforce-lockfile` pour chaque entrée avec un `PUB_CACHE` temporaire isolé,
-puis exige à la fois des locks identiques octet par octet et un `git diff` vide avant OSV.
+`certigo-pr` uniquement, la gate télécharge Flutter dans un répertoire neuf, vérifie le SHA-256
+figé de l'archive avant toute exécution, puis lance `flutter pub get --enforce-lockfile` pour
+chaque entrée avec un `PUB_CACHE` temporaire isolé. Elle exige ensuite des locks identiques octet
+par octet, un `git diff` vide et un checkout trusted-base inchangé avant OSV, puis supprime SDK,
+cache et source de restauration.
 La CI utilise exclusivement `npm ci` et `dart/flutter pub get --enforce-lockfile`. Toute
 régénération npm/pub s'effectue seulement dans un environnement de développement de confiance,
 puis `python tools/validate_dependency_locks.py --root .` doit réussir avant commit.
 
-Les releases Android/iOS et toute autre exécution `certigo-trusted` désactivent explicitement les
-caches Flutter/Pub. Une PR exécutée via `pull_request_target` sur `certigo-pr` ne peut donc pas
-alimenter un cache ensuite restauré par une opération de signature ou de publication.
+Les releases Android/iOS et toute autre exécution `certigo-trusted` interdisent les actions de
+cache ainsi que toute entrée `cache`/`pub-cache` autre que le booléen littéral `false`. Les
+workflows mobiles téléchargent Flutter dans un répertoire neuf, vérifient le SHA-256 figé de
+l'archive, utilisent un `PUB_CACHE` propre au run et suppriment ces deux répertoires en fin de job.
+Une PR exécutée via `pull_request_target` sur `certigo-pr` ne peut donc alimenter ni SDK ni cache
+ensuite restauré par une opération de signature ou de publication.
 
 La gate `Generated state equals committed state` n'accède à aucun dépôt externe et ne reçoit
 aucun secret. Le générateur du SHA immuable de base valide la référence locale

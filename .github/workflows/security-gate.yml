@@ -62,6 +62,7 @@ jobs:
               - '.github/osv-scanner.toml'
               - '.github/workflows/dependency-vuln-scan.yml'
               - '.github/workflows/security-gate.yml'
+              - '.github/scripts/install-verified-flutter.sh'
               - 'tools/validate_nuget_locks.py'
               - 'tools/validate_dependency_locks.py'
               - 'tools/verify_pub_locks.py'

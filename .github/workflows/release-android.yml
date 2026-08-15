@@ -73,12 +73,19 @@ jobs:
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" >/dev/null
 
-      - name: Configurer Flutter ${{ env.FLUTTER_VERSION }}
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: false
+      - name: Installer Flutter vérifié ${{ env.FLUTTER_VERSION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLUTTER_INSTALL_DIR="$RUNNER_TEMP/certigo-flutter-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          PUB_CACHE="$RUNNER_TEMP/certigo-pub-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          rm -rf -- "$PUB_CACHE"
+          mkdir -p -- "$PUB_CACHE"
+          echo "FLUTTER_INSTALL_DIR=$FLUTTER_INSTALL_DIR" >> "$GITHUB_ENV"
+          echo "PUB_CACHE=$PUB_CACHE" >> "$GITHUB_ENV"
+          bash .github/scripts/install-verified-flutter.sh \
+            "$FLUTTER_VERSION" \
+            "$FLUTTER_INSTALL_DIR"
 
       - name: Résoudre la version (name + build number + track)
         id: ver
@@ -374,5 +381,7 @@ jobs:
         run: |
           rm -f apps/mobile/android/app/upload-keystore.jks apps/mobile/android/key.properties
           rm -f "$RUNNER_TEMP/play-sa.json" 2>/dev/null || true
+          [ -z "${FLUTTER_INSTALL_DIR:-}" ] || rm -rf -- "$FLUTTER_INSTALL_DIR"
+          [ -z "${PUB_CACHE:-}" ] || rm -rf -- "$PUB_CACHE"
           az logout --output none 2>/dev/null || true
           echo "Matériel de signature supprimé du workspace du runner self-hosted."
