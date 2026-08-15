@@ -661,9 +661,11 @@ class ProjectStateTests(unittest.TestCase):
             )
             self.assertNotRegex(
                 workflow,
-                r"(?m)^\s+cache:\s*['\"]?true['\"]?\s*$",
-                f"{workflow_path.name} must not restore PR-writable caches",
+                r"(?m)^\s+(?:cache|pub-cache):\s*(?!false\s*$).+$",
+                f"{workflow_path.name} must not enable or dynamically select caches",
             )
+            self.assertNotIn("actions/cache@", workflow)
+            self.assertNotIn("subosito/flutter-action@", workflow)
             if "\n  push:" in workflow:
                 self.assertIn(
                     "\n    branches:",
@@ -696,9 +698,25 @@ class ProjectStateTests(unittest.TestCase):
         self.assertNotIn("refs/tags/", android)
         self.assertIn('has("dry_run")', android)
         self.assertIn('has("track")', android)
-        self.assertIn("cache: false", android)
+        self.assertIn("install-verified-flutter.sh", android)
+        self.assertNotIn("subosito/flutter-action@", android)
         ios = (workflows / "release-ios.yml").read_text(encoding="utf-8")
-        self.assertIn("cache: false", ios)
+        self.assertIn("install-verified-flutter.sh", ios)
+        self.assertNotIn("subosito/flutter-action@", ios)
+
+        installer = (
+            REPO_ROOT / ".github/scripts/install-verified-flutter.sh"
+        ).read_text(encoding="utf-8")
+        for digest in [
+            "c853cda0312a162854c481fe6a1bc286d84fbb74bfab7037c39750061dc9b466",
+            "32bca4386121042e827ff2d90edbd7c7fb47c514fc04d5a87db6e3202dafde5d",
+            "eac833fe956c670d1f27946f25de8bc4fe4fb86146d5ef8d53e79a971a3ba042",
+        ]:
+            self.assertIn(digest, installer)
+        self.assertIn("sha256sum --check --strict", installer)
+        self.assertIn("shasum -a 256", installer)
+        self.assertNotIn("releases_linux.json", installer)
+        self.assertNotIn("releases_macos.json", installer)
 
     def test_security_scanners_are_independent_from_artifact_storage(self) -> None:
         expected_markers = {
@@ -712,11 +730,14 @@ class ProjectStateTests(unittest.TestCase):
                 '--write-expected-sources "$EXPECTED_LOCKS_FILE"',
                 "path: .untrusted-pub-restore",
                 "name: Reset isolated dependency state",
-                "cache: false",
+                "name: Install digest-verified Flutter without shared caches",
+                'bash "$TRUSTED_CONTROL_DIR/.github/scripts/install-verified-flutter.sh"',
                 'python -P "$TRUSTED_CONTROL_DIR/tools/verify_pub_locks.py"',
                 '--root "$UNTRUSTED_PUB_DIR"',
                 '--contract "$EXPECTED_LOCKS_FILE"',
                 '--pub-cache "$PUB_CACHE"',
+                'FLUTTER_EXECUTABLE="$FLUTTER_INSTALL_DIR/flutter/bin/flutter"',
+                "name: Verify trusted controls remain immutable",
                 '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
                 '--output-file "$output_temp"',
                 'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',

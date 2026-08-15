@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateTrustedCachePolicy } from './workflow-security-cache-policy.mjs';
 
 const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -162,12 +163,7 @@ function validateWorkflow(file) {
   if (text.includes('certigo-ci')) {
     errors.push(`${file}: legacy mixed-trust runner label certigo-ci is forbidden`);
   }
-  if (
-    hasTrustedJob
-    && /^\s+cache:\s*['"]?true['"]?\s*$/m.test(text)
-  ) {
-    errors.push(`${file}: certigo-trusted workflows must not restore writable caches`);
-  }
+  errors.push(...validateTrustedCachePolicy(text, file));
   if (hasTrustedJob && /^ {2}workflow_dispatch:/m.test(text)) {
     errors.push(`${file}: certigo-trusted workflows must not use workflow_dispatch`);
   }
@@ -362,6 +358,10 @@ function validateRepositoryInvariants() {
   );
   const pubLockVerifier = fs.readFileSync(
     path.join(root, 'tools', 'verify_pub_locks.py'),
+    'utf8',
+  );
+  const flutterInstaller = fs.readFileSync(
+    path.join(root, '.github', 'scripts', 'install-verified-flutter.sh'),
     'utf8',
   );
   const secureBicepWriter = fs.readFileSync(
@@ -633,6 +633,7 @@ function validateRepositoryInvariants() {
     "'tools/validate_nuget_locks.py'",
     "'tools/validate_dependency_locks.py'",
     "'tools/verify_pub_locks.py'",
+    "'.github/scripts/install-verified-flutter.sh'",
     "'tools/tests/test_validate_nuget_locks.py'",
     "'tools/tests/test_validate_dependency_locks.py'",
     "'tools/tests/test_verify_pub_locks.py'",
@@ -688,12 +689,16 @@ function validateRepositoryInvariants() {
     'path: .untrusted-pub-restore',
     'name: Reset isolated dependency state',
     '/usr/bin/rm -rf -- "$SCANNER_STATE_DIR" "$UNTRUSTED_PUB_DIR"',
-    'cache: false',
+    'name: Install digest-verified Flutter without shared caches',
+    'bash "$TRUSTED_CONTROL_DIR/.github/scripts/install-verified-flutter.sh"',
     'python -P "$TRUSTED_CONTROL_DIR/tools/verify_pub_locks.py"',
     '--root "$UNTRUSTED_PUB_DIR"',
     '--contract "$EXPECTED_LOCKS_FILE"',
     '--flutter "$FLUTTER_EXECUTABLE"',
     '--pub-cache "$PUB_CACHE"',
+    'FLUTTER_EXECUTABLE="$FLUTTER_INSTALL_DIR/flutter/bin/flutter"',
+    'name: Verify trusted controls remain immutable',
+    'git -C "$TRUSTED_CONTROL_DIR" status --porcelain --untracked-files=all',
     '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
     '--output-file "$output_temp"',
     'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
@@ -790,6 +795,38 @@ function validateRepositoryInvariants() {
   if (dependencyScan.includes('secrets.')) {
     errors.push('dependency-vuln-scan.yml: dependency jobs must not receive secrets');
   }
+  for (const forbiddenCacheSurface of [
+    'actions/cache@',
+    'subosito/flutter-action@',
+    'command -v flutter',
+  ]) {
+    if (dependencyScan.includes(forbiddenCacheSurface)) {
+      errors.push(
+        `dependency-vuln-scan.yml: forbidden shared Flutter/cache surface `
+        + forbiddenCacheSurface,
+      );
+    }
+  }
+  for (const marker of [
+    'https://storage.googleapis.com/flutter_infra_release/releases/$archive',
+    'sha256sum --check --strict',
+    'shasum -a 256',
+    'c853cda0312a162854c481fe6a1bc286d84fbb74bfab7037c39750061dc9b466',
+    '32bca4386121042e827ff2d90edbd7c7fb47c514fc04d5a87db6e3202dafde5d',
+    'eac833fe956c670d1f27946f25de8bc4fe4fb86146d5ef8d53e79a971a3ba042',
+  ]) {
+    if (!flutterInstaller.includes(marker)) {
+      errors.push(`install-verified-flutter.sh: missing immutable SDK invariant ${marker}`);
+    }
+  }
+  for (const mutableManifest of ['releases_linux.json', 'releases_macos.json']) {
+    if (flutterInstaller.includes(mutableManifest)) {
+      errors.push(
+        `install-verified-flutter.sh: runtime release manifest is forbidden: `
+        + mutableManifest,
+      );
+    }
+  }
   const restoreJob = dependencyScan.indexOf('  locked-restore:');
   const untrustedRestore = dependencyScan.indexOf('path: .untrusted-restore', restoreJob);
   const lockedRestore = dependencyScan.indexOf('--locked-mode', untrustedRestore);
@@ -810,7 +847,7 @@ function validateRepositoryInvariants() {
   );
   const pubCheckout = dependencyScan.indexOf('path: .untrusted-pub-restore', staticValidation);
   const flutterSetup = dependencyScan.indexOf(
-    'subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2',
+    'name: Install digest-verified Flutter without shared caches',
     pubCheckout,
   );
   const pubRestore = dependencyScan.indexOf(
@@ -821,14 +858,22 @@ function validateRepositoryInvariants() {
     'name: Remove isolated Pub restore state',
     pubRestore,
   );
-  const osvScan = dependencyScan.indexOf('name: Run and enforce OSV-Scanner', pubCleanup);
+  const immutableControlCheck = dependencyScan.indexOf(
+    'name: Verify trusted controls remain immutable',
+    pubCleanup,
+  );
+  const osvScan = dependencyScan.indexOf(
+    'name: Run and enforce OSV-Scanner',
+    immutableControlCheck,
+  );
   if (
     staticValidation < 0
     || pubCheckout < staticValidation
     || flutterSetup < pubCheckout
     || pubRestore < flutterSetup
     || pubCleanup < pubRestore
-    || osvScan < pubCleanup
+    || immutableControlCheck < pubCleanup
+    || osvScan < immutableControlCheck
   ) {
     errors.push('dependency-vuln-scan.yml: Pub lock restore order is unsafe');
   }
