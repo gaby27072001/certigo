@@ -59,6 +59,8 @@ jobs:
               - '**/package-lock.json'
               - '**/npm-shrinkwrap.json'
               - 'global.json'
+              - '.github/osv-scanner.toml'
+              - '.github/nuget-scanner.config'
               - '.github/workflows/dependency-vuln-scan.yml'
               - '.github/workflows/nuget-vuln-scan.yml'
               - '.github/workflows/security-gate.yml'

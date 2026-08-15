@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "project_state.py"
-REPO_ROOT = MODULE_PATH.parents[1]
+REPO_ROOT = Path(os.environ.get("CERTIGO_WORKSPACE", MODULE_PATH.parents[1])).resolve()
 SPEC = importlib.util.spec_from_file_location("project_state", MODULE_PATH)
 assert SPEC and SPEC.loader
 project_state = importlib.util.module_from_spec(SPEC)
@@ -505,6 +505,23 @@ class ProjectStateTests(unittest.TestCase):
         expected = f"sha256:{hashlib.sha256(canonical).hexdigest()}"
         self.assertEqual(expected, project_state._canonical_manifest_id(manifest))
 
+    def test_manifest_reference_rejects_paths_outside_active_content(self) -> None:
+        reference_path = self.root / project_state.ACTIVE_CONTENT_REFERENCE_FILE
+        reference = json.loads(reference_path.read_text(encoding="utf-8"))
+        reference["manifests"]["public"]["path"] = "../manifest.json"
+        reference_path.write_text(json.dumps(reference), encoding="utf-8")
+        with self.assertRaisesRegex(
+            project_state.ProjectStateError, "expected a manifest.json path"
+        ):
+            project_state.load_active_content_reference(self.root)
+
+    def test_cli_uses_explicit_repository_root(self) -> None:
+        project_state.update(self.root, check=False)
+        self.assertEqual(
+            0,
+            project_state.main(["--root", str(self.root), "--check"]),
+        )
+
     def test_project_state_workflow_and_branch_protection_contract(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/ci-project-state.yml").read_text(
             encoding="utf-8"
@@ -532,6 +549,21 @@ class ProjectStateTests(unittest.TestCase):
             "github.event.pull_request.head.sha || github.sha }}",
             workflow,
         )
+        self.assertIn(
+            "ref: ${{ github.event_name == 'pull_request_target' && "
+            "github.event.pull_request.base.sha || github.sha }}",
+            workflow,
+        )
+        self.assertIn("path: .untrusted-source", workflow)
+        self.assertIn("path: .trusted-control", workflow)
+        self.assertIn("validate-source:", workflow)
+        self.assertIn("needs: validate-source", workflow)
+        source_job = workflow[
+            workflow.index("  validate-source:") : workflow.index(
+                "  validate:\n", workflow.index("  validate-source:")
+            )
+        ]
+        self.assertNotIn("secrets.", source_job)
         self.assertNotIn("-latest", workflow)
         self.assertIn('node-version: "20.20.2"', workflow)
         self.assertIn("persist-credentials: false", workflow)
@@ -559,7 +591,20 @@ class ProjectStateTests(unittest.TestCase):
         self.assertNotIn("token: ${{", workflow)
         self.assertIn("npm ci", workflow)
         self.assertIn("npm run package", workflow)
-        self.assertIn("--validate-active-content .active-content", workflow)
+        self.assertIn(
+            'python -P tools/project_state.py --root "$PROJECT_WORKSPACE" --check',
+            workflow,
+        )
+        self.assertIn('--validate-active-content "$ACTIVE_CONTENT_DIR"', workflow)
+        key_index = workflow.index(
+            "ssh-key: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}"
+        )
+        trusted_validation_index = workflow.index(
+            '--validate-active-content "$ACTIVE_CONTENT_DIR"'
+        )
+        self.assertGreater(trusted_validation_index, key_index)
+        self.assertNotIn("python tools/", workflow[key_index:])
+        self.assertNotIn("node tools/", workflow[key_index:])
 
         protection = json.loads(
             (REPO_ROOT / ".github/branch-protection-main.json").read_text(
@@ -587,6 +632,19 @@ class ProjectStateTests(unittest.TestCase):
         self.assertIn("- '.github/scripts/**/*.mjs'", workflow)
         self.assertNotIn("actions/upload-artifact@", workflow)
         self.assertIn("upload: always", workflow)
+        self.assertIn("source-root: .untrusted-source", workflow)
+        self.assertIn(
+            "config-file: ./.trusted-control/.github/codeql/codeql-config.yml",
+            workflow,
+        )
+        self.assertIn(
+            'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-codeql-sarif.mjs"',
+            workflow,
+        )
+        self.assertNotIn(
+            "run: node .github/scripts/enforce-codeql-sarif.mjs",
+            workflow,
+        )
         enforcer = (
             REPO_ROOT / ".github/scripts/enforce-codeql-sarif.mjs"
         ).read_text(encoding="utf-8")
@@ -597,18 +655,24 @@ class ProjectStateTests(unittest.TestCase):
             "dependency-vuln-scan.yml": [
                 "OSV-Scanner output is missing or malformed.",
                 "--format=json",
+                '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
                 '--output-file "$output_temp"',
-                "node .github/scripts/enforce-osv-json.mjs osv-results.json 2> osv-enforce.log",
+                'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
+                '"$OSV_RESULTS_FILE" 2> "$OSV_ENFORCE_LOG"',
                 "finding_count",
             ],
             "nuget-vuln-scan.yml": [
                 "NuGet vulnerability scan output is missing or malformed.",
                 "has no vulnerable packages|has the following vulnerable",
+                '--configfile "$TRUSTED_CONTROL_DIR/.github/nuget-scanner.config"',
+                '"$UNTRUSTED_SOURCE_DIR/backend/Certigo.sln"',
                 "scan_status",
             ],
             "security-scan.yml": [
                 "Checkov output is missing or malformed.",
                 "Passed checks: [0-9]+, Failed checks: [0-9]+",
+                '--directory "$UNTRUSTED_SOURCE_DIR/infra"',
+                '--config-file "$TRUSTED_CONTROL_DIR/.checkov.yaml"',
                 "failed_checks",
             ],
         }
@@ -620,6 +684,18 @@ class ProjectStateTests(unittest.TestCase):
                 self.assertNotIn("actions/upload-artifact@", workflow)
                 self.assertNotIn("continue-on-error: true", workflow)
                 self.assertIn("$GITHUB_STEP_SUMMARY", workflow)
+                self.assertIn(
+                    "environment: ${{ github.event_name == 'pull_request_target' "
+                    "&& 'pr-ci' || '' }}",
+                    workflow,
+                )
+                self.assertIn(
+                    "ref: ${{ github.event_name == 'pull_request_target' && "
+                    "github.event.pull_request.base.sha || github.sha }}",
+                    workflow,
+                )
+                self.assertIn("path: .untrusted-source", workflow)
+                self.assertIn("path: .trusted-control", workflow)
                 for marker in markers:
                     self.assertIn(marker, workflow)
 

@@ -59,7 +59,10 @@ rapports automatisés sans impact démontré.
   **Microsoft Defender for Cloud**. CodeQL transmet son SARIF à Code Scanning et
   publie aussi une synthèse locale ; OSV, NuGet et Checkov publient leurs résultats
   structurés non secrets dans les logs immutables et le résumé du job, sans dépendre
-  du quota d'artefacts.
+  du quota d'artefacts. Les contrôleurs et configurations CodeQL, OSV, NuGet, Checkov
+  et project-state sont toujours exécutés depuis le SHA immuable de base, séparément
+  des sources de PR analysées. Les scans pouvant interpréter les fichiers de la PR
+  restent protégés par l'environnement `pr-ci`.
 - `.github/dependabot.yml` propose uniquement des mises à jour de versions ; ce
   service n'est pas une gate de sécurité.
 

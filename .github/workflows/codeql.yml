@@ -57,6 +57,7 @@ jobs:
               - 'tools/**/*.py'
             workflow:
               - '.github/workflows/codeql.yml'
+              - '.github/codeql/codeql-config.yml'
       - name: Build minimal language matrix
         id: matrix
         shell: bash
@@ -95,13 +96,16 @@ jobs:
     name: Analyze (${{ matrix.language }})
     needs: changes
     if: ${{ needs.changes.outputs.has_changes == 'true' }}
+    environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}
     runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions:
       actions: read
       contents: read
       security-events: write
     env:
-      CODEQL_RESULTS_DIR: codeql-results/${{ matrix.language }}
+      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+      TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
+      CODEQL_RESULTS_DIR: ${{ github.workspace }}/.codeql-results/${{ matrix.language }}
       CODEQL_BLOCKING_SECURITY_SEVERITY: "7.0"
     strategy:
       fail-fast: false
@@ -110,6 +114,14 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          path: .untrusted-source
+          persist-credentials: false
+
+      - name: Checkout immutable trusted controls
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}
+          path: .trusted-control
           persist-credentials: false
 
       - name: Initialize CodeQL
@@ -118,6 +130,8 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-and-quality
+          source-root: .untrusted-source
+          config-file: ./.trusted-control/.github/codeql/codeql-config.yml
 
       - name: Perform CodeQL analysis
         id: codeql-analysis
@@ -126,10 +140,11 @@ jobs:
           category: "/language:${{ matrix.language }}"
           output: ${{ env.CODEQL_RESULTS_DIR }}
           upload: always
+          checkout_path: ${{ env.UNTRUSTED_SOURCE_DIR }}
 
       - name: Enforce CodeQL severity threshold
         if: ${{ always() }}
-        run: node .github/scripts/enforce-codeql-sarif.mjs "$CODEQL_RESULTS_DIR"
+        run: node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-codeql-sarif.mjs" "$CODEQL_RESULTS_DIR"
 
   security-gate:
     name: CodeQL / Security gate

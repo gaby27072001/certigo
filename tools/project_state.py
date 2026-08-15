@@ -96,7 +96,7 @@ class ProjectState:
 
 
 def _read(root: Path, relative: str | Path) -> str:
-    path = root / relative
+    path = _path_within(root, relative)
     try:
         return path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -104,11 +104,25 @@ def _read(root: Path, relative: str | Path) -> str:
 
 
 def _read_bytes(root: Path, relative: str | Path) -> bytes:
-    path = root / relative
+    path = _path_within(root, relative)
     try:
         return path.read_bytes()
     except OSError as exc:
         raise ProjectStateError(f"Cannot read canonical source {relative}: {exc}") from exc
+
+
+def _path_within(root: Path, relative: str | Path) -> Path:
+    relative_path = Path(relative)
+    if relative_path.is_absolute():
+        raise ProjectStateError(f"Canonical source path must be relative: {relative}.")
+    try:
+        canonical_root = root.resolve(strict=True)
+        candidate = (canonical_root / relative_path).resolve(strict=True)
+    except OSError as exc:
+        raise ProjectStateError(f"Cannot resolve canonical source {relative}: {exc}") from exc
+    if not candidate.is_relative_to(canonical_root):
+        raise ProjectStateError(f"Canonical source escapes its repository root: {relative}.")
+    return candidate
 
 
 def _one(pattern: str, text: str, source: str, flags: int = 0) -> str:
@@ -322,7 +336,9 @@ def _manifest_reference(
     manifest_id = value["manifestId"]
     file_count = value["fileCount"]
     file_sha256 = value["fileSha256"]
-    if not isinstance(path, str) or not path.endswith("/manifest.json"):
+    if not isinstance(path, str) or not re.fullmatch(
+        r"(?:(?!\.{1,2}/)[A-Za-z0-9._-]+/)+manifest\.json", path
+    ):
         raise ProjectStateError(f"{source}.path: expected a manifest.json path.")
     if channel != expected_channel or artifact != expected_artifact:
         raise ProjectStateError(
@@ -851,9 +867,18 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="validate a packaged certigo-content checkout against the active reference",
     )
+    parser.add_argument(
+        "--root",
+        metavar="PATH",
+        type=Path,
+        default=Path(__file__).resolve().parents[1],
+        help="repository workspace to inspect (defaults to this script's repository)",
+    )
     args = parser.parse_args(argv)
-    root = Path(__file__).resolve().parents[1]
     try:
+        root = args.root.resolve(strict=True)
+        if not root.is_dir():
+            raise ProjectStateError(f"Repository root is not a directory: {root}.")
         if args.validate_active_content:
             validate_active_content_repository(root, args.validate_active_content.resolve())
             print("Active content reference is current.")

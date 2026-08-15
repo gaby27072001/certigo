@@ -4,7 +4,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+function workspaceRoot(argv) {
+  if (argv.length === 0) {
+    return controlRoot;
+  }
+  if (argv.length !== 2 || argv[0] !== '--workspace') {
+    throw new Error('Usage: validate-workflow-security.mjs [--workspace <repository-root>]');
+  }
+  const workspace = fs.realpathSync(argv[1]);
+  if (!fs.statSync(workspace).isDirectory()) {
+    throw new Error(`Workflow workspace is not a directory: ${workspace}`);
+  }
+  return workspace;
+}
+
+const root = workspaceRoot(process.argv.slice(2));
 const workflowsDir = path.join(root, '.github', 'workflows');
 const shaPattern = /^[0-9a-f]{40}$/;
 const versionPattern = /^v[0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z.-]+)?$/;
@@ -304,6 +320,9 @@ function validateRepositoryInvariants() {
     azureLinuxRunner,
     "github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository",
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
+    "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
+    'path: .untrusted-source',
+    'path: .trusted-control',
     "- '.github/scripts/**/*.js'",
     "- '.github/scripts/**/*.mjs'",
   ]) {
@@ -316,8 +335,11 @@ function validateRepositoryInvariants() {
     'output: ${{ env.CODEQL_RESULTS_DIR }}',
     'upload: always',
     'security-events: write',
+    'source-root: .untrusted-source',
+    'config-file: ./.trusted-control/.github/codeql/codeql-config.yml',
+    'checkout_path: ${{ env.UNTRUSTED_SOURCE_DIR }}',
     'name: Enforce CodeQL severity threshold',
-    'node .github/scripts/enforce-codeql-sarif.mjs "$CODEQL_RESULTS_DIR"',
+    'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-codeql-sarif.mjs" "$CODEQL_RESULTS_DIR"',
   ]) {
     if (!codeql.includes(marker)) {
       errors.push(`codeql.yml: missing SARIF enforcement invariant ${marker}`);
@@ -345,15 +367,33 @@ function validateRepositoryInvariants() {
     azureLinuxRunner,
     'github.event.pull_request.head.repo.full_name == github.repository',
     'ref: ${{ github.event.pull_request.head.sha }}',
+    'ref: ${{ github.event.pull_request.base.sha }}',
+    'path: .untrusted-source',
+    'path: .trusted-control',
+    'node "$TRUSTED_CONTROL_DIR/.github/scripts/validate-workflow-security.mjs"',
+    '--workspace "$UNTRUSTED_SOURCE_DIR"',
   ]) {
     if (!lint.includes(marker)) {
       errors.push(`lint-workflows.yml: missing trusted Azure PR invariant ${marker}`);
     }
   }
-  if (!lint.includes('node --test .github/scripts/*.test.mjs')) {
+  if (
+    !lint.includes('working-directory: .trusted-control') ||
+    !lint.includes('node --test .github/scripts/*.test.mjs')
+  ) {
     errors.push('lint-workflows.yml: workflow security script tests are not enforced');
   }
   for (const marker of [
+    'validate-source:',
+    'name: Validate project-state source',
+    'needs: validate-source',
+    'name: Generated state equals committed state',
+    "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
+    "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
+    'path: .untrusted-source',
+    'path: .trusted-control',
+    'python -P -m unittest discover -s tools/tests',
+    'python -P tools/project_state.py --root "$PROJECT_WORKSPACE" --check',
     'CONTENT_DEPLOY_KEY: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}',
     'if [ -z "${CONTENT_DEPLOY_KEY//[[:space:]]/}" ]',
     'ssh-key: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}',
@@ -362,10 +402,36 @@ function validateRepositoryInvariants() {
     'github.com ssh-ed25519 ',
     'github.com ecdsa-sha2-nistp256 ',
     'github.com ssh-rsa ',
+    'working-directory: .trusted-control',
+    '--root "$PROJECT_WORKSPACE"',
+    '--validate-active-content "$ACTIVE_CONTENT_DIR"',
   ]) {
     if (!projectState.includes(marker)) {
       errors.push(`ci-project-state.yml: missing strict deploy-key invariant ${marker}`);
     }
+  }
+  const sourceJobStart = projectState.indexOf('  validate-source:');
+  const contentJobStart = projectState.indexOf('  validate:\n', sourceJobStart);
+  const deployKeyStep = projectState.indexOf('ssh-key: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}');
+  const trustedContentValidation = projectState.indexOf(
+    '--validate-active-content "$ACTIVE_CONTENT_DIR"',
+  );
+  if (
+    sourceJobStart < 0
+    || contentJobStart < 0
+    || projectState.slice(sourceJobStart, contentJobStart).includes('secrets.')
+  ) {
+    errors.push('ci-project-state.yml: secret-free source validation job is not isolated');
+  }
+  if (
+    deployKeyStep < contentJobStart
+    || trustedContentValidation < deployKeyStep
+    || projectState.slice(deployKeyStep).includes('python tools/')
+    || projectState.slice(deployKeyStep).includes('node tools/')
+  ) {
+    errors.push(
+      'ci-project-state.yml: only immutable trusted-control code may run after deploy-key installation',
+    );
   }
   for (const forbiddenMarker of [
     'CERTIGO_CONTENT_APP_ID',
@@ -415,8 +481,22 @@ function validateRepositoryInvariants() {
     if (!workflow.includes(azureLinuxRunner)) {
       errors.push(`${fileName}: scanner must use the fixed Azure self-hosted pool`);
     }
-    if (workflow.includes('environment:')) {
-      errors.push(`${fileName}: reusable scanners must not select deployment environments`);
+    if (
+      !workflow.includes(
+        "environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}",
+      )
+    ) {
+      errors.push(`${fileName}: reusable scanner must require pr-ci for PR execution`);
+    }
+    for (const marker of [
+      "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
+      "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
+      'path: .untrusted-source',
+      'path: .trusted-control',
+    ]) {
+      if (!workflow.includes(marker)) {
+        errors.push(`${fileName}: missing trusted-base scanner invariant ${marker}`);
+      }
     }
     if (workflow.includes('actions/upload-artifact@')) {
       errors.push(`${fileName}: scanner result must not depend on artifact storage`);
@@ -437,8 +517,13 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'OSV-Scanner output is missing or malformed.',
     '--format=json',
+    '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
     '--output-file "$output_temp"',
-    'node .github/scripts/enforce-osv-json.mjs osv-results.json 2> osv-enforce.log',
+    'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
+    '"$OSV_RESULTS_FILE" 2> "$OSV_ENFORCE_LOG"',
+    'path: .untrusted-source',
+    'path: .trusted-control',
+    "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
     'finding_count',
   ]) {
     if (!dependencyScan.includes(marker)) {
@@ -459,6 +544,8 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'NuGet vulnerability scan output is missing or malformed.',
     'has no vulnerable packages|has the following vulnerable',
+    '--configfile "$TRUSTED_CONTROL_DIR/.github/nuget-scanner.config"',
+    '"$UNTRUSTED_SOURCE_DIR/backend/Certigo.sln"',
     'scan_status',
   ]) {
     if (!nugetScan.includes(marker)) {
@@ -468,6 +555,8 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'Checkov output is missing or malformed.',
     'Passed checks: [0-9]+, Failed checks: [0-9]+',
+    '--directory "$UNTRUSTED_SOURCE_DIR/infra"',
+    '--config-file "$TRUSTED_CONTROL_DIR/.checkov.yaml"',
     'failed_checks',
   ]) {
     if (!iacScan.includes(marker)) {

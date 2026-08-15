@@ -48,6 +48,10 @@ SARIF évalué localement : les sévérités de sécurité `high`/`critical` (sc
 résultats SARIF de niveau `error` sans score bloquent le job. L'action CodeQL transmet le SARIF
 au service Code Scanning natif ; indépendamment, le contrôleur local journalise des findings
 assainis et publie une synthèse dans `GITHUB_STEP_SUMMARY`. Aucun artefact Actions n'est créé.
+Sur les PR internes, les sources analysées sont isolées sous `.untrusted-source` ; scripts
+d'enforcement et configurations scanner proviennent exclusivement du SHA immuable de base sous
+`.trusted-control`. Chaque scanner réutilisable exige aussi l'environnement `pr-ci`, avant toute
+évaluation ou restauration pouvant interpréter les fichiers de la PR.
 Les jobs Azure OSV, NuGet et Checkov écrivent leurs diagnostics et résultats structurés non
 secrets dans les logs immutables du job et une synthèse dans `GITHUB_STEP_SUMMARY`. Leur
 conclusion dépend uniquement du statut scanner, des findings et de la validité de la sortie,
@@ -58,7 +62,10 @@ atteindre le pool Azure persistant.
 La gate `Generated state equals committed state` accède au dépôt privé `certigo-content`
 uniquement avec la deploy key SSH en lecture seule stockée dans le secret Actions
 `CERTIGO_CONTENT_DEPLOY_KEY`. Le workflow refuse une clé absente, impose la vérification stricte
-des clés hôte `github.com` épinglées et n'accepte aucun PAT ni GitHub App en fallback.
+des clés hôte `github.com` épinglées et n'accepte aucun PAT ni GitHub App en fallback. La
+validation de la PR est exécutée sans secret par le générateur du SHA de base ; le job qui
+installe la deploy key n'exécute ensuite que du code provenant du contrôle de base ou du dépôt
+de contenu approuvé.
 
 ### Conclusion DoD
 

@@ -9,33 +9,53 @@ permissions: {}
 jobs:
   dotnet-vuln:
     name: Vulnerable .NET packages (NuGet/GitHub Advisory)
+    environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}
     runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions:
       contents: read
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
+      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+      TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
+      NUGET_SCAN_LOG: ${{ github.workspace }}/.scanner-state/dotnet-vulnerable.log
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          path: .untrusted-source
+          persist-credentials: false
+      - name: Checkout immutable trusted controls
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}
+          path: .trusted-control
           persist-credentials: false
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: "8.0.x"
 
       - name: Restore
-        run: dotnet restore backend/Certigo.sln
+        run: |
+          dotnet restore "$UNTRUSTED_SOURCE_DIR/backend/Certigo.sln" \
+            --configfile "$TRUSTED_CONTROL_DIR/.github/nuget-scanner.config"
 
       - name: Check vulnerable packages
         run: |
           set -uo pipefail
+          mkdir -p -- "$(dirname "$NUGET_SCAN_LOG")"
+          rm -f -- "$NUGET_SCAN_LOG"
           set +e
-          dotnet list backend/Certigo.sln package --vulnerable --include-transitive \
-            2>&1 | tee dotnet-vulnerable.log
-          scan_status="${PIPESTATUS[0]}"
+          dotnet list "$UNTRUSTED_SOURCE_DIR/backend/Certigo.sln" package \
+            --vulnerable --include-transitive > "$NUGET_SCAN_LOG" 2>&1
+          scan_status=$?
           set -e
 
-          if ! grep -Eqi "has no vulnerable packages|has the following vulnerable" dotnet-vulnerable.log; then
+          stop_token="$(cat /proc/sys/kernel/random/uuid)"
+          echo "::stop-commands::$stop_token"
+          cat -- "$NUGET_SCAN_LOG"
+          echo "::$stop_token::"
+
+          if ! grep -Eqi "has no vulnerable packages|has the following vulnerable" "$NUGET_SCAN_LOG"; then
             {
               echo "## NuGet dependency scan"
               echo
@@ -45,7 +65,9 @@ jobs:
             echo "::error::NuGet vulnerability scan output is missing or malformed."
             exit 1
           fi
-          vulnerable_projects="$(grep -Eic "has the following vulnerable" dotnet-vulnerable.log || true)"
+          vulnerable_projects="$(
+            grep -Eic "has the following vulnerable" "$NUGET_SCAN_LOG" || true
+          )"
           {
             echo "## NuGet dependency scan"
             echo

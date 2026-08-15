@@ -9,13 +9,25 @@ permissions: {}
 jobs:
   iac-scan:
     name: Bicep IaC scan (Checkov)
+    environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}
     runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions:
       contents: read
+    env:
+      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+      TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
+      CHECKOV_SCAN_LOG: ${{ github.workspace }}/.scanner-state/checkov-results.log
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          path: .untrusted-source
+          persist-credentials: false
+      - name: Checkout immutable trusted controls
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}
+          path: .trusted-control
           persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
@@ -25,16 +37,25 @@ jobs:
       - name: Run Checkov on infra/
         run: |
           set -uo pipefail
+          mkdir -p -- "$(dirname "$CHECKOV_SCAN_LOG")"
+          rm -f -- "$CHECKOV_SCAN_LOG"
           set +e
-          checkov --directory infra --framework bicep --compact --quiet \
-            --config-file .checkov.yaml 2>&1 | tee checkov-results.log
-          scan_status="${PIPESTATUS[0]}"
+          checkov --directory "$UNTRUSTED_SOURCE_DIR/infra" \
+            --framework bicep --compact --quiet \
+            --config-file "$TRUSTED_CONTROL_DIR/.checkov.yaml" \
+            > "$CHECKOV_SCAN_LOG" 2>&1
+          scan_status=$?
           set -e
+
+          stop_token="$(cat /proc/sys/kernel/random/uuid)"
+          echo "::stop-commands::$stop_token"
+          cat -- "$CHECKOV_SCAN_LOG"
+          echo "::$stop_token::"
 
           summary_line="$(
             grep -Eo \
               'Passed checks: [0-9]+, Failed checks: [0-9]+, Skipped checks: [0-9]+, Parsing errors: [0-9]+' \
-              checkov-results.log | tail -n 1
+              "$CHECKOV_SCAN_LOG" | tail -n 1
           )"
           if [ -z "$summary_line" ]; then
             {
