@@ -121,6 +121,21 @@ param keyVaultPrivateEndpointName string
 @description('Existing Cosmos DB private endpoint name.')
 param cosmosPrivateEndpointName string
 
+@description('Existing Blob private DNS zone group name.')
+param storageBlobPrivateDnsZoneGroupName string = 'default'
+
+@description('Existing Queue private DNS zone group name.')
+param storageQueuePrivateDnsZoneGroupName string = 'default'
+
+@description('Existing Table private DNS zone group name.')
+param storageTablePrivateDnsZoneGroupName string = 'default'
+
+@description('Existing Key Vault private DNS zone group name.')
+param keyVaultPrivateDnsZoneGroupName string = 'default'
+
+@description('Existing Cosmos DB private DNS zone group name.')
+param cosmosPrivateDnsZoneGroupName string = 'default'
+
 @description('Explicit Cosmos backup mode.')
 @allowed([ 'Periodic', 'Continuous' ])
 param cosmosBackupMode string
@@ -291,6 +306,11 @@ module privateNetwork 'modules/privateNetwork.bicep' = {
     storageTablePrivateEndpointName: storageTablePrivateEndpointName
     keyVaultPrivateEndpointName: keyVaultPrivateEndpointName
     cosmosPrivateEndpointName: cosmosPrivateEndpointName
+    storageBlobPrivateDnsZoneGroupName: storageBlobPrivateDnsZoneGroupName
+    storageQueuePrivateDnsZoneGroupName: storageQueuePrivateDnsZoneGroupName
+    storageTablePrivateDnsZoneGroupName: storageTablePrivateDnsZoneGroupName
+    keyVaultPrivateDnsZoneGroupName: keyVaultPrivateDnsZoneGroupName
+    cosmosPrivateDnsZoneGroupName: cosmosPrivateDnsZoneGroupName
     ciVnetResourceGroupName: ciVnetResourceGroupName
     ciVnetName: ciVnetName
     blobZoneId: sharedPrivateDns.outputs.blobZoneId

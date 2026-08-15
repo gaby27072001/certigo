@@ -42,6 +42,7 @@ function createHarness() {
   const shellPollState = `${shellState}.poll`;
   const shellNumericState = `${shellState}.numeric`;
   const shellTransientState = `${shellState}.transient`;
+  const shellTrailingHtmlState = `${shellState}.trailing-html`;
   const packagePath = path.join(root, 'publish.zip');
   writeFileSync(packagePath, 'deterministic-package', 'utf8');
 
@@ -198,6 +199,18 @@ fi
 if [[ "\${MOCK_TRANSIENT_INVALID_STATUS:-false}" == 'true' && ! -f "${shellTransientState}" ]]; then
   touch "${shellTransientState}"
   printf '{}\\n' >"$output_file"
+  printf '200'
+  exit 0
+fi
+if [[ "\${MOCK_TRAILING_HTML_STATUS:-false}" == 'true' ]]; then
+  if [[ -f "${shellTrailingHtmlState}" ]]; then
+    numeric_status=4
+  else
+    touch "${shellTrailingHtmlState}"
+    numeric_status=2
+  fi
+  printf '{"properties":{"status":%s}}<!DOCTYPE html><html></html>\\n' \
+    "$numeric_status" >"$output_file"
   printf '200'
   exit 0
 fi
@@ -371,6 +384,20 @@ test('deploy script retries a transient payload without a deployment status', ()
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /status is not yet available; retrying/);
+  assert.match(result.stdout, /passed liveness and readiness checks/);
+});
+
+test('deploy script accepts an ARM JSON payload followed by an App Service error page', () => {
+  const harness = createHarness();
+  const result = spawnSync('bash', [bashPath(deployScript)], {
+    env: {
+      ...harness.env,
+      MOCK_TRAILING_HTML_STATUS: 'true',
+    },
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /passed liveness and readiness checks/);
 });
 
