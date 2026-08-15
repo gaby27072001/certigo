@@ -359,7 +359,44 @@ while (( SECONDS - operation_started_at < DEPLOYMENT_TIMEOUT_SECONDS )); do
   if ! operation_status="$(
     "${NODE_BIN:-node}" -e '
       const fs = require("node:fs");
-      const payload = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      const source = fs.readFileSync(process.argv[1], "utf8").trimStart();
+      let json = source;
+      try {
+        JSON.parse(json);
+      } catch {
+        if (source[0] !== "{" && source[0] !== "[") process.exit(2);
+        let depth = 0;
+        let end = -1;
+        let escaped = false;
+        let quoted = false;
+        for (let index = 0; index < source.length; index += 1) {
+          const character = source[index];
+          if (quoted) {
+            if (escaped) {
+              escaped = false;
+            } else if (character === "\\") {
+              escaped = true;
+            } else if (character === "\"") {
+              quoted = false;
+            }
+            continue;
+          }
+          if (character === "\"") {
+            quoted = true;
+          } else if (character === "{" || character === "[") {
+            depth += 1;
+          } else if (character === "}" || character === "]") {
+            depth -= 1;
+            if (depth === 0) {
+              end = index + 1;
+              break;
+            }
+          }
+        }
+        if (end < 1 || !/^<!DOCTYPE html>/i.test(source.slice(end).trim())) process.exit(2);
+        json = source.slice(0, end);
+      }
+      const payload = JSON.parse(json);
       const status = payload.status
         ?? payload.properties?.status
         ?? payload.properties?.provisioningState;
