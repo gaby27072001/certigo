@@ -376,8 +376,9 @@ while (( SECONDS - operation_started_at < DEPLOYMENT_TIMEOUT_SECONDS )); do
       process.stdout.write(normalizedStatus);
     ' "$operation_body_file" 2>/dev/null
   )"; then
-    echo "::error::OneDeploy asynchronous operation returned an invalid status payload."
-    exit 1
+    echo "OneDeploy asynchronous operation status is not yet available; retrying."
+    sleep "$POLL_INTERVAL_SECONDS"
+    continue
   fi
 
   case "${operation_status,,}" in
