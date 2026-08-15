@@ -639,6 +639,8 @@ function validateRepositoryInvariants() {
     'packageResult.groups',
     'references unknown vulnerability',
     'omitted expected tracked lockfiles',
+    'allowedEmptyNugetPackages',
+    'may be empty only for a validated',
     'vulnerabilityCount',
   ]) {
     if (!osvEnforcer.includes(marker)) {
@@ -676,6 +678,7 @@ function validateRepositoryInvariants() {
       'root {field} differs',
       'core.hooksPath=/dev/null',
       'validate_nuget_locks.py',
+      'allowedEmptyNugetPackages',
     ]) {
       if (!dependencyLockValidator.includes(marker)) {
         errors.push(`validate_dependency_locks.py: missing fail-closed invariant ${marker}`);

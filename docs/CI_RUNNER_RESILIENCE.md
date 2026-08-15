@@ -270,7 +270,7 @@ Le rollback est réussi quand l'ancien pool traite de nouveau un dispatch et que
 
 1. Ajouter/reconstruire un runner avec une nouvelle `imageVersion` et les nouvelles
    versions/SHA-256 vérifiées.
-2. Prouver santé et failover.
+2. Prouver santé et respect du label de confiance.
 3. Mettre l'ancien runner hors ligne, confirmer qu'aucun job n'est `busy`, révoquer ses
    attributions Azure, supprimer son enregistrement GitHub, puis sa VM/NIC/disque et sa
    clé SSH break-glass.
