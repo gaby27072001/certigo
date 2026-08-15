@@ -64,6 +64,7 @@ for module in storage keyvault cosmos; do
   grep -F "publicNetworkAccess: 'Disabled'" \
     "${root}/infra/modules/${module}.bicep" >/dev/null
 done
+  grep -F 'enablePurgeProtection: true' "${root}/infra/modules/keyvault.bicep" >/dev/null
 grep -F "serviceName: 'Microsoft.App/environments'" \
   "${root}/infra/modules/privateNetwork.bicep" >/dev/null
 grep -F "privateEndpointNetworkPolicies: 'Disabled'" \

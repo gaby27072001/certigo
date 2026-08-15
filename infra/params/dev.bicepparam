@@ -1,5 +1,6 @@
 // Dev environment parameters. Authority/audience point to the Certigo
 // Entra External ID app registration (replace placeholders before deploying).
+// Key Vault purge protection is enabled in every environment and is irreversible.
 // NOTE on Entra placeholders (audit finding F-02): the entraAuthority/entraAudience
 // values below are the all-zeros tenant placeholder (00000000-...). This is INTENTIONAL
 // and safe for dev, because dev runs on an explicit auth bypass — it never validates

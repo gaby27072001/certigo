@@ -71,8 +71,14 @@ case "$*" in
     printf 'sv=mock&spr=https&sp=r&sig=masked-test-token\\n'
     ;;
   "webapp log deployment list"*)
-    if [[ -f "${shellState}" ]]; then
+    if [[ ! -f "${shellState}" ]]; then
+      printf 'baseline-deployment\\n'
+    elif [[ "$*" == *"id=='new-deployment'"* ]]; then
       printf 'new-deployment\\t4\\ttrue\\n'
+    elif [[ "\${MOCK_AMBIGUOUS_DEPLOYMENTS:-false}" == 'true' ]]; then
+      printf 'new-deployment-a\\t0\\tfalse\\nnew-deployment-b\\t0\\tfalse\\n'
+    else
+      printf 'baseline-deployment\\t4\\ttrue\\nnew-deployment\\t0\\tfalse\\n'
     fi
     ;;
   "webapp deploy"*)
@@ -84,7 +90,7 @@ case "$*" in
       exit 1
     fi
     touch "${shellState}"
-    printf 'new-deployment\\n'
+    printf '{"id":null,"status":"InProgress"}\\n'
     ;;
   *)
     echo "unexpected az command: $*" >&2
@@ -173,6 +179,21 @@ test('deploy script redacts the signed package URL from OneDeploy errors', () =>
   assert.doesNotMatch(result.stdout + result.stderr, /masked-test-token|\?sv=mock/);
 });
 
+test('deploy script fails closed when multiple new deployments make correlation ambiguous', () => {
+  const harness = createHarness();
+  const result = spawnSync('bash', [bashPath(deployScript)], {
+    env: {
+      ...harness.env,
+      MOCK_AMBIGUOUS_DEPLOYMENTS: 'true',
+    },
+    encoding: 'utf8',
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout + result.stderr, /correlation is ambiguous/);
+  assert.doesNotMatch(result.stdout + result.stderr, /masked-test-token|\?sv=mock/);
+});
+
 test('deploy script forbids config-zip and key-based authentication', () => {
   const script = readFileSync(deployScript, 'utf8');
   assert.doesNotMatch(script, /config-zip|--account-key|--sas-token/i);
@@ -180,5 +201,7 @@ test('deploy script forbids config-zip and key-based authentication', () => {
   assert.match(script, /--src-url/);
   assert.match(script, /--as-user/);
   assert.match(script, /--overwrite false/);
+  assert.match(script, /baseline_deployment_id/);
+  assert.match(script, /sort_by\(\[\?id != null\], &received_time\)/);
   assert.doesNotMatch(script, /storage blob delete/);
 });

@@ -238,6 +238,16 @@ test('policy-constrained services permanently disable public access', () => {
   }
 });
 
+test('Key Vault purge protection is enabled in every environment', () => {
+  const template = compileTemplate('infra/modules/keyvault.bicep');
+  const [vault] = resourcesOfType(template, 'Microsoft.KeyVault/vaults');
+  assert.equal(vault.properties.enablePurgeProtection, true);
+  assert.doesNotMatch(
+    readFileSync(path.join(repositoryRoot, '.checkov.yaml'), 'utf8'),
+    /CKV_AZURE_(42|110)/,
+  );
+});
+
 test('Flex app uses the delegated subnet without forcing public egress into it', () => {
   const template = compileTemplate('infra/modules/functionApp.bicep');
   const [site] = resourcesOfType(template, 'Microsoft.Web/sites');

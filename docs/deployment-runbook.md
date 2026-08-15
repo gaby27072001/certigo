@@ -576,11 +576,15 @@ Avant toute application, exécuter le `what-if` et vérifier que l'ordre ARM est
   ne contourne pas `publicNetworkAccess=Disabled` : OneDeploy doit toujours résoudre et joindre le
   private endpoint via le VNet applicatif.
 - `.github/scripts/deploy-flex-onedeploy.sh` refuse toute résolution DNS publique, vérifie
-  l'identité utilisateur du deployment storage, capture l'identifiant exact retourné par OneDeploy,
-  attend ce déploiement jusqu'au statut `4/complete`, puis exige `/api/health/live` et
-  `/api/health/ready`. Le blob source immuable n'est pas supprimé par le script : la policy Storage
-  supprime uniquement `app-package/deployments/` après 30 jours, sans supposer que OneDeploy l'a
-  copié.
+  l'identité utilisateur du deployment storage et capture l'identifiant du dernier déploiement
+  avant la requête. La réponse asynchrone peut légitimement contenir `id: null` ; le script l'ignore,
+  découvre ensuite un unique nouvel identifiant dans l'historique trié, puis suit exclusivement ce
+  déploiement jusqu'au statut `4/complete`. Plusieurs nouveaux identifiants, un statut inconnu ou un
+  délai dépassé échouent fermés. Il exige enfin `/api/health/live` et `/api/health/ready`. Le blob
+  source immuable n'est pas supprimé par le script : la policy Storage supprime uniquement
+  `app-package/deployments/` après 30 jours, sans supposer que OneDeploy l'a copié.
+- La purge protection Key Vault est activée dans tous les environnements, y compris `dev`. Cette
+  protection est irréversible ; aucune procédure Certigo ne dépend de la purge d'un vault.
 - **`func` Core Tools cassé sur win-arm64** — l'éviter ; tout piloter via `az` / ARM.
 - **SCM basic auth désactivée** (AAD-only). Pour interroger le hostruntime, passer par le proxy ARM
   `…/hostruntime/admin/...` avec un token `az account get-access-token --resource

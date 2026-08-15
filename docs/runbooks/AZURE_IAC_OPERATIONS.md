@@ -188,6 +188,8 @@ repousser sans changer la clé, et appliquer la procédure de chevauchement déc
   Defender, et MCSB reste `DoNotEnforce` tant que les exemptions/remédiations ne sont pas validées.
 - Ne jamais réintroduire de fallback public ou de toggle partiel : la policy Storage désactive
   l'accès public et l'application dépend de la topologie privée complète.
+- La purge protection Key Vault reste activée dans tous les environnements. Son activation est
+  irréversible et remplace l'ancienne exception Checkov de développement.
 - Ne jamais remplacer le SAS user delegation par une clé de compte. Le SAS lecture seule de
   14 minutes n'accorde qu'une autorisation data-plane ; il ne contourne pas le pare-feu Storage.
   Le runner doit résoudre le FQDN Blob vers l'IP du private endpoint avant tout upload, et le blob

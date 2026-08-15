@@ -13,12 +13,8 @@ getent() {
   command "${GETENT_BIN:-getent}" "$@"
 }
 
-deploy_output_file=''
 deploy_error_file=''
 cleanup() {
-  if [[ -n "$deploy_output_file" ]]; then
-    rm -f -- "$deploy_output_file"
-  fi
   if [[ -n "$deploy_error_file" ]]; then
     rm -f -- "$deploy_error_file"
   fi
@@ -206,7 +202,20 @@ mask_secret "$sas_token"
 package_url="${STORAGE_BLOB_ENDPOINT}${DEPLOYMENT_CONTAINER}/${BLOB_NAME}?${sas_token}"
 mask_secret "$package_url"
 
-deploy_output_file="$(mktemp)"
+baseline_deployment_id="$(
+  az webapp log deployment list \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$FUNCTION_APP_NAME" \
+    --query 'sort_by([?id != null], &received_time) | [-1].id' \
+    --output tsv \
+    --only-show-errors
+)"
+baseline_deployment_id="$(tr -d '\r\n' <<< "$baseline_deployment_id")"
+if [[ -n "$baseline_deployment_id" && ! "$baseline_deployment_id" =~ ^[A-Za-z0-9-]+$ ]]; then
+  echo "::error::Existing OneDeploy history returned an invalid deployment id."
+  exit 1
+fi
+
 deploy_error_file="$(mktemp)"
 if ! az webapp deploy \
   --resource-group "$RESOURCE_GROUP" \
@@ -216,9 +225,8 @@ if ! az webapp deploy \
   --async true \
   --track-status false \
   --enable-kudu-warmup false \
-  --query id \
-  --output tsv \
-  --only-show-errors >"$deploy_output_file" 2>"$deploy_error_file"; then
+  --output none \
+  --only-show-errors >/dev/null 2>"$deploy_error_file"; then
   deploy_error="$(<"$deploy_error_file")"
   deploy_error="${deploy_error//$package_url/<masked-package-url>}"
   deploy_error="${deploy_error//$sas_token/<masked-sas>}"
@@ -226,48 +234,92 @@ if ! az webapp deploy \
   echo "::error::OneDeploy request failed."
   exit 1
 fi
-deployment_id="$(tr -d '\r\n' <"$deploy_output_file")"
-if [[ ! "$deployment_id" =~ ^[A-Za-z0-9-]+$ ]]; then
-  echo "::error::OneDeploy did not return a valid deployment id."
-  exit 1
-fi
-rm -f -- "$deploy_output_file"
 rm -f -- "$deploy_error_file"
-deploy_output_file=''
 deploy_error_file=''
 
+deployment_id=''
+current_status=''
+current_complete=''
 deployment_started_at="$SECONDS"
 while (( SECONDS - deployment_started_at < DEPLOYMENT_TIMEOUT_SECONDS )); do
-  deployment_row="$(
-    az webapp log deployment list \
-      --resource-group "$RESOURCE_GROUP" \
-      --name "$FUNCTION_APP_NAME" \
-      --query "[?id=='${deployment_id}'] | [0].[id,status,complete]" \
-      --output tsv \
-      --only-show-errors
-  )"
-  IFS=$'\t' read -r current_id current_status current_complete <<< "$deployment_row"
-  if [[ "$current_id" == "$deployment_id" ]]; then
-    case "$current_status" in
-      4)
-        if [[ "${current_complete,,}" == 'true' ]]; then
-          break
-        fi
-        ;;
-      -1|3|5|6)
-        echo "::error::OneDeploy failed with status ${current_status}."
+  if [[ -z "$deployment_id" ]]; then
+    mapfile -t deployment_rows < <(
+      az webapp log deployment list \
+        --resource-group "$RESOURCE_GROUP" \
+        --name "$FUNCTION_APP_NAME" \
+        --query 'sort_by([?id != null], &received_time) | [-2:] | [].[id,status,complete]' \
+        --output tsv \
+        --only-show-errors
+    )
+    if (( ${#deployment_rows[@]} == 0 )); then
+      sleep "$POLL_INTERVAL_SECONDS"
+      continue
+    fi
+    latest_index=$((${#deployment_rows[@]} - 1))
+    IFS=$'\t' read -r current_id current_status current_complete <<< "${deployment_rows[$latest_index]}"
+    if [[ ! "$current_id" =~ ^[A-Za-z0-9-]+$ ]]; then
+      echo "::error::OneDeploy discovery returned an invalid deployment id."
+      exit 1
+    fi
+    if [[ "$current_id" == "$baseline_deployment_id" ]]; then
+      sleep "$POLL_INTERVAL_SECONDS"
+      continue
+    fi
+    if (( ${#deployment_rows[@]} > 1 )); then
+      IFS=$'\t' read -r previous_id _ _ <<< "${deployment_rows[$((latest_index - 1))]}"
+      if [[ ! "$previous_id" =~ ^[A-Za-z0-9-]+$ ]]; then
+        echo "::error::OneDeploy discovery returned an invalid preceding deployment id."
         exit 1
-        ;;
-      ''|0|1|2) ;;
-      *)
-        echo "::error::OneDeploy returned unknown status ${current_status}."
+      fi
+      if [[ -z "$baseline_deployment_id" || "$previous_id" != "$baseline_deployment_id" ]]; then
+        echo "::error::Multiple new OneDeploy deployments appeared; correlation is ambiguous."
         exit 1
-        ;;
-    esac
+      fi
+    fi
+    deployment_id="$current_id"
+  else
+    mapfile -t deployment_rows < <(
+      az webapp log deployment list \
+        --resource-group "$RESOURCE_GROUP" \
+        --name "$FUNCTION_APP_NAME" \
+        --query "[?id=='${deployment_id}'].[id,status,complete]" \
+        --output tsv \
+        --only-show-errors
+    )
+    if (( ${#deployment_rows[@]} != 1 )); then
+      echo "::error::Tracked OneDeploy deployment returned an unknown or duplicate record."
+      exit 1
+    fi
+    IFS=$'\t' read -r current_id current_status current_complete <<< "${deployment_rows[0]}"
+    if [[ "$current_id" != "$deployment_id" ]]; then
+      echo "::error::Tracked OneDeploy deployment id changed unexpectedly."
+      exit 1
+    fi
   fi
+
+  case "$current_status" in
+    4)
+      if [[ "${current_complete,,}" == 'true' ]]; then
+        break
+      fi
+      ;;
+    -1|3|5|6)
+      echo "::error::OneDeploy failed with status ${current_status}."
+      exit 1
+      ;;
+    ''|0|1|2) ;;
+    *)
+      echo "::error::OneDeploy returned unknown status ${current_status}."
+      exit 1
+      ;;
+  esac
   sleep "$POLL_INTERVAL_SECONDS"
 done
-if [[ -z "$deployment_id" || "${current_status:-}" != '4' || "${current_complete,,}" != 'true' ]]; then
+if [[ -z "$deployment_id" ]]; then
+  echo "::error::No new OneDeploy deployment appeared before timeout."
+  exit 1
+fi
+if [[ "${current_status:-}" != '4' || "${current_complete,,}" != 'true' ]]; then
   echo "::error::OneDeploy did not complete successfully before timeout."
   exit 1
 fi

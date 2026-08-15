@@ -224,7 +224,6 @@ module vault 'modules/keyvault.bicep' = {
     // (both already resolve to 6, so their live vault names are unchanged).
     name: 'kv-${appName}-${env}-${take(suffix, kvSuffixLen)}'
     location: location
-    enablePurgeProtection: hardened
     softDeleteRetentionInDays: hardened ? 90 : 7
     jwtSigningKey: effectiveAuthJwtSigningKey
     jwtSigningKeyExpiresOn: effectiveAuthJwtSigningKeyExpiresOn

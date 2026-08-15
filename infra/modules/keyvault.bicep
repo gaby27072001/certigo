@@ -6,9 +6,6 @@ param name string
 param location string
 param tags object = {}
 
-@description('Permanently protect the vault/secrets against purge. Recommended for staging/prod (cannot be disabled once enabled).')
-param enablePurgeProtection bool = false
-
 @description('Soft-delete retention in days (7-90).')
 @minValue(7)
 @maxValue(90)
@@ -34,8 +31,7 @@ resource vault 'Microsoft.KeyVault/vaults@2024-04-01-preview' = {
     enableRbacAuthorization: true
     enableSoftDelete: true
     softDeleteRetentionInDays: softDeleteRetentionInDays
-    // Null (not false) when disabled: ARM rejects an explicit `false`.
-    enablePurgeProtection: enablePurgeProtection ? true : null
+    enablePurgeProtection: true
     publicNetworkAccess: 'Disabled'
     networkAcls: {
       bypass: 'AzureServices'
