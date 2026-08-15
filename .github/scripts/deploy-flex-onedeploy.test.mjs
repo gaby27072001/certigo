@@ -41,6 +41,7 @@ function createHarness() {
   const shellState = bashPath(state);
   const shellPollState = `${shellState}.poll`;
   const shellNumericState = `${shellState}.numeric`;
+  const shellTransientState = `${shellState}.transient`;
   const packagePath = path.join(root, 'publish.zip');
   writeFileSync(packagePath, 'deterministic-package', 'utf8');
 
@@ -187,6 +188,17 @@ if [[ "\${MOCK_LOCATION_EMPTY_202:-false}" == 'true' && ! -f "${shellPollState}"
   touch "${shellPollState}"
   : >"$output_file"
   printf '202'
+  exit 0
+fi
+if [[ "\${MOCK_INVALID_STATUS_PAYLOAD:-false}" == 'true' ]]; then
+  printf '{}\\n' >"$output_file"
+  printf '200'
+  exit 0
+fi
+if [[ "\${MOCK_TRANSIENT_INVALID_STATUS:-false}" == 'true' && ! -f "${shellTransientState}" ]]; then
+  touch "${shellTransientState}"
+  printf '{}\\n' >"$output_file"
+  printf '200'
   exit 0
 fi
 if [[ "\${MOCK_NUMERIC_OPERATION_STATUS:-false}" == 'true' ]]; then
@@ -347,6 +359,21 @@ test('deploy script accepts numeric Kudu deployment statuses', () => {
   assert.match(result.stdout, /passed liveness and readiness checks/);
 });
 
+test('deploy script retries a transient payload without a deployment status', () => {
+  const harness = createHarness();
+  const result = spawnSync('bash', [bashPath(deployScript)], {
+    env: {
+      ...harness.env,
+      MOCK_TRANSIENT_INVALID_STATUS: 'true',
+    },
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /status is not yet available; retrying/);
+  assert.match(result.stdout, /passed liveness and readiness checks/);
+});
+
 for (const [name, environment, expected] of [
   [
     'missing asynchronous operation header',
@@ -366,6 +393,11 @@ for (const [name, environment, expected] of [
   [
     'asynchronous operation timeout',
     { MOCK_OPERATION_STATUS: 'Timeout', DEPLOYMENT_TIMEOUT_SECONDS: '2' },
+    /did not succeed before timeout/,
+  ],
+  [
+    'permanently invalid asynchronous operation status',
+    { MOCK_INVALID_STATUS_PAYLOAD: 'true', DEPLOYMENT_TIMEOUT_SECONDS: '2' },
     /did not succeed before timeout/,
   ],
 ]) {
