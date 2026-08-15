@@ -188,13 +188,13 @@ auto-hébergé (`vm-certigo-runner`, groupe `rg-certigo-ci`). Une panne de ce po
 **bloqué la CI ~6 h** — d'où la priorité. ⚠️ **Contrainte EMU** : les runners **hébergés par
 GitHub sont désactivés durablement par la politique d'entreprise**
 (voir `infra/ci-runner/README.md`). La résilience repose exclusivement sur plusieurs
-instances Azure partageant le label `certigo-ci`.
+instances Azure séparées par les labels `certigo-pr` et `certigo-trusted`.
 
 **Pré-requis.**
 - `az login` + abonnement sélectionné (`az account set --subscription <SUBSCRIPTION_ID>`).
 - Droits d'admin sur les runners de l'org/dépôt GitHub (pour l'enregistrement).
 - Précondition idempotente : auditer les workflows — si les jobs ciblent déjà un pool
-  Azure redondé par le label `certigo-ci`, le lot est **fait**.
+  Azure isolé par les labels `certigo-pr`/`certigo-trusted`, le lot est **fait**.
 
 **Étapes (intention + commande type — provisionnement live).**
 
@@ -223,7 +223,7 @@ lors du lot réel).** Principe à appliquer dans les `.github/workflows/*` :
 
 ```yaml
 # Le label commun route vers une instance disponible du pool Azure.
-runs-on: [self-hosted, Linux, X64, certigo-ci]
+runs-on: [self-hosted, Linux, X64, certigo-trusted]
 # Conserver au moins deux runners Azure homogènes dans ce pool.
 ```
 
@@ -395,7 +395,7 @@ Vérifier l'**isolation** : les ressources staging portent le suffixe `staging` 
 - [ ] Vérif : PR de test **exige** l'approbation d'un CODEOWNER avant merge
 
 **Lot 2 — `wp-p1-11-ci-spof-runners`**
-- [ ] **≥2 runners Azure** en ligne partageant le label `certigo-ci`
+- [ ] **1 runner `certigo-pr` + 1 runner `certigo-trusted`** en ligne, sans label commun
 - [ ] Aucun label GitHub-hosted ni fallback configurable dans les workflows
 - [ ] Simulation d'indisponibilité d'un runner : la CI **ne bloque pas**
 

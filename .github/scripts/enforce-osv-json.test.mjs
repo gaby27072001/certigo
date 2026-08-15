@@ -81,7 +81,7 @@ test('rejects OSV JSON with invalid nested field types', () => {
       }],
     }),
   );
-  assert.throws(() => evaluateOsvJson(file), /package\.version must be a non-empty string/);
+  assert.throws(() => evaluateOsvJson(file), /package\.version must be a string/);
 });
 
 test('requires every expected tracked lockfile in all-packages output', () => {
@@ -102,7 +102,10 @@ test('requires every expected tracked lockfile in all-packages output', () => {
   );
   assert.deepEqual(
     evaluateOsvJson(file, {
-      expectedSources: ['package-lock.json'],
+      expectedSources: {
+        sources: ['package-lock.json'],
+        allowedEmptyNugetPackages: [],
+      },
       sourceRoot: directory,
     }),
     {
@@ -115,10 +118,42 @@ test('requires every expected tracked lockfile in all-packages output', () => {
   );
   assert.throws(
     () => evaluateOsvJson(file, {
-      expectedSources: ['package-lock.json', 'missing.lock'],
+      expectedSources: {
+        sources: ['package-lock.json', 'missing.lock'],
+        allowedEmptyNugetPackages: [],
+      },
       sourceRoot: directory,
     }),
     /omitted expected tracked lockfiles/,
+  );
+});
+
+test('allows empty versions only for validated NuGet project references', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-osv-project-'));
+  const file = path.join(directory, 'project-reference.json');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      results: [{
+        source: { path: path.join(directory, 'packages.lock.json'), type: 'lockfile' },
+        packages: [{
+          package: { name: 'Certigo.Domain', version: '', ecosystem: 'NuGet' },
+        }],
+      }],
+    }),
+  );
+  const options = {
+    expectedSources: {
+      sources: ['packages.lock.json'],
+      allowedEmptyNugetPackages: ['certigo.domain'],
+    },
+    sourceRoot: directory,
+  };
+  assert.equal(evaluateOsvJson(file, options).packageCount, 1);
+  options.expectedSources.allowedEmptyNugetPackages = [];
+  assert.throws(
+    () => evaluateOsvJson(file, options),
+    /may be empty only for a validated tracked NuGet project reference/,
   );
 });
 
@@ -126,7 +161,10 @@ test('CLI exit codes distinguish clean, vulnerable, and invalid reports', () => 
   const script = path.join(path.dirname(fileURLToPath(import.meta.url)), 'enforce-osv-json.mjs');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-osv-cli-'));
   const expectedSources = path.join(directory, 'expected.json');
-  fs.writeFileSync(expectedSources, '[]');
+  fs.writeFileSync(
+    expectedSources,
+    '{"sources":[],"allowedEmptyNugetPackages":[]}',
+  );
   const cases = [
     ['osv-clean.json', 0],
     ['osv-vulnerable.json', 1],

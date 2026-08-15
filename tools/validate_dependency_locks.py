@@ -177,13 +177,35 @@ def validate_repository(
         and path.parts[0] == "backend"
         and path.name.casefold() == "packages.lock.json"
     }
+    empty_locks: set[PurePosixPath] = set()
+    for lock in nuget_locks:
+        value = json.loads(_safe_file(canonical_root, lock).read_text(encoding="utf-8"))
+        dependencies = value.get("dependencies", {})
+        if isinstance(dependencies, dict) and all(
+            isinstance(graph, dict) and not graph for graph in dependencies.values()
+        ):
+            empty_locks.add(lock)
     expected_sources = sorted(
-        str(path) for path in npm_locks | pub_locks | nuget_locks
+        str(path) for path in npm_locks | pub_locks | (nuget_locks - empty_locks)
+    )
+    allowed_empty_nuget_packages = sorted(
+        path.stem.casefold()
+        for path in tracked
+        if path.parts
+        and path.parts[0] == "backend"
+        and path.suffix.casefold() == ".csproj"
     )
     if expected_sources_file is not None:
         expected_sources_file.parent.mkdir(parents=True, exist_ok=True)
         expected_sources_file.write_text(
-            json.dumps(expected_sources, indent=2) + "\n",
+            json.dumps(
+                {
+                    "sources": expected_sources,
+                    "allowedEmptyNugetPackages": allowed_empty_nuget_packages,
+                },
+                indent=2,
+            )
+            + "\n",
             encoding="utf-8",
             newline="\n",
         )

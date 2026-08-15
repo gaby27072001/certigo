@@ -61,7 +61,9 @@ atteindre le pool Azure persistant.
 OSV utilise `--no-ignore --all-packages` : aucun `.gitignore` fourni par la PR ne peut masquer un
 manifeste ou lockfile, et toute modification d'un `.gitignore` déclenche le scan de dépendances.
 Le contrôleur trusted-base calcule d'abord l'inventaire Git attendu et rejette le rapport OSV si
-une seule source verrouillée suivie manque dans `results[].source.path`.
+une seule source verrouillée non vide suivie manque dans `results[].source.path`. Un lock NuGet
+sans aucun package est identifié comme vide seulement après validation statique complète, car OSV
+ne produit pas de résultat JSON pour cette source bien qu'il l'ait parcourue.
 Chaque `.csproj` suivi sous `backend/` doit avoir exactement un `packages.lock.json` adjacent.
 Le validateur statique trusted-base refuse les locks absents, orphelins ou malformés, les graphes
 incomplets et tout écart entre un `PackageReference` direct à version exacte et son entrée
@@ -257,7 +259,9 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
       contrôlé localement par `validate-workflow-security.mjs`.
 - [ ] Ajouter `Fork PR policy / Required gate` aux contextes requis. Les PR de forks
       restent non supportées et échouent fermement sans checkout ; seules les PR internes
-      peuvent exécuter leur SHA de tête sur le pool Azure `certigo-ci`.
+      peuvent exécuter leur SHA de tête uniquement sur `certigo-pr`, sans environnement,
+      secret ou identité cloud. Les gates agrégées sans source PR et toutes les opérations
+      privilégiées utilisent exclusivement `certigo-trusted`.
 - [ ] Supprimer le secret `AUTOMERGE_TOKEN`, révoquer le PAT correspondant et
       désactiver **Allow auto-merge** si aucun autre usage gouverné ne le justifie.
 - [ ] Protéger l'environnement `beta` avec reviewers obligatoires, interdiction

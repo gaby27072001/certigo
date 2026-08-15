@@ -20,8 +20,7 @@ jobs:
   validate-source:
     name: Validate project-state source
     if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository }}
-    environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
     env:
@@ -56,8 +55,7 @@ jobs:
     name: Generated state equals committed state
     needs: validate-source
     if: ${{ always() && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) }}
-    environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions:
       contents: read
     steps:

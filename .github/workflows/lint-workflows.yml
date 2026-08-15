@@ -13,8 +13,7 @@ jobs:
   validate:
     name: Validate workflow YAML
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-    environment: pr-ci
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     env:
       UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
       TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control

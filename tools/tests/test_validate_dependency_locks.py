@@ -81,11 +81,13 @@ class DependencyLockValidatorTests(unittest.TestCase):
         output = self.root / "expected.json"
         self.assertEqual((1, 1, 1), validator.validate_repository(self.root, output))
         self.assertEqual(
-            [
-                "backend/App/packages.lock.json",
-                "package-lock.json",
-                "packages/app/pubspec.lock",
-            ],
+            {
+                "sources": [
+                    "package-lock.json",
+                    "packages/app/pubspec.lock",
+                ],
+                "allowedEmptyNugetPackages": ["app"],
+            },
             json.loads(output.read_text(encoding="utf-8")),
         )
 
@@ -115,6 +117,18 @@ class DependencyLockValidatorTests(unittest.TestCase):
             capture_output=True,
         )
         with self.assertRaisesRegex(validator.DependencyLockError, "pub locks.*missing"):
+            validator.validate_repository(self.root)
+
+    def test_rejects_tracked_symlink_manifest(self) -> None:
+        manifest = self.root / "package.json"
+        target = self.root / "real-package.json"
+        target.write_text(manifest.read_text(encoding="utf-8"), encoding="utf-8")
+        manifest.unlink()
+        try:
+            manifest.symlink_to(target.name)
+        except OSError as exc:
+            self.skipTest(f"symlinks are unavailable: {exc}")
+        with self.assertRaisesRegex(validator.DependencyLockError, "Symlinks are forbidden"):
             validator.validate_repository(self.root)
 
     def test_excludes_generated_and_example_directories(self) -> None:

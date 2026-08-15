@@ -69,7 +69,7 @@ jobs:
     name: Build AAB signé + publication Play
     if: ${{ github.ref == 'refs/heads/main' || github.ref_type == 'tag' }}
     # Android stays on the redundant Azure pool for managed-identity Key Vault access.
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions:
       contents: read
     # Approval gate: configure required reviewers on the "beta" environment

@@ -9,8 +9,7 @@ permissions: {}
 jobs:
   osv-scan:
     name: OSV-Scanner (all dependencies, JSON)
-    environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
     env:
@@ -114,10 +113,21 @@ jobs:
               process.stdout.write(String(summary.vulnerabilityCount));
             ' "$evaluation"
           )"
+          source_coverage="$(
+            node -e '
+              const evaluation = JSON.parse(process.argv[1].split(/\r?\n/, 1)[0]);
+              const contract = JSON.parse(require("fs").readFileSync(process.argv[2], "utf8"));
+              process.stdout.write(
+                `${evaluation.sourceCount} reported`
+                + ` / ${contract.sources.length} expected non-empty locks`,
+              );
+            ' "$evaluation" "$EXPECTED_LOCKS_FILE"
+          )"
           {
             echo "## OSV dependency scan"
             echo
             echo "- Findings: **$finding_count**"
+            echo "- Tracked lockfile coverage: **$source_coverage**"
             echo "- Scanner exit code: \`$scan_status\`"
             echo "- Structured validation result and scanner diagnostics are in the job logs."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -134,8 +144,7 @@ jobs:
   locked-restore:
     name: NuGet locked restore (no secrets)
     needs: osv-scan
-    environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
     env:

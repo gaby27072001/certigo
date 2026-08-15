@@ -61,7 +61,7 @@ git push origin v1.2.3
 | Déclencheurs | push d'un tag `v*` **ou** `workflow_dispatch` (manuel) |
 | Gates bloquants | provenance `main`, SemVer/versionCode/track, `flutter analyze`, `flutter test`, signature, configuration API/Entra |
 | Approbation humaine | environnement GitHub **`beta`** (reviewers requis à configurer) |
-| Runner | self-hosted `certigo-ci` |
+| Runner | self-hosted `certigo-trusted` |
 | `versionName` | saisi, sinon lu depuis `apps/mobile/pubspec.yaml` |
 | `versionCode` | saisi, sinon `github.run_number` (auto-incrémenté) |
 | Package | `com.certigo.mobileapp` |
@@ -99,7 +99,7 @@ Le backend suit un modèle **CD par environnement** (pas un tag applicatif) :
 | [`promote-backend-staging-prod.yml`](../.github/workflows/promote-backend-staging-prod.yml) | Promotion `staging` → `prod` | `workflow_dispatch` (manuel) | environnements `staging` puis `prod` (chaînés, `needs`) |
 
 - **`dev`** : déploiement automatique à chaque merge sur `main` (via `cd-backend.yml`,
-  OIDC + Bicep + `func` zip-deploy, runners self-hosted `certigo-ci`).
+  OIDC + Bicep + `func` zip-deploy, runners self-hosted `certigo-trusted`).
 - **`staging` → `prod`** : promotion **manuelle et chaînée** (`deploy-prod` dépend de
   `deploy-staging`), chaque étape franchissant la *gate* d'environnement GitHub
   correspondante.

@@ -23,7 +23,7 @@ jobs:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     # EMU policy keeps this on the redundant self-hosted pool. There is no PR
     # trigger, so untrusted fork code cannot reach a persistent runner.
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 

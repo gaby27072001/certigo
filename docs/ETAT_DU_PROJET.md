@@ -325,11 +325,13 @@ automatisées principales sont `ci-backend.yml`, `ci-mobile.yml`, `ci-content.ym
 `ci-project-state.yml`. Les deux références iOS GitHub historiques restent opt-in ; la chaîne iOS
 déclarée est dans `codemagic.yaml`.
 
-> ⚠️ CI exécutée **uniquement sur le runner self‑hosted Azure** (`certigo-ci`) — les runners
+> ⚠️ CI exécutée **uniquement sur les runners self‑hosted Azure** (`certigo-pr` sans
+> identité pour les sources PR, `certigo-trusted` pour gates/opérations) — les runners
 > GitHub‑hébergés sont désactivés par la politique d'entreprise. Egress via NAT Gateway `nat-certigo` (RG `rg-certigo-ci`).
 
 > 🛟 **Résilience CI backend** — le job `build-test` cible exclusivement le pool Azure
-> `[self-hosted, Linux, X64, certigo-ci]`. La haute disponibilité est fournie par plusieurs
+> `[self-hosted, Linux, X64, certigo-pr|certigo-trusted]`. Les classes sont isolées et
+> sans fallback croisé ;
 > VMs portant ces labels ; aucun fallback hébergé ou piloté par variable n'est supporté.
 
 ---

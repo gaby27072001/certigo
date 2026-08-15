@@ -536,12 +536,10 @@ class ProjectStateTests(unittest.TestCase):
             "github.event.pull_request.head.repo.full_name == github.repository",
             workflow,
         )
+        self.assertNotIn("environment:", workflow)
+        self.assertIn("runs-on: [self-hosted, Linux, X64, certigo-pr]", workflow)
         self.assertIn(
-            "environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}",
-            workflow,
-        )
-        self.assertIn(
-            "runs-on: [self-hosted, Linux, X64, certigo-ci]",
+            "runs-on: [self-hosted, Linux, X64, certigo-trusted]",
             workflow,
         )
         self.assertIn(
@@ -668,9 +666,9 @@ class ProjectStateTests(unittest.TestCase):
                 self.assertNotIn("actions/upload-artifact@", workflow)
                 self.assertNotIn("continue-on-error: true", workflow)
                 self.assertIn("$GITHUB_STEP_SUMMARY", workflow)
+                self.assertNotIn("environment:", workflow)
                 self.assertIn(
-                    "environment: ${{ github.event_name == 'pull_request_target' "
-                    "&& 'pr-ci' || '' }}",
+                    "runs-on: [self-hosted, Linux, X64, certigo-pr]",
                     workflow,
                 )
                 self.assertIn(

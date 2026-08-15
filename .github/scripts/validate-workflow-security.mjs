@@ -27,10 +27,12 @@ const versionPattern = /^v[0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z.-]+)?$/;
 const usesPattern =
   /^\s*(?:-\s+)?uses:\s*(?<value>[^#\s]+)(?:\s+#\s*(?<version>\S+))?\s*$/;
 const runPattern = /^(?<indent>\s*)(?:-\s+)?run:\s*(?<value>.*)$/;
-const azureLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-ci]';
+const prLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-pr]';
+const trustedLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-trusted]';
 const allowedRunnerLines = new Set([
-  azureLinuxRunner,
-  'runs-on: [self-hosted, macOS]',
+  prLinuxRunner,
+  trustedLinuxRunner,
+  'runs-on: [self-hosted, macOS, certigo-trusted]',
 ]);
 const forbiddenRunnerConfiguration = [
   'CI_GITHUB_HOSTED_FALLBACK',
@@ -47,6 +49,20 @@ const forbiddenAutomation = [
 const reusableScannerFiles = new Set([
   'dependency-vuln-scan.yml',
   'security-scan.yml',
+]);
+const trustedOnlyWorkflowFiles = new Set([
+  'cd-backend.yml',
+  'deploy-privacy-policy.yml',
+  'release-android.yml',
+  'release-ios.yml',
+  'runner-health.yml',
+  'runner-resilience-drill.yml',
+  'sync-ios-certs.yml',
+]);
+const trustedAggregateJobs = new Map([
+  ['ci-project-state.yml', new Set(['validate'])],
+  ['codeql.yml', new Set(['security-gate'])],
+  ['security-gate.yml', new Set(['security-gate'])],
 ]);
 
 function shellExpressions(lines) {
@@ -90,6 +106,22 @@ function shellExpressions(lines) {
   return findings;
 }
 
+function jobBlocks(text) {
+  const jobsStart = text.indexOf('\njobs:\n');
+  if (jobsStart < 0) {
+    return [];
+  }
+  const jobsText = text.slice(jobsStart + 1);
+  const matches = [...jobsText.matchAll(/^  (?<id>[A-Za-z0-9_-]+):\s*$/gm)];
+  return matches.map((match, index) => ({
+    id: match.groups.id,
+    text: jobsText.slice(
+      match.index,
+      index + 1 < matches.length ? matches[index + 1].index : undefined,
+    ),
+  }));
+}
+
 function validateWorkflow(file) {
   const text = fs.readFileSync(file, 'utf8');
   const lines = text.split(/\r?\n/);
@@ -113,6 +145,47 @@ function validateWorkflow(file) {
     const trimmed = line.trim();
     if (trimmed.startsWith('runs-on:') && !allowedRunnerLines.has(trimmed)) {
       errors.push(`${file}: runner must use a fixed Azure self-hosted label set`);
+    }
+  }
+  if (text.includes('certigo-ci')) {
+    errors.push(`${file}: legacy mixed-trust runner label certigo-ci is forbidden`);
+  }
+  for (const job of jobBlocks(text)) {
+    const fileName = path.basename(file);
+    if (
+      trustedOnlyWorkflowFiles.has(fileName)
+      && job.text.includes('runs-on:')
+      && !job.text.includes('certigo-trusted')
+    ) {
+      errors.push(`${file}: operational job ${job.id} must use certigo-trusted`);
+    }
+    if (
+      trustedAggregateJobs.get(fileName)?.has(job.id)
+      && !job.text.includes(trustedLinuxRunner)
+    ) {
+      errors.push(`${file}: aggregate job ${job.id} must use certigo-trusted`);
+    }
+    if (job.text.includes(prLinuxRunner)) {
+      if (
+        job.text.includes('secrets.')
+        || /^\s+environment:\s*/m.test(job.text)
+        || job.text.includes('azure/login@')
+        || /key\s*vault|keyvault/i.test(job.text)
+      ) {
+        errors.push(
+          `${file}: certigo-pr job ${job.id} must not receive secrets, environments, or cloud identity`,
+        );
+      }
+    }
+    if (
+      job.text.includes('certigo-trusted')
+      && (
+        job.text.includes('github.event.pull_request.head.sha')
+        || job.text.includes('.untrusted-source')
+        || job.text.includes('.untrusted-restore')
+      )
+    ) {
+      errors.push(`${file}: certigo-trusted job ${job.id} must not checkout or parse PR source`);
     }
   }
   if (text.includes('pull_request_target:')) {
@@ -339,7 +412,7 @@ function validateRepositoryInvariants() {
   }
   for (const marker of [
     'pull_request_target:',
-    azureLinuxRunner,
+    prLinuxRunner,
     "github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository",
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
@@ -386,7 +459,7 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'name: Validate workflow YAML',
     'pull_request_target:',
-    azureLinuxRunner,
+    prLinuxRunner,
     'github.event.pull_request.head.repo.full_name == github.repository',
     'ref: ${{ github.event.pull_request.head.sha }}',
     'ref: ${{ github.event.pull_request.base.sha }}',
@@ -509,15 +582,8 @@ function validateRepositoryInvariants() {
     if (!workflow.includes('workflow_call:')) {
       errors.push(`${fileName}: scanner must be callable by the stable security gate`);
     }
-    if (!workflow.includes(azureLinuxRunner)) {
-      errors.push(`${fileName}: scanner must use the fixed Azure self-hosted pool`);
-    }
-    if (
-      !workflow.includes(
-        "environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}",
-      )
-    ) {
-      errors.push(`${fileName}: reusable scanner must require pr-ci for PR execution`);
+    if (!workflow.includes(prLinuxRunner)) {
+      errors.push(`${fileName}: scanner must use the isolated PR runner`);
     }
     for (const marker of [
       "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
@@ -593,6 +659,9 @@ function validateRepositoryInvariants() {
     'is absent from the target graph',
     'expected a 64-byte SHA-512 digest',
     'unreachable from Direct/Project roots',
+    'conditional MSBuild elements are unsupported',
+    'PackageReference contains unsupported metadata',
+    'declared ProjectReference entries are absent',
   ]) {
     if (!nugetLockValidator.includes(marker)) {
       errors.push(`validate_nuget_locks.py: missing fail-closed invariant ${marker}`);
@@ -686,7 +755,7 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'pull_request_target:',
     'Fork PR policy / Required gate',
-    azureLinuxRunner,
+    prLinuxRunner,
     'HEAD_REPOSITORY" != "$BASE_REPOSITORY',
   ]) {
     if (!forkPolicy.includes(marker)) {

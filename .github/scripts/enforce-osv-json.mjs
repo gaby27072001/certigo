@@ -40,6 +40,34 @@ export function evaluateOsvJson(file, options = {}) {
   ) {
     throw new Error('OSV-Scanner JSON must contain a results array.');
   }
+  let sourceContract;
+  const allowedEmptyNugetPackages = new Set();
+  if (options.expectedSources !== undefined) {
+    sourceContract = options.expectedSources;
+    if (
+      typeof sourceContract !== 'object'
+      || sourceContract === null
+      || Array.isArray(sourceContract)
+      || !Array.isArray(sourceContract.sources)
+      || !Array.isArray(sourceContract.allowedEmptyNugetPackages)
+      || Object.keys(sourceContract).some(
+        (key) => !['sources', 'allowedEmptyNugetPackages'].includes(key),
+      )
+    ) {
+      throw new Error(
+        'Expected OSV source contract must contain sources and '
+        + 'allowedEmptyNugetPackages arrays.',
+      );
+    }
+    for (const [index, value] of sourceContract.allowedEmptyNugetPackages.entries()) {
+      allowedEmptyNugetPackages.add(
+        requiredString(
+          value,
+          `expectedSources.allowedEmptyNugetPackages[${index}]`,
+        ).toLowerCase(),
+      );
+    }
+  }
 
   let packageCount = 0;
   let vulnerabilityCount = 0;
@@ -91,13 +119,35 @@ export function evaluateOsvJson(file, options = {}) {
           `${packageSource} must contain a package and valid vulnerability/group arrays.`,
         );
       }
-      requiredString(packageResult.package.name, `${packageSource}.package.name`);
-      requiredString(packageResult.package.version, `${packageSource}.package.version`);
-      requiredString(packageResult.package.ecosystem, `${packageSource}.package.ecosystem`);
+      const packageName = requiredString(
+        packageResult.package.name,
+        `${packageSource}.package.name`,
+      );
+      if (typeof packageResult.package.version !== 'string') {
+        throw new Error(`${packageSource}.package.version must be a string.`);
+      }
+      const ecosystem = requiredString(
+        packageResult.package.ecosystem,
+        `${packageSource}.package.ecosystem`,
+      );
 
       const packageVulnerabilityIds = new Set();
       const vulnerabilities = packageResult.vulnerabilities ?? [];
       const groups = packageResult.groups ?? [];
+      if (
+        packageResult.package.version === ''
+        && (
+          ecosystem !== 'NuGet'
+          || !allowedEmptyNugetPackages.has(packageName.toLowerCase())
+          || vulnerabilities.length > 0
+          || groups.length > 0
+        )
+      ) {
+        throw new Error(
+          `${packageSource}.package.version may be empty only for a validated `
+          + 'tracked NuGet project reference without findings.',
+        );
+      }
       for (const [vulnerabilityIndex, vulnerability] of vulnerabilities.entries()) {
         if (
           typeof vulnerability !== 'object'
@@ -148,15 +198,12 @@ export function evaluateOsvJson(file, options = {}) {
       vulnerabilityCount += groups.length;
     }
   }
-  if (options.expectedSources !== undefined) {
-    if (!Array.isArray(options.expectedSources)) {
-      throw new Error('Expected OSV sources must be an array.');
-    }
+  if (sourceContract !== undefined) {
     const expectedSources = new Set();
-    for (const [index, value] of options.expectedSources.entries()) {
-      const expected = requiredString(value, `expectedSources[${index}]`);
+    for (const [index, value] of sourceContract.sources.entries()) {
+      const expected = requiredString(value, `expectedSources.sources[${index}]`);
       if (path.isAbsolute(expected) || expected.split(/[\\/]/).includes('..')) {
-        throw new Error(`expectedSources[${index}] must be repository-relative.`);
+        throw new Error(`expectedSources.sources[${index}] must be repository-relative.`);
       }
       expectedSources.add(expected.replaceAll('\\', '/'));
     }

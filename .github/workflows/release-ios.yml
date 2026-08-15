@@ -65,7 +65,7 @@ jobs:
     if: ${{ inputs.enable_legacy_workflow && github.ref == 'refs/heads/main' }}
     name: Build IPA signé + upload TestFlight
     # Runner macOS self-hosted requis pour Xcode ; aucun fallback hébergé.
-    runs-on: [self-hosted, macOS]
+    runs-on: [self-hosted, macOS, certigo-trusted]
     # Approval gate: configure required reviewers on the "beta" environment
     # (Settings → Environments) so a human signs off before any TestFlight upload.
     environment: beta

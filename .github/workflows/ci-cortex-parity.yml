@@ -33,7 +33,7 @@ jobs:
   changes:
     name: Detect changed paths
     if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
       pull-requests: read
@@ -58,8 +58,7 @@ jobs:
       always()
       && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
       && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
-    environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     # Le runner-2 a /usr/share/dotnet NON inscriptible : on force actions/setup-dotnet a
     # installer dans un dossier temporaire inscriptible pour que le job passe sur les 2 runners.
     env:

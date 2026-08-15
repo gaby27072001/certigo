@@ -181,13 +181,25 @@ class NuGetLockValidatorTests(unittest.TestCase):
         self.add("backend/App/App.csproj", "backend/App/packages.lock.json")
         with self.assertRaisesRegex(
             validate_nuget_locks.NuGetLockError,
-            "conditional PackageReference elements are unsupported",
+            "conditional MSBuild elements are unsupported",
         ):
             validate_nuget_locks.validate_repository(self.root)
 
         self.write("backend/App/App.csproj", self.project("$(PackageVersion)"))
         with self.assertRaisesRegex(
             validate_nuget_locks.NuGetLockError, "literal exact Version"
+        ):
+            validate_nuget_locks.validate_repository(self.root)
+
+        self.write(
+            "backend/App/App.csproj",
+            self.project().replace(
+                'Version="1.2.3"',
+                'Version="1.2.3" VersionOverride="9.9.9"',
+            ),
+        )
+        with self.assertRaisesRegex(
+            validate_nuget_locks.NuGetLockError, "unsupported metadata"
         ):
             validate_nuget_locks.validate_repository(self.root)
 

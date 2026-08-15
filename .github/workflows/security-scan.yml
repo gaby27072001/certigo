@@ -9,8 +9,7 @@ permissions: {}
 jobs:
   iac-scan:
     name: Bicep IaC scan (Checkov)
-    environment: ${{ github.event_name == 'pull_request_target' && 'pr-ci' || '' }}
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
     env:

@@ -16,7 +16,7 @@ concurrency:
 jobs:
   trust-gate:
     name: Fork PR policy / Required gate
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     steps:
       - name: Enforce same-repository pull requests
         shell: bash

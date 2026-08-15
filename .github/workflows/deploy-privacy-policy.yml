@@ -17,7 +17,7 @@ concurrency:
 jobs:
   build:
     name: Build privacy policy page
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions:
       contents: read
       pages: write
@@ -65,7 +65,7 @@ jobs:
     name: Deploy to GitHub Pages
     needs: build
     if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

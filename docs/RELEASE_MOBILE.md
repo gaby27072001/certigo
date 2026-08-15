@@ -192,11 +192,11 @@ inline (`prod` pour `ios-release`, `dev` pour `ios-release-dry`).
 
 ### 3.1 Pré-requis du runner self-hosted
 
-Le runner `certigo-ci` (Linux X64) doit disposer de Flutter/Dart (déjà requis
+Le runner `certigo-trusted` (Linux X64) doit disposer de Flutter/Dart (déjà requis
 par la CI). Le workflow installe lui-même **JDK 17** et le **SDK Android**
 (`android-actions/setup-android` + `sdkmanager`), donc aucune action manuelle
 supplémentaire n'est nécessaire. L'egress internet passe par la NAT Gateway
-`certigo-ci` (voir README).
+`certigo-trusted` (voir le runbook CI).
 
 ### 3.2 Générer le keystore upload (one-time, en local)
 

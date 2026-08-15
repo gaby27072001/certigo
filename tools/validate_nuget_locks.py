@@ -77,7 +77,12 @@ def _condition(element: ET.Element) -> str | None:
     return None
 
 
-def _direct_references(project_path: Path, source: PurePosixPath) -> dict[str, tuple[str, str]]:
+def _direct_references(
+    project_path: Path,
+    source: PurePosixPath,
+    repository_root: Path,
+    tracked_projects: set[PurePosixPath],
+) -> tuple[dict[str, tuple[str, str]], set[str]]:
     try:
         raw = project_path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -98,8 +103,11 @@ def _direct_references(project_path: Path, source: PurePosixPath) -> dict[str, t
         raise NuGetLockError(
             f"{source}: Project Sdk must be exactly Microsoft.NET.Sdk."
         )
+    if set(root_attributes) != {"sdk"}:
+        raise NuGetLockError(f"{source}: unsupported Project attributes.")
 
     references: dict[str, tuple[str, str]] = {}
+    project_references: set[str] = set()
 
     def walk(
         element: ET.Element,
@@ -112,11 +120,9 @@ def _direct_references(project_path: Path, source: PurePosixPath) -> dict[str, t
                 f"{source}: {element_name} elements are unsupported."
             )
         current_conditional = conditional or _condition(element) is not None
+        if current_conditional:
+            raise NuGetLockError(f"{source}: conditional MSBuild elements are unsupported.")
         if element_name == "PackageReference":
-            if current_conditional:
-                raise NuGetLockError(
-                    f"{source}: conditional PackageReference elements are unsupported."
-                )
             if ancestors != ("Project", "ItemGroup"):
                 raise NuGetLockError(
                     f"{source}: PackageReference must be directly inside an ItemGroup."
@@ -125,6 +131,17 @@ def _direct_references(project_path: Path, source: PurePosixPath) -> dict[str, t
                 _local_name(name).lower(): value.strip()
                 for name, value in element.attrib.items()
             }
+            if not set(attributes).issubset({"include", "version", "outputitemtype"}):
+                raise NuGetLockError(
+                    f"{source}: PackageReference contains unsupported metadata."
+                )
+            if (
+                "outputitemtype" in attributes
+                and attributes["outputitemtype"] != "Analyzer"
+            ):
+                raise NuGetLockError(
+                    f"{source}: PackageReference OutputItemType must be Analyzer."
+                )
             package_name = attributes.get("include", "")
             if not PACKAGE_ID.fullmatch(package_name):
                 raise NuGetLockError(
@@ -135,6 +152,10 @@ def _direct_references(project_path: Path, source: PurePosixPath) -> dict[str, t
                 for child in element
                 if _local_name(child.tag) == "Version"
             ]
+            if any(_local_name(child.tag) != "Version" for child in element):
+                raise NuGetLockError(
+                    f"{source}: PackageReference child metadata is unsupported."
+                )
             if len(child_versions) > 1:
                 raise NuGetLockError(
                     f"{source}: {package_name} has multiple Version elements."
@@ -165,11 +186,55 @@ def _direct_references(project_path: Path, source: PurePosixPath) -> dict[str, t
                     f"{source}: duplicate PackageReference for {package_name}."
                 )
             references[key] = (package_name, version)
+        elif element_name == "ProjectReference":
+            if ancestors != ("Project", "ItemGroup"):
+                raise NuGetLockError(
+                    f"{source}: ProjectReference must be directly inside an ItemGroup."
+                )
+            attributes = {
+                _local_name(name).lower(): value.strip()
+                for name, value in element.attrib.items()
+            }
+            if set(attributes) != {"include"} or list(element):
+                raise NuGetLockError(
+                    f"{source}: ProjectReference contains unsupported metadata."
+                )
+            include = attributes["include"].replace("\\", "/")
+            if (
+                not include
+                or include.startswith("/")
+                or ":" in include
+                or any(character in include for character in "$*?[]")
+                or PurePosixPath(include).suffix.casefold() != ".csproj"
+            ):
+                raise NuGetLockError(
+                    f"{source}: ProjectReference Include must be a literal relative .csproj path."
+                )
+            referenced_path = (project_path.parent / Path(include)).resolve(strict=False)
+            try:
+                referenced_relative = PurePosixPath(
+                    referenced_path.relative_to(repository_root).as_posix()
+                )
+            except ValueError as exc:
+                raise NuGetLockError(
+                    f"{source}: ProjectReference escapes the repository."
+                ) from exc
+            if referenced_relative not in tracked_projects:
+                raise NuGetLockError(
+                    f"{source}: ProjectReference must target a tracked backend project."
+                )
+            _safe_file(repository_root, referenced_relative)
+            project_key = PurePosixPath(include).stem.casefold()
+            if project_key in project_references:
+                raise NuGetLockError(
+                    f"{source}: duplicate ProjectReference for {project_key}."
+                )
+            project_references.add(project_key)
         for child in element:
             walk(child, current_conditional, (*ancestors, element_name))
 
     walk(root, False, ())
-    return references
+    return references, project_references
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -217,6 +282,7 @@ def _validate_content_hash(value: object, source: str) -> None:
 def _validate_graph(
     graph: object,
     direct_references: dict[str, tuple[str, str]],
+    project_references: set[str],
     source: str,
 ) -> int:
     if not isinstance(graph, dict):
@@ -237,6 +303,14 @@ def _validate_graph(
     direct_packages = {
         key for key, (_, entry) in packages.items() if entry.get("type") == "Direct"
     }
+    project_packages = {
+        key for key, (_, entry) in packages.items() if entry.get("type") == "Project"
+    }
+    missing_projects = sorted(project_references - project_packages)
+    if missing_projects:
+        raise NuGetLockError(
+            f"{source}: declared ProjectReference entries are absent: {missing_projects}."
+        )
     if direct_packages != set(direct_references):
         missing = sorted(set(direct_references) - direct_packages)
         extra = sorted(direct_packages - set(direct_references))
@@ -300,11 +374,7 @@ def _validate_graph(
                 raise NuGetLockError(
                     f"{source}.{package_name}.{dependency_name}: expected a version."
                 )
-    reachable = {
-        key
-        for key, (_, entry) in packages.items()
-        if entry.get("type") in {"Direct", "Project"}
-    }
+    reachable = set(direct_packages) | set(project_references)
     pending = list(reachable)
     while pending:
         current = pending.pop()
@@ -374,8 +444,11 @@ def validate_repository(root: Path) -> tuple[int, int, int]:
     package_count = 0
     for project in sorted(projects, key=str):
         lock = project.parent / "packages.lock.json"
-        references = _direct_references(
-            _safe_file(canonical_root, project), project
+        references, project_references = _direct_references(
+            _safe_file(canonical_root, project),
+            project,
+            canonical_root,
+            set(projects),
         )
         lock_value = _load_lock(_safe_file(canonical_root, lock), lock)
         dependencies = lock_value["dependencies"]
@@ -384,7 +457,7 @@ def validate_repository(root: Path) -> tuple[int, int, int]:
             if not isinstance(target, str) or not target.strip():
                 raise NuGetLockError(f"{lock}: target names must be non-empty strings.")
             package_count += _validate_graph(
-                graph, references, f"{lock}.dependencies.{target}"
+                graph, references, project_references, f"{lock}.dependencies.{target}"
             )
             target_count += 1
     return len(projects), target_count, package_count

@@ -1,6 +1,6 @@
 name: Runner resilience drill
 
-# Manual, non-destructive proof that the shared Azure runner pool fails over.
+# Manual, non-destructive proof that trusted operations survive PR-runner loss.
 on:
   workflow_dispatch:
     inputs:
@@ -22,7 +22,7 @@ jobs:
     # workflow_dispatch can target another ref. Refuse branch-modified workflow
     # code on the persistent runner; drills are always launched from main.
     if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: [self-hosted, Linux, X64, certigo-ci]
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
     steps:
       - name: Validate runner selection
         shell: bash
@@ -52,7 +52,7 @@ jobs:
             echo
             echo "| Field | Value |"
             echo "|---|---|"
-            echo "| Mode | \`azure-self-hosted-failover\` |"
+            echo "| Mode | \`azure-trust-boundary-isolation\` |"
             echo "| Runner | \`$CURRENT_RUNNER_NAME\` |"
             echo "| Environment | \`$RUNNER_KIND\` |"
             echo "| Expected offline runner | \`${EXPECTED_OFFLINE_RUNNER:-n/a}\` |"
