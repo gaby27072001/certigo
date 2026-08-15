@@ -17,6 +17,7 @@ concurrency:
 jobs:
   build:
     name: Build privacy policy page
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions:
       contents: read
