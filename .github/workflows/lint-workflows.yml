@@ -61,6 +61,14 @@ jobs:
           fi
           actionlint "${workflows[@]}"
 
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+
+      - name: Install trusted validator dependencies
+        working-directory: .trusted-control
+        run: npm ci --ignore-scripts
+
       - name: Enforce workflow security policy
         run: |
           node "$TRUSTED_CONTROL_DIR/.github/scripts/validate-workflow-security.mjs" \
