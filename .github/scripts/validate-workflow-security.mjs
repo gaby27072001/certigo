@@ -488,6 +488,9 @@ function validateRepositoryInvariants() {
     'STORAGE_BLOB_ENDPOINT',
     'DEPLOYMENT_CONTAINER',
     'FUNCTION_INTEGRATION_SUBNET_ID',
+    'functionIntegrationSubnetName: ${{ steps.deploy-bicep.outputs.functionIntegrationSubnetName }}',
+    'FUNCTION_INTEGRATION_SUBNET_NAME: ${{ needs.deploy-infra.outputs.functionIntegrationSubnetName }}',
+    '/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}',
     'APPROVED_REQUIRED_GROUPS',
     "contains(['Sql', 'blob', 'queue', 'table', 'vault'], @)",
     'SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}',
@@ -496,6 +499,15 @@ function validateRepositoryInvariants() {
     if (!backend.includes(marker)) {
       errors.push(`cd-backend.yml: missing private OneDeploy invariant ${marker}`);
     }
+  }
+  if (
+    backend.includes(
+      'functionIntegrationSubnetId: ${{ steps.deploy-bicep.outputs.functionIntegrationSubnetId }}',
+    )
+  ) {
+    errors.push(
+      'cd-backend.yml: subnet resource ids containing the masked subscription id cannot cross job boundaries',
+    );
   }
   if (backend.includes("--query 'length(@)' -o tsv")) {
     errors.push(
