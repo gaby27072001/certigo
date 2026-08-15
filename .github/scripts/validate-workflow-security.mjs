@@ -200,6 +200,7 @@ function validateRepositoryInvariants() {
   const errors = [];
   const android = fs.readFileSync(path.join(workflowsDir, 'release-android.yml'), 'utf8');
   const backend = fs.readFileSync(path.join(workflowsDir, 'cd-backend.yml'), 'utf8');
+  const backendCi = fs.readFileSync(path.join(workflowsDir, 'ci-backend.yml'), 'utf8');
   const promoteBackend = fs.readFileSync(
     path.join(workflowsDir, 'promote-backend-staging-prod.yml'),
     'utf8',
@@ -273,6 +274,18 @@ function validateRepositoryInvariants() {
   }
   if (!backend.includes('environment: ${{ needs.validate-target.outputs.target }}')) {
     errors.push('cd-backend.yml: deployment environment is not sourced from validation');
+  }
+  for (const marker of [
+    'dotnet restore backend/src/Certigo.Api/Certigo.Api.csproj',
+    '--locked-mode',
+    '--no-restore',
+  ]) {
+    if (!backend.includes(marker)) {
+      errors.push(`cd-backend.yml: missing locked dependency invariant ${marker}`);
+    }
+  }
+  if (!backendCi.includes('dotnet restore Certigo.sln --locked-mode')) {
+    errors.push('ci-backend.yml: backend build must restore committed locks in locked mode');
   }
   for (const secret of [
     'AZURE_CLIENT_ID',
@@ -558,6 +571,9 @@ function validateRepositoryInvariants() {
     'git ls-files',
     'PackageReference',
     'packages.lock.json',
+    'Project Sdk must be exactly Microsoft.NET.Sdk',
+    'Central/imported MSBuild dependency configuration is unsupported',
+    'Import", "Choose", "Sdk',
     'expected NuGet lock schema version 1',
     'Direct packages differ from the project',
     'expected requested',

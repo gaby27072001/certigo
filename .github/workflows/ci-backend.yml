@@ -63,7 +63,7 @@ jobs:
           dotnet-version: "8.0.x"
       - name: Restore
         working-directory: backend
-        run: dotnet restore Certigo.sln
+        run: dotnet restore Certigo.sln --locked-mode
       - name: Build
         working-directory: backend
         run: dotnet build Certigo.sln --configuration Release --no-restore -warnaserror

@@ -149,10 +149,15 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Restore locked dependencies
+        run: |
+          dotnet restore backend/src/Certigo.Api/Certigo.Api.csproj \
+            --locked-mode
       - name: Publish
         run: |
           dotnet publish backend/src/Certigo.Api/Certigo.Api.csproj \
             --configuration Release \
+            --no-restore \
             --output ./publish
 
       - name: Zip publish artefact

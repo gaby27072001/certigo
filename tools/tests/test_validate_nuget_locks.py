@@ -157,6 +157,39 @@ class NuGetLockValidatorTests(unittest.TestCase):
         ):
             validate_nuget_locks.validate_repository(self.root)
 
+    def test_rejects_imports_custom_sdks_and_central_configuration(self) -> None:
+        self.valid_fixture()
+        self.write(
+            "backend/App/App.csproj",
+            '<Project Sdk="Custom.Sdk/1.0.0"><Import Project="deps.props" /></Project>',
+        )
+        with self.assertRaisesRegex(
+            validate_nuget_locks.NuGetLockError,
+            "Project Sdk must be exactly Microsoft.NET.Sdk",
+        ):
+            validate_nuget_locks.validate_repository(self.root)
+
+        self.write(
+            "backend/App/App.csproj",
+            '<Project Sdk="Microsoft.NET.Sdk"><Import Project="deps.props" /></Project>',
+        )
+        with self.assertRaisesRegex(
+            validate_nuget_locks.NuGetLockError, "Import elements are unsupported"
+        ):
+            validate_nuget_locks.validate_repository(self.root)
+
+        self.write("backend/App/App.csproj", self.project())
+        self.write(
+            "Directory.Packages.props",
+            "<Project><ItemGroup /></Project>",
+        )
+        self.add("Directory.Packages.props")
+        with self.assertRaisesRegex(
+            validate_nuget_locks.NuGetLockError,
+            "Central/imported MSBuild dependency configuration is unsupported",
+        ):
+            validate_nuget_locks.validate_repository(self.root)
+
 
 if __name__ == "__main__":
     unittest.main()

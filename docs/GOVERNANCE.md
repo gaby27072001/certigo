@@ -69,6 +69,8 @@ développement de confiance avec
 `dotnet restore backend/Certigo.sln --use-lock-file --force-evaluate`, n'ajoute que les huit
 `packages.lock.json` adjacents aux projets (jamais `obj/**/WorkerExtensions/**`), puis exécute
 `python tools/validate_nuget_locks.py --root .` avant de commiter.
+Les builds CI et le déploiement backend restaurent ensuite en `--locked-mode` ; une dépendance
+importée ou un lock tronqué ne peut donc ni être fusionné ni produire l'artefact publié.
 
 La gate `Generated state equals committed state` n'accède à aucun dépôt externe et ne reçoit
 aucun secret. Le générateur du SHA immuable de base valide la référence locale

@@ -26,7 +26,7 @@ def _local_name(name: str) -> str:
     return name.rsplit("}", 1)[-1]
 
 
-def _tracked_backend_paths(root: Path) -> tuple[PurePosixPath, ...]:
+def _tracked_paths(root: Path) -> tuple[PurePosixPath, ...]:
     try:
         result = subprocess.run(
             [
@@ -35,8 +35,6 @@ def _tracked_backend_paths(root: Path) -> tuple[PurePosixPath, ...]:
                 "core.hooksPath=/dev/null",
                 "ls-files",
                 "-z",
-                "--",
-                "backend",
             ],
             cwd=root,
             check=True,
@@ -92,15 +90,36 @@ def _direct_references(project_path: Path, source: PurePosixPath) -> dict[str, t
         raise NuGetLockError(f"{source}: invalid XML: {exc}") from exc
     if _local_name(root.tag) != "Project":
         raise NuGetLockError(f"{source}: expected an MSBuild Project root.")
+    root_attributes = {
+        _local_name(name).lower(): value.strip()
+        for name, value in root.attrib.items()
+    }
+    if root_attributes.get("sdk") != "Microsoft.NET.Sdk":
+        raise NuGetLockError(
+            f"{source}: Project Sdk must be exactly Microsoft.NET.Sdk."
+        )
 
     references: dict[str, tuple[str, str]] = {}
 
-    def walk(element: ET.Element, conditional: bool) -> None:
+    def walk(
+        element: ET.Element,
+        conditional: bool,
+        ancestors: tuple[str, ...],
+    ) -> None:
+        element_name = _local_name(element.tag)
+        if element_name in {"Import", "Choose", "Sdk"}:
+            raise NuGetLockError(
+                f"{source}: {element_name} elements are unsupported."
+            )
         current_conditional = conditional or _condition(element) is not None
-        if _local_name(element.tag) == "PackageReference":
+        if element_name == "PackageReference":
             if current_conditional:
                 raise NuGetLockError(
                     f"{source}: conditional PackageReference elements are unsupported."
+                )
+            if ancestors != ("Project", "ItemGroup"):
+                raise NuGetLockError(
+                    f"{source}: PackageReference must be directly inside an ItemGroup."
                 )
             attributes = {
                 _local_name(name).lower(): value.strip()
@@ -147,9 +166,9 @@ def _direct_references(project_path: Path, source: PurePosixPath) -> dict[str, t
                 )
             references[key] = (package_name, version)
         for child in element:
-            walk(child, current_conditional)
+            walk(child, current_conditional, (*ancestors, element_name))
 
-    walk(root, False)
+    walk(root, False, ())
     return references
 
 
@@ -282,13 +301,37 @@ def _validate_graph(
 
 def validate_repository(root: Path) -> tuple[int, int, int]:
     canonical_root = root.resolve(strict=True)
-    tracked = _tracked_backend_paths(canonical_root)
+    tracked = _tracked_paths(canonical_root)
     projects = tuple(
-        path for path in tracked if path.suffix.casefold() == ".csproj"
+        path
+        for path in tracked
+        if path.parts
+        and path.parts[0] == "backend"
+        and path.suffix.casefold() == ".csproj"
     )
     tracked_locks = {
-        path for path in tracked if path.name.casefold() == "packages.lock.json"
+        path
+        for path in tracked
+        if path.parts
+        and path.parts[0] == "backend"
+        and path.name.casefold() == "packages.lock.json"
     }
+    unsupported_configuration = sorted(
+        str(path)
+        for path in tracked
+        if path.name.casefold()
+        in {
+            "directory.build.props",
+            "directory.build.targets",
+            "directory.packages.props",
+            "directory.packages.targets",
+        }
+    )
+    if unsupported_configuration:
+        raise NuGetLockError(
+            "Central/imported MSBuild dependency configuration is unsupported: "
+            f"{unsupported_configuration}."
+        )
     if not projects:
         raise NuGetLockError("No tracked backend .csproj files were found.")
     expected_locks = {
