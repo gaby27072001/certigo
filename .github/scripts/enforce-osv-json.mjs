@@ -49,14 +49,15 @@ export function evaluateOsvJson(file, options = {}) {
       || sourceContract === null
       || Array.isArray(sourceContract)
       || !Array.isArray(sourceContract.sources)
+      || !Array.isArray(sourceContract.pubManifests)
       || !Array.isArray(sourceContract.allowedEmptyNugetPackages)
       || Object.keys(sourceContract).some(
-        (key) => !['sources', 'allowedEmptyNugetPackages'].includes(key),
+        (key) => !['sources', 'pubManifests', 'allowedEmptyNugetPackages'].includes(key),
       )
     ) {
       throw new Error(
-        'Expected OSV source contract must contain sources and '
-        + 'allowedEmptyNugetPackages arrays.',
+        'Expected OSV source contract must contain sources, pubManifests, and '
+        + 'allowedEmptyNugetPackages arrays only.',
       );
     }
     for (const [index, value] of sourceContract.allowedEmptyNugetPackages.entries()) {

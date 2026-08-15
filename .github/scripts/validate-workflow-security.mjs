@@ -719,6 +719,7 @@ function validateRepositoryInvariants() {
     'packageResult.groups',
     'references unknown vulnerability',
     'omitted expected tracked lockfiles',
+    'pubManifests',
     'allowedEmptyNugetPackages',
     'may be empty only for a validated',
     'vulnerabilityCount',

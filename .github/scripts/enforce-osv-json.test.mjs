@@ -104,6 +104,7 @@ test('requires every expected tracked lockfile in all-packages output', () => {
     evaluateOsvJson(file, {
       expectedSources: {
         sources: ['package-lock.json'],
+        pubManifests: [],
         allowedEmptyNugetPackages: [],
       },
       sourceRoot: directory,
@@ -120,6 +121,7 @@ test('requires every expected tracked lockfile in all-packages output', () => {
     () => evaluateOsvJson(file, {
       expectedSources: {
         sources: ['package-lock.json', 'missing.lock'],
+        pubManifests: [],
         allowedEmptyNugetPackages: [],
       },
       sourceRoot: directory,
@@ -145,6 +147,7 @@ test('allows empty versions only for validated NuGet project references', () => 
   const options = {
     expectedSources: {
       sources: ['packages.lock.json'],
+      pubManifests: [],
       allowedEmptyNugetPackages: ['certigo.domain'],
     },
     sourceRoot: directory,
@@ -163,7 +166,7 @@ test('CLI exit codes distinguish clean, vulnerable, and invalid reports', () => 
   const expectedSources = path.join(directory, 'expected.json');
   fs.writeFileSync(
     expectedSources,
-    '{"sources":[],"allowedEmptyNugetPackages":[]}',
+    '{"sources":[],"pubManifests":[],"allowedEmptyNugetPackages":[]}',
   );
   const cases = [
     ['osv-clean.json', 0],

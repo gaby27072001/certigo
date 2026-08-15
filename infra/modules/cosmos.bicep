@@ -114,6 +114,16 @@ resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
         indexingPolicy: {
           indexingMode: 'consistent'
           automatic: true
+          includedPaths: [
+            {
+              path: '/*'
+            }
+          ]
+          excludedPaths: [
+            {
+              path: '/"_etag"/?'
+            }
+          ]
         }
       }
     }
