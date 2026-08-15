@@ -4,7 +4,7 @@
 |---|---|
 | **Type** | Runbook opérationnel (CI / infra / coûts) |
 | **Objectif** | Exploiter la CI de Certigo sur ses **runners self-hosted** : **rallumer** les VMs avant une session de travail, les **déallouer** après (économie), **vérifier** l'état des runners et **dépanner** un runner hors ligne. |
-| **Voie officielle** | **Self-hosted** — 2 VMs Azure. Les runners **GitHub-hosted sont BLOQUÉS au niveau Enterprise (EMU)** : cf. §1 (verdict + preuve). |
+| **Voie officielle** | **Self-hosted** — 2 VMs Azure. Les runners GitHub-hosted sont indisponibles par politique d'organisation et ne sont pas une dépendance supportée. |
 | **Périmètre** | Repo `gchambaud_microsoft/Certigo` · RG `RG-CERTIGO-CI` · subscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**). |
 | **Statut** | **En vigueur** (voie pérenne de la CI Certigo). |
 
@@ -26,27 +26,26 @@
 
 ## 1. Contexte & verdict — pourquoi self-hosted (et pas GitHub-hosted)
 
-La CI de Certigo s'appuie **uniquement** sur des runners **self-hosted** (labels
-`self-hosted, Linux, X64, certigo-ci`), portés par **2 VMs Azure**. Ce n'est pas une préférence : c'est
+La CI de Certigo s'appuie **uniquement** sur deux runners **self-hosted** isolés :
+`self-hosted, Linux, X64, certigo-pr` pour toute source PR et
+`self-hosted, Linux, X64, certigo-trusted` pour les opérations/gates sans source PR.
+Ils sont portés par **2 VMs Azure**. Ce n'est pas une préférence : c'est
 une **contrainte dure**, désormais **prouvée empiriquement**.
 
-**Test empirique (verdict sans appel).** Une tentative de bascule vers `ubuntu-latest` (runners
-GitHub-hosted) a été testée en conditions réelles :
+**Test empirique (verdict sans appel).** Une tentative de bascule vers un runner
+hébergé par GitHub a été testée en conditions réelles :
 
 - **Échec immédiat** : `startup_failure` en **~4 secondes**.
-- **Annotation officielle GitHub** :
-  > *GitHub Actions hosted runners are disabled for this repository. For more information please contact
-  > your GitHub Enterprise Administrator.*
+- **Annotation GitHub** : les runners hébergés sont désactivés pour ce dépôt.
 - **Preuve** : run **`28782170300`** →
   <https://github.com/gchambaud_microsoft/Certigo/actions/runs/28782170300>.
 
-**Cause** : les runners GitHub-hosted sont **désactivés au niveau Enterprise (politique EMU —
-Enterprise Managed Users)**, pas seulement au niveau repo/org. Les réactiver relève d'un **admin GitHub
-Enterprise**, **hors de portée de l'équipe Certigo** et jugé **irréaliste** à ce jour.
+**Décision durable** : aucune réactivation ni validation par un propriétaire Enterprise ne sera
+sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur le pool Azure.
 
 > ✅ **Conclusion opérationnelle** : **self-hosted est la voie officielle et pérenne** de la CI Certigo.
-> Le reste de ce runbook décrit son exploitation au quotidien. La bascule vers GitHub-hosted n'est
-> conservée qu'à titre d'**archive conditionnelle** (cf. §10).
+> Le reste de ce runbook décrit son exploitation au quotidien. Aucun chemin alternatif
+> hébergé par GitHub n'est supporté.
 
 ---
 
@@ -58,10 +57,11 @@ Enterprise**, **hors de portée de l'équipe Certigo** et jugé **irréaliste** 
 | **Runner #2** | `vm-certigo-runner-2` |
 | **Resource group** | `RG-CERTIGO-CI` |
 | **Subscription** | `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**) |
-| **Labels runner** | `self-hosted`, `Linux`, `X64`, `certigo-ci` |
+| **Runner PR** | `vm-certigo-runner` · labels `self-hosted`, `Linux`, `X64`, `certigo-pr` · aucune identité/secrets |
+| **Runner trusted** | `vm-certigo-runner-2` · labels `self-hosted`, `Linux`, `X64`, `certigo-trusted` · identité minimale pour release/déploiement |
 | **Repo desservi** | `gchambaud_microsoft/Certigo` |
 
-> 📌 Ces 2 VMs portent le pool **Linux `certigo-ci`** (CI des PR + backend + android). Un éventuel
+> 📌 Les labels `certigo-pr` et `certigo-trusted` sont mutuellement exclusifs. Un éventuel
 > runner **macOS** dédié à iOS (cf. §9) est **distinct** et **n'est pas** géré par ce runbook.
 
 > ℹ️ **Prérequis outillage** (poste opérateur) : `az` (Azure CLI) connecté à la subscription Non-Prod,
@@ -71,14 +71,13 @@ Enterprise**, **hors de portée de l'équipe Certigo** et jugé **irréaliste** 
 
 ## 3. Capacité et stratégie d'exploitation
 
-Chaque `Standard_D4s_v5` traite **un job GitHub Actions à la fois**. Les deux VMs Linux
-`online` apportent donc deux slots de CI concurrents et la tolérance à la panne d'un slot.
-Il n'y a pas d'autoscaling : une file d'attente persistante est un signal pour démarrer les
-deux VMs ou planifier une troisième VM via l'IaC, jamais pour retirer la redondance.
+Chaque `Standard_D4s_v5` traite **un job GitHub Actions à la fois**. Chaque classe ne
+dispose que d'un slot et n'a pas de failover vers l'autre : une file d'attente est un
+signal pour restaurer la VM de la classe concernée, jamais pour déplacer son label.
 
 | Situation | État requis | Décision opérateur |
 |---|---|---|
-| Avant une session CI | 2 VMs `running`, 2 runners `online`, labels `certigo-ci` | Démarrer les deux VMs et attendre la confirmation GitHub. |
+| Avant une session CI | 2 VMs `running`, un runner `certigo-pr` et un `certigo-trusted` online | Démarrer les deux VMs et attendre la confirmation GitHub. |
 | Pendant une session | 2 runners disponibles ; maximum 2 jobs simultanés | Garder les deux VMs allouées ; investiguer toute file d'attente. |
 | Après la session | Tous les runners `busy: false`, aucun run à traiter | Déallouer les deux VMs. |
 | Panne/maintenance d'une VM | Au moins 1 slot sain, idéalement 2 après réparation | Ne manipuler qu'une VM à la fois et reconstruire avant la prochaine session critique. |
@@ -214,16 +213,15 @@ Si, après un `az vm start` et ~1–2 minutes d'attente, un runner reste `offlin
 
 ## 9. Ce qui reste **obligatoirement** self-hosted
 
-Indépendamment de tout, ces workflows **ne peuvent pas** tourner sur GitHub-hosted et **exigent** le
-self-hosted :
+Tous les workflows **exigent** une capacité self-hosted adaptée :
 
 | Workflow | Raison |
 |---|---|
-| [`cd-backend.yml`](../../.github/workflows/cd-backend.yml) | **Déploiement critique** du backend (runner de confiance `MAIN_CRITICAL_RUNNER_LABELS`). |
-| [`promote-backend-staging-prod.yml`](../../.github/workflows/promote-backend-staging-prod.yml) | Orchestrateur **manuel** (`workflow_dispatch`) qui **réutilise** `cd-backend.yml`. |
-| [`release-android.yml`](../../.github/workflows/release-android.yml) | Build **AAB lourd**, runner **en dur** `[self-hosted, Linux, X64, certigo-ci]` (release/tag). |
-| [`release-ios.yml`](../../.github/workflows/release-ios.yml) | **iOS = Mac obligatoire** (Xcode), runner **en dur** `[self-hosted, macOS]`. **Non remplaçable.** |
-| [`sync-ios-certs.yml`](../../.github/workflows/sync-ios-certs.yml) | Certificats iOS, runner **en dur** `[self-hosted, macOS]`. **Non remplaçable.** |
+| [`cd-backend.yml`](../../.github/workflows/cd-backend.yml) | **Déploiement critique** du backend sur `certigo-trusted`. |
+| [`promote-backend-staging-prod.yml`](../../.github/workflows/promote-backend-staging-prod.yml) | Orchestrateur privilégié (`repository_dispatch` depuis `main`) qui **réutilise** `cd-backend.yml`. |
+| [`release-android.yml`](../../.github/workflows/release-android.yml) | Build **AAB lourd**, runner `[self-hosted, Linux, X64, certigo-trusted]`. |
+| [`release-ios.yml`](../../.github/workflows/release-ios.yml) | **iOS = Mac obligatoire**, runner `[self-hosted, macOS, certigo-trusted]`. |
+| [`sync-ios-certs.yml`](../../.github/workflows/sync-ios-certs.yml) | Certificats iOS, runner `[self-hosted, macOS, certigo-trusted]`. |
 
 > ⚠️ **Runner macOS distinct.** Les jobs iOS exigent un runner **macOS self-hosted** séparé des 2 VMs
 > Linux de ce runbook. S'il existe, il doit **rester disponible** pour les releases iOS. Voir
@@ -231,29 +229,23 @@ self-hosted :
 
 ---
 
-## 10. Archive — « si un jour les GitHub-hosted sont débloqués »
+## 10. Politique permanente de sélection
 
-> 📎 **Encadré conditionnel — NON applicable aujourd'hui** (hosted bloqués au niveau Enterprise, cf. §1).
-> Conservé uniquement comme **connaissance utile** au cas où la politique EMU changerait un jour.
->
-> Les jobs de PR sont **pré-câblés** pour une bascule sans modification de workflow. Le `runs-on` type
-> est :
-> ```yaml
-> runs-on: ${{ vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
-> ```
-> Si — **et seulement si** — un admin GitHub Enterprise réactive les hosted runners, on pourrait alors :
-> ```bash
-> # Bascule des workflows de PR vers ubuntu-latest
-> gh variable set PR_RUNNER_LABELS   --body '["ubuntu-latest"]' --repo gchambaud_microsoft/Certigo
-> # Le backend a une logique dédiée : nécessite EN PLUS
-> gh variable set BACKEND_CI_FALLBACK --body 'true'             --repo gchambaud_microsoft/Certigo
-> # Retour au self-hosted = supprimer les variables
-> gh variable delete PR_RUNNER_LABELS    --repo gchambaud_microsoft/Certigo
-> gh variable delete BACKEND_CI_FALLBACK --repo gchambaud_microsoft/Certigo
-> ```
-> ⚠️ Tant que le blocage EMU est en place, **poser ces variables casse la CI** (jobs `Pending` puis
-> `startup_failure`, cf. §1). **Ne pas exécuter** sans confirmation que les hosted sont réellement
-> activés.
+Les workflows Linux utilisent exclusivement l'une de ces deux sélections :
+
+```yaml
+runs-on: [self-hosted, Linux, X64, certigo-pr]
+runs-on: [self-hosted, Linux, X64, certigo-trusted]
+```
+
+Ces sélections ne sont ni paramétrables ni dotées d'un fallback. `certigo-pr` ne reçoit
+ni environnement, ni secret, ni identité cloud ; `certigo-trusted` ne checkout et
+n'analyse jamais de source PR. Tout workflow contenant un job `certigo-trusted`
+interdit `workflow_dispatch` et les déclencheurs par tag : les opérations manuelles
+utilisent un type `repository_dispatch` dédié afin que GitHub charge le YAML depuis
+la branche par défaut. Ces workflows interdisent également `cache: true` : aucun cache
+Flutter/Pub inscriptible par les validations PR ne doit être restauré sur le pool
+trusted.
 
 ---
 
@@ -271,4 +263,4 @@ self-hosted :
 - Autres runbooks : [`docs/runbooks/README.md`](./README.md).
 
 > **Paramètres confirmés** : RG `RG-CERTIGO-CI` · VMs `vm-certigo-runner`, `vm-certigo-runner-2` ·
-> subscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (Non-Prod) · labels `self-hosted, Linux, X64, certigo-ci`.
+> subscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (Non-Prod) · rôles `certigo-pr` / `certigo-trusted`.

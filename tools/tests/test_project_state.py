@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "project_state.py"
-REPO_ROOT = MODULE_PATH.parents[1]
+REPO_ROOT = Path(os.environ.get("CERTIGO_WORKSPACE", MODULE_PATH.parents[1])).resolve()
 SPEC = importlib.util.spec_from_file_location("project_state", MODULE_PATH)
 assert SPEC and SPEC.loader
 project_state = importlib.util.module_from_spec(SPEC)
@@ -108,6 +108,7 @@ class Fixture:
         self.write("backend/tests/Domain/RuleTests.cs", "class RuleTests {}\n")
         self.write("apps/mobile/test/widget_test.dart", "void main() {}\n")
         self.write(".gitignore", "__pycache__/\n*.pyc\n")
+        self.write(".gitattributes", "* text=auto eol=lf\n*.png binary\n")
         self.json(
             "docs/active-content-reference.json",
             {
@@ -182,6 +183,26 @@ class ProjectStateTests(unittest.TestCase):
         self.assertEqual("2026-08-06", first.reference_date)
         self.assertEqual(self.fixture.git("rev-parse", "HEAD"), first.reference_commit)
         self.assertEqual(project_state.render(first), project_state.render(second))
+
+    def test_observable_hash_normalizes_declared_lf_text(self) -> None:
+        source = self.root / ".github/workflows/ci-mobile.yml"
+        original = source.read_bytes().replace(b"\r\n", b"\n")
+        source.write_bytes(original)
+        expected = project_state.observable_sha256(self.root)
+
+        source.write_bytes(original.replace(b"\n", b"\r\n"))
+        self.assertEqual(expected, project_state.observable_sha256(self.root))
+
+        source.write_bytes(original + b"# semantic change\n")
+        self.assertNotEqual(expected, project_state.observable_sha256(self.root))
+
+    def test_observable_hash_does_not_normalize_auto_detected_binary(self) -> None:
+        source = self.root / "content/binary.dat"
+        source.write_bytes(b"\0binary\r\npayload")
+        crlf_hash = project_state.observable_sha256(self.root)
+
+        source.write_bytes(b"\0binary\npayload")
+        self.assertNotEqual(crlf_hash, project_state.observable_sha256(self.root))
 
     def test_equivalent_root_commit_does_not_require_reference_ancestry(self) -> None:
         captured_commit = project_state.load_reference(self.root)[1]
@@ -484,11 +505,29 @@ class ProjectStateTests(unittest.TestCase):
         expected = f"sha256:{hashlib.sha256(canonical).hexdigest()}"
         self.assertEqual(expected, project_state._canonical_manifest_id(manifest))
 
+    def test_manifest_reference_rejects_paths_outside_active_content(self) -> None:
+        reference_path = self.root / project_state.ACTIVE_CONTENT_REFERENCE_FILE
+        reference = json.loads(reference_path.read_text(encoding="utf-8"))
+        reference["manifests"]["public"]["path"] = "../manifest.json"
+        reference_path.write_text(json.dumps(reference), encoding="utf-8")
+        with self.assertRaisesRegex(
+            project_state.ProjectStateError, "expected a manifest.json path"
+        ):
+            project_state.load_active_content_reference(self.root)
+
+    def test_cli_uses_explicit_repository_root(self) -> None:
+        project_state.update(self.root, check=False)
+        self.assertEqual(
+            0,
+            project_state.main(["--root", str(self.root), "--check"]),
+        )
+
     def test_project_state_workflow_and_branch_protection_contract(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/ci-project-state.yml").read_text(
             encoding="utf-8"
         )
-        self.assertIn("pull_request:", workflow)
+        self.assertIn("pull_request_target:", workflow)
+        self.assertNotIn("\n  pull_request:\n", workflow)
         self.assertNotIn("paths:", workflow)
         self.assertIn("schedule:", workflow)
         self.assertIn('cron: "17 4 * * *"', workflow)
@@ -497,23 +536,56 @@ class ProjectStateTests(unittest.TestCase):
             "github.event.pull_request.head.repo.full_name == github.repository",
             workflow,
         )
+        self.assertNotIn("environment:", workflow)
+        self.assertIn("runs-on: [self-hosted, Linux, X64, certigo-pr]", workflow)
         self.assertIn(
-            "environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}",
+            "runs-on: [self-hosted, Linux, X64, certigo-trusted]",
             workflow,
         )
-        self.assertIn("vars.CI_GITHUB_HOSTED_FALLBACK == 'true'", workflow)
-        self.assertIn("vars.MAIN_CRITICAL_RUNNER_LABELS", workflow)
-        self.assertIn("vars.PR_RUNNER_LABELS", workflow)
         self.assertIn(
-            'fromJSON(\'["self-hosted","Linux","X64","certigo-ci"]\')',
+            "ref: ${{ github.event_name == 'pull_request_target' && "
+            "github.event.pull_request.head.sha || github.sha }}",
             workflow,
         )
-        self.assertNotIn("\n    runs-on: ubuntu-latest\n", workflow)
-        self.assertIn('node-version: "20.20.2"', workflow)
+        self.assertIn(
+            "ref: ${{ github.event_name == 'pull_request_target' && "
+            "github.event.pull_request.base.sha || github.sha }}",
+            workflow,
+        )
+        self.assertIn("path: .untrusted-source", workflow)
+        self.assertIn("path: .trusted-control", workflow)
+        self.assertIn("validate-source:", workflow)
+        self.assertIn("needs: validate-source", workflow)
+        source_job = workflow[
+            workflow.index("  validate-source:") : workflow.index(
+                "  validate:\n", workflow.index("  validate-source:")
+            )
+        ]
+        self.assertNotIn("secrets.", source_job)
+        self.assertNotIn("-latest", workflow)
         self.assertIn("persist-credentials: false", workflow)
-        self.assertIn("npm ci", workflow)
-        self.assertIn("npm run package", workflow)
-        self.assertIn("--validate-active-content .active-content", workflow)
+        self.assertIn(
+            "name: Validate committed active-content reference and generated state",
+            workflow,
+        )
+        self.assertNotIn("secrets.", workflow)
+        self.assertNotIn("repository:", workflow)
+        self.assertNotIn("ssh-key:", workflow)
+        self.assertNotIn("ssh-known-hosts:", workflow)
+        self.assertNotIn("CERTIGO_CONTENT_", workflow)
+        self.assertNotIn("create-github-app-token", workflow)
+        self.assertNotIn("token: ${{", workflow)
+        self.assertNotIn("actions/setup-node@", workflow)
+        self.assertNotIn("npm ci", workflow)
+        self.assertNotIn("npm run", workflow)
+        self.assertIn(
+            'python -P tools/project_state.py --root "$PROJECT_WORKSPACE" --check',
+            workflow,
+        )
+        gate_job = workflow[
+            workflow.index("  validate:\n", workflow.index("  validate-source:"))
+        :]
+        self.assertNotIn("actions/checkout@", gate_job)
 
         protection = json.loads(
             (REPO_ROOT / ".github/branch-protection-main.json").read_text(
@@ -525,9 +597,187 @@ class ProjectStateTests(unittest.TestCase):
                 "Build & test",
                 "Flutter app + UI packages",
                 "Generated state equals committed state",
+                "Validate workflow YAML",
+                "CodeQL / Security gate",
+                "Security / Required gate",
+                "Fork PR policy / Required gate",
             ],
             protection["required_status_checks"]["contexts"],
         )
+
+    def test_codeql_covers_github_security_scripts(self) -> None:
+        workflow = (REPO_ROOT / ".github/workflows/codeql.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("- '.github/scripts/**/*.js'", workflow)
+        self.assertIn("- '.github/scripts/**/*.mjs'", workflow)
+        self.assertNotIn("actions/upload-artifact@", workflow)
+        self.assertIn("upload: always", workflow)
+        self.assertIn("source-root: .untrusted-source", workflow)
+        self.assertIn(
+            "config-file: ./.trusted-control/.github/codeql/codeql-config.yml",
+            workflow,
+        )
+        self.assertIn(
+            'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-codeql-sarif.mjs"',
+            workflow,
+        )
+        self.assertNotIn(
+            "run: node .github/scripts/enforce-codeql-sarif.mjs",
+            workflow,
+        )
+        enforcer = (
+            REPO_ROOT / ".github/scripts/enforce-codeql-sarif.mjs"
+        ).read_text(encoding="utf-8")
+        self.assertIn("GITHUB_STEP_SUMMARY", enforcer)
+
+    def test_trusted_workflows_use_default_branch_dispatch_only(self) -> None:
+        workflows = REPO_ROOT / ".github/workflows"
+        dispatch_types = {
+            "deploy-privacy-policy.yml": "deploy-privacy-policy",
+            "promote-backend-staging-prod.yml": "promote-backend-staging-prod",
+            "release-android.yml": "release-android",
+            "release-ios.yml": "release-ios-legacy",
+            "runner-health.yml": "runner-health",
+            "runner-resilience-drill.yml": "runner-resilience-drill",
+            "sync-ios-certs.yml": "sync-ios-certs-legacy",
+        }
+
+        trusted_workflows = []
+        for workflow_path in workflows.glob("*.yml"):
+            workflow = workflow_path.read_text(encoding="utf-8")
+            if "certigo-trusted" not in workflow:
+                continue
+            trusted_workflows.append(workflow_path.name)
+            self.assertNotIn(
+                "\n  workflow_dispatch:",
+                workflow,
+                f"{workflow_path.name} must load privileged runs from main",
+            )
+            self.assertNotRegex(
+                workflow,
+                r"(?m)^ {4}tags(?:-ignore)?:",
+                f"{workflow_path.name} must not run privileged jobs from tags",
+            )
+            self.assertNotRegex(
+                workflow,
+                r"(?m)^\s+cache:\s*['\"]?true['\"]?\s*$",
+                f"{workflow_path.name} must not restore PR-writable caches",
+            )
+            if "\n  push:" in workflow:
+                self.assertIn(
+                    "\n    branches:",
+                    workflow,
+                    f"{workflow_path.name} push must be branch restricted",
+                )
+
+        self.assertGreater(len(trusted_workflows), 0)
+        for workflow_name, event_type in dispatch_types.items():
+            workflow = (workflows / workflow_name).read_text(encoding="utf-8")
+            self.assertIn(
+                f"repository_dispatch:\n    types: [{event_type}]",
+                workflow,
+            )
+            self.assertIn("CLIENT_PAYLOAD_JSON:", workflow)
+            self.assertIn("github.event.client_payload", workflow)
+
+        for workflow_name in [
+            "ci-project-state.yml",
+            "codeql.yml",
+            "security-gate.yml",
+        ]:
+            workflow = (workflows / workflow_name).read_text(encoding="utf-8")
+            self.assertNotIn("repository_dispatch:", workflow)
+            self.assertNotIn("workflow_dispatch:", workflow)
+
+        android = (workflows / "release-android.yml").read_text(encoding="utf-8")
+        self.assertNotIn("github.ref_type", android)
+        self.assertNotIn("github.ref_name", android)
+        self.assertNotIn("refs/tags/", android)
+        self.assertIn('has("dry_run")', android)
+        self.assertIn('has("track")', android)
+        self.assertIn("cache: false", android)
+        ios = (workflows / "release-ios.yml").read_text(encoding="utf-8")
+        self.assertIn("cache: false", ios)
+
+    def test_security_scanners_are_independent_from_artifact_storage(self) -> None:
+        expected_markers = {
+            "dependency-vuln-scan.yml": [
+                "OSV-Scanner output is missing or malformed.",
+                "--format=json",
+                "--no-ignore",
+                "--all-packages",
+                'python -P "$TRUSTED_CONTROL_DIR/tools/validate_dependency_locks.py"',
+                '--root "$UNTRUSTED_SOURCE_DIR"',
+                '--write-expected-sources "$EXPECTED_LOCKS_FILE"',
+                "path: .untrusted-pub-restore",
+                "name: Reset isolated dependency state",
+                "cache: false",
+                'python -P "$TRUSTED_CONTROL_DIR/tools/verify_pub_locks.py"',
+                '--root "$UNTRUSTED_PUB_DIR"',
+                '--contract "$EXPECTED_LOCKS_FILE"',
+                '--pub-cache "$PUB_CACHE"',
+                '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
+                '--output-file "$output_temp"',
+                'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
+                '"$EXPECTED_LOCKS_FILE"',
+                '"$UNTRUSTED_SOURCE_DIR" 2> "$OSV_ENFORCE_LOG"',
+                "name: NuGet locked restore (no secrets)",
+                '"$DOTNET_EXECUTABLE" restore "$RESTORE_SOLUTION" --locked-mode',
+                "finding_count",
+            ],
+            "security-scan.yml": [
+                "Checkov output is missing or malformed.",
+                "Passed checks: [0-9]+, Failed checks: [0-9]+",
+                '--directory "$UNTRUSTED_SOURCE_DIR/infra"',
+                '--config-file "$TRUSTED_CONTROL_DIR/.checkov.yaml"',
+                "failed_checks",
+            ],
+        }
+        for file_name, markers in expected_markers.items():
+            with self.subTest(file_name=file_name):
+                workflow = (
+                    REPO_ROOT / ".github/workflows" / file_name
+                ).read_text(encoding="utf-8")
+                self.assertNotIn("actions/upload-artifact@", workflow)
+                self.assertNotIn("continue-on-error: true", workflow)
+                self.assertIn("$GITHUB_STEP_SUMMARY", workflow)
+                self.assertNotIn("environment:", workflow)
+                self.assertIn(
+                    "runs-on: [self-hosted, Linux, X64, certigo-pr]",
+                    workflow,
+                )
+                self.assertIn(
+                    "ref: ${{ github.event_name == 'pull_request_target' && "
+                    "github.event.pull_request.base.sha || github.sha }}",
+                    workflow,
+                )
+                self.assertIn("path: .untrusted-source", workflow)
+                self.assertIn("path: .trusted-control", workflow)
+                for marker in markers:
+                    self.assertIn(marker, workflow)
+        security_gate = (
+            REPO_ROOT / ".github/workflows/security-gate.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("needs: [changes, osv, checkov]", security_gate)
+        self.assertIn("- '.gitignore'", security_gate)
+        self.assertIn("- '**/.gitignore'", security_gate)
+        self.assertIn("- 'tools/validate_nuget_locks.py'", security_gate)
+        self.assertIn("- 'tools/validate_dependency_locks.py'", security_gate)
+        self.assertIn("- 'tools/verify_pub_locks.py'", security_gate)
+        self.assertIn(
+            "- 'tools/tests/test_validate_nuget_locks.py'", security_gate
+        )
+        self.assertIn(
+            "- 'tools/tests/test_validate_dependency_locks.py'", security_gate
+        )
+        self.assertIn("- 'tools/tests/test_verify_pub_locks.py'", security_gate)
+        self.assertNotIn("nuget-vuln-scan", security_gate)
+        self.assertNotIn("NUGET_RESULT", security_gate)
+        self.assertFalse(
+            (REPO_ROOT / ".github/workflows/nuget-vuln-scan.yml").exists()
+        )
+        self.assertFalse((REPO_ROOT / ".github/nuget-scanner.config").exists())
 
 
 if __name__ == "__main__":

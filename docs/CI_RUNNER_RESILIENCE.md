@@ -2,29 +2,29 @@
 
 ## Objectif et architecture
 
-Les workflows Linux ciblent un **pool** et jamais une machine précise. Par défaut, le
-pool est sélectionné avec les labels :
+Les workflows Linux ciblent deux classes de confiance fixes et jamais un nom de machine :
 
 ```json
-["self-hosted", "Linux", "X64", "certigo-ci"]
+["self-hosted", "Linux", "X64", "certigo-pr"]
+["self-hosted", "Linux", "X64", "certigo-trusted"]
 ```
 
-Au moins deux runners en ligne doivent partager ces labels. GitHub Actions attribue
-alors chaque job à n'importe quelle instance disponible : l'arrêt d'une VM ne bloque
-plus la CI. Les protections existantes restent inchangées :
+`vm-certigo-runner` porte `certigo-pr` sans identité/secrets ; `vm-certigo-runner-2`
+porte `certigo-trusted` pour les gates agrégées sans source PR et les opérations
+release/déploiement. Les labels sont mutuellement exclusifs :
 
 - les PR de fork ne peuvent pas exécuter de code sur les runners persistants ;
-- les PR internes restent soumises à l'environnement `pr-ci` ;
+- les PR internes n'obtiennent ni environnement, ni secret, ni identité Azure ;
 - les déploiements et releases conservent leurs environnements (`dev`, `staging`,
   `prod`, `beta`, `github-pages`) et leurs approbations ;
-- le chemin hébergé par GitHub est désactivé par défaut conformément à la politique EMU.
+- les runners hébergés par GitHub sont durablement indisponibles ; aucun fallback n'est
+  configuré ou accepté.
 
 ## Capacité et stratégie de cycle de vie
 
-Chaque VM Linux est une `Standard_D4s_v5` qui exécute un seul job à la fois : deux VMs
-`online` offrent donc deux slots de CI concurrents. Il n'y a pas d'autoscaling. Une file
-d'attente persistante impose de démarrer les deux VMs ou de planifier une troisième
-reconstruction ; ne pas contourner ce signal en diminuant le niveau de redondance.
+Chaque VM Linux est une `Standard_D4s_v5` qui exécute un seul job à la fois. Il n'y a
+pas d'autoscaling ni de failover entre classes : l'indisponibilité du runner PR bloque
+les analyses PR, celle du runner trusted bloque gates finales et opérations.
 
 La stratégie normale est **démarrer les deux VMs avant une session CI, attendre deux
 runners `online`, puis déallouer les deux VMs seulement quand tous sont `busy: false`**.
@@ -33,22 +33,17 @@ maintenance de l'autre. Les commandes sont strictement opérateur dans
 [`docs/runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md) : l'IaC et les scripts locaux ne
 démarrent, n'arrêtent, ne déallouent ni ne détruisent aucune ressource live.
 
-## Variables du dépôt
+La release Android reste volontairement sur `certigo-trusted`. Elle peut
+utiliser l'identité managée Azure du runner pour lire Key Vault.
 
-Configurer dans **Settings > Secrets and variables > Actions > Variables** :
+## Politique des pull requests
 
-| Variable | Valeur normale | Usage |
-|---|---|---|
-| `MAIN_CRITICAL_RUNNER_LABELS` | `["self-hosted","Linux","X64","certigo-ci"]` | Push `main`, schedules, déploiements et releases |
-| `PR_RUNNER_LABELS` | `["self-hosted","Linux","X64","certigo-ci"]` | PR internes |
-| `CI_GITHUB_HOSTED_FALLBACK` | `false` | Repli d'urgence global, seulement après exception EMU |
-
-`BACKEND_CI_FALLBACK` reste reconnu par `ci-backend` et `ci-cortex-parity` pour
-compatibilité. Il doit être retiré après migration vers `CI_GITHUB_HOSTED_FALLBACK`.
-
-La release Android reste volontairement sur le pool self-hosted redondé. Elle peut
-utiliser l'identité managée Azure du runner pour lire Key Vault, capacité absente d'un
-runner GitHub-hosted.
+Les workflows PR sont chargés depuis `main` avec `pull_request_target`. Pour une PR
+interne, ils vérifient `head.repo.full_name == github.repository`, puis checkoutent
+explicitement le SHA de tête avant toute exécution. Une PR de fork n'est pas supportée :
+`fork-pr-policy.yml`, lui aussi chargé depuis `main`, n'effectue aucun checkout et fait
+échouer `Fork PR policy / Required gate`. Ce contexte requis empêche tout faux vert lié
+aux autres jobs non applicables, sans exécuter une seule instruction du fork.
 
 ## Actions d'infrastructure externes
 
@@ -65,17 +60,17 @@ Ces opérations modifient Azure ou GitHub et ne peuvent pas être prouvées par 
 2. Conserver au moins deux VM dans `snet-runners` ; toute nouvelle instance ou
    reconstruction utilise `infra/ci-runner/runner.bicep` et l'accès NAT décrit dans
    `infra/ci-runner/README.md`.
-3. Installer les prérequis des workflows, enregistrer chaque runner avec le label
-   commun `certigo-ci`, et attribuer les mêmes droits minimaux à son identité managée
-   lorsque le runner doit exécuter `release-android`.
-4. Vérifier qu'au moins deux runners en ligne partagent tous les labels du pool :
+3. Enregistrer `vm-certigo-runner` avec `certigo-pr` et sans rôle Azure ; enregistrer
+   `vm-certigo-runner-2` avec `certigo-trusted` et n'accorder les droits minimaux
+   nécessaires qu'à cette seconde identité.
+4. Vérifier qu'un runner en ligne existe dans chaque classe :
 
    ```bash
    gh api repos/gchambaud_microsoft/Certigo/actions/runners \
-     --jq '[.runners[] | select(.status == "online") | select(any(.labels[]; .name == "certigo-ci"))] | length'
+     --jq '[.runners[] | {name,status,labels:[.labels[].name]} | select(.status == "online") | select(any(.labels[]; . == "certigo-pr") or any(.labels[]; . == "certigo-trusted"))]'
    ```
 
-   La valeur attendue est `2` ou plus.
+   Attendu : exactement le runner PR et le runner trusted, chacun avec un seul label de rôle.
 
 Conserver comme preuve la sortie des deux inventaires, les noms des runners, leurs
 labels, la date et l'URL du drill décrit ci-dessous.
@@ -91,8 +86,8 @@ dérives, appliquer toujours le bootstrap de façon **idempotente** sur chaque V
    `sudo`, le binaire GitHub runner et Azure CLI) ; les SDK de workload (Node, .NET,
    Flutter/Dart, Java/Android, Bicep) sont épinglés et provisionnés par les workflows ;
 2. vérifier que le service `actions.runner.*` existe et redémarre automatiquement ;
-3. réappliquer le label personnalisé `certigo-ci` (GitHub ajoute `self-hosted`, `Linux` et
-   `X64`) ;
+3. réappliquer exactement un label de rôle, `certigo-pr` ou `certigo-trusted`
+   (GitHub ajoute `self-hosted`, `Linux` et `X64`) ;
 4. tester la connectivité sortante via la NAT Gateway avant d'approuver une PR.
 
 Le compte de service `runner` n'a pas de privilège administrateur général. Son allow-list
@@ -122,7 +117,7 @@ df -h
 
 Points à vérifier :
 
-- deux runners `online` portant `certigo-ci` ;
+- un runner `certigo-pr` et un runner `certigo-trusted` en ligne ;
 - deux VMs `VM running` avant usage ou `VM deallocated` hors session ;
 - NAT Gateway et association du sous-réseau intactes ;
 - espace disque suffisant sur chaque runner (conserver une marge opérationnelle pour
@@ -243,11 +238,12 @@ Ces opérations Azure/GitHub sont externes au commit. Toujours garder l'autre ru
    ```bash
    gh api repos/gchambaud_microsoft/Certigo/actions/runners \
      --jq '.runners[] | select(.name == "'"$RUNNER_NAME"'") | {status,busy,labels:[.labels[].name]}'
-   gh workflow run runner-health.yml
+   gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
+     -f event_type=runner-health
    gh run list --workflow runner-health.yml --limit 1
    ```
 
-   Critères : `online`, label `certigo-ci`, santé verte pour GitHub, NuGet, pub.dev,
+   Critères : `online`, label de rôle exact, santé verte pour GitHub, NuGet, pub.dev,
    npm, Azure, au moins 10 Gio libres et tous les SDK/outils. Exécuter ensuite le drill
    de perte de l'autre runner.
 
@@ -275,7 +271,7 @@ Le rollback est réussi quand l'ancien pool traite de nouveau un dispatch et que
 
 1. Ajouter/reconstruire un runner avec une nouvelle `imageVersion` et les nouvelles
    versions/SHA-256 vérifiées.
-2. Prouver santé et failover.
+2. Prouver santé et respect du label de confiance.
 3. Mettre l'ancien runner hors ligne, confirmer qu'aucun job n'est `busy`, révoquer ses
    attributions Azure, supprimer son enregistrement GitHub, puis sa VM/NIC/disque et sa
    clé SSH break-glass.
@@ -362,58 +358,53 @@ Le second résultat doit être vide avant suppression d'une VM compromise.
 
 ## Drill de perte d'un runner
 
-Le workflow manuel `Runner resilience drill` ne checkout aucun code, ne lit aucun
-secret et refuse toute ref autre que `main`. Pour prouver le failover self-hosted :
+Le workflow `Runner resilience drill`, déclenché par un type
+`repository_dispatch` dédié, ne checkout aucun code et ne lit aucun secret. GitHub
+le charge depuis `main`. Il s'exécute sur `certigo-trusted` pour
+prouver que l'arrêt contrôlé du runner `certigo-pr` n'affecte pas les opérations trusted :
 
 1. Relever les deux runners en ligne.
-2. Arrêter ou désactiver un seul runner et noter son nom exact.
+2. Arrêter uniquement `vm-certigo-runner` (`certigo-pr`) et noter son nom exact.
 3. Déclencher le workflow :
 
    ```bash
-   gh workflow run runner-resilience-drill.yml \
-     -f mode=self-hosted-failover \
-     -f expected_offline_runner=<RUNNER_ARRETE>
+   gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input - <<JSON
+   {
+     "event_type": "runner-resilience-drill",
+     "client_payload": {
+       "expected_offline_runner": "<RUNNER_ARRETE>"
+     }
+   }
+   JSON
    ```
 
-4. Vérifier que le job termine sur un autre runner :
+4. Vérifier que le job termine sur `vm-certigo-runner-2` (`certigo-trusted`) :
 
    ```bash
    gh run list --workflow runner-resilience-drill.yml --limit 1
    gh run watch <RUN_ID>
    ```
 
-5. Réactiver le runner arrêté et confirmer que les deux instances sont `online`.
+5. Réactiver le runner PR et confirmer que les deux instances sont `online`.
 
 Le drill échoue si le runner exécutant porte le nom déclaré indisponible ou si le job
 n'est pas exécuté sur un runner self-hosted. L'attente en file n'est pas limitée par
 `timeout-minutes` ; l'absence de démarrage reste donc une preuve opérationnelle d'un
 pool insuffisant et doit être interrompue manuellement.
 
-## Repli hébergé et contrainte EMU
+## Résilience exclusivement Azure
 
-Ne jamais positionner `CI_GITHUB_HOSTED_FALLBACK=true` tant que l'organisation EMU
-interdit les runners GitHub-hosted. Une fois une exception explicite accordée :
-
-1. obtenir et consigner l'exception EMU explicite ;
-2. positionner `CI_GITHUB_HOSTED_FALLBACK=true` uniquement pendant l'incident ;
-3. lancer `Runner resilience drill` avec `mode=github-hosted-break-glass` ;
-4. vérifier que le résumé indique `Environment = github-hosted` ;
-5. relancer les workflows critiques ;
-6. remettre la variable à `false` dès que le pool self-hosted est rétabli.
-
-Le workflow refuse le chemin hébergé tant que la variable n'est pas exactement `true` :
-il reste alors sur le pool auto-hébergé et échoue avant le probe.
-
-Le fork-guard et les environments restent évalués même en mode hébergé. Si aucune
-exception EMU n'est accordée, le second runner self-hosted est le seul mécanisme de
-failover supporté.
+Les runners hébergés par GitHub sont durablement indisponibles et aucun chemin de
+break-glass ne doit les cibler. Les deux runners Azure ne sont pas interchangeables : `certigo-pr` absorbe tout code ou
+donnée PR, `certigo-trusted` les opérations et gates sans source PR. Un job reste bloqué
+jusqu'à restauration d'une VM saine de sa propre classe ; aucun fallback de classe n'existe.
 
 ## Reconstruction, rotation et révocation
 
 - **Reconstruction** : si une VM runner devient irrécupérable, reprovisionner une VM
   Linux dans `RG-CERTIGO-CI`, la raccorder au sous-réseau `snet-runners`, réappliquer
-  le bootstrap idempotent, puis réenregistrer le runner GitHub avec le label
-  `certigo-ci`.
+  le bootstrap idempotent, puis réenregistrer le runner GitHub avec son label de rôle
+  `certigo-pr` ou `certigo-trusted`.
 - **Rotation** : lors de la rotation d'un outil, d'un certificat ou d'un accès
   managé, mettre à jour la documentation opérateur correspondante puis valider la VM
   reconstruite avec la sonde quotidienne et le drill manuel.
@@ -423,6 +414,5 @@ failover supporté.
 
 ## Rollback
 
-Remettre `CI_GITHUB_HOSTED_FALLBACK=false`, restaurer les deux variables de labels avec
-le JSON par défaut, puis réactiver les runners. Ne supprimer une VM ou un enregistrement
-GitHub qu'après avoir confirmé qu'au moins deux autres runners compatibles sont en ligne.
+Réactiver ou reconstruire le runner Azure avec son label de rôle fixe. Ne jamais
+réaffecter temporairement le label de l'autre classe pour contourner une indisponibilité.

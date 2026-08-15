@@ -1,0 +1,151 @@
+name: security-gate
+
+# Stable required context. The workflow always starts; path detection selects the
+# expensive scanners, and the final job rejects every failed applicable scanner.
+# Scanner conclusions are authoritative and never depend on artifact-storage quota.
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    branches: [main]
+  schedule:
+    - cron: "47 2 * * 1"
+
+concurrency:
+  group: security-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions: {}
+
+jobs:
+  changes:
+    name: Select security scanners
+    if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      dependencies: ${{ steps.selection.outputs.dependencies }}
+      iac: ${{ steps.selection.outputs.iac }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Detect security-relevant paths
+        id: filter
+        if: ${{ github.event_name == 'pull_request_target' || github.event_name == 'push' }}
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        with:
+          filters: |
+            dependencies:
+              - '.gitignore'
+              - '**/.gitignore'
+              - '**/*.csproj'
+              - '**/*.sln'
+              - '**/Directory.Build.props'
+              - '**/Directory.Build.targets'
+              - '**/Directory.Packages.props'
+              - '**/NuGet.Config'
+              - '**/NuGet.config'
+              - '**/nuget.config'
+              - '**/packages.lock.json'
+              - '**/pubspec.yaml'
+              - '**/pubspec_overrides.yaml'
+              - '**/pubspec.lock'
+              - '**/.npmrc'
+              - '**/package.json'
+              - '**/package-lock.json'
+              - '**/npm-shrinkwrap.json'
+              - 'global.json'
+              - '.github/osv-scanner.toml'
+              - '.github/workflows/dependency-vuln-scan.yml'
+              - '.github/workflows/security-gate.yml'
+              - 'tools/validate_nuget_locks.py'
+              - 'tools/validate_dependency_locks.py'
+              - 'tools/verify_pub_locks.py'
+              - 'tools/tests/test_validate_nuget_locks.py'
+              - 'tools/tests/test_validate_dependency_locks.py'
+              - 'tools/tests/test_verify_pub_locks.py'
+            iac:
+              - 'infra/**'
+              - '.checkov.yaml'
+              - '.github/workflows/security-scan.yml'
+              - '.github/workflows/security-gate.yml'
+      - name: Select applicable scanners
+        id: selection
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DEPENDENCIES_CHANGED: ${{ steps.filter.outputs.dependencies }}
+          IAC_CHANGED: ${{ steps.filter.outputs.iac }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            dependencies=true
+            iac=true
+          else
+            dependencies="${DEPENDENCIES_CHANGED:-false}"
+            iac="${IAC_CHANGED:-false}"
+          fi
+          case "$dependencies:$iac" in
+            true:true|true:false|false:true|false:false) ;;
+            *)
+              echo "::error::Security path selection returned an invalid value."
+              exit 1
+              ;;
+          esac
+          echo "dependencies=$dependencies" >> "$GITHUB_OUTPUT"
+          echo "iac=$iac" >> "$GITHUB_OUTPUT"
+
+  osv:
+    name: OSV dependency scan
+    needs: changes
+    if: ${{ needs.changes.outputs.dependencies == 'true' }}
+    uses: ./.github/workflows/dependency-vuln-scan.yml
+    permissions:
+      contents: read
+
+  checkov:
+    name: Checkov IaC scan
+    needs: changes
+    if: ${{ needs.changes.outputs.iac == 'true' }}
+    uses: ./.github/workflows/security-scan.yml
+    permissions:
+      contents: read
+
+  security-gate:
+    name: Security / Required gate
+    needs: [changes, osv, checkov]
+    if: ${{ always() && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions: {}
+    steps:
+      - name: Enforce applicable scanner results
+        shell: bash
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DEPENDENCIES_APPLICABLE: ${{ needs.changes.outputs.dependencies }}
+          IAC_APPLICABLE: ${{ needs.changes.outputs.iac }}
+          OSV_RESULT: ${{ needs.osv.result }}
+          CHECKOV_RESULT: ${{ needs.checkov.result }}
+        run: |
+          set -euo pipefail
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "::error::Security path selection did not succeed."
+            exit 1
+          fi
+          enforce_result() {
+            scanner="$1"
+            applicable="$2"
+            result="$3"
+            expected="skipped"
+            [ "$applicable" = "true" ] && expected="success"
+            if [ "$result" != "$expected" ]; then
+              echo "::error::$scanner result was '$result'; expected '$expected'."
+              return 1
+            fi
+          }
+          enforce_result "OSV" "$DEPENDENCIES_APPLICABLE" "$OSV_RESULT"
+          enforce_result "Checkov" "$IAC_APPLICABLE" "$CHECKOV_RESULT"

@@ -1,28 +1,57 @@
 name: promote-backend-staging-prod
 
 on:
-  workflow_dispatch:
+  repository_dispatch:
+    types: [promote-backend-staging-prod]
 
-permissions:
-  id-token: write
-  contents: read
+permissions: {}
 
 concurrency:
   group: promote-backend-staging-prod-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  validate-dispatch:
+    name: Validate default-branch dispatch
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    steps:
+      - name: Reject unexpected payload fields
+        shell: bash
+        env:
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          if ! jq -e 'type == "object" and length == 0' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+            echo "::error::promote-backend-staging-prod does not accept client_payload fields."
+            exit 1
+          fi
+
   deploy-staging:
     name: Promote backend to staging
+    needs: validate-dispatch
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/cd-backend.yml
     with:
       environment: staging
-    secrets: inherit
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
   deploy-prod:
     name: Promote backend to prod
     needs: deploy-staging
+    if: ${{ github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/cd-backend.yml
     with:
       environment: prod
-    secrets: inherit
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}

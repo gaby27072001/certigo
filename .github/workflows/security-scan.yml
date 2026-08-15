@@ -1,78 +1,81 @@
 name: security-scan
 
-# Software-composition (dependency CVE) + infrastructure-as-code scanning.
-# Complements CodeQL (SAST): this catches vulnerable NuGet packages and risky
-# Bicep configuration before they reach main.
+# Reusable Checkov scan called by security-gate.yml only for applicable changes.
 on:
-  schedule:
-    # Nightly scan to reduce daytime pressure on self-hosted runners.
-    - cron: "47 2 * * *"
-  workflow_dispatch:
+  workflow_call:
 
-concurrency:
-  group: security-scan-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
-  dependency-scan:
-    name: NuGet vulnerability scan
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
-      - name: Restore
-        working-directory: backend
-        run: dotnet restore Certigo.sln
-      - name: Scan for vulnerable & deprecated packages
-        working-directory: backend
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet list Certigo.sln package --vulnerable --include-transitive 2>&1 | tee vulnerable.txt
-          if grep -qi "has the following vulnerable" vulnerable.txt; then
-            echo "::error::Vulnerable NuGet packages detected — see the log above."
-            exit 1
-          fi
-          echo "No vulnerable NuGet packages found."
-
-  mobile-dependency-scan:
-    name: Flutter pub dependency scan
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.44.4"
-          channel: stable
-          cache: true
-      - name: Check Flutter outdated packages
-        working-directory: apps/mobile
-        run: flutter pub outdated --no-color
-      - name: Check for known vulnerabilities (pub audit)
-        working-directory: apps/mobile
-        # dart pub audit is advisory: reports known advisories without failing the build.
-        # flutter pub outdated (above) is the primary actionable gate for stale deps.
-        run: dart pub deps --style=compact || true
-
   iac-scan:
     name: Bicep IaC scan (Checkov)
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    permissions:
+      contents: read
+    env:
+      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+      TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
+      CHECKOV_SCAN_LOG: ${{ github.workspace }}/.scanner-state/checkov-results.log
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          # Keep Checkov runtime on a stable, broadly compatible Python release.
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          path: .untrusted-source
+          persist-credentials: false
+      - name: Checkout immutable trusted controls
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}
+          path: .trusted-control
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
           python-version: "3.12"
+      - name: Install pinned Checkov
+        run: python -m pip install --disable-pip-version-check checkov==3.2.495
       - name: Run Checkov on infra/
-        shell: bash
         run: |
-          set -euo pipefail
-          python -m pip install --upgrade --quiet checkov
-          # Hard-fail gate: any new critical/high finding blocks delivery.
-          # Accepted false-positives are documented in .checkov.yaml (skip-check).
-          checkov --directory infra --framework bicep --compact --quiet --config-file .checkov.yaml
+          set -uo pipefail
+          mkdir -p -- "$(dirname "$CHECKOV_SCAN_LOG")"
+          rm -f -- "$CHECKOV_SCAN_LOG"
+          set +e
+          checkov --directory "$UNTRUSTED_SOURCE_DIR/infra" \
+            --framework bicep --compact --quiet \
+            --config-file "$TRUSTED_CONTROL_DIR/.checkov.yaml" \
+            > "$CHECKOV_SCAN_LOG" 2>&1
+          scan_status=$?
+          set -e
+
+          stop_token="$(cat /proc/sys/kernel/random/uuid)"
+          echo "::stop-commands::$stop_token"
+          cat -- "$CHECKOV_SCAN_LOG"
+          echo "::$stop_token::"
+
+          summary_line="$(
+            grep -Eo \
+              'Passed checks: [0-9]+, Failed checks: [0-9]+, Skipped checks: [0-9]+, Parsing errors: [0-9]+' \
+              "$CHECKOV_SCAN_LOG" | tail -n 1
+          )"
+          if [ -z "$summary_line" ]; then
+            {
+              echo "## Checkov IaC scan"
+              echo
+              echo "- Result: **invalid output**"
+              echo "- Scanner exit code: \`$scan_status\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Checkov output is missing or malformed."
+            exit 1
+          fi
+          failed_checks="$(sed -E 's/.*Failed checks: ([0-9]+).*/\1/' <<< "$summary_line")"
+          {
+            echo "## Checkov IaC scan"
+            echo
+            echo "- $summary_line"
+            echo "- Scanner exit code: \`$scan_status\`"
+            echo "- Complete scanner output is available in this job's immutable logs."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$scan_status" -ne 0 ] || [ "$failed_checks" -ne 0 ]; then
+            echo "::error::Checkov found a blocking IaC issue or could not complete."
+            exit 1
+          fi

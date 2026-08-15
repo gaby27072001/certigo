@@ -16,10 +16,10 @@ on:
       - "backend/src/Certigo.Domain/**"
       - "backend/tests/Certigo.Domain.Tests/**"
       - ".github/workflows/ci-cortex-parity.yml"
-  pull_request:
+  pull_request_target:
 
 concurrency:
-  group: ci-cortex-parity-${{ github.ref }}
+  group: ci-cortex-parity-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
@@ -32,8 +32,8 @@ jobs:
   # qui laisserait le check requis Pending et bloquerait la PR indefiniment.
   changes:
     name: Detect changed paths
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ (vars.CI_GITHUB_HOSTED_FALLBACK == 'true' || vars.BACKEND_CI_FALLBACK == 'true') && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
       pull-requests: read
@@ -53,30 +53,21 @@ jobs:
   parity:
     name: Dart <-> .NET golden vectors parity
     needs: [changes]
-    # CI-01 (fork-guard) : une PR de FORK execute du code non fiable → elle NE doit PAS
-    # toucher le runner self-hosted persistant. Sur un evenement pull_request, on
-    # n'autorise le job QUE si la PR vient du meme repo (branche interne). Les evenements
-    # push/dispatch passent inchanges → zero regression.
-    # CI-08 : `always()` neutralise le skip herite de `needs.changes` ; le fork-guard reste
-    # (clause 2) ; on ne skippe QUE si paths-filter dit explicitement `false` (clause 3, PR
-    # seulement). Un output vide/erreur de filtre (!= 'false') => le vrai gate tourne (sur).
+    # Only an internal head SHA from the trusted base workflow reaches this runner.
     if: >-
       always()
-      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-      && (github.event_name != 'pull_request' || needs.changes.outputs.relevant != 'false')
-    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant execution
-    # sur le runner self-hosted persistant. Sans effet pour push/dispatch.
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    # SPOF mitigation : repli GitHub-hosted pre-cable (CI_GITHUB_HOSTED_FALLBACK=true).
-    # BACKEND_CI_FALLBACK reste accepte temporairement pour compatibilite.
-    # Defaut = runner self-hosted (comportement inchange).
-    runs-on: ${{ (vars.CI_GITHUB_HOSTED_FALLBACK == 'true' || vars.BACKEND_CI_FALLBACK == 'true') && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+      && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     # Le runner-2 a /usr/share/dotnet NON inscriptible : on force actions/setup-dotnet a
     # installer dans un dossier temporaire inscriptible pour que le job passe sur les 2 runners.
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - name: Ensure CI prerequisites (unzip, jq, zip, xz)
         run: |
           set -e
@@ -91,18 +82,18 @@ jobs:
           else
             echo "All prerequisites already present."
           fi
-      - uses: dart-lang/setup-dart@v1
+      - uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
         with:
           # Epingle pour une CI reproductible (Dart livre avec Flutter 3.44.4).
           # A bumper deliberement avec FLUTTER_VERSION de ci-mobile.
           sdk: "3.12.2"
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: "8.0.x"
       # --- Cote Dart : rejoue les golden vectors partages via package:cortex ---
       - name: Dart cortex get dependencies
         working-directory: packages/cortex
-        run: dart pub get
+        run: dart pub get --enforce-lockfile
       - name: Dart parity golden test
         working-directory: packages/cortex
         run: dart test test/cortex_golden_test.dart

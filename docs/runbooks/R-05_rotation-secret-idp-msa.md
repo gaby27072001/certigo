@@ -152,7 +152,7 @@ on:
   workflow_dispatch: {}
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
     steps:
       - name: Login Azure (service principal dédié, lecture seule sur l'app)
         uses: azure/login@v2

@@ -20,8 +20,8 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | `require_code_owner_reviews` (revue d'un code owner) | `false` | ⚠️ durcissement possible |
 | `require_last_push_approval` | `false` | — |
 | Checks de statut requis | ✅ oui, `strict = true` | **DoD : checks requis** |
-| Contextes requis constatés avant réconciliation | `Build & test`, `Flutter app + UI packages` | ⚠️ ajouter la gate d'état |
-| Contexte cible supplémentaire | `Generated state equals committed state` | Vérifié sur chaque PR par `ci-project-state.yml` |
+| Contextes requis constatés avant réconciliation | `Build & test`, `Flutter app + UI packages` | ⚠️ réconcilier les sept gates cibles |
+| Contextes cibles supplémentaires | `Generated state equals committed state`, `Validate workflow YAML`, `CodeQL / Security gate`, `Security / Required gate`, `Fork PR policy / Required gate` | Vérifiés sur chaque PR |
 | `allow_force_pushes` (push forcé) | `false` | **DoD : push direct interdit** |
 | `allow_deletions` (suppression de branche) | `false` | ✅ |
 | `enforce_admins` (appliquer aux admins) | `false` | ⚠️ durcissement possible |
@@ -38,13 +38,88 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | `Build & test` | [`.github/workflows/ci-backend.yml`](../.github/workflows/ci-backend.yml) | `Build & test` |
 | `Flutter app + UI packages` | [`.github/workflows/ci-mobile.yml`](../.github/workflows/ci-mobile.yml) | `Flutter app + UI packages` |
 | `Generated state equals committed state` | [`.github/workflows/ci-project-state.yml`](../.github/workflows/ci-project-state.yml) | `Generated state equals committed state` |
+| `Validate workflow YAML` | [`.github/workflows/lint-workflows.yml`](../.github/workflows/lint-workflows.yml) | `Validate workflow YAML` |
+| `CodeQL / Security gate` | [`.github/workflows/codeql.yml`](../.github/workflows/codeql.yml) | `CodeQL / Security gate` |
+| `Security / Required gate` | [`.github/workflows/security-gate.yml`](../.github/workflows/security-gate.yml) | `Security / Required gate` |
+| `Fork PR policy / Required gate` | [`.github/workflows/fork-pr-policy.yml`](../.github/workflows/fork-pr-policy.yml) | `Fork PR policy / Required gate` |
+
+Le gate CodeQL ne se contente pas du statut d'exécution de l'analyse. Chaque langue produit un
+SARIF évalué localement : les sévérités de sécurité `high`/`critical` (score >= 7.0) et les
+résultats SARIF de niveau `error` sans score bloquent le job. L'action CodeQL transmet le SARIF
+au service Code Scanning natif ; indépendamment, le contrôleur local journalise des findings
+assainis et publie une synthèse dans `GITHUB_STEP_SUMMARY`. Aucun artefact Actions n'est créé.
+Sur les PR internes, les sources analysées sont isolées sous `.untrusted-source` ; scripts
+d'enforcement et configurations scanner proviennent exclusivement du SHA immuable de base sous
+`.trusted-control`. Chaque scanner réutilisable exige aussi l'environnement `pr-ci`, avant toute
+évaluation ou restauration pouvant interpréter les fichiers de la PR.
+Les jobs Azure OSV et Checkov écrivent leurs diagnostics et résultats structurés non
+secrets dans les logs immutables du job et une synthèse dans `GITHUB_STEP_SUMMARY`. Leur
+conclusion dépend uniquement du statut scanner, des findings et de la validité de la sortie,
+jamais du quota de stockage d'artefacts. Les forks ne sont pas supportés : la gate de confiance
+chargée depuis `main` échoue sans checkout, tandis qu'aucun workflow contrôlé par le fork ne peut
+atteindre le pool Azure persistant.
+OSV utilise `--no-ignore --all-packages` : aucun `.gitignore` fourni par la PR ne peut masquer un
+manifeste ou lockfile, et toute modification d'un `.gitignore` déclenche le scan de dépendances.
+Le contrôleur trusted-base calcule d'abord l'inventaire Git attendu et rejette le rapport OSV si
+une seule source verrouillée non vide suivie manque dans `results[].source.path`. Un lock NuGet
+sans aucun package est identifié comme vide seulement après validation statique complète, car OSV
+ne produit pas de résultat JSON pour cette source bien qu'il l'ait parcourue.
+Chaque `.csproj` suivi sous `backend/` doit avoir exactement un `packages.lock.json` adjacent.
+Le validateur statique trusted-base refuse les locks absents, orphelins ou malformés, les graphes
+incomplets et tout écart entre un `PackageReference` direct à version exacte et son entrée
+`Direct` demandée/résolue. Il rejette aussi les imports/SDK/conditions/versions indirectes non
+modélisés et exige que chaque `contentHash` soit un SHA-512 base64 de 64 octets.
+Après une modification de package, un mainteneur régénère les locks dans un environnement de
+développement de confiance avec
+`dotnet restore backend/Certigo.sln --use-lock-file --force-evaluate`, n'ajoute que les huit
+`packages.lock.json` adjacents aux projets (jamais `obj/**/WorkerExtensions/**`), puis exécute
+`python tools/validate_nuget_locks.py --root .` avant de commiter.
+La gate exécute ensuite un `dotnet restore backend/Certigo.sln --locked-mode` sans secret, depuis
+un SDK installé dans un chemin absolu isolé. Ce restore peut évaluer les projets de PR : il est
+donc le dernier traitement de code non fiable de son job, ne précède aucun job secret/trusted,
+et ses sources ainsi que son SDK sont supprimés avec des chemins de cleanup réinjectés au niveau
+de l'étape. Le risque résiduel propre au runner persistant reste contenu par cette absence de
+secrets et par le nettoyage ; la décision statique trusted-base demeure indépendante de MSBuild.
+Les builds CI et le déploiement backend restaurent aussi en `--locked-mode`, afin qu'une
+dépendance importée ou un lock tronqué ne puisse ni être fusionné ni produire l'artefact publié.
+
+Le même inventaire exige exactement un `package-lock.json` adjacent à chaque `package.json` et un
+`pubspec.lock` adjacent à chaque `pubspec.yaml`, hors répertoires générés et exemples ; manifestes
+et locks symboliques sont interdits. Le lock npm v3 doit reproduire les dépendances racine du
+manifest, tandis que les locks pub doivent conserver leur structure générée `packages`/`sdks`.
+La validation statique exporte en JSON la liste triée de tous les `pubspec.yaml` inclus. Sur
+`certigo-pr` uniquement, la gate installe Flutter épinglé sans cache partagé, exécute
+`flutter pub get --enforce-lockfile` pour chaque entrée avec un `PUB_CACHE` temporaire isolé,
+puis exige à la fois des locks identiques octet par octet et un `git diff` vide avant OSV.
+La CI utilise exclusivement `npm ci` et `dart/flutter pub get --enforce-lockfile`. Toute
+régénération npm/pub s'effectue seulement dans un environnement de développement de confiance,
+puis `python tools/validate_dependency_locks.py --root .` doit réussir avant commit.
+
+Les releases Android/iOS et toute autre exécution `certigo-trusted` désactivent explicitement les
+caches Flutter/Pub. Une PR exécutée via `pull_request_target` sur `certigo-pr` ne peut donc pas
+alimenter un cache ensuite restauré par une opération de signature ou de publication.
+
+La gate `Generated state equals committed state` n'accède à aucun dépôt externe et ne reçoit
+aucun secret. Le générateur du SHA immuable de base valide la référence locale
+`docs/active-content-reference.json` (schéma, SHA de révision complet, contrat de package,
+identifiants et SHA-256 des manifestes), puis vérifie que l'état généré de la PR est commité.
+La fraîcheur de `certigo-content/main` relève de la CI et de la protection de ce dépôt, pas d'un
+checkout cross-repository sur un runner PR persistant.
+
+Le bump de contenu actif est donc volontairement manuel et vérifié : après fusion protégée dans
+`certigo-content`, un mainteneur checkout le SHA exact, exécute `npm ci --ignore-scripts` puis
+`npm run package`, reporte la révision, l'horodatage et les deux manifestes dans
+`docs/active-content-reference.json`, puis lance
+`python tools/project_state.py --validate-active-content <checkout-certigo-content>` et
+`python tools/project_state.py --refresh-reference`. La PR du bump doit commiter la référence et
+l'état projet régénéré.
 
 ### Conclusion DoD
 
 Le **cœur de la DoD est SATISFAIT** : `main` exige une PR avec **≥ 1 revue**, des checks stricts et
 interdit le push direct (`allow_force_pushes=false` + revue obligatoire ⇒ pas de `git push` direct
-sur `main`). L'état cible versionné ajoute `Generated state equals committed state` aux deux
-contextes existants ; sa réconciliation live doit utiliser uniquement le `PATCH` étroit du §4.
+sur `main`). L'état cible versionné ajoute cinq gates aux deux contextes existants ; sa
+réconciliation live doit utiliser uniquement le `PATCH` étroit du §4.
 
 Restent des **gaps de durcissement** (facultatifs pour la DoD mais recommandés) traités
 en **réserve admin** au §4.
@@ -91,9 +166,11 @@ par domaine (backend, mobile, infra, `.github`, docs, registre de migration…).
 ### Fichier de capture ré-appliquable
 
 [`.github/branch-protection-main.json`](../.github/branch-protection-main.json) contient un
-**état cible pour revue**, incluant le contexte `Generated state equals committed state`. Ce fichier
+**état cible pour revue**, incluant les sept contextes du §4. Ce fichier
 n'est pas une charge utile à envoyer en bloc : les champs de durcissement restent des réserves
 séparées, et seuls les checks requis sont réconciliés ici.
+Ces sept noms sont uniquement les gates agrégées stables : aucun job enfant, variante de matrice
+ou contexte interne d'un workflow réutilisable ne doit être ajouté à la protection.
 
 ### Procédure pas-à-pas (admin)
 
@@ -119,7 +196,11 @@ séparées, et seuls les checks requis sont réconciliés ici.
      "contexts": [
        "Build & test",
        "Flutter app + UI packages",
-       "Generated state equals committed state"
+       "Generated state equals committed state",
+       "Validate workflow YAML",
+       "CodeQL / Security gate",
+       "Security / Required gate",
+       "Fork PR policy / Required gate"
      ]
    }
    JSON
@@ -134,7 +215,7 @@ séparées, et seuls les checks requis sont réconciliés ici.
 
    Attendu pour les checks :
    `strict=true` et
-   `checks=["Build & test","Flutter app + UI packages","Generated state equals committed state"]`.
+   `   checks=["Build & test","Flutter app + UI packages","Generated state equals committed state","Validate workflow YAML","CodeQL / Security gate","Security / Required gate","Fork PR policy / Required gate"]`.
 
 > **Rollback des checks seulement** : rejouer le même endpoint `PATCH` avec `strict` inchangé et la
 > liste de contextes antérieure. Ne jamais utiliser `PUT` avec le JSON durci complet.
@@ -178,6 +259,33 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
 - [ ] Activer `require_code_owner_reviews = true` (après merge de `CODEOWNERS` sur `main`).
 - [ ] Activer `required_conversation_resolution = true`.
 - [ ] *(Optionnel, à arbitrer)* `required_linear_history = true`.
+- [ ] Réconcilier les checks requis avec les sept contextes du §4, en gardant
+      `strict=true`.
+- [ ] Dans **Settings → Actions → General**, conserver le token par défaut en
+      lecture seule, désactiver l'autorisation pour GitHub Actions d'approuver
+      des PR et restreindre les Actions autorisées. L'épinglage SHA complet est
+      contrôlé localement par `validate-workflow-security.mjs`.
+- [ ] Ajouter `Fork PR policy / Required gate` aux contextes requis. Les PR de forks
+      restent non supportées et échouent fermement sans checkout ; seules les PR internes
+      peuvent exécuter leur SHA de tête uniquement sur `certigo-pr`, sans environnement,
+      secret ou identité cloud. Les gates agrégées sans source PR et toutes les opérations
+      privilégiées utilisent exclusivement `certigo-trusted`.
+- [ ] Supprimer le secret `AUTOMERGE_TOKEN`, révoquer le PAT correspondant et
+      désactiver **Allow auto-merge** si aucun autre usage gouverné ne le justifie.
+- [ ] Protéger l'environnement `beta` avec reviewers obligatoires, interdiction
+      d'auto-approbation et déploiement limité à la branche `main` uniquement.
+      Stocker ses secrets de signature/publication dans cet environnement.
+- [ ] Limiter `dev`, `staging` et `prod` aux branches protégées. Ajouter des
+      reviewers obligatoires et interdire l'auto-approbation sur `staging` et
+      `prod`. Conserver les secrets OIDC `AZURE_*` au niveau environnement, pas
+      au niveau dépôt.
+- [ ] Supprimer toute règle de déploiement ou autorité de release fondée sur
+      `v*`. Les tags restent une métadonnée de traçabilité et ne déclenchent
+      aucun workflow privilégié.
+
+Les mises à jour de versions de `.github/dependabot.yml` restent une aide de maintenance.
+La décision de sécurité repose exclusivement sur les gates Azure bloquantes OSV (qui couvre
+NuGet/csproj, npm et pub), Checkov et CodeQL, sans activation de fonctionnalité Enterprise.
 
 Ces réserves ne doivent pas être appliquées implicitement avec le JSON complet. Les traiter
 séparément, avec revue admin et lecture préalable de l'état live.

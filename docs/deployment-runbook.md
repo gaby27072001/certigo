@@ -6,8 +6,8 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 > **Pourquoi ce runbook ?** Le pipeline `.github/workflows/cd-backend.yml` est un pipeline de
 > déploiement complet (infra Bicep + code Functions). Le chemin critique est désormais
 > **compatible EMU (self-hosted obligatoire)** :
-> 1. les jobs critiques backend restent sur self-hosted (GitHub-hosted est bloqué par policy EMU) ;
-> 2. la capacité CI est séparée entre flux critiques `main` (`certigo-ci`) et flux PR/non-critiques (`certigo-ci`) ;
+> 1. les jobs critiques backend restent sur le runner Azure `certigo-trusted` ;
+> 2. toute source PR reste confinée au runner sans identité `certigo-pr` ;
 > 3. l'auth Azure reste via OIDC (`azure/login@v2`) avec permissions minimales.
 >
 > Les actions humaines restantes concernent surtout la gouvernance (OIDC Azure AD, environments,
@@ -19,7 +19,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 
 | Élément | Statut | Où |
 |---|---|---|
-| Chemin critique backend self-hosted (`certigo-ci`) | ✅ Fait | `cd-backend.yml`, `ci-backend.yml` |
+| Chemin critique backend self-hosted (`certigo-trusted`) | ✅ Fait | `cd-backend.yml` |
 | Jobs rattachés à un `environment:` | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Clarification placeholders Entra en dev | ✅ Fait (cette PR) | `infra/params/dev.bicepparam` |
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
@@ -34,12 +34,22 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 
 ### Check-list d'exploitation (utilisateur non-admin)
 
-1. Déclencher `cd-backend.yml` avec `environment=dev|staging|prod` (aucun paramètre runner à fournir).
-2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `certigo-ci`.
+1. Pour `dev`, merger sur `main` afin de déclencher `cd-backend.yml`. Pour
+   `staging` puis `prod`, envoyer le dispatch `promote-backend-staging-prod`.
+2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `certigo-trusted`.
 3. En cas d'échec Azure login, contrôler uniquement les 3 secrets repo : `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
 4. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
    `AUTH_JWT_SIGNING_KEY` / `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`, sans afficher sa valeur.
-4. Pour une promotion, lancer `promote-backend-staging-prod.yml` (enchaînement staging puis prod).
+4. Pour une promotion, utiliser le type `repository_dispatch`
+   `promote-backend-staging-prod` (enchaînement staging puis prod depuis `main`).
+
+La publication GitHub Pages de la politique de confidentialité suit la même
+frontière de confiance :
+
+```bash
+gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" \
+  -f event_type=deploy-privacy-policy
+```
 
 ### Pourquoi Azure-first (long terme)
 
@@ -55,49 +65,38 @@ vérité opérationnelle est portée par Azure pour limiter la dépendance aux d
 | Gouvernance production | GitHub environments (approvals) + garde-fous Azure | Le gate GitHub reste utile, mais la sécurité critique est déjà enforce côté Azure. |
 
 Limites connues : ce modèle suppose des permissions Azure correctement déléguées (OIDC + RBAC),
-et la disponibilité d'au moins un runner self-hosted online avec le label `certigo-ci`.
+et la disponibilité du runner self-hosted online avec le label `certigo-trusted`.
 
 ### Réconciliation des labels runners
 
 Les deux runners existants (`vm-certigo-runner`) portent les labels
-custom **`certigo-ci`** (chemin critique et PR/non-critique), en plus
+custom mutuellement exclusif **`certigo-pr`** ou **`certigo-trusted`**, en plus
 des labels système
 (`self-hosted`, `Linux`, `X64`).  
 Le label a été ajouté via l'API GitHub :
 `POST /repos/{owner}/{repo}/actions/runners/{id}/labels`.
 
-Conséquence : les workflows critiques `main` ciblent `certigo-ci` et les workflows PR/non
-critiques ciblent `certigo-ci`, ce qui réserve la capacité sans éditer les YAML à chaque
+Conséquence : les workflows critiques `main` ciblent `certigo-trusted` et les workflows PR
+ciblent `certigo-pr`, ce qui isole la confiance sans éditer les YAML à chaque
 ajustement.
 
-### Variables repo de pilotage runners
+### Sélection immuable des runners
 
-Les workflows lisent des variables Actions **optionnelles** pour éviter les edits récurrents :
-
-- `MAIN_CRITICAL_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","certigo-ci"]`
-- `PR_RUNNER_LABELS` (JSON array) — défaut `["self-hosted","Linux","X64","certigo-ci"]`
-
-Exemple de valeur valide :
-
-```json
-["self-hosted","Linux","X64","certigo-ci"]
-```
+Les workflows Linux ciblent directement les labels
+`[self-hosted, Linux, X64, certigo-trusted]`. Aucune variable de sélection ni aucun fallback
+hébergé n'est accepté : la résilience repose exclusivement sur plusieurs runners Azure
+portant le même jeu de labels.
 
 ### Politique scans lourds (CodeQL / security-scan)
 
-Pour fluidifier la file CI en journée, les workflows `codeql.yml` et `security-scan.yml`
-déclenchent désormais :
-
-- en **nightly** (`schedule`) ;
-- en **manuel** (`workflow_dispatch`) pour un lancement ad-hoc.
-
-Compromis assumé : plus de scan automatique à chaque PR/push ; la détection se fait en nightly
-(ou sur déclenchement manuel en cas de besoin immédiat).
+`codeql.yml` et `security-gate.yml` exécutent les analyses pertinentes sur les PR
+internes et les push `main`, avec sélection par chemins, puis un scan complet
+planifié. Ils n'exposent aucun déclenchement manuel privilégié.
 
 ### Risque / rollback (chemin critique EMU)
 
-- **Risque principal** : aucun runner self-hosted online avec le label `certigo-ci`.
-- **Rollback repo** : ajuster (ou supprimer) `MAIN_CRITICAL_RUNNER_LABELS` / `PR_RUNNER_LABELS` pour revenir aux defaults sans modifier les workflows.
+- **Risque principal** : runner `certigo-trusted` indisponible pour déploiements/gates.
+- **Rollback repo** : restaurer le dernier YAML validé sans modifier les labels de sécurité.
 - **Rollback opérationnel** : démarrer/maintenir online la VM runner Azure (ou activer un auto-start), puis redéclencher le workflow.
 
 ---
@@ -152,6 +151,29 @@ devient `repo:<org>/<repo>:environment:<env>`. On crée donc **une federated cre
 environnement** (dev/staging/prod). Une FC supplémentaire pour `push` sur `main` est optionnelle
 (le push déclenche l'environnement `dev`, déjà couvert par la FC `dev`).
 
+### Secret de signature JWT par environnement
+
+Créer `AUTH_JWT_SIGNING_KEY` comme **secret d'environnement** dans `staging` et
+`prod`, avec une valeur aléatoire durable et différente par environnement. Ne pas
+le créer au niveau dépôt et ne pas le passer depuis le workflow appelant :
+`cd-backend.yml` le lit après l'entrée dans l'environnement protégé. `dev` n'exige
+pas ce secret et conserve sa dérivation non-production déterministe.
+
+Le workflow compile d'abord le `.bicepparam`, fusionne la valeur dans un unique
+fichier ARM temporaire en permissions `0600`, ne place jamais la valeur dans les
+arguments `az` ou les logs, puis supprime les fichiers temporaires à la fin du
+déploiement.
+
+Ordre de mise en service inter-branches :
+
+1. déployer d'abord la version de `cd-backend.yml` qui injecte le paramètre sécurisé ;
+2. créer les secrets d'environnement `staging` et `prod` ;
+3. fusionner puis déployer le durcissement Bicep qui rend
+   `authJwtSigningKey` obligatoire hors `dev`.
+
+Cet ordre est compatible avec le template actuel, où le paramètre existe déjà mais
+reste facultatif, et avec le template durci de la PR #263.
+
 ### Commandes
 
 ```bash
@@ -197,8 +219,8 @@ gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPT
 
 **Côté repo :**
 - les jobs critiques de `cd-backend.yml` (`deploy-infra`, `deploy-backend`) ciblent
-  `MAIN_CRITICAL_RUNNER_LABELS` (défaut `["self-hosted","Linux","X64","certigo-ci"]`) ;
-- `ci-backend.yml` cible le même pool sur `main` et le pool `PR_RUNNER_LABELS` sur PR/non-main ;
+  `[self-hosted, Linux, X64, certigo-trusted]` ;
+- `ci-backend.yml` cible le même pool Azure pour `main` et les PR internes ;
 - le chemin critique reste compatible avec la contrainte EMU (self-hosted obligatoire).
 
 ### Isolement des dépendances runner
@@ -237,7 +259,7 @@ gh api -X PUT "repos/$GH_ORG/$GH_REPO/environments/prod" \
 Sur ce dépôt (privé, détenu par un **compte User**), l'ajout de **required reviewers** à un
 environnement renvoie **HTTP 422** : la fonctionnalité « environment protection rules » (reviewers
 requis, wait timer, branch policy) n'est disponible que pour les **dépôts publics** ou sous un plan
-payant **GitHub Pro / Team / Enterprise**. Conséquence cette session : les environnements
+GitHub payant compatible. Conséquence cette session : les environnements
 `dev` / `staging` / `prod` ont bien été **créés**, mais le **gate reviewer sur `prod` n'a pas pu
 être posé**. Résiduel admin : passer le repo sous un plan payant (ou le déplacer sous une org
 éligible), puis ré-exécuter le bloc `prod` ci-dessus.
@@ -346,8 +368,10 @@ par examen soit actif sans expirer les tentatives existantes.
 **Option B — via le pipeline** (une fois T0.1 + T0.3 prêts) :
 
 ```bash
-gh workflow run cd-backend.yml --repo "$GH_ORG/$GH_REPO" \
-  -f environment=dev
+# dev : merge/push protégé sur main déclenche cd-backend automatiquement.
+# staging puis prod : caller chargé depuis la branche par défaut.
+gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" \
+  -f event_type=promote-backend-staging-prod
 ```
 
 > Le job `deploy-infra` capture l'output `functionAppName`, réutilisé par `deploy-backend`
@@ -463,9 +487,9 @@ documentation), et le **résiduel strict** qui nécessite une action hors périm
 - **T0.3 — Environments : ✅ PARTIEL.** `dev` / `staging` / `prod` créés. **Reviewer gate `prod`
   non posé** (billing GitHub 422, voir §T0.3). Branch protection `main` = résiduel admin.
 - **T0.2 — Runner : ✅ prémisse hosted réfutée en live.** Le run `28381092423` a été rejeté
-  immédiatement avec l'annotation GitHub :
-  "GitHub Actions hosted runners are disabled for this repository. For more information please contact your GitHub Enterprise Administrator."
-  ⇒ **GitHub-hosted bloqué par policy EMU**. Le chemin critique reste self-hosted (`certigo-ci`).
+  immédiatement car les runners GitHub-hosted sont désactivés pour ce dépôt.
+  Aucune validation Enterprise ne sera sollicitée : le chemin critique reste le pool Azure
+  self-hosted (`certigo-trusted`).
 
 ### Ce qui est effectivement déployé
 
@@ -515,7 +539,7 @@ Aucune n'a fait indexer les functions.
 - **SCM basic auth désactivée** (AAD-only). Pour interroger le hostruntime, passer par le proxy ARM
   `…/hostruntime/admin/...` avec un token `az account get-access-token --resource
   https://management.azure.com` (construire l'URI par concaténation : PowerShell mange `?api-version`).
-- **EMU bloque `ubuntu-latest`** (cf. ci-dessus) — le CI/CD critique doit cibler self-hosted `certigo-ci`.
+- **EMU bloque les runners hébergés** — CI/CD cible `certigo-pr` ou `certigo-trusted` selon la confiance.
 
 ### Résiduel strict (hors périmètre repo)
 

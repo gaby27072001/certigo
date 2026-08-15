@@ -14,8 +14,8 @@ Documentation opérationnelle pour publier les bêtas Certigo.
 
 ```
                     ┌─────────────────────────────────────────────────────┐
-  git push / tag /  │  GitHub Actions (runner self-hosted Linux)          │
-  Run workflow ────▶│  release-android.yml                                │
+  repo dispatch ───▶│  GitHub Actions (runner self-hosted Linux)          │
+  depuis main       │  release-android.yml                                │
                     │   1. JDK 17 + SDK Android + Flutter 3.24.0           │
                     │   2. gates BLOQUANTS : flutter analyze + test        │
                     │   3. secrets via Key Vault / GitHub → key.properties │
@@ -32,8 +32,11 @@ Documentation opérationnelle pour publier les bêtas Certigo.
 | Nom affiché | Certigo |
 | versionName | lu depuis `apps/mobile/pubspec.yaml` (`version:` → partie avant `+`) |
 | versionCode / build number | `github.run_number` (auto-incrémenté), override possible |
-| Workflows | `release-android.yml` (actif), `release-ios.yml` + `sync-ios-certs.yml` (legacy, inertes par défaut, opt-in manuel) ; iOS actif géré par Codemagic |
+| Workflows | `release-android.yml` (actif), `release-ios.yml` + `sync-ios-certs.yml` (legacy, opt-in par types `repository_dispatch` dédiés) ; iOS actif géré par Codemagic |
 | CI inchangée | `ci-mobile.yml` (format/analyze/test) — aucune régression |
+
+Les workflows GitHub de release désactivent explicitement les caches Flutter/Pub :
+un cache produit par une analyse de PR ne peut jamais entrer dans une build signée.
 
 > ⚠️ **`com.certigo.mobileapp` est l'identifiant unifié** (Android `applicationId`
 > = iOS bundle id). Il est définitif une fois la première build store uploadée.
@@ -133,9 +136,9 @@ Utilisé automatiquement si `AZURE_KEYVAULT_NAME` n'est **pas** définie.
 | `ASC_ISSUER_ID` | iOS | App Store Connect Issuer ID |
 | `ASC_KEY_P8_BASE64` | iOS | Clé API App Store Connect (.p8) en base64 |
 
-> Tant que `PLAY_SERVICE_ACCOUNT_JSON` est absent, le workflow **construit quand
-> même l'AAB signé** (téléchargeable en artefact) et **saute** proprement la
-> publication.
+> `PLAY_SERVICE_ACCOUNT_JSON` est obligatoire pour toute exécution non
+> `dry_run`. Son absence fait échouer le workflow avant publication. Un dry-run
+> peut construire l'AAB sans ce compte de service.
 
 ### 2.3 Configuration app (dart-define) — social login & API ⚙️
 
@@ -170,10 +173,12 @@ noms sont référencés dans le code.
   Actions → Variables → New repository variable` pour chaque `MOBILE_*`
   ci-dessus. (Onglet **Variables**, pas **Secrets**.)
 
-> 🟡 **Comportement warn-only** : si `API_BASE_URL`, `ENTRA_CLIENT_ID` ou
-> `ENTRA_AUTHORITY` est vide, l'étape `appconfig` émet un `::warning::` mais
-> **ne casse pas** le build beta (l'AAB est produit avec social/login
-> désactivés). Renseigner les valeurs pour un login fonctionnel.
+> 🔒 **Gate bloquant de publication** : pour toute exécution non `dry_run`, les
+> cinq valeurs sont obligatoires et validées strictement (URL API HTTPS en
+> `/api`, GUID client, authority External ID, scope `api://...`, environnement
+> `dev|staging|prod`). Un dry-run invalide reste autorisé avec configuration
+> neutralisée et ne peut pas publier. La piste `production` exige en plus
+> `MOBILE_CERTIGO_ENV=prod`.
 
 **iOS — groupe de variables Codemagic `certigo_mobile_config`**
 
@@ -190,11 +195,11 @@ inline (`prod` pour `ios-release`, `dev` pour `ios-release-dry`).
 
 ### 3.1 Pré-requis du runner self-hosted
 
-Le runner `certigo-ci` (Linux X64) doit disposer de Flutter/Dart (déjà requis
+Le runner `certigo-trusted` (Linux X64) doit disposer de Flutter/Dart (déjà requis
 par la CI). Le workflow installe lui-même **JDK 17** et le **SDK Android**
 (`android-actions/setup-android` + `sdkmanager`), donc aucune action manuelle
 supplémentaire n'est nécessaire. L'egress internet passe par la NAT Gateway
-`certigo-ci` (voir README).
+`certigo-trusted` (voir le runbook CI).
 
 ### 3.2 Générer le keystore upload (one-time, en local)
 
@@ -257,27 +262,42 @@ gh secret set ANDROID_KEY_PASSWORD      --body '<mot_de_passe_cle>'
 
 ### 3.5 Runbook — Lancer une beta Android (manuel) ✅
 
-1. Onglet **Actions** → workflow **release-android** → **Run workflow**.
-2. Renseigner :
-   - **track** : `internal` (puis `beta`/closed plus tard),
-   - **version_name** : vide (= pubspec) ou ex. `0.1.0`,
-   - **build_number** : vide (= numéro de run, auto-incrémenté),
-   - **dry_run** : `false` (mettre `true` pour builder sans publier).
+1. Depuis un compte autorisé en écriture, envoyer le dispatch chargé depuis la
+   branche par défaut :
+   ```bash
+   gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input - <<'JSON'
+   {
+     "event_type": "release-android",
+     "client_payload": {
+       "track": "internal",
+       "version_name": "0.1.0",
+       "dry_run": false
+     }
+   }
+   JSON
+   ```
+2. `track` et le booléen JSON `dry_run` sont obligatoires. `version_name` peut
+   être omis (= pubspec) et `build_number` peut être omis (= numéro de run).
+   Tout champ supplémentaire ou type incorrect fait échouer le run.
 3. Le workflow exécute les **gates** (`analyze` + `test`), construit l'**AAB
    signé**, l'**uploade** sur la piste choisie, puis nettoie les secrets.
+   `version_name` doit être un SemVer strict, `build_number` un entier positif
+   ≤ 2 100 000 000 et `track` l'une de `internal|alpha|beta|production`.
 4. Dans la Play Console, ajouter les testeurs (e-mails ou liste) et partager le
    **lien d'opt-in** de la piste de test interne.
 5. Les testeurs acceptent l'invitation puis installent depuis le lien.
 
-### 3.6 Runbook — Release par tag
+### 3.6 Point de version par tag, puis dispatch
 
 ```bash
-git tag v0.1.0
+git tag -a v0.1.0 -m "Release v0.1.0"
 git push origin v0.1.0
 ```
 
-→ déclenche `release-android` qui publie automatiquement sur la piste
-**internal** (versionName = `0.1.0` déduit du tag).
+Le tag reste une preuve de version et ne déclenche aucun job privilégié. Envoyer
+ensuite le dispatch §3.5 avec `version_name=0.1.0`. GitHub charge alors
+`release-android.yml` depuis `main`, puis l'environnement `beta` impose son
+approbation et sa restriction à `main`.
 
 ### 3.7 Promouvoir Internal → Closed testing (beta)
 
@@ -361,9 +381,14 @@ git push origin v0.1.0
 > **signature automatique Codemagic** (§4.0), **aucun** de ces secrets n'est
 > nécessaire : Codemagic gère certificats et profils via l'API App Store
 > Connect. Conservé uniquement à titre historique pour les workflows
-> `release-ios.yml` / `sync-ios-certs.yml` (`workflow_dispatch` avec opt-in
-> `enable_legacy_workflow=true`).
+> `release-ios.yml` / `sync-ios-certs.yml` (types `repository_dispatch`
+> `release-ios-legacy` et `sync-ios-certs-legacy`, chargés depuis `main`).
 > **Ne pas créer ces secrets pour une release Codemagic.**
+> Une exception legacy explicitement approuvée se déclenche uniquement ainsi :
+> `gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches -f
+> event_type=sync-ios-certs-legacy`, ou avec un corps JSON
+> `{"event_type":"release-ios-legacy","client_payload":{"external":false,
+> "dry_run":true}}` pour une build iOS. Tout champ ou type inattendu est rejeté.
 
 <details>
 <summary>Ancienne procédure (GitHub Actions iOS, dépréciée)</summary>
@@ -395,7 +420,7 @@ gh secret set ASC_KEY_P8_BASE64               < authkey.b64
    - Pour un dry run (IPA sans upload) : choisir **`ios-release-dry`**.
    - Pour distribuer aux testeurs externes : modifier `beta_groups` dans
      `codemagic.yaml` avant de lancer.
-3. Ou pousser un **tag git `v*`** (ex: `git tag v1.2.3+45 && git push --tags`) ;
+3. Ou pousser un **tag git `v*`** (ex: `git tag -a v1.2.3 -m "Release v1.2.3" && git push --tags`) ;
    cela déclenche automatiquement `ios-release`.
 4. Le workflow : `analyze`/`test` → signature automatique via App Store Connect
    API → `flutter build ipa` → upload TestFlight.
@@ -451,7 +476,7 @@ profil App Store.
 
 | Champ | Source | Règle |
 |---|---|---|
-| versionName | `pubspec.yaml` ou input/tag | Sémantique (`MAJEUR.MINEUR.CORRECTIF`) |
+| versionName | `pubspec.yaml` ou payload du dispatch | Sémantique (`MAJEUR.MINEUR.CORRECTIF`) |
 | versionCode (Android) | `github.run_number` ou input | **Strictement croissant** (exigé par Play) |
 
 - Pour une nouvelle version publique, bumper `version:` dans

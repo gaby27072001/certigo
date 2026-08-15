@@ -29,15 +29,15 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-08-15** |
-| Commit de référence analysé | `f567ea1a1a597d3ea88702d8824ce045f5ee937b` |
+| Commit de référence analysé | `31e9af1b4e112c563f38e9a9501faef581b6ece7` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
 | Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `55a512821dabbea8b65d3403f9c83571b4a33ed8` du **2026-08-14** |
 | Package public actif | **146 fichiers** — `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
 | Package privé actif (`answerKey`) | **146 fichiers** — `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
-| Workflows GitHub Actions | **20** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-project-state.yml`, `codeql.yml`, `copilot-auto-merge.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `lint-workflows.yml`, `promote-backend-staging-prod.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **148 fichiers** — .NET : 4 projets / 64 fichiers ; Flutter/Dart : 6 racines / 83 fichiers ; Python : 1 racine / 1 fichier |
+| Workflows GitHub Actions | **21** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-project-state.yml`, `codeql.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `lint-workflows.yml`, `promote-backend-staging-prod.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
+| Tests découverts | **151 fichiers** — .NET : 4 projets / 64 fichiers ; Flutter/Dart : 6 racines / 83 fichiers ; Python : 1 racine / 4 fichier |
 | Corpus **historique** local | **91 pistes**, **146 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
@@ -325,15 +325,14 @@ automatisées principales sont `ci-backend.yml`, `ci-mobile.yml`, `ci-content.ym
 `ci-project-state.yml`. Les deux références iOS GitHub historiques restent opt-in ; la chaîne iOS
 déclarée est dans `codemagic.yaml`.
 
-> ⚠️ CI exécutée **uniquement sur le runner self‑hosted Azure** (`certigo-ci`) — les runners
+> ⚠️ CI exécutée **uniquement sur les runners self‑hosted Azure** (`certigo-pr` sans
+> identité pour les sources PR, `certigo-trusted` pour gates/opérations) — les runners
 > GitHub‑hébergés sont désactivés par la politique d'entreprise. Egress via NAT Gateway `nat-certigo` (RG `rg-certigo-ci`).
 
-> 🛟 **Repli CI backend (audit #1, SPOF runner)** — le job `build-test` de `ci-backend.yml` a un
-> repli `ubuntu-latest` **pré‑câblé mais inerte par défaut** (comportement inchangé = self‑hosted).
-> Pour l'activer en cas de panne du pool self‑hosted, **deux** prérequis : (1) définir la variable repo
-> `BACKEND_CI_FALLBACK = true` (Settings › Actions › Variables) ; (2) un admin doit **réactiver les
-> runners GitHub‑hébergés** pour le repo/org (désactivés par défaut ici). Repasser la variable à `false`
-> pour revenir au self‑hosted. Runbook détaillé en commentaire au‑dessus du `runs-on:` du job.
+> 🛟 **Résilience CI backend** — le job `build-test` cible exclusivement le pool Azure
+> `[self-hosted, Linux, X64, certigo-pr|certigo-trusted]`. Les classes sont isolées et
+> sans fallback croisé ;
+> VMs portant ces labels ; aucun fallback hébergé ou piloté par variable n'est supporté.
 
 ---
 
@@ -349,7 +348,7 @@ déclarée est dans `codemagic.yaml`.
 | 2026‑08‑06 | 📦 **Phase 2 avancée** : `wp-p2-02` et `wp-p2-03` sont `done` après fusion des PR `certigo-content` #7/#8 ; `wp-p2-04`, `wp-p2-07` et `wp-p2-09` sont en cours dans leurs sessions dédiées. |
 | 2026‑08‑05 | 📚 **Registre de migration réconcilié** : seuls les lots Phase 1 dont la DoD complète est satisfaite sont alignés à `done` dans le manifeste, les états JSON et la vue humaine ; les lots incomplets restent ouverts même si une PR associée a été fusionnée. Démarrage de `wp-p2-01` documentaire ; `wp-p2-02..09` ont alors été enregistrés à `todo`, avant leur exécution dans des sessions distinctes. |
 | 2026‑06‑29 | 🧪 **Tests Cosmos exécutés sur émulateur réel** : 6 cas `Certigo.Infrastructure.Tests` lancés (0 ignoré) sur l'émulateur Docker `vnext-preview` (ARM64, HTTPS) → **5/6 verts** ; le 6e (agrégat `GetRecentActivityAsync`) bute sur une limite _vnext-preview_ (`RewrittenAggregateProjections`), pas un bug prod (classic amd64 inutilisable sur ARM64 : `exec format error` / segfault QEMU). ✅ **Couverture HTTP des 15 Functions** restantes ajoutée (faux services + harness) → suite globale **496** verte. |
-| 2026‑06‑28 | 🛟 **Repli CI backend (audit #1)** : repli `ubuntu-latest` pré‑câblé (inerte par défaut) sur le job `build-test` de `ci-backend.yml`, piloté par la variable repo `BACKEND_CI_FALLBACK` — comportement self‑hosted inchangé ; activation conditionnée à la réactivation des runners GitHub‑hébergés (cf. §11). |
+| 2026‑06‑28 | 🛟 **Ancienne expérimentation de repli CI backend** : un fallback hébergé avait été pré-câblé ; cette voie a depuis été entièrement supprimée au profit du pool Azure redondé (cf. §11). |
 | 2026‑06‑24 | 📱 **Écrans gamification mobile** : saisons · quêtes · succès · boutique · amis · examens blancs branchés (couche data + providers + router) → 6 écrans + 6 tests widget ; suite Dart **185** verte. 🧪 **Tests d'intégration Cosmos** (`Certigo.Infrastructure.Tests`, 6 cas émulateur‑gated, skippés proprement hors émulateur). |
 | 2026‑06‑24 | 🔐 **Connexion sociale iOS** : ajout du callback natif `certigo://auth` dans `Info.plist` + messages d'erreur login plus explicites (redirect/client/provider) côté mobile. |
 | 2026‑06‑24 | 🛡️ **Anti‑triche examen** : fenêtre de cadence (XP/tentatives sur 1 h, conteneur `attempts`) câblée dans `ExamService` — miroir de `QuizService` → détecteurs de débit actifs aussi pour les examens blancs ; test dédié `SubmitAsync_flags_submission_spam_via_the_rate_window`. Backend **325** tests verts. |
@@ -384,8 +383,9 @@ déclarée est dans `codemagic.yaml`.
 - 🏗️ **Provisionner `staging`** par Bicep et valider `/health` ; `dev`, `prod` et CI sont déjà déployés.
 - 🔐 **Valider l'auth de bout en bout** sur un vrai tenant Entra External ID (E2E).
 - 🔍 **Faire passer l'anti‑triche** du mode détection au mode application des sanctions (lot suivant) — la **fenêtre de cadence** (débit XP/tentatives sur 1 h) est désormais câblée pour **quiz et examens** ; reste la calibration puis la bascule en mode sanction.
-- ✅ **Gate Cosmos dédiée et sans secret de dépôt** : `backend\run-cosmos-gate.ps1` exécute toujours les tests hermétiques du contrat JSON (camelCase, enum, `_etag`, TTL, état d'opération). Avec `CERTIGO_COSMOS_TESTS=1`, elle ajoute les tests d'intégration contre un émulateur local ; la connexion est fournie à l'exécution par `COSMOS_EMULATOR_CONNECTION_STRING` ou `COSMOS_EMULATOR_KEY`, jamais versionnée. Sur cet hôte ARM64, l'émulateur classic reste indisponible et le preview conserve sa limite connue sur l'agrégat `COUNT/SUM` ; aucune réussite d'émulateur supplémentaire n'est revendiquée.
-- ✅ **Couverture HTTP/middleware Functions complétée** : tests ajoutés pour les **15 Functions** jusque‑là non couvertes (User, Tutor, Streak, Shop, ShareCard, Season, Recommendation, Quest, Path, Notification, Lesson, Leaderboard, Friend, Exam, Achievement) via le harness maison (`FunctionTestHost` + faux services dans `Fakes.Functions.cs`) — happy‑path authentifié (200 + service appelé 1×) et garde non‑authentifié. La suite globale est rejouée à chaque remédiation ; les cas Cosmos restent `Skipped` proprement quand le gate émulateur est désactivé.
+- ✅ **Tests d'intégration Cosmos exécutés sur émulateur réel** (le projet `Certigo.Infrastructure.Tests` est gated `CERTIGO_COSMOS_TESTS=1`). Les **6 cas ont tourné** (0 ignoré) contre l'émulateur Docker `mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview` (ARM64, HTTPS) : **5/6 verts**. Le 6e — `Attempt_recent_activity_aggregates_count_and_xp_within_window` (`CosmosAttemptRepository.GetRecentActivityAsync`, agrégat `COUNT(1)`/`SUM` projeté en objet `VALUE { … }`) — échoue **uniquement** sur l'émulateur _vnext-preview_ (back‑end PostgreSQL) avec `RewrittenAggregateProjections was not an array for a value aggregate query`. **Ce n'est pas un bug de production** : la requête est valide contre Cosmos réel et l'émulateur classic ; on **ne réécrit pas** la requête pour contourner une limite de l'émulateur preview. L'émulateur **classic amd64** est **inutilisable sur cet hôte ARM64** (`exec format error` sans QEMU ; `segfault signal 11` même avec QEMU x86_64 binfmt installé), d'où la cible 6/6 hors de portée localement — à confirmer en CI/Cosmos réel.
+  - _Relancer la suite_ : `docker run -d --name cosmos-emulator -p 8081:8081 -p 1234:1234 -e PROTOCOL=https mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview` (attendre `PostgreSQL=OK, Gateway=OK, Explorer=OK` dans `docker logs`), puis exporter `CERTIGO_COSMOS_TESTS=1`, `COSMOS_EMULATOR_ENDPOINT=https://localhost:8081`, `COSMOS_EMULATOR_KEY=<clé publique émulateur>` et lancer `dotnet test backend\tests\Certigo.Infrastructure.Tests`.
+- ✅ **Couverture HTTP/middleware Functions complétée** : tests ajoutés pour les **15 Functions** jusque‑là non couvertes (User, Tutor, Streak, Shop, ShareCard, Season, Recommendation, Quest, Path, Notification, Lesson, Leaderboard, Friend, Exam, Achievement) via le harness maison (`FunctionTestHost` + faux services dans `Fakes.Functions.cs`) — happy‑path authentifié (200 + service appelé 1×) et garde non‑authentifié. **Suite globale `dotnet test backend\Certigo.sln` : 496 verts, 0 échec** (6 cas Cosmos `Skipped` proprement quand le gate est off).
 - 🤖 **Tuteur IA — valider l'appel LLM réel** : le provider Azure OpenAI / Foundry (`gpt-5.4-mini`, surface **v1**, auth **Entra ID**) est **câblé, compilé et couvert par tests unitaires**. **RBAC à accorder en `dev`** (rôle _Cognitive Services OpenAI User_ sur `certigo-openai` pour l'identité managée de `func-certigo-dev`) et **activé en `dev`** (`infra/params/dev.bicepparam` → app settings `TUTOR_LLM_*`, déployés par `cd-backend`). Reste **un appel réel de validation** (register/login → JWT → `POST /api/tutor/explain` → 200 + explication LLM authentique) pour confirmer le chemin live et basculer le statut en 🟢 ; tant que cet appel n'est pas validé, le tuteur garde le repli déterministe en filet.
 
 ---

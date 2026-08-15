@@ -12,7 +12,7 @@ on:
       - ".github/workflows/cd-backend.yml"
       - ".github/workflows/ci-infra.yml"
       - ".github/workflows/runner-health.yml"
-  pull_request:
+  pull_request_target:
     paths:
       - "infra/**"
       - ".github/scripts/write-secure-bicep-parameters.mjs"
@@ -22,7 +22,7 @@ on:
       - ".github/workflows/runner-health.yml"
 
 concurrency:
-  group: ci-infra-${{ github.ref }}
+  group: ci-infra-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -31,17 +31,13 @@ permissions:
 jobs:
   bicep-build:
     name: Bicep build (lint)
-    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
-    # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
-    # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
-    # évènements push/dispatch passent inchangés → zéro régression.
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
-    # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       # CI-09 : le runner-2 n'a PAS l'Azure CLI (`az`). On installe le CLI Bicep
       # standalone dans un répertoire écrivable ($RUNNER_TEMP) et on l'ajoute au PATH,
       # de sorte que le lint fonctionne à l'identique sur les DEUX runners.

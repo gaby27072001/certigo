@@ -1,14 +1,10 @@
-# Valide la syntaxe de tous les workflows GitHub Actions a chaque PR sur main.
-# Bloque les PRs qui introduisent des workflows YAML malformes ou non conformes
-# au schema GitHub Actions (ex. doublon d'id:, champs inconnus, etc.).
-# Note: utilise le runner self-hosted (les GitHub-hosted runners sont desactives dans ce repo).
+# Loaded from main through pull_request_target. Only same-repository pull
+# requests are checked out; fork policy is enforced by fork-pr-policy.yml.
 name: Lint GitHub Actions workflows
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [main]
-    paths:
-      - ".github/workflows/**"
 
 permissions:
   contents: read
@@ -16,17 +12,24 @@ permissions:
 jobs:
   validate:
     name: Validate workflow YAML
-    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
-    # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
-    # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
-    # évènements push/dispatch passent inchangés → zéro régression.
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
-    # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    env:
+      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+      TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: .untrusted-source
+          persist-credentials: false
+
+      - name: Checkout immutable trusted controls
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .trusted-control
+          persist-credentials: false
 
       - name: Install actionlint
         run: |
@@ -48,9 +51,21 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          workflows=(.github/workflows/*.yml .github/workflows/*.yaml)
+          workflows=(
+            "$UNTRUSTED_SOURCE_DIR"/.github/workflows/*.yml
+            "$UNTRUSTED_SOURCE_DIR"/.github/workflows/*.yaml
+          )
           if [ "${#workflows[@]}" -eq 0 ]; then
             echo "::error::No workflow files found under .github/workflows."
             exit 1
           fi
           actionlint "${workflows[@]}"
+
+      - name: Enforce workflow security policy
+        run: |
+          node "$TRUSTED_CONTROL_DIR/.github/scripts/validate-workflow-security.mjs" \
+            --workspace "$UNTRUSTED_SOURCE_DIR"
+
+      - name: Test workflow security scripts
+        working-directory: .trusted-control
+        run: node --test .github/scripts/*.test.mjs

@@ -264,12 +264,12 @@ work_packages:
 
   - id: wp-p1-11-ci-spof-runners
     phase: 1
-    title: "Résilience CI : suppression du point unique de défaillance runners (matrix + fallback hébergé)"
+    title: "Résilience CI : suppression du point unique de défaillance du pool Azure"
     size: S
     effort_pweeks: 0.5
     depends_on: [wp-p1-00-decomposition]
     precondition: "Auditer les workflows CI pour tout point unique de défaillance sur les runners. Idempotent : si les jobs tolèrent déjà l'indisponibilité d'un runner, le lot est déjà fait."
-    dod: "Les jobs critiques n'ont plus de dépendance à un runner unique (matrix ou fallback runner hébergé) ; simulation d'indisponibilité d'un runner sans blocage de la CI."
+    dod: "Les sources PR ciblent certigo-pr sans identité/secrets et les opérations ciblent certigo-trusted sans checkout PR, sans runner GitHub-hosted ni fallback croisé."
     rollback: "Abandon de la branche ; les workflows précédents restent en place."
     status: todo
     notes: "Vague V5 · voie ops/live (SPOF = point unique de défaillance)."

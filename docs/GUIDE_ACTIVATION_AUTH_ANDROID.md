@@ -336,14 +336,16 @@ gh variable set MOBILE_ENTRA_API_SCOPE  --body "api://<backend-client-id>/user_i
 > ⚠️ Le build ne saura injecter ces valeurs **qu'une fois le correctif CI en place**
 > (tâche « Fix CI Android auth »). Attendez sa fusion, ou coordonnez le timing.
 
-1. **Lancer la release** — deux moyens :
+1. **Lancer la release** depuis le workflow de la branche par défaut :
    ```powershell
-   # a) Manuellement (workflow_dispatch) :
-   gh workflow run release-android.yml
-
-   # b) Par tag de version :
-   git tag v0.1.0 && git push origin v0.1.0
+   gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches `
+     -f event_type=release-android `
+     -f "client_payload[track]=internal" `
+     -f "client_payload[version_name]=0.1.0" `
+     -F "client_payload[dry_run]=false"
    ```
+   Un tag peut être créé séparément pour la traçabilité, mais il ne déclenche
+   aucun workflow privilégié.
 2. **Suivre le run** :
    ```powershell
    gh run list --workflow release-android.yml -L 3

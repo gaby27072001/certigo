@@ -17,22 +17,21 @@ on:
         description: 'Target environment'
         required: true
         type: string
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Target environment'
+    secrets:
+      AZURE_CLIENT_ID:
         required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+      AUTH_JWT_SIGNING_KEY:
+        required: false
+      AUTH_JWT_PREVIOUS_SIGNING_KEY:
+        required: false
   push:
     branches: [ main ]
 
-env:
-  TARGET_ENV: ${{ inputs.environment || 'dev' }}
+permissions: {}
 
 # Prevent concurrent deployments to the same environment.
 concurrency:
@@ -40,20 +39,50 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate-target:
+    name: Validate deployment target
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions: {}
+    outputs:
+      target: ${{ steps.target.outputs.environment }}
+    steps:
+      - name: Allow only protected deployment environments
+        id: target
+        shell: bash
+        env:
+          REQUESTED_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          TARGET="${REQUESTED_ENVIRONMENT:-dev}"
+          case "$TARGET" in
+            dev|staging|prod) ;;
+            *)
+              echo "::error::Deployment environment must be dev, staging or prod."
+              exit 1
+              ;;
+          esac
+          echo "environment=$TARGET" >> "$GITHUB_OUTPUT"
+
   deploy-infra:
-    name: Deploy infrastructure (${{ inputs.environment || 'dev' }})
-    environment: ${{ inputs.environment || 'dev' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    name: Deploy infrastructure (${{ needs.validate-target.outputs.target }})
+    needs: validate-target
+    environment: ${{ needs.validate-target.outputs.target }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions:
       id-token: write
       contents: read
+    env:
+      TARGET_ENV: ${{ needs.validate-target.outputs.target }}
     outputs:
       functionAppName: ${{ steps.deploy-bicep.outputs.functionAppName }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Azure login (OIDC)
-        uses: azure/login@v3
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -61,6 +90,7 @@ jobs:
 
       - name: Deploy infrastructure and capture outputs
         id: deploy-bicep
+        shell: bash
         env:
           AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}
           AUTH_JWT_SIGNING_KEY_EXPIRES_ON: ${{ vars.AUTH_JWT_SIGNING_KEY_EXPIRES_ON }}
@@ -76,57 +106,73 @@ jobs:
             --outfile "$BASE_PARAMETERS_FILE"
           node .github/scripts/write-secure-bicep-parameters.mjs
           FUNCTION_APP_NAME=$(az deployment sub create \
-            --name certigo-$TARGET_ENV \
+            --name "certigo-$TARGET_ENV" \
             --location westeurope \
             --template-file infra/main.bicep \
             --parameters "@$AUTH_PARAMETERS_FILE" \
             --query 'properties.outputs.functionAppName.value' -o tsv)
-          echo "functionAppName=$FUNCTION_APP_NAME" >> $GITHUB_OUTPUT
+          if [[ ! "$FUNCTION_APP_NAME" =~ ^[A-Za-z0-9-]{2,60}$ ]]; then
+            echo "::error::Azure returned an invalid Function App name."
+            exit 1
+          fi
+          echo "functionAppName=$FUNCTION_APP_NAME" >> "$GITHUB_OUTPUT"
 
   deploy-backend:
-    name: Deploy backend code (${{ inputs.environment || 'dev' }})
-    environment: ${{ inputs.environment || 'dev' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
-    needs: deploy-infra
+    name: Deploy backend code (${{ needs.validate-target.outputs.target }})
+    environment: ${{ needs.validate-target.outputs.target }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    needs: [validate-target, deploy-infra]
     permissions:
       id-token: write
       contents: read
+    env:
+      TARGET_ENV: ${{ needs.validate-target.outputs.target }}
+      FUNCTION_APP_NAME: ${{ needs.deploy-infra.outputs.functionAppName }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup .NET 8
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
         with:
           dotnet-version: "8.0.x"
 
+      - name: Restore locked dependencies
+        run: |
+          dotnet restore backend/src/Certigo.Api/Certigo.Api.csproj \
+            --locked-mode
       - name: Publish
         run: |
           dotnet publish backend/src/Certigo.Api/Certigo.Api.csproj \
             --configuration Release \
+            --no-restore \
             --output ./publish
 
       - name: Zip publish artefact
         run: cd ./publish && zip -r ../publish.zip . && cd ..
 
       - name: Azure login (OIDC)
-        uses: azure/login@v3
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Deploy to Function App (with retry for RBAC propagation)
+        shell: bash
         run: |
+          set -euo pipefail
           for i in 1 2 3 4 5; do
             echo "Attempt $i of 5..."
             if az functionapp deployment source config-zip \
-              --resource-group rg-certigo-$TARGET_ENV \
-              --name ${{ needs.deploy-infra.outputs.functionAppName }} \
+              --resource-group "rg-certigo-$TARGET_ENV" \
+              --name "$FUNCTION_APP_NAME" \
               --src ./publish.zip; then
               echo "Deployment succeeded on attempt $i"
               exit 0
             fi
-            if [ $i -lt 5 ]; then
+            if [ "$i" -lt 5 ]; then
               # Role assignments use deterministic guid() names (idempotent), so in
               # steady state the first attempt succeeds instantly. This loop only guards
               # rare first-ever/Function-App warm-up cases; 5 x ~45s keeps a ~3 min budget.

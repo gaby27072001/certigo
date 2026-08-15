@@ -264,11 +264,11 @@ Pour ajouter les intégrations réelles, démarrer l'émulateur puis définir
 > Les workflows applicatifs utilisent un runner **self-hosted** avec labels
 > `[self-hosted, Linux, X64, certigo-ci]` (les runners hébergés par GitHub sont
 > désactivés par la politique d'entreprise EMU sur ce dépôt).
-> La gate obligatoire `ci-project-state` utilise explicitement `ubuntu-latest` afin d'émettre le
-> contexte `Generated state equals committed state` sur chaque PR.
+> La gate obligatoire `ci-project-state` utilise explicitement le pool Azure
+> `[self-hosted, Linux, X64, certigo-ci]` pour chaque PR interne.
 >
-> Ces labels doivent désigner un pool d'au moins deux runners. Le routage, le drill
-> de panne et le repli hébergé conditionnel sont détaillés dans
+> Ces labels doivent désigner un pool d'au moins deux runners Azure. Le routage et le
+> drill de panne sans fallback hébergé sont détaillés dans
 > [`docs/CI_RUNNER_RESILIENCE.md`](docs/CI_RUNNER_RESILIENCE.md).
 >
 >  

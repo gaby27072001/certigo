@@ -7,11 +7,11 @@ on:
   push:
     branches: [ main ]
     paths: [ "content/**", "tools/validate_content.mjs", ".github/workflows/ci-content.yml" ]
-  pull_request:
+  pull_request_target:
     paths: [ "content/**", "tools/validate_content.mjs", ".github/workflows/ci-content.yml" ]
 
 concurrency:
-  group: ci-content-${{ github.ref }}
+  group: ci-content-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -20,22 +20,18 @@ permissions:
 jobs:
   validate:
     name: Validate tracks & lessons
-    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
-    # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
-    # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
-    # évènements push/dispatch passent inchangés → zéro régression.
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
-    # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "20"
-      - name: Install validator deps
-        run: npm install --no-save ajv ajv-formats yaml glob
+      - name: Install validator dependencies from lock
+        run: npm ci
       - name: Validate content
         run: node tools/validate_content.mjs
       - name: npm audit backend tools

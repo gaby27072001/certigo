@@ -96,7 +96,7 @@ class ProjectState:
 
 
 def _read(root: Path, relative: str | Path) -> str:
-    path = root / relative
+    path = _path_within(root, relative)
     try:
         return path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -104,11 +104,25 @@ def _read(root: Path, relative: str | Path) -> str:
 
 
 def _read_bytes(root: Path, relative: str | Path) -> bytes:
-    path = root / relative
+    path = _path_within(root, relative)
     try:
         return path.read_bytes()
     except OSError as exc:
         raise ProjectStateError(f"Cannot read canonical source {relative}: {exc}") from exc
+
+
+def _path_within(root: Path, relative: str | Path) -> Path:
+    relative_path = Path(relative)
+    if relative_path.is_absolute():
+        raise ProjectStateError(f"Canonical source path must be relative: {relative}.")
+    try:
+        canonical_root = root.resolve(strict=True)
+        candidate = (canonical_root / relative_path).resolve(strict=True)
+    except OSError as exc:
+        raise ProjectStateError(f"Cannot resolve canonical source {relative}: {exc}") from exc
+    if not candidate.is_relative_to(canonical_root):
+        raise ProjectStateError(f"Canonical source escapes its repository root: {relative}.")
+    return candidate
 
 
 def _one(pattern: str, text: str, source: str, flags: int = 0) -> str:
@@ -158,14 +172,64 @@ def _observable_files(root: Path) -> tuple[Path, ...]:
     return tuple(sorted(paths, key=lambda path: path.as_posix()))
 
 
+def _git_text_attributes(
+    root: Path, paths: tuple[Path, ...]
+) -> dict[Path, dict[str, str]]:
+    input_bytes = b"".join(
+        path.as_posix().encode("utf-8") + b"\0" for path in paths
+    )
+    try:
+        result = subprocess.run(
+            ["git", "check-attr", "-z", "--stdin", "text", "eol"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            input=input_bytes,
+        )
+    except OSError as exc:
+        raise ProjectStateError(f"Cannot execute git: {exc}") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr.decode("utf-8", errors="replace").strip()
+        raise ProjectStateError(f"git check-attr failed: {detail}") from exc
+
+    fields = result.stdout.split(b"\0")
+    if fields and fields[-1] == b"":
+        fields.pop()
+    if len(fields) % 3 != 0:
+        raise ProjectStateError("git check-attr returned malformed NUL-delimited output.")
+
+    attributes: dict[Path, dict[str, str]] = {path: {} for path in paths}
+    for index in range(0, len(fields), 3):
+        relative = Path(fields[index].decode("utf-8"))
+        attribute = fields[index + 1].decode("utf-8")
+        value = fields[index + 2].decode("utf-8")
+        if relative not in attributes:
+            raise ProjectStateError(
+                f"git check-attr returned unexpected path {relative.as_posix()}."
+            )
+        attributes[relative][attribute] = value
+    return attributes
+
+
 def observable_sha256(root: Path) -> str:
-    """Hash observable path names and bytes with deterministic length framing."""
+    """Hash observable paths and Git-canonical content with length framing."""
 
     digest = hashlib.sha256()
     digest.update(OBSERVABLE_HASH_PREFIX)
-    for relative in _observable_files(root):
+    observable_files = _observable_files(root)
+    attributes = _git_text_attributes(root, observable_files)
+    for relative in observable_files:
         path_bytes = relative.as_posix().encode("utf-8")
         content = _read_bytes(root, relative)
+        path_attributes = attributes[relative]
+        text_attribute = path_attributes.get("text")
+        is_text = text_attribute == "set" or (
+            text_attribute == "auto" and b"\0" not in content[:8000]
+        )
+        if (
+            is_text and path_attributes.get("eol") == "lf"
+        ):
+            content = content.replace(b"\r\n", b"\n")
         digest.update(len(path_bytes).to_bytes(8, "big"))
         digest.update(path_bytes)
         digest.update(len(content).to_bytes(8, "big"))
@@ -238,10 +302,10 @@ def refresh_reference(root: Path) -> None:
         "observableSha256": observable_sha256(root),
         "semantics": (
             "Captured source commit/date plus SHA-256 of stable-sorted observable UTF-8 path "
-            "names and exact file bytes, framed by unsigned 64-bit big-endian path/content "
-            "lengths. The generated document and this excluded reference are committed "
-            "separately, avoiding self-reference while remaining valid after an equivalent "
-            "squash or root commit."
+            "names and Git-canonical file bytes after declared text/eol normalization, framed "
+            "by unsigned 64-bit big-endian path/content lengths. The generated document and "
+            "this excluded reference are committed separately, avoiding self-reference while "
+            "remaining valid after an equivalent squash or root commit."
         ),
     }
     path = root / REFERENCE_FILE
@@ -272,7 +336,9 @@ def _manifest_reference(
     manifest_id = value["manifestId"]
     file_count = value["fileCount"]
     file_sha256 = value["fileSha256"]
-    if not isinstance(path, str) or not path.endswith("/manifest.json"):
+    if not isinstance(path, str) or not re.fullmatch(
+        r"(?:(?!\.{1,2}/)[A-Za-z0-9._-]+/)+manifest\.json", path
+    ):
         raise ProjectStateError(f"{source}.path: expected a manifest.json path.")
     if channel != expected_channel or artifact != expected_artifact:
         raise ProjectStateError(
@@ -801,9 +867,18 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="validate a packaged certigo-content checkout against the active reference",
     )
+    parser.add_argument(
+        "--root",
+        metavar="PATH",
+        type=Path,
+        default=Path(__file__).resolve().parents[1],
+        help="repository workspace to inspect (defaults to this script's repository)",
+    )
     args = parser.parse_args(argv)
-    root = Path(__file__).resolve().parents[1]
     try:
+        root = args.root.resolve(strict=True)
+        if not root.is_dir():
+            raise ProjectStateError(f"Repository root is not a directory: {root}.")
         if args.validate_active_content:
             validate_active_content_repository(root, args.validate_active_content.resolve())
             print("Active content reference is current.")

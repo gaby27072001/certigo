@@ -6,10 +6,10 @@ on:
   push:
     branches: [ main ]
     paths: [ "apps/**", "packages/**", ".github/workflows/ci-mobile.yml" ]
-  pull_request:
+  pull_request_target:
 
 concurrency:
-  group: ci-mobile-${{ github.ref }}
+  group: ci-mobile-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -17,7 +17,6 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.44.4"
-  NON_CRITICAL_RUNNER_LABELS_JSON: ${{ vars.PR_RUNNER_LABELS || '["self-hosted","Linux","X64","certigo-ci"]' }}
 
 jobs:
   # CI-08 : détecte si des chemins pertinents ont changé pour cette PR. Une PR qui ne
@@ -26,8 +25,8 @@ jobs:
   # laisserait le check requis Pending et bloquerait la PR indéfiniment.
   changes:
     name: Detect changed paths
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
       pull-requests: read
@@ -46,26 +45,20 @@ jobs:
   packages:
     name: Pure-Dart packages (core, cortex, data)
     needs: [changes]
-    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
-    # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
-    # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
-    # évènements push/dispatch passent inchangés → zéro régression.
-    # CI-08 : `always()` neutralise le skip hérité de `needs.changes` ; le fork-guard reste
-    # (clause 2) ; on ne skippe QUE si paths-filter dit explicitement `false` (clause 3, PR
-    # seulement). Un output vide/erreur de filtre (!= 'false') => le vrai job tourne (sûr).
+    # Only internal head SHAs selected by the trusted base workflow execute here.
     if: >-
       always()
-      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-      && (github.event_name != 'pull_request' || needs.changes.outputs.relevant != 'false')
-    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
-    # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+      && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     strategy:
       matrix:
         package: [ core, cortex, data ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - name: Ensure CI prerequisites (unzip, jq, zip, xz)
         run: |
           set -e
@@ -80,14 +73,14 @@ jobs:
           else
             echo "All prerequisites already present."
           fi
-      - uses: dart-lang/setup-dart@v1
+      - uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
         with:
           # Pinned for reproducible CI (matches the Dart bundled with Flutter
           # 3.44.4). Bump deliberately alongside FLUTTER_VERSION.
           sdk: "3.12.2"
       - name: Get dependencies
         working-directory: packages/${{ matrix.package }}
-        run: dart pub get
+        run: dart pub get --enforce-lockfile
       - name: Analyze
         working-directory: packages/${{ matrix.package }}
         run: dart analyze --fatal-infos
@@ -98,23 +91,17 @@ jobs:
   app:
     name: Flutter app + UI packages
     needs: [changes]
-    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
-    # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
-    # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
-    # évènements push/dispatch passent inchangés → zéro régression.
-    # CI-08 : `always()` neutralise le skip hérité de `needs.changes` ; le fork-guard reste
-    # (clause 2) ; on ne skippe QUE si paths-filter dit explicitement `false` (clause 3, PR
-    # seulement). Un output vide/erreur de filtre (!= 'false') => le vrai job tourne (sûr).
+    # Only internal head SHAs selected by the trusted base workflow execute here.
     if: >-
       always()
-      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-      && (github.event_name != 'pull_request' || needs.changes.outputs.relevant != 'false')
-    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
-    # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+      && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - name: Ensure CI prerequisites (unzip, jq, zip, xz)
         run: |
           set -e
@@ -149,20 +136,20 @@ jobs:
           done
         continue-on-error: true
       - name: Set up repository formatter
-        uses: dart-lang/setup-dart@v1
+        uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
         with:
           # Formatting normalization is intentionally a separate migration.
           sdk: "3.6.0"
       - name: Format check
         run: dart format --line-length 100 --set-exit-if-changed apps packages
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
       - name: Pub get (app)
         working-directory: apps/mobile
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
       - name: Dart pub outdated
         working-directory: apps/mobile
         run: flutter pub outdated --no-color || true
@@ -174,7 +161,7 @@ jobs:
         run: flutter test --coverage
       - name: Upload coverage
         continue-on-error: true
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mobile-coverage
           path: apps/mobile/coverage/lcov.info
@@ -185,23 +172,17 @@ jobs:
     needs: [changes]
     # Uses the same Flutter/Dart toolchain as the app and package jobs so
     # dependency resolution and golden rendering cannot drift independently.
-    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
-    # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
-    # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
-    # évènements push/dispatch passent inchangés → zéro régression.
-    # CI-08 : `always()` neutralise le skip hérité de `needs.changes` ; le fork-guard reste
-    # (clause 2) ; on ne skippe QUE si paths-filter dit explicitement `false` (clause 3, PR
-    # seulement). Un output vide/erreur de filtre (!= 'false') => le vrai job tourne (sûr).
+    # Only internal head SHAs selected by the trusted base workflow execute here.
     if: >-
       always()
-      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-      && (github.event_name != 'pull_request' || needs.changes.outputs.relevant != 'false')
-    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
-    # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    runs-on: ${{ vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+      && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - name: Ensure CI prerequisites (unzip, jq, zip, xz)
         run: |
           set -e
@@ -235,7 +216,7 @@ jobs:
             fi
           done
         continue-on-error: true
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -245,7 +226,7 @@ jobs:
       # échouer CE job — c'est le gate dédié exigé par la DoD.
       - name: Pub get (prism_ui)
         working-directory: packages/prism_ui
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
       - name: Golden tests (prism_ui renderer)
         working-directory: packages/prism_ui
         run: flutter test test/rendering/renderer_golden_test.dart

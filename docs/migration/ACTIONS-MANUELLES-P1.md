@@ -26,7 +26,7 @@
 | # | Action | Lot | Surface | Durée | Débloque |
 | --- | --- | --- | --- | --- | --- |
 | 1 | **Créer le dépôt `certigo-content`** (arborescence + gouvernance + séparation public/answerKey) | `wp-p1-04-certigo-content-repo` | GitHub (org) | ~45 min | p1-05, p1-06 → p1-07 → p1-08 |
-| 2 | **Résilience CI** : supprimer le SPOF runner (≥2 self-hosted + fallback hébergé) | `wp-p1-11-ci-spof-runners` | Azure + GitHub Actions | ~2–4 h | Stabilité CI de toute la Phase 1+ |
+| 2 | **Résilience CI** : supprimer le SPOF runner (pool Azure ≥2 instances) | `wp-p1-11-ci-spof-runners` | Azure + GitHub Actions | ~2–4 h | Stabilité CI de toute la Phase 1+ |
 | 3 | **Import du drift IaC** : Azure OpenAI + réseau CI en Bicep (what-if → apply) | `wp-p1-12-iac-drift-import` | Azure (abonnement live) | ~2–3 h | p1-13 |
 | 4 | **Environnement de staging** : pré-prod isolée, provisionnée par IaC (O-04) | `wp-p1-13-staging-environment` | Azure (abonnement live) | ~1–2 h | Recette pré-prod P1+ |
 
@@ -180,22 +180,21 @@ Débloque `wp-p1-05` (migration contenu, dépend aussi de p1-02) et `wp-p1-06` (
 ### 2. Résilience CI — supprimer le SPOF des runners (wp-p1-11-ci-spof-runners)
 
 **Objectif (DoD).** Les jobs CI critiques n'ont **plus de dépendance à un runner unique** :
-soit une **matrix** répartie sur **≥2 runners self-hosted**, soit un **fallback** hébergé.
-Une simulation d'indisponibilité d'un runner **ne bloque plus** la CI.
+ils ciblent le label commun d'un pool d'au moins deux runners Azure self-hosted.
+Une simulation d'indisponibilité d'une instance **ne bloque plus** la CI.
 
 **Finding opérationnel.** La CI Certigo tourne aujourd'hui sur **un seul** runner
 auto-hébergé (`vm-certigo-runner`, groupe `rg-certigo-ci`). Une panne de ce pool a déjà
 **bloqué la CI ~6 h** — d'où la priorité. ⚠️ **Contrainte EMU** : les runners **hébergés par
-GitHub sont désactivés par la politique d'entreprise** (voir `infra/ci-runner/README.md`).
-Le « fallback hébergé » suppose donc **soit** une **exception d'allow-list EMU**, **soit** —
-plus réaliste à court terme — un **second runner self-hosted** comme véritable mécanisme de
-résilience. Décider avant de commencer.
+GitHub sont désactivés durablement par la politique d'entreprise**
+(voir `infra/ci-runner/README.md`). La résilience repose exclusivement sur plusieurs
+instances Azure séparées par les labels `certigo-pr` et `certigo-trusted`.
 
 **Pré-requis.**
 - `az login` + abonnement sélectionné (`az account set --subscription <SUBSCRIPTION_ID>`).
 - Droits d'admin sur les runners de l'org/dépôt GitHub (pour l'enregistrement).
-- Précondition idempotente : auditer les workflows — si les jobs **tolèrent déjà** la perte
-  d'un runner (matrix ou fallback effectif), le lot est **fait**.
+- Précondition idempotente : auditer les workflows — si les jobs ciblent déjà un pool
+  Azure isolé par les labels `certigo-pr`/`certigo-trusted`, le lot est **fait**.
 
 **Étapes (intention + commande type — provisionnement live).**
 
@@ -223,12 +222,9 @@ az vmss create -g rg-certigo-ci -n vmss-certigo-runners \
 lors du lot réel).** Principe à appliquer dans les `.github/workflows/*` :
 
 ```yaml
-# Matrix sur le pool self-hosted : le job survit à la perte d'une instance.
-runs-on: [self-hosted, certigo]
-strategy:
-  fail-fast: false
-# Fallback hébergé (SI exception EMU accordée) — sinon, s'appuyer sur >=2 self-hosted :
-#   runs-on: ${{ needs.pick-runner.outputs.pool || 'ubuntu-latest' }}
+# Le label commun route vers une instance disponible du pool Azure.
+runs-on: [self-hosted, Linux, X64, certigo-trusted]
+# Conserver au moins deux runners Azure homogènes dans ce pool.
 ```
 
 **Placeholders.** `<SUBSCRIPTION_ID>`, `<ORG>`, `<REPO>`, `<IMAGE>`, `<IDENTITY>`.
@@ -399,8 +395,8 @@ Vérifier l'**isolation** : les ressources staging portent le suffixe `staging` 
 - [ ] Vérif : PR de test **exige** l'approbation d'un CODEOWNER avant merge
 
 **Lot 2 — `wp-p1-11-ci-spof-runners`**
-- [ ] Décision fallback tranchée (exception EMM/EMU **ou** ≥2 self-hosted)
-- [ ] **≥2 runners** en ligne partageant le même label (matrix/pool)
+- [ ] **1 runner `certigo-pr` + 1 runner `certigo-trusted`** en ligne, sans label commun
+- [ ] Aucun label GitHub-hosted ni fallback configurable dans les workflows
 - [ ] Simulation d'indisponibilité d'un runner : la CI **ne bloque pas**
 
 **Lot 3 — `wp-p1-12-iac-drift-import`**

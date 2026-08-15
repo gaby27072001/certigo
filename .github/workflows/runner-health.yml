@@ -3,7 +3,8 @@ name: Runner daily health
 on:
   schedule:
     - cron: "17 5 * * *"
-  workflow_dispatch:
+  repository_dispatch:
+    types: [runner-health]
 
 permissions:
   contents: read
@@ -15,40 +16,50 @@ concurrency:
 jobs:
   probe:
     name: Egress, disk and SDK probe
-    # A dispatch against a feature/fork ref must not execute branch code on the
-    # persistent runner. Scheduled and approved manual probes use main only.
+    # Scheduled workflows are loaded from the default branch.
     if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 45
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     # EMU policy keeps this on the redundant self-hosted pool. There is no PR
     # trigger, so untrusted fork code cannot reach a persistent runner.
-    runs-on: ${{ vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]') }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Reject unexpected payload fields
+        if: ${{ github.event_name == 'repository_dispatch' }}
+        shell: bash
+        env:
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          if ! jq -e 'type == "object" and length == 0' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+            echo "::error::runner-health does not accept client_payload fields."
+            exit 1
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
 
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: "8.0.x"
 
-      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1
+      - uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
         with:
           sdk: "3.6.0"
 
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: "3.27.4"
           channel: stable
-          cache: true
+          cache: false
 
       - name: Install verified Bicep CLI
         shell: bash

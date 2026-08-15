@@ -1,0 +1,4 @@
+name: Certigo CodeQL configuration
+
+paths-ignore:
+  - .trusted-control/**

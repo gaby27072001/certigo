@@ -1,25 +1,11 @@
 name: Runner resilience drill
 
-# Manual, non-destructive proof that the shared runner pool or the hosted
-# break-glass path remains usable. See docs/CI_RUNNER_RESILIENCE.md.
+# Repository-dispatched, non-destructive proof that trusted operations survive PR-runner loss.
 on:
-  workflow_dispatch:
-    inputs:
-      mode:
-        description: "Resilience path to prove"
-        type: choice
-        required: true
-        default: self-hosted-failover
-        options:
-          - self-hosted-failover
-          - github-hosted-break-glass
-      expected_offline_runner:
-        description: "Runner name intentionally stopped (required for self-hosted failover)"
-        type: string
-        required: false
+  repository_dispatch:
+    types: [runner-resilience-drill]
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: runner-resilience-drill
@@ -28,46 +14,39 @@ concurrency:
 jobs:
   probe:
     name: Probe selected resilience path
-    # workflow_dispatch can target another ref. Refuse branch-modified workflow
-    # code on the persistent runner; drills are always launched from main.
+    # repository_dispatch always loads this workflow from the default branch.
     if: ${{ github.ref == 'refs/heads/main' }}
-    # A hosted runner is selected only after an explicit EMU exception has been
-    # recorded in the break-glass variable. Otherwise the self-hosted job fails
-    # closed in the validation step without consuming hosted capacity.
-    runs-on: ${{ inputs.mode == 'github-hosted-break-glass' && vars.CI_GITHUB_HOSTED_FALLBACK == 'true' && 'ubuntu-latest' || (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
     steps:
       - name: Validate runner selection
         shell: bash
         env:
-          DRILL_MODE: ${{ inputs.mode }}
-          HOSTED_FALLBACK_ENABLED: ${{ vars.CI_GITHUB_HOSTED_FALLBACK }}
-          EXPECTED_OFFLINE_RUNNER: ${{ inputs.expected_offline_runner }}
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+          EXPECTED_OFFLINE_RUNNER: ${{ github.event.client_payload.expected_offline_runner }}
           CURRENT_RUNNER_NAME: ${{ runner.name }}
           RUNNER_KIND: ${{ runner.environment }}
         run: |
           set -euo pipefail
 
-          if [ "$DRILL_MODE" = "github-hosted-break-glass" ] &&
-            [ "$HOSTED_FALLBACK_ENABLED" != "true" ]; then
-            echo "::error::CI_GITHUB_HOSTED_FALLBACK must be true after an approved EMU exception."
+          if ! jq -e '
+            type == "object"
+            and keys == ["expected_offline_runner"]
+            and (.expected_offline_runner | type == "string")
+          ' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+            echo "::error::client_payload must contain only expected_offline_runner as a string."
+            exit 1
+          fi
+          if [[ ! "$EXPECTED_OFFLINE_RUNNER" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
+            echo "::error::expected_offline_runner has an invalid format."
             exit 1
           fi
 
-          if [ "$DRILL_MODE" = "self-hosted-failover" ]; then
-            if [ -z "$EXPECTED_OFFLINE_RUNNER" ]; then
-              echo "::error::expected_offline_runner is required for a self-hosted failover drill."
-              exit 1
-            fi
-            if [ "$RUNNER_KIND" != "self-hosted" ]; then
-              echo "::error::Expected a self-hosted runner, got $RUNNER_KIND."
-              exit 1
-            fi
-            if [ "$CURRENT_RUNNER_NAME" = "$EXPECTED_OFFLINE_RUNNER" ]; then
-              echo "::error::Runner $EXPECTED_OFFLINE_RUNNER was expected to be offline."
-              exit 1
-            fi
-          elif [ "$RUNNER_KIND" != "github-hosted" ]; then
-            echo "::error::Expected a GitHub-hosted runner, got $RUNNER_KIND."
+          if [ "$RUNNER_KIND" != "self-hosted" ]; then
+            echo "::error::Expected an Azure self-hosted runner, got $RUNNER_KIND."
+            exit 1
+          fi
+          if [ "$CURRENT_RUNNER_NAME" = "$EXPECTED_OFFLINE_RUNNER" ]; then
+            echo "::error::Runner $EXPECTED_OFFLINE_RUNNER was expected to be offline."
             exit 1
           fi
 
@@ -76,7 +55,7 @@ jobs:
             echo
             echo "| Field | Value |"
             echo "|---|---|"
-            echo "| Mode | \`$DRILL_MODE\` |"
+            echo "| Mode | \`azure-trust-boundary-isolation\` |"
             echo "| Runner | \`$CURRENT_RUNNER_NAME\` |"
             echo "| Environment | \`$RUNNER_KIND\` |"
             echo "| Expected offline runner | \`${EXPECTED_OFFLINE_RUNNER:-n/a}\` |"

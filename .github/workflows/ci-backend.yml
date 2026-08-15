@@ -6,10 +6,10 @@ on:
   push:
     branches: [ main ]
     paths: [ "backend/**", ".github/workflows/ci-backend.yml" ]
-  pull_request:
+  pull_request_target:
 
 concurrency:
-  group: ci-backend-${{ github.ref }}
+  group: ci-backend-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
@@ -22,8 +22,8 @@ jobs:
   # laisserait le check requis Pending et bloquerait la PR indéfiniment.
   changes:
     name: Detect changed paths
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ (vars.CI_GITHUB_HOSTED_FALLBACK == 'true' || vars.BACKEND_CI_FALLBACK == 'true') && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
       pull-requests: read
@@ -41,41 +41,28 @@ jobs:
   build-test:
     name: Build & test
     needs: [changes]
-    # CI-01 (fork-guard) : une PR de FORK exécute du code non fiable → elle NE doit
-    # PAS toucher le runner self-hosted persistant. Sur un évènement pull_request, on
-    # n'autorise le job QUE si la PR vient du même repo (branche interne). Les
-    # évènements push/dispatch passent inchangés → zéro régression.
-    # CI-08 : `always()` neutralise le skip hérité de `needs.changes` ; le fork-guard reste
-    # (clause 2) ; on ne skippe QUE si paths-filter dit explicitement `false` (clause 3, PR
-    # seulement). Un output vide/erreur de filtre (!= 'false') => le vrai build tourne (sûr).
+    # pull_request_target loads this definition from main. Only internal head SHAs
+    # can reach the persistent Azure pool; forks are rejected by fork-pr-policy.yml.
     if: >-
       always()
-      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-      && (github.event_name != 'pull_request' || needs.changes.outputs.relevant != 'false')
-    # CI-01 : approbation humaine requise pour les PR (Environment pr-ci) avant
-    # exécution sur le runner self-hosted persistant. Sans effet pour push/dispatch.
-    environment: ${{ github.event_name == 'pull_request' && 'pr-ci' || '' }}
-    # SPOF mitigation (audit #1) : repli GitHub-hosted pré-câblé.
-    # Défaut = runner self-hosted (comportement inchangé).
-    # Pour basculer en urgence si le pool self-hosted est indisponible :
-    #   1) définir la variable repo CI_GITHUB_HOSTED_FALLBACK = true
-    #      (BACKEND_CI_FALLBACK reste accepté temporairement pour compatibilité)
-    #   2) s'assurer que les GitHub-hosted runners sont ACTIVÉS pour le repo/org
-    #      (ils sont désactivés par défaut ici — cf. lint-workflows.yml).
-    # Repasser CI_GITHUB_HOSTED_FALLBACK à false pour revenir au pool self-hosted.
-    runs-on: ${{ (vars.CI_GITHUB_HOSTED_FALLBACK == 'true' || vars.BACKEND_CI_FALLBACK == 'true') && 'ubuntu-latest' || (github.event_name != 'pull_request' && (vars.MAIN_CRITICAL_RUNNER_LABELS && fromJSON(vars.MAIN_CRITICAL_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]')) || (vars.PR_RUNNER_LABELS && fromJSON(vars.PR_RUNNER_LABELS) || fromJSON('["self-hosted","Linux","X64","certigo-ci"]'))) }}
+      && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     # Le runner-2 a /usr/share/dotnet NON inscriptible : on force actions/setup-dotnet à
     # installer dans un dossier temporaire inscriptible pour que le job passe sur les 2 runners.
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: "8.0.x"
       - name: Restore
         working-directory: backend
-        run: dotnet restore Certigo.sln
+        run: dotnet restore Certigo.sln --locked-mode
       - name: Build
         working-directory: backend
         run: dotnet build Certigo.sln --configuration Release --no-restore -warnaserror
@@ -92,7 +79,7 @@ jobs:
           dotnet CycloneDX Certigo.sln --output ./sbom --json
       - name: Upload SBOM
         continue-on-error: true # advisory artifact: never fail the gate (e.g. on storage quota)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: backend-sbom
           path: backend/sbom/**
