@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { evaluateSarif } from './enforce-codeql-sarif.mjs';
+import { evaluateSarif, sarifSummary } from './enforce-codeql-sarif.mjs';
 
 function fixture(results, rules = []) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-codeql-sarif-'));
@@ -102,4 +102,24 @@ test('rejects an invalid default rule level', () => {
     ],
   );
   assert.throws(() => evaluateSarif(directory, 7), /SARIF level 'fatal' is invalid/);
+});
+
+test('builds a non-secret aggregate summary from evaluated findings', () => {
+  const directory = fixture(
+    [
+      { ruleId: 'high', level: 'error' },
+      { ruleId: 'medium', level: 'warning' },
+    ],
+    [
+      { id: 'high', properties: { 'security-severity': '8.1' } },
+      { id: 'medium', properties: { 'security-severity': '5.0' } },
+    ],
+  );
+  assert.deepEqual(sarifSummary(evaluateSarif(directory, 7), 7), {
+    files: 1,
+    findings: 2,
+    blocking: 1,
+    threshold: 7,
+    levels: { none: 0, note: 0, warning: 1, error: 1 },
+  });
 });

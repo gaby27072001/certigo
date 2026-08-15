@@ -136,8 +136,14 @@ function validateWorkflow(file) {
   if (/^\s*secrets:\s*inherit\s*$/m.test(text)) {
     errors.push(`${file}: reusable workflows must pass only explicit secrets`);
   }
-  if (/^\s*(?:actions|checks|contents|pull-requests|security-events):\s*write\s*$/m.test(text)) {
+  if (/^\s*(?:actions|checks|contents|pull-requests):\s*write\s*$/m.test(text)) {
     errors.push(`${file}: privileged repository write permission is forbidden`);
+  }
+  if (
+    /^\s*security-events:\s*write\s*$/m.test(text)
+    && path.basename(file) !== 'codeql.yml'
+  ) {
+    errors.push(`${file}: security-events write is restricted to CodeQL uploads`);
   }
   for (const token of forbiddenAutomation) {
     if (text.includes(token)) {
@@ -186,6 +192,10 @@ function validateRepositoryInvariants() {
   const codeql = fs.readFileSync(path.join(workflowsDir, 'codeql.yml'), 'utf8');
   const codeqlEnforcer = fs.readFileSync(
     path.join(root, '.github', 'scripts', 'enforce-codeql-sarif.mjs'),
+    'utf8',
+  );
+  const osvEnforcer = fs.readFileSync(
+    path.join(root, '.github', 'scripts', 'enforce-osv-json.mjs'),
     'utf8',
   );
   const secureBicepWriter = fs.readFileSync(
@@ -304,9 +314,8 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'CODEQL_BLOCKING_SECURITY_SEVERITY: "7.0"',
     'output: ${{ env.CODEQL_RESULTS_DIR }}',
-    'upload: never',
-    'name: Preserve CodeQL SARIF',
-    'if-no-files-found: error',
+    'upload: always',
+    'security-events: write',
     'name: Enforce CodeQL severity threshold',
     'node .github/scripts/enforce-codeql-sarif.mjs "$CODEQL_RESULTS_DIR"',
   ]) {
@@ -314,11 +323,8 @@ function validateRepositoryInvariants() {
       errors.push(`codeql.yml: missing SARIF enforcement invariant ${marker}`);
     }
   }
-  if (
-    codeql.includes('upload-sarif@') ||
-    codeql.includes('security-events: write')
-  ) {
-    errors.push('codeql.yml: local SARIF enforcement must not depend on GitHub Code Scanning');
+  if (codeql.includes('actions/upload-artifact@')) {
+    errors.push('codeql.yml: local SARIF enforcement must not depend on artifact storage');
   }
   for (const marker of [
     "securitySeverity >= threshold",
@@ -326,6 +332,8 @@ function validateRepositoryInvariants() {
     'No SARIF files found',
     'SARIF run is missing tool.driver.name',
     "['none', 'note', 'warning', 'error'].includes(level)",
+    'GITHUB_STEP_SUMMARY',
+    'Sanitized finding records are available in this job log.',
   ]) {
     if (!codeqlEnforcer.includes(marker)) {
       errors.push(`enforce-codeql-sarif.mjs: missing fail-closed invariant ${marker}`);
@@ -428,11 +436,24 @@ function validateRepositoryInvariants() {
   }
   for (const marker of [
     'OSV-Scanner output is missing or malformed.',
-    'sarif.version !==',
+    '--format=json',
+    '--output-file "$output_temp"',
+    'node .github/scripts/enforce-osv-json.mjs osv-results.json',
     'finding_count',
   ]) {
     if (!dependencyScan.includes(marker)) {
       errors.push(`dependency-vuln-scan.yml: missing fail-closed output invariant ${marker}`);
+    }
+  }
+  for (const marker of [
+    'OSV-Scanner JSON must contain a results array.',
+    'packageResult.vulnerabilities',
+    'packageResult.groups',
+    'references unknown vulnerability',
+    'vulnerabilityCount',
+  ]) {
+    if (!osvEnforcer.includes(marker)) {
+      errors.push(`enforce-osv-json.mjs: missing fail-closed invariant ${marker}`);
     }
   }
   for (const marker of [

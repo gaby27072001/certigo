@@ -585,12 +585,20 @@ class ProjectStateTests(unittest.TestCase):
         )
         self.assertIn("- '.github/scripts/**/*.js'", workflow)
         self.assertIn("- '.github/scripts/**/*.mjs'", workflow)
+        self.assertNotIn("actions/upload-artifact@", workflow)
+        self.assertIn("upload: always", workflow)
+        enforcer = (
+            REPO_ROOT / ".github/scripts/enforce-codeql-sarif.mjs"
+        ).read_text(encoding="utf-8")
+        self.assertIn("GITHUB_STEP_SUMMARY", enforcer)
 
     def test_security_scanners_are_independent_from_artifact_storage(self) -> None:
         expected_markers = {
             "dependency-vuln-scan.yml": [
                 "OSV-Scanner output is missing or malformed.",
-                "sarif.version !==",
+                "--format=json",
+                '--output-file "$output_temp"',
+                "node .github/scripts/enforce-osv-json.mjs osv-results.json",
                 "finding_count",
             ],
             "nuget-vuln-scan.yml": [

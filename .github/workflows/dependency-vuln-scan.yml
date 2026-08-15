@@ -8,7 +8,7 @@ permissions: {}
 
 jobs:
   osv-scan:
-    name: OSV-Scanner (all dependencies, SARIF)
+    name: OSV-Scanner (all dependencies, JSON)
     runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions:
       contents: read
@@ -32,43 +32,32 @@ jobs:
       - name: Run and enforce OSV-Scanner
         run: |
           set -uo pipefail
+          output_temp="$RUNNER_TEMP/osv-results.$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT.json"
+          rm -f -- "$output_temp" osv-results.json
           set +e
-          ./osv-scanner scan --format=sarif --recursive ./ > osv-results.sarif 2> osv-scan.log
+          ./osv-scanner scan --format=json --recursive ./ \
+            --output-file "$output_temp" 2> osv-scan.log
           scan_status=$?
           set -e
+          if [ -e "$output_temp" ]; then
+            mv -- "$output_temp" osv-results.json
+          fi
 
           echo "::group::OSV-Scanner diagnostics"
           cat osv-scan.log
           echo "::endgroup::"
-          echo "::group::OSV SARIF"
-          cat osv-results.sarif
+
+          set +e
+          evaluation="$(
+            node .github/scripts/enforce-osv-json.mjs osv-results.json 2>&1
+          )"
+          enforcement_status=$?
+          set -e
+          echo "::group::OSV structured result"
+          printf '%s\n' "$evaluation"
           echo "::endgroup::"
 
-          if ! finding_count="$(node <<'NODE'
-          const fs = require('node:fs');
-          const file = 'osv-results.sarif';
-          if (!fs.existsSync(file) || fs.statSync(file).size === 0) {
-            throw new Error('OSV-Scanner did not produce SARIF output.');
-          fi
-          const sarif = JSON.parse(fs.readFileSync(file, 'utf8'));
-          if (sarif.version !== '2.1.0' || !Array.isArray(sarif.runs) || sarif.runs.length === 0) {
-            throw new Error('OSV-Scanner produced malformed SARIF.');
-          }
-          let count = 0;
-          for (const run of sarif.runs) {
-            if (
-              !run
-              || typeof run !== 'object'
-              || !run.tool?.driver?.name
-              || !Array.isArray(run.results)
-            ) {
-              throw new Error('OSV-Scanner produced a malformed SARIF run.');
-            }
-            count += run.results.length;
-          }
-          process.stdout.write(String(count));
-          NODE
-          )"; then
+          if [ "$enforcement_status" -eq 2 ]; then
             {
               echo "## OSV dependency scan"
               echo
@@ -79,15 +68,25 @@ jobs:
             exit 1
           fi
 
+          finding_count="$(
+            node -e '
+              const summary = JSON.parse(process.argv[1].split(/\r?\n/, 1)[0]);
+              process.stdout.write(String(summary.vulnerabilityCount));
+            ' "$evaluation"
+          )"
           {
             echo "## OSV dependency scan"
             echo
             echo "- Findings: **$finding_count**"
             echo "- Scanner exit code: \`$scan_status\`"
-            echo "- Full diagnostics and SARIF are available in this job's immutable logs."
+            echo "- Structured validation result and scanner diagnostics are in the job logs."
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "$scan_status" -ne 0 ] || [ "$finding_count" -ne 0 ]; then
+          if [ "$scan_status" -gt 1 ]; then
+            echo "::error::OSV-Scanner could not complete."
+            exit 1
+          fi
+          if [ "$enforcement_status" -ne 0 ] || [ "$finding_count" -ne 0 ]; then
             echo "::error::OSV-Scanner found a vulnerability or could not complete."
             exit 1
           fi

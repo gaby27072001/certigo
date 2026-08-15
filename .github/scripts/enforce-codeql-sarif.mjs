@@ -135,6 +135,23 @@ export function evaluateSarif(directory, threshold) {
   return { files, findings };
 }
 
+export function sarifSummary(evaluation, threshold) {
+  const blocking = evaluation.findings.filter((finding) => finding.blocking).length;
+  const levels = Object.fromEntries(
+    ['none', 'note', 'warning', 'error'].map((level) => [
+      level,
+      evaluation.findings.filter((finding) => finding.level === level).length,
+    ]),
+  );
+  return {
+    files: evaluation.files.length,
+    findings: evaluation.findings.length,
+    blocking,
+    threshold,
+    levels,
+  };
+}
+
 function main() {
   const directory = process.argv[2];
   if (!directory) {
@@ -147,12 +164,31 @@ function main() {
   try {
     const evaluation = evaluateSarif(directory, threshold);
     const blocking = evaluation.findings.filter((finding) => finding.blocking);
+    const summary = sarifSummary(evaluation, threshold);
     console.log(
       `Evaluated ${evaluation.findings.length} CodeQL finding(s) from ` +
         `${evaluation.files.length} SARIF file(s); blocking threshold=${threshold}.`,
     );
     for (const finding of evaluation.findings) {
       console.log(JSON.stringify(finding));
+    }
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      fs.appendFileSync(
+        process.env.GITHUB_STEP_SUMMARY,
+        [
+          '## CodeQL local SARIF enforcement',
+          '',
+          `- SARIF files: **${summary.files}**`,
+          `- Findings: **${summary.findings}**`,
+          `- Blocking findings: **${summary.blocking}**`,
+          `- Blocking security severity: **${summary.threshold}**`,
+          `- Levels: error=${summary.levels.error}, warning=${summary.levels.warning}, ` +
+            `note=${summary.levels.note}, none=${summary.levels.none}`,
+          '- Sanitized finding records are available in this job log.',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
     }
     if (blocking.length > 0) {
       console.error(

@@ -45,14 +45,15 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 
 Le gate CodeQL ne se contente pas du statut d'exécution de l'analyse. Chaque langue produit un
 SARIF évalué localement : les sévérités de sécurité `high`/`critical` (score >= 7.0) et les
-résultats SARIF de niveau `error` sans score bloquent le job. Le SARIF est conservé 30 jours
-comme artefact pour chaque PR interne et évalué sans dépendre d'un service GitHub Enterprise.
-Les jobs Azure OSV, NuGet et Checkov écrivent leurs résultats complets non secrets dans les logs
-immutables du job et une synthèse dans `GITHUB_STEP_SUMMARY`. Leur conclusion dépend uniquement
-du statut scanner, des findings et de la validité de la sortie, jamais du quota de stockage
-d'artefacts. Les forks ne sont pas supportés : la gate de confiance chargée depuis `main`
-échoue sans checkout, tandis qu'aucun workflow contrôlé par le fork ne peut atteindre le pool
-Azure persistant.
+résultats SARIF de niveau `error` sans score bloquent le job. L'action CodeQL transmet le SARIF
+au service Code Scanning natif ; indépendamment, le contrôleur local journalise des findings
+assainis et publie une synthèse dans `GITHUB_STEP_SUMMARY`. Aucun artefact Actions n'est créé.
+Les jobs Azure OSV, NuGet et Checkov écrivent leurs diagnostics et résultats structurés non
+secrets dans les logs immutables du job et une synthèse dans `GITHUB_STEP_SUMMARY`. Leur
+conclusion dépend uniquement du statut scanner, des findings et de la validité de la sortie,
+jamais du quota de stockage d'artefacts. Les forks ne sont pas supportés : la gate de confiance
+chargée depuis `main` échoue sans checkout, tandis qu'aucun workflow contrôlé par le fork ne peut
+atteindre le pool Azure persistant.
 
 La gate `Generated state equals committed state` accède au dépôt privé `certigo-content`
 uniquement avec la deploy key SSH en lecture seule stockée dans le secret Actions

@@ -56,9 +56,10 @@ rapports automatisés sans impact démontré.
 - Notation des quiz **autoritative côté serveur** (clé de correction non exposée).
 - Analyse continue bloquante sur runners Azure : **CodeQL** (SAST), **OSV** et
   **NuGet** (dépendances), **Checkov** (IaC), et posture cloud via
-  **Microsoft Defender for Cloud**. CodeQL conserve ses SARIF ; OSV, NuGet et
-  Checkov publient leurs résultats non secrets dans les logs immutables et le résumé
-  du job, sans dépendre du quota d'artefacts.
+  **Microsoft Defender for Cloud**. CodeQL transmet son SARIF à Code Scanning et
+  publie aussi une synthèse locale ; OSV, NuGet et Checkov publient leurs résultats
+  structurés non secrets dans les logs immutables et le résumé du job, sans dépendre
+  du quota d'artefacts.
 - `.github/dependabot.yml` propose uniquement des mises à jour de versions ; ce
   service n'est pas une gate de sécurité.
 
