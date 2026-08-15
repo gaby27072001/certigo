@@ -571,18 +571,21 @@ Avant toute application, exécuter le `what-if` et vérifier que l'ordre ARM est
   délégation utilisateur. Il n'a aucun accès à `lesson-assets` et aucune clé de compte n'est
   autorisée.
 - Le runner crée ensuite un SAS **user delegation**, HTTPS, lecture seule, valable 14 minutes,
-  masque immédiatement le token et l'URL, puis appelle
-  `az webapp deploy --src-url … --type zip --async true`. Le SAS autorise la lecture du blob mais
-  ne contourne pas `publicNetworkAccess=Disabled` : OneDeploy doit toujours résoudre et joindre le
-  private endpoint via le VNet applicatif.
+  masque immédiatement le token et l'URL, puis appelle directement l'extension ARM
+  `Microsoft.Web/sites/extensions/onedeploy` avec `packageUri`, `type=zip`, `async=true`,
+  `restart=true` et `clean=true`. Le SAS autorise la lecture du blob mais ne contourne pas
+  `publicNetworkAccess=Disabled` : OneDeploy doit toujours résoudre et joindre le private endpoint
+  via le VNet applicatif.
 - `.github/scripts/deploy-flex-onedeploy.sh` refuse toute résolution DNS publique, vérifie
-  l'identité utilisateur du deployment storage et capture l'identifiant du dernier déploiement
-  avant la requête. La réponse asynchrone peut légitimement contenir `id: null` ; le script l'ignore,
-  découvre ensuite un unique nouvel identifiant dans l'historique trié, puis suit exclusivement ce
-  déploiement jusqu'au statut `4/complete`. Plusieurs nouveaux identifiants, un statut inconnu ou un
-  délai dépassé échouent fermés. Il exige enfin `/api/health/live` et `/api/health/ready`. Le blob
-  source immuable n'est pas supprimé par le script : la policy Storage supprime uniquement
-  `app-package/deployments/` après 30 jours, sans supposer que OneDeploy l'a copié.
+  l'identité utilisateur du deployment storage, obtient un jeton ARM court via Azure CLI et envoie
+  le PUT avec `curl`. Le bearer, le SAS, le corps et les réponses restent dans des fichiers
+  temporaires mode `0600`, supprimés par `trap`. La réponse asynchrone peut contenir `id: null` :
+  seule l'URL `Azure-AsyncOperation` (ou `Location`) de cette requête exacte est acceptée, après
+  validation du host `management.azure.com`. Si l'en-tête est absent/invalide, le statut est inconnu,
+  l'opération échoue ou le délai est dépassé, le déploiement échoue fermé. Le script exige ensuite
+  `/api/health/live` et `/api/health/ready`. Le blob source immuable n'est pas supprimé par le
+  script : la policy Storage supprime uniquement `app-package/deployments/` après 30 jours, sans
+  supposer que OneDeploy l'a copié.
 - La purge protection Key Vault est activée dans tous les environnements, y compris `dev`. Cette
   protection est irréversible ; aucune procédure Certigo ne dépend de la purge d'un vault.
 - **`func` Core Tools cassé sur win-arm64** — l'éviter ; tout piloter via `az` / ARM.

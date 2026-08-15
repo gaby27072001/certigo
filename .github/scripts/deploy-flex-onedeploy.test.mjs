@@ -39,6 +39,7 @@ function createHarness() {
   mkdirSync(bin);
   const state = path.join(root, 'state');
   const shellState = bashPath(state);
+  const shellPollState = `${shellState}.poll`;
   const packagePath = path.join(root, 'publish.zip');
   writeFileSync(packagePath, 'deterministic-package', 'utf8');
 
@@ -70,27 +71,9 @@ case "$*" in
     [[ "$*" == *"--https-only"* ]]
     printf 'sv=mock&spr=https&sp=r&sig=masked-test-token\\n'
     ;;
-  "webapp log deployment list"*)
-    if [[ ! -f "${shellState}" ]]; then
-      printf 'baseline-deployment\\n'
-    elif [[ "$*" == *"id=='new-deployment'"* ]]; then
-      printf 'new-deployment\\t4\\ttrue\\n'
-    elif [[ "\${MOCK_AMBIGUOUS_DEPLOYMENTS:-false}" == 'true' ]]; then
-      printf 'new-deployment-a\\t0\\tfalse\\nnew-deployment-b\\t0\\tfalse\\n'
-    else
-      printf 'baseline-deployment\\t4\\ttrue\\nnew-deployment\\t0\\tfalse\\n'
-    fi
-    ;;
-  "webapp deploy"*)
-    [[ "$*" == *"--src-url https://stcertigodev.blob.core.windows.net/app-package/deployments/0123456789abcdef0123456789abcdef01234567.zip?sv=mock&spr=https&sp=r&sig=masked-test-token"* ]]
-    [[ "$*" == *"--async true"* ]]
-    [[ "$*" == *"--track-status false"* ]]
-    if [[ "\${MOCK_DEPLOY_FAILURE:-false}" == 'true' ]]; then
-      echo "failed to fetch https://stcertigodev.blob.core.windows.net/app-package/deployments/0123456789abcdef0123456789abcdef01234567.zip?sv=mock&spr=https&sp=r&sig=masked-test-token" >&2
-      exit 1
-    fi
-    touch "${shellState}"
-    printf '{"id":null,"status":"InProgress"}\\n'
+  "account get-access-token"*)
+    [[ "$*" == *"--resource https://management.azure.com/"* ]]
+    printf 'masked-arm-token\\n'
     ;;
   *)
     echo "unexpected az command: $*" >&2
@@ -108,7 +91,112 @@ printf '%s STREAM mock\\n' "\${MOCK_DNS_IP:-10.60.0.68}"
   writeExecutable(
     path.join(bin, 'curl'),
     `#!/usr/bin/env bash
-[[ "$*" == *"/api/health/live"* || "$*" == *"/api/health/ready"* ]]
+set -euo pipefail
+original_args="$*"
+method='GET'
+auth_config=''
+data_file=''
+headers_file=''
+output_file=''
+url=''
+
+while (( $# > 0 )); do
+  case "$1" in
+    --request)
+      method="$2"
+      shift 2
+      ;;
+    --config)
+      auth_config="$2"
+      shift 2
+      ;;
+    --data-binary)
+      data_file="\${2#@}"
+      shift 2
+      ;;
+    --dump-header)
+      headers_file="$2"
+      shift 2
+      ;;
+    --output)
+      output_file="$2"
+      shift 2
+      ;;
+    --header|--write-out|--max-time)
+      shift 2
+      ;;
+    --fail|--silent|--show-error)
+      shift
+      ;;
+    https://*)
+      url="$1"
+      shift
+      ;;
+    *)
+      echo "unexpected curl argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ "$url" == *"/api/health/live" || "$url" == *"/api/health/ready" ]]; then
+  exit 0
+fi
+
+[[ -n "$auth_config" && -f "$auth_config" ]]
+[[ "$(stat -c '%a' "$auth_config")" == '600' ]]
+grep -Fx 'header = "Authorization: Bearer masked-arm-token"' "$auth_config" >/dev/null
+[[ "$original_args" != *"masked-arm-token"* ]]
+[[ "$original_args" != *"masked-test-token"* ]]
+
+if [[ "$method" == 'PUT' ]]; then
+  [[ "$url" == 'https://management.azure.com/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-certigo-dev/providers/Microsoft.Web/sites/func-certigo-dev-test/extensions/onedeploy?api-version=2024-04-01' ]]
+  [[ -n "$data_file" && -f "$data_file" ]]
+  [[ "$(stat -c '%a' "$data_file")" == '600' ]]
+  grep -F '"packageUri":"https://stcertigodev.blob.core.windows.net/app-package/deployments/0123456789abcdef0123456789abcdef01234567.zip?sv=mock&spr=https&sp=r&sig=masked-test-token"' "$data_file" >/dev/null
+  grep -F '"type":"zip"' "$data_file" >/dev/null
+  grep -F '"async":true' "$data_file" >/dev/null
+  grep -F '"restart":true' "$data_file" >/dev/null
+  grep -F '"clean":true' "$data_file" >/dev/null
+
+  printf '{"id":null,"status":"InProgress"}\\n' >"$output_file"
+  if [[ "\${MOCK_DEPLOY_FAILURE:-false}" == 'true' ]]; then
+    printf '{"error":{"message":"failed to fetch ?sv=mock&sig=masked-test-token"}}\\n' >"$output_file"
+    printf 'HTTP/1.1 400 Bad Request\\r\\n\\r\\n' >"$headers_file"
+    printf '400'
+    exit 0
+  fi
+  if [[ "\${MOCK_MISSING_OPERATION_HEADER:-false}" == 'true' ]]; then
+    printf 'HTTP/1.1 202 Accepted\\r\\n\\r\\n' >"$headers_file"
+  elif [[ "\${MOCK_INVALID_OPERATION_HEADER:-false}" == 'true' ]]; then
+    printf 'HTTP/1.1 202 Accepted\\r\\nAzure-AsyncOperation: https://example.invalid/steal\\r\\n\\r\\n' >"$headers_file"
+  elif [[ "\${MOCK_LOCATION_HEADER:-false}" == 'true' ]]; then
+    printf 'HTTP/1.1 202 Accepted\\r\\nLocation: https://management.azure.com/subscriptions/test/operations/mock-operation?api-version=2024-04-01\\r\\n\\r\\n' >"$headers_file"
+  else
+    printf 'HTTP/1.1 202 Accepted\\r\\nAzure-AsyncOperation: https://management.azure.com/subscriptions/test/operations/mock-operation?api-version=2024-04-01\\r\\n\\r\\n' >"$headers_file"
+  fi
+  touch "${shellState}"
+  printf '202'
+  exit 0
+fi
+
+[[ "$method" == 'GET' ]]
+[[ "$url" == 'https://management.azure.com/subscriptions/test/operations/mock-operation?api-version=2024-04-01' ]]
+if [[ "\${MOCK_LOCATION_EMPTY_202:-false}" == 'true' && ! -f "${shellPollState}" ]]; then
+  touch "${shellPollState}"
+  : >"$output_file"
+  printf '202'
+  exit 0
+fi
+case "\${MOCK_OPERATION_STATUS:-Succeeded}" in
+  Timeout)
+    printf '{"status":"InProgress"}\\n' >"$output_file"
+    ;;
+  *)
+    printf '{"status":"%s"}\\n' "\${MOCK_OPERATION_STATUS:-Succeeded}" >"$output_file"
+    ;;
+esac
+printf '200'
 `,
   );
 
@@ -123,6 +211,7 @@ printf '%s STREAM mock\\n' "\${MOCK_DNS_IP:-10.60.0.68}"
       CURL_BIN: bashPath(path.join(bin, 'curl')),
       GETENT_BIN: bashPath(path.join(bin, 'getent')),
       RESOURCE_GROUP: 'rg-certigo-dev',
+      SUBSCRIPTION_ID: '11111111-1111-1111-1111-111111111111',
       FUNCTION_APP_NAME: 'func-certigo-dev-test',
       STORAGE_ACCOUNT: 'stcertigodev',
       STORAGE_BLOB_ENDPOINT: 'https://stcertigodev.blob.core.windows.net/',
@@ -136,7 +225,7 @@ printf '%s STREAM mock\\n' "\${MOCK_DNS_IP:-10.60.0.68}"
   };
 }
 
-test('deploy script uses private URL-based OneDeploy and retains the immutable source blob', () => {
+test('deploy script polls the exact ARM operation returned with an id-null response', () => {
   const harness = createHarness();
   const result = spawnSync('bash', [bashPath(deployScript)], {
     env: harness.env,
@@ -164,7 +253,7 @@ test('deploy script fails before upload when blob DNS is not private', () => {
   assert.match(result.stdout + result.stderr, /does not resolve.*private endpoint/);
 });
 
-test('deploy script redacts the signed package URL from OneDeploy errors', () => {
+test('deploy script does not disclose the signed package URL from ARM errors', () => {
   const harness = createHarness();
   const result = spawnSync('bash', [bashPath(deployScript)], {
     env: {
@@ -175,33 +264,99 @@ test('deploy script redacts the signed package URL from OneDeploy errors', () =>
   });
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stdout + result.stderr, /<masked-package-url>/);
-  assert.doesNotMatch(result.stdout + result.stderr, /masked-test-token|\?sv=mock/);
+  assert.match(result.stdout + result.stderr, /returned HTTP 400/);
+  assert.doesNotMatch(
+    result.stdout + result.stderr,
+    /masked-arm-token|masked-test-token|\?sv=mock/,
+  );
 });
 
-test('deploy script fails closed when multiple new deployments make correlation ambiguous', () => {
+test('deploy script accepts a valid Location fallback header', () => {
   const harness = createHarness();
   const result = spawnSync('bash', [bashPath(deployScript)], {
     env: {
       ...harness.env,
-      MOCK_AMBIGUOUS_DEPLOYMENTS: 'true',
+      MOCK_LOCATION_HEADER: 'true',
     },
     encoding: 'utf8',
   });
 
-  assert.notEqual(result.status, 0);
-  assert.match(result.stdout + result.stderr, /correlation is ambiguous/);
-  assert.doesNotMatch(result.stdout + result.stderr, /masked-test-token|\?sv=mock/);
+  assert.equal(result.status, 0, result.stderr);
 });
 
-test('deploy script forbids config-zip and key-based authentication', () => {
+test('deploy script accepts an empty 202 while polling a Location fallback', () => {
+  const harness = createHarness();
+  const result = spawnSync('bash', [bashPath(deployScript)], {
+    env: {
+      ...harness.env,
+      MOCK_LOCATION_HEADER: 'true',
+      MOCK_LOCATION_EMPTY_202: 'true',
+    },
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(
+    result.stdout + result.stderr,
+    /masked-arm-token|masked-test-token|\?sv=mock/,
+  );
+});
+
+for (const [name, environment, expected] of [
+  [
+    'missing asynchronous operation header',
+    { MOCK_MISSING_OPERATION_HEADER: 'true' },
+    /did not return exactly one asynchronous operation header/,
+  ],
+  [
+    'invalid asynchronous operation URL',
+    { MOCK_INVALID_OPERATION_HEADER: 'true' },
+    /invalid asynchronous operation URL/,
+  ],
+  [
+    'failed asynchronous operation',
+    { MOCK_OPERATION_STATUS: 'Failed' },
+    /asynchronous operation failed/,
+  ],
+  [
+    'asynchronous operation timeout',
+    { MOCK_OPERATION_STATUS: 'Timeout', DEPLOYMENT_TIMEOUT_SECONDS: '2' },
+    /did not succeed before timeout/,
+  ],
+]) {
+  test(`deploy script fails closed on ${name}`, () => {
+    const harness = createHarness();
+    const result = spawnSync('bash', [bashPath(deployScript)], {
+      env: {
+        ...harness.env,
+        ...environment,
+      },
+      encoding: 'utf8',
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout + result.stderr, expected);
+    assert.doesNotMatch(
+      result.stdout + result.stderr,
+      /masked-arm-token|masked-test-token|\?sv=mock/,
+    );
+  });
+}
+
+test('deploy script uses only direct ARM OneDeploy and user delegation', () => {
   const script = readFileSync(deployScript, 'utf8');
-  assert.doesNotMatch(script, /config-zip|--account-key|--sas-token/i);
-  assert.match(script, /az webapp deploy/);
-  assert.match(script, /--src-url/);
+  assert.doesNotMatch(
+    script,
+    /config-zip|--account-key|--sas-token|az webapp deploy|webapp log deployment/i,
+  );
+  assert.match(script, /az account get-access-token/);
+  assert.match(script, /extensions\/onedeploy\?api-version=2024-04-01/);
+  assert.match(script, /Azure-AsyncOperation/);
+  assert.match(script, /Location/);
+  assert.match(script, /--dump-header/);
+  assert.match(script, /--config "\$auth_config_file"/);
   assert.match(script, /--as-user/);
   assert.match(script, /--overwrite false/);
-  assert.match(script, /baseline_deployment_id/);
-  assert.match(script, /sort_by\(\[\?id != null\], &received_time\)/);
+  assert.match(script, /umask 077/);
   assert.doesNotMatch(script, /storage blob delete/);
 });

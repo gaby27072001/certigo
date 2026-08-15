@@ -13,16 +13,31 @@ getent() {
   command "${GETENT_BIN:-getent}" "$@"
 }
 
-deploy_error_file=''
+auth_config_file=''
+request_body_file=''
+request_headers_file=''
+response_body_file=''
+operation_body_file=''
+curl_error_file=''
 cleanup() {
-  if [[ -n "$deploy_error_file" ]]; then
-    rm -f -- "$deploy_error_file"
-  fi
-  unset package_url sas_token
+  local file
+  for file in \
+    "$auth_config_file" \
+    "$request_body_file" \
+    "$request_headers_file" \
+    "$response_body_file" \
+    "$operation_body_file" \
+    "$curl_error_file"; do
+    if [[ -n "$file" ]]; then
+      rm -f -- "$file"
+    fi
+  done
+  unset arm_access_token package_url sas_token
 }
 trap cleanup EXIT
 
 required_variables=(
+  SUBSCRIPTION_ID
   RESOURCE_GROUP
   FUNCTION_APP_NAME
   STORAGE_ACCOUNT
@@ -40,6 +55,18 @@ done
 
 if [[ ! "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo "::error::COMMIT_SHA must be a lowercase 40-character Git commit SHA."
+  exit 1
+fi
+if [[ ! "$SUBSCRIPTION_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+  echo "::error::SUBSCRIPTION_ID must be an Azure subscription GUID."
+  exit 1
+fi
+if [[ ! "$RESOURCE_GROUP" =~ ^[A-Za-z0-9._()-]{1,90}$ ]]; then
+  echo "::error::RESOURCE_GROUP is not a valid Azure resource group name."
+  exit 1
+fi
+if [[ ! "$FUNCTION_APP_NAME" =~ ^[A-Za-z0-9-]{2,60}$ ]]; then
+  echo "::error::FUNCTION_APP_NAME is not a valid Azure Function App name."
   exit 1
 fi
 if [[ ! -f "$PACKAGE_PATH" ]]; then
@@ -202,125 +229,149 @@ mask_secret "$sas_token"
 package_url="${STORAGE_BLOB_ENDPOINT}${DEPLOYMENT_CONTAINER}/${BLOB_NAME}?${sas_token}"
 mask_secret "$package_url"
 
-baseline_deployment_id="$(
-  az webapp log deployment list \
-    --resource-group "$RESOURCE_GROUP" \
-    --name "$FUNCTION_APP_NAME" \
-    --query 'sort_by([?id != null], &received_time) | [-1].id' \
+arm_access_token="$(
+  az account get-access-token \
+    --resource 'https://management.azure.com/' \
+    --query accessToken \
     --output tsv \
     --only-show-errors
 )"
-baseline_deployment_id="$(tr -d '\r\n' <<< "$baseline_deployment_id")"
-if [[ -n "$baseline_deployment_id" && ! "$baseline_deployment_id" =~ ^[A-Za-z0-9-]+$ ]]; then
-  echo "::error::Existing OneDeploy history returned an invalid deployment id."
+if [[ -z "$arm_access_token" ]]; then
+  echo "::error::Azure CLI returned an empty ARM access token."
+  exit 1
+fi
+mask_secret "$arm_access_token"
+
+umask 077
+auth_config_file="$(mktemp)"
+request_body_file="$(mktemp)"
+request_headers_file="$(mktemp)"
+response_body_file="$(mktemp)"
+operation_body_file="$(mktemp)"
+curl_error_file="$(mktemp)"
+
+printf 'header = "Authorization: Bearer %s"\n' "$arm_access_token" >"$auth_config_file"
+printf \
+  '{"properties":{"packageUri":"%s","type":"zip","async":true,"restart":true,"clean":true}}\n' \
+  "$package_url" >"$request_body_file"
+
+arm_endpoint="https://management.azure.com/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.Web/sites/${FUNCTION_APP_NAME}/extensions/onedeploy?api-version=2024-04-01"
+mask_secret "$arm_endpoint"
+if ! request_status="$(
+  curl \
+    --config "$auth_config_file" \
+    --request PUT \
+    --header 'Accept: application/json' \
+    --header 'Content-Type: application/json' \
+    --data-binary "@${request_body_file}" \
+    --dump-header "$request_headers_file" \
+    --output "$response_body_file" \
+    --write-out '%{http_code}' \
+    --silent \
+    --show-error \
+    "$arm_endpoint" 2>"$curl_error_file"
+)"; then
+  echo "::error::OneDeploy ARM request could not be completed."
+  exit 1
+fi
+if [[ "$request_status" != '200' && "$request_status" != '202' ]]; then
+  echo "::error::OneDeploy ARM request returned HTTP ${request_status}."
   exit 1
 fi
 
-deploy_error_file="$(mktemp)"
-if ! az webapp deploy \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$FUNCTION_APP_NAME" \
-  --src-url "$package_url" \
-  --type zip \
-  --async true \
-  --track-status false \
-  --enable-kudu-warmup false \
-  --output none \
-  --only-show-errors >/dev/null 2>"$deploy_error_file"; then
-  deploy_error="$(<"$deploy_error_file")"
-  deploy_error="${deploy_error//$package_url/<masked-package-url>}"
-  deploy_error="${deploy_error//$sas_token/<masked-sas>}"
-  printf '%s\n' "$deploy_error" >&2
-  echo "::error::OneDeploy request failed."
+header_values() {
+  local header_name="$1"
+  local headers_file="$2"
+  awk -v target="${header_name,,}" '
+    {
+      line = $0
+      sub(/\r$/, "", line)
+      separator = index(line, ":")
+      if (separator > 0 && tolower(substr(line, 1, separator - 1)) == target) {
+        value = substr(line, separator + 1)
+        sub(/^[ \t]+/, "", value)
+        if (length(value) > 0) {
+          print value
+        }
+      }
+    }
+  ' "$headers_file"
+}
+
+mapfile -t operation_headers < <(header_values 'Azure-AsyncOperation' "$request_headers_file")
+if (( ${#operation_headers[@]} == 0 )); then
+  mapfile -t operation_headers < <(header_values 'Location' "$request_headers_file")
+fi
+if (( ${#operation_headers[@]} != 1 )); then
+  echo "::error::OneDeploy ARM response did not return exactly one asynchronous operation header."
   exit 1
 fi
-rm -f -- "$deploy_error_file"
-deploy_error_file=''
+operation_url="${operation_headers[0]}"
+if [[ ! "$operation_url" =~ ^https://management\.azure\.com/[^[:space:]]+$ ]]; then
+  echo "::error::OneDeploy ARM response returned an invalid asynchronous operation URL."
+  exit 1
+fi
+mask_secret "$operation_url"
 
-deployment_id=''
-current_status=''
-current_complete=''
-deployment_started_at="$SECONDS"
-while (( SECONDS - deployment_started_at < DEPLOYMENT_TIMEOUT_SECONDS )); do
-  if [[ -z "$deployment_id" ]]; then
-    mapfile -t deployment_rows < <(
-      az webapp log deployment list \
-        --resource-group "$RESOURCE_GROUP" \
-        --name "$FUNCTION_APP_NAME" \
-        --query 'sort_by([?id != null], &received_time) | [-2:] | [].[id,status,complete]' \
-        --output tsv \
-        --only-show-errors
-    )
-    if (( ${#deployment_rows[@]} == 0 )); then
-      sleep "$POLL_INTERVAL_SECONDS"
-      continue
-    fi
-    latest_index=$((${#deployment_rows[@]} - 1))
-    IFS=$'\t' read -r current_id current_status current_complete <<< "${deployment_rows[$latest_index]}"
-    if [[ ! "$current_id" =~ ^[A-Za-z0-9-]+$ ]]; then
-      echo "::error::OneDeploy discovery returned an invalid deployment id."
-      exit 1
-    fi
-    if [[ "$current_id" == "$baseline_deployment_id" ]]; then
-      sleep "$POLL_INTERVAL_SECONDS"
-      continue
-    fi
-    if (( ${#deployment_rows[@]} > 1 )); then
-      IFS=$'\t' read -r previous_id _ _ <<< "${deployment_rows[$((latest_index - 1))]}"
-      if [[ ! "$previous_id" =~ ^[A-Za-z0-9-]+$ ]]; then
-        echo "::error::OneDeploy discovery returned an invalid preceding deployment id."
-        exit 1
-      fi
-      if [[ -z "$baseline_deployment_id" || "$previous_id" != "$baseline_deployment_id" ]]; then
-        echo "::error::Multiple new OneDeploy deployments appeared; correlation is ambiguous."
-        exit 1
-      fi
-    fi
-    deployment_id="$current_id"
-  else
-    mapfile -t deployment_rows < <(
-      az webapp log deployment list \
-        --resource-group "$RESOURCE_GROUP" \
-        --name "$FUNCTION_APP_NAME" \
-        --query "[?id=='${deployment_id}'].[id,status,complete]" \
-        --output tsv \
-        --only-show-errors
-    )
-    if (( ${#deployment_rows[@]} != 1 )); then
-      echo "::error::Tracked OneDeploy deployment returned an unknown or duplicate record."
-      exit 1
-    fi
-    IFS=$'\t' read -r current_id current_status current_complete <<< "${deployment_rows[0]}"
-    if [[ "$current_id" != "$deployment_id" ]]; then
-      echo "::error::Tracked OneDeploy deployment id changed unexpectedly."
-      exit 1
-    fi
+operation_status=''
+operation_started_at="$SECONDS"
+while (( SECONDS - operation_started_at < DEPLOYMENT_TIMEOUT_SECONDS )); do
+  if ! poll_status="$(
+    curl \
+      --config "$auth_config_file" \
+      --request GET \
+      --header 'Accept: application/json' \
+      --output "$operation_body_file" \
+      --write-out '%{http_code}' \
+      --silent \
+      --show-error \
+      "$operation_url" 2>"$curl_error_file"
+  )"; then
+    echo "::error::OneDeploy asynchronous operation poll could not be completed."
+    exit 1
+  fi
+  if [[ "$poll_status" != '200' && "$poll_status" != '202' ]]; then
+    echo "::error::OneDeploy asynchronous operation returned HTTP ${poll_status}."
+    exit 1
+  fi
+  if [[ "$poll_status" == '202' && ! -s "$operation_body_file" ]]; then
+    sleep "$POLL_INTERVAL_SECONDS"
+    continue
+  fi
+  if ! operation_status="$(
+    "${NODE_BIN:-node}" -e '
+      const fs = require("node:fs");
+      const payload = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      const status = payload.status
+        ?? payload.properties?.status
+        ?? payload.properties?.provisioningState;
+      if (typeof status !== "string" || status.length === 0) process.exit(2);
+      process.stdout.write(status);
+    ' "$operation_body_file" 2>/dev/null
+  )"; then
+    echo "::error::OneDeploy asynchronous operation returned an invalid status payload."
+    exit 1
   fi
 
-  case "$current_status" in
-    4)
-      if [[ "${current_complete,,}" == 'true' ]]; then
-        break
-      fi
+  case "${operation_status,,}" in
+    succeeded)
+      break
       ;;
-    -1|3|5|6)
-      echo "::error::OneDeploy failed with status ${current_status}."
+    failed|canceled|cancelled)
+      echo "::error::OneDeploy asynchronous operation failed."
       exit 1
       ;;
-    ''|0|1|2) ;;
+    accepted|inprogress|running)
+      sleep "$POLL_INTERVAL_SECONDS"
+      ;;
     *)
-      echo "::error::OneDeploy returned unknown status ${current_status}."
+      echo "::error::OneDeploy asynchronous operation returned an unknown status."
       exit 1
       ;;
   esac
-  sleep "$POLL_INTERVAL_SECONDS"
 done
-if [[ -z "$deployment_id" ]]; then
-  echo "::error::No new OneDeploy deployment appeared before timeout."
-  exit 1
-fi
-if [[ "${current_status:-}" != '4' || "${current_complete,,}" != 'true' ]]; then
-  echo "::error::OneDeploy did not complete successfully before timeout."
+if [[ "${operation_status,,}" != 'succeeded' ]]; then
+  echo "::error::OneDeploy asynchronous operation did not succeed before timeout."
   exit 1
 fi
 

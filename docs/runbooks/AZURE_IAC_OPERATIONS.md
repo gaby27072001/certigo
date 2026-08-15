@@ -196,6 +196,11 @@ repousser sans changer la clé, et appliquer la procédure de chevauchement déc
   `deployments/<commit-sha>.zip` ne peut être réutilisé que si son SHA-256 est identique. Le script
   ne le supprime pas après OneDeploy : la policy lifecycle bornée à 30 jours cible exclusivement
   `app-package/deployments/`.
+- OneDeploy est invoqué par PUT ARM direct. Ne jamais revenir à une corrélation par « dernier
+  déploiement » : seul l'en-tête `Azure-AsyncOperation` ou `Location` renvoyé par le PUT exact peut
+  être interrogé. L'absence d'en-tête, une URL hors `management.azure.com`, un statut inconnu ou un
+  timeout sont bloquants. Jeton ARM, SAS, corps, en-têtes et réponses restent dans des fichiers
+  temporaires `0600` détruits par `trap`.
 
 ## Interdictions opérationnelles
 
