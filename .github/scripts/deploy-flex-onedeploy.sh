@@ -110,7 +110,7 @@ mask_secret() {
   fi
 }
 
-read -r public_network_access shared_key_access < <(
+mapfile -t storage_security_settings < <(
   az storage account show \
     --resource-group "$RESOURCE_GROUP" \
     --name "$STORAGE_ACCOUNT" \
@@ -118,12 +118,18 @@ read -r public_network_access shared_key_access < <(
     --output tsv \
     --only-show-errors
 )
+if (( ${#storage_security_settings[@]} != 2 )); then
+  echo "::error::Deployment storage returned invalid security settings."
+  exit 1
+fi
+public_network_access="${storage_security_settings[0]}"
+shared_key_access="${storage_security_settings[1]}"
 if [[ "${public_network_access,,}" != 'disabled' || "${shared_key_access,,}" != 'false' ]]; then
   echo "::error::Deployment storage must disable public network and shared-key access."
   exit 1
 fi
 
-read -r deployment_auth_type deployment_storage integration_subnet < <(
+mapfile -t deployment_settings < <(
   az resource show \
     --resource-group "$RESOURCE_GROUP" \
     --resource-type Microsoft.Web/sites \
@@ -133,6 +139,13 @@ read -r deployment_auth_type deployment_storage integration_subnet < <(
     --output tsv \
     --only-show-errors
 )
+if (( ${#deployment_settings[@]} != 3 )); then
+  echo "::error::Function App returned invalid deployment settings."
+  exit 1
+fi
+deployment_auth_type="${deployment_settings[0]}"
+deployment_storage="${deployment_settings[1]}"
+integration_subnet="${deployment_settings[2]}"
 if [[ "$deployment_auth_type" != 'UserAssignedIdentity' ]]; then
   echo "::error::Flex deployment storage must use the app user-assigned identity."
   exit 1
