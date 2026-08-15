@@ -80,6 +80,7 @@ jobs:
       storageBlobEndpoint: ${{ steps.deploy-bicep.outputs.storageBlobEndpoint }}
       deploymentContainerName: ${{ steps.deploy-bicep.outputs.deploymentContainerName }}
       privateDnsResourceGroup: ${{ steps.deploy-bicep.outputs.privateDnsResourceGroup }}
+      functionIntegrationSubnetId: ${{ steps.deploy-bicep.outputs.functionIntegrationSubnetId }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -122,6 +123,7 @@ jobs:
           STORAGE_BLOB_ENDPOINT="$(node -p "require('$DEPLOYMENT_OUTPUTS_FILE').storageBlobEndpoint.value")"
           DEPLOYMENT_CONTAINER_NAME="$(node -p "require('$DEPLOYMENT_OUTPUTS_FILE').deploymentContainerName.value")"
           PRIVATE_DNS_RESOURCE_GROUP="$(node -p "require('$DEPLOYMENT_OUTPUTS_FILE').privateDnsResourceGroup.value")"
+          FUNCTION_INTEGRATION_SUBNET_ID="$(node -p "require('$DEPLOYMENT_OUTPUTS_FILE').functionIntegrationSubnetId.value")"
           rm -f -- "$DEPLOYMENT_OUTPUTS_FILE"
           if [[ ! "$FUNCTION_APP_NAME" =~ ^[A-Za-z0-9-]{2,60}$ ]]; then
             echo "::error::Azure returned an invalid Function App name."
@@ -143,11 +145,16 @@ jobs:
             echo "::error::Azure returned an unexpected shared private DNS resource group."
             exit 1
           fi
+          if [[ ! "$FUNCTION_INTEGRATION_SUBNET_ID" =~ ^/subscriptions/[0-9a-fA-F-]+/resourceGroups/rg-certigo-${TARGET_ENV}/providers/Microsoft.Network/virtualNetworks/vnet-certigo-${TARGET_ENV}/subnets/[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::Azure returned an unexpected Function integration subnet."
+            exit 1
+          fi
           echo "functionAppName=$FUNCTION_APP_NAME" >> "$GITHUB_OUTPUT"
           echo "storageAccount=$STORAGE_ACCOUNT" >> "$GITHUB_OUTPUT"
           echo "storageBlobEndpoint=$STORAGE_BLOB_ENDPOINT" >> "$GITHUB_OUTPUT"
           echo "deploymentContainerName=$DEPLOYMENT_CONTAINER_NAME" >> "$GITHUB_OUTPUT"
           echo "privateDnsResourceGroup=$PRIVATE_DNS_RESOURCE_GROUP" >> "$GITHUB_OUTPUT"
+          echo "functionIntegrationSubnetId=$FUNCTION_INTEGRATION_SUBNET_ID" >> "$GITHUB_OUTPUT"
 
       - name: Verify private networking before code deployment
         shell: bash
@@ -155,6 +162,7 @@ jobs:
           FUNCTION_APP_NAME: ${{ steps.deploy-bicep.outputs.functionAppName }}
           STORAGE_ACCOUNT: ${{ steps.deploy-bicep.outputs.storageAccount }}
           PRIVATE_DNS_RESOURCE_GROUP: ${{ steps.deploy-bicep.outputs.privateDnsResourceGroup }}
+          FUNCTION_INTEGRATION_SUBNET_ID: ${{ steps.deploy-bicep.outputs.functionIntegrationSubnetId }}
         run: |
           set -euo pipefail
           RESOURCE_GROUP="rg-certigo-$TARGET_ENV"
@@ -204,8 +212,8 @@ jobs:
             echo "::error::Expected five approved private endpoint connections."
             exit 1
           fi
-          if [[ "$INTEGRATION_SUBNET" != */subnets/snet-functions ]]; then
-            echo "::error::Function App is not connected to the dedicated integration subnet."
+          if [[ "$INTEGRATION_SUBNET" != "$FUNCTION_INTEGRATION_SUBNET_ID" ]]; then
+            echo "::error::Function App is not connected to the expected integration subnet."
             exit 1
           fi
           if [[ "${ROUTE_ALL,,}" != "false" ]]; then
@@ -269,6 +277,7 @@ jobs:
       STORAGE_BLOB_ENDPOINT: ${{ needs.deploy-infra.outputs.storageBlobEndpoint }}
       DEPLOYMENT_CONTAINER: ${{ needs.deploy-infra.outputs.deploymentContainerName }}
       SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      FUNCTION_INTEGRATION_SUBNET_ID: ${{ needs.deploy-infra.outputs.functionIntegrationSubnetId }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

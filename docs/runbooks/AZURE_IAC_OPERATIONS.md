@@ -109,16 +109,18 @@ private endpoint `Approved`, cinq zones DNS partagées dans `rg-certigo-ci` avec
 applicatif, deux peerings `Connected`, subnet FC1 délégué à `Microsoft.App/environments`, route-all
 désactivé, authentification locale Storage/Cosmos désactivée hors dev et readiness `healthy`.
 
-### Migration initiale des zones privées dev
+### Migration initiale des zones privées par environnement
 
-Avant la première application de ce hotfix, planifier une fenêtre de changement. Les cinq zones de
-`rg-certigo-dev` doivent être retirées avant de lier leurs remplaçantes de même namespace au VNet CI.
-Supprimer d'abord uniquement le zone group `default` de chacun des cinq private endpoints dev, puis
-les cinq zones de `rg-certigo-dev`; ne supprimer ni endpoint ni VNet. Appliquer immédiatement le
-template `dev`, qui recrée le jeu unique dans `rg-certigo-ci` et rattache les liens et zone groups.
-Conserver le `what-if`, suspendre le CD pendant l'opération et vérifier les dix liens (cinq CI, cinq
-dev) ainsi que la résolution privée avant reprise. Staging et production consomment ensuite ce jeu
-partagé.
+Avant la première application de chaque environnement, planifier une fenêtre de
+changement. Les cinq zones du groupe applicatif (`dev`, `staging`, puis `prod`)
+doivent être retirées avant de lier leurs remplaçantes de même namespace.
+Lister et supprimer l'unique zone group de chacun des cinq private endpoints,
+puis les cinq zones du groupe ; ne supprimer ni endpoint ni VNet. Ne pas
+supprimer la zone OpenAI de dev, ni la zone Vault partagée de `rg-certigo-ci`,
+ni son lien `vnet-certigo-ci-kv-dnslink`. Appliquer immédiatement le template
+de l'environnement, qui adopte le réseau live et rattache liens et zone groups
+au jeu partagé. Vérifier les dix liens et la résolution privée avant de passer
+à l'environnement suivant.
 
 ## Prévol sans mutation
 
@@ -154,7 +156,7 @@ repousser sans changer la clé, et appliquer la procédure de chevauchement déc
 ## Ordre de déploiement autorisé
 
 1. **Dev** : appliquer l'IaC ; le module réseau doit terminer avant la Function App. Vérifier cinq
-   connexions privées approuvées, les peerings, les liens DNS CI, l'intégration `snet-functions` et
+   connexions privées approuvées, les peerings, les liens DNS CI, l'intégration au subnet FC1 attendu et
    route-all désactivé. Le CD publie ensuite via
    `.github/scripts/deploy-flex-onedeploy.sh` et bloque tant que `/health/live` puis
    `/health/ready` ne sont pas verts.

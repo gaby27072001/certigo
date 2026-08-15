@@ -84,7 +84,9 @@ resource tableCiLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024
 
 resource vaultCiLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
   parent: vaultZone
-  name: '${ciVnetName}-link'
+  // Adopt the pre-existing CI Key Vault DNS link instead of linking the same
+  // VNet to this shared zone a second time.
+  name: '${ciVnetName}-kv-dnslink'
   location: 'global'
   tags: tags
   properties: {

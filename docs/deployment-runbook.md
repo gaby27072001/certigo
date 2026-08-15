@@ -531,24 +531,28 @@ chaque environnement dans les deux sens. Un seul jeu de cinq zones DNS privées,
 `rg-certigo-ci`, est lié au VNet CI et à chaque VNet applicatif. Le runner de confiance écrit le
 package par le chemin Blob privé. **Cette PR ne déploie aucune ressource Azure.**
 
-### Migration DNS privée unique (première application seulement)
+### Migration DNS privée unique (première application par environnement)
 
-Les zones actuellement déployées dans `rg-certigo-dev` ne peuvent pas coexister avec les mêmes
-namespaces dans `rg-certigo-ci` lorsqu'elles sont liées aux mêmes VNets. Cette migration est une
-opération Azure manuelle avec une courte interruption DNS privée ; elle ne doit pas être lancée par
-la PR.
+Les cinq zones actuellement déployées dans chacun de `rg-certigo-dev`,
+`rg-certigo-staging` et `rg-certigo-prod` ne peuvent pas coexister avec les
+mêmes namespaces dans `rg-certigo-ci` lorsqu'elles sont liées au VNet de
+l'environnement. Cette migration se fait séparément, juste avant la première
+application de chaque environnement, avec une courte interruption DNS privée.
 
 1. Faire approuver la fenêtre de changement, conserver le résultat du `what-if` et suspendre les
    déploiements backend.
-2. Dans `rg-certigo-dev`, supprimer le zone group `default` des cinq private endpoints (`blob`,
-   `queue`, `table`, `vault`, `Sql`), puis supprimer les cinq anciennes zones privées. Ne supprimer
-   ni private endpoint ni VNet.
-3. Appliquer immédiatement `infra/main.bicep` pour `dev`. Le module hub crée les zones dans
-   `rg-certigo-ci`, le lien CI unique, les liens applicatifs et rattache les zone groups aux nouveaux
-   identifiants de zone.
-4. Vérifier la résolution privée Blob depuis le runner, les cinq liens CI, les cinq liens dev et les
-   cinq connexions private endpoint avant de réactiver le CD. Staging et production réutilisent
-   ensuite ces mêmes zones ; ils n'en créent aucune copie.
+2. Dans le groupe de l'environnement, lister puis supprimer l'unique zone group
+   de chacun des cinq private endpoints (`blob`, `queue`, `table`, `vault`,
+   `Sql`), quel que soit son nom, puis supprimer uniquement les cinq zones
+   correspondantes. Ne supprimer ni private endpoint, ni VNet, ni la zone
+   OpenAI de dev.
+3. Appliquer immédiatement `infra/main.bicep` pour cet environnement. Le
+   module adopte les VNets, subnets et private endpoints live, crée ou réutilise
+   les zones dans `rg-certigo-ci`, puis rattache les liens et zone groups.
+4. Vérifier la résolution privée depuis le runner et l'application, les cinq
+   liens CI, les cinq liens applicatifs et les cinq connexions privées avant de
+   passer à l'environnement suivant. Ne jamais supprimer la zone Vault
+   préexistante du hub ni son lien `vnet-certigo-ci-kv-dnslink`.
 
 Avant toute application, exécuter le `what-if` et vérifier que l'ordre ARM est :
 
@@ -596,8 +600,9 @@ Avant toute application, exécuter le `what-if` et vérifier que l'ordre ARM est
 
 ### Résiduel strict (hors périmètre repo)
 
-1. **Opérateur Azure** — exécuter la migration DNS unique ci-dessus, examiner le `what-if` des
-   peerings, liens DNS et attributions Blob, puis déployer `dev` dans une fenêtre autorisée.
+1. **Opérateur Azure** — exécuter la migration DNS environnement par
+   environnement ci-dessus, examiner le `what-if` des peerings, liens DNS et
+   attributions Blob, puis déployer dans une fenêtre autorisée.
 2. **Validation post-déploiement** — confirmer les deux peerings `Connected`, les cinq liens CI et
    cinq liens applicatifs, l'absence d'accès public/clé partagée, puis rejouer auth 200/401 et le
    smoke test. Le workflow traite déjà les deux sondes santé comme des gates bloquants.

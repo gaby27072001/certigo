@@ -52,7 +52,7 @@ case "$*" in
     printf 'Disabled\\tfalse\\n'
     ;;
   "resource show"*)
-    printf 'UserAssignedIdentity\\thttps://stcertigodev.blob.core.windows.net/app-package\\t/subscriptions/test/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet/subnets/snet-functions\\n'
+    printf 'UserAssignedIdentity\\thttps://stcertigodev.blob.core.windows.net/app-package\\t/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-certigo-dev/providers/Microsoft.Network/virtualNetworks/vnet-certigo-dev/subnets/snet-functions\\n'
     ;;
   "network private-endpoint show"*)
     printf '/subscriptions/test/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/blob-nic\\n'
@@ -213,6 +213,8 @@ printf '200'
       RESOURCE_GROUP: 'rg-certigo-dev',
       SUBSCRIPTION_ID: '11111111-1111-1111-1111-111111111111',
       FUNCTION_APP_NAME: 'func-certigo-dev-test',
+      FUNCTION_INTEGRATION_SUBNET_ID:
+        '/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-certigo-dev/providers/Microsoft.Network/virtualNetworks/vnet-certigo-dev/subnets/snet-functions',
       STORAGE_ACCOUNT: 'stcertigodev',
       STORAGE_BLOB_ENDPOINT: 'https://stcertigodev.blob.core.windows.net/',
       PACKAGE_PATH: bashPath(packagePath),
@@ -251,6 +253,24 @@ test('deploy script fails before upload when blob DNS is not private', () => {
 
   assert.notEqual(result.status, 0);
   assert.match(result.stdout + result.stderr, /does not resolve.*private endpoint/);
+});
+
+test('deploy script fails when the Function App uses an unexpected integration subnet', () => {
+  const harness = createHarness();
+  const result = spawnSync('bash', [bashPath(deployScript)], {
+    env: {
+      ...harness.env,
+      FUNCTION_INTEGRATION_SUBNET_ID:
+        '/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-certigo-dev/providers/Microsoft.Network/virtualNetworks/vnet-certigo-dev/subnets/other-subnet',
+    },
+    encoding: 'utf8',
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(
+    result.stdout + result.stderr,
+    /not connected to the expected private integration subnet/,
+  );
 });
 
 test('deploy script does not disclose the signed package URL from ARM errors', () => {

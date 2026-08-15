@@ -40,6 +40,7 @@ required_variables=(
   SUBSCRIPTION_ID
   RESOURCE_GROUP
   FUNCTION_APP_NAME
+  FUNCTION_INTEGRATION_SUBNET_ID
   STORAGE_ACCOUNT
   STORAGE_BLOB_ENDPOINT
   PACKAGE_PATH
@@ -67,6 +68,10 @@ if [[ ! "$RESOURCE_GROUP" =~ ^[A-Za-z0-9._()-]{1,90}$ ]]; then
 fi
 if [[ ! "$FUNCTION_APP_NAME" =~ ^[A-Za-z0-9-]{2,60}$ ]]; then
   echo "::error::FUNCTION_APP_NAME is not a valid Azure Function App name."
+  exit 1
+fi
+if [[ ! "$FUNCTION_INTEGRATION_SUBNET_ID" =~ ^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[A-Za-z0-9._()-]+/providers/Microsoft.Network/virtualNetworks/[A-Za-z0-9._-]+/subnets/[A-Za-z0-9._-]+$ ]]; then
+  echo "::error::FUNCTION_INTEGRATION_SUBNET_ID is not a valid Azure subnet resource id."
   exit 1
 fi
 if [[ ! -f "$PACKAGE_PATH" ]]; then
@@ -136,8 +141,8 @@ if [[ "$deployment_storage" != "${STORAGE_BLOB_ENDPOINT}${DEPLOYMENT_CONTAINER}"
   echo "::error::Flex deployment storage does not match the private package container."
   exit 1
 fi
-if [[ "$integration_subnet" != */subnets/snet-functions ]]; then
-  echo "::error::Function App is not connected to the private integration subnet."
+if [[ "$integration_subnet" != "$FUNCTION_INTEGRATION_SUBNET_ID" ]]; then
+  echo "::error::Function App is not connected to the expected private integration subnet."
   exit 1
 fi
 

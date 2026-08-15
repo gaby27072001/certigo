@@ -97,8 +97,29 @@ param vnetAddressPrefix string
 @description('Dedicated Flex Consumption integration subnet. /27 is the supported minimum; /26 is used for capacity.')
 param functionIntegrationSubnetPrefix string
 
+@description('Existing dedicated Flex Consumption integration subnet name.')
+param functionIntegrationSubnetName string
+
 @description('Dedicated subnet for private endpoints.')
 param privateEndpointSubnetPrefix string
+
+@description('Existing dedicated subnet for private endpoints.')
+param privateEndpointSubnetName string
+
+@description('Existing Blob private endpoint name.')
+param storageBlobPrivateEndpointName string
+
+@description('Existing Queue private endpoint name.')
+param storageQueuePrivateEndpointName string
+
+@description('Existing Table private endpoint name.')
+param storageTablePrivateEndpointName string
+
+@description('Existing Key Vault private endpoint name.')
+param keyVaultPrivateEndpointName string
+
+@description('Existing Cosmos DB private endpoint name.')
+param cosmosPrivateEndpointName string
 
 @description('Explicit Cosmos backup mode.')
 @allowed([ 'Periodic', 'Continuous' ])
@@ -206,9 +227,11 @@ module storage 'modules/storage.bicep' = {
     accountName: toLower('st${appName}${env}${take(suffix, 8)}')
     location: location
     skuName: hardened ? 'Standard_GRS' : 'Standard_LRS'
-    enableVersioning: hardened
-    blobSoftDeleteDays: hardened ? 30 : 7
-    containerSoftDeleteDays: hardened ? 30 : 7
+    // Azure Policy enables point-in-time restore on the live accounts. Restore
+    // requires versioning and sufficient soft-delete retention, including dev.
+    enableVersioning: true
+    blobSoftDeleteDays: 30
+    containerSoftDeleteDays: 30
     ciDeploymentPrincipalId: ciDeploymentPrincipalId
     tags: tags
   }
@@ -237,7 +260,7 @@ module sharedPrivateDns 'modules/sharedPrivateDns.bicep' = {
   scope: resourceGroup(ciVnetResourceGroupName)
   name: 'privateDns-${appName}-hub'
   params: {
-    ciVnetId: resourceId(ciVnetResourceGroupName, 'Microsoft.Network/virtualNetworks', ciVnetName)
+    ciVnetId: resourceId(subscription().subscriptionId, ciVnetResourceGroupName, 'Microsoft.Network/virtualNetworks', ciVnetName)
     ciVnetName: ciVnetName
     tags: {
       product: 'Certigo'
@@ -257,10 +280,17 @@ module privateNetwork 'modules/privateNetwork.bicep' = {
     location: location
     vnetAddressPrefix: vnetAddressPrefix
     functionIntegrationSubnetPrefix: functionIntegrationSubnetPrefix
+    functionIntegrationSubnetName: functionIntegrationSubnetName
     privateEndpointSubnetPrefix: privateEndpointSubnetPrefix
+    privateEndpointSubnetName: privateEndpointSubnetName
     storageAccountName: storage.outputs.accountName
     keyVaultName: vault.outputs.name
     cosmosAccountName: data.outputs.accountName
+    storageBlobPrivateEndpointName: storageBlobPrivateEndpointName
+    storageQueuePrivateEndpointName: storageQueuePrivateEndpointName
+    storageTablePrivateEndpointName: storageTablePrivateEndpointName
+    keyVaultPrivateEndpointName: keyVaultPrivateEndpointName
+    cosmosPrivateEndpointName: cosmosPrivateEndpointName
     ciVnetResourceGroupName: ciVnetResourceGroupName
     ciVnetName: ciVnetName
     blobZoneId: sharedPrivateDns.outputs.blobZoneId
@@ -433,4 +463,5 @@ output storageBlobEndpoint string = storage.outputs.primaryBlobEndpoint
 output privateDnsResourceGroup string = ciVnetResourceGroupName
 output keyVaultName string = vault.outputs.name
 output virtualNetworkId string = privateNetwork.outputs.vnetId
+output functionIntegrationSubnetId string = privateNetwork.outputs.functionIntegrationSubnetId
 output cosmosBackupMode string = cosmosBackupMode

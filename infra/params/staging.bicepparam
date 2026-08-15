@@ -14,9 +14,17 @@ param env = 'staging'
 param location = 'westeurope'
 param appName = 'certigo'
 param ciDeploymentPrincipalId = '15d2b34a-c0a0-4b5d-8360-b895a8164706'
-param vnetAddressPrefix = '10.61.0.0/24'
-param functionIntegrationSubnetPrefix = '10.61.0.0/26'
-param privateEndpointSubnetPrefix = '10.61.0.64/26'
+// Adopt the live network rather than replacing in-use subnets.
+param vnetAddressPrefix = '10.80.0.0/16'
+param functionIntegrationSubnetPrefix = '10.80.1.0/24'
+param functionIntegrationSubnetName = 'snet-func-flex'
+param privateEndpointSubnetPrefix = '10.80.2.0/24'
+param privateEndpointSubnetName = 'snet-kv-private-endpoint'
+param storageBlobPrivateEndpointName = 'pe-st-certigo-staging-blob'
+param storageQueuePrivateEndpointName = 'pe-st-certigo-staging-queue'
+param storageTablePrivateEndpointName = 'pe-st-certigo-staging-table'
+param keyVaultPrivateEndpointName = 'pe-kv-certigo-staging'
+param cosmosPrivateEndpointName = 'pe-cosmos-certigo-staging'
 
 // Cosmos DB region. West Europe has AZ-capacity limits for Cosmos (the reason dev
 // and prod both deploy Cosmos in North Europe). We pin staging to North Europe too

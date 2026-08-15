@@ -487,6 +487,7 @@ function validateRepositoryInvariants() {
     'bash .github/scripts/deploy-flex-onedeploy.sh',
     'STORAGE_BLOB_ENDPOINT',
     'DEPLOYMENT_CONTAINER',
+    'FUNCTION_INTEGRATION_SUBNET_ID',
     'SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}',
     'COMMIT_SHA: ${{ github.sha }}',
   ]) {
@@ -514,6 +515,7 @@ function validateRepositoryInvariants() {
     'health_check \'health/live\'',
     'health_check \'health/ready\'',
     'retained for lifecycle cleanup',
+    '"$integration_subnet" != "$FUNCTION_INTEGRATION_SUBNET_ID"',
   ]) {
     if (!flexOneDeploy.includes(marker)) {
       errors.push(`deploy-flex-onedeploy.sh: missing deployment invariant ${marker}`);
