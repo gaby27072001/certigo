@@ -9,8 +9,14 @@ param vnetAddressPrefix string
 @description('Dedicated Flex Consumption integration subnet prefix. Use /27 minimum; /26 is recommended for additional capacity.')
 param functionIntegrationSubnetPrefix string
 
+@description('Existing dedicated Flex Consumption integration subnet name.')
+param functionIntegrationSubnetName string
+
 @description('Dedicated private endpoint subnet prefix.')
 param privateEndpointSubnetPrefix string
+
+@description('Existing dedicated private endpoint subnet name.')
+param privateEndpointSubnetName string
 
 @description('Storage account protected by blob, queue, and table private endpoints.')
 param storageAccountName string
@@ -20,6 +26,21 @@ param keyVaultName string
 
 @description('Cosmos DB for NoSQL account protected by a Sql private endpoint.')
 param cosmosAccountName string
+
+@description('Existing Blob private endpoint name.')
+param storageBlobPrivateEndpointName string
+
+@description('Existing Queue private endpoint name.')
+param storageQueuePrivateEndpointName string
+
+@description('Existing Table private endpoint name.')
+param storageTablePrivateEndpointName string
+
+@description('Existing Key Vault private endpoint name.')
+param keyVaultPrivateEndpointName string
+
+@description('Existing Cosmos DB private endpoint name.')
+param cosmosPrivateEndpointName string
 
 @description('Resource group containing the trusted CI runner virtual network.')
 param ciVnetResourceGroupName string
@@ -64,7 +85,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
     }
     subnets: [
       {
-        name: 'snet-functions'
+        name: functionIntegrationSubnetName
         properties: {
           addressPrefix: functionIntegrationSubnetPrefix
           delegations: [
@@ -78,7 +99,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
         }
       }
       {
-        name: 'snet-private-endpoints'
+        name: privateEndpointSubnetName
         properties: {
           addressPrefix: privateEndpointSubnetPrefix
           privateEndpointNetworkPolicies: 'Disabled'
@@ -103,12 +124,12 @@ resource appToCiPeering 'Microsoft.Network/virtualNetworks/virtualNetworkPeering
 }
 
 resource storageBlobEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: 'pep-${storageAccountName}-blob'
+  name: storageBlobPrivateEndpointName
   location: location
   tags: tags
   properties: {
     subnet: {
-      id: '${vnet.id}/subnets/snet-private-endpoints'
+      id: '${vnet.id}/subnets/${privateEndpointSubnetName}'
     }
     privateLinkServiceConnections: [
       {
@@ -125,12 +146,12 @@ resource storageBlobEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
 }
 
 resource storageQueueEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: 'pep-${storageAccountName}-queue'
+  name: storageQueuePrivateEndpointName
   location: location
   tags: tags
   properties: {
     subnet: {
-      id: '${vnet.id}/subnets/snet-private-endpoints'
+      id: '${vnet.id}/subnets/${privateEndpointSubnetName}'
     }
     privateLinkServiceConnections: [
       {
@@ -147,12 +168,12 @@ resource storageQueueEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = 
 }
 
 resource storageTableEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: 'pep-${storageAccountName}-table'
+  name: storageTablePrivateEndpointName
   location: location
   tags: tags
   properties: {
     subnet: {
-      id: '${vnet.id}/subnets/snet-private-endpoints'
+      id: '${vnet.id}/subnets/${privateEndpointSubnetName}'
     }
     privateLinkServiceConnections: [
       {
@@ -169,12 +190,12 @@ resource storageTableEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = 
 }
 
 resource vaultEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: 'pep-${keyVaultName}-vault'
+  name: keyVaultPrivateEndpointName
   location: location
   tags: tags
   properties: {
     subnet: {
-      id: '${vnet.id}/subnets/snet-private-endpoints'
+      id: '${vnet.id}/subnets/${privateEndpointSubnetName}'
     }
     privateLinkServiceConnections: [
       {
@@ -191,12 +212,12 @@ resource vaultEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
 }
 
 resource cosmosEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: 'pep-${cosmosAccountName}-sql'
+  name: cosmosPrivateEndpointName
   location: location
   tags: tags
   properties: {
     subnet: {
-      id: '${vnet.id}/subnets/snet-private-endpoints'
+      id: '${vnet.id}/subnets/${privateEndpointSubnetName}'
     }
     privateLinkServiceConnections: [
       {
@@ -289,5 +310,6 @@ resource cosmosZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroup
 
 output vnetId string = vnet.id
 output vnetName string = vnet.name
-output functionIntegrationSubnetId string = '${vnet.id}/subnets/snet-functions'
-output privateEndpointSubnetId string = '${vnet.id}/subnets/snet-private-endpoints'
+output functionIntegrationSubnetId string = '${vnet.id}/subnets/${functionIntegrationSubnetName}'
+output functionIntegrationSubnetName string = functionIntegrationSubnetName
+output privateEndpointSubnetId string = '${vnet.id}/subnets/${privateEndpointSubnetName}'

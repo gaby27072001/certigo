@@ -16,9 +16,17 @@ param env = 'prod'
 param location = 'westeurope'
 param appName = 'certigo'
 param ciDeploymentPrincipalId = '15d2b34a-c0a0-4b5d-8360-b895a8164706'
-param vnetAddressPrefix = '10.62.0.0/24'
-param functionIntegrationSubnetPrefix = '10.62.0.0/26'
-param privateEndpointSubnetPrefix = '10.62.0.64/26'
+// Adopt the live network rather than replacing in-use subnets.
+param vnetAddressPrefix = '10.100.0.0/16'
+param functionIntegrationSubnetPrefix = '10.100.1.0/24'
+param functionIntegrationSubnetName = 'snet-func-flex'
+param privateEndpointSubnetPrefix = '10.100.2.0/24'
+param privateEndpointSubnetName = 'snet-private-endpoints'
+param storageBlobPrivateEndpointName = 'pe-st-certigo-prod-blob'
+param storageQueuePrivateEndpointName = 'pe-st-certigo-prod-queue'
+param storageTablePrivateEndpointName = 'pe-st-certigo-prod-table'
+param keyVaultPrivateEndpointName = 'pe-kv-certigo-prod'
+param cosmosPrivateEndpointName = 'pe-cosmos-certigo-prod-sql'
 
 // Cosmos DB region. West Europe has AZ-capacity limits for Cosmos (the reason dev
 // deploys Cosmos in North Europe). We pin prod to North Europe too so the deploy

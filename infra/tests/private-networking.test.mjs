@@ -39,7 +39,7 @@ test('private network separates Flex integration from private endpoints', () => 
   assert.ok(vnet);
 
   const functionSubnet = vnet.properties.subnets.find(
-    (subnet) => subnet.name === 'snet-functions',
+    (subnet) => subnet.name === "[parameters('functionIntegrationSubnetName')]",
   );
   assert.deepEqual(functionSubnet.properties.delegations, [
     {
@@ -51,7 +51,7 @@ test('private network separates Flex integration from private endpoints', () => 
   ]);
 
   const privateEndpointSubnet = vnet.properties.subnets.find(
-    (subnet) => subnet.name === 'snet-private-endpoints',
+    (subnet) => subnet.name === "[parameters('privateEndpointSubnetName')]",
   );
   assert.equal(
     privateEndpointSubnet.properties.privateEndpointNetworkPolicies,
@@ -90,6 +90,10 @@ test('private endpoints and DNS cover every backend dependency', () => {
     String(link.name).includes("parameters('ciVnetName')"),
   );
   assert.equal(ciLinks.length, 5);
+  const vaultLink = links.find((link) =>
+    String(link.name).includes('kv-dnslink'),
+  );
+  assert.ok(vaultLink);
 
   const appLinks = resourcesOfType(
     compileTemplate('infra/modules/privateDnsAppLinks.bicep'),
@@ -114,6 +118,16 @@ test('private endpoints and DNS cover every backend dependency', () => {
     .flatMap((connection) => connection.properties.groupIds)
     .sort();
   assert.deepEqual(groupIds, ['Sql', 'blob', 'queue', 'table', 'vault']);
+  assert.deepEqual(
+    endpoints.map((endpoint) => endpoint.name).sort(),
+    [
+      "[parameters('cosmosPrivateEndpointName')]",
+      "[parameters('keyVaultPrivateEndpointName')]",
+      "[parameters('storageBlobPrivateEndpointName')]",
+      "[parameters('storageQueuePrivateEndpointName')]",
+      "[parameters('storageTablePrivateEndpointName')]",
+    ].sort(),
+  );
 
   const zoneGroups = resourcesOfType(
     compileTemplate('infra/modules/privateNetwork.bicep'),
@@ -226,6 +240,14 @@ test('deployment packages expire through a bounded prefix lifecycle policy', () 
   );
 });
 
+test('storage protections remain compatible with policy-enforced point-in-time restore', () => {
+  const template = compileTemplate('infra/main.bicep');
+  const parameters = template.resources.storage.properties.parameters;
+  assert.equal(parameters.enableVersioning.value, true);
+  assert.equal(parameters.blobSoftDeleteDays.value, 30);
+  assert.equal(parameters.containerSoftDeleteDays.value, 30);
+});
+
 test('policy-constrained services permanently disable public access', () => {
   for (const [file, resourceType] of [
     ['infra/modules/storage.bicep', 'Microsoft.Storage/storageAccounts'],
@@ -274,7 +296,7 @@ test('Function deployment waits for the complete private network deployment', ()
 });
 
 test('environment address spaces are unique and do not overlap the CI runner VNet', () => {
-  const prefixes = ['10.60.0.0/24', '10.61.0.0/24', '10.62.0.0/24'];
+  const prefixes = ['10.60.0.0/24', '10.80.0.0/16', '10.100.0.0/16'];
   for (const [index, environment] of ['dev', 'staging', 'prod'].entries()) {
     const parameters = readFileSync(
       path.join(repositoryRoot, 'infra', 'params', `${environment}.bicepparam`),
@@ -282,5 +304,61 @@ test('environment address spaces are unique and do not overlap the CI runner VNe
     );
     assert.match(parameters, new RegExp(`vnetAddressPrefix = '${prefixes[index]}'`));
     assert.doesNotMatch(parameters, /10\.42\./);
+  }
+});
+
+test('environment parameters adopt the live subnets and private endpoints', () => {
+  const expected = {
+    dev: {
+      functionSubnet: 'snet-functions',
+      privateEndpointSubnet: 'snet-private-endpoints',
+      endpoints: [
+        'pep-stcertigodevbk3j5ja6-blob',
+        'pep-stcertigodevbk3j5ja6-queue',
+        'pep-stcertigodevbk3j5ja6-table',
+        'pep-kv-certigo-dev-bk3j5j-vault',
+        'pep-cosmos-certigo-dev-bk3j5ja6vw23s-sql',
+      ],
+    },
+    staging: {
+      functionSubnet: 'snet-func-flex',
+      privateEndpointSubnet: 'snet-kv-private-endpoint',
+      endpoints: [
+        'pe-st-certigo-staging-blob',
+        'pe-st-certigo-staging-queue',
+        'pe-st-certigo-staging-table',
+        'pe-kv-certigo-staging',
+        'pe-cosmos-certigo-staging',
+      ],
+    },
+    prod: {
+      functionSubnet: 'snet-func-flex',
+      privateEndpointSubnet: 'snet-private-endpoints',
+      endpoints: [
+        'pe-st-certigo-prod-blob',
+        'pe-st-certigo-prod-queue',
+        'pe-st-certigo-prod-table',
+        'pe-kv-certigo-prod',
+        'pe-cosmos-certigo-prod-sql',
+      ],
+    },
+  };
+
+  for (const [environment, values] of Object.entries(expected)) {
+    const parameters = readFileSync(
+      path.join(repositoryRoot, 'infra', 'params', `${environment}.bicepparam`),
+      'utf8',
+    );
+    assert.match(
+      parameters,
+      new RegExp(`functionIntegrationSubnetName = '${values.functionSubnet}'`),
+    );
+    assert.match(
+      parameters,
+      new RegExp(`privateEndpointSubnetName = '${values.privateEndpointSubnet}'`),
+    );
+    for (const endpoint of values.endpoints) {
+      assert.ok(parameters.includes(`= '${endpoint}'`));
+    }
   }
 });
