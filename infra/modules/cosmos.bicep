@@ -9,10 +9,6 @@ param tags object = {}
 @description('Disable Cosmos key-based (local) auth — RBAC/Entra only. Recommended for staging/prod; the API and seed use managed identity.')
 param disableLocalAuth bool = false
 
-@description('Network posture. Only public-rbac is supported until VNet integration, private endpoints and private DNS are deployed together.')
-@allowed([ 'public-rbac' ])
-param networkAccessMode string = 'public-rbac'
-
 @description('Explicit backup mode. Switching an existing account from Periodic to Continuous is irreversible.')
 @allowed([ 'Periodic', 'Continuous' ])
 param backupMode string
@@ -58,7 +54,7 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
       }
     ]
     disableLocalAuth: disableLocalAuth
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Disabled'
     minimalTlsVersion: 'Tls12'
     backupPolicy: backupMode == 'Continuous' ? {
       type: 'Continuous'
@@ -135,4 +131,3 @@ resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
 output endpoint string = account.properties.documentEndpoint
 output accountName string = account.name
 output backupMode string = backupMode
-output networkAccessMode string = networkAccessMode

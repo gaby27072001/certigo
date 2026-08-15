@@ -23,7 +23,9 @@ using '../main.bicep'
 param env = 'dev'
 param location = 'westeurope'
 param appName = 'certigo'
-param networkAccessMode = 'public-rbac'
+param vnetAddressPrefix = '10.60.0.0/24'
+param functionIntegrationSubnetPrefix = '10.60.0.0/26'
+param privateEndpointSubnetPrefix = '10.60.0.64/26'
 
 // Explicit periodic backup for disposable development data.
 param cosmosBackupMode = 'Periodic'

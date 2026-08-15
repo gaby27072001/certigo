@@ -82,9 +82,14 @@ param ciRunnerPrincipalId string = ''
 @description('When true, the security log-search alerts get a system-assigned identity + least-privilege Log Analytics Reader role on the workspace (most robust). Default false: creating that role assignment needs Microsoft.Authorization/roleAssignments/write at the workspace scope, which the deployer may lack — off keeps the deployment guaranteed to succeed. Turn on once the deployer has role-assignment rights.')
 param grantAlertReaderRole bool = false
 
-@description('Network posture. Only public-rbac is accepted until VNet integration, private endpoints and private DNS are delivered atomically.')
-@allowed([ 'public-rbac' ])
-param networkAccessMode string = 'public-rbac'
+@description('Environment virtual network address space. Keep environment ranges non-overlapping to allow future peering.')
+param vnetAddressPrefix string
+
+@description('Dedicated Flex Consumption integration subnet. /27 is the supported minimum; /26 is used for capacity.')
+param functionIntegrationSubnetPrefix string
+
+@description('Dedicated subnet for private endpoints.')
+param privateEndpointSubnetPrefix string
 
 @description('Explicit Cosmos backup mode.')
 @allowed([ 'Periodic', 'Continuous' ])
@@ -175,7 +180,6 @@ module data 'modules/cosmos.bicep' = {
     location: cosmosRegion
     databaseName: 'certigo'
     disableLocalAuth: hardened
-    networkAccessMode: networkAccessMode
     backupMode: cosmosBackupMode
     continuousBackupTier: cosmosContinuousBackupTier
     periodicBackupIntervalMinutes: cosmosPeriodicBackupIntervalMinutes
@@ -196,7 +200,6 @@ module storage 'modules/storage.bicep' = {
     enableVersioning: hardened
     blobSoftDeleteDays: hardened ? 30 : 7
     containerSoftDeleteDays: hardened ? 30 : 7
-    networkAccessMode: networkAccessMode
     tags: tags
   }
 }
@@ -213,9 +216,27 @@ module vault 'modules/keyvault.bicep' = {
     location: location
     enablePurgeProtection: hardened
     softDeleteRetentionInDays: hardened ? 90 : 7
-    networkAccessMode: networkAccessMode
     jwtSigningKey: effectiveAuthJwtSigningKey
     jwtSigningKeyExpiresOn: effectiveAuthJwtSigningKeyExpiresOn
+    tags: tags
+  }
+}
+
+// Private networking is an atomic prerequisite for the Function App. The nested
+// deployment must finish all private endpoints, DNS zone groups and VNet links
+// before FC1 validates its private deployment storage.
+module privateNetwork 'modules/privateNetwork.bicep' = {
+  scope: rg
+  name: 'privateNetwork'
+  params: {
+    vnetName: 'vnet-${appName}-${env}'
+    location: location
+    vnetAddressPrefix: vnetAddressPrefix
+    functionIntegrationSubnetPrefix: functionIntegrationSubnetPrefix
+    privateEndpointSubnetPrefix: privateEndpointSubnetPrefix
+    storageAccountName: storage.outputs.accountName
+    keyVaultName: vault.outputs.name
+    cosmosAccountName: data.outputs.accountName
     tags: tags
   }
 }
@@ -256,6 +277,7 @@ module api 'modules/functionApp.bicep' = {
     cosmosEndpoint: data.outputs.endpoint
     cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
+    functionIntegrationSubnetId: privateNetwork.outputs.functionIntegrationSubnetId
     authMode: authMode
     authJwtSigningKeySecretUri: vault.outputs.jwtSecretUri
     authJwtPreviousSigningKeySecretUri: previousJwtSecret.?outputs.?jwtSecretUri ?? ''
@@ -353,5 +375,5 @@ output functionAppHostName string = api.outputs.defaultHostName
 output cosmosEndpoint string = data.outputs.endpoint
 output storageAccount string = storage.outputs.accountName
 output keyVaultName string = vault.outputs.name
-output networkAccessMode string = networkAccessMode
+output virtualNetworkId string = privateNetwork.outputs.vnetId
 output cosmosBackupMode string = cosmosBackupMode

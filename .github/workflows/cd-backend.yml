@@ -117,6 +117,51 @@ jobs:
           fi
           echo "functionAppName=$FUNCTION_APP_NAME" >> "$GITHUB_OUTPUT"
 
+      - name: Verify private networking before code deployment
+        shell: bash
+        env:
+          FUNCTION_APP_NAME: ${{ steps.deploy-bicep.outputs.functionAppName }}
+        run: |
+          set -euo pipefail
+          RESOURCE_GROUP="rg-certigo-$TARGET_ENV"
+          PRIVATE_ENDPOINTS="$(
+            az network private-endpoint list \
+              --resource-group "$RESOURCE_GROUP" \
+              --query 'length(@)' -o tsv
+          )"
+          APPROVED_CONNECTIONS="$(
+            az network private-endpoint list \
+              --resource-group "$RESOURCE_GROUP" \
+              --query "[].privateLinkServiceConnections[?privateLinkServiceConnectionState.status=='Approved'] | [] | length(@)" \
+              -o tsv
+          )"
+          INTEGRATION_SUBNET="$(
+            az resource show \
+              --resource-group "$RESOURCE_GROUP" \
+              --resource-type Microsoft.Web/sites \
+              --name "$FUNCTION_APP_NAME" \
+              --api-version 2024-04-01 \
+              --query properties.virtualNetworkSubnetId -o tsv
+          )"
+          ROUTE_ALL="$(
+            az functionapp config show \
+              --resource-group "$RESOURCE_GROUP" \
+              --name "$FUNCTION_APP_NAME" \
+              --query vnetRouteAllEnabled -o tsv
+          )"
+          if [[ "$PRIVATE_ENDPOINTS" != "5" || "$APPROVED_CONNECTIONS" != "5" ]]; then
+            echo "::error::Expected five approved private endpoint connections."
+            exit 1
+          fi
+          if [[ "$INTEGRATION_SUBNET" != */subnets/snet-functions ]]; then
+            echo "::error::Function App is not connected to the dedicated integration subnet."
+            exit 1
+          fi
+          if [[ "${ROUTE_ALL,,}" != "false" ]]; then
+            echo "::error::Function App must retain platform egress until NAT/firewall is provisioned."
+            exit 1
+          fi
+
   deploy-backend:
     name: Deploy backend code (${{ needs.validate-target.outputs.target }})
     environment: ${{ needs.validate-target.outputs.target }}

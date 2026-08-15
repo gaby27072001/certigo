@@ -16,10 +16,6 @@ param containerSoftDeleteDays int = 7
 @description('Enable blob versioning (recommended for prod).')
 param enableVersioning bool = false
 
-@description('Network posture. Only public-rbac is supported until VNet integration, private endpoints and private DNS are deployed together.')
-@allowed([ 'public-rbac' ])
-param networkAccessMode string = 'public-rbac'
-
 resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
   name: accountName
   location: location
@@ -32,10 +28,10 @@ resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
     allowSharedKeyAccess: false
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Disabled'
     networkAcls: {
       bypass: 'AzureServices'
-      defaultAction: 'Allow'
+      defaultAction: 'Deny'
     }
   }
 }
@@ -72,4 +68,3 @@ resource appPackage 'Microsoft.Storage/storageAccounts/blobServices/containers@2
 output accountName string = storage.name
 output deploymentContainerName string = appPackage.name
 output primaryBlobEndpoint string = storage.properties.primaryEndpoints.blob
-output networkAccessMode string = networkAccessMode
