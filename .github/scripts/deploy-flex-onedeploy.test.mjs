@@ -49,10 +49,10 @@ function createHarness() {
 set -euo pipefail
 case "$*" in
   "storage account show"*)
-    printf 'Disabled\\tfalse\\n'
+    printf 'Disabled\\nfalse\\n'
     ;;
   "resource show"*)
-    printf 'UserAssignedIdentity\\thttps://stcertigodev.blob.core.windows.net/app-package\\t/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-certigo-dev/providers/Microsoft.Network/virtualNetworks/vnet-certigo-dev/subnets/snet-functions\\n'
+    printf 'UserAssignedIdentity\\nhttps://stcertigodev.blob.core.windows.net/app-package\\n/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-certigo-dev/providers/Microsoft.Network/virtualNetworks/vnet-certigo-dev/subnets/snet-functions\\n'
     ;;
   "network private-endpoint show"*)
     printf '/subscriptions/test/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/blob-nic\\n'

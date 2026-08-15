@@ -522,6 +522,8 @@ function validateRepositoryInvariants() {
     '--as-user',
     '--permissions r',
     '--https-only',
+    'mapfile -t storage_security_settings',
+    'mapfile -t deployment_settings',
     'az account get-access-token',
     "https://management.azure.com/",
     '/extensions/onedeploy?api-version=2024-04-01',
