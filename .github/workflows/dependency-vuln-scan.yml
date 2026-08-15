@@ -49,12 +49,15 @@ jobs:
 
           set +e
           evaluation="$(
-            node .github/scripts/enforce-osv-json.mjs osv-results.json 2>&1
+            node .github/scripts/enforce-osv-json.mjs osv-results.json 2> osv-enforce.log
           )"
           enforcement_status=$?
           set -e
           echo "::group::OSV structured result"
           printf '%s\n' "$evaluation"
+          echo "::endgroup::"
+          echo "::group::OSV enforcement diagnostics"
+          cat osv-enforce.log
           echo "::endgroup::"
 
           if [ "$enforcement_status" -eq 2 ]; then

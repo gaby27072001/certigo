@@ -438,7 +438,7 @@ function validateRepositoryInvariants() {
     'OSV-Scanner output is missing or malformed.',
     '--format=json',
     '--output-file "$output_temp"',
-    'node .github/scripts/enforce-osv-json.mjs osv-results.json',
+    'node .github/scripts/enforce-osv-json.mjs osv-results.json 2> osv-enforce.log',
     'finding_count',
   ]) {
     if (!dependencyScan.includes(marker)) {
