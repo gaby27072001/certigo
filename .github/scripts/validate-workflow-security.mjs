@@ -213,6 +213,10 @@ function validateRepositoryInvariants() {
     path.join(root, '.github', 'scripts', 'enforce-osv-json.mjs'),
     'utf8',
   );
+  const nugetLockValidator = fs.readFileSync(
+    path.join(root, 'tools', 'validate_nuget_locks.py'),
+    'utf8',
+  );
   const secureBicepWriter = fs.readFileSync(
     path.join(root, '.github', 'scripts', 'write-secure-bicep-parameters.mjs'),
     'utf8',
@@ -462,11 +466,15 @@ function validateRepositoryInvariants() {
     }
   }
   for (const dependencyInput of [
+    "'.gitignore'",
+    "'**/.gitignore'",
     "'**/Directory.Build.props'",
     "'**/Directory.Build.targets'",
     "'**/NuGet.Config'",
     "'**/.npmrc'",
     "'**/pubspec_overrides.yaml'",
+    "'tools/validate_nuget_locks.py'",
+    "'tools/tests/test_validate_nuget_locks.py'",
   ]) {
     if (!securityGate.includes(dependencyInput)) {
       errors.push(`security-gate.yml: dependency filter omits ${dependencyInput}`);
@@ -518,6 +526,9 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'OSV-Scanner output is missing or malformed.',
     '--format=json',
+    '--no-ignore',
+    'python -P "$TRUSTED_CONTROL_DIR/tools/validate_nuget_locks.py"',
+    '--root "$UNTRUSTED_SOURCE_DIR"',
     '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
     '--output-file "$output_temp"',
     'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
@@ -540,6 +551,20 @@ function validateRepositoryInvariants() {
   ]) {
     if (!osvEnforcer.includes(marker)) {
       errors.push(`enforce-osv-json.mjs: missing fail-closed invariant ${marker}`);
+    }
+  }
+  for (const marker of [
+    'core.hooksPath=/dev/null',
+    'git ls-files',
+    'PackageReference',
+    'packages.lock.json',
+    'expected NuGet lock schema version 1',
+    'Direct packages differ from the project',
+    'expected requested',
+    'is absent from the target graph',
+  ]) {
+    if (!nugetLockValidator.includes(marker)) {
+      errors.push(`validate_nuget_locks.py: missing fail-closed invariant ${marker}`);
     }
   }
   for (const marker of [

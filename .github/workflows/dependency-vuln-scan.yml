@@ -34,6 +34,15 @@ jobs:
           path: .trusted-control
           persist-credentials: false
 
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Validate committed NuGet dependency graphs
+        run: |
+          python -P "$TRUSTED_CONTROL_DIR/tools/validate_nuget_locks.py" \
+            --root "$UNTRUSTED_SOURCE_DIR"
+
       - name: Download OSV-Scanner (v2.4.0, verified SHA256)
         run: |
           set -euo pipefail
@@ -53,7 +62,7 @@ jobs:
           output_temp="$RUNNER_TEMP/osv-results.$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT.json"
           rm -f -- "$output_temp" "$OSV_RESULTS_FILE" "$OSV_SCAN_LOG" "$OSV_ENFORCE_LOG"
           set +e
-          "$OSV_BINARY" scan --format=json --recursive \
+          "$OSV_BINARY" scan --format=json --recursive --no-ignore \
             --config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml" \
             "$UNTRUSTED_SOURCE_DIR" \
             --output-file "$output_temp" 2> "$OSV_SCAN_LOG"

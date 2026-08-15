@@ -638,6 +638,9 @@ class ProjectStateTests(unittest.TestCase):
             "dependency-vuln-scan.yml": [
                 "OSV-Scanner output is missing or malformed.",
                 "--format=json",
+                "--no-ignore",
+                'python -P "$TRUSTED_CONTROL_DIR/tools/validate_nuget_locks.py"',
+                '--root "$UNTRUSTED_SOURCE_DIR"',
                 '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
                 '--output-file "$output_temp"',
                 'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
@@ -678,6 +681,12 @@ class ProjectStateTests(unittest.TestCase):
             REPO_ROOT / ".github/workflows/security-gate.yml"
         ).read_text(encoding="utf-8")
         self.assertIn("needs: [changes, osv, checkov]", security_gate)
+        self.assertIn("- '.gitignore'", security_gate)
+        self.assertIn("- '**/.gitignore'", security_gate)
+        self.assertIn("- 'tools/validate_nuget_locks.py'", security_gate)
+        self.assertIn(
+            "- 'tools/tests/test_validate_nuget_locks.py'", security_gate
+        )
         self.assertNotIn("nuget-vuln-scan", security_gate)
         self.assertNotIn("NUGET_RESULT", security_gate)
         self.assertFalse(

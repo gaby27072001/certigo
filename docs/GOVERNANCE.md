@@ -58,6 +58,17 @@ conclusion dépend uniquement du statut scanner, des findings et de la validité
 jamais du quota de stockage d'artefacts. Les forks ne sont pas supportés : la gate de confiance
 chargée depuis `main` échoue sans checkout, tandis qu'aucun workflow contrôlé par le fork ne peut
 atteindre le pool Azure persistant.
+OSV utilise `--no-ignore` : aucun `.gitignore` fourni par la PR ne peut masquer un manifeste ou
+lockfile, et toute modification d'un `.gitignore` déclenche le scan de dépendances.
+Chaque `.csproj` suivi sous `backend/` doit avoir exactement un `packages.lock.json` adjacent.
+Le validateur statique trusted-base refuse les locks absents, orphelins ou malformés, les graphes
+incomplets et tout écart entre un `PackageReference` direct à version exacte et son entrée
+`Direct` demandée/résolue. La CI ne régénère jamais ces locks et n'évalue aucun MSBuild de PR.
+Après une modification de package, un mainteneur régénère les locks dans un environnement de
+développement de confiance avec
+`dotnet restore backend/Certigo.sln --use-lock-file --force-evaluate`, n'ajoute que les huit
+`packages.lock.json` adjacents aux projets (jamais `obj/**/WorkerExtensions/**`), puis exécute
+`python tools/validate_nuget_locks.py --root .` avant de commiter.
 
 La gate `Generated state equals committed state` n'accède à aucun dépôt externe et ne reçoit
 aucun secret. Le générateur du SHA immuable de base valide la référence locale
