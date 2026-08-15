@@ -215,7 +215,7 @@ modules. `params/dev.bicepparam` porte les valeurs d'environnement.
 | `appInsights.bicep` | Application Insights *workspace-based* |
 | `keyvault.bicep` | Key Vault (modèle RBAC) |
 | `privateNetwork.bicep` | VNet `/24`, subnet FC1 `/26`, subnet private endpoint, 5 zones DNS/liens et endpoints privés Storage/KV/Cosmos |
-| `functionApp.bicep` | plan FC1 Linux, `dotnet-isolated` 8.0, intégration VNet route-all, identité système Cosmos et identité utilisateur préprovisionnée pour stockage/KV/App Insights |
+| `functionApp.bicep` | plan FC1 Linux, `dotnet-isolated` 8.0, intégration VNet privée sans route-all, identité système Cosmos et identité utilisateur préprovisionnée pour stockage/KV/App Insights |
 
 ---
 

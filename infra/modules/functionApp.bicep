@@ -240,7 +240,9 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
     siteConfig: {
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
-      vnetRouteAllEnabled: true
+      // Flex VNet integration reaches RFC1918 private endpoints without Route All.
+      // Keep public dependencies on platform egress unless a NAT/firewall is added.
+      vnetRouteAllEnabled: false
       cors: {
         // Native mobile clients aren't subject to CORS; staging/prod pass [] and
         // tighten via API Management later. Dev allows '*' for browser tooling.

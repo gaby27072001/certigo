@@ -412,9 +412,14 @@ Le package FC1 et `AzureWebJobsStorage` utilisent une identité managée **utili
 la Function App. Ses rôles Blob Owner/Contributor, Queue Contributor et Table Contributor sont
 provisionnés avant l'application. Le module `functionApp` dépend en plus du déploiement imbriqué
 `privateNetwork` complet : les private endpoints, zone groups et liens DNS sont donc terminés avant
-la validation du deployment storage FC1. `virtualNetworkSubnetId` pointe vers `snet-functions` et
-`vnetRouteAllEnabled=true` force les accès Storage / Key Vault / Cosmos à suivre le VNet. Cette
-séquence suit les modèles de [secured deployments Azure
+la validation du deployment storage FC1. `virtualNetworkSubnetId` pointe vers `snet-functions`.
+`vnetRouteAllEnabled=false` est volontaire : les endpoints privés résolvent vers les adresses
+RFC1918 `10.60/61/62.*` et empruntent l'intégration VNet, tandis que les dépendances publiques
+(Entra, Application Insights, ACS et Azure OpenAI) conservent l'egress plateforme. Microsoft
+précise que, pour Flex Consumption, Route All n'est pas requis ; il ne doit être activé qu'avec un
+egress explicite (NAT Gateway ou firewall). Voir [Azure Functions networking
+options](https://learn.microsoft.com/azure/azure-functions/functions-networking-options?tabs=azure-portal#regional-virtual-network-integration).
+Cette séquence suit les modèles de [secured deployments Azure
 Functions](https://learn.microsoft.com/azure/azure-functions/functions-infrastructure-as-code?tabs=bicep&pivots=flex-consumption-plan#secured-deployments).
 
 > ⚠️ **Flags policy-enforced — ne pas contourner.** `publicNetworkAccess: Disabled`,
@@ -526,13 +531,13 @@ Avant toute application, exécuter le `what-if` et vérifier que l'ordre ARM est
 1. Storage / Key Vault / Cosmos avec accès public désactivé ;
 2. VNet, subnets, cinq zones privées, liens, private endpoints et zone groups ;
 3. rôles data-plane de l'identité utilisateur ;
-4. Function App FC1 avec intégration VNet et route-all ;
+4. Function App FC1 avec intégration VNet privée et egress public plateforme ;
 5. seulement après succès du job infra, publication du zip.
 
 ### Chemins de déploiement Flex (pièges rencontrés — à retenir)
 
 - **Utiliser `az functionapp deployment source config-zip`** (front-end One Deploy de Flex), après
-  validation automatique des cinq connexions privées, du subnet FC1 et du route-all.
+  validation automatique des cinq connexions privées, du subnet FC1 et de l'egress plateforme.
 - **`func` Core Tools cassé sur win-arm64** — l'éviter ; tout piloter via `az` / ARM.
 - **SCM basic auth désactivée** (AAD-only). Pour interroger le hostruntime, passer par le proxy ARM
   `…/hostruntime/admin/...` avec un token `az account get-access-token --resource

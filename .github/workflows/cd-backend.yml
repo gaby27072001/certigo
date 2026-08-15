@@ -157,8 +157,8 @@ jobs:
             echo "::error::Function App is not connected to the dedicated integration subnet."
             exit 1
           fi
-          if [[ "${ROUTE_ALL,,}" != "true" ]]; then
-            echo "::error::Function App VNet route-all is not enabled."
+          if [[ "${ROUTE_ALL,,}" != "false" ]]; then
+            echo "::error::Function App must retain platform egress until NAT/firewall is provisioned."
             exit 1
           fi
 

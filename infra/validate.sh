@@ -68,7 +68,7 @@ grep -F "privateEndpointNetworkPolicies: 'Disabled'" \
   "${root}/infra/modules/privateNetwork.bicep" >/dev/null
 grep -F 'virtualNetworkSubnetId: functionIntegrationSubnetId' \
   "${root}/infra/modules/functionApp.bicep" >/dev/null
-grep -F 'vnetRouteAllEnabled: true' \
+grep -F 'vnetRouteAllEnabled: false' \
   "${root}/infra/modules/functionApp.bicep" >/dev/null
 
 grep -F "type: 'UserAssignedIdentity'" "${root}/infra/modules/functionApp.bicep" >/dev/null

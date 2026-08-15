@@ -122,14 +122,14 @@ test('policy-constrained services permanently disable public access', () => {
   }
 });
 
-test('Flex app uses the delegated subnet and routes all outbound traffic', () => {
+test('Flex app uses the delegated subnet without forcing public egress into it', () => {
   const template = compileTemplate('infra/modules/functionApp.bicep');
   const [site] = resourcesOfType(template, 'Microsoft.Web/sites');
   assert.equal(
     site.properties.virtualNetworkSubnetId,
     "[parameters('functionIntegrationSubnetId')]",
   );
-  assert.equal(site.properties.siteConfig.vnetRouteAllEnabled, true);
+  assert.equal(site.properties.siteConfig.vnetRouteAllEnabled, false);
 });
 
 test('Function deployment waits for the complete private network deployment', () => {

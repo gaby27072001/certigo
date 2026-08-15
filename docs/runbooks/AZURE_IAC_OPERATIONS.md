@@ -87,7 +87,7 @@ curl --fail --show-error "https://${HOST}/api/health/ready"
 
 Résultats attendus : package `UserAssignedIdentity`, rôles Blob Data Owner/Contributor + Queue/Table
 Contributor, réseau `Disabled/Deny`, cinq connexions private endpoint `Approved`, cinq zones DNS,
-subnet FC1 délégué à `Microsoft.App/environments`, route-all actif, authentification locale
+subnet FC1 délégué à `Microsoft.App/environments`, route-all désactivé, authentification locale
 Storage/Cosmos désactivée hors dev et readiness `healthy` pour Cosmos, Storage et Key Vault.
 
 ## Prévol sans mutation
@@ -124,8 +124,8 @@ repousser sans changer la clé, et appliquer la procédure de chevauchement déc
 ## Ordre de déploiement autorisé
 
 1. **Dev** : appliquer l'IaC ; le module réseau doit terminer avant la Function App. Vérifier cinq
-   connexions privées approuvées, l'intégration `snet-functions` et route-all, puis publier le
-   backend et vérifier `/health/live` puis `/health/ready`.
+   connexions privées approuvées, l'intégration `snet-functions` et route-all désactivé, puis
+   publier le backend et vérifier `/health/live` puis `/health/ready`.
 2. **Staging** : fournir la clé JWT sécurisée et son expiration absolue, appliquer l'IaC, attendre
    la propagation RBAC, publier, tester alertes et restauration PITR vers un nouveau compte.
 3. **Production** : fenêtre de changement approuvée, preuve du what-if, sauvegarde/PITR vérifiée,
@@ -147,6 +147,11 @@ repousser sans changer la clé, et appliquer la procédure de chevauchement déc
 - Le subnet private endpoint ne doit jamais être réutilisé pour l'intégration Flex. Les zones DNS
   suivent les [valeurs officielles Azure Private
   Endpoint](https://learn.microsoft.com/azure/private-link/private-endpoint-dns).
+- Flex Consumption n'exige pas Route All pour joindre les endpoints privés RFC1918. Tant qu'aucun
+  NAT Gateway/firewall n'est associé à `snet-functions`, conserver
+  `vnetRouteAllEnabled=false` afin que les dépendances publiques utilisent l'egress plateforme.
+  Référence : [Azure Functions networking
+  options](https://learn.microsoft.com/azure/azure-functions/functions-networking-options?tabs=azure-portal#regional-virtual-network-integration).
 - Defender et MCSB sont au scope abonnement : un seul environnement doit posséder les paramètres
   Defender, et MCSB reste `DoNotEnforce` tant que les exemptions/remédiations ne sont pas validées.
 - Ne jamais réintroduire de fallback public ou de toggle partiel : la policy Storage désactive
