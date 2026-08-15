@@ -13,7 +13,9 @@ using '../main.bicep'
 param env = 'staging'
 param location = 'westeurope'
 param appName = 'certigo'
-param networkAccessMode = 'public-rbac'
+param vnetAddressPrefix = '10.61.0.0/24'
+param functionIntegrationSubnetPrefix = '10.61.0.0/26'
+param privateEndpointSubnetPrefix = '10.61.0.64/26'
 
 // Cosmos DB region. West Europe has AZ-capacity limits for Cosmos (the reason dev
 // and prod both deploy Cosmos in North Europe). We pin staging to North Europe too
@@ -56,7 +58,3 @@ param cosmosContinuousBackupTier = 'Continuous7Days'
 param deployMcsbPolicyAssignment = true
 param mcsbEnforcementMode = 'DoNotEnforce'
 param grantAlertReaderRole = true
-
-// ============================================================================
-// public-rbac is the only accepted network mode. A private mode is intentionally
-// unavailable until VNet integration, private endpoints and private DNS ship together.

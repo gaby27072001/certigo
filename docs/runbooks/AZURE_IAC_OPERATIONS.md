@@ -13,8 +13,17 @@ bash infra/validate.sh
 bash infra/ci-runner/validate.sh
 ```
 
-Le validateur impose `public-rbac` dans dev/staging/prod, une politique Cosmos explicite, un
-destinataire d'alerte hors dev et l'identité utilisateur FC1 préprovisionnée.
+Le validateur compile tous les templates et tous les paramètres. Il impose des CIDR explicites et
+non partagés par environnement, l'accès public désactivé sur Storage / Cosmos / Key Vault, la
+topologie private endpoint/DNS complète, une politique Cosmos explicite, un destinataire d'alerte
+hors dev et l'identité utilisateur FC1 préprovisionnée.
+
+```bash
+node --test infra/tests/cosmos-indexing-policy.test.mjs \
+  infra/tests/private-networking.test.mjs
+checkov --directory infra --framework bicep --compact --quiet \
+  --config-file .checkov.yaml
+```
 
 ## Diagnostics Azure read-only
 
@@ -49,6 +58,18 @@ az cosmosdb show -g "$RG" -n "$COSMOS" \
   --query "{publicNetworkAccess:publicNetworkAccess,localAuthDisabled:disableLocalAuth,backup:backupPolicy}" -o json
 az keyvault show -g "$RG" -n "$KV" \
   --query "{publicNetworkAccess:properties.publicNetworkAccess,rbac:properties.enableRbacAuthorization,defaultAction:properties.networkAcls.defaultAction}" -o table
+az network vnet subnet show -g "$RG" --vnet-name "vnet-certigo-${ENV}" \
+  -n snet-functions \
+  --query "{prefix:addressPrefix,delegation:delegations[0].serviceName}" -o table
+az network vnet subnet show -g "$RG" --vnet-name "vnet-certigo-${ENV}" \
+  -n snet-private-endpoints \
+  --query "{prefix:addressPrefix,privateEndpointPolicies:privateEndpointNetworkPolicies}" -o table
+az network private-endpoint list -g "$RG" \
+  --query "[].{name:name,groupIds:privateLinkServiceConnections[0].groupIds,status:privateLinkServiceConnections[0].privateLinkServiceConnectionState.status}" \
+  -o table
+az network private-dns zone list -g "$RG" --query "[].name" -o tsv
+az functionapp config show -g "$RG" -n "$FUNC" \
+  --query "{routeAll:vnetRouteAllEnabled}" -o table
 az role assignment list \
   --scope "$(az monitor app-insights component show -g "$RG" -a "$APPI" --query id -o tsv)" \
   --query "[].{principalId:principalId,role:roleDefinitionName}" -o table
@@ -65,8 +86,9 @@ curl --fail --show-error "https://${HOST}/api/health/ready"
 ```
 
 Résultats attendus : package `UserAssignedIdentity`, rôles Blob Data Owner/Contributor + Queue/Table
-Contributor, réseau `Enabled/Allow`, authentification locale Storage/Cosmos désactivée hors dev, et
-readiness `healthy` pour Cosmos, Storage et Key Vault.
+Contributor, réseau `Disabled/Deny`, cinq connexions private endpoint `Approved`, cinq zones DNS,
+subnet FC1 délégué à `Microsoft.App/environments`, route-all actif, authentification locale
+Storage/Cosmos désactivée hors dev et readiness `healthy` pour Cosmos, Storage et Key Vault.
 
 ## Prévol sans mutation
 
@@ -93,14 +115,17 @@ az deployment sub what-if \
 ```
 
 Refuser l'application si le what-if annonce une suppression, un remplacement du compte Cosmos,
-une fermeture réseau sans VNet/private endpoints/DNS, ou une baisse inattendue de Defender.
+une Function App créée avant le déploiement `privateNetwork`, une private endpoint sans zone group,
+ou une baisse inattendue de Defender.
 La date d'expiration JWT est une entrée absolue auditée : ne pas utiliser `utcNow()`, ne pas la
 repousser sans changer la clé, et appliquer la procédure de chevauchement décrite dans
 `docs/deployment-runbook.md` avant toute rotation.
 
 ## Ordre de déploiement autorisé
 
-1. **Dev** : appliquer l'IaC, publier le backend, vérifier `/health/live` puis `/health/ready`.
+1. **Dev** : appliquer l'IaC ; le module réseau doit terminer avant la Function App. Vérifier cinq
+   connexions privées approuvées, l'intégration `snet-functions` et route-all, puis publier le
+   backend et vérifier `/health/live` puis `/health/ready`.
 2. **Staging** : fournir la clé JWT sécurisée et son expiration absolue, appliquer l'IaC, attendre
    la propagation RBAC, publier, tester alertes et restauration PITR vers un nouveau compte.
 3. **Production** : fenêtre de changement approuvée, preuve du what-if, sauvegarde/PITR vérifiée,
@@ -115,9 +140,17 @@ repousser sans changer la clé, et appliquer la procédure de chevauchement déc
   avant le redémarrage de l'application.
 - L'identité utilisateur FC1 et ses rôles doivent exister avant la mise à jour de
   `functionAppConfig.deployment.storage`.
+- Le subnet Flex doit être dédié, dans la même région que l'app, délégué à
+  `Microsoft.App/environments` et au minimum `/27`. Certigo réserve `/26`. Référence :
+  [Flex Consumption virtual network
+  integration](https://learn.microsoft.com/azure/azure-functions/flex-consumption-how-to#configure-virtual-network-integration).
+- Le subnet private endpoint ne doit jamais être réutilisé pour l'intégration Flex. Les zones DNS
+  suivent les [valeurs officielles Azure Private
+  Endpoint](https://learn.microsoft.com/azure/private-link/private-endpoint-dns).
 - Defender et MCSB sont au scope abonnement : un seul environnement doit posséder les paramètres
   Defender, et MCSB reste `DoNotEnforce` tant que les exemptions/remédiations ne sont pas validées.
-- `public-rbac` est volontaire : ne fermer aucun endpoint avant livraison atomique du réseau privé.
+- Ne jamais réintroduire de fallback public ou de toggle partiel : la policy Storage désactive
+  l'accès public et l'application dépend de la topologie privée complète.
 
 ## Interdictions opérationnelles
 

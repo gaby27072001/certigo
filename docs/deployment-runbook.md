@@ -25,12 +25,12 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
 | 3 secrets GitHub OIDC | ✅ **Fait (session)** — déjà positionnés | §T0.1 |
 | Clé JWT + expiration par Environment | ⛔ **Humain** — obligatoire avant staging/prod | §T0.4 |
-| `publicNetworkAccess` storage épinglé `Enabled` (anti-dérive) | ✅ Fait (cette PR) | `infra/modules/storage.bicep` + `infra/main.bicep` |
+| Réseau privé atomique Storage / Key Vault / Cosmos | ✅ Prêt dans l'IaC, non déployé | `infra/modules/privateNetwork.bicep` |
 | GitHub Environments `dev`/`staging`/`prod` | ✅ **Fait (session)** — créés ; ⚠️ reviewers `prod` bloqués (billing 422) | §T0.3 |
 | Branch protection sur `main` | ⛔ **Humain** (admin repo) | §T0.3 |
 | Déploiement infra `dev` | ✅ **Fait (session)** — amorçage local réel | §T0.4 |
-| Validation auth (200/401) | ⛔ **Bloqué** — Functions n'indexent pas (échec plateforme Flex) | §T0.5 + §Statut réel |
-| Smoke test | ⛔ **Bloqué** — idem | §T0.6 + §Statut réel |
+| Validation auth (200/401) | ⛔ **À rejouer après déploiement privé** | §T0.5 + §Statut réel |
+| Smoke test | ⛔ **À rejouer après déploiement privé** | §T0.6 + §Statut réel |
 
 ### Check-list d'exploitation (utilisateur non-admin)
 
@@ -386,21 +386,43 @@ gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" \
 
 ### Storage FC1 et posture réseau
 
-Le seul mode accepté est `networkAccessMode='public-rbac'`. Storage, Cosmos et Key Vault gardent
-leurs endpoints publics tant que l'intégration VNet, les private endpoints et les zones DNS privées
-ne sont pas déployés ensemble. Aucun commutateur partiel ne peut désactiver les endpoints et rendre
-le backend indisponible.
+La posture est privée et sans commutateur partiel :
+
+- VNet `/24` propre à chaque environnement ;
+- subnet FC1 `/26` `snet-functions`, exclusivement délégué à
+  `Microsoft.App/environments` ;
+- subnet `/26` `snet-private-endpoints`, distinct, avec les network policies de private endpoint
+  désactivées ;
+- private endpoints Storage `blob`, `queue`, `table`, Key Vault `vault` et Cosmos DB for NoSQL
+  `Sql` ;
+- zones `privatelink.blob.core.windows.net`, `privatelink.queue.core.windows.net`,
+  `privatelink.table.core.windows.net`, `privatelink.vaultcore.azure.net` et
+  `privatelink.documents.azure.com`, toutes liées au VNet ;
+- `publicNetworkAccess='Disabled'` sur Storage, Key Vault et Cosmos.
+
+Le plan Flex Consumption exige un subnet d'intégration d'au moins `/27`, délégué à
+`Microsoft.App/environments`, inutilisable par les private endpoints et situé dans la même région
+que l'application. Certigo utilise `/26` pour conserver de la capacité. Voir la documentation
+Microsoft [Create and manage function apps in the Flex Consumption
+plan](https://learn.microsoft.com/azure/azure-functions/flex-consumption-how-to#configure-virtual-network-integration).
+Les noms de zones et groupIds suivent la table officielle [Azure Private Endpoint private DNS zone
+values](https://learn.microsoft.com/azure/private-link/private-endpoint-dns).
 
 Le package FC1 et `AzureWebJobsStorage` utilisent une identité managée **utilisateur** créée avant
 la Function App. Ses rôles Blob Owner/Contributor, Queue Contributor et Table Contributor sont
-provisionnés avant l'application, ce qui supprime la course de propagation qui provoquait
-`InaccessibleStorageException`/403 avec une identité système créée en même temps que l'application.
+provisionnés avant l'application. Le module `functionApp` dépend en plus du déploiement imbriqué
+`privateNetwork` complet : les private endpoints, zone groups et liens DNS sont donc terminés avant
+la validation du deployment storage FC1. `virtualNetworkSubnetId` pointe vers `snet-functions` et
+`vnetRouteAllEnabled=true` force les accès Storage / Key Vault / Cosmos à suivre le VNet. Cette
+séquence suit les modèles de [secured deployments Azure
+Functions](https://learn.microsoft.com/azure/azure-functions/functions-infrastructure-as-code?tabs=bicep&pivots=flex-consumption-plan#secured-deployments).
 
-> ⚠️ **Flags policy-enforced — ne pas « corriger ».** `allowSharedKeyAccess: false` et
+> ⚠️ **Flags policy-enforced — ne pas contourner.** `publicNetworkAccess: Disabled`,
+> `allowSharedKeyAccess: false` et
 > `allowBlobPublicAccess: false` sont **imposés au niveau org** par des Azure Policy
-> (`StorageAccount_DisableLocalAuth_Modify`, `StorageAccount_BlobAnonymousAccess_Modify`). Le
-> `what-if` peut les afficher en `modify` : c'est attendu. L'accès au blob se fait via identité
-> managée et RBAC, jamais par clé partagée.
+> (`StorageAccount_PublicNetwork_Modify`, `StorageAccount_DisableLocalAuth_Modify`,
+> `StorageAccount_BlobAnonymousAccess_Modify`). L'accès se fait via private endpoint, identité
+> managée et RBAC, jamais par clé partagée ni exception publique.
 
 ---
 
@@ -491,50 +513,26 @@ documentation), et le **résiduel strict** qui nécessite une action hors périm
   Aucune validation Enterprise ne sera sollicitée : le chemin critique reste le pool Azure
   self-hosted (`certigo-trusted`).
 
-### Ce qui est effectivement déployé
+### État live avant cette modification
 
-- **T0.4 — Infra `dev` : ✅ DÉPLOYÉE (amorçage local réel).** `az deployment sub create` exécuté
-  avec succès (Owner sur la souscription). `AUTH_MODE=dev` actif. Ressources avec suffixe
-  `a2msquxibzvcu` (Function App `func-certigo-dev-bk3j5ja6vw23s`, Cosmos, Key Vault, App
-  Insights, Storage). Dérive `publicNetworkAccess` du Storage réconciliée (désormais IaC).
+L'environnement `dev` live ne possède ni VNet, ni private endpoint, ni private DNS. La policy
+`StorageAccount_PublicNetwork_Modify` force néanmoins `publicNetworkAccess=Disabled` sur le Storage.
+Le deployment storage FC1 devient alors inaccessible et One Deploy/Kudu renvoie
+`403 InaccessibleStorageException`. Le code de cette modification corrige l'incohérence, mais
+**aucun déploiement Azure n'est réalisé par la PR**.
 
-### ⛔ Blocage plateforme Flex — Functions n'indexent jamais (T0.5 / T0.6 bloqués)
+Avant toute application, exécuter le `what-if` et vérifier que l'ordre ARM est :
 
-Malgré un déploiement de package **réussi** (`az functionapp deployment source config-zip` → 202,
-SCM `Success`, sync triggers OK), **aucune des 32 functions de l'app ne s'indexe** :
-
-- `GET /api/health` → **404** (et un `503` transitoire par cold start) ; racine `/` → **200**.
-- ARM `admin/functions` ne liste qu'**1** function : le placeholder plateforme `WarmUp`.
-- ARM `deploymentStatus/latest` reste figé sur **`RuntimeStarting`** avec
-  **0 instance** (`inProgress=0`, `successful=0`, `failed=0`, `errors=null`, `failedInstancesLogs=null`).
-
-**Diagnostic (définitif) :** le cycle de vie Flex est `Build → RuntimeStarting → RuntimeSuccessful`.
-Rester sur `RuntimeStarting` avec **0 instance allouée** et **aucune erreur/log d'échec** signifie que
-**la plateforme n'a jamais alloué de worker** pour spécialiser notre app. Un défaut de code/package
-afficherait `failed > 0` **avec** des logs. `0/0/0` = **défaillance d'allocation/spécialisation côté
-plateforme**, pas une erreur applicative.
-
-**Couches explicitement exonérées** (toutes vérifiées non coupables) : package (zip valide, 99
-fichiers, ~13 Mo), code, `functionAppConfig` + runtime, app settings (8 clés correctes), identité
-managée, **RBAC** (la MI a Storage Blob Data Owner + Storage Queue Data Contributor + Key Vault
-Secrets User), blob du package (présent + frais), manifeste, réseau Storage (Enabled + Allow).
-
-**Remédiations tentées sans succès :** redéploiement One Deploy ×4-5 ; **suppression + recréation
-complète de la Function App** ; nettoyage de 5 role assignments périmées ; **restart explicite**.
-Aucune n'a fait indexer les functions.
-
-> 🔧 **Gotcha recreate-in-place (à connaître).** `functionApp.bicep` nomme ses role assignments
-> `guid(scope.id, functionApp.id, roleDefId)`. Après une recréation **au même nom**, le
-> `functionApp.id` est **identique** → les noms de role assignments ne changent pas, mais le
-> `principalId` de la **nouvelle** identité managée diffère → ARM rejette
-> (`RoleAssignmentUpdateNotPermitted`, et `BadRequest` côté Cosmos SQL role). **Correctif qui
-> fonctionne :** supprimer les anciennes attributions par leur id au scope, puis relancer le
-> déploiement.
+1. Storage / Key Vault / Cosmos avec accès public désactivé ;
+2. VNet, subnets, cinq zones privées, liens, private endpoints et zone groups ;
+3. rôles data-plane de l'identité utilisateur ;
+4. Function App FC1 avec intégration VNet et route-all ;
+5. seulement après succès du job infra, publication du zip.
 
 ### Chemins de déploiement Flex (pièges rencontrés — à retenir)
 
-- **Utiliser `az functionapp deployment source config-zip`** (front-end One Deploy de Flex). Le
-  zip-deploy Kudu **brut** échoue (`403 InaccessibleStorageException`) si le Storage est verrouillé.
+- **Utiliser `az functionapp deployment source config-zip`** (front-end One Deploy de Flex), après
+  validation automatique des cinq connexions privées, du subnet FC1 et du route-all.
 - **`func` Core Tools cassé sur win-arm64** — l'éviter ; tout piloter via `az` / ARM.
 - **SCM basic auth désactivée** (AAD-only). Pour interroger le hostruntime, passer par le proxy ARM
   `…/hostruntime/admin/...` avec un token `az account get-access-token --resource
@@ -543,15 +541,11 @@ Aucune n'a fait indexer les functions.
 
 ### Résiduel strict (hors périmètre repo)
 
-1. **Azure-support** — escalade de la **défaillance de spécialisation Flex** (worker jamais alloué ;
-   `RuntimeStarting` 0 instance). C'est le **seul** blocage empêchant T0.5/T0.6. Sans functions
-   indexées, impossible de valider auth 200/401 ni le smoke test.
-2. **GitHub plan payant** — pour poser le reviewer gate `prod` (limitation billing 422).
-3. **Exploitation runner Azure** — maintenir online la VM runner self-hosted pour exécuter le CI sous EMU.
-
-> Dès que les functions s'indexent (post-remédiation plateforme), **T0.5 et T0.6 sont prêts à
-> jouer** : voir les commandes en §T0.5 / §T0.6 (host
-> `https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net`).
+1. **Opérateur Azure** — examiner le `what-if`, puis déployer `dev` dans une fenêtre autorisée.
+2. **Validation post-déploiement** — rejouer `/health/live`, `/health/ready`, auth 200/401 et le
+   smoke test.
+3. **GitHub plan payant** — poser le reviewer gate `prod` (limitation billing 422).
+4. **Exploitation runner Azure** — maintenir online la VM runner self-hosted sous EMU.
 
 ---
 

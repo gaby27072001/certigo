@@ -25,7 +25,9 @@ done < <(find "${root}/infra/params" -type f -name '*.bicepparam' -print0 | sort
 
 for environment in dev staging prod; do
   params="${root}/infra/params/${environment}.bicepparam"
-  grep -F "param networkAccessMode = 'public-rbac'" "${params}" >/dev/null
+  grep -F 'param vnetAddressPrefix =' "${params}" >/dev/null
+  grep -F 'param functionIntegrationSubnetPrefix =' "${params}" >/dev/null
+  grep -F 'param privateEndpointSubnetPrefix =' "${params}" >/dev/null
   grep -F 'param cosmosBackupMode =' "${params}" >/dev/null
   grep -F 'param deployMcsbPolicyAssignment =' "${params}" >/dev/null
   grep -F 'param manageDefenderPlans =' "${params}" >/dev/null
@@ -49,11 +51,25 @@ for environment in staging prod; do
   grep -F 'param grantAlertReaderRole = true' "${params}" >/dev/null
 done
 
-if grep -R --include='*.bicep' --include='*.bicepparam' -n 'enablePrivateNetworking' \
+if grep -R --include='*.bicep' --include='*.bicepparam' -n \
+  -E 'enablePrivateNetworking|networkAccessMode|public-rbac' \
   "${root}/infra" >/dev/null; then
-  echo "Unsafe enablePrivateNetworking switch remains in IaC." >&2
+  echo "A partial or public networking switch remains in IaC." >&2
   exit 1
 fi
+
+for module in storage keyvault cosmos; do
+  grep -F "publicNetworkAccess: 'Disabled'" \
+    "${root}/infra/modules/${module}.bicep" >/dev/null
+done
+grep -F "serviceName: 'Microsoft.App/environments'" \
+  "${root}/infra/modules/privateNetwork.bicep" >/dev/null
+grep -F "privateEndpointNetworkPolicies: 'Disabled'" \
+  "${root}/infra/modules/privateNetwork.bicep" >/dev/null
+grep -F 'virtualNetworkSubnetId: functionIntegrationSubnetId' \
+  "${root}/infra/modules/functionApp.bicep" >/dev/null
+grep -F 'vnetRouteAllEnabled: true' \
+  "${root}/infra/modules/functionApp.bicep" >/dev/null
 
 grep -F "type: 'UserAssignedIdentity'" "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F 'userAssignedIdentityResourceId:' "${root}/infra/modules/functionApp.bicep" >/dev/null

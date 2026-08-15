@@ -15,7 +15,9 @@ using '../main.bicep'
 param env = 'prod'
 param location = 'westeurope'
 param appName = 'certigo'
-param networkAccessMode = 'public-rbac'
+param vnetAddressPrefix = '10.62.0.0/24'
+param functionIntegrationSubnetPrefix = '10.62.0.0/26'
+param privateEndpointSubnetPrefix = '10.62.0.64/26'
 
 // Cosmos DB region. West Europe has AZ-capacity limits for Cosmos (the reason dev
 // deploys Cosmos in North Europe). We pin prod to North Europe too so the deploy
@@ -76,8 +78,3 @@ param grantAlertReaderRole = true
 // authJwtSigningKey and authJwtSigningKeyExpiresOn out-of-band from the production
 // Environment secret/variable pair. main.bicep rejects either value when omitted;
 // never commit the key in this file.
-
-// ============================================================================
-// public-rbac is the only accepted network mode. A private mode is intentionally
-// unavailable until VNet integration, private endpoints and private DNS ship together.
-// ============================================================================
