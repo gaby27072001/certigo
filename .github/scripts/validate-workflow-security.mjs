@@ -488,12 +488,19 @@ function validateRepositoryInvariants() {
     'STORAGE_BLOB_ENDPOINT',
     'DEPLOYMENT_CONTAINER',
     'FUNCTION_INTEGRATION_SUBNET_ID',
+    'APPROVED_REQUIRED_GROUPS',
+    "contains(['Sql', 'blob', 'queue', 'table', 'vault'], @)",
     'SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}',
     'COMMIT_SHA: ${{ github.sha }}',
   ]) {
     if (!backend.includes(marker)) {
       errors.push(`cd-backend.yml: missing private OneDeploy invariant ${marker}`);
     }
+  }
+  if (backend.includes("--query 'length(@)' -o tsv")) {
+    errors.push(
+      'cd-backend.yml: private endpoint validation must not reject unrelated approved endpoints',
+    );
   }
   for (const marker of [
     'az storage blob upload',
