@@ -214,7 +214,7 @@ modules. `params/dev.bicepparam` porte les valeurs d'environnement.
 | `storage.bicep` | StorageV2 + container `lesson-assets` |
 | `appInsights.bicep` | Application Insights *workspace-based* |
 | `keyvault.bicep` | Key Vault (modèle RBAC) |
-| `functionApp.bicep` | plan Y1 Linux, `dotnet-isolated` 8.0, *managed identity*, rôle *Key Vault Secrets User*, app settings |
+| `functionApp.bicep` | plan FC1 Linux, `dotnet-isolated` 8.0, identité système Cosmos et identité utilisateur préprovisionnée pour stockage/KV/App Insights |
 
 ---
 
@@ -322,7 +322,8 @@ backend était **déjà conforme** (dépendances `wp-p0-02` ETag et `wp-p0-06` s
 complète l'ADR-011 (§12.1) sur l'axe **plafonds anti-abus**.
 
 **1. ETag sur toutes les écritures d'économie.** Chaque mutation de profil est encapsulée dans
-`OptimisticConcurrency.ExecuteAsync` (relit le profil et **ré-évalue** la règle métier sur 412) :
+`DurableEconomy.ApplyProfileOnceAsync`, qui relit le profil, vérifie le reçu d'opération borné,
+puis réessaie l'écriture conditionnelle sur 412 :
 
 | Écriture | Site |
 |---|---|
@@ -332,10 +333,33 @@ complète l'ADR-011 (§12.1) sur l'axe **plafonds anti-abus**.
 | Réparation de série (`RepairAsync`) | `GamificationServices.cs:428` |
 | Scoring quiz (crédit profil) | `QuizService.cs` (voir §12.1) |
 
-**2. `TransactionalBatch` multi-document.** La progression de leçon écrit *profil + tentative +
-événements* dans **un seul batch** transactionnel, sur la partition `userId` :
-`CosmosProgressRepository.cs:50` — `context.Progress.CreateTransactionalBatch(new PartitionKey(userId))`.
-Aucune écriture partielle possible (tout ou rien).
+**2. État durable, sans fausse transaction cross-container.** Chaque quiz, examen et mutation de
+gamification crée un `EconomyOperationRecord` déterministe dans le conteneur `economy`. Le record
+conserve le payload immuable, l'issue réconciliée, les étapes requises et les étapes terminées.
+Les journaux ont `ttl = -1` et sont donc retenus : une reprise relit l'issue durable et rejoue
+uniquement les projections manquantes :
+
+- profil : reçu `{ operationId, appliedAt, outcomeJson }` écrit avec la mutation sous ETag ;
+- classement : XP + marqueur écrits ensemble sous ETag dans l'entrée hebdomadaire ;
+- événements : ids déterministes, un conflit Cosmos 409 signifie que la projection existe déjà ;
+- tentative/ledger/progression : créations ou upserts idempotents, puis étape acquittée.
+
+Les reçus profil sont limités à 128 et à 256 Kio sérialisés. Ils ne conservent que l'issue minimale
+nécessaire à la reprise (par exemple `RewardsDto`, jamais les réponses ou explications d'examen).
+Avant d'en ajouter un, les plus anciens ne sont compactés que si leur journal durable est terminal
+(`completed` ou `failed`). Un journal non terminal n'est jamais compacté ; si les limites sont
+atteintes uniquement par des opérations non terminales, la mutation échoue explicitement et doit
+être réconciliée. Ces reçus et les marqueurs de migration sont filtrés des réponses HTTP. Pour quiz
+et examen, tentative persistée, profil,
+classement, réponse et événements utilisent tous la même issue réconciliée stockée dans le journal.
+Les soldes réconciliés de boutique, quêtes, saisons et réparation de série suivent la même règle
+pour le ledger, la réponse et les événements. Les anciens marqueurs
+`AppliedEconomyOperations` restent lisibles uniquement comme pont de migration : ils ne sont plus
+alimentés et sont convertis en reçus sans réappliquer la mutation lors de la reprise du journal.
+
+Il ne s'agit **pas** d'une transaction cross-container. Une panne peut laisser une opération
+`pending`, mais le retry la réconcilie sans double crédit. Le seul `TransactionalBatch` est celui de
+`CosmosProgressRepository`, limité aux documents de progression d'une même partition `/userId`.
 
 **3. Plafonds `RateWindow` — enforcement (pas shadow).** La fenêtre de cadence est **lue du
 conteneur réel** (`attempts`), pas un stub dormant :
@@ -356,20 +380,16 @@ conteneur réel** (`attempts`), pas un stub dormant :
 elles-mêmes emploient `userContext.UserId` (`QuizService.cs:370`, `ExamService.cs:428`) : aucun DTO
 gamification ne transporte de `userId` client — impossible de plafonner « l'identité d'un autre ».
 
-**5. Idempotence récompenses & achats (ids déterministes).** Confirmé §12.1 (réserver-avant-créditer,
-sens d'échec sûr). Ancres propres à ce lot : boutique — garde `GetByClientPurchaseIdAsync`
-(`GamificationServices.cs:52`) → id `purchase::{ClientPurchaseId}` (`GamificationServices.cs:83`) →
-`CreateAsync` (`:90`) ; réparation de série — garde (`:432`) → `CreateAsync` (`:477`) ; scoring quiz —
-garde amont `prior.Result` (`QuizService.cs:35`/`:38`), id `attempt::{ClientAttemptId}` (`:243`),
-`DuplicateRecordException` → relecture du gagnant (`:255`/`:257`), sinon `ConcurrencyConflictException`
-(`:263`). Au pire une récompense est *rejouable*, **jamais** double-créditée.
+**5. Idempotence récompenses & achats (ids déterministes).** L'id
+`operation::{kind}::{operationKey}` est la réservation globale. Le premier `CreateItem` gagne ; les
+appels concurrents relisent son payload et participent à la même reprise. Les tests injectent des
+pannes après le crédit profil et avant le classement ou l'événement, puis prouvent qu'un retry
+termine l'opération sans doubler XP, gems, achat, tentative ou événement.
 
 **Tests anti-régression.** Couverts par les suites listées en §12.1 (`QuizServiceTests`,
 `ExamServiceTests`, `ShopServiceTests`, `QuestServiceTests`, `SeasonServiceTests`,
 `StreakRepairServiceTests` : idempotence par clé cliente) ; les plafonds de cadence sont vérifiés par
 `AttemptIntegrityEvaluatorTests` (dépassement XP/tentatives → flags `IntegrityFlag.*RateExceeded`).
 
-**Hors périmètre.** `cortex` (`wp-p1-09`) et le renderer contenu (`wp-p1-01`) ne sont **pas** touchés ;
-la réserve `wp-p0-02` sur `NotificationService.UpsertAsync` reste **différée** (cf. §12.1). Ce lot est
-strictement **backend économie/gamification** et **sans changement de code** (`git diff origin/main`
-limité au registre de migration et à ce document).
+**Hors périmètre.** `cortex` (`wp-p1-09`), le mobile et le renderer contenu (`wp-p1-01`) ne sont pas
+touchés ; la réserve `wp-p0-02` sur `NotificationService.UpsertAsync` reste différée.

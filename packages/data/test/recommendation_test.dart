@@ -62,10 +62,8 @@ void main() {
     });
 
     test('maps every wire kind, including the "start" fallback', () {
-      Recommendation item(String? kind) => Recommendation.fromJson(<String, dynamic>{
-            'kind': kind,
-            'title': 't',
-          });
+      Recommendation item(String? kind) =>
+          Recommendation.fromJson(<String, dynamic>{'kind': kind, 'title': 't'});
 
       expect(item('practice').kind, RecommendationKind.practice);
       expect(item('review').kind, RecommendationKind.review);

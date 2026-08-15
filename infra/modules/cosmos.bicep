@@ -9,11 +9,31 @@ param tags object = {}
 @description('Disable Cosmos key-based (local) auth — RBAC/Entra only. Recommended for staging/prod; the API and seed use managed identity.')
 param disableLocalAuth bool = false
 
-@description('Private-networking posture. When true, the Cosmos public network endpoint is Disabled (assumes private endpoints exist — Phase 2). Default false keeps it Enabled so the Function App managed identity can reach the account without private endpoints. Decoupled from disableLocalAuth (RBAC-only auth), which stays on independently for hardened envs.')
-param enablePrivateNetworking bool = false
+@description('Network posture. Only public-rbac is supported until VNet integration, private endpoints and private DNS are deployed together.')
+@allowed([ 'public-rbac' ])
+param networkAccessMode string = 'public-rbac'
 
-@description('Enable Continuous backup (Point-In-Time Restore) instead of the implicit Periodic default. Recommended for staging/prod. WARNING: on an EXISTING account, switching Periodic to Continuous is IRREVERSIBLE and one-way.')
-param enableContinuousBackup bool = false
+@description('Explicit backup mode. Switching an existing account from Periodic to Continuous is irreversible.')
+@allowed([ 'Periodic', 'Continuous' ])
+param backupMode string
+
+@description('Continuous backup retention tier.')
+@allowed([ 'Continuous7Days', 'Continuous30Days' ])
+param continuousBackupTier string = 'Continuous7Days'
+
+@description('Periodic backup interval in minutes.')
+@minValue(60)
+@maxValue(1440)
+param periodicBackupIntervalMinutes int = 240
+
+@description('Periodic backup retention in hours.')
+@minValue(8)
+@maxValue(720)
+param periodicBackupRetentionHours int = 8
+
+@description('Periodic backup storage redundancy.')
+@allowed([ 'Local', 'Geo', 'Zone' ])
+param periodicBackupStorageRedundancy string = 'Geo'
 
 resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   name: accountName
@@ -38,17 +58,21 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
       }
     ]
     disableLocalAuth: disableLocalAuth
-    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
+    publicNetworkAccess: 'Enabled'
     minimalTlsVersion: 'Tls12'
-    // Backup posture (audit finding R-02). Continuous = Point-In-Time Restore.
-    // Continuous7Days tier is free; bump to Continuous30Days if longer PITR is needed.
-    // null preserves the account default (Periodic) for dev.
-    backupPolicy: enableContinuousBackup ? {
+    backupPolicy: backupMode == 'Continuous' ? {
       type: 'Continuous'
       continuousModeProperties: {
-        tier: 'Continuous7Days'
+        tier: continuousBackupTier
       }
-    } : null
+    } : {
+      type: 'Periodic'
+      periodicModeProperties: {
+        backupIntervalInMinutes: periodicBackupIntervalMinutes
+        backupRetentionIntervalInHours: periodicBackupRetentionHours
+        backupStorageRedundancy: periodicBackupStorageRedundancy
+      }
+    }
   }
 }
 
@@ -62,14 +86,16 @@ resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15
 
 // Locked container topology: name -> partition key.
 var containers = [
-  { name: 'users', pk: '/id' }
-  { name: 'content', pk: '/trackId' }
-  { name: 'progress', pk: '/userId' }
-  { name: 'attempts', pk: '/userId' }
-  { name: 'events', pk: '/userId' }
-  { name: 'leaderboard', pk: '/periodLeagueId' }
-  { name: 'economy', pk: '/userId' }
-  { name: 'friends', pk: '/userId' }
+  { name: 'users', pk: '/id', defaultTtl: null }
+  { name: 'content', pk: '/trackId', defaultTtl: null }
+  { name: 'progress', pk: '/userId', defaultTtl: null }
+  // Existing attempts remain durable because their documents omit "ttl"; issued
+  // exam documents opt in with a positive per-item TTL.
+  { name: 'attempts', pk: '/userId', defaultTtl: -1 }
+  { name: 'events', pk: '/userId', defaultTtl: null }
+  { name: 'leaderboard', pk: '/periodLeagueId', defaultTtl: null }
+  { name: 'economy', pk: '/userId', defaultTtl: null }
+  { name: 'friends', pk: '/userId', defaultTtl: null }
 ]
 
 resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [
@@ -79,6 +105,7 @@ resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
     properties: {
       resource: {
         id: c.name
+        defaultTtl: c.defaultTtl
         partitionKey: {
           paths: [ c.pk ]
           kind: 'Hash'
@@ -95,3 +122,5 @@ resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
 
 output endpoint string = account.properties.documentEndpoint
 output accountName string = account.name
+output backupMode string = backupMode
+output networkAccessMode string = networkAccessMode

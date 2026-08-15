@@ -60,10 +60,7 @@ class OrderingStepWidget extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               'Mets dans le bon ordre',
-              style: text.labelLarge?.copyWith(
-                color: p.primary,
-                fontWeight: FontWeight.w700,
-              ),
+              style: text.labelLarge?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -124,10 +121,7 @@ class OrderingStepWidget extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 20),
-          AnswerFeedbackCard(
-            correct: outcome!.correct,
-            explanation: outcome!.explanation,
-          ),
+          AnswerFeedbackCard(correct: outcome!.correct, explanation: outcome!.explanation),
         ],
       ],
     );

@@ -41,11 +41,7 @@ class Quest {
 
 /// The learner's quest board for one day.
 class QuestBoard {
-  const QuestBoard({
-    required this.date,
-    required this.gems,
-    required this.quests,
-  });
+  const QuestBoard({required this.date, required this.gems, required this.quests});
 
   /// The board's day, `yyyy-MM-dd` (server `DateOnly`).
   final String date;

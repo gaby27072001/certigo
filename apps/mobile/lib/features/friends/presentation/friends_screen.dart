@@ -113,11 +113,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
           child: Column(
             children: <Widget>[
               const ScreenHeader(title: 'Amis'),
-              _AddFriendCard(
-                controller: _handleController,
-                adding: _adding,
-                onSubmit: _add,
-              ),
+              _AddFriendCard(controller: _handleController, adding: _adding, onSubmit: _add),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
@@ -137,9 +133,8 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                     onRemove: _removingId == null ? _remove : null,
                   ),
                   loading: () => const _FriendsLoading(),
-                  error: (Object error, StackTrace _) => PrismStatusView.error(
-                    onRetry: () => ref.invalidate(friendListProvider),
-                  ),
+                  error: (Object error, StackTrace _) =>
+                      PrismStatusView.error(onRetry: () => ref.invalidate(friendListProvider)),
                 ),
               ),
             ],
@@ -151,11 +146,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
 }
 
 class _AddFriendCard extends StatelessWidget {
-  const _AddFriendCard({
-    required this.controller,
-    required this.adding,
-    required this.onSubmit,
-  });
+  const _AddFriendCard({required this.controller, required this.adding, required this.onSubmit});
 
   final TextEditingController controller;
   final bool adding;
@@ -214,11 +205,7 @@ class _AddFriendCard extends StatelessWidget {
 }
 
 class _FriendRoster extends StatelessWidget {
-  const _FriendRoster({
-    required this.list,
-    required this.removingId,
-    required this.onRemove,
-  });
+  const _FriendRoster({required this.list, required this.removingId, required this.onRemove});
 
   final FriendList list;
   final String? removingId;
@@ -266,11 +253,7 @@ class _FriendRoster extends StatelessWidget {
 }
 
 class _FriendCard extends StatelessWidget {
-  const _FriendCard({
-    required this.friend,
-    required this.removing,
-    required this.onRemove,
-  });
+  const _FriendCard({required this.friend, required this.removing, required this.onRemove});
 
   final Friend friend;
   final bool removing;
@@ -297,10 +280,7 @@ class _FriendCard extends StatelessWidget {
                 ? null
                 : Text(
                     _initials(friend.displayName),
-                    style: t.titleMedium?.copyWith(
-                      color: p.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: t.titleMedium?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
                   ),
           ),
           const SizedBox(width: 12),
@@ -313,17 +293,15 @@ class _FriendCard extends StatelessWidget {
                   style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 1),
-                Text(
-                  '@${friend.handle}',
-                  style: t.bodySmall?.copyWith(color: p.textSecondary),
-                ),
+                Text('@${friend.handle}', style: t.bodySmall?.copyWith(color: p.textSecondary)),
                 const SizedBox(height: 6),
                 Row(
                   children: <Widget>[
                     _Stat(
-                        icon: Icons.military_tech_rounded,
-                        label: 'Niv. ${friend.level}',
-                        color: p.primary),
+                      icon: Icons.military_tech_rounded,
+                      label: 'Niv. ${friend.level}',
+                      color: p.primary,
+                    ),
                     const SizedBox(width: 10),
                     _Stat(
                       icon: Icons.local_fire_department_rounded,
@@ -374,10 +352,7 @@ class _Stat extends StatelessWidget {
       children: <Widget>[
         Icon(icon, size: 14, color: color),
         const SizedBox(width: 3),
-        Text(
-          label,
-          style: t.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
+        Text(label, style: t.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
       ],
     );
   }

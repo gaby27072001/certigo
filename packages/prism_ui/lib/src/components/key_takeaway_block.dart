@@ -9,11 +9,7 @@ import 'prism_rich_text.dart';
 /// A gold accent bar on the leading edge ties it to the XP / reward language of
 /// the product, signalling "this is the thing worth remembering".
 class KeyTakeawayBlock extends StatelessWidget {
-  const KeyTakeawayBlock({
-    super.key,
-    required this.body,
-    this.title = 'À retenir',
-  });
+  const KeyTakeawayBlock({super.key, required this.body, this.title = 'À retenir'});
 
   final String body;
   final String title;
@@ -23,10 +19,7 @@ class KeyTakeawayBlock extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
     return Container(
-      decoration: BoxDecoration(
-        color: p.xpGold.withOpacity(0.08),
-        borderRadius: PrismRadii.cardMd,
-      ),
+      decoration: BoxDecoration(color: p.xpGold.withOpacity(0.08), borderRadius: PrismRadii.cardMd),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -35,9 +28,7 @@ class KeyTakeawayBlock extends StatelessWidget {
               width: 4,
               decoration: BoxDecoration(
                 color: p.xpGold,
-                borderRadius: const BorderRadius.horizontal(
-                  left: Radius.circular(4),
-                ),
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(4)),
               ),
             ),
             Expanded(
@@ -60,10 +51,7 @@ class KeyTakeawayBlock extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    PrismRichText(
-                      body,
-                      style: t.bodyLarge?.copyWith(height: 1.5),
-                    ),
+                    PrismRichText(body, style: t.bodyLarge?.copyWith(height: 1.5)),
                   ],
                 ),
               ),

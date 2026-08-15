@@ -251,9 +251,7 @@ class MascotAvatar extends StatelessWidget {
             ),
           ),
           // Friendly face.
-          Positioned.fill(
-            child: CustomPaint(painter: _MascotFacePainter(mood)),
-          ),
+          Positioned.fill(child: CustomPaint(painter: _MascotFacePainter(mood))),
           // Service badge.
           if (showBadge) _badge(dark),
         ],

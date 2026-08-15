@@ -31,6 +31,7 @@ internal static class LocalJwtSigning
 public sealed class JwtTokenIssuer : ITokenIssuer
 {
     private readonly SymmetricSecurityKey _key;
+    private readonly IReadOnlyList<SecurityKey> _validationKeys;
     private readonly string _issuer;
     private readonly string _audience;
     private readonly TimeSpan _accessLifetime;
@@ -42,9 +43,13 @@ public sealed class JwtTokenIssuer : ITokenIssuer
         string issuer,
         string audience,
         TimeSpan? accessLifetime = null,
-        TimeSpan? refreshLifetime = null)
+        TimeSpan? refreshLifetime = null,
+        string? previousSigningSecret = null)
     {
         _key = LocalJwtSigning.DeriveKey(signingSecret);
+        _validationKeys = string.IsNullOrWhiteSpace(previousSigningSecret)
+            ? [_key]
+            : [_key, LocalJwtSigning.DeriveKey(previousSigningSecret)];
         _issuer = string.IsNullOrWhiteSpace(issuer) ? "certigo" : issuer;
         _audience = string.IsNullOrWhiteSpace(audience) ? "certigo" : audience;
         _accessLifetime = accessLifetime ?? TimeSpan.FromDays(1);
@@ -123,7 +128,7 @@ public sealed class JwtTokenIssuer : ITokenIssuer
     {
         ValidIssuer = _issuer,
         ValidAudience = _audience,
-        IssuerSigningKey = _key,
+        IssuerSigningKeys = _validationKeys,
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidateIssuerSigningKey = true,

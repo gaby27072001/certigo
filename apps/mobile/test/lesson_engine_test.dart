@@ -15,10 +15,7 @@ import 'package:certigo/features/lesson/application/sample_lesson.dart';
 /// (bundled sample lesson + embedded answer key + locally computed result).
 class _OfflineLessonRepo implements LessonRepository {
   @override
-  Future<Result<Lesson>> getLesson({
-    required String trackId,
-    required String lessonId,
-  }) async =>
+  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) async =>
       const Err<Lesson>(NetworkFailure());
 }
 

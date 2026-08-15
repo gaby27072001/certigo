@@ -109,10 +109,7 @@ CustomTransitionPage<void> _stepPage({
       return FadeTransition(
         opacity: curved,
         child: SlideTransition(
-          position: Tween<Offset>(
-            begin: begin,
-            end: Offset.zero,
-          ).animate(curved),
+          position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
           child: child,
         ),
       );
@@ -146,13 +143,8 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   ref.listen<AuthState>(authControllerProvider, (_, __) => authRefresh.value++);
   ref.onDispose(authRefresh.dispose);
 
-  final OnboardingController onboardingCtrl = ref.read(
-    onboardingControllerProvider,
-  );
-  final Listenable refresh = Listenable.merge(<Listenable>[
-    authRefresh,
-    onboardingCtrl,
-  ]);
+  final OnboardingController onboardingCtrl = ref.read(onboardingControllerProvider);
+  final Listenable refresh = Listenable.merge(<Listenable>[authRefresh, onboardingCtrl]);
 
   return GoRouter(
     navigatorKey: _rootKey,
@@ -178,11 +170,8 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         path: Routes.landing,
         name: 'landing',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) => _stepPage(
-          state: state,
-          child: const LandingScreen(),
-          begin: const Offset(0, 0.03),
-        ),
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const LandingScreen(), begin: const Offset(0, 0.03)),
       ),
       GoRoute(
         path: Routes.auth,
@@ -404,19 +393,12 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: OnboardingRoutes.login,
         parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) => _stepPage(
-          state: state,
-          child: const LoginScreen(),
-          begin: const Offset(0.03, 0),
-        ),
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const LoginScreen(), begin: const Offset(0.03, 0)),
       ),
       // Bottom-nav shell: persistent state per tab via StatefulShellRoute.
       StatefulShellRoute.indexedStack(
-        builder: (
-          BuildContext context,
-          GoRouterState state,
-          StatefulNavigationShell shell,
-        ) {
+        builder: (BuildContext context, GoRouterState state, StatefulNavigationShell shell) {
           return AppShell(shell: shell);
         },
         branches: <StatefulShellBranch>[
@@ -424,11 +406,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           StatefulShellBranch(
             navigatorKey: _shellKey,
             routes: <RouteBase>[
-              GoRoute(
-                path: Routes.home,
-                name: 'home',
-                builder: (_, __) => const HomeScreen(),
-              ),
+              GoRoute(path: Routes.home, name: 'home', builder: (_, __) => const HomeScreen()),
             ],
           ),
           StatefulShellBranch(
@@ -451,8 +429,9 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
                     path: 'vendor/:vendorId',
                     name: 'library-vendor',
                     builder: (BuildContext context, GoRouterState state) {
-                      final VendorBrand vendor =
-                          VendorBrandInfo.fromId(state.pathParameters['vendorId'] ?? '');
+                      final VendorBrand vendor = VendorBrandInfo.fromId(
+                        state.pathParameters['vendorId'] ?? '',
+                      );
                       return VendorCertificationsScreen(vendor: vendor);
                     },
                     routes: <RouteBase>[
@@ -532,61 +511,43 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         path: Routes.seasons,
         name: 'seasons',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
-          state: state,
-          begin: const Offset(0, 0.04),
-          child: const SeasonsScreen(),
-        ),
+        pageBuilder: (BuildContext context, GoRouterState state) =>
+            _stepPage(state: state, begin: const Offset(0, 0.04), child: const SeasonsScreen()),
       ),
       GoRoute(
         path: Routes.quests,
         name: 'quests',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
-          state: state,
-          begin: const Offset(0, 0.04),
-          child: const QuestsScreen(),
-        ),
+        pageBuilder: (BuildContext context, GoRouterState state) =>
+            _stepPage(state: state, begin: const Offset(0, 0.04), child: const QuestsScreen()),
       ),
       GoRoute(
         path: Routes.shop,
         name: 'shop',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
-          state: state,
-          begin: const Offset(0, 0.04),
-          child: const ShopScreen(),
-        ),
+        pageBuilder: (BuildContext context, GoRouterState state) =>
+            _stepPage(state: state, begin: const Offset(0, 0.04), child: const ShopScreen()),
       ),
       GoRoute(
         path: Routes.friends,
         name: 'friends',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
-          state: state,
-          begin: const Offset(0, 0.04),
-          child: const FriendsScreen(),
-        ),
+        pageBuilder: (BuildContext context, GoRouterState state) =>
+            _stepPage(state: state, begin: const Offset(0, 0.04), child: const FriendsScreen()),
       ),
       GoRoute(
         path: Routes.exam,
         name: 'exam',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
-          state: state,
-          begin: const Offset(0, 0.04),
-          child: const ExamScreen(),
-        ),
+        pageBuilder: (BuildContext context, GoRouterState state) =>
+            _stepPage(state: state, begin: const Offset(0, 0.04), child: const ExamScreen()),
       ),
       GoRoute(
         path: Routes.dailyShare,
         name: 'daily-share',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
-          state: state,
-          begin: const Offset(0, 0.04),
-          child: const DailyShareScreen(),
-        ),
+        pageBuilder: (BuildContext context, GoRouterState state) =>
+            _stepPage(state: state, begin: const Offset(0, 0.04), child: const DailyShareScreen()),
       ),
     ],
   );

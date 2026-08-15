@@ -13,6 +13,7 @@ using '../main.bicep'
 param env = 'staging'
 param location = 'westeurope'
 param appName = 'certigo'
+param networkAccessMode = 'public-rbac'
 
 // Cosmos DB region. West Europe has AZ-capacity limits for Cosmos (the reason dev
 // and prod both deploy Cosmos in North Europe). We pin staging to North Europe too
@@ -36,24 +37,26 @@ param entraAuthority = 'https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.c
 // Audience = Application ID URI of the staging backend app registration.
 param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
 
-// Email notified on 401/403/5xx spikes (optional but recommended pre-prod).
-param alertEmail = ''
+// authJwtSigningKey and authJwtSigningKeyExpiresOn are supplied out-of-band by CD
+// from the staging Environment secret/variable pair. main.bicep rejects an omitted
+// value or expiration; never commit the key here.
+
+// Mandatory monitored receiver for security and readiness alerts.
+param alertEmail = 'secops@certigo.app'
 
 // Paid Defender plans off by default; enable when budget is approved.
 param enableDefenderPlans = false
+param manageDefenderPlans = false
+
+// Staging validates the same PITR contract as production.
+param cosmosBackupMode = 'Continuous'
+param cosmosContinuousBackupTier = 'Continuous7Days'
+
+// Audit-only MCSB assignment is explicit and cannot deny staging deployments.
+param deployMcsbPolicyAssignment = true
+param mcsbEnforcementMode = 'DoNotEnforce'
+param grantAlertReaderRole = true
 
 // ============================================================================
-// Network posture (public network access) — mirrors the prod beta trade-off.
-// enablePrivateNetworking is intentionally LEFT AT false: the data resources
-// (Storage, Cosmos DB, Key Vault) keep their PUBLIC network endpoints Enabled.
-// This is required today because the Flex Consumption (FC1) Function App has NO
-// private endpoints / VNet integration, so it must reach Storage (deployment
-// package pull), Key Vault (secrets at startup) and Cosmos over the public endpoint
-// via its managed identity. Setting enablePrivateNetworking = true WITHOUT first
-// provisioning those private endpoints takes the backend fully offline (503/timeout).
-// Security is NOT relaxed by this flag: access stays RBAC-only (Cosmos
-// disableLocalAuth=true, Storage allowSharedKeyAccess=false, Key Vault RBAC) — only
-// the public NETWORK filter is left open. Same posture as prod for the beta.
-// Phase 2: provision private endpoints + VNet integration for the Function App, then
-// flip the line below to true to close the public endpoints.
-param enablePrivateNetworking = false
+// public-rbac is the only accepted network mode. A private mode is intentionally
+// unavailable until VNet integration, private endpoints and private DNS ship together.

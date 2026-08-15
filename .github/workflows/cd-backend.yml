@@ -5,8 +5,11 @@ name: cd-backend
 #
 # Required OIDC federated-identity secrets (repo/env settings):
 #   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
-# Required environment secret for staging/prod only:
-#   AUTH_JWT_SIGNING_KEY
+# Required staging/prod environment configuration:
+#   secret AUTH_JWT_SIGNING_KEY + variable AUTH_JWT_SIGNING_KEY_EXPIRES_ON
+# Optional only during a planned overlap:
+#   secret AUTH_JWT_PREVIOUS_SIGNING_KEY
+#   variable AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON
 on:
   workflow_call:
     inputs:
@@ -22,6 +25,8 @@ on:
       AZURE_SUBSCRIPTION_ID:
         required: true
       AUTH_JWT_SIGNING_KEY:
+        required: false
+      AUTH_JWT_PREVIOUS_SIGNING_KEY:
         required: false
   workflow_dispatch:
     inputs:
@@ -99,6 +104,9 @@ jobs:
         shell: bash
         env:
           AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}
+          AUTH_JWT_SIGNING_KEY_EXPIRES_ON: ${{ vars.AUTH_JWT_SIGNING_KEY_EXPIRES_ON }}
+          AUTH_JWT_PREVIOUS_SIGNING_KEY: ${{ secrets.AUTH_JWT_PREVIOUS_SIGNING_KEY }}
+          AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON: ${{ vars.AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON }}
           BASE_PARAMETERS_FILE: ${{ runner.temp }}/certigo-base-parameters.json
           AUTH_PARAMETERS_FILE: ${{ runner.temp }}/certigo-auth-parameters.json
         run: |

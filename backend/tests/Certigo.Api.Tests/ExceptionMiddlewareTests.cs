@@ -35,6 +35,25 @@ public sealed class ExceptionMiddlewareTests
     }
 
     [Fact]
+    public async Task RequestValidationException_MapsTo400_ProblemDetails()
+    {
+        var middleware = CreateMiddleware();
+        var invocation = FunctionTestHarness.CreateHttp();
+
+        await middleware.Invoke(
+            invocation.Context,
+            _ => throw new RequestValidationException("Duplicate item id(s) are not allowed."));
+
+        invocation.Response.Should().NotBeNull();
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problem = await invocation.ReadProblemAsync();
+        problem!.Status.Should().Be(400);
+        problem.Title.Should().Be("Invalid request");
+        problem.Detail.Should().Be("Duplicate item id(s) are not allowed.");
+    }
+
+    [Fact]
     public async Task AuthFailedException_MapsTo401_ProblemDetails()
     {
         var middleware = CreateMiddleware();

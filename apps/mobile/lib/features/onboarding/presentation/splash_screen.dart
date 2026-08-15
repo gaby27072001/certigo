@@ -91,9 +91,9 @@ class _SplashScreenState extends State<SplashScreen> {
                           const SizedBox(height: 6),
                           Text(
                             'Tes certifs Microsoft, leçon par leçon',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white.withOpacity(0.85),
-                                ),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(color: Colors.white.withOpacity(0.85)),
                           ),
                         ],
                       ),

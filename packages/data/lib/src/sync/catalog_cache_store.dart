@@ -36,10 +36,8 @@ typedef CatalogJsonWrite = Future<void> Function(String json);
 
 /// Durable store that serializes the whole catalog as one JSON list.
 class JsonCatalogCacheStore implements CatalogCacheStore {
-  JsonCatalogCacheStore({
-    required CatalogJsonRead read,
-    required CatalogJsonWrite write,
-  })  : _read = read,
+  JsonCatalogCacheStore({required CatalogJsonRead read, required CatalogJsonWrite write})
+      : _read = read,
         _write = write;
 
   final CatalogJsonRead _read;
@@ -56,9 +54,7 @@ class JsonCatalogCacheStore implements CatalogCacheStore {
     try {
       return decoded
           .whereType<Map<dynamic, dynamic>>()
-          .map(
-            (Map<dynamic, dynamic> m) => TrackSummary.fromJson(Map<String, dynamic>.from(m)),
-          )
+          .map((Map<dynamic, dynamic> m) => TrackSummary.fromJson(Map<String, dynamic>.from(m)))
           .toList();
     } catch (_) {
       return null;
@@ -67,9 +63,7 @@ class JsonCatalogCacheStore implements CatalogCacheStore {
 
   @override
   Future<void> write(List<TrackSummary> tracks) async {
-    final String raw = jsonEncode(
-      tracks.map((TrackSummary track) => track.toJson()).toList(),
-    );
+    final String raw = jsonEncode(tracks.map((TrackSummary track) => track.toJson()).toList());
     await _write(raw);
   }
 }

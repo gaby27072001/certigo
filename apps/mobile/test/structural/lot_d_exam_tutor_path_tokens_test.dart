@@ -84,12 +84,7 @@ void main() {
     ),
     const _PaddingCase(
       'exam prompt padding',
-      EdgeInsets.fromLTRB(
-        PrismSpacing.gutter,
-        0,
-        PrismSpacing.gutter,
-        PrismSpacing.xs,
-      ),
+      EdgeInsets.fromLTRB(PrismSpacing.gutter, 0, PrismSpacing.gutter, PrismSpacing.xs),
       EdgeInsets.fromLTRB(20, 0, 20, 8),
     ),
     const _PaddingCase(
@@ -104,12 +99,7 @@ void main() {
     ),
     const _PaddingCase(
       'exam meta padding',
-      EdgeInsets.fromLTRB(
-        PrismSpacing.gutter,
-        0,
-        PrismSpacing.gutter,
-        PrismSpacing.md,
-      ),
+      EdgeInsets.fromLTRB(PrismSpacing.gutter, 0, PrismSpacing.gutter, PrismSpacing.md),
       EdgeInsets.fromLTRB(20, 0, 20, 16),
     ),
     _PaddingCase(
@@ -124,28 +114,17 @@ void main() {
     ),
     const _PaddingCase(
       'exam pill padding',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.sm,
-        vertical: PrismSpacing.xs,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.xs),
       EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     ),
     const _PaddingCase(
       'exam card md padding',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.sm,
-        vertical: PrismSpacing.debt10,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.debt10),
       EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     ),
     const _PaddingCase(
       'exam back-row padding',
-      EdgeInsets.fromLTRB(
-        PrismSpacing.xs,
-        PrismSpacing.xxs,
-        PrismSpacing.gutter,
-        PrismSpacing.xxs,
-      ),
+      EdgeInsets.fromLTRB(PrismSpacing.xs, PrismSpacing.xxs, PrismSpacing.gutter, PrismSpacing.xxs),
       EdgeInsets.fromLTRB(8, 4, 20, 4),
     ),
     // tutor_sheet.dart -----------------------------------------------------
@@ -186,10 +165,7 @@ void main() {
     ),
     const _PaddingCase(
       'tutor chip padding',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.debt11,
-        vertical: PrismSpacing.debt6,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.debt11, vertical: PrismSpacing.debt6),
       EdgeInsets.symmetric(horizontal: 11, vertical: 6),
     ),
     const _PaddingCase(
@@ -200,22 +176,12 @@ void main() {
     // path_screen.dart -----------------------------------------------------
     const _PaddingCase(
       'path header padding',
-      EdgeInsets.fromLTRB(
-        PrismSpacing.gutter,
-        PrismSpacing.xs,
-        PrismSpacing.gutter,
-        0,
-      ),
+      EdgeInsets.fromLTRB(PrismSpacing.gutter, PrismSpacing.xs, PrismSpacing.gutter, 0),
       EdgeInsets.fromLTRB(20, 8, 20, 0),
     ),
     const _PaddingCase(
       'path sliver padding',
-      EdgeInsets.fromLTRB(
-        PrismSpacing.md,
-        PrismSpacing.gutter,
-        PrismSpacing.md,
-        0,
-      ),
+      EdgeInsets.fromLTRB(PrismSpacing.md, PrismSpacing.gutter, PrismSpacing.md, 0),
       EdgeInsets.fromLTRB(16, 20, 16, 0),
     ),
     const _PaddingCase(
@@ -230,10 +196,7 @@ void main() {
     ),
     const _PaddingCase(
       'path badge padding',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.debt9,
-        vertical: PrismSpacing.debt3,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.debt9, vertical: PrismSpacing.debt3),
       EdgeInsets.symmetric(horizontal: 9, vertical: 3),
     ),
     const _PaddingCase(
@@ -248,10 +211,7 @@ void main() {
     ),
     const _PaddingCase(
       'path tag padding',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.sm,
-        vertical: PrismSpacing.debt7,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.debt7),
       EdgeInsets.symmetric(horizontal: 12, vertical: 7),
     ),
     _PaddingCase(
@@ -269,11 +229,7 @@ void main() {
         const Key key = Key('lot_d_padding');
         await tester.pumpWidget(
           _host(
-            Padding(
-              key: key,
-              padding: c.actual,
-              child: const SizedBox.shrink(),
-            ),
+            Padding(key: key, padding: c.actual, child: const SizedBox.shrink()),
             brightness: brightness,
           ),
         );
@@ -287,26 +243,17 @@ void main() {
   group('Lot D radii are token-exact', () {
     test('tutor sheet top radius (debt26 == 26)', () {
       expect(PrismRadii.debt26, 26);
-      expect(
-        const Radius.circular(PrismRadii.debt26),
-        const Radius.circular(26),
-      );
+      expect(const Radius.circular(PrismRadii.debt26), const Radius.circular(26));
     });
 
     test('tutor grabber radius (debt3 == 3)', () {
       expect(PrismRadii.debt3, 3);
-      expect(
-        BorderRadius.circular(PrismRadii.debt3),
-        BorderRadius.circular(3),
-      );
+      expect(BorderRadius.circular(PrismRadii.debt3), BorderRadius.circular(3));
     });
 
     test('tutor avatar radius (md == 12)', () {
       expect(PrismRadii.md, 12);
-      expect(
-        BorderRadius.circular(PrismRadii.md),
-        BorderRadius.circular(12),
-      );
+      expect(BorderRadius.circular(PrismRadii.md), BorderRadius.circular(12));
     });
   });
 }

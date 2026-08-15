@@ -30,9 +30,8 @@ class ShopScreen extends ConsumerWidget {
               child: async.when(
                 data: (ShopCatalog catalog) => _ShopContent(catalog: catalog),
                 loading: () => const _ShopLoading(),
-                error: (Object error, StackTrace _) => PrismStatusView.error(
-                  onRetry: () => ref.invalidate(shopCatalogProvider),
-                ),
+                error: (Object error, StackTrace _) =>
+                    PrismStatusView.error(onRetry: () => ref.invalidate(shopCatalogProvider)),
               ),
             ),
           ],
@@ -129,10 +128,7 @@ class _ShopContentState extends ConsumerState<_ShopContent> {
             ],
           ),
         ),
-        if (_error != null) ...<Widget>[
-          const SizedBox(height: 14),
-          InlineError(message: _error!),
-        ],
+        if (_error != null) ...<Widget>[const SizedBox(height: 14), InlineError(message: _error!)],
         const SizedBox(height: 16),
         for (final ShopItem item in catalog.items) ...<Widget>[
           _ShopItemCard(

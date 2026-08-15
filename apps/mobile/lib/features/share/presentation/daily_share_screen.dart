@@ -25,9 +25,8 @@ class DailyShareScreen extends ConsumerWidget {
               child: async.when(
                 data: (ShareCard card) => _DailyShareContent(card: card),
                 loading: () => const _DailyShareLoading(),
-                error: (Object error, StackTrace _) => PrismStatusView.error(
-                  onRetry: () => ref.invalidate(dailyShareCardProvider),
-                ),
+                error: (Object error, StackTrace _) =>
+                    PrismStatusView.error(onRetry: () => ref.invalidate(dailyShareCardProvider)),
               ),
             ),
           ],
@@ -53,10 +52,9 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
   Future<void> _share() async {
     setState(() => _sharing = true);
     try {
-      await ref.read(shareIntentProvider).shareText(
-            _shareMessage(widget.card),
-            subject: 'Certigo • ${widget.card.trackCode}',
-          );
+      await ref
+          .read(shareIntentProvider)
+          .shareText(_shareMessage(widget.card), subject: 'Certigo • ${widget.card.trackCode}');
     } finally {
       if (mounted) {
         setState(() => _sharing = false);
@@ -111,12 +109,7 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
                           style: t.bodyMedium?.copyWith(color: p.textSecondary),
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          dateLabel,
-                          style: t.labelMedium?.copyWith(
-                            color: p.textSecondary,
-                          ),
-                        ),
+                        Text(dateLabel, style: t.labelMedium?.copyWith(color: p.textSecondary)),
                       ],
                     ),
                   ),
@@ -130,10 +123,7 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
               const SizedBox(height: 14),
               Text(
                 card.caption,
-                style: t.bodyLarge?.copyWith(
-                  color: p.textSecondary,
-                  height: 1.45,
-                ),
+                style: t.bodyLarge?.copyWith(color: p.textSecondary, height: 1.45),
               ),
             ],
           ),
@@ -212,10 +202,7 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
                   horizontal: PrismSpacing.debt14,
                   vertical: PrismSpacing.debt14,
                 ),
-                decoration: BoxDecoration(
-                  color: p.surfaceAlt,
-                  borderRadius: PrismRadii.cardMd,
-                ),
+                decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: PrismRadii.cardMd),
                 child: Row(
                   children: <Widget>[
                     Expanded(
@@ -239,10 +226,7 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
                 const SizedBox(height: 10),
                 Text(
                   'Code copie.',
-                  style: t.labelMedium?.copyWith(
-                    color: p.success,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: t.labelMedium?.copyWith(color: p.success, fontWeight: FontWeight.w700),
                 ),
               ],
             ],
@@ -255,10 +239,7 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
             children: <Widget>[
               Text('Apercu du message', style: t.titleMedium),
               const SizedBox(height: 10),
-              SelectableText(
-                _shareMessage(card),
-                style: t.bodyMedium?.copyWith(height: 1.5),
-              ),
+              SelectableText(_shareMessage(card), style: t.bodyMedium?.copyWith(height: 1.5)),
             ],
           ),
         ),
@@ -329,10 +310,7 @@ class _StatPill extends StatelessWidget {
         horizontal: PrismSpacing.sm,
         vertical: PrismSpacing.debt10,
       ),
-      decoration: BoxDecoration(
-        color: tone.withOpacity(0.12),
-        borderRadius: PrismRadii.cardMd,
-      ),
+      decoration: BoxDecoration(color: tone.withOpacity(0.12), borderRadius: PrismRadii.cardMd),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
@@ -340,10 +318,7 @@ class _StatPill extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             '$label • $value',
-            style: t.labelLarge?.copyWith(
-              color: tone,
-              fontWeight: FontWeight.w700,
-            ),
+            style: t.labelLarge?.copyWith(color: tone, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -366,10 +341,7 @@ class _TagPill extends StatelessWidget {
         horizontal: PrismSpacing.debt10,
         vertical: PrismSpacing.debt6,
       ),
-      decoration: BoxDecoration(
-        color: tone.withOpacity(0.14),
-        borderRadius: PrismRadii.pillAll,
-      ),
+      decoration: BoxDecoration(color: tone.withOpacity(0.14), borderRadius: PrismRadii.pillAll),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
@@ -377,10 +349,7 @@ class _TagPill extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: t.labelSmall?.copyWith(
-              color: tone,
-              fontWeight: FontWeight.w800,
-            ),
+            style: t.labelSmall?.copyWith(color: tone, fontWeight: FontWeight.w800),
           ),
         ],
       ),

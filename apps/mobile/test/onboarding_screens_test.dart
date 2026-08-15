@@ -143,11 +143,7 @@ void main() {
   });
 
   testWidgets('NotificationsScreen renders the primer', (WidgetTester tester) async {
-    await pumpScreen(
-      tester,
-      '/onboarding/notifications',
-      const NotificationsScreen(),
-    );
+    await pumpScreen(tester, '/onboarding/notifications', const NotificationsScreen());
     expect(find.text('Reste régulier grâce aux rappels'), findsOneWidget);
     expect(find.text('ACTIVER LES RAPPELS'), findsOneWidget);
   });
@@ -155,11 +151,7 @@ void main() {
   testWidgets('WidgetPromoScreen renders the placeholder with a "bientôt" tag', (
     WidgetTester tester,
   ) async {
-    await pumpScreen(
-      tester,
-      '/onboarding/widget',
-      const WidgetPromoScreen(),
-    );
+    await pumpScreen(tester, '/onboarding/widget', const WidgetPromoScreen());
     expect(find.byType(SoonTag), findsOneWidget);
     expect(find.text('AJOUTER LE WIDGET'), findsOneWidget);
   });

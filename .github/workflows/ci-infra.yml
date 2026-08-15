@@ -5,9 +5,21 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
-    paths: [ "infra/**", ".github/workflows/ci-infra.yml", ".github/workflows/runner-health.yml" ]
+    paths:
+      - "infra/**"
+      - ".github/scripts/write-secure-bicep-parameters.mjs"
+      - ".github/scripts/write-secure-bicep-parameters.test.mjs"
+      - ".github/workflows/cd-backend.yml"
+      - ".github/workflows/ci-infra.yml"
+      - ".github/workflows/runner-health.yml"
   pull_request_target:
-    paths: [ "infra/**", ".github/workflows/ci-infra.yml", ".github/workflows/runner-health.yml" ]
+    paths:
+      - "infra/**"
+      - ".github/scripts/write-secure-bicep-parameters.mjs"
+      - ".github/scripts/write-secure-bicep-parameters.test.mjs"
+      - ".github/workflows/cd-backend.yml"
+      - ".github/workflows/ci-infra.yml"
+      - ".github/workflows/runner-health.yml"
 
 concurrency:
   group: ci-infra-${{ github.event.pull_request.number || github.ref }}
@@ -51,6 +63,8 @@ jobs:
         run: bicep build infra/ci-runner/runner.bicep --stdout > /dev/null
       - name: Validate ci-runner bootstrap and health probe
         run: bash infra/ci-runner/validate.sh
+      - name: Validate secure deployment parameter writer
+        run: node --test .github/scripts/write-secure-bicep-parameters.test.mjs
       - name: Lint params
         run: bicep build-params infra/params/dev.bicepparam --stdout > /dev/null
       - name: Lint params (staging)

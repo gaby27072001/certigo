@@ -23,6 +23,19 @@ using '../main.bicep'
 param env = 'dev'
 param location = 'westeurope'
 param appName = 'certigo'
+param networkAccessMode = 'public-rbac'
+
+// Explicit periodic backup for disposable development data.
+param cosmosBackupMode = 'Periodic'
+param cosmosPeriodicBackupIntervalMinutes = 240
+param cosmosPeriodicBackupRetentionHours = 8
+param cosmosPeriodicBackupStorageRedundancy = 'Local'
+
+// Subscription-wide controls are owned by the production deployment.
+param deployMcsbPolicyAssignment = false
+param mcsbEnforcementMode = 'DoNotEnforce'
+param manageDefenderPlans = false
+param enableDefenderPlans = false
 
 // Cosmos DB deployed in northeurope — westeurope has AZ-capacity limits.
 param cosmosLocation = 'northeurope'
@@ -31,6 +44,11 @@ param cosmosLocation = 'northeurope'
 // (see the F-02 note at the top of this file). Leave as-is unless testing Entra locally.
 param entraAuthority = 'https://certigo.ciamlogin.com/00000000-0000-0000-0000-000000000000/v2.0'
 param entraAudience = '00000000-0000-0000-0000-000000000000'
+
+// authJwtSigningKey is intentionally omitted in dev. main.bicep derives a stable
+// value that is explicitly gated to the non-hardened dev environment.
+// Its expiration is fixed and reviewable: deployments do not extend it implicitly.
+param authJwtSigningKeyExpiresOn = '2027-08-31T00:00:00Z'
 
 // AI tutor (Azure OpenAI / Microsoft Foundry). Enabled in dev.
 // The dev resource "certigo-openai" (deployment gpt-5.4-mini, v1 project-scoped

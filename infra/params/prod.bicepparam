@@ -15,6 +15,7 @@ using '../main.bicep'
 param env = 'prod'
 param location = 'westeurope'
 param appName = 'certigo'
+param networkAccessMode = 'public-rbac'
 
 // Cosmos DB region. West Europe has AZ-capacity limits for Cosmos (the reason dev
 // deploys Cosmos in North Europe). We pin prod to North Europe too so the deploy
@@ -53,6 +54,16 @@ param alertEmail = 'secops@certigo.app'
 
 // Turn on paid Microsoft Defender for Cloud plans in production.
 param enableDefenderPlans = true
+param manageDefenderPlans = true
+
+// Production PITR is explicit. Changing an existing Periodic account is irreversible.
+param cosmosBackupMode = 'Continuous'
+param cosmosContinuousBackupTier = 'Continuous7Days'
+
+// MCSB remains audit-only until remediation identities and exemptions are reviewed.
+param deployMcsbPolicyAssignment = true
+param mcsbEnforcementMode = 'DoNotEnforce'
+param grantAlertReaderRole = true
 
 // AI tutor (Azure OpenAI / Foundry): left DISABLED in prod (main.bicep default is
 // false). No prod Azure OpenAI resource is provisioned (dev uses "certigo-openai"
@@ -61,25 +72,12 @@ param enableDefenderPlans = true
 // falls back to the deterministic grounded tutor. Provide tutorLlmEnabled = true
 // + tutorLlmEndpoint/tutorLlmDeployment when a prod OpenAI resource exists.
 
-// Email/password JWT signing key: intentionally NOT set here. main.bicep derives a
-// deterministic guid() (stable across redeploys) when empty, so email/password
-// login works for the beta without committing a secret to the repo. For a hardened
-// prod, inject a real authJwtSigningKey out-of-band (secure param / Key Vault),
-// never committed in this file.
+// Email/password JWT signing key: intentionally NOT set here. CD supplies
+// authJwtSigningKey and authJwtSigningKeyExpiresOn out-of-band from the production
+// Environment secret/variable pair. main.bicep rejects either value when omitted;
+// never commit the key in this file.
 
 // ============================================================================
-// Network posture (public network access) — BETA trade-off.
-// enablePrivateNetworking is intentionally LEFT AT ITS DEFAULT (false): the data
-// resources (Storage, Cosmos DB, Key Vault) keep their PUBLIC network endpoints
-// Enabled. This is required today because the Flex Consumption (FC1) Function App
-// has NO private endpoints / VNet integration, so it must reach Storage (deployment
-// package pull), Key Vault (secrets at startup) and Cosmos over the public endpoint
-// via its managed identity. Setting enablePrivateNetworking = true WITHOUT first
-// provisioning those private endpoints takes the backend fully offline (503/timeout).
-// Security is NOT relaxed by this flag: access stays RBAC-only (Cosmos
-// disableLocalAuth=true, Storage allowSharedKeyAccess=false, Key Vault RBAC) — only
-// the public NETWORK filter is left open. Acceptable for the beta.
-// Phase 2: provision private endpoints + VNet integration for the Function App, then
-// add here:  param enablePrivateNetworking = true  to close the public endpoints.
+// public-rbac is the only accepted network mode. A private mode is intentionally
+// unavailable until VNet integration, private endpoints and private DNS ship together.
 // ============================================================================
-

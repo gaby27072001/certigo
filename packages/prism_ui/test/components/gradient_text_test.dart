@@ -9,10 +9,7 @@ void main() {
     testWidgets('renders the text through a ShaderMask', (WidgetTester tester) async {
       await pumpPrism(
         tester,
-        const GradientText(
-          'commencent ici',
-          gradient: LinearGradient(colors: kOrbitBrandGradient),
-        ),
+        const GradientText('commencent ici', gradient: LinearGradient(colors: kOrbitBrandGradient)),
       );
 
       expect(find.text('commencent ici'), findsOneWidget);

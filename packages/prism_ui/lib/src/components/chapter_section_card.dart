@@ -123,12 +123,7 @@ class ChapterSectionCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _ChapterEmblem(
-            index: index,
-            accent: accent,
-            locked: locked,
-            completed: completed,
-          ),
+          _ChapterEmblem(index: index, accent: accent, locked: locked, completed: completed),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -157,10 +152,7 @@ class ChapterSectionCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   title,
-                  style: text.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: titleColor,
-                  ),
+                  style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: titleColor),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -283,10 +275,7 @@ class _CounterBadge extends StatelessWidget {
     final Color color = muted ? p.textSecondary : accent;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.14),
-        borderRadius: PrismRadii.pillAll,
-      ),
+      decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: PrismRadii.pillAll),
       child: Text(
         '$completed/$total leçons',
         style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 11),

@@ -15,10 +15,7 @@ import 'auth_controller_test.dart' show FakeAuthGateway, FakeCredentialsGateway,
 /// On ne `pumpAndSettle` jamais : `OrbitField` anime un flottement en boucle et
 /// ne se stabiliserait pas.
 void main() {
-  Future<void> pumpLanding(
-    WidgetTester tester, {
-    bool configured = true,
-  }) async {
+  Future<void> pumpLanding(WidgetTester tester, {bool configured = true}) async {
     // Le hero façon Luma est plus haut que la fenêtre de test par défaut
     // (800x600) : on élargit la surface pour que le CTA, le lien « J'ai déjà un
     // compte » et la sheet soient à l'écran et donc tappables.

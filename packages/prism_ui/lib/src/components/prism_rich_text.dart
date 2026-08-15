@@ -64,21 +64,14 @@ class PrismRichText extends StatelessWidget {
 
       if (boldItalic != null) {
         final TextStyle s = base.merge(
-          const TextStyle(
-            fontWeight: FontWeight.w800,
-            fontStyle: FontStyle.italic,
-          ),
+          const TextStyle(fontWeight: FontWeight.w800, fontStyle: FontStyle.italic),
         );
         spans.add(TextSpan(style: s, children: _inlineSpans(boldItalic, s)));
       } else if (bold != null) {
-        final TextStyle s = base.merge(
-          const TextStyle(fontWeight: FontWeight.w800),
-        );
+        final TextStyle s = base.merge(const TextStyle(fontWeight: FontWeight.w800));
         spans.add(TextSpan(style: s, children: _inlineSpans(bold, s)));
       } else if (italic != null) {
-        final TextStyle s = base.merge(
-          const TextStyle(fontStyle: FontStyle.italic),
-        );
+        final TextStyle s = base.merge(const TextStyle(fontStyle: FontStyle.italic));
         spans.add(TextSpan(style: s, children: _inlineSpans(italic, s)));
       } else if (code != null) {
         spans.add(TextSpan(text: code, style: _codeStyle(base)));

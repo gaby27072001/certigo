@@ -80,9 +80,7 @@ class PrismBlockFallback extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       _message(),
-                      style: text.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
+                      style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
                     ),
                     if (detail != null && detail!.isNotEmpty) ...<Widget>[
                       const SizedBox(height: 8),

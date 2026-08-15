@@ -55,10 +55,9 @@ class StatPill extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               value,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelLarge
-                  ?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700),
             ),
           ],
         ),

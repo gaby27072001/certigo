@@ -18,10 +18,7 @@ sealed class Result<T> {
       };
 
   /// Exhaustive handling of both branches.
-  R when<R>({
-    required R Function(T value) success,
-    required R Function(Failure failure) failure,
-  }) {
+  R when<R>({required R Function(T value) success, required R Function(Failure failure) failure}) {
     return switch (this) {
       Success<T>(:final T value) => success(value),
       Err<T>(failure: final Failure f) => failure(f),

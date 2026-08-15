@@ -17,11 +17,15 @@ void main() {
   group('PathNode', () {
     testWidgets('available lesson shows its star + caption and fires onTap', (tester) async {
       var tapped = false;
-      await tester.pumpWidget(host(PathNode(
-        status: PathNodeStatus.available,
-        label: 'Stockage Azure',
-        onTap: () => tapped = true,
-      )));
+      await tester.pumpWidget(
+        host(
+          PathNode(
+            status: PathNodeStatus.available,
+            label: 'Stockage Azure',
+            onTap: () => tapped = true,
+          ),
+        ),
+      );
 
       expect(find.text('Stockage Azure'), findsOneWidget);
       expect(find.byIcon(Icons.star_rounded), findsOneWidget);
@@ -34,11 +38,11 @@ void main() {
     testWidgets('locked node is inert and reads "verrouillée"', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       var tapped = false;
-      await tester.pumpWidget(host(PathNode(
-        status: PathNodeStatus.locked,
-        label: 'Gouvernance',
-        onTap: () => tapped = true,
-      )));
+      await tester.pumpWidget(
+        host(
+          PathNode(status: PathNodeStatus.locked, label: 'Gouvernance', onTap: () => tapped = true),
+        ),
+      );
 
       expect(find.byIcon(Icons.lock_rounded), findsOneWidget);
       // The node merges its visible title with a French status word for a11y.
@@ -53,20 +57,23 @@ void main() {
     });
 
     testWidgets('mastered node wears the gold crown', (tester) async {
-      await tester.pumpWidget(host(const PathNode(
-        status: PathNodeStatus.mastered,
-        label: 'Identité',
-      )));
+      await tester.pumpWidget(
+        host(const PathNode(status: PathNodeStatus.mastered, label: 'Identité')),
+      );
       expect(find.byIcon(Icons.workspace_premium_rounded), findsOneWidget);
     });
 
     testWidgets('current node floats its start call-out', (tester) async {
-      await tester.pumpWidget(host(const PathNode(
-        status: PathNodeStatus.inProgress,
-        label: 'Réseau',
-        current: true,
-        startLabel: 'REPRENDRE',
-      )));
+      await tester.pumpWidget(
+        host(
+          const PathNode(
+            status: PathNodeStatus.inProgress,
+            label: 'Réseau',
+            current: true,
+            startLabel: 'REPRENDRE',
+          ),
+        ),
+      );
       await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.text('REPRENDRE'), findsOneWidget);
@@ -74,11 +81,15 @@ void main() {
     });
 
     testWidgets('cleared checkpoint shows the trophy', (tester) async {
-      await tester.pumpWidget(host(const PathNode(
-        status: PathNodeStatus.completed,
-        kind: PathNodeKind.checkpoint,
-        label: 'Révision',
-      )));
+      await tester.pumpWidget(
+        host(
+          const PathNode(
+            status: PathNodeStatus.completed,
+            kind: PathNodeKind.checkpoint,
+            label: 'Révision',
+          ),
+        ),
+      );
       expect(find.byIcon(Icons.emoji_events_rounded), findsOneWidget);
     });
   });
@@ -95,10 +106,9 @@ void main() {
 
     testWidgets('is a button and fires onTap when interactive', (tester) async {
       var tapped = false;
-      await tester.pumpWidget(host(MascotAvatar(
-        mascot: AuroraMascot.sentinel,
-        onTap: () => tapped = true,
-      )));
+      await tester.pumpWidget(
+        host(MascotAvatar(mascot: AuroraMascot.sentinel, onTap: () => tapped = true)),
+      );
 
       await tester.tap(find.byType(MascotAvatar));
       await tester.pump();
@@ -108,15 +118,19 @@ void main() {
 
   group('UnitHeader', () {
     testWidgets('renders the unit index, title, domain and lesson count', (tester) async {
-      await tester.pumpWidget(host(const UnitHeader(
-        index: 1,
-        title: 'Fondamentaux du cloud',
-        accent: Color(0xFF3BA0F0),
-        domainName: 'Concepts cloud',
-        mascot: AuroraMascot.nimbus,
-        completed: 2,
-        total: 4,
-      )));
+      await tester.pumpWidget(
+        host(
+          const UnitHeader(
+            index: 1,
+            title: 'Fondamentaux du cloud',
+            accent: Color(0xFF3BA0F0),
+            domainName: 'Concepts cloud',
+            mascot: AuroraMascot.nimbus,
+            completed: 2,
+            total: 4,
+          ),
+        ),
+      );
 
       expect(find.text('UNITÉ 1'), findsOneWidget);
       expect(find.text('Fondamentaux du cloud'), findsOneWidget);

@@ -15,13 +15,7 @@ import 'quiz_option_tile.dart';
 /// Fires a selection haptic on tap (iOS + Android) and animates state changes,
 /// keeping interactions "juicy" without per-screen boilerplate.
 class AnswerChip extends StatelessWidget {
-  const AnswerChip({
-    super.key,
-    required this.label,
-    required this.state,
-    this.onTap,
-    this.order,
-  });
+  const AnswerChip({super.key, required this.label, required this.state, this.onTap, this.order});
 
   final String label;
   final QuizOptionState state;
@@ -160,16 +154,12 @@ class _OrderBadge extends StatelessWidget {
       width: 22,
       height: 22,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.16),
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: color.withOpacity(0.16), shape: BoxShape.circle),
       child: Text(
         '$order',
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
-            ?.copyWith(color: color, fontWeight: FontWeight.w800),
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w800),
       ),
     );
   }

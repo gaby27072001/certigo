@@ -9,9 +9,20 @@ namespace Certigo.Application.Tests;
 internal sealed class InMemoryUserCredentialRepository : IUserCredentialRepository
 {
     private readonly Dictionary<string, UserCredentialRecord> _store = new(StringComparer.Ordinal);
+    private readonly object _gate = new();
+    private long _version;
 
     public Task<UserCredentialRecord?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
-        => Task.FromResult(_store.GetValueOrDefault(UserCredentialRecord.IdFor(email.Trim().ToLowerInvariant())));
+    {
+        lock (_gate)
+        {
+            var normalized = AuthRules.NormalizeEmail(email);
+            var match = _store.GetValueOrDefault(UserCredentialRecord.IdFor(normalized))
+                ?? _store.GetValueOrDefault(
+                    UserCredentialRecord.CanonicalIdFor(AuthRules.CanonicalizeEmail(normalized)));
+            return Task.FromResult(match);
+        }
+    }
 
     public Task<UserCredentialRecord?> FindByCanonicalEmailAsync(string canonicalEmail, CancellationToken cancellationToken = default)
     {
@@ -20,25 +31,146 @@ internal sealed class InMemoryUserCredentialRepository : IUserCredentialReposito
             return Task.FromResult<UserCredentialRecord?>(null);
         }
 
-        var match = _store.Values.FirstOrDefault(r => string.Equals(r.CanonicalEmail, canonicalEmail, StringComparison.Ordinal));
-        return Task.FromResult<UserCredentialRecord?>(match);
+        lock (_gate)
+        {
+            var canonicalId = UserCredentialRecord.CanonicalIdFor(canonicalEmail);
+            var match = _store.GetValueOrDefault(canonicalId)
+                ?? _store.Values.FirstOrDefault(r => string.Equals(r.CanonicalEmail, canonicalEmail, StringComparison.Ordinal));
+            return Task.FromResult<UserCredentialRecord?>(match);
+        }
     }
 
-    public Task CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
+    public Task<UserCredentialRecord> CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
     {
-        if (!_store.TryAdd(record.Id, record))
+        lock (_gate)
         {
-            throw new DuplicateRecordException($"A credential for '{record.Email}' already exists.");
-        }
+            if (_store.ContainsKey(record.Id))
+            {
+                throw new DuplicateRecordException($"A credential for '{record.Email}' already exists.");
+            }
 
-        return Task.CompletedTask;
+            var stored = record with { ETag = NextETag() };
+            _store.Add(record.Id, stored);
+            return Task.FromResult(stored);
+        }
     }
 
     public Task UpdateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
     {
-        _store[record.Id] = record;
-        return Task.CompletedTask;
+        lock (_gate)
+        {
+            if (!_store.TryGetValue(record.Id, out var current)
+                || !string.Equals(record.ETag, current.ETag, StringComparison.Ordinal))
+            {
+                throw new ConcurrencyConflictException("stale credential");
+            }
+
+            _store[record.Id] = record with { ETag = NextETag() };
+            return Task.CompletedTask;
+        }
     }
+
+    public Task<bool> DeletePendingAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            if (!_store.TryGetValue(record.Id, out var current)
+                || !current.IsProvisioning
+                || !string.Equals(record.ETag, current.ETag, StringComparison.Ordinal))
+            {
+                return Task.FromResult(false);
+            }
+
+            return Task.FromResult(_store.Remove(record.Id));
+        }
+    }
+
+    private string NextETag() => $"\"{Interlocked.Increment(ref _version)}\"";
+}
+
+internal sealed class CompleteRegistrationBeforeDeleteCredentialRepository(
+    InMemoryUserCredentialRepository inner,
+    InMemoryUserRepository users) : IUserCredentialRepository
+{
+    public Task<UserCredentialRecord?> FindByEmailAsync(
+        string email,
+        CancellationToken cancellationToken = default) =>
+        inner.FindByEmailAsync(email, cancellationToken);
+
+    public Task<UserCredentialRecord?> FindByCanonicalEmailAsync(
+        string canonicalEmail,
+        CancellationToken cancellationToken = default) =>
+        inner.FindByCanonicalEmailAsync(canonicalEmail, cancellationToken);
+
+    public Task<UserCredentialRecord> CreateAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default) =>
+        inner.CreateAsync(record, cancellationToken);
+
+    public Task UpdateAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default) =>
+        inner.UpdateAsync(record, cancellationToken);
+
+    public async Task<bool> DeletePendingAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default)
+    {
+        users.Seed(TestContent.NewProfile(record.UserId));
+        var current = await inner.FindByCanonicalEmailAsync(
+            record.CanonicalEmail!,
+            cancellationToken);
+        await inner.UpdateAsync(
+            current! with
+            {
+                ProvisioningState = CredentialProvisioningState.Active,
+                ProvisioningLeaseExpiresAt = null,
+            },
+            cancellationToken);
+        return await inner.DeletePendingAsync(record, cancellationToken);
+    }
+}
+
+internal sealed class CoordinatedLegacyLookupCredentialRepository(
+    InMemoryUserCredentialRepository inner,
+    int participants) : IUserCredentialRepository
+{
+    private readonly TaskCompletionSource _release =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _entered;
+
+    public async Task<UserCredentialRecord?> FindByEmailAsync(
+        string email,
+        CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.Increment(ref _entered) == participants)
+        {
+            _release.TrySetResult();
+        }
+
+        await _release.Task.WaitAsync(cancellationToken);
+        return await inner.FindByEmailAsync(email, cancellationToken);
+    }
+
+    public Task<UserCredentialRecord?> FindByCanonicalEmailAsync(
+        string canonicalEmail,
+        CancellationToken cancellationToken = default) =>
+        inner.FindByCanonicalEmailAsync(canonicalEmail, cancellationToken);
+
+    public Task<UserCredentialRecord> CreateAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default) =>
+        inner.CreateAsync(record, cancellationToken);
+
+    public Task UpdateAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default) =>
+        inner.UpdateAsync(record, cancellationToken);
+
+    public Task<bool> DeletePendingAsync(
+        UserCredentialRecord record,
+        CancellationToken cancellationToken = default) =>
+        inner.DeletePendingAsync(record, cancellationToken);
 }
 
 /// Captures the emails an <see cref="AuthService"/> would send so verification
@@ -79,6 +211,93 @@ internal sealed class FakeTokenIssuer : ITokenIssuer
         var parts = refreshToken["refresh:".Length..].Split('|');
         return new RefreshTokenPrincipal(parts[0], parts.ElementAtOrDefault(1) ?? string.Empty, parts.ElementAtOrDefault(2) ?? string.Empty);
     }
+}
+
+internal sealed class FailingProfileProvisionRepository : IUserRepository
+{
+    public Task<UserProfileDto?> GetAsync(string userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<UserProfileDto?>(null);
+
+    public Task<UserProfileDto?> FindByHandleAsync(string handle, CancellationToken cancellationToken = default) =>
+        Task.FromResult<UserProfileDto?>(null);
+
+    public Task<UserProfileDto> UpsertAsync(
+        UserProfileDto profile,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<UserProfileDto>(
+            new DefinitivePersistenceException(
+                "simulated profile provisioning failure",
+                new InvalidOperationException("rejected before commit")));
+}
+
+internal sealed class CommitThenThrowProfileProvisionRepository(
+    InMemoryUserRepository inner,
+    Exception? failure = null)
+    : IUserRepository
+{
+    private bool _thrown;
+
+    public Task<UserProfileDto?> GetAsync(
+        string userId,
+        CancellationToken cancellationToken = default) =>
+        inner.GetAsync(userId, cancellationToken);
+
+    public Task<UserProfileDto?> FindByHandleAsync(
+        string handle,
+        CancellationToken cancellationToken = default) =>
+        inner.FindByHandleAsync(handle, cancellationToken);
+
+    public async Task<UserProfileDto> UpsertAsync(
+        UserProfileDto profile,
+        CancellationToken cancellationToken = default)
+    {
+        var committed = await inner.UpsertAsync(profile, cancellationToken);
+        if (!_thrown)
+        {
+            _thrown = true;
+            throw failure ?? new InvalidOperationException("simulated lost profile response");
+        }
+
+        return committed;
+    }
+}
+
+internal sealed class BlockingProfileProvisionRepository(InMemoryUserRepository inner)
+    : IUserRepository
+{
+    private readonly TaskCompletionSource _entered =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _release =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _getCalls;
+
+    public int GetCalls => Volatile.Read(ref _getCalls);
+    public Task Entered => _entered.Task;
+
+    public void Release() => _release.TrySetResult();
+
+    public async Task<UserProfileDto?> GetAsync(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.Increment(ref _getCalls) == 1)
+        {
+            _entered.TrySetResult();
+            await _release.Task.WaitAsync(cancellationToken);
+        }
+
+        return await inner.GetAsync(userId, cancellationToken);
+    }
+
+    public Task<UserProfileDto?> FindByHandleAsync(
+        string handle,
+        CancellationToken cancellationToken = default) =>
+        inner.FindByHandleAsync(handle, cancellationToken);
+
+    public Task<UserProfileDto> UpsertAsync(
+        UserProfileDto profile,
+        CancellationToken cancellationToken = default) =>
+        inner.UpsertAsync(profile, cancellationToken);
 }
 
 public sealed class AuthRulesTests
@@ -172,6 +391,282 @@ public sealed class AuthServiceTests
         var act = async () => await service.RegisterAsync(new RegisterRequest("DUP@Example.com", "password123", null));
 
         await act.Should().ThrowAsync<DuplicateRecordException>().WithMessage("*déjà utilisée*");
+    }
+
+    [Theory]
+    [InlineData("legacy@example.com")]
+    [InlineData("LEGACY@Example.COM")]
+    public async Task Register_rejects_an_exact_legacy_credential_without_mutating_it(string attemptedEmail)
+    {
+        var credentials = new InMemoryUserCredentialRepository();
+        var createdAt = new DateTimeOffset(2024, 3, 2, 10, 0, 0, TimeSpan.Zero);
+        var legacy = await credentials.CreateAsync(new UserCredentialRecord(
+            UserCredentialRecord.IdFor("legacy@example.com"),
+            "legacy@example.com",
+            "legacy-user",
+            "Legacy",
+            "h:original-password",
+            createdAt));
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new InMemoryUserRepository(),
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+
+        var act = () => service.RegisterAsync(
+            new RegisterRequest(attemptedEmail, "different-password", "Attacker"));
+
+        await act.Should().ThrowAsync<DuplicateRecordException>().WithMessage("*déjà utilisée*");
+        var unchanged = await credentials.FindByEmailAsync("legacy@example.com");
+        unchanged.Should().BeEquivalentTo(legacy);
+        (await credentials.FindByCanonicalEmailAsync("legacy@example.com")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Concurrent_registrations_cannot_replace_an_exact_legacy_credential()
+    {
+        var innerCredentials = new InMemoryUserCredentialRepository();
+        var legacy = await innerCredentials.CreateAsync(new UserCredentialRecord(
+            UserCredentialRecord.IdFor("legacy-race@example.com"),
+            "legacy-race@example.com",
+            "legacy-race-user",
+            "Legacy Race",
+            "h:original-password",
+            new DateTimeOffset(2024, 3, 2, 10, 0, 0, TimeSpan.Zero)));
+        var credentials = new CoordinatedLegacyLookupCredentialRepository(
+            innerCredentials,
+            participants: 3);
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new InMemoryUserRepository(),
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+        var attemptedEmails = new[]
+        {
+            "legacy-race@example.com",
+            "LEGACY-RACE@EXAMPLE.COM",
+            "Legacy-Race@Example.Com",
+        };
+
+        var outcomes = await Task.WhenAll(attemptedEmails.Select(async attemptedEmail =>
+        {
+            try
+            {
+                await service.RegisterAsync(
+                    new RegisterRequest(attemptedEmail, "different-password", "Replacement"));
+                return (Exception?)null;
+            }
+            catch (Exception error)
+            {
+                return error;
+            }
+        }));
+
+        outcomes.Should().OnlyContain(error => error is DuplicateRecordException);
+        var unchanged = await innerCredentials.FindByEmailAsync("legacy-race@example.com");
+        unchanged.Should().BeEquivalentTo(legacy);
+        (await innerCredentials.FindByCanonicalEmailAsync("legacy-race@example.com")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Concurrent_canonical_variants_create_one_identity()
+    {
+        var (service, _, credentials) = Build();
+        var requests = new[]
+        {
+            new RegisterRequest("first.last+one@gmail.com", "password123", "First"),
+            new RegisterRequest("firstlast@gmail.com", "password123", "Second"),
+        };
+
+        var outcomes = await Task.WhenAll(requests.Select(async request =>
+        {
+            try
+            {
+                return (Result: await service.RegisterAsync(request), Error: (Exception?)null);
+            }
+            catch (Exception error)
+            {
+                return (Result: (AuthResultDto?)null, Error: error);
+            }
+        }));
+
+        outcomes.Count(outcome => outcome.Result is not null).Should().Be(1);
+        outcomes.Count(outcome => outcome.Error is DuplicateRecordException).Should().Be(1);
+        var stored = await credentials.FindByCanonicalEmailAsync("firstlast@gmail.com");
+        stored.Should().NotBeNull();
+        stored!.IsProvisioning.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Login_rejects_pending_registration_until_profile_is_active()
+    {
+        var users = new BlockingProfileProvisionRepository(new InMemoryUserRepository());
+        var credentials = new InMemoryUserCredentialRepository();
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            users,
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+        var request = new RegisterRequest("race@example.com", "password123", "Race");
+
+        var registration = service.RegisterAsync(request);
+        await users.Entered;
+
+        var pendingLogin = () => service.LoginAsync(
+            new LoginRequest(request.Email, request.Password));
+        await pendingLogin.Should().ThrowAsync<AuthFailedException>()
+            .WithMessage("E-mail ou mot de passe incorrect.");
+        users.GetCalls.Should().Be(1);
+
+        users.Release();
+        await registration;
+        var activeLogin = await service.LoginAsync(
+            new LoginRequest(request.Email, request.Password));
+
+        activeLogin.AccessToken.Should().StartWith("access:");
+        users.GetCalls.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Register_rolls_back_pending_identity_when_profile_provisioning_fails()
+    {
+        var credentials = new InMemoryUserCredentialRepository();
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new FailingProfileProvisionRepository(),
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+
+        var act = () => service.RegisterAsync(
+            new RegisterRequest("rollback@example.com", "password123", "Rollback"));
+
+        await act.Should().ThrowAsync<DefinitivePersistenceException>();
+        (await credentials.FindByCanonicalEmailAsync("rollback@example.com")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Register_recovers_when_profile_commits_but_its_response_is_lost()
+    {
+        var users = new InMemoryUserRepository();
+        var credentials = new InMemoryUserCredentialRepository();
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new CommitThenThrowProfileProvisionRepository(users),
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+
+        var result = await service.RegisterAsync(
+            new RegisterRequest("ambiguous@example.com", "password123", "Ambiguous"));
+
+        (await users.GetAsync(result.Profile.Id)).Should().NotBeNull();
+        var credential = await credentials.FindByCanonicalEmailAsync("ambiguous@example.com");
+        credential.Should().NotBeNull();
+        credential!.IsProvisioning.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Register_does_not_delete_reservation_when_profile_committed_concurrently()
+    {
+        var users = new InMemoryUserRepository();
+        var credentials = new InMemoryUserCredentialRepository();
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new CommitThenThrowProfileProvisionRepository(
+                users,
+                new DefinitivePersistenceException(
+                    "simulated rejected response",
+                    new InvalidOperationException("race"))),
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+
+        var result = await service.RegisterAsync(
+            new RegisterRequest("rollback-race@example.com", "password123", "Race"));
+
+        (await users.GetAsync(result.Profile.Id)).Should().NotBeNull();
+        var credential = await credentials.FindByCanonicalEmailAsync(
+            "rollback-race@example.com");
+        credential.Should().NotBeNull();
+        credential!.IsProvisioning.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Register_rollback_etag_cannot_delete_a_concurrently_completed_identity()
+    {
+        var users = new InMemoryUserRepository();
+        var innerCredentials = new InMemoryUserCredentialRepository();
+        var credentials = new CompleteRegistrationBeforeDeleteCredentialRepository(
+            innerCredentials,
+            users);
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new FailingProfileProvisionRepository(),
+            new FakeClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+
+        var act = () => service.RegisterAsync(
+            new RegisterRequest("rollback-etag@example.com", "password123", "Race"));
+
+        await act.Should().ThrowAsync<DefinitivePersistenceException>();
+        var credential = await innerCredentials.FindByCanonicalEmailAsync(
+            "rollback-etag@example.com");
+        credential.Should().NotBeNull();
+        credential!.IsProvisioning.Should().BeFalse();
+        (await users.GetAsync(credential.UserId)).Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Register_recovers_an_expired_pending_identity()
+    {
+        var now = new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero);
+        var credentials = new InMemoryUserCredentialRepository();
+        await credentials.CreateAsync(new UserCredentialRecord(
+            UserCredentialRecord.CanonicalIdFor("recover@example.com"),
+            "recover@example.com",
+            "reserved-user",
+            "Recover",
+            "h:password123",
+            now.AddMinutes(-10),
+            CanonicalEmail: "recover@example.com",
+            EmailVerified: false,
+            ProvisioningState: CredentialProvisioningState.Pending,
+            ProvisioningLeaseExpiresAt: now.AddMinutes(-5)));
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new InMemoryUserRepository(),
+            new FakeClock(now),
+            new CapturingEmailSender(),
+            TestEmailOptions);
+
+        var result = await service.RegisterAsync(
+            new RegisterRequest("recover@example.com", "password123", "Recovered"));
+
+        result.Profile.Id.Should().Be("reserved-user");
+        var recovered = await credentials.FindByCanonicalEmailAsync("recover@example.com");
+        recovered!.IsProvisioning.Should().BeFalse();
+        recovered.ProvisioningLeaseExpiresAt.Should().BeNull();
     }
 
     [Fact]

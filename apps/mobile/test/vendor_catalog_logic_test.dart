@@ -72,10 +72,11 @@ void main() {
 
     test('groups into ordered, non-empty sections', () {
       final List<CertSection> sections = groupIntoSections(tracks);
-      expect(
-        sections.map((CertSection s) => s.category),
-        <CertCategory>[CertCategory.azure, CertCategory.security, CertCategory.dataAi],
-      );
+      expect(sections.map((CertSection s) => s.category), <CertCategory>[
+        CertCategory.azure,
+        CertCategory.security,
+        CertCategory.dataAi,
+      ]);
       expect(sections.first.tracks.length, 2); // AZ-900 + AZ-104
     });
 

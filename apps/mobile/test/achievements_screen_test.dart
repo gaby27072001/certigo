@@ -61,10 +61,7 @@ void main() {
         overrides: <Override>[
           achievementBoardProvider.overrideWith((Ref ref) async => fakeBoard()),
         ],
-        child: MaterialApp.router(
-          theme: PrismTheme.light(),
-          routerConfig: router,
-        ),
+        child: MaterialApp.router(theme: PrismTheme.light(), routerConfig: router),
       ),
     );
 

@@ -5,10 +5,7 @@ import 'block_fallback.dart';
 import 'content_block.dart';
 
 /// Builds a widget for a [ContentBlock]. Registered against a block [type].
-typedef BlockRenderer = Widget Function(
-  BuildContext context,
-  ContentBlock block,
-);
+typedef BlockRenderer = Widget Function(BuildContext context, ContentBlock block);
 
 /// Maps a content block's wire [ContentBlock.type] to a widget (ADR-003).
 ///
@@ -54,10 +51,7 @@ class RendererRegistry {
 
     final BlockRenderer? renderer = _renderers[block.type];
     if (renderer == null) {
-      return PrismBlockFallback(
-        reason: BlockFallbackReason.unknownType,
-        blockType: block.type,
-      );
+      return PrismBlockFallback(reason: BlockFallbackReason.unknownType, blockType: block.type);
     }
 
     try {

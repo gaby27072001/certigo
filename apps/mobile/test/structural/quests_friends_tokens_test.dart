@@ -58,10 +58,7 @@ void main() {
 
       // ISO: pre-migration literal was fromLTRB(20, 4, 20, 120)
       // (quests list / loading, friends roster / loading).
-      expect(
-        _resolvedPadding(tester, key),
-        const EdgeInsets.fromLTRB(20, 4, 20, 120),
-      );
+      expect(_resolvedPadding(tester, key), const EdgeInsets.fromLTRB(20, 4, 20, 120));
     });
 
     testWidgets('inline error padding is token-exact ($mode)', (WidgetTester tester) async {
@@ -83,10 +80,7 @@ void main() {
       );
 
       // ISO: pre-migration literal was fromLTRB(20, 14, 20, 0).
-      expect(
-        _resolvedPadding(tester, key),
-        const EdgeInsets.fromLTRB(20, 14, 20, 0),
-      );
+      expect(_resolvedPadding(tester, key), const EdgeInsets.fromLTRB(20, 14, 20, 0));
     });
 
     testWidgets('add-friend card padding is token-exact ($mode)', (WidgetTester tester) async {
@@ -108,10 +102,7 @@ void main() {
       );
 
       // ISO: pre-migration literal was fromLTRB(20, 4, 20, 0).
-      expect(
-        _resolvedPadding(tester, key),
-        const EdgeInsets.fromLTRB(20, 4, 20, 0),
-      );
+      expect(_resolvedPadding(tester, key), const EdgeInsets.fromLTRB(20, 4, 20, 0));
     });
 
     testWidgets('roster count padding is token-exact ($mode)', (WidgetTester tester) async {
@@ -133,10 +124,7 @@ void main() {
       );
 
       // ISO: pre-migration literal was fromLTRB(4, 0, 4, 10).
-      expect(
-        _resolvedPadding(tester, key),
-        const EdgeInsets.fromLTRB(4, 0, 4, 10),
-      );
+      expect(_resolvedPadding(tester, key), const EdgeInsets.fromLTRB(4, 0, 4, 10));
     });
 
     testWidgets('friend card padding is token-exact ($mode)', (WidgetTester tester) async {
@@ -176,10 +164,7 @@ void main() {
       );
 
       // ISO: pre-migration literal was all(10).
-      expect(
-        _resolvedPadding(tester, key),
-        const EdgeInsets.all(10),
-      );
+      expect(_resolvedPadding(tester, key), const EdgeInsets.all(10));
     });
   }
 }

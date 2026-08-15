@@ -10,11 +10,7 @@ import '../tokens/prism_radii.dart';
 /// [delta] surfaces gems just earned (e.g. `+5`) in the success tone for a quick
 /// reward beat, mirroring [XpChip] and [StreakBadge].
 class GemCounter extends StatelessWidget {
-  const GemCounter({
-    super.key,
-    required this.gems,
-    this.delta,
-  });
+  const GemCounter({super.key, required this.gems, this.delta});
 
   /// Total gems owned.
   final int gems;
@@ -43,19 +39,13 @@ class GemCounter extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               _compact(gems),
-              style: t.labelLarge?.copyWith(
-                color: p.textPrimary,
-                fontWeight: FontWeight.w800,
-              ),
+              style: t.labelLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800),
             ),
             if (delta != null && delta! > 0) ...<Widget>[
               const SizedBox(width: 6),
               Text(
                 '+${_compact(delta!)}',
-                style: t.labelMedium?.copyWith(
-                  color: p.success,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: t.labelMedium?.copyWith(color: p.success, fontWeight: FontWeight.w700),
               ),
             ],
           ],

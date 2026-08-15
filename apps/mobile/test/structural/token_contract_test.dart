@@ -35,10 +35,7 @@ void main() {
     });
 
     test('convenience EdgeInsets resolve to their scalar tokens', () {
-      expect(
-        PrismSpacing.screen,
-        const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      );
+      expect(PrismSpacing.screen, const EdgeInsets.symmetric(horizontal: 20, vertical: 24));
       expect(PrismSpacing.cardPadding, const EdgeInsets.all(16));
       expect(PrismSpacing.listGap, const EdgeInsets.only(bottom: 12));
     });

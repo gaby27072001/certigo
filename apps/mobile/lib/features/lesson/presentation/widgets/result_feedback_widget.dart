@@ -62,7 +62,9 @@ class ResultFeedbackWidget extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       children: <Widget>[
         const SizedBox(height: 8),
-        Center(child: _ScoreRing(scorePct: result.scorePct, tone: tone)),
+        Center(
+          child: _ScoreRing(scorePct: result.scorePct, tone: tone),
+        ),
         const SizedBox(height: 20),
         Text(
           passed ? 'Concept validé !' : 'Presque !',
@@ -131,17 +133,10 @@ class ResultFeedbackWidget extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 28),
-        PrismButton(
-          label: 'Continuer',
-          icon: Icons.arrow_forward_rounded,
-          onPressed: onContinue,
-        ),
+        PrismButton(label: 'Continuer', icon: Icons.arrow_forward_rounded, onPressed: onContinue),
         const SizedBox(height: 10),
         Center(
-          child: PrismButton.ghost(
-            label: 'Réviser les points faibles',
-            onPressed: onReview,
-          ),
+          child: PrismButton.ghost(label: 'Réviser les points faibles', onPressed: onReview),
         ),
       ],
     );
@@ -177,14 +172,8 @@ class _ScoreRing extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(
-                '$scorePct%',
-                style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              Text(
-                'score',
-                style: text.labelSmall?.copyWith(color: p.textSecondary),
-              ),
+              Text('$scorePct%', style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Text('score', style: text.labelSmall?.copyWith(color: p.textSecondary)),
             ],
           ),
         ],
@@ -194,11 +183,7 @@ class _ScoreRing extends StatelessWidget {
 }
 
 class _RewardPill extends StatelessWidget {
-  const _RewardPill({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  const _RewardPill({required this.icon, required this.label, required this.color});
 
   final IconData icon;
   final String label;
@@ -209,8 +194,10 @@ class _RewardPill extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.debt7),
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.sm,
+        vertical: PrismSpacing.debt7,
+      ),
       decoration: BoxDecoration(
         color: p.surface,
         borderRadius: PrismRadii.pillAll,
@@ -223,10 +210,7 @@ class _RewardPill extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: text.labelLarge?.copyWith(
-              color: p.textPrimary,
-              fontWeight: FontWeight.w800,
-            ),
+            style: text.labelLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800),
           ),
         ],
       ),
@@ -263,9 +247,7 @@ class _ResultRow extends StatelessWidget {
               size: 20,
             ),
             const SizedBox(width: 10),
-            Expanded(
-              child: Text(stem, style: text.bodyMedium?.copyWith(height: 1.35)),
-            ),
+            Expanded(child: Text(stem, style: text.bodyMedium?.copyWith(height: 1.35))),
           ],
         ),
         const SizedBox(height: 6),

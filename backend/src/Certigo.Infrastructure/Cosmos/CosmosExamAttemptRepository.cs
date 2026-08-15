@@ -28,6 +28,32 @@ public sealed class CosmosExamAttemptRepository(CosmosContext context) : IExamAt
         return null;
     }
 
+    public async Task<ExamAttemptRecord?> GetByExamIdAsync(
+        string userId,
+        string examId,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new QueryDefinition(
+                "SELECT * FROM c WHERE c.userId = @userId AND c.examId = @examId AND c.kind = 'exam'")
+            .WithParameter("@userId", userId)
+            .WithParameter("@examId", examId);
+        using var iterator = context.Attempts.GetItemQueryIterator<ExamAttemptRecord>(
+            query,
+            requestOptions: new QueryRequestOptions
+            {
+                PartitionKey = new PartitionKey(userId),
+                MaxItemCount = 1
+            });
+
+        while (iterator.HasMoreResults)
+        {
+            var page = await iterator.ReadNextAsync(cancellationToken);
+            return page.FirstOrDefault();
+        }
+
+        return null;
+    }
+
     public async Task CreateAsync(ExamAttemptRecord attempt, CancellationToken cancellationToken = default)
     {
         try

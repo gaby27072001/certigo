@@ -80,12 +80,7 @@ void main() {
     ),
     const _PaddingCase(
       'back-row fromLTRB',
-      EdgeInsets.fromLTRB(
-        PrismSpacing.xs,
-        PrismSpacing.xxs,
-        PrismSpacing.gutter,
-        PrismSpacing.xs,
-      ),
+      EdgeInsets.fromLTRB(PrismSpacing.xs, PrismSpacing.xxs, PrismSpacing.gutter, PrismSpacing.xs),
       EdgeInsets.fromLTRB(8, 4, 20, 8),
     ),
     const _PaddingCase(
@@ -110,39 +105,23 @@ void main() {
     ),
     const _PaddingCase(
       'quiz footer fromLTRB',
-      EdgeInsets.fromLTRB(
-        PrismSpacing.gutter,
-        0,
-        PrismSpacing.gutter,
-        PrismSpacing.md,
-      ),
+      EdgeInsets.fromLTRB(PrismSpacing.gutter, 0, PrismSpacing.gutter, PrismSpacing.md),
       EdgeInsets.fromLTRB(20, 0, 20, 16),
     ),
     const _PaddingCase(
       'results sheet fromLTRB',
-      EdgeInsets.fromLTRB(
-        PrismSpacing.lg,
-        PrismSpacing.md,
-        PrismSpacing.lg,
-        PrismSpacing.debt28,
-      ),
+      EdgeInsets.fromLTRB(PrismSpacing.lg, PrismSpacing.md, PrismSpacing.lg, PrismSpacing.debt28),
       EdgeInsets.fromLTRB(24, 16, 24, 28),
     ),
     // symmetric ---------------------------------------------------------------
     const _PaddingCase(
       'symmetric debt10/xxs',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.debt10,
-        vertical: PrismSpacing.xxs,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.debt10, vertical: PrismSpacing.xxs),
       EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     ),
     const _PaddingCase(
       'symmetric debt14/sm',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.debt14,
-        vertical: PrismSpacing.sm,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.debt14, vertical: PrismSpacing.sm),
       EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     ),
     const _PaddingCase(
@@ -157,58 +136,37 @@ void main() {
     ),
     const _PaddingCase(
       'symmetric debt14/debt14',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.debt14,
-        vertical: PrismSpacing.debt14,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.debt14, vertical: PrismSpacing.debt14),
       EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     ),
     const _PaddingCase(
       'symmetric sm/debt10',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.sm,
-        vertical: PrismSpacing.debt10,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.debt10),
       EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     ),
     const _PaddingCase(
       'symmetric debt10/debt6',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.debt10,
-        vertical: PrismSpacing.debt6,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.debt10, vertical: PrismSpacing.debt6),
       EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     ),
     const _PaddingCase(
       'symmetric xs/debt3',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.xs,
-        vertical: PrismSpacing.debt3,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.xs, vertical: PrismSpacing.debt3),
       EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     ),
     const _PaddingCase(
       'symmetric md/sm',
-      EdgeInsets.symmetric(
-        vertical: PrismSpacing.md,
-        horizontal: PrismSpacing.sm,
-      ),
+      EdgeInsets.symmetric(vertical: PrismSpacing.md, horizontal: PrismSpacing.sm),
       EdgeInsets.symmetric(vertical: 16, horizontal: 12),
     ),
     const _PaddingCase(
       'symmetric sm/debt6',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.sm,
-        vertical: PrismSpacing.debt6,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.debt6),
       EdgeInsets.symmetric(horizontal: 12, vertical: 6),
     ),
     const _PaddingCase(
       'symmetric sm/xs',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.sm,
-        vertical: PrismSpacing.xs,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.xs),
       EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     ),
     const _PaddingCase(
@@ -218,10 +176,7 @@ void main() {
     ),
     const _PaddingCase(
       'symmetric sm/debt7',
-      EdgeInsets.symmetric(
-        horizontal: PrismSpacing.sm,
-        vertical: PrismSpacing.debt7,
-      ),
+      EdgeInsets.symmetric(horizontal: PrismSpacing.sm, vertical: PrismSpacing.debt7),
       EdgeInsets.symmetric(horizontal: 12, vertical: 7),
     ),
     const _PaddingCase(
@@ -266,11 +221,7 @@ void main() {
       EdgeInsets.only(left: 30),
     ),
     // all ---------------------------------------------------------------------
-    const _PaddingCase(
-      'all debt14',
-      EdgeInsets.all(PrismSpacing.debt14),
-      EdgeInsets.all(14),
-    ),
+    const _PaddingCase('all debt14', EdgeInsets.all(PrismSpacing.debt14), EdgeInsets.all(14)),
   ];
 
   for (final Brightness brightness in Brightness.values) {
@@ -281,11 +232,7 @@ void main() {
         const Key key = Key('lot_e_padding');
         await tester.pumpWidget(
           _host(
-            Padding(
-              key: key,
-              padding: c.actual,
-              child: const SizedBox.shrink(),
-            ),
+            Padding(key: key, padding: c.actual, child: const SizedBox.shrink()),
             brightness: brightness,
           ),
         );
@@ -309,10 +256,7 @@ void main() {
 
     test('results sheet radius debt28 == 28', () {
       expect(PrismRadii.debt28, 28);
-      expect(
-        const Radius.circular(PrismRadii.debt28),
-        const Radius.circular(28),
-      );
+      expect(const Radius.circular(PrismRadii.debt28), const Radius.circular(28));
     });
   });
 }

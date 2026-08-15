@@ -38,11 +38,7 @@ void main() {
 
       await store.write(<TrackSummary>[
         _track(),
-        _track(
-          id: 'sc-900',
-          code: 'SC-900',
-          title: 'Microsoft Security Fundamentals',
-        ),
+        _track(id: 'sc-900', code: 'SC-900', title: 'Microsoft Security Fundamentals'),
       ]);
 
       final List<TrackSummary>? loaded = await store.read();

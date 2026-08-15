@@ -51,10 +51,7 @@ void main() {
       );
 
       // ISO: pre-migration literal was fromLTRB(20, 12, 20, 120).
-      expect(
-        _resolvedPadding(tester, key),
-        const EdgeInsets.fromLTRB(20, 12, 20, 120),
-      );
+      expect(_resolvedPadding(tester, key), const EdgeInsets.fromLTRB(20, 12, 20, 120));
     });
 
     testWidgets('library card inner padding is token-exact ($mode)', (WidgetTester tester) async {
@@ -71,10 +68,7 @@ void main() {
       );
 
       // ISO: pre-migration literal was all(16) (skeleton / _TipCard / _DomainCard).
-      expect(
-        _resolvedPadding(tester, key),
-        const EdgeInsets.all(16),
-      );
+      expect(_resolvedPadding(tester, key), const EdgeInsets.all(16));
     });
 
     testWidgets('shop scroll body padding is token-exact ($mode)', (WidgetTester tester) async {
@@ -91,10 +85,7 @@ void main() {
       );
 
       // ISO: pre-migration literal was fromLTRB(20, 4, 20, 120).
-      expect(
-        _resolvedPadding(tester, key),
-        const EdgeInsets.fromLTRB(20, 4, 20, 120),
-      );
+      expect(_resolvedPadding(tester, key), const EdgeInsets.fromLTRB(20, 4, 20, 120));
     });
   }
 }

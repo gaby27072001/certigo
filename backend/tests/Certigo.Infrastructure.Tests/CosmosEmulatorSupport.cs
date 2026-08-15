@@ -75,8 +75,15 @@ public sealed class CosmosEmulatorFixture : IAsyncLifetime
 
             foreach (var definition in CosmosContainers.All)
             {
+                var properties = new ContainerProperties(
+                    definition.Name,
+                    definition.PartitionKeyPath)
+                {
+                    DefaultTimeToLive = definition.DefaultTimeToLive
+                };
                 await database.CreateContainerIfNotExistsAsync(
-                    definition.Name, definition.PartitionKeyPath, cancellationToken: cancellationToken);
+                    properties,
+                    cancellationToken: cancellationToken);
             }
 
             _client = client;

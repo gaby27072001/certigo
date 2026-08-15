@@ -27,8 +27,11 @@ void main() {
 
   test('explicit mood registration takes priority', () {
     MascotRegistry.instance.useImageAssets();
-    MascotRegistry.instance
-        .registerMood(AuroraMascot.nimbus, MascotMood.happy, 'custom/nimbus_happy.png');
+    MascotRegistry.instance.registerMood(
+      AuroraMascot.nimbus,
+      MascotMood.happy,
+      'custom/nimbus_happy.png',
+    );
     expect(
       MascotRegistry.instance.resolve(AuroraMascot.nimbus, MascotMood.happy)!.assetPath,
       'custom/nimbus_happy.png',

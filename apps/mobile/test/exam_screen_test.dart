@@ -25,11 +25,7 @@ void main() {
         passingScore: 700,
         blueprint: <MockExamBlueprintDomain>[
           MockExamBlueprintDomain(
-            domainId: 'd1',
-            name: 'Concepts du cloud',
-            weight: 0.3,
-            itemCount: 1,
-          ),
+              domainId: 'd1', name: 'Concepts du cloud', weight: 0.3, itemCount: 1),
         ],
         items: <MockExamItem>[
           MockExamItem(
@@ -59,13 +55,8 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          examProvider.overrideWith((Ref ref) async => fakeExam()),
-        ],
-        child: MaterialApp.router(
-          theme: PrismTheme.light(),
-          routerConfig: router,
-        ),
+        overrides: <Override>[examProvider.overrideWith((Ref ref) async => fakeExam())],
+        child: MaterialApp.router(theme: PrismTheme.light(), routerConfig: router),
       ),
     );
 
@@ -77,9 +68,6 @@ void main() {
     await pumpExam(tester);
 
     expect(find.text('Examen blanc'), findsOneWidget);
-    expect(
-      find.text('Quel modèle de service fournit des machines virtuelles ?'),
-      findsOneWidget,
-    );
+    expect(find.text('Quel modèle de service fournit des machines virtuelles ?'), findsOneWidget);
   });
 }

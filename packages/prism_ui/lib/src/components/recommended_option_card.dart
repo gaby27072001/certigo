@@ -123,10 +123,7 @@ class _RecommendedOptionCardState extends State<RecommendedOptionCard> {
                 ],
               ),
             ),
-            if (widget.trailing != null) ...<Widget>[
-              const SizedBox(width: 12),
-              widget.trailing!,
-            ],
+            if (widget.trailing != null) ...<Widget>[const SizedBox(width: 12), widget.trailing!],
           ],
         ),
       ),

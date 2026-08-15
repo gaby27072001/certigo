@@ -123,11 +123,7 @@ class _LevelTileState extends State<_LevelTile> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: <Widget>[
-              SizedBox(
-                width: 34,
-                height: 34,
-                child: Center(child: widget.leading),
-              ),
+              SizedBox(width: 34, height: 34, child: Center(child: widget.leading)),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

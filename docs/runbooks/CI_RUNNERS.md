@@ -17,6 +17,10 @@
 > ⚠️ **Principe « l'agent PRÉPARE, VOUS EXÉCUTEZ »** — aucune commande `gh` / `az` n'est lancée par
 > l'agent. Les commandes ci-dessous sont **à exécuter par vous** après vérification des identifiants
 > (repo, noms de VM, resource group, subscription).
+>
+> Les blocs `az vm start`, `az vm deallocate`, `az vm delete` et les appels GitHub qui
+> modifient un runner sont des **actions live opérateur**. Une validation locale de
+> `infra/ci-runner` ne les invoque jamais.
 
 ---
 
@@ -55,14 +59,33 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 | **Repo desservi** | `gchambaud_microsoft/Certigo` |
 
 > 📌 Ces 2 VMs portent le pool **Linux `certigo-ci`** (CI des PR + backend + android). Un éventuel
-> runner **macOS** dédié à iOS (cf. §8) est **distinct** et **n'est pas** géré par ce runbook.
+> runner **macOS** dédié à iOS (cf. §9) est **distinct** et **n'est pas** géré par ce runbook.
 
 > ℹ️ **Prérequis outillage** (poste opérateur) : `az` (Azure CLI) connecté à la subscription Non-Prod,
 > et `gh` (GitHub CLI) authentifié sur `gchambaud_microsoft/Certigo`.
 
 ---
 
-## 3. Rallumer la CI (avant une session de travail)
+## 3. Capacité et stratégie d'exploitation
+
+Chaque `Standard_D4s_v5` traite **un job GitHub Actions à la fois**. Les deux VMs Linux
+`online` apportent donc deux slots de CI concurrents et la tolérance à la panne d'un slot.
+Il n'y a pas d'autoscaling : une file d'attente persistante est un signal pour démarrer les
+deux VMs ou planifier une troisième VM via l'IaC, jamais pour retirer la redondance.
+
+| Situation | État requis | Décision opérateur |
+|---|---|---|
+| Avant une session CI | 2 VMs `running`, 2 runners `online`, labels `certigo-ci` | Démarrer les deux VMs et attendre la confirmation GitHub. |
+| Pendant une session | 2 runners disponibles ; maximum 2 jobs simultanés | Garder les deux VMs allouées ; investiguer toute file d'attente. |
+| Après la session | Tous les runners `busy: false`, aucun run à traiter | Déallouer les deux VMs. |
+| Panne/maintenance d'une VM | Au moins 1 slot sain, idéalement 2 après réparation | Ne manipuler qu'une VM à la fois et reconstruire avant la prochaine session critique. |
+
+Le détail de reconstruction, de santé et de révocation est dans
+[`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md).
+
+---
+
+## 4. Rallumer la CI (avant une session de travail)
 
 À faire **avant** d'ouvrir/relancer des PR ou de déclencher un build : les 2 VMs doivent être démarrées.
 
@@ -91,9 +114,11 @@ Attendre `status: online` **avant** d'approuver un run de PR (sinon les jobs res
 
 ---
 
-## 4. Éteindre la CI (après usage — pour le coût)
+## 5. Éteindre la CI (après usage — pour le coût)
 
-Dès que la CI n'est plus nécessaire, **déallouer** les 2 VMs pour couper la facturation compute.
+Avant toute déallocation, vérifier dans GitHub que **les deux** runners sont `busy: false` et
+qu'aucun run ne doit démarrer. Dès que la CI n'est plus nécessaire, **déallouer** les 2 VMs
+pour couper la facturation compute.
 
 ```bash
 az vm deallocate --resource-group RG-CERTIGO-CI --name vm-certigo-runner   --no-wait
@@ -106,11 +131,11 @@ az vm deallocate --resource-group RG-CERTIGO-CI --name vm-certigo-runner-2 --no-
 > - **`az vm stop`** (ou un `shutdown` depuis l'OS) : éteint l'OS mais **laisse la VM allouée** →
 >   **le compute reste facturé**. ❌ **à éviter.**
 
-**Vérifier que les VMs sont bien déallouées** (cf. §5) avant de considérer la CI éteinte.
+**Vérifier que les VMs sont bien déallouées** (cf. §6) avant de considérer la CI éteinte.
 
 ---
 
-## 5. Vérifier l'état (VMs + runners)
+## 6. Vérifier l'état (VMs + runners)
 
 **État des VMs (Azure) :**
 
@@ -134,21 +159,30 @@ gh api repos/gchambaud_microsoft/Certigo/actions/runners \
 
 ---
 
-## 6. Dépannage — un runner reste `offline`
+## 7. Dépannage — un runner reste `offline`
 
 Si, après un `az vm start` et ~1–2 minutes d'attente, un runner reste `offline` côté GitHub :
 
-1. **Confirmer l'état Azure de la VM** (§5). Si elle n'est pas `VM running`, la (re)démarrer :
+1. **Confirmer l'état Azure de la VM** (§6). Si elle n'est pas `VM running`, la (re)démarrer :
    ```bash
    az vm restart --resource-group RG-CERTIGO-CI --name <vm-concernée>
    ```
 2. **Vérifier le service de l'agent sur la VM** (connexion SSH / Bastion selon l'accès en vigueur). Le
-   runner tourne en service systemd nommé `actions.runner.*` :
+   runner tourne en service systemd nommé `actions.runner.*`. Le compte break-glass peut
+   administrer le service ; le compte de service `runner` ne peut exécuter sans mot de
+   passe que le wrapper root-owned, sans argument, de redémarrage :
    ```bash
    systemctl list-units 'actions.runner.*'
    sudo systemctl status  'actions.runner.*'
    sudo systemctl restart 'actions.runner.*'   # relance l'agent si le service est tombé
+
+   # Seulement depuis le compte runner :
+   sudo /usr/local/sbin/certigo-runner-restart
    ```
+   L'allow-list du compte `runner` est volontairement limitée à ce wrapper, à
+   `apt-get update` et à `apt-get install -y unzip zip jq xz-utils` (les seuls paquets
+   requis par les jobs actuels, avec `DEBIAN_FRONTEND` autorisé). Il ne peut ni installer
+   de paquet arbitraire, ni reconfigurer un service, ni enregistrer un runner.
 3. **Consulter les logs de l'agent** sur la VM (répertoire `_diag/` de l'installation du runner) pour
    identifier un échec de connexion.
 4. **En dernier recours — reconfigurer le runner** (token expiré, runner supprimé côté GitHub, etc.) en
@@ -161,13 +195,13 @@ Si, après un `az vm start` et ~1–2 minutes d'attente, un runner reste `offlin
 
 ---
 
-## 7. Coût & bonnes pratiques
+## 8. Coût & bonnes pratiques
 
 - **Ne jamais laisser les VMs allumées H24.** Une VM `running` — ou seulement `stopped` (non
   déallouée) — facture le compute **même à vide**. C'est le principal poste d'économie.
-- **`deallocate` systématique** après chaque session de CI (cf. §4). Réflexe : *j'allume → j'utilise →
+- **`deallocate` systématique** après chaque session de CI (cf. §5). Réflexe : *j'allume → j'utilise →
   je déalloue*.
-- **Vérifier `busy: false`** avant de déallouer (§5) pour ne pas tuer un run en cours.
+- **Vérifier `busy: false`** avant de déallouer (§6) pour ne pas tuer un run en cours.
 - **Grouper les runs.** Plutôt que d'allumer/éteindre pour une micro-PR, regrouper les besoins CI d'une
   même session réduit les cycles de démarrage.
 - **Subscription Non-Prod** : ces VMs vivent dans la sub `b8952c8c-8f72-469d-99cd-ac906da4e2fc`
@@ -175,7 +209,7 @@ Si, après un `az vm start` et ~1–2 minutes d'attente, un runner reste `offlin
 
 ---
 
-## 8. Ce qui reste **obligatoirement** self-hosted
+## 9. Ce qui reste **obligatoirement** self-hosted
 
 Tous les workflows **exigent** une capacité self-hosted adaptée :
 
@@ -193,7 +227,7 @@ Tous les workflows **exigent** une capacité self-hosted adaptée :
 
 ---
 
-## 9. Politique permanente de sélection
+## 10. Politique permanente de sélection
 
 Les workflows Linux utilisent exclusivement :
 

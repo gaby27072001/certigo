@@ -11,11 +11,7 @@ import '../tokens/prism_radii.dart';
 /// cools to a muted tone and the ember halo is dropped — a gentle nudge, never a
 /// punishment.
 class StreakBadge extends StatelessWidget {
-  const StreakBadge({
-    super.key,
-    required this.days,
-    this.active = true,
-  });
+  const StreakBadge({super.key, required this.days, this.active = true});
 
   /// Current streak length in days.
   final int days;
@@ -36,9 +32,7 @@ class StreakBadge extends StatelessWidget {
         decoration: BoxDecoration(
           color: p.surface,
           borderRadius: PrismRadii.pillAll,
-          border: Border.all(
-            color: active ? p.ember.withOpacity(0.35) : p.border,
-          ),
+          border: Border.all(color: active ? p.ember.withOpacity(0.35) : p.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -47,10 +41,7 @@ class StreakBadge extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               '$days',
-              style: t.labelLarge?.copyWith(
-                color: p.textPrimary,
-                fontWeight: FontWeight.w800,
-              ),
+              style: t.labelLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800),
             ),
           ],
         ),

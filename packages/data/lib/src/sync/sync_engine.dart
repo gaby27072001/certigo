@@ -7,11 +7,7 @@ import 'sync_queue_store.dart';
 
 /// Snapshot of the queue's health, emitted on [SyncEngine.status].
 class SyncStatus {
-  const SyncStatus({
-    required this.pending,
-    required this.dead,
-    required this.syncing,
-  });
+  const SyncStatus({required this.pending, required this.dead, required this.syncing});
 
   /// Number of actions awaiting (or backing off before) dispatch.
   final int pending;

@@ -61,10 +61,7 @@ class ClozeStepWidget extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               'Complète la phrase',
-              style: text.labelLarge?.copyWith(
-                color: p.primary,
-                fontWeight: FontWeight.w700,
-              ),
+              style: text.labelLarge?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -138,10 +135,7 @@ class ClozeStepWidget extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 20),
-          AnswerFeedbackCard(
-            correct: outcome!.correct,
-            explanation: outcome!.explanation,
-          ),
+          AnswerFeedbackCard(correct: outcome!.correct, explanation: outcome!.explanation),
         ],
       ],
     );
@@ -150,8 +144,9 @@ class ClozeStepWidget extends StatelessWidget {
   /// Splits a literal stem segment into word [Text] widgets so the sentence
   /// reflows naturally inside the [Wrap] around the blank slots.
   List<Widget> _words(BuildContext context, String segment) {
-    final TextStyle? style =
-        Theme.of(context).textTheme.titleMedium?.copyWith(height: 1.4, fontWeight: FontWeight.w500);
+    final TextStyle? style = Theme.of(
+      context,
+    ).textTheme.titleMedium?.copyWith(height: 1.4, fontWeight: FontWeight.w500);
     return <Widget>[
       for (final String w in segment.split(RegExp(r'\s+')))
         if (w.isNotEmpty) Text(w, style: style),

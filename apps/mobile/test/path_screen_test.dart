@@ -89,9 +89,8 @@ void main() {
         ),
         GoRoute(
           path: '/lesson/:trackId/:lessonId',
-          builder: (BuildContext context, GoRouterState state) => Scaffold(
-            body: Center(child: Text('LEÇON ${state.pathParameters['lessonId']}')),
-          ),
+          builder: (BuildContext context, GoRouterState state) =>
+              Scaffold(body: Center(child: Text('LEÇON ${state.pathParameters['lessonId']}'))),
         ),
       ],
     );
@@ -102,10 +101,7 @@ void main() {
           pathProvider('az-900').overrideWith((Ref ref) async => fakePath()),
           sessionStoreProvider.overrideWithValue(FakeSessionStore()),
         ],
-        child: MaterialApp.router(
-          theme: PrismTheme.light(),
-          routerConfig: router,
-        ),
+        child: MaterialApp.router(theme: PrismTheme.light(), routerConfig: router),
       ),
     );
 

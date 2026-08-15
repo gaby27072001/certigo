@@ -203,6 +203,8 @@ Mobile (Flutter)  ──JWT Entra──▶  Azure Functions (.NET 8)  ──▶ 
 
 - **`userId` provient TOUJOURS du JWT**, jamais du corps de requête.
 - Idempotence des soumissions de quiz via `clientAttemptId`.
+- Reprise durable des effets économie/gamification via un état d'opération Cosmos ; aucune
+  transaction cross-container n'est supposée.
 - Le moteur **Cortex** existe en double (client pour l'UX optimiste, serveur pour la vérité).
 
 API principale :
@@ -243,6 +245,17 @@ API principale :
 > `release-ios.yml` et `sync-ios-certs.yml` sont des workflows legacy, inertes par
 > défaut et exécutables uniquement par opt-in manuel `enable_legacy_workflow=true`.
 > La chaîne iOS active passe par Codemagic.
+
+La gate Cosmos locale sans secret de dépôt exécute toujours les contrats de sérialisation/ETag/TTL :
+
+```powershell
+.\backend\run-cosmos-gate.ps1
+```
+
+Pour ajouter les intégrations réelles, démarrer l'émulateur puis définir
+`CERTIGO_COSMOS_TESTS=1` et une connexion locale via
+`COSMOS_EMULATOR_CONNECTION_STRING` ou `COSMOS_EMULATOR_KEY`. Utiliser
+`-RequireEmulator` pour faire échouer explicitement la gate si l'émulateur n'est pas configuré.
 
 > Publication des bêtas mobiles (signature, secrets, runbooks Android & iOS,
 > rollback, checklist) : voir [`docs/RELEASE_MOBILE.md`](docs/RELEASE_MOBILE.md).
