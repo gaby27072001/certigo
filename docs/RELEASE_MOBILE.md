@@ -381,6 +381,11 @@ approbation et sa restriction à `main`.
 > `release-ios.yml` / `sync-ios-certs.yml` (types `repository_dispatch`
 > `release-ios-legacy` et `sync-ios-certs-legacy`, chargés depuis `main`).
 > **Ne pas créer ces secrets pour une release Codemagic.**
+> Une exception legacy explicitement approuvée se déclenche uniquement ainsi :
+> `gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches -f
+> event_type=sync-ios-certs-legacy`, ou avec un corps JSON
+> `{"event_type":"release-ios-legacy","client_payload":{"external":false,
+> "dry_run":true}}` pour une build iOS. Tout champ ou type inattendu est rejeté.
 
 <details>
 <summary>Ancienne procédure (GitHub Actions iOS, dépréciée)</summary>

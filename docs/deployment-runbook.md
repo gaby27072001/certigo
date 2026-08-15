@@ -43,6 +43,14 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 4. Pour une promotion, utiliser le type `repository_dispatch`
    `promote-backend-staging-prod` (enchaînement staging puis prod depuis `main`).
 
+La publication GitHub Pages de la politique de confidentialité suit la même
+frontière de confiance :
+
+```bash
+gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" \
+  -f event_type=deploy-privacy-policy
+```
+
 ### Pourquoi Azure-first (long terme)
 
 Le workflow GitHub reste un **orchestrateur** (dispatch, ordering, traçabilité), mais la
