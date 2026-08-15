@@ -169,17 +169,13 @@ jobs:
           APP_VNET="vnet-certigo-$TARGET_ENV"
           CI_RESOURCE_GROUP="$PRIVATE_DNS_RESOURCE_GROUP"
           CI_VNET="vnet-${CI_RESOURCE_GROUP#rg-}"
-          PRIVATE_ENDPOINTS="$(
+          APPROVED_REQUIRED_GROUPS="$(
             az network private-endpoint list \
               --resource-group "$RESOURCE_GROUP" \
-              --query 'length(@)' -o tsv
-          )"
-          APPROVED_CONNECTIONS="$(
-            az network private-endpoint list \
-              --resource-group "$RESOURCE_GROUP" \
-              --query "[].privateLinkServiceConnections[?privateLinkServiceConnectionState.status=='Approved'] | [] | length(@)" \
+              --query "[].privateLinkServiceConnections[?privateLinkServiceConnectionState.status=='Approved'].groupIds[] | [] | [?contains(['Sql', 'blob', 'queue', 'table', 'vault'], @)] | sort(@)" \
               -o tsv
           )"
+          EXPECTED_REQUIRED_GROUPS=$'Sql\nblob\nqueue\ntable\nvault'
           INTEGRATION_SUBNET="$(
             az resource show \
               --resource-group "$RESOURCE_GROUP" \
@@ -208,8 +204,8 @@ jobs:
               --name "peer-to-$APP_VNET" \
               --query peeringState -o tsv
           )"
-          if [[ "$PRIVATE_ENDPOINTS" != "5" || "$APPROVED_CONNECTIONS" != "5" ]]; then
-            echo "::error::Expected five approved private endpoint connections."
+          if [[ "$APPROVED_REQUIRED_GROUPS" != "$EXPECTED_REQUIRED_GROUPS" ]]; then
+            echo "::error::Expected one approved private endpoint connection for each required backend service."
             exit 1
           fi
           if [[ "$INTEGRATION_SUBNET" != "$FUNCTION_INTEGRATION_SUBNET_ID" ]]; then
