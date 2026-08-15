@@ -24,22 +24,38 @@ jobs:
         run: python -m pip install --disable-pip-version-check checkov==3.2.495
       - name: Run Checkov on infra/
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          set +e
           checkov --directory infra --framework bicep --compact --quiet \
             --config-file .checkov.yaml 2>&1 | tee checkov-results.log
+          scan_status="${PIPESTATUS[0]}"
+          set -e
 
-      - name: Ensure Checkov findings log exists
-        if: ${{ always() }}
-        run: |
-          if [ ! -e checkov-results.log ]; then
-            echo "Checkov did not produce a findings log; inspect prior failed steps." > checkov-results.log
+          summary_line="$(
+            grep -Eo \
+              'Passed checks: [0-9]+, Failed checks: [0-9]+, Skipped checks: [0-9]+, Parsing errors: [0-9]+' \
+              checkov-results.log | tail -n 1
+          )"
+          if [ -z "$summary_line" ]; then
+            {
+              echo "## Checkov IaC scan"
+              echo
+              echo "- Result: **invalid output**"
+              echo "- Scanner exit code: \`$scan_status\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Checkov output is missing or malformed."
+            exit 1
           fi
+          failed_checks="$(sed -E 's/.*Failed checks: ([0-9]+).*/\1/' <<< "$summary_line")"
+          {
+            echo "## Checkov IaC scan"
+            echo
+            echo "- $summary_line"
+            echo "- Scanner exit code: \`$scan_status\`"
+            echo "- Complete scanner output is available in this job's immutable logs."
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Preserve Checkov findings
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: checkov-findings
-          path: checkov-results.log
-          if-no-files-found: error
-          retention-days: 30
+          if [ "$scan_status" -ne 0 ] || [ "$failed_checks" -ne 0 ]; then
+            echo "::error::Checkov found a blocking IaC issue or could not complete."
+            exit 1
+          fi

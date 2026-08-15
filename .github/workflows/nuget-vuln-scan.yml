@@ -28,25 +28,37 @@ jobs:
 
       - name: Check vulnerable packages
         run: |
-          set -euo pipefail
-          dotnet list backend/Certigo.sln package --vulnerable --include-transitive | tee dotnet-vulnerable.log
-          if grep -qi "has the following vulnerable" dotnet-vulnerable.log; then
+          set -uo pipefail
+          set +e
+          dotnet list backend/Certigo.sln package --vulnerable --include-transitive \
+            2>&1 | tee dotnet-vulnerable.log
+          scan_status="${PIPESTATUS[0]}"
+          set -e
+
+          if ! grep -Eqi "has no vulnerable packages|has the following vulnerable" dotnet-vulnerable.log; then
+            {
+              echo "## NuGet dependency scan"
+              echo
+              echo "- Result: **invalid output**"
+              echo "- Scanner exit code: \`$scan_status\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::NuGet vulnerability scan output is missing or malformed."
+            exit 1
+          fi
+          vulnerable_projects="$(grep -Eic "has the following vulnerable" dotnet-vulnerable.log || true)"
+          {
+            echo "## NuGet dependency scan"
+            echo
+            echo "- Projects reporting vulnerable packages: **$vulnerable_projects**"
+            echo "- Scanner exit code: \`$scan_status\`"
+            echo "- Complete scanner output is available in this job's immutable logs."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$scan_status" -ne 0 ]; then
+            echo "::error::NuGet vulnerability scan could not complete."
+            exit 1
+          fi
+          if [ "$vulnerable_projects" -ne 0 ]; then
             echo "::error::Vulnerable NuGet packages detected."
             exit 1
           fi
-
-      - name: Ensure NuGet findings log exists
-        if: ${{ always() }}
-        run: |
-          if [ ! -e dotnet-vulnerable.log ]; then
-            echo "NuGet scan did not produce a findings log; inspect prior failed steps." > dotnet-vulnerable.log
-          fi
-
-      - name: Preserve NuGet findings
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: nuget-findings
-          path: dotnet-vulnerable.log
-          if-no-files-found: error
-          retention-days: 30

@@ -410,17 +410,47 @@ function validateRepositoryInvariants() {
     if (workflow.includes('environment:')) {
       errors.push(`${fileName}: reusable scanners must not select deployment environments`);
     }
-    if (!workflow.includes('actions/upload-artifact@')) {
-      errors.push(`${fileName}: scanner findings must be preserved as an artifact`);
+    if (workflow.includes('actions/upload-artifact@')) {
+      errors.push(`${fileName}: scanner result must not depend on artifact storage`);
     }
-    if (!workflow.includes('if-no-files-found: error')) {
-      errors.push(`${fileName}: scanner artifact upload must fail when findings are missing`);
+    if (!workflow.includes('$GITHUB_STEP_SUMMARY')) {
+      errors.push(`${fileName}: scanner must publish a non-secret step summary`);
+    }
+    if (workflow.includes('continue-on-error: true')) {
+      errors.push(`${fileName}: scanner failures must not be converted to successful steps`);
     }
     if (
       workflow.includes('upload-sarif@') ||
       workflow.includes('security-events: write')
     ) {
       errors.push(`${fileName}: scanner must not depend on GitHub Code Scanning`);
+    }
+  }
+  for (const marker of [
+    'OSV-Scanner output is missing or malformed.',
+    'sarif.version !==',
+    'finding_count',
+  ]) {
+    if (!dependencyScan.includes(marker)) {
+      errors.push(`dependency-vuln-scan.yml: missing fail-closed output invariant ${marker}`);
+    }
+  }
+  for (const marker of [
+    'NuGet vulnerability scan output is missing or malformed.',
+    'has no vulnerable packages|has the following vulnerable',
+    'scan_status',
+  ]) {
+    if (!nugetScan.includes(marker)) {
+      errors.push(`nuget-vuln-scan.yml: missing fail-closed output invariant ${marker}`);
+    }
+  }
+  for (const marker of [
+    'Checkov output is missing or malformed.',
+    'Passed checks: [0-9]+, Failed checks: [0-9]+',
+    'failed_checks',
+  ]) {
+    if (!iacScan.includes(marker)) {
+      errors.push(`security-scan.yml: missing fail-closed output invariant ${marker}`);
     }
   }
   if (

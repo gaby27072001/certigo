@@ -586,6 +586,35 @@ class ProjectStateTests(unittest.TestCase):
         self.assertIn("- '.github/scripts/**/*.js'", workflow)
         self.assertIn("- '.github/scripts/**/*.mjs'", workflow)
 
+    def test_security_scanners_are_independent_from_artifact_storage(self) -> None:
+        expected_markers = {
+            "dependency-vuln-scan.yml": [
+                "OSV-Scanner output is missing or malformed.",
+                "sarif.version !==",
+                "finding_count",
+            ],
+            "nuget-vuln-scan.yml": [
+                "NuGet vulnerability scan output is missing or malformed.",
+                "has no vulnerable packages|has the following vulnerable",
+                "scan_status",
+            ],
+            "security-scan.yml": [
+                "Checkov output is missing or malformed.",
+                "Passed checks: [0-9]+, Failed checks: [0-9]+",
+                "failed_checks",
+            ],
+        }
+        for file_name, markers in expected_markers.items():
+            with self.subTest(file_name=file_name):
+                workflow = (
+                    REPO_ROOT / ".github/workflows" / file_name
+                ).read_text(encoding="utf-8")
+                self.assertNotIn("actions/upload-artifact@", workflow)
+                self.assertNotIn("continue-on-error: true", workflow)
+                self.assertIn("$GITHUB_STEP_SUMMARY", workflow)
+                for marker in markers:
+                    self.assertIn(marker, workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

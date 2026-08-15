@@ -2,6 +2,7 @@ name: security-gate
 
 # Stable required context. The workflow always starts; path detection selects the
 # expensive scanners, and the final job rejects every failed applicable scanner.
+# Scanner conclusions are authoritative and never depend on artifact-storage quota.
 on:
   push:
     branches: [main]

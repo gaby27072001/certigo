@@ -47,8 +47,10 @@ Le gate CodeQL ne se contente pas du statut d'exécution de l'analyse. Chaque la
 SARIF évalué localement : les sévérités de sécurité `high`/`critical` (score >= 7.0) et les
 résultats SARIF de niveau `error` sans score bloquent le job. Le SARIF est conservé 30 jours
 comme artefact pour chaque PR interne et évalué sans dépendre d'un service GitHub Enterprise.
-Les résultats OSV, NuGet et Checkov sont également conservés comme artefacts par leurs jobs
-Azure bloquants. Les forks ne sont pas supportés : la gate de confiance chargée depuis `main`
+Les jobs Azure OSV, NuGet et Checkov écrivent leurs résultats complets non secrets dans les logs
+immutables du job et une synthèse dans `GITHUB_STEP_SUMMARY`. Leur conclusion dépend uniquement
+du statut scanner, des findings et de la validité de la sortie, jamais du quota de stockage
+d'artefacts. Les forks ne sont pas supportés : la gate de confiance chargée depuis `main`
 échoue sans checkout, tandis qu'aucun workflow contrôlé par le fork ne peut atteindre le pool
 Azure persistant.
 
