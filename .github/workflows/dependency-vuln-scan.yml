@@ -15,12 +15,20 @@ jobs:
     env:
       UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
       TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
+      SCANNER_STATE_DIR: ${{ github.workspace }}/.scanner-state
       OSV_BINARY: ${{ github.workspace }}/.scanner-state/osv-scanner
       OSV_RESULTS_FILE: ${{ github.workspace }}/.scanner-state/osv-results.json
       OSV_SCAN_LOG: ${{ github.workspace }}/.scanner-state/osv-scan.log
       OSV_ENFORCE_LOG: ${{ github.workspace }}/.scanner-state/osv-enforce.log
       EXPECTED_LOCKS_FILE: ${{ github.workspace }}/.scanner-state/expected-lockfiles.json
+      UNTRUSTED_PUB_DIR: ${{ github.workspace }}/.untrusted-pub-restore
+      PUB_CACHE: ${{ github.workspace }}/.scanner-state/pub-cache-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
+      - name: Reset isolated dependency state
+        run: |
+          /usr/bin/rm -rf -- "$SCANNER_STATE_DIR" "$UNTRUSTED_PUB_DIR"
+          /usr/bin/mkdir -p -- "$SCANNER_STATE_DIR"
+
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
@@ -43,6 +51,38 @@ jobs:
           python -P "$TRUSTED_CONTROL_DIR/tools/validate_dependency_locks.py" \
             --root "$UNTRUSTED_SOURCE_DIR" \
             --write-expected-sources "$EXPECTED_LOCKS_FILE"
+
+      - name: Checkout isolated Pub restore source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          path: .untrusted-pub-restore
+          persist-credentials: false
+
+      - name: Configure pinned Flutter without shared caches
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.44.4"
+          channel: stable
+          cache: false
+
+      - name: Resolve every Pub lock from trusted inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLUTTER_EXECUTABLE="$(command -v flutter)"
+          if [ -z "$FLUTTER_EXECUTABLE" ]; then
+            echo "::error::Pinned Flutter executable is unavailable."
+            exit 1
+          fi
+          python -P "$TRUSTED_CONTROL_DIR/tools/verify_pub_locks.py" \
+            --root "$UNTRUSTED_PUB_DIR" \
+            --contract "$EXPECTED_LOCKS_FILE" \
+            --flutter "$FLUTTER_EXECUTABLE" \
+            --pub-cache "$PUB_CACHE"
+
+      - name: Remove isolated Pub restore state
+        run: /usr/bin/rm -rf -- "$UNTRUSTED_PUB_DIR" "$PUB_CACHE"
 
       - name: Download OSV-Scanner (v2.4.0, verified SHA256)
         run: |
@@ -140,6 +180,10 @@ jobs:
             echo "::error::OSV-Scanner found a vulnerability or could not complete."
             exit 1
           fi
+
+      - name: Remove isolated dependency state
+        if: ${{ always() }}
+        run: /usr/bin/rm -rf -- "$SCANNER_STATE_DIR" "$UNTRUSTED_PUB_DIR"
 
   locked-restore:
     name: NuGet locked restore (no secrets)

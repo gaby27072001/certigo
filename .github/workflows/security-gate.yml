@@ -64,8 +64,10 @@ jobs:
               - '.github/workflows/security-gate.yml'
               - 'tools/validate_nuget_locks.py'
               - 'tools/validate_dependency_locks.py'
+              - 'tools/verify_pub_locks.py'
               - 'tools/tests/test_validate_nuget_locks.py'
               - 'tools/tests/test_validate_dependency_locks.py'
+              - 'tools/tests/test_verify_pub_locks.py'
             iac:
               - 'infra/**'
               - '.checkov.yaml'

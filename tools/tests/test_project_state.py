@@ -659,6 +659,11 @@ class ProjectStateTests(unittest.TestCase):
                 r"(?m)^ {4}tags(?:-ignore)?:",
                 f"{workflow_path.name} must not run privileged jobs from tags",
             )
+            self.assertNotRegex(
+                workflow,
+                r"(?m)^\s+cache:\s*['\"]?true['\"]?\s*$",
+                f"{workflow_path.name} must not restore PR-writable caches",
+            )
             if "\n  push:" in workflow:
                 self.assertIn(
                     "\n    branches:",
@@ -691,6 +696,9 @@ class ProjectStateTests(unittest.TestCase):
         self.assertNotIn("refs/tags/", android)
         self.assertIn('has("dry_run")', android)
         self.assertIn('has("track")', android)
+        self.assertIn("cache: false", android)
+        ios = (workflows / "release-ios.yml").read_text(encoding="utf-8")
+        self.assertIn("cache: false", ios)
 
     def test_security_scanners_are_independent_from_artifact_storage(self) -> None:
         expected_markers = {
@@ -702,6 +710,13 @@ class ProjectStateTests(unittest.TestCase):
                 'python -P "$TRUSTED_CONTROL_DIR/tools/validate_dependency_locks.py"',
                 '--root "$UNTRUSTED_SOURCE_DIR"',
                 '--write-expected-sources "$EXPECTED_LOCKS_FILE"',
+                "path: .untrusted-pub-restore",
+                "name: Reset isolated dependency state",
+                "cache: false",
+                'python -P "$TRUSTED_CONTROL_DIR/tools/verify_pub_locks.py"',
+                '--root "$UNTRUSTED_PUB_DIR"',
+                '--contract "$EXPECTED_LOCKS_FILE"',
+                '--pub-cache "$PUB_CACHE"',
                 '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
                 '--output-file "$output_temp"',
                 'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
@@ -749,12 +764,14 @@ class ProjectStateTests(unittest.TestCase):
         self.assertIn("- '**/.gitignore'", security_gate)
         self.assertIn("- 'tools/validate_nuget_locks.py'", security_gate)
         self.assertIn("- 'tools/validate_dependency_locks.py'", security_gate)
+        self.assertIn("- 'tools/verify_pub_locks.py'", security_gate)
         self.assertIn(
             "- 'tools/tests/test_validate_nuget_locks.py'", security_gate
         )
         self.assertIn(
             "- 'tools/tests/test_validate_dependency_locks.py'", security_gate
         )
+        self.assertIn("- 'tools/tests/test_verify_pub_locks.py'", security_gate)
         self.assertNotIn("nuget-vuln-scan", security_gate)
         self.assertNotIn("NUGET_RESULT", security_gate)
         self.assertFalse(

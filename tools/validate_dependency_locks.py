@@ -201,6 +201,7 @@ def validate_repository(
             json.dumps(
                 {
                     "sources": expected_sources,
+                    "pubManifests": sorted(str(path) for path in pub_manifests),
                     "allowedEmptyNugetPackages": allowed_empty_nuget_packages,
                 },
                 indent=2,

@@ -162,6 +162,12 @@ function validateWorkflow(file) {
   if (text.includes('certigo-ci')) {
     errors.push(`${file}: legacy mixed-trust runner label certigo-ci is forbidden`);
   }
+  if (
+    hasTrustedJob
+    && /^\s+cache:\s*['"]?true['"]?\s*$/m.test(text)
+  ) {
+    errors.push(`${file}: certigo-trusted workflows must not restore writable caches`);
+  }
   if (hasTrustedJob && /^ {2}workflow_dispatch:/m.test(text)) {
     errors.push(`${file}: certigo-trusted workflows must not use workflow_dispatch`);
   }
@@ -352,6 +358,10 @@ function validateRepositoryInvariants() {
   );
   const dependencyLockValidator = fs.readFileSync(
     path.join(root, 'tools', 'validate_dependency_locks.py'),
+    'utf8',
+  );
+  const pubLockVerifier = fs.readFileSync(
+    path.join(root, 'tools', 'verify_pub_locks.py'),
     'utf8',
   );
   const secureBicepWriter = fs.readFileSync(
@@ -622,8 +632,10 @@ function validateRepositoryInvariants() {
     "'**/pubspec_overrides.yaml'",
     "'tools/validate_nuget_locks.py'",
     "'tools/validate_dependency_locks.py'",
+    "'tools/verify_pub_locks.py'",
     "'tools/tests/test_validate_nuget_locks.py'",
     "'tools/tests/test_validate_dependency_locks.py'",
+    "'tools/tests/test_verify_pub_locks.py'",
   ]) {
     if (!securityGate.includes(dependencyInput)) {
       errors.push(`security-gate.yml: dependency filter omits ${dependencyInput}`);
@@ -673,6 +685,15 @@ function validateRepositoryInvariants() {
     'python -P "$TRUSTED_CONTROL_DIR/tools/validate_dependency_locks.py"',
     '--root "$UNTRUSTED_SOURCE_DIR"',
     '--write-expected-sources "$EXPECTED_LOCKS_FILE"',
+    'path: .untrusted-pub-restore',
+    'name: Reset isolated dependency state',
+    '/usr/bin/rm -rf -- "$SCANNER_STATE_DIR" "$UNTRUSTED_PUB_DIR"',
+    'cache: false',
+    'python -P "$TRUSTED_CONTROL_DIR/tools/verify_pub_locks.py"',
+    '--root "$UNTRUSTED_PUB_DIR"',
+    '--contract "$EXPECTED_LOCKS_FILE"',
+    '--flutter "$FLUTTER_EXECUTABLE"',
+    '--pub-cache "$PUB_CACHE"',
     '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
     '--output-file "$output_temp"',
     'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
@@ -724,48 +745,92 @@ function validateRepositoryInvariants() {
     }
   }
   for (const marker of [
-      'git ls-files',
-      'package-lock.json',
-      'pubspec.lock',
-      'packages.lock.json',
-      'lockfileVersion',
-      'root {field} differs',
-      'core.hooksPath=/dev/null',
-      'validate_nuget_locks.py',
-      'allowedEmptyNugetPackages',
-    ]) {
-      if (!dependencyLockValidator.includes(marker)) {
-        errors.push(`validate_dependency_locks.py: missing fail-closed invariant ${marker}`);
-      }
-    for (const marker of [
-      'name: NuGet locked restore (no secrets)',
-      'needs: osv-scan',
-      'actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1',
-      'DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet-locked',
-      'DOTNET_EXECUTABLE: ${{ github.workspace }}/.dotnet-locked/dotnet',
-      '"$DOTNET_EXECUTABLE" restore "$RESTORE_SOLUTION" --locked-mode',
-      'name: Remove untrusted restore state',
-      '/usr/bin/rm -rf -- "$CLEANUP_DOTNET_DIR" "$CLEANUP_SOURCE_DIR"',
-    ]) {
-      if (!dependencyScan.includes(marker)) {
-        errors.push(`dependency-vuln-scan.yml: missing isolated restore invariant ${marker}`);
-      }
+    'git ls-files',
+    'package-lock.json',
+    'pubspec.lock',
+    'packages.lock.json',
+    'lockfileVersion',
+    'root {field} differs',
+    'core.hooksPath=/dev/null',
+    'validate_nuget_locks.py',
+    'pubManifests',
+    'allowedEmptyNugetPackages',
+  ]) {
+    if (!dependencyLockValidator.includes(marker)) {
+      errors.push(`validate_dependency_locks.py: missing fail-closed invariant ${marker}`);
     }
-    if (dependencyScan.includes('secrets.')) {
-      errors.push('dependency-vuln-scan.yml: dependency jobs must not receive secrets');
+  }
+  for (const marker of [
+    'flutter pub get --enforce-lockfile failed',
+    'Pub resolution changed the committed lockfile',
+    'git',
+    'diff',
+    '--exit-code',
+    'PUB_CACHE must be outside the source checkout',
+    'pubManifests must be sorted and unique',
+  ]) {
+    if (!pubLockVerifier.includes(marker)) {
+      errors.push(`verify_pub_locks.py: missing fail-closed invariant ${marker}`);
     }
-    const restoreJob = dependencyScan.indexOf('  locked-restore:');
-    const untrustedRestore = dependencyScan.indexOf('path: .untrusted-restore', restoreJob);
-    const lockedRestore = dependencyScan.indexOf('--locked-mode', untrustedRestore);
-    const cleanupRestore = dependencyScan.indexOf('name: Remove untrusted restore state', lockedRestore);
-    if (
-      restoreJob < 0
-      || untrustedRestore < restoreJob
-      || lockedRestore < untrustedRestore
-      || cleanupRestore < lockedRestore
-    ) {
-      errors.push('dependency-vuln-scan.yml: untrusted locked restore order is unsafe');
+  }
+  for (const marker of [
+    'name: NuGet locked restore (no secrets)',
+    'needs: osv-scan',
+    'actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1',
+    'DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet-locked',
+    'DOTNET_EXECUTABLE: ${{ github.workspace }}/.dotnet-locked/dotnet',
+    '"$DOTNET_EXECUTABLE" restore "$RESTORE_SOLUTION" --locked-mode',
+    'name: Remove untrusted restore state',
+    '/usr/bin/rm -rf -- "$CLEANUP_DOTNET_DIR" "$CLEANUP_SOURCE_DIR"',
+  ]) {
+    if (!dependencyScan.includes(marker)) {
+      errors.push(`dependency-vuln-scan.yml: missing isolated restore invariant ${marker}`);
     }
+  }
+  if (dependencyScan.includes('secrets.')) {
+    errors.push('dependency-vuln-scan.yml: dependency jobs must not receive secrets');
+  }
+  const restoreJob = dependencyScan.indexOf('  locked-restore:');
+  const untrustedRestore = dependencyScan.indexOf('path: .untrusted-restore', restoreJob);
+  const lockedRestore = dependencyScan.indexOf('--locked-mode', untrustedRestore);
+  const cleanupRestore = dependencyScan.indexOf(
+    'name: Remove untrusted restore state',
+    lockedRestore,
+  );
+  if (
+    restoreJob < 0
+    || untrustedRestore < restoreJob
+    || lockedRestore < untrustedRestore
+    || cleanupRestore < lockedRestore
+  ) {
+    errors.push('dependency-vuln-scan.yml: untrusted locked restore order is unsafe');
+  }
+  const staticValidation = dependencyScan.indexOf(
+    'python -P "$TRUSTED_CONTROL_DIR/tools/validate_dependency_locks.py"',
+  );
+  const pubCheckout = dependencyScan.indexOf('path: .untrusted-pub-restore', staticValidation);
+  const flutterSetup = dependencyScan.indexOf(
+    'subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2',
+    pubCheckout,
+  );
+  const pubRestore = dependencyScan.indexOf(
+    'python -P "$TRUSTED_CONTROL_DIR/tools/verify_pub_locks.py"',
+    flutterSetup,
+  );
+  const pubCleanup = dependencyScan.indexOf(
+    'name: Remove isolated Pub restore state',
+    pubRestore,
+  );
+  const osvScan = dependencyScan.indexOf('name: Run and enforce OSV-Scanner', pubCleanup);
+  if (
+    staticValidation < 0
+    || pubCheckout < staticValidation
+    || flutterSetup < pubCheckout
+    || pubRestore < flutterSetup
+    || pubCleanup < pubRestore
+    || osvScan < pubCleanup
+  ) {
+    errors.push('dependency-vuln-scan.yml: Pub lock restore order is unsafe');
   }
   for (const marker of [
     'Checkov output is missing or malformed.',

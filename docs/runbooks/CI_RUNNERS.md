@@ -243,7 +243,9 @@ ni environnement, ni secret, ni identité cloud ; `certigo-trusted` ne checkout 
 n'analyse jamais de source PR. Tout workflow contenant un job `certigo-trusted`
 interdit `workflow_dispatch` et les déclencheurs par tag : les opérations manuelles
 utilisent un type `repository_dispatch` dédié afin que GitHub charge le YAML depuis
-la branche par défaut.
+la branche par défaut. Ces workflows interdisent également `cache: true` : aucun cache
+Flutter/Pub inscriptible par les validations PR ne doit être restauré sur le pool
+trusted.
 
 ---
 

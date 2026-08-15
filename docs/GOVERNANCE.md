@@ -87,9 +87,17 @@ Le même inventaire exige exactement un `package-lock.json` adjacent à chaque `
 `pubspec.lock` adjacent à chaque `pubspec.yaml`, hors répertoires générés et exemples ; manifestes
 et locks symboliques sont interdits. Le lock npm v3 doit reproduire les dépendances racine du
 manifest, tandis que les locks pub doivent conserver leur structure générée `packages`/`sdks`.
+La validation statique exporte en JSON la liste triée de tous les `pubspec.yaml` inclus. Sur
+`certigo-pr` uniquement, la gate installe Flutter épinglé sans cache partagé, exécute
+`flutter pub get --enforce-lockfile` pour chaque entrée avec un `PUB_CACHE` temporaire isolé,
+puis exige à la fois des locks identiques octet par octet et un `git diff` vide avant OSV.
 La CI utilise exclusivement `npm ci` et `dart/flutter pub get --enforce-lockfile`. Toute
 régénération npm/pub s'effectue seulement dans un environnement de développement de confiance,
 puis `python tools/validate_dependency_locks.py --root .` doit réussir avant commit.
+
+Les releases Android/iOS et toute autre exécution `certigo-trusted` désactivent explicitement les
+caches Flutter/Pub. Une PR exécutée via `pull_request_target` sur `certigo-pr` ne peut donc pas
+alimenter un cache ensuite restauré par une opération de signature ou de publication.
 
 La gate `Generated state equals committed state` n'accède à aucun dépôt externe et ne reçoit
 aucun secret. Le générateur du SHA immuable de base valide la référence locale

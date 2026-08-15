@@ -35,6 +35,9 @@ Documentation opérationnelle pour publier les bêtas Certigo.
 | Workflows | `release-android.yml` (actif), `release-ios.yml` + `sync-ios-certs.yml` (legacy, opt-in par types `repository_dispatch` dédiés) ; iOS actif géré par Codemagic |
 | CI inchangée | `ci-mobile.yml` (format/analyze/test) — aucune régression |
 
+Les workflows GitHub de release désactivent explicitement les caches Flutter/Pub :
+un cache produit par une analyse de PR ne peut jamais entrer dans une build signée.
+
 > ⚠️ **`com.certigo.mobileapp` est l'identifiant unifié** (Android `applicationId`
 > = iOS bundle id). Il est définitif une fois la première build store uploadée.
 > S'il change, mettre à jour : `apps/mobile/android/app/build.gradle`
@@ -473,7 +476,7 @@ profil App Store.
 
 | Champ | Source | Règle |
 |---|---|---|
-| versionName | `pubspec.yaml` ou input/tag | Sémantique (`MAJEUR.MINEUR.CORRECTIF`) |
+| versionName | `pubspec.yaml` ou payload du dispatch | Sémantique (`MAJEUR.MINEUR.CORRECTIF`) |
 | versionCode (Android) | `github.run_number` ou input | **Strictement croissant** (exigé par Play) |
 
 - Pour une nouvelle version publique, bumper `version:` dans
