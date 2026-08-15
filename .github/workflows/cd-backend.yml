@@ -24,10 +24,6 @@ on:
         required: true
       AZURE_SUBSCRIPTION_ID:
         required: true
-      AUTH_JWT_SIGNING_KEY:
-        required: false
-      AUTH_JWT_PREVIOUS_SIGNING_KEY:
-        required: false
   push:
     branches: [ main ]
 

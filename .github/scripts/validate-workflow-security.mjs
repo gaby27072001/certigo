@@ -460,7 +460,6 @@ function validateRepositoryInvariants() {
       errors.push(`cd-backend.yml: missing explicit reusable secret ${secret}`);
     }
     for (const marker of [
-      'AUTH_JWT_SIGNING_KEY:\n        required: false',
       'AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}',
       'az bicep build-params',
       'node .github/scripts/write-secure-bicep-parameters.mjs',
@@ -473,9 +472,11 @@ function validateRepositoryInvariants() {
       }
     }
     if (
-      backend.includes('authJwtSigningKey="$AUTH_JWT_SIGNING_KEY"') ||
-      backend.includes('--parameters authJwtSigningKey') ||
-      promoteBackend.includes('AUTH_JWT_SIGNING_KEY')
+      backend.includes('AUTH_JWT_SIGNING_KEY:\n        required: false')
+      || backend.includes('AUTH_JWT_PREVIOUS_SIGNING_KEY:\n        required: false')
+      || backend.includes('authJwtSigningKey="$AUTH_JWT_SIGNING_KEY"')
+      || backend.includes('--parameters authJwtSigningKey')
+      || promoteBackend.includes('AUTH_JWT_SIGNING_KEY')
     ) {
       errors.push(
         'backend deployment: JWT signing key must come from the called job environment and never a command argument',
