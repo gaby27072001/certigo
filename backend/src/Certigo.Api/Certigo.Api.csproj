@@ -22,4 +22,7 @@
     <ProjectReference Include="..\Certigo.Application\Certigo.Application.csproj" />
     <ProjectReference Include="..\Certigo.Infrastructure\Certigo.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Certigo.Api.Tests" />
+  </ItemGroup>
 </Project>

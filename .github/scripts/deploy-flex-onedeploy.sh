@@ -363,8 +363,17 @@ while (( SECONDS - operation_started_at < DEPLOYMENT_TIMEOUT_SECONDS )); do
       const status = payload.status
         ?? payload.properties?.status
         ?? payload.properties?.provisioningState;
-      if (typeof status !== "string" || status.length === 0) process.exit(2);
-      process.stdout.write(status);
+      let normalizedStatus;
+      if (typeof status === "string" && status.length > 0) {
+        normalizedStatus = status;
+      } else if (Number.isInteger(status)) {
+        const kuduStatuses = ["Accepted", "InProgress", "InProgress", "Failed", "Succeeded"];
+        if (status >= 0 && status < kuduStatuses.length) {
+          normalizedStatus = kuduStatuses[status];
+        }
+      }
+      if (!normalizedStatus) process.exit(2);
+      process.stdout.write(normalizedStatus);
     ' "$operation_body_file" 2>/dev/null
   )"; then
     echo "::error::OneDeploy asynchronous operation returned an invalid status payload."
