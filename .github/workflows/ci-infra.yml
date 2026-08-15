@@ -62,6 +62,8 @@ jobs:
         run: bicep build infra/ci-runner/runner.bicep --stdout > /dev/null
       - name: Validate ci-runner bootstrap and health probe
         run: bash infra/ci-runner/validate.sh
+      - name: Validate Cosmos indexing policy
+        run: node --test infra/tests/cosmos-indexing-policy.test.mjs
       - name: Validate secure deployment parameter writer
         run: node --test .github/scripts/write-secure-bicep-parameters.test.mjs
       - name: Lint params

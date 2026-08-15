@@ -144,7 +144,10 @@ class DependencyLockValidatorTests(unittest.TestCase):
             manifest.symlink_to(target.name)
         except OSError as exc:
             self.skipTest(f"symlinks are unavailable: {exc}")
-        with self.assertRaisesRegex(validator.DependencyLockError, "Symlinks are forbidden"):
+        with self.assertRaisesRegex(
+            validator.DependencyLockError,
+            r"unsafe or symbolic tracked path",
+        ):
             validator.validate_repository(self.root)
 
     def test_excludes_generated_and_example_directories(self) -> None:
