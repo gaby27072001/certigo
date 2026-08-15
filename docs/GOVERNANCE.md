@@ -52,20 +52,27 @@ Sur les PR internes, les sources analysées sont isolées sous `.untrusted-sourc
 d'enforcement et configurations scanner proviennent exclusivement du SHA immuable de base sous
 `.trusted-control`. Chaque scanner réutilisable exige aussi l'environnement `pr-ci`, avant toute
 évaluation ou restauration pouvant interpréter les fichiers de la PR.
-Les jobs Azure OSV, NuGet et Checkov écrivent leurs diagnostics et résultats structurés non
+Les jobs Azure OSV et Checkov écrivent leurs diagnostics et résultats structurés non
 secrets dans les logs immutables du job et une synthèse dans `GITHUB_STEP_SUMMARY`. Leur
 conclusion dépend uniquement du statut scanner, des findings et de la validité de la sortie,
 jamais du quota de stockage d'artefacts. Les forks ne sont pas supportés : la gate de confiance
 chargée depuis `main` échoue sans checkout, tandis qu'aucun workflow contrôlé par le fork ne peut
 atteindre le pool Azure persistant.
 
-La gate `Generated state equals committed state` accède au dépôt privé `certigo-content`
-uniquement avec la deploy key SSH en lecture seule stockée dans le secret Actions
-`CERTIGO_CONTENT_DEPLOY_KEY`. Le workflow refuse une clé absente, impose la vérification stricte
-des clés hôte `github.com` épinglées et n'accepte aucun PAT ni GitHub App en fallback. La
-validation de la PR est exécutée sans secret par le générateur du SHA de base ; le job qui
-installe la deploy key n'exécute ensuite que du code provenant du contrôle de base ou du dépôt
-de contenu approuvé.
+La gate `Generated state equals committed state` n'accède à aucun dépôt externe et ne reçoit
+aucun secret. Le générateur du SHA immuable de base valide la référence locale
+`docs/active-content-reference.json` (schéma, SHA de révision complet, contrat de package,
+identifiants et SHA-256 des manifestes), puis vérifie que l'état généré de la PR est commité.
+La fraîcheur de `certigo-content/main` relève de la CI et de la protection de ce dépôt, pas d'un
+checkout cross-repository sur un runner PR persistant.
+
+Le bump de contenu actif est donc volontairement manuel et vérifié : après fusion protégée dans
+`certigo-content`, un mainteneur checkout le SHA exact, exécute `npm ci --ignore-scripts` puis
+`npm run package`, reporte la révision, l'horodatage et les deux manifestes dans
+`docs/active-content-reference.json`, puis lance
+`python tools/project_state.py --validate-active-content <checkout-certigo-content>` et
+`python tools/project_state.py --refresh-reference`. La PR du bump doit commiter la référence et
+l'état projet régénéré.
 
 ### Conclusion DoD
 
@@ -229,14 +236,10 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
       OIDC `AZURE_*` au niveau environnement, pas au niveau dépôt.
 - [ ] Créer un ruleset de tags `v*` interdisant suppression et modification, et
       limitant la création aux mainteneurs de release.
-- [ ] Dans `certigo-content`, enregistrer la clé publique comme **Deploy key** sans
-      `Allow write access`, puis stocker la clé privée correspondante dans le secret
-      Actions `CERTIGO_CONTENT_DEPLOY_KEY` de Certigo. Aucun PAT/App ou réglage
-      Enterprise ne fait partie de ce contrôle.
 
 Les mises à jour de versions de `.github/dependabot.yml` restent une aide de maintenance.
-La décision de sécurité repose exclusivement sur les gates Azure bloquantes OSV, NuGet,
-Checkov et CodeQL, sans activation de fonctionnalité Enterprise.
+La décision de sécurité repose exclusivement sur les gates Azure bloquantes OSV (qui couvre
+NuGet/csproj, npm et pub), Checkov et CodeQL, sans activation de fonctionnalité Enterprise.
 
 Ces réserves ne doivent pas être appliquées implicitement avec le JSON complet. Les traiter
 séparément, avec revue admin et lecture préalable de l'état live.

@@ -1,5 +1,6 @@
 # Dependabot version updates only. Blocking security decisions are made by the
-# repository-local OSV, NuGet, Checkov and CodeQL gates on Azure runners.
+# repository-local OSV, Checkov and CodeQL gates on Azure runners. OSV covers
+# NuGet/csproj, npm and pub dependency ecosystems without executing project builds.
 #
 # Volumétrie volontairement basse : le parc de runners self-hosted est petit
 # (2 VM). Des limites élevées saturent la file d'attente et bloquent la CI.

@@ -60,9 +60,7 @@ jobs:
               - '**/npm-shrinkwrap.json'
               - 'global.json'
               - '.github/osv-scanner.toml'
-              - '.github/nuget-scanner.config'
               - '.github/workflows/dependency-vuln-scan.yml'
-              - '.github/workflows/nuget-vuln-scan.yml'
               - '.github/workflows/security-gate.yml'
             iac:
               - 'infra/**'
@@ -103,14 +101,6 @@ jobs:
     permissions:
       contents: read
 
-  nuget:
-    name: NuGet dependency scan
-    needs: changes
-    if: ${{ needs.changes.outputs.dependencies == 'true' }}
-    uses: ./.github/workflows/nuget-vuln-scan.yml
-    permissions:
-      contents: read
-
   checkov:
     name: Checkov IaC scan
     needs: changes
@@ -121,7 +111,7 @@ jobs:
 
   security-gate:
     name: Security / Required gate
-    needs: [changes, osv, nuget, checkov]
+    needs: [changes, osv, checkov]
     if: ${{ always() && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: [self-hosted, Linux, X64, certigo-ci]
     permissions: {}
@@ -133,7 +123,6 @@ jobs:
           DEPENDENCIES_APPLICABLE: ${{ needs.changes.outputs.dependencies }}
           IAC_APPLICABLE: ${{ needs.changes.outputs.iac }}
           OSV_RESULT: ${{ needs.osv.result }}
-          NUGET_RESULT: ${{ needs.nuget.result }}
           CHECKOV_RESULT: ${{ needs.checkov.result }}
         run: |
           set -euo pipefail
@@ -153,5 +142,4 @@ jobs:
             fi
           }
           enforce_result "OSV" "$DEPENDENCIES_APPLICABLE" "$OSV_RESULT"
-          enforce_result "NuGet" "$DEPENDENCIES_APPLICABLE" "$NUGET_RESULT"
           enforce_result "Checkov" "$IAC_APPLICABLE" "$CHECKOV_RESULT"

@@ -46,7 +46,6 @@ const forbiddenAutomation = [
 ];
 const reusableScannerFiles = new Set([
   'dependency-vuln-scan.yml',
-  'nuget-vuln-scan.yml',
   'security-scan.yml',
 ]);
 
@@ -229,7 +228,6 @@ function validateRepositoryInvariants() {
     path.join(workflowsDir, 'dependency-vuln-scan.yml'),
     'utf8',
   );
-  const nugetScan = fs.readFileSync(path.join(workflowsDir, 'nuget-vuln-scan.yml'), 'utf8');
   const iacScan = fs.readFileSync(path.join(workflowsDir, 'security-scan.yml'), 'utf8');
   const branchProtection = JSON.parse(
     fs.readFileSync(path.join(root, '.github', 'branch-protection-main.json'), 'utf8'),
@@ -393,50 +391,37 @@ function validateRepositoryInvariants() {
     'path: .untrusted-source',
     'path: .trusted-control',
     'python -P -m unittest discover -s tools/tests',
+    'name: Validate committed active-content reference and generated state',
     'python -P tools/project_state.py --root "$PROJECT_WORKSPACE" --check',
-    'CONTENT_DEPLOY_KEY: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}',
-    'if [ -z "${CONTENT_DEPLOY_KEY//[[:space:]]/}" ]',
-    'ssh-key: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}',
-    'ssh-strict: true',
-    'ssh-known-hosts: |',
-    'github.com ssh-ed25519 ',
-    'github.com ecdsa-sha2-nistp256 ',
-    'github.com ssh-rsa ',
     'working-directory: .trusted-control',
     '--root "$PROJECT_WORKSPACE"',
-    '--validate-active-content "$ACTIVE_CONTENT_DIR"',
   ]) {
     if (!projectState.includes(marker)) {
-      errors.push(`ci-project-state.yml: missing strict deploy-key invariant ${marker}`);
+      errors.push(`ci-project-state.yml: missing local trusted-base invariant ${marker}`);
     }
   }
   const sourceJobStart = projectState.indexOf('  validate-source:');
-  const contentJobStart = projectState.indexOf('  validate:\n', sourceJobStart);
-  const deployKeyStep = projectState.indexOf('ssh-key: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}');
-  const trustedContentValidation = projectState.indexOf(
-    '--validate-active-content "$ACTIVE_CONTENT_DIR"',
-  );
+  const gateJobStart = projectState.indexOf('  validate:\n', sourceJobStart);
   if (
     sourceJobStart < 0
-    || contentJobStart < 0
-    || projectState.slice(sourceJobStart, contentJobStart).includes('secrets.')
+    || gateJobStart < 0
+    || projectState.slice(sourceJobStart, gateJobStart).includes('secrets.')
   ) {
     errors.push('ci-project-state.yml: secret-free source validation job is not isolated');
   }
-  if (
-    deployKeyStep < contentJobStart
-    || trustedContentValidation < deployKeyStep
-    || projectState.slice(deployKeyStep).includes('python tools/')
-    || projectState.slice(deployKeyStep).includes('node tools/')
-  ) {
-    errors.push(
-      'ci-project-state.yml: only immutable trusted-control code may run after deploy-key installation',
-    );
+  if (gateJobStart >= 0 && projectState.slice(gateJobStart).includes('actions/checkout@')) {
+    errors.push('ci-project-state.yml: required gate must not perform another checkout');
   }
   for (const forbiddenMarker of [
-    'CERTIGO_CONTENT_APP_ID',
-    'CERTIGO_CONTENT_APP_PRIVATE_KEY',
-    'CERTIGO_CONTENT_READ_TOKEN',
+    'secrets.',
+    'repository:',
+    'ssh-key:',
+    'ssh-known-hosts:',
+    'actions/setup-node@',
+    'npm ci',
+    'npm run',
+    '--validate-active-content',
+    'CERTIGO_CONTENT_',
     'actions/create-github-app-token',
     'token: ${{',
   ]) {
@@ -446,9 +431,8 @@ function validateRepositoryInvariants() {
   }
   for (const marker of [
     'name: Security / Required gate',
-    'needs: [changes, osv, nuget, checkov]',
+    'needs: [changes, osv, checkov]',
     'uses: ./.github/workflows/dependency-vuln-scan.yml',
-    'uses: ./.github/workflows/nuget-vuln-scan.yml',
     'uses: ./.github/workflows/security-scan.yml',
     "if: ${{ always() && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) }}",
   ]) {
@@ -458,6 +442,24 @@ function validateRepositoryInvariants() {
   }
   if (securityGate.includes('\n    paths:')) {
     errors.push('security-gate.yml: required workflow triggers must not be path-scoped');
+  }
+  for (const forbiddenMarker of [
+    'nuget-vuln-scan',
+    'nuget-scanner.config',
+    'NUGET_RESULT',
+    'enforce_result "NuGet"',
+  ]) {
+    if (securityGate.includes(forbiddenMarker)) {
+      errors.push(`security-gate.yml: removed NuGet scanner remains referenced: ${forbiddenMarker}`);
+    }
+  }
+  for (const removedPath of [
+    path.join(workflowsDir, 'nuget-vuln-scan.yml'),
+    path.join(root, '.github', 'nuget-scanner.config'),
+  ]) {
+    if (fs.existsSync(removedPath)) {
+      errors.push(`removed NuGet scanner surface still exists: ${path.relative(root, removedPath)}`);
+    }
   }
   for (const dependencyInput of [
     "'**/Directory.Build.props'",
@@ -472,7 +474,6 @@ function validateRepositoryInvariants() {
   }
   for (const [fileName, workflow] of [
     ['dependency-vuln-scan.yml', dependencyScan],
-    ['nuget-vuln-scan.yml', nugetScan],
     ['security-scan.yml', iacScan],
   ]) {
     if (!workflow.includes('workflow_call:')) {
@@ -539,17 +540,6 @@ function validateRepositoryInvariants() {
   ]) {
     if (!osvEnforcer.includes(marker)) {
       errors.push(`enforce-osv-json.mjs: missing fail-closed invariant ${marker}`);
-    }
-  }
-  for (const marker of [
-    'NuGet vulnerability scan output is missing or malformed.',
-    'has no vulnerable packages|has the following vulnerable',
-    '--configfile "$TRUSTED_CONTROL_DIR/.github/nuget-scanner.config"',
-    '"$UNTRUSTED_SOURCE_DIR/backend/Certigo.sln"',
-    'scan_status',
-  ]) {
-    if (!nugetScan.includes(marker)) {
-      errors.push(`nuget-vuln-scan.yml: missing fail-closed output invariant ${marker}`);
     }
   }
   for (const marker of [

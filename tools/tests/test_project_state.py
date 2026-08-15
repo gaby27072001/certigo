@@ -565,46 +565,29 @@ class ProjectStateTests(unittest.TestCase):
         ]
         self.assertNotIn("secrets.", source_job)
         self.assertNotIn("-latest", workflow)
-        self.assertIn('node-version: "20.20.2"', workflow)
         self.assertIn("persist-credentials: false", workflow)
         self.assertIn(
-            "CONTENT_DEPLOY_KEY: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}",
+            "name: Validate committed active-content reference and generated state",
             workflow,
         )
-        self.assertIn(
-            'if [ -z "${CONTENT_DEPLOY_KEY//[[:space:]]/}" ]',
-            workflow,
-        )
-        self.assertIn(
-            "ssh-key: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}",
-            workflow,
-        )
-        self.assertIn("ssh-strict: true", workflow)
-        self.assertIn("ssh-known-hosts: |", workflow)
-        self.assertIn("github.com ssh-ed25519 ", workflow)
-        self.assertIn("github.com ecdsa-sha2-nistp256 ", workflow)
-        self.assertIn("github.com ssh-rsa ", workflow)
-        self.assertNotIn("CERTIGO_CONTENT_APP_ID", workflow)
-        self.assertNotIn("CERTIGO_CONTENT_APP_PRIVATE_KEY", workflow)
-        self.assertNotIn("CERTIGO_CONTENT_READ_TOKEN", workflow)
+        self.assertNotIn("secrets.", workflow)
+        self.assertNotIn("repository:", workflow)
+        self.assertNotIn("ssh-key:", workflow)
+        self.assertNotIn("ssh-known-hosts:", workflow)
+        self.assertNotIn("CERTIGO_CONTENT_", workflow)
         self.assertNotIn("create-github-app-token", workflow)
         self.assertNotIn("token: ${{", workflow)
-        self.assertIn("npm ci", workflow)
-        self.assertIn("npm run package", workflow)
+        self.assertNotIn("actions/setup-node@", workflow)
+        self.assertNotIn("npm ci", workflow)
+        self.assertNotIn("npm run", workflow)
         self.assertIn(
             'python -P tools/project_state.py --root "$PROJECT_WORKSPACE" --check',
             workflow,
         )
-        self.assertIn('--validate-active-content "$ACTIVE_CONTENT_DIR"', workflow)
-        key_index = workflow.index(
-            "ssh-key: ${{ secrets.CERTIGO_CONTENT_DEPLOY_KEY }}"
-        )
-        trusted_validation_index = workflow.index(
-            '--validate-active-content "$ACTIVE_CONTENT_DIR"'
-        )
-        self.assertGreater(trusted_validation_index, key_index)
-        self.assertNotIn("python tools/", workflow[key_index:])
-        self.assertNotIn("node tools/", workflow[key_index:])
+        gate_job = workflow[
+            workflow.index("  validate:\n", workflow.index("  validate-source:"))
+        :]
+        self.assertNotIn("actions/checkout@", gate_job)
 
         protection = json.loads(
             (REPO_ROOT / ".github/branch-protection-main.json").read_text(
@@ -661,13 +644,6 @@ class ProjectStateTests(unittest.TestCase):
                 '"$OSV_RESULTS_FILE" 2> "$OSV_ENFORCE_LOG"',
                 "finding_count",
             ],
-            "nuget-vuln-scan.yml": [
-                "NuGet vulnerability scan output is missing or malformed.",
-                "has no vulnerable packages|has the following vulnerable",
-                '--configfile "$TRUSTED_CONTROL_DIR/.github/nuget-scanner.config"',
-                '"$UNTRUSTED_SOURCE_DIR/backend/Certigo.sln"',
-                "scan_status",
-            ],
             "security-scan.yml": [
                 "Checkov output is missing or malformed.",
                 "Passed checks: [0-9]+, Failed checks: [0-9]+",
@@ -698,6 +674,16 @@ class ProjectStateTests(unittest.TestCase):
                 self.assertIn("path: .trusted-control", workflow)
                 for marker in markers:
                     self.assertIn(marker, workflow)
+        security_gate = (
+            REPO_ROOT / ".github/workflows/security-gate.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("needs: [changes, osv, checkov]", security_gate)
+        self.assertNotIn("nuget-vuln-scan", security_gate)
+        self.assertNotIn("NUGET_RESULT", security_gate)
+        self.assertFalse(
+            (REPO_ROOT / ".github/workflows/nuget-vuln-scan.yml").exists()
+        )
+        self.assertFalse((REPO_ROOT / ".github/nuget-scanner.config").exists())
 
 
 if __name__ == "__main__":
