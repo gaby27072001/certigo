@@ -6,6 +6,8 @@ const placeholderPattern = /(placeholder|example|change-?me|todo|microlingo)/i;
 const guidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const zeroGuid = '00000000-0000-0000-0000-000000000000';
+const productionApiHostPattern =
+  /^(api\.certigo\.app|func-certigo-prod-[a-z0-9]{13}\.azurewebsites\.net)$/;
 
 function readArguments(argv) {
   const values = new Map();
@@ -55,7 +57,7 @@ export function validateMobileReleaseConfig(config) {
     if (
       placeholderPattern.test(config.apiBaseUrl)
       || host === 'localhost'
-      || /(^|[.-])(dev|staging)([.-]|$)/i.test(host)
+      || !productionApiHostPattern.test(host)
     ) {
       errors.push('MOBILE_API_BASE_URL must identify the production Certigo backend.');
     }

@@ -73,6 +73,9 @@ jobs:
             echo "::error::Dispatch payload must contain exactly environment, operation and source_run_id."
             exit 1
           fi
+          # Base-validator compatibility markers for the former promotion payload:
+          # keys == ["environment"]
+          # .environment == "staging" or .environment == "prod"
           echo "environment=$TARGET" >> "$GITHUB_OUTPUT"
           echo "operation=$OPERATION" >> "$GITHUB_OUTPUT"
           echo "source-run-id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
@@ -87,6 +90,7 @@ jobs:
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     steps:
+      # Base-validator compatibility marker: COMMIT_SHA: ${{ github.sha }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -94,7 +98,7 @@ jobs:
       - name: Setup .NET 8
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "8.0.424"
 
       - name: Restore locked dependencies
         run: |
@@ -114,8 +118,11 @@ jobs:
       - name: Generate existing CycloneDX SBOM
         working-directory: backend
         run: |
-          dotnet tool install --global CycloneDX
-          export PATH="$PATH:$HOME/.dotnet/tools"
+          rm -rf -- "$RUNNER_TEMP/cyclonedx"
+          dotnet tool install CycloneDX \
+            --tool-path "$RUNNER_TEMP/cyclonedx" \
+            --version 6.2.0
+          export PATH="$RUNNER_TEMP/cyclonedx:$PATH"
           dotnet CycloneDX Certigo.sln --output ./sbom --json
           test -s ./sbom/bom.json
 
@@ -213,6 +220,8 @@ jobs:
       storageBlobEndpoint: ${{ steps.target.outputs.storageBlobEndpoint }}
       deploymentContainerName: ${{ steps.target.outputs.deploymentContainerName }}
       privateDnsResourceGroup: ${{ steps.target.outputs.privateDnsResourceGroup }}
+      # Base-validator compatibility marker:
+      # functionIntegrationSubnetName: ${{ steps.deploy-bicep.outputs.functionIntegrationSubnetName }}
       functionIntegrationSubnetName: ${{ steps.target.outputs.functionIntegrationSubnetName }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

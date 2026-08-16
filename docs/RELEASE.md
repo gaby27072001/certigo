@@ -105,8 +105,8 @@ Le backend suit un modèle **CD par environnement** (pas un tag applicatif) :
 | --- | --- | --- | --- |
 | [`cd-backend.yml`](../.github/workflows/cd-backend.yml) | Construit une fois, déploie, promeut ou rollback `dev`/`staging`/`prod` | `push` sur `main` (build + dev), dispatch `promote-backend` | opération, environnement et run source validés depuis un payload strict |
 
-- **Build unique** : chaque push `main` publie une seule fois le backend, normalise les
-  timestamps du ZIP, génère le SBOM CycloneDX déjà utilisé par la CI et produit
+- **Build unique** : chaque push `main` publie une seule fois le backend avec le SDK
+  .NET `8.0.424` et CycloneDX `6.2.0`, normalise les timestamps du ZIP et produit
   `release-manifest.json` (commit, SHA-256 du ZIP/SBOM, run et provenance).
 - **`dev`** : ce même run déploie automatiquement l'artefact retenu. Aucun job de
   déploiement ne relance `dotnet publish`.

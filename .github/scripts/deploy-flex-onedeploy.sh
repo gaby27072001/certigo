@@ -114,6 +114,7 @@ POLL_INTERVAL_SECONDS="${POLL_INTERVAL_SECONDS:-10}"
 RBAC_RETRY_ATTEMPTS="${RBAC_RETRY_ATTEMPTS:-40}"
 RBAC_RETRY_INTERVAL_SECONDS="${RBAC_RETRY_INTERVAL_SECONDS:-15}"
 BLOB_NAME="deployments/${COMMIT_SHA}.zip"
+# The immutable source is retained for lifecycle cleanup and controlled rollback.
 BLOB_HOST="${STORAGE_ACCOUNT}.blob.core.windows.net"
 PACKAGE_SHA256="$(sha256sum "$PACKAGE_PATH" | awk '{print $1}')"
 STATE_BLOB_NAME='state/backend-release.json'

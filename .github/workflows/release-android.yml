@@ -251,12 +251,16 @@ jobs:
             echo "Config app : variables GitHub (variable AZURE_KEYVAULT_NAME non définie)."
           fi
 
-          node .github/scripts/validate-mobile-release-config.mjs \
-            --api-base-url "$API_BASE_URL" \
-            --entra-client-id "$ENTRA_CLIENT_ID" \
-            --entra-authority "$ENTRA_AUTHORITY" \
-            --entra-api-scope "$ENTRA_API_SCOPE" \
-            --certigo-env "$CERTIGO_ENV"
+          if ! node .github/scripts/validate-mobile-release-config.mjs \
+              --api-base-url "$API_BASE_URL" \
+              --entra-client-id "$ENTRA_CLIENT_ID" \
+              --entra-authority "$ENTRA_AUTHORITY" \
+              --entra-api-scope "$ENTRA_API_SCOPE" \
+              --certigo-env "$CERTIGO_ENV"; then
+            echo "::error::Une configuration API/Entra complète et valide est obligatoire avant publication."
+            echo "::error::La piste production exige MOBILE_CERTIGO_ENV=prod."
+            exit 1
+          fi
           echo "config_valid=true" >> "$GITHUB_OUTPUT"
 
           {
