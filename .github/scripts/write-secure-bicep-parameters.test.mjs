@@ -35,6 +35,7 @@ function write(overrides = {}) {
   const outputFile = outputPath();
   const result = writeSecureParameters({
     environment: 'dev',
+    alertEmail: '',
     jwtSigningKey: '',
     jwtSigningKeyExpiresOn: '',
     jwtPreviousSigningKey: '',
@@ -62,12 +63,13 @@ test('preserves the explicit stable dev expiration without injecting a secret', 
 test('requires the active key and expiration together outside dev', () => {
   for (const environment of ['staging', 'prod']) {
     assert.throws(
-      () => write({ environment }),
+      () => write({ environment, alertEmail: 'alerts@example.invalid' }),
       /are required for staging and production/,
     );
     assert.throws(
       () => write({
         environment,
+        alertEmail: 'alerts@example.invalid',
         jwtSigningKey: 'test-secret',
       }),
       /must be configured together/,
@@ -78,6 +80,7 @@ test('requires the active key and expiration together outside dev', () => {
 test('injects active and previous rotation pairs into a private parameter document', () => {
   const { outputFile, result } = write({
     environment: 'prod',
+    alertEmail: 'alerts@example.invalid',
     jwtSigningKey: 'new-test-secret',
     jwtSigningKeyExpiresOn: expiration,
     jwtPreviousSigningKey: 'old-test-secret',
@@ -88,6 +91,7 @@ test('injects active and previous rotation pairs into a private parameter docume
   assert.deepEqual(result, { hasActiveKey: true, hasPreviousKey: true });
   assert.deepEqual(parameters.authJwtSigningKey, { value: 'new-test-secret' });
   assert.deepEqual(parameters.authJwtSigningKeyExpiresOn, { value: expiration });
+  assert.deepEqual(parameters.alertEmail, { value: 'alerts@example.invalid' });
   assert.deepEqual(
     parameters.authJwtPreviousSigningKey,
     { value: 'old-test-secret' },
@@ -96,6 +100,29 @@ test('injects active and previous rotation pairs into a private parameter docume
     parameters.authJwtPreviousSigningKeyExpiresOn,
     { value: expiration },
   );
+});
+
+test('requires a valid environment alert receiver outside dev', () => {
+  const requiredParameters = {
+    environment: 'prod',
+    jwtSigningKey: 'new-test-secret',
+    jwtSigningKeyExpiresOn: expiration,
+  };
+  assert.throws(
+    () => write(requiredParameters),
+    /ALERT_EMAIL is required for staging and production/,
+  );
+  for (const alertEmail of [
+    ' alerts@example.invalid',
+    'alerts@example.invalid\nsecond@example.invalid',
+    'alerts@localhost',
+    'alerts..ops@example.invalid',
+  ]) {
+    assert.throws(
+      () => write({ ...requiredParameters, alertEmail }),
+      /ALERT_EMAIL must be a valid email address/,
+    );
+  }
 });
 
 test('rejects incomplete previous-key rotation and non-UTC expiration', () => {
@@ -148,6 +175,7 @@ test('refuses to overwrite an existing parameter file', () => {
   assert.throws(
     () => writeSecureParameters({
       environment: 'dev',
+      alertEmail: '',
       jwtSigningKey: '',
       jwtSigningKeyExpiresOn: '',
       jwtPreviousSigningKey: '',
@@ -167,6 +195,7 @@ test('rejects a malformed compiled parameter document', () => {
   assert.throws(
     () => writeSecureParameters({
       environment: 'dev',
+      alertEmail: '',
       jwtSigningKey: '',
       jwtSigningKeyExpiresOn: '',
       jwtPreviousSigningKey: '',

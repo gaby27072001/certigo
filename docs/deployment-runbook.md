@@ -25,6 +25,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
 | Configuration GitHub OIDC | ✅ Opérationnelle aux scopes existants ; ne pas déplacer sans audit | §T0.1 |
 | Clé JWT + expiration par Environment | ⛔ **Humain** — obligatoire avant staging/prod | §T0.4 |
+| Destinataire `ALERT_EMAIL` par Environment | ✅ Configuré dans `staging`/`prod`, valeur non divulguée et hors dépôt | §T0.4 |
 | Réseau privé atomique Storage / Key Vault / Cosmos + peering CI | ✅ IaC + hotfix OneDeploy | `infra/modules/privateNetwork.bicep` |
 | GitHub Environments `dev`/`staging`/`prod` | ✅ Créés ; staging/prod limités aux branches protégées et configurés JWT | §T0.3 |
 | Branch protection sur `main` | ⛔ **Humain** (admin repo) | §T0.3 |
@@ -48,7 +49,10 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
    effectivement consommé.
 5. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
    `AUTH_JWT_SIGNING_KEY` / `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`, sans afficher sa valeur.
-6. Pour un rollback, sélectionner un ancien run `main` réussi encore retenu et
+6. Contrôler que la variable non secrète `ALERT_EMAIL` de chaque Environment
+   `staging`/`prod` désigne une boîte réellement supervisée ; aucune valeur par
+   défaut n'est committée.
+7. Pour un rollback, sélectionner un ancien run `main` réussi encore retenu et
    utiliser `promote-backend` avec `operation=rollback`. Le chemin rollback ne
    redéploie pas Bicep.
 
@@ -98,7 +102,35 @@ limitées aux signaux qu'une personne seule peut traiter :
   OneDeploy dans le resource group de l'environnement.
 
 Les alertes 5xx/readiness déjà présentes ne sont pas dupliquées. Aucun rôle Azure
-supplémentaire ni changement de paramètre de production n'est requis.
+supplémentaire ni changement DNS n'est requis.
+
+Le destinataire vient exclusivement de la variable non secrète `ALERT_EMAIL` du
+GitHub Environment ciblé (`staging` ou `prod`). Le workflow refuse une valeur vide,
+avec caractères de contrôle ou hors d'un format email raisonnable, puis l'injecte
+dans le fichier de paramètres Bicep temporaire protégé. Ne versionner aucune adresse
+personnelle. La configuration DNS et les nameservers ne font pas partie de ce flux.
+
+#### Test post-déploiement du routage d'alerte
+
+Après fusion de cette PR et premier déploiement réussi de chaque environnement,
+envoyer une notification de test Azure Monitor à l'Action Group existant. Cette
+commande n'affiche ni ne demande l'adresse configurée et ne provoque pas d'échec
+applicatif ou de déploiement :
+
+```bash
+ENVIRONMENT=staging # puis prod après validation staging
+az monitor action-group test-notifications create \
+  --resource-group "rg-certigo-$ENVIRONMENT" \
+  --action-group-name ag-certigo-security \
+  --alert-type webtestalert \
+  --output none
+```
+
+Confirmer hors des logs que la boîte supervisée reçoit la notification de test. Si
+Azure demande la validation initiale du destinataire, terminer la vérification OTP
+depuis cette boîte puis relancer le test. Ne jamais déclencher volontairement une
+erreur ARM/OneDeploy en production pour tester l'Activity Log Alert. Procédure Azure
+officielle : [tester un Action Group](https://learn.microsoft.com/azure/azure-monitor/alerts/action-groups#test-an-action-group-in-the-azure-portal).
 
 La publication GitHub Pages de la politique de confidentialité suit la même
 frontière de confiance :
@@ -382,7 +414,9 @@ secret.
 Configurer dans chaque GitHub Environment `staging`/`prod` :
 
 - le secret `AUTH_JWT_SIGNING_KEY` ;
-- la variable non secrète `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`.
+- la variable non secrète `AUTH_JWT_SIGNING_KEY_EXPIRES_ON` ;
+- la variable non secrète `ALERT_EMAIL`, pointant vers une boîte réellement
+  supervisée et capable de recevoir du courrier.
 
 Ne jamais placer la clé dans un fichier `.bicepparam` versionné, une sortie de
 commande ou les logs du pipeline. Le workflow refuse une clé sans expiration (et
@@ -582,7 +616,8 @@ documentation), et le **résiduel strict** qui nécessite une action hors périm
   `github-env-dev/staging/prod` ajoutées.
 - **T0.3 — Environments : ✅ PARTIEL.** `dev` / `staging` / `prod` créés ;
   `staging`/`prod` limités aux branches protégées. **Reviewer gate `prod` non
-  posé** (billing GitHub 422, voir §T0.3). Branch protection `main` = résiduel admin.
+  posé** (billing GitHub 422, voir §T0.3). `ALERT_EMAIL` est configuré dans
+  `staging` et `prod` sans valeur divulguée. Branch protection `main` = résiduel admin.
 - **T0.2 — Runner : ✅ prémisse hosted réfutée en live.** Le run `28381092423` a été rejeté
   immédiatement car les runners GitHub-hosted sont désactivés pour ce dépôt.
   Aucune validation Enterprise ne sera sollicitée : le chemin critique reste le pool Azure

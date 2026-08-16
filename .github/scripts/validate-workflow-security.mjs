@@ -380,6 +380,13 @@ function validateRepositoryInvariants() {
     path.join(root, '.github', 'scripts', 'write-secure-bicep-parameters.mjs'),
     'utf8',
   );
+  const releaseEnvironmentParameters = ['staging', 'prod'].map((environment) => ({
+    environment,
+    content: fs.readFileSync(
+      path.join(root, 'infra', 'params', `${environment}.bicepparam`),
+      'utf8',
+    ),
+  }));
   const flexOneDeploy = fs.readFileSync(
     path.join(root, '.github', 'scripts', 'deploy-flex-onedeploy.sh'),
     'utf8',
@@ -500,6 +507,7 @@ function validateRepositoryInvariants() {
       errors.push(`cd-backend.yml: missing deployment secret ${secret}`);
     }
     for (const marker of [
+      'ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}',
       'AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}',
       'az bicep build-params',
       'node .github/scripts/write-secure-bicep-parameters.mjs',
@@ -508,7 +516,7 @@ function validateRepositoryInvariants() {
       '--parameters "@$AUTH_PARAMETERS_FILE"',
     ]) {
       if (!backend.includes(marker)) {
-        errors.push(`cd-backend.yml: missing secure JWT deployment invariant ${marker}`);
+        errors.push(`cd-backend.yml: missing secure deployment invariant ${marker}`);
       }
     }
     if (
@@ -527,12 +535,20 @@ function validateRepositoryInvariants() {
     }
     for (const marker of [
       "environment !== 'dev'",
+      'compiled.parameters.alertEmail',
       'compiled.parameters.authJwtSigningKey',
       'mode: 0o600',
       "flag: 'wx'",
     ]) {
       if (!secureBicepWriter.includes(marker)) {
         errors.push(`write-secure-bicep-parameters.mjs: missing invariant ${marker}`);
+      }
+    }
+    for (const { environment, content } of releaseEnvironmentParameters) {
+      if (/^\s*param\s+alertEmail\s*=/m.test(content)) {
+        errors.push(
+          `${environment}.bicepparam: alertEmail must come from the GitHub Environment`,
+        );
       }
     }
   }

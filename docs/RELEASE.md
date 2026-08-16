@@ -120,6 +120,10 @@ Le backend suit un modèle **CD par environnement** (pas un tag applicatif) :
   `state/backend-release.json` référence les versions courante et précédente.
 - **Post-déploiement** : les probes existantes `/api/health/live` et
   `/api/health/ready` sont bloquantes avant la mise à jour du pointeur de release.
+- **Destinataire des alertes** : `staging` et `prod` définissent chacun la
+  variable non secrète `ALERT_EMAIL` dans leur GitHub Environment. Le CD refuse une
+  valeur vide ou mal formée et l'injecte dans le JSON Bicep temporaire ; aucune
+  adresse d'opérateur n'est versionnée.
 
 **Promouvoir le backend** :
 

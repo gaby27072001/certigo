@@ -339,6 +339,17 @@ test('deployment failure alert is scoped to failed backend operations in its res
   ]);
 });
 
+test('staging and production do not commit an alert receiver address', () => {
+  for (const environment of ['staging', 'prod']) {
+    const parameters = readFileSync(
+      path.join(repositoryRoot, 'infra', 'params', `${environment}.bicepparam`),
+      'utf8',
+    );
+    assert.doesNotMatch(parameters, /^\s*param\s+alertEmail\s*=/m);
+    assert.match(parameters, /ALERT_EMAIL variable on the/);
+  }
+});
+
 test('Key Vault purge protection is enabled in every environment', () => {
   const template = compileTemplate('infra/modules/keyvault.bicep');
   const [vault] = resourcesOfType(template, 'Microsoft.KeyVault/vaults');

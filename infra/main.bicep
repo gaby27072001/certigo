@@ -57,7 +57,7 @@ param authJwtPreviousSigningKeyExpiresOn string = ''
 @description('Maximum output tokens requested from the tutor LLM.')
 param tutorLlmMaxOutputTokens int = 400
 
-@description('Email notified on security and readiness alerts. Required outside dev.')
+@description('Email notified on security and readiness alerts. Required outside dev and injected by CD from the target GitHub Environment.')
 param alertEmail string = ''
 
 @description('Data residency for the Azure Communication Services Email resource (e.g. Europe, United States).')

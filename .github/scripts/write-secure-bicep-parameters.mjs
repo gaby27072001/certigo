@@ -5,6 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const absoluteUtcTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+const alertEmailPattern =
+  /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/;
 const refreshOverlapMilliseconds = (90 * 24 * 60 + 2) * 60 * 1000;
 
 function requirePair(value, expiresOn, valueName, expiresOnName) {
@@ -29,8 +31,28 @@ function requireRefreshOverlap(expiresOn, name, now) {
   }
 }
 
+function validateAlertEmail(value, environment) {
+  const email = typeof value === 'string' ? value : '';
+  if (environment !== 'dev' && email.length === 0) {
+    throw new Error('ALERT_EMAIL is required for staging and production.');
+  }
+  if (
+    email.length > 0
+    && (
+      email.length > 254
+      || email !== email.trim()
+      || /[\u0000-\u001f\u007f]/.test(email)
+      || !alertEmailPattern.test(email)
+    )
+  ) {
+    throw new Error('ALERT_EMAIL must be a valid email address of at most 254 characters.');
+  }
+  return email;
+}
+
 export function writeSecureParameters({
   environment,
+  alertEmail,
   jwtSigningKey,
   jwtSigningKeyExpiresOn,
   jwtPreviousSigningKey,
@@ -45,6 +67,7 @@ export function writeSecureParameters({
   if (!inputFile || !outputFile) {
     throw new Error('Input and output deployment parameter file paths are required.');
   }
+  const validatedAlertEmail = validateAlertEmail(alertEmail, environment);
 
   const hasActiveKey = requirePair(
     jwtSigningKey,
@@ -98,6 +121,9 @@ export function writeSecureParameters({
       now,
     );
   }
+  if (validatedAlertEmail.length > 0) {
+    compiled.parameters.alertEmail = { value: validatedAlertEmail };
+  }
 
   if (hasActiveKey) {
     compiled.parameters.authJwtSigningKey = { value: jwtSigningKey };
@@ -122,6 +148,7 @@ function main() {
   try {
     writeSecureParameters({
       environment: process.env.TARGET_ENV,
+      alertEmail: process.env.ALERT_EMAIL,
       jwtSigningKey: process.env.AUTH_JWT_SIGNING_KEY,
       jwtSigningKeyExpiresOn: process.env.AUTH_JWT_SIGNING_KEY_EXPIRES_ON,
       jwtPreviousSigningKey: process.env.AUTH_JWT_PREVIOUS_SIGNING_KEY,

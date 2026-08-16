@@ -231,6 +231,7 @@ jobs:
         if: ${{ needs.validate-target.outputs.operation != 'rollback' }}
         shell: bash
         env:
+          ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
           AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}
           AUTH_JWT_SIGNING_KEY_EXPIRES_ON: ${{ vars.AUTH_JWT_SIGNING_KEY_EXPIRES_ON }}
           AUTH_JWT_PREVIOUS_SIGNING_KEY: ${{ secrets.AUTH_JWT_PREVIOUS_SIGNING_KEY }}
