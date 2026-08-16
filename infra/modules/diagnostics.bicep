@@ -13,6 +13,12 @@
 @description('Function App name — the auth/request surface (401/403/5xx).')
 param functionAppName string
 
+@description('Function App public host name used by the availability/readiness probe.')
+param functionAppHostName string
+
+@description('Workspace-based Application Insights component name.')
+param appInsightsName string
+
 @description('Cosmos DB account name — data-plane request logs.')
 param cosmosAccountName string
 
@@ -51,6 +57,10 @@ param tags object = {}
 
 resource functionApp 'Microsoft.Web/sites@2023-12-01' existing = {
   name: functionAppName
+}
+
+resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
+  name: appInsightsName
 }
 
 resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' existing = {
@@ -179,6 +189,126 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
         useCommonAlertSchema: true
       }
     ]
+  }
+}
+
+// One low-frequency standard test continuously exercises the existing readiness
+// endpoint. It covers public availability and the endpoint's Cosmos, Storage and
+// Key Vault checks without introducing a second synthetic transaction.
+var availabilityTestName = 'availability-${functionAppName}'
+
+resource readinessAvailabilityTest 'Microsoft.Insights/webtests@2022-06-15' = {
+  name: availabilityTestName
+  location: location
+  kind: 'standard'
+  tags: union(tags, {
+    'hidden-link:${appInsights.id}': 'Resource'
+  })
+  properties: {
+    Name: availabilityTestName
+    Description: 'Certigo backend availability and dependency-readiness probe.'
+    Enabled: true
+    Frequency: 300
+    Timeout: 30
+    Kind: 'standard'
+    RetryEnabled: true
+    Locations: [
+      { Id: 'emea-nl-ams-azr' }
+      { Id: 'us-va-ash-azr' }
+    ]
+    Request: {
+      RequestUrl: 'https://${functionAppHostName}/api/health/ready'
+      HttpVerb: 'GET'
+      FollowRedirects: false
+      ParseDependentRequests: false
+    }
+    ValidationRules: {
+      ExpectedHttpStatusCode: 200
+      SSLCheck: true
+      SSLCertRemainingLifetimeCheck: 14
+    }
+    SyntheticMonitorId: availabilityTestName
+  }
+}
+
+resource availabilityAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+  name: 'alert-certigo-availability'
+  location: 'global'
+  tags: union(tags, {
+    'hidden-link:${appInsights.id}': 'Resource'
+    'hidden-link:${readinessAvailabilityTest.id}': 'Resource'
+  })
+  properties: {
+    description: 'Readiness failed from both probe locations; inspect the Function App and Cosmos/Storage/Key Vault dependencies.'
+    severity: 1
+    enabled: true
+    scopes: [
+      readinessAvailabilityTest.id
+      appInsights.id
+    ]
+    evaluationFrequency: 'PT5M'
+    windowSize: 'PT15M'
+    criteria: {
+      'odata.type': 'Microsoft.Azure.Monitor.WebtestLocationAvailabilityCriteria'
+      webTestId: readinessAvailabilityTest.id
+      componentId: appInsights.id
+      failedLocationCount: 2
+    }
+    actions: [
+      {
+        actionGroupId: actionGroup.id
+      }
+    ]
+  }
+}
+
+// Activity Log alerts are free and catch failures before application telemetry is
+// available, including ARM infrastructure deployments and Function OneDeploy.
+resource deploymentFailureAlert 'Microsoft.Insights/activityLogAlerts@2020-10-01' = {
+  name: 'alert-certigo-deployment-failure'
+  location: 'global'
+  tags: tags
+  properties: {
+    description: 'Backend infrastructure deployment or Function OneDeploy failed in this environment.'
+    enabled: true
+    scopes: [
+      subscription().id
+    ]
+    condition: {
+      allOf: [
+        {
+          field: 'category'
+          equals: 'Administrative'
+        }
+        {
+          field: 'status'
+          equals: 'Failed'
+        }
+        {
+          field: 'resourceGroup'
+          equals: resourceGroup().name
+        }
+        {
+          anyOf: [
+            {
+              field: 'operationName'
+              equals: 'Microsoft.Resources/deployments/write'
+            }
+            {
+              field: 'operationName'
+              equals: 'Microsoft.Web/sites/extensions/write'
+            }
+          ]
+        }
+      ]
+    }
+    actions: {
+      actionGroups: [
+        {
+          actionGroupId: actionGroup.id
+        }
+      ]
+    }
   }
 }
 

@@ -1,7 +1,8 @@
 name: cd-backend
 
-# Deploys the Certigo Azure infrastructure (Bicep) then the .NET 8
-# Azure Functions API code.
+# A push to main builds the backend release once and deploys that artifact to dev.
+# Promotions and rollbacks only accept the retained artifact from a successful
+# main push run of this workflow; staging/prod never rebuild application code.
 #
 # Required OIDC federated-identity secrets (repo/env settings):
 #   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
@@ -14,11 +15,10 @@ on:
   repository_dispatch:
     types: [promote-backend]
   push:
-    branches: [ main ]
+    branches: [main]
 
 permissions: {}
 
-# Prevent concurrent deployments to the same environment.
 concurrency:
   group: cd-backend-${{ github.event_name == 'push' && 'dev' || github.event.client_payload.environment }}
   cancel-in-progress: false
@@ -31,8 +31,10 @@ jobs:
     permissions: {}
     outputs:
       target: ${{ steps.target.outputs.environment }}
+      operation: ${{ steps.target.outputs.operation }}
+      sourceRunId: ${{ steps.target.outputs.source-run-id }}
     steps:
-      - name: Allow only protected deployment environments
+      - name: Allow only protected deployment environments and source runs
         id: target
         shell: bash
         env:
@@ -42,22 +44,162 @@ jobs:
           set -euo pipefail
           if [[ "$EVENT_NAME" == "push" ]]; then
             TARGET=dev
+            OPERATION=release
+            SOURCE_RUN_ID="$GITHUB_RUN_ID"
           elif [[ "$EVENT_NAME" == "repository_dispatch" ]] \
             && jq -e '
               type == "object"
-              and keys == ["environment"]
-              and (.environment == "staging" or .environment == "prod")
+              and keys == ["environment", "operation", "source_run_id"]
+              and (
+                .environment == "dev"
+                or .environment == "staging"
+                or .environment == "prod"
+              )
+              and (.operation == "promotion" or .operation == "rollback")
+              and (.source_run_id | type == "string" and test("^[1-9][0-9]{0,19}$"))
             ' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
             TARGET="$(jq -r '.environment' <<< "$CLIENT_PAYLOAD_JSON")"
+            OPERATION="$(jq -r '.operation' <<< "$CLIENT_PAYLOAD_JSON")"
+            SOURCE_RUN_ID="$(jq -r '.source_run_id' <<< "$CLIENT_PAYLOAD_JSON")"
+            case "$OPERATION:$TARGET" in
+              promotion:staging|promotion:prod|rollback:dev|rollback:staging|rollback:prod)
+                ;;
+              *)
+                echo "::error::Promotion allows staging/prod; rollback allows dev/staging/prod."
+                exit 1
+                ;;
+            esac
           else
-            echo "::error::Promotion payload must select exactly staging or prod."
+            echo "::error::Dispatch payload must contain exactly environment, operation and source_run_id."
             exit 1
           fi
           echo "environment=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "operation=$OPERATION" >> "$GITHUB_OUTPUT"
+          echo "source-run-id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
+
+  build-release:
+    name: Build immutable backend release
+    needs: validate-target
+    if: ${{ github.event_name == 'push' }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      contents: read
+    env:
+      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore locked dependencies
+        run: |
+          dotnet restore backend/src/Certigo.Api/Certigo.Api.csproj \
+            --locked-mode
+
+      - name: Publish deterministic backend
+        run: |
+          dotnet publish backend/src/Certigo.Api/Certigo.Api.csproj \
+            --configuration Release \
+            --no-restore \
+            --output ./publish \
+            -p:ContinuousIntegrationBuild=true \
+            -p:Deterministic=true \
+            -p:DebugType=None
+
+      - name: Generate existing CycloneDX SBOM
+        working-directory: backend
+        run: |
+          dotnet tool install --global CycloneDX
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet CycloneDX Certigo.sln --output ./sbom --json
+          test -s ./sbom/bom.json
+
+      - name: Create deterministic ZIP and release manifest
+        id: manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct "$GITHUB_SHA")"
+          export SOURCE_DATE_EPOCH
+          rm -rf ./release
+          mkdir -p ./release/sbom
+          cp ./backend/sbom/bom.json ./release/sbom/bom.json
+          find ./publish -exec touch -h -d '1980-01-01T00:00:00Z' {} +
+          (
+            cd ./publish
+            find . -type f -print0 \
+              | LC_ALL=C sort -z \
+              | xargs -0 zip -X ../release/publish.zip
+          )
+          node .github/scripts/backend-release-manifest.mjs create \
+            --package ./release/publish.zip \
+            --sbom ./release/sbom/bom.json \
+            --output ./release/release-manifest.json
+          node .github/scripts/backend-release-manifest.mjs verify \
+            --manifest ./release/release-manifest.json \
+            --expected-commit "$GITHUB_SHA"
+
+      - name: Retain build-once release
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-release
+          path: release/**
+          if-no-files-found: error
+          retention-days: 90
+
+  resolve-release:
+    name: Resolve trusted release source
+    needs: [validate-target, build-release]
+    if: >-
+      ${{
+        always()
+        && needs.validate-target.result == 'success'
+        && (needs.build-release.result == 'success' || needs.build-release.result == 'skipped')
+      }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      sourceCommit: ${{ steps.verify.outputs.commit-sha }}
+      packageSha256: ${{ steps.verify.outputs.package-sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate successful main-push provenance
+        id: source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}
+        run: node .github/scripts/resolve-backend-release.mjs
+
+      - name: Download retained release
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: backend-release
+          path: release
+          run-id: ${{ needs.validate-target.outputs.sourceRunId }}
+          github-token: ${{ github.token }}
+
+      - name: Verify release manifest and hashes
+        id: verify
+        env:
+          EXPECTED_COMMIT_SHA: ${{ steps.source.outputs.commit-sha }}
+        run: |
+          node .github/scripts/backend-release-manifest.mjs verify \
+            --manifest ./release/release-manifest.json \
+            --expected-commit "$EXPECTED_COMMIT_SHA"
 
   deploy-infra:
-    name: Deploy infrastructure (${{ needs.validate-target.outputs.target }})
-    needs: validate-target
+    name: Prepare infrastructure (${{ needs.validate-target.outputs.target }})
+    needs: [validate-target, resolve-release]
     environment: ${{ needs.validate-target.outputs.target }}
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions:
@@ -66,12 +208,12 @@ jobs:
     env:
       TARGET_ENV: ${{ needs.validate-target.outputs.target }}
     outputs:
-      functionAppName: ${{ steps.deploy-bicep.outputs.functionAppName }}
-      storageAccount: ${{ steps.deploy-bicep.outputs.storageAccount }}
-      storageBlobEndpoint: ${{ steps.deploy-bicep.outputs.storageBlobEndpoint }}
-      deploymentContainerName: ${{ steps.deploy-bicep.outputs.deploymentContainerName }}
-      privateDnsResourceGroup: ${{ steps.deploy-bicep.outputs.privateDnsResourceGroup }}
-      functionIntegrationSubnetName: ${{ steps.deploy-bicep.outputs.functionIntegrationSubnetName }}
+      functionAppName: ${{ steps.target.outputs.functionAppName }}
+      storageAccount: ${{ steps.target.outputs.storageAccount }}
+      storageBlobEndpoint: ${{ steps.target.outputs.storageBlobEndpoint }}
+      deploymentContainerName: ${{ steps.target.outputs.deploymentContainerName }}
+      privateDnsResourceGroup: ${{ steps.target.outputs.privateDnsResourceGroup }}
+      functionIntegrationSubnetName: ${{ steps.target.outputs.functionIntegrationSubnetName }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -84,8 +226,9 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy infrastructure and capture outputs
+      - name: Deploy current infrastructure
         id: deploy-bicep
+        if: ${{ needs.validate-target.outputs.operation != 'rollback' }}
         shell: bash
         env:
           AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}
@@ -115,8 +258,80 @@ jobs:
           DEPLOYMENT_CONTAINER_NAME="$(node -p "require('$DEPLOYMENT_OUTPUTS_FILE').deploymentContainerName.value")"
           PRIVATE_DNS_RESOURCE_GROUP="$(node -p "require('$DEPLOYMENT_OUTPUTS_FILE').privateDnsResourceGroup.value")"
           FUNCTION_INTEGRATION_SUBNET_ID="$(node -p "require('$DEPLOYMENT_OUTPUTS_FILE').functionIntegrationSubnetId.value")"
-          FUNCTION_INTEGRATION_SUBNET_NAME="${FUNCTION_INTEGRATION_SUBNET_ID##*/}"
           rm -f -- "$DEPLOYMENT_OUTPUTS_FILE"
+          FUNCTION_INTEGRATION_SUBNET_NAME="${FUNCTION_INTEGRATION_SUBNET_ID##*/}"
+          {
+            echo "functionAppName=$FUNCTION_APP_NAME"
+            echo "storageAccount=$STORAGE_ACCOUNT"
+            echo "storageBlobEndpoint=$STORAGE_BLOB_ENDPOINT"
+            echo "deploymentContainerName=$DEPLOYMENT_CONTAINER_NAME"
+            echo "privateDnsResourceGroup=$PRIVATE_DNS_RESOURCE_GROUP"
+            echo "functionIntegrationSubnetName=$FUNCTION_INTEGRATION_SUBNET_NAME"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve existing infrastructure for code-only rollback
+        id: rollback-target
+        if: ${{ needs.validate-target.outputs.operation == 'rollback' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESOURCE_GROUP="rg-certigo-$TARGET_ENV"
+          mapfile -t FUNCTION_APPS < <(
+            az resource list \
+              --resource-group "$RESOURCE_GROUP" \
+              --resource-type Microsoft.Web/sites \
+              --query "[?tags.product=='Certigo' && tags.env=='$TARGET_ENV'].name" \
+              --output tsv
+          )
+          mapfile -t STORAGE_ACCOUNTS < <(
+            az storage account list \
+              --resource-group "$RESOURCE_GROUP" \
+              --query "[?tags.product=='Certigo' && tags.env=='$TARGET_ENV'].name" \
+              --output tsv
+          )
+          if (( ${#FUNCTION_APPS[@]} != 1 || ${#STORAGE_ACCOUNTS[@]} != 1 )); then
+            echo "::error::Rollback requires exactly one tagged Function App and storage account."
+            exit 1
+          fi
+          FUNCTION_APP_NAME="${FUNCTION_APPS[0]}"
+          STORAGE_ACCOUNT="${STORAGE_ACCOUNTS[0]}"
+          STORAGE_BLOB_ENDPOINT="$(
+            az storage account show \
+              --resource-group "$RESOURCE_GROUP" \
+              --name "$STORAGE_ACCOUNT" \
+              --query primaryEndpoints.blob \
+              --output tsv
+          )"
+          FUNCTION_INTEGRATION_SUBNET_ID="$(
+            az resource show \
+              --resource-group "$RESOURCE_GROUP" \
+              --resource-type Microsoft.Web/sites \
+              --name "$FUNCTION_APP_NAME" \
+              --api-version 2024-04-01 \
+              --query properties.virtualNetworkSubnetId \
+              --output tsv
+          )"
+          {
+            echo "functionAppName=$FUNCTION_APP_NAME"
+            echo "storageAccount=$STORAGE_ACCOUNT"
+            echo "storageBlobEndpoint=$STORAGE_BLOB_ENDPOINT"
+            echo "deploymentContainerName=app-package"
+            echo "privateDnsResourceGroup=rg-certigo-ci"
+            echo "functionIntegrationSubnetName=${FUNCTION_INTEGRATION_SUBNET_ID##*/}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Normalize and validate Azure target outputs
+        id: target
+        shell: bash
+        env:
+          FUNCTION_APP_NAME: ${{ steps.deploy-bicep.outputs.functionAppName || steps.rollback-target.outputs.functionAppName }}
+          STORAGE_ACCOUNT: ${{ steps.deploy-bicep.outputs.storageAccount || steps.rollback-target.outputs.storageAccount }}
+          STORAGE_BLOB_ENDPOINT: ${{ steps.deploy-bicep.outputs.storageBlobEndpoint || steps.rollback-target.outputs.storageBlobEndpoint }}
+          DEPLOYMENT_CONTAINER_NAME: ${{ steps.deploy-bicep.outputs.deploymentContainerName || steps.rollback-target.outputs.deploymentContainerName }}
+          PRIVATE_DNS_RESOURCE_GROUP: ${{ steps.deploy-bicep.outputs.privateDnsResourceGroup || steps.rollback-target.outputs.privateDnsResourceGroup }}
+          FUNCTION_INTEGRATION_SUBNET_NAME: ${{ steps.deploy-bicep.outputs.functionIntegrationSubnetName || steps.rollback-target.outputs.functionIntegrationSubnetName }}
+        run: |
+          set -euo pipefail
           if [[ ! "$FUNCTION_APP_NAME" =~ ^[A-Za-z0-9-]{2,60}$ ]]; then
             echo "::error::Azure returned an invalid Function App name."
             exit 1
@@ -137,35 +352,34 @@ jobs:
             echo "::error::Azure returned an unexpected shared private DNS resource group."
             exit 1
           fi
-          if [[ ! "$FUNCTION_INTEGRATION_SUBNET_ID" =~ ^/subscriptions/[0-9a-fA-F-]+/resourceGroups/rg-certigo-${TARGET_ENV}/providers/Microsoft.Network/virtualNetworks/vnet-certigo-${TARGET_ENV}/subnets/[A-Za-z0-9._-]+$ ]]; then
-            echo "::error::Azure returned an unexpected Function integration subnet."
-            exit 1
-          fi
           if [[ ! "$FUNCTION_INTEGRATION_SUBNET_NAME" =~ ^[A-Za-z0-9._-]+$ ]]; then
             echo "::error::Azure returned an invalid Function integration subnet name."
             exit 1
           fi
-          echo "functionAppName=$FUNCTION_APP_NAME" >> "$GITHUB_OUTPUT"
-          echo "storageAccount=$STORAGE_ACCOUNT" >> "$GITHUB_OUTPUT"
-          echo "storageBlobEndpoint=$STORAGE_BLOB_ENDPOINT" >> "$GITHUB_OUTPUT"
-          echo "deploymentContainerName=$DEPLOYMENT_CONTAINER_NAME" >> "$GITHUB_OUTPUT"
-          echo "privateDnsResourceGroup=$PRIVATE_DNS_RESOURCE_GROUP" >> "$GITHUB_OUTPUT"
-          echo "functionIntegrationSubnetId=$FUNCTION_INTEGRATION_SUBNET_ID" >> "$GITHUB_OUTPUT"
-          echo "functionIntegrationSubnetName=$FUNCTION_INTEGRATION_SUBNET_NAME" >> "$GITHUB_OUTPUT"
+          {
+            echo "functionAppName=$FUNCTION_APP_NAME"
+            echo "storageAccount=$STORAGE_ACCOUNT"
+            echo "storageBlobEndpoint=$STORAGE_BLOB_ENDPOINT"
+            echo "deploymentContainerName=$DEPLOYMENT_CONTAINER_NAME"
+            echo "privateDnsResourceGroup=$PRIVATE_DNS_RESOURCE_GROUP"
+            echo "functionIntegrationSubnetName=$FUNCTION_INTEGRATION_SUBNET_NAME"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Verify private networking before code deployment
         shell: bash
         env:
-          FUNCTION_APP_NAME: ${{ steps.deploy-bicep.outputs.functionAppName }}
-          STORAGE_ACCOUNT: ${{ steps.deploy-bicep.outputs.storageAccount }}
-          PRIVATE_DNS_RESOURCE_GROUP: ${{ steps.deploy-bicep.outputs.privateDnsResourceGroup }}
-          FUNCTION_INTEGRATION_SUBNET_ID: ${{ steps.deploy-bicep.outputs.functionIntegrationSubnetId }}
+          FUNCTION_APP_NAME: ${{ steps.target.outputs.functionAppName }}
+          STORAGE_ACCOUNT: ${{ steps.target.outputs.storageAccount }}
+          PRIVATE_DNS_RESOURCE_GROUP: ${{ steps.target.outputs.privateDnsResourceGroup }}
+          FUNCTION_INTEGRATION_SUBNET_NAME: ${{ steps.target.outputs.functionIntegrationSubnetName }}
+          SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           set -euo pipefail
           RESOURCE_GROUP="rg-certigo-$TARGET_ENV"
           APP_VNET="vnet-certigo-$TARGET_ENV"
           CI_RESOURCE_GROUP="$PRIVATE_DNS_RESOURCE_GROUP"
           CI_VNET="vnet-${CI_RESOURCE_GROUP#rg-}"
+          FUNCTION_INTEGRATION_SUBNET_ID="/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.Network/virtualNetworks/${APP_VNET}/subnets/${FUNCTION_INTEGRATION_SUBNET_NAME}"
           APPROVED_REQUIRED_GROUPS="$(
             az network private-endpoint list \
               --resource-group "$RESOURCE_GROUP" \
@@ -256,11 +470,12 @@ jobs:
           done
 
   deploy-backend:
-    name: Deploy backend code (${{ needs.validate-target.outputs.target }})
+    name: Deploy verified backend (${{ needs.validate-target.outputs.target }})
     environment: ${{ needs.validate-target.outputs.target }}
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
-    needs: [validate-target, deploy-infra]
+    needs: [validate-target, resolve-release, deploy-infra]
     permissions:
+      actions: read
       id-token: write
       contents: read
     env:
@@ -271,34 +486,28 @@ jobs:
       DEPLOYMENT_CONTAINER: ${{ needs.deploy-infra.outputs.deploymentContainerName }}
       SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       FUNCTION_INTEGRATION_SUBNET_NAME: ${{ needs.deploy-infra.outputs.functionIntegrationSubnetName }}
+      COMMIT_SHA: ${{ needs.resolve-release.outputs.sourceCommit }}
+      EXPECTED_PACKAGE_SHA256: ${{ needs.resolve-release.outputs.packageSha256 }}
+      SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}
+      DEPLOYMENT_OPERATION: ${{ needs.validate-target.outputs.operation }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+      - name: Download exact retained release
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          dotnet-version: "8.0.x"
+          name: backend-release
+          path: release
+          run-id: ${{ needs.validate-target.outputs.sourceRunId }}
+          github-token: ${{ github.token }}
 
-      - name: Restore locked dependencies
+      - name: Reverify release before Azure login
         run: |
-          dotnet restore backend/src/Certigo.Api/Certigo.Api.csproj \
-            --locked-mode
-      - name: Publish
-        run: |
-          dotnet publish backend/src/Certigo.Api/Certigo.Api.csproj \
-            --configuration Release \
-            --no-restore \
-            --output ./publish
-
-      - name: Zip publish artefact
-        run: |
-          rm -f ./publish.zip
-          find ./publish -exec touch -d '1980-01-01T00:00:00Z' {} +
-          cd ./publish
-          find . -type f -print0 | LC_ALL=C sort -z | xargs -0 zip -X ../publish.zip
-          cd ..
+          node .github/scripts/backend-release-manifest.mjs verify \
+            --manifest ./release/release-manifest.json \
+            --expected-commit "$COMMIT_SHA"
 
       - name: Azure login (OIDC)
         uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
@@ -307,13 +516,25 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy to Function App with private URL-based OneDeploy
+      - name: Deploy once and run liveness/readiness smoke tests
         shell: bash
         env:
           RESOURCE_GROUP: rg-certigo-${{ env.TARGET_ENV }}
-          PACKAGE_PATH: ./publish.zip
-          COMMIT_SHA: ${{ github.sha }}
+          PACKAGE_PATH: ./release/publish.zip
         run: |
           FUNCTION_INTEGRATION_SUBNET_ID="/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.Network/virtualNetworks/vnet-certigo-${TARGET_ENV}/subnets/${FUNCTION_INTEGRATION_SUBNET_NAME}"
           export FUNCTION_INTEGRATION_SUBNET_ID
           bash .github/scripts/deploy-flex-onedeploy.sh
+
+      - name: Summarize deployment evidence
+        if: ${{ success() }}
+        run: |
+          {
+            echo "## Backend $DEPLOYMENT_OPERATION"
+            echo
+            echo "- Environment: \`$TARGET_ENV\`"
+            echo "- Source run: \`$SOURCE_RUN_ID\`"
+            echo "- Commit: \`$COMMIT_SHA\`"
+            echo "- Package SHA-256: \`$EXPECTED_PACKAGE_SHA256\`"
+            echo "- Smoke tests: \`health/live\` and \`health/ready\` passed"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -291,6 +291,54 @@ test('diagnostic settings adopt the live storage setting names', () => {
   }
 });
 
+test('readiness availability alert requires both low-frequency probe locations to fail', () => {
+  const template = compileTemplate('infra/modules/diagnostics.bicep');
+  const [webTest] = resourcesOfType(template, 'Microsoft.Insights/webtests');
+  const [alert] = resourcesOfType(template, 'Microsoft.Insights/metricAlerts');
+
+  assert.equal(webTest.kind, 'standard');
+  assert.equal(webTest.properties.Frequency, 300);
+  assert.equal(
+    webTest.properties.Request.RequestUrl,
+    "[format('https://{0}/api/health/ready', parameters('functionAppHostName'))]",
+  );
+  assert.deepEqual(webTest.properties.Locations, [
+    { Id: 'emea-nl-ams-azr' },
+    { Id: 'us-va-ash-azr' },
+  ]);
+  assert.equal(
+    alert.properties.criteria['odata.type'],
+    'Microsoft.Azure.Monitor.WebtestLocationAvailabilityCriteria',
+  );
+  assert.equal(alert.properties.criteria.failedLocationCount, 2);
+  assert.equal(alert.properties.evaluationFrequency, 'PT5M');
+});
+
+test('deployment failure alert is scoped to failed backend operations in its resource group', () => {
+  const template = compileTemplate('infra/modules/diagnostics.bicep');
+  const [alert] = resourcesOfType(
+    template,
+    'Microsoft.Insights/activityLogAlerts',
+  );
+  const condition = alert.properties.condition.allOf;
+
+  assert.deepEqual(condition.slice(0, 3), [
+    { field: 'category', equals: 'Administrative' },
+    { field: 'status', equals: 'Failed' },
+    { field: 'resourceGroup', equals: '[resourceGroup().name]' },
+  ]);
+  assert.deepEqual(condition[3].anyOf, [
+    {
+      field: 'operationName',
+      equals: 'Microsoft.Resources/deployments/write',
+    },
+    {
+      field: 'operationName',
+      equals: 'Microsoft.Web/sites/extensions/write',
+    },
+  ]);
+});
+
 test('Key Vault purge protection is enabled in every environment', () => {
   const template = compileTemplate('infra/modules/keyvault.bicep');
   const [vault] = resourcesOfType(template, 'Microsoft.KeyVault/vaults');

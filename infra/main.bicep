@@ -462,6 +462,8 @@ module diagnostics 'modules/diagnostics.bicep' = if (env != 'dev') {
   name: 'diagnostics'
   params: {
     functionAppName: api.outputs.functionAppName
+    functionAppHostName: api.outputs.defaultHostName
+    appInsightsName: monitoring.outputs.name
     cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
     storageAccountName: storage.outputs.accountName

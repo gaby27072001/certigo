@@ -23,27 +23,82 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | Jobs rattachés à un `environment:` | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Clarification placeholders Entra en dev | ✅ Fait (cette PR) | `infra/params/dev.bicepparam` |
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
-| 3 secrets GitHub OIDC | ✅ **Fait (session)** — déjà positionnés | §T0.1 |
+| Configuration GitHub OIDC | ✅ Opérationnelle aux scopes existants ; ne pas déplacer sans audit | §T0.1 |
 | Clé JWT + expiration par Environment | ⛔ **Humain** — obligatoire avant staging/prod | §T0.4 |
 | Réseau privé atomique Storage / Key Vault / Cosmos + peering CI | ✅ IaC + hotfix OneDeploy | `infra/modules/privateNetwork.bicep` |
-| GitHub Environments `dev`/`staging`/`prod` | ✅ **Fait (session)** — créés ; ⚠️ reviewers `prod` bloqués (billing 422) | §T0.3 |
+| GitHub Environments `dev`/`staging`/`prod` | ✅ Créés ; staging/prod limités aux branches protégées et configurés JWT | §T0.3 |
 | Branch protection sur `main` | ⛔ **Humain** (admin repo) | §T0.3 |
 | Déploiement infra `dev` | ✅ **Fait (session)** — amorçage local réel | §T0.4 |
 | Validation auth (200/401) | ⛔ **À rejouer après déploiement privé** | §T0.5 + §Statut réel |
-| Smoke test | ⛔ **À rejouer après déploiement privé** | §T0.6 + §Statut réel |
+| Smoke test live + ready | ✅ Automatique et bloquant après OneDeploy | `deploy-flex-onedeploy.sh` |
+| ZIP/manifest/SBOM de release | ✅ Build unique, hashes revérifiés à chaque environnement | `cd-backend.yml` |
+| Rollback applicatif | ✅ Dispatch protégé vers un run `main` antérieur, sans Bicep | §Release récupérable |
 
 ### Check-list d'exploitation (utilisateur non-admin)
 
-1. Pour `dev`, merger sur `main` afin de déclencher `cd-backend.yml`. Pour
-   `staging` puis `prod`, envoyer séparément le dispatch `promote-backend` avec
-   `client_payload.environment` égal à l'environnement ciblé.
-2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `certigo-trusted`.
-3. En cas d'échec Azure login, contrôler uniquement les 3 secrets repo : `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
-4. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
+1. Pour `dev`, merger sur `main` afin de déclencher le build unique et le
+   déploiement `cd-backend.yml`. Noter l'identifiant numérique de ce run.
+2. Pour `staging` puis `prod`, envoyer séparément `promote-backend` avec
+   `client_payload.operation=promotion`, `client_payload.environment` et le même
+   `client_payload.source_run_id`.
+3. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `certigo-trusted`.
+4. En cas d'échec Azure login, contrôler la présence de `AZURE_CLIENT_ID`,
+   `AZURE_TENANT_ID` et `AZURE_SUBSCRIPTION_ID` dans leurs scopes GitHub
+   opérationnels actuels. Ne pas les recréer ou les déplacer sans preuve du scope
+   effectivement consommé.
+5. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
    `AUTH_JWT_SIGNING_KEY` / `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`, sans afficher sa valeur.
-4. Pour une promotion, utiliser le type `repository_dispatch` `promote-backend`.
-   Déployer `staging`, valider les smoke tests, puis envoyer un second dispatch
-   pour `prod`.
+6. Pour un rollback, sélectionner un ancien run `main` réussi encore retenu et
+   utiliser `promote-backend` avec `operation=rollback`. Le chemin rollback ne
+   redéploie pas Bicep.
+
+### Release récupérable
+
+Le workflow sépare désormais strictement la construction et la promotion :
+
+1. un push `main` produit `backend-release` une seule fois ;
+2. le bundle contient `publish.zip`, `release-manifest.json` et le SBOM CycloneDX ;
+3. le manifeste lie le commit, le run source et les SHA-256 du ZIP et du SBOM ;
+4. `dev`, `staging` et `prod` téléchargent et revérifient le même artefact ;
+5. OneDeploy conserve le ZIP immuable sous `deployments/<commit>.zip` et ne met à
+   jour `state/backend-release.json` qu'après succès de `health/live` et
+   `health/ready`.
+
+La rétention GitHub est de 90 jours. La politique Storage conserve les packages
+30 jours ; le pointeur minuscule `state/backend-release.json`, non soumis à cette
+expiration, référence `current` et `previous`. Pour une récupération opérateur :
+
+```bash
+# Trouver les runs push main réussis et choisir celui à restaurer.
+gh run list --workflow cd-backend.yml --branch main --event push \
+  --status success --limit 20
+
+PREVIOUS_RUN_ID="<id retenu>"
+printf '%s' \
+  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"prod\",\"operation\":\"rollback\",\"source_run_id\":\"$PREVIOUS_RUN_ID\"}}" |
+  gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input -
+```
+
+Le rollback reste soumis à l'environnement GitHub ciblé, réutilise OIDC et les
+secrets isolés de cet environnement, n'accepte qu'un run source `main` réussi de
+`cd-backend.yml`, puis exécute les deux smoke tests. En cas d'échec, le pointeur
+`current` n'est pas modifié et le workflow échoue fermé.
+
+### Alertes opérables
+
+Staging et production utilisent l'Action Group email existant. Les règles sont
+limitées aux signaux qu'une personne seule peut traiter :
+
+- disponibilité et dépendances : un test standard toutes les 5 minutes sur
+  `/api/health/ready`, depuis deux emplacements ; l'alerte exige l'échec des deux ;
+- readiness/Cosmos : la règle Log Analytics existante garde le détail du retour
+  non-200 (Cosmos, Storage ou Key Vault) ;
+- stabilité : la règle 5xx existante alerte sur un pic de réponses serveur ;
+- déploiement : une Activity Log Alert gratuite couvre les échecs ARM et
+  OneDeploy dans le resource group de l'environnement.
+
+Les alertes 5xx/readiness déjà présentes ne sont pas dupliquées. Aucun rôle Azure
+supplémentaire ni changement de paramètre de production n'est requis.
 
 La publication GitHub Pages de la politique de confidentialité suit la même
 frontière de confiance :
@@ -130,10 +185,13 @@ az account show -o table
 
 > ✅ **Déjà réalisé dans ce tenant (session Phase 0).** L'identité OIDC existe déjà :
 > app registration **`microlingo-github-actions`** (`appId 4bfc43dc-6a25-404e-a6ab-d19784ab0673`,
-> SP objectId `15d2b34a-c0a0-4b5d-8360-b895a8164706`). Les **3 secrets repo**
-> (`AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID`) sont **déjà positionnés**, et
+> SP objectId `15d2b34a-c0a0-4b5d-8360-b895a8164706`). La configuration
+> `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` est déjà
+> opérationnelle aux scopes GitHub existants, et
 > les 3 federated credentials `github-env-dev` / `github-env-staging` / `github-env-prod`
-> (sujet `repo:…:environment:<env>`) ont été **ajoutées cette session**. Les commandes ci-dessous
+> (sujet `repo:…:environment:<env>`) ont été **ajoutées cette session**. Les valeurs
+> `AZURE_*` sont déjà consommées par les déploiements ; leur scope ne doit pas être
+> recréé ou déplacé sans audit. Les commandes ci-dessous
 > sont la **recette de référence/reproduction** (par ex. pour un nouveau tenant) — ne pas
 > recréer une seconde app `microlingo-github-oidc` sous peine de doublon. Pour réutiliser
 > l'existant, faire `APP_ID=4bfc43dc-6a25-404e-a6ab-d19784ab0673`.
@@ -206,7 +264,7 @@ done
 az role assignment create --assignee "$APP_ID" --role "Owner" \
   --scope "/subscriptions/$SUBSCRIPTION_ID"
 
-# 4) Secrets GitHub (niveau repo)
+# 4) Exemple pour un nouveau dépôt uniquement — ne pas exécuter sur Certigo sans audit
 gh secret set AZURE_CLIENT_ID       --repo "$GH_ORG/$GH_REPO" --body "$APP_ID"
 gh secret set AZURE_TENANT_ID       --repo "$GH_ORG/$GH_REPO" --body "$TENANT_ID"
 gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPTION_ID"
@@ -264,7 +322,8 @@ requis, wait timer, branch policy) n'est disponible que pour les **dépôts publ
 GitHub payant compatible. Conséquence cette session : les environnements
 `dev` / `staging` / `prod` ont bien été **créés**, mais le **gate reviewer sur `prod` n'a pas pu
 être posé**. Résiduel admin : passer le repo sous un plan payant (ou le déplacer sous une org
-éligible), puis ré-exécuter le bloc `prod` ci-dessus.
+éligible), puis ré-exécuter le bloc `prod` ci-dessus. Les restrictions de branche
+sur `staging` et `prod` sont, elles, actives et doivent rester inchangées.
 
 ### Branch protection sur `main`
 
@@ -377,12 +436,14 @@ par examen soit actif sans expirer les tentatives existantes.
 ```bash
 # dev : merge/push protégé sur main déclenche cd-backend automatiquement.
 # staging, puis répéter avec "prod" après validation.
-printf '%s' '{"event_type":"promote-backend","client_payload":{"environment":"staging"}}' |
+SOURCE_RUN_ID="<run push main ayant déployé dev>"
+printf '%s' \
+  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"staging\",\"operation\":\"promotion\",\"source_run_id\":\"$SOURCE_RUN_ID\"}}" |
   gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" --input -
 ```
 
-> Le job `deploy-infra` capture l'output `functionAppName`, réutilisé par `deploy-backend`
-> pour le zip-deploy (avec boucle de retry × 5 contre la latence de propagation RBAC).
+> Le job `deploy-infra` capture les outputs Azure. `deploy-backend` télécharge
+> l'artefact retenu, revérifie son manifeste, lance OneDeploy puis les probes live/ready.
 
 ### Cohérence des paramètres `dev`
 
@@ -517,9 +578,11 @@ documentation), et le **résiduel strict** qui nécessite une action hors périm
 ### Ce qui est effectivement configuré
 
 - **T0.1 — OIDC : ✅ COMPLET.** App `microlingo-github-actions` (`appId 4bfc43dc-…`) + SP +
-  3 secrets repo déjà en place ; 3 federated credentials `github-env-dev/staging/prod` ajoutées.
-- **T0.3 — Environments : ✅ PARTIEL.** `dev` / `staging` / `prod` créés. **Reviewer gate `prod`
-  non posé** (billing GitHub 422, voir §T0.3). Branch protection `main` = résiduel admin.
+  configuration `AZURE_*` opérationnelle ; 3 federated credentials
+  `github-env-dev/staging/prod` ajoutées.
+- **T0.3 — Environments : ✅ PARTIEL.** `dev` / `staging` / `prod` créés ;
+  `staging`/`prod` limités aux branches protégées. **Reviewer gate `prod` non
+  posé** (billing GitHub 422, voir §T0.3). Branch protection `main` = résiduel admin.
 - **T0.2 — Runner : ✅ prémisse hosted réfutée en live.** Le run `28381092423` a été rejeté
   immédiatement car les runners GitHub-hosted sont désactivés pour ce dépôt.
   Aucune validation Enterprise ne sera sollicitée : le chemin critique reste le pool Azure

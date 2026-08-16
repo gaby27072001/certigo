@@ -275,8 +275,8 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
       peuvent exécuter leur SHA de tête uniquement sur `certigo-pr`, sans environnement,
       secret ou identité cloud. Les gates agrégées sans source PR et toutes les opérations
       privilégiées utilisent exclusivement `certigo-trusted`.
-- [ ] Supprimer le secret `AUTOMERGE_TOKEN`, révoquer le PAT correspondant et
-      désactiver **Allow auto-merge** si aucun autre usage gouverné ne le justifie.
+- [x] Le secret `AUTOMERGE_TOKEN` a été supprimé et le PAT correspondant révoqué.
+      Aucun workflow ne dépend de cet ancien mécanisme.
 - [ ] Protéger l'environnement `beta` avec reviewers obligatoires, interdiction
       d'auto-approbation et déploiement limité à la branche `main` uniquement.
       Stocker ses secrets de signature/publication dans cet environnement.

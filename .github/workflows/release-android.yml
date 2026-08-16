@@ -18,9 +18,9 @@ name: release-android
 #   Secret Key Vault            | Repli variable GitHub       | Rôle / format
 #   mobile-app-api-base-url     | vars.MOBILE_API_BASE_URL    | URL backend, https://<host>/api
 #   mobile-entra-client-id      | vars.MOBILE_ENTRA_CLIENT_ID | GUID App Registration mobile
-#   mobile-entra-authority      | vars.MOBILE_ENTRA_AUTHORITY | https://<domain>.ciamlogin.com/<tenant-id>/v2.0
+#   mobile-entra-authority      | vars.MOBILE_ENTRA_AUTHORITY | https://<tenant-guid>.ciamlogin.com/<tenant-guid>/v2.0
 #   mobile-entra-api-scope      | vars.MOBILE_ENTRA_API_SCOPE | api://<backend-client-id>/user_impersonation
-#   mobile-app-env              | vars.MOBILE_CERTIGO_ENV     | prod | staging | dev (défaut: prod)
+#   mobile-app-env              | vars.MOBILE_CERTIGO_ENV     | prod uniquement
 # Voir docs/RELEASE_MOBILE.md pour la génération des secrets (aucune valeur n'est committée).
 
 on:
@@ -223,8 +223,6 @@ jobs:
         shell: bash
         env:
           KV_NAME: ${{ vars.AZURE_KEYVAULT_NAME }}
-          DRY_RUN: ${{ steps.ver.outputs.dry_run }}
-          RELEASE_TRACK: ${{ steps.ver.outputs.track }}
           # Repli si Key Vault non configuré. Ce sont des variables (vars.*), pas des
           # secrets : ces valeurs sont embarquées en clair dans le binaire de l'app.
           FB_API_BASE_URL: ${{ vars.MOBILE_API_BASE_URL }}
@@ -237,9 +235,11 @@ jobs:
           API_BASE_URL="$FB_API_BASE_URL"; ENTRA_CLIENT_ID="$FB_ENTRA_CLIENT_ID"
           ENTRA_AUTHORITY="$FB_ENTRA_AUTHORITY"; ENTRA_API_SCOPE="$FB_ENTRA_API_SCOPE"
           CERTIGO_ENV="$FB_CERTIGO_ENV"
+          CONFIG_SOURCE=github-variables
 
           if [ -n "${KV_NAME:-}" ]; then
             echo "Config app : Azure Key Vault ($KV_NAME) via l'identité managée du runner."
+            CONFIG_SOURCE=azure-key-vault
             az login --identity --output none
             kv(){ az keyvault secret show --vault-name "$KV_NAME" --name "$1" --query value -o tsv 2>/dev/null || true; }
             V="$(kv mobile-app-api-base-url)"; [ -n "$V" ] && API_BASE_URL="$V"
@@ -251,52 +251,13 @@ jobs:
             echo "Config app : variables GitHub (variable AZURE_KEYVAULT_NAME non définie)."
           fi
 
-          CERTIGO_ENV="${CERTIGO_ENV:-prod}"
-
-          GUID_RE='^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'
-          CONFIG_VALID=true
-
-          if [[ ! "$API_BASE_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?/api/?$ ]]; then
-            echo "::error::MOBILE_API_BASE_URL doit être une URL HTTPS terminée par /api."
-            CONFIG_VALID=false
-          fi
-          if [[ ! "$ENTRA_CLIENT_ID" =~ $GUID_RE ]]; then
-            echo "::error::MOBILE_ENTRA_CLIENT_ID doit être un GUID."
-            CONFIG_VALID=false
-          fi
-          if [[ ! "$ENTRA_AUTHORITY" =~ ^https://[A-Za-z0-9-]+\.ciamlogin\.com/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/v2\.0/?$ ]]; then
-            echo "::error::MOBILE_ENTRA_AUTHORITY doit cibler le tenant External ID en HTTPS."
-            CONFIG_VALID=false
-          fi
-          if [[ ! "$ENTRA_API_SCOPE" =~ ^api://[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/[A-Za-z][A-Za-z0-9._-]{0,99}$ ]]; then
-            echo "::error::MOBILE_ENTRA_API_SCOPE doit être un scope api://<GUID>/<nom>."
-            CONFIG_VALID=false
-          fi
-          case "$CERTIGO_ENV" in
-            dev|staging|prod) ;;
-            *)
-              echo "::error::MOBILE_CERTIGO_ENV doit valoir dev, staging ou prod."
-              CONFIG_VALID=false
-              ;;
-          esac
-          if [ "$RELEASE_TRACK" = "production" ] && [ "$CERTIGO_ENV" != "prod" ]; then
-            echo "::error::La piste production exige MOBILE_CERTIGO_ENV=prod."
-            CONFIG_VALID=false
-          fi
-
-          echo "config_valid=$CONFIG_VALID" >> "$GITHUB_OUTPUT"
-          if [ "$CONFIG_VALID" != "true" ]; then
-            if [ "${DRY_RUN:-false}" != "true" ]; then
-              echo "::error::Une configuration API/Entra complète et valide est obligatoire avant publication."
-              exit 1
-            fi
-            echo "::warning::Configuration API/Entra invalide : dry-run autorisé avec configuration neutralisée."
-            API_BASE_URL=""
-            ENTRA_CLIENT_ID=""
-            ENTRA_AUTHORITY=""
-            ENTRA_API_SCOPE=""
-            CERTIGO_ENV="dev"
-          fi
+          node .github/scripts/validate-mobile-release-config.mjs \
+            --api-base-url "$API_BASE_URL" \
+            --entra-client-id "$ENTRA_CLIENT_ID" \
+            --entra-authority "$ENTRA_AUTHORITY" \
+            --entra-api-scope "$ENTRA_API_SCOPE" \
+            --certigo-env "$CERTIGO_ENV"
+          echo "config_valid=true" >> "$GITHUB_OUTPUT"
 
           {
             echo "APP_API_BASE_URL=$API_BASE_URL"
@@ -305,7 +266,8 @@ jobs:
             echo "APP_ENTRA_API_SCOPE=$ENTRA_API_SCOPE"
             echo "APP_CERTIGO_ENV=$CERTIGO_ENV"
           } >> "$GITHUB_ENV"
-          echo "Configuration app résolue (env=$CERTIGO_ENV)."
+          echo "Configuration app prod validée (source=$CONFIG_SOURCE)." |
+            tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Construire l'AAB signé
         working-directory: apps/mobile
