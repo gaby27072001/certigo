@@ -115,6 +115,22 @@ Key entry points are `apps\mobile\lib\main.dart`,
 - Add comments only for architectural invariants, security constraints, or
   non-obvious formulas.
 
+## Project Agent Skills
+
+- Project-scoped design and motion references live in `.agents/skills`; their
+  provenance, license, selection, and update procedure are documented in
+  `docs/AGENT_SKILLS.md`.
+- Treat the installed upstream skills as design guidance, not as web stack
+  requirements. Translate CSS, React, browser, and Motion examples to Flutter
+  primitives and existing Prism components.
+- `packages/prism_ui/lib/src/tokens/prism_motion.dart` remains authoritative
+  for durations and curves. Extend existing Prism tokens instead of copying
+  CSS timing values into Dart.
+- Preserve `MediaQuery.disableAnimations` handling and the repository rule that
+  motion is informative rather than decorative.
+- Do not add JavaScript UI libraries, Flutter dependencies, or generated web
+  scaffolding solely because an upstream skill recommends them.
+
 ## Git and CI
 
 - Work on a feature branch; do not push directly to `main`.
