@@ -114,18 +114,23 @@ mapfile -t storage_security_settings < <(
   az storage account show \
     --resource-group "$RESOURCE_GROUP" \
     --name "$STORAGE_ACCOUNT" \
-    --query '[publicNetworkAccess,allowSharedKeyAccess]' \
+    --query '[publicNetworkAccess,allowSharedKeyAccess,id]' \
     --output tsv \
     --only-show-errors
 )
-if (( ${#storage_security_settings[@]} != 2 )); then
+if (( ${#storage_security_settings[@]} != 3 )); then
   echo "::error::Deployment storage returned invalid security settings."
   exit 1
 fi
 public_network_access="${storage_security_settings[0]}"
 shared_key_access="${storage_security_settings[1]}"
+storage_resource_id="${storage_security_settings[2]}"
 if [[ "${public_network_access,,}" != 'disabled' || "${shared_key_access,,}" != 'false' ]]; then
   echo "::error::Deployment storage must disable public network and shared-key access."
+  exit 1
+fi
+if [[ ! "$storage_resource_id" =~ ^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[A-Za-z0-9._()-]+/providers/Microsoft.Storage/storageAccounts/[a-z0-9]+$ ]]; then
+  echo "::error::Deployment storage returned an invalid resource id."
   exit 1
 fi
 
@@ -159,14 +164,18 @@ if [[ "$integration_subnet" != "$FUNCTION_INTEGRATION_SUBNET_ID" ]]; then
   exit 1
 fi
 
-private_endpoint_nic="$(
-  az network private-endpoint show \
+mapfile -t private_endpoint_nics < <(
+  az network private-endpoint list \
     --resource-group "$RESOURCE_GROUP" \
-    --name "pep-${STORAGE_ACCOUNT}-blob" \
-    --query 'networkInterfaces[0].id' \
+    --query "[?privateLinkServiceConnections[0].privateLinkServiceId=='${storage_resource_id}' && privateLinkServiceConnections[0].privateLinkServiceConnectionState.status=='Approved' && contains(privateLinkServiceConnections[0].groupIds, 'blob')].networkInterfaces[0].id" \
     --output tsv \
     --only-show-errors
-)"
+)
+if (( ${#private_endpoint_nics[@]} != 1 )); then
+  echo "::error::Expected exactly one approved blob private endpoint for deployment storage."
+  exit 1
+fi
+private_endpoint_nic="${private_endpoint_nics[0]}"
 private_endpoint_ip="$(
   az network nic show \
     --ids "$private_endpoint_nic" \

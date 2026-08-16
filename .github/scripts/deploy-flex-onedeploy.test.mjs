@@ -53,12 +53,14 @@ function createHarness() {
 set -euo pipefail
 case "$*" in
   "storage account show"*)
-    printf 'Disabled\\nfalse\\n'
+    printf 'Disabled\\nfalse\\n/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-certigo-dev/providers/Microsoft.Storage/storageAccounts/stcertigodev\\n'
     ;;
   "resource show"*)
     printf 'UserAssignedIdentity\\nhttps://stcertigodev.blob.core.windows.net/app-package\\n/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-certigo-dev/providers/Microsoft.Network/virtualNetworks/vnet-certigo-dev/subnets/snet-functions\\n'
     ;;
-  "network private-endpoint show"*)
+  "network private-endpoint list"*)
+    [[ "$*" == *"privateLinkServiceId=='/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-certigo-dev/providers/Microsoft.Storage/storageAccounts/stcertigodev'"* ]]
+    [[ "$*" == *"contains(privateLinkServiceConnections[0].groupIds, 'blob')"* ]]
     printf '/subscriptions/test/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/blob-nic\\n'
     ;;
   "network nic show"*)
@@ -490,5 +492,7 @@ test('deploy script uses only direct ARM OneDeploy and user delegation', () => {
   assert.match(script, /--as-user/);
   assert.match(script, /--overwrite false/);
   assert.match(script, /umask 077/);
+  assert.match(script, /network private-endpoint list/);
+  assert.doesNotMatch(script, /pep-\$\{STORAGE_ACCOUNT\}-blob/);
   assert.doesNotMatch(script, /storage blob delete/);
 });
