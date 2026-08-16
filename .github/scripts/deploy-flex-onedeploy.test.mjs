@@ -43,6 +43,7 @@ function createHarness() {
   const shellNumericState = `${shellState}.numeric`;
   const shellTransientState = `${shellState}.transient`;
   const shellTrailingHtmlState = `${shellState}.trailing-html`;
+  const shellCollectionState = `${shellState}.collection`;
   const packagePath = path.join(root, 'publish.zip');
   writeFileSync(packagePath, 'deterministic-package', 'utf8');
 
@@ -211,6 +212,19 @@ if [[ "\${MOCK_TRAILING_HTML_STATUS:-false}" == 'true' ]]; then
   fi
   printf '{"properties":{"status":%s}}<!DOCTYPE html><html></html>\\n' \
     "$numeric_status" >"$output_file"
+  printf '200'
+  exit 0
+fi
+if [[ "\${MOCK_DEPLOYMENT_COLLECTION_STATUS:-false}" == 'true' ]]; then
+  if [[ -f "${shellCollectionState}" ]]; then
+    numeric_status=4
+  else
+    touch "${shellCollectionState}"
+    numeric_status=2
+  fi
+  received_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  printf '{"value":[{"properties":{"deployer":"AZURE_RESOURCE_MANAGER","received_time":"2000-01-01T00:00:00Z","status":4}},{"properties":{"deployer":"AZURE_RESOURCE_MANAGER","received_time":"%s","status":%s}}]}<!DOCTYPE html><html></html>\\n' \
+    "$received_at" "$numeric_status" >"$output_file"
   printf '200'
   exit 0
 fi
@@ -393,6 +407,20 @@ test('deploy script accepts an ARM JSON payload followed by an App Service error
     env: {
       ...harness.env,
       MOCK_TRAILING_HTML_STATUS: 'true',
+    },
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /passed liveness and readiness checks/);
+});
+
+test('deploy script correlates the current deployment from an ARM collection', () => {
+  const harness = createHarness();
+  const result = spawnSync('bash', [bashPath(deployScript)], {
+    env: {
+      ...harness.env,
+      MOCK_DEPLOYMENT_COLLECTION_STATUS: 'true',
     },
     encoding: 'utf8',
   });

@@ -275,6 +275,7 @@ printf \
 
 arm_endpoint="https://management.azure.com/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.Web/sites/${FUNCTION_APP_NAME}/extensions/onedeploy?api-version=2024-04-01"
 mask_secret "$arm_endpoint"
+deployment_started_at="$(date -u '+%s')"
 if ! request_status="$(
   curl \
     --config "$auth_config_file" \
@@ -397,9 +398,20 @@ while (( SECONDS - operation_started_at < DEPLOYMENT_TIMEOUT_SECONDS )); do
         json = source.slice(0, end);
       }
       const payload = JSON.parse(json);
-      const status = payload.status
-        ?? payload.properties?.status
-        ?? payload.properties?.provisioningState;
+      const startedAt = Number(process.argv[2]) * 1000;
+      const candidates = Array.isArray(payload.value)
+        ? payload.value
+          .filter((deployment) =>
+            deployment?.properties?.deployer === "AZURE_RESOURCE_MANAGER"
+            && Date.parse(deployment.properties.received_time) >= startedAt)
+          .sort((left, right) =>
+            Date.parse(right.properties.received_time)
+            - Date.parse(left.properties.received_time))
+        : [payload];
+      const deployment = candidates[0];
+      const status = deployment?.status
+        ?? deployment?.properties?.status
+        ?? deployment?.properties?.provisioningState;
       let normalizedStatus;
       if (typeof status === "string" && status.length > 0) {
         normalizedStatus = status;
@@ -411,7 +423,7 @@ while (( SECONDS - operation_started_at < DEPLOYMENT_TIMEOUT_SECONDS )); do
       }
       if (!normalizedStatus) process.exit(2);
       process.stdout.write(normalizedStatus);
-    ' "$operation_body_file" 2>/dev/null
+    ' "$operation_body_file" "$deployment_started_at" 2>/dev/null
   )"; then
     echo "OneDeploy asynchronous operation status is not yet available; retrying."
     sleep "$POLL_INTERVAL_SECONDS"
