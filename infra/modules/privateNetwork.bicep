@@ -42,6 +42,21 @@ param keyVaultPrivateEndpointName string
 @description('Existing Cosmos DB private endpoint name.')
 param cosmosPrivateEndpointName string
 
+@description('Existing Blob private link service connection name.')
+param storageBlobPrivateLinkConnectionName string
+
+@description('Existing Queue private link service connection name.')
+param storageQueuePrivateLinkConnectionName string
+
+@description('Existing Table private link service connection name.')
+param storageTablePrivateLinkConnectionName string
+
+@description('Existing Key Vault private link service connection name.')
+param keyVaultPrivateLinkConnectionName string
+
+@description('Existing Cosmos DB private link service connection name.')
+param cosmosPrivateLinkConnectionName string
+
 @description('Existing Blob private DNS zone group name.')
 param storageBlobPrivateDnsZoneGroupName string = 'default'
 
@@ -148,7 +163,7 @@ resource storageBlobEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
     }
     privateLinkServiceConnections: [
       {
-        name: '${storageAccountName}-blob'
+        name: storageBlobPrivateLinkConnectionName
         properties: {
           privateLinkServiceId: storage.id
           groupIds: [
@@ -170,7 +185,7 @@ resource storageQueueEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = 
     }
     privateLinkServiceConnections: [
       {
-        name: '${storageAccountName}-queue'
+        name: storageQueuePrivateLinkConnectionName
         properties: {
           privateLinkServiceId: storage.id
           groupIds: [
@@ -192,7 +207,7 @@ resource storageTableEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = 
     }
     privateLinkServiceConnections: [
       {
-        name: '${storageAccountName}-table'
+        name: storageTablePrivateLinkConnectionName
         properties: {
           privateLinkServiceId: storage.id
           groupIds: [
@@ -214,7 +229,7 @@ resource vaultEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
     }
     privateLinkServiceConnections: [
       {
-        name: '${keyVaultName}-vault'
+        name: keyVaultPrivateLinkConnectionName
         properties: {
           privateLinkServiceId: vault.id
           groupIds: [
@@ -236,7 +251,7 @@ resource cosmosEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
     }
     privateLinkServiceConnections: [
       {
-        name: '${cosmosAccountName}-sql'
+        name: cosmosPrivateLinkConnectionName
         properties: {
           privateLinkServiceId: cosmos.id
           groupIds: [

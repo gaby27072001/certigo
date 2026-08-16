@@ -27,6 +27,11 @@ param storageQueuePrivateEndpointName = 'pe-st-certigo-prod-queue'
 param storageTablePrivateEndpointName = 'pe-st-certigo-prod-table'
 param keyVaultPrivateEndpointName = 'pe-kv-certigo-prod'
 param cosmosPrivateEndpointName = 'pe-cosmos-certigo-prod-sql'
+param storageBlobPrivateLinkConnectionName = 'pe-st-certigo-prod-blob-conn'
+param storageQueuePrivateLinkConnectionName = 'pe-st-certigo-prod-queue-conn'
+param storageTablePrivateLinkConnectionName = 'pe-st-certigo-prod-table-conn'
+param keyVaultPrivateLinkConnectionName = 'pe-kv-certigo-prod-conn'
+param cosmosPrivateLinkConnectionName = 'pe-cosmos-certigo-prod-sql-conn'
 
 // Cosmos DB region. West Europe has AZ-capacity limits for Cosmos (the reason dev
 // deploys Cosmos in North Europe). We pin prod to North Europe too so the deploy

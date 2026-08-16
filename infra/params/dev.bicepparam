@@ -35,6 +35,11 @@ param storageQueuePrivateEndpointName = 'pep-stcertigodevbk3j5ja6-queue'
 param storageTablePrivateEndpointName = 'pep-stcertigodevbk3j5ja6-table'
 param keyVaultPrivateEndpointName = 'pep-kv-certigo-dev-bk3j5j-vault'
 param cosmosPrivateEndpointName = 'pep-cosmos-certigo-dev-bk3j5ja6vw23s-sql'
+param storageBlobPrivateLinkConnectionName = 'stcertigodevbk3j5ja6-blob'
+param storageQueuePrivateLinkConnectionName = 'stcertigodevbk3j5ja6-queue'
+param storageTablePrivateLinkConnectionName = 'stcertigodevbk3j5ja6-table'
+param keyVaultPrivateLinkConnectionName = 'kv-certigo-dev-bk3j5j-vault'
+param cosmosPrivateLinkConnectionName = 'cosmos-certigo-dev-bk3j5ja6vw23s-sql'
 
 // Explicit periodic backup for disposable development data.
 param cosmosBackupMode = 'Periodic'
