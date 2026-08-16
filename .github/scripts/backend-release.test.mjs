@@ -34,6 +34,12 @@ const deploymentStateScript = path.join(
   'scripts',
   'update-backend-deployment-state.mjs',
 );
+const deploymentStateVerificationScript = path.join(
+  repositoryRoot,
+  '.github',
+  'scripts',
+  'verify-backend-deployment-state.mjs',
+);
 const commitSha = '0123456789abcdef0123456789abcdef01234567';
 
 function createRelease() {
@@ -212,4 +218,65 @@ test('deployment state preserves the previously healthy release', () => {
     state.previous.commitSha,
     '1111111111111111111111111111111111111111',
   );
+});
+
+test('deployment lineage accepts only the recorded current or previous release', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'certigo-deployment-lineage-'));
+  const stateFile = path.join(root, 'state.json');
+  const previousCommit = '1111111111111111111111111111111111111111';
+  writeFileSync(
+    stateFile,
+    JSON.stringify({
+      schema: 'certigo.backend.deployment-state/v1',
+      environment: 'prod',
+      current: {
+        commitSha,
+        packageSha256: 'b'.repeat(64),
+        blobName: `deployments/${commitSha}.zip`,
+        sourceRunId: 1234,
+        operation: 'promotion',
+        deployedAt: '2026-08-16T14:00:00Z',
+      },
+      previous: {
+        commitSha: previousCommit,
+        packageSha256: 'a'.repeat(64),
+        blobName: `deployments/${previousCommit}.zip`,
+        sourceRunId: 100,
+        operation: 'release',
+        deployedAt: '2026-08-15T10:00:00Z',
+      },
+    }),
+    'utf8',
+  );
+
+  const verify = (slot, expectedCommit, expectedDigest, expectedRunId) =>
+    spawnSync(
+      process.execPath,
+      [
+        deploymentStateVerificationScript,
+        '--state',
+        stateFile,
+        '--environment',
+        'prod',
+        '--slot',
+        slot,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          EXPECTED_COMMIT_SHA: expectedCommit,
+          EXPECTED_PACKAGE_SHA256: expectedDigest,
+          EXPECTED_SOURCE_RUN_ID: expectedRunId,
+        },
+      },
+    );
+
+  const current = verify('current', commitSha, 'b'.repeat(64), '1234');
+  assert.equal(current.status, 0, current.stderr);
+  const previous = verify('previous', previousCommit, 'a'.repeat(64), '100');
+  assert.equal(previous.status, 0, previous.stderr);
+  const mismatch = verify('previous', commitSha, 'b'.repeat(64), '1234');
+  assert.notEqual(mismatch.status, 0);
+  assert.match(mismatch.stderr, /does not match the previous prod release/);
 });

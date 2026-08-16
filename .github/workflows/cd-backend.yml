@@ -235,6 +235,41 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Require the staging release before production promotion
+        if: ${{ needs.validate-target.outputs.operation == 'promotion' && needs.validate-target.outputs.target == 'prod' }}
+        shell: bash
+        env:
+          EXPECTED_COMMIT_SHA: ${{ needs.resolve-release.outputs.sourceCommit }}
+          EXPECTED_PACKAGE_SHA256: ${{ needs.resolve-release.outputs.packageSha256 }}
+          EXPECTED_SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}
+        run: |
+          set -euo pipefail
+          STATE_FILE="$RUNNER_TEMP/certigo-staging-release-state.json"
+          trap 'rm -f -- "$STATE_FILE"' EXIT
+          mapfile -t STORAGE_ACCOUNTS < <(
+            az storage account list \
+              --resource-group rg-certigo-staging \
+              --query "[?tags.product=='Certigo' && tags.env=='staging'].name" \
+              --output tsv
+          )
+          if (( ${#STORAGE_ACCOUNTS[@]} != 1 )); then
+            echo "::error::Production promotion requires exactly one tagged staging storage account."
+            exit 1
+          fi
+          az storage blob download \
+            --account-name "${STORAGE_ACCOUNTS[0]}" \
+            --container-name app-package \
+            --name state/backend-release.json \
+            --file "$STATE_FILE" \
+            --auth-mode login \
+            --overwrite true \
+            --output none \
+            --only-show-errors
+          node .github/scripts/verify-backend-deployment-state.mjs \
+            --state "$STATE_FILE" \
+            --environment staging \
+            --slot current
+
       - name: Deploy current infrastructure
         id: deploy-bicep
         if: ${{ needs.validate-target.outputs.operation != 'rollback' }}
@@ -374,6 +409,32 @@ jobs:
             echo "privateDnsResourceGroup=$PRIVATE_DNS_RESOURCE_GROUP"
             echo "functionIntegrationSubnetName=$FUNCTION_INTEGRATION_SUBNET_NAME"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Require the recorded previous release for rollback
+        if: ${{ needs.validate-target.outputs.operation == 'rollback' }}
+        shell: bash
+        env:
+          EXPECTED_COMMIT_SHA: ${{ needs.resolve-release.outputs.sourceCommit }}
+          EXPECTED_PACKAGE_SHA256: ${{ needs.resolve-release.outputs.packageSha256 }}
+          EXPECTED_SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}
+          STORAGE_ACCOUNT: ${{ steps.target.outputs.storageAccount }}
+        run: |
+          set -euo pipefail
+          STATE_FILE="$RUNNER_TEMP/certigo-$TARGET_ENV-release-state.json"
+          trap 'rm -f -- "$STATE_FILE"' EXIT
+          az storage blob download \
+            --account-name "$STORAGE_ACCOUNT" \
+            --container-name app-package \
+            --name state/backend-release.json \
+            --file "$STATE_FILE" \
+            --auth-mode login \
+            --overwrite true \
+            --output none \
+            --only-show-errors
+          node .github/scripts/verify-backend-deployment-state.mjs \
+            --state "$STATE_FILE" \
+            --environment "$TARGET_ENV" \
+            --slot previous
 
       - name: Verify private networking before code deployment
         shell: bash

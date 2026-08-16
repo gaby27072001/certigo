@@ -113,8 +113,10 @@ Le backend suit un modèle **CD par environnement** (pas un tag applicatif) :
 - **`staging` puis `prod`** : deux promotions manuelles référencent le `source_run_id`
   du run `main` déjà passé en `dev`. Le workflow vérifie via l'API GitHub que ce run
   est un push `main` réussi de `cd-backend.yml`, puis revérifie manifeste et hashes.
-- **Récupération** : `promote-backend` avec `operation=rollback` redéploie l'artefact d'un ancien run `main`
-  réussi, sous la gate GitHub de l'environnement, sans redéployer Bicep.
+  `prod` refuse l'artefact s'il n'est pas le `current` déjà sain de staging.
+- **Récupération** : `promote-backend` avec `operation=rollback` redéploie uniquement
+  l'artefact `previous` enregistré pour l'environnement, sous sa gate GitHub et sans
+  redéployer Bicep.
 - **Conservation** : le bundle GitHub (`backend-release`) reste 90 jours ; chaque
   stockage d'environnement conserve les ZIP immuables 30 jours et
   `state/backend-release.json` référence les versions courante et précédente.

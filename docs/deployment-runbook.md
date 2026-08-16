@@ -52,9 +52,9 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 6. Contrôler que la variable non secrète `ALERT_EMAIL` de chaque Environment
    `staging`/`prod` désigne une boîte réellement supervisée ; aucune valeur par
    défaut n'est committée.
-7. Pour un rollback, sélectionner un ancien run `main` réussi encore retenu et
-   utiliser `promote-backend` avec `operation=rollback`. Le chemin rollback ne
-   redéploie pas Bicep.
+7. Pour un rollback, relever le `sourceRunId` de `previous` dans l'état de
+   déploiement et utiliser `promote-backend` avec `operation=rollback`. Le chemin
+   rollback refuse tout autre artefact et ne redéploie pas Bicep.
 
 ### Release récupérable
 
@@ -64,6 +64,7 @@ Le workflow sépare désormais strictement la construction et la promotion :
 2. le bundle contient `publish.zip`, `release-manifest.json` et le SBOM CycloneDX ;
 3. le manifeste lie le commit, le run source et les SHA-256 du ZIP et du SBOM ;
 4. `dev`, `staging` et `prod` téléchargent et revérifient le même artefact ;
+   `prod` exige qu'il soit déjà le `current` sain de staging ;
 5. OneDeploy conserve le ZIP immuable sous `deployments/<commit>.zip` et ne met à
    jour `state/backend-release.json` qu'après succès de `health/live` et
    `health/ready`.
@@ -73,20 +74,17 @@ La rétention GitHub est de 90 jours. La politique Storage conserve les packages
 expiration, référence `current` et `previous`. Pour une récupération opérateur :
 
 ```bash
-# Trouver les runs push main réussis et choisir celui à restaurer.
-gh run list --workflow cd-backend.yml --branch main --event push \
-  --status success --limit 20
-
-PREVIOUS_RUN_ID="<id retenu>"
+# Utiliser exclusivement le sourceRunId du champ previous de l'environnement.
+PREVIOUS_RUN_ID="<state/backend-release.json.previous.sourceRunId>"
 printf '%s' \
   "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"prod\",\"operation\":\"rollback\",\"source_run_id\":\"$PREVIOUS_RUN_ID\"}}" |
   gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input -
 ```
 
 Le rollback reste soumis à l'environnement GitHub ciblé, réutilise OIDC et les
-secrets isolés de cet environnement, n'accepte qu'un run source `main` réussi de
-`cd-backend.yml`, puis exécute les deux smoke tests. En cas d'échec, le pointeur
-`current` n'est pas modifié et le workflow échoue fermé.
+secrets isolés de cet environnement, exige le commit, le hash et le run source
+enregistrés dans `previous`, puis exécute les deux smoke tests. En cas d'échec, le
+pointeur `current` n'est pas modifié et le workflow échoue fermé.
 
 ### Alertes opérables
 

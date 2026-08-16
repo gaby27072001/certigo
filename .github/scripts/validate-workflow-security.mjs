@@ -569,6 +569,10 @@ function validateRepositoryInvariants() {
     'COMMIT_SHA: ${{ needs.resolve-release.outputs.sourceCommit }}',
     'EXPECTED_PACKAGE_SHA256: ${{ needs.resolve-release.outputs.packageSha256 }}',
     'SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}',
+    'verify-backend-deployment-state.mjs',
+    '--environment staging',
+    '--slot current',
+    '--slot previous',
   ]) {
     if (!backend.includes(marker)) {
       errors.push(`cd-backend.yml: missing private OneDeploy invariant ${marker}`);

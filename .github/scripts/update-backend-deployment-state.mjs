@@ -2,68 +2,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-const schema = 'certigo.backend.deployment-state/v1';
+import {
+  deploymentStateSchema,
+  loadDeploymentState,
+  validateDeploymentRelease,
+} from './backend-deployment-state.mjs';
+
 const shaPattern = /^[0-9a-f]{40}$/;
 const digestPattern = /^[0-9a-f]{64}$/;
 
 function fail(message) {
   throw new Error(message);
-}
-
-function exactKeys(value, expected, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    fail(`${label} must be an object.`);
-  }
-  const actual = Object.keys(value).sort();
-  const wanted = [...expected].sort();
-  if (JSON.stringify(actual) !== JSON.stringify(wanted)) {
-    fail(`${label} fields must be exactly ${wanted.join(', ')}.`);
-  }
-}
-
-function validateRelease(value, label) {
-  exactKeys(
-    value,
-    ['blobName', 'commitSha', 'deployedAt', 'operation', 'packageSha256', 'sourceRunId'],
-    label,
-  );
-  if (!shaPattern.test(value.commitSha ?? '')) {
-    fail(`${label}.commitSha is invalid.`);
-  }
-  if (!digestPattern.test(value.packageSha256 ?? '')) {
-    fail(`${label}.packageSha256 is invalid.`);
-  }
-  if (value.blobName !== `deployments/${value.commitSha}.zip`) {
-    fail(`${label}.blobName does not match its commit.`);
-  }
-  if (!/^[1-9][0-9]{0,19}$/.test(String(value.sourceRunId ?? ''))) {
-    fail(`${label}.sourceRunId is invalid.`);
-  }
-  if (!['release', 'promotion', 'rollback'].includes(value.operation)) {
-    fail(`${label}.operation is invalid.`);
-  }
-  if (
-    typeof value.deployedAt !== 'string'
-    || Number.isNaN(Date.parse(value.deployedAt))
-  ) {
-    fail(`${label}.deployedAt is invalid.`);
-  }
-}
-
-function loadPrevious(file, environment) {
-  if (!file || !fs.existsSync(file) || fs.statSync(file).size === 0) {
-    return null;
-  }
-  const state = JSON.parse(fs.readFileSync(file, 'utf8'));
-  exactKeys(state, ['current', 'environment', 'previous', 'schema'], 'deployment state');
-  if (state.schema !== schema || state.environment !== environment) {
-    fail('Existing deployment state has an unexpected schema or environment.');
-  }
-  validateRelease(state.current, 'deployment state.current');
-  if (state.previous !== null) {
-    validateRelease(state.previous, 'deployment state.previous');
-  }
-  return state;
 }
 
 function requireEnvironment(name, pattern) {
@@ -108,14 +57,14 @@ function main() {
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/,
     ),
   };
-  validateRelease(current, 'current release');
+  validateDeploymentRelease(current, 'current release');
 
-  const existing = loadPrevious(args.previous, environment);
+  const existing = loadDeploymentState(args.previous, environment);
   const sameRelease = existing
     && existing.current.commitSha === current.commitSha
     && existing.current.packageSha256 === current.packageSha256;
   const state = {
-    schema,
+    schema: deploymentStateSchema,
     environment,
     current,
     previous: sameRelease ? existing.previous : existing?.current ?? null,
