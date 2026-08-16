@@ -218,7 +218,6 @@ Tous les workflows **exigent** une capacité self-hosted adaptée :
 | Workflow | Raison |
 |---|---|
 | [`cd-backend.yml`](../../.github/workflows/cd-backend.yml) | **Déploiement critique** du backend sur `certigo-trusted`. |
-| [`promote-backend-staging-prod.yml`](../../.github/workflows/promote-backend-staging-prod.yml) | Orchestrateur privilégié (`repository_dispatch` depuis `main`) qui **réutilise** `cd-backend.yml`. |
 | [`release-android.yml`](../../.github/workflows/release-android.yml) | Build **AAB lourd**, runner `[self-hosted, Linux, X64, certigo-trusted]`. |
 | [`release-ios.yml`](../../.github/workflows/release-ios.yml) | **iOS = Mac obligatoire**, runner `[self-hosted, macOS, certigo-trusted]`. |
 | [`sync-ios-certs.yml`](../../.github/workflows/sync-ios-certs.yml) | Certificats iOS, runner `[self-hosted, macOS, certigo-trusted]`. |
@@ -256,7 +255,6 @@ validations PR ne peut donc être restauré sur le pool trusted.
 - Preuve du blocage EMU : run [`28782170300`](https://github.com/gchambaud_microsoft/Certigo/actions/runs/28782170300).
 - Workflows CI/CD : [`.github/workflows/`](../../.github/workflows/).
 - Restent self-hosted : [`cd-backend.yml`](../../.github/workflows/cd-backend.yml),
-  [`promote-backend-staging-prod.yml`](../../.github/workflows/promote-backend-staging-prod.yml),
   [`release-android.yml`](../../.github/workflows/release-android.yml),
   [`release-ios.yml`](../../.github/workflows/release-ios.yml),
   [`sync-ios-certs.yml`](../../.github/workflows/sync-ios-certs.yml).

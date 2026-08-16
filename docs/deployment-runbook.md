@@ -35,13 +35,15 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 ### Check-list d'exploitation (utilisateur non-admin)
 
 1. Pour `dev`, merger sur `main` afin de déclencher `cd-backend.yml`. Pour
-   `staging` puis `prod`, envoyer le dispatch `promote-backend-staging-prod`.
+   `staging` puis `prod`, envoyer séparément le dispatch `promote-backend` avec
+   `client_payload.environment` égal à l'environnement ciblé.
 2. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `certigo-trusted`.
 3. En cas d'échec Azure login, contrôler uniquement les 3 secrets repo : `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
 4. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
    `AUTH_JWT_SIGNING_KEY` / `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`, sans afficher sa valeur.
-4. Pour une promotion, utiliser le type `repository_dispatch`
-   `promote-backend-staging-prod` (enchaînement staging puis prod depuis `main`).
+4. Pour une promotion, utiliser le type `repository_dispatch` `promote-backend`.
+   Déployer `staging`, valider les smoke tests, puis envoyer un second dispatch
+   pour `prod`.
 
 La publication GitHub Pages de la politique de confidentialité suit la même
 frontière de confiance :
@@ -369,9 +371,9 @@ par examen soit actif sans expirer les tentatives existantes.
 
 ```bash
 # dev : merge/push protégé sur main déclenche cd-backend automatiquement.
-# staging puis prod : caller chargé depuis la branche par défaut.
-gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" \
-  -f event_type=promote-backend-staging-prod
+# staging, puis répéter avec "prod" après validation.
+printf '%s' '{"event_type":"promote-backend","client_payload":{"environment":"staging"}}' |
+  gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" --input -
 ```
 
 > Le job `deploy-infra` capture l'output `functionAppName`, réutilisé par `deploy-backend`

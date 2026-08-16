@@ -54,7 +54,6 @@ const reusableScannerFiles = new Set([
 const trustedOnlyWorkflowFiles = new Set([
   'cd-backend.yml',
   'deploy-privacy-policy.yml',
-  'promote-backend-staging-prod.yml',
   'release-android.yml',
   'release-ios.yml',
   'runner-health.yml',
@@ -67,8 +66,8 @@ const trustedAggregateJobs = new Map([
   ['security-gate.yml', new Set(['security-gate'])],
 ]);
 const privilegedDispatchTypes = new Map([
+  ['cd-backend.yml', 'promote-backend'],
   ['deploy-privacy-policy.yml', 'deploy-privacy-policy'],
-  ['promote-backend-staging-prod.yml', 'promote-backend-staging-prod'],
   ['release-android.yml', 'release-android'],
   ['release-ios.yml', 'release-ios-legacy'],
   ['runner-health.yml', 'runner-health'],
@@ -339,10 +338,6 @@ function validateRepositoryInvariants() {
   const android = fs.readFileSync(path.join(workflowsDir, 'release-android.yml'), 'utf8');
   const backend = fs.readFileSync(path.join(workflowsDir, 'cd-backend.yml'), 'utf8');
   const backendCi = fs.readFileSync(path.join(workflowsDir, 'ci-backend.yml'), 'utf8');
-  const promoteBackend = fs.readFileSync(
-    path.join(workflowsDir, 'promote-backend-staging-prod.yml'),
-    'utf8',
-  );
   const codeql = fs.readFileSync(path.join(workflowsDir, 'codeql.yml'), 'utf8');
   const codeqlEnforcer = fs.readFileSync(
     path.join(root, '.github', 'scripts', 'enforce-codeql-sarif.mjs'),
@@ -421,7 +416,10 @@ function validateRepositoryInvariants() {
       errors.push(`release-android.yml: missing ${label}`);
     }
   }
-  if (!backend.includes('dev|staging|prod')) {
+  if (
+    !backend.includes('TARGET=dev')
+    || !backend.includes('.environment == "staging" or .environment == "prod"')
+  ) {
     errors.push('cd-backend.yml: deployment environments are not strictly allowlisted');
   }
   if (!backend.includes('environment: ${{ needs.validate-target.outputs.target }}')) {
@@ -430,13 +428,12 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'keys == ["environment"]',
     '.environment == "staging" or .environment == "prod"',
-    'target=$(jq -r \'.environment // "staging-prod"\'',
-    "needs.validate-dispatch.outputs.target != 'prod'",
-    "needs.validate-dispatch.outputs.target == 'prod'",
-    "needs.validate-dispatch.outputs.target == 'staging-prod'",
+    'TARGET="$(jq -r \'.environment\'',
+    'EVENT_NAME: ${{ github.event_name }}',
+    'CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}',
   ]) {
-    if (!promoteBackend.includes(marker)) {
-      errors.push(`promote-backend-staging-prod.yml: missing controlled promotion invariant ${marker}`);
+    if (!backend.includes(marker)) {
+      errors.push(`cd-backend.yml: missing controlled promotion invariant ${marker}`);
     }
   }
   for (const marker of [
@@ -456,8 +453,8 @@ function validateRepositoryInvariants() {
     'AZURE_TENANT_ID',
     'AZURE_SUBSCRIPTION_ID',
   ]) {
-    if (!backend.includes(`${secret}:`)) {
-      errors.push(`cd-backend.yml: missing explicit reusable secret ${secret}`);
+    if (!backend.includes(`secrets.${secret}`)) {
+      errors.push(`cd-backend.yml: missing required environment or repository secret ${secret}`);
     }
     for (const marker of [
       'AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}',
@@ -476,7 +473,6 @@ function validateRepositoryInvariants() {
       || backend.includes('AUTH_JWT_PREVIOUS_SIGNING_KEY:\n        required: false')
       || backend.includes('authJwtSigningKey="$AUTH_JWT_SIGNING_KEY"')
       || backend.includes('--parameters authJwtSigningKey')
-      || promoteBackend.includes('AUTH_JWT_SIGNING_KEY')
     ) {
       errors.push(
         'backend deployment: JWT signing key must come from the called job environment and never a command argument',
