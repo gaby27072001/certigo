@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_motion.dart';
+import 'prism_content_frame.dart';
 import 'prism_button.dart';
 
 /// The shared chrome for every onboarding step.
@@ -75,41 +76,44 @@ class OnboardingScaffold extends StatelessWidget {
     return Scaffold(
       backgroundColor: p.background,
       body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            if (progress != null || onBack != null || onClose != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 20, 6),
-                child: Row(
-                  children: <Widget>[
-                    if (onBack != null)
-                      _BackChevron(onTap: onBack!, color: p.textSecondary)
-                    else if (onClose != null)
-                      _CloseCross(onTap: onClose!, color: p.textSecondary)
-                    else
-                      const SizedBox(width: 4),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: progress == null
-                          ? const SizedBox.shrink()
-                          : _TopProgress(
-                              value: progress!.clamp(0, 1),
-                              color: p.primary,
-                              track: p.surfaceAlt,
-                            ),
-                    ),
-                  ],
+        child: PrismContentFrame(
+          maxWidth: 640,
+          child: Column(
+            children: <Widget>[
+              if (progress != null || onBack != null || onClose != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 20, 6),
+                  child: Row(
+                    children: <Widget>[
+                      if (onBack != null)
+                        _BackChevron(onTap: onBack!, color: p.textSecondary)
+                      else if (onClose != null)
+                        _CloseCross(onTap: onClose!, color: p.textSecondary)
+                      else
+                        const SizedBox(width: 4),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: progress == null
+                            ? const SizedBox.shrink()
+                            : _TopProgress(
+                                value: progress!.clamp(0, 1),
+                                color: p.primary,
+                                track: p.surfaceAlt,
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
+              Expanded(child: body),
+              _StickyCta(
+                label: primaryLabel,
+                onPressed: onPrimary,
+                tone: primaryTone,
+                loading: primaryLoading,
+                secondary: secondary,
               ),
-            Expanded(child: body),
-            _StickyCta(
-              label: primaryLabel,
-              onPressed: onPrimary,
-              tone: primaryTone,
-              loading: primaryLoading,
-              secondary: secondary,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -185,7 +189,7 @@ class _TopProgress extends StatelessWidget {
               Positioned.fill(child: ColoredBox(color: track)),
               TweenAnimationBuilder<double>(
                 tween: Tween<double>(begin: 0, end: value),
-                duration: PrismMotion.base,
+                duration: PrismMotion.resolve(context, PrismMotion.base),
                 curve: PrismMotion.standard,
                 builder: (BuildContext context, double v, _) => Align(
                   alignment: Alignment.centerLeft,
@@ -241,9 +245,8 @@ class _StickyCta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
-    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final bool enabled = onPressed != null && !loading;
-    final Duration d = reduceMotion ? Duration.zero : PrismMotion.fast;
+    final Duration d = PrismMotion.resolve(context, PrismMotion.fast);
     return Container(
       decoration: BoxDecoration(
         color: p.background,

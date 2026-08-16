@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
+import '../tokens/prism_radii.dart';
+import '../tokens/prism_spacing.dart';
 import 'prism_button.dart';
 
 /// A centered, full-bleed view for terminal empty / error states with an
@@ -16,6 +18,7 @@ class PrismStatusView extends StatelessWidget {
     this.message,
     this.actionLabel,
     this.onAction,
+    this.tone,
   });
 
   /// Convenience constructor for an offline / error state with a retry CTA.
@@ -24,45 +27,74 @@ class PrismStatusView extends StatelessWidget {
         title = 'Connexion impossible',
         message = message ?? 'Vérifie ta connexion puis réessaie.',
         actionLabel = onRetry == null ? null : 'Réessayer',
-        onAction = onRetry;
+        onAction = onRetry,
+        tone = null;
+
+  const PrismStatusView.empty({
+    super.key,
+    required this.title,
+    this.message,
+    this.actionLabel,
+    this.onAction,
+    this.icon = Icons.inbox_rounded,
+    this.tone,
+  });
 
   final IconData icon;
   final String title;
   final String? message;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final Color? tone;
 
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(icon, size: 44, color: p.textSecondary),
-            const SizedBox(height: 16),
-            Text(title, style: t.titleLarge, textAlign: TextAlign.center),
-            if (message != null) ...<Widget>[
-              const SizedBox(height: 8),
-              Text(
-                message!,
-                style: t.bodyMedium?.copyWith(color: p.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-            ],
-            if (actionLabel != null && onAction != null) ...<Widget>[
-              const SizedBox(height: 24),
-              PrismButton.secondary(
-                label: actionLabel!,
-                onPressed: onAction,
-                icon: Icons.refresh_rounded,
-                expand: false,
-              ),
-            ],
-          ],
+    final Color accent = tone ?? (icon == Icons.cloud_off_rounded ? p.error : p.primary);
+    return Semantics(
+      liveRegion: true,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(PrismSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Container(
+                  width: 72,
+                  height: 72,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: p.brightness == Brightness.dark ? 0.20 : 0.10),
+                    borderRadius: PrismRadii.cardXl,
+                    border: Border.all(color: accent.withValues(alpha: 0.20)),
+                  ),
+                  child: Icon(icon, size: 32, color: accent),
+                ),
+                const SizedBox(height: PrismSpacing.lg),
+                Text(title, style: t.titleLarge, textAlign: TextAlign.center),
+                if (message != null) ...<Widget>[
+                  const SizedBox(height: PrismSpacing.xs),
+                  Text(
+                    message!,
+                    style: t.bodyMedium?.copyWith(color: p.textSecondary),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+                if (actionLabel != null && onAction != null) ...<Widget>[
+                  const SizedBox(height: PrismSpacing.lg),
+                  PrismButton.secondary(
+                    label: actionLabel!,
+                    onPressed: onAction,
+                    icon: Icons.refresh_rounded,
+                    expand: false,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );

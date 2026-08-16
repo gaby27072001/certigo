@@ -69,7 +69,9 @@ Le **sens des dépendances** backend : `Api → Application → Domain ← Infra
   `prism_radii`, `prism_elevation`, `prism_motion`, `prism_typography`), thème
   (`PrismTheme.light()/.dark()` + `PrismColorScheme` exposé en `ThemeExtension`, accès
   ergonomique `context.prism`) et composants : surfaces (`GlassSurface`,
-  `AuroraBackground`), actions (`PrismButton`), progression (`PrismProgressBar`,
+  `AuroraBackground`, `PrismContentFrame`), actions (`PrismButton`, `PrismPressable`),
+  composition (`PrismSectionHeader`, `PrismReveal`), états (`PrismLoadingView`,
+  `PrismStatusView`), progression (`PrismProgressBar`,
   `ReadinessGauge`), gamification (`StreakBadge`, `XpChip`, `StatPill`), apprentissage
   (`LessonTile`, `QuizOptionTile`).
 - **`packages/data`** — modèles (miroir camelCase des DTO backend, `fromJson` manuel),

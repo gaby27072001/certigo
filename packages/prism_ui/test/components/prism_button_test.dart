@@ -66,5 +66,21 @@ void main() {
       expect(find.text('Secondaire'), findsOneWidget);
       expect(find.text('Fantôme'), findsOneWidget);
     });
+
+    testWidgets('uses zero-duration feedback when animations are disabled', (
+      WidgetTester tester,
+    ) async {
+      await pumpPrism(
+        tester,
+        PrismButton(label: 'Continuer', onPressed: () {}),
+        disableAnimations: true,
+      );
+
+      expect(
+        tester.widget<AnimatedPositioned>(find.byType(AnimatedPositioned)).duration,
+        Duration.zero,
+      );
+      expect(tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).duration, Duration.zero);
+    });
   });
 }

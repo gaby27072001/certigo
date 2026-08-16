@@ -86,18 +86,14 @@ class _PourToiSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final PrismColorScheme p = context.prism;
-    final TextTheme t = Theme.of(context).textTheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Icon(Icons.auto_awesome_rounded, size: 20, color: p.primary),
-            const SizedBox(width: PrismSpacing.xs),
-            Text('Pour toi', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-          ],
+        const PrismSectionHeader(
+          title: 'Pour toi',
+          subtitle: 'La meilleure prochaine action selon ta progression',
+          icon: Icons.auto_awesome_rounded,
+          compact: true,
         ),
         const SizedBox(height: PrismSpacing.md),
         home.when(
@@ -151,16 +147,14 @@ class _VendorSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final TextTheme t = Theme.of(context).textTheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Éditeurs', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-        const SizedBox(height: PrismSpacing.xxs),
-        Text(
-          'Choisis un éditeur pour explorer ses certifications',
-          style: t.labelMedium?.copyWith(color: context.prism.textSecondary),
+        const PrismSectionHeader(
+          title: 'Éditeurs',
+          subtitle: 'Choisis un éditeur pour explorer ses certifications',
+          icon: Icons.apartment_rounded,
+          compact: true,
         ),
         const SizedBox(height: PrismSpacing.md),
         GridView.count(

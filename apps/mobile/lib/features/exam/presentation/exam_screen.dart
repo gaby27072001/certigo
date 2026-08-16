@@ -7,6 +7,7 @@ import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/router.dart';
+import '../../../shared/widgets/screen_header.dart';
 
 /// Mock exam — a full, timed-style assessment that mirrors the real
 /// certification experience. Unlike the lesson quiz (which grades locally for
@@ -26,7 +27,7 @@ class ExamScreen extends ConsumerWidget {
         bottom: false,
         child: Column(
           children: <Widget>[
-            const _ScreenHeader(title: 'Examen blanc'),
+            const ScreenHeader(title: 'Examen blanc'),
             Expanded(
               child: async.when(
                 data: (MockExam exam) => exam.items.isEmpty
@@ -613,41 +614,6 @@ class _InlineError extends StatelessWidget {
           Expanded(
             child: Text(message, style: t.bodySmall?.copyWith(color: p.error)),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScreenHeader extends StatelessWidget {
-  const _ScreenHeader({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final TextTheme t = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        PrismSpacing.xs,
-        PrismSpacing.xxs,
-        PrismSpacing.gutter,
-        PrismSpacing.xxs,
-      ),
-      child: Row(
-        children: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go(Routes.home);
-              }
-            },
-          ),
-          const SizedBox(width: 4),
-          Text(title, style: t.headlineSmall),
         ],
       ),
     );

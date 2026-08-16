@@ -545,8 +545,8 @@ class _CommencerButtonState extends State<_CommencerButton> {
         onTap: widget.onPressed,
         child: AnimatedScale(
           scale: _down ? 0.98 : 1,
-          duration: PrismMotion.fast,
-          curve: Curves.easeOut,
+          duration: PrismMotion.resolve(context, PrismMotion.fast),
+          curve: PrismMotion.standard,
           child: Container(
             height: 58,
             alignment: Alignment.center,

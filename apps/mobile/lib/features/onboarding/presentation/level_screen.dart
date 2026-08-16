@@ -94,6 +94,7 @@ class _LevelTileState extends State<_LevelTile> {
             p.surface,
           )
         : p.surface;
+    final Duration duration = PrismMotion.resolve(context, PrismMotion.fast);
 
     return Semantics(
       button: true,
@@ -109,7 +110,7 @@ class _LevelTileState extends State<_LevelTile> {
           widget.onTap();
         },
         child: AnimatedContainer(
-          duration: PrismMotion.fast,
+          duration: duration,
           curve: PrismMotion.standard,
           margin: EdgeInsets.only(bottom: _down ? 0 : 3),
           decoration: BoxDecoration(
@@ -150,7 +151,7 @@ class _LevelTileState extends State<_LevelTile> {
                 ),
               ),
               const SizedBox(width: 12),
-              _Checkbox(selected: sel, accent: accent, border: p.border),
+              _Checkbox(selected: sel, accent: accent, border: p.border, duration: duration),
             ],
           ),
         ),
@@ -165,16 +166,22 @@ class _LevelTileState extends State<_LevelTile> {
 }
 
 class _Checkbox extends StatelessWidget {
-  const _Checkbox({required this.selected, required this.accent, required this.border});
+  const _Checkbox({
+    required this.selected,
+    required this.accent,
+    required this.border,
+    required this.duration,
+  });
 
   final bool selected;
   final Color accent;
   final Color border;
+  final Duration duration;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: PrismMotion.fast,
+      duration: duration,
       width: 26,
       height: 26,
       decoration: BoxDecoration(
@@ -183,7 +190,7 @@ class _Checkbox extends StatelessWidget {
         border: Border.all(color: selected ? accent : border, width: 2),
       ),
       child: AnimatedSwitcher(
-        duration: PrismMotion.fast,
+        duration: duration,
         switchInCurve: PrismMotion.spring,
         switchOutCurve: PrismMotion.standard,
         transitionBuilder: (Widget child, Animation<double> animation) {
