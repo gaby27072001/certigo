@@ -1,0 +1,65 @@
+name: promote-backend-staging-prod (legacy disabled)
+
+on:
+  repository_dispatch:
+    types: [promote-backend-staging-prod]
+
+permissions: {}
+
+concurrency:
+  group: promote-backend-staging-prod-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-dispatch:
+    name: Validate deprecated dispatch
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    outputs:
+      target: ${{ steps.payload.outputs.target }}
+    steps:
+      - name: Validate promotion target
+        id: payload
+        shell: bash
+        env:
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          if ! jq -e '
+            type == "object"
+            and (
+              length == 0
+              or (
+                keys == ["environment"]
+                and (.environment == "staging" or .environment == "prod")
+              )
+            )
+          ' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+            echo "::error::client_payload must be empty or select exactly staging or prod."
+            exit 1
+          fi
+          echo "target=$(jq -r '.environment // "staging-prod"' <<< "$CLIENT_PAYLOAD_JSON")" \
+            >> "$GITHUB_OUTPUT"
+          echo "::error::This dispatch is disabled; use promote-backend with an explicit environment."
+          exit 1
+
+  deploy-staging:
+    name: Deprecated staging promotion
+    needs: validate-dispatch
+    if: ${{ false && needs.validate-dispatch.outputs.target != 'prod' }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    steps:
+      - run: echo "disabled"
+
+  deploy-prod:
+    name: Deprecated production promotion
+    needs: [validate-dispatch, deploy-staging]
+    if: >-
+      ${{
+        false
+        && needs.validate-dispatch.outputs.target == 'prod'
+        || needs.validate-dispatch.outputs.target == 'staging-prod'
+      }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    steps:
+      - run: echo "disabled"

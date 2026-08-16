@@ -192,7 +192,9 @@ function validateWorkflow(file) {
   if (
     expectedDispatchType
     && text.includes('repository_dispatch:')
-    && !text.includes(`repository_dispatch:\n    types: [${expectedDispatchType}]`)
+    && !new RegExp(
+      `repository_dispatch:\\r?\\n {4}types: \\[${expectedDispatchType}\\]`,
+    ).test(text)
   ) {
     errors.push(
       `${file}: privileged dispatch must use the dedicated repository_dispatch type ${expectedDispatchType}`,
