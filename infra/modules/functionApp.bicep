@@ -248,58 +248,6 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
         // tighten via API Management later. Dev allows '*' for browser tooling.
         allowedOrigins: allowedCorsOrigins
       }
-      appSettings: [
-        // Identity-based AzureWebJobsStorage (no key). The managed identity is
-        // granted Blob/Queue data roles on the storage account below.
-        { name: 'AzureWebJobsStorage__accountName', value: storage.name }
-        { name: 'AzureWebJobsStorage__credential', value: 'managedidentity' }
-        { name: 'AzureWebJobsStorage__clientId', value: hostStorageIdentity.properties.clientId }
-        { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
-        {
-          name: 'APPLICATIONINSIGHTS_AUTHENTICATION_STRING'
-          value: 'ClientId=${hostStorageIdentity.properties.clientId};Authorization=AAD'
-        }
-        // App config consumed by the API. Keys are FLAT (match Program.cs /
-        // local.settings.json.example): COSMOS_ENDPOINT, ENTRA_AUTHORITY, etc.
-        { name: 'COSMOS_ENDPOINT', value: cosmosEndpoint }
-        { name: 'COSMOS_DATABASE', value: 'certigo' }
-        { name: 'BLOB_ENDPOINT', value: storage.properties.primaryEndpoints.blob }
-        { name: 'DEPLOYMENT_CONTAINER_NAME', value: deploymentContainerName }
-        { name: 'HEALTH_PROBE_TIMEOUT_SECONDS', value: '5' }
-        { name: 'HEALTH_PLATFORM_CLIENT_ID', value: hostStorageIdentity.properties.clientId }
-        { name: 'KeyVault__HealthSecretName', value: 'AUTH-JWT-SIGNING-KEY' }
-        // "dev" => permissive DevTokenValidator (dev env only); "prod" (or any non-"dev" value) => Entra.
-        { name: 'AUTH_MODE', value: authMode }
-        // Azure Functions defaults the hosting environment to "Production", so the dev-validator
-        // production guard (AuthValidatorSelection.ShouldUseDevValidator) throws on every request
-        // unless this explicit non-production override is set. Only enabled when AUTH_MODE=dev
-        // (dev env); 'false' elsewhere is inert because the guard short-circuits when AUTH_MODE!=dev.
-        { name: 'AUTH_ALLOW_DEV', value: authMode == 'dev' ? 'true' : 'false' }
-        { name: 'AUTH_JWT_SIGNING_KEY', value: '@Microsoft.KeyVault(SecretUri=${authJwtSigningKeySecretUri})' }
-        {
-          name: 'AUTH_JWT_PREVIOUS_SIGNING_KEY'
-          value: empty(authJwtPreviousSigningKeySecretUri)
-            ? ''
-            : '@Microsoft.KeyVault(SecretUri=${authJwtPreviousSigningKeySecretUri})'
-        }
-        { name: 'ENTRA_AUTHORITY', value: entraAuthority }
-        { name: 'ENTRA_AUDIENCE', value: entraAudience }
-        { name: 'TUTOR_LLM_ENABLED', value: string(tutorLlmEnabled) }
-        { name: 'TUTOR_LLM_ENDPOINT', value: tutorLlmEndpoint }
-        { name: 'TUTOR_LLM_DEPLOYMENT', value: tutorLlmDeployment }
-        { name: 'TUTOR_LLM_API_SURFACE', value: tutorLlmApiSurface }
-        { name: 'TUTOR_LLM_API_VERSION', value: tutorLlmApiVersion }
-        { name: 'TUTOR_LLM_API_KEY', value: tutorLlmApiKey }
-        { name: 'TUTOR_LLM_MAX_OUTPUT_TOKENS', value: string(tutorLlmMaxOutputTokens) }
-        { name: 'KeyVault__Uri', value: 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/' }
-        // Email verification (email/password accounts). When ACS_EMAIL_* are empty
-        // the API falls back to a logging no-op sender — sign-up still works, the
-        // confirmation link is just written to the logs instead of emailed.
-        { name: 'ACS_EMAIL_ENDPOINT', value: acsEmailEndpoint }
-        { name: 'ACS_EMAIL_SENDER', value: acsEmailSender }
-        { name: 'ACS_EMAIL_CONNECTION_STRING', value: acsEmailConnectionString }
-        { name: 'EMAIL_VERIFY_BASE_URL', value: emailVerifyBaseUrl }
-      ]
     }
   }
   dependsOn: [
@@ -310,6 +258,50 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
     appInsightsPublisherAccess
     hostVaultAccess
   ]
+}
+
+// Apply app settings after the site, its managed identity, and data-plane access
+// exist. This sequencing is required for private Key Vault references to resolve
+// reliably instead of reaching the worker as an unresolved @Microsoft.KeyVault value.
+resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
+  parent: functionApp
+  name: 'appsettings'
+  properties: {
+    // Identity-based AzureWebJobsStorage (no key). The managed identity is
+    // granted Blob/Queue data roles on the storage account above.
+    AzureWebJobsStorage__accountName: storage.name
+    AzureWebJobsStorage__credential: 'managedidentity'
+    AzureWebJobsStorage__clientId: hostStorageIdentity.properties.clientId
+    APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsConnectionString
+    APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${hostStorageIdentity.properties.clientId};Authorization=AAD'
+    COSMOS_ENDPOINT: cosmosEndpoint
+    COSMOS_DATABASE: 'certigo'
+    BLOB_ENDPOINT: storage.properties.primaryEndpoints.blob
+    DEPLOYMENT_CONTAINER_NAME: deploymentContainerName
+    HEALTH_PROBE_TIMEOUT_SECONDS: '5'
+    HEALTH_PLATFORM_CLIENT_ID: hostStorageIdentity.properties.clientId
+    KeyVault__HealthSecretName: 'AUTH-JWT-SIGNING-KEY'
+    AUTH_MODE: authMode
+    AUTH_ALLOW_DEV: authMode == 'dev' ? 'true' : 'false'
+    AUTH_JWT_SIGNING_KEY: '@Microsoft.KeyVault(SecretUri=${authJwtSigningKeySecretUri})'
+    AUTH_JWT_PREVIOUS_SIGNING_KEY: empty(authJwtPreviousSigningKeySecretUri)
+      ? ''
+      : '@Microsoft.KeyVault(SecretUri=${authJwtPreviousSigningKeySecretUri})'
+    ENTRA_AUTHORITY: entraAuthority
+    ENTRA_AUDIENCE: entraAudience
+    TUTOR_LLM_ENABLED: string(tutorLlmEnabled)
+    TUTOR_LLM_ENDPOINT: tutorLlmEndpoint
+    TUTOR_LLM_DEPLOYMENT: tutorLlmDeployment
+    TUTOR_LLM_API_SURFACE: tutorLlmApiSurface
+    TUTOR_LLM_API_VERSION: tutorLlmApiVersion
+    TUTOR_LLM_API_KEY: tutorLlmApiKey
+    TUTOR_LLM_MAX_OUTPUT_TOKENS: string(tutorLlmMaxOutputTokens)
+    KeyVault__Uri: 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/'
+    ACS_EMAIL_ENDPOINT: acsEmailEndpoint
+    ACS_EMAIL_SENDER: acsEmailSender
+    ACS_EMAIL_CONNECTION_STRING: acsEmailConnectionString
+    EMAIL_VERIFY_BASE_URL: emailVerifyBaseUrl
+  }
 }
 
 // Grant the Function App's managed identity Cosmos DB data-plane access via the
