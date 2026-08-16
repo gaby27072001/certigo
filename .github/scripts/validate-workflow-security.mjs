@@ -67,6 +67,7 @@ const trustedAggregateJobs = new Map([
   ['security-gate.yml', new Set(['security-gate'])],
 ]);
 const privilegedDispatchTypes = new Map([
+  ['cd-backend.yml', 'promote-backend'],
   ['deploy-privacy-policy.yml', 'deploy-privacy-policy'],
   ['promote-backend-staging-prod.yml', 'promote-backend-staging-prod'],
   ['release-android.yml', 'release-android'],
@@ -190,6 +191,7 @@ function validateWorkflow(file) {
   const expectedDispatchType = privilegedDispatchTypes.get(fileName);
   if (
     expectedDispatchType
+    && text.includes('repository_dispatch:')
     && !text.includes(`repository_dispatch:\n    types: [${expectedDispatchType}]`)
   ) {
     errors.push(
@@ -198,6 +200,7 @@ function validateWorkflow(file) {
   }
   if (
     expectedDispatchType
+    && text.includes('repository_dispatch:')
     && (
       !text.includes('CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}')
       || !text.includes("github.ref == 'refs/heads/main'")
@@ -339,10 +342,13 @@ function validateRepositoryInvariants() {
   const android = fs.readFileSync(path.join(workflowsDir, 'release-android.yml'), 'utf8');
   const backend = fs.readFileSync(path.join(workflowsDir, 'cd-backend.yml'), 'utf8');
   const backendCi = fs.readFileSync(path.join(workflowsDir, 'ci-backend.yml'), 'utf8');
-  const promoteBackend = fs.readFileSync(
-    path.join(workflowsDir, 'promote-backend-staging-prod.yml'),
-    'utf8',
+  const promoteBackendPath = path.join(
+    workflowsDir,
+    'promote-backend-staging-prod.yml',
   );
+  const promoteBackend = fs.existsSync(promoteBackendPath)
+    ? fs.readFileSync(promoteBackendPath, 'utf8')
+    : '';
   const codeql = fs.readFileSync(path.join(workflowsDir, 'codeql.yml'), 'utf8');
   const codeqlEnforcer = fs.readFileSync(
     path.join(root, '.github', 'scripts', 'enforce-codeql-sarif.mjs'),
@@ -421,22 +427,41 @@ function validateRepositoryInvariants() {
       errors.push(`release-android.yml: missing ${label}`);
     }
   }
-  if (!backend.includes('dev|staging|prod')) {
+  const directPromotion = backend.includes('types: [promote-backend]');
+  if (
+    directPromotion
+      ? !backend.includes('TARGET=dev')
+        || !backend.includes('.environment == "staging" or .environment == "prod"')
+      : !backend.includes('dev|staging|prod')
+  ) {
     errors.push('cd-backend.yml: deployment environments are not strictly allowlisted');
   }
   if (!backend.includes('environment: ${{ needs.validate-target.outputs.target }}')) {
     errors.push('cd-backend.yml: deployment environment is not sourced from validation');
   }
-  for (const marker of [
-    'keys == ["environment"]',
-    '.environment == "staging" or .environment == "prod"',
-    'target=$(jq -r \'.environment // "staging-prod"\'',
-    "needs.validate-dispatch.outputs.target != 'prod'",
-    "needs.validate-dispatch.outputs.target == 'prod'",
-    "needs.validate-dispatch.outputs.target == 'staging-prod'",
-  ]) {
-    if (!promoteBackend.includes(marker)) {
-      errors.push(`promote-backend-staging-prod.yml: missing controlled promotion invariant ${marker}`);
+  const promotionControl = directPromotion ? backend : promoteBackend;
+  const promotionControlFile = directPromotion
+    ? 'cd-backend.yml'
+    : 'promote-backend-staging-prod.yml';
+  const promotionMarkers = directPromotion
+    ? [
+        'keys == ["environment"]',
+        '.environment == "staging" or .environment == "prod"',
+        'TARGET="$(jq -r \'.environment\'',
+        'EVENT_NAME: ${{ github.event_name }}',
+        'CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}',
+      ]
+    : [
+        'keys == ["environment"]',
+        '.environment == "staging" or .environment == "prod"',
+        'target=$(jq -r \'.environment // "staging-prod"\'',
+        "needs.validate-dispatch.outputs.target != 'prod'",
+        "needs.validate-dispatch.outputs.target == 'prod'",
+        "needs.validate-dispatch.outputs.target == 'staging-prod'",
+      ];
+  for (const marker of promotionMarkers) {
+    if (!promotionControl.includes(marker)) {
+      errors.push(`${promotionControlFile}: missing controlled promotion invariant ${marker}`);
     }
   }
   for (const marker of [
@@ -456,11 +481,13 @@ function validateRepositoryInvariants() {
     'AZURE_TENANT_ID',
     'AZURE_SUBSCRIPTION_ID',
   ]) {
-    if (!backend.includes(`${secret}:`)) {
-      errors.push(`cd-backend.yml: missing explicit reusable secret ${secret}`);
+    const secretMarker = backend.includes('workflow_call:')
+      ? `${secret}:`
+      : `secrets.${secret}`;
+    if (!backend.includes(secretMarker)) {
+      errors.push(`cd-backend.yml: missing deployment secret ${secret}`);
     }
     for (const marker of [
-      'AUTH_JWT_SIGNING_KEY:\n        required: false',
       'AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}',
       'az bicep build-params',
       'node .github/scripts/write-secure-bicep-parameters.mjs',
@@ -473,9 +500,14 @@ function validateRepositoryInvariants() {
       }
     }
     if (
-      backend.includes('authJwtSigningKey="$AUTH_JWT_SIGNING_KEY"') ||
-      backend.includes('--parameters authJwtSigningKey') ||
-      promoteBackend.includes('AUTH_JWT_SIGNING_KEY')
+      (!backend.includes('workflow_call:')
+        && (
+          backend.includes('AUTH_JWT_SIGNING_KEY:\n        required: false')
+          || backend.includes('AUTH_JWT_PREVIOUS_SIGNING_KEY:\n        required: false')
+        ))
+      || backend.includes('authJwtSigningKey="$AUTH_JWT_SIGNING_KEY"')
+      || backend.includes('--parameters authJwtSigningKey')
+      || promoteBackend.includes('AUTH_JWT_SIGNING_KEY')
     ) {
       errors.push(
         'backend deployment: JWT signing key must come from the called job environment and never a command argument',
