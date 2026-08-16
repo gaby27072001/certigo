@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   chmodSync,
   mkdirSync,
@@ -46,6 +47,9 @@ function createHarness() {
   const shellCollectionState = `${shellState}.collection`;
   const packagePath = path.join(root, 'publish.zip');
   writeFileSync(packagePath, 'deterministic-package', 'utf8');
+  const packageSha256 = createHash('sha256')
+    .update('deterministic-package')
+    .digest('hex');
 
   writeExecutable(
     path.join(bin, 'az'),
@@ -68,8 +72,17 @@ case "$*" in
     ;;
   "storage blob upload"*)
     [[ "$*" == *"--auth-mode login"* ]]
-    [[ "$*" == *"--overwrite false"* ]]
-    [[ "$*" == *"deployments/0123456789abcdef0123456789abcdef01234567.zip"* ]]
+    if [[ "$*" == *"state/backend-release.json"* ]]; then
+      [[ "$*" == *"--overwrite true"* ]]
+    else
+      [[ "$*" == *"--overwrite false"* ]]
+      [[ "$*" == *"deployments/0123456789abcdef0123456789abcdef01234567.zip"* ]]
+    fi
+    ;;
+  "storage blob exists"*)
+    [[ "$*" == *"--auth-mode login"* ]]
+    [[ "$*" == *"state/backend-release.json"* ]]
+    printf 'false\\n'
     ;;
   "storage blob generate-sas"*)
     [[ "$*" == *"--as-user"* ]]
@@ -271,6 +284,10 @@ printf '200'
       STORAGE_BLOB_ENDPOINT: 'https://stcertigodev.blob.core.windows.net/',
       PACKAGE_PATH: bashPath(packagePath),
       COMMIT_SHA: '0123456789abcdef0123456789abcdef01234567',
+      EXPECTED_PACKAGE_SHA256: packageSha256,
+      SOURCE_RUN_ID: '1234',
+      TARGET_ENV: 'dev',
+      DEPLOYMENT_OPERATION: 'release',
       POLL_INTERVAL_SECONDS: '1',
       DEPLOYMENT_TIMEOUT_SECONDS: '5',
       HEALTH_TIMEOUT_SECONDS: '5',
@@ -288,7 +305,7 @@ test('deploy script polls the exact ARM operation returned with an id-null respo
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /passed liveness and readiness checks/);
-  assert.match(result.stdout, /retained for lifecycle cleanup/);
+  assert.match(result.stdout, /current and previous immutable releases/);
   assert.doesNotMatch(result.stdout + result.stderr, /masked-test-token/);
   assert.equal(readFileSync(harness.state, 'utf8'), '');
 });
@@ -493,6 +510,7 @@ test('deploy script uses only direct ARM OneDeploy and user delegation', () => {
   assert.match(script, /--overwrite false/);
   assert.match(script, /umask 077/);
   assert.match(script, /network private-endpoint list/);
+  assert.match(script, /state\/backend-release\.json/);
   assert.doesNotMatch(script, /pep-\$\{STORAGE_ACCOUNT\}-blob/);
   assert.doesNotMatch(script, /storage blob delete/);
 });

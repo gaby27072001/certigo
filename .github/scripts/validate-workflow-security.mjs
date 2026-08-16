@@ -380,6 +380,13 @@ function validateRepositoryInvariants() {
     path.join(root, '.github', 'scripts', 'write-secure-bicep-parameters.mjs'),
     'utf8',
   );
+  const releaseEnvironmentParameters = ['staging', 'prod'].map((environment) => ({
+    environment,
+    content: fs.readFileSync(
+      path.join(root, 'infra', 'params', `${environment}.bicepparam`),
+      'utf8',
+    ),
+  }));
   const flexOneDeploy = fs.readFileSync(
     path.join(root, '.github', 'scripts', 'deploy-flex-onedeploy.sh'),
     'utf8',
@@ -415,13 +422,13 @@ function validateRepositoryInvariants() {
     ],
     [
       'blocking API/Entra validation',
-      'Une configuration API/Entra complète et valide est obligatoire avant publication',
+      'validate-mobile-release-config.mjs',
     ],
     [
       'Play credential gate',
       'PLAY_SERVICE_ACCOUNT_JSON est obligatoire pour une publication non dry-run',
     ],
-    ['production configuration gate', 'La piste production exige MOBILE_CERTIGO_ENV=prod'],
+    ['production configuration gate', '--certigo-env "$CERTIGO_ENV"'],
   ]);
 
   for (const [label, marker] of androidRequirements) {
@@ -429,11 +436,16 @@ function validateRepositoryInvariants() {
       errors.push(`release-android.yml: missing ${label}`);
     }
   }
-  const directPromotion = backend.includes('types: [promote-backend]');
+  if (android.includes('${{ vars.API_BASE_URL }}')) {
+    errors.push('release-android.yml: legacy API_BASE_URL repository variable is forbidden');
+  }
+  const directPromotion = backend.includes('promote-backend');
   if (
     directPromotion
       ? !backend.includes('TARGET=dev')
-        || !backend.includes('.environment == "staging" or .environment == "prod"')
+        || !backend.includes('.environment == "dev"')
+        || !backend.includes('.environment == "staging"')
+        || !backend.includes('.environment == "prod"')
       : !backend.includes('dev|staging|prod')
   ) {
     errors.push('cd-backend.yml: deployment environments are not strictly allowlisted');
@@ -447,11 +459,16 @@ function validateRepositoryInvariants() {
     : 'promote-backend-staging-prod.yml';
   const promotionMarkers = directPromotion
     ? [
-        'keys == ["environment"]',
-        '.environment == "staging" or .environment == "prod"',
+        'keys == ["environment", "operation", "source_run_id"]',
+        'test("^[1-9][0-9]{0,19}$")',
+        '.operation == "promotion" or .operation == "rollback"',
+        'promotion:staging|promotion:prod|rollback:dev|rollback:staging|rollback:prod',
         'TARGET="$(jq -r \'.environment\'',
         'EVENT_NAME: ${{ github.event_name }}',
         'CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}',
+        'node .github/scripts/resolve-backend-release.mjs',
+        'actions/download-artifact@',
+        'node .github/scripts/backend-release-manifest.mjs verify',
       ]
     : [
         'keys == ["environment"]',
@@ -490,6 +507,7 @@ function validateRepositoryInvariants() {
       errors.push(`cd-backend.yml: missing deployment secret ${secret}`);
     }
     for (const marker of [
+      'ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}',
       'AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}',
       'az bicep build-params',
       'node .github/scripts/write-secure-bicep-parameters.mjs',
@@ -498,7 +516,7 @@ function validateRepositoryInvariants() {
       '--parameters "@$AUTH_PARAMETERS_FILE"',
     ]) {
       if (!backend.includes(marker)) {
-        errors.push(`cd-backend.yml: missing secure JWT deployment invariant ${marker}`);
+        errors.push(`cd-backend.yml: missing secure deployment invariant ${marker}`);
       }
     }
     if (
@@ -517,12 +535,20 @@ function validateRepositoryInvariants() {
     }
     for (const marker of [
       "environment !== 'dev'",
+      'compiled.parameters.alertEmail',
       'compiled.parameters.authJwtSigningKey',
       'mode: 0o600',
       "flag: 'wx'",
     ]) {
       if (!secureBicepWriter.includes(marker)) {
         errors.push(`write-secure-bicep-parameters.mjs: missing invariant ${marker}`);
+      }
+    }
+    for (const { environment, content } of releaseEnvironmentParameters) {
+      if (/^\s*param\s+alertEmail\s*=/m.test(content)) {
+        errors.push(
+          `${environment}.bicepparam: alertEmail must come from the GitHub Environment`,
+        );
       }
     }
   }
@@ -534,13 +560,19 @@ function validateRepositoryInvariants() {
     'STORAGE_BLOB_ENDPOINT',
     'DEPLOYMENT_CONTAINER',
     'FUNCTION_INTEGRATION_SUBNET_ID',
-    'functionIntegrationSubnetName: ${{ steps.deploy-bicep.outputs.functionIntegrationSubnetName }}',
+    'functionIntegrationSubnetName: ${{ steps.target.outputs.functionIntegrationSubnetName }}',
     'FUNCTION_INTEGRATION_SUBNET_NAME: ${{ needs.deploy-infra.outputs.functionIntegrationSubnetName }}',
     '/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}',
     'APPROVED_REQUIRED_GROUPS',
     "contains(['Sql', 'blob', 'queue', 'table', 'vault'], @)",
     'SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}',
-    'COMMIT_SHA: ${{ github.sha }}',
+    'COMMIT_SHA: ${{ needs.resolve-release.outputs.sourceCommit }}',
+    'EXPECTED_PACKAGE_SHA256: ${{ needs.resolve-release.outputs.packageSha256 }}',
+    'SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}',
+    'verify-backend-deployment-state.mjs',
+    '--environment staging',
+    '--slot current',
+    '--slot previous',
   ]) {
     if (!backend.includes(marker)) {
       errors.push(`cd-backend.yml: missing private OneDeploy invariant ${marker}`);
@@ -581,7 +613,8 @@ function validateRepositoryInvariants() {
     '--config "$auth_config_file"',
     'health_check \'health/live\'',
     'health_check \'health/ready\'',
-    'retained for lifecycle cleanup',
+    'state/backend-release.json',
+    'current and previous immutable releases',
     '"$integration_subnet" != "$FUNCTION_INTEGRATION_SUBNET_ID"',
   ]) {
     if (!flexOneDeploy.includes(marker)) {

@@ -57,7 +57,7 @@ param authJwtPreviousSigningKeyExpiresOn string = ''
 @description('Maximum output tokens requested from the tutor LLM.')
 param tutorLlmMaxOutputTokens int = 400
 
-@description('Email notified on security and readiness alerts. Required outside dev.')
+@description('Email notified on security and readiness alerts. Required outside dev and injected by CD from the target GitHub Environment.')
 param alertEmail string = ''
 
 @description('Data residency for the Azure Communication Services Email resource (e.g. Europe, United States).')
@@ -462,6 +462,8 @@ module diagnostics 'modules/diagnostics.bicep' = if (env != 'dev') {
   name: 'diagnostics'
   params: {
     functionAppName: api.outputs.functionAppName
+    functionAppHostName: api.outputs.defaultHostName
+    appInsightsName: monitoring.outputs.name
     cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
     storageAccountName: storage.outputs.accountName

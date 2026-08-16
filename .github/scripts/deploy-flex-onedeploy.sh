@@ -19,6 +19,8 @@ request_headers_file=''
 response_body_file=''
 operation_body_file=''
 curl_error_file=''
+previous_state_file=''
+next_state_file=''
 cleanup() {
   local file
   for file in \
@@ -27,7 +29,9 @@ cleanup() {
     "$request_headers_file" \
     "$response_body_file" \
     "$operation_body_file" \
-    "$curl_error_file"; do
+    "$curl_error_file" \
+    "$previous_state_file" \
+    "$next_state_file"; do
     if [[ -n "$file" ]]; then
       rm -f -- "$file"
     fi
@@ -45,6 +49,10 @@ required_variables=(
   STORAGE_BLOB_ENDPOINT
   PACKAGE_PATH
   COMMIT_SHA
+  EXPECTED_PACKAGE_SHA256
+  SOURCE_RUN_ID
+  TARGET_ENV
+  DEPLOYMENT_OPERATION
 )
 
 for variable in "${required_variables[@]}"; do
@@ -56,6 +64,22 @@ done
 
 if [[ ! "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo "::error::COMMIT_SHA must be a lowercase 40-character Git commit SHA."
+  exit 1
+fi
+if [[ ! "$EXPECTED_PACKAGE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "::error::EXPECTED_PACKAGE_SHA256 must be a lowercase SHA-256 digest."
+  exit 1
+fi
+if [[ ! "$SOURCE_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]; then
+  echo "::error::SOURCE_RUN_ID must be a positive GitHub Actions run id."
+  exit 1
+fi
+if [[ ! "$TARGET_ENV" =~ ^(dev|staging|prod)$ ]]; then
+  echo "::error::TARGET_ENV must be dev, staging or prod."
+  exit 1
+fi
+if [[ ! "$DEPLOYMENT_OPERATION" =~ ^(release|promotion|rollback)$ ]]; then
+  echo "::error::DEPLOYMENT_OPERATION must be release, promotion or rollback."
   exit 1
 fi
 if [[ ! "$SUBSCRIPTION_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
@@ -90,8 +114,15 @@ POLL_INTERVAL_SECONDS="${POLL_INTERVAL_SECONDS:-10}"
 RBAC_RETRY_ATTEMPTS="${RBAC_RETRY_ATTEMPTS:-40}"
 RBAC_RETRY_INTERVAL_SECONDS="${RBAC_RETRY_INTERVAL_SECONDS:-15}"
 BLOB_NAME="deployments/${COMMIT_SHA}.zip"
+# The immutable source is retained for lifecycle cleanup and controlled rollback.
 BLOB_HOST="${STORAGE_ACCOUNT}.blob.core.windows.net"
 PACKAGE_SHA256="$(sha256sum "$PACKAGE_PATH" | awk '{print $1}')"
+STATE_BLOB_NAME='state/backend-release.json'
+
+if [[ "$PACKAGE_SHA256" != "$EXPECTED_PACKAGE_SHA256" ]]; then
+  echo "::error::Deployment package does not match the verified release manifest."
+  exit 1
+fi
 
 if ((
   DEPLOYMENT_TIMEOUT_SECONDS < 1 ||
@@ -231,6 +262,31 @@ for attempt in $(seq 1 "$RBAC_RETRY_ATTEMPTS"); do
 done
 if [[ "$uploaded" != 'true' ]]; then
   echo "::error::Unable to upload deployment package with the OIDC identity."
+  exit 1
+fi
+
+previous_state_file="$(mktemp)"
+state_exists="$(
+  az storage blob exists \
+    --account-name "$STORAGE_ACCOUNT" \
+    --container-name "$DEPLOYMENT_CONTAINER" \
+    --name "$STATE_BLOB_NAME" \
+    --auth-mode login \
+    --query exists \
+    --output tsv \
+    --only-show-errors
+)"
+if [[ "${state_exists,,}" == 'true' ]]; then
+  az storage blob download \
+    --account-name "$STORAGE_ACCOUNT" \
+    --container-name "$DEPLOYMENT_CONTAINER" \
+    --name "$STATE_BLOB_NAME" \
+    --file "$previous_state_file" \
+    --auth-mode login \
+    --output none \
+    --only-show-errors
+elif [[ "${state_exists,,}" != 'false' ]]; then
+  echo "::error::Deployment state lookup returned an invalid result."
   exit 1
 fi
 
@@ -483,4 +539,22 @@ health_check() {
 health_check 'health/live'
 health_check 'health/ready'
 
-echo "OneDeploy completed and the Function App passed liveness and readiness checks; the immutable source package is retained for lifecycle cleanup."
+next_state_file="$(mktemp)"
+export PACKAGE_SHA256 BLOB_NAME
+DEPLOYED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+export DEPLOYED_AT
+"${NODE_BIN:-node}" .github/scripts/update-backend-deployment-state.mjs \
+  --previous "$previous_state_file" \
+  --output "$next_state_file"
+az storage blob upload \
+  --account-name "$STORAGE_ACCOUNT" \
+  --container-name "$DEPLOYMENT_CONTAINER" \
+  --name "$STATE_BLOB_NAME" \
+  --file "$next_state_file" \
+  --auth-mode login \
+  --overwrite true \
+  --metadata "commitSha=${COMMIT_SHA}" "packageSha256=${PACKAGE_SHA256}" \
+  --output none \
+  --only-show-errors
+
+echo "OneDeploy completed and the Function App passed liveness and readiness checks; current and previous immutable releases are referenced in deployment state."

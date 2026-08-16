@@ -66,8 +66,8 @@ param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
 // from the staging Environment secret/variable pair. main.bicep rejects an omitted
 // value or expiration; never commit the key here.
 
-// Mandatory monitored receiver for security and readiness alerts.
-param alertEmail = 'secops@certigo.app'
+// alertEmail is injected by CD from the non-secret ALERT_EMAIL variable on the
+// staging GitHub Environment. Never commit an operator address here.
 
 // Paid Defender plans off by default; enable when budget is approved.
 param enableDefenderPlans = false

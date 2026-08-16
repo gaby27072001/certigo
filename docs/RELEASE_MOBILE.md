@@ -59,7 +59,7 @@ les **secrets GitHub**.
 
 ### 2.1 Recommandé — Azure Key Vault (zéro secret dans GitHub) ⭐
 
-Les secrets de signature vivent dans le Key Vault `kv-certigo-<env>-<suffixe>`
+Les secrets de signature vivent dans le Key Vault `kv-certigo-prod-<suffixe>`
 (déjà déployé par `infra/`), lus à la volée par l'**identité managée du runner**.
 Rien n'est stocké dans GitHub ; la rotation se fait en un seul endroit.
 
@@ -83,12 +83,12 @@ Rien n'est stocké dans GitHub ; la rotation se fait en un seul endroit.
      ```
 3. **Variable de dépôt** (non sensible) désignant le vault à utiliser :
    ```bash
-   gh variable set AZURE_KEYVAULT_NAME --body 'kv-certigo-dev-bk3j5j'
+   gh variable set AZURE_KEYVAULT_NAME --body 'kv-certigo-prod-<suffixe>'
    ```
 4. **Charger les secrets dans le Key Vault** (une seule commande) :
    ```powershell
    Copy-Item tools/secrets/mobile-secrets.env.example tools/secrets/mobile-secrets.env  # puis renseigne-le
-   ./tools/secrets/set-keyvault-secrets.ps1 -VaultName kv-certigo-dev-bk3j5j
+   ./tools/secrets/set-keyvault-secrets.ps1 -VaultName kv-certigo-prod-<suffixe>
    ```
    *(`mobile-secrets.env` est gitignoré ; le script encode keystore / certificat /
    profil / clé en base64 et pousse chaque valeur. `-DryRun` pour prévisualiser.)*
@@ -161,11 +161,11 @@ noms sont référencés dans le code.
 
 | Valeur | Secret Key Vault | Repli variable GitHub | Format / exemple |
 |---|---|---|---|
-| URL de base API | `mobile-app-api-base-url` | `vars.MOBILE_API_BASE_URL` | `https://<host>/api` |
+| URL de base API | `mobile-app-api-base-url` | `vars.MOBILE_API_BASE_URL` | `https://api.certigo.app/api` ou `https://func-certigo-prod-<suffixe Bicep>.azurewebsites.net/api` |
 | Entra client ID | `mobile-entra-client-id` | `vars.MOBILE_ENTRA_CLIENT_ID` | GUID App Registration mobile |
-| Entra authority | `mobile-entra-authority` | `vars.MOBILE_ENTRA_AUTHORITY` | `https://<domain>.ciamlogin.com/<tenant-id>/v2.0` |
+| Entra authority | `mobile-entra-authority` | `vars.MOBILE_ENTRA_AUTHORITY` | `https://<tenant-guid>.ciamlogin.com/<tenant-guid>/v2.0` |
 | Entra API scope | `mobile-entra-api-scope` | `vars.MOBILE_ENTRA_API_SCOPE` | `api://<backend-client-id>/user_impersonation` |
-| Env (flavor) | `mobile-app-env` | `vars.MOBILE_CERTIGO_ENV` | `prod` \| `staging` \| `dev` (défaut : `prod`) |
+| Env (flavor) | `mobile-app-env` | `vars.MOBILE_CERTIGO_ENV` | `prod` uniquement |
 
 - **Via Key Vault (recommandé)** : renseigner `API_BASE_URL`, `CERTIGO_ENV`,
   `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`, `ENTRA_API_SCOPE` dans
@@ -175,12 +175,15 @@ noms sont référencés dans le code.
   Actions → Variables → New repository variable` pour chaque `MOBILE_*`
   ci-dessus. (Onglet **Variables**, pas **Secrets**.)
 
-> 🔒 **Gate bloquant de publication** : pour toute exécution non `dry_run`, les
-> cinq valeurs sont obligatoires et validées strictement (URL API HTTPS en
-> `/api`, GUID client, authority External ID, scope `api://...`, environnement
-> `dev|staging|prod`). Un dry-run invalide reste autorisé avec configuration
-> neutralisée et ne peut pas publier. La piste `production` exige en plus
-> `MOBILE_CERTIGO_ENV=prod`.
+> 🔒 **Gate bloquant de build** : pour toute exécution, y compris `dry_run`, les
+> cinq valeurs sont obligatoires et validées strictement. La configuration doit
+> cibler la production : URL API Certigo HTTPS en `/api`, GUID client non
+> placeholder, authority External ID canonique dont l'hôte GUID correspond au
+> tenant GUID du chemin, scope `api://...` non placeholder et
+> `MOBILE_CERTIGO_ENV=prod`. La source est le Key Vault désigné par
+> `AZURE_KEYVAULT_NAME`, sinon les variables `MOBILE_*` au scope environnement ou
+> dépôt. La variable legacy `API_BASE_URL` et les anciennes valeurs Microlingo ne
+> sont jamais lues. Les valeurs live sont corrigées hors de cette PR.
 
 **iOS — groupe de variables Codemagic `certigo_mobile_config`**
 
