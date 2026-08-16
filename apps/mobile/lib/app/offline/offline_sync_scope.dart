@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:data/data.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -27,17 +28,26 @@ class OfflineSyncScope extends ConsumerStatefulWidget {
 
 class _OfflineSyncScopeState extends ConsumerState<OfflineSyncScope> with WidgetsBindingObserver {
   StreamSubscription<List<ConnectivityResult>>? _connectivity;
+  late final SyncEngine _engine;
+  bool _disposed = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _connectivity = Connectivity().onConnectivityChanged.listen(_onConnectivityChanged);
+    _engine = ref.read(syncEngineProvider);
+    _connectivity = Connectivity().onConnectivityChanged.listen(
+      _onConnectivityChanged,
+      onError: (Object error, StackTrace stackTrace) {
+        _reportError(error, stackTrace, 'while observing connectivity');
+      },
+    );
     // Drain anything queued during a previous offline session, once at startup.
     _flush();
   }
 
   void _onConnectivityChanged(List<ConnectivityResult> results) {
+    if (_disposed) return;
     final bool isOnline = results.any(
       (ConnectivityResult result) => result != ConnectivityResult.none,
     );
@@ -54,11 +64,35 @@ class _OfflineSyncScopeState extends ConsumerState<OfflineSyncScope> with Widget
   }
 
   void _flush() {
-    unawaited(ref.read(syncEngineProvider).flush());
+    if (_disposed) return;
+    unawaited(
+      _engine.flush().catchError((Object error, StackTrace stackTrace) {
+        _reportError(error, stackTrace, 'while flushing the offline queue');
+        return SyncFlushReport(
+          dispatched: 0,
+          succeeded: 0,
+          retried: 0,
+          deadLettered: 0,
+          pendingRemaining: _engine.pendingCount,
+        );
+      }),
+    );
+  }
+
+  void _reportError(Object error, StackTrace stackTrace, String operation) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'certigo.offline-sync',
+        context: ErrorDescription(operation),
+      ),
+    );
   }
 
   @override
   void dispose() {
+    _disposed = true;
     unawaited(_connectivity?.cancel());
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();

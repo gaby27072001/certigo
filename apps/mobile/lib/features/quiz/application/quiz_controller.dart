@@ -13,19 +13,23 @@ class QuizSubmission {
     required this.result,
     required this.pendingSync,
     required this.totalQuestions,
+    required this.isDemo,
+    required this.submissionFailed,
   });
 
   final SubmitQuizResult result;
   final bool pendingSync;
   final int totalQuestions;
+  final bool isDemo;
+  final bool submissionFailed;
 }
 
 /// Owns the quiz game-loop state (current item, score, timing, progression) so
 /// it can be driven and tested independently of the widget tree.
 ///
-/// Questions come from the lesson API; if it is unavailable a local sample quiz
-/// is used so the learning flow still works offline. Answers are submitted at
-/// the end and rewards come from server grading (with a local fallback).
+/// Questions come from the lesson API (including its genuine offline cache).
+/// Bundled sample questions are available only after an explicit [startDemo]
+/// action and are never submitted or rewarded.
 class QuizController extends ChangeNotifier {
   QuizController({
     required this._lessons,
@@ -43,6 +47,9 @@ class QuizController extends ChangeNotifier {
 
   List<QuizEntry> _items = <QuizEntry>[];
   bool _loading = true;
+  bool _loadFailed = false;
+  bool _isDemo = false;
+  bool _disposed = false;
   bool _submitting = false;
   int _index = 0;
   String? _selectedId;
@@ -55,6 +62,8 @@ class QuizController extends ChangeNotifier {
 
   List<QuizEntry> get items => _items;
   bool get loading => _loading;
+  bool get loadFailed => _loadFailed;
+  bool get isDemo => _isDemo;
   bool get submitting => _submitting;
   int get index => _index;
   QuizEntry get current => _items[_index];
@@ -64,7 +73,14 @@ class QuizController extends ChangeNotifier {
   int get correctCount => _correctCount;
 
   Future<void> loadItems() async {
-    final Result<Lesson> lesson = await _lessons.getLesson(trackId: trackId, lessonId: lessonId);
+    _loading = true;
+    _loadFailed = false;
+    notifyListeners();
+    final Result<Lesson> lesson = await _lessons.getLesson(
+      trackId: trackId,
+      lessonId: lessonId,
+    );
+    if (_disposed) return;
 
     final List<QuizEntry> entries = lesson.when(
       success: (Lesson l) {
@@ -72,14 +88,30 @@ class QuizController extends ChangeNotifier {
             .where((LessonBlock b) => b.check != null)
             .map((LessonBlock b) => QuizEntry(item: b.check!))
             .toList(growable: false);
-        if (fromApi.isNotEmpty) return fromApi;
-        return sampleQuizItems();
+        return fromApi;
       },
-      failure: (Failure _) => sampleQuizItems(),
+      failure: (Failure _) => const <QuizEntry>[],
     );
 
     _items = entries;
+    _loadFailed = lesson.isFailure;
+    _isDemo = false;
     _loading = false;
+    _shownAt = DateTime.now();
+    notifyListeners();
+  }
+
+  void startDemo() {
+    if (_loading || !_loadFailed) return;
+    _items = sampleQuizItems();
+    _loadFailed = false;
+    _isDemo = true;
+    _index = 0;
+    _selectedId = null;
+    _graded = false;
+    _correctCount = 0;
+    _answersByItem.clear();
+    _latencyByItem.clear();
     _shownAt = DateTime.now();
     notifyListeners();
   }
@@ -116,8 +148,26 @@ class QuizController extends ChangeNotifier {
     if (_submitting) return null;
     _submitting = true;
     notifyListeners();
+    await Future<void>.value();
+    if (_disposed) return null;
 
     final String clientAttemptId = DateTime.now().microsecondsSinceEpoch.toString();
+    if (_isDemo) {
+      final SubmitQuizResult result = _localDemoResult(
+        clientAttemptId: clientAttemptId,
+        total: _items.length,
+      );
+      _submitting = false;
+      notifyListeners();
+      return QuizSubmission(
+        result: result,
+        pendingSync: false,
+        totalQuestions: _items.length,
+        isDemo: true,
+        submissionFailed: false,
+      );
+    }
+
     final List<QuizAnswer> answers = _items
         .map(
           (QuizEntry entry) => QuizAnswer(
@@ -129,50 +179,99 @@ class QuizController extends ChangeNotifier {
         )
         .toList(growable: false);
 
-    final Result<SubmitQuizResult> submission = await _quiz.submit(
-      lessonId: lessonId,
-      request: SubmitQuizRequest(
-        clientAttemptId: clientAttemptId,
-        trackId: trackId,
-        startedAt: _startedAt,
-        answers: answers,
-      ),
-    );
-
-    final bool hasLocalKey = _items.any((QuizEntry entry) => entry.hasLocalCorrection);
-    final bool pendingSync = submission.isFailure && !hasLocalKey;
-    final SubmitQuizResult result = submission.valueOrNull ??
-        _localFallbackResult(
+    late final Result<SubmitQuizResult> submission;
+    try {
+      submission = await _quiz.submit(
+        lessonId: lessonId,
+        request: SubmitQuizRequest(
           clientAttemptId: clientAttemptId,
-          total: _items.length,
-          hasLocalCorrection: hasLocalKey,
-        );
+          trackId: trackId,
+          startedAt: _startedAt,
+          answers: answers,
+        ),
+      );
+    } on Object catch (error, stackTrace) {
+      if (_disposed) return null;
+      _submitting = false;
+      notifyListeners();
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'certigo.quiz',
+          context: ErrorDescription('while submitting a quiz attempt'),
+        ),
+      );
+      return QuizSubmission(
+        result: _pendingResult(clientAttemptId: clientAttemptId),
+        pendingSync: false,
+        totalQuestions: _items.length,
+        isDemo: false,
+        submissionFailed: true,
+      );
+    }
+    if (_disposed) return null;
+
+    final Failure? failure = submission.when(
+      success: (SubmitQuizResult _) => null,
+      failure: (Failure failure) => failure,
+    );
+    final bool pendingSync = failure != null && classifyFailure(failure) == SyncDispatch.retryable;
+    final bool submissionFailed = failure != null && !pendingSync;
+    final SubmitQuizResult result =
+        submission.valueOrNull ?? _pendingResult(clientAttemptId: clientAttemptId);
 
     _submitting = false;
     notifyListeners();
 
-    return QuizSubmission(result: result, pendingSync: pendingSync, totalQuestions: _items.length);
+    return QuizSubmission(
+      result: result,
+      pendingSync: pendingSync,
+      totalQuestions: _items.length,
+      isDemo: false,
+      submissionFailed: submissionFailed,
+    );
   }
 
-  SubmitQuizResult _localFallbackResult({
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  SubmitQuizResult _localDemoResult({
     required String clientAttemptId,
     required int total,
-    required bool hasLocalCorrection,
   }) {
-    final int scorePct =
-        hasLocalCorrection ? (total == 0 ? 0 : ((_correctCount / total) * 100).round()) : 0;
-    final int xp = hasLocalCorrection ? (20 + _correctCount * 10) : 0;
+    final int scorePct = total == 0 ? 0 : ((_correctCount / total) * 100).round();
     return SubmitQuizResult(
-      attemptId: 'local-$clientAttemptId',
+      attemptId: 'demo-$clientAttemptId',
       scorePct: scorePct,
       results: const <ItemResult>[],
-      rewards: QuizRewards(
-        xpEarned: xp,
-        newXp: 1240 + xp,
+      rewards: const QuizRewards(
+        xpEarned: 0,
+        newXp: 0,
         levelUp: false,
         streakExtended: false,
         gemsEarned: 0,
-        achievementsUnlocked: const <String>[],
+        achievementsUnlocked: <String>[],
+      ),
+      weakConcepts: const <String>[],
+    );
+  }
+
+  SubmitQuizResult _pendingResult({required String clientAttemptId}) {
+    return SubmitQuizResult(
+      attemptId: 'pending-$clientAttemptId',
+      scorePct: 0,
+      results: const <ItemResult>[],
+      rewards: const QuizRewards(
+        xpEarned: 0,
+        newXp: 0,
+        levelUp: false,
+        streakExtended: false,
+        gemsEarned: 0,
+        achievementsUnlocked: <String>[],
       ),
       weakConcepts: const <String>[],
     );

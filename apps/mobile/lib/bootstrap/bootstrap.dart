@@ -11,6 +11,8 @@ import '../app/offline/prefs_catalog_store.dart';
 import '../app/offline/prefs_lesson_cache_store.dart';
 import '../app/offline/prefs_sync_store.dart';
 import '../app/providers.dart';
+import '../features/notifications/notification_lifecycle_scope.dart';
+import '../features/notifications/notification_service.dart';
 import 'config_error_app.dart';
 import 'crash_reporting.dart';
 
@@ -55,7 +57,23 @@ Future<void> bootstrap() async {
       'Configuration d\'authentification invalide (voir logs [config]) :\n${config.describe()}',
     );
 
-    await SystemChrome.setPreferredOrientations(<DeviceOrientation>[DeviceOrientation.portraitUp]);
+    await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
+      DeviceOrientation.portraitUp,
+    ]);
+
+    try {
+      await NotificationService.initialize();
+    } on Object catch (error, stackTrace) {
+      crashReporter.report(
+        CrashReport(
+          error: error,
+          stackTrace: stackTrace,
+          source: CrashSource.zone,
+          context: 'notification bootstrap initialization',
+          library: 'certigo.notifications',
+        ),
+      );
+    }
 
     // Wire mascot artwork (built-in faces by default; see app/mascots.dart).
     configureMascots();
@@ -71,7 +89,9 @@ Future<void> bootstrap() async {
           lessonStoreProvider.overrideWithValue(prefsLessonCacheStore(prefs)),
           syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
         ],
-        child: const OfflineSyncScope(child: CertigoApp()),
+        child: const NotificationLifecycleScope(
+          child: OfflineSyncScope(child: CertigoApp()),
+        ),
       ),
     );
   }, crashReporter);

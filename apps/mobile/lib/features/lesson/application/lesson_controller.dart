@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:core/core.dart';
 import 'package:cortex/cortex.dart';
 import 'package:data/data.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
@@ -18,10 +19,9 @@ import 'sample_lesson.dart';
 /// Drives one lesson-playing session as a small state machine:
 /// load → (read content · answer checks) → submit → result.
 ///
-/// Grading is injected via a [LessonGrader] seam: P0 grades offline with an
-/// [EmbeddedKeyGrader] over [sampleLesson]; P1 swaps to server grading with no
-/// UI change. The optimistic FSRS [ReviewGrade] is computed with the shared
-/// `cortex` package so client and backend mastery never diverge.
+/// Grading is injected via a [LessonGrader] seam. Server or genuinely cached
+/// content remains synchronizable; bundled content is confined to explicit demo
+/// mode and never reaches the submission repository.
 class LessonController extends StateNotifier<LessonSessionState> {
   LessonController({
     required this._lessons,
@@ -41,35 +41,77 @@ class LessonController extends StateNotifier<LessonSessionState> {
   final String _clientAttemptId = _generateAttemptId();
   final DateTime _startedAt = DateTime.now().toUtc();
   DateTime _stepShownAt = DateTime.now();
+  bool _disposed = false;
 
-  /// Fetch the lesson; fall back to bundled sample content (with its answer key)
-  /// when the backend is unreachable, so the player always runs.
+  /// Fetches server or genuinely cached content. A failure stays visible until
+  /// retry or an explicit [startDemo] action.
   Future<void> load() async {
     state = state.copyWith(status: LessonStatus.loading);
     final Result<Lesson> res = await _lessons.getLesson(
       trackId: args.trackId,
       lessonId: args.lessonId,
     );
+    if (_disposed) return;
 
-    final Lesson lesson = res.when(
+    final Lesson? lesson = res.when(
       success: (Lesson remote) {
         // Server content is graded server-side; no embedded answer key.
         _grader = const EmbeddedKeyGrader(<String, CheckOutcome>{});
         return remote;
       },
-      failure: (Failure _) {
-        // Offline skeleton: bundled lesson + its key for local grading.
-        _grader = EmbeddedKeyGrader(sampleAnswerKey());
-        return sampleLesson(args.lessonId);
-      },
+      failure: (Failure _) => null,
     );
 
+    if (lesson == null) {
+      state = state.copyWith(
+        status: LessonStatus.error,
+        errorMessage: 'Le contenu est indisponible. Réessaie ou lance la démo.',
+      );
+      return;
+    }
+
+    final List<QuizItem?> checks = lesson.blocks
+        .where((LessonBlock block) => block.type == BlockType.check)
+        .map((LessonBlock block) => block.check)
+        .toList();
+    if (checks.isEmpty ||
+        checks.any(
+          (QuizItem? check) => check == null || !isAnswerableCheck(check),
+        )) {
+      state = state.copyWith(
+        status: LessonStatus.error,
+        errorMessage: 'Le contenu est indisponible. Réessaie ou lance la démo.',
+      );
+      return;
+    }
+
+    final List<LessonStep> steps = buildLessonSteps(lesson);
+    state = state.copyWith(
+      status: LessonStatus.ready,
+      lesson: lesson,
+      steps: steps,
+      index: 0,
+      selection: const <String>[],
+      isDemo: false,
+      pendingSync: false,
+      submissionFailed: false,
+    );
+    _stepShownAt = DateTime.now();
+  }
+
+  void startDemo() {
+    if (state.status != LessonStatus.error) return;
+    final Lesson lesson = sampleLesson('certigo-demo');
+    _grader = EmbeddedKeyGrader(sampleAnswerKey());
     state = state.copyWith(
       status: LessonStatus.ready,
       lesson: lesson,
       steps: buildLessonSteps(lesson),
       index: 0,
       selection: const <String>[],
+      isDemo: true,
+      pendingSync: false,
+      submissionFailed: false,
     );
     _stepShownAt = DateTime.now();
   }
@@ -165,7 +207,11 @@ class LessonController extends StateNotifier<LessonSessionState> {
     }
     final int next = state.index + 1;
     if (next >= state.steps.length) return;
-    state = state.copyWith(status: LessonStatus.ready, index: next, selection: const <String>[]);
+    state = state.copyWith(
+      status: LessonStatus.ready,
+      index: next,
+      selection: const <String>[],
+    );
     _stepShownAt = DateTime.now();
   }
 
@@ -188,28 +234,67 @@ class LessonController extends StateNotifier<LessonSessionState> {
       );
     }
 
-    final Result<SubmitQuizResult> res = await _quiz.submit(
-      lessonId: args.lessonId,
-      request: SubmitQuizRequest(
-        clientAttemptId: _clientAttemptId,
-        trackId: args.trackId,
-        startedAt: _startedAt,
-        answers: answers,
-      ),
-    );
+    if (state.isDemo) {
+      _feedback.completed();
+      state = state.copyWith(
+        status: LessonStatus.finished,
+        index: state.steps.length - 1,
+        result: _localDemoResult(lesson, answers),
+        pendingSync: false,
+      );
+      return;
+    }
 
-    final SubmitQuizResult result = res.valueOrNull ?? _localResult(lesson, answers);
+    late final Result<SubmitQuizResult> res;
+    try {
+      res = await _quiz.submit(
+        lessonId: args.lessonId,
+        request: SubmitQuizRequest(
+          clientAttemptId: _clientAttemptId,
+          trackId: args.trackId,
+          startedAt: _startedAt,
+          answers: answers,
+        ),
+      );
+    } on Object catch (error, stackTrace) {
+      if (_disposed) return;
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'certigo.lesson',
+          context: ErrorDescription('while submitting a lesson attempt'),
+        ),
+      );
+      state = state.copyWith(
+        status: LessonStatus.finished,
+        index: state.steps.length - 1,
+        result: _pendingResult(),
+        pendingSync: false,
+        submissionFailed: true,
+      );
+      return;
+    }
+    if (_disposed) return;
+
+    final Failure? failure = res.when(
+      success: (SubmitQuizResult _) => null,
+      failure: (Failure failure) => failure,
+    );
+    final bool pendingSync = failure != null && classifyFailure(failure) == SyncDispatch.retryable;
+    final bool submissionFailed = failure != null && !pendingSync;
+    final SubmitQuizResult result = res.valueOrNull ?? _pendingResult();
     _feedback.completed();
     state = state.copyWith(
       status: LessonStatus.finished,
       index: state.steps.length - 1,
       result: result,
+      pendingSync: pendingSync,
+      submissionFailed: submissionFailed,
     );
   }
 
-  /// Compute a result locally from embedded outcomes (offline P0 path), reusing
-  /// the shared Cortex grade so mastery deltas match the backend's intent.
-  SubmitQuizResult _localResult(Lesson lesson, List<QuizAnswer> answers) {
+  SubmitQuizResult _localDemoResult(Lesson lesson, List<QuizAnswer> answers) {
     final List<ItemResult> results = <ItemResult>[];
     final List<String> weak = <String>[];
     int correctCount = 0;
@@ -246,21 +331,36 @@ class LessonController extends StateNotifier<LessonSessionState> {
 
     final int total = results.length;
     final int scorePct = total == 0 ? 100 : ((correctCount / total) * 100).round();
-    final int xpEarned = 20 + correctCount * 10;
     return SubmitQuizResult(
-      attemptId: 'local-$_clientAttemptId',
+      attemptId: 'demo-$_clientAttemptId',
       scorePct: scorePct,
       results: results,
-      rewards: QuizRewards(
-        xpEarned: xpEarned,
-        newXp: 1240 + xpEarned,
+      rewards: const QuizRewards(
+        xpEarned: 0,
+        newXp: 0,
         levelUp: false,
-        streakExtended: true,
+        streakExtended: false,
         gemsEarned: 0,
-        achievementsUnlocked: const <String>[],
+        achievementsUnlocked: <String>[],
       ),
       weakConcepts: weak,
-      nextReviewDueAt: DateTime.now().toUtc().add(const Duration(days: 1)),
+    );
+  }
+
+  SubmitQuizResult _pendingResult() {
+    return SubmitQuizResult(
+      attemptId: 'pending-$_clientAttemptId',
+      scorePct: 0,
+      results: const <ItemResult>[],
+      rewards: const QuizRewards(
+        xpEarned: 0,
+        newXp: 0,
+        levelUp: false,
+        streakExtended: false,
+        gemsEarned: 0,
+        achievementsUnlocked: <String>[],
+      ),
+      weakConcepts: const <String>[],
     );
   }
 
@@ -276,12 +376,21 @@ class LessonController extends StateNotifier<LessonSessionState> {
     final int rand = Random().nextInt(0x7fffffff);
     return '${micros.toRadixString(16)}-${rand.toRadixString(16)}';
   }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 }
 
 /// Family provider keyed by [LessonArgs]; auto-disposed so leaving a lesson
 /// resets its session.
-final lessonControllerProvider = StateNotifierProvider.autoDispose
-    .family<LessonController, LessonSessionState, LessonArgs>((Ref ref, LessonArgs args) {
+final lessonControllerProvider =
+    StateNotifierProvider.autoDispose.family<LessonController, LessonSessionState, LessonArgs>((
+  Ref ref,
+  LessonArgs args,
+) {
   return LessonController(
     lessons: ref.watch(lessonRepositoryProvider),
     quiz: ref.watch(quizRepositoryProvider),

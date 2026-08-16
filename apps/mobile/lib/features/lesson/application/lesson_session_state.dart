@@ -4,6 +4,31 @@ import 'answer_grading.dart';
 import 'check_outcome.dart';
 import 'lesson_step.dart';
 
+bool isAnswerableCheck(QuizItem item) {
+  bool hasUniqueIds(List<QuizOption> options) =>
+      options.map((QuizOption option) => option.id).toSet().length == options.length;
+
+  if (!hasUniqueIds(item.options)) return false;
+  switch (item.type) {
+    case ItemType.ordering:
+    case ItemType.applied:
+      return item.options.isNotEmpty;
+    case ItemType.matchPairs:
+      return item.options.isNotEmpty &&
+          item.matches.length >= item.options.length &&
+          hasUniqueIds(item.matches);
+    case ItemType.cloze:
+      final int blanks = clozeBlankCount(item.stem);
+      return blanks > 0 && item.options.length >= blanks;
+    case ItemType.mcq:
+    case ItemType.multi:
+    case ItemType.scenario:
+    case ItemType.spotTheIssue:
+    case ItemType.unknown:
+      return item.options.isNotEmpty;
+  }
+}
+
 /// Lifecycle of a lesson-playing session.
 enum LessonStatus { idle, loading, ready, graded, submitting, finished, error }
 
@@ -21,6 +46,9 @@ class LessonSessionState {
     this.outcomes = const <String, CheckOutcome>{},
     this.result,
     this.errorMessage,
+    this.isDemo = false,
+    this.pendingSync = false,
+    this.submissionFailed = false,
   });
 
   final LessonStatus status;
@@ -39,6 +67,9 @@ class LessonSessionState {
   /// Server (or locally computed) result, once submitted.
   final SubmitQuizResult? result;
   final String? errorMessage;
+  final bool isDemo;
+  final bool pendingSync;
+  final bool submissionFailed;
 
   LessonStep? get current => (index >= 0 && index < steps.length) ? steps[index] : null;
 
@@ -110,6 +141,9 @@ class LessonSessionState {
     Map<String, CheckOutcome>? outcomes,
     SubmitQuizResult? result,
     String? errorMessage,
+    bool? isDemo,
+    bool? pendingSync,
+    bool? submissionFailed,
   }) {
     return LessonSessionState(
       status: status ?? this.status,
@@ -122,6 +156,9 @@ class LessonSessionState {
       outcomes: outcomes ?? this.outcomes,
       result: result ?? this.result,
       errorMessage: errorMessage ?? this.errorMessage,
+      isDemo: isDemo ?? this.isDemo,
+      pendingSync: pendingSync ?? this.pendingSync,
+      submissionFailed: submissionFailed ?? this.submissionFailed,
     );
   }
 }

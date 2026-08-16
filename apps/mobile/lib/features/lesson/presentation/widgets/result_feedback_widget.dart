@@ -14,6 +14,9 @@ class ResultFeedbackWidget extends StatelessWidget {
     required this.trackId,
     required this.lessonId,
     required this.answers,
+    required this.isDemo,
+    required this.pendingSync,
+    required this.submissionFailed,
     required this.onContinue,
     required this.onReview,
   });
@@ -26,6 +29,9 @@ class ResultFeedbackWidget extends StatelessWidget {
   /// The learner's locked selection per check itemId, used to ask the tutor to
   /// explain a specific answer.
   final Map<String, List<String>> answers;
+  final bool isDemo;
+  final bool pendingSync;
+  final bool submissionFailed;
   final VoidCallback onContinue;
   final VoidCallback onReview;
 
@@ -67,34 +73,49 @@ class ResultFeedbackWidget extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         Text(
-          passed ? 'Concept validé !' : 'Presque !',
+          isDemo
+              ? 'Démo terminée'
+              : pendingSync
+                  ? 'Soumis hors ligne'
+                  : submissionFailed
+                      ? 'Envoi impossible'
+                      : passed
+                          ? 'Concept validé !'
+                          : 'Presque !',
           textAlign: TextAlign.center,
           style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
         Text(
-          passed
-              ? 'Tu maîtrises ce concept. On le consolide avec une révision espacée.'
-              : 'Tu y es presque — une courte révision et ce sera acquis.',
+          isDemo
+              ? 'Cette session ne sera pas synchronisée et ne rapporte aucune récompense.'
+              : pendingSync
+                  ? 'Tes réponses seront synchronisées automatiquement au retour du réseau.'
+                  : submissionFailed
+                      ? 'Aucune progression ni récompense n’a été enregistrée.'
+                      : passed
+                          ? 'Tu maîtrises ce concept. On le consolide avec une révision espacée.'
+                          : 'Tu y es presque — une courte révision et ce sera acquis.',
           textAlign: TextAlign.center,
           style: text.bodyMedium?.copyWith(color: p.textSecondary, height: 1.4),
         ),
         const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            XpChip(xp: rewards.newXp, delta: rewards.xpEarned),
-            if (rewards.streakExtended) ...<Widget>[
-              const SizedBox(width: 12),
-              _RewardPill(
-                icon: Icons.local_fire_department_rounded,
-                label: 'Série +1',
-                color: p.ember,
-              ),
+        if (!isDemo && !pendingSync && !submissionFailed)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              XpChip(xp: rewards.newXp, delta: rewards.xpEarned),
+              if (rewards.streakExtended) ...<Widget>[
+                const SizedBox(width: 12),
+                _RewardPill(
+                  icon: Icons.local_fire_department_rounded,
+                  label: 'Série +1',
+                  color: p.ember,
+                ),
+              ],
             ],
-          ],
-        ),
-        if (rewards.levelUp) ...<Widget>[
+          ),
+        if (!isDemo && !pendingSync && !submissionFailed && rewards.levelUp) ...<Widget>[
           const SizedBox(height: 16),
           Center(
             child: _RewardPill(
@@ -116,14 +137,17 @@ class ResultFeedbackWidget extends StatelessWidget {
                   correct: r.correct,
                   stem: _stemFor(r.itemId),
                   tone: r.correct ? p.success : p.error,
-                  onExplain: () => _explain(context, r),
+                  onExplain: isDemo ? null : () => _explain(context, r),
                 ),
                 if (!identical(r, result.results.last)) const SizedBox(height: 12),
               ],
             ],
           ),
         ),
-        if (result.weakConcepts.isNotEmpty) ...<Widget>[
+        if (!isDemo &&
+            !pendingSync &&
+            !submissionFailed &&
+            result.weakConcepts.isNotEmpty) ...<Widget>[
           const SizedBox(height: 16),
           CalloutBlock(
             kind: CalloutKind.warning,
@@ -172,8 +196,16 @@ class _ScoreRing extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text('$scorePct%', style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
-              Text('score', style: text.labelSmall?.copyWith(color: p.textSecondary)),
+              Text(
+                '$scorePct%',
+                style: text.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                'score',
+                style: text.labelSmall?.copyWith(color: p.textSecondary),
+              ),
             ],
           ),
         ],
@@ -229,7 +261,7 @@ class _ResultRow extends StatelessWidget {
   final bool correct;
   final String stem;
   final Color tone;
-  final VoidCallback onExplain;
+  final VoidCallback? onExplain;
 
   @override
   Widget build(BuildContext context) {
@@ -250,31 +282,37 @@ class _ResultRow extends StatelessWidget {
             Expanded(child: Text(stem, style: text.bodyMedium?.copyWith(height: 1.35))),
           ],
         ),
-        const SizedBox(height: 6),
-        Padding(
-          padding: const EdgeInsets.only(left: PrismSpacing.debt30),
-          child: GestureDetector(
-            onTap: onExplain,
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: PrismSpacing.xxs),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Icon(Icons.auto_awesome_rounded, size: 16, color: p.primary),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Demander au tuteur',
-                    style: text.labelMedium?.copyWith(
+        if (onExplain != null) ...<Widget>[
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.only(left: PrismSpacing.debt30),
+            child: GestureDetector(
+              onTap: onExplain,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: PrismSpacing.xxs),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 16,
                       color: p.primary,
-                      fontWeight: FontWeight.w700,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Text(
+                      'Demander au tuteur',
+                      style: text.labelMedium?.copyWith(
+                        color: p.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }

@@ -2,7 +2,7 @@ import 'package:data/data.dart';
 
 import 'quiz_entry.dart';
 
-// --- Sample graded items (replaced by server grading in P1) ----------------
+// --- Demo-only graded items; never submitted or rewarded --------------------
 
 List<QuizEntry> sampleQuizItems() => <QuizEntry>[
       QuizEntry(
@@ -35,7 +35,10 @@ List<QuizEntry> sampleQuizItems() => <QuizEntry>[
           options: <QuizOption>[
             QuizOption(id: 'a', label: 'Elle possède physiquement ses serveurs'),
             QuizOption(id: 'b', label: 'Ses coûts sont fixes quoi qu\'il arrive'),
-            QuizOption(id: 'c', label: 'La facture suit la demande, à la hausse comme à la baisse'),
+            QuizOption(
+              id: 'c',
+              label: 'La facture suit la demande, à la hausse comme à la baisse',
+            ),
             QuizOption(id: 'd', label: 'Elle évite toute facturation cloud'),
           ],
         ),

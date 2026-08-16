@@ -1,7 +1,7 @@
 import 'package:data/data.dart';
 
 /// Pairs a public [QuizItem] with optional local answer-key metadata used only
-/// in offline fallback mode.
+/// in explicit demo mode.
 class QuizEntry {
   QuizEntry({required this.item, this.correctOptionId, this.explanation});
 

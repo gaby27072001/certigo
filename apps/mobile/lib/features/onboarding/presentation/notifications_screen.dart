@@ -4,13 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../application/onboarding_controller.dart';
+import '../../notifications/notification_service.dart';
 import 'onboarding_common.dart';
 
 /// The notifications primer — explains the value of a daily reminder before the
-/// (future) OS permission prompt, and lets the learner opt in or out. The
-/// `permission_handler` package isn't in the app's dependencies, so this stays a
-/// visual primer: the choice is stored on the controller, no real OS permission
-/// is requested yet.
+/// OS permission prompt and lets the learner opt in or out.
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
@@ -26,9 +24,42 @@ class NotificationsScreen extends ConsumerWidget {
       progress: 0.70,
       onBack: () => context.go(OnboardingRoutes.goal),
       primaryLabel: 'ACTIVER LES RAPPELS',
-      onPrimary: () {
-        c.setReminders(true);
-        go();
+      onPrimary: () async {
+        try {
+          final bool scheduled = await NotificationService.scheduleDailyReminder(
+            NotificationService.defaultReminderTime,
+          );
+          c.setReminders(scheduled);
+          if (!context.mounted) return;
+          if (!scheduled) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Notifications refusées. Tu pourras les activer dans les réglages.',
+                ),
+              ),
+            );
+          }
+          go();
+        } on Object catch (error, stackTrace) {
+          c.setReminders(false);
+          FlutterError.reportError(
+            FlutterErrorDetails(
+              exception: error,
+              stack: stackTrace,
+              library: 'certigo.notifications',
+              context: ErrorDescription(
+                'while requesting onboarding notification permission',
+              ),
+            ),
+          );
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Impossible d’activer les rappels pour le moment.'),
+            ),
+          );
+        }
       },
       secondary: TextButton(
         onPressed: () {
@@ -46,7 +77,11 @@ class NotificationsScreen extends ConsumerWidget {
             height: 96,
             decoration: BoxDecoration(color: p.primary.withOpacity(0.12), shape: BoxShape.circle),
             alignment: Alignment.center,
-            child: Icon(Icons.notifications_active_rounded, color: p.primary, size: 46),
+            child: Icon(
+              Icons.notifications_active_rounded,
+              color: p.primary,
+              size: 46,
+            ),
           ),
           const SizedBox(height: 24),
           Text(
@@ -57,7 +92,8 @@ class NotificationsScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Text(
             'Un petit rappel par jour, et la régularité fait le reste. '
-            'On te proposera le moment idéal pour ta leçon.',
+            'En l’activant, il sera programmé chaque jour à 19 h. '
+            'Tu pourras modifier cette heure dans ton profil.',
             textAlign: TextAlign.center,
             style: t.bodyMedium?.copyWith(color: p.textSecondary, height: 1.45),
           ),
