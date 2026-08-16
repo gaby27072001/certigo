@@ -1,4 +1,4 @@
-name: promote-backend-staging-prod
+name: promote-backend-staging-prod (legacy disabled)
 
 on:
   repository_dispatch:
@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   validate-dispatch:
-    name: Validate default-branch dispatch
+    name: Validate deprecated dispatch
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     outputs:
@@ -40,45 +40,26 @@ jobs:
           fi
           echo "target=$(jq -r '.environment // "staging-prod"' <<< "$CLIENT_PAYLOAD_JSON")" \
             >> "$GITHUB_OUTPUT"
+          echo "::error::This dispatch is disabled; use promote-backend with an explicit environment."
+          exit 1
 
   deploy-staging:
-    name: Promote backend to staging
+    name: Deprecated staging promotion
     needs: validate-dispatch
-    if: ${{ needs.validate-dispatch.outputs.target != 'prod' }}
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/cd-backend.yml
-    with:
-      environment: staging
-    secrets:
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    if: ${{ false && needs.validate-dispatch.outputs.target != 'prod' }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    steps:
+      - run: echo "disabled"
 
   deploy-prod:
-    name: Promote backend to prod
+    name: Deprecated production promotion
     needs: [validate-dispatch, deploy-staging]
     if: >-
       ${{
-        always()
-        && github.ref == 'refs/heads/main'
-        && needs.validate-dispatch.result == 'success'
-        && (
-          needs.validate-dispatch.outputs.target == 'prod'
-          || (
-            needs.validate-dispatch.outputs.target == 'staging-prod'
-            && needs.deploy-staging.result == 'success'
-          )
-        )
+        false
+        && needs.validate-dispatch.outputs.target == 'prod'
+        || needs.validate-dispatch.outputs.target == 'staging-prod'
       }}
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/cd-backend.yml
-    with:
-      environment: prod
-    secrets:
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    steps:
+      - run: echo "disabled"
