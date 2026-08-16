@@ -32,6 +32,10 @@ param storageQueuePrivateLinkConnectionName = 'pe-st-certigo-prod-queue-conn'
 param storageTablePrivateLinkConnectionName = 'pe-st-certigo-prod-table-conn'
 param keyVaultPrivateLinkConnectionName = 'pe-kv-certigo-prod-conn'
 param cosmosPrivateLinkConnectionName = 'pe-cosmos-certigo-prod-sql-conn'
+param storageDiagnosticSettingName = 'diag-to-log-analytics'
+param blobServiceDiagnosticSettingName = 'diag-to-log-appi-certigo-prod'
+param queueServiceDiagnosticSettingName = 'diag-to-log-appi-certigo-prod'
+param tableServiceDiagnosticSettingName = 'diag-to-log-appi-certigo-prod'
 
 // Cosmos DB region. West Europe has AZ-capacity limits for Cosmos (the reason dev
 // deploys Cosmos in North Europe). We pin prod to North Europe too so the deploy

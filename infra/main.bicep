@@ -91,6 +91,18 @@ param ciVnetName string = 'vnet-certigo-ci'
 @description('When true, the security log-search alerts get a system-assigned identity + least-privilege Log Analytics Reader role on the workspace (most robust). Default false: creating that role assignment needs Microsoft.Authorization/roleAssignments/write at the workspace scope, which the deployer may lack — off keeps the deployment guaranteed to succeed. Turn on once the deployer has role-assignment rights.')
 param grantAlertReaderRole bool = false
 
+@description('Existing storage-account diagnostic setting name.')
+param storageDiagnosticSettingName string = 'security-to-law'
+
+@description('Existing Blob service diagnostic setting name.')
+param blobServiceDiagnosticSettingName string = 'security-to-law'
+
+@description('Existing Queue service diagnostic setting name.')
+param queueServiceDiagnosticSettingName string = 'security-to-law'
+
+@description('Existing Table service diagnostic setting name.')
+param tableServiceDiagnosticSettingName string = 'security-to-law'
+
 @description('Environment virtual network address space. Keep environment ranges non-overlapping to allow future peering.')
 param vnetAddressPrefix string
 
@@ -457,6 +469,10 @@ module diagnostics 'modules/diagnostics.bicep' = if (env != 'dev') {
     location: location
     alertEmail: effectiveAlertEmail
     grantAlertReaderRole: grantAlertReaderRole
+    storageDiagnosticSettingName: storageDiagnosticSettingName
+    blobServiceDiagnosticSettingName: blobServiceDiagnosticSettingName
+    queueServiceDiagnosticSettingName: queueServiceDiagnosticSettingName
+    tableServiceDiagnosticSettingName: tableServiceDiagnosticSettingName
     tags: tags
   }
 }

@@ -35,6 +35,10 @@ param storageQueuePrivateDnsZoneGroupName = 'default'
 param storageTablePrivateDnsZoneGroupName = 'default'
 param keyVaultPrivateDnsZoneGroupName = 'pdzg-kv-certigo-staging'
 param cosmosPrivateDnsZoneGroupName = 'default'
+param storageDiagnosticSettingName = 'diag-to-log-analytics'
+param blobServiceDiagnosticSettingName = 'diag-to-log-analytics'
+param queueServiceDiagnosticSettingName = 'diag-to-log-analytics'
+param tableServiceDiagnosticSettingName = 'diag-to-log-analytics'
 
 // Cosmos DB region. West Europe has AZ-capacity limits for Cosmos (the reason dev
 // and prod both deploy Cosmos in North Europe). We pin staging to North Europe too
