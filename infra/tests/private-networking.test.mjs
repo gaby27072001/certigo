@@ -270,6 +270,27 @@ test('policy-constrained services permanently disable public access', () => {
   }
 });
 
+test('diagnostic settings adopt the live storage setting names', () => {
+  const template = compileTemplate('infra/modules/diagnostics.bicep');
+  const settings = resourcesOfType(template, 'Microsoft.Insights/diagnosticSettings');
+  const storageSettings = settings.slice(3, 7).map((setting) => setting.name);
+
+  assert.deepEqual(storageSettings, [
+    "[parameters('storageDiagnosticSettingName')]",
+    "[parameters('blobServiceDiagnosticSettingName')]",
+    "[parameters('queueServiceDiagnosticSettingName')]",
+    "[parameters('tableServiceDiagnosticSettingName')]",
+  ]);
+
+  for (const environment of ['staging', 'prod']) {
+    const parameters = readFileSync(
+      path.join(repositoryRoot, 'infra', 'params', `${environment}.bicepparam`),
+      'utf8',
+    );
+    assert.match(parameters, /storageDiagnosticSettingName = 'diag-to-log-analytics'/);
+  }
+});
+
 test('Key Vault purge protection is enabled in every environment', () => {
   const template = compileTemplate('infra/modules/keyvault.bicep');
   const [vault] = resourcesOfType(template, 'Microsoft.KeyVault/vaults');

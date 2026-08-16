@@ -35,6 +35,18 @@ param alertEmail string
 @description('When true, each log-search alert gets a system-assigned identity granted the least-privilege Log Analytics Reader role on the workspace (most robust: the rule no longer inherits the last editor\'s permissions). Default false because creating the role assignment requires Microsoft.Authorization/roleAssignments/write at the workspace scope, which the deploying principal may not have — keeping it off guarantees the deployment succeeds. Turn on once the deployer has role-assignment rights.')
 param grantAlertReaderRole bool = false
 
+@description('Existing storage-account diagnostic setting name.')
+param storageDiagnosticSettingName string = 'security-to-law'
+
+@description('Existing Blob service diagnostic setting name.')
+param blobServiceDiagnosticSettingName string = 'security-to-law'
+
+@description('Existing Queue service diagnostic setting name.')
+param queueServiceDiagnosticSettingName string = 'security-to-law'
+
+@description('Existing Table service diagnostic setting name.')
+param tableServiceDiagnosticSettingName string = 'security-to-law'
+
 param tags object = {}
 
 resource functionApp 'Microsoft.Web/sites@2023-12-01' existing = {
@@ -113,7 +125,7 @@ resource vaultDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = 
 
 resource storageDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
   scope: storage
-  name: 'security-to-law'
+  name: storageDiagnosticSettingName
   properties: {
     workspaceId: workspaceId
     metrics: [ { category: 'Transaction', enabled: true } ]
@@ -122,7 +134,7 @@ resource storageDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' 
 
 resource blobServiceDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
   scope: blobService
-  name: 'security-to-law'
+  name: blobServiceDiagnosticSettingName
   properties: {
     workspaceId: workspaceId
     logs: [ { categoryGroup: 'allLogs', enabled: true } ]
@@ -132,7 +144,7 @@ resource blobServiceDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-previ
 
 resource queueServiceDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
   scope: queueService
-  name: 'security-to-law'
+  name: queueServiceDiagnosticSettingName
   properties: {
     workspaceId: workspaceId
     logs: [ { categoryGroup: 'allLogs', enabled: true } ]
@@ -142,7 +154,7 @@ resource queueServiceDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-prev
 
 resource tableServiceDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
   scope: tableService
-  name: 'security-to-law'
+  name: tableServiceDiagnosticSettingName
   properties: {
     workspaceId: workspaceId
     logs: [ { categoryGroup: 'allLogs', enabled: true } ]
