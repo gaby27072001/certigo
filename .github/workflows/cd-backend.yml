@@ -11,23 +11,8 @@ name: cd-backend
 #   secret AUTH_JWT_PREVIOUS_SIGNING_KEY
 #   variable AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON
 on:
-  workflow_call:
-    inputs:
-      environment:
-        description: 'Target environment'
-        required: true
-        type: string
-    secrets:
-      AZURE_CLIENT_ID:
-        required: true
-      AZURE_TENANT_ID:
-        required: true
-      AZURE_SUBSCRIPTION_ID:
-        required: true
-      AUTH_JWT_SIGNING_KEY:
-        required: false
-      AUTH_JWT_PREVIOUS_SIGNING_KEY:
-        required: false
+  repository_dispatch:
+    types: [promote-backend]
   push:
     branches: [ main ]
 
@@ -35,7 +20,7 @@ permissions: {}
 
 # Prevent concurrent deployments to the same environment.
 concurrency:
-  group: cd-backend-${{ inputs.environment || 'dev' }}
+  group: cd-backend-${{ github.event_name == 'push' && 'dev' || github.event.client_payload.environment }}
   cancel-in-progress: false
 
 jobs:
@@ -51,17 +36,23 @@ jobs:
         id: target
         shell: bash
         env:
-          REQUESTED_ENVIRONMENT: ${{ inputs.environment }}
+          EVENT_NAME: ${{ github.event_name }}
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
         run: |
           set -euo pipefail
-          TARGET="${REQUESTED_ENVIRONMENT:-dev}"
-          case "$TARGET" in
-            dev|staging|prod) ;;
-            *)
-              echo "::error::Deployment environment must be dev, staging or prod."
-              exit 1
-              ;;
-          esac
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            TARGET=dev
+          elif [[ "$EVENT_NAME" == "repository_dispatch" ]] \
+            && jq -e '
+              type == "object"
+              and keys == ["environment"]
+              and (.environment == "staging" or .environment == "prod")
+            ' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+            TARGET="$(jq -r '.environment' <<< "$CLIENT_PAYLOAD_JSON")"
+          else
+            echo "::error::Promotion payload must select exactly staging or prod."
+            exit 1
+          fi
           echo "environment=$TARGET" >> "$GITHUB_OUTPUT"
 
   deploy-infra:
