@@ -101,7 +101,8 @@ Le backend suit un modèle **CD par environnement** (pas un tag applicatif) :
 
 | Workflow | Rôle | Déclencheur | Garde |
 | --- | --- | --- | --- |
-| [`cd-backend.yml`](../.github/workflows/cd-backend.yml) | Déploie `dev`, `staging` ou `prod` | `push` sur `main` (dev), `repository_dispatch` type `promote-backend` (staging/prod) | environnement validé depuis un payload strict |
+| [`cd-backend.yml`](../.github/workflows/cd-backend.yml) | Déploie `dev` | `push` sur `main` (auto), `workflow_call` depuis le caller trusted de `main` | environnement `dev` |
+| [`promote-backend-staging-prod.yml`](../.github/workflows/promote-backend-staging-prod.yml) | Promotion `staging` → `prod` | `repository_dispatch` type `promote-backend-staging-prod` | environnements `staging` puis `prod` (chaînés, `needs`) |
 
 - **`dev`** : déploiement automatique à chaque merge sur `main` (via `cd-backend.yml`,
   OIDC + Bicep + `func` zip-deploy, runners self-hosted `certigo-trusted`).
@@ -115,8 +116,8 @@ Le backend suit un modèle **CD par environnement** (pas un tag applicatif) :
 **Promouvoir le backend** :
 
 ```bash
-printf '%s' '{"event_type":"promote-backend","client_payload":{"environment":"staging"}}' |
-  gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input -
+gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
+  -f event_type=promote-backend-staging-prod
 ```
 
 > Détails infra/déploiement (OIDC, Bicep, runners, RBAC) :
@@ -138,8 +139,8 @@ printf '%s' '{"event_type":"promote-backend","client_payload":{"environment":"st
    - [ ] Notes de version / changelog préparés.
 2. **Backend**
    - [ ] `dev` déployé (auto au merge) et sain.
-   - [ ] Dispatch `promote-backend` pour `staging`, valider les smoke tests,
-         puis envoyer le même dispatch pour `prod`.
+   - [ ] Dispatch `promote-backend-staging-prod` → valider *gate* `staging`,
+         puis *gate* `prod`.
 3. **Point de version (tag)**
    - [ ] `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`.
    - [ ] `gh release create vX.Y.Z --generate-notes` (optionnel mais recommandé).
