@@ -251,4 +251,3 @@ try {
   console.error(`::error::${error.message}`);
   process.exitCode = 1;
 }
-
