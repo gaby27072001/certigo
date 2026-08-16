@@ -329,6 +329,13 @@ test('environment parameters adopt the live subnets and private endpoints', () =
         'pep-kv-certigo-dev-bk3j5j-vault',
         'pep-cosmos-certigo-dev-bk3j5ja6vw23s-sql',
       ],
+      connections: [
+        'stcertigodevbk3j5ja6-blob',
+        'stcertigodevbk3j5ja6-queue',
+        'stcertigodevbk3j5ja6-table',
+        'kv-certigo-dev-bk3j5j-vault',
+        'cosmos-certigo-dev-bk3j5ja6vw23s-sql',
+      ],
       zoneGroups: [],
     },
     staging: {
@@ -340,6 +347,13 @@ test('environment parameters adopt the live subnets and private endpoints', () =
         'pe-st-certigo-staging-table',
         'pe-kv-certigo-staging',
         'pe-cosmos-certigo-staging',
+      ],
+      connections: [
+        'conn-pe-st-certigo-staging-blob',
+        'conn-pe-st-certigo-staging-queue',
+        'pe-st-certigo-staging-table-conn',
+        'conn-pe-kv-certigo-staging',
+        'conn-pe-cosmos-certigo-staging',
       ],
       zoneGroups: [
         'pdzg-st-certigo-staging-blob',
@@ -355,6 +369,13 @@ test('environment parameters adopt the live subnets and private endpoints', () =
         'pe-st-certigo-prod-table',
         'pe-kv-certigo-prod',
         'pe-cosmos-certigo-prod-sql',
+      ],
+      connections: [
+        'pe-st-certigo-prod-blob-conn',
+        'pe-st-certigo-prod-queue-conn',
+        'pe-st-certigo-prod-table-conn',
+        'pe-kv-certigo-prod-conn',
+        'pe-cosmos-certigo-prod-sql-conn',
       ],
       zoneGroups: [],
     },
@@ -375,6 +396,9 @@ test('environment parameters adopt the live subnets and private endpoints', () =
     );
     for (const endpoint of values.endpoints) {
       assert.ok(parameters.includes(`= '${endpoint}'`));
+    }
+    for (const connection of values.connections) {
+      assert.ok(parameters.includes(`= '${connection}'`));
     }
     for (const zoneGroup of values.zoneGroups) {
       assert.ok(parameters.includes(`= '${zoneGroup}'`));

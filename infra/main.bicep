@@ -121,6 +121,21 @@ param keyVaultPrivateEndpointName string
 @description('Existing Cosmos DB private endpoint name.')
 param cosmosPrivateEndpointName string
 
+@description('Existing Blob private link service connection name.')
+param storageBlobPrivateLinkConnectionName string
+
+@description('Existing Queue private link service connection name.')
+param storageQueuePrivateLinkConnectionName string
+
+@description('Existing Table private link service connection name.')
+param storageTablePrivateLinkConnectionName string
+
+@description('Existing Key Vault private link service connection name.')
+param keyVaultPrivateLinkConnectionName string
+
+@description('Existing Cosmos DB private link service connection name.')
+param cosmosPrivateLinkConnectionName string
+
 @description('Existing Blob private DNS zone group name.')
 param storageBlobPrivateDnsZoneGroupName string = 'default'
 
@@ -306,6 +321,11 @@ module privateNetwork 'modules/privateNetwork.bicep' = {
     storageTablePrivateEndpointName: storageTablePrivateEndpointName
     keyVaultPrivateEndpointName: keyVaultPrivateEndpointName
     cosmosPrivateEndpointName: cosmosPrivateEndpointName
+    storageBlobPrivateLinkConnectionName: storageBlobPrivateLinkConnectionName
+    storageQueuePrivateLinkConnectionName: storageQueuePrivateLinkConnectionName
+    storageTablePrivateLinkConnectionName: storageTablePrivateLinkConnectionName
+    keyVaultPrivateLinkConnectionName: keyVaultPrivateLinkConnectionName
+    cosmosPrivateLinkConnectionName: cosmosPrivateLinkConnectionName
     storageBlobPrivateDnsZoneGroupName: storageBlobPrivateDnsZoneGroupName
     storageQueuePrivateDnsZoneGroupName: storageQueuePrivateDnsZoneGroupName
     storageTablePrivateDnsZoneGroupName: storageTablePrivateDnsZoneGroupName
