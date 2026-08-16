@@ -97,11 +97,19 @@ var host = new HostBuilder()
         // production a fixed dev key is tolerated so the email/password flow works out
         // of the box locally. The decision is a pure, unit-tested function.
         var signingSecret = JwtSigningKeyGuard.ResolveSigningSecret(
-            configuration["AUTH_JWT_SIGNING_KEY"],
+            KeyVaultSecretValueResolver.Resolve(
+                configuration["AUTH_JWT_SIGNING_KEY"],
+                configuration[ConfigurationKeys.AuthJwtSigningKeySecretUri],
+                configuration["HEALTH_PLATFORM_CLIENT_ID"],
+                TimeSpan.FromSeconds(10)),
             context.HostingEnvironment.IsProduction(),
             configuration["AUTH_MODE"]);
         var previousSigningSecret = JwtSigningKeyGuard.ResolvePreviousSigningSecret(
-            configuration["AUTH_JWT_PREVIOUS_SIGNING_KEY"],
+            KeyVaultSecretValueResolver.Resolve(
+                configuration["AUTH_JWT_PREVIOUS_SIGNING_KEY"],
+                configuration[ConfigurationKeys.AuthJwtPreviousSigningKeySecretUri],
+                configuration["HEALTH_PLATFORM_CLIENT_ID"],
+                TimeSpan.FromSeconds(10)),
             signingSecret,
             context.HostingEnvironment.IsProduction(),
             configuration["AUTH_MODE"]);

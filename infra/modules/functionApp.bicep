@@ -261,8 +261,8 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
 }
 
 // Apply app settings after the site, its managed identity, and data-plane access
-// exist. This sequencing is required for private Key Vault references to resolve
-// reliably instead of reaching the worker as an unresolved @Microsoft.KeyVault value.
+// exist. Flex Consumption workers read private Key Vault secrets through the SDK;
+// only the versioned, non-secret URI is passed in application configuration.
 resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
   parent: functionApp
   name: 'appsettings'
@@ -283,10 +283,8 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     KeyVault__HealthSecretName: 'AUTH-JWT-SIGNING-KEY'
     AUTH_MODE: authMode
     AUTH_ALLOW_DEV: authMode == 'dev' ? 'true' : 'false'
-    AUTH_JWT_SIGNING_KEY: '@Microsoft.KeyVault(SecretUri=${authJwtSigningKeySecretUri})'
-    AUTH_JWT_PREVIOUS_SIGNING_KEY: empty(authJwtPreviousSigningKeySecretUri)
-      ? ''
-      : '@Microsoft.KeyVault(SecretUri=${authJwtPreviousSigningKeySecretUri})'
+    AUTH_JWT_SIGNING_KEY_SECRET_URI: authJwtSigningKeySecretUri
+    AUTH_JWT_PREVIOUS_SIGNING_KEY_SECRET_URI: authJwtPreviousSigningKeySecretUri
     ENTRA_AUTHORITY: entraAuthority
     ENTRA_AUDIENCE: entraAudience
     TUTOR_LLM_ENABLED: string(tutorLlmEnabled)

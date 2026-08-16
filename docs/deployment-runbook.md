@@ -331,6 +331,11 @@ inversement). Le secret Key Vault reçoit aussi un `contentType` explicite et un
 épinglée sur sa version, afin que la Function App recharge immédiatement une
 rotation au lieu d'attendre le cache d'une référence versionless.
 
+Le déploiement transmet uniquement cette URI versionnée à la Function App. Le
+worker Flex Consumption lit ensuite la valeur via son identité managée et le point
+de terminaison privé Key Vault; la clé elle-même n'est jamais stockée dans les app
+settings.
+
 Le CD compile d'abord le `.bicepparam` sans secret, injecte les valeurs en mémoire
 dans un JSON temporaire créé avec le mode `0600`, puis transmet uniquement
 `@<chemin-du-fichier>` à Azure CLI. Un `trap` supprime les deux fichiers temporaires

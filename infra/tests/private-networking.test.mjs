@@ -311,7 +311,7 @@ test('Flex app uses the delegated subnet without forcing public egress into it',
   assert.equal(site.properties.siteConfig.vnetRouteAllEnabled, false);
 });
 
-test('Function app settings are applied after the site for Key Vault reference resolution', () => {
+test('Function app settings pass only versioned Key Vault secret URIs after the site', () => {
   const template = compileTemplate('infra/modules/functionApp.bicep');
   const [site] = resourcesOfType(template, 'Microsoft.Web/sites');
   const [settings] = resourcesOfType(template, 'Microsoft.Web/sites/config');
@@ -319,9 +319,10 @@ test('Function app settings are applied after the site for Key Vault reference r
   assert.equal(site.properties.siteConfig.appSettings, undefined);
   assert.equal(settings.name, "[format('{0}/{1}', parameters('functionAppName'), 'appsettings')]");
   assert.equal(
-    settings.properties.AUTH_JWT_SIGNING_KEY,
-    "[format('@Microsoft.KeyVault(SecretUri={0})', parameters('authJwtSigningKeySecretUri'))]",
+    settings.properties.AUTH_JWT_SIGNING_KEY_SECRET_URI,
+    "[parameters('authJwtSigningKeySecretUri')]",
   );
+  assert.equal(settings.properties.AUTH_JWT_SIGNING_KEY, undefined);
   assert.ok(settings.dependsOn.includes("[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"));
 });
 
