@@ -78,7 +78,9 @@ param manageDefenderPlans = true
 
 // Production PITR is explicit. Changing an existing Periodic account is irreversible.
 param cosmosBackupMode = 'Continuous'
-param cosmosContinuousBackupTier = 'Continuous7Days'
+// Preserve the live 30-day PITR retention; production deployments must never
+// silently downgrade the established recovery window.
+param cosmosContinuousBackupTier = 'Continuous30Days'
 
 // MCSB remains audit-only until remediation identities and exemptions are reviewed.
 param deployMcsbPolicyAssignment = true
