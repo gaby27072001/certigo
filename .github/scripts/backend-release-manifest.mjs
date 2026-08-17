@@ -210,13 +210,38 @@ function createManifest(values) {
 function verifyManifest(values) {
   const manifestFile = path.resolve(requireValue(values, 'manifest'));
   const expectedCommit = requireValue(values, 'expected-commit');
+  const expectedRunId = requireValue(values, 'expected-run-id');
+  const expectedPackageSha256 = requireValue(values, 'expected-package-sha256');
   if (!shaPattern.test(expectedCommit)) {
     fail('--expected-commit must be a lowercase 40-character Git SHA.');
+  }
+  if (!/^[1-9][0-9]{0,19}$/.test(expectedRunId)) {
+    fail('--expected-run-id must be a positive GitHub Actions run id.');
+  }
+  if (!digestPattern.test(expectedPackageSha256)) {
+    fail('--expected-package-sha256 must be a lowercase SHA-256 digest.');
   }
 
   const manifest = readManifest(manifestFile);
   if (manifest.commitSha !== expectedCommit) {
     fail(`Release commit ${manifest.commitSha} does not match expected commit ${expectedCommit}.`);
+  }
+  if (String(manifest.provenance.runId) !== expectedRunId) {
+    fail(
+      `Release run ${manifest.provenance.runId} does not match expected run ${expectedRunId}.`,
+    );
+  }
+  if (manifest.package.sha256 !== expectedPackageSha256) {
+    fail('Release package does not match the trusted source-run digest.');
+  }
+  const expectedRepository = process.env.GITHUB_REPOSITORY ?? '';
+  const expectedWorkflowRef =
+    `${expectedRepository}/.github/workflows/cd-backend.yml@refs/heads/main`;
+  if (
+    manifest.provenance.repository !== expectedRepository
+    || manifest.provenance.workflowRef !== expectedWorkflowRef
+  ) {
+    fail('Release provenance does not match the current repository workflow.');
   }
 
   for (const [label, descriptor] of [

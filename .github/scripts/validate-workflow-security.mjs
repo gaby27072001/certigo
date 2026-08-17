@@ -391,6 +391,10 @@ function validateRepositoryInvariants() {
     path.join(root, '.github', 'scripts', 'deploy-flex-onedeploy.sh'),
     'utf8',
   );
+  const releaseTransfer = fs.readFileSync(
+    path.join(root, '.github', 'scripts', 'transfer-backend-release.sh'),
+    'utf8',
+  );
   const lint = fs.readFileSync(path.join(workflowsDir, 'lint-workflows.yml'), 'utf8');
   const projectState = fs.readFileSync(
     path.join(workflowsDir, 'ci-project-state.yml'),
@@ -573,10 +577,43 @@ function validateRepositoryInvariants() {
     '--environment staging',
     '--slot current',
     '--slot previous',
+    'bash .github/scripts/transfer-backend-release.sh',
+    'RELEASE_ACTION: upload',
+    'RELEASE_ACTION: download',
+    '--expected-run-id',
+    '--expected-package-sha256',
+    'CERTIGO_RELEASE_PACKAGE_SHA256=',
+    '/actions/runs/$SOURCE_RUN_ID/logs',
+    'ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""',
+    'ACTIONS_ID_TOKEN_REQUEST_URL: ""',
   ]) {
     if (!backend.includes(marker)) {
       errors.push(`cd-backend.yml: missing private OneDeploy invariant ${marker}`);
     }
+  }
+  if (/^\s*-\s+uses:\s+actions\/(?:upload|download)-artifact@/m.test(backend)) {
+    errors.push('cd-backend.yml: retained releases must not depend on GitHub artifact quota');
+  }
+  for (const variable of [
+    'ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""',
+    'ACTIONS_ID_TOKEN_REQUEST_URL: ""',
+  ]) {
+    if (backend.split(variable).length - 1 < 5) {
+      errors.push(`cd-backend.yml: build subprocesses must clear ${variable}`);
+    }
+  }
+  for (const marker of [
+    'RELEASE_PREFIX="releases/${SOURCE_RUN_ID}"',
+    '--auth-mode login',
+    '--overwrite false',
+    '--metadata "sha256=${digest}"',
+  ]) {
+    if (!releaseTransfer.includes(marker)) {
+      errors.push(`transfer-backend-release.sh: missing immutable storage invariant ${marker}`);
+    }
+  }
+  if (/generate-sas|account-key|connection-string/.test(releaseTransfer)) {
+    errors.push('transfer-backend-release.sh: release storage must use OIDC only');
   }
   if (
     backend.includes(

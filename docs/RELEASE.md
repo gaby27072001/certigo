@@ -117,9 +117,13 @@ Le backend suit un modèle **CD par environnement** (pas un tag applicatif) :
 - **Récupération** : `promote-backend` avec `operation=rollback` redéploie uniquement
   l'artefact `previous` enregistré pour l'environnement, sous sa gate GitHub et sans
   redéployer Bicep.
-- **Conservation** : le bundle GitHub (`backend-release`) reste 90 jours ; chaque
-  stockage d'environnement conserve les ZIP immuables 30 jours et
-  `state/backend-release.json` référence les versions courante et précédente.
+- **Conservation** : le bundle source reste 90 jours sous
+  `app-package/releases/<source_run_id>/` dans le Storage privé `dev`, sans dépendre
+  du quota GitHub Actions Artifact ; chaque stockage d'environnement conserve les
+  ZIP immuables déployés 30 jours et
+  `state/backend-release.json` référence les versions courante et précédente. Le
+  SHA-256 du ZIP est aussi ancré dans les logs immuables du job source et revérifié
+  à chaque téléchargement ; un rerun réutilise le bundle canonique du run.
 - **Post-déploiement** : les probes existantes `/api/health/live` et
   `/api/health/ready` sont bloquantes avant la mise à jour du pointeur de release.
 - **Destinataire des alertes** : `staging` et `prod` définissent chacun la

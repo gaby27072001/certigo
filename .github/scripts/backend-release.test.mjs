@@ -40,6 +40,12 @@ const deploymentStateVerificationScript = path.join(
   'scripts',
   'verify-backend-deployment-state.mjs',
 );
+const releaseTransferScript = path.join(
+  repositoryRoot,
+  '.github',
+  'scripts',
+  'transfer-backend-release.sh',
+);
 const commitSha = '0123456789abcdef0123456789abcdef01234567';
 
 function createRelease() {
@@ -93,22 +99,131 @@ test('release manifest records and verifies package, SBOM and provenance', () =>
 
   const result = spawnSync(
     process.execPath,
-    [manifestScript, 'verify', '--manifest', output, '--expected-commit', commitSha],
-    { encoding: 'utf8' },
+    [
+      manifestScript,
+      'verify',
+      '--manifest',
+      output,
+      '--expected-commit',
+      commitSha,
+      '--expected-run-id',
+      '1234',
+      '--expected-package-sha256',
+      manifest.package.sha256,
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_REPOSITORY: 'gchambaud_microsoft/Certigo',
+      },
+    },
   );
   assert.equal(result.status, 0, result.stderr);
 });
 
 test('release verification rejects changed package bytes', () => {
   const { release, output } = createRelease();
+  const manifest = JSON.parse(readFileSync(output, 'utf8'));
   writeFileSync(path.join(release, 'publish.zip'), 'tampered package', 'utf8');
   const result = spawnSync(
     process.execPath,
-    [manifestScript, 'verify', '--manifest', output, '--expected-commit', commitSha],
-    { encoding: 'utf8' },
+    [
+      manifestScript,
+      'verify',
+      '--manifest',
+      output,
+      '--expected-commit',
+      commitSha,
+      '--expected-run-id',
+      '1234',
+      '--expected-package-sha256',
+      manifest.package.sha256,
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_REPOSITORY: 'gchambaud_microsoft/Certigo',
+      },
+    },
   );
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /package does not match/i);
+});
+
+test('release verification rejects a different source run', () => {
+  const { output } = createRelease();
+  const manifest = JSON.parse(readFileSync(output, 'utf8'));
+  const result = spawnSync(
+    process.execPath,
+    [
+      manifestScript,
+      'verify',
+      '--manifest',
+      output,
+      '--expected-commit',
+      commitSha,
+      '--expected-run-id',
+      '9999',
+      '--expected-package-sha256',
+      manifest.package.sha256,
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_REPOSITORY: 'gchambaud_microsoft/Certigo',
+      },
+    },
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /does not match expected run/i);
+});
+
+test('release verification rejects a package digest absent from the source run', () => {
+  const { output } = createRelease();
+  const result = spawnSync(
+    process.execPath,
+    [
+      manifestScript,
+      'verify',
+      '--manifest',
+      output,
+      '--expected-commit',
+      commitSha,
+      '--expected-run-id',
+      '1234',
+      '--expected-package-sha256',
+      'c'.repeat(64),
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_REPOSITORY: 'gchambaud_microsoft/Certigo',
+      },
+    },
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /trusted source-run digest/i);
+});
+
+test('release storage transfer is immutable, private and run-scoped', () => {
+  const script = readFileSync(releaseTransferScript, 'utf8');
+  for (const marker of [
+    'RELEASE_PREFIX="releases/${SOURCE_RUN_ID}"',
+    '--auth-mode login',
+    '--overwrite false',
+    '--metadata "sha256=${digest}"',
+    'Reused canonical backend release',
+    "'publish.zip'",
+    "'release-manifest.json'",
+    "'sbom/bom.json'",
+  ]) {
+    assert.match(script, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+  assert.doesNotMatch(script, /generate-sas|account-key|connection-string/);
 });
 
 test('release resolver accepts only a successful main push from cd-backend', () => {
