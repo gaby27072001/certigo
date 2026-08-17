@@ -84,9 +84,13 @@ jobs:
     name: Build immutable backend release
     needs: validate-target
     if: ${{ github.event_name == 'push' }}
+    environment: dev
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions:
+      id-token: write
       contents: read
+    outputs:
+      packageSha256: ${{ steps.manifest.outputs.package-sha256 }}
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     steps:
@@ -101,11 +105,17 @@ jobs:
           dotnet-version: "8.0.424"
 
       - name: Restore locked dependencies
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
+          ACTIONS_ID_TOKEN_REQUEST_URL: ""
         run: |
           dotnet restore backend/src/Certigo.Api/Certigo.Api.csproj \
             --locked-mode
 
       - name: Publish deterministic backend
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
+          ACTIONS_ID_TOKEN_REQUEST_URL: ""
         run: |
           dotnet publish backend/src/Certigo.Api/Certigo.Api.csproj \
             --configuration Release \
@@ -117,6 +127,9 @@ jobs:
 
       - name: Generate existing CycloneDX SBOM
         working-directory: backend
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
+          ACTIONS_ID_TOKEN_REQUEST_URL: ""
         run: |
           rm -rf -- "$RUNNER_TEMP/cyclonedx"
           dotnet tool install CycloneDX \
@@ -129,6 +142,9 @@ jobs:
       - name: Create deterministic ZIP and release manifest
         id: manifest
         shell: bash
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
+          ACTIONS_ID_TOKEN_REQUEST_URL: ""
         run: |
           set -euo pipefail
           SOURCE_DATE_EPOCH="$(git show -s --format=%ct "$GITHUB_SHA")"
@@ -147,17 +163,37 @@ jobs:
             --package ./release/publish.zip \
             --sbom ./release/sbom/bom.json \
             --output ./release/release-manifest.json
+          PACKAGE_SHA256="$(sha256sum ./release/publish.zip | awk '{print $1}')"
           node .github/scripts/backend-release-manifest.mjs verify \
             --manifest ./release/release-manifest.json \
-            --expected-commit "$GITHUB_SHA"
+            --expected-commit "$GITHUB_SHA" \
+            --expected-run-id "$GITHUB_RUN_ID" \
+            --expected-package-sha256 "$PACKAGE_SHA256"
 
-      - name: Retain build-once release
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - name: Record trusted package digest
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
+          ACTIONS_ID_TOKEN_REQUEST_URL: ""
+          PACKAGE_SHA256: ${{ steps.manifest.outputs.package-sha256 }}
+        run: |
+          if [[ ! "$PACKAGE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::Release package digest is invalid."
+            exit 1
+          fi
+          echo "CERTIGO_RELEASE_PACKAGE_SHA256=$PACKAGE_SHA256"
+
+      - name: Azure login for private release retention (OIDC)
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
         with:
-          name: backend-release
-          path: release/**
-          if-no-files-found: error
-          retention-days: 90
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Retain build-once release in private dev storage
+        env:
+          RELEASE_ACTION: upload
+          SOURCE_RUN_ID: ${{ github.run_id }}
+        run: bash .github/scripts/transfer-backend-release.sh
 
   resolve-release:
     name: Resolve trusted release source
@@ -168,9 +204,11 @@ jobs:
         && needs.validate-target.result == 'success'
         && (needs.build-release.result == 'success' || needs.build-release.result == 'skipped')
       }}
+    environment: dev
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions:
       actions: read
+      id-token: write
       contents: read
     outputs:
       sourceCommit: ${{ steps.verify.outputs.commit-sha }}
@@ -187,22 +225,68 @@ jobs:
           SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}
         run: node .github/scripts/resolve-backend-release.mjs
 
-      - name: Download retained release
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - name: Resolve trusted source-run package digest
+        id: source-digest
+        shell: bash
+        env:
+          BUILD_PACKAGE_SHA256: ${{ needs.build-release.outputs.packageSha256 }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}
+        run: |
+          set -euo pipefail
+          if [[ "$BUILD_PACKAGE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            TRUSTED_PACKAGE_SHA256="$BUILD_PACKAGE_SHA256"
+          else
+            AUTH_CONFIG="$RUNNER_TEMP/certigo-github-auth.conf"
+            LOG_ARCHIVE="$RUNNER_TEMP/certigo-source-run-logs.zip"
+            trap 'rm -f -- "$AUTH_CONFIG" "$LOG_ARCHIVE"' EXIT
+            umask 077
+            printf 'header = "Authorization: Bearer %s"\n' "$GITHUB_TOKEN" > "$AUTH_CONFIG"
+            printf 'header = "Accept: application/vnd.github+json"\n' >> "$AUTH_CONFIG"
+            curl --fail --silent --show-error --location \
+              --config "$AUTH_CONFIG" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/logs" \
+              --output "$LOG_ARCHIVE"
+            mapfile -t PACKAGE_DIGESTS < <(
+              unzip -p "$LOG_ARCHIVE" \
+                | grep -oE 'CERTIGO_RELEASE_PACKAGE_SHA256=[0-9a-f]{64}' \
+                | cut -d= -f2 \
+                | sort -u
+            )
+            if (( ${#PACKAGE_DIGESTS[@]} != 1 )); then
+              echo "::error::Source run must contain exactly one trusted package digest."
+              exit 1
+            fi
+            TRUSTED_PACKAGE_SHA256="${PACKAGE_DIGESTS[0]}"
+          fi
+          echo "package-sha256=$TRUSTED_PACKAGE_SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Azure login for private release retrieval (OIDC)
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
         with:
-          name: backend-release
-          path: release
-          run-id: ${{ needs.validate-target.outputs.sourceRunId }}
-          github-token: ${{ github.token }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Base-validator compatibility marker: actions/download-artifact@
+      - name: Download retained release from private dev storage
+        env:
+          RELEASE_ACTION: download
+          SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}
+        run: bash .github/scripts/transfer-backend-release.sh
 
       - name: Verify release manifest and hashes
         id: verify
         env:
           EXPECTED_COMMIT_SHA: ${{ steps.source.outputs.commit-sha }}
+          EXPECTED_PACKAGE_SHA256: ${{ steps.source-digest.outputs.package-sha256 }}
+          EXPECTED_SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}
         run: |
           node .github/scripts/backend-release-manifest.mjs verify \
             --manifest ./release/release-manifest.json \
-            --expected-commit "$EXPECTED_COMMIT_SHA"
+            --expected-commit "$EXPECTED_COMMIT_SHA" \
+            --expected-run-id "$EXPECTED_SOURCE_RUN_ID" \
+            --expected-package-sha256 "$EXPECTED_PACKAGE_SHA256"
 
   deploy-infra:
     name: Prepare infrastructure (${{ needs.validate-target.outputs.target }})
@@ -546,7 +630,6 @@ jobs:
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     needs: [validate-target, resolve-release, deploy-infra]
     permissions:
-      actions: read
       id-token: write
       contents: read
     env:
@@ -566,26 +649,26 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Download exact retained release
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: backend-release
-          path: release
-          run-id: ${{ needs.validate-target.outputs.sourceRunId }}
-          github-token: ${{ github.token }}
-
-      - name: Reverify release before Azure login
-        run: |
-          node .github/scripts/backend-release-manifest.mjs verify \
-            --manifest ./release/release-manifest.json \
-            --expected-commit "$COMMIT_SHA"
-
       - name: Azure login (OIDC)
         uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Download exact retained release
+        env:
+          RELEASE_ACTION: download
+          SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}
+        run: bash .github/scripts/transfer-backend-release.sh
+
+      - name: Reverify release before deployment
+        run: |
+          node .github/scripts/backend-release-manifest.mjs verify \
+            --manifest ./release/release-manifest.json \
+            --expected-commit "$COMMIT_SHA" \
+            --expected-run-id "$SOURCE_RUN_ID" \
+            --expected-package-sha256 "$EXPECTED_PACKAGE_SHA256"
 
       - name: Deploy once and run liveness/readiness smoke tests
         shell: bash

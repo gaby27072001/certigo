@@ -69,9 +69,14 @@ Le workflow sépare désormais strictement la construction et la promotion :
    jour `state/backend-release.json` qu'après succès de `health/live` et
    `health/ready`.
 
-La rétention GitHub est de 90 jours. La politique Storage conserve les packages
-30 jours ; le pointeur minuscule `state/backend-release.json`, non soumis à cette
-expiration, référence `current` et `previous`. Pour une récupération opérateur :
+Le bundle source est conservé 90 jours sous
+`app-package/releases/<source_run_id>/` dans le Storage privé `dev`, via OIDC et
+sans dépendance au quota GitHub Actions Artifact. La politique Storage conserve
+les packages déployés 30 jours ; le pointeur minuscule
+`state/backend-release.json`, non soumis à cette expiration, référence `current`
+et `previous`. Le SHA-256 du ZIP publié dans les logs immuables du job source est
+comparé au manifeste et aux octets téléchargés ; la promotion échoue fermée si
+les logs ou le bundle ne sont plus disponibles. Pour une récupération opérateur :
 
 ```bash
 # Utiliser exclusivement le sourceRunId du champ previous de l'environnement.

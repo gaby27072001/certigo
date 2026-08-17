@@ -96,6 +96,33 @@ resource deploymentRetention 'Microsoft.Storage/storageAccounts/managementPolici
             }
           }
         }
+        {
+          enabled: true
+          name: 'delete-expired-release-bundles'
+          type: 'Lifecycle'
+          definition: {
+            actions: {
+              baseBlob: {
+                delete: {
+                  daysAfterModificationGreaterThan: 90
+                }
+              }
+              version: {
+                delete: {
+                  daysAfterCreationGreaterThan: 90
+                }
+              }
+            }
+            filters: {
+              blobTypes: [
+                'blockBlob'
+              ]
+              prefixMatch: [
+                'app-package/releases/'
+              ]
+            }
+          }
+        }
       ]
     }
   }

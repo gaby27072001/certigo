@@ -231,22 +231,40 @@ test('OIDC deployment principal receives container blob access and account deleg
   }
 });
 
-test('deployment packages expire through a bounded prefix lifecycle policy', () => {
+test('deployment packages and release bundles expire through bounded lifecycle policies', () => {
   const template = compileTemplate('infra/modules/storage.bicep');
   const [policy] = resourcesOfType(
     template,
     'Microsoft.Storage/storageAccounts/managementPolicies',
   );
-  const [rule] = policy.properties.policy.rules;
-  assert.equal(rule.enabled, true);
-  assert.equal(rule.type, 'Lifecycle');
-  assert.deepEqual(rule.definition.filters.prefixMatch, [
+  const rules = Object.fromEntries(
+    policy.properties.policy.rules.map((rule) => [rule.name, rule]),
+  );
+  const deploymentRule = rules['delete-expired-deployment-packages'];
+  assert.equal(deploymentRule.enabled, true);
+  assert.equal(deploymentRule.type, 'Lifecycle');
+  assert.deepEqual(deploymentRule.definition.filters.prefixMatch, [
     'app-package/deployments/',
   ]);
-  assert.deepEqual(rule.definition.filters.blobTypes, ['blockBlob']);
+  assert.deepEqual(deploymentRule.definition.filters.blobTypes, ['blockBlob']);
   assert.equal(
-    rule.definition.actions.baseBlob.delete.daysAfterModificationGreaterThan,
+    deploymentRule.definition.actions.baseBlob.delete.daysAfterModificationGreaterThan,
     30,
+  );
+  const releaseRule = rules['delete-expired-release-bundles'];
+  assert.equal(releaseRule.enabled, true);
+  assert.equal(releaseRule.type, 'Lifecycle');
+  assert.deepEqual(releaseRule.definition.filters.prefixMatch, [
+    'app-package/releases/',
+  ]);
+  assert.deepEqual(releaseRule.definition.filters.blobTypes, ['blockBlob']);
+  assert.equal(
+    releaseRule.definition.actions.baseBlob.delete.daysAfterModificationGreaterThan,
+    90,
+  );
+  assert.equal(
+    releaseRule.definition.actions.version.delete.daysAfterCreationGreaterThan,
+    90,
   );
 });
 
