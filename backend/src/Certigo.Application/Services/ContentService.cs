@@ -34,19 +34,38 @@ public sealed class ContentService(IContentRepository content) : IContentService
         if (!tracks.Any())
             throw new EmptyCatalogException();
 
-        var summaries = tracks
-            .Select(t => new TrackSummaryDto(
-                Id: t.Id,
-                Code: t.Code,
-                Title: t.Title,
-                Level: t.Level ?? string.Empty,
-                Summary: t.Summary,
-                UnitCount: t.Units.Count,
-                LessonCount: t.Units.Sum(u => u.Lessons.Count)))
+        var summaries = tracks.Select(ToSummary).ToList();
+        summaries.AddRange(
+            OfficialCertificationCatalog.MissingReplacementSummaries(tracks.Select(t => t.Code)));
+
+        var ordered = summaries
             .OrderBy(s => LevelRank(s.Level))
             .ThenBy(s => s.Code, StringComparer.Ordinal)
             .ToArray();
-        return new CatalogDto(summaries);
+        return new CatalogDto(ordered);
+    }
+
+    private static TrackSummaryDto ToSummary(Track track)
+    {
+        var official = OfficialCertificationCatalog.Find(track.Code);
+        return new TrackSummaryDto(
+            Id: track.Id,
+            Code: track.Code,
+            Title: OfficialCertificationCatalog.TitleFor(track.Code, track.Title),
+            Level: track.Level ?? string.Empty,
+            Summary: official?.Summary ?? track.Summary,
+            UnitCount: track.Units.Count,
+            LessonCount: track.Units.Sum(u => u.Lessons.Count),
+            Domains: official?.Domains ?? Array.Empty<CertificationDomainDto>(),
+            Prerequisites: official?.Prerequisites ?? string.Empty,
+            StudyGuideUrl: official?.StudyGuideUrl ?? string.Empty,
+            ExamUrl: official?.ExamUrl ?? string.Empty,
+            BlueprintDate: official?.BlueprintDate,
+            Lifecycle: official?.Lifecycle ?? string.Empty,
+            LifecycleNote: official?.LifecycleNote ?? string.Empty,
+            ExamDetailsNote: official?.ExamDetailsNote ?? string.Empty,
+            ReplacementCode: official?.ReplacementCode ?? string.Empty,
+            MigrationNote: official?.MigrationNote ?? string.Empty);
     }
 
     // Order the picker the way Microsoft tiers certifications: Fundamentals

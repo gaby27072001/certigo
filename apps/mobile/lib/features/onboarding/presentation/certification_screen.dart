@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import '../../../app/providers.dart';
 import '../application/onboarding_controller.dart';
 import 'onboarding_common.dart';
 
@@ -16,25 +17,37 @@ class CertificationScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final OnboardingController c = ref.watch(onboardingControllerProvider);
+    final catalog = ref.watch(catalogProvider).asData?.value;
+
+    bool hasPublishedLearningContent(TargetCertification cert) {
+      if (cert != TargetCertification.ai901) return true;
+      return catalog?.any((track) => track.code == cert.code && track.learningAvailable) ?? false;
+    }
+
+    final TargetCertification? target = c.targetCertification;
 
     return OnboardingScaffold(
       progress: 0.16,
       onBack: () => context.go(OnboardingRoutes.birthYear),
       primaryLabel: 'CONTINUER',
-      onPrimary: c.targetCertification == null ? null : () => context.go(OnboardingRoutes.domains),
+      onPrimary: target != null && hasPublishedLearningContent(target)
+          ? () => context.go(OnboardingRoutes.domains)
+          : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const SizedBox(height: 8),
           const MascotPrompt(message: 'Quelle certification veux-tu décrocher ?'),
           const SizedBox(height: 24),
-          for (final TargetCertification cert in TargetCertification.values) ...<Widget>[
+          for (final TargetCertification cert in availableTargetCertifications) ...<Widget>[
             CertificationCard(
               code: cert.code,
               title: cert.title,
               accent: context.prism.accentFor(cert.domainIndex),
-              selected: c.targetCertification == cert,
-              onTap: () => c.setTargetCertification(cert),
+              levelLabel: hasPublishedLearningContent(cert) ? '' : 'Bientôt',
+              selected: target == cert,
+              onTap:
+                  hasPublishedLearningContent(cert) ? () => c.setTargetCertification(cert) : null,
             ),
             const SizedBox(height: 12),
           ],

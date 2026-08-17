@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
+import 'package:data/data.dart';
 
+import 'package:certigo/app/providers.dart';
 import 'package:certigo/features/onboarding/application/onboarding_controller.dart';
 import 'package:certigo/features/notifications/notification_service.dart';
 import 'package:certigo/features/onboarding/presentation/attribution_screen.dart';
@@ -28,8 +30,9 @@ void main() {
     String location,
     Widget child, {
     List<GoRoute> extraRoutes = const <GoRoute>[],
+    List<Override> overrides = const <Override>[],
   }) async {
-    final ProviderContainer container = ProviderContainer();
+    final ProviderContainer container = ProviderContainer(overrides: overrides);
     addTearDown(container.dispose);
     final GoRouter router = GoRouter(
       initialLocation: location,
@@ -59,9 +62,31 @@ void main() {
       tester,
       '/onboarding/certification',
       const CertificationScreen(),
+      overrides: <Override>[
+        catalogProvider.overrideWith(
+          (Ref ref) async => const <TrackSummary>[
+            TrackSummary(
+              id: 'ai-901',
+              code: 'AI-901',
+              title: 'Microsoft Azure AI Fundamentals',
+              level: 'fundamentals',
+              summary: '',
+              unitCount: 0,
+              lessonCount: 0,
+              learningAvailable: false,
+            ),
+          ],
+        ),
+      ],
     );
     expect(find.text('AZ-900'), findsOneWidget);
-    expect(find.text('AI-900'), findsOneWidget);
+    expect(find.text('AI-900'), findsNothing);
+    expect(find.text('AI-901'), findsOneWidget);
+    expect(find.text('Bientôt'), findsOneWidget);
+
+    await tester.tap(find.text('AI-901'));
+    await tester.pump();
+    expect(c.read(onboardingControllerProvider).targetCertification, isNull);
 
     await tester.tap(find.text('AZ-900'));
     await tester.pump();
@@ -69,6 +94,40 @@ void main() {
     expect(
       c.read(onboardingControllerProvider).targetCertification,
       TargetCertification.az900,
+    );
+  });
+
+  testWidgets('CertificationScreen enables AI-901 when published content exists', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer c = await pumpScreen(
+      tester,
+      '/onboarding/certification',
+      const CertificationScreen(),
+      overrides: <Override>[
+        catalogProvider.overrideWith(
+          (Ref ref) async => const <TrackSummary>[
+            TrackSummary(
+              id: 'ai-901',
+              code: 'AI-901',
+              title: 'Microsoft Azure AI Fundamentals',
+              level: 'fundamentals',
+              summary: '',
+              unitCount: 1,
+              lessonCount: 1,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    expect(find.text('Bientôt'), findsNothing);
+    await tester.tap(find.text('AI-901'));
+    await tester.pump();
+
+    expect(
+      c.read(onboardingControllerProvider).targetCertification,
+      TargetCertification.ai901,
     );
   });
 

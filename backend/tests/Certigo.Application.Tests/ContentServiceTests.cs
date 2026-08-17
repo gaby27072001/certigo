@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Certigo.Application.Dtos;
 using Certigo.Application.Services;
 using Certigo.Domain.Content;
 using Xunit;
@@ -18,14 +19,14 @@ public sealed class ContentServiceTests
 
         var catalog = await service.GetCatalogAsync();
 
-        // Fundamentals first (AI-900, AZ-900 by code), then associate (AZ-104).
-        catalog.Tracks.Select(t => t.Code).Should().Equal("AI-900", "AZ-900", "AZ-104");
+        // Fundamentals first, including the active AI-901 successor, then associate.
+        catalog.Tracks.Select(t => t.Code).Should().Equal("AI-900", "AI-901", "AZ-900", "AZ-104");
 
         var az104 = catalog.Tracks.Single(t => t.Code == "AZ-104");
         az104.Level.Should().Be("associate");
         az104.UnitCount.Should().Be(3);
         az104.LessonCount.Should().Be(12);
-        az104.Title.Should().Be("Azure Administrator");
+        az104.Title.Should().Be("Microsoft Azure Administrator");
     }
 
     [Fact]
@@ -40,6 +41,54 @@ public sealed class ContentServiceTests
 
         catalog.Tracks.Select(t => t.Code).Should().Equal("AZ-900", "ZZ-000");
         catalog.Tracks.Last().Level.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetCatalogAsync_overlays_official_blueprints_without_changing_authored_content()
+    {
+        var content = new InMemoryContentRepository();
+        content.AddTrack(MakeTrack("az-900", "AZ-900", "Old AZ title", "fundamentals", units: 1, lessonsPerUnit: 1));
+        content.AddTrack(MakeTrack("dp-900", "DP-900", "Old DP title", "fundamentals", units: 1, lessonsPerUnit: 1));
+        content.AddTrack(MakeTrack("az-104", "AZ-104", "Old admin title", "associate", units: 1, lessonsPerUnit: 1));
+        content.AddTrack(MakeTrack("ai-900", "AI-900", "Old AI title", "fundamentals", units: 1, lessonsPerUnit: 1));
+        var service = new ContentService(content);
+
+        var catalog = await service.GetCatalogAsync();
+
+        catalog.Tracks.Single(t => t.Code == "AZ-900").Should().Match<TrackSummaryDto>(t =>
+            t.Title == "Microsoft Azure Fundamentals" &&
+            t.BlueprintDate == new DateOnly(2026, 7, 20));
+        catalog.Tracks.Single(t => t.Code == "DP-900").BlueprintDate.Should().Be(new DateOnly(2026, 7, 21));
+        catalog.Tracks.Single(t => t.Code == "AZ-104").BlueprintDate.Should().Be(new DateOnly(2026, 4, 17));
+
+        var ai900 = catalog.Tracks.Single(t => t.Code == "AI-900");
+        ai900.BlueprintDate.Should().Be(new DateOnly(2025, 5, 2));
+        ai900.Lifecycle.Should().Be("retired");
+        ai900.LifecycleNote.Should().Contain("30 juin 2026");
+        ai900.ReplacementCode.Should().Be("AI-901");
+        ai900.LearningAvailable.Should().BeTrue();
+
+        var ai901 = catalog.Tracks.Single(t => t.Code == "AI-901");
+        ai901.BlueprintDate.Should().Be(new DateOnly(2026, 4, 15));
+        ai901.Lifecycle.Should().Be("active");
+        ai901.LearningAvailable.Should().BeFalse();
+        ai901.Domains.Should().HaveCount(2);
+        ai901.Domains!.Select(d => d.Name).Should().Contain("Implement AI solutions by using Microsoft Foundry");
+        ai901.MigrationNote.Should().Contain("remplace AI-900");
+
+        foreach (var track in catalog.Tracks)
+        {
+            track.Domains.Should().NotBeNullOrEmpty();
+            var domains = track.Domains!;
+            domains.Should().OnlyContain(d =>
+                d.MinWeightPct > 0 && d.MinWeightPct <= d.MaxWeightPct && d.MaxWeightPct <= 100);
+            domains.Sum(d => d.MinWeightPct).Should().BeLessThanOrEqualTo(100);
+            domains.Sum(d => d.MaxWeightPct).Should().BeGreaterThanOrEqualTo(100);
+            track.StudyGuideUrl.Should().StartWith("https://learn.microsoft.com/");
+            track.StudyGuideUrl.Should().EndWith(track.Code.ToLowerInvariant());
+            track.ExamUrl.Should().StartWith("https://learn.microsoft.com/");
+            track.Prerequisites.Should().NotBeNullOrWhiteSpace();
+        }
     }
 
     private static Track MakeTrack(string id, string code, string title, string? level, int units, int lessonsPerUnit)

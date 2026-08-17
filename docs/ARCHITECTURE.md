@@ -186,6 +186,14 @@ Certigo/content/             # instantané historique, non éditorial
   puis produit un manifeste immuable adressable par hash.
 - **Compatibilité** : `Certigo/content/` et ses outils de seed historiques restent disponibles
   pendant la transition, sans constituer une source éditoriale concurrente.
+- **Métadonnées d'examen consommées par l'app** : le catalogue API superpose aux tracks les
+  titres, domaines pondérés, prérequis, liens Microsoft Learn, date de blueprint et statut de
+  cycle de vie maintenus dans `OfficialCertificationCatalog`. Cette couche factuelle ne contient
+  ni leçons ni questions et ne transforme pas l'instantané `Certigo/content/` en source éditoriale.
+- **Remplacement d'un examen** : un examen retiré reste navigable si sa progression historique
+  existe (AI-900), tandis que son successeur actif peut apparaître comme entrée informative
+  non navigable (AI-901) jusqu'à publication de son contenu. La présence ultérieure d'un track
+  `ai-901` rend automatiquement son parcours navigable, sans migration destructive d'AI-900.
 
 ---
 

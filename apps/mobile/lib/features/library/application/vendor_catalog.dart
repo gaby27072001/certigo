@@ -145,7 +145,11 @@ List<CertSection> groupIntoSections(List<TrackSummary> tracks, {String query = '
           (TrackSummary t) =>
               t.code.toLowerCase().contains(q) ||
               t.title.toLowerCase().contains(q) ||
-              t.summary.toLowerCase().contains(q),
+              t.summary.toLowerCase().contains(q) ||
+              t.prerequisites.toLowerCase().contains(q) ||
+              t.replacementCode.toLowerCase().contains(q) ||
+              t.migrationNote.toLowerCase().contains(q) ||
+              t.domains.any((CertificationDomain domain) => domain.name.toLowerCase().contains(q)),
         );
 
   final Map<CertCategory, List<TrackSummary>> byCategory = <CertCategory, List<TrackSummary>>{};

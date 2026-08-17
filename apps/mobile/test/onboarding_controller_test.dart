@@ -97,7 +97,13 @@ void main() {
 
   test('certification exposes code/title/domainIndex', () {
     expect(TargetCertification.az900.code, 'AZ-900');
-    expect(TargetCertification.ai900.title, 'AI Fundamentals');
+    expect(TargetCertification.az900.title, 'Microsoft Azure Fundamentals');
+    expect(TargetCertification.ai900.title, 'Microsoft Azure AI Fundamentals');
+    expect(TargetCertification.ai900.isAvailableForNewLearners, isFalse);
+    expect(availableTargetCertifications, isNot(contains(TargetCertification.ai900)));
+    expect(TargetCertification.ai901.code, 'AI-901');
+    expect(TargetCertification.ai901.isAvailableForNewLearners, isTrue);
+    expect(availableTargetCertifications, contains(TargetCertification.ai901));
     expect(TargetCertification.sc900.domainIndex, isNonNegative);
   });
 }

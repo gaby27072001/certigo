@@ -145,12 +145,13 @@ class _CertList extends StatelessWidget {
           code: track.code,
           title: track.title,
           summary: track.summary,
-          levelLabel: _levelLabels[track.level] ?? track.level,
-          lessonCount: track.lessonCount,
-          unitCount: track.unitCount,
+          levelLabel:
+              track.learningAvailable ? _levelLabels[track.level] ?? track.level : 'Bientôt',
+          lessonCount: track.learningAvailable ? track.lessonCount : null,
+          unitCount: track.learningAvailable ? track.unitCount : null,
           accent: context.prism.accentFor(i),
           selected: track.id == activeId,
-          onTap: () => onSelect(track.id),
+          onTap: track.learningAvailable ? () => onSelect(track.id) : null,
         );
       },
     );

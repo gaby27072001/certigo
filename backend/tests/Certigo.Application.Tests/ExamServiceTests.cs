@@ -76,6 +76,7 @@ public sealed class ExamServiceTests
         var exam = await service.GenerateAsync(new MockExamRequest(TestContent.TrackId));
 
         exam.TrackCode.Should().Be("AZ-900");
+        exam.TrackTitle.Should().Be("Microsoft Azure Fundamentals");
         exam.PassingScore.Should().Be(700);
         exam.Items.Should().HaveCount(3); // pool has exactly 3 gradable items
         exam.Items.Should().OnlyContain(i => !string.IsNullOrWhiteSpace(i.Stem) && i.Options.Count == 2);

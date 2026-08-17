@@ -40,6 +40,23 @@ public sealed record TrackSummaryDto(
     string Level,
     string Summary,
     int UnitCount,
-    int LessonCount);
+    int LessonCount,
+    IReadOnlyList<CertificationDomainDto>? Domains = null,
+    string Prerequisites = "",
+    string StudyGuideUrl = "",
+    string ExamUrl = "",
+    DateOnly? BlueprintDate = null,
+    string Lifecycle = "",
+    string LifecycleNote = "",
+    string ExamDetailsNote = "",
+    bool LearningAvailable = true,
+    string ReplacementCode = "",
+    string MigrationNote = "");
+
+public sealed record CertificationDomainDto(
+    string Id,
+    string Name,
+    int MinWeightPct,
+    int MaxWeightPct);
 
 public sealed record CatalogDto(IReadOnlyList<TrackSummaryDto> Tracks);

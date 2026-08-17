@@ -32,7 +32,20 @@ public sealed class CriticalHttpFunctionsTests
             Catalog = new CatalogDto(
                 new[]
                 {
-                    new TrackSummaryDto("track-1", "AZ-900", "Azure Fundamentals", "Fundamentals", "Intro", 3, 12),
+                    new TrackSummaryDto(
+                        "track-1",
+                        "AZ-900",
+                        "Microsoft Azure Fundamentals",
+                        "Fundamentals",
+                        "Intro",
+                        3,
+                        12,
+                        [new CertificationDomainDto("cloud", "Cloud concepts", 25, 30)],
+                        "No formal prerequisites",
+                        "https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/az-900",
+                        "https://learn.microsoft.com/en-us/credentials/certifications/exams/az-900/",
+                        new DateOnly(2026, 7, 20),
+                        "active"),
                 }),
         };
         var function = new CatalogFunctions(service);
@@ -46,6 +59,8 @@ public sealed class CriticalHttpFunctionsTests
         var payload = await response.ReadJsonAsync<CatalogDto>();
         payload.Tracks.Should().ContainSingle();
         payload.Tracks[0].Code.Should().Be("AZ-900");
+        payload.Tracks[0].BlueprintDate.Should().Be(new DateOnly(2026, 7, 20));
+        payload.Tracks[0].Domains.Should().ContainSingle(d => d.MinWeightPct == 25 && d.MaxWeightPct == 30);
     }
 
     [Fact]

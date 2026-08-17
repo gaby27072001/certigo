@@ -1,6 +1,7 @@
 import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
@@ -183,18 +184,170 @@ class _CategorySection extends StatelessWidget {
         for (final TrackSummary track in section.tracks)
           Padding(
             padding: const EdgeInsets.only(bottom: PrismSpacing.sm),
-            child: CertificationCard(
-              code: track.code,
-              title: track.title,
-              summary: track.summary,
-              levelLabel: levelLabelOf(track.level),
-              lessonCount: track.lessonCount,
-              unitCount: track.unitCount,
-              accent: accent,
-              onTap: () => context.push('${Routes.library}/vendor/${vendor.id}/cert/${track.id}'),
+            child: Column(
+              children: <Widget>[
+                CertificationCard(
+                  code: track.code,
+                  title: track.title,
+                  summary: track.summary,
+                  levelLabel: levelLabelOf(track.level),
+                  lessonCount: track.learningAvailable ? track.lessonCount : null,
+                  unitCount: track.learningAvailable ? track.unitCount : null,
+                  accent: accent,
+                  onTap: () => _openTrack(context, track),
+                ),
+                if (track.studyGuideUrl.isNotEmpty)
+                  _OfficialMetadataPanel(track: track, accent: accent),
+              ],
             ),
           ),
       ],
+    );
+  }
+
+  void _openTrack(BuildContext context, TrackSummary track) {
+    if (!track.learningAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Le parcours Certigo ${track.code} est en préparation.'),
+        ),
+      );
+      return;
+    }
+    context.push('${Routes.library}/vendor/${vendor.id}/cert/${track.id}');
+  }
+}
+
+class _OfficialMetadataPanel extends StatelessWidget {
+  const _OfficialMetadataPanel({required this.track, required this.accent});
+
+  final TrackSummary track;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    final TextTheme t = Theme.of(context).textTheme;
+    final String headline = track.isRetired
+        ? 'Examen retiré · parcours archivé'
+        : 'Référentiel officiel · ${track.blueprintDate}';
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: PrismSpacing.sm),
+        childrenPadding: const EdgeInsets.fromLTRB(
+          PrismSpacing.sm,
+          0,
+          PrismSpacing.sm,
+          PrismSpacing.sm,
+        ),
+        leading: Icon(
+          track.isRetired ? Icons.event_busy_rounded : Icons.verified_rounded,
+          color: track.isRetired ? p.error : accent,
+          size: 20,
+        ),
+        title: Text(headline, style: t.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
+        subtitle: const Text('Détails et liens Microsoft Learn'),
+        children: <Widget>[
+          if (track.lifecycleNote.isNotEmpty)
+            _MetadataText(
+              text: track.lifecycleNote,
+              color: track.isRetired ? p.error : p.info,
+            ),
+          if (track.replacementCode.isNotEmpty)
+            _MetadataText(text: 'Certification active de remplacement : ${track.replacementCode}'),
+          if (track.migrationNote.isNotEmpty)
+            _MetadataText(text: track.migrationNote, color: p.textSecondary),
+          for (final CertificationDomain domain in track.domains)
+            Padding(
+              padding: const EdgeInsets.only(bottom: PrismSpacing.xxs),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(child: Text(domain.name, style: t.bodySmall)),
+                  const SizedBox(width: PrismSpacing.sm),
+                  Text(
+                    domain.weightLabel,
+                    style: t.labelMedium?.copyWith(color: accent, fontWeight: FontWeight.w800),
+                  ),
+                ],
+              ),
+            ),
+          if (track.prerequisites.isNotEmpty) ...<Widget>[
+            const SizedBox(height: PrismSpacing.xs),
+            _MetadataText(text: 'Prérequis : ${track.prerequisites}'),
+          ],
+          const SizedBox(height: PrismSpacing.xs),
+          _MetadataLink(label: 'Guide officiel Microsoft Learn', url: track.studyGuideUrl),
+          if (track.examUrl.isNotEmpty)
+            _MetadataLink(label: 'Page officielle de l’examen', url: track.examUrl),
+          if (track.examDetailsNote.isNotEmpty) ...<Widget>[
+            const SizedBox(height: PrismSpacing.xs),
+            _MetadataText(text: track.examDetailsNote, color: p.textSecondary),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MetadataText extends StatelessWidget {
+  const _MetadataText({required this.text, this.color});
+
+  final String text;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(text, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color)),
+    );
+  }
+}
+
+class _MetadataLink extends StatelessWidget {
+  const _MetadataLink({required this.label, required this.url});
+
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme t = Theme.of(context).textTheme;
+    final Color primary = context.prism.primary;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PrismSpacing.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  label,
+                  style: t.labelMedium?.copyWith(color: primary, fontWeight: FontWeight.w800),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Copier le lien $label',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.content_copy_rounded, size: 18),
+                color: primary,
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: url));
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Lien Microsoft Learn copié')),
+                  );
+                },
+              ),
+            ],
+          ),
+          SelectableText(url, style: t.bodySmall?.copyWith(color: primary)),
+        ],
+      ),
     );
   }
 }

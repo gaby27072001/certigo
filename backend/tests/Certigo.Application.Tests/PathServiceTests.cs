@@ -25,7 +25,7 @@ public sealed class PathServiceTests
 
         var path = await service.GetPathAsync(TestContent.TrackId);
 
-        path.TrackName.Should().Be("Azure Fundamentals");
+        path.TrackName.Should().Be("Microsoft Azure Fundamentals");
         path.Exam.Should().Be("AZ-900");
         path.ReadinessScore.Should().Be(0);
         path.Units.Should().HaveCount(2);

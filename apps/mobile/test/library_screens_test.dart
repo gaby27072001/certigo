@@ -16,22 +16,58 @@ import 'package:prism_ui/prism_ui.dart';
 /// fakes — the same ProviderScope-override pattern the path suite uses to swap
 /// repositories — so the screens render against known data with no network.
 void main() {
-  TrackSummary track(String id, String code, String title, {String level = 'fundamentals'}) =>
-      TrackSummary(
-        id: id,
-        code: code,
-        title: title,
-        level: level,
-        summary: '',
-        unitCount: 5,
-        lessonCount: 20,
-      );
+  TrackSummary track(String id, String code, String title, {String level = 'fundamentals'}) {
+    final bool hasOfficialMetadata =
+        <String>{'AZ-900', 'AZ-104', 'AI-900', 'AI-901'}.contains(code);
+    return TrackSummary(
+      id: id,
+      code: code,
+      title: title,
+      level: level,
+      summary: '',
+      unitCount: 5,
+      lessonCount: 20,
+      domains: hasOfficialMetadata
+          ? <CertificationDomain>[
+              CertificationDomain(
+                id: 'domain-1',
+                name: code == 'AI-901'
+                    ? 'Implement AI solutions by using Microsoft Foundry'
+                    : 'Describe cloud concepts',
+                minWeightPct: 25,
+                maxWeightPct: 30,
+              ),
+            ]
+          : const <CertificationDomain>[],
+      prerequisites: hasOfficialMetadata ? 'Aucun prérequis formel.' : '',
+      studyGuideUrl: hasOfficialMetadata
+          ? 'https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/${code.toLowerCase()}'
+          : '',
+      examUrl: hasOfficialMetadata
+          ? 'https://learn.microsoft.com/en-us/credentials/certifications/exams/${code.toLowerCase()}/'
+          : '',
+      blueprintDate: code == 'AZ-900' ? '2026-07-20' : '2026-04-17',
+      lifecycle: code == 'AI-900' ? 'retired' : 'active',
+      lifecycleNote: code == 'AI-900'
+          ? 'Examen retiré le 30 juin 2026.'
+          : code == 'AI-901'
+              ? 'Certification active. Parcours Certigo en préparation.'
+              : '',
+      examDetailsNote: hasOfficialMetadata ? 'Le tarif et la durée peuvent changer.' : '',
+      learningAvailable: code != 'AI-901',
+      replacementCode: code == 'AI-900' ? 'AI-901' : '',
+      migrationNote: code.startsWith('AI-9')
+          ? 'La progression AI-900 reste disponible ; AI-901 est la cible active.'
+          : '',
+    );
+  }
 
   final List<TrackSummary> fakeCatalog = <TrackSummary>[
     track('az-900', 'AZ-900', 'Azure Fundamentals'),
     track('az-104', 'AZ-104', 'Azure Administrator', level: 'associate'),
     track('sc-900', 'SC-900', 'Security Fundamentals'),
     track('ai-900', 'AI-900', 'AI Fundamentals'),
+    track('ai-901', 'AI-901', 'Microsoft Azure AI Fundamentals'),
     track('github-foundations', 'GH-900', 'GitHub Foundations'),
   ];
 
@@ -56,8 +92,8 @@ void main() {
 
       expect(find.text('Microsoft'), findsOneWidget);
       expect(find.text('GitHub'), findsOneWidget);
-      // 4 Microsoft tracks, 1 GitHub track.
-      expect(find.text('4 certifications'), findsOneWidget);
+      // 5 Microsoft tracks, 1 GitHub track.
+      expect(find.text('5 certifications'), findsOneWidget);
       expect(find.text('1 certification'), findsOneWidget);
       // Three showcase vendors, all "Bientôt".
       expect(find.text('Bientôt'), findsNWidgets(3));
@@ -86,6 +122,11 @@ void main() {
 
       expect(find.text('Azure'), findsOneWidget);
       expect(find.text('Sécurité'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Data & IA'),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
       expect(find.text('Data & IA'), findsOneWidget);
       expect(find.text('AZ-900'), findsOneWidget);
       // GitHub track belongs to another vendor → filtered out.
@@ -103,6 +144,49 @@ void main() {
       expect(find.text('AZ-900'), findsOneWidget);
       expect(find.text('Sécurité'), findsNothing);
       expect(find.text('SC-900'), findsNothing);
+    });
+
+    testWidgets('shows official blueprint domains, links and retirement status', (
+      WidgetTester tester,
+    ) async {
+      await pumpCerts(tester);
+      expect(find.text('Référentiel officiel · 2026-07-20'), findsOneWidget);
+
+      await tester.tap(find.text('Référentiel officiel · 2026-07-20'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Describe cloud concepts'), findsOneWidget);
+      expect(find.text('25–30%'), findsOneWidget);
+      expect(find.text('Guide officiel Microsoft Learn'), findsOneWidget);
+      expect(find.textContaining('Le tarif et la durée peuvent changer.'), findsOneWidget);
+      expect(find.byTooltip('Copier le lien Guide officiel Microsoft Learn'), findsOneWidget);
+
+      await tester.tap(find.text('Référentiel officiel · 2026-07-20'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Examen retiré · parcours archivé'),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.text('Examen retiré · parcours archivé'), findsOneWidget);
+    });
+
+    testWidgets('keeps AI-901 visible but blocks learning navigation until content exists', (
+      WidgetTester tester,
+    ) async {
+      await pumpCerts(tester);
+      await tester.scrollUntilVisible(
+        find.text('AI-901'),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.ensureVisible(find.text('AI-901'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('AI-901'));
+      await tester.pump();
+
+      expect(find.text('Le parcours Certigo AI-901 est en préparation.'), findsOneWidget);
     });
   });
 
@@ -212,9 +296,13 @@ void main() {
 
   group('cert_picker_sheet (regression after CertificationCard refactor)', () {
     testWidgets('renders the shared CertificationCard for each track', (WidgetTester tester) async {
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[catalogProvider.overrideWith((Ref ref) async => fakeCatalog)],
+      );
+      addTearDown(container.dispose);
       await tester.pumpWidget(
-        ProviderScope(
-          overrides: <Override>[catalogProvider.overrideWith((Ref ref) async => fakeCatalog)],
+        UncontrolledProviderScope(
+          container: container,
           child: MaterialApp(
             theme: PrismTheme.light(),
             home: const Scaffold(body: CertPickerSheet()),
@@ -227,6 +315,14 @@ void main() {
       expect(find.byType(CertificationCard), findsWidgets);
       expect(find.text('AZ-900'), findsOneWidget);
       expect(find.text('Azure Fundamentals'), findsOneWidget);
+      expect(find.text('Bientôt'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('AI-901'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('AI-901'));
+      await tester.pump();
+
+      expect(container.read(activeTrackProvider), 'az-900');
     });
   });
 }

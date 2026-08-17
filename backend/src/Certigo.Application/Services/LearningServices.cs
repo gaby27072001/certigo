@@ -141,7 +141,7 @@ public sealed class PathService(
 
         return new PathDto(
             track.Id,
-            track.Title,
+            OfficialCertificationCatalog.TitleFor(track.Code, track.Title),
             track.Code,
             readiness.Score,
             0,

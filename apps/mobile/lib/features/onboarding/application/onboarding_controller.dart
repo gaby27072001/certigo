@@ -23,13 +23,22 @@ enum DailyGoalOption { chill, regular, serious, intense }
 
 /// The certification the learner is aiming for — the Certigo equivalent of the
 /// "which language?" question that opens the reference flow.
-enum TargetCertification { az900, ai900, dp900, sc900, az104 }
+enum TargetCertification { az900, ai900, ai901, dp900, sc900, az104 }
+
+const List<TargetCertification> availableTargetCertifications = <TargetCertification>[
+  TargetCertification.az900,
+  TargetCertification.ai901,
+  TargetCertification.dp900,
+  TargetCertification.sc900,
+  TargetCertification.az104,
+];
 
 extension TargetCertificationInfo on TargetCertification {
   /// Exam code shown as the bold tile label (e.g. "AZ-900").
   String get code => switch (this) {
         TargetCertification.az900 => 'AZ-900',
         TargetCertification.ai900 => 'AI-900',
+        TargetCertification.ai901 => 'AI-901',
         TargetCertification.dp900 => 'DP-900',
         TargetCertification.sc900 => 'SC-900',
         TargetCertification.az104 => 'AZ-104',
@@ -37,17 +46,21 @@ extension TargetCertificationInfo on TargetCertification {
 
   /// Human-readable exam title (the tile subtitle / trailing caption).
   String get title => switch (this) {
-        TargetCertification.az900 => 'Azure Fundamentals',
-        TargetCertification.ai900 => 'AI Fundamentals',
-        TargetCertification.dp900 => 'Data Fundamentals',
+        TargetCertification.az900 => 'Microsoft Azure Fundamentals',
+        TargetCertification.ai900 => 'Microsoft Azure AI Fundamentals',
+        TargetCertification.ai901 => 'Microsoft Azure AI Fundamentals',
+        TargetCertification.dp900 => 'Microsoft Azure Data Fundamentals',
         TargetCertification.sc900 => 'Security Fundamentals',
-        TargetCertification.az104 => 'Azure Administrator',
+        TargetCertification.az104 => 'Microsoft Azure Administrator',
       };
+
+  bool get isAvailableForNewLearners => this != TargetCertification.ai900;
 
   /// Index into `PrismColors.domainAccents` used for the leading accent chip.
   int get domainIndex => switch (this) {
         TargetCertification.az900 => 0,
         TargetCertification.ai900 => 3,
+        TargetCertification.ai901 => 3,
         TargetCertification.dp900 => 4,
         TargetCertification.sc900 => 5,
         TargetCertification.az104 => 1,

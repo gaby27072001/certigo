@@ -30,6 +30,7 @@ void main() {
       expect(categoryOf(track('az-900', 'AZ-900')), CertCategory.azure);
       expect(categoryOf(track('sc-900', 'SC-900')), CertCategory.security);
       expect(categoryOf(track('ai-900', 'AI-900')), CertCategory.dataAi);
+      expect(categoryOf(track('ai-901', 'AI-901')), CertCategory.dataAi);
       expect(categoryOf(track('dp-900', 'DP-900')), CertCategory.dataAi);
       expect(categoryOf(track('ms-900', 'MS-900')), CertCategory.microsoft365);
       expect(categoryOf(track('pl-900', 'PL-900')), CertCategory.powerPlatform);

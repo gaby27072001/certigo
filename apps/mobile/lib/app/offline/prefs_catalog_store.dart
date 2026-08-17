@@ -5,8 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// can remove any stale data left in SharedPreferences on existing devices.
 const String _kLegacyCatalogCachePrefsKey = 'microlingo.catalog.cache.v1';
 
+/// Cache schema before official blueprint metadata was added.
+const String _kCatalogCacheV1PrefsKey = 'certigo.catalog.cache.v1';
+
 /// Storage key for the offline catalog cache.
-const String kCatalogCachePrefsKey = 'certigo.catalog.cache.v1';
+const String kCatalogCachePrefsKey = 'certigo.catalog.cache.v2';
 
 /// Builds a [JsonCatalogCacheStore] persisted in [SharedPreferences] under one
 /// string key so the track catalog survives app restarts.
@@ -18,8 +21,13 @@ const String kCatalogCachePrefsKey = 'certigo.catalog.cache.v1';
 JsonCatalogCacheStore prefsCatalogCacheStore(SharedPreferences prefs) {
   // Clean up the stale key from before the rename; fire-and-forget is fine here
   // because this is a cache and a miss simply triggers a fresh network fetch.
-  if (prefs.containsKey(_kLegacyCatalogCachePrefsKey)) {
-    prefs.remove(_kLegacyCatalogCachePrefsKey);
+  for (final String staleKey in <String>[
+    _kLegacyCatalogCachePrefsKey,
+    _kCatalogCacheV1PrefsKey,
+  ]) {
+    if (prefs.containsKey(staleKey)) {
+      prefs.remove(staleKey);
+    }
   }
 
   return JsonCatalogCacheStore(

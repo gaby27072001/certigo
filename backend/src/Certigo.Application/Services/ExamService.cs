@@ -78,7 +78,7 @@ public sealed class ExamService(
                 now,
                 cancellationToken);
             return new MockExamDto(
-                emptyExamId, track.Id, track.Code, track.Title,
+                emptyExamId, track.Id, track.Code, OfficialCertificationCatalog.TitleFor(track.Code, track.Title),
                 0, ExamConstants.PassingScore,
                 Array.Empty<MockExamBlueprintDomainDto>(), Array.Empty<MockExamItemDto>());
         }
@@ -150,7 +150,7 @@ public sealed class ExamService(
             cancellationToken);
 
         return new MockExamDto(
-            examId, track.Id, track.Code, track.Title,
+            examId, track.Id, track.Code, OfficialCertificationCatalog.TitleFor(track.Code, track.Title),
             timeLimit, ExamConstants.PassingScore, blueprint, items);
     }
 
