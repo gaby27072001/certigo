@@ -72,6 +72,7 @@ function createRelease() {
       encoding: 'utf8',
       env: {
         ...process.env,
+        GITHUB_OUTPUT: '',
         GITHUB_SHA: commitSha,
         GITHUB_REPOSITORY: 'gchambaud_microsoft/Certigo',
         GITHUB_WORKFLOW_REF:
@@ -245,6 +246,7 @@ test('release resolver accepts only a successful main push from cd-backend', () 
     encoding: 'utf8',
     env: {
       ...process.env,
+      GITHUB_OUTPUT: '',
       SOURCE_RUN_ID: '1234',
       SOURCE_RUN_METADATA_FILE: metadata,
       GITHUB_REPOSITORY: 'gchambaud_microsoft/Certigo',
@@ -273,6 +275,7 @@ test('release resolver rejects non-push workflow provenance', () => {
     encoding: 'utf8',
     env: {
       ...process.env,
+      GITHUB_OUTPUT: '',
       SOURCE_RUN_ID: '1234',
       SOURCE_RUN_METADATA_FILE: metadata,
       GITHUB_REPOSITORY: 'gchambaud_microsoft/Certigo',
