@@ -644,8 +644,21 @@ class ProjectStateTests(unittest.TestCase):
         }
 
         trusted_workflows = []
+        persistent_runner_workflows = []
         for workflow_path in workflows.glob("*.yml"):
             workflow = workflow_path.read_text(encoding="utf-8")
+            if "certigo-trusted" in workflow or "certigo-pr" in workflow:
+                persistent_runner_workflows.append(workflow_path.name)
+                self.assertNotRegex(
+                    workflow,
+                    r"(?m)^\s+(?:cache|pub-cache):[ \t]*(?!false[ \t]*$)\S.*$",
+                    f"{workflow_path.name} must not enable or dynamically select caches",
+                )
+                self.assertNotRegex(
+                    workflow,
+                    r"(?i)uses:\s*actions/cache(?:/[^@\s]+)?@",
+                    f"{workflow_path.name} must not invoke GitHub cache actions",
+                )
             if "certigo-trusted" not in workflow:
                 continue
             trusted_workflows.append(workflow_path.name)
@@ -659,12 +672,6 @@ class ProjectStateTests(unittest.TestCase):
                 r"(?m)^ {4}tags(?:-ignore)?:",
                 f"{workflow_path.name} must not run privileged jobs from tags",
             )
-            self.assertNotRegex(
-                workflow,
-                r"(?m)^\s+(?:cache|pub-cache):\s*(?!false\s*$).+$",
-                f"{workflow_path.name} must not enable or dynamically select caches",
-            )
-            self.assertNotIn("actions/cache@", workflow)
             self.assertNotIn("subosito/flutter-action@", workflow)
             if "\n  push:" in workflow:
                 self.assertIn(
@@ -674,6 +681,7 @@ class ProjectStateTests(unittest.TestCase):
                 )
 
         self.assertGreater(len(trusted_workflows), 0)
+        self.assertGreater(len(persistent_runner_workflows), len(trusted_workflows))
         for workflow_name, event_type in dispatch_types.items():
             workflow = (workflows / workflow_name).read_text(encoding="utf-8")
             self.assertIn(
@@ -703,6 +711,9 @@ class ProjectStateTests(unittest.TestCase):
         ios = (workflows / "release-ios.yml").read_text(encoding="utf-8")
         self.assertIn("install-verified-flutter.sh", ios)
         self.assertNotIn("subosito/flutter-action@", ios)
+        mobile = (workflows / "ci-mobile.yml").read_text(encoding="utf-8")
+        self.assertEqual(mobile.count("uses: subosito/flutter-action@"), 2)
+        self.assertEqual(mobile.count("cache: false"), 2)
 
         installer = (
             REPO_ROOT / ".github/scripts/install-verified-flutter.sh"
