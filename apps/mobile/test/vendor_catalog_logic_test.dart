@@ -6,7 +6,16 @@ import 'package:prism_ui/prism_ui.dart';
 /// Pure unit tests for the vendor/category derivation that powers the library
 /// catalogue. No widgets, no providers — just the classification rules.
 void main() {
-  TrackSummary track(String id, String code, {String level = 'fundamentals'}) => TrackSummary(
+  TrackSummary track(
+    String id,
+    String code, {
+    String level = 'fundamentals',
+    CertificationProvider provider = CertificationProvider.microsoft,
+    String family = 'other',
+    CertificationLifecycleStatus status = CertificationLifecycleStatus.active,
+    CertificationContentStatus contentStatus = CertificationContentStatus.available,
+  }) =>
+      TrackSummary(
         id: id,
         code: code,
         title: '$code title',
@@ -14,14 +23,27 @@ void main() {
         summary: 'summary of $code',
         unitCount: 5,
         lessonCount: 20,
+        provider: provider,
+        family: family,
+        status: status,
+        contentStatus: contentStatus,
       );
 
   group('vendorOf', () {
-    test('maps GitHub tracks by id/code prefix and everything else to Microsoft', () {
-      expect(vendorOf(track('github-foundations', 'GH-900')), VendorBrand.github);
-      expect(vendorOf(track('gh-actions', 'GHA-100')), VendorBrand.github);
+    test('maps explicit providers without relying on exam-code prefixes', () {
+      expect(
+        vendorOf(track('github-foundations', 'GH-900', provider: CertificationProvider.github)),
+        VendorBrand.github,
+      );
       expect(vendorOf(track('az-900', 'AZ-900')), VendorBrand.microsoft);
-      expect(vendorOf(track('sc-900', 'SC-900')), VendorBrand.microsoft);
+      expect(
+        vendorOf(track('aws-saa-c03', 'SAA-C03', provider: CertificationProvider.aws)),
+        VendorBrand.aws,
+      );
+      expect(
+        vendorOf(track('gcp-cloud-digital-leader', '', provider: CertificationProvider.gcp)),
+        VendorBrand.google,
+      );
     });
   });
 
@@ -38,15 +60,23 @@ void main() {
       expect(categoryOf(track('mo-100', 'MO-100')), CertCategory.mos);
       expect(categoryOf(track('github-foundations', 'GH-900')), CertCategory.github);
       expect(categoryOf(track('xy-1', 'XY-1')), CertCategory.other);
+      expect(
+        categoryOf(track('aws-saa-c03', 'SAA-C03', family: 'architecture')),
+        CertCategory.architecture,
+      );
+      expect(
+        categoryOf(track('gcp-security', '', family: 'security-operations')),
+        CertCategory.security,
+      );
     });
   });
 
   group('levelLabelOf', () {
-    test('localises the three known authoring levels', () {
-      expect(levelLabelOf('fundamentals'), 'Fondamentaux');
-      expect(levelLabelOf('associate'), 'Associé');
-      expect(levelLabelOf('expert'), 'Expert');
-      expect(levelLabelOf('unknown'), 'unknown');
+    test('localises the four provider-neutral levels', () {
+      expect(levelLabelOf(CertificationLevel.foundational), 'Fondamentaux');
+      expect(levelLabelOf(CertificationLevel.associate), 'Associé');
+      expect(levelLabelOf(CertificationLevel.professional), 'Professionnel');
+      expect(levelLabelOf(CertificationLevel.specialty), 'Spécialité');
     });
   });
 
@@ -54,12 +84,56 @@ void main() {
     test('keeps only the tracks owned by the vendor, in order', () {
       final List<TrackSummary> catalog = <TrackSummary>[
         track('az-900', 'AZ-900'),
-        track('github-foundations', 'GH-900'),
+        track('github-foundations', 'GH-900', provider: CertificationProvider.github),
         track('sc-900', 'SC-900'),
+        track(
+          'aws-ans-c01',
+          'ANS-C01',
+          provider: CertificationProvider.aws,
+          status: CertificationLifecycleStatus.retired,
+          contentStatus: CertificationContentStatus.planned,
+        ),
       ];
       final List<TrackSummary> ms = tracksForVendor(catalog, VendorBrand.microsoft);
       expect(ms.map((TrackSummary t) => t.id), <String>['az-900', 'sc-900']);
       expect(tracksForVendor(catalog, VendorBrand.github).single.id, 'github-foundations');
+      expect(tracksForVendor(catalog, VendorBrand.aws), isEmpty);
+    });
+  });
+
+  group('selectableTracks', () {
+    test('keeps authored history while excluding planned entries', () {
+      final List<TrackSummary> catalog = <TrackSummary>[
+        track('az-900', 'AZ-900'),
+        track(
+          'aws-aif-c01',
+          'AIF-C01',
+          provider: CertificationProvider.aws,
+          contentStatus: CertificationContentStatus.planned,
+        ),
+        track('retired', 'OLD-001', status: CertificationLifecycleStatus.retired),
+      ];
+
+      expect(selectableTracks(catalog).map((TrackSummary track) => track.id), <String>[
+        'az-900',
+        'retired',
+      ]);
+    });
+  });
+
+  group('deep links', () {
+    test('encode the provider carried by catalog metadata', () {
+      final TrackSummary aws = track('aws-saa-c03', 'SAA-C03', provider: CertificationProvider.aws);
+      final TrackSummary gcp = track(
+        'gcp-cloud-digital-leader',
+        '',
+        provider: CertificationProvider.gcp,
+      );
+
+      expect(certificationLocation(aws), '/library/vendor/aws/cert/aws-saa-c03');
+      expect(certificationLocation(gcp), '/library/vendor/gcp/cert/gcp-cloud-digital-leader');
+      expect(VendorBrandInfo.fromId('gcp'), VendorBrand.google);
+      expect(VendorBrandInfo.fromId('google'), VendorBrand.google);
     });
   });
 

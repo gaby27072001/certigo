@@ -2,11 +2,12 @@
 
 # Certigo
 
-**Apprenez, révisez et validez vos certifications Microsoft — par micro-leçons premium.**
+**Apprenez, révisez et validez vos certifications cloud — par micro-leçons premium.**
 
 Micro-learning mobile (iOS + Android) pour maîtriser des **concepts techniques & cloud réels**
-et atteindre la *readiness* certification sur un catalogue Microsoft
-(dont AZ-900 · AZ-104 · AI-900 · DP-900 · SC-900).
+et atteindre la *readiness* certification sur un catalogue multi-cloud. Les parcours Microsoft
+existants restent disponibles ; les fondations de découverte AWS et Google Cloud sont versionnées
+séparément avant l'arrivée progressive des contenus.
 
 `Flutter` · `.NET 8 isolated Functions` · `Cosmos DB` · `Entra External ID` · `Bicep`
 
@@ -302,6 +303,7 @@ Pour ajouter les intégrations réelles, démarrer l'émulateur puis définir
 
 ## 📄 Licence & marques
 
-Projet original. Microsoft, Azure et les codes de certification cités sont des marques de
-Microsoft ; Certigo n'est ni affilié, ni approuvé par Microsoft. Aucun contenu d'examen réel
-n'est reproduit — toutes les leçons et tous les items sont **originaux**.
+Projet original. Microsoft, Azure, AWS, Google Cloud et les codes de certification cités sont des
+marques de leurs détenteurs respectifs. Certigo n'est affilié ni approuvé par aucun fournisseur.
+Aucun contenu d'examen réel n'est reproduit — toutes les leçons et tous les items sont
+**originaux**.

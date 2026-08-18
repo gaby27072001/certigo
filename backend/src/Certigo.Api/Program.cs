@@ -237,6 +237,7 @@ var host = new HostBuilder()
             services.AddSingleton<ITutorCompletion, NullTutorCompletion>();
         }
         services.AddScoped<IUserService, UserService>();
+        services.AddSingleton<ICertificationRegistry, EmbeddedCertificationRegistry>();
         services.AddScoped<IContentService, ContentService>();
         services.AddScoped<IQuizService, QuizService>();
         services.AddScoped<ILeaderboardService, LeaderboardService>();

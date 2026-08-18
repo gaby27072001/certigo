@@ -65,7 +65,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Google'), findsOneWidget);
+      expect(find.text('Google Cloud'), findsOneWidget);
       expect(find.text('Bientôt'), findsOneWidget);
       expect(find.byIcon(Icons.lock_rounded), findsOneWidget);
 

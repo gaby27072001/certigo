@@ -184,7 +184,15 @@ internal static class OfficialCertificationCatalog
                     "Certification active. Parcours Certigo planifie, en attente de contenu publie.",
                 ExamDetailsNote: metadata.ExamDetailsNote,
                 LearningAvailable: false,
-                MigrationNote: metadata.MigrationNote)
+                MigrationNote: metadata.MigrationNote,
+                Provider: "microsoft",
+                Family: "data-ai",
+                CertificationLevel: "foundational",
+                Status: metadata.Lifecycle,
+                ContentStatus: "planned",
+                OfficialUrl: metadata.ExamUrl,
+                ExamGuideUrl: metadata.StudyGuideUrl,
+                BlueprintPublishedOn: metadata.BlueprintDate)
         ];
     }
 }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
+import '../../library/application/vendor_catalog.dart';
 
 /// Opens the Duolingo-style course picker: the learner browses the
 /// certifications the app offers and taps one to switch the Path screen to it.
@@ -16,14 +17,6 @@ Future<void> showCertPickerSheet(BuildContext context) {
     builder: (BuildContext _) => const CertPickerSheet(),
   );
 }
-
-/// French labels for the authoring levels. Certification titles themselves stay
-/// in Microsoft's official English wording (e.g. "Azure Fundamentals").
-const Map<String, String> _levelLabels = <String, String>{
-  'fundamentals': 'Fondamentaux',
-  'associate': 'Associé',
-  'expert': 'Expert',
-};
 
 /// Bottom sheet listing every certification track, with the active one marked.
 /// Reads the catalog lazily (only while open) and the active track from
@@ -83,7 +76,7 @@ class CertPickerSheet extends ConsumerWidget {
               Flexible(
                 child: catalog.when(
                   data: (List<TrackSummary> tracks) => _CertList(
-                    tracks: tracks,
+                    tracks: pickerTracks(tracks),
                     activeId: activeId,
                     onSelect: (String id) {
                       ref.read(activeTrackProvider.notifier).state = id;
@@ -142,16 +135,20 @@ class _CertList extends StatelessWidget {
       itemBuilder: (BuildContext context, int i) {
         final TrackSummary track = tracks[i];
         return CertificationCard(
-          code: track.code,
+          code: track.displayCode,
           title: track.title,
           summary: track.summary,
-          levelLabel:
-              track.learningAvailable ? _levelLabels[track.level] ?? track.level : 'Bientôt',
-          lessonCount: track.learningAvailable ? track.lessonCount : null,
-          unitCount: track.learningAvailable ? track.unitCount : null,
+          levelLabel: levelLabelOf(track.normalizedLevel),
+          lessonCount: track.hasLearningContent ? track.lessonCount : null,
+          unitCount: track.hasLearningContent ? track.unitCount : null,
+          statusLabel: track.isRetired
+              ? 'Examen retiré'
+              : track.hasLearningContent
+                  ? ''
+                  : 'Bientôt',
           accent: context.prism.accentFor(i),
           selected: track.id == activeId,
-          onTap: track.learningAvailable ? () => onSelect(track.id) : null,
+          onTap: track.hasLearningContent ? () => onSelect(track.id) : null,
         );
       },
     );

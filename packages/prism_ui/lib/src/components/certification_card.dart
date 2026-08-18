@@ -21,6 +21,7 @@ class CertificationCard extends StatelessWidget {
     required this.accent,
     this.summary = '',
     this.levelLabel = '',
+    this.statusLabel = '',
     this.lessonCount,
     this.unitCount,
     this.selected = false,
@@ -43,6 +44,9 @@ class CertificationCard extends StatelessWidget {
   /// empty.
   final String levelLabel;
 
+  /// Optional availability or lifecycle label such as "Parcours à venir".
+  final String statusLabel;
+
   /// Number of lessons; shown in the counts row only when both counts are set.
   final int? lessonCount;
 
@@ -61,73 +65,96 @@ class CertificationCard extends StatelessWidget {
     final TextTheme text = Theme.of(context).textTheme;
     final bool showCounts = lessonCount != null && unitCount != null;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: PrismRadii.cardXl,
-        child: Container(
-          padding: const EdgeInsets.all(PrismSpacing.debt14),
-          decoration: BoxDecoration(
-            color: selected ? accent.withOpacity(0.10) : p.surface,
+    final String semanticLabel = <String>[
+      if (code.isNotEmpty) code,
+      title,
+      if (levelLabel.isNotEmpty) levelLabel,
+      if (statusLabel.isNotEmpty) statusLabel,
+    ].join(', ');
+
+    return Semantics(
+      container: true,
+      label: semanticLabel,
+      button: onTap != null,
+      enabled: onTap != null,
+      selected: selected,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
             borderRadius: PrismRadii.cardXl,
-            border: Border.all(color: selected ? accent : p.border, width: selected ? 2 : 1),
-          ),
-          child: Row(
-            children: <Widget>[
-              _Emblem(code: code, accent: accent),
-              const SizedBox(width: PrismSpacing.debt14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      title,
-                      style: text.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (summary.isNotEmpty) ...<Widget>[
-                      const SizedBox(height: PrismSpacing.debt3),
-                      Text(
-                        summary,
-                        style: text.bodySmall?.copyWith(color: p.textSecondary, height: 1.3),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    if (levelLabel.isNotEmpty || showCounts) ...<Widget>[
-                      const SizedBox(height: PrismSpacing.debt9),
-                      Row(
-                        children: <Widget>[
-                          if (levelLabel.isNotEmpty) ...<Widget>[
-                            _MetaChip(label: levelLabel, color: accent),
-                            const SizedBox(width: PrismSpacing.xs),
-                          ],
-                          if (showCounts) ...<Widget>[
-                            Icon(Icons.menu_book_rounded, size: 14, color: p.textSecondary),
-                            const SizedBox(width: PrismSpacing.xxs),
-                            Flexible(
-                              child: Text(
-                                '$lessonCount leçons · $unitCount chapitres',
-                                style: text.labelSmall?.copyWith(color: p.textSecondary),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+            child: Container(
+              padding: const EdgeInsets.all(PrismSpacing.debt14),
+              decoration: BoxDecoration(
+                color: selected ? accent.withValues(alpha: 0.10) : p.surface,
+                borderRadius: PrismRadii.cardXl,
+                border: Border.all(color: selected ? accent : p.border, width: selected ? 2 : 1),
+              ),
+              child: Row(
+                children: <Widget>[
+                  _Emblem(code: code, accent: accent),
+                  const SizedBox(width: PrismSpacing.debt14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          title,
+                          style: text.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (summary.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: PrismSpacing.debt3),
+                          Text(
+                            summary,
+                            style: text.bodySmall?.copyWith(color: p.textSecondary, height: 1.3),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ],
-                      ),
-                    ],
-                  ],
-                ),
+                        if (levelLabel.isNotEmpty ||
+                            statusLabel.isNotEmpty ||
+                            showCounts) ...<Widget>[
+                          const SizedBox(height: PrismSpacing.debt9),
+                          Wrap(
+                            spacing: PrismSpacing.xs,
+                            runSpacing: PrismSpacing.xxs,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: <Widget>[
+                              if (levelLabel.isNotEmpty)
+                                _MetaChip(label: levelLabel, color: accent),
+                              if (statusLabel.isNotEmpty)
+                                _MetaChip(label: statusLabel, color: p.textSecondary),
+                              if (showCounts) ...<Widget>[
+                                Icon(Icons.menu_book_rounded, size: 14, color: p.textSecondary),
+                                Text(
+                                  '$lessonCount leçons · $unitCount chapitres',
+                                  style: text.labelSmall?.copyWith(color: p.textSecondary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: PrismSpacing.xs),
+                  Icon(
+                    selected
+                        ? Icons.check_circle_rounded
+                        : statusLabel.isNotEmpty
+                            ? Icons.schedule_rounded
+                            : Icons.chevron_right_rounded,
+                    color: selected ? accent : p.textSecondary,
+                  ),
+                ],
               ),
-              const SizedBox(width: PrismSpacing.xs),
-              Icon(
-                selected ? Icons.check_circle_rounded : Icons.chevron_right_rounded,
-                color: selected ? accent : p.textSecondary,
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -152,7 +179,7 @@ class _Emblem extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[accent, accent.withOpacity(0.74)],
+          colors: <Color>[accent, accent.withValues(alpha: 0.74)],
         ),
         borderRadius: PrismRadii.cardLg,
       ),
@@ -184,7 +211,10 @@ class _MetaChip extends StatelessWidget {
         horizontal: PrismSpacing.xs,
         vertical: PrismSpacing.debt3,
       ),
-      decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: PrismRadii.pillAll),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: PrismRadii.pillAll,
+      ),
       child: Text(
         label,
         style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 11),

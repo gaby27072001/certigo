@@ -195,6 +195,24 @@ Certigo/content/             # instantané historique, non éditorial
   non navigable (AI-901) jusqu'à publication de son contenu. La présence ultérieure d'un track
   `ai-901` rend automatiquement son parcours navigable, sans migration destructive d'AI-900.
 
+### 7.1 Registre de certifications multi-cloud
+
+Le registre versionné `catalog/official-certifications-<date>.json` décrit uniquement la surface
+de découverte officielle : provider, famille, niveau normalisé, code public lorsqu'il existe,
+cycle de vie et liens fournisseur. Il est distinct des leçons/questions et embarqué dans
+`Certigo.Application`.
+
+`ContentService` fusionne ce registre avec les tracks publiés :
+
+- une certification officielle sans track reste `planned`, visible mais non sélectionnable ;
+- un track de même ID fournit les compteurs et passe à `available` ;
+- les tracks historiques sans métadonnées restent compatibles et reçoivent les valeurs Microsoft
+  ou GitHub dérivées par le serveur ;
+- le mobile utilise les champs explicites et ne déduit plus AWS/GCP d'un préfixe.
+
+Le snapshot et la stratégie de retrait/renommage sont documentés dans
+[`CERTIFICATION_CATALOG_2026-08-17.md`](CERTIFICATION_CATALOG_2026-08-17.md).
+
 ---
 
 ## 8. Flux d'une soumission de quiz

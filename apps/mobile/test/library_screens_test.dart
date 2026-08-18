@@ -16,9 +16,23 @@ import 'package:prism_ui/prism_ui.dart';
 /// fakes — the same ProviderScope-override pattern the path suite uses to swap
 /// repositories — so the screens render against known data with no network.
 void main() {
-  TrackSummary track(String id, String code, String title, {String level = 'fundamentals'}) {
-    final bool hasOfficialMetadata =
-        <String>{'AZ-900', 'AZ-104', 'AI-900', 'AI-901'}.contains(code);
+  TrackSummary track(
+    String id,
+    String code,
+    String title, {
+    String level = 'fundamentals',
+    CertificationProvider provider = CertificationProvider.microsoft,
+    String family = 'other',
+    CertificationContentStatus contentStatus = CertificationContentStatus.available,
+  }) {
+    final bool hasOfficialMetadata = <String>{
+      'AZ-900',
+      'AZ-104',
+      'AI-900',
+      'AI-901',
+    }.contains(code);
+    final bool learningAvailable =
+        contentStatus == CertificationContentStatus.available && code != 'AI-901';
     return TrackSummary(
       id: id,
       code: code,
@@ -54,11 +68,17 @@ void main() {
               ? 'Certification active. Parcours Certigo en préparation.'
               : '',
       examDetailsNote: hasOfficialMetadata ? 'Le tarif et la durée peuvent changer.' : '',
-      learningAvailable: code != 'AI-901',
+      learningAvailable: learningAvailable,
       replacementCode: code == 'AI-900' ? 'AI-901' : '',
       migrationNote: code.startsWith('AI-9')
           ? 'La progression AI-900 reste disponible ; AI-901 est la cible active.'
           : '',
+      provider: provider,
+      family: family,
+      status: code == 'AI-900'
+          ? CertificationLifecycleStatus.retired
+          : CertificationLifecycleStatus.active,
+      contentStatus: contentStatus,
     );
   }
 
@@ -67,12 +87,39 @@ void main() {
     track('az-104', 'AZ-104', 'Azure Administrator', level: 'associate'),
     track('sc-900', 'SC-900', 'Security Fundamentals'),
     track('ai-900', 'AI-900', 'AI Fundamentals'),
-    track('ai-901', 'AI-901', 'Microsoft Azure AI Fundamentals'),
-    track('github-foundations', 'GH-900', 'GitHub Foundations'),
+    track(
+      'ai-901',
+      'AI-901',
+      'Microsoft Azure AI Fundamentals',
+      family: 'data-ai',
+      contentStatus: CertificationContentStatus.planned,
+    ),
+    track(
+      'github-foundations',
+      'GH-900',
+      'GitHub Foundations',
+      provider: CertificationProvider.github,
+    ),
+    track(
+      'aws-aif-c01',
+      'AIF-C01',
+      'AWS Certified AI Practitioner',
+      provider: CertificationProvider.aws,
+      family: 'ai',
+      contentStatus: CertificationContentStatus.planned,
+    ),
+    track(
+      'gcp-cloud-digital-leader',
+      '',
+      'Cloud Digital Leader',
+      provider: CertificationProvider.gcp,
+      family: 'cloud-foundations',
+      contentStatus: CertificationContentStatus.planned,
+    ),
   ];
 
   group('VendorCatalogScreen', () {
-    testWidgets('renders real vendors with counts and showcase "Bientôt" tiles', (
+    testWidgets('renders multi-cloud providers with counts and one showcase tile', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
@@ -92,23 +139,26 @@ void main() {
 
       expect(find.text('Microsoft'), findsOneWidget);
       expect(find.text('GitHub'), findsOneWidget);
-      // 5 Microsoft tracks, 1 GitHub track.
-      expect(find.text('5 certifications'), findsOneWidget);
-      expect(find.text('1 certification'), findsOneWidget);
-      // Three showcase vendors, all "Bientôt".
-      expect(find.text('Bientôt'), findsNWidgets(3));
-      expect(find.text('Google'), findsOneWidget);
       expect(find.text('AWS'), findsOneWidget);
+      expect(find.text('Google Cloud'), findsOneWidget);
+      // Five Microsoft tracks and one track for every other catalogued provider.
+      expect(find.text('5 certifications'), findsOneWidget);
+      expect(find.text('1 certification'), findsNWidgets(3));
+      // OpenAI remains the sole showcase provider.
+      expect(find.text('Bientôt'), findsOneWidget);
       expect(find.text('OpenAI'), findsOneWidget);
     });
   });
 
   group('VendorCertificationsScreen', () {
-    Future<void> pumpCerts(WidgetTester tester) async {
+    Future<void> pumpCerts(
+      WidgetTester tester, {
+      VendorBrand vendor = VendorBrand.microsoft,
+    }) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: <Override>[catalogProvider.overrideWith((Ref ref) async => fakeCatalog)],
-          child: const MaterialApp(home: VendorCertificationsScreen(vendor: VendorBrand.microsoft)),
+          child: MaterialApp(home: VendorCertificationsScreen(vendor: vendor)),
         ),
       );
       await tester.pump();
@@ -144,6 +194,28 @@ void main() {
       expect(find.text('AZ-900'), findsOneWidget);
       expect(find.text('Sécurité'), findsNothing);
       expect(find.text('SC-900'), findsNothing);
+    });
+
+    testWidgets('renders planned AWS certifications without opening an empty path', (
+      WidgetTester tester,
+    ) async {
+      await pumpCerts(tester, vendor: VendorBrand.aws);
+
+      expect(find.text('IA & machine learning'), findsOneWidget);
+      expect(find.text('AIF-C01'), findsOneWidget);
+      expect(find.text('Parcours à venir'), findsOneWidget);
+      expect(find.byIcon(Icons.schedule_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
+    });
+
+    testWidgets('renders a neutral GCP badge when no public exam code exists', (
+      WidgetTester tester,
+    ) async {
+      await pumpCerts(tester, vendor: VendorBrand.google);
+
+      expect(find.text('GCP'), findsOneWidget);
+      expect(find.text('Cloud Digital Leader'), findsOneWidget);
+      expect(find.text('Parcours à venir'), findsOneWidget);
     });
 
     testWidgets('shows official blueprint domains, links and retirement status', (
@@ -183,10 +255,13 @@ void main() {
       await tester.ensureVisible(find.text('AI-901'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('AI-901'));
-      await tester.pump();
-
-      expect(find.text('Le parcours Certigo AI-901 est en préparation.'), findsOneWidget);
+      final Finder cardFinder = find.ancestor(
+        of: find.text('AI-901'),
+        matching: find.byType(CertificationCard),
+      );
+      final CertificationCard card = tester.widget<CertificationCard>(cardFinder);
+      expect(card.onTap, isNull);
+      expect(card.statusLabel, 'Parcours à venir');
     });
   });
 
@@ -315,13 +390,15 @@ void main() {
       expect(find.byType(CertificationCard), findsWidgets);
       expect(find.text('AZ-900'), findsOneWidget);
       expect(find.text('Azure Fundamentals'), findsOneWidget);
+      expect(find.text('AIF-C01'), findsNothing);
+      expect(find.text('Cloud Digital Leader'), findsNothing);
       expect(find.text('Bientôt'), findsOneWidget);
 
       await tester.ensureVisible(find.text('AI-901'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('AI-901'));
       await tester.pump();
-
+      expect(container.read(activeTrackProvider), 'az-900');
       expect(container.read(activeTrackProvider), 'az-900');
     });
   });

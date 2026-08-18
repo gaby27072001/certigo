@@ -44,6 +44,40 @@ public sealed class ContentServiceTests
     }
 
     [Fact]
+    public async Task GetCatalogAsync_merges_planned_metadata_without_exposing_it_as_learning_content()
+    {
+        var content = new InMemoryContentRepository();
+        content.AddTrack(MakeTrack("az-900", "AZ-900", "Azure Fundamentals", "fundamentals", 1, 2));
+        var registry = new StubCertificationRegistry(
+            new CertificationCatalogEntry(
+                Id: "aws-aif-c01",
+                Provider: "aws",
+                Family: "ai",
+                Code: "AIF-C01",
+                Title: "AWS Certified AI Practitioner",
+                Level: "foundational",
+                Status: "active",
+                ContentStatus: "planned",
+                OfficialUrl: "https://aws.amazon.com/certification/certified-ai-practitioner/"));
+        var service = new ContentService(content, registry);
+
+        var catalog = await service.GetCatalogAsync();
+
+        catalog.Tracks.Should().HaveCount(2);
+        var microsoft = catalog.Tracks.Single(track => track.Id == "az-900");
+        microsoft.Provider.Should().Be("microsoft");
+        microsoft.CertificationLevel.Should().Be("foundational");
+        microsoft.ContentStatus.Should().Be("available");
+
+        var aws = catalog.Tracks.Single(track => track.Id == "aws-aif-c01");
+        aws.Provider.Should().Be("aws");
+        aws.ContentStatus.Should().Be("planned");
+        aws.UnitCount.Should().Be(0);
+        aws.LessonCount.Should().Be(0);
+        aws.CatalogVersion.Should().Be("2026-08-17");
+    }
+
+    [Fact]
     public async Task GetCatalogAsync_overlays_official_blueprints_without_changing_authored_content()
     {
         var content = new InMemoryContentRepository();
@@ -67,11 +101,17 @@ public sealed class ContentServiceTests
         ai900.LifecycleNote.Should().Contain("30 juin 2026");
         ai900.ReplacementCode.Should().Be("AI-901");
         ai900.LearningAvailable.Should().BeTrue();
+        ai900.Status.Should().Be("retired");
+        ai900.ContentStatus.Should().Be("available");
+        ai900.Provider.Should().Be("microsoft");
 
         var ai901 = catalog.Tracks.Single(t => t.Code == "AI-901");
         ai901.BlueprintDate.Should().Be(new DateOnly(2026, 4, 15));
         ai901.Lifecycle.Should().Be("active");
         ai901.LearningAvailable.Should().BeFalse();
+        ai901.Status.Should().Be("active");
+        ai901.ContentStatus.Should().Be("planned");
+        ai901.Provider.Should().Be("microsoft");
         ai901.Domains.Should().HaveCount(2);
         ai901.Domains!.Select(d => d.Name).Should().Contain("Implement AI solutions by using Microsoft Foundry");
         ai901.MigrationNote.Should().Contain("remplace AI-900");
@@ -108,5 +148,12 @@ public sealed class ContentServiceTests
             Domains: new[] { new ExamDomain("d-1", "Domain 1", 1.0) },
             Units: unitList,
             Level: level);
+    }
+
+    private sealed class StubCertificationRegistry(params CertificationCatalogEntry[] entries)
+        : ICertificationRegistry
+    {
+        public string Version => "2026-08-17";
+        public IReadOnlyList<CertificationCatalogEntry> Entries => entries;
     }
 }

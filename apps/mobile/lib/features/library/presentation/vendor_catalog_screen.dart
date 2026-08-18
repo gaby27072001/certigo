@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
-import '../../../app/router.dart';
 import '../../home/application/home_controller.dart';
 import '../../home/presentation/coach_section.dart';
 import '../application/vendor_catalog.dart';
@@ -13,10 +12,8 @@ import '../application/vendor_catalog.dart';
 /// Library root — the top level of the Duolingo-style content shelf.
 ///
 /// "Apprendre à ton rythme": a personalised "Pour toi" coaching shelf on top,
-/// then the vendor catalogue — Microsoft and GitHub (real, with live
-/// certification counts derived from [catalogProvider]) and Google, AWS and
-/// OpenAI as showcase "bientôt" tiles. Tapping a real vendor drills into its
-/// certifications.
+/// then the provider catalogue. Certification counts come from the API-backed
+/// [catalogProvider], including planned AWS and Google Cloud learning tracks.
 class VendorCatalogScreen extends ConsumerWidget {
   const VendorCatalogScreen({super.key});
 
@@ -194,19 +191,17 @@ class _RealVendorTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String subtitle = catalog.when(
+    return catalog.when(
       data: (List<TrackSummary> tracks) {
         final int count = tracksForVendor(tracks, vendor).length;
-        return count <= 1 ? '$count certification' : '$count certifications';
+        return VendorTile(
+          brand: vendor,
+          subtitle: count <= 1 ? '$count certification' : '$count certifications',
+          onTap: count == 0 ? null : () => context.push(vendorLocation(vendor)),
+        );
       },
-      loading: () => 'Chargement…',
-      error: (_, __) => 'Catalogue indisponible',
-    );
-
-    return VendorTile(
-      brand: vendor,
-      subtitle: subtitle,
-      onTap: () => context.push('${Routes.library}/vendor/${vendor.id}'),
+      loading: () => VendorTile(brand: vendor, subtitle: 'Chargement…'),
+      error: (_, __) => VendorTile(brand: vendor, subtitle: 'Catalogue indisponible'),
     );
   }
 }

@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
-import '../../../app/router.dart';
 import '../application/vendor_catalog.dart';
 
 /// Second level of the catalogue: every certification a [vendor] offers.
@@ -94,8 +93,7 @@ class _VendorCertificationsScreenState extends ConsumerState<VendorCertification
               : ListView(
                   padding: PrismSpacing.scrollBody(top: PrismSpacing.xs),
                   children: <Widget>[
-                    for (final CertSection section in sections)
-                      _CategorySection(section: section, vendor: widget.vendor),
+                    for (final CertSection section in sections) _CategorySection(section: section),
                   ],
                 ),
         ),
@@ -145,10 +143,9 @@ class _SearchField extends StatelessWidget {
 
 /// A titled category section with its stack of certification cards.
 class _CategorySection extends StatelessWidget {
-  const _CategorySection({required this.section, required this.vendor});
+  const _CategorySection({required this.section});
 
   final CertSection section;
-  final VendorBrand vendor;
 
   @override
   Widget build(BuildContext context) {
@@ -187,34 +184,28 @@ class _CategorySection extends StatelessWidget {
             child: Column(
               children: <Widget>[
                 CertificationCard(
-                  code: track.code,
+                  code: track.displayCode,
                   title: track.title,
                   summary: track.summary,
-                  levelLabel: levelLabelOf(track.level),
-                  lessonCount: track.learningAvailable ? track.lessonCount : null,
-                  unitCount: track.learningAvailable ? track.unitCount : null,
+                  levelLabel: levelLabelOf(track.normalizedLevel),
+                  lessonCount: track.hasLearningContent ? track.lessonCount : null,
+                  unitCount: track.hasLearningContent ? track.unitCount : null,
+                  statusLabel: track.isRetired
+                      ? 'Examen retiré'
+                      : track.hasLearningContent
+                          ? ''
+                          : 'Parcours à venir',
                   accent: accent,
-                  onTap: () => _openTrack(context, track),
+                  onTap: track.hasLearningContent
+                      ? () => context.push(certificationLocation(track))
+                      : null,
                 ),
-                if (track.studyGuideUrl.isNotEmpty)
-                  _OfficialMetadataPanel(track: track, accent: accent),
+                if (track.hasOfficialMetadata) _OfficialMetadataPanel(track: track, accent: accent),
               ],
             ),
           ),
       ],
     );
-  }
-
-  void _openTrack(BuildContext context, TrackSummary track) {
-    if (!track.learningAvailable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Le parcours Certigo ${track.code} est en préparation.'),
-        ),
-      );
-      return;
-    }
-    context.push('${Routes.library}/vendor/${vendor.id}/cert/${track.id}');
   }
 }
 
@@ -230,7 +221,13 @@ class _OfficialMetadataPanel extends StatelessWidget {
     final TextTheme t = Theme.of(context).textTheme;
     final String headline = track.isRetired
         ? 'Examen retiré · parcours archivé'
-        : 'Référentiel officiel · ${track.blueprintDate}';
+        : track.blueprintLabel.isEmpty
+            ? 'Référentiel officiel'
+            : 'Référentiel officiel · ${track.blueprintLabel}';
+    final String providerLabel = track.provider.displayName;
+    final String studyGuideLabel = track.provider == CertificationProvider.microsoft
+        ? 'Guide officiel Microsoft Learn'
+        : 'Guide officiel $providerLabel';
 
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -248,17 +245,18 @@ class _OfficialMetadataPanel extends StatelessWidget {
           size: 20,
         ),
         title: Text(headline, style: t.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
-        subtitle: const Text('Détails et liens Microsoft Learn'),
+        subtitle: Text('Détails et liens $providerLabel'),
         children: <Widget>[
           if (track.lifecycleNote.isNotEmpty)
-            _MetadataText(
-              text: track.lifecycleNote,
-              color: track.isRetired ? p.error : p.info,
-            ),
+            _MetadataText(text: track.lifecycleNote, color: track.isRetired ? p.error : p.info),
           if (track.replacementCode.isNotEmpty)
             _MetadataText(text: 'Certification active de remplacement : ${track.replacementCode}'),
           if (track.migrationNote.isNotEmpty)
             _MetadataText(text: track.migrationNote, color: p.textSecondary),
+          if (track.retiresOn?.isNotEmpty ?? false)
+            _MetadataText(text: 'Retrait annoncé : ${track.retiresOn}', color: p.warning),
+          if (track.retiredOn?.isNotEmpty ?? false)
+            _MetadataText(text: 'Retirée le ${track.retiredOn}', color: p.error),
           for (final CertificationDomain domain in track.domains)
             Padding(
               padding: const EdgeInsets.only(bottom: PrismSpacing.xxs),
@@ -278,10 +276,16 @@ class _OfficialMetadataPanel extends StatelessWidget {
             const SizedBox(height: PrismSpacing.xs),
             _MetadataText(text: 'Prérequis : ${track.prerequisites}'),
           ],
-          const SizedBox(height: PrismSpacing.xs),
-          _MetadataLink(label: 'Guide officiel Microsoft Learn', url: track.studyGuideUrl),
-          if (track.examUrl.isNotEmpty)
-            _MetadataLink(label: 'Page officielle de l’examen', url: track.examUrl),
+          if (track.durationMinutes != null)
+            _MetadataText(text: 'Durée publiée : ${track.durationMinutes} min'),
+          if (track.languages.isNotEmpty)
+            _MetadataText(text: 'Langues publiées : ${track.languages.join(', ')}'),
+          if (track.officialStudyGuideUrl.isNotEmpty) ...<Widget>[
+            const SizedBox(height: PrismSpacing.xs),
+            _MetadataLink(label: studyGuideLabel, url: track.officialStudyGuideUrl),
+          ],
+          if (track.officialExamUrl.isNotEmpty)
+            _MetadataLink(label: 'Page officielle de la certification', url: track.officialExamUrl),
           if (track.examDetailsNote.isNotEmpty) ...<Widget>[
             const SizedBox(height: PrismSpacing.xs),
             _MetadataText(text: track.examDetailsNote, color: p.textSecondary),
@@ -338,9 +342,9 @@ class _MetadataLink extends StatelessWidget {
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: url));
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Lien Microsoft Learn copié')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('Lien officiel copié')));
                 },
               ),
             ],
