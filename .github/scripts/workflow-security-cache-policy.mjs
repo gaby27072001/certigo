@@ -1,7 +1,14 @@
 import { parseDocument } from 'yaml';
 
-export function validateTrustedCachePolicy(text, file) {
-  if (!text.includes('certigo-trusted')) {
+const persistentRunnerLabels = new Set(['certigo-pr', 'certigo-trusted']);
+
+function persistentRunner(job) {
+  const labels = Array.isArray(job?.['runs-on']) ? job['runs-on'] : [job?.['runs-on']];
+  return labels.find((label) => persistentRunnerLabels.has(label));
+}
+
+export function validatePersistentCachePolicy(text, file) {
+  if (![...persistentRunnerLabels].some((label) => text.includes(label))) {
     return [];
   }
 
@@ -18,25 +25,35 @@ export function validateTrustedCachePolicy(text, file) {
 
   const errors = [];
   for (const job of Object.values(workflow?.jobs ?? {})) {
+    const runnerLabel = persistentRunner(job);
+    if (!runnerLabel) {
+      continue;
+    }
     for (const step of job?.steps ?? []) {
       const action = typeof step?.uses === 'string' ? step.uses : '';
       const normalizedAction = action.toLowerCase();
-      if (
-        /^actions\/cache(?:\/|@)/.test(normalizedAction)
-        || normalizedAction.startsWith('subosito/flutter-action@')
-      ) {
+      if (/^actions\/cache(?:\/|@)/.test(normalizedAction)) {
         errors.push(
-          `${file}: certigo-trusted workflow uses forbidden cache surface ${action}`,
+          `${file}: ${runnerLabel} job uses forbidden cache surface ${action}`,
         );
       }
-      for (const [inputName, inputValue] of Object.entries(step?.with ?? {})) {
+      const inputs = step?.with ?? {};
+      if (
+        normalizedAction.startsWith('subosito/flutter-action@')
+        && !Object.hasOwn(inputs, 'cache')
+      ) {
+        errors.push(
+          `${file}: ${runnerLabel} Flutter action must set cache to the literal false value`,
+        );
+      }
+      for (const [inputName, inputValue] of Object.entries(inputs)) {
         const cacheInput = inputName.toLowerCase();
         if (
           ['cache', 'pub-cache'].includes(cacheInput)
           && inputValue !== false
         ) {
           errors.push(
-            `${file}: certigo-trusted ${cacheInput} must be the literal false value`,
+            `${file}: ${runnerLabel} ${cacheInput} must be the literal false value`,
           );
         }
       }

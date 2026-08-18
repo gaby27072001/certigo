@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateTrustedCachePolicy } from './workflow-security-cache-policy.mjs';
+import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
 
 const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -168,7 +168,7 @@ function validateWorkflow(file) {
   ) {
     errors.push(`${file}: legacy mixed-trust runner label certigo-ci is forbidden`);
   }
-  errors.push(...validateTrustedCachePolicy(text, file));
+  errors.push(...validatePersistentCachePolicy(text, file));
   if (hasTrustedJob && /^ {2}workflow_dispatch:/m.test(text)) {
     errors.push(`${file}: certigo-trusted workflows must not use workflow_dispatch`);
   }

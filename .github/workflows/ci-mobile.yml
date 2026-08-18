@@ -146,7 +146,7 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
-          cache: true
+          cache: false
       - name: Pub get (app)
         working-directory: apps/mobile
         run: flutter pub get --enforce-lockfile
@@ -220,7 +220,7 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
-          cache: true
+          cache: false
       # Gate de régression visuelle : rejoue les golden tests par type de bloc
       # rendu. Toute divergence au-delà de la tolérance du comparateur fait
       # échouer CE job — c'est le gate dédié exigé par la DoD.
