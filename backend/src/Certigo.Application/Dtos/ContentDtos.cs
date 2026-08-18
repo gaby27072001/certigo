@@ -51,7 +51,23 @@ public sealed record TrackSummaryDto(
     string ExamDetailsNote = "",
     bool LearningAvailable = true,
     string ReplacementCode = "",
-    string MigrationNote = "");
+    string MigrationNote = "",
+    string Provider = "microsoft",
+    string Family = "other",
+    string CertificationLevel = "unspecified",
+    string Status = "active",
+    string ContentStatus = "available",
+    string? OfficialUrl = null,
+    string? ExamGuideUrl = null,
+    string? CatalogVersion = null,
+    DateOnly? BlueprintPublishedOn = null,
+    string? BlueprintVersion = null,
+    IReadOnlyList<string>? Languages = null,
+    int? DurationMinutes = null,
+    IReadOnlyList<string>? Aliases = null,
+    string? ReplacedBy = null,
+    DateOnly? RetiresOn = null,
+    DateOnly? RetiredOn = null);
 
 public sealed record CertificationDomainDto(
     string Id,

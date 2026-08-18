@@ -7,4 +7,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Certigo.Domain\Certigo.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource
+      Include="..\..\..\catalog\official-certifications-2026-08-17.json"
+      Link="Catalog\official-certifications-2026-08-17.json" />
+  </ItemGroup>
 </Project>

@@ -1,4 +1,7 @@
+import 'dart:ui' show SemanticsAction;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show SemanticsNode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prism_ui/prism_ui.dart';
 
@@ -48,8 +51,36 @@ void main() {
       expect(find.byIcon(Icons.menu_book_rounded), findsNothing);
     });
 
+    testWidgets('announces planned content as disabled and shows a schedule icon', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle semantics = tester.ensureSemantics();
+      await pumpPrism(
+        tester,
+        const SizedBox(
+          width: 340,
+          child: CertificationCard(
+            code: 'GCP',
+            title: 'Cloud Digital Leader',
+            levelLabel: 'Fondamentaux',
+            statusLabel: 'Parcours à venir',
+            accent: Color(0xFF4285F4),
+          ),
+        ),
+      );
+
+      expect(find.text('Parcours à venir'), findsOneWidget);
+      expect(find.byIcon(Icons.schedule_rounded), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('GCP, Cloud Digital Leader, Fondamentaux, Parcours à venir'),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    });
+
     testWidgets('fires onTap and shows the selected check mark', (WidgetTester tester) async {
       int taps = 0;
+      final SemanticsHandle semantics = tester.ensureSemantics();
       await pumpPrism(
         tester,
         SizedBox(
@@ -65,9 +96,12 @@ void main() {
       );
 
       expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+      final SemanticsNode node = tester.getSemantics(find.byType(CertificationCard));
+      expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
       await tester.tap(find.text('DP-900'));
       await tester.pumpAndSettle();
       expect(taps, 1);
+      semantics.dispose();
     });
   });
 }

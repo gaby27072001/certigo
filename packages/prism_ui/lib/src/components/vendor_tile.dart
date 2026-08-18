@@ -9,9 +9,8 @@ import 'vendor_brand.dart';
 /// A large, pressable catalogue tile for one software [VendorBrand] — the top
 /// level of the Duolingo-style content shelf (vendor → certification → chapter).
 ///
-/// Real vendors (Microsoft, GitHub) show a live certification count and route
-/// into their catalogue; showcase vendors (Google, AWS, OpenAI) are [locked],
-/// dimmed with a "Bientôt" cue so the shelf reads as ever-growing.
+/// Catalogued providers show a live certification count and route into their
+/// catalogue; showcase providers are [locked] and dimmed.
 class VendorTile extends StatelessWidget {
   const VendorTile({
     super.key,
@@ -96,7 +95,7 @@ class _LogoBadge extends StatelessWidget {
         borderRadius: PrismRadii.cardMd,
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

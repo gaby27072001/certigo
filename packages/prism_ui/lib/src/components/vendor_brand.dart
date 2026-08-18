@@ -5,10 +5,7 @@ import 'package:flutter/material.dart';
 /// The software vendors whose certification catalogues Certigo surfaces.
 ///
 /// The Certigo content library is organised, Duolingo-section-picker style, by
-/// *vendor* first: the learner picks Microsoft or GitHub (the two vendors with
-/// real tracks today) before drilling into a certification and its chapters.
-/// Google, AWS and OpenAI are showcase-only placeholders ("bientôt") so the
-/// catalogue reads as an ever-growing shelf.
+/// *provider* first, before drilling into a certification and its chapters.
 ///
 /// Kept dependency-free (no data-layer coupling) so the design system can draw
 /// a vendor tile without importing any app model; screens map their catalogue
@@ -20,10 +17,10 @@ enum VendorBrand {
   /// GitHub — GitHub Foundations, Actions, Advanced Security, Copilot… .
   github,
 
-  /// Google Cloud — showcase placeholder (no tracks yet).
+  /// Google Cloud.
   google,
 
-  /// Amazon Web Services — showcase placeholder (no tracks yet).
+  /// Amazon Web Services.
   aws,
 
   /// OpenAI — showcase placeholder (no tracks yet).
@@ -36,13 +33,16 @@ extension VendorBrandInfo on VendorBrand {
   String get label => switch (this) {
         VendorBrand.microsoft => 'Microsoft',
         VendorBrand.github => 'GitHub',
-        VendorBrand.google => 'Google',
+        VendorBrand.google => 'Google Cloud',
         VendorBrand.aws => 'AWS',
         VendorBrand.openai => 'OpenAI',
       };
 
   /// A stable id, used for routing (`/library/vendor/:vendorId`).
-  String get id => name;
+  String get id => switch (this) {
+        VendorBrand.google => 'gcp',
+        _ => name,
+      };
 
   /// Signature brand color — a representative single hue for chips, borders and
   /// accent washes. The multi-color logos are drawn by [VendorLogo].
@@ -57,7 +57,7 @@ extension VendorBrandInfo on VendorBrand {
   /// Resolves a [VendorBrand] from its [id]; falls back to Microsoft, the
   /// flagship vendor, for unknown ids.
   static VendorBrand fromId(String id) => VendorBrand.values.firstWhere(
-        (VendorBrand v) => v.id == id,
+        (VendorBrand v) => v.id == id || (v == VendorBrand.google && id == 'google'),
         orElse: () => VendorBrand.microsoft,
       );
 }
