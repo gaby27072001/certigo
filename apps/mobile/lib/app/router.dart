@@ -30,6 +30,7 @@ import '../features/auth/presentation/register_sync_contacts_screen.dart';
 import '../features/auth/presentation/register_friends_screen.dart';
 import '../features/auth/presentation/register_profile_created_screen.dart';
 import '../features/auth/presentation/splash_screen.dart' as auth;
+import '../features/account_deletion/presentation/account_deletion_screen.dart';
 import '../features/onboarding/application/onboarding_controller.dart';
 import '../features/onboarding/presentation/attribution_screen.dart';
 import '../features/onboarding/presentation/birth_year_screen.dart';
@@ -80,6 +81,8 @@ abstract class Routes {
   static const String friends = '/friends';
   static const String exam = '/exam';
   static const String dailyShare = '/share-daily';
+  static const String accountDeletion = '/account/delete';
+  static const String accountDeleted = '/account/deleted';
 }
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -127,6 +130,10 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   assert(Routes.landing == AuthShellRoutes.landing, 'Routes.landing désynchronisé');
   assert(Routes.auth == AuthShellRoutes.auth, 'Routes.auth désynchronisé');
   assert(Routes.home == AuthShellRoutes.home, 'Routes.home désynchronisé');
+  assert(
+    Routes.accountDeleted == AuthShellRoutes.accountDeleted,
+    'Routes.accountDeleted désynchronisé',
+  );
   assert(
     OnboardingRoutes.splash == AuthShellRoutes.onboardingSplash,
     'OnboardingRoutes.splash désynchronisé du garde d\'auth',
@@ -182,6 +189,17 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           // alors les boutons sociaux (déjà proposés par la sheet).
           emailOnly: state.uri.queryParameters['emailOnly'] == '1',
         ),
+      ),
+      GoRoute(
+        path: Routes.accountDeletion,
+        parentNavigatorKey: _rootKey,
+        builder: (_, GoRouterState state) =>
+            AccountDeletionScreen(expectedUserId: state.extra as String?),
+      ),
+      GoRoute(
+        path: Routes.accountDeleted,
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const AccountDeletionCompletedScreen(),
       ),
 
       // Flux d'inscription progressif (Partie 3, façon Duo) : nom → e-mail →

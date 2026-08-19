@@ -23,3 +23,12 @@ public sealed class CompositeTokenValidator(IReadOnlyList<ITokenValidator> valid
         return new AppTokenValidationResult(false, null, null);
     }
 }
+
+public sealed class ReauthenticationProofValidator(ITokenValidator validator)
+    : IReauthenticationProofValidator
+{
+    public Task<AppTokenValidationResult> TryValidateAsync(
+        string token,
+        CancellationToken cancellationToken = default)
+        => validator.TryValidateAsync(token, cancellationToken);
+}

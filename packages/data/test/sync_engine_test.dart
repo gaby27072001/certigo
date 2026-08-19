@@ -111,6 +111,22 @@ void main() {
       await engine.dispose();
     });
 
+    test('discardAll permanently clears queued user work after account deletion', () async {
+      final InMemorySyncQueueStore store = InMemorySyncQueueStore();
+      final SyncEngine engine = SyncEngine(
+        store: store,
+        sender: (_) async => SyncDispatch.success,
+      );
+      await _enqueue(engine, 'account-data-1');
+      await _enqueue(engine, 'account-data-2');
+
+      await engine.discardAll();
+
+      expect(engine.actions, isEmpty);
+      expect(await store.load(), isEmpty);
+      await engine.dispose();
+    });
+
     test(
       'a completed action blocks re-enqueue until its retention elapses',
       () async {

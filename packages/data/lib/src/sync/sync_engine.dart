@@ -7,7 +7,11 @@ import 'sync_queue_store.dart';
 
 /// Snapshot of the queue's health, emitted on [SyncEngine.status].
 class SyncStatus {
-  const SyncStatus({required this.pending, required this.dead, required this.syncing});
+  const SyncStatus({
+    required this.pending,
+    required this.dead,
+    required this.syncing,
+  });
 
   /// Number of actions awaiting (or backing off before) dispatch.
   final int pending;
@@ -137,6 +141,21 @@ class SyncEngine {
 
   /// Immutable view of the queue (for diagnostics/tests).
   List<SyncAction> get actions => List<SyncAction>.unmodifiable(_queue);
+
+  /// Permanently discards every local action after the server confirms account
+  /// deletion. This is intentionally not called before confirmation: a network
+  /// failure must never erase unsynchronised work while the account still exists.
+  Future<void> discardAll() async {
+    _ensureActive();
+    await ensureLoaded();
+    final Future<SyncFlushReport>? running = _inFlight;
+    if (running != null) {
+      await running;
+    }
+    _queue.clear();
+    await _persist();
+    _emit();
+  }
 
   /// Lazily loads the persisted queue exactly once.
   Future<void> ensureLoaded() {

@@ -37,6 +37,10 @@ final userRepositoryProvider = Provider<UserRepository>(
   (Ref ref) => RemoteUserRepository(ref.watch(apiClientProvider)),
 );
 
+final accountDeletionRepositoryProvider = Provider<AccountDeletionRepository>(
+  (Ref ref) => RemoteAccountDeletionRepository(ref.watch(apiClientProvider)),
+);
+
 final pathRepositoryProvider = Provider<PathRepository>(
   (Ref ref) => RemotePathRepository(ref.watch(apiClientProvider)),
 );

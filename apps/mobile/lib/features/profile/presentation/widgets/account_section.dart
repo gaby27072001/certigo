@@ -1,10 +1,10 @@
-import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
-import '../../../auth/application/auth_controller.dart';
+import '../../../../app/router.dart';
 import '../../application/settings_preferences.dart';
 import 'tappable_row.dart';
 
@@ -94,32 +94,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
   }
 
   Future<void> _deleteAccount() async {
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext ctx) => AlertDialog(
-        title: const Text('Supprimer le compte'),
-        content: const Text(
-          'Cette action est irréversible. Toutes vos données seront supprimées définitivement.',
-        ),
-        actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Annuler')),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Supprimer'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) {
-      if (AppEnv.entraConfigured) {
-        await ref.read(authControllerProvider.notifier).signOut();
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Disponible bientôt')));
-      }
-    }
+    await context.push(Routes.accountDeletion, extra: widget.me.id);
   }
 
   @override

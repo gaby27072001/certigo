@@ -56,12 +56,31 @@ public sealed class JwtTokenIssuer : ITokenIssuer
         _refreshLifetime = refreshLifetime ?? TimeSpan.FromDays(90);
     }
 
-    public IssuedTokens Issue(string userId, string displayName, string email)
+    public IssuedTokens Issue(
+        string userId,
+        string displayName,
+        string email,
+        DateTimeOffset? authenticatedAt = null)
     {
         var now = DateTime.UtcNow;
+        var authenticationInstant = (authenticatedAt ?? new DateTimeOffset(now)).ToUnixTimeSeconds();
         var accessExpires = now.Add(_accessLifetime);
-        var access = Write(userId, displayName, email, now, accessExpires, isRefresh: false);
-        var refresh = Write(userId, displayName, email, now, now.Add(_refreshLifetime), isRefresh: true);
+        var access = Write(
+            userId,
+            displayName,
+            email,
+            authenticationInstant,
+            now,
+            accessExpires,
+            isRefresh: false);
+        var refresh = Write(
+            userId,
+            displayName,
+            email,
+            authenticationInstant,
+            now,
+            now.Add(_refreshLifetime),
+            isRefresh: true);
         return new IssuedTokens(access, refresh, accessExpires);
     }
 
@@ -88,7 +107,20 @@ public sealed class JwtTokenIssuer : ITokenIssuer
 
             var name = principal.FindFirst("name")?.Value ?? "Certigo learner";
             var email = principal.FindFirst("email")?.Value ?? string.Empty;
-            return new RefreshTokenPrincipal(userId, name, email);
+            if (!long.TryParse(
+                    principal.FindFirst("auth_time")?.Value,
+                    System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var authenticationSeconds))
+            {
+                return null;
+            }
+
+            return new RefreshTokenPrincipal(
+                userId,
+                name,
+                email,
+                DateTimeOffset.FromUnixTimeSeconds(authenticationSeconds));
         }
         catch
         {
@@ -96,13 +128,24 @@ public sealed class JwtTokenIssuer : ITokenIssuer
         }
     }
 
-    private string Write(string userId, string displayName, string email, DateTime issuedAt, DateTime expires, bool isRefresh)
+    private string Write(
+        string userId,
+        string displayName,
+        string email,
+        long authenticationInstant,
+        DateTime issuedAt,
+        DateTime expires,
+        bool isRefresh)
     {
         var claims = new List<Claim>
         {
             new("oid", userId),
             new("sub", userId),
             new("name", string.IsNullOrWhiteSpace(displayName) ? "Certigo learner" : displayName),
+            new(
+                "auth_time",
+                authenticationInstant.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ClaimValueTypes.Integer64),
         };
         if (!string.IsNullOrWhiteSpace(email))
         {

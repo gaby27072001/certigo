@@ -6,4 +6,5 @@ internal static class ConfigurationKeys
     public const string KeyVaultHealthSecretName = "KeyVault:HealthSecretName";
     public const string AuthJwtSigningKeySecretUri = "AUTH_JWT_SIGNING_KEY_SECRET_URI";
     public const string AuthJwtPreviousSigningKeySecretUri = "AUTH_JWT_PREVIOUS_SIGNING_KEY_SECRET_URI";
+    public const string EntraGraphClientSecretSecretUri = "ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI";
 }
