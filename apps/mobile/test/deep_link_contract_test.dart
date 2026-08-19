@@ -1,0 +1,143 @@
+import 'package:certigo/features/deep_links/application/deep_link_contract.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  const DeepLinkPolicy enabledPolicy = DeepLinkPolicy(enabled: true);
+
+  group('HTTPS deep-link parsing', () {
+    test('is disabled by default', () {
+      const DeepLinkPolicy policy = DeepLinkPolicy();
+
+      final DeepLinkParseResult result = policy.parse(
+        'https://certigo.app/learn/az-900/shared-responsibility',
+      );
+
+      expect(result.rejection, DeepLinkRejection.disabled);
+    });
+
+    test('maps the canonical lesson URL to the existing lesson route', () {
+      final DeepLinkParseResult result = enabledPolicy.parse(
+        'https://certigo.app/learn/az-900/shared-responsibility',
+      );
+
+      expect(result.isAccepted, isTrue);
+      expect(result.destination!.kind, DeepLinkKind.lesson);
+      expect(result.destination!.appLocation, '/lesson/az-900/shared-responsibility');
+      expect(result.destination!.requiresAuthentication, isTrue);
+    });
+
+    test('accepts the explicit GitHub Pages project fallback prefix', () {
+      final DeepLinkParseResult result = enabledPolicy.parse(
+        'https://gchambaud_microsoft.github.io/Certigo/assignments/assignment-42',
+      );
+
+      expect(result.destination!.appLocation, '/assignments/assignment-42');
+    });
+
+    test('supports achievement and public account-deletion contracts', () {
+      final DeepLinkDestination achievement = enabledPolicy
+          .parse('https://certigo.app/achievements/first-lesson')
+          .destination!;
+      final DeepLinkDestination deletion = enabledPolicy
+          .parse('https://certigo.app/account-deletion/')
+          .destination!;
+
+      expect(achievement.appLocation, '/achievements/first-lesson');
+      expect(achievement.requiresAuthentication, isTrue);
+      expect(deletion.appLocation, '/account-deletion/');
+      expect(deletion.requiresAuthentication, isFalse);
+    });
+
+    test('generates canonical share URLs without carrying arbitrary parameters', () {
+      const DeepLinkDestination lesson = DeepLinkDestination.lesson(
+        trackId: 'az-900',
+        lessonId: 'identity-basics',
+      );
+
+      expect(lesson.toHttpsUri().toString(), 'https://certigo.app/learn/az-900/identity-basics');
+    });
+  });
+
+  group('authentication boundary', () {
+    test('does not navigate to a protected route before authentication', () {
+      final DeepLinkNavigationDecision decision = enabledPolicy.resolveNavigation(
+        rawUrl: 'https://certigo.app/assignments/assignment-42',
+        isAuthenticated: false,
+      );
+
+      expect(decision.action, DeepLinkNavigationAction.requireAuthentication);
+      expect(decision.location, isNull);
+      expect(decision.pendingLocation, '/assignments/assignment-42');
+    });
+
+    test('allows a protected route only after authentication', () {
+      final DeepLinkNavigationDecision decision = enabledPolicy.resolveNavigation(
+        rawUrl: 'https://certigo.app/achievements/first-lesson',
+        isAuthenticated: true,
+      );
+
+      expect(decision.action, DeepLinkNavigationAction.navigate);
+      expect(decision.location, '/achievements/first-lesson');
+    });
+
+    test('keeps account deletion public', () {
+      final DeepLinkNavigationDecision decision = enabledPolicy.resolveNavigation(
+        rawUrl: 'https://certigo.app/account-deletion/',
+        isAuthenticated: false,
+      );
+
+      expect(decision.action, DeepLinkNavigationAction.navigate);
+      expect(decision.location, '/account-deletion/');
+    });
+  });
+
+  group('origin and open-redirect hardening', () {
+    test('rejects non-HTTPS and foreign origins', () {
+      expect(
+        enabledPolicy.parse('http://certigo.app/assignments/a').rejection,
+        DeepLinkRejection.insecureScheme,
+      );
+      expect(
+        enabledPolicy.parse('https://certigo.app.evil.example/assignments/a').rejection,
+        DeepLinkRejection.untrustedOrigin,
+      );
+      expect(
+        enabledPolicy.parse('https://certigo.app@evil.example/assignments/a').rejection,
+        DeepLinkRejection.untrustedOrigin,
+      );
+    });
+
+    test('rejects redirect parameters, fragments, ports, and unsupported paths', () {
+      expect(
+        enabledPolicy
+            .parse('https://certigo.app/assignments/a?redirect=https://evil.example')
+            .rejection,
+        DeepLinkRejection.unexpectedParameters,
+      );
+      expect(
+        enabledPolicy.parse('https://certigo.app/assignments/a#https://evil.example').rejection,
+        DeepLinkRejection.unexpectedParameters,
+      );
+      expect(
+        enabledPolicy.parse('https://certigo.app:443/assignments/a').rejection,
+        DeepLinkRejection.untrustedOrigin,
+      );
+      expect(
+        enabledPolicy.parse('https://certigo.app/unknown/a').rejection,
+        DeepLinkRejection.unsupportedPath,
+      );
+    });
+
+    test('rejects traversal and encoded separators in identifiers', () {
+      expect(enabledPolicy.parse('https://certigo.app/assignments/..').rejection, isNotNull);
+      expect(
+        enabledPolicy.parse('https://certigo.app/learn/az-900%2F..%2Fadmin/lesson').rejection,
+        DeepLinkRejection.invalidIdentifier,
+      );
+      expect(
+        enabledPolicy.parse('https://certigo.app/assignments/a%5Cb').rejection,
+        DeepLinkRejection.invalidIdentifier,
+      );
+    });
+  });
+}

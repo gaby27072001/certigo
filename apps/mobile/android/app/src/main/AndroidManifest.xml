@@ -27,9 +27,33 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="true" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="${appLinksHost}"
+                    android:pathPrefix="${appLinksPathPrefix}/learn/" />
+                <data
+                    android:scheme="https"
+                    android:host="${appLinksHost}"
+                    android:pathPrefix="${appLinksPathPrefix}/assignments/" />
+                <data
+                    android:scheme="https"
+                    android:host="${appLinksHost}"
+                    android:pathPrefix="${appLinksPathPrefix}/achievements/" />
+                <data
+                    android:scheme="https"
+                    android:host="${appLinksHost}"
+                    android:path="${appLinksPathPrefix}/account-deletion/" />
             </intent-filter>
         </activity>
         <!-- flutter_local_notifications receivers -->

@@ -44,6 +44,40 @@ void main() {
     );
   });
 
+  test('les App Links Android restent inertes tant que le host n\'est pas activé', () {
+    final String gradle = resolve('android/app/build.gradle').readAsStringSync();
+    final String manifest = resolve('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+
+    expect(gradle, contains('"links-disabled.invalid"'));
+    expect(gradle, contains('appLinksHost: appLinksHost'));
+    expect(gradle, contains('appLinksPathPrefix: appLinksPathPrefix'));
+    expect(manifest, contains('android:autoVerify="true"'));
+    expect(manifest, contains(r'android:host="${appLinksHost}"'));
+    for (final String path in <String>[
+      '/learn/',
+      '/assignments/',
+      '/achievements/',
+      '/account-deletion/',
+    ]) {
+      expect(manifest, contains(path), reason: 'Route App Link absente: $path');
+    }
+    expect(manifest, contains(r'android:pathPrefix="${appLinksPathPrefix}/learn/"'));
+  });
+
+  test('iOS déclare les Associated Domains avec un host inerte paramétrable', () {
+    final String entitlements = resolve('ios/Runner/Runner.entitlements').readAsStringSync();
+    final String releaseConfig = resolve('ios/Flutter/Release.xcconfig').readAsStringSync();
+    final String project = resolve('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
+
+    expect(entitlements, contains(r'applinks:$(CERTIGO_APP_LINKS_HOST)'));
+    expect(releaseConfig, contains('CERTIGO_APP_LINKS_HOST=links-disabled.invalid'));
+    expect(
+      project,
+      isNot(contains('CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;')),
+      reason: 'L\'entitlement doit rester opt-in tant que les profils Apple ne le supportent pas.',
+    );
+  });
+
   test('ENTRA_REDIRECT_URI utilise le schéma natif', () {
     final Uri redirect = Uri.parse(AppEnv.entraRedirectUri);
     expect(redirect.scheme, AppEnv.redirectScheme);

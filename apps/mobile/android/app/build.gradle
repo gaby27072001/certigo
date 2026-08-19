@@ -14,6 +14,20 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+// Native HTTPS link capture stays inert until the domain associations are live.
+// Activate with ORG_GRADLE_PROJECT_CERTIGO_APP_LINKS_HOST=certigo.app.
+def appLinksHost = project.findProperty("CERTIGO_APP_LINKS_HOST") ?: "links-disabled.invalid"
+if (!(appLinksHost ==~ /^[A-Za-z0-9.-]+$/)) {
+    throw new GradleException("CERTIGO_APP_LINKS_HOST must be a hostname without scheme or path.")
+}
+def appLinksPathPrefix = project.findProperty("CERTIGO_APP_LINKS_PATH_PREFIX") ?: ""
+if (!(appLinksPathPrefix == "" ||
+        appLinksPathPrefix ==~ /^\/[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)*$/)) {
+    throw new GradleException(
+        "CERTIGO_APP_LINKS_PATH_PREFIX must be empty or start with '/' without a trailing slash."
+    )
+}
+
 android {
     namespace = "com.certigo.mobileapp"
     compileSdk = 35
@@ -50,7 +64,11 @@ android {
         // L'activité RedirectUriReceiverActivity du plugin capture certigo://auth/
         // (matching par schéma « certigo », le slash final ne change rien côté
         // Android ; il est requis uniquement pour la validation iOS d'AppAuth).
-        manifestPlaceholders += [appAuthRedirectScheme: "certigo"]
+        manifestPlaceholders += [
+            appAuthRedirectScheme: "certigo",
+            appLinksHost: appLinksHost,
+            appLinksPathPrefix: appLinksPathPrefix,
+        ]
     }
 
     signingConfigs {
