@@ -82,26 +82,25 @@ CustomTransitionPage<void> _stepPage({
     child: child,
     transitionDuration: PrismMotion.base,
     reverseTransitionDuration: PrismMotion.fast,
-    transitionsBuilder:
-        (
-          BuildContext context,
-          Animation<double> animation,
-          Animation<double> secondaryAnimation,
-          Widget child,
-        ) {
-          final CurvedAnimation curved = CurvedAnimation(
-            parent: animation,
-            curve: PrismMotion.decelerate,
-            reverseCurve: PrismMotion.standard,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
-              child: child,
-            ),
-          );
-        },
+    transitionsBuilder: (
+      BuildContext context,
+      Animation<double> animation,
+      Animation<double> secondaryAnimation,
+      Widget child,
+    ) {
+      final CurvedAnimation curved = CurvedAnimation(
+        parent: animation,
+        curve: PrismMotion.decelerate,
+        reverseCurve: PrismMotion.standard,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
+          child: child,
+        ),
+      );
+    },
   );
 }
 
