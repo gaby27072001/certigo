@@ -93,21 +93,26 @@ dotnet test backend/tests/Certigo.Api.Tests/Certigo.Api.Tests.csproj \
   --configuration Release
 ```
 
-Le parseur Bicep de Checkov ne comprend pas encore plusieurs expressions
-Bicep utilisees par le depot. Scanner les ARM compiles evite un faux vert avec
-`Parsing errors` :
+Checkov 3.2.495 reste une verification complementaire, pas la preuve principale
+sur ce module. Son parseur Bicep ne comprend pas plusieurs expressions utilisees
+par le depot : le scan de #303 retourne 31 checks passes, aucun echec et
+7 `Parsing errors`. Le meme scan sur la combinaison #303 + #296 retourne
+35 checks passes, aucun echec et toujours 7 `Parsing errors`.
 
 ```bash
-CHECKOV_DIR="$(mktemp -d)"
-trap 'rm -rf -- "$CHECKOV_DIR"' EXIT
-bicep build infra/modules/appInsights.bicep \
-  --outfile "$CHECKOV_DIR/appInsights.json"
-bicep build infra/modules/diagnostics.bicep \
-  --outfile "$CHECKOV_DIR/diagnostics.json"
-checkov --file "$CHECKOV_DIR/appInsights.json" \
-  "$CHECKOV_DIR/diagnostics.json" \
-  --framework arm --compact --quiet --config-file .checkov.yaml
+checkov --directory infra --framework bicep --compact --quiet \
+  --config-file .checkov.yaml
 ```
+
+Ne pas presenter ce resultat comme un scan vert complet. Avec cette version,
+scanner les ARM compiles via `--framework arm` retourne `resource_count: 0` et
+constitue aussi un faux vert. Les preuves bloquantes sont donc :
+
+- `infra/validate.sh`, qui compile tous les templates et parametres avec Bicep ;
+- `infra/tests/private-networking.test.mjs`, qui inspecte les ARM compiles et
+  verifie notamment la retention 30/90 jours, l'absence de purge immediate et
+  les noms stables des webtests/alertes ;
+- les gates workflow et backend listees ci-dessus.
 
 Le `what-if` est le seul appel Azure autorise dans cette PR. Il est read-only
 et doit etre lance avec les parametres securises ephemeres decrits dans
