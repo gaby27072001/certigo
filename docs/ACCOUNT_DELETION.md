@@ -55,48 +55,59 @@ Une restauration Cosmos doit exécuter la réconciliation des suppressions avant
 de remettre les données restaurées en service. Le tombstone ne doit pas être
 restauré isolément de son historique.
 
-## Configuration humaine obligatoire avant production
+## État des prérequis externes
 
-1. Créer ou vérifier dans le tenant External ID un client confidentiel
-   mono-tenant dédié. Lui accorder uniquement les permissions d’application
-   Microsoft Graph `User.RevokeSessions.All` et `User.ReadWrite.All`, puis le
-   consentement administrateur.
-2. Dans chacun des GitHub Environments `staging` et `prod`, créer le secret
-   `ENTRA_GRAPH_CLIENT_SECRET` et les variables `ENTRA_GRAPH_TENANT_ID`,
-   `ENTRA_GRAPH_CLIENT_ID` et `ENTRA_REAUTH_AUDIENCE`. Cette dernière contient
-   le client ID mobile qui reçoit l’ID token OIDC, même lorsque l’audience de
-   l’API (`ENTRA_AUDIENCE`) utilise une App ID URI différente.
-3. Le CD valide ce jeu complet, injecte le secret uniquement dans un paramètre
-   Bicep `@secure`, puis Bicep crée une nouvelle version
-   `ENTRA-GRAPH-CLIENT-SECRET` dans le Key Vault de l’environnement. Seule son
-   URI versionnée est écrite dans
-   `ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI`; l’identité managée de la Function
-   App lit la valeur au runtime. Aucune saisie manuelle dans Key Vault ou dans
-   les app settings n’est requise. Le compte humain n’a donc pas besoin d’accès
-   à l’abonnement Certigo.
-4. Sans les trois variables et le secret, le déploiement staging/production
-   échoue avant Azure. En `dev`, le CD les ignore, ne crée aucun secret Graph et
-   l’étape d’identité externe reste indisponible plutôt que de produire un faux
-   succès.
-5. Vérifier dans le tenant Entra External ID si la suppression de l’identité
-   cliente révoque aussi le jeton amont **Sign in with Apple**. Certigo ne reçoit
-   aujourd’hui que les jetons Entra, pas le refresh token Apple nécessaire à
-   l’API Apple de révocation. Si le broker ne garantit pas cette révocation,
-   l’équipe identité doit ajouter une révocation amont avant de déclarer la
-   conformité complète Sign in with Apple.
-6. Enregistrer
+Les prérequis suivants sont accomplis :
+
+- le client confidentiel Graph dédié est créé ;
+- les permissions d’application minimales Microsoft Graph
+  `User.RevokeSessions.All` et `User.ReadWrite.All` sont consenties par un
+  administrateur ;
+- le secret `ENTRA_GRAPH_CLIENT_SECRET` et les variables
+  `ENTRA_GRAPH_TENANT_ID`, `ENTRA_GRAPH_CLIENT_ID` et
+  `ENTRA_REAUTH_AUDIENCE` sont configurés dans les GitHub Environments
+  `staging` et `prod`, sans valeur dans le dépôt ;
+- Sign in with Apple est activé sur l’App ID mobile ; le Service ID Certigo
+  CIAM est associé au domaine et à la return URL ; Apple est activé dans
+  `susi_certigo` et le bouton est visible.
+
+`User.Read`, visible uniquement sous « Autres autorisations accordées », n’est
+ni configurée ni utilisée par Certigo. Son nettoyage est une tâche distincte.
+
+Le CD valide le jeu Graph complet, injecte le secret uniquement dans un paramètre
+Bicep `@secure`, puis Bicep crée une nouvelle version
+`ENTRA-GRAPH-CLIENT-SECRET` dans le Key Vault de l’environnement. Seule son URI
+versionnée est écrite dans `ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI` ; l’identité
+managée de la Function App lit la valeur au runtime. Aucune saisie manuelle dans
+Key Vault ou dans les app settings n’est requise. Le compte humain n’a donc pas
+besoin d’accès à l’abonnement Certigo.
+
+Sans les trois variables et le secret, le déploiement staging/production
+échoue avant Azure. En `dev`, le CD les ignore, ne crée aucun secret Graph et
+l’étape d’identité externe reste indisponible plutôt que de produire un faux
+succès.
+
+### Validation Apple restante après déploiement
+
+Effectuer un test réel avec un compte Apple sacrifiable : créer la connexion via
+`susi_certigo`, supprimer le compte dans Certigo, puis vérifier que
+l’association Apple n’existe plus ou est révoquée. C’est la seule validation
+Apple encore ouverte pour ce flux.
+
+Les actions humaines non liées à ce câblage restent :
+
+1. Enregistrer
    `https://gchambaud_microsoft.github.io/Certigo/account-deletion/` dans le champ
    URL de suppression du compte de Play Console après publication de la page.
-7. Faire valider par le responsable juridique la base légale, le contact public
+2. Faire valider par le responsable juridique la base légale, le contact public
    et toute conservation réglementaire additionnelle. Aucune durée légale
    additionnelle n’est inventée dans cette implémentation. Le dépôt ne contient
    actuellement aucun document de CGU : cette PR n’en crée pas et ne prétend pas
    qu’un texte contractuel a été approuvé.
 
-Cette PR ne renseigne aucune valeur de production et ne publie aucune page. La
-création des trois variables et du secret dans les GitHub Environments, les
-promotions Bicep, le dispatch GitHub Pages et les déclarations des consoles store
-restent des actions humaines bloquantes avant soumission.
+Cette PR ne renseigne aucune valeur de production et ne publie aucune page. Les
+promotions Bicep, le test Apple réel, le dispatch GitHub Pages et les déclarations
+des consoles store restent des actions humaines avant soumission.
 
 ## Exigences officielles consultées le 18 août 2026
 

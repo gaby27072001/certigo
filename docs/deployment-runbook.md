@@ -26,7 +26,9 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | Configuration GitHub OIDC | ✅ Opérationnelle aux scopes existants ; ne pas déplacer sans audit | §T0.1 |
 | Clé JWT + expiration par Environment | ⛔ **Humain** — obligatoire avant staging/prod | §T0.4 |
 | Permissions Graph app-only minimales | ✅ Configurées et consenties ; `User.Read` non configurée/non utilisée, nettoyage séparé | §T0.1 |
-| Identité Graph de suppression + audience de preuve | ⛔ **Humain** — 1 secret + 3 variables Environment avant staging/prod, Key Vault et app settings automatisés | §T0.1 |
+| Identité Graph de suppression + audience de preuve | ✅ Secret + 3 variables configurés dans `staging`/`prod` ; Key Vault et app settings automatisés | §T0.1 |
+| Fédération Sign in with Apple | ✅ App ID, Service ID, domaine/return URL et `susi_certigo` configurés ; bouton visible | §T0.1 |
+| Révocation Apple après suppression | ⛔ **Post-déploiement** — test réel avec compte sacrifiable, puis contrôle de disparition/révocation de l’association | §T0.1 |
 | Destinataire `ALERT_EMAIL` par Environment | ✅ Configuré dans `staging`/`prod`, valeur non divulguée et hors dépôt | §T0.4 |
 | Réseau privé atomique Storage / Key Vault / Cosmos + peering CI | ✅ IaC + hotfix OneDeploy | `infra/modules/privateNetwork.bicep` |
 | GitHub Environments `dev`/`staging`/`prod` | ✅ Créés ; staging/prod limités aux branches protégées et configurés JWT | §T0.3 |
@@ -278,12 +280,13 @@ reste facultatif, et avec le template durci de la PR #263.
 
 ### Identité Graph de suppression de compte
 
-Créer ou vérifier dans le tenant External ID un client confidentiel mono-tenant
-dédié. Lui accorder uniquement les permissions d’application Microsoft Graph
-`User.RevokeSessions.All` et `User.ReadWrite.All`, avec consentement
-administrateur.
+Le client confidentiel Graph dédié est créé. Les permissions d’application
+Microsoft Graph minimales `User.RevokeSessions.All` et `User.ReadWrite.All`
+sont consenties par un administrateur. `User.Read`, visible uniquement sous
+« Autres autorisations accordées », n’est ni configurée ni utilisée par Certigo ;
+son nettoyage est une tâche distincte.
 
-Configurer dans `staging` et `prod` :
+Les GitHub Environments `staging` et `prod` contiennent :
 
 - le **secret GitHub Environment** `ENTRA_GRAPH_CLIENT_SECRET` ;
 - `ENTRA_GRAPH_TENANT_ID` : Directory/Tenant ID du tenant External ID ;
@@ -304,6 +307,16 @@ portail post-déploiement n’est nécessaire.
 En `dev`, le writer ignore explicitement ces entrées, le module Key Vault n’est
 pas déployé et l’identité externe reste indisponible plutôt qu’émulée avec une
 identité réelle.
+
+### Sign in with Apple
+
+La configuration externe est accomplie : Sign in with Apple est activé sur
+l’App ID mobile, le Service ID Certigo CIAM est associé au domaine et à la
+return URL, Apple est activé dans `susi_certigo` et le bouton est visible.
+
+Après le déploiement de cette PR, la seule validation Apple restante consiste à
+utiliser un compte sacrifiable pour un parcours réel connexion → suppression,
+puis à vérifier la disparition ou la révocation de l’association Apple.
 
 ### Commandes
 
@@ -450,11 +463,12 @@ timestamp ISO 8601 absolu obligatoire. Elle n'est jamais calculée avec `utcNow(
 un redéploiement identique ne prolonge donc pas silencieusement la durée de vie du
 secret.
 
-Configurer dans chaque GitHub Environment `staging`/`prod` :
+Conserver dans chaque GitHub Environment `staging`/`prod` :
 
 - le secret `AUTH_JWT_SIGNING_KEY` ;
 - la variable non secrète `AUTH_JWT_SIGNING_KEY_EXPIRES_ON` ;
-- le secret et les trois variables de l’identité Graph décrits en §T0.1 ;
+- le secret et les trois variables de l’identité Graph décrits en §T0.1, déjà
+  configurés ;
 - la variable non secrète `ALERT_EMAIL`, pointant vers une boîte réellement
   supervisée et capable de recevoir du courrier.
 

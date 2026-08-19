@@ -511,6 +511,68 @@ test('Graph client secret module stores the value only in Key Vault and returns 
   assert.doesNotMatch(JSON.stringify(template), /ENTRA_GRAPH_CLIENT_SECRET":/);
 });
 
+test('account deletion checklist records provisioned Graph and Apple prerequisites', () => {
+  const accountDeletion = readFileSync(
+    path.join(repositoryRoot, 'docs', 'ACCOUNT_DELETION.md'),
+    'utf8',
+  );
+  const deploymentRunbook = readFileSync(
+    path.join(repositoryRoot, 'docs', 'deployment-runbook.md'),
+    'utf8',
+  );
+  const e2ePrerequisites = readFileSync(
+    path.join(repositoryRoot, 'docs', 'E2E_AUTH_PREREQUIS.md'),
+    'utf8',
+  );
+  const infraWorkflow = readFileSync(
+    path.join(repositoryRoot, '.github', 'workflows', 'ci-infra.yml'),
+    'utf8',
+  );
+
+  for (const marker of [
+    'le client confidentiel Graph dédié est créé',
+    '`ENTRA_GRAPH_CLIENT_SECRET`',
+    '`ENTRA_GRAPH_TENANT_ID`',
+    '`ENTRA_GRAPH_CLIENT_ID`',
+    '`ENTRA_REAUTH_AUDIENCE`',
+    'Apple est activé dans',
+    '`susi_certigo`',
+    'compte Apple sacrifiable',
+    'n’existe plus ou est révoquée',
+  ]) {
+    assert.ok(accountDeletion.includes(marker), `missing checklist marker: ${marker}`);
+  }
+  assert.match(
+    deploymentRunbook,
+    /Identité Graph de suppression \+ audience de preuve \| ✅/,
+  );
+  assert.match(deploymentRunbook, /Fédération Sign in with Apple \| ✅/);
+  assert.match(deploymentRunbook, /Révocation Apple après suppression \| ⛔/);
+  assert.match(
+    e2ePrerequisites,
+    /la seule validation Apple restante est un parcours réel avec un compte\s+sacrifiable/,
+  );
+  assert.doesNotMatch(
+    accountDeletion,
+    /Créer ou vérifier dans le tenant External ID un client confidentiel/,
+  );
+  assert.doesNotMatch(
+    accountDeletion,
+    /Dans chacun des GitHub Environments `staging` et `prod`, créer le secret/,
+  );
+  for (const documentationPath of [
+    'docs/ACCOUNT_DELETION.md',
+    'docs/deployment-runbook.md',
+    'docs/E2E_AUTH_PREREQUIS.md',
+  ]) {
+    assert.equal(
+      infraWorkflow.split(`- "${documentationPath}"`).length,
+      3,
+      `${documentationPath} must trigger ci-infra for push and pull requests`,
+    );
+  }
+});
+
 test('Function deployment waits for the complete private network deployment', () => {
   const template = compileTemplate('infra/main.bicep');
   const networkDeployment = template.resources.privateNetwork;
