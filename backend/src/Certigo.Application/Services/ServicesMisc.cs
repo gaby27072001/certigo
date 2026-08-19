@@ -16,8 +16,6 @@ namespace Certigo.Application.Services;
 
 internal static class ProfileDefaults
 {
-    public const string DefaultTrackId = "az-900";
-
     public static UserProfileDto New(string userId, string displayName)
     {
         var handle = Handle(displayName, userId);
@@ -33,7 +31,7 @@ internal static class ProfileDefaults
             DailyGoalXp: 50,
             DailyXpEarned: 0,
             Gems: 0,
-            ActiveTrackId: DefaultTrackId,
+            ActiveTrackId: null,
             LastActiveDate: null,
             DailyXpDate: null);
     }

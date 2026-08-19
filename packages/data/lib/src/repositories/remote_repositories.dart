@@ -43,6 +43,20 @@ class RemoteUserRepository implements UserRepository {
 
   @override
   Future<Result<UserProfile>> getMe() => _api.getJson('/me', UserProfile.fromJson);
+
+  @override
+  Future<Result<UserProfile>> setActiveTrack({
+    required String trackId,
+    required String? expectedTrackId,
+  }) =>
+      _api.postJson(
+        '/me/active-track',
+        <String, dynamic>{
+          'trackId': trackId,
+          'expectedTrackId': expectedTrackId,
+        },
+        UserProfile.fromJson,
+      );
 }
 
 class RemotePathRepository implements PathRepository {

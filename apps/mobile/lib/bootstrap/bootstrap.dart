@@ -5,12 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app/app.dart';
+import '../app/active_track_store.dart';
 import '../app/mascots.dart';
 import '../app/offline/offline_sync_scope.dart';
 import '../app/offline/prefs_catalog_store.dart';
 import '../app/offline/prefs_lesson_cache_store.dart';
 import '../app/offline/prefs_sync_store.dart';
 import '../app/providers.dart';
+import '../features/auth/application/auth_controller.dart';
 import '../features/notifications/notification_lifecycle_scope.dart';
 import '../features/notifications/notification_service.dart';
 import 'config_error_app.dart';
@@ -57,9 +59,7 @@ Future<void> bootstrap() async {
       'Configuration d\'authentification invalide (voir logs [config]) :\n${config.describe()}',
     );
 
-    await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
-      DeviceOrientation.portraitUp,
-    ]);
+    await SystemChrome.setPreferredOrientations(<DeviceOrientation>[DeviceOrientation.portraitUp]);
 
     try {
       await NotificationService.initialize();
@@ -85,13 +85,18 @@ Future<void> bootstrap() async {
     runApp(
       ProviderScope(
         overrides: <Override>[
+          authLocalAccountCleanupProvider.overrideWith((Ref ref) {
+            return () async {
+              await ref.read(syncEngineProvider).waitForIdle();
+              await ref.read(activeTrackProvider.notifier).clear();
+            };
+          }),
+          activeTrackStoreProvider.overrideWithValue(SharedPreferencesActiveTrackStore(prefs)),
           catalogStoreProvider.overrideWithValue(prefsCatalogCacheStore(prefs)),
           lessonStoreProvider.overrideWithValue(prefsLessonCacheStore(prefs)),
           syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
         ],
-        child: const NotificationLifecycleScope(
-          child: OfflineSyncScope(child: CertigoApp()),
-        ),
+        child: const NotificationLifecycleScope(child: OfflineSyncScope(child: CertigoApp())),
       ),
     );
   }, crashReporter);

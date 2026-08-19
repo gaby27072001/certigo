@@ -23,6 +23,11 @@ import '../models/share_card.dart';
 
 abstract interface class UserRepository {
   Future<Result<UserProfile>> getMe();
+
+  Future<Result<UserProfile>> setActiveTrack({
+    required String trackId,
+    required String? expectedTrackId,
+  });
 }
 
 abstract interface class PathRepository {

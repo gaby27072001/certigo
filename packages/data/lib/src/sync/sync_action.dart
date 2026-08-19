@@ -43,6 +43,7 @@ class SyncAction {
     required this.payload,
     required this.idempotencyKey,
     required this.createdAt,
+    this.ownerId,
     this.status = SyncActionStatus.pending,
     this.attempts = 0,
     this.nextAttemptAt,
@@ -69,6 +70,10 @@ class SyncAction {
 
   /// When the action was first enqueued.
   final DateTime createdAt;
+
+  /// Authenticated account that created this action. Null only for legacy v1
+  /// records, which the engine quarantines instead of replaying under a new user.
+  final String? ownerId;
 
   final SyncActionStatus status;
 
@@ -112,6 +117,7 @@ class SyncAction {
       payload: payload,
       idempotencyKey: idempotencyKey,
       createdAt: createdAt,
+      ownerId: ownerId,
       status: status ?? this.status,
       attempts: attempts ?? this.attempts,
       nextAttemptAt: clearNextAttemptAt ? null : (nextAttemptAt ?? this.nextAttemptAt),
@@ -127,6 +133,7 @@ class SyncAction {
         'payload': payload,
         'idempotencyKey': idempotencyKey,
         'createdAt': createdAt.toUtc().toIso8601String(),
+        if (ownerId != null) 'ownerId': ownerId,
         'status': _statusToWire(status),
         'attempts': attempts,
         if (nextAttemptAt != null) 'nextAttemptAt': nextAttemptAt!.toUtc().toIso8601String(),
@@ -141,6 +148,7 @@ class SyncAction {
         payload: Map<String, dynamic>.from(json['payload'] as Map<dynamic, dynamic>),
         idempotencyKey: json['idempotencyKey'] as String,
         createdAt: DateTime.parse(json['createdAt'] as String),
+        ownerId: json['ownerId'] as String?,
         status: _statusFromWire(json['status'] as String?),
         attempts: (json['attempts'] as num?)?.toInt() ?? 0,
         nextAttemptAt:

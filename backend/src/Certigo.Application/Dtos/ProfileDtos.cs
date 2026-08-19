@@ -7,6 +7,8 @@ public sealed record EconomyProfileReceipt(
     DateTimeOffset AppliedAt,
     string OutcomeJson);
 
+public sealed record SetActiveTrackRequest(string TrackId, string? ExpectedTrackId);
+
 public sealed record UserProfileDto(
     string Id,
     string DisplayName,

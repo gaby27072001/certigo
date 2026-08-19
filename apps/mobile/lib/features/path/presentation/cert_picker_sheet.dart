@@ -20,7 +20,7 @@ Future<void> showCertPickerSheet(BuildContext context) {
 
 /// Bottom sheet listing every certification track, with the active one marked.
 /// Reads the catalog lazily (only while open) and the active track from
-/// [activeTrackProvider]; selecting a track updates that provider and closes.
+/// [activeTrackProvider]; selecting a track persists it locally and on the API.
 class CertPickerSheet extends ConsumerWidget {
   const CertPickerSheet({super.key});
 
@@ -29,7 +29,8 @@ class CertPickerSheet extends ConsumerWidget {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
     final AsyncValue<List<TrackSummary>> catalog = ref.watch(catalogProvider);
-    final String activeId = ref.watch(activeTrackProvider);
+    final AsyncValue<String?> activeTrack = ref.watch(activeTrackProvider);
+    final String? activeId = activeTrack.asData?.value;
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -78,9 +79,21 @@ class CertPickerSheet extends ConsumerWidget {
                   data: (List<TrackSummary> tracks) => _CertList(
                     tracks: pickerTracks(tracks),
                     activeId: activeId,
-                    onSelect: (String id) {
-                      ref.read(activeTrackProvider.notifier).state = id;
-                      Navigator.of(context).maybePop();
+                    onSelect: (String id) async {
+                      final ActiveTrackSaveResult result =
+                          await ref.read(activeTrackProvider.notifier).select(id);
+                      if (!context.mounted) return;
+                      if (result.accepted) {
+                        Navigator.of(context).maybePop();
+                        return;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            result.failure?.message ?? 'Impossible de changer de certification.',
+                          ),
+                        ),
+                      );
                     },
                   ),
                   loading: () => const _CertLoading(),
@@ -110,8 +123,8 @@ class _CertList extends StatelessWidget {
   const _CertList({required this.tracks, required this.activeId, required this.onSelect});
 
   final List<TrackSummary> tracks;
-  final String activeId;
-  final ValueChanged<String> onSelect;
+  final String? activeId;
+  final Future<void> Function(String) onSelect;
 
   @override
   Widget build(BuildContext context) {

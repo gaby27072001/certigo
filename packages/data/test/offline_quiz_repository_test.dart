@@ -16,6 +16,19 @@ class _ScriptedQuiz implements QuizRepository {
       result;
 }
 
+class _OwnerChangingQuiz implements QuizRepository {
+  _OwnerChangingQuiz(this.onSubmit);
+
+  final Result<SubmitQuizResult> Function() onSubmit;
+
+  @override
+  Future<Result<SubmitQuizResult>> submit({
+    required String lessonId,
+    required SubmitQuizRequest request,
+  }) async =>
+      onSubmit();
+}
+
 SubmitQuizRequest _request(String key) => SubmitQuizRequest(
       clientAttemptId: key,
       trackId: 'az-900',
@@ -25,8 +38,15 @@ SubmitQuizRequest _request(String key) => SubmitQuizRequest(
 
 Future<SyncDispatch> _alwaysSucceed(SyncAction _) async => SyncDispatch.success;
 
-SyncEngine _engine({SyncSender? sender}) =>
-    SyncEngine(store: InMemorySyncQueueStore(), sender: sender ?? _alwaysSucceed);
+SyncEngine _engine({
+  SyncSender? sender,
+  String? Function()? ownerIdProvider,
+}) =>
+    SyncEngine(
+      store: InMemorySyncQueueStore(),
+      sender: sender ?? _alwaysSucceed,
+      ownerIdProvider: ownerIdProvider,
+    );
 
 void main() {
   group('OfflineQuizRepository', () {
@@ -64,6 +84,21 @@ void main() {
       expect(queued.endpoint, '/quiz/L1/submit');
       expect(queued.idempotencyKey, 'k1');
       expect(queued.payload['clientAttemptId'], 'k1');
+      await engine.dispose();
+    });
+
+    test('captures the owner before a 401 clears authentication', () async {
+      String? ownerId = 'user-a';
+      final _OwnerChangingQuiz inner = _OwnerChangingQuiz(() {
+        ownerId = null;
+        return const Err<SubmitQuizResult>(AuthFailure());
+      });
+      final SyncEngine engine = _engine(ownerIdProvider: () => ownerId);
+      final OfflineQuizRepository repo = OfflineQuizRepository(inner, engine);
+
+      await repo.submit(lessonId: 'L1', request: _request('auth-expired'));
+
+      expect(engine.actions.single.ownerId, 'user-a');
       await engine.dispose();
     });
 
