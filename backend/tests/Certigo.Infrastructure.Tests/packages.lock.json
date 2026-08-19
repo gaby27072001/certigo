@@ -498,6 +498,9 @@
           "Microsoft.IdentityModel.Protocols.OpenIdConnect": "[8.19.1, )",
           "System.IdentityModel.Tokens.Jwt": "[8.19.1, )"
         }
+      },
+      "certigo.vivalearning.poc": {
+        "type": "Project"
       }
     }
   }

@@ -2,7 +2,8 @@
 
 > **Origine** : findings de l'audit de sécurité `AUDIT_Certigo.md` (PR #176).
 > Ce dossier regroupe les procédures opérationnelles pour les findings **gouvernance CIAM**,
-> **opérations cloud** et **protection des données** : `R-02`, `R-04`, `R-05`, `R-06`, `O-01`, `O-02`, `O-05`.
+> **opérations cloud**, **protection des données** et les validations d'intégration contrôlées :
+> `R-02`, `R-04`, `R-05`, `R-06`, `O-01`, `O-02`, `O-05` et le POC Viva Learning.
 
 ## ⚠️ Principe : « l'agent PRÉPARE, VOUS EXÉCUTEZ »
 
@@ -52,6 +53,7 @@ rollbacks. **C'est vous qui exécutez** chaque commande, après relecture.
 | **O-02** | 🔴 Haut | Plan de test de charge Azure OpenAI + bump capacity | [`O-02_plan-test-charge-openai.md`](./O-02_plan-test-charge-openai.md) | Cognitive Services OpenAI User (test) + Contributor (bump) | À exécuter |
 | **R-02** | 🟠 Moyen | Restauration Point-In-Time (PITR) du compte Cosmos DB | [`R-02_cosmos-pitr-restauration.md`](./R-02_cosmos-pitr-restauration.md) | Cosmos DB Operator/Contributor + `CosmosRestoreOperator` (sub staging/prod) | Remédiation IaC ✅ (PR #178) — restore-test à planifier |
 | **Azure IaC** | 🔴 Haut | Prévol, diagnostics read-only, ordre de déploiement et risques | [`AZURE_IAC_OPERATIONS.md`](./AZURE_IAC_OPERATIONS.md) | Reader pour diagnostic ; Contributor + User Access Administrator pour appliquer | Versionné — exécution live soumise à autorisation |
+| **Viva Learning POC** | 🟠 Moyen | Consentement minimal, preuve live et nettoyage du provider POC | [`VIVA_LEARNING_POC_LIVE_VALIDATION.md`](./VIVA_LEARNING_POC_LIVE_VALIDATION.md) | Tenant M365 non-prod licencié ; Knowledge Administrator ; approbation explicite | Contrats validés — live **NO-GO non testé** |
 
 ## Ordre d'exécution conseillé
 

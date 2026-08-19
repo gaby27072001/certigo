@@ -22,6 +22,13 @@
     <ProjectReference Include="..\..\src\Certigo.Infrastructure\Certigo.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Certigo.Application\Certigo.Application.csproj" />
     <ProjectReference Include="..\..\src\Certigo.Domain\Certigo.Domain.csproj" />
+    <ProjectReference Include="..\..\spikes\Certigo.VivaLearning.Poc\Certigo.VivaLearning.Poc.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\spikes\Certigo.VivaLearning.Poc\Fixtures\*.json"
+             Link="VivaLearningFixtures\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

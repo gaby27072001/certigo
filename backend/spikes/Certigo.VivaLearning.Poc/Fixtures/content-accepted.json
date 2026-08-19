@@ -1,0 +1,15 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#learningContents/$entity",
+  "id": "22222222-2222-2222-2222-222222222222",
+  "externalId": "certigo:az-900:az900-l-cloud-benefits",
+  "title": "Benefices du cloud",
+  "contentWebUrl": "https://certigo.invalid/lesson/az-900/az900-l-cloud-benefits",
+  "languageTag": "fr-fr",
+  "duration": "PT5M",
+  "format": "Course",
+  "level": "Beginner",
+  "sourceName": "Certigo",
+  "isActive": true,
+  "isPremium": true,
+  "isSearchable": true
+}

@@ -1,0 +1,11 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#learningProviders/$entity",
+  "id": "11111111-1111-1111-1111-111111111111",
+  "displayName": "Certigo POC",
+  "squareLogoWebUrlForDarkTheme": "https://certigo.invalid/assets/logo-square-dark.png",
+  "longLogoWebUrlForDarkTheme": "https://certigo.invalid/assets/logo-long-dark.png",
+  "squareLogoWebUrlForLightTheme": "https://certigo.invalid/assets/logo-square-light.png",
+  "longLogoWebUrlForLightTheme": "https://certigo.invalid/assets/logo-long-light.png",
+  "loginWebUrl": "https://certigo.invalid/sign-in",
+  "isCourseActivitySyncEnabled": true
+}
