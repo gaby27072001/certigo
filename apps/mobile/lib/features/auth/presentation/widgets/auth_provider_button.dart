@@ -101,6 +101,7 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
   @override
   Widget build(BuildContext context) {
     final _ProviderBrand brand = _brandFor(context);
+    final Duration duration = PrismMotion.resolve(context, PrismMotion.fast);
     final TextStyle labelStyle = Theme.of(
       context,
     ).textTheme.titleMedium!.copyWith(color: brand.foreground, fontWeight: FontWeight.w700);
@@ -116,11 +117,11 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
         onTap: _interactive ? _handleTap : null,
         child: AnimatedScale(
           scale: _down ? 0.97 : 1.0,
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
+          duration: duration,
+          curve: PrismMotion.standard,
           child: AnimatedOpacity(
             opacity: _interactive ? 1 : 0.55,
-            duration: const Duration(milliseconds: 160),
+            duration: duration,
             child: Container(
               height: 56,
               padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.md),

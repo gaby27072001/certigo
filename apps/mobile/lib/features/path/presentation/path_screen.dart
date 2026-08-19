@@ -486,14 +486,15 @@ class _ContinueCtaDelegate extends SliverPersistentHeaderDelegate {
       ),
       alignment: Alignment.center,
       child: AnimatedSwitcher(
-        duration: PrismMotion.fast,
-        reverseDuration: PrismMotion.instant,
+        duration: PrismMotion.resolve(context, PrismMotion.fast),
+        reverseDuration: PrismMotion.resolve(context, PrismMotion.instant),
         switchInCurve: PrismMotion.spring,
         switchOutCurve: PrismMotion.standard,
         transitionBuilder: (Widget child, Animation<double> animation) {
+          final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
           return FadeTransition(
             opacity: animation,
-            child: ScaleTransition(scale: animation, child: child),
+            child: reduceMotion ? child : ScaleTransition(scale: animation, child: child),
           );
         },
         child: PrismButton(

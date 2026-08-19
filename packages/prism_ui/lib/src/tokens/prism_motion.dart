@@ -16,15 +16,20 @@ class PrismMotion {
   static const Duration slow = Duration(milliseconds: 380);
   static const Duration celebrate = Duration(milliseconds: 720);
 
-  /// Standard easing for entrances/exits — smooth, slightly eager.
-  static const Curve standard = Cubic(0.2, 0.0, 0.0, 1.0);
+  /// Strong ease-out for direct UI feedback and entrances.
+  static const Curve standard = Cubic(0.23, 1.0, 0.32, 1.0);
 
-  /// Emphasized easing for reward / celebration moments.
-  static const Curve emphasized = Cubic(0.2, 0.0, 0.0, 1.0);
+  /// Strong ease-in-out for elements already moving on screen.
+  static const Curve emphasized = Cubic(0.77, 0.0, 0.175, 1.0);
 
   /// Springy overshoot for taps and "pop" feedback.
   static const Curve spring = Cubic(0.34, 1.56, 0.64, 1.0);
 
   /// Decelerate — for content settling into place.
-  static const Curve decelerate = Cubic(0.0, 0.0, 0.2, 1.0);
+  static const Curve decelerate = Cubic(0.32, 0.72, 0.0, 1.0);
+
+  /// Returns zero duration when the platform requests reduced motion.
+  static Duration resolve(BuildContext context, Duration duration) {
+    return (MediaQuery.maybeDisableAnimationsOf(context) ?? false) ? Duration.zero : duration;
+  }
 }

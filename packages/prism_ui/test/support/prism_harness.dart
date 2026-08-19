@@ -27,11 +27,18 @@ Future<void> pumpPrism(
   WidgetTester tester,
   Widget child, {
   Brightness brightness = Brightness.light,
+  bool disableAnimations = false,
 }) {
   return tester.pumpWidget(
     MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: _prismTestTheme(brightness),
+      builder: (BuildContext context, Widget? appChild) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(disableAnimations: disableAnimations),
+          child: appChild!,
+        );
+      },
       home: Scaffold(body: Center(child: child)),
     ),
   );
