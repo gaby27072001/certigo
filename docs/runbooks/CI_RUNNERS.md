@@ -4,32 +4,32 @@
 |---|---|
 | **Type** | Runbook opérationnel (CI / infra / coûts) |
 | **Objectif** | Exploiter la CI de Certigo sur ses **runners self-hosted** : **rallumer** les VMs avant une session de travail, les **déallouer** après (économie), **vérifier** l'état des runners et **dépanner** un runner hors ligne. |
-| **Voie officielle** | **Self-hosted** — 2 VMs Azure. Les runners GitHub-hosted sont indisponibles par politique d'organisation et ne sont pas une dépendance supportée. |
+| **Voie officielle** | **Self-hosted** — VMSS flexible Azure. Les runners GitHub-hosted sont indisponibles par politique d'organisation. |
 | **Périmètre** | Repo `gchambaud_microsoft/Certigo` · RG `RG-CERTIGO-CI` · subscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**). |
-| **Statut** | **En vigueur** (voie pérenne de la CI Certigo). |
+| **Statut** | **Migration bloquée** : aucune déallocation automatisée avant séparation des labels et retrait du scale-in CPU. |
 
-> **Pourquoi ce runbook ?** La CI de Certigo tourne **exclusivement** sur des runners *self-hosted*
-> hébergés par 2 VMs Azure. Ces VMs **facturent du compute tant qu'elles sont allouées** : on les
-> **rallume** juste avant d'avoir besoin de la CI et on les **déalloue** dès qu'on a fini, pour ne payer
-> que l'usage réel. Ce runbook regroupe les commandes exactes pour ce cycle **allumage → usage →
-> extinction**, plus le **dépannage** d'un runner offline.
+> **Dérive live constatée le 19 août 2026.** Le pool est désormais
+> `vmss-certigo-runner-zonal` (Flexible, autoscale 2–4). Les deux runners GitHub
+> enregistrés portent simultanément `certigo-pr` et `certigo-trusted`; le scale-in CPU
+> ignore l'état `busy`. Les anciennes commandes visant `vm-certigo-runner` et
+> `vm-certigo-runner-2` ne doivent plus être exécutées.
 
 > ⚠️ **Principe « l'agent PRÉPARE, VOUS EXÉCUTEZ »** — aucune commande `gh` / `az` n'est lancée par
 > l'agent. Les commandes ci-dessous sont **à exécuter par vous** après vérification des identifiants
 > (repo, noms de VM, resource group, subscription).
 >
-> Les blocs `az vm start`, `az vm deallocate`, `az vm delete` et les appels GitHub qui
-> modifient un runner sont des **actions live opérateur**. Une validation locale de
-> `infra/ci-runner` ne les invoque jamais.
+> Exécuter d'abord `bash infra/ci-runner/lifecycle-preflight.sh deallocate`. Ce script est
+> strictement read-only et bloque l'état actuel. La migration et le rollback sont définis dans
+> [`CLOUD_LEAST_PRIVILEGE.md`](./CLOUD_LEAST_PRIVILEGE.md).
 
 ---
 
 ## 1. Contexte & verdict — pourquoi self-hosted (et pas GitHub-hosted)
 
-La CI de Certigo s'appuie **uniquement** sur deux runners **self-hosted** isolés :
+La cible Certigo s'appuie sur des runners **self-hosted** isolés :
 `self-hosted, Linux, X64, certigo-pr` pour toute source PR et
 `self-hosted, Linux, X64, certigo-trusted` pour les opérations/gates sans source PR.
-Ils sont portés par **2 VMs Azure**. Ce n'est pas une préférence : c'est
+Ils doivent être portés par des pools/VMSS distincts. Ce n'est pas une préférence : c'est
 une **contrainte dure**, désormais **prouvée empiriquement**.
 
 **Test empirique (verdict sans appel).** Une tentative de bascule vers un runner
@@ -53,15 +53,16 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 
 | Élément | Valeur |
 |---|---|
-| **Runner #1** | `vm-certigo-runner` |
-| **Runner #2** | `vm-certigo-runner-2` |
+| **VMSS live** | `vmss-certigo-runner-zonal` · Flexible · `Standard_D2ads_v6` |
+| **Capacité Azure live** | `f55d176e` et `4153d1dd` running; `22f7fb52` absent (`ResourceNotFound`) |
 | **Resource group** | `RG-CERTIGO-CI` |
 | **Subscription** | `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**) |
-| **Runner PR** | `vm-certigo-runner` · labels `self-hosted`, `Linux`, `X64`, `certigo-pr` · aucune identité/secrets |
-| **Runner trusted** | `vm-certigo-runner-2` · labels `self-hosted`, `Linux`, `X64`, `certigo-trusted` · identité minimale pour release/déploiement |
+| **Runners GitHub live** | `22f7fb52` offline/stale; `f55d176e` est passé d'online à offline entre deux snapshots; labels doubles |
+| **Capacité utilisable** | dynamique : 1 puis 0; `4153d1dd` est intacte mais non enregistrée |
+| **Identité VMSS** | UAMI `id-vm-certigo-runner-2-vmss`, rôle `Key Vault Secrets User` au coffre CI exact |
 | **Repo desservi** | `gchambaud_microsoft/Certigo` |
 
-> 📌 Les labels `certigo-pr` et `certigo-trusted` sont mutuellement exclusifs. Un éventuel
+> 📌 Les labels `certigo-pr` et `certigo-trusted` doivent redevenir mutuellement exclusifs. Un éventuel
 > runner **macOS** dédié à iOS (cf. §9) est **distinct** et **n'est pas** géré par ce runbook.
 
 > ℹ️ **Prérequis outillage** (poste opérateur) : `az` (Azure CLI) connecté à la subscription Non-Prod,
@@ -71,38 +72,45 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 
 ## 3. Capacité et stratégie d'exploitation
 
-Chaque `Standard_D4s_v5` traite **un job GitHub Actions à la fois**. Chaque classe ne
-dispose que d'un slot et n'a pas de failover vers l'autre : une file d'attente est un
-signal pour restaurer la VM de la classe concernée, jamais pour déplacer son label.
+Chaque runner traite **un job GitHub Actions à la fois**. L'autoscale CPU actuel peut ajouter
+ou retirer une VM sans connaître GitHub. Tout scale-in reste interdit jusqu'au remplacement
+par le contrôleur sérialisé décrit dans le runbook moindre privilège.
+
+Baseline 30 jours : **242,06 USD**, 413 jobs, 18,84 runner-heures, CPU moyen 3,78 %,
+file P95 5 108 s et P99 12 628 s. Le CPU faible combiné à une file longue justifie un
+contrôleur `workflow_job` queue-driven, pas un seuil CPU. Son feature flag reste désactivé.
+Le plan réconcilie les noms Azure/GitHub à chaque lecture et ne suppose jamais deux instances
+fixes. La redondance doit être reconstruite et prouvée avant toute activation.
 
 | Situation | État requis | Décision opérateur |
 |---|---|---|
-| Avant une session CI | 2 VMs `running`, un runner `certigo-pr` et un `certigo-trusted` online | Démarrer les deux VMs et attendre la confirmation GitHub. |
-| Pendant une session | 2 runners disponibles ; maximum 2 jobs simultanés | Garder les deux VMs allouées ; investiguer toute file d'attente. |
-| Après la session | Tous les runners `busy: false`, aucun run à traiter | Déallouer les deux VMs. |
-| Panne/maintenance d'une VM | Au moins 1 slot sain, idéalement 2 après réparation | Ne manipuler qu'une VM à la fois et reconstruire avant la prochaine session critique. |
+| Avant une session CI | un runner exclusif `certigo-pr` et un exclusif `certigo-trusted`, `online` | Tant que les labels sont doubles, corriger la configuration avant toute automation. |
+| Pendant une session | zéro scale-in CPU | Ne jamais laisser Azure retirer une instance sur simple faible CPU. |
+| Après la session | tous `busy: false`, zéro run queued/in-progress, deux sondes successives | Prévol seulement; changement sous lease et un pool à la fois. |
+| Panne/maintenance | autre classe préservée | Ne jamais déplacer son label pour contourner la panne. |
 
 Le détail de reconstruction, de santé et de révocation est dans
 [`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md).
+
+Prévisualiser drift et état `idle`/`normal`/`boost`, sans mutation :
+
+```bash
+bash infra/ci-runner/capacity-plan.sh
+```
 
 ---
 
 ## 4. Rallumer la CI (avant une session de travail)
 
-À faire **avant** d'ouvrir/relancer des PR ou de déclencher un build : les 2 VMs doivent être démarrées.
+Le dépôt ne fournit pas de chemin mutable tant que les findings live restent ouverts.
 
 ```bash
-az login
-az account set --subscription b8952c8c-8f72-469d-99cd-ac906da4e2fc
-
-# Démarrer les 2 runners (--no-wait : rend la main immédiatement, démarrage en tâche de fond)
-az vm start --resource-group RG-CERTIGO-CI --name vm-certigo-runner   --no-wait
-az vm start --resource-group RG-CERTIGO-CI --name vm-certigo-runner-2 --no-wait
+export AZURE_SUBSCRIPTION_ID=b8952c8c-8f72-469d-99cd-ac906da4e2fc
+bash infra/ci-runner/lifecycle-preflight.sh start
 ```
 
-> ℹ️ **Le service runner redémarre tout seul au boot.** L'agent GitHub Actions est installé en service
-> (systemd) et démarre automatiquement au boot de la VM — comptez **~1 minute** après le démarrage pour
-> que le runner repasse **online**. Aucune action manuelle sur la VM n'est nécessaire en temps normal.
+Une future automation externe acquiert un lease, démarre un pool, attend Azure `running` puis
+GitHub `online`, et restaure seulement son label exclusif.
 
 **Vérifier que les runners sont bien en ligne côté GitHub :**
 
@@ -118,13 +126,11 @@ Attendre `status: online` **avant** d'approuver un run de PR (sinon les jobs res
 
 ## 5. Éteindre la CI (après usage — pour le coût)
 
-Avant toute déallocation, vérifier dans GitHub que **les deux** runners sont `busy: false` et
-qu'aucun run ne doit démarrer. Dès que la CI n'est plus nécessaire, **déallouer** les 2 VMs
-pour couper la facturation compute.
+Le prévol ci-dessous vérifie les labels, jobs actifs/en file, autoscale et réconciliation
+Azure/GitHub. Il n'effectue aucune déallocation.
 
 ```bash
-az vm deallocate --resource-group RG-CERTIGO-CI --name vm-certigo-runner   --no-wait
-az vm deallocate --resource-group RG-CERTIGO-CI --name vm-certigo-runner-2 --no-wait
+bash infra/ci-runner/lifecycle-preflight.sh deallocate
 ```
 
 > ⚠️ **`deallocate` ≠ `stop` — c'est le point crucial.**
@@ -133,7 +139,8 @@ az vm deallocate --resource-group RG-CERTIGO-CI --name vm-certigo-runner-2 --no-
 > - **`az vm stop`** (ou un `shutdown` depuis l'OS) : éteint l'OS mais **laisse la VM allouée** →
 >   **le compute reste facturé**. ❌ **à éviter.**
 
-**Vérifier que les VMs sont bien déallouées** (cf. §6) avant de considérer la CI éteinte.
+Un résultat bloqué est le comportement attendu tant que les labels doubles, la file ou le
+scale-in CPU existent.
 
 ---
 
@@ -262,5 +269,7 @@ validations PR ne peut donc être restauré sur le pool trusted.
 - Doc GitHub self-hosted runners : <https://docs.github.com/actions/hosting-your-own-runners/managing-self-hosted-runners>.
 - Autres runbooks : [`docs/runbooks/README.md`](./README.md).
 
-> **Paramètres confirmés** : RG `RG-CERTIGO-CI` · VMs `vm-certigo-runner`, `vm-certigo-runner-2` ·
-> subscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (Non-Prod) · rôles `certigo-pr` / `certigo-trusted`.
+> **Paramètres confirmés** : RG `RG-CERTIGO-CI` · VMSS
+> `vmss-certigo-runner-zonal` · subscription
+> `b8952c8c-8f72-469d-99cd-ac906da4e2fc` · labels live doubles
+> `certigo-pr` / `certigo-trusted` à corriger.

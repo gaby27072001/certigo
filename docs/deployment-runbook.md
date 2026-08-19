@@ -170,16 +170,14 @@ et la disponibilité du runner self-hosted online avec le label `certigo-trusted
 
 ### Réconciliation des labels runners
 
-Les deux runners existants (`vm-certigo-runner`) portent les labels
-custom mutuellement exclusif **`certigo-pr`** ou **`certigo-trusted`**, en plus
-des labels système
-(`self-hosted`, `Linux`, `X64`).  
-Le label a été ajouté via l'API GitHub :
-`POST /repos/{owner}/{repo}/actions/runners/{id}/labels`.
+Les workflows attendent des labels custom mutuellement exclusifs **`certigo-pr`** ou
+**`certigo-trusted`**, en plus des labels système (`self-hosted`, `Linux`, `X64`).
+L'inventaire du 19 août 2026 montre cependant deux runners VMSS portant **les deux**
+labels : c'est un finding bloquant avant toute automation de cycle de vie.
 
-Conséquence : les workflows critiques `main` ciblent `certigo-trusted` et les workflows PR
-ciblent `certigo-pr`, ce qui isole la confiance sans éditer les YAML à chaque
-ajustement.
+Les workflows critiques `main` ciblent `certigo-trusted` et les workflows PR ciblent
+`certigo-pr`; l'isolation n'est effective qu'après séparation des pools/labels selon
+[`CLOUD_LEAST_PRIVILEGE.md`](./runbooks/CLOUD_LEAST_PRIVILEGE.md).
 
 ### Sélection immuable des runners
 
@@ -227,33 +225,38 @@ az account show -o table
 
 **Acteur : admin Azure AD + admin du repo GitHub.**
 
-> ✅ **Déjà réalisé dans ce tenant (session Phase 0).** L'identité OIDC existe déjà :
+> ✅ **État historique inventorié en lecture seule.** L'identité OIDC existe :
 > app registration **`microlingo-github-actions`** (`appId 4bfc43dc-6a25-404e-a6ab-d19784ab0673`,
 > SP objectId `15d2b34a-c0a0-4b5d-8360-b895a8164706`). La configuration
-> `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` est déjà
-> opérationnelle aux scopes GitHub existants, et
-> les 3 federated credentials `github-env-dev` / `github-env-staging` / `github-env-prod`
-> (sujet `repo:…:environment:<env>`) ont été **ajoutées cette session**. Les valeurs
-> `AZURE_*` sont déjà consommées par les déploiements ; leur scope ne doit pas être
-> recréé ou déplacé sans audit. Les commandes ci-dessous
-> sont la **recette de référence/reproduction** (par ex. pour un nouveau tenant) — ne pas
-> recréer une seconde app `microlingo-github-oidc` sous peine de doublon. Pour réutiliser
-> l'existant, faire `APP_ID=4bfc43dc-6a25-404e-a6ab-d19784ab0673`.
+> `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` fonctionne encore,
+> mais ce principal porte historiquement `Contributor` + `User Access Administrator`
+> au scope abonnement. Il possède aussi les rôles Blob minimaux aux scopes exacts.
+> Les cinq federated credentials couvrent `main`, un sujet `workflow_dispatch`, puis
+> `dev`, `staging` et `prod`.
+>
+> Cet état est conservé uniquement pour rollback pendant la migration. La cible, les preuves
+> requises et l'ordre de retrait sont dans
+> [`docs/runbooks/CLOUD_LEAST_PRIVILEGE.md`](./runbooks/CLOUD_LEAST_PRIVILEGE.md).
 
-### Pourquoi Owner (et pas Contributor) ?
+### Pourquoi ni Owner, ni UAA abonnement pour la CI ?
 
-`infra/modules/functionApp.bicep` crée **4 attributions de rôle** (Storage Blob Data Owner,
-Storage Queue Data Contributor, Key Vault Secrets User, Cosmos SQL Data Contributor). Créer des
-role assignments requiert la permission `Microsoft.Authorization/roleAssignments/write`, incluse
-dans **Owner** (mais **pas** dans Contributor). L'identité de déploiement doit donc être **Owner**
-au scope souscription, sinon `deploy-infra` échoue.
+Les attributions runtime exigent `Microsoft.Authorization/roleAssignments/write`, mais cela
+ne justifie pas un rôle administrateur global. `infra/governance/main.bicep` sépare :
+
+- le lancement de deployment au scope abonnement, sans droit métier ;
+- `Contributor` au seul RG de l'environnement ;
+- un writer RBAC sans `delete`, conditionné aux rôles runtime allow-listés et aux
+  service principals ;
+- un rôle réseau limité au DNS privé et aux peerings dans `rg-certigo-ci`.
+
+Les contrôles MCSB/Defender et toute administration d'attributions restent humains via PIM.
 
 ### Sujets OIDC
 
-Comme les jobs portent désormais `environment: <env>`, le **sujet** du token OIDC émis par GitHub
-devient `repo:<org>/<repo>:environment:<env>`. On crée donc **une federated credential par
-environnement** (dev/staging/prod). Une FC supplémentaire pour `push` sur `main` est optionnelle
-(le push déclenche l'environnement `dev`, déjà couvert par la FC `dev`).
+Comme les jobs portent `environment: <env>`, le **sujet** du token OIDC émis par GitHub
+devient `repo:<org>/<repo>:environment:<env>`. La cible utilise **une UAMI et une seule
+federated credential par environnement**. Aucun sujet `main`, `workflow_dispatch` ou PR
+supplémentaire n'est nécessaire : la branch policy de l'Environment borne déjà `main`.
 
 ### Secret de signature JWT par environnement
 
@@ -328,44 +331,16 @@ locale, crée une base d’émulation unique et détruit le conteneur en `finall
 Il ne se connecte pas à Azure et ne modifie ni RBAC ni infrastructure. Un test
 skippé ou non démarré ne permet jamais d’activer la feature.
 
-### Commandes
+### Prévol read-only
 
 ```bash
-# 1) App registration + service principal
-APP_ID=$(az ad app create --display-name "$APP_NAME" --query appId -o tsv)
-az ad sp create --id "$APP_ID"
-
-# 2) Federated credentials — une par environnement
-for ENVNAME in dev staging prod; do
-  az ad app federated-credential create --id "$APP_ID" --parameters "{
-    \"name\": \"github-env-$ENVNAME\",
-    \"issuer\": \"https://token.actions.githubusercontent.com\",
-    \"subject\": \"repo:$GH_ORG/$GH_REPO:environment:$ENVNAME\",
-    \"audiences\": [\"api://AzureADTokenExchange\"]
-  }"
-done
-
-# (Optionnel) FC pour les push directs sur main sans environnement explicite.
-# Inutile si les push passent par l'environnement dev (cas par défaut).
-# az ad app federated-credential create --id "$APP_ID" --parameters "{
-#   \"name\": \"github-branch-main\",
-#   \"issuer\": \"https://token.actions.githubusercontent.com\",
-#   \"subject\": \"repo:$GH_ORG/$GH_REPO:ref:refs/heads/main\",
-#   \"audiences\": [\"api://AzureADTokenExchange\"]
-# }"
-
-# 3) Rôle Owner au scope souscription
-az role assignment create --assignee "$APP_ID" --role "Owner" \
-  --scope "/subscriptions/$SUBSCRIPTION_ID"
-
-# 4) Exemple pour un nouveau dépôt uniquement — ne pas exécuter sur Certigo sans audit
-gh secret set AZURE_CLIENT_ID       --repo "$GH_ORG/$GH_REPO" --body "$APP_ID"
-gh secret set AZURE_TENANT_ID       --repo "$GH_ORG/$GH_REPO" --body "$TENANT_ID"
-gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPTION_ID"
+export AZURE_SUBSCRIPTION_ID="<SUBSCRIPTION_ID>"
+bash infra/governance/inventory.sh > inventory.json
+bash infra/governance/what-if.sh
 ```
 
-> 💡 Si la politique de l'org restreint la création d'app registrations, faire exécuter ces
-> commandes par un administrateur du tenant `fdpo.onmicrosoft.com`.
+Toute création d'identité/rôle/policy et toute modification de GitHub Environment sont des
+actions humaines PIM hors de cette PR.
 
 ---
 

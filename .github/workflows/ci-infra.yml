@@ -90,3 +90,5 @@ jobs:
         run: node --test .github/scripts/write-secure-bicep-parameters.test.mjs
       - name: Validate private URL-based OneDeploy
         run: node --test .github/scripts/deploy-flex-onedeploy.test.mjs
+      - name: Validate least-privilege cloud guardrails
+        run: node --test infra/tests/least-privilege.test.mjs

@@ -1,0 +1,30 @@
+{
+  "enabled": false,
+  "trigger": "workflow_job",
+  "maxAggregateCapacity": 4,
+  "scaleStep": 1,
+  "minimumExclusivePools": 2,
+  "boostQueueDepth": 2,
+  "boostOldestQueuedSeconds": 300,
+  "leaseRequired": true,
+  "modes": {
+    "idle": {
+      "aggregateCapacity": 0
+    },
+    "normal": {
+      "aggregateCapacity": 2
+    },
+    "boost": {
+      "aggregateCapacity": 4
+    }
+  },
+  "observedBaseline30Days": {
+    "capturedOn": "2026-08-19",
+    "costUsd": 242.06,
+    "jobs": 413,
+    "queueP95Seconds": 5108,
+    "queueP99Seconds": 12628,
+    "runnerHours": 18.84,
+    "averageCpuPercent": 3.78
+  }
+}

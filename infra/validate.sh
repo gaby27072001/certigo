@@ -11,6 +11,14 @@ command -v "${bicep_bin}" >/dev/null 2>&1 || {
   exit 1
 }
 
+for script in \
+  "${root}/infra/governance/inventory.sh" \
+  "${root}/infra/governance/what-if.sh"; do
+  bash -n "${script}"
+done
+node --check "${root}/infra/governance/render-inventory.mjs"
+node --check "${root}/infra/governance/validate-what-if.mjs"
+
 index=0
 while IFS= read -r -d '' template; do
   index=$((index + 1))
@@ -28,12 +36,17 @@ for environment in dev staging prod; do
   grep -F 'param vnetAddressPrefix =' "${params}" >/dev/null
   grep -F 'param functionIntegrationSubnetPrefix =' "${params}" >/dev/null
   grep -F 'param privateEndpointSubnetPrefix =' "${params}" >/dev/null
-  grep -F "param ciDeploymentPrincipalId = '15d2b34a-c0a0-4b5d-8360-b895a8164706'" \
-    "${params}" >/dev/null
+  grep -Eq "^param ciDeploymentPrincipalId = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'$" \
+    "${params}"
   grep -F 'param cosmosBackupMode =' "${params}" >/dev/null
   grep -F 'param deployMcsbPolicyAssignment =' "${params}" >/dev/null
   grep -F 'param manageDefenderPlans =' "${params}" >/dev/null
 done
+
+grep -F 'param manageMcsbPolicyAssignment = false' \
+  "${root}/infra/params/least-privilege.bicepparam" >/dev/null
+grep -F "param privilegedAssignmentPolicyEffect = 'Audit'" \
+  "${root}/infra/params/least-privilege.bicepparam" >/dev/null
 
 grep -F "param authJwtSigningKeyExpiresOn = '2027-08-31T00:00:00Z'" \
   "${root}/infra/params/dev.bicepparam" >/dev/null
