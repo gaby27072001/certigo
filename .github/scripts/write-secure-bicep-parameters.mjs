@@ -59,19 +59,23 @@ function validateGuid(value, name) {
 }
 
 function validateAccountDeletionIdentityConfiguration({
+  enabled,
   environment,
   entraGraphTenantId,
   entraGraphClientId,
   entraGraphClientSecret,
+  entraGraphClientSecretExpiresOn,
   entraReauthAudience,
+  now,
 }) {
   const values = [
     entraGraphTenantId,
     entraGraphClientId,
     entraGraphClientSecret,
+    entraGraphClientSecretExpiresOn,
     entraReauthAudience,
   ].map((value) => (typeof value === 'string' ? value : ''));
-  if (environment === 'dev') {
+  if (!enabled || environment === 'dev') {
     return null;
   }
   if (values.some((value) => value !== value.trim())) {
@@ -81,18 +85,29 @@ function validateAccountDeletionIdentityConfiguration({
   if (configured !== values.length) {
     throw new Error(
       'ENTRA_GRAPH_TENANT_ID, ENTRA_GRAPH_CLIENT_ID, '
-      + 'ENTRA_GRAPH_CLIENT_SECRET and ENTRA_REAUTH_AUDIENCE '
+      + 'ENTRA_GRAPH_CLIENT_SECRET, ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON '
+      + 'and ENTRA_REAUTH_AUDIENCE '
       + 'are required for staging and production.',
     );
   }
   validateGuid(values[0], 'ENTRA_GRAPH_TENANT_ID');
   validateGuid(values[1], 'ENTRA_GRAPH_CLIENT_ID');
-  validateGuid(values[3], 'ENTRA_REAUTH_AUDIENCE');
+  if (
+    !absoluteUtcTimestamp.test(values[3])
+    || !Number.isFinite(Date.parse(values[3]))
+    || Date.parse(values[3]) <= now.getTime()
+  ) {
+    throw new Error(
+      'ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON must be a future absolute UTC timestamp.',
+    );
+  }
+  validateGuid(values[4], 'ENTRA_REAUTH_AUDIENCE');
   return {
     entraGraphTenantId: values[0],
     entraGraphClientId: values[1],
     entraGraphClientSecret: values[2],
-    entraReauthAudience: values[3],
+    entraGraphClientSecretExpiresOn: values[3],
+    entraReauthAudience: values[4],
   };
 }
 
@@ -106,6 +121,7 @@ export function writeSecureParameters({
   entraGraphTenantId,
   entraGraphClientId,
   entraGraphClientSecret,
+  entraGraphClientSecretExpiresOn,
   entraReauthAudience,
   inputFile,
   outputFile,
@@ -117,14 +133,27 @@ export function writeSecureParameters({
   if (!inputFile || !outputFile) {
     throw new Error('Input and output deployment parameter file paths are required.');
   }
+  const compiled = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
+  if (
+    typeof compiled !== 'object'
+    || compiled === null
+    || typeof compiled.parameters !== 'object'
+    || compiled.parameters === null
+    || Array.isArray(compiled.parameters)
+  ) {
+    throw new Error('The compiled Bicep parameter document is invalid.');
+  }
   const validatedAlertEmail = validateAlertEmail(alertEmail, environment);
   const accountDeletionIdentityConfiguration =
     validateAccountDeletionIdentityConfiguration({
+      enabled: compiled.parameters.accountDeletionEnabled?.value === true,
       environment,
       entraGraphTenantId,
       entraGraphClientId,
       entraGraphClientSecret,
+      entraGraphClientSecretExpiresOn,
       entraReauthAudience,
+      now,
     });
 
   const hasActiveKey = requirePair(
@@ -146,17 +175,6 @@ export function writeSecureParameters({
   );
   if (hasActiveKey && hasPreviousKey && jwtSigningKey === jwtPreviousSigningKey) {
     throw new Error('The active and previous JWT signing keys must differ.');
-  }
-
-  const compiled = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
-  if (
-    typeof compiled !== 'object'
-    || compiled === null
-    || typeof compiled.parameters !== 'object'
-    || compiled.parameters === null
-    || Array.isArray(compiled.parameters)
-  ) {
-    throw new Error('The compiled Bicep parameter document is invalid.');
   }
 
   const activeExpiration = hasActiveKey
@@ -203,6 +221,9 @@ export function writeSecureParameters({
     compiled.parameters.entraGraphClientSecret = {
       value: accountDeletionIdentityConfiguration.entraGraphClientSecret,
     };
+    compiled.parameters.entraGraphClientSecretExpiresOn = {
+      value: accountDeletionIdentityConfiguration.entraGraphClientSecretExpiresOn,
+    };
     compiled.parameters.entraReauthAudience = {
       value: accountDeletionIdentityConfiguration.entraReauthAudience,
     };
@@ -229,6 +250,8 @@ function main() {
       entraGraphTenantId: process.env.ENTRA_GRAPH_TENANT_ID,
       entraGraphClientId: process.env.ENTRA_GRAPH_CLIENT_ID,
       entraGraphClientSecret: process.env.ENTRA_GRAPH_CLIENT_SECRET,
+      entraGraphClientSecretExpiresOn:
+        process.env.ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON,
       entraReauthAudience: process.env.ENTRA_REAUTH_AUDIENCE,
       inputFile: process.env.BASE_PARAMETERS_FILE,
       outputFile: process.env.AUTH_PARAMETERS_FILE,

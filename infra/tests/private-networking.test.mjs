@@ -503,11 +503,16 @@ test('Graph client secret module stores the value only in Key Vault and returns 
   const [secret] = resourcesOfType(template, 'Microsoft.KeyVault/vaults/secrets');
 
   assert.equal(template.parameters.graphClientSecret.type, 'securestring');
+  assert.equal(template.parameters.graphClientSecretExpiresOn.type, 'securestring');
   assert.equal(
     secret.name,
     "[format('{0}/{1}', parameters('keyVaultName'), 'ENTRA-GRAPH-CLIENT-SECRET')]",
   );
   assert.equal(secret.properties.value, "[parameters('graphClientSecret')]");
+  assert.equal(
+    secret.properties.attributes.exp,
+    "[dateTimeToEpoch(parameters('graphClientSecretExpiresOn'))]",
+  );
   assert.match(template.outputs.secretUri.value, /secretUriWithVersion/);
   assert.doesNotMatch(JSON.stringify(template), /ENTRA_GRAPH_CLIENT_SECRET":/);
 });

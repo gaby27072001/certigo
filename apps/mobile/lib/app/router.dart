@@ -82,25 +82,26 @@ CustomTransitionPage<void> _stepPage({
     child: child,
     transitionDuration: PrismMotion.base,
     reverseTransitionDuration: PrismMotion.fast,
-    transitionsBuilder: (
-      BuildContext context,
-      Animation<double> animation,
-      Animation<double> secondaryAnimation,
-      Widget child,
-    ) {
-      final CurvedAnimation curved = CurvedAnimation(
-        parent: animation,
-        curve: PrismMotion.decelerate,
-        reverseCurve: PrismMotion.standard,
-      );
-      return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
-          child: child,
-        ),
-      );
-    },
+    transitionsBuilder:
+        (
+          BuildContext context,
+          Animation<double> animation,
+          Animation<double> secondaryAnimation,
+          Widget child,
+        ) {
+          final CurvedAnimation curved = CurvedAnimation(
+            parent: animation,
+            curve: PrismMotion.decelerate,
+            reverseCurve: PrismMotion.standard,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
+              child: child,
+            ),
+          );
+        },
   );
 }
 
@@ -144,8 +145,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
     initialLocation: Routes.splash,
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
-      if (!AppEnv.accountDeletionEnabled
-          && state.matchedLocation == Routes.accountDeletion) {
+      if (!AppEnv.accountDeletionEnabled && state.matchedLocation == Routes.accountDeletion) {
         return Routes.profile;
       }
       final AuthState auth = ref.read(authControllerProvider);

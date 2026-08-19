@@ -369,6 +369,7 @@ jobs:
           ENTRA_GRAPH_TENANT_ID: ${{ vars.ENTRA_GRAPH_TENANT_ID }}
           ENTRA_GRAPH_CLIENT_ID: ${{ vars.ENTRA_GRAPH_CLIENT_ID }}
           ENTRA_GRAPH_CLIENT_SECRET: ${{ secrets.ENTRA_GRAPH_CLIENT_SECRET }}
+          ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON: ${{ vars.ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON }}
           ENTRA_REAUTH_AUDIENCE: ${{ vars.ENTRA_REAUTH_AUDIENCE }}
           BASE_PARAMETERS_FILE: ${{ runner.temp }}/certigo-base-parameters.json
           AUTH_PARAMETERS_FILE: ${{ runner.temp }}/certigo-auth-parameters.json

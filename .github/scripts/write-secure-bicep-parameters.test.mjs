@@ -12,6 +12,7 @@ const accountDeletionIdentityConfiguration = {
   entraGraphTenantId: '11111111-1111-1111-1111-111111111111',
   entraGraphClientId: '22222222-2222-2222-2222-222222222222',
   entraGraphClientSecret: 'test-graph-client-secret',
+  entraGraphClientSecretExpiresOn: expiration,
   entraReauthAudience: '44444444-4444-4444-4444-444444444444',
 };
 
@@ -20,7 +21,7 @@ function outputPath() {
   return path.join(directory, 'parameters.json');
 }
 
-function compiledParameters() {
+function compiledParameters(accountDeletionEnabled = true) {
   const file = outputPath();
   fs.writeFileSync(
     file,
@@ -30,6 +31,7 @@ function compiledParameters() {
       contentVersion: '1.0.0.0',
       parameters: {
         env: { value: 'dev' },
+        accountDeletionEnabled: { value: accountDeletionEnabled },
         authJwtSigningKeyExpiresOn: { value: '2027-08-31T00:00:00Z' },
       },
     }),
@@ -49,6 +51,7 @@ function write(overrides = {}) {
     entraGraphTenantId: '',
     entraGraphClientId: '',
     entraGraphClientSecret: '',
+    entraGraphClientSecretExpiresOn: '',
     entraReauthAudience: '',
     inputFile: compiledParameters(),
     outputFile,
@@ -113,6 +116,10 @@ test('injects active and previous rotation pairs into a private parameter docume
     { value: accountDeletionIdentityConfiguration.entraReauthAudience },
   );
   assert.deepEqual(
+    parameters.entraGraphClientSecretExpiresOn,
+    { value: expiration },
+  );
+  assert.deepEqual(
     parameters.authJwtPreviousSigningKey,
     { value: 'old-test-secret' },
   );
@@ -164,6 +171,24 @@ test('requires complete account deletion identity configuration outside dev', ()
     }),
     /required for staging and production/,
   );
+});
+
+test('feature-off deployment ignores Graph credentials and emits no Graph parameters', () => {
+  const inputFile = compiledParameters(false);
+  const { outputFile } = write({
+    environment: 'prod',
+    alertEmail: 'alerts@example.invalid',
+    jwtSigningKey: 'new-test-secret',
+    jwtSigningKeyExpiresOn: expiration,
+    inputFile,
+  });
+  const parameters = JSON.parse(fs.readFileSync(outputFile, 'utf8')).parameters;
+
+  assert.equal(parameters.entraGraphTenantId, undefined);
+  assert.equal(parameters.entraGraphClientId, undefined);
+  assert.equal(parameters.entraGraphClientSecret, undefined);
+  assert.equal(parameters.entraGraphClientSecretExpiresOn, undefined);
+  assert.equal(parameters.entraReauthAudience, undefined);
 });
 
 test('requires canonical Entra identifiers', () => {
@@ -261,6 +286,7 @@ test('refuses to overwrite an existing parameter file', () => {
       entraGraphTenantId: '',
       entraGraphClientId: '',
       entraGraphClientSecret: '',
+      entraGraphClientSecretExpiresOn: '',
       entraReauthAudience: '',
       inputFile: compiledParameters(),
       outputFile,
@@ -285,6 +311,7 @@ test('rejects a malformed compiled parameter document', () => {
       entraGraphTenantId: '',
       entraGraphClientId: '',
       entraGraphClientSecret: '',
+      entraGraphClientSecretExpiresOn: '',
       entraReauthAudience: '',
       inputFile,
       outputFile: outputPath(),

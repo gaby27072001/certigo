@@ -97,6 +97,9 @@ ne pourra être activé dans l’IaC qu’après succès explicite du test d’i
 Cosmos de suppression ; un test skippé ou non exécuté ne satisfait pas ce gate.
 Tant que le flag reste faux, Bicep ne crée pas le secret Graph dans Key Vault et
 n’émet aucun des quatre app settings Graph/ré-authentification de suppression.
+La PR d’activation devra aussi fournir
+`ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON` comme timestamp UTC futur ; cette
+expiration est appliquée au secret Key Vault et contrôlée par Checkov.
 
 ### Gate d’intégration Cosmos
 

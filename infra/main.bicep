@@ -39,6 +39,9 @@ param entraGraphClientId string = ''
 @description('Microsoft Graph confidential-client secret. Supplied only as a secure deployment parameter; Bicep stores it in the environment Key Vault and passes only its versioned URI to the Function App.')
 @secure()
 param entraGraphClientSecret string = ''
+@description('Absolute ISO 8601 expiration of the Microsoft Graph confidential-client secret.')
+@secure()
+param entraGraphClientSecretExpiresOn string = ''
 @description('Enables the account-deletion API only after the Cosmos integration gate has passed. Defaults fail-closed.')
 param accountDeletionEnabled bool = false
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
@@ -234,6 +237,11 @@ var effectiveEntraGraphClientSecret = requireAccountDeletionGraph
     ? fail('entraGraphClientSecret must be supplied securely for staging and production deployments.')
     : entraGraphClientSecret)
   : ''
+var effectiveEntraGraphClientSecretExpiresOn = requireAccountDeletionGraph
+  ? (empty(entraGraphClientSecretExpiresOn)
+    ? fail('entraGraphClientSecretExpiresOn must be supplied for account deletion.')
+    : entraGraphClientSecretExpiresOn)
+  : ''
 var useEntraGraphClientSecret = !empty(effectiveEntraGraphClientSecret)
 // The deterministic fallback is intentionally restricted to dev. fail() stops
 // staging/prod deployment evaluation with a clear error before any derivable key
@@ -426,6 +434,7 @@ module graphClientSecret 'modules/keyvaultGraphClientSecret.bicep' = if (useEntr
   params: {
     keyVaultName: vault.outputs.name
     graphClientSecret: effectiveEntraGraphClientSecret
+    graphClientSecretExpiresOn: effectiveEntraGraphClientSecretExpiresOn
   }
 }
 

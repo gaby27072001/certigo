@@ -106,6 +106,12 @@ if grep -F 'ENTRA_GRAPH_CLIENT_SECRET:' \
   echo "The raw Graph client secret must never be emitted as a Function App setting." >&2
   exit 1
 fi
+grep -F "name: 'ENTRA-GRAPH-CLIENT-SECRET'" \
+  "${root}/infra/modules/keyvaultGraphClientSecret.bicep" >/dev/null
+grep -F 'exp: dateTimeToEpoch(graphClientSecretExpiresOn)' \
+  "${root}/infra/modules/keyvaultGraphClientSecret.bicep" >/dev/null
+grep -F 'secretUriWithVersion' \
+  "${root}/infra/modules/keyvaultGraphClientSecret.bicep" >/dev/null
 grep -F "type: 'UserAssignedIdentity'" "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F 'userAssignedIdentityResourceId:' "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F "b7e6dc6d-f1e8-4753-8033-0f276bb0955b" "${root}/infra/modules/functionApp.bicep" >/dev/null
