@@ -52,12 +52,18 @@ void main() {
     expect(gradle, contains('appLinksHost: appLinksHost'));
     expect(gradle, contains('appLinksPathPrefix: appLinksPathPrefix'));
     expect(manifest, contains('android:autoVerify="true"'));
+    expect(manifest, contains('android:scheme="https"'));
+    expect(
+      manifest,
+      isNot(contains('android:scheme="certigo"')),
+      reason: 'MainActivity ne doit pas concurrencer RedirectUriReceiverActivity pour OAuth.',
+    );
     expect(manifest, contains(r'android:host="${appLinksHost}"'));
     for (final String path in <String>[
       '/learn/',
       '/assignments/',
       '/achievements/',
-      '/account-deletion/',
+      '/account-deletion',
     ]) {
       expect(manifest, contains(path), reason: 'Route App Link absente: $path');
     }
@@ -81,6 +87,7 @@ void main() {
   test('ENTRA_REDIRECT_URI utilise le schéma natif', () {
     final Uri redirect = Uri.parse(AppEnv.entraRedirectUri);
     expect(redirect.scheme, AppEnv.redirectScheme);
+    expect(redirect.toString(), startsWith('certigo://auth'));
   });
 
   test('la validation de config n\'émet aucune erreur de redirection par défaut', () {

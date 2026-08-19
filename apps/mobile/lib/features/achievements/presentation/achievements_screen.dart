@@ -12,7 +12,9 @@ import '../../../shared/widgets/screen_header.dart';
 /// we show honest, motivating progress toward each threshold rather than a bare
 /// lock. Presented above the shell, so it carries its own back affordance.
 class AchievementsScreen extends ConsumerWidget {
-  const AchievementsScreen({super.key});
+  const AchievementsScreen({super.key, this.highlightedAchievementId});
+
+  final String? highlightedAchievementId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -26,7 +28,10 @@ class AchievementsScreen extends ConsumerWidget {
             const ScreenHeader(title: 'Succès'),
             Expanded(
               child: async.when(
-                data: (AchievementBoard board) => _AchievementsContent(board: board),
+                data: (AchievementBoard board) => _AchievementsContent(
+                  board: board,
+                  highlightedAchievementId: highlightedAchievementId,
+                ),
                 loading: () => const _AchievementsLoading(),
                 error: (Object error, StackTrace _) =>
                     PrismStatusView.error(onRetry: () => ref.invalidate(achievementBoardProvider)),
@@ -40,9 +45,10 @@ class AchievementsScreen extends ConsumerWidget {
 }
 
 class _AchievementsContent extends StatelessWidget {
-  const _AchievementsContent({required this.board});
+  const _AchievementsContent({required this.board, this.highlightedAchievementId});
 
   final AchievementBoard board;
+  final String? highlightedAchievementId;
 
   @override
   Widget build(BuildContext context) {
@@ -88,19 +94,32 @@ class _AchievementsContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        for (final Achievement a in board.achievements) ...<Widget>[
-          _AchievementCard(achievement: a),
+        for (final Achievement a in _orderedAchievements()) ...<Widget>[
+          _AchievementCard(achievement: a, highlighted: a.id == highlightedAchievementId),
           const SizedBox(height: 12),
         ],
       ],
     );
   }
+
+  List<Achievement> _orderedAchievements() {
+    final String? highlightedId = highlightedAchievementId;
+    if (highlightedId == null) return board.achievements;
+    final List<Achievement> ordered = List<Achievement>.of(board.achievements);
+    ordered.sort((Achievement left, Achievement right) {
+      if (left.id == highlightedId) return -1;
+      if (right.id == highlightedId) return 1;
+      return 0;
+    });
+    return ordered;
+  }
 }
 
 class _AchievementCard extends StatelessWidget {
-  const _AchievementCard({required this.achievement});
+  const _AchievementCard({required this.achievement, required this.highlighted});
 
   final Achievement achievement;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -113,9 +132,9 @@ class _AchievementCard extends StatelessWidget {
         : (unlocked ? 1.0 : 0.0);
 
     return PrismCard(
-      variant: unlocked ? PrismCardVariant.tonal : PrismCardVariant.surface,
-      accent: unlocked ? tierColor : null,
-      elevation: unlocked ? 2 : 0,
+      variant: unlocked || highlighted ? PrismCardVariant.tonal : PrismCardVariant.surface,
+      accent: highlighted ? p.primary : (unlocked ? tierColor : null),
+      elevation: unlocked || highlighted ? 2 : 0,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

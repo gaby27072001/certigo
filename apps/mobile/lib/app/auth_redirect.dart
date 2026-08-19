@@ -15,6 +15,7 @@ abstract class AuthShellRoutes {
   static const String landing = '/landing'; // écran d'ouverture façon Luma (hero + sheet)
   static const String auth = '/auth'; // écran de connexion e-mail (ouvert depuis la sheet)
   static const String home = '/home'; // accueil (dans le shell)
+  static const String accountDeletion = '/account-deletion'; // informations publiques
   static const String onboardingSplash = '/onboarding/splash'; // ≠ [splash] (cf. #154)
 
   /// Ensemble des routes du flux de démarrage (hors shell), doit rester
@@ -43,6 +44,8 @@ abstract class AuthShellRoutes {
   /// Vrai pour toute route du flux d'inscription progressif (préfixe
   /// `/register`). Distinct du préfixe `/onboarding`.
   static bool isRegisterFlow(String location) => location.startsWith('/register');
+
+  static bool isPublic(String location) => location == accountDeletion;
 }
 
 /// Décision de redirection d'authentification, **pure et testable**.
@@ -70,8 +73,11 @@ String? resolveAuthRedirect({
   final bool atAuthSplash = location == AuthShellRoutes.splash;
   final bool atLanding = location == AuthShellRoutes.landing;
   final bool atAuth = location == AuthShellRoutes.auth;
+  final bool atPublic = AuthShellRoutes.isPublic(location);
   final bool atOnboarding = AuthShellRoutes.isStartup(location);
   final bool atRegister = AuthShellRoutes.isRegisterFlow(location);
+
+  if (atPublic) return null;
 
   // Restauration de session : rester sur le splash d'auth. Exception : les
   // écrans d'inscription affichent leur propre chargement inline (CTA en

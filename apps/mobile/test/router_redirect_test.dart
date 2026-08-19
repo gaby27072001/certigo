@@ -81,6 +81,17 @@ void main() {
         AuthShellRoutes.landing,
       );
     });
+
+    test('la page de suppression de compte reste publique', () {
+      expect(
+        resolveAuthRedirect(
+          auth: const Unauthenticated(),
+          location: AuthShellRoutes.accountDeletion,
+          onboardingCompleted: false,
+        ),
+        isNull,
+      );
+    });
   });
 
   group('resolveAuthRedirect — authentifié (#154 non-régression)', () {
@@ -248,6 +259,25 @@ void main() {
     test('les deux splash sont des routes distinctes', () {
       expect(AuthShellRoutes.splash, isNot(AuthShellRoutes.onboardingSplash));
       expect(AuthShellRoutes.isStartup(AuthShellRoutes.splash), isFalse);
+    });
+
+    test('la restauration de session ne masque pas la page publique', () {
+      expect(
+        resolveAuthRedirect(
+          auth: const AuthLoading(),
+          location: AuthShellRoutes.accountDeletion,
+          onboardingCompleted: false,
+        ),
+        isNull,
+      );
+      expect(
+        resolveAuthRedirect(
+          auth: const Authenticated(validSession),
+          location: AuthShellRoutes.accountDeletion,
+          onboardingCompleted: false,
+        ),
+        isNull,
+      );
     });
 
     test('un utilisateur authentifié ne cible jamais une surface d\'auth', () {

@@ -71,7 +71,7 @@ class GenerateLinkAssociationsTests(unittest.TestCase):
                 "/Certigo/learn/*/*",
                 "/Certigo/assignments/*",
                 "/Certigo/achievements/*",
-                "/Certigo/account-deletion/",
+                "/Certigo/account-deletion",
             ],
         )
 

@@ -28,6 +28,8 @@ import '../features/auth/presentation/register_email_screen.dart';
 import '../features/auth/presentation/register_password_screen.dart';
 import '../features/auth/presentation/register_profile_created_screen.dart';
 import '../features/auth/presentation/splash_screen.dart' as auth;
+import '../features/deep_links/presentation/account_deletion_screen.dart';
+import '../features/deep_links/presentation/assignment_link_screen.dart';
 import '../features/onboarding/application/onboarding_controller.dart';
 import '../features/onboarding/presentation/certification_screen.dart';
 import '../features/onboarding/presentation/onboarding_common.dart';
@@ -35,6 +37,7 @@ import '../features/onboarding/presentation/splash_screen.dart' as onboarding;
 import '../features/onboarding/presentation/welcome_screen.dart';
 import 'app_shell.dart';
 import 'auth_redirect.dart';
+import 'deep_link_redirect.dart';
 import 'providers.dart';
 
 /// Centralized, named route table. Using constants avoids stringly-typed
@@ -57,6 +60,8 @@ abstract class Routes {
 
   /// "Explore" destinations presented above the shell (no bottom nav).
   static const String achievements = '/achievements';
+  static const String assignments = '/assignments';
+  static const String accountDeletion = '/account-deletion';
   static const String seasons = '/seasons';
   static const String quests = '/quests';
   static const String shop = '/shop';
@@ -78,25 +83,26 @@ CustomTransitionPage<void> _stepPage({
     child: child,
     transitionDuration: PrismMotion.base,
     reverseTransitionDuration: PrismMotion.fast,
-    transitionsBuilder: (
-      BuildContext context,
-      Animation<double> animation,
-      Animation<double> secondaryAnimation,
-      Widget child,
-    ) {
-      final CurvedAnimation curved = CurvedAnimation(
-        parent: animation,
-        curve: PrismMotion.decelerate,
-        reverseCurve: PrismMotion.standard,
-      );
-      return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
-          child: child,
-        ),
-      );
-    },
+    transitionsBuilder:
+        (
+          BuildContext context,
+          Animation<double> animation,
+          Animation<double> secondaryAnimation,
+          Widget child,
+        ) {
+          final CurvedAnimation curved = CurvedAnimation(
+            parent: animation,
+            curve: PrismMotion.decelerate,
+            reverseCurve: PrismMotion.standard,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
+              child: child,
+            ),
+          );
+        },
   );
 }
 
@@ -110,6 +116,10 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   assert(Routes.landing == AuthShellRoutes.landing, 'Routes.landing désynchronisé');
   assert(Routes.auth == AuthShellRoutes.auth, 'Routes.auth désynchronisé');
   assert(Routes.home == AuthShellRoutes.home, 'Routes.home désynchronisé');
+  assert(
+    Routes.accountDeletion == AuthShellRoutes.accountDeletion,
+    'Routes.accountDeletion désynchronisé',
+  );
   assert(
     OnboardingRoutes.splash == AuthShellRoutes.onboardingSplash,
     'OnboardingRoutes.splash désynchronisé du garde d\'auth',
@@ -130,6 +140,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   ref.onDispose(authRefresh.dispose);
 
   final Listenable refresh = Listenable.merge(<Listenable>[authRefresh, onboardingCtrl]);
+  final DeepLinkRouterCoordinator deepLinks = DeepLinkRouterCoordinator();
 
   return GoRouter(
     navigatorKey: _rootKey,
@@ -137,13 +148,18 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
       final AuthState auth = ref.read(authControllerProvider);
-      return resolveAuthRedirect(
+      return deepLinks.redirect(
+        uri: state.uri,
         auth: auth,
         location: state.matchedLocation,
         onboardingCompleted: onboardingCtrl.completed,
       );
     },
     routes: <RouteBase>[
+      // Defensive sink if iOS also forwards the AppAuth custom-scheme callback
+      // to Flutter. The HTTPS coordinator ignores it and the auth guard decides
+      // the safe surface while flutter_appauth completes the native exchange.
+      GoRoute(path: '/', parentNavigatorKey: _rootKey, builder: (_, __) => const SizedBox.shrink()),
       // Auth flows, above the shell (no bottom nav).
       GoRoute(
         path: Routes.splash,
@@ -167,6 +183,12 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           // alors les boutons sociaux (déjà proposés par la sheet).
           emailOnly: state.uri.queryParameters['emailOnly'] == '1',
         ),
+      ),
+      GoRoute(
+        path: Routes.accountDeletion,
+        name: 'account-deletion',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const AccountDeletionScreen(),
       ),
 
       // Real account creation: name → email → password → confirmation.
@@ -311,6 +333,23 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         ),
       ),
       GoRoute(
+        path: '/learn/:trackId/:lessonId',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const SizedBox.shrink(),
+      ),
+      GoRoute(
+        path: '${Routes.assignments}/:assignmentId',
+        name: 'assignment',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: AssignmentLinkScreen(
+            assignmentId: Uri.decodeComponent(state.pathParameters['assignmentId']!),
+          ),
+        ),
+      ),
+      GoRoute(
         path: '${Routes.quiz}/:trackId/:lessonId',
         name: 'quiz',
         parentNavigatorKey: _rootKey,
@@ -332,6 +371,38 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           begin: const Offset(0, 0.04),
           child: const AchievementsScreen(),
         ),
+      ),
+      GoRoute(
+        path: '${Routes.achievements}/:achievementId',
+        name: 'achievement',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: AchievementsScreen(
+            highlightedAchievementId: Uri.decodeComponent(state.pathParameters['achievementId']!),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/Certigo/learn/:trackId/:lessonId',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const SizedBox.shrink(),
+      ),
+      GoRoute(
+        path: '/Certigo/assignments/:assignmentId',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const SizedBox.shrink(),
+      ),
+      GoRoute(
+        path: '/Certigo/achievements/:achievementId',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const SizedBox.shrink(),
+      ),
+      GoRoute(
+        path: '/Certigo/account-deletion',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const SizedBox.shrink(),
       ),
       GoRoute(
         path: Routes.seasons,

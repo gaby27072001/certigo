@@ -53,7 +53,7 @@
                 <data
                     android:scheme="https"
                     android:host="${appLinksHost}"
-                    android:path="${appLinksPathPrefix}/account-deletion/" />
+                    android:path="${appLinksPathPrefix}/account-deletion" />
             </intent-filter>
         </activity>
         <!-- flutter_local_notifications receivers -->

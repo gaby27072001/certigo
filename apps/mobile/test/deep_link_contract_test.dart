@@ -39,12 +39,12 @@ void main() {
           .parse('https://certigo.app/achievements/first-lesson')
           .destination!;
       final DeepLinkDestination deletion = enabledPolicy
-          .parse('https://certigo.app/account-deletion/')
+          .parse('https://certigo.app/account-deletion')
           .destination!;
 
       expect(achievement.appLocation, '/achievements/first-lesson');
       expect(achievement.requiresAuthentication, isTrue);
-      expect(deletion.appLocation, '/account-deletion/');
+      expect(deletion.appLocation, '/account-deletion');
       expect(deletion.requiresAuthentication, isFalse);
     });
 
@@ -82,12 +82,42 @@ void main() {
 
     test('keeps account deletion public', () {
       final DeepLinkNavigationDecision decision = enabledPolicy.resolveNavigation(
-        rawUrl: 'https://certigo.app/account-deletion/',
+        rawUrl: 'https://certigo.app/account-deletion',
         isAuthenticated: false,
       );
 
       expect(decision.action, DeepLinkNavigationAction.navigate);
-      expect(decision.location, '/account-deletion/');
+      expect(decision.location, '/account-deletion');
+    });
+  });
+
+  group('Flutter router input', () {
+    test('accepts a relative native route without weakening origin parsing', () {
+      final DeepLinkParseResult result = enabledPolicy.parseRouterUri(
+        Uri.parse('/learn/az-900/shared-responsibility'),
+      );
+
+      expect(result.destination!.appLocation, '/lesson/az-900/shared-responsibility');
+      expect(
+        enabledPolicy.parse('https://evil.example/learn/az-900/shared-responsibility').rejection,
+        DeepLinkRejection.untrustedOrigin,
+      );
+    });
+
+    test('recognizes the Pages prefix and rejects relative redirect parameters', () {
+      expect(
+        enabledPolicy
+            .parseRouterUri(Uri.parse('/Certigo/achievements/first-lesson'))
+            .destination!
+            .appLocation,
+        '/achievements/first-lesson',
+      );
+      expect(
+        enabledPolicy
+            .parseRouterUri(Uri.parse('/assignments/a?next=https://evil.example'))
+            .rejection,
+        DeepLinkRejection.unexpectedParameters,
+      );
     });
   });
 

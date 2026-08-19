@@ -52,7 +52,7 @@ final class DeepLinkDestination {
       '/lesson/${Uri.encodeComponent(trackId!)}/${Uri.encodeComponent(resourceId!)}',
     DeepLinkKind.assignment => '/assignments/${Uri.encodeComponent(resourceId!)}',
     DeepLinkKind.achievement => '/achievements/${Uri.encodeComponent(resourceId!)}',
-    DeepLinkKind.accountDeletion => '/account-deletion/',
+    DeepLinkKind.accountDeletion => '/account-deletion',
   };
 
   Uri toHttpsUri({String host = certigoPrimaryLinkHost, String pathPrefix = ''}) {
@@ -64,7 +64,7 @@ final class DeepLinkDestination {
         '$prefix/learn/${Uri.encodeComponent(trackId!)}/${Uri.encodeComponent(resourceId!)}',
       DeepLinkKind.assignment => '$prefix/assignments/${Uri.encodeComponent(resourceId!)}',
       DeepLinkKind.achievement => '$prefix/achievements/${Uri.encodeComponent(resourceId!)}',
-      DeepLinkKind.accountDeletion => '$prefix/account-deletion/',
+      DeepLinkKind.accountDeletion => '$prefix/account-deletion',
     };
     return Uri(scheme: 'https', host: host, path: path);
   }
@@ -162,6 +162,50 @@ final class DeepLinkPolicy {
     return _parsePath(segments, hasTrailingSlash: hasTrailingSlash);
   }
 
+  /// Parses a URI supplied by Flutter's route-information pipeline.
+  ///
+  /// Android and iOS can deliver either the absolute HTTPS URI or only its path.
+  /// Relative paths are safe here because the native association layer admits
+  /// only the configured HTTPS host; custom schemes remain absolute and are
+  /// rejected by the router coordinator before reaching this method.
+  DeepLinkParseResult parseRouterUri(Uri uri) {
+    if (uri.hasScheme || uri.hasAuthority) {
+      return parse(uri.toString());
+    }
+    if (!enabled) {
+      return const DeepLinkParseResult.rejected(DeepLinkRejection.disabled);
+    }
+    if (uri.query.isNotEmpty || uri.fragment.isNotEmpty) {
+      return const DeepLinkParseResult.rejected(DeepLinkRejection.unexpectedParameters);
+    }
+
+    final bool usesFallbackPrefix =
+        uri.path == pagesFallbackPrefix || uri.path.startsWith('$pagesFallbackPrefix/');
+    final Uri absolute = Uri(
+      scheme: 'https',
+      host: usesFallbackPrefix ? pagesFallbackHost : primaryHost,
+      path: uri.path,
+    );
+    return parse(absolute.toString());
+  }
+
+  /// Whether [path] belongs to a declared HTTPS ingress route.
+  ///
+  /// This intentionally checks only route prefixes. Full shape and identifier
+  /// validation still happens in [parseRouterUri].
+  bool isPotentialRouterPath(String path) {
+    final String candidate = path == pagesFallbackPrefix
+        ? '/'
+        : path.startsWith('$pagesFallbackPrefix/')
+        ? path.substring(pagesFallbackPrefix.length)
+        : path;
+    return candidate.startsWith('/learn/') ||
+        candidate.startsWith('/assignments/') ||
+        candidate.startsWith('/achievements/') ||
+        candidate == '/account-deletion' ||
+        candidate == '/account-deletion/';
+  }
+
   DeepLinkNavigationDecision resolveNavigation({
     required String rawUrl,
     required bool isAuthenticated,
@@ -198,7 +242,7 @@ final class DeepLinkPolicy {
       }
       return DeepLinkParseResult.accepted(DeepLinkDestination.achievement(segments[1]));
     }
-    if (segments.length == 1 && segments.first == 'account-deletion' && hasTrailingSlash) {
+    if (segments.length == 1 && segments.first == 'account-deletion' && !hasTrailingSlash) {
       return const DeepLinkParseResult.accepted(DeepLinkDestination.accountDeletion());
     }
     return const DeepLinkParseResult.rejected(DeepLinkRejection.unsupportedPath);

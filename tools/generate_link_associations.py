@@ -73,7 +73,7 @@ def association_payloads(
         {"/": f"{prefix}/learn/*/*", "comment": "Authenticated lesson route"},
         {"/": f"{prefix}/assignments/*", "comment": "Authenticated assignment route"},
         {"/": f"{prefix}/achievements/*", "comment": "Authenticated achievement route"},
-        {"/": f"{prefix}/account-deletion/", "comment": "Public account-deletion route"},
+        {"/": f"{prefix}/account-deletion", "comment": "Public account-deletion route"},
     ]
     apple = {
         "applinks": {
