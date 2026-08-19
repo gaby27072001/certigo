@@ -25,6 +25,17 @@ void main() {
       );
     });
 
+    test('AuthSigningOut reste sur le splash pendant le nettoyage durable', () {
+      expect(
+        resolveAuthRedirect(
+          auth: const AuthSigningOut(),
+          location: AuthShellRoutes.home,
+          onboardingCompleted: true,
+        ),
+        AuthShellRoutes.splash,
+      );
+    });
+
     test('depuis une autre route → renvoyé sur le splash d\'auth', () {
       expect(
         resolveAuthRedirect(
@@ -189,8 +200,6 @@ void main() {
       AuthShellRoutes.registerName,
       AuthShellRoutes.registerEmail,
       AuthShellRoutes.registerPassword,
-      AuthShellRoutes.registerSyncContacts,
-      AuthShellRoutes.registerFriends,
       AuthShellRoutes.registerProfileCreated,
     ];
 
@@ -273,7 +282,6 @@ void main() {
         AuthShellRoutes.home,
         AuthShellRoutes.onboardingSplash,
         '/welcome',
-        '/login',
       ];
       for (final bool completed in <bool>[true, false]) {
         for (final String loc in locations) {

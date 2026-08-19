@@ -4,8 +4,7 @@ import 'package:prism_ui/prism_ui.dart';
 
 import 'onboarding_common.dart';
 
-/// Welcome — the first interactive screen. A large guide, a confident tagline
-/// and the two opening actions: start fresh, or sign in to an existing account.
+/// Welcome shown after real authentication and before track selection.
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
@@ -25,7 +24,7 @@ class WelcomeScreen extends StatelessWidget {
               const MascotHero(mascot: AuroraMascot.nimbus, mood: MascotMood.celebrate, size: 168),
               const SizedBox(height: 28),
               Text(
-                'Apprends Azure\nsans y penser',
+                'Choisis ton objectif,\npuis commence',
                 textAlign: TextAlign.center,
                 style: t.displayMedium?.copyWith(
                   fontWeight: FontWeight.w800,
@@ -35,19 +34,15 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Des leçons courtes, ludiques et gratuites pour décrocher tes certifications Microsoft.',
+                'Ton compte est prêt. Sélectionne une certification disponible '
+                'pour ouvrir le parcours correspondant.',
                 textAlign: TextAlign.center,
                 style: t.bodyLarge?.copyWith(color: p.textSecondary, height: 1.4),
               ),
               const Spacer(flex: 3),
               PrismButton(
-                label: 'C\'EST PARTI',
-                onPressed: () => context.go(OnboardingRoutes.intro),
-              ),
-              const SizedBox(height: 12),
-              PrismButton.secondary(
-                label: 'J\'AI DÉJÀ UN COMPTE',
-                onPressed: () => context.go(OnboardingRoutes.login),
+                label: 'CHOISIR MA CERTIFICATION',
+                onPressed: () => context.go(OnboardingRoutes.certification),
               ),
               const SizedBox(height: 8),
             ],

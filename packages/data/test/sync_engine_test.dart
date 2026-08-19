@@ -401,6 +401,7 @@ void main() {
           payload: const <String, dynamic>{'k': 'persisted'},
           idempotencyKey: 'persisted',
           createdAt: DateTime.utc(2026),
+          ownerId: 'unscoped',
         );
         final _BlockedLoadStore store = _BlockedLoadStore(<SyncAction>[
           persisted,
@@ -437,5 +438,98 @@ void main() {
         await engine.dispose();
       },
     );
+
+    test('dispatches only actions owned by the authenticated account', () async {
+      var ownerId = 'user-a';
+      final _RecordingSender sender = _RecordingSender((_) => SyncDispatch.success);
+      final SyncEngine engine = SyncEngine(
+        store: InMemorySyncQueueStore(),
+        sender: sender.call,
+        ownerIdProvider: () => ownerId,
+      );
+
+      await _enqueue(engine, 'same-attempt');
+      ownerId = 'user-b';
+      await _enqueue(engine, 'same-attempt');
+      await engine.flush();
+
+      expect(sender.calls.map((SyncAction action) => action.ownerId), <String?>['user-b']);
+      expect(engine.pendingCount, 1);
+
+      ownerId = 'user-a';
+      await engine.flush();
+      expect(
+        sender.calls.map((SyncAction action) => action.ownerId),
+        <String?>['user-b', 'user-a'],
+      );
+      await engine.dispose();
+    });
+
+    test('quarantines legacy pending actions that have no owner', () async {
+      final SyncAction legacy = SyncAction(
+        id: 'legacy',
+        kind: 'quizSubmit',
+        endpoint: '/quiz/legacy/submit',
+        payload: const <String, dynamic>{},
+        idempotencyKey: 'legacy',
+        createdAt: DateTime.utc(2026),
+      );
+      final SyncEngine engine = SyncEngine(
+        store: InMemorySyncQueueStore(<SyncAction>[legacy]),
+        sender: (_) async => SyncDispatch.success,
+      );
+
+      await engine.ensureLoaded();
+
+      expect(engine.actions.single.isDead, isTrue);
+      expect(engine.actions.single.lastError, 'legacy-owner-missing');
+      await engine.dispose();
+    });
+
+    test('waitForIdle holds sign-out cleanup until the current owner flush completes', () async {
+      final Completer<SyncDispatch> dispatch = Completer<SyncDispatch>();
+      final SyncEngine engine = SyncEngine(
+        store: InMemorySyncQueueStore(),
+        sender: (_) => dispatch.future,
+      );
+      await _enqueue(engine, 'pending-sign-out');
+
+      final Future<SyncFlushReport> flush = engine.flush();
+      await Future<void>.delayed(Duration.zero);
+      var cleanupReleased = false;
+      final Future<void> waiting = engine.waitForIdle().then((_) {
+        cleanupReleased = true;
+      });
+      await Future<void>.delayed(Duration.zero);
+      expect(cleanupReleased, isFalse);
+
+      dispatch.complete(SyncDispatch.success);
+      await flush;
+      await waiting;
+      expect(cleanupReleased, isTrue);
+      await engine.dispose();
+    });
+
+    test('aborts the remaining flush when the authenticated owner changes', () async {
+      var ownerId = 'user-a';
+      final _RecordingSender sender = _RecordingSender((_) {
+        ownerId = 'user-b';
+        return SyncDispatch.success;
+      });
+      final SyncEngine engine = SyncEngine(
+        store: InMemorySyncQueueStore(),
+        sender: sender.call,
+        ownerIdProvider: () => ownerId,
+      );
+      await _enqueue(engine, 'first');
+      await _enqueue(engine, 'second');
+
+      ownerId = 'user-a';
+      await engine.flush();
+
+      expect(sender.keys, <String>['first']);
+      expect(engine.pendingCount, 1);
+      await engine.dispose();
+    });
   });
 }

@@ -128,7 +128,10 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
     });
 
     final MockExam exam = widget.exam;
-    final String trackId = exam.trackId.isNotEmpty ? exam.trackId : ref.read(activeTrackProvider);
+    final String? selectedTrackId = ref.read(activeTrackProvider).asData?.value;
+    final String trackId = exam.trackId.isNotEmpty
+        ? exam.trackId
+        : selectedTrackId ?? (throw const MissingActiveTrackException());
 
     final List<QuizAnswer> answers = <QuizAnswer>[
       for (final MockExamItem item in exam.items)

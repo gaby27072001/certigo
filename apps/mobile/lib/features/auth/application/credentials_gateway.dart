@@ -107,6 +107,7 @@ class HttpCredentialsGateway implements CredentialsGateway {
       userId: userId,
       refreshToken: json['refreshToken'] as String?,
       accessTokenExpiry: expiryRaw is String ? DateTime.tryParse(expiryRaw) : null,
+      userId: userId,
       displayName: displayName,
       email: email,
       provider: AuthProvider.email,

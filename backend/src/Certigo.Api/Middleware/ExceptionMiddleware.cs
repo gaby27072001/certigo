@@ -78,6 +78,24 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
         {
             await WriteProblemAsync(context, HttpStatusCode.NotFound, "Track not found", ex.Message, correlationId);
         }
+        catch (ActiveTrackRequiredException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.Conflict,
+                "Active track required",
+                ex.Message,
+                correlationId);
+        }
+        catch (ActiveTrackConflictException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.Conflict,
+                "Active track conflict",
+                ex.Message,
+                correlationId);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Unhandled exception in function {FunctionName}.", context.FunctionDefinition.Name);

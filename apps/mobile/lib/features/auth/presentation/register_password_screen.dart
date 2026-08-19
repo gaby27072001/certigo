@@ -15,7 +15,7 @@ import 'widgets/register_text_field.dart';
 /// backend** : il appelle `AuthController.registerWithEmail(...)` avec l'e-mail
 /// et le nom accumulés dans le brouillon, affiche le CTA en chargement pendant
 /// l'appel, puis :
-/// - succès (`Authenticated`) → écrans post-création (sync contacts) ;
+/// - succès (`Authenticated`) → confirmation de création du profil ;
 /// - échec (`Unauthenticated(message)`) → SnackBar et on reste sur l'écran.
 class RegisterPasswordScreen extends ConsumerStatefulWidget {
   const RegisterPasswordScreen({super.key});
@@ -68,9 +68,7 @@ class _RegisterPasswordScreenState extends ConsumerState<RegisterPasswordScreen>
     ref.listen<AuthState>(authControllerProvider, (AuthState? prev, AuthState next) {
       if (!mounted || !_submitting) return;
       if (next is Authenticated) {
-        // Compte créé : on enchaîne sur les écrans post-création (le garde
-        // laisse le flux d'inscription piloter sa navigation).
-        context.go('/register/sync-contacts');
+        context.go('/register/profile-created');
       } else if (next is Unauthenticated) {
         setState(() => _submitting = false);
         final String message = (next.message != null && next.message!.isNotEmpty)

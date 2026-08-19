@@ -84,6 +84,7 @@ class AuthSession {
     this.refreshToken,
     this.idToken,
     this.accessTokenExpiry,
+    this.userId,
     this.displayName,
     this.email,
     this.provider,
@@ -95,6 +96,7 @@ class AuthSession {
   final String? refreshToken;
   final String? idToken;
   final DateTime? accessTokenExpiry;
+  final String? userId;
   final String? displayName;
   final String? email;
   final AuthProvider? provider;
@@ -126,6 +128,7 @@ class AuthSession {
     String? refreshToken,
     String? idToken,
     DateTime? accessTokenExpiry,
+    String? userId,
     String? displayName,
     String? email,
     AuthProvider? provider,
@@ -137,6 +140,7 @@ class AuthSession {
       refreshToken: refreshToken ?? this.refreshToken,
       idToken: idToken ?? this.idToken,
       accessTokenExpiry: accessTokenExpiry ?? this.accessTokenExpiry,
+      userId: userId ?? this.userId,
       displayName: displayName ?? this.displayName,
       email: email ?? this.email,
       provider: provider ?? this.provider,
@@ -150,6 +154,7 @@ class AuthSession {
         'refreshToken': refreshToken,
         'idToken': idToken,
         'accessTokenExpiry': accessTokenExpiry?.toIso8601String(),
+        'userId': userId,
         'displayName': displayName,
         'email': email,
         'provider': provider?.id,
@@ -160,12 +165,14 @@ class AuthSession {
     final Object? token = json['accessToken'];
     if (token is! String || token.isEmpty) return null;
     final Object? expiryRaw = json['accessTokenExpiry'];
+    final String? idToken = json['idToken'] as String?;
     return AuthSession(
       accessToken: token,
       userId: json['userId'] as String?,
       refreshToken: json['refreshToken'] as String?,
-      idToken: json['idToken'] as String?,
+      idToken: idToken,
       accessTokenExpiry: expiryRaw is String ? DateTime.tryParse(expiryRaw) : null,
+      userId: json['userId'] as String? ?? _decodeUserId(idToken) ?? _decodeUserId(token),
       displayName: json['displayName'] as String?,
       email: json['email'] as String?,
       provider: AuthProviderX.fromId(json['provider'] as String?),
@@ -185,6 +192,21 @@ class AuthSession {
       return null;
     }
   }
+
+  static String? _decodeUserId(String? token) {
+    if (token == null) return null;
+    final List<String> parts = token.split('.');
+    if (parts.length != 3) return null;
+    try {
+      final String normalized = base64Url.normalize(parts[1]);
+      final Object? payload = jsonDecode(utf8.decode(base64Url.decode(normalized)));
+      if (payload is! Map<String, dynamic>) return null;
+      final Object? userId = payload['oid'] ?? payload['sub'];
+      return userId is String && userId.isNotEmpty ? userId : null;
+    } on FormatException {
+      return null;
+    }
+  }
 }
 
 /// État synchrone exposé à l'application (lu directement par le garde de
@@ -198,6 +220,10 @@ class AuthLoading extends AuthState {
   const AuthLoading();
 }
 
+class AuthSigningOut extends AuthState {
+  const AuthSigningOut();
+}
+
 /// Utilisateur connecté → accès au parcours.
 class Authenticated extends AuthState {
   const Authenticated(this.session);
@@ -207,9 +233,12 @@ class Authenticated extends AuthState {
 
 /// Aucune session valide → écran de connexion (avec message éventuel).
 class Unauthenticated extends AuthState {
-  const Unauthenticated([this.message]);
+  const Unauthenticated([this.message]) : clearLocalAccountData = false;
+
+  const Unauthenticated.signedOut([this.message]) : clearLocalAccountData = true;
 
   final String? message;
+  final bool clearLocalAccountData;
 }
 
 /// The server confirmed irreversible deletion and local credentials are gone.

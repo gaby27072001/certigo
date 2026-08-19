@@ -26,31 +26,14 @@ import '../features/auth/presentation/landing_screen.dart';
 import '../features/auth/presentation/register_name_screen.dart';
 import '../features/auth/presentation/register_email_screen.dart';
 import '../features/auth/presentation/register_password_screen.dart';
-import '../features/auth/presentation/register_sync_contacts_screen.dart';
-import '../features/auth/presentation/register_friends_screen.dart';
 import '../features/auth/presentation/register_profile_created_screen.dart';
 import '../features/auth/presentation/splash_screen.dart' as auth;
 import '../features/account_deletion/presentation/account_deletion_screen.dart';
 import '../features/onboarding/application/onboarding_controller.dart';
-import '../features/onboarding/presentation/attribution_screen.dart';
-import '../features/onboarding/presentation/birth_year_screen.dart';
 import '../features/onboarding/presentation/certification_screen.dart';
-import '../features/onboarding/presentation/goal_screen.dart';
-import '../features/onboarding/presentation/domains_screen.dart';
-import '../features/onboarding/presentation/intro_screen.dart';
-import '../features/onboarding/presentation/level_screen.dart';
-import '../features/onboarding/presentation/login_screen.dart';
-import '../features/onboarding/presentation/notifications_screen.dart';
 import '../features/onboarding/presentation/onboarding_common.dart';
-import '../features/onboarding/presentation/path_building_screen.dart';
-import '../features/onboarding/presentation/paywall_screen.dart';
-import '../features/onboarding/presentation/promise_screen.dart';
-import '../features/onboarding/presentation/reaction_screens.dart';
-import '../features/onboarding/presentation/reasons_screen.dart';
 import '../features/onboarding/presentation/splash_screen.dart' as onboarding;
-import '../features/onboarding/presentation/start_choice_screen.dart';
 import '../features/onboarding/presentation/welcome_screen.dart';
-import '../features/onboarding/presentation/widget_promo_screen.dart';
 import 'app_shell.dart';
 import 'auth_redirect.dart';
 import 'providers.dart';
@@ -146,11 +129,13 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
 
   // Bridge auth-state changes into a [Listenable] so GoRouter re-runs redirects
   // as soon as session restore / sign-in / sign-out happens.
+  final OnboardingController onboardingCtrl = ref.read(onboardingControllerProvider);
   final ValueNotifier<int> authRefresh = ValueNotifier<int>(0);
-  ref.listen<AuthState>(authControllerProvider, (_, __) => authRefresh.value++);
+  ref.listen<AuthState>(authControllerProvider, (_, AuthState next) {
+    authRefresh.value++;
+  });
   ref.onDispose(authRefresh.dispose);
 
-  final OnboardingController onboardingCtrl = ref.read(onboardingControllerProvider);
   final Listenable refresh = Listenable.merge(<Listenable>[authRefresh, onboardingCtrl]);
 
   return GoRouter(
@@ -202,11 +187,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         builder: (_, __) => const AccountDeletionCompletedScreen(),
       ),
 
-      // Flux d'inscription progressif (Partie 3, façon Duo) : nom → e-mail →
-      // mot de passe (branché sur registerWithEmail) → contacts → amis →
-      // bienvenue. Écrans hors shell, sur le navigateur racine, avec la même
-      // transition `_stepPage` que l'onboarding. Le garde d'auth
-      // (resolveAuthRedirect) autorise ces routes (`isRegisterFlow`).
+      // Real account creation: name → email → password → confirmation.
       GoRoute(
         path: AuthShellRoutes.registerName,
         parentNavigatorKey: _rootKey,
@@ -226,18 +207,6 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
             _stepPage(state: state, child: const RegisterPasswordScreen()),
       ),
       GoRoute(
-        path: AuthShellRoutes.registerSyncContacts,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const RegisterSyncContactsScreen()),
-      ),
-      GoRoute(
-        path: AuthShellRoutes.registerFriends,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const RegisterFriendsScreen()),
-      ),
-      GoRoute(
         path: AuthShellRoutes.registerProfileCreated,
         parentNavigatorKey: _rootKey,
         pageBuilder: (_, GoRouterState state) => _stepPage(
@@ -247,10 +216,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         ),
       ),
 
-      // Onboarding startup flow (full-screen, above the shell). Sequence mirrors
-      // the Duo-style flow: intros → certification → course-building → tailoring
-      // questions interleaved with mascot reactions → value/permission moments →
-      // paywall → readiness reveal → home.
+      // Honest startup flow: brief welcome → published certification → Home.
       GoRoute(
         path: OnboardingRoutes.splash,
         parentNavigatorKey: _rootKey,
@@ -267,152 +233,10 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
             _stepPage(state: state, child: const WelcomeScreen()),
       ),
       GoRoute(
-        path: OnboardingRoutes.intro,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
-          state: state,
-          child: NimbusIntroScreen(
-            message: 'Salut, moi c\'est Nimbus ! Juste quelques questions avant ta 1re leçon.',
-            primaryLabel: 'CONTINUER',
-            progress: 0.05,
-            onBack: () => context.go(OnboardingRoutes.welcome),
-            onPrimary: () => context.go(OnboardingRoutes.birthYear),
-          ),
-        ),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.birthYear,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const BirthYearScreen()),
-      ),
-      GoRoute(
         path: OnboardingRoutes.certification,
         parentNavigatorKey: _rootKey,
         pageBuilder: (_, GoRouterState state) =>
             _stepPage(state: state, child: const CertificationScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.domains,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const DomainsScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.building,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const PathBuildingScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.attribution,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const AttributionScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.level,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const LevelScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.levelReaction,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const LevelReactionScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.reasons,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const ReasonsScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.reasonsReaction,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const ReasonsReactionScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.routineIntro,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
-          state: state,
-          child: NimbusIntroScreen(
-            message: 'On installe ta routine — quelques réglages pour tenir dans la durée.',
-            primaryLabel: 'CONTINUER',
-            mood: MascotMood.happy,
-            progress: 0.54,
-            onBack: () => context.go(OnboardingRoutes.reasons),
-            onPrimary: () => context.go(OnboardingRoutes.goal),
-          ),
-        ),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.goal,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) => _stepPage(state: state, child: const GoalScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.goalReaction,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const GoalReactionScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.notifications,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const NotificationsScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.widget,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const WidgetPromoScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.widgetReaction,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const WidgetReactionScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.promise,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const PromiseScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.paywall,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const PaywallScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.paywallReaction,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const PaywallReactionScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.start,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const StartChoiceScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.startReaction,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const StartReactionScreen()),
-      ),
-      GoRoute(
-        path: OnboardingRoutes.login,
-        parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const LoginScreen(), begin: const Offset(0.03, 0)),
       ),
       // Bottom-nav shell: persistent state per tab via StatefulShellRoute.
       StatefulShellRoute.indexedStack(
@@ -432,7 +256,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
               GoRoute(
                 path: Routes.path,
                 name: 'path',
-                builder: (_, __) => const _ActivePathScreen(),
+                builder: (_, __) => const ActivePathScreen(),
               ),
             ],
           ),
@@ -577,12 +401,31 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
 /// in the course picker, so switching tracks re-points the primary tab without
 /// touching the route table. The Path screen itself stays trackId-driven (and
 /// directly constructible in tests).
-class _ActivePathScreen extends ConsumerWidget {
-  const _ActivePathScreen();
+class ActivePathScreen extends ConsumerWidget {
+  const ActivePathScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final String trackId = ref.watch(activeTrackProvider);
-    return PathScreen(trackId: trackId);
+    final AsyncValue<String?> activeTrack = ref.watch(activeTrackProvider);
+    return activeTrack.when(
+      data: (String? trackId) => trackId == null
+          ? Scaffold(
+              body: PrismStatusView(
+                icon: Icons.school_outlined,
+                title: 'Aucune certification sélectionnée',
+                message: 'Choisis un parcours publié avant d\'ouvrir le programme.',
+                actionLabel: 'Voir la bibliothèque',
+                onAction: () => context.go(Routes.library),
+              ),
+            )
+          : PathScreen(trackId: trackId),
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (Object error, StackTrace _) => Scaffold(
+        body: PrismStatusView.error(
+          message: 'Impossible de restaurer la certification sélectionnée.',
+          onRetry: () => ref.invalidate(activeTrackProvider),
+        ),
+      ),
+    );
   }
 }

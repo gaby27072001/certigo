@@ -95,6 +95,7 @@ class SyncEngine {
     DateTime Function()? clock,
     BackoffPolicy? backoff,
     String Function()? idGenerator,
+    String? Function()? ownerIdProvider,
     this.maxAttempts = 6,
     this.doneRetention = const Duration(hours: 24),
     this.deadRetention = const Duration(days: 7),
@@ -103,13 +104,22 @@ class SyncEngine {
         _sender = sender,
         _clock = clock ?? DateTime.now,
         _backoff = backoff ?? exponentialBackoff(),
-        _idGenerator = idGenerator;
+        _idGenerator = idGenerator,
+        _ownerIdProvider = ownerIdProvider ?? _unscopedOwner;
 
   final SyncQueueStore _store;
   final SyncSender _sender;
   final DateTime Function() _clock;
   final BackoffPolicy _backoff;
   final String Function()? _idGenerator;
+  final String? Function() _ownerIdProvider;
+
+  static String _unscopedOwner() => 'unscoped';
+
+  static String? _normalizeOwner(String? ownerId) {
+    final String normalized = (ownerId ?? '').trim();
+    return normalized.isEmpty ? null : normalized;
+  }
 
   /// Total dispatch attempts before an action is dead-lettered.
   final int maxAttempts;
@@ -142,6 +152,8 @@ class SyncEngine {
   /// Immutable view of the queue (for diagnostics/tests).
   List<SyncAction> get actions => List<SyncAction>.unmodifiable(_queue);
 
+  String? get currentOwnerId => _normalizeOwner(_ownerIdProvider());
+
   /// Permanently discards every local action after the server confirms account
   /// deletion. This is intentionally not called before confirmation: a network
   /// failure must never erase unsynchronised work while the account still exists.
@@ -173,7 +185,16 @@ class SyncEngine {
       final List<SyncAction> persisted = await _store.load();
       _queue
         ..clear()
-        ..addAll(persisted);
+        ..addAll(
+          persisted.map(
+            (SyncAction action) => action.ownerId == null && action.isPending
+                ? action.copyWith(
+                    status: SyncActionStatus.dead,
+                    lastError: 'legacy-owner-missing',
+                  )
+                : action,
+          ),
+        );
       _loaded = true;
       _emit();
     } finally {
@@ -190,10 +211,15 @@ class SyncEngine {
     required String endpoint,
     required Map<String, dynamic> payload,
     required String idempotencyKey,
+    String? ownerId,
   }) async {
     _ensureActive();
     await ensureLoaded();
-    final SyncAction? live = _findLiveByKey(idempotencyKey);
+    final String? resolvedOwner = _normalizeOwner(ownerId ?? _ownerIdProvider());
+    if (resolvedOwner == null) {
+      throw StateError('An authenticated owner is required to queue offline work.');
+    }
+    final SyncAction? live = _findLiveByKey(idempotencyKey, resolvedOwner);
     if (live != null) return live;
 
     final SyncAction action = SyncAction(
@@ -203,6 +229,7 @@ class SyncEngine {
       payload: payload,
       idempotencyKey: idempotencyKey,
       createdAt: _clock(),
+      ownerId: resolvedOwner,
     );
     _queue.add(action);
     await _persist();
@@ -224,13 +251,23 @@ class SyncEngine {
     return pass;
   }
 
+  Future<void> waitForIdle() async {
+    final Future<SyncFlushReport>? running = _inFlight;
+    if (running != null) await running;
+  }
+
   Future<SyncFlushReport> _flush() async {
     await ensureLoaded();
     _emit(syncing: true);
+    final String? ownerId = _normalizeOwner(_ownerIdProvider());
 
     final DateTime now = _clock();
-    final List<String> dueIds =
-        _queue.where((SyncAction a) => a.isDue(now)).map((SyncAction a) => a.id).toList();
+    final List<String> dueIds = ownerId == null
+        ? <String>[]
+        : _queue
+            .where((SyncAction action) => action.ownerId == ownerId && action.isDue(now))
+            .map((SyncAction action) => action.id)
+            .toList();
 
     var dispatched = 0;
     var succeeded = 0;
@@ -238,6 +275,7 @@ class SyncEngine {
     var deadLettered = 0;
 
     for (final String id in dueIds) {
+      if (_normalizeOwner(_ownerIdProvider()) != ownerId) break;
       final int index = _indexOf(id);
       if (index < 0) continue;
       final SyncAction current = _queue[index];
@@ -343,10 +381,10 @@ class SyncEngine {
     }
   }
 
-  SyncAction? _findLiveByKey(String idempotencyKey) {
+  SyncAction? _findLiveByKey(String idempotencyKey, String ownerId) {
     final DateTime now = _clock();
     for (final SyncAction a in _queue) {
-      if (a.idempotencyKey != idempotencyKey) continue;
+      if (a.ownerId != ownerId || a.idempotencyKey != idempotencyKey) continue;
       if (a.isPending) return a;
       if (a.isDone) {
         final DateTime ref = a.completedAt ?? a.createdAt;

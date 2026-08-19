@@ -1,3 +1,4 @@
+import 'package:certigo/app/active_track_store.dart';
 import 'package:certigo/app/providers.dart';
 import 'package:certigo/features/home/application/home_controller.dart';
 import 'package:certigo/features/library/presentation/certification_chapters_screen.dart';
@@ -10,6 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
+
+import 'support/fake_user_repository.dart';
 
 /// Widget tests for the Part-4 library catalogue (vendor → certification →
 /// chapters). We override [catalogProvider] / [pathProvider] with deterministic
@@ -326,7 +329,16 @@ void main() {
       WidgetTester tester,
     ) async {
       final ProviderContainer container = ProviderContainer(
-        overrides: <Override>[pathProvider('az-900').overrideWith((Ref ref) async => fakePath())],
+        overrides: <Override>[
+          activeTrackStoreProvider.overrideWithValue(
+            InMemoryActiveTrackStore.synced('az-900'),
+          ),
+          activeTrackOwnerIdProvider.overrideWithValue('user-1'),
+          userRepositoryProvider.overrideWithValue(
+            FakeUserRepository(profile: testUserProfile(activeTrackId: 'az-900')),
+          ),
+          pathProvider('az-900').overrideWith((Ref ref) async => fakePath()),
+        ],
       );
       addTearDown(container.dispose);
 
@@ -365,14 +377,20 @@ void main() {
       await tester.pump(const Duration(milliseconds: 60));
 
       expect(find.text('PATH TAB'), findsOneWidget);
-      expect(container.read(activeTrackProvider), 'az-900');
+      expect(container.read(activeTrackProvider).asData?.value, 'az-900');
     });
   });
 
   group('cert_picker_sheet (regression after CertificationCard refactor)', () {
     testWidgets('renders the shared CertificationCard for each track', (WidgetTester tester) async {
       final ProviderContainer container = ProviderContainer(
-        overrides: <Override>[catalogProvider.overrideWith((Ref ref) async => fakeCatalog)],
+        overrides: <Override>[
+          activeTrackStoreProvider.overrideWithValue(
+            InMemoryActiveTrackStore.synced('az-900'),
+          ),
+          activeTrackOwnerIdProvider.overrideWithValue('user-1'),
+          catalogProvider.overrideWith((Ref ref) async => fakeCatalog),
+        ],
       );
       addTearDown(container.dispose);
       await tester.pumpWidget(
@@ -398,8 +416,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('AI-901'));
       await tester.pump();
-      expect(container.read(activeTrackProvider), 'az-900');
-      expect(container.read(activeTrackProvider), 'az-900');
+      expect(container.read(activeTrackProvider).asData?.value, 'az-900');
+      expect(container.read(activeTrackProvider).asData?.value, 'az-900');
     });
   });
 }

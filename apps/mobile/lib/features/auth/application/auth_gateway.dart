@@ -356,6 +356,7 @@ class AppAuthGateway implements AuthGateway {
     AuthProvider? provider,
   ) {
     final Map<String, dynamic> claims = _decodeJwtClaims(idToken);
+    final String? userId = (claims['oid'] ?? claims['sub']) as String?;
     final String? name = (claims['name'] ?? claims['preferred_username']) as String?;
     final String? email = (claims['email'] ?? claims['preferred_username']) as String?;
     return AuthSession(
@@ -366,6 +367,7 @@ class AppAuthGateway implements AuthGateway {
       refreshToken: refreshToken,
       idToken: idToken,
       accessTokenExpiry: expiry,
+      userId: userId,
       displayName: name,
       email: email,
       provider: provider,

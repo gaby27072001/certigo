@@ -16,10 +16,25 @@ internal sealed class FakeUserService : IUserService
     public UserProfileDto Result { get; set; } = DefaultResult();
 
     public int CallCount { get; private set; }
+    public int SetActiveTrackCallCount { get; private set; }
+    public string? LastTrackId { get; private set; }
+    public string? LastExpectedTrackId { get; private set; }
 
     public Task<UserProfileDto> GetOrProvisionAsync(CancellationToken cancellationToken = default)
     {
         CallCount++;
+        return Task.FromResult(Result);
+    }
+
+    public Task<UserProfileDto> SetActiveTrackAsync(
+        string trackId,
+        string? expectedTrackId,
+        CancellationToken cancellationToken = default)
+    {
+        SetActiveTrackCallCount++;
+        LastTrackId = trackId;
+        LastExpectedTrackId = expectedTrackId;
+        Result = Result with { ActiveTrackId = trackId };
         return Task.FromResult(Result);
     }
 
