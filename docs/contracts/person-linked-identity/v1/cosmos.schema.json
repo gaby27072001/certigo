@@ -1,0 +1,505 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://certigo.app/contracts/person-linked-identity/v1/cosmos.schema.json",
+  "title": "Certigo Person and LinkedIdentity Cosmos documents",
+  "version": "1.0.0",
+  "x-certigo-cosmos": {
+    "container": "users",
+    "partitionKey": "/id",
+    "topologyChangeRequired": false,
+    "uniqueKeyPolicyRequired": false,
+    "identityIdStrategy": "linked-identity::v1::<sha256(canonical provider, tenant, subject and type)>",
+    "intentIdStrategy": "identity-link-intent::v1::<sha256(personId and Idempotency-Key)>",
+    "operationIdStrategy": "identity-link-operation::v1::<sha256(personId and Idempotency-Key)>",
+    "currentIndexingPolicy": {
+      "automatic": true,
+      "includedPaths": [
+        "/*"
+      ],
+      "excludedPaths": [
+        "/\"_etag\"/?"
+      ]
+    },
+    "requiredAccessPatterns": [
+      {
+        "name": "resolveIdentity",
+        "kind": "pointRead",
+        "key": "linkedIdentity.id"
+      },
+      {
+        "name": "readPerson",
+        "kind": "pointRead",
+        "key": "person.id"
+      },
+      {
+        "name": "readIntent",
+        "kind": "pointRead",
+        "key": "sha256(personId and Idempotency-Key)"
+      },
+      {
+        "name": "readOperation",
+        "kind": "pointRead",
+        "key": "sha256(personId and Idempotency-Key)"
+      },
+      {
+        "name": "listPersonIdentities",
+        "kind": "crossPartitionQuery",
+        "predicate": "documentType = 'linkedIdentity' AND personId = @personId",
+        "compositeIndexRequired": false
+      }
+    ]
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/person"
+    },
+    {
+      "$ref": "#/$defs/localCredentialIdentityOverlay"
+    },
+    {
+      "$ref": "#/$defs/linkedIdentity"
+    },
+    {
+      "$ref": "#/$defs/identityLinkIntent"
+    },
+    {
+      "$ref": "#/$defs/identityLinkOperation"
+    }
+  ],
+  "$defs": {
+    "localCredentialIdentityOverlay": {
+      "title": "Identity overlay on an existing local credential document",
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "userId",
+        "identitySubject"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^credential::"
+        },
+        "type": {
+          "const": "credential"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Permanent personId and legacy userId."
+        },
+        "identitySubject": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32,}$",
+          "description": "Random opaque value persisted once with optimistic concurrency."
+        }
+      },
+      "additionalProperties": true
+    },
+    "person": {
+      "title": "Person overlay on the existing user profile document",
+      "type": "object",
+      "required": [
+        "id",
+        "identityMetadata"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Permanent personId and legacy userId."
+        },
+        "identityMetadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "personId",
+            "legacyUserId",
+            "migrationState",
+            "migratedAt"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "personId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "legacyUserId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "migrationState": {
+              "type": "string",
+              "enum": [
+                "shadow",
+                "resolved"
+              ]
+            },
+            "anchorLinkedIdentityId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "migratedAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "linkedIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "documentType",
+        "schemaVersion",
+        "personId",
+        "locator",
+        "verification",
+        "revocation",
+        "createdAt",
+        "updatedAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^linked-identity::v1::[0-9a-f]{64}$"
+        },
+        "documentType": {
+          "const": "linkedIdentity"
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "personId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "locator": {
+          "$ref": "#/$defs/identityLocator"
+        },
+        "verification": {
+          "$ref": "#/$defs/verification"
+        },
+        "revocation": {
+          "$ref": "#/$defs/revocation"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "_etag": {
+          "type": "string"
+        }
+      }
+    },
+    "identityLocator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "tenant",
+        "subject",
+        "type"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "certigo-local",
+            "entra-external-id"
+          ]
+        },
+        "tenant": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 16,
+          "description": "Opaque local subject or validated Entra oid."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "localPassword",
+            "entraExternalId"
+          ]
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "method",
+        "verifiedAt",
+        "authenticatedAt"
+      ],
+      "properties": {
+        "state": {
+          "const": "verified"
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "legacyCredentialBackfill",
+            "localPasswordReauthentication",
+            "oidcReauthentication"
+          ]
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "authenticatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "issuer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "audience": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "revocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "generation",
+        "providerAction"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "active",
+            "pending",
+            "revoked"
+          ]
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "providerAction": {
+          "type": "string",
+          "enum": [
+            "notApplicable",
+            "notRequested",
+            "pending",
+            "completed",
+            "failed"
+          ]
+        },
+        "revokedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            null,
+            "userUnlinked",
+            "accountDeletion",
+            "securityResponse"
+          ]
+        },
+        "operationId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "identityLinkIntent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "documentType",
+        "schemaVersion",
+        "personId",
+        "sourceLinkedIdentityId",
+        "targetProvider",
+        "targetTenant",
+        "targetType",
+        "nonceHash",
+        "requestHash",
+        "status",
+        "createdAt",
+        "expiresAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^identity-link-intent::v1::[0-9a-f]{64}$"
+        },
+        "documentType": {
+          "const": "identityLinkIntent"
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "personId": {
+          "type": "string"
+        },
+        "sourceLinkedIdentityId": {
+          "type": "string"
+        },
+        "targetProvider": {
+          "type": "string"
+        },
+        "targetTenant": {
+          "type": "string"
+        },
+        "targetType": {
+          "type": "string"
+        },
+        "nonceHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "requestHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "consumed",
+            "expired",
+            "failed"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "consumedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "resultOperationId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_etag": {
+          "type": "string"
+        }
+      }
+    },
+    "identityLinkOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "documentType",
+        "schemaVersion",
+        "personId",
+        "intentId",
+        "idempotencyKeyHash",
+        "requestHash",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^identity-link-operation::v1::[0-9a-f]{64}$"
+        },
+        "documentType": {
+          "const": "identityLinkOperation"
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "personId": {
+          "type": "string"
+        },
+        "intentId": {
+          "type": "string"
+        },
+        "linkedIdentityId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "idempotencyKeyHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "requestHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "completed",
+            "failed"
+          ]
+        },
+        "failureCode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "_etag": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
