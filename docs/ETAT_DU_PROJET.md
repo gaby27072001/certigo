@@ -29,15 +29,15 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-08-19** |
-| Commit de référence analysé | `19c68ed9f07657e20e5ad18e48ccbde91260033c` |
+| Commit de référence analysé | `a33f8fa04f3367aaf76a95d5ffa5f01d3d5651ca` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
-| Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `55a512821dabbea8b65d3403f9c83571b4a33ed8` du **2026-08-14** |
-| Package public actif | **146 fichiers** — `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
-| Package privé actif (`answerKey`) | **146 fichiers** — `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
+| Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `87ae81724899387a8d6c922f0dc4b4631b6523ec` du **2026-08-19** |
+| Package public actif | **259 fichiers** — `sha256:a3ab2254673515990410268a93f95afd5605f19e29637373d7b20d412fa08869` |
+| Package privé actif (`answerKey`) | **232 fichiers** — `sha256:e3bfa7c20c03503384a68d8e261bcbb88f749292a273744a5ba4a309fc48c901` |
 | Workflows GitHub Actions | **21** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-project-state.yml`, `codeql.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `lint-workflows.yml`, `promote-backend-staging-prod.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **165 fichiers** — .NET : 4 projets / 68 fichiers ; Flutter/Dart : 6 racines / 93 fichiers ; Python : 1 racine / 4 fichier |
+| Tests découverts | **172 fichiers** — .NET : 4 projets / 74 fichiers ; Flutter/Dart : 6 racines / 94 fichiers ; Python : 1 racine / 4 fichier |
 | Corpus **historique** local | **91 pistes**, **146 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
