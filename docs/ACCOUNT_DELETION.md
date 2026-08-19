@@ -57,35 +57,46 @@ restauré isolément de son historique.
 
 ## Configuration humaine obligatoire avant production
 
-1. Créer dans le tenant External ID un client confidentiel dédié, lui accorder
-   avec consentement administrateur les permissions d’application Microsoft
-   Graph `User.RevokeSessions.All` et `User.ReadWrite.All`, puis configurer
-   `ENTRA_GRAPH_TENANT_ID`, `ENTRA_GRAPH_CLIENT_ID` et un secret versionné Key
-   Vault via `ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI`. Une managed identity Azure
-   du tenant de ressources ne doit pas être supposée valide dans le tenant
-   External ID. Sans cette configuration, l’étape reste `pending` avec
-   `external-identity-configuration-missing` et aucun faux succès n’est renvoyé.
-   Configurer aussi `ENTRA_REAUTH_AUDIENCE` avec le client ID mobile qui reçoit
-   l’ID token OIDC ; cela permet de valider la preuve fraîche même lorsque
-   l’audience de l’API (`ENTRA_AUDIENCE`) utilise une App ID URI différente.
-2. Vérifier dans le tenant Entra External ID si la suppression de l’identité
+1. Créer ou vérifier dans le tenant External ID un client confidentiel
+   mono-tenant dédié. Lui accorder uniquement les permissions d’application
+   Microsoft Graph `User.RevokeSessions.All` et `User.ReadWrite.All`, puis le
+   consentement administrateur.
+2. Dans chacun des GitHub Environments `staging` et `prod`, créer le secret
+   `ENTRA_GRAPH_CLIENT_SECRET` et les variables `ENTRA_GRAPH_TENANT_ID`,
+   `ENTRA_GRAPH_CLIENT_ID` et `ENTRA_REAUTH_AUDIENCE`. Cette dernière contient
+   le client ID mobile qui reçoit l’ID token OIDC, même lorsque l’audience de
+   l’API (`ENTRA_AUDIENCE`) utilise une App ID URI différente.
+3. Le CD valide ce jeu complet, injecte le secret uniquement dans un paramètre
+   Bicep `@secure`, puis Bicep crée une nouvelle version
+   `ENTRA-GRAPH-CLIENT-SECRET` dans le Key Vault de l’environnement. Seule son
+   URI versionnée est écrite dans
+   `ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI`; l’identité managée de la Function
+   App lit la valeur au runtime. Aucune saisie manuelle dans Key Vault ou dans
+   les app settings n’est requise. Le compte humain n’a donc pas besoin d’accès
+   à l’abonnement Certigo.
+4. Sans les trois variables et le secret, le déploiement staging/production
+   échoue avant Azure. En `dev`, le CD les ignore, ne crée aucun secret Graph et
+   l’étape d’identité externe reste indisponible plutôt que de produire un faux
+   succès.
+5. Vérifier dans le tenant Entra External ID si la suppression de l’identité
    cliente révoque aussi le jeton amont **Sign in with Apple**. Certigo ne reçoit
    aujourd’hui que les jetons Entra, pas le refresh token Apple nécessaire à
    l’API Apple de révocation. Si le broker ne garantit pas cette révocation,
    l’équipe identité doit ajouter une révocation amont avant de déclarer la
    conformité complète Sign in with Apple.
-3. Enregistrer
+6. Enregistrer
    `https://gchambaud_microsoft.github.io/Certigo/account-deletion/` dans le champ
    URL de suppression du compte de Play Console après publication de la page.
-4. Faire valider par le responsable juridique la base légale, le contact public
+7. Faire valider par le responsable juridique la base légale, le contact public
    et toute conservation réglementaire additionnelle. Aucune durée légale
    additionnelle n’est inventée dans cette implémentation. Le dépôt ne contient
    actuellement aucun document de CGU : cette PR n’en crée pas et ne prétend pas
    qu’un texte contractuel a été approuvé.
 
 Cette PR ne renseigne aucune valeur de production et ne publie aucune page. La
-configuration Graph/Key Vault, le dispatch GitHub Pages et les déclarations des
-consoles store restent des actions humaines bloquantes avant soumission.
+création des trois variables et du secret dans les GitHub Environments, les
+promotions Bicep, le dispatch GitHub Pages et les déclarations des consoles store
+restent des actions humaines bloquantes avant soumission.
 
 ## Exigences officielles consultées le 18 août 2026
 

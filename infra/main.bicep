@@ -27,6 +27,18 @@ param entraAuthority string = ''
 @description('Entra External ID application (audience) client ID — the App Registration client ID. Replace with the value from Azure Portal -> External ID -> App registrations -> <your-app> -> Overview. Leave empty until configured.')
 @secure()
 param entraAudience string = ''
+@description('Mobile Entra application client ID expected in fresh OIDC ID-token proofs for sensitive account deletion.')
+@secure()
+param entraReauthAudience string = ''
+@description('External ID tenant ID used by the dedicated Microsoft Graph confidential client.')
+@secure()
+param entraGraphTenantId string = ''
+@description('Application client ID of the dedicated Microsoft Graph confidential client in the External ID tenant.')
+@secure()
+param entraGraphClientId string = ''
+@description('Microsoft Graph confidential-client secret. Supplied only as a secure deployment parameter; Bicep stores it in the environment Key Vault and passes only its versioned URI to the Function App.')
+@secure()
+param entraGraphClientSecret string = ''
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
 @description('Azure OpenAI resource endpoint used by the tutor when enabled. Example: https://<resource>.openai.azure.com/.')
@@ -199,6 +211,27 @@ var authMode = env == 'dev' ? 'dev' : 'prod'
 // auth, Key Vault purge protection + 90-day soft delete, geo-redundant + versioned
 // storage, and a locked-down CORS origin set.
 var hardened = env != 'dev'
+var effectiveEntraReauthAudience = hardened
+  ? (empty(entraReauthAudience)
+    ? fail('entraReauthAudience must be supplied securely for staging and production deployments.')
+    : entraReauthAudience)
+  : ''
+var effectiveEntraGraphTenantId = hardened
+  ? (empty(entraGraphTenantId)
+    ? fail('entraGraphTenantId must be supplied securely for staging and production deployments.')
+    : entraGraphTenantId)
+  : ''
+var effectiveEntraGraphClientId = hardened
+  ? (empty(entraGraphClientId)
+    ? fail('entraGraphClientId must be supplied securely for staging and production deployments.')
+    : entraGraphClientId)
+  : ''
+var effectiveEntraGraphClientSecret = hardened
+  ? (empty(entraGraphClientSecret)
+    ? fail('entraGraphClientSecret must be supplied securely for staging and production deployments.')
+    : entraGraphClientSecret)
+  : ''
+var useEntraGraphClientSecret = !empty(effectiveEntraGraphClientSecret)
 // The deterministic fallback is intentionally restricted to dev. fail() stops
 // staging/prod deployment evaluation with a clear error before any derivable key
 // can be provisioned.
@@ -384,6 +417,15 @@ module previousJwtSecret 'modules/keyvaultPreviousJwtSecret.bicep' = if (usePrev
   }
 }
 
+module graphClientSecret 'modules/keyvaultGraphClientSecret.bicep' = if (useEntraGraphClientSecret) {
+  scope: rg
+  name: 'keyvaultGraphClientSecret'
+  params: {
+    keyVaultName: vault.outputs.name
+    graphClientSecret: effectiveEntraGraphClientSecret
+  }
+}
+
 // Azure Communication Services Email — transactional sender for the
 // email/password verification message. Global resource with an Azure-managed
 // domain (no DNS setup). Its outputs feed the Function App app settings below.
@@ -416,6 +458,10 @@ module api 'modules/functionApp.bicep' = {
     authJwtPreviousSigningKeySecretUri: previousJwtSecret.?outputs.?jwtSecretUri ?? ''
     entraAuthority: entraAuthority
     entraAudience: entraAudience
+    entraReauthAudience: effectiveEntraReauthAudience
+    entraGraphTenantId: effectiveEntraGraphTenantId
+    entraGraphClientId: effectiveEntraGraphClientId
+    entraGraphClientSecretSecretUri: graphClientSecret.?outputs.?secretUri ?? ''
     tutorLlmEnabled: tutorLlmEnabled
     tutorLlmEndpoint: tutorLlmEndpoint
     tutorLlmDeployment: tutorLlmDeployment

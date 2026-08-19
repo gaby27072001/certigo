@@ -392,6 +392,12 @@ test('Function app settings pass only versioned Key Vault secret URIs after the 
   const template = compileTemplate('infra/modules/functionApp.bicep');
   const [site] = resourcesOfType(template, 'Microsoft.Web/sites');
   const [settings] = resourcesOfType(template, 'Microsoft.Web/sites/config');
+  const accountDeletionParameters = [
+    'entraReauthAudience',
+    'entraGraphTenantId',
+    'entraGraphClientId',
+    'entraGraphClientSecretSecretUri',
+  ];
 
   assert.equal(site.properties.siteConfig.appSettings, undefined);
   assert.equal(settings.name, "[format('{0}/{1}', parameters('functionAppName'), 'appsettings')]");
@@ -400,7 +406,123 @@ test('Function app settings pass only versioned Key Vault secret URIs after the 
     "[parameters('authJwtSigningKeySecretUri')]",
   );
   assert.equal(settings.properties.AUTH_JWT_SIGNING_KEY, undefined);
+  assert.equal(
+    settings.properties.ENTRA_REAUTH_AUDIENCE,
+    "[parameters('entraReauthAudience')]",
+  );
+  assert.equal(
+    settings.properties.ENTRA_GRAPH_TENANT_ID,
+    "[parameters('entraGraphTenantId')]",
+  );
+  assert.equal(
+    settings.properties.ENTRA_GRAPH_CLIENT_ID,
+    "[parameters('entraGraphClientId')]",
+  );
+  assert.equal(
+    settings.properties.ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI,
+    "[parameters('entraGraphClientSecretSecretUri')]",
+  );
+  assert.equal(settings.properties.ENTRA_GRAPH_CLIENT_SECRET, undefined);
+  for (const parameter of accountDeletionParameters) {
+    assert.equal(template.parameters[parameter].type, 'securestring');
+  }
+  assert.equal(
+    site.properties.keyVaultReferenceIdentity,
+    "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('id-{0}-host', parameters('functionAppName')))]",
+  );
+  const vaultAccess = resourcesOfType(
+    template,
+    'Microsoft.Authorization/roleAssignments',
+  ).find(
+    (assignment) =>
+      assignment.scope
+        === "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+  );
+  assert.ok(vaultAccess);
+  assert.equal(
+    vaultAccess.properties.roleDefinitionId,
+    "[variables('keyVaultSecretsUser')]",
+  );
   assert.ok(settings.dependsOn.includes("[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"));
+});
+
+test('account deletion identity flows through secure parameters and a versioned Key Vault secret', () => {
+  const template = compileTemplate('infra/main.bicep');
+  const accountDeletionParameters = {
+    entraReauthAudience: 'effectiveEntraReauthAudience',
+    entraGraphTenantId: 'effectiveEntraGraphTenantId',
+    entraGraphClientId: 'effectiveEntraGraphClientId',
+    entraGraphClientSecret: 'effectiveEntraGraphClientSecret',
+  };
+  for (const parameter of Object.keys(accountDeletionParameters)) {
+    assert.equal(template.parameters[parameter].type, 'securestring');
+  }
+  for (const [parameter, variable] of Object.entries(accountDeletionParameters)) {
+    const deployment = parameter === 'entraGraphClientSecret'
+      ? template.resources.graphClientSecret
+      : template.resources.api;
+    const deploymentParameter = parameter === 'entraGraphClientSecret'
+      ? 'graphClientSecret'
+      : parameter;
+    assert.equal(
+      deployment.properties.parameters[deploymentParameter].value,
+      `[variables('${variable}')]`,
+    );
+  }
+  assert.equal(template.parameters.entraGraphClientSecretSecretUri, undefined);
+  assert.equal(
+    template.resources.graphClientSecret.condition,
+    "[variables('useEntraGraphClientSecret')]",
+  );
+  assert.match(
+    template.resources.api.properties.parameters.entraGraphClientSecretSecretUri.value,
+    /reference\('graphClientSecret'\).*'secretUri'/,
+  );
+  for (const variable of Object.values(accountDeletionParameters)) {
+    assert.match(
+      template.variables[variable],
+      /variables\('hardened'\).*fail\('.*staging and production deployments\.'\).*''\)\]$/,
+    );
+  }
+
+  for (const environment of ['staging', 'prod']) {
+    const parameters = readFileSync(
+      path.join(repositoryRoot, 'infra', 'params', `${environment}.bicepparam`),
+      'utf8',
+    );
+    assert.doesNotMatch(
+      parameters,
+      /^\s*param\s+entra(GraphTenantId|GraphClientId|GraphClientSecret|ReauthAudience)\s*=/m,
+    );
+  }
+});
+
+test('Graph client secret module stores the value only in Key Vault and returns a versioned URI', () => {
+  const template = compileTemplate('infra/modules/keyvaultGraphClientSecret.bicep');
+  const [secret] = resourcesOfType(template, 'Microsoft.KeyVault/vaults/secrets');
+
+  assert.equal(template.parameters.graphClientSecret.type, 'securestring');
+  assert.equal(
+    secret.name,
+    "[format('{0}/{1}', parameters('keyVaultName'), 'ENTRA-GRAPH-CLIENT-SECRET')]",
+  );
+  assert.equal(secret.properties.value, "[parameters('graphClientSecret')]");
+  assert.match(template.outputs.secretUri.value, /secretUriWithVersion/);
+  assert.doesNotMatch(JSON.stringify(template), /ENTRA_GRAPH_CLIENT_SECRET":/);
+});
+
+test('staging and production retain the 30-day continuous backup policy', () => {
+  for (const environment of ['staging', 'prod']) {
+    const parameters = readFileSync(
+      path.join(repositoryRoot, 'infra', 'params', `${environment}.bicepparam`),
+      'utf8',
+    );
+    assert.match(parameters, /^\s*param\s+cosmosBackupMode\s*=\s*'Continuous'/m);
+    assert.match(
+      parameters,
+      /^\s*param\s+cosmosContinuousBackupTier\s*=\s*'Continuous30Days'/m,
+    );
+  }
 });
 
 test('Function deployment waits for the complete private network deployment', () => {

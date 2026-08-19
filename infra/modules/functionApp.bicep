@@ -41,6 +41,18 @@ param entraAuthority string = ''
 @description('Entra External ID application (audience) client ID — the App Registration client ID in the External ID tenant. Replace with the value from Azure Portal → External ID → App registrations → <your-app> → Overview. Leave empty until configured.')
 @secure()
 param entraAudience string = ''
+@description('Mobile Entra application client ID expected in fresh OIDC ID-token proofs for sensitive account deletion.')
+@secure()
+param entraReauthAudience string = ''
+@description('External ID tenant ID used by the dedicated Microsoft Graph confidential client.')
+@secure()
+param entraGraphTenantId string = ''
+@description('Application client ID of the dedicated Microsoft Graph confidential client in the External ID tenant.')
+@secure()
+param entraGraphClientId string = ''
+@description('Versioned Azure Key Vault secret URI containing the Microsoft Graph confidential-client secret.')
+@secure()
+param entraGraphClientSecretSecretUri string = ''
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
 @description('Azure OpenAI resource endpoint used by the tutor when the feature flag is enabled. Example: https://<resource>.openai.azure.com/.')
@@ -287,6 +299,10 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     AUTH_JWT_PREVIOUS_SIGNING_KEY_SECRET_URI: authJwtPreviousSigningKeySecretUri
     ENTRA_AUTHORITY: entraAuthority
     ENTRA_AUDIENCE: entraAudience
+    ENTRA_REAUTH_AUDIENCE: entraReauthAudience
+    ENTRA_GRAPH_TENANT_ID: entraGraphTenantId
+    ENTRA_GRAPH_CLIENT_ID: entraGraphClientId
+    ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI: entraGraphClientSecretSecretUri
     TUTOR_LLM_ENABLED: string(tutorLlmEnabled)
     TUTOR_LLM_ENDPOINT: tutorLlmEndpoint
     TUTOR_LLM_DEPLOYMENT: tutorLlmDeployment

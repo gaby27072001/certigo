@@ -25,6 +25,8 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
 | Configuration GitHub OIDC | ✅ Opérationnelle aux scopes existants ; ne pas déplacer sans audit | §T0.1 |
 | Clé JWT + expiration par Environment | ⛔ **Humain** — obligatoire avant staging/prod | §T0.4 |
+| Permissions Graph app-only minimales | ✅ Configurées et consenties ; `User.Read` non configurée/non utilisée, nettoyage séparé | §T0.1 |
+| Identité Graph de suppression + audience de preuve | ⛔ **Humain** — 1 secret + 3 variables Environment avant staging/prod, Key Vault et app settings automatisés | §T0.1 |
 | Destinataire `ALERT_EMAIL` par Environment | ✅ Configuré dans `staging`/`prod`, valeur non divulguée et hors dépôt | §T0.4 |
 | Réseau privé atomique Storage / Key Vault / Cosmos + peering CI | ✅ IaC + hotfix OneDeploy | `infra/modules/privateNetwork.bicep` |
 | GitHub Environments `dev`/`staging`/`prod` | ✅ Créés ; staging/prod limités aux branches protégées et configurés JWT | §T0.3 |
@@ -49,10 +51,14 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
    effectivement consommé.
 5. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
    `AUTH_JWT_SIGNING_KEY` / `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`, sans afficher sa valeur.
-6. Contrôler que la variable non secrète `ALERT_EMAIL` de chaque Environment
+6. En cas d'échec du prévol de suppression de compte, contrôler le jeu complet
+   du secret `ENTRA_GRAPH_CLIENT_SECRET` et des variables
+   `ENTRA_GRAPH_TENANT_ID`, `ENTRA_GRAPH_CLIENT_ID` et
+   `ENTRA_REAUTH_AUDIENCE`. Ne jamais afficher le secret.
+7. Contrôler que la variable non secrète `ALERT_EMAIL` de chaque Environment
    `staging`/`prod` désigne une boîte réellement supervisée ; aucune valeur par
    défaut n'est committée.
-7. Pour un rollback, relever le `sourceRunId` de `previous` dans l'état de
+8. Pour un rollback, relever le `sourceRunId` de `previous` dans l'état de
    déploiement et utiliser `promote-backend` avec `operation=rollback`. Le chemin
    rollback refuse tout autre artefact et ne redéploie pas Bicep.
 
@@ -270,6 +276,35 @@ Ordre de mise en service inter-branches :
 Cet ordre est compatible avec le template actuel, où le paramètre existe déjà mais
 reste facultatif, et avec le template durci de la PR #263.
 
+### Identité Graph de suppression de compte
+
+Créer ou vérifier dans le tenant External ID un client confidentiel mono-tenant
+dédié. Lui accorder uniquement les permissions d’application Microsoft Graph
+`User.RevokeSessions.All` et `User.ReadWrite.All`, avec consentement
+administrateur.
+
+Configurer dans `staging` et `prod` :
+
+- le **secret GitHub Environment** `ENTRA_GRAPH_CLIENT_SECRET` ;
+- `ENTRA_GRAPH_TENANT_ID` : Directory/Tenant ID du tenant External ID ;
+- `ENTRA_GRAPH_CLIENT_ID` : Application/Client ID du client Graph dédié ;
+- `ENTRA_REAUTH_AUDIENCE` : client ID de l’application mobile qui reçoit l’ID
+  token OIDC de ré-authentification.
+
+`cd-backend.yml` lit ces valeurs uniquement après l’entrée dans le GitHub
+Environment ciblé, les valide avec les autres paramètres de déploiement, puis les
+écrit dans le fichier ARM temporaire `0600`. Le secret reste un paramètre Bicep
+`@secure`; `keyvaultGraphClientSecret.bicep` crée ou rotationne sa version dans
+le Key Vault Certigo et retourne son URI versionnée. `functionApp.bicep`
+maintient les quatre app settings, dont
+`ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI`, à chaque déploiement. Aucune commande
+`az keyvault secret set`, `az functionapp config appsettings set` ni saisie
+portail post-déploiement n’est nécessaire.
+
+En `dev`, le writer ignore explicitement ces entrées, le module Key Vault n’est
+pas déployé et l’identité externe reste indisponible plutôt qu’émulée avec une
+identité réelle.
+
 ### Commandes
 
 ```bash
@@ -419,6 +454,7 @@ Configurer dans chaque GitHub Environment `staging`/`prod` :
 
 - le secret `AUTH_JWT_SIGNING_KEY` ;
 - la variable non secrète `AUTH_JWT_SIGNING_KEY_EXPIRES_ON` ;
+- le secret et les trois variables de l’identité Graph décrits en §T0.1 ;
 - la variable non secrète `ALERT_EMAIL`, pointant vers une boîte réellement
   supervisée et capable de recevoir du courrier.
 

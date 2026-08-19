@@ -228,12 +228,17 @@ var host = new HostBuilder()
         services.AddSingleton<IAccountDeletionRepository, CosmosAccountDeletionRepository>();
         services.AddSingleton<IAccountDeletionAccessGuard, AccountDeletionAccessGuard>();
         services.AddSingleton<IAccountDeletionAudit, AccountDeletionAudit>();
+        var directGraphClientSecret = configuration["ENTRA_GRAPH_CLIENT_SECRET"];
+        GraphClientSecretGuard.EnsureIndirectConfiguration(
+            directGraphClientSecret,
+            context.HostingEnvironment.IsProduction(),
+            configuration["AUTH_MODE"]);
         if (!string.IsNullOrWhiteSpace(configuration["ENTRA_AUTHORITY"]))
         {
             var graphTenantId = configuration["ENTRA_GRAPH_TENANT_ID"];
             var graphClientId = configuration["ENTRA_GRAPH_CLIENT_ID"];
             var graphClientSecret = KeyVaultSecretValueResolver.Resolve(
-                configuration["ENTRA_GRAPH_CLIENT_SECRET"],
+                directGraphClientSecret,
                 configuration[ConfigurationKeys.EntraGraphClientSecretSecretUri],
                 configuration["HEALTH_PLATFORM_CLIENT_ID"],
                 TimeSpan.FromSeconds(10));

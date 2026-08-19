@@ -513,6 +513,10 @@ function validateRepositoryInvariants() {
     for (const marker of [
       'ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}',
       'AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}',
+      'ENTRA_GRAPH_TENANT_ID: ${{ vars.ENTRA_GRAPH_TENANT_ID }}',
+      'ENTRA_GRAPH_CLIENT_ID: ${{ vars.ENTRA_GRAPH_CLIENT_ID }}',
+      'ENTRA_GRAPH_CLIENT_SECRET: ${{ secrets.ENTRA_GRAPH_CLIENT_SECRET }}',
+      'ENTRA_REAUTH_AUDIENCE: ${{ vars.ENTRA_REAUTH_AUDIENCE }}',
       'az bicep build-params',
       'node .github/scripts/write-secure-bicep-parameters.mjs',
       'DEPLOYMENT_OUTPUTS_FILE',
@@ -531,16 +535,31 @@ function validateRepositoryInvariants() {
         ))
       || backend.includes('authJwtSigningKey="$AUTH_JWT_SIGNING_KEY"')
       || backend.includes('--parameters authJwtSigningKey')
+      || backend.includes('--parameters entraGraphClientSecret')
+      || backend.includes('ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI: ${{ vars.')
       || promoteBackend.includes('AUTH_JWT_SIGNING_KEY')
+      || promoteBackend.includes('ENTRA_GRAPH_CLIENT_SECRET')
     ) {
       errors.push(
-        'backend deployment: JWT signing key must come from the called job environment and never a command argument',
+        'backend deployment: sensitive keys must come from the target environment and never a command argument or promotion payload',
+      );
+    }
+    if (
+      backend.includes('workflow_call:')
+      && !backend.includes('ENTRA_GRAPH_CLIENT_SECRET:\n        required: true')
+    ) {
+      errors.push(
+        'cd-backend.yml: reusable workflow must declare ENTRA_GRAPH_CLIENT_SECRET as required',
       );
     }
     for (const marker of [
       "environment !== 'dev'",
       'compiled.parameters.alertEmail',
       'compiled.parameters.authJwtSigningKey',
+      'compiled.parameters.entraGraphTenantId',
+      'compiled.parameters.entraGraphClientId',
+      'compiled.parameters.entraGraphClientSecret',
+      'compiled.parameters.entraReauthAudience',
       'mode: 0o600',
       "flag: 'wx'",
     ]) {
@@ -552,6 +571,14 @@ function validateRepositoryInvariants() {
       if (/^\s*param\s+alertEmail\s*=/m.test(content)) {
         errors.push(
           `${environment}.bicepparam: alertEmail must come from the GitHub Environment`,
+        );
+      }
+      if (
+        /^\s*param\s+entra(GraphTenantId|GraphClientId|GraphClientSecret|ReauthAudience)\s*=/m
+          .test(content)
+      ) {
+        errors.push(
+          `${environment}.bicepparam: account deletion identity values must come from the GitHub Environment`,
         );
       }
     }

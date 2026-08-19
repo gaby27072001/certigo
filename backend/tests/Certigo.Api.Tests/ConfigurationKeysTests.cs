@@ -40,4 +40,35 @@ public sealed class ConfigurationKeysTests
             Environment.SetEnvironmentVariable(graphSecretUriVariable, null);
         }
     }
+
+    [Theory]
+    [InlineData(true, null)]
+    [InlineData(false, "prod")]
+    [InlineData(false, null)]
+    [InlineData(false, "staging")]
+    [InlineData(false, "test")]
+    [InlineData(true, "dev")]
+    public void GraphClientSecretGuard_RejectsDirectSecretsInHardenedEnvironments(
+        bool isProduction,
+        string? authMode)
+    {
+        var action = () => GraphClientSecretGuard.EnsureIndirectConfiguration(
+            "direct-secret",
+            isProduction,
+            authMode);
+
+        action.Should().Throw<InvalidOperationException>()
+            .WithMessage("*ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI*");
+    }
+
+    [Fact]
+    public void GraphClientSecretGuard_AllowsDirectSecretsOnlyForExplicitDevelopment()
+    {
+        var action = () => GraphClientSecretGuard.EnsureIndirectConfiguration(
+            "local-development-secret",
+            isProduction: false,
+            authMode: "dev");
+
+        action.Should().NotThrow();
+    }
 }
