@@ -1,14 +1,14 @@
 {
   "id": "wp-p2-04",
-  "status": "in_progress",
-  "session_id": "5cf299a4-4f53-453a-8d1d-671f70f54913",
-  "branch": "gchambaud-microsoft-import-content-releases",
-  "pr": null,
+  "status": "in_review",
+  "session_id": "22d76479-75a1-4b74-b50d-7e169bc2162b",
+  "branch": "gchambaud-microsoft-runtime-content-backend",
+  "pr": 304,
   "checkpoint": {
-    "step": "implementation-started",
-    "note": "Issue #244 lancée après fusion de wp-p2-03 ; contrat des artefacts content en cours d'intégration dans le backend.",
-    "at": "2026-08-06T10:03:18Z"
+    "step": "implementation-complete-awaiting-staging",
+    "note": "Import Blob WORM, vérification complète, projection runtime, staging Cosmos, promotion/rollback ETag, historique épinglé, endpoint public, auth admin, feature flag legacy et tests livrés. Reste la preuve opérateur staging sans déploiement dans cette PR.",
+    "at": "2026-08-19T17:46:01+01:00"
   },
-  "updated_at": "2026-08-06T10:03:18Z",
+  "updated_at": "2026-08-19T17:46:01+01:00",
   "history_ref": "log.jsonl"
 }
