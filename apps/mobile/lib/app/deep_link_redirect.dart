@@ -64,8 +64,7 @@ final class DeepLinkRouterCoordinator {
   }
 
   DeepLinkParseResult? _parseIncoming(Uri uri) {
-    final bool isAbsoluteWebLink =
-        uri.hasScheme &&
+    final bool isAbsoluteWebLink = uri.hasScheme &&
         (uri.scheme.toLowerCase() == 'https' || uri.scheme.toLowerCase() == 'http');
     final bool isRelativeIngress = !uri.hasScheme && policy.isPotentialRouterPath(uri.path);
     if (!isAbsoluteWebLink && !isRelativeIngress) {

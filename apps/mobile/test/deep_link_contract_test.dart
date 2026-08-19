@@ -35,12 +35,10 @@ void main() {
     });
 
     test('supports achievement and public account-deletion contracts', () {
-      final DeepLinkDestination achievement = enabledPolicy
-          .parse('https://certigo.app/achievements/first-lesson')
-          .destination!;
-      final DeepLinkDestination deletion = enabledPolicy
-          .parse('https://certigo.app/account-deletion')
-          .destination!;
+      final DeepLinkDestination achievement =
+          enabledPolicy.parse('https://certigo.app/achievements/first-lesson').destination!;
+      final DeepLinkDestination deletion =
+          enabledPolicy.parse('https://certigo.app/account-deletion').destination!;
 
       expect(achievement.appLocation, '/achievements/first-lesson');
       expect(achievement.requiresAuthentication, isTrue);
