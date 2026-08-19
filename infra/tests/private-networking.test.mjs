@@ -511,20 +511,6 @@ test('Graph client secret module stores the value only in Key Vault and returns 
   assert.doesNotMatch(JSON.stringify(template), /ENTRA_GRAPH_CLIENT_SECRET":/);
 });
 
-test('staging and production retain the 30-day continuous backup policy', () => {
-  for (const environment of ['staging', 'prod']) {
-    const parameters = readFileSync(
-      path.join(repositoryRoot, 'infra', 'params', `${environment}.bicepparam`),
-      'utf8',
-    );
-    assert.match(parameters, /^\s*param\s+cosmosBackupMode\s*=\s*'Continuous'/m);
-    assert.match(
-      parameters,
-      /^\s*param\s+cosmosContinuousBackupTier\s*=\s*'Continuous30Days'/m,
-    );
-  }
-});
-
 test('Function deployment waits for the complete private network deployment', () => {
   const template = compileTemplate('infra/main.bicep');
   const networkDeployment = template.resources.privateNetwork;

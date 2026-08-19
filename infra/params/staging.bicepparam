@@ -73,9 +73,9 @@ param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
 param enableDefenderPlans = false
 param manageDefenderPlans = false
 
-// Staging validates the same 30-day PITR contract as production.
+// Staging validates the same PITR contract as production.
 param cosmosBackupMode = 'Continuous'
-param cosmosContinuousBackupTier = 'Continuous30Days'
+param cosmosContinuousBackupTier = 'Continuous7Days'
 
 // Audit-only MCSB assignment is explicit and cannot deny staging deployments.
 param deployMcsbPolicyAssignment = true
