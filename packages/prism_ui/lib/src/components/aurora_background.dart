@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/prism_color_scheme.dart';
+import 'prism_content_frame.dart';
 
 /// The signature Certigo backdrop: a soft, slow "aurora" of brand-tinted
 /// radial glows over the base background. It gives the glass surfaces something
@@ -8,10 +9,16 @@ import '../theme/prism_color_scheme.dart';
 /// Static by default (cheap). Set [animate] true on hero screens for a gentle
 /// drift; it auto-disables when the platform requests reduced motion.
 class AuroraBackground extends StatelessWidget {
-  const AuroraBackground({super.key, required this.child, this.animate = false});
+  const AuroraBackground({
+    super.key,
+    required this.child,
+    this.animate = false,
+    this.maxContentWidth = 840,
+  });
 
   final Widget child;
   final bool animate;
+  final double? maxContentWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +42,11 @@ class AuroraBackground extends StatelessWidget {
             left: 20,
             child: _Glow(color: p.info.withOpacity(0.12), size: 360),
           ),
-          Positioned.fill(child: child),
+          Positioned.fill(
+            child: maxContentWidth == null
+                ? child
+                : PrismContentFrame(maxWidth: maxContentWidth!, child: child),
+          ),
         ],
       ),
     );

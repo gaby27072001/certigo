@@ -87,41 +87,31 @@ class _MascotPromptState extends State<MascotPrompt> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        AnimatedSlide(
-          offset: _visible ? Offset.zero : const Offset(-0.08, 0),
+        PrismReveal(
+          visible: _visible,
+          from: const Offset(-0.08, 0),
           duration: d,
-          curve: PrismMotion.decelerate,
-          child: AnimatedOpacity(
-            opacity: _visible ? 1 : 0,
-            duration: d,
-            curve: PrismMotion.decelerate,
-            child: MascotAvatar(
-              mascot: widget.mascot,
-              mood: widget.mood,
-              size: widget.size,
-              showBadge: false,
-            ),
+          child: MascotAvatar(
+            mascot: widget.mascot,
+            mood: widget.mood,
+            size: widget.size,
+            showBadge: false,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: AnimatedSlide(
-              offset: _visible ? Offset.zero : const Offset(0.08, 0),
+            child: PrismReveal(
+              visible: _visible,
+              from: const Offset(0.08, 0),
               duration: d,
-              curve: PrismMotion.decelerate,
-              child: AnimatedOpacity(
-                opacity: _visible ? 1 : 0,
-                duration: d,
-                curve: PrismMotion.decelerate,
-                child: SpeechBubble(
-                  tail: SpeechTail.left,
-                  tailAlignment: 0.32,
-                  child: widget.typewriter
-                      ? TypewriterText(widget.message, style: bubbleStyle)
-                      : Text(widget.message, style: bubbleStyle),
-                ),
+              child: SpeechBubble(
+                tail: SpeechTail.left,
+                tailAlignment: 0.32,
+                child: widget.typewriter
+                    ? TypewriterText(widget.message, style: bubbleStyle)
+                    : Text(widget.message, style: bubbleStyle),
               ),
             ),
           ),

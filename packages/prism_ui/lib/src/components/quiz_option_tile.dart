@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/prism_color_scheme.dart';
+import '../tokens/prism_motion.dart';
 import '../tokens/prism_radii.dart';
 
 /// Visual + interaction states a quiz answer option can be in.
@@ -47,6 +48,7 @@ class QuizOptionTile extends StatelessWidget {
     final bool graded = state == QuizOptionState.correct ||
         state == QuizOptionState.incorrect ||
         state == QuizOptionState.missed;
+    final Duration duration = PrismMotion.resolve(context, PrismMotion.fast);
 
     return Semantics(
       button: true,
@@ -60,8 +62,8 @@ class QuizOptionTile extends StatelessWidget {
                 onTap!.call();
               },
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
+          duration: duration,
+          curve: PrismMotion.standard,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           decoration: BoxDecoration(
             color: s.fill,

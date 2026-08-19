@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:prism_ui/prism_ui.dart';
 
 import '../../app/router.dart';
 
@@ -12,24 +13,40 @@ class ScreenHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final TextTheme t = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 20, 4),
-      child: Row(
-        children: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go(Routes.home);
-              }
-            },
-          ),
-          const SizedBox(width: 4),
-          Text(title, style: t.headlineSmall),
-        ],
+      padding: const EdgeInsets.fromLTRB(
+        PrismSpacing.sm,
+        PrismSpacing.xs,
+        PrismSpacing.sm,
+        PrismSpacing.xs,
+      ),
+      child: GlassSurface(
+        elevation: 0,
+        borderRadius: PrismRadii.pillAll,
+        padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.xs),
+        child: Row(
+          children: <Widget>[
+            IconButton(
+              tooltip: 'Retour',
+              icon: const Icon(Icons.arrow_back_rounded),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go(Routes.home);
+                }
+              },
+            ),
+            const SizedBox(width: PrismSpacing.xxs),
+            Expanded(
+              child: Semantics(
+                header: true,
+                child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+              ),
+            ),
+            const SizedBox(width: 48),
+          ],
+        ),
       ),
     );
   }

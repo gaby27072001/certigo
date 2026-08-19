@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/prism_color_scheme.dart';
+import '../tokens/prism_motion.dart';
 import '../tokens/prism_radii.dart';
 import 'quiz_option_tile.dart';
 
@@ -45,8 +46,8 @@ class AnswerChip extends StatelessWidget {
                 onTap!.call();
               },
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOut,
+          duration: PrismMotion.resolve(context, PrismMotion.fast),
+          curve: PrismMotion.standard,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: s.fill,

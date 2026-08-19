@@ -43,9 +43,12 @@ class PrismStepSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final Duration effectiveDuration = PrismMotion.resolve(context, duration);
+    final Duration effectiveReverseDuration = PrismMotion.resolve(context, reverseDuration);
     return AnimatedSwitcher(
-      duration: duration,
-      reverseDuration: reverseDuration,
+      duration: effectiveDuration,
+      reverseDuration: effectiveReverseDuration,
       switchInCurve: PrismMotion.decelerate,
       switchOutCurve: PrismMotion.standard,
       layoutBuilder: (Widget? current, List<Widget> previous) {
@@ -55,6 +58,9 @@ class PrismStepSwitcher extends StatelessWidget {
         );
       },
       transitionBuilder: (Widget child, Animation<double> animation) {
+        if (reduceMotion) {
+          return FadeTransition(opacity: animation, child: child);
+        }
         final Animation<Offset> offset = Tween<Offset>(
           begin: Offset(slideExtent, 0),
           end: Offset.zero,
