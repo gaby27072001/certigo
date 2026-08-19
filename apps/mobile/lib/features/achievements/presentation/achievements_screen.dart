@@ -82,7 +82,7 @@ class _AchievementsContent extends StatelessWidget {
               PrismProgressBar(
                 value: overall,
                 semanticLabel: 'Progression globale des succès',
-                duration: const Duration(milliseconds: 800),
+                duration: PrismMotion.celebrate,
               ),
             ],
           ),
@@ -164,7 +164,7 @@ class _AchievementCard extends StatelessWidget {
                   value: value,
                   gradient: unlocked ? <Color>[tierColor, tierColor] : null,
                   semanticLabel: 'Progression du succès',
-                  duration: const Duration(milliseconds: 800),
+                  duration: PrismMotion.celebrate,
                 ),
               ),
               const SizedBox(width: 12),

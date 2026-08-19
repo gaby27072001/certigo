@@ -20,6 +20,16 @@ void main() {
       expect(find.byType(BackdropFilter), findsNothing);
     });
 
+    testWidgets('keeps glass blur when only motion is reduced', (WidgetTester tester) async {
+      await pumpPrism(
+        tester,
+        const GlassSurface(child: Text('Calm glass')),
+        disableAnimations: true,
+      );
+
+      expect(find.byType(BackdropFilter), findsOneWidget);
+    });
+
     testWidgets('invokes onTap when pressed', (WidgetTester tester) async {
       int taps = 0;
       await pumpPrism(tester, GlassSurface(onTap: () => taps++, child: const Text('Tap me')));

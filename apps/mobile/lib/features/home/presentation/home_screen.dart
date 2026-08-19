@@ -125,19 +125,22 @@ class _HomeContent extends StatelessWidget {
         const SizedBox(height: 24),
 
         // Explorer — secondary destinations beyond the daily path.
-        Text('Explorer', style: t.titleLarge),
+        const PrismSectionHeader(
+          title: 'Explorer',
+          subtitle: 'Choisis ton prochain objectif',
+          icon: Icons.explore_rounded,
+        ),
         const SizedBox(height: 12),
         const _ExploreSection(),
         const SizedBox(height: 24),
 
         // Weakest domain -------------------------------------------------
         if (weak != null) ...<Widget>[
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: <Widget>[
-              Text('À renforcer', style: t.titleLarge),
-              Text('${weak.score}/100', style: t.labelMedium?.copyWith(color: p.ember)),
-            ],
+          PrismSectionHeader(
+            title: 'À renforcer',
+            subtitle: 'Un effort ciblé fait vite progresser',
+            icon: Icons.bolt_rounded,
+            trailing: Text('${weak.score}/100', style: t.labelMedium?.copyWith(color: p.ember)),
           ),
           const SizedBox(height: 12),
           _WeakDomainCard(domain: weak, onTap: () => context.go(Routes.path)),
@@ -177,47 +180,37 @@ class _HomeGreetingState extends State<_HomeGreeting> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        AnimatedSlide(
-          offset: _visible ? Offset.zero : const Offset(-0.08, 0),
+        PrismReveal(
+          visible: _visible,
+          from: const Offset(-0.08, 0),
           duration: d,
-          curve: PrismMotion.decelerate,
-          child: AnimatedOpacity(
-            opacity: _visible ? 1 : 0,
-            duration: d,
-            curve: PrismMotion.decelerate,
-            child: const MascotAvatar(
-              mascot: AuroraMascot.nimbus,
-              mood: MascotMood.happy,
-              size: 64,
-              showBadge: false,
-            ),
+          child: const MascotAvatar(
+            mascot: AuroraMascot.nimbus,
+            mood: MascotMood.happy,
+            size: 64,
+            showBadge: false,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: AnimatedSlide(
-            offset: _visible ? Offset.zero : const Offset(0.08, 0),
+          child: PrismReveal(
+            visible: _visible,
+            from: const Offset(0.08, 0),
             duration: d,
-            curve: PrismMotion.decelerate,
-            child: AnimatedOpacity(
-              opacity: _visible ? 1 : 0,
-              duration: d,
-              curve: PrismMotion.decelerate,
-              child: SpeechBubble(
-                tail: SpeechTail.left,
-                tailAlignment: 0.34,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Text(
-                      'Bon retour, ${widget.firstName} 👋',
-                      style: t.bodyMedium?.copyWith(color: p.textSecondary),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(widget.subtitle, style: t.titleLarge),
-                  ],
-                ),
+            child: SpeechBubble(
+              tail: SpeechTail.left,
+              tailAlignment: 0.34,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    'Bon retour, ${widget.firstName} 👋',
+                    style: t.bodyMedium?.copyWith(color: p.textSecondary),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(widget.subtitle, style: t.titleLarge),
+                ],
               ),
             ),
           ),
@@ -349,7 +342,6 @@ class _WeakDomainCard extends StatelessWidget {
     return PrismCard(
       variant: PrismCardVariant.tonal,
       accent: p.ember,
-      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

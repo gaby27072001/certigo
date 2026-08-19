@@ -140,7 +140,7 @@ class _YearWheel extends StatelessWidget {
               final bool selected = year == selectedYear;
               return Center(
                 child: AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 120),
+                  duration: PrismMotion.resolve(ctx, PrismMotion.fast),
                   style: selected
                       ? (t.headlineMedium ?? const TextStyle()).copyWith(
                           color: p.primary,
