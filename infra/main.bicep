@@ -283,7 +283,7 @@ module monitoring 'modules/appInsights.bicep' = {
   params: {
     name: 'appi-${appName}-${env}'
     location: location
-    retentionInDays: hardened ? 90 : 30
+    retentionInDays: 30
     tags: tags
   }
 }

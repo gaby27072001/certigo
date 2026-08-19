@@ -7,6 +7,7 @@ on:
     types: [runner-health]
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -41,6 +42,28 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
+
+      - name: Measure current workflow queue wait
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RUN_TIMESTAMPS="$(
+            curl --fail --silent --show-error \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+              | jq -er '[.created_at, .run_started_at] | @tsv'
+          )"
+          IFS=$'\t' read -r CREATED_AT RUN_STARTED_AT <<< "$RUN_TIMESTAMPS"
+          CREATED_EPOCH="$(date --date="$CREATED_AT" +%s)"
+          STARTED_EPOCH="$(date --date="$RUN_STARTED_AT" +%s)"
+          if (( CREATED_EPOCH > STARTED_EPOCH )); then
+            echo "::error::Workflow start time precedes its creation time."
+            exit 1
+          fi
+          echo "RUN_QUEUE_WAIT_SECONDS=$((STARTED_EPOCH - CREATED_EPOCH))" >> "$GITHUB_ENV"
 
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
@@ -88,6 +111,7 @@ jobs:
         shell: bash
         env:
           MIN_FREE_GB: "10"
+          CACHE_PATHS: ${{ runner.tool_cache }}:${{ env.PUB_CACHE }}:${{ env.DOTNET_INSTALL_DIR }}
         run: bash infra/ci-runner/health-probe.sh
 
       - name: Remove isolated Flutter state

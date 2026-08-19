@@ -16,6 +16,9 @@ resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   properties: {
     sku: { name: 'PerGB2018' }
     retentionInDays: retentionInDays
+    features: {
+      immediatePurgeDataOn30Days: retentionInDays == 30
+    }
   }
 }
 

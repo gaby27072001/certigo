@@ -309,27 +309,89 @@ test('diagnostic settings adopt the live storage setting names', () => {
   }
 });
 
-test('readiness availability alert requires both low-frequency probe locations to fail', () => {
+test('bounded liveness and readiness tests require both probe locations to fail', () => {
   const template = compileTemplate('infra/modules/diagnostics.bicep');
-  const [webTest] = resourcesOfType(template, 'Microsoft.Insights/webtests');
-  const [alert] = resourcesOfType(template, 'Microsoft.Insights/metricAlerts');
+  const webTests = resourcesOfType(template, 'Microsoft.Insights/webtests');
+  const alerts = resourcesOfType(template, 'Microsoft.Insights/metricAlerts');
 
-  assert.equal(webTest.kind, 'standard');
-  assert.equal(webTest.properties.Frequency, 300);
-  assert.equal(
-    webTest.properties.Request.RequestUrl,
-    "[format('https://{0}/api/health/ready', parameters('functionAppHostName'))]",
+  assert.equal(template.variables.availabilityTests.length, 2);
+  assert.deepEqual(
+    template.variables.availabilityTests.map((testDefinition) => testDefinition.path),
+    ['/api/health/live', '/api/health/ready'],
   );
-  assert.deepEqual(webTest.properties.Locations, [
-    { Id: 'emea-nl-ams-azr' },
-    { Id: 'us-va-ash-azr' },
-  ]);
-  assert.equal(
-    alert.properties.criteria['odata.type'],
-    'Microsoft.Azure.Monitor.WebtestLocationAvailabilityCriteria',
+  assert.equal(webTests.length, 1);
+  assert.equal(alerts.length, 1);
+  assert.equal(webTests[0].copy.count, "[length(variables('availabilityTests'))]");
+  assert.equal(alerts[0].copy.count, "[length(variables('availabilityTests'))]");
+  for (const webTest of webTests) {
+    assert.equal(webTest.kind, 'standard');
+    assert.equal(webTest.properties.Frequency, 300);
+    assert.equal(
+      webTest.properties.Request.RequestUrl,
+      "[format('https://{0}{1}', parameters('functionAppHostName'), variables('availabilityTests')[copyIndex()].path)]",
+    );
+    assert.equal(webTest.properties.Request.HttpVerb, 'GET');
+    assert.equal(webTest.properties.Request.Headers, undefined);
+    assert.equal(webTest.properties.Request.RequestBody, undefined);
+    assert.deepEqual(webTest.properties.Locations, [
+      { Id: 'emea-nl-ams-azr' },
+      { Id: 'us-va-ash-azr' },
+    ]);
+  }
+  for (const alert of alerts) {
+    assert.equal(
+      alert.properties.criteria['odata.type'],
+      'Microsoft.Azure.Monitor.WebtestLocationAvailabilityCriteria',
+    );
+    assert.equal(alert.properties.criteria.failedLocationCount, 2);
+    assert.equal(alert.properties.evaluationFrequency, 'PT5M');
+  }
+});
+
+test('observability alerts and workbook cover low-volume failure gaps without raw identifiers', () => {
+  const template = compileTemplate('infra/modules/diagnostics.bicep');
+  const scheduledAlerts = resourcesOfType(
+    template,
+    'Microsoft.Insights/scheduledQueryRules',
   );
-  assert.equal(alert.properties.criteria.failedLocationCount, 2);
-  assert.equal(alert.properties.evaluationFrequency, 'PT5M');
+  const [workbook] = resourcesOfType(template, 'Microsoft.Insights/workbooks');
+  const source = readFileSync(
+    path.join(repositoryRoot, 'infra', 'modules', 'diagnostics.bicep'),
+    'utf8',
+  );
+
+  assert.match(source, /name: 'telemetry-absent'/);
+  assert.match(source, /RequestCount == 0/);
+  assert.match(source, /name: 'http5xx-spike'[\s\S]*threshold: 0/);
+  assert.equal(template.variables.logAlerts.length, 5);
+  assert.equal(scheduledAlerts.length, 1);
+  assert.equal(scheduledAlerts[0].copy.count, "[length(variables('logAlerts'))]");
+  assert.ok(workbook);
+  assert.equal(workbook.properties.sourceId, "[parameters('workspaceId')]");
+  assert.match(source, /CDBPartitionKeyRUConsumption/);
+  assert.match(source, /CDBPartitionKeyStatistics/);
+  assert.match(source, /functions\.cold_start/);
+  assert.doesNotMatch(source, /summarize[\s\S]*by PartitionKey/);
+});
+
+test('Application Insights retention and adaptive sampling are explicitly bounded', () => {
+  const main = compileTemplate('infra/main.bicep');
+  assert.equal(
+    main.resources.monitoring.properties.parameters.retentionInDays.value,
+    30,
+  );
+
+  const host = JSON.parse(
+    readFileSync(
+      path.join(repositoryRoot, 'backend', 'src', 'Certigo.Api', 'host.json'),
+      'utf8',
+    ),
+  );
+  const sampling = host.logging.applicationInsights.samplingSettings;
+  assert.equal(sampling.isEnabled, true);
+  assert.equal(sampling.maxTelemetryItemsPerSecond, 5);
+  assert.equal(sampling.minSamplingPercentage, 10);
+  assert.equal(sampling.excludedTypes, 'Request;Exception');
 });
 
 test('deployment failure alert is scoped to failed backend operations in its resource group', () => {

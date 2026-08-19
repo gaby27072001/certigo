@@ -13,6 +13,7 @@ using Certigo.Api;
 using Certigo.Api.Auth;
 using Certigo.Api.Functions;
 using Certigo.Api.Middleware;
+using Certigo.Api.Observability;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Services;
 using Certigo.Infrastructure.Ai;
@@ -37,6 +38,7 @@ var host = new HostBuilder()
         var configuration = context.Configuration;
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
+        services.AddHostedService<ColdStartTelemetryService>();
 
         services.AddSingleton<TokenCredential, DefaultAzureCredential>();
         services.AddSingleton(sp =>

@@ -76,6 +76,8 @@ jobs:
         run: BICEP_BIN=bicep bash infra/validate.sh
       - name: Validate ci-runner bootstrap and health probe
         run: bash infra/ci-runner/validate.sh
+      - name: Validate runner observability metrics
+        run: node --test .github/scripts/runner-observability.test.mjs
       - name: Validate Cosmos indexing policy
         run: node --test infra/tests/cosmos-indexing-policy.test.mjs
       - name: Validate private networking topology

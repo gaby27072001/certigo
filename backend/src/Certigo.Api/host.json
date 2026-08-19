@@ -5,6 +5,14 @@
       "enableLiveMetricsFilters": true,
       "samplingSettings": {
         "isEnabled": true,
+        "evaluationInterval": "00:00:15",
+        "initialSamplingPercentage": 100.0,
+        "maxSamplingPercentage": 100.0,
+        "maxTelemetryItemsPerSecond": 5,
+        "minSamplingPercentage": 10.0,
+        "movingAverageRatio": 0.25,
+        "samplingPercentageDecreaseTimeout": "00:02:00",
+        "samplingPercentageIncreaseTimeout": "00:15:00",
         "excludedTypes": "Request;Exception"
       }
     }
