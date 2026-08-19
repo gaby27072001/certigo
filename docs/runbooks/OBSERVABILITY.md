@@ -17,8 +17,10 @@ La baseline mesuree avant ce changement est :
 
 Le module `infra/modules/diagnostics.bicep` ajoute ou ajuste :
 
-- deux tests standard externes, `GET /api/health/live` et
-  `GET /api/health/ready`, toutes les cinq minutes depuis Amsterdam et Ashburn ;
+- le test readiness existant `availability-<function-app>` est conserve sans
+  renommage, et un seul test standard externe `availability-<function-app>-live`
+  est ajoute ; tous deux s'executent toutes les cinq minutes depuis Amsterdam
+  et Ashburn ;
 - une alerte par test, uniquement si les deux localisations echouent ;
 - une alerte au premier 5xx hors endpoints de sante sur 15 minutes ;
 - une alerte readiness et une alerte d'absence totale de requetes sur
@@ -26,9 +28,12 @@ Le module `infra/modules/diagnostics.bicep` ajoute ou ajuste :
 - un workbook agrege Functions, Cosmos DB et Storage ;
 - la metrique `functions.cold_start`, emise une seule fois par processus
   Functions avec deux dimensions statiques ;
-- une retention Log Analytics de 30 jours et un sampling adaptatif borne a
-  5 elements par seconde. Les requetes et exceptions restent exemptes afin que
-  les alertes demeurent fiables au faible volume observe.
+- une retention Log Analytics de 30 jours en dev et 90 jours dans les
+  environnements hardened (staging et production), sans
+  `immediatePurgeDataOn30Days`, afin de conserver les logs de suppression ; le
+  sampling adaptatif reste borne a 5 elements par seconde. Les requetes et
+  exceptions restent exemptes afin que les alertes demeurent fiables au faible
+  volume observe.
 
 Le workflow runner quotidien publie dans son Step Summary des metriques de
 lifecycle, attente du run courant, taille agregee des caches locaux, latence
@@ -49,23 +54,31 @@ les partitions peuvent etre correlees a un utilisateur.
 
 ## Cout marginal estime
 
-Tarif public Azure Retail Prices West Europe consulte le 19 aout 2026 :
-`Standard Web Test Execution` = **0,0006 EUR par execution**.
+Tarifs publics Azure Retail Prices West Europe consultes le 19 aout 2026 :
 
-Un test ajoute, deux localisations, une execution toutes les cinq minutes :
+- `Standard Web Test Execution` : **0,0006 EUR par execution**
+  ([meter `301dd520-69b3-52a7-9ad2-3cd457b79fb8`](https://prices.azure.com/api/retail/prices?currencyCode=%27EUR%27&$filter=serviceName%20eq%20%27Azure%20Monitor%27%20and%20armRegionName%20eq%20%27westeurope%27%20and%20meterName%20eq%20%27Standard%20Web%20Test%20Execution%27)) ;
+- `Alerts Resource Monitored at 5 Minute Frequency` :
+  **0,1318 EUR par ressource/mois**
+  ([meter `25bbac3f-6637-54eb-89f2-30d9afed34a0`](https://prices.azure.com/api/retail/prices?currencyCode=%27EUR%27&$filter=serviceName%20eq%20%27Azure%20Monitor%27%20and%20armRegionName%20eq%20%27westeurope%27%20and%20meterName%20eq%20%27Alerts%20Resource%20Monitored%20at%205%20Minute%20Frequency%27)).
 
-`2 x 12 x 730 = 17 520 executions/mois`, soit **10,51 EUR/mois par
-environnement**. Staging et production ajoutent donc environ **21,02 EUR/mois**
-au total. Le webtest readiness existant coute deja le meme montant et ne fait
-pas partie du marginal.
+La PR ajoute exactement un webtest live dans chacun des deux environnements ou
+le module diagnostics est deploye (staging et production). Ses retries sont
+desactives : `2 localisations x 12 executions/heure x 730 heures =
+17 520 executions/mois`, soit exactement **10,512 EUR/mois par environnement**
+au tarif public. Le webtest readiness conserve son nom et son cout existants ;
+il ne fait pas partie du marginal.
 
-Le workbook n'a pas de cout propre. La metrique cold-start et les requetes
-synthetiques ajoutent un volume d'ingestion negligeable a cette echelle. Les
-regles d'alerte supplementaires peuvent ajouter moins de 1 EUR/mois par
-environnement selon le tarif d'evaluation et de notification du contrat.
-Retirer la retention 90 jours au profit de 30 jours et borner le sampling peut
-reduire le cout existant ; cette economie n'est pas creditee dans l'estimation.
-Budget prudent : **12 EUR/mois par environnement**, **24 EUR/mois au total**.
+Sans crediter les eventuelles unites gratuites, l'alerte live ajoute au plus
+**0,1318 EUR/mois par environnement** sur ce meter. Le marginal public borne est
+donc **10,6438 EUR/mois par environnement**, soit **21,2876 EUR/mois** pour
+staging et production. Les notifications ne sont facturees que si elles sont
+emises et restent dependantes du contrat ; elles ne sont pas masquees dans ce
+total fixe. Le workbook n'a pas de cout propre. La metrique cold-start et les
+requetes synthetiques ajoutent un faible volume d'ingestion variable, facture
+au tarif d'ingestion du contrat. La retention 90 jours hors dev est conservee :
+aucune economie de retention n'est creditee. Budget arrondi vers le haut pour
+les meters fixes : **11 EUR/mois par environnement**, **22 EUR/mois au total**.
 
 ## Validation sans mutation
 

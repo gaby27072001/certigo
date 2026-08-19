@@ -316,13 +316,39 @@ test('bounded liveness and readiness tests require both probe locations to fail'
 
   assert.equal(template.variables.availabilityTests.length, 2);
   assert.deepEqual(
-    template.variables.availabilityTests.map((testDefinition) => testDefinition.path),
-    ['/api/health/live', '/api/health/ready'],
+    template.variables.availabilityTests.map((testDefinition) => ({
+      alertName: testDefinition.alertName,
+      path: testDefinition.path,
+      resourceName: testDefinition.resourceName,
+      retryEnabled: testDefinition.retryEnabled,
+    })),
+    [
+      {
+        alertName: 'alert-certigo-availability',
+        path: '/api/health/ready',
+        resourceName: "[format('availability-{0}', parameters('functionAppName'))]",
+        retryEnabled: true,
+      },
+      {
+        alertName: 'alert-certigo-availability-live',
+        path: '/api/health/live',
+        resourceName: "[format('availability-{0}-live', parameters('functionAppName'))]",
+        retryEnabled: false,
+      },
+    ],
   );
   assert.equal(webTests.length, 1);
   assert.equal(alerts.length, 1);
   assert.equal(webTests[0].copy.count, "[length(variables('availabilityTests'))]");
   assert.equal(alerts[0].copy.count, "[length(variables('availabilityTests'))]");
+  assert.equal(
+    webTests[0].name,
+    "[variables('availabilityTests')[copyIndex()].resourceName]",
+  );
+  assert.equal(
+    alerts[0].name,
+    "[variables('availabilityTests')[copyIndex()].alertName]",
+  );
   for (const webTest of webTests) {
     assert.equal(webTest.kind, 'standard');
     assert.equal(webTest.properties.Frequency, 300);
@@ -333,6 +359,10 @@ test('bounded liveness and readiness tests require both probe locations to fail'
     assert.equal(webTest.properties.Request.HttpVerb, 'GET');
     assert.equal(webTest.properties.Request.Headers, undefined);
     assert.equal(webTest.properties.Request.RequestBody, undefined);
+    assert.equal(
+      webTest.properties.RetryEnabled,
+      "[variables('availabilityTests')[copyIndex()].retryEnabled]",
+    );
     assert.deepEqual(webTest.properties.Locations, [
       { Id: 'emea-nl-ams-azr' },
       { Id: 'us-va-ash-azr' },
@@ -377,9 +407,15 @@ test('observability alerts and workbook cover low-volume failure gaps without ra
 test('Application Insights retention and adaptive sampling are explicitly bounded', () => {
   const main = compileTemplate('infra/main.bicep');
   assert.equal(
-    main.resources.monitoring.properties.parameters.retentionInDays.value,
-    30,
+    main.resources.monitoring.properties.parameters.retentionInDays,
+    "[if(variables('hardened'), createObject('value', 90), createObject('value', 30))]",
   );
+  const monitoring = compileTemplate('infra/modules/appInsights.bicep');
+  const [workspace] = resourcesOfType(
+    monitoring,
+    'Microsoft.OperationalInsights/workspaces',
+  );
+  assert.equal(workspace.properties.features, undefined);
 
   const host = JSON.parse(
     readFileSync(

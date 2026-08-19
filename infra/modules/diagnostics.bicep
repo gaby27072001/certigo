@@ -189,36 +189,46 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
   }
 }
 
-// The probes send no headers, body, query string or user data. Two locations and
-// a five-minute cadence bound cost while avoiding a single-location false alarm.
+// Preserve the deployed readiness resource names during incremental deployments;
+// only the liveness test and its alert are new. The probes send no headers, body,
+// query string or user data. The new liveness test disables retries so its
+// execution cost stays strictly bounded.
 var availabilityTests = [
   {
-    name: 'live'
-    path: '/api/health/live'
-    description: 'Certigo backend process liveness probe.'
+    name: 'ready'
+    resourceName: 'availability-${functionAppName}'
+    alertName: 'alert-certigo-availability'
+    path: '/api/health/ready'
+    description: 'Certigo backend availability and dependency-readiness probe.'
+    alertDescription: 'Readiness failed from both probe locations; inspect the Function App and Cosmos/Storage/Key Vault dependencies.'
+    retryEnabled: true
   }
   {
-    name: 'ready'
-    path: '/api/health/ready'
-    description: 'Certigo backend dependency-readiness probe.'
+    name: 'live'
+    resourceName: 'availability-${functionAppName}-live'
+    alertName: 'alert-certigo-availability-live'
+    path: '/api/health/live'
+    description: 'Certigo backend process liveness probe.'
+    alertDescription: 'Liveness failed from both probe locations; inspect the Function App process.'
+    retryEnabled: false
   }
 ]
 
 resource availabilityWebTests 'Microsoft.Insights/webtests@2022-06-15' = [for test in availabilityTests: {
-  name: 'availability-${functionAppName}-${test.name}'
+  name: test.resourceName
   location: location
   kind: 'standard'
   tags: union(tags, {
     'hidden-link:${appInsights.id}': 'Resource'
   })
   properties: {
-    Name: 'availability-${functionAppName}-${test.name}'
+    Name: test.resourceName
     Description: test.description
     Enabled: true
     Frequency: 300
     Timeout: 30
     Kind: 'standard'
-    RetryEnabled: true
+    RetryEnabled: test.retryEnabled
     Locations: [
       { Id: 'emea-nl-ams-azr' }
       { Id: 'us-va-ash-azr' }
@@ -234,19 +244,19 @@ resource availabilityWebTests 'Microsoft.Insights/webtests@2022-06-15' = [for te
       SSLCheck: true
       SSLCertRemainingLifetimeCheck: 14
     }
-    SyntheticMonitorId: 'availability-${functionAppName}-${test.name}'
+    SyntheticMonitorId: test.resourceName
   }
 }]
 
 resource availabilityAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [for (test, i) in availabilityTests: {
-  name: 'alert-certigo-availability-${test.name}'
+  name: test.alertName
   location: 'global'
   tags: union(tags, {
     'hidden-link:${appInsights.id}': 'Resource'
     'hidden-link:${availabilityWebTests[i].id}': 'Resource'
   })
   properties: {
-    description: '${test.name} failed from both probe locations; inspect the Function App and its dependencies.'
+    description: test.alertDescription
     severity: 1
     enabled: true
     scopes: [
