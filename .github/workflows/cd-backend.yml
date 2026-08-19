@@ -7,7 +7,9 @@ name: cd-backend
 # Required OIDC federated-identity secrets (repo/env settings):
 #   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
 # Required staging/prod environment configuration:
-#   secret AUTH_JWT_SIGNING_KEY + variable AUTH_JWT_SIGNING_KEY_EXPIRES_ON
+#   secrets AUTH_JWT_SIGNING_KEY and ENTRA_GRAPH_CLIENT_SECRET
+#   variables AUTH_JWT_SIGNING_KEY_EXPIRES_ON, ENTRA_GRAPH_TENANT_ID,
+#   ENTRA_GRAPH_CLIENT_ID and ENTRA_REAUTH_AUDIENCE
 # Optional only during a planned overlap:
 #   secret AUTH_JWT_PREVIOUS_SIGNING_KEY
 #   variable AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON
@@ -364,6 +366,11 @@ jobs:
           AUTH_JWT_SIGNING_KEY_EXPIRES_ON: ${{ vars.AUTH_JWT_SIGNING_KEY_EXPIRES_ON }}
           AUTH_JWT_PREVIOUS_SIGNING_KEY: ${{ secrets.AUTH_JWT_PREVIOUS_SIGNING_KEY }}
           AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON: ${{ vars.AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON }}
+          ENTRA_GRAPH_TENANT_ID: ${{ vars.ENTRA_GRAPH_TENANT_ID }}
+          ENTRA_GRAPH_CLIENT_ID: ${{ vars.ENTRA_GRAPH_CLIENT_ID }}
+          ENTRA_GRAPH_CLIENT_SECRET: ${{ secrets.ENTRA_GRAPH_CLIENT_SECRET }}
+          ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON: ${{ vars.ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON }}
+          ENTRA_REAUTH_AUDIENCE: ${{ vars.ENTRA_REAUTH_AUDIENCE }}
           BASE_PARAMETERS_FILE: ${{ runner.temp }}/certigo-base-parameters.json
           AUTH_PARAMETERS_FILE: ${{ runner.temp }}/certigo-auth-parameters.json
           DEPLOYMENT_OUTPUTS_FILE: ${{ runner.temp }}/certigo-deployment-outputs.json

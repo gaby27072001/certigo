@@ -12,6 +12,7 @@
 | Adresse e-mail de contact | TODO (ex : `support@certigo.app`) |
 | Site web | `https://gchambaud_microsoft.github.io/Certigo/` |
 | Politique de confidentialité (URL) | `https://gchambaud_microsoft.github.io/Certigo/privacy-policy/` |
+| Suppression du compte (URL) | `https://gchambaud_microsoft.github.io/Certigo/account-deletion/` |
 
 ## Description courte (≤ 80 caractères)
 Le Duolingo des certifications IT — formez-vous, entraînez-vous, réussissez.
@@ -39,9 +40,16 @@ XP, niveaux, streak quotidien, badges de progression — sans cœurs ni vies. Vo
 
 ## Conformité (à vérifier dans la console Play)
 - **Politique de confidentialité** : URL publique en place via GitHub Pages (`/privacy-policy/`). Migration ultérieure possible vers `https://certigo.app/privacy-policy/` en conservant le même chemin.
-- **Section "Sécurité des données"** : déclarer les données collectées. La bêta
-  stocke des préférences locales (`shared_preferences`) et appelle l'API
-  Certigo authentifiée (Entra External ID). TODO : compléter le formulaire.
+- **Section "Sécurité des données"** : déclarer au minimum les informations de
+  compte (e-mail pour le mode e-mail, identifiant utilisateur, nom/pseudo),
+  l’activité dans l’application (progression, réponses, scores), les relations
+  sociales choisies et les diagnostics techniques transmis au backend. Ces
+  données servent au fonctionnement, à la gestion du compte, à la sécurité et
+  au diagnostic ; elles ne sont pas vendues.
+- **Suppression des données** : répondre que la suppression du compte et des
+  données associées est disponible dans l’application et renseigner
+  `/account-deletion/` dans le champ URL Play Console. La page doit être publiée
+  avant de valider ce formulaire.
 - **Classification du contenu** : remplir le questionnaire (IARC). Attendu : Tout public.
 - **Public cible & contenu** : hors « familles/enfants ».
 - **targetSdk** : actuellement 34 (défaut Flutter 3.24). TODO : suivre l'exigence

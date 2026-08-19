@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
+import 'package:core/core.dart';
 
 import '../features/home/presentation/home_screen.dart';
 import '../features/path/presentation/path_screen.dart';
@@ -28,6 +29,7 @@ import '../features/auth/presentation/register_email_screen.dart';
 import '../features/auth/presentation/register_password_screen.dart';
 import '../features/auth/presentation/register_profile_created_screen.dart';
 import '../features/auth/presentation/splash_screen.dart' as auth;
+import '../features/account_deletion/presentation/account_deletion_screen.dart';
 import '../features/onboarding/application/onboarding_controller.dart';
 import '../features/onboarding/presentation/certification_screen.dart';
 import '../features/onboarding/presentation/onboarding_common.dart';
@@ -63,6 +65,8 @@ abstract class Routes {
   static const String friends = '/friends';
   static const String exam = '/exam';
   static const String dailyShare = '/share-daily';
+  static const String accountDeletion = '/account/delete';
+  static const String accountDeleted = '/account/deleted';
 }
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -111,6 +115,10 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   assert(Routes.auth == AuthShellRoutes.auth, 'Routes.auth désynchronisé');
   assert(Routes.home == AuthShellRoutes.home, 'Routes.home désynchronisé');
   assert(
+    Routes.accountDeleted == AuthShellRoutes.accountDeleted,
+    'Routes.accountDeleted désynchronisé',
+  );
+  assert(
     OnboardingRoutes.splash == AuthShellRoutes.onboardingSplash,
     'OnboardingRoutes.splash désynchronisé du garde d\'auth',
   );
@@ -136,6 +144,9 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
     initialLocation: Routes.splash,
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
+      if (!AppEnv.accountDeletionEnabled && state.matchedLocation == Routes.accountDeletion) {
+        return Routes.profile;
+      }
       final AuthState auth = ref.read(authControllerProvider);
       return resolveAuthRedirect(
         auth: auth,
@@ -167,6 +178,17 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           // alors les boutons sociaux (déjà proposés par la sheet).
           emailOnly: state.uri.queryParameters['emailOnly'] == '1',
         ),
+      ),
+      GoRoute(
+        path: Routes.accountDeletion,
+        parentNavigatorKey: _rootKey,
+        builder: (_, GoRouterState state) =>
+            AccountDeletionScreen(expectedUserId: state.extra as String?),
+      ),
+      GoRoute(
+        path: Routes.accountDeleted,
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const AccountDeletionCompletedScreen(),
       ),
 
       // Real account creation: name → email → password → confirmation.

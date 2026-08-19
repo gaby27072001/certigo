@@ -72,6 +72,8 @@ public sealed class CosmosEmulatorFixture : IAsyncLifetime
             var databaseResponse = await client.CreateDatabaseIfNotExistsAsync(
                 _databaseName, cancellationToken: cancellationToken);
             var database = databaseResponse.Database;
+            _client = client;
+            _database = database;
 
             foreach (var definition in CosmosContainers.All)
             {
@@ -86,8 +88,6 @@ public sealed class CosmosEmulatorFixture : IAsyncLifetime
                     cancellationToken: cancellationToken);
             }
 
-            _client = client;
-            _database = database;
             _context = new CosmosContext(client, _databaseName);
             return _context;
         }
@@ -107,7 +107,8 @@ public sealed class CosmosEmulatorFixture : IAsyncLifetime
             }
             catch (CosmosException)
             {
-                // Best-effort cleanup of the ephemeral database; never fail teardown.
+                // Local emulator cleanup is best effort because stopping the
+                // ephemeral container already removes every test document.
             }
         }
 

@@ -277,10 +277,18 @@ jobs:
         working-directory: apps/mobile
         shell: bash
         env:
+          ACCOUNT_DELETION_ENABLED: ${{ vars.ACCOUNT_DELETION_ENABLED || 'false' }}
           BUILD_NAME: ${{ steps.ver.outputs.build_name }}
           BUILD_NUMBER: ${{ steps.ver.outputs.build_number }}
         run: |
           set -euo pipefail
+          case "$ACCOUNT_DELETION_ENABLED" in
+            true|false) ;;
+            *)
+              echo "::error::ACCOUNT_DELETION_ENABLED must be true or false."
+              exit 1
+              ;;
+          esac
           flutter build appbundle --release \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
@@ -288,7 +296,8 @@ jobs:
             --dart-define="API_BASE_URL=$APP_API_BASE_URL" \
             --dart-define="ENTRA_CLIENT_ID=$APP_ENTRA_CLIENT_ID" \
             --dart-define="ENTRA_AUTHORITY=$APP_ENTRA_AUTHORITY" \
-            --dart-define="ENTRA_API_SCOPE=$APP_ENTRA_API_SCOPE"
+            --dart-define="ENTRA_API_SCOPE=$APP_ENTRA_API_SCOPE" \
+            --dart-define="ACCOUNT_DELETION_ENABLED=$ACCOUNT_DELETION_ENABLED"
 
       - name: Conserver l'AAB signé
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -392,15 +392,240 @@ test('Function app settings pass only versioned Key Vault secret URIs after the 
   const template = compileTemplate('infra/modules/functionApp.bicep');
   const [site] = resourcesOfType(template, 'Microsoft.Web/sites');
   const [settings] = resourcesOfType(template, 'Microsoft.Web/sites/config');
+  const accountDeletionParameters = [
+    'entraReauthAudience',
+    'entraGraphTenantId',
+    'entraGraphClientId',
+    'entraGraphClientSecretSecretUri',
+  ];
 
   assert.equal(site.properties.siteConfig.appSettings, undefined);
   assert.equal(settings.name, "[format('{0}/{1}', parameters('functionAppName'), 'appsettings')]");
-  assert.equal(
-    settings.properties.AUTH_JWT_SIGNING_KEY_SECRET_URI,
-    "[parameters('authJwtSigningKeySecretUri')]",
+  assert.match(
+    settings.properties,
+    /'AUTH_JWT_SIGNING_KEY_SECRET_URI', parameters\('authJwtSigningKeySecretUri'\)/,
   );
-  assert.equal(settings.properties.AUTH_JWT_SIGNING_KEY, undefined);
+  assert.match(
+    settings.properties,
+    /'ACCOUNT_DELETION_ENABLED', string\(parameters\('accountDeletionEnabled'\)\)/,
+  );
+  assert.equal(
+    template.variables.accountDeletionGraphSettings,
+    "[if(parameters('accountDeletionEnabled'), createObject('ENTRA_REAUTH_AUDIENCE', parameters('entraReauthAudience'), 'ENTRA_GRAPH_TENANT_ID', parameters('entraGraphTenantId'), 'ENTRA_GRAPH_CLIENT_ID', parameters('entraGraphClientId'), 'ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI', parameters('entraGraphClientSecretSecretUri')), createObject())]",
+  );
+  assert.match(settings.properties, /variables\('accountDeletionGraphSettings'\)/);
+  assert.doesNotMatch(settings.properties, /'ENTRA_GRAPH_CLIENT_SECRET',/);
+  for (const parameter of accountDeletionParameters) {
+    assert.equal(template.parameters[parameter].type, 'securestring');
+  }
+  assert.equal(
+    site.properties.keyVaultReferenceIdentity,
+    "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('id-{0}-host', parameters('functionAppName')))]",
+  );
+  const vaultAccess = resourcesOfType(
+    template,
+    'Microsoft.Authorization/roleAssignments',
+  ).find(
+    (assignment) =>
+      assignment.scope
+        === "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+  );
+  assert.ok(vaultAccess);
+  assert.equal(
+    vaultAccess.properties.roleDefinitionId,
+    "[variables('keyVaultSecretsUser')]",
+  );
   assert.ok(settings.dependsOn.includes("[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"));
+});
+
+test('account deletion identity flows through secure parameters and a versioned Key Vault secret', () => {
+  const template = compileTemplate('infra/main.bicep');
+  assert.equal(template.parameters.accountDeletionEnabled.defaultValue, false);
+  assert.equal(
+    template.resources.api.properties.parameters.accountDeletionEnabled.value,
+    "[parameters('accountDeletionEnabled')]",
+  );
+  const accountDeletionParameters = {
+    entraReauthAudience: 'effectiveEntraReauthAudience',
+    entraGraphTenantId: 'effectiveEntraGraphTenantId',
+    entraGraphClientId: 'effectiveEntraGraphClientId',
+    entraGraphClientSecret: 'effectiveEntraGraphClientSecret',
+  };
+  for (const parameter of Object.keys(accountDeletionParameters)) {
+    assert.equal(template.parameters[parameter].type, 'securestring');
+  }
+  for (const [parameter, variable] of Object.entries(accountDeletionParameters)) {
+    const deployment = parameter === 'entraGraphClientSecret'
+      ? template.resources.graphClientSecret
+      : template.resources.api;
+    const deploymentParameter = parameter === 'entraGraphClientSecret'
+      ? 'graphClientSecret'
+      : parameter;
+    assert.equal(
+      deployment.properties.parameters[deploymentParameter].value,
+      `[variables('${variable}')]`,
+    );
+  }
+  assert.equal(template.parameters.entraGraphClientSecretSecretUri, undefined);
+  assert.equal(
+    template.resources.graphClientSecret.condition,
+    "[variables('useEntraGraphClientSecret')]",
+  );
+  assert.match(
+    template.resources.api.properties.parameters.entraGraphClientSecretSecretUri.value,
+    /reference\('graphClientSecret'\).*'secretUri'/,
+  );
+  for (const variable of Object.values(accountDeletionParameters)) {
+    assert.match(
+      template.variables[variable],
+      /variables\('requireAccountDeletionGraph'\).*fail\('.*staging and production deployments\.'\).*''\)\]$/,
+    );
+  }
+  assert.equal(
+    template.variables.requireAccountDeletionGraph,
+    "[and(variables('hardened'), parameters('accountDeletionEnabled'))]",
+  );
+
+  for (const environment of ['staging', 'prod']) {
+    const parameters = readFileSync(
+      path.join(repositoryRoot, 'infra', 'params', `${environment}.bicepparam`),
+      'utf8',
+    );
+    assert.doesNotMatch(
+      parameters,
+      /^\s*param\s+entra(GraphTenantId|GraphClientId|GraphClientSecret|ReauthAudience)\s*=/m,
+    );
+  }
+});
+
+test('Graph client secret module stores the value only in Key Vault and returns a versioned URI', () => {
+  const template = compileTemplate('infra/modules/keyvaultGraphClientSecret.bicep');
+  const [secret] = resourcesOfType(template, 'Microsoft.KeyVault/vaults/secrets');
+
+  assert.equal(template.parameters.graphClientSecret.type, 'securestring');
+  assert.equal(template.parameters.graphClientSecretExpiresOn.type, 'securestring');
+  assert.equal(
+    secret.name,
+    "[format('{0}/{1}', parameters('keyVaultName'), 'ENTRA-GRAPH-CLIENT-SECRET')]",
+  );
+  assert.equal(secret.properties.value, "[parameters('graphClientSecret')]");
+  assert.equal(
+    secret.properties.attributes.exp,
+    "[dateTimeToEpoch(parameters('graphClientSecretExpiresOn'))]",
+  );
+  assert.match(template.outputs.secretUri.value, /secretUriWithVersion/);
+  assert.doesNotMatch(JSON.stringify(template), /ENTRA_GRAPH_CLIENT_SECRET":/);
+});
+
+test('account deletion checklist records provisioned Graph and Apple prerequisites', () => {
+  const accountDeletion = readFileSync(
+    path.join(repositoryRoot, 'docs', 'ACCOUNT_DELETION.md'),
+    'utf8',
+  );
+  const deploymentRunbook = readFileSync(
+    path.join(repositoryRoot, 'docs', 'deployment-runbook.md'),
+    'utf8',
+  );
+  const e2ePrerequisites = readFileSync(
+    path.join(repositoryRoot, 'docs', 'E2E_AUTH_PREREQUIS.md'),
+    'utf8',
+  );
+  const infraWorkflow = readFileSync(
+    path.join(repositoryRoot, '.github', 'workflows', 'ci-infra.yml'),
+    'utf8',
+  );
+
+  for (const marker of [
+    'le client confidentiel Graph dédié est créé',
+    '`ENTRA_GRAPH_CLIENT_SECRET`',
+    '`ENTRA_GRAPH_TENANT_ID`',
+    '`ENTRA_GRAPH_CLIENT_ID`',
+    '`ENTRA_REAUTH_AUDIENCE`',
+    'Apple est activé dans',
+    '`susi_certigo`',
+    'compte Apple sacrifiable',
+    'n’existe plus ou est révoquée',
+  ]) {
+    assert.ok(accountDeletion.includes(marker), `missing checklist marker: ${marker}`);
+  }
+  assert.match(
+    deploymentRunbook,
+    /Identité Graph de suppression \+ audience de preuve \| ✅/,
+  );
+  assert.match(deploymentRunbook, /Fédération Sign in with Apple \| ✅/);
+  assert.match(deploymentRunbook, /Révocation Apple après suppression \| ⛔/);
+  assert.match(
+    e2ePrerequisites,
+    /la seule validation Apple restante est un parcours réel avec un compte\s+sacrifiable/,
+  );
+  assert.doesNotMatch(
+    accountDeletion,
+    /Créer ou vérifier dans le tenant External ID un client confidentiel/,
+  );
+  assert.doesNotMatch(
+    accountDeletion,
+    /Dans chacun des GitHub Environments `staging` et `prod`, créer le secret/,
+  );
+  for (const documentationPath of [
+    'docs/ACCOUNT_DELETION.md',
+    'docs/deployment-runbook.md',
+    'docs/E2E_AUTH_PREREQUIS.md',
+    'docs/legal/account-deletion.md',
+    'docs/legal/privacy-policy.md',
+    'tools/build_public_pages.mjs',
+    'tools/tests/build_public_pages.test.mjs',
+  ]) {
+    assert.equal(
+      infraWorkflow.split(`- "${documentationPath}"`).length,
+      3,
+      `${documentationPath} must trigger ci-infra for push and pull requests`,
+    );
+  }
+});
+
+test('approved account-deletion retention policy matches hardened infrastructure', () => {
+  const template = compileTemplate('infra/main.bicep');
+  assert.equal(
+    template.resources.monitoring.properties.parameters.retentionInDays,
+    "[if(variables('hardened'), createObject('value', 90), createObject('value', 30))]",
+  );
+
+  const prod = readFileSync(
+    path.join(repositoryRoot, 'infra', 'params', 'prod.bicepparam'),
+    'utf8',
+  );
+  const staging = readFileSync(
+    path.join(repositoryRoot, 'infra', 'params', 'staging.bicepparam'),
+    'utf8',
+  );
+  assert.match(prod, /cosmosContinuousBackupTier = 'Continuous30Days'/);
+  assert.match(staging, /cosmosContinuousBackupTier = 'Continuous7Days'/);
+
+  const accountDeletion = readFileSync(
+    path.join(repositoryRoot, 'docs', 'legal', 'account-deletion.md'),
+    'utf8',
+  );
+  const privacy = readFileSync(
+    path.join(repositoryRoot, 'docs', 'legal', 'privacy-policy.md'),
+    'utf8',
+  );
+  for (const marker of [
+    'supprimées immédiatement',
+    'expire automatiquement après 30 jours',
+    'au plus tard après 30 jours',
+    'conservés pendant 90 jours',
+    'pièce d’identité',
+    'gabriel.chambaud@icloud.com',
+  ]) {
+    assert.ok(
+      `${accountDeletion}\n${privacy}`.includes(marker),
+      `missing approved policy marker: ${marker}`,
+    );
+  }
+  assert.doesNotMatch(
+    `${accountDeletion}\n${privacy}`,
+    /validation juridique|responsable juridique|durée légale additionnelle/i,
+  );
 });
 
 test('Function deployment waits for the complete private network deployment', () => {

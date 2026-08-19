@@ -5,6 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const absoluteUtcTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+const guidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const alertEmailPattern =
   /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/;
 const refreshOverlapMilliseconds = (90 * 24 * 60 + 2) * 60 * 1000;
@@ -50,6 +52,65 @@ function validateAlertEmail(value, environment) {
   return email;
 }
 
+function validateGuid(value, name) {
+  if (!guidPattern.test(value)) {
+    throw new Error(`${name} must be a canonical Entra GUID.`);
+  }
+}
+
+function validateAccountDeletionIdentityConfiguration({
+  enabled,
+  environment,
+  entraGraphTenantId,
+  entraGraphClientId,
+  entraGraphClientSecret,
+  entraGraphClientSecretExpiresOn,
+  entraReauthAudience,
+  now,
+}) {
+  const values = [
+    entraGraphTenantId,
+    entraGraphClientId,
+    entraGraphClientSecret,
+    entraGraphClientSecretExpiresOn,
+    entraReauthAudience,
+  ].map((value) => (typeof value === 'string' ? value : ''));
+  if (!enabled || environment === 'dev') {
+    return null;
+  }
+  if (values.some((value) => value !== value.trim())) {
+    throw new Error('Account deletion Entra configuration must not contain surrounding whitespace.');
+  }
+  const configured = values.filter((value) => value.length > 0).length;
+  if (configured !== values.length) {
+    throw new Error(
+      'ENTRA_GRAPH_TENANT_ID, ENTRA_GRAPH_CLIENT_ID, '
+      + 'ENTRA_GRAPH_CLIENT_SECRET, ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON '
+      + 'and ENTRA_REAUTH_AUDIENCE '
+      + 'are required for staging and production.',
+    );
+  }
+  validateGuid(values[0], 'ENTRA_GRAPH_TENANT_ID');
+  validateGuid(values[1], 'ENTRA_GRAPH_CLIENT_ID');
+  if (
+    !absoluteUtcTimestamp.test(values[3])
+    || !Number.isFinite(Date.parse(values[3]))
+    || Date.parse(values[3]) <= now.getTime()
+  ) {
+    throw new Error(
+      'ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON must be a future absolute UTC timestamp.',
+    );
+  }
+  validateGuid(values[4], 'ENTRA_REAUTH_AUDIENCE');
+  return {
+    entraGraphTenantId: values[0],
+    entraGraphClientId: values[1],
+    entraGraphClientSecret: values[2],
+    entraGraphClientSecretExpiresOn: values[3],
+    entraReauthAudience: values[4],
+  };
+}
+
 export function writeSecureParameters({
   environment,
   alertEmail,
@@ -57,6 +118,11 @@ export function writeSecureParameters({
   jwtSigningKeyExpiresOn,
   jwtPreviousSigningKey,
   jwtPreviousSigningKeyExpiresOn,
+  entraGraphTenantId,
+  entraGraphClientId,
+  entraGraphClientSecret,
+  entraGraphClientSecretExpiresOn,
+  entraReauthAudience,
   inputFile,
   outputFile,
   now = new Date(),
@@ -67,7 +133,28 @@ export function writeSecureParameters({
   if (!inputFile || !outputFile) {
     throw new Error('Input and output deployment parameter file paths are required.');
   }
+  const compiled = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
+  if (
+    typeof compiled !== 'object'
+    || compiled === null
+    || typeof compiled.parameters !== 'object'
+    || compiled.parameters === null
+    || Array.isArray(compiled.parameters)
+  ) {
+    throw new Error('The compiled Bicep parameter document is invalid.');
+  }
   const validatedAlertEmail = validateAlertEmail(alertEmail, environment);
+  const accountDeletionIdentityConfiguration =
+    validateAccountDeletionIdentityConfiguration({
+      enabled: compiled.parameters.accountDeletionEnabled?.value === true,
+      environment,
+      entraGraphTenantId,
+      entraGraphClientId,
+      entraGraphClientSecret,
+      entraGraphClientSecretExpiresOn,
+      entraReauthAudience,
+      now,
+    });
 
   const hasActiveKey = requirePair(
     jwtSigningKey,
@@ -88,17 +175,6 @@ export function writeSecureParameters({
   );
   if (hasActiveKey && hasPreviousKey && jwtSigningKey === jwtPreviousSigningKey) {
     throw new Error('The active and previous JWT signing keys must differ.');
-  }
-
-  const compiled = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
-  if (
-    typeof compiled !== 'object'
-    || compiled === null
-    || typeof compiled.parameters !== 'object'
-    || compiled.parameters === null
-    || Array.isArray(compiled.parameters)
-  ) {
-    throw new Error('The compiled Bicep parameter document is invalid.');
   }
 
   const activeExpiration = hasActiveKey
@@ -135,6 +211,23 @@ export function writeSecureParameters({
       value: jwtPreviousSigningKeyExpiresOn,
     };
   }
+  if (accountDeletionIdentityConfiguration !== null) {
+    compiled.parameters.entraGraphTenantId = {
+      value: accountDeletionIdentityConfiguration.entraGraphTenantId,
+    };
+    compiled.parameters.entraGraphClientId = {
+      value: accountDeletionIdentityConfiguration.entraGraphClientId,
+    };
+    compiled.parameters.entraGraphClientSecret = {
+      value: accountDeletionIdentityConfiguration.entraGraphClientSecret,
+    };
+    compiled.parameters.entraGraphClientSecretExpiresOn = {
+      value: accountDeletionIdentityConfiguration.entraGraphClientSecretExpiresOn,
+    };
+    compiled.parameters.entraReauthAudience = {
+      value: accountDeletionIdentityConfiguration.entraReauthAudience,
+    };
+  }
 
   fs.writeFileSync(
     outputFile,
@@ -154,6 +247,12 @@ function main() {
       jwtPreviousSigningKey: process.env.AUTH_JWT_PREVIOUS_SIGNING_KEY,
       jwtPreviousSigningKeyExpiresOn:
         process.env.AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON,
+      entraGraphTenantId: process.env.ENTRA_GRAPH_TENANT_ID,
+      entraGraphClientId: process.env.ENTRA_GRAPH_CLIENT_ID,
+      entraGraphClientSecret: process.env.ENTRA_GRAPH_CLIENT_SECRET,
+      entraGraphClientSecretExpiresOn:
+        process.env.ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON,
+      entraReauthAudience: process.env.ENTRA_REAUTH_AUDIENCE,
       inputFile: process.env.BASE_PARAMETERS_FILE,
       outputFile: process.env.AUTH_PARAMETERS_FILE,
     });

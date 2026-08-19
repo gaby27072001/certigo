@@ -28,15 +28,27 @@ public sealed class CosmosAttemptRepository(CosmosContext context) : IAttemptRep
 
     public async Task CreateAsync(AttemptRecord attempt, CancellationToken cancellationToken = default)
     {
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            attempt.UserId,
+            cancellationToken);
         // Atomic idempotency: the doc id is derived from the clientAttemptId, so a
         // duplicate (replayed or concurrent) submission fails the create instead of
         // double-applying. Surfaced as a domain-level DuplicateRecordException.
+        await writeLease.MarkMutationDispatchedAsync();
         try
         {
-            await context.Attempts.CreateItemAsync(attempt, new PartitionKey(attempt.UserId), cancellationToken: cancellationToken);
+            var response = await context.Attempts.CreateItemAsync(
+                attempt,
+                new PartitionKey(attempt.UserId),
+                cancellationToken: cancellationToken);
+            await writeLease.CommitAsync(
+                CosmosContainers.Attempts,
+                response.Headers.Session,
+                cancellationToken);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
         {
+            writeLease.MarkDefinitelyNotCommitted();
             throw new DuplicateRecordException($"Attempt '{attempt.Id}' already exists.");
         }
     }

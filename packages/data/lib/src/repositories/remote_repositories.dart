@@ -15,6 +15,7 @@ import '../models/shop.dart';
 import '../models/friend.dart';
 import '../models/exam.dart';
 import '../models/share_card.dart';
+import '../models/account_deletion.dart';
 import 'repositories.dart';
 
 /// HTTP-backed implementations of the repository contracts. Each method maps a
@@ -56,6 +57,25 @@ class RemoteUserRepository implements UserRepository {
           'expectedTrackId': expectedTrackId,
         },
         UserProfile.fromJson,
+      );
+}
+
+class RemoteAccountDeletionRepository implements AccountDeletionRepository {
+  const RemoteAccountDeletionRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<AccountDeletion>> getStatus() =>
+      _api.getJson('/account/deletion', AccountDeletion.fromJson);
+
+  @override
+  Future<Result<AccountDeletion>> requestDeletion({String? reauthenticationToken}) => _api.postJson(
+        '/account/deletion',
+        const <String, dynamic>{},
+        AccountDeletion.fromJson,
+        headers: reauthenticationToken == null
+            ? null
+            : <String, dynamic>{'X-Certigo-Reauthentication': reauthenticationToken},
       );
 }
 

@@ -88,6 +88,43 @@ public sealed class ExceptionMiddlewareTests
     }
 
     [Fact]
+    public async Task AccountDeletionInProgressException_MapsTo423_ProblemDetails()
+    {
+        var middleware = CreateMiddleware();
+        var invocation = FunctionTestHarness.CreateHttp();
+
+        await middleware.Invoke(
+            invocation.Context,
+            _ => throw new AccountDeletionInProgressException());
+
+        invocation.Response.Should().NotBeNull();
+        invocation.Response!.StatusCode.Should().Be((HttpStatusCode)423);
+
+        var problem = await invocation.ReadProblemAsync();
+        problem!.Status.Should().Be(423);
+        problem.Title.Should().Be("Account deletion in progress");
+        problem.Detail.Should().NotContain("Cosmos");
+    }
+
+    [Fact]
+    public async Task AccountDeletionDisabledException_MapsTo503_ProblemDetails()
+    {
+        var middleware = CreateMiddleware();
+        var invocation = FunctionTestHarness.CreateHttp();
+
+        await middleware.Invoke(
+            invocation.Context,
+            _ => throw new AccountDeletionDisabledException());
+
+        invocation.Response.Should().NotBeNull();
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+
+        var problem = await invocation.ReadProblemAsync();
+        problem!.Status.Should().Be(503);
+        problem.Title.Should().Be("Account deletion unavailable");
+    }
+
+    [Fact]
     public async Task DuplicateRecordException_MapsTo409_WithExceptionMessage()
     {
         var middleware = CreateMiddleware();

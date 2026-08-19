@@ -55,6 +55,11 @@ var host = new HostBuilder()
             sp.GetRequiredService<CosmosClient>(),
             configuration["COSMOS_DATABASE"] ?? CosmosContainers.DatabaseName));
         services.AddHttpClient("HealthProbe", client => client.Timeout = Timeout.InfiniteTimeSpan);
+        services.AddHttpClient("MicrosoftGraph", client =>
+        {
+            client.BaseAddress = new Uri("https://graph.microsoft.com/");
+            client.Timeout = TimeSpan.FromSeconds(20);
+        });
         services.AddSingleton<IHealthProbe>(sp =>
         {
             var blobEndpoint = configuration["BLOB_ENDPOINT"]
@@ -157,6 +162,19 @@ var host = new HostBuilder()
 
             return new CompositeTokenValidator(validators);
         });
+        services.AddSingleton<IReauthenticationProofValidator>(sp =>
+        {
+            var authority = configuration["ENTRA_AUTHORITY"];
+            var proofAudience = configuration["ENTRA_REAUTH_AUDIENCE"];
+            ITokenValidator validator = !string.IsNullOrWhiteSpace(authority)
+                && !string.IsNullOrWhiteSpace(proofAudience)
+                ? new EntraTokenValidator(
+                    authority,
+                    proofAudience,
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<EntraTokenValidator>>())
+                : sp.GetRequiredService<ITokenValidator>();
+            return new ReauthenticationProofValidator(validator);
+        });
 
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<ITokenIssuer>(_ => new JwtTokenIssuer(
@@ -207,6 +225,47 @@ var host = new HostBuilder()
         services.AddScoped<IUserContext, FunctionUserContext>();
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IUserRepository, CosmosUserRepository>();
+        services.AddSingleton<IAccountDeletionRepository, CosmosAccountDeletionRepository>();
+        services.AddSingleton<IAccountDeletionAccessGuard, AccountDeletionAccessGuard>();
+        services.AddSingleton<IAccountDeletionAudit, AccountDeletionAudit>();
+        var directGraphClientSecret = configuration["ENTRA_GRAPH_CLIENT_SECRET"];
+        GraphClientSecretGuard.EnsureIndirectConfiguration(
+            directGraphClientSecret,
+            context.HostingEnvironment.IsProduction(),
+            configuration["AUTH_MODE"]);
+        if (!string.IsNullOrWhiteSpace(configuration["ENTRA_AUTHORITY"]))
+        {
+            var graphTenantId = configuration["ENTRA_GRAPH_TENANT_ID"];
+            var graphClientId = configuration["ENTRA_GRAPH_CLIENT_ID"];
+            var graphClientSecret = KeyVaultSecretValueResolver.Resolve(
+                directGraphClientSecret,
+                configuration[ConfigurationKeys.EntraGraphClientSecretSecretUri],
+                configuration["HEALTH_PLATFORM_CLIENT_ID"],
+                TimeSpan.FromSeconds(10));
+            if (!string.IsNullOrWhiteSpace(graphTenantId)
+                && !string.IsNullOrWhiteSpace(graphClientId)
+                && !string.IsNullOrWhiteSpace(graphClientSecret))
+            {
+                services.AddSingleton<IExternalIdentityDeletion>(sp =>
+                    new GraphExternalIdentityDeletion(
+                        sp.GetRequiredService<IHttpClientFactory>().CreateClient("MicrosoftGraph"),
+                        new ClientSecretCredential(
+                            graphTenantId,
+                            graphClientId,
+                            graphClientSecret)));
+            }
+            else
+            {
+                // Fail the identity step as pending rather than reporting a false
+                // success against the Azure resource tenant. External ID commonly
+                // lives in a distinct tenant and needs its own Graph credential.
+                services.AddSingleton<IExternalIdentityDeletion, UnavailableExternalIdentityDeletion>();
+            }
+        }
+        else
+        {
+            services.AddSingleton<IExternalIdentityDeletion, DevelopmentExternalIdentityDeletion>();
+        }
         services.AddScoped<IContentRepository, CosmosContentRepository>();
         services.AddScoped<IProgressRepository, CosmosProgressRepository>();
         services.AddScoped<IAttemptRepository, CosmosAttemptRepository>();
@@ -237,6 +296,18 @@ var host = new HostBuilder()
             services.AddSingleton<ITutorCompletion, NullTutorCompletion>();
         }
         services.AddScoped<IUserService, UserService>();
+        var accountDeletionEnabled = bool.TryParse(
+            configuration["ACCOUNT_DELETION_ENABLED"],
+            out var configuredAccountDeletionEnabled)
+            && configuredAccountDeletionEnabled;
+        if (accountDeletionEnabled)
+        {
+            services.AddScoped<IAccountDeletionService, AccountDeletionService>();
+        }
+        else
+        {
+            services.AddScoped<IAccountDeletionService, DisabledAccountDeletionService>();
+        }
         // certigo-content is the sole multi-cloud inventory. Until its package
         // importer is wired, production exposes authored tracks with an empty
         // external source instead of embedding a second catalog snapshot.
