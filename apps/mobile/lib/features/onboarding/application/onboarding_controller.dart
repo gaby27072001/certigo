@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../auth/application/auth_controller.dart';
+import '../../auth/application/auth_state.dart';
+
 /// What the learner wants to do first — mirrors the opening "what now?" question
 /// of a returning-user flow, themed for certification tracks.
 enum StartChoice { continueTrack, switchTrack, explore }
@@ -34,6 +37,15 @@ const List<TargetCertification> availableTargetCertifications = <TargetCertifica
 ];
 
 extension TargetCertificationInfo on TargetCertification {
+  String get trackId => switch (this) {
+        TargetCertification.az900 => 'az-900',
+        TargetCertification.ai900 => 'ai-900',
+        TargetCertification.ai901 => 'ai-901',
+        TargetCertification.dp900 => 'dp-900',
+        TargetCertification.sc900 => 'sc-900',
+        TargetCertification.az104 => 'az-104',
+      };
+
   /// Exam code shown as the bold tile label (e.g. "AZ-900").
   String get code => switch (this) {
         TargetCertification.az900 => 'AZ-900',
@@ -67,15 +79,6 @@ extension TargetCertificationInfo on TargetCertification {
       };
 }
 
-/// How the learner first heard about Certigo (single-select attribution).
-enum AttributionSource { newsBlog, friendsFamily, search, youtube, appStore, social, tiktok, other }
-
-/// The plan the learner picks on the paywall (placeholder — no billing yet).
-enum PremiumChoice { premium, free }
-
-/// Where the learner wants to begin their track (single-select).
-enum StartMode { scratch, findLevel }
-
 extension DailyGoalOptionInfo on DailyGoalOption {
   int get minutes => switch (this) {
         DailyGoalOption.chill => 3,
@@ -107,15 +110,12 @@ extension DailyGoalOptionInfo on DailyGoalOption {
 /// directly to GoRouter's `refreshListenable`: when [complete] flips the flag,
 /// the router's redirect re-runs and lets the learner into the app.
 ///
-/// State is in-memory for now — the flow replays each launch, which is exactly
-/// what you want while polishing the onboarding. Persisting "already onboarded"
-/// later is a one-line change in [complete] (e.g. shared_preferences).
 class OnboardingController extends ChangeNotifier {
-  OnboardingController() {
-    Future<void>.microtask(_restoreCompletedFlag);
-  }
+  OnboardingController({String? ownerId}) : _ownerId = _normalizeOwner(ownerId);
 
-  static const String _completedPrefsKey = 'onboarding_completed';
+  static const String _completedPrefsPrefix = 'onboarding_completed';
+
+  String? _ownerId;
 
   bool _completed = false;
   bool get completed => _completed;
@@ -140,15 +140,6 @@ class OnboardingController extends ChangeNotifier {
 
   TargetCertification? _targetCertification;
   TargetCertification? get targetCertification => _targetCertification;
-
-  AttributionSource? _attributionSource;
-  AttributionSource? get attributionSource => _attributionSource;
-
-  PremiumChoice? _premiumChoice;
-  PremiumChoice? get premiumChoice => _premiumChoice;
-
-  StartMode? _startMode;
-  StartMode? get startMode => _startMode;
 
   void setStart(StartChoice value) {
     _start = value;
@@ -189,21 +180,6 @@ class OnboardingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setAttributionSource(AttributionSource value) {
-    _attributionSource = value;
-    notifyListeners();
-  }
-
-  void setPremiumChoice(PremiumChoice value) {
-    _premiumChoice = value;
-    notifyListeners();
-  }
-
-  void setStartMode(StartMode value) {
-    _startMode = value;
-    notifyListeners();
-  }
-
   /// Starting Readiness Score, credited from the self-reported knowledge level —
   /// powers the closing "tu démarres à X !" reaction. A learner who already
   /// knows some notions never starts from zero.
@@ -215,23 +191,19 @@ class OnboardingController extends ChangeNotifier {
         null => 5,
       };
 
-  /// Number of new notions promised for the first week, derived from the daily
-  /// goal — used by the "≈ N notions cette semaine" promise screen.
-  int get weeklyNotions {
-    final int minutes = (_goal ?? DailyGoalOption.regular).minutes;
-    return (minutes * 7 / 2).round();
-  }
-
   /// Mark onboarding finished; the router redirect then admits the learner.
-  void complete() {
+  Future<void> complete() async {
     if (_completed) return;
+    if (_ownerId == null) {
+      throw StateError('An authenticated account is required to complete onboarding.');
+    }
+    await _persistCompletedFlag(value: true);
     _completed = true;
     notifyListeners();
-    unawaited(_persistCompletedFlag(value: true));
   }
 
   /// Reset everything (useful for "recommencer l'introduction" or tests).
-  void restart() {
+  Future<void> restart() async {
     _completed = false;
     _start = StartChoice.continueTrack;
     _reasons.clear();
@@ -240,17 +212,30 @@ class OnboardingController extends ChangeNotifier {
     _goal = null;
     _reminders = true;
     _targetCertification = null;
-    _attributionSource = null;
-    _premiumChoice = null;
-    _startMode = null;
     notifyListeners();
-    unawaited(_persistCompletedFlag(value: false));
+    if (_ownerId != null) {
+      await _persistCompletedFlag(value: false);
+    }
   }
 
-  Future<void> _restoreCompletedFlag() async {
+  Future<void> restoreForOwner(String? value) async {
+    final String? ownerId = _normalizeOwner(value);
+    if (ownerId == null) {
+      if (_completed) {
+        _completed = false;
+        notifyListeners();
+      }
+      return;
+    }
+    _ownerId = ownerId;
+    if (_completed) {
+      _completed = false;
+      notifyListeners();
+    }
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final bool completed = prefs.getBool(_completedPrefsKey) ?? false;
+      final bool completed = prefs.getBool(_keyFor(ownerId)) ?? false;
+      if (_ownerId != ownerId) return;
       if (_completed == completed) return;
       _completed = completed;
       notifyListeners();
@@ -261,18 +246,42 @@ class OnboardingController extends ChangeNotifier {
   }
 
   Future<void> _persistCompletedFlag({required bool value}) async {
+    final String ownerId = _ownerId!;
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_completedPrefsKey, value);
+      final bool saved = await prefs.setBool(_keyFor(ownerId), value);
+      if (!saved) {
+        throw StateError('Unable to persist onboarding completion.');
+      }
     } catch (e, st) {
       debugPrint('[OnboardingController] Failed to persist completion flag: $e');
       debugPrint('$st');
+      rethrow;
     }
+  }
+
+  static String _keyFor(String ownerId) => '$_completedPrefsPrefix:$ownerId';
+
+  static String? _normalizeOwner(String? value) {
+    final String normalized = (value ?? '').trim();
+    return normalized.isEmpty ? null : normalized;
   }
 }
 
 /// App-wide onboarding state. Read by the startup screens and handed to GoRouter
 /// as a `refreshListenable` so completing the flow re-runs the route guard.
 final onboardingControllerProvider = ChangeNotifierProvider<OnboardingController>(
-  (Ref ref) => OnboardingController(),
+  (Ref ref) {
+    final OnboardingController controller = OnboardingController();
+    ref.listen<AuthState>(authControllerProvider, (_, AuthState next) {
+      if (next is Authenticated) {
+        unawaited(controller.restoreForOwner(next.session.userId));
+      }
+    });
+    final AuthState current = ref.read(authControllerProvider);
+    if (current is Authenticated) {
+      unawaited(controller.restoreForOwner(current.session.userId));
+    }
+    return controller;
+  },
 );

@@ -213,6 +213,7 @@ API principale :
 | Méthode | Route | Rôle |
 |---|---|---|
 | `GET`  | `/me` | profil + stats lifetime |
+| `POST` | `/me/active-track` | persiste la certification active validée par le catalogue |
 | `GET`  | `/me/paths/{trackId}` | parcours + progression |
 | `GET`  | `/tracks/{trackId}/lessons/{lessonId}` | leçon (sans réponses) |
 | `POST` | `/quiz/{lessonId}/submit` | notation serveur + feedback + récompenses |

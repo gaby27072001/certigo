@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import '../../../app/providers.dart';
 import '../../../app/router.dart';
 import '../application/home_controller.dart';
 import 'coach_section.dart';
@@ -26,8 +27,15 @@ class HomeScreen extends ConsumerWidget {
         child: async.when(
           data: (HomeData data) => _HomeContent(data: data),
           loading: () => const _HomeLoading(),
-          error: (Object error, StackTrace _) =>
-              PrismStatusView.error(onRetry: () => ref.invalidate(homeDataProvider)),
+          error: (Object error, StackTrace _) => error is MissingActiveTrackException
+              ? PrismStatusView(
+                  icon: Icons.school_outlined,
+                  title: 'Aucune certification sélectionnée',
+                  message: 'Choisis un parcours publié pour afficher ton accueil.',
+                  actionLabel: 'Voir la bibliothèque',
+                  onAction: () => context.go(Routes.library),
+                )
+              : PrismStatusView.error(onRetry: () => ref.invalidate(homeDataProvider)),
         ),
       ),
     );

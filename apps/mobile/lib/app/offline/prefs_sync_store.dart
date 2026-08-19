@@ -16,7 +16,10 @@ JsonSyncQueueStore prefsSyncQueueStore(SharedPreferences prefs) {
   return JsonSyncQueueStore(
     read: () async => prefs.getString(kSyncQueuePrefsKey),
     write: (String json) async {
-      await prefs.setString(kSyncQueuePrefsKey, json);
+      final bool saved = await prefs.setString(kSyncQueuePrefsKey, json);
+      if (!saved) {
+        throw StateError('Unable to persist the offline synchronization queue.');
+      }
     },
   );
 }

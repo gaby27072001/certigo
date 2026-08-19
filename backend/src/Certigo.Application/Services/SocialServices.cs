@@ -38,8 +38,8 @@ public sealed class ShareCardService(
         var goalMet = profile.DailyGoalXp > 0 && dailyXp >= profile.DailyGoalXp;
 
         var trackId = string.IsNullOrWhiteSpace(profile.ActiveTrackId)
-            ? ProfileDefaults.DefaultTrackId
-            : profile.ActiveTrackId!;
+            ? throw new ActiveTrackRequiredException()
+            : profile.ActiveTrackId;
         var pathDto = await path.GetPathAsync(trackId, cancellationToken);
 
         var referral = ShareCodec.ReferralCode(profile.Id);

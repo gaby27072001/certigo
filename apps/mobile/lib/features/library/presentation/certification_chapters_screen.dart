@@ -106,9 +106,17 @@ class CertificationChaptersScreen extends ConsumerWidget {
 
   /// Points the Path tab at this track and jumps to it — the "démarrer /
   /// continuer cette certif" action.
-  void _openChapter(BuildContext context, WidgetRef ref) {
-    ref.read(activeTrackProvider.notifier).state = trackId;
-    context.go(Routes.path);
+  Future<void> _openChapter(BuildContext context, WidgetRef ref) async {
+    final ActiveTrackSaveResult result =
+        await ref.read(activeTrackProvider.notifier).select(trackId);
+    if (!context.mounted) return;
+    if (result.accepted) {
+      context.go(Routes.path);
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.failure?.message ?? 'Impossible de changer de certification.')),
+    );
   }
 }
 

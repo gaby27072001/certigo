@@ -31,6 +31,7 @@ class OfflineQuizRepository implements QuizRepository {
     required String lessonId,
     required SubmitQuizRequest request,
   }) async {
+    final String? ownerId = _engine.currentOwnerId;
     final Result<SubmitQuizResult> result = await _inner.submit(
       lessonId: lessonId,
       request: request,
@@ -39,12 +40,13 @@ class OfflineQuizRepository implements QuizRepository {
     if (result.isSuccess) return result;
 
     final Failure failure = (result as Err<SubmitQuizResult>).failure;
-    if (classifyFailure(failure) == SyncDispatch.retryable) {
+    if (ownerId != null && classifyFailure(failure) == SyncDispatch.retryable) {
       await _engine.enqueue(
         kind: kQuizSubmitKind,
         endpoint: '/quiz/$lessonId/submit',
         payload: request.toJson(),
         idempotencyKey: request.clientAttemptId,
+        ownerId: ownerId,
       );
     }
 

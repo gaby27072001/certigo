@@ -37,6 +37,12 @@ final authConfiguredProvider = Provider<bool>((Ref ref) => AppEnv.entraConfigure
 /// l'ancien passage direct en dev.)
 final authRequiredProvider = Provider<bool>((Ref ref) => true);
 
+typedef AuthLocalAccountCleanup = Future<void> Function();
+
+final authLocalAccountCleanupProvider = Provider<AuthLocalAccountCleanup>(
+  (Ref ref) => () async {},
+);
+
 /// Contrôleur d'authentification : source de vérité synchrone de l'état de
 /// session, pilotant le garde de navigation et l'injection du jeton d'API.
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(AuthController.new);
@@ -51,8 +57,11 @@ class AuthController extends Notifier<AuthState> {
   late final SessionStore _store;
   late final AuthTelemetry _telemetry;
   late final AuthDiagnosticsNotifier _diagnostics;
+  late final AuthLocalAccountCleanup _localAccountCleanup;
   late final bool _required;
   late final bool _configured;
+  int _sessionRevision = 0;
+  Future<void> _sessionStoreTail = Future<void>.value();
 
   /// Filet de sécurité pour la connexion e-mail (appel API direct).
   static const Duration _emailTimeout = Duration(seconds: 25);
@@ -73,6 +82,7 @@ class AuthController extends Notifier<AuthState> {
     _store = ref.read(sessionStoreProvider);
     _telemetry = ref.read(authTelemetryProvider);
     _diagnostics = ref.read(authDiagnosticsProvider.notifier);
+    _localAccountCleanup = ref.read(authLocalAccountCleanupProvider);
     _required = ref.read(authRequiredProvider);
     _configured = ref.read(authConfiguredProvider);
     // Différé en micro-tâche : `build` doit retourner sans muter l'état.
@@ -82,11 +92,12 @@ class AuthController extends Notifier<AuthState> {
 
   /// Restauration au démarrage : c'est ce qui réalise l'**auto-connexion**.
   Future<void> _restore() async {
+    final int revision = _sessionRevision;
     // Passage direct en dev : tant qu'Entra n'est pas configuré (et qu'on ne
     // force pas l'aperçu), on n'impose pas d'écran de connexion pour préserver
     // le flux de développement existant (jeton dev).
     if (!_required) {
-      state = Authenticated(_devSession());
+      if (_isCurrent(revision)) state = Authenticated(_devSession());
       return;
     }
 
@@ -95,6 +106,7 @@ class AuthController extends Notifier<AuthState> {
     // authentifié » pour que l'app quitte TOUJOURS le splash et atteigne /auth.
     try {
       final AuthSession? session = await _store.read().timeout(_restoreReadTimeout);
+      if (!_isCurrent(revision)) return;
       if (session == null) {
         // Aucune session mémorisée (premier lancement / déconnecté) : ce n'est
         // pas un échec — aucune tentative d'auto-connexion à mesurer.
@@ -110,6 +122,7 @@ class AuthController extends Notifier<AuthState> {
       }
       // Session expirée → tentative de rafraîchissement silencieux.
       final AuthSession? refreshed = await _tryRefresh(session);
+      if (!_isCurrent(revision)) return;
       if (refreshed != null) {
         _telemetry.authSuccess(AuthMethod.restore);
         state = Authenticated(refreshed);
@@ -118,6 +131,7 @@ class AuthController extends Notifier<AuthState> {
         state = const Unauthenticated();
       }
     } catch (e, st) {
+      if (!_isCurrent(revision)) return;
       _logAuthError('_restore', e, st);
       _telemetry.authFailure(AuthMethod.restore, AuthFailureCause.unknown);
       state = const Unauthenticated();
@@ -126,6 +140,7 @@ class AuthController extends Notifier<AuthState> {
 
   /// Connexion explicite via l'un des trois fournisseurs.
   Future<void> signIn(AuthProvider provider) async {
+    final int revision = ++_sessionRevision;
     final AuthMethod method = AuthMethodX.fromProvider(provider);
     if (!_configured) {
       _telemetry.authFailure(method, AuthFailureCause.configError);
@@ -143,6 +158,7 @@ class AuthController extends Notifier<AuthState> {
     final Stopwatch sw = Stopwatch()..start();
     try {
       final AuthSession session = await _gateway.signIn(provider).timeout(_socialTimeout);
+      if (!_isCurrent(revision)) return;
       if (session.accessToken.isEmpty) {
         _telemetry.authFailure(
           method,
@@ -160,11 +176,12 @@ class AuthController extends Notifier<AuthState> {
         );
         return;
       }
-      await _store.write(session);
+      if (!await _persistSession(session, revision)) return;
       _diagnostics.mark(AuthDiagnosticStep.sessionWritten);
       _telemetry.authSuccess(method, durationMs: sw.elapsedMilliseconds);
       state = Authenticated(session);
     } on TimeoutException catch (e, st) {
+      if (!_isCurrent(revision)) return;
       _logAuthError('signIn(${provider.id}, timeout)', e, st);
       _telemetry.authFailure(method, AuthFailureCause.timeout, durationMs: sw.elapsedMilliseconds);
       final int seconds = _socialTimeout.inSeconds;
@@ -178,9 +195,11 @@ class AuthController extends Notifier<AuthState> {
         'callback OIDC n\'est jamais revenu (étape : autorisation + échange du code).',
       );
     } on AuthGatewayException catch (e) {
+      if (!_isCurrent(revision)) return;
       _telemetry.authFailure(method, e.cause, durationMs: sw.elapsedMilliseconds);
       state = Unauthenticated(_composeError(e));
     } catch (e, st) {
+      if (!_isCurrent(revision)) return;
       _logAuthError('signIn(${provider.id})', e, st);
       _telemetry.authFailure(method, AuthFailureCause.unknown, durationMs: sw.elapsedMilliseconds);
       _diagnostics.mark(AuthDiagnosticStep.failed, detail: '${e.runtimeType} : $e');
@@ -210,12 +229,14 @@ class AuthController extends Notifier<AuthState> {
 
   /// Connexion par e-mail + mot de passe (compte géré par notre backend).
   Future<void> signInWithEmail({required String email, required String password}) async {
+    final int revision = ++_sessionRevision;
     _telemetry.authStart(AuthMethod.email);
     state = const AuthLoading();
     final Stopwatch sw = Stopwatch()..start();
     try {
       final AuthSession session =
           await _credentials.login(email: email, password: password).timeout(_emailTimeout);
+      if (!_isCurrent(revision)) return;
       if (session.accessToken.isEmpty) {
         _telemetry.authFailure(
           AuthMethod.email,
@@ -225,10 +246,11 @@ class AuthController extends Notifier<AuthState> {
         state = const Unauthenticated('La connexion a échoué. Réessayez.');
         return;
       }
-      await _store.write(session);
+      if (!await _persistSession(session, revision)) return;
       _telemetry.authSuccess(AuthMethod.email, durationMs: sw.elapsedMilliseconds);
       state = Authenticated(session);
     } on TimeoutException catch (e, st) {
+      if (!_isCurrent(revision)) return;
       _logAuthError('signInWithEmail(timeout)', e, st);
       _telemetry.authFailure(
         AuthMethod.email,
@@ -237,9 +259,11 @@ class AuthController extends Notifier<AuthState> {
       );
       state = Unauthenticated(authMessageForCause(AuthFailureCause.timeout));
     } on AuthGatewayException catch (e) {
+      if (!_isCurrent(revision)) return;
       _telemetry.authFailure(AuthMethod.email, e.cause, durationMs: sw.elapsedMilliseconds);
       state = Unauthenticated(e.message);
     } catch (e, st) {
+      if (!_isCurrent(revision)) return;
       _logAuthError('signInWithEmail', e, st);
       _telemetry.authFailure(
         AuthMethod.email,
@@ -256,6 +280,7 @@ class AuthController extends Notifier<AuthState> {
     required String password,
     String? displayName,
   }) async {
+    final int revision = ++_sessionRevision;
     _telemetry.authStart(AuthMethod.register);
     state = const AuthLoading();
     final Stopwatch sw = Stopwatch()..start();
@@ -263,6 +288,7 @@ class AuthController extends Notifier<AuthState> {
       final AuthSession session = await _credentials
           .register(email: email, password: password, displayName: displayName)
           .timeout(_emailTimeout);
+      if (!_isCurrent(revision)) return;
       if (session.accessToken.isEmpty) {
         _telemetry.authFailure(
           AuthMethod.register,
@@ -272,10 +298,11 @@ class AuthController extends Notifier<AuthState> {
         state = const Unauthenticated('La création du compte a échoué. Réessayez.');
         return;
       }
-      await _store.write(session);
+      if (!await _persistSession(session, revision)) return;
       _telemetry.authSuccess(AuthMethod.register, durationMs: sw.elapsedMilliseconds);
       state = Authenticated(session);
     } on TimeoutException catch (e, st) {
+      if (!_isCurrent(revision)) return;
       _logAuthError('registerWithEmail(timeout)', e, st);
       _telemetry.authFailure(
         AuthMethod.register,
@@ -284,9 +311,11 @@ class AuthController extends Notifier<AuthState> {
       );
       state = Unauthenticated(authMessageForCause(AuthFailureCause.timeout));
     } on AuthGatewayException catch (e) {
+      if (!_isCurrent(revision)) return;
       _telemetry.authFailure(AuthMethod.register, e.cause, durationMs: sw.elapsedMilliseconds);
       state = Unauthenticated(e.message);
     } catch (e, st) {
+      if (!_isCurrent(revision)) return;
       _logAuthError('registerWithEmail', e, st);
       _telemetry.authFailure(
         AuthMethod.register,
@@ -300,6 +329,8 @@ class AuthController extends Notifier<AuthState> {
   /// Déconnexion : efface la session persistée et revient à l'écran de connexion.
   Future<void> signOut() async {
     final AuthState current = state;
+    final int revision = ++_sessionRevision;
+    state = const AuthSigningOut();
     if (current is Authenticated) {
       try {
         await _gateway.signOut(current.session);
@@ -308,8 +339,29 @@ class AuthController extends Notifier<AuthState> {
         // Déconnexion best-effort : on nettoie le stockage quoi qu'il arrive.
       }
     }
-    await _store.clear();
-    state = const Unauthenticated();
+    String? cleanupMessage;
+    try {
+      await _localAccountCleanup();
+    } catch (e, st) {
+      _logAuthError('signOut(local cleanup)', e, st);
+      cleanupMessage =
+          'Déconnexion terminée. Certaines données locales seront nettoyées au prochain démarrage.';
+    }
+    var sessionCleared = true;
+    try {
+      if (!await _clearPersistedSession(revision)) {
+        sessionCleared = false;
+      }
+    } catch (e, st) {
+      _logAuthError('signOut(session clear)', e, st);
+      sessionCleared = false;
+    }
+    if (!_isCurrent(revision)) return;
+    if (!sessionCleared) {
+      state = current;
+      return;
+    }
+    state = Unauthenticated.signedOut(cleanupMessage);
   }
 
   /// Renvoie l'e-mail de vérification pour le compte connecté (best-effort).
@@ -350,6 +402,7 @@ class AuthController extends Notifier<AuthState> {
 
     final AuthState current = state;
     if (current is! Authenticated) return null;
+    final int revision = _sessionRevision;
 
     AuthSession session = current.session;
     if (session.willExpireSoon) {
@@ -359,7 +412,7 @@ class AuthController extends Notifier<AuthState> {
         state = Authenticated(refreshed);
       }
     }
-    return session.accessToken;
+    return _isCurrent(revision) ? session.accessToken : null;
   }
 
   /// Appelé par l'`ApiClient` sur une réponse 401 : tente un rafraîchissement,
@@ -367,18 +420,22 @@ class AuthController extends Notifier<AuthState> {
   Future<void> handleUnauthorized() async {
     if (!_required) return;
     final AuthState current = state;
+    if (current is AuthSigningOut) return;
+    final int revision = _sessionRevision;
     if (current is Authenticated && current.session.refreshToken != null) {
       final AuthSession? refreshed = await _tryRefresh(current.session);
       if (refreshed != null) {
+        if (!_isCurrent(revision)) return;
         state = Authenticated(refreshed);
         return;
       }
     }
-    await _store.clear();
+    if (!await _clearPersistedSession(revision)) return;
     state = const Unauthenticated('Votre session a expiré. Reconnectez-vous.');
   }
 
   Future<AuthSession?> _tryRefresh(AuthSession session) async {
+    final int revision = _sessionRevision;
     final String? refreshToken = session.refreshToken;
     if (refreshToken == null) return null;
     try {
@@ -388,13 +445,15 @@ class AuthController extends Notifier<AuthState> {
           ? await _credentials.refresh(refreshToken)
           : await _gateway.refresh(refreshToken);
       if (refreshed.accessToken.isEmpty) return null;
+      if (!_isCurrent(revision)) return null;
       // La réponse `/auth/refresh` n'inclut pas l'e-mail : on reporte celui de la
       // session précédente pour que les fonctions qui s'appuient dessus (renvoi de
       // l'e-mail de vérification) continuent de marcher après un refresh silencieux.
-      final AuthSession carried = refreshed.email == null && session.email != null
-          ? refreshed.copyWith(email: session.email)
-          : refreshed;
-      await _store.write(carried);
+      final AuthSession carried = refreshed.copyWith(
+        email: refreshed.email ?? session.email,
+        userId: refreshed.userId ?? session.userId,
+      );
+      if (!await _persistSession(carried, revision)) return null;
       return carried;
     } catch (e, st) {
       _logAuthError('_tryRefresh', e, st);
@@ -407,6 +466,35 @@ class AuthController extends Notifier<AuthState> {
     debugPrint('$stackTrace');
   }
 
-  AuthSession _devSession() =>
-      const AuthSession(accessToken: AppEnv.devAuthToken, displayName: 'Développeur');
+  bool _isCurrent(int revision) => revision == _sessionRevision;
+
+  Future<bool> _persistSession(AuthSession session, int revision) async {
+    var persisted = false;
+    final Future<void> operation = _sessionStoreTail.then((_) async {
+      if (!_isCurrent(revision)) return;
+      await _store.write(session);
+      persisted = _isCurrent(revision);
+    });
+    _sessionStoreTail = operation.catchError((Object _) {});
+    await operation;
+    return persisted;
+  }
+
+  Future<bool> _clearPersistedSession(int revision) async {
+    var cleared = false;
+    final Future<void> operation = _sessionStoreTail.then((_) async {
+      if (!_isCurrent(revision)) return;
+      await _store.clear();
+      cleared = _isCurrent(revision);
+    });
+    _sessionStoreTail = operation.catchError((Object _) {});
+    await operation;
+    return cleared;
+  }
+
+  AuthSession _devSession() => AuthSession(
+        accessToken: AppEnv.devAuthToken,
+        userId: AppEnv.devAuthToken.trim().isEmpty ? 'dev-user' : AppEnv.devAuthToken.trim(),
+        displayName: 'Développeur',
+      );
 }

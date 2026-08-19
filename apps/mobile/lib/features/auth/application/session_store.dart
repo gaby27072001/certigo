@@ -28,12 +28,16 @@ class SecureSessionStore implements SessionStore {
             );
 
   static const String _key = 'certigo.session.v1';
+  static const String _signedOutKey = 'certigo.session.signed_out.v1';
 
   final FlutterSecureStorage _storage;
 
   @override
   Future<AuthSession?> read() async {
     try {
+      final String? signedOut =
+          await _storage.read(key: _signedOutKey).timeout(const Duration(seconds: 5));
+      if (signedOut == 'true') return null;
       final String? raw = await _storage.read(key: _key).timeout(const Duration(seconds: 5));
       return AuthSession.decode(raw);
     } catch (_) {
@@ -45,19 +49,17 @@ class SecureSessionStore implements SessionStore {
 
   @override
   Future<void> write(AuthSession session) async {
-    try {
-      await _storage.write(key: _key, value: session.encode()).timeout(const Duration(seconds: 5));
-    } catch (_) {
-      // Best-effort : la persistance ne doit jamais bloquer la connexion.
-    }
+    await _storage.write(key: _key, value: session.encode()).timeout(const Duration(seconds: 5));
+    await _storage.delete(key: _signedOutKey).timeout(const Duration(seconds: 5));
   }
 
   @override
   Future<void> clear() async {
+    await _storage.write(key: _signedOutKey, value: 'true').timeout(const Duration(seconds: 5));
     try {
       await _storage.delete(key: _key).timeout(const Duration(seconds: 5));
     } catch (_) {
-      // Best-effort : nettoyage silencieux, ne jamais relancer.
+      // The tombstone already prevents restoration if physical deletion fails.
     }
   }
 }

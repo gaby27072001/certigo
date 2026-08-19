@@ -97,11 +97,13 @@ class HttpCredentialsGateway implements CredentialsGateway {
     final Object? profile = json['profile'];
     final String? displayName =
         profile is Map<String, dynamic> ? profile['displayName'] as String? : null;
+    final String? userId = profile is Map<String, dynamic> ? profile['id'] as String? : null;
     final Object? expiryRaw = json['accessTokenExpiresAt'];
     return AuthSession(
       accessToken: (json['accessToken'] as String?) ?? '',
       refreshToken: json['refreshToken'] as String?,
       accessTokenExpiry: expiryRaw is String ? DateTime.tryParse(expiryRaw) : null,
+      userId: userId,
       displayName: displayName,
       email: email,
       provider: AuthProvider.email,
