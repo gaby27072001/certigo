@@ -21,7 +21,18 @@ import 'repositories.dart';
 /// single REST endpoint to a typed model via [ApiClient]. Routes mirror the
 /// backend exactly (userId is always derived from the JWT, never sent).
 
+const String _kAppCatalogSchema = 'certigo.app-certification-catalog/v2';
+const String _kCanonicalCatalogSchema = 'certigo.certification-catalog/v1';
+
 List<TrackSummary> _decodeTrackSummaries(Map<String, dynamic> json) {
+  final String? schema = json['schema'] as String?;
+  final String? sourceSchema = json['sourceSchema'] as String?;
+  if (schema != _kAppCatalogSchema) {
+    throw FormatException('Unsupported app catalog schema: $schema');
+  }
+  if (sourceSchema != _kCanonicalCatalogSchema) {
+    throw FormatException('Unsupported source catalog schema: $sourceSchema');
+  }
   final List<dynamic> tracks = json['tracks'] as List<dynamic>? ?? <dynamic>[];
   return tracks.map((dynamic e) => TrackSummary.fromJson(e as Map<String, dynamic>)).toList();
 }
@@ -54,7 +65,7 @@ class RemotePathRepository implements PathRepository {
 
   @override
   Future<Result<LearningPath>> getPath(String trackId) =>
-      _api.getJson('/me/paths/$trackId', LearningPath.fromJson);
+      _api.getJson('/me/paths/${Uri.encodeComponent(trackId)}', LearningPath.fromJson);
 }
 
 class RemoteCatalogRepository implements CatalogRepository {
@@ -86,7 +97,10 @@ class RemoteLessonRepository implements LessonRepository {
 
   @override
   Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) =>
-      _api.getJson('/tracks/$trackId/lessons/$lessonId', Lesson.fromJson);
+      _api.getJson(
+        '/tracks/${Uri.encodeComponent(trackId)}/lessons/${Uri.encodeComponent(lessonId)}',
+        Lesson.fromJson,
+      );
 }
 
 class RemoteQuizRepository implements QuizRepository {
@@ -124,7 +138,7 @@ class RemoteRecommendationRepository implements RecommendationRepository {
 
   @override
   Future<Result<NextBest>> getNextBest(String trackId) =>
-      _api.getJson('/me/recommendations/$trackId', NextBest.fromJson);
+      _api.getJson('/me/recommendations/${Uri.encodeComponent(trackId)}', NextBest.fromJson);
 }
 
 class RemoteSeasonRepository implements SeasonRepository {

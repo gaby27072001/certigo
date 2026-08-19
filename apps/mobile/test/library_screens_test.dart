@@ -104,7 +104,7 @@ void main() {
       provider: CertificationProvider.github,
     ),
     track(
-      'aws-aif-c01',
+      'aws:aif-c01',
       'AIF-C01',
       'AWS Certified AI Practitioner',
       provider: CertificationProvider.aws,
@@ -112,7 +112,7 @@ void main() {
       contentStatus: CertificationContentStatus.planned,
     ),
     track(
-      'gcp-cloud-digital-leader',
+      'gcp:cloud-digital-leader',
       '',
       'Cloud Digital Leader',
       provider: CertificationProvider.gcp,

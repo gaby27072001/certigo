@@ -263,7 +263,9 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
                         path: 'cert/:trackId',
                         name: 'library-chapters',
                         builder: (BuildContext context, GoRouterState state) {
-                          final String trackId = state.pathParameters['trackId'] ?? '';
+                          final String trackId = Uri.decodeComponent(
+                            state.pathParameters['trackId'] ?? '',
+                          );
                           return CertificationChaptersScreen(trackId: trackId);
                         },
                       ),
@@ -303,8 +305,8 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           state: state,
           begin: const Offset(0, 0.04),
           child: LessonScreen(
-            trackId: state.pathParameters['trackId']!,
-            lessonId: state.pathParameters['lessonId']!,
+            trackId: Uri.decodeComponent(state.pathParameters['trackId']!),
+            lessonId: Uri.decodeComponent(state.pathParameters['lessonId']!),
           ),
         ),
       ),
@@ -316,8 +318,8 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           state: state,
           begin: const Offset(0, 0.04),
           child: QuizScreen(
-            trackId: state.pathParameters['trackId']!,
-            lessonId: state.pathParameters['lessonId']!,
+            trackId: Uri.decodeComponent(state.pathParameters['trackId']!),
+            lessonId: Uri.decodeComponent(state.pathParameters['lessonId']!),
           ),
         ),
       ),

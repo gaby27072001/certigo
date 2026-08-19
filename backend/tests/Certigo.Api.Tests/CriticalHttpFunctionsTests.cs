@@ -30,6 +30,11 @@ public sealed class CriticalHttpFunctionsTests
         var service = new FakeContentService
         {
             Catalog = new CatalogDto(
+                CertificationCatalogSchemas.AppV2,
+                CertificationCatalogSchemas.SourceV1,
+                null,
+                null,
+                Array.Empty<CertificationProviderDto>(),
                 new[]
                 {
                     new TrackSummaryDto(
@@ -58,6 +63,8 @@ public sealed class CriticalHttpFunctionsTests
         service.GetCatalogCalls.Should().Be(1);
         var payload = await response.ReadJsonAsync<CatalogDto>();
         payload.Tracks.Should().ContainSingle();
+        payload.Schema.Should().Be(CertificationCatalogSchemas.AppV2);
+        payload.SourceSchema.Should().Be(CertificationCatalogSchemas.SourceV1);
         payload.Tracks[0].Code.Should().Be("AZ-900");
         payload.Tracks[0].BlueprintDate.Should().Be(new DateOnly(2026, 7, 20));
         payload.Tracks[0].Domains.Should().ContainSingle(d => d.MinWeightPct == 25 && d.MaxWeightPct == 30);
@@ -208,7 +215,13 @@ public sealed class CriticalHttpFunctionsTests
 
     private sealed class FakeContentService : IContentService
     {
-        public CatalogDto Catalog { get; set; } = new(Array.Empty<TrackSummaryDto>());
+        public CatalogDto Catalog { get; set; } = new(
+            CertificationCatalogSchemas.AppV2,
+            CertificationCatalogSchemas.SourceV1,
+            null,
+            null,
+            Array.Empty<CertificationProviderDto>(),
+            Array.Empty<TrackSummaryDto>());
         public int GetCatalogCalls { get; private set; }
 
         public Task<Lesson?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default)

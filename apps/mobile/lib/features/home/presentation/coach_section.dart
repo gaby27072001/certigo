@@ -65,8 +65,11 @@ class CoachSection extends ConsumerWidget {
   }
 
   void _open(BuildContext context, Recommendation item) {
-    if (item.hasLesson) {
-      context.go('${Routes.lesson}/$trackId/${item.lessonId}');
+    final String? lessonId = item.lessonId;
+    if (item.hasLesson && lessonId != null) {
+      context.go(
+        '${Routes.lesson}/${Uri.encodeComponent(trackId)}/${Uri.encodeComponent(lessonId)}',
+      );
     } else {
       context.go(Routes.path);
     }

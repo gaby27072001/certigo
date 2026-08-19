@@ -467,7 +467,13 @@ internal sealed class FakeContentService : IContentService
         new("lesson-1", "track-1", "unit-1", "domain-1", "Title", 5, new List<LessonBlock>());
 
     private static CatalogDto DefaultCatalog() =>
-        new(new List<TrackSummaryDto>());
+        new(
+            CertificationCatalogSchemas.AppV2,
+            CertificationCatalogSchemas.SourceV1,
+            null,
+            null,
+            Array.Empty<CertificationProviderDto>(),
+            Array.Empty<TrackSummaryDto>());
 }
 
 /// <summary>Double for <see cref="IExamService"/>.</summary>

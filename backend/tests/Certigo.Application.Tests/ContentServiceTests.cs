@@ -48,33 +48,48 @@ public sealed class ContentServiceTests
     {
         var content = new InMemoryContentRepository();
         content.AddTrack(MakeTrack("az-900", "AZ-900", "Azure Fundamentals", "fundamentals", 1, 2));
-        var registry = new StubCertificationRegistry(
-            new CertificationCatalogEntry(
-                Id: "aws-aif-c01",
-                Provider: "aws",
-                Family: "ai",
-                Code: "AIF-C01",
-                Title: "AWS Certified AI Practitioner",
-                Level: "foundational",
-                Status: "active",
-                ContentStatus: "planned",
-                OfficialUrl: "https://aws.amazon.com/certification/certified-ai-practitioner/"));
+        var registry = FixtureRegistry();
         var service = new ContentService(content, registry);
 
         var catalog = await service.GetCatalogAsync();
 
-        catalog.Tracks.Should().HaveCount(2);
+        catalog.Schema.Should().Be(CertificationCatalogSchemas.AppV2);
+        catalog.SourceSchema.Should().Be(CertificationCatalogSchemas.SourceV1);
+        catalog.SourceAsOf.Should().Be(new DateOnly(2026, 8, 17));
+        catalog.Providers.Should().HaveCount(3);
+        catalog.Tracks.Should().HaveCount(4);
         var microsoft = catalog.Tracks.Single(track => track.Id == "az-900");
         microsoft.Provider.Should().Be("microsoft");
         microsoft.CertificationLevel.Should().Be("foundational");
         microsoft.ContentStatus.Should().Be("available");
 
-        var aws = catalog.Tracks.Single(track => track.Id == "aws-aif-c01");
+        var aws = catalog.Tracks.Single(track => track.Id == "aws:dva-c02");
         aws.Provider.Should().Be("aws");
+        aws.Family.Should().Be("development");
+        aws.Code.Should().Be("DVA-C02");
+        aws.OfficialCode.Should().Be("DVA-C02");
         aws.ContentStatus.Should().Be("planned");
         aws.UnitCount.Should().Be(0);
         aws.LessonCount.Should().Be(0);
         aws.CatalogVersion.Should().Be("2026-08-17");
+        aws.Guide!.Url.Should().EndWith("/developer-associate-02/developer-associate-02.html");
+        aws.Blueprint!.Objectives.Should().Contain(objective =>
+            objective.Id == "domain-1" && objective.WeightPercent == 32m && objective.WeightType == "exact");
+        aws.LifecycleDetails!.Successor.Should().Be("aws:dva-c03");
+        aws.Provenance!.Sources.Should().HaveCount(3);
+
+        var gcp = catalog.Tracks.Single(track => track.Id == "gcp:cloud-digital-leader");
+        gcp.Code.Should().BeEmpty();
+        gcp.OfficialCode.Should().BeNull();
+        gcp.Provider.Should().Be("gcp");
+        gcp.Family.Should().Be("cloud-foundations");
+        gcp.CertificationLevel.Should().Be("foundational");
+        gcp.Blueprint!.Objectives.Should().OnlyContain(objective => objective.WeightType == "approximate");
+
+        var retiring = catalog.Tracks.Single(track => track.Id == "aws:ans-c01");
+        retiring.Status.Should().Be("active-retiring");
+        retiring.Family.Should().Be("networking");
+        retiring.LifecycleDetails!.LastExamOn.Should().Be(new DateOnly(2026, 8, 25));
     }
 
     [Fact]
@@ -150,10 +165,14 @@ public sealed class ContentServiceTests
             Level: level);
     }
 
-    private sealed class StubCertificationRegistry(params CertificationCatalogEntry[] entries)
-        : ICertificationRegistry
+    private static ICertificationRegistry FixtureRegistry()
     {
-        public string Version => "2026-08-17";
-        public IReadOnlyList<CertificationCatalogEntry> Entries => entries;
+        var assembly = typeof(ContentServiceTests).Assembly;
+        var resourceName = assembly.GetManifestResourceNames()
+            .Single(name => name.EndsWith("canonical-certification-catalog-v1.json", StringComparison.Ordinal));
+        using var stream = assembly.GetManifestResourceStream(resourceName)!;
+        using var reader = new StreamReader(stream);
+        var document = new CertificationCatalogParser().Parse(reader.ReadToEnd());
+        return new CertificationCatalogAdapter(document);
     }
 }

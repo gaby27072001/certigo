@@ -31,7 +31,14 @@ extension CertificationLevelInfo on CertificationLevel {
   String get wireName => name;
 }
 
-enum CertificationLifecycleStatus { active, retired }
+enum CertificationLifecycleStatus { announced, active, activeRetiring, retired, replaced }
+
+extension CertificationLifecycleStatusInfo on CertificationLifecycleStatus {
+  String get wireName => switch (this) {
+        CertificationLifecycleStatus.activeRetiring => 'active-retiring',
+        _ => name,
+      };
+}
 
 enum CertificationContentStatus { available, planned }
 
@@ -46,11 +53,30 @@ CertificationProvider _providerFromJson(Map<String, dynamic> json) {
 
   final String id = (json['id'] as String? ?? '').toLowerCase();
   final String code = (json['code'] as String? ?? '').toLowerCase();
+  final String namespace = id.split(':').first;
+  if (id.contains(':')) {
+    return switch (namespace) {
+      'aws' => CertificationProvider.aws,
+      'gcp' => CertificationProvider.gcp,
+      'github' => CertificationProvider.github,
+      'microsoft' => CertificationProvider.microsoft,
+      _ => throw FormatException('Unsupported certification namespace: $namespace'),
+    };
+  }
   if (id.startsWith('github') || id.startsWith('gh-') || code.startsWith('gh')) {
     return CertificationProvider.github;
   }
   return CertificationProvider.microsoft;
 }
+
+CertificationLifecycleStatus _lifecycleStatusFromWire(String raw) => switch (raw.toLowerCase()) {
+      'announced' => CertificationLifecycleStatus.announced,
+      'active' => CertificationLifecycleStatus.active,
+      'active-retiring' => CertificationLifecycleStatus.activeRetiring,
+      'retired' => CertificationLifecycleStatus.retired,
+      'replaced' => CertificationLifecycleStatus.replaced,
+      _ => throw FormatException('Unsupported certification status: $raw'),
+    };
 
 CertificationLevel _levelFromWire(String raw) => switch (raw.toLowerCase()) {
       'foundational' || 'fundamentals' => CertificationLevel.foundational,
@@ -103,6 +129,13 @@ class TrackSummary {
     this.replacedBy,
     this.retiresOn,
     this.retiredOn,
+    this.officialCode,
+    this.slug,
+    this.officialSlug,
+    this.guide,
+    this.blueprint,
+    this.lifecycleDetails,
+    this.provenance,
   });
 
   final String id;
@@ -145,14 +178,29 @@ class TrackSummary {
   final String? replacedBy;
   final String? retiresOn;
   final String? retiredOn;
+  final String? officialCode;
+  final String? slug;
+  final String? officialSlug;
+  final CertificationGuide? guide;
+  final CertificationBlueprint? blueprint;
+  final CertificationLifecycle? lifecycleDetails;
+  final CertificationProvenance? provenance;
 
   CertificationLevel get normalizedLevel => certificationLevel == CertificationLevel.unspecified
       ? _levelFromWire(level)
       : certificationLevel;
 
-  bool get isRetired => status == CertificationLifecycleStatus.retired || lifecycle == 'retired';
+  bool get isRetired =>
+      status == CertificationLifecycleStatus.retired ||
+      status == CertificationLifecycleStatus.replaced ||
+      lifecycle == 'retired' ||
+      lifecycle == 'replaced';
 
-  bool get isActive => !isRetired;
+  bool get isActive =>
+      status == CertificationLifecycleStatus.active ||
+      status == CertificationLifecycleStatus.activeRetiring;
+
+  bool get isDiscoverable => status == CertificationLifecycleStatus.announced || isActive;
 
   bool get hasLearningContent =>
       learningAvailable && contentStatus == CertificationContentStatus.available;
@@ -163,6 +211,7 @@ class TrackSummary {
       officialStudyGuideUrl.isNotEmpty ||
       officialExamUrl.isNotEmpty ||
       blueprintLabel.isNotEmpty ||
+      (blueprint?.objectives.isNotEmpty ?? false) ||
       lifecycleNote.isNotEmpty ||
       migrationNote.isNotEmpty;
 
@@ -175,6 +224,7 @@ class TrackSummary {
   String get blueprintLabel {
     if (blueprintDate.isNotEmpty) return blueprintDate;
     return <String>[
+      if (blueprint?.version.isNotEmpty ?? false) blueprint!.version,
       if (blueprintVersion?.isNotEmpty ?? false) blueprintVersion!,
       if (blueprintPublishedOn?.isNotEmpty ?? false) blueprintPublishedOn!,
     ].join(' · ');
@@ -215,11 +265,7 @@ class TrackSummary {
       provider: _providerFromJson(json),
       family: json['family'] as String? ?? 'other',
       certificationLevel: _levelFromWire(normalizedLevel),
-      status: _enumFromWire<CertificationLifecycleStatus>(
-        rawStatus,
-        CertificationLifecycleStatus.values,
-        'certification status',
-      ),
+      status: _lifecycleStatusFromWire(rawStatus),
       contentStatus: _enumFromWire<CertificationContentStatus>(
         rawContentStatus,
         CertificationContentStatus.values,
@@ -240,6 +286,21 @@ class TrackSummary {
       replacedBy: json['replacedBy'] as String?,
       retiresOn: json['retiresOn'] as String?,
       retiredOn: json['retiredOn'] as String?,
+      officialCode: json['officialCode'] as String?,
+      slug: json['slug'] as String?,
+      officialSlug: json['officialSlug'] as String?,
+      guide: json['guide'] is Map<String, dynamic>
+          ? CertificationGuide.fromJson(json['guide'] as Map<String, dynamic>)
+          : null,
+      blueprint: json['blueprint'] is Map<String, dynamic>
+          ? CertificationBlueprint.fromJson(json['blueprint'] as Map<String, dynamic>)
+          : null,
+      lifecycleDetails: json['lifecycleDetails'] is Map<String, dynamic>
+          ? CertificationLifecycle.fromJson(json['lifecycleDetails'] as Map<String, dynamic>)
+          : null,
+      provenance: json['provenance'] is Map<String, dynamic>
+          ? CertificationProvenance.fromJson(json['provenance'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -265,8 +326,8 @@ class TrackSummary {
         'provider': provider.wireName,
         'family': family,
         'certificationLevel': normalizedLevel.wireName,
-        'status': isRetired ? 'retired' : status.name,
-        'contentStatus': hasLearningContent ? 'available' : 'planned',
+        'status': status.wireName,
+        'contentStatus': contentStatus.name,
         'officialUrl': officialUrl,
         'examGuideUrl': examGuideUrl,
         'catalogVersion': catalogVersion,
@@ -278,6 +339,13 @@ class TrackSummary {
         'replacedBy': replacedBy,
         'retiresOn': retiresOn,
         'retiredOn': retiredOn,
+        'officialCode': officialCode,
+        'slug': slug,
+        'officialSlug': officialSlug,
+        'guide': guide?.toJson(),
+        'blueprint': blueprint?.toJson(),
+        'lifecycleDetails': lifecycleDetails?.toJson(),
+        'provenance': provenance?.toJson(),
       };
 }
 
@@ -310,4 +378,158 @@ class CertificationDomain {
         'minWeightPct': minWeightPct,
         'maxWeightPct': maxWeightPct,
       };
+}
+
+class CertificationGuide {
+  const CertificationGuide({
+    required this.url,
+    this.version,
+    this.publishedOn,
+    this.versionSource,
+    this.revisionToken,
+  });
+
+  final String url;
+  final String? version;
+  final String? publishedOn;
+  final String? versionSource;
+  final String? revisionToken;
+
+  factory CertificationGuide.fromJson(Map<String, dynamic> json) => CertificationGuide(
+        url: json['url'] as String? ?? '',
+        version: json['version'] as String?,
+        publishedOn: json['publishedOn'] as String?,
+        versionSource: json['versionSource'] as String?,
+        revisionToken: json['revisionToken'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'url': url,
+        'version': version,
+        'publishedOn': publishedOn,
+        'versionSource': versionSource,
+        'revisionToken': revisionToken,
+      };
+}
+
+class CertificationBlueprint {
+  const CertificationBlueprint({required this.version, required this.objectives});
+
+  final String version;
+  final List<CertificationObjective> objectives;
+
+  factory CertificationBlueprint.fromJson(Map<String, dynamic> json) => CertificationBlueprint(
+        version: json['version'] as String? ?? '',
+        objectives: (json['objectives'] as List<dynamic>? ?? <dynamic>[])
+            .map((dynamic value) => CertificationObjective.fromJson(value as Map<String, dynamic>))
+            .toList(growable: false),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'version': version,
+        'objectives': objectives
+            .map((CertificationObjective objective) => objective.toJson())
+            .toList(growable: false),
+      };
+}
+
+class CertificationObjective {
+  const CertificationObjective({
+    required this.id,
+    required this.title,
+    required this.weightPercent,
+    required this.weightType,
+  });
+
+  final String id;
+  final String title;
+  final double weightPercent;
+  final String weightType;
+
+  String get weightLabel {
+    final String weight = weightPercent == weightPercent.roundToDouble()
+        ? weightPercent.toInt().toString()
+        : weightPercent.toString();
+    return '${weightType == 'approximate' ? '~' : ''}$weight%';
+  }
+
+  factory CertificationObjective.fromJson(Map<String, dynamic> json) => CertificationObjective(
+        id: json['id'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        weightPercent: (json['weightPercent'] as num?)?.toDouble() ?? 0,
+        weightType: json['weightType'] as String? ?? '',
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'title': title,
+        'weightPercent': weightPercent,
+        'weightType': weightType,
+      };
+}
+
+class CertificationLifecycle {
+  const CertificationLifecycle({
+    this.reviewOn,
+    this.lastExamOn,
+    this.replaces = const <String>[],
+    this.successor,
+    this.note,
+  });
+
+  final String? reviewOn;
+  final String? lastExamOn;
+  final List<String> replaces;
+  final String? successor;
+  final String? note;
+
+  factory CertificationLifecycle.fromJson(Map<String, dynamic> json) => CertificationLifecycle(
+        reviewOn: json['reviewOn'] as String?,
+        lastExamOn: json['lastExamOn'] as String?,
+        replaces: (json['replaces'] as List<dynamic>? ?? <dynamic>[])
+            .map((dynamic value) => value as String)
+            .toList(growable: false),
+        successor: json['successor'] as String?,
+        note: json['note'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'reviewOn': reviewOn,
+        'lastExamOn': lastExamOn,
+        'replaces': replaces,
+        'successor': successor,
+        'note': note,
+      };
+}
+
+class CertificationProvenance {
+  const CertificationProvenance({required this.checkedOn, required this.sources});
+
+  final String checkedOn;
+  final List<CertificationSource> sources;
+
+  factory CertificationProvenance.fromJson(Map<String, dynamic> json) => CertificationProvenance(
+        checkedOn: json['checkedOn'] as String? ?? '',
+        sources: (json['sources'] as List<dynamic>? ?? <dynamic>[])
+            .map((dynamic value) => CertificationSource.fromJson(value as Map<String, dynamic>))
+            .toList(growable: false),
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'checkedOn': checkedOn,
+        'sources':
+            sources.map((CertificationSource source) => source.toJson()).toList(growable: false),
+      };
+}
+
+class CertificationSource {
+  const CertificationSource({required this.kind, required this.url});
+
+  final String kind;
+  final String url;
+
+  factory CertificationSource.fromJson(Map<String, dynamic> json) =>
+      CertificationSource(kind: json['kind'] as String? ?? '', url: json['url'] as String? ?? '');
+
+  Map<String, dynamic> toJson() => <String, dynamic>{'kind': kind, 'url': url};
 }

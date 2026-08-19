@@ -67,7 +67,14 @@ public sealed record TrackSummaryDto(
     IReadOnlyList<string>? Aliases = null,
     string? ReplacedBy = null,
     DateOnly? RetiresOn = null,
-    DateOnly? RetiredOn = null);
+    DateOnly? RetiredOn = null,
+    string? OfficialCode = null,
+    string? Slug = null,
+    string? OfficialSlug = null,
+    CertificationGuideDto? Guide = null,
+    CertificationBlueprintDto? Blueprint = null,
+    CertificationLifecycleDto? LifecycleDetails = null,
+    CertificationProvenanceDto? Provenance = null);
 
 public sealed record CertificationDomainDto(
     string Id,
@@ -75,4 +82,54 @@ public sealed record CertificationDomainDto(
     int MinWeightPct,
     int MaxWeightPct);
 
-public sealed record CatalogDto(IReadOnlyList<TrackSummaryDto> Tracks);
+public sealed record CertificationGuideDto(
+    string Url,
+    string? Version,
+    DateOnly? PublishedOn,
+    string? VersionSource,
+    string? RevisionToken);
+
+public sealed record CertificationBlueprintDto(
+    string Version,
+    IReadOnlyList<CertificationObjectiveDto> Objectives);
+
+public sealed record CertificationObjectiveDto(
+    string Id,
+    string Title,
+    decimal WeightPercent,
+    string WeightType);
+
+public sealed record CertificationLifecycleDto(
+    DateOnly? ReviewOn = null,
+    DateOnly? LastExamOn = null,
+    IReadOnlyList<string>? Replaces = null,
+    string? Successor = null,
+    string? Note = null);
+
+public sealed record CertificationProvenanceDto(
+    DateOnly CheckedOn,
+    IReadOnlyList<CertificationSourceDto> Sources);
+
+public sealed record CertificationSourceDto(
+    string Kind,
+    string Url);
+
+public sealed record CertificationProviderDto(
+    string Id,
+    string Name,
+    string Namespace,
+    string? OfficialCatalogUrl,
+    IReadOnlyList<string> SourceHosts,
+    DateOnly? CheckedOn);
+
+public sealed record CatalogFreshnessDto(
+    int MaxAgeDays,
+    DateOnly ReviewDueOn);
+
+public sealed record CatalogDto(
+    string Schema,
+    string SourceSchema,
+    DateOnly? SourceAsOf,
+    CatalogFreshnessDto? Freshness,
+    IReadOnlyList<CertificationProviderDto> Providers,
+    IReadOnlyList<TrackSummaryDto> Tracks);
