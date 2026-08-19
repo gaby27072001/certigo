@@ -63,6 +63,12 @@ public sealed class AccountDeletionStepException(string failureCode, Exception i
     public string FailureCode { get; } = failureCode;
 }
 
+public sealed class AccountDeletionInProgressException()
+    : Exception("Account deletion is in progress; user data can no longer be modified.");
+
+public sealed class AccountDeletionDisabledException()
+    : Exception("Account deletion is temporarily unavailable.");
+
 public interface IAccountDeletionRepository
 {
     Task<AccountDeletionRecord?> GetAsync(
@@ -94,6 +100,10 @@ public interface IAccountDeletionRepository
         string subjectHash,
         DateTimeOffset completedAt,
         int retentionSeconds,
+        CancellationToken cancellationToken = default);
+
+    Task ReconcileDataAsync(
+        string subjectUserId,
         CancellationToken cancellationToken = default);
 
     Task DeleteSocialDataAsync(string subjectUserId, CancellationToken cancellationToken = default);

@@ -3,12 +3,6 @@ name: ci-backend
 # .NET 8 Azure Functions API: restore, build (warnings as errors) and test.
 on:
   workflow_dispatch:
-    inputs:
-      run_cosmos_account_deletion:
-        description: Run the local-emulator account-deletion integration gate
-        required: false
-        default: false
-        type: boolean
   push:
     branches: [ main ]
     paths: [ "backend/**", ".github/workflows/ci-backend.yml" ]
@@ -91,27 +85,3 @@ jobs:
           path: backend/sbom/**
           if-no-files-found: warn
           retention-days: 90
-
-  cosmos-account-deletion:
-    name: Cosmos account deletion
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_cosmos_account_deletion }}
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
-        with:
-          dotnet-version: "8.0.x"
-      - name: Restore locked dependencies
-        run: >-
-          dotnet restore
-          backend/tests/Certigo.Infrastructure.Tests/Certigo.Infrastructure.Tests.csproj
-          --locked-mode
-      - name: Run account-deletion integration against ephemeral Cosmos
-        env:
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
-          ACTIONS_ID_TOKEN_REQUEST_URL: ""
-        run: bash backend/run-account-deletion-cosmos-emulator.sh

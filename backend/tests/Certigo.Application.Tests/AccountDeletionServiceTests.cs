@@ -42,12 +42,19 @@ public sealed class AccountDeletionServiceTests
             "learning",
             "economy",
             "profile",
-            "social");
+            "social",
+            "social",
+            "learning",
+            "economy",
+            "profile",
+            "social",
+            "identity");
         identity.Subjects.Should().Equal("external-user-1");
         repository.Record!.SubjectUserId.Should().BeNull();
         repository.Record.Ttl.Should().Be((int)TimeSpan.FromDays(30).TotalSeconds);
         audit.Events.Select(entry => entry.EventType).Should().ContainInOrder(
             "requested",
+            "step-completed",
             "step-completed",
             "step-completed",
             "step-completed",
@@ -78,7 +85,13 @@ public sealed class AccountDeletionServiceTests
             "learning",
             "economy",
             "profile",
-            "social");
+            "social",
+            "social",
+            "learning",
+            "economy",
+            "profile",
+            "social",
+            "identity");
     }
 
     [Fact]
@@ -89,6 +102,17 @@ public sealed class AccountDeletionServiceTests
 
         status.Status.Should().Be(AccountDeletionStatus.NotRequested);
         repository.Record.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Disabled_feature_fails_closed()
+    {
+        IAccountDeletionService service = new DisabledAccountDeletionService();
+
+        await FluentActions.Invoking(() => service.GetStatusAsync())
+            .Should().ThrowAsync<AccountDeletionDisabledException>();
+        await FluentActions.Invoking(() => service.RequestAsync(Now))
+            .Should().ThrowAsync<AccountDeletionDisabledException>();
     }
 
     [Fact]
@@ -187,6 +211,18 @@ public sealed class AccountDeletionServiceTests
                 Ttl = retentionSeconds,
             };
             return Task.FromResult(Record);
+        }
+
+        public async Task ReconcileDataAsync(
+            string subjectUserId,
+            CancellationToken cancellationToken = default)
+        {
+            await Execute("social");
+            await Execute("learning");
+            await Execute("economy");
+            await Execute("profile");
+            await Execute("social");
+            await Execute("identity");
         }
 
         public Task DeleteSocialDataAsync(

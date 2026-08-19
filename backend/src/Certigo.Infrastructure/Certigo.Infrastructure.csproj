@@ -10,6 +10,9 @@
     <ProjectReference Include="..\Certigo.Domain\Certigo.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Certigo.Infrastructure.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Azure.Communication.Email" Version="1.0.1" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.23.0" />

@@ -10,6 +10,7 @@
 | Persistance | état `account-deletion` durable dans `attempts`, partitionnée par SHA-256 de l’identifiant de compte |
 | Blocage | toute API hors suppression répond `423` dès qu’une demande durable existe |
 | Audit | identifiant de demande aléatoire, événement, étape, code d’échec et horodatage ; aucun nom, e-mail, identifiant de compte ou jeton |
+| Activation | `ACCOUNT_DELETION_ENABLED=false` par défaut ; activation interdite avant succès du gate Cosmos destructif |
 
 ## Preuve et ré-authentification
 
@@ -29,6 +30,10 @@ Les étapes sont idempotentes et enregistrées après chaque succès :
 4. profil, puis seconde réconciliation des relations sociales pour fermer les
    créations concurrentes ;
 5. credential e-mail local ou identité cliente Entra External ID.
+6. réconciliation finale de toutes les partitions utilisateur ; chaque writer
+   Cosmos acquiert atomiquement un lease avant mutation, publie le session token
+   du conteneur écrit, puis la suppression attend zéro lease et rejoue ses sweeps
+   avec ces tokens avant de passer à `completed`.
 
 Un échec conserve les étapes terminées, un code non personnel, un compteur et
 la prochaine échéance de retry. Le client n’efface jamais sa session ni sa file
@@ -86,6 +91,27 @@ Sans les trois variables et le secret, le déploiement staging/production
 échoue avant Azure. En `dev`, le CD les ignore, ne crée aucun secret Graph et
 l’étape d’identité externe reste indisponible plutôt que de produire un faux
 succès.
+
+Le backend reste fail-closed avec `ACCOUNT_DELETION_ENABLED=false`. Le paramètre
+ne pourra être activé dans l’IaC qu’après succès explicite du test d’intégration
+Cosmos de suppression ; un test skippé ou non exécuté ne satisfait pas ce gate.
+Tant que le flag reste faux, Bicep ne crée pas le secret Graph dans Key Vault et
+n’émet aucun des quatre app settings Graph/ré-authentification de suppression.
+
+### Gate d’intégration Cosmos
+
+Le workflow trusted `test-account-deletion-cosmos.yml`, chargé uniquement depuis
+`main` par un `repository_dispatch` manuel sans payload, autorise uniquement un
+émulateur Docker local sur runner éphémère. Il génère une clé aléatoire pour le
+run, crée une base unique et supprime le conteneur en `finally`. Il n’utilise
+aucune identité Azure, aucun rôle data-plane et aucune donnée live.
+
+Déclenchement opérateur, après présence du workflow sur `main` :
+
+```powershell
+'{"event_type":"test-account-deletion-cosmos","client_payload":{}}' |
+  gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input -
+```
 
 ### Validation Apple restante après déploiement
 

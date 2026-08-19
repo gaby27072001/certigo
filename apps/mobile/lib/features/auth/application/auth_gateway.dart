@@ -363,7 +363,6 @@ class AppAuthGateway implements AuthGateway {
       // L'API valide un jeton porteur ; on privilégie l'access_token et on
       // retombe sur l'id_token si l'IdP n'a pas émis d'access_token séparé.
       accessToken: accessToken ?? idToken ?? '',
-      userId: (claims['oid'] ?? claims['sub']) as String?,
       refreshToken: refreshToken,
       idToken: idToken,
       accessTokenExpiry: expiry,

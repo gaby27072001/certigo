@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
+import 'package:core/core.dart';
 
 import '../features/home/presentation/home_screen.dart';
 import '../features/path/presentation/path_screen.dart';
@@ -143,6 +144,10 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
     initialLocation: Routes.splash,
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
+      if (!AppEnv.accountDeletionEnabled
+          && state.matchedLocation == Routes.accountDeletion) {
+        return Routes.profile;
+      }
       final AuthState auth = ref.read(authControllerProvider);
       return resolveAuthRedirect(
         auth: auth,

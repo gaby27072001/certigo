@@ -97,6 +97,10 @@ grep -F 'ENTRA_GRAPH_CLIENT_ID: entraGraphClientId' \
   "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F 'ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI: entraGraphClientSecretSecretUri' \
   "${root}/infra/modules/functionApp.bicep" >/dev/null
+grep -F 'ACCOUNT_DELETION_ENABLED: string(accountDeletionEnabled)' \
+  "${root}/infra/modules/functionApp.bicep" >/dev/null
+grep -F 'param accountDeletionEnabled bool = false' \
+  "${root}/infra/main.bicep" >/dev/null
 if grep -F 'ENTRA_GRAPH_CLIENT_SECRET:' \
   "${root}/infra/modules/functionApp.bicep" >/dev/null; then
   echo "The raw Graph client secret must never be emitted as a Function App setting." >&2

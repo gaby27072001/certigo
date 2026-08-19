@@ -28,14 +28,26 @@ public sealed class CosmosPurchaseRepository(CosmosContext context) : IPurchaseR
 
     public async Task CreateAsync(PurchaseRecord record, CancellationToken cancellationToken = default)
     {
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            record.UserId,
+            cancellationToken);
         // Atomic idempotency on the clientPurchaseId-derived id so a replayed or
         // concurrent purchase can never debit gems twice.
+        await writeLease.MarkMutationDispatchedAsync();
         try
         {
-            await context.Economy.CreateItemAsync(record, new PartitionKey(record.UserId), cancellationToken: cancellationToken);
+            var response = await context.Economy.CreateItemAsync(
+                record,
+                new PartitionKey(record.UserId),
+                cancellationToken: cancellationToken);
+            await writeLease.CommitAsync(
+                CosmosContainers.Economy,
+                response.Headers.Session,
+                cancellationToken);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
         {
+            writeLease.MarkDefinitelyNotCommitted();
             throw new DuplicateRecordException($"Purchase '{record.Id}' already exists.");
         }
     }

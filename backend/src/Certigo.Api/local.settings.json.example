@@ -26,6 +26,7 @@
     "ENTRA_GRAPH_CLIENT_ID": "<confidential-client-id>",
     "ENTRA_GRAPH_CLIENT_SECRET": "",
     "ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI": "https://<vault>.vault.azure.net/secrets/<name>/<version>",
+    "ACCOUNT_DELETION_ENABLED": "false",
     "APPLICATIONINSIGHTS_CONNECTION_STRING": "<connection-string>"
   }
 }

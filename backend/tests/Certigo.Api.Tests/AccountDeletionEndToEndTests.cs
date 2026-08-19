@@ -57,6 +57,12 @@ public sealed class AccountDeletionEndToEndTests
             "economy",
             "profile",
             "social",
+            "social",
+            "learning",
+            "economy",
+            "profile",
+            "social",
+            "credentials",
             "credentials");
         repository.Record!.Status.Should().Be(AccountDeletionRecordStatus.Completed);
         repository.Record.SubjectUserId.Should().BeNull();
@@ -183,6 +189,18 @@ public sealed class AccountDeletionEndToEndTests
                 Ttl = retentionSeconds,
             };
             return Task.FromResult(Record);
+        }
+
+        public async Task ReconcileDataAsync(
+            string subjectUserId,
+            CancellationToken cancellationToken = default)
+        {
+            await DeleteSocialDataAsync(subjectUserId, cancellationToken);
+            await DeleteLearningDataAsync(subjectUserId, cancellationToken);
+            await DeleteEconomyDataAsync(subjectUserId, cancellationToken);
+            await DeleteProfileAsync(subjectUserId, cancellationToken);
+            await DeleteSocialDataAsync(subjectUserId, cancellationToken);
+            await DeleteCredentialsAsync(subjectUserId, cancellationToken);
         }
 
         public Task DeleteSocialDataAsync(

@@ -1,0 +1,59 @@
+name: test-account-deletion-cosmos
+
+on:
+  repository_dispatch:
+    types: [test-account-deletion-cosmos]
+
+permissions: {}
+
+jobs:
+  preflight:
+    name: Validate empty dispatch payload
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    permissions: {}
+    steps:
+      - name: Reject payload fields
+        shell: bash
+        env:
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          if ! jq -e 'type == "object" and length == 0' \
+              <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+            echo "::error::The emulator gate does not accept payload fields."
+            exit 1
+          fi
+
+  emulator:
+    name: Account deletion / local emulator
+    needs: preflight
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: "8.0.x"
+      - name: Require a local container runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v docker >/dev/null
+          docker info >/dev/null
+          command -v openssl >/dev/null
+          command -v curl >/dev/null
+      - name: Restore locked dependencies
+        run: >-
+          dotnet restore
+          backend/tests/Certigo.Infrastructure.Tests/Certigo.Infrastructure.Tests.csproj
+          --locked-mode
+      - name: Run destructive test against an ephemeral local database
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
+          ACTIONS_ID_TOKEN_REQUEST_URL: ""
+        run: bash backend/run-account-deletion-cosmos-emulator.sh

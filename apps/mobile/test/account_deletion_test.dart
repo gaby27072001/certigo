@@ -112,21 +112,25 @@ class _Purger implements LocalAccountDataPurger {
 }
 
 void main() {
+  test('account deletion remains disabled by default until the Cosmos gate passes', () {
+    expect(AppEnv.accountDeletionEnabled, isFalse);
+  });
+
   const AccountDeletion notRequested = AccountDeletion(
     status: AccountDeletionPhase.notRequested,
     completedSteps: 0,
-    totalSteps: 5,
+    totalSteps: 6,
   );
   const AccountDeletion pending = AccountDeletion(
     status: AccountDeletionPhase.pending,
     completedSteps: 2,
-    totalSteps: 5,
+    totalSteps: 6,
     failureCode: 'learning-data-delete-failed',
   );
   const AccountDeletion completed = AccountDeletion(
     status: AccountDeletionPhase.completed,
-    completedSteps: 5,
-    totalSteps: 5,
+    completedSteps: 6,
+    totalSteps: 6,
   );
 
   AuthSession socialSession() => const AuthSession(
@@ -367,7 +371,7 @@ void main() {
     final SemanticsNode progress = tester.getSemantics(
       find.byKey(const Key('account-deletion-progress-semantics')),
     );
-    expect(progress.label, contains('2 étapes sur 5 terminées'));
+    expect(progress.label, contains('2 étapes sur 6 terminées'));
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     semantics.dispose();

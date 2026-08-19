@@ -318,6 +318,16 @@ Après le déploiement de cette PR, la seule validation Apple restante consiste 
 utiliser un compte sacrifiable pour un parcours réel connexion → suppression,
 puis à vérifier la disparition ou la révocation de l’association Apple.
 
+### Gate de suppression de compte
+
+`ACCOUNT_DELETION_ENABLED` reste `false` par défaut. Avant toute activation,
+déclencher manuellement le `repository_dispatch`
+`test-account-deletion-cosmos`, chargé depuis `main`, sans payload. Le runner
+trusted doit être éphémère et disposer de Docker ; le workflow génère une clé
+locale, crée une base d’émulation unique et détruit le conteneur en `finally`.
+Il ne se connecte pas à Azure et ne modifie ni RBAC ni infrastructure. Un test
+skippé ou non démarré ne permet jamais d’activer la feature.
+
 ### Commandes
 
 ```bash

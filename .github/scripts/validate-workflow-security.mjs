@@ -342,8 +342,14 @@ function validateWorkflow(file) {
 function validateRepositoryInvariants() {
   const errors = [];
   const android = fs.readFileSync(path.join(workflowsDir, 'release-android.yml'), 'utf8');
+  const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');
   const backend = fs.readFileSync(path.join(workflowsDir, 'cd-backend.yml'), 'utf8');
   const backendCi = fs.readFileSync(path.join(workflowsDir, 'ci-backend.yml'), 'utf8');
+  const accountDeletionCosmosWorkflow = fs.readFileSync(
+    path.join(workflowsDir, 'test-account-deletion-cosmos.yml'),
+    'utf8',
+  );
+  const accountDeletionCosmosControls = accountDeletionCosmosWorkflow;
   const promoteBackendPath = path.join(
     workflowsDir,
     'promote-backend-staging-prod.yml',
@@ -437,6 +443,10 @@ function validateRepositoryInvariants() {
       'PLAY_SERVICE_ACCOUNT_JSON est obligatoire pour une publication non dry-run',
     ],
     ['production configuration gate', '--certigo-env "$CERTIGO_ENV"'],
+    [
+      'account deletion release gate',
+      '--dart-define="ACCOUNT_DELETION_ENABLED=$ACCOUNT_DELETION_ENABLED"',
+    ],
   ]);
 
   for (const [label, marker] of androidRequirements) {
@@ -446,6 +456,15 @@ function validateRepositoryInvariants() {
   }
   if (android.includes('${{ vars.API_BASE_URL }}')) {
     errors.push('release-android.yml: legacy API_BASE_URL repository variable is forbidden');
+  }
+  if (
+    codemagic.split(
+      '--dart-define=ACCOUNT_DELETION_ENABLED="$ACCOUNT_DELETION_ENABLED"',
+    ).length !== 3
+  ) {
+    errors.push(
+      'codemagic.yaml: production and dev IPA builds must carry the account deletion flag',
+    );
   }
   const directPromotion = backend.includes('promote-backend');
   if (
@@ -501,14 +520,31 @@ function validateRepositoryInvariants() {
     }
   }
   for (const marker of [
-    "github.event_name == 'workflow_dispatch' && inputs.run_cosmos_account_deletion",
-    'runs-on: [self-hosted, Linux, X64, certigo-pr]',
+    'refs/heads/main',
+    'repository_dispatch:',
+    'types: [test-account-deletion-cosmos]',
+    'type == "object" and length == 0',
+    "github.ref == 'refs/heads/main'",
+    'ref: ${{ github.sha }}',
+    'runs-on: [self-hosted, Linux, X64, certigo-trusted]',
     'ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""',
     'bash backend/run-account-deletion-cosmos-emulator.sh',
   ]) {
-    if (!backendCi.includes(marker)) {
-      errors.push(`ci-backend.yml: missing isolated Cosmos gate invariant ${marker}`);
+    if (!accountDeletionCosmosControls.includes(marker)) {
+      errors.push(
+        `test-account-deletion-cosmos.yml: missing isolated gate invariant ${marker}`,
+      );
     }
+  }
+  if (
+    accountDeletionCosmosControls.includes('pull_request')
+    || accountDeletionCosmosControls.includes('push:')
+    || accountDeletionCosmosControls.includes('az role assignment')
+    || accountDeletionCosmosControls.includes('az cosmosdb create')
+  ) {
+    errors.push(
+      'test-account-deletion-cosmos.yml: the destructive gate must stay manual and must not provision Azure resources or roles',
+    );
   }
   for (const marker of [
     'openssl rand -base64 64',
@@ -1175,7 +1211,6 @@ function validateRepositoryInvariants() {
   if (!contentWorkflow.includes('run: npm ci') || contentWorkflow.includes('npm install')) {
     errors.push('ci-content.yml: npm dependencies must be installed exclusively with npm ci');
   }
-  const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');
   if (/(?:dart|flutter)\s+pub\s+get(?!\s+--enforce-lockfile)/.test(codemagic)) {
     errors.push('codemagic.yaml: Flutter dependency resolution must enforce the lockfile');
   }

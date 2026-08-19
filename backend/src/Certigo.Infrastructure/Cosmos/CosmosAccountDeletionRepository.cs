@@ -23,11 +23,7 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
     {
         try
         {
-            var response = await context.Attempts.CreateItemAsync(
-                record,
-                new PartitionKey(record.UserId),
-                cancellationToken: cancellationToken);
-            return response.Resource;
+            return await context.StartAccountDeletionAsync(record, cancellationToken);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
         {
@@ -108,26 +104,109 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
                 },
             cancellationToken);
 
-    public Task<AccountDeletionRecord> MarkCompletedAsync(
+    public async Task<AccountDeletionRecord> MarkCompletedAsync(
         string subjectHash,
         DateTimeOffset completedAt,
         int retentionSeconds,
         CancellationToken cancellationToken = default)
-        => UpdateStateAsync(
+        => await context.CompleteAccountDeletionAsync(
             subjectHash,
-            current => current.Status == AccountDeletionRecordStatus.Completed
-                ? current
-                : current with
-                {
-                    SubjectUserId = null,
-                    Status = AccountDeletionRecordStatus.Completed,
-                    UpdatedAt = completedAt,
-                    CompletedAt = completedAt,
-                    FailureCode = null,
-                    NextRetryAt = null,
-                    Ttl = retentionSeconds,
-                },
+            completedAt,
+            retentionSeconds,
             cancellationToken);
+
+    public async Task ReconcileDataAsync(
+        string subjectUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var subjectHash = AccountDeletionSubject.Hash(subjectUserId);
+        if (await context.HasActiveAccountWriteLeasesAsync(subjectHash, cancellationToken))
+        {
+            throw new AccountDeletionStepException(
+                "account-mutations-draining",
+                new InvalidOperationException(
+                    "Account deletion is waiting for admitted mutations to finish."));
+        }
+
+        try
+        {
+            var barriers = await context.GetAccountWriteBarriersAsync(
+                subjectHash,
+                cancellationToken);
+            foreach (var sessionToken in SessionTokens(
+                         barriers,
+                         CosmosContainers.Friends))
+            {
+                await DeleteFriendsAsync(subjectUserId, sessionToken, cancellationToken);
+            }
+            foreach (var sessionToken in SessionTokens(
+                         barriers,
+                         CosmosContainers.Leaderboard))
+            {
+                await DeleteLeaderboardEntriesAsync(
+                    subjectUserId,
+                    sessionToken,
+                    cancellationToken);
+            }
+            foreach (var sessionToken in SessionTokens(
+                         barriers,
+                         CosmosContainers.Progress))
+            {
+                await DeletePartitionAsync(
+                    context.Progress,
+                    subjectUserId,
+                    sessionToken,
+                    cancellationToken);
+            }
+            foreach (var sessionToken in SessionTokens(
+                         barriers,
+                         CosmosContainers.Attempts))
+            {
+                await DeletePartitionAsync(
+                    context.Attempts,
+                    subjectUserId,
+                    sessionToken,
+                    cancellationToken);
+            }
+            foreach (var sessionToken in SessionTokens(
+                         barriers,
+                         CosmosContainers.Events))
+            {
+                await DeletePartitionAsync(
+                    context.Events,
+                    subjectUserId,
+                    sessionToken,
+                    cancellationToken);
+            }
+            foreach (var sessionToken in SessionTokens(
+                         barriers,
+                         CosmosContainers.Economy))
+            {
+                await DeletePartitionAsync(
+                    context.Economy,
+                    subjectUserId,
+                    sessionToken,
+                    cancellationToken);
+            }
+            foreach (var sessionToken in SessionTokens(
+                         barriers,
+                         CosmosContainers.Users))
+            {
+                await DeleteProfileWithSessionAsync(
+                    subjectUserId,
+                    sessionToken,
+                    cancellationToken);
+                await DeleteCredentialsWithSessionAsync(
+                    subjectUserId,
+                    sessionToken,
+                    cancellationToken);
+            }
+        }
+        catch (CosmosException ex)
+        {
+            throw new AccountDeletionStepException("reconciliation-delete-failed", ex);
+        }
+    }
 
     public async Task DeleteSocialDataAsync(
         string subjectUserId,
@@ -135,8 +214,14 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
     {
         try
         {
-            await DeleteFriendsAsync(subjectUserId, cancellationToken);
-            await DeleteLeaderboardEntriesAsync(subjectUserId, cancellationToken);
+            await DeleteFriendsAsync(
+                subjectUserId,
+                sessionToken: null,
+                cancellationToken);
+            await DeleteLeaderboardEntriesAsync(
+                subjectUserId,
+                sessionToken: null,
+                cancellationToken);
         }
         catch (CosmosException ex)
         {
@@ -150,9 +235,21 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
     {
         try
         {
-            await DeletePartitionAsync(context.Progress, subjectUserId, cancellationToken);
-            await DeletePartitionAsync(context.Attempts, subjectUserId, cancellationToken);
-            await DeletePartitionAsync(context.Events, subjectUserId, cancellationToken);
+            await DeletePartitionAsync(
+                context.Progress,
+                subjectUserId,
+                sessionToken: null,
+                cancellationToken);
+            await DeletePartitionAsync(
+                context.Attempts,
+                subjectUserId,
+                sessionToken: null,
+                cancellationToken);
+            await DeletePartitionAsync(
+                context.Events,
+                subjectUserId,
+                sessionToken: null,
+                cancellationToken);
         }
         catch (CosmosException ex)
         {
@@ -166,7 +263,11 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
     {
         try
         {
-            await DeletePartitionAsync(context.Economy, subjectUserId, cancellationToken);
+            await DeletePartitionAsync(
+                context.Economy,
+                subjectUserId,
+                sessionToken: null,
+                cancellationToken);
         }
         catch (CosmosException ex)
         {
@@ -180,10 +281,9 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
     {
         try
         {
-            await DeleteIfExistsAsync(
-                context.Users,
+            await DeleteProfileWithSessionAsync(
                 subjectUserId,
-                new PartitionKey(subjectUserId),
+                sessionToken: null,
                 cancellationToken);
         }
         catch (CosmosException ex)
@@ -198,24 +298,10 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
     {
         try
         {
-            var query = new QueryDefinition(
-                    "SELECT c.id FROM c WHERE c.type = 'credential' AND c.userId = @userId")
-                .WithParameter("@userId", subjectUserId);
-            using var iterator = context.Users.GetItemQueryIterator<PartitionedDocument>(query);
-            var documents = new List<PartitionedDocument>();
-            while (iterator.HasMoreResults)
-            {
-                documents.AddRange(await iterator.ReadNextAsync(cancellationToken));
-            }
-
-            foreach (var document in documents)
-            {
-                await DeleteIfExistsAsync(
-                    context.Users,
-                    document.Id,
-                    new PartitionKey(document.Id),
-                    cancellationToken);
-            }
+            await DeleteCredentialsWithSessionAsync(
+                subjectUserId,
+                sessionToken: null,
+                cancellationToken);
         }
         catch (CosmosException ex)
         {
@@ -263,12 +349,15 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
 
     private async Task DeleteFriendsAsync(
         string subjectUserId,
+        string? sessionToken,
         CancellationToken cancellationToken)
     {
         var query = new QueryDefinition(
                 "SELECT c.id, c.userId FROM c WHERE c.userId = @userId OR c.friendUserId = @userId")
             .WithParameter("@userId", subjectUserId);
-        using var iterator = context.Friends.GetItemQueryIterator<PartitionedDocument>(query);
+        using var iterator = context.Friends.GetItemQueryIterator<PartitionedDocument>(
+            query,
+            requestOptions: new QueryRequestOptions { SessionToken = sessionToken });
         var documents = new List<PartitionedDocument>();
         while (iterator.HasMoreResults)
         {
@@ -281,18 +370,22 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
                 context.Friends,
                 document.Id,
                 new PartitionKey(document.UserId),
+                sessionToken,
                 cancellationToken);
         }
     }
 
     private async Task DeleteLeaderboardEntriesAsync(
         string subjectUserId,
+        string? sessionToken,
         CancellationToken cancellationToken)
     {
         var query = new QueryDefinition(
                 "SELECT c.id, c.periodLeagueId FROM c WHERE c.userId = @userId")
             .WithParameter("@userId", subjectUserId);
-        using var iterator = context.Leaderboard.GetItemQueryIterator<LeaderboardDocument>(query);
+        using var iterator = context.Leaderboard.GetItemQueryIterator<LeaderboardDocument>(
+            query,
+            requestOptions: new QueryRequestOptions { SessionToken = sessionToken });
         var documents = new List<LeaderboardDocument>();
         while (iterator.HasMoreResults)
         {
@@ -305,6 +398,7 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
                 context.Leaderboard,
                 document.Id,
                 new PartitionKey(document.PeriodLeagueId),
+                sessionToken,
                 cancellationToken);
         }
     }
@@ -312,12 +406,17 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
     private static async Task DeletePartitionAsync(
         Container container,
         string subjectUserId,
+        string? sessionToken,
         CancellationToken cancellationToken)
     {
         var partitionKey = new PartitionKey(subjectUserId);
         using var iterator = container.GetItemQueryIterator<string>(
             new QueryDefinition("SELECT VALUE c.id FROM c"),
-            requestOptions: new QueryRequestOptions { PartitionKey = partitionKey });
+            requestOptions: new QueryRequestOptions
+            {
+                PartitionKey = partitionKey,
+                SessionToken = sessionToken,
+            });
         var ids = new List<string>();
         while (iterator.HasMoreResults)
         {
@@ -326,7 +425,12 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
 
         foreach (var id in ids)
         {
-            await DeleteIfExistsAsync(container, id, partitionKey, cancellationToken);
+            await DeleteIfExistsAsync(
+                container,
+                id,
+                partitionKey,
+                sessionToken,
+                cancellationToken);
         }
     }
 
@@ -334,6 +438,7 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
         Container container,
         string id,
         PartitionKey partitionKey,
+        string? sessionToken,
         CancellationToken cancellationToken)
     {
         try
@@ -341,6 +446,7 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
             await container.DeleteItemAsync<object>(
                 id,
                 partitionKey,
+                new ItemRequestOptions { SessionToken = sessionToken },
                 cancellationToken: cancellationToken);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -348,6 +454,57 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
             // Every deletion step is replay-safe.
         }
     }
+
+    private async Task DeleteProfileWithSessionAsync(
+        string subjectUserId,
+        string? sessionToken,
+        CancellationToken cancellationToken)
+        => await DeleteIfExistsAsync(
+            context.Users,
+            subjectUserId,
+            new PartitionKey(subjectUserId),
+            sessionToken,
+            cancellationToken);
+
+    private async Task DeleteCredentialsWithSessionAsync(
+        string subjectUserId,
+        string? sessionToken,
+        CancellationToken cancellationToken)
+    {
+        var query = new QueryDefinition(
+                "SELECT c.id FROM c WHERE c.type = 'credential' AND c.userId = @userId")
+            .WithParameter("@userId", subjectUserId);
+        using var iterator = context.Users.GetItemQueryIterator<PartitionedDocument>(
+            query,
+            requestOptions: new QueryRequestOptions { SessionToken = sessionToken });
+        var documents = new List<PartitionedDocument>();
+        while (iterator.HasMoreResults)
+        {
+            documents.AddRange(await iterator.ReadNextAsync(cancellationToken));
+        }
+
+        foreach (var document in documents)
+        {
+            await DeleteIfExistsAsync(
+                context.Users,
+                document.Id,
+                new PartitionKey(document.Id),
+                sessionToken,
+                cancellationToken);
+        }
+    }
+
+    private static IEnumerable<string?> SessionTokens(
+        IReadOnlyList<CosmosContext.AccountWriteBarrier> barriers,
+        string containerName)
+        => new string?[] { null }.Concat(
+            barriers
+                .Where(barrier => string.Equals(
+                    barrier.ContainerName,
+                    containerName,
+                    StringComparison.Ordinal))
+                .Select(barrier => barrier.SessionToken)
+                .Distinct(StringComparer.Ordinal));
 
     private sealed record PartitionedDocument(string Id, string UserId);
     private sealed record LeaderboardDocument(string Id, string PeriodLeagueId);

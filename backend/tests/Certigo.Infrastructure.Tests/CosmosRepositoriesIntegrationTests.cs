@@ -261,25 +261,41 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
         await attempts.CreateAsync(attempt);
 
         var subjectHash = AccountDeletionSubject.Hash(profile.Id);
+        await using var admittedMutation =
+            await context.AcquireAccountWriteLeaseAsync(profile.Id);
         await deletion.GetOrCreateAsync(new AccountDeletionRecord(
             AccountDeletionRecord.RecordId,
             subjectHash,
             profile.Id,
             Guid.NewGuid().ToString("n"),
             AccountIdentityKind.Local,
-            ["social", "learning", "economy", "profile", "identity"],
+            ["social", "learning", "economy", "profile", "identity", "reconciliation"],
             [],
             AccountDeletionRecordStatus.Pending,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow));
 
+        (await context.HasActiveAccountWriteLeasesAsync(subjectHash)).Should().BeTrue();
+        await admittedMutation.DisposeAsync();
+        (await context.HasActiveAccountWriteLeasesAsync(subjectHash)).Should().BeFalse();
+
+        Func<Task> recreateProfile = () => users.UpsertAsync(profile with { ETag = null });
+        await recreateProfile.Should().ThrowAsync<AccountDeletionInProgressException>();
+        Func<Task> recreateAttempt = () => attempts.CreateAsync(NewAttempt(
+            profile.Id,
+            xpEarned: 99,
+            submittedAt: DateTimeOffset.UtcNow));
+        await recreateAttempt.Should().ThrowAsync<AccountDeletionInProgressException>();
+        Func<Task> recreateFriend = () => friends.UpsertAsync(new FriendEdge(
+            $"{friendId}:{profile.Id}",
+            friendId,
+            profile.Id,
+            DateTimeOffset.UtcNow));
+        await recreateFriend.Should().ThrowAsync<AccountDeletionInProgressException>();
+
         (await deletion.ResolveIdentityKindAsync(profile.Id)).Should()
             .Be(AccountIdentityKind.Local);
-        await deletion.DeleteSocialDataAsync(profile.Id);
-        await deletion.DeleteLearningDataAsync(profile.Id);
-        await deletion.DeleteEconomyDataAsync(profile.Id);
-        await deletion.DeleteProfileAsync(profile.Id);
-        await deletion.DeleteCredentialsAsync(profile.Id);
+        await deletion.ReconcileDataAsync(profile.Id);
         var tombstone = await deletion.MarkCompletedAsync(
             subjectHash,
             DateTimeOffset.UtcNow,

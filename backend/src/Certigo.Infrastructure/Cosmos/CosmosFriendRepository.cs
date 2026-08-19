@@ -31,7 +31,36 @@ public sealed class CosmosFriendRepository(CosmosContext context) : IFriendRepos
         => context.Friends.ReadOrDefaultAsync<FriendEdge>(Id(userId, friendUserId), new PartitionKey(userId), cancellationToken);
 
     public async Task UpsertAsync(FriendEdge edge, CancellationToken cancellationToken = default)
-        => await context.Friends.UpsertItemAsync(edge, new PartitionKey(edge.UserId), cancellationToken: cancellationToken);
+    {
+        await using var ownerLease = await context.AcquireAccountWriteLeaseAsync(
+            edge.UserId,
+            cancellationToken);
+        await using var friendLease = await context.AcquireAccountWriteLeaseAsync(
+            edge.FriendUserId,
+            cancellationToken);
+        await ownerLease.MarkMutationDispatchedAsync();
+        try
+        {
+            await friendLease.MarkMutationDispatchedAsync();
+        }
+        catch (CosmosException)
+        {
+            ownerLease.MarkDefinitelyNotCommitted();
+            throw;
+        }
+        var response = await context.Friends.UpsertItemAsync(
+            edge,
+            new PartitionKey(edge.UserId),
+            cancellationToken: cancellationToken);
+        await ownerLease.CommitAsync(
+            CosmosContainers.Friends,
+            response.Headers.Session,
+            cancellationToken);
+        await friendLease.CommitAsync(
+            CosmosContainers.Friends,
+            response.Headers.Session,
+            cancellationToken);
+    }
 
     public async Task RemoveAsync(string userId, string friendUserId, CancellationToken cancellationToken = default)
     {

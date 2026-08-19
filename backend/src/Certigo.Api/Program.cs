@@ -296,7 +296,18 @@ var host = new HostBuilder()
             services.AddSingleton<ITutorCompletion, NullTutorCompletion>();
         }
         services.AddScoped<IUserService, UserService>();
-        services.AddScoped<IAccountDeletionService, AccountDeletionService>();
+        var accountDeletionEnabled = bool.TryParse(
+            configuration["ACCOUNT_DELETION_ENABLED"],
+            out var configuredAccountDeletionEnabled)
+            && configuredAccountDeletionEnabled;
+        if (accountDeletionEnabled)
+        {
+            services.AddScoped<IAccountDeletionService, AccountDeletionService>();
+        }
+        else
+        {
+            services.AddScoped<IAccountDeletionService, DisabledAccountDeletionService>();
+        }
         // certigo-content is the sole multi-cloud inventory. Until its package
         // importer is wired, production exposes authored tracks with an empty
         // external source instead of embedding a second catalog snapshot.

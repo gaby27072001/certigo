@@ -39,6 +39,8 @@ param entraGraphClientId string = ''
 @description('Microsoft Graph confidential-client secret. Supplied only as a secure deployment parameter; Bicep stores it in the environment Key Vault and passes only its versioned URI to the Function App.')
 @secure()
 param entraGraphClientSecret string = ''
+@description('Enables the account-deletion API only after the Cosmos integration gate has passed. Defaults fail-closed.')
+param accountDeletionEnabled bool = false
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
 @description('Azure OpenAI resource endpoint used by the tutor when enabled. Example: https://<resource>.openai.azure.com/.')
@@ -211,22 +213,23 @@ var authMode = env == 'dev' ? 'dev' : 'prod'
 // auth, Key Vault purge protection + 90-day soft delete, geo-redundant + versioned
 // storage, and a locked-down CORS origin set.
 var hardened = env != 'dev'
-var effectiveEntraReauthAudience = hardened
+var requireAccountDeletionGraph = hardened && accountDeletionEnabled
+var effectiveEntraReauthAudience = requireAccountDeletionGraph
   ? (empty(entraReauthAudience)
     ? fail('entraReauthAudience must be supplied securely for staging and production deployments.')
     : entraReauthAudience)
   : ''
-var effectiveEntraGraphTenantId = hardened
+var effectiveEntraGraphTenantId = requireAccountDeletionGraph
   ? (empty(entraGraphTenantId)
     ? fail('entraGraphTenantId must be supplied securely for staging and production deployments.')
     : entraGraphTenantId)
   : ''
-var effectiveEntraGraphClientId = hardened
+var effectiveEntraGraphClientId = requireAccountDeletionGraph
   ? (empty(entraGraphClientId)
     ? fail('entraGraphClientId must be supplied securely for staging and production deployments.')
     : entraGraphClientId)
   : ''
-var effectiveEntraGraphClientSecret = hardened
+var effectiveEntraGraphClientSecret = requireAccountDeletionGraph
   ? (empty(entraGraphClientSecret)
     ? fail('entraGraphClientSecret must be supplied securely for staging and production deployments.')
     : entraGraphClientSecret)
@@ -462,6 +465,7 @@ module api 'modules/functionApp.bicep' = {
     entraGraphTenantId: effectiveEntraGraphTenantId
     entraGraphClientId: effectiveEntraGraphClientId
     entraGraphClientSecretSecretUri: graphClientSecret.?outputs.?secretUri ?? ''
+    accountDeletionEnabled: accountDeletionEnabled
     tutorLlmEnabled: tutorLlmEnabled
     tutorLlmEndpoint: tutorLlmEndpoint
     tutorLlmDeployment: tutorLlmDeployment

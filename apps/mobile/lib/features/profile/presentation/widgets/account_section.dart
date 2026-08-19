@@ -1,4 +1,5 @@
 import 'package:data/data.dart';
+import 'package:core/core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -121,13 +122,15 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
             trailing: handle.isEmpty ? null : '@$handle',
             onTap: _editHandle,
           ),
-          Divider(color: p.border, height: 24),
-          TappableRow(
-            icon: Icons.delete_outline_rounded,
-            label: 'Supprimer le compte',
-            trailingColor: p.error,
-            onTap: _deleteAccount,
-          ),
+          if (AppEnv.accountDeletionEnabled) ...<Widget>[
+            Divider(color: p.border, height: 24),
+            TappableRow(
+              icon: Icons.delete_outline_rounded,
+              label: 'Supprimer le compte',
+              trailingColor: p.error,
+              onTap: _deleteAccount,
+            ),
+          ],
         ],
       ),
     );

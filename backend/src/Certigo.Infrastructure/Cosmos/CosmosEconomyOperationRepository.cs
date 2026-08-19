@@ -19,16 +19,25 @@ public sealed class CosmosEconomyOperationRepository(CosmosContext context) : IE
         EconomyOperationRecord operation,
         CancellationToken cancellationToken = default)
     {
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            operation.UserId,
+            cancellationToken);
+        await writeLease.MarkMutationDispatchedAsync();
         try
         {
             var response = await context.Economy.CreateItemAsync(
                 operation,
                 new PartitionKey(operation.UserId),
                 cancellationToken: cancellationToken);
+            await writeLease.CommitAsync(
+                CosmosContainers.Economy,
+                response.Headers.Session,
+                cancellationToken);
             return response.Resource;
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
         {
+            writeLease.MarkDefinitelyNotCommitted();
             return await GetAsync(operation.UserId, operation.Id, cancellationToken)
                 ?? throw new ConcurrencyConflictException(
                     $"Economy operation '{operation.Id}' conflicted but could not be re-read.");
@@ -41,6 +50,9 @@ public sealed class CosmosEconomyOperationRepository(CosmosContext context) : IE
         string step,
         CancellationToken cancellationToken = default)
     {
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            userId,
+            cancellationToken);
         return await OptimisticConcurrency.ExecuteAsync(async () =>
         {
             var current = await GetAsync(userId, operationId, cancellationToken)
@@ -70,16 +82,22 @@ public sealed class CosmosEconomyOperationRepository(CosmosContext context) : IE
 
             try
             {
+                await writeLease.MarkMutationDispatchedAsync();
                 var response = await context.Economy.ReplaceItemAsync(
                     updated,
                     operationId,
                     new PartitionKey(userId),
                     new ItemRequestOptions { IfMatchEtag = current.ETag },
                     cancellationToken);
+                await writeLease.CommitAsync(
+                    CosmosContainers.Economy,
+                    response.Headers.Session,
+                    cancellationToken);
                 return response.Resource;
             }
             catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
             {
+                writeLease.MarkDefinitelyNotCommitted();
                 throw new ConcurrencyConflictException(
                     $"Economy operation '{operationId}' was modified concurrently.");
             }
@@ -92,6 +110,9 @@ public sealed class CosmosEconomyOperationRepository(CosmosContext context) : IE
         string failureCode,
         CancellationToken cancellationToken = default)
     {
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            userId,
+            cancellationToken);
         return await OptimisticConcurrency.ExecuteAsync(async () =>
         {
             var current = await GetAsync(userId, operationId, cancellationToken)
@@ -116,16 +137,22 @@ public sealed class CosmosEconomyOperationRepository(CosmosContext context) : IE
             };
             try
             {
+                await writeLease.MarkMutationDispatchedAsync();
                 var response = await context.Economy.ReplaceItemAsync(
                     failed,
                     operationId,
                     new PartitionKey(userId),
                     new ItemRequestOptions { IfMatchEtag = current.ETag },
                     cancellationToken);
+                await writeLease.CommitAsync(
+                    CosmosContainers.Economy,
+                    response.Headers.Session,
+                    cancellationToken);
                 return response.Resource;
             }
             catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
             {
+                writeLease.MarkDefinitelyNotCommitted();
                 throw new ConcurrencyConflictException(
                     $"Economy operation '{operationId}' was modified concurrently.");
             }
@@ -138,6 +165,9 @@ public sealed class CosmosEconomyOperationRepository(CosmosContext context) : IE
         string outcomeJson,
         CancellationToken cancellationToken = default)
     {
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            userId,
+            cancellationToken);
         return await OptimisticConcurrency.ExecuteAsync(async () =>
         {
             var current = await GetAsync(userId, operationId, cancellationToken)
@@ -166,16 +196,22 @@ public sealed class CosmosEconomyOperationRepository(CosmosContext context) : IE
             };
             try
             {
+                await writeLease.MarkMutationDispatchedAsync();
                 var response = await context.Economy.ReplaceItemAsync(
                     updated,
                     operationId,
                     new PartitionKey(userId),
                     new ItemRequestOptions { IfMatchEtag = current.ETag },
                     cancellationToken);
+                await writeLease.CommitAsync(
+                    CosmosContainers.Economy,
+                    response.Headers.Session,
+                    cancellationToken);
                 return response.Resource;
             }
             catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
             {
+                writeLease.MarkDefinitelyNotCommitted();
                 throw new ConcurrencyConflictException(
                     $"Economy operation '{operationId}' was modified concurrently.");
             }

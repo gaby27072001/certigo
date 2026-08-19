@@ -49,6 +49,9 @@ public sealed class CosmosProgressRepository(CosmosContext context) : IProgressR
             return;
         }
 
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            userId,
+            cancellationToken);
         var partitionKey = new PartitionKey(userId);
         for (var attempt = 1; attempt <= 3; attempt++)
         {
@@ -98,12 +101,18 @@ public sealed class CosmosProgressRepository(CosmosContext context) : IProgressR
                 }
             }
 
+            await writeLease.MarkMutationDispatchedAsync();
             using var response = await batch.ExecuteAsync(cancellationToken);
             if (response.IsSuccessStatusCode)
             {
+                await writeLease.CommitAsync(
+                    CosmosContainers.Progress,
+                    response.Headers.Session,
+                    cancellationToken);
                 return;
             }
 
+            writeLease.MarkDefinitelyNotCommitted();
             if (attempt == 3
                 || response.StatusCode is not (HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed))
             {

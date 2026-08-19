@@ -65,16 +65,25 @@ public sealed class CosmosUserCredentialRepository(CosmosContext context) : IUse
 
     public async Task<UserCredentialRecord> CreateAsync(UserCredentialRecord record, CancellationToken cancellationToken = default)
     {
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            record.UserId,
+            cancellationToken);
+        await writeLease.MarkMutationDispatchedAsync();
         try
         {
             var response = await context.Users.CreateItemAsync(
                 record,
                 new PartitionKey(record.Id),
                 cancellationToken: cancellationToken);
+            await writeLease.CommitAsync(
+                CosmosContainers.Users,
+                response.Headers.Session,
+                cancellationToken);
             return response.Resource;
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
         {
+            writeLease.MarkDefinitelyNotCommitted();
             throw new DuplicateRecordException($"A credential for '{record.Email}' already exists.");
         }
     }
@@ -86,17 +95,26 @@ public sealed class CosmosUserCredentialRepository(CosmosContext context) : IUse
             throw new InvalidOperationException($"Credential '{record.Id}' update requires an ETag.");
         }
 
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            record.UserId,
+            cancellationToken);
+        await writeLease.MarkMutationDispatchedAsync();
         try
         {
-            await context.Users.ReplaceItemAsync(
+            var response = await context.Users.ReplaceItemAsync(
                 record,
                 record.Id,
                 new PartitionKey(record.Id),
                 new ItemRequestOptions { IfMatchEtag = record.ETag },
                 cancellationToken);
+            await writeLease.CommitAsync(
+                CosmosContainers.Users,
+                response.Headers.Session,
+                cancellationToken);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
         {
+            writeLease.MarkDefinitelyNotCommitted();
             throw new ConcurrencyConflictException($"Credential '{record.Id}' was modified concurrently.");
         }
     }

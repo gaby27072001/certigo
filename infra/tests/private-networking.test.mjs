@@ -401,28 +401,20 @@ test('Function app settings pass only versioned Key Vault secret URIs after the 
 
   assert.equal(site.properties.siteConfig.appSettings, undefined);
   assert.equal(settings.name, "[format('{0}/{1}', parameters('functionAppName'), 'appsettings')]");
-  assert.equal(
-    settings.properties.AUTH_JWT_SIGNING_KEY_SECRET_URI,
-    "[parameters('authJwtSigningKeySecretUri')]",
+  assert.match(
+    settings.properties,
+    /'AUTH_JWT_SIGNING_KEY_SECRET_URI', parameters\('authJwtSigningKeySecretUri'\)/,
   );
-  assert.equal(settings.properties.AUTH_JWT_SIGNING_KEY, undefined);
-  assert.equal(
-    settings.properties.ENTRA_REAUTH_AUDIENCE,
-    "[parameters('entraReauthAudience')]",
-  );
-  assert.equal(
-    settings.properties.ENTRA_GRAPH_TENANT_ID,
-    "[parameters('entraGraphTenantId')]",
+  assert.match(
+    settings.properties,
+    /'ACCOUNT_DELETION_ENABLED', string\(parameters\('accountDeletionEnabled'\)\)/,
   );
   assert.equal(
-    settings.properties.ENTRA_GRAPH_CLIENT_ID,
-    "[parameters('entraGraphClientId')]",
+    template.variables.accountDeletionGraphSettings,
+    "[if(parameters('accountDeletionEnabled'), createObject('ENTRA_REAUTH_AUDIENCE', parameters('entraReauthAudience'), 'ENTRA_GRAPH_TENANT_ID', parameters('entraGraphTenantId'), 'ENTRA_GRAPH_CLIENT_ID', parameters('entraGraphClientId'), 'ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI', parameters('entraGraphClientSecretSecretUri')), createObject())]",
   );
-  assert.equal(
-    settings.properties.ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI,
-    "[parameters('entraGraphClientSecretSecretUri')]",
-  );
-  assert.equal(settings.properties.ENTRA_GRAPH_CLIENT_SECRET, undefined);
+  assert.match(settings.properties, /variables\('accountDeletionGraphSettings'\)/);
+  assert.doesNotMatch(settings.properties, /'ENTRA_GRAPH_CLIENT_SECRET',/);
   for (const parameter of accountDeletionParameters) {
     assert.equal(template.parameters[parameter].type, 'securestring');
   }
@@ -448,6 +440,11 @@ test('Function app settings pass only versioned Key Vault secret URIs after the 
 
 test('account deletion identity flows through secure parameters and a versioned Key Vault secret', () => {
   const template = compileTemplate('infra/main.bicep');
+  assert.equal(template.parameters.accountDeletionEnabled.defaultValue, false);
+  assert.equal(
+    template.resources.api.properties.parameters.accountDeletionEnabled.value,
+    "[parameters('accountDeletionEnabled')]",
+  );
   const accountDeletionParameters = {
     entraReauthAudience: 'effectiveEntraReauthAudience',
     entraGraphTenantId: 'effectiveEntraGraphTenantId',
@@ -481,9 +478,13 @@ test('account deletion identity flows through secure parameters and a versioned 
   for (const variable of Object.values(accountDeletionParameters)) {
     assert.match(
       template.variables[variable],
-      /variables\('hardened'\).*fail\('.*staging and production deployments\.'\).*''\)\]$/,
+      /variables\('requireAccountDeletionGraph'\).*fail\('.*staging and production deployments\.'\).*''\)\]$/,
     );
   }
+  assert.equal(
+    template.variables.requireAccountDeletionGraph,
+    "[and(variables('hardened'), parameters('accountDeletionEnabled'))]",
+  );
 
   for (const environment of ['staging', 'prod']) {
     const parameters = readFileSync(

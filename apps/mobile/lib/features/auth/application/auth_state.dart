@@ -80,7 +80,6 @@ extension AuthProviderX on AuthProvider {
 class AuthSession {
   const AuthSession({
     required this.accessToken,
-    this.userId,
     this.refreshToken,
     this.idToken,
     this.accessTokenExpiry,
@@ -92,7 +91,6 @@ class AuthSession {
   });
 
   final String accessToken;
-  final String? userId;
   final String? refreshToken;
   final String? idToken;
   final DateTime? accessTokenExpiry;
@@ -124,7 +122,6 @@ class AuthSession {
 
   AuthSession copyWith({
     String? accessToken,
-    String? userId,
     String? refreshToken,
     String? idToken,
     DateTime? accessTokenExpiry,
@@ -136,7 +133,6 @@ class AuthSession {
   }) {
     return AuthSession(
       accessToken: accessToken ?? this.accessToken,
-      userId: userId ?? this.userId,
       refreshToken: refreshToken ?? this.refreshToken,
       idToken: idToken ?? this.idToken,
       accessTokenExpiry: accessTokenExpiry ?? this.accessTokenExpiry,
@@ -150,7 +146,6 @@ class AuthSession {
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'accessToken': accessToken,
-        'userId': userId,
         'refreshToken': refreshToken,
         'idToken': idToken,
         'accessTokenExpiry': accessTokenExpiry?.toIso8601String(),
@@ -168,7 +163,6 @@ class AuthSession {
     final String? idToken = json['idToken'] as String?;
     return AuthSession(
       accessToken: token,
-      userId: json['userId'] as String?,
       refreshToken: json['refreshToken'] as String?,
       idToken: idToken,
       accessTokenExpiry: expiryRaw is String ? DateTime.tryParse(expiryRaw) : null,

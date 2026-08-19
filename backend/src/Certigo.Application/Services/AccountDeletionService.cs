@@ -28,6 +28,7 @@ public sealed class AccountDeletionService(
     private const string EconomyStep = "economy";
     private const string ProfileStep = "profile";
     private const string IdentityStep = "identity";
+    private const string ReconciliationStep = "reconciliation";
 
     private static readonly IReadOnlyList<string> RequiredSteps =
     [
@@ -35,6 +36,7 @@ public sealed class AccountDeletionService(
         LearningStep,
         EconomyStep,
         ProfileStep,
+        ReconciliationStep,
         IdentityStep,
     ];
 
@@ -76,6 +78,11 @@ public sealed class AccountDeletionService(
 
         if (record.Status == AccountDeletionRecordStatus.Completed)
         {
+            record = await repository.MarkCompletedAsync(
+                subjectHash,
+                record.CompletedAt ?? clock.UtcNow,
+                checked((int)CompletedRecordRetention.TotalSeconds),
+                cancellationToken);
             return ToDto(record, clock.UtcNow);
         }
 
@@ -174,6 +181,14 @@ public sealed class AccountDeletionService(
             case IdentityStep when identityKind == AccountIdentityKind.External:
                 await externalIdentityDeletion.DeleteAsync(subjectUserId, cancellationToken);
                 break;
+            case ReconciliationStep:
+                // Writers hold distributed leases acquired against the same
+                // lifecycle partition that deletion closes atomically. Their
+                // session tokens form the cross-container visibility barrier.
+                await repository.ReconcileDataAsync(
+                    subjectUserId,
+                    cancellationToken);
+                break;
             case IdentityStep:
                 throw new InvalidOperationException(
                     $"Unsupported account identity kind '{identityKind}'.");
@@ -213,6 +228,17 @@ public sealed class AccountDeletionService(
             record.FailureCode,
             retryAfter);
     }
+}
+
+public sealed class DisabledAccountDeletionService : IAccountDeletionService
+{
+    public Task<AccountDeletionDto> GetStatusAsync(CancellationToken cancellationToken = default)
+        => throw new AccountDeletionDisabledException();
+
+    public Task<AccountDeletionDto> RequestAsync(
+        DateTimeOffset? authenticatedAt,
+        CancellationToken cancellationToken = default)
+        => throw new AccountDeletionDisabledException();
 }
 
 public sealed class AccountDeletionAccessGuard(IAccountDeletionRepository repository)
