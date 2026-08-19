@@ -372,26 +372,26 @@ class ProjectStateTests(unittest.TestCase):
     def test_active_content_reference_is_pinned_exactly(self) -> None:
         active = project_state.load_active_content_reference(REPO_ROOT)
         self.assertEqual(
-            "55a512821dabbea8b65d3403f9c83571b4a33ed8", active.revision
+            "87ae81724899387a8d6c922f0dc4b4631b6523ec", active.revision
         )
-        self.assertEqual("2026-08-14", active.date)
-        self.assertEqual("2026-08-14T21:42:01Z", active.committed_at)
-        self.assertEqual(146, active.public.file_count)
+        self.assertEqual("2026-08-19", active.date)
+        self.assertEqual("2026-08-19T14:18:47Z", active.committed_at)
+        self.assertEqual(259, active.public.file_count)
         self.assertEqual(
-            "sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff",
+            "sha256:a3ab2254673515990410268a93f95afd5605f19e29637373d7b20d412fa08869",
             active.public.manifest_id,
         )
         self.assertEqual(
-            "d067b47b9d96593ea58e5dbb22289e6abeef48fcc960ca74f74905c71644ed02",
+            "7cb52a5609d08e0ebdd31f57704758b8853b5cba164a3fd43ae2c1a34c9d70ce",
             active.public.file_sha256,
         )
-        self.assertEqual(146, active.private.file_count)
+        self.assertEqual(232, active.private.file_count)
         self.assertEqual(
-            "sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b",
+            "sha256:e3bfa7c20c03503384a68d8e261bcbb88f749292a273744a5ba4a309fc48c901",
             active.private.manifest_id,
         )
         self.assertEqual(
-            "06c42204be85737f149c1aff9c21da393c3dbdc6eeeeebe5621fa83777b2c102",
+            "f78ad1b15b99e7e07817b89a3923a09eb8f52bbd78c0d1b669f19a2f5a558024",
             active.private.file_sha256,
         )
 
@@ -422,6 +422,9 @@ class ProjectStateTests(unittest.TestCase):
                                 "questions/lesson.json"
                                 if channel == "public"
                                 else "solutions/lesson.json"
+                            ),
+                            "resourceType": (
+                                "question" if channel == "public" else "solution"
                             ),
                             "hash": "6" * 64,
                             "size": 123,

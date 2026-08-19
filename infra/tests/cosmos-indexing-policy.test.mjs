@@ -61,6 +61,9 @@ test('compiled Cosmos ARM emits TTL only for attempts', () => {
   assert.deepEqual(containers, [
     { name: 'users', pk: '/id' },
     { name: 'content', pk: '/trackId' },
+    { name: 'content-public', pk: '/releaseId' },
+    { name: 'content-private', pk: '/releaseId' },
+    { name: 'content-control', pk: '/scope' },
     { name: 'progress', pk: '/userId' },
     { name: 'attempts', pk: '/userId' },
     { name: 'events', pk: '/userId' },

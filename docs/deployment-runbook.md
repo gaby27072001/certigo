@@ -34,6 +34,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | Smoke test live + ready | ✅ Automatique et bloquant après OneDeploy | `deploy-flex-onedeploy.sh` |
 | ZIP/manifest/SBOM de release | ✅ Build unique, hashes revérifiés à chaque environnement | `cd-backend.yml` |
 | Rollback applicatif | ✅ Dispatch protégé vers un run `main` antérieur, sans Bicep | §Release récupérable |
+| Releases de contenu | ✅ Procédure séparée, Blob WORM + ETag + rollback N-1 | `docs/runbooks/CONTENT_RELEASES.md` |
 
 ### Check-list d'exploitation (utilisateur non-admin)
 
@@ -59,6 +60,12 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 ### Release récupérable
 
 Le workflow sépare désormais strictement la construction et la promotion :
+
+Le déploiement backend et la promotion de contenu sont deux opérations
+indépendantes. Le déploiement conserve `CONTENT_REPOSITORY_MODE=legacy`; une
+release éditoriale n'est importée/activée qu'avec le runbook
+`docs/runbooks/CONTENT_RELEASES.md`, après validation staging et avec l'app role
+administrateur.
 
 1. un push `main` produit `backend-release` une seule fois ;
 2. le bundle contient `publish.zip`, `release-manifest.json` et le SBOM CycloneDX ;

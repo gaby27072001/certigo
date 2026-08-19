@@ -112,16 +112,17 @@ test('private endpoints and DNS cover every backend dependency', () => {
     compileTemplate('infra/modules/privateNetwork.bicep'),
     'Microsoft.Network/privateEndpoints',
   );
-  assert.equal(endpoints.length, 5);
+  assert.equal(endpoints.length, 6);
   const groupIds = endpoints
     .flatMap((endpoint) => endpoint.properties.privateLinkServiceConnections)
     .flatMap((connection) => connection.properties.groupIds)
     .sort();
-  assert.deepEqual(groupIds, ['Sql', 'blob', 'queue', 'table', 'vault']);
+  assert.deepEqual(groupIds, ['Sql', 'blob', 'blob', 'queue', 'table', 'vault']);
   assert.deepEqual(
     endpoints.map((endpoint) => endpoint.name).sort(),
     [
       "[parameters('cosmosPrivateEndpointName')]",
+      "[parameters('contentStorageBlobPrivateEndpointName')]",
       "[parameters('keyVaultPrivateEndpointName')]",
       "[parameters('storageBlobPrivateEndpointName')]",
       "[parameters('storageQueuePrivateEndpointName')]",
@@ -133,7 +134,7 @@ test('private endpoints and DNS cover every backend dependency', () => {
     compileTemplate('infra/modules/privateNetwork.bicep'),
     'Microsoft.Network/privateEndpoints/privateDnsZoneGroups',
   );
-  assert.equal(zoneGroups.length, 5);
+  assert.equal(zoneGroups.length, 6);
   assert.ok(
     zoneGroups.every(
       (group) => group.properties.privateDnsZoneConfigs.length === 1,
@@ -143,6 +144,7 @@ test('private endpoints and DNS cover every backend dependency', () => {
     zoneGroups.map((group) => group.name).sort(),
     [
       "[format('{0}/{1}', parameters('cosmosPrivateEndpointName'), parameters('cosmosPrivateDnsZoneGroupName'))]",
+      "[format('{0}/{1}', parameters('contentStorageBlobPrivateEndpointName'), parameters('contentStorageBlobPrivateDnsZoneGroupName'))]",
       "[format('{0}/{1}', parameters('keyVaultPrivateEndpointName'), parameters('keyVaultPrivateDnsZoneGroupName'))]",
       "[format('{0}/{1}', parameters('storageBlobPrivateEndpointName'), parameters('storageBlobPrivateDnsZoneGroupName'))]",
       "[format('{0}/{1}', parameters('storageQueuePrivateEndpointName'), parameters('storageQueuePrivateDnsZoneGroupName'))]",
@@ -279,6 +281,7 @@ test('storage protections remain compatible with policy-enforced point-in-time r
 test('policy-constrained services permanently disable public access', () => {
   for (const [file, resourceType] of [
     ['infra/modules/storage.bicep', 'Microsoft.Storage/storageAccounts'],
+    ['infra/modules/contentStorage.bicep', 'Microsoft.Storage/storageAccounts'],
     ['infra/modules/keyvault.bicep', 'Microsoft.KeyVault/vaults'],
     ['infra/modules/cosmos.bicep', 'Microsoft.DocumentDB/databaseAccounts'],
   ]) {
@@ -409,6 +412,7 @@ test('Function deployment waits for the complete private network deployment', ()
   const functionDeployment = template.resources.api;
 
   assert.ok(networkDeployment.dependsOn.includes('storage'));
+  assert.ok(networkDeployment.dependsOn.includes('contentStorage'));
   assert.ok(networkDeployment.dependsOn.includes('vault'));
   assert.ok(networkDeployment.dependsOn.includes('data'));
   assert.ok(networkDeployment.dependsOn.includes('sharedPrivateDns'));

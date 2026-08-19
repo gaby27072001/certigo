@@ -35,7 +35,12 @@ OBSERVABLE_PATHS = (
     "tools/tests",
 )
 OBSERVABLE_HASH_PREFIX = b"certigo-project-state-observable-v1\0"
-PACKAGE_MANIFEST_SCHEMA = "certigo.content.package-manifest/v1"
+PACKAGE_MANIFEST_SCHEMA = "certigo.content.package-manifest/v2"
+SUPPORTED_PACKAGE_MANIFEST_SCHEMAS = {
+    "certigo.content.package-manifest/v1",
+    "certigo.content.package-manifest/v2",
+    "certigo.content.package-manifest/v3",
+}
 PACKAGE_MANIFEST_ALGORITHM = "sha256"
 PACKAGE_MANIFEST_SERIALIZATION = "json-sorted-keys-compact-utf8-lf"
 PACKAGE_MANIFEST_BODY_FIELDS = (
@@ -71,6 +76,7 @@ class ActiveContentReference:
     revision: str
     date: str
     committed_at: str
+    package_schema: str
     public: ActiveManifestReference
     private: ActiveManifestReference
 
@@ -432,8 +438,13 @@ def load_active_content_reference(root: Path) -> ActiveContentReference:
         },
         f"{ACTIVE_CONTENT_REFERENCE_FILE}.packageContract",
     )
+    package_schema = contract.get("schema")
+    if package_schema not in SUPPORTED_PACKAGE_MANIFEST_SCHEMAS:
+        raise ProjectStateError(
+            f"{ACTIVE_CONTENT_REFERENCE_FILE}.packageContract.schema: unsupported package manifest."
+        )
     expected_contract = {
-        "schema": PACKAGE_MANIFEST_SCHEMA,
+        "schema": package_schema,
         "algorithm": PACKAGE_MANIFEST_ALGORITHM,
         "serialization": PACKAGE_MANIFEST_SERIALIZATION,
         "canonicalBodyFields": list(PACKAGE_MANIFEST_BODY_FIELDS),
@@ -442,7 +453,7 @@ def load_active_content_reference(root: Path) -> ActiveContentReference:
     if contract != expected_contract:
         raise ProjectStateError(
             f"{ACTIVE_CONTENT_REFERENCE_FILE}.packageContract: contract does not match "
-            "certigo.content.package-manifest/v1."
+            f"{package_schema}."
         )
 
     manifests = value["manifests"]
@@ -464,7 +475,14 @@ def load_active_content_reference(root: Path) -> ActiveContentReference:
         "private",
     )
     return ActiveContentReference(
-        repository, branch, revision, date, committed_at, public, private
+        repository,
+        branch,
+        revision,
+        date,
+        committed_at,
+        package_schema,
+        public,
+        private,
     )
 
 
@@ -483,7 +501,9 @@ def _canonical_manifest_id(manifest: dict[str, object]) -> str:
 
 
 def _validate_manifest(
-    active_root: Path, reference: ActiveManifestReference
+    active_root: Path,
+    reference: ActiveManifestReference,
+    expected_schema: str,
 ) -> None:
     source = reference.path
     raw = _read_bytes(active_root, source)
@@ -501,7 +521,7 @@ def _validate_manifest(
         raise ProjectStateError(f"{source}: expected a JSON object.")
     expected_fields = set(PACKAGE_MANIFEST_BODY_FIELDS + PACKAGE_MANIFEST_DIGEST_FIELDS)
     _exact_keys(manifest, expected_fields, source)
-    if manifest["schema"] != PACKAGE_MANIFEST_SCHEMA:
+    if manifest["schema"] != expected_schema:
         raise ProjectStateError(f"{source}.schema: unexpected package manifest schema.")
     if manifest["algorithm"] != PACKAGE_MANIFEST_ALGORITHM:
         raise ProjectStateError(f"{source}.algorithm: expected sha256.")
@@ -527,36 +547,87 @@ def _validate_manifest(
         raise ProjectStateError(
             f"{source}.fileCount: expected {reference.file_count} and len(files) equality."
         )
-    expected_path = (
-        r"questions/[^/]+\.json"
-        if reference.channel == "public"
-        else r"solutions/[^/]+\.json"
-    )
+    if expected_schema.endswith("/v1"):
+        expected_path = (
+            r"questions/[^/]+\.json"
+            if reference.channel == "public"
+            else r"solutions/[^/]+\.json"
+        )
+        required_entry_keys = {"id", "path", "hash", "size"}
+        allowed_entry_keys = required_entry_keys
+    else:
+        public_prefixes = (
+            r"(?:questions|catalog|coverage)"
+            if expected_schema.endswith("/v2")
+            else r"(?:questions|catalog|coverage|runtime/(?:tracks|domains|units|lessons|concepts))"
+        )
+        expected_path = (
+            rf"{public_prefixes}/.+\.json"
+            if reference.channel == "public"
+            else r"solutions/.+\.json"
+        )
+        required_entry_keys = {"id", "path", "resourceType", "hash", "size"}
+        allowed_entry_keys = required_entry_keys | {
+            "provider",
+            "certification",
+            "blueprintVersion",
+            "objective",
+        }
     manifest_paths: list[str] = []
     for index, file_entry in enumerate(files):
         entry_source = f"{source}.files[{index}]"
         if not isinstance(file_entry, dict):
             raise ProjectStateError(f"{entry_source}: expected an object.")
-        _exact_keys(file_entry, {"id", "path", "hash", "size"}, entry_source)
+        actual_entry_keys = set(file_entry)
+        if not required_entry_keys.issubset(actual_entry_keys) or not actual_entry_keys.issubset(
+            allowed_entry_keys
+        ):
+            raise ProjectStateError(
+                f"{entry_source}: expected required fields {sorted(required_entry_keys)} "
+                f"and optional metadata {sorted(allowed_entry_keys - required_entry_keys)}, "
+                f"found {sorted(actual_entry_keys)}."
+            )
         item_id = file_entry["id"]
         item_path = file_entry["path"]
         item_hash = file_entry["hash"]
         item_size = file_entry["size"]
+        resource_type = file_entry.get("resourceType")
         if not isinstance(item_id, str) or not item_id or "/" in item_id:
             raise ProjectStateError(f"{entry_source}.id: expected a non-empty item id.")
         if not isinstance(item_path, str) or not re.fullmatch(expected_path, item_path):
             raise ProjectStateError(
                 f"{entry_source}.path: unexpected path for {reference.channel}."
             )
+        if resource_type is not None:
+            allowed_resource_types = {
+                "question",
+                "solution",
+                "certificationCatalog",
+                "coverageMatrix",
+            }
+            if expected_schema.endswith("/v3"):
+                allowed_resource_types.update(
+                    {"track", "domain", "unit", "lesson", "concept"}
+                )
+            if resource_type not in allowed_resource_types:
+                raise ProjectStateError(f"{entry_source}.resourceType: unsupported value.")
+            if reference.channel == "public" and resource_type == "solution":
+                raise ProjectStateError(
+                    f"{entry_source}: public manifest cannot contain solutions."
+                )
+            if reference.channel == "answerKey" and resource_type != "solution":
+                raise ProjectStateError(
+                    f"{entry_source}: private manifest accepts only solutions."
+                )
         if not isinstance(item_hash, str) or not re.fullmatch(
             r"[0-9a-f]{64}", item_hash
         ):
             raise ProjectStateError(
                 f"{entry_source}.hash: expected 64 lowercase hex characters."
             )
-        if isinstance(item_size, bool) or not isinstance(item_size, int) or item_size < 0:
+        if isinstance(item_size, bool) or not isinstance(item_size, int) or item_size <= 0:
             raise ProjectStateError(
-                f"{entry_source}.size: expected a non-negative integer."
+                f"{entry_source}.size: expected a positive integer."
             )
         manifest_paths.append(item_path)
     if manifest_paths != sorted(manifest_paths) or len(manifest_paths) != len(
@@ -608,8 +679,8 @@ def validate_active_content_repository(root: Path, active_root: Path) -> None:
             f"Active content commit time {committed_at} does not match "
             f"{reference.committed_at}."
         )
-    _validate_manifest(active_root, reference.public)
-    _validate_manifest(active_root, reference.private)
+    _validate_manifest(active_root, reference.public, reference.package_schema)
+    _validate_manifest(active_root, reference.private, reference.package_schema)
 
 
 def parse_versions(root: Path) -> tuple[str, str, str]:

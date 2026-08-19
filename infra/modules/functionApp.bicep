@@ -9,6 +9,18 @@ param location string
 @description('Storage account (in this RG) used by the Functions runtime.')
 param storageAccountName string
 
+@description('Dedicated immutable content storage account.')
+param contentStorageAccountName string
+
+@description('Container holding immutable content release descriptors.')
+param contentDescriptorContainerName string
+
+@description('Container holding immutable public content packages.')
+param contentPublicContainerName string
+
+@description('Container holding immutable private answer-key packages.')
+param contentPrivateContainerName string
+
 @description('Blob container (in the storage account) holding the deployment package.')
 param deploymentContainerName string = 'app-package'
 
@@ -33,6 +45,10 @@ param functionIntegrationSubnetId string
 @description('Authentication mode. "dev" enables the permissive dev token validator (safe default for local/dev); "prod" enforces Entra External ID token validation. Set to "prod" in staging/production once the Entra External ID tenant is configured. Any value other than "dev" also enables Entra validation.')
 @allowed([ 'dev', 'prod', '' ])
 param authMode string = 'dev'
+
+@description('Active content repository implementation. Keep legacy until a verified release is promoted.')
+@allowed([ 'legacy', 'versioned' ])
+param contentRepositoryMode string = 'legacy'
 
 @description('Entra External ID authority URL. Format: https://<domain>.ciamlogin.com/<tenant-id>/v2.0. Replace with the value from Azure Portal → External ID tenant → Overview. Leave empty until the tenant is created.')
 @secure()
@@ -86,6 +102,30 @@ resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
   name: storageAccountName
 }
 
+resource contentStorage 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
+  name: contentStorageAccountName
+}
+
+resource contentBlob 'Microsoft.Storage/storageAccounts/blobServices@2024-01-01' existing = {
+  parent: contentStorage
+  name: 'default'
+}
+
+resource contentDescriptors 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' existing = {
+  parent: contentBlob
+  name: contentDescriptorContainerName
+}
+
+resource contentPublic 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' existing = {
+  parent: contentBlob
+  name: contentPublicContainerName
+}
+
+resource contentPrivate 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' existing = {
+  parent: contentBlob
+  name: contentPrivateContainerName
+}
+
 resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
   name: appInsightsName
 }
@@ -102,9 +142,19 @@ resource hostStorageIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2
   tags: tags
 }
 
+resource contentReaderIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: 'id-${functionAppName}-content-reader'
+  location: location
+  tags: tags
+}
+
 var storageBlobDataOwner = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+)
+var storageBlobDataReader = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
 )
 var storageBlobDataContributor = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
@@ -167,6 +217,36 @@ resource hostTableAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
   }
 }
 
+resource contentDescriptorReadAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: contentDescriptors
+  name: guid(contentDescriptors.id, contentReaderIdentity.id, storageBlobDataReader)
+  properties: {
+    principalId: contentReaderIdentity.properties.principalId
+    roleDefinitionId: storageBlobDataReader
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource contentPublicReadAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: contentPublic
+  name: guid(contentPublic.id, contentReaderIdentity.id, storageBlobDataReader)
+  properties: {
+    principalId: contentReaderIdentity.properties.principalId
+    roleDefinitionId: storageBlobDataReader
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource contentPrivateReadAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: contentPrivate
+  name: guid(contentPrivate.id, contentReaderIdentity.id, storageBlobDataReader)
+  properties: {
+    principalId: contentReaderIdentity.properties.principalId
+    roleDefinitionId: storageBlobDataReader
+    principalType: 'ServicePrincipal'
+  }
+}
+
 resource appInsightsPublisherAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: appInsights
   name: guid(appInsights.id, hostStorageIdentity.id, monitoringMetricsPublisher)
@@ -207,6 +287,7 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
     type: 'SystemAssigned, UserAssigned'
     userAssignedIdentities: {
       '${hostStorageIdentity.id}': {}
+      '${contentReaderIdentity.id}': {}
     }
   }
   properties: {
@@ -257,6 +338,9 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
     hostTableAccess
     appInsightsPublisherAccess
     hostVaultAccess
+    contentDescriptorReadAccess
+    contentPublicReadAccess
+    contentPrivateReadAccess
   ]
 }
 
@@ -278,6 +362,19 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     COSMOS_DATABASE: 'certigo'
     BLOB_ENDPOINT: storage.properties.primaryEndpoints.blob
     DEPLOYMENT_CONTAINER_NAME: deploymentContainerName
+    CONTENT_BLOB_ENDPOINT: contentStorage.properties.primaryEndpoints.blob
+    CONTENT_STORAGE_CLIENT_ID: contentReaderIdentity.properties.clientId
+    CONTENT_DESCRIPTOR_CONTAINER: contentDescriptorContainerName
+    CONTENT_PUBLIC_CONTAINER: contentPublicContainerName
+    CONTENT_PRIVATE_CONTAINER: contentPrivateContainerName
+    CONTENT_REPOSITORY_MODE: contentRepositoryMode
+    CONTENT_ADMIN_ROLE: 'Content.Release.Admin'
+    CONTENT_ADMIN_ALLOW_DEV: authMode == 'dev' ? 'true' : 'false'
+    CONTENT_ALLOW_MUTABLE_BLOBS: 'false'
+    CONTENT_IMPORT_MAX_FILES: '10000'
+    CONTENT_IMPORT_MAX_FILE_BYTES: '2097152'
+    CONTENT_IMPORT_MAX_RELEASE_BYTES: '134217728'
+    CONTENT_IMPORT_MAX_COSMOS_ITEM_BYTES: '1900000'
     HEALTH_PROBE_TIMEOUT_SECONDS: '5'
     HEALTH_PLATFORM_CLIENT_ID: hostStorageIdentity.properties.clientId
     KeyVault__HealthSecretName: 'AUTH-JWT-SIGNING-KEY'
@@ -326,3 +423,4 @@ output functionAppName string = functionApp.name
 output defaultHostName string = functionApp.properties.defaultHostName
 output principalId string = functionApp.identity.principalId
 output hostStoragePrincipalId string = hostStorageIdentity.properties.principalId
+output contentReaderPrincipalId string = contentReaderIdentity.properties.principalId

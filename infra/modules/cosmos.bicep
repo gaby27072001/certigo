@@ -84,6 +84,9 @@ resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15
 var containers = [
   { name: 'users', pk: '/id' }
   { name: 'content', pk: '/trackId' }
+  { name: 'content-public', pk: '/releaseId' }
+  { name: 'content-private', pk: '/releaseId' }
+  { name: 'content-control', pk: '/scope' }
   { name: 'progress', pk: '/userId' }
   // Existing attempts remain durable because their documents omit "ttl"; issued
   // exam documents opt in with a positive per-item TTL.

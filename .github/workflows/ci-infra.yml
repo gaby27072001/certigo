@@ -66,6 +66,8 @@ jobs:
         run: node --test infra/tests/cosmos-indexing-policy.test.mjs
       - name: Validate private networking topology
         run: node --test infra/tests/private-networking.test.mjs
+      - name: Validate immutable content storage
+        run: node --test infra/tests/content-storage.test.mjs
       - name: Validate secure deployment parameter writer
         run: node --test .github/scripts/write-secure-bicep-parameters.test.mjs
       - name: Validate private URL-based OneDeploy

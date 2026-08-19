@@ -107,6 +107,17 @@ class ApiClient {
     });
   }
 
+  Future<Result<T>> getJsonWithHeaders<T>(
+    String path,
+    T Function(Map<String, dynamic> json, Headers headers) parse, {
+    Map<String, dynamic>? query,
+  }) async {
+    return _guard(() async {
+      final Response<dynamic> res = await _dio.get<dynamic>(path, queryParameters: query);
+      return parse(_asMap(res.data), res.headers);
+    });
+  }
+
   Future<Result<T>> postJson<T>(
     String path,
     Map<String, dynamic> body,

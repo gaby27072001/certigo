@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://certigo.microsoft.com/schemas/package-manifest.schema.json",
+  "title": "Certigo channel package manifest",
+  "description": "Deterministic channel manifest. Accepts legacy v1, catalog-aware v2, and canonical runtime v3 packages.",
+  "oneOf": [
+    { "$ref": "#/$defs/v1" },
+    { "$ref": "#/$defs/v2" },
+    { "$ref": "#/$defs/v3" }
+  ],
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "manifestId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "certification": {
+      "type": "string",
+      "pattern": "^(aws|gcp|microsoft):[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "blueprintVersion": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+    },
+    "v1File": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "hash", "size"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^(questions|solutions)/[^/]+\\.json$" },
+        "hash": { "$ref": "#/$defs/hash" },
+        "size": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "v2File": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "resourceType", "hash", "size"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "path": {
+          "type": "string",
+          "pattern": "^(questions|solutions|catalog|coverage)/.+\\.json$"
+        },
+        "resourceType": {
+          "enum": ["question", "solution", "certificationCatalog", "coverageMatrix"]
+        },
+        "provider": { "enum": ["aws", "gcp", "microsoft"] },
+        "certification": { "$ref": "#/$defs/certification" },
+        "blueprintVersion": { "$ref": "#/$defs/blueprintVersion" },
+        "objective": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "hash": { "$ref": "#/$defs/hash" },
+        "size": { "type": "integer", "minimum": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "question" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "pattern": "^questions/" } } }
+        },
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "solution" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "pattern": "^solutions/" } } }
+        },
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "certificationCatalog" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "const": "catalog/certifications.json" } } }
+        },
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "coverageMatrix" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "pattern": "^coverage/" } } }
+        }
+      ]
+    },
+    "v3File": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "resourceType", "hash", "size"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "path": {
+          "type": "string",
+          "pattern": "^(questions|solutions|catalog|coverage|runtime/(tracks|domains|units|lessons|concepts))/.+\\.json$"
+        },
+        "resourceType": {
+          "enum": [
+            "question",
+            "solution",
+            "certificationCatalog",
+            "coverageMatrix",
+            "track",
+            "domain",
+            "unit",
+            "lesson",
+            "concept"
+          ]
+        },
+        "provider": { "enum": ["aws", "gcp", "microsoft"] },
+        "certification": { "$ref": "#/$defs/certification" },
+        "blueprintVersion": { "$ref": "#/$defs/blueprintVersion" },
+        "objective": { "type": "string", "pattern": "^(domain|section)-[1-9][0-9]*$" },
+        "hash": { "$ref": "#/$defs/hash" },
+        "size": { "type": "integer", "minimum": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "question" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "pattern": "^questions/" } } }
+        },
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "solution" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "pattern": "^solutions/" } } }
+        },
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "certificationCatalog" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "const": "catalog/certifications.json" } } }
+        },
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "coverageMatrix" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "pattern": "^coverage/" } } }
+        },
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "track" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "pattern": "^runtime/tracks/" } } }
+        },
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "domain" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "pattern": "^runtime/domains/" } } }
+        },
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "unit" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "pattern": "^runtime/units/" } } }
+        },
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "lesson" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "pattern": "^runtime/lessons/" } } }
+        },
+        {
+          "if": {
+            "properties": { "resourceType": { "const": "concept" } },
+            "required": ["resourceType"]
+          },
+          "then": { "properties": { "path": { "pattern": "^runtime/concepts/" } } }
+        }
+      ]
+    },
+    "baseProperties": {
+      "channel": { "enum": ["public", "answerKey"] },
+      "artifact": { "enum": ["public", "private"] },
+      "algorithm": { "const": "sha256" },
+      "serialization": { "const": "json-sorted-keys-compact-utf8-lf" },
+      "fileCount": { "type": "integer", "minimum": 0 },
+      "manifestId": { "$ref": "#/$defs/manifestId" },
+      "rootHash": { "$ref": "#/$defs/hash" }
+    },
+    "v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "channel",
+        "artifact",
+        "algorithm",
+        "serialization",
+        "fileCount",
+        "files",
+        "manifestId",
+        "rootHash"
+      ],
+      "properties": {
+        "schema": { "const": "certigo.content.package-manifest/v1" },
+        "channel": { "$ref": "#/$defs/baseProperties/channel" },
+        "artifact": { "$ref": "#/$defs/baseProperties/artifact" },
+        "algorithm": { "$ref": "#/$defs/baseProperties/algorithm" },
+        "serialization": { "$ref": "#/$defs/baseProperties/serialization" },
+        "fileCount": { "$ref": "#/$defs/baseProperties/fileCount" },
+        "files": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/v1File" } },
+        "manifestId": { "$ref": "#/$defs/baseProperties/manifestId" },
+        "rootHash": { "$ref": "#/$defs/baseProperties/rootHash" }
+      },
+      "allOf": [{ "$ref": "#/$defs/channelRulesV1" }]
+    },
+    "v2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "channel",
+        "artifact",
+        "algorithm",
+        "serialization",
+        "fileCount",
+        "files",
+        "manifestId",
+        "rootHash"
+      ],
+      "properties": {
+        "schema": { "const": "certigo.content.package-manifest/v2" },
+        "channel": { "$ref": "#/$defs/baseProperties/channel" },
+        "artifact": { "$ref": "#/$defs/baseProperties/artifact" },
+        "algorithm": { "$ref": "#/$defs/baseProperties/algorithm" },
+        "serialization": { "$ref": "#/$defs/baseProperties/serialization" },
+        "fileCount": { "$ref": "#/$defs/baseProperties/fileCount" },
+        "files": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/v2File" } },
+        "manifestId": { "$ref": "#/$defs/baseProperties/manifestId" },
+        "rootHash": { "$ref": "#/$defs/baseProperties/rootHash" }
+      },
+      "allOf": [{ "$ref": "#/$defs/channelRulesV2" }]
+    },
+    "v3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "channel",
+        "artifact",
+        "algorithm",
+        "serialization",
+        "fileCount",
+        "files",
+        "manifestId",
+        "rootHash"
+      ],
+      "properties": {
+        "schema": { "const": "certigo.content.package-manifest/v3" },
+        "channel": { "$ref": "#/$defs/baseProperties/channel" },
+        "artifact": { "$ref": "#/$defs/baseProperties/artifact" },
+        "algorithm": { "$ref": "#/$defs/baseProperties/algorithm" },
+        "serialization": { "$ref": "#/$defs/baseProperties/serialization" },
+        "fileCount": { "$ref": "#/$defs/baseProperties/fileCount" },
+        "files": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/v3File" } },
+        "manifestId": { "$ref": "#/$defs/baseProperties/manifestId" },
+        "rootHash": { "$ref": "#/$defs/baseProperties/rootHash" }
+      },
+      "allOf": [{ "$ref": "#/$defs/channelRulesV3" }]
+    },
+    "channelRulesV1": {
+      "if": { "properties": { "artifact": { "const": "public" } }, "required": ["artifact"] },
+      "then": {
+        "properties": {
+          "channel": { "const": "public" },
+          "files": {
+            "items": { "properties": { "path": { "pattern": "^questions/[^/]+\\.json$" } } }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "channel": { "const": "answerKey" },
+          "files": {
+            "items": { "properties": { "path": { "pattern": "^solutions/[^/]+\\.json$" } } }
+          }
+        }
+      }
+    },
+    "channelRulesV2": {
+      "if": { "properties": { "artifact": { "const": "public" } }, "required": ["artifact"] },
+      "then": {
+        "properties": {
+          "channel": { "const": "public" },
+          "files": {
+            "items": {
+              "properties": {
+                "path": { "pattern": "^(questions|catalog|coverage)/" },
+                "resourceType": { "not": { "const": "solution" } }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "channel": { "const": "answerKey" },
+          "files": {
+            "items": {
+              "properties": {
+                "path": { "pattern": "^solutions/" },
+                "resourceType": { "const": "solution" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "channelRulesV3": {
+      "if": { "properties": { "artifact": { "const": "public" } }, "required": ["artifact"] },
+      "then": {
+        "properties": {
+          "channel": { "const": "public" },
+          "files": {
+            "items": {
+              "properties": {
+                "path": {
+                  "pattern": "^(questions|catalog|coverage|runtime/(tracks|domains|units|lessons|concepts))/"
+                },
+                "resourceType": { "not": { "const": "solution" } }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "channel": { "const": "answerKey" },
+          "files": {
+            "items": {
+              "properties": {
+                "path": { "pattern": "^solutions/" },
+                "resourceType": { "const": "solution" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -195,7 +195,26 @@ Certigo/content/             # instantané historique, non éditorial
   non navigable (AI-901) jusqu'à publication de son contenu. La présence ultérieure d'un track
   `ai-901` rend automatiquement son parcours navigable, sans migration destructive d'AI-900.
 
-### 7.1 Catalogue canonique de certifications multi-cloud
+### 7.1 Releases runtime immuables
+
+Le contrat runtime fusionné dans `certigo-content` au SHA
+`87ae81724899387a8d6c922f0dc4b4631b6523ec` lie un package public et un package
+privé via `certigo.content.release/v1`. Le backend lit les versions Blob WORM
+depuis un compte dédié et vérifie descriptor, manifestes, chemins, schémas,
+hashes, tailles, graphe et anti-fuite avant la première écriture.
+
+La projection canonique produit des `Track`/`Lesson` publics et des
+`LessonAnswerKey` privés. Les parcours guided ne dupliquent pas les questions;
+les question banks synthétisent une lesson de pratique par domaine. Les
+documents sont create-only dans `content-public` et `content-private`, avec
+`content-control` pour les receipts et le pointeur active/previous sous ETag.
+
+Une requête métier résout un `ContentSnapshot` une fois, afin qu'une promotion
+concurrente ne mélange jamais deux releases. Quiz, examens et tuteur épinglent
+les opérations par `publicManifestId`/`releaseId`. Le container `content`
+historique reste disponible via `CONTENT_REPOSITORY_MODE=legacy`.
+
+### 7.2 Catalogue canonique de certifications multi-cloud
 
 Le catalogue public `content/public/catalog/certifications.json` de `certigo-content`, défini par
 l'ADR-0004 de ce dépôt éditorial et le schéma `certigo.certification-catalog/v1`, est l'unique

@@ -10,7 +10,8 @@ public sealed record Track(
     string Summary,
     IReadOnlyList<ExamDomain> Domains,
     IReadOnlyList<TrackUnit> Units,
-    string? Level = null);
+    string? Level = null,
+    string? CertificationId = null);
 
 public sealed record ExamDomain(string Id, string Name, double Weight);
 

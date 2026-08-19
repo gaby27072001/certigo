@@ -74,7 +74,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
         .where((LessonBlock block) => block.type == BlockType.check)
         .map((LessonBlock block) => block.check)
         .toList();
-    if (checks.isEmpty ||
+    if (lesson.blocks.isEmpty ||
         checks.any(
           (QuizItem? check) => check == null || !isAnswerableCheck(check),
         )) {
@@ -254,6 +254,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
           trackId: args.trackId,
           startedAt: _startedAt,
           answers: answers,
+          publicManifestId: lesson.publicManifestId,
         ),
       );
     } on Object catch (error, stackTrace) {

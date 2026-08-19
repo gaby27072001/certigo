@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://certigo.example/schemas/manifest.schema.json",
+  "title": "Certigo Content Manifest",
+  "description": "Immutable, hash-addressable manifest. Accepts legacy v1, catalog-aware v2, and canonical runtime v3.",
+  "oneOf": [
+    { "$ref": "#/$defs/v1" },
+    { "$ref": "#/$defs/v2" },
+    { "$ref": "#/$defs/v3" }
+  ],
+  "$defs": {
+    "base": {
+      "algorithm": { "const": "sha256" },
+      "canonicalization": { "type": "string", "minLength": 1 },
+      "itemCount": { "type": "integer", "minimum": 0 },
+      "manifestId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+      "rootHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    },
+    "v1Item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "id", "path", "hash", "size"],
+      "properties": {
+        "channel": { "enum": ["public", "answerKey"] },
+        "id": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^content/" },
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "v2Item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "id", "path", "resourceType", "hash", "size"],
+      "properties": {
+        "channel": { "enum": ["public", "answerKey"] },
+        "id": { "type": "string", "minLength": 1 },
+        "path": {
+          "type": "string",
+          "pattern": "^content/(public/(questions|catalog|coverage)|answerKey/solutions)/"
+        },
+        "resourceType": {
+          "enum": ["question", "solution", "certificationCatalog", "coverageMatrix"]
+        },
+        "provider": { "enum": ["aws", "gcp", "microsoft"] },
+        "certification": {
+          "type": "string",
+          "pattern": "^(aws|gcp|microsoft):[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "blueprintVersion": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+        },
+        "objective": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "v3Item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "id", "path", "resourceType", "hash", "size"],
+      "properties": {
+        "channel": { "enum": ["public", "answerKey"] },
+        "id": { "type": "string", "minLength": 1 },
+        "path": {
+          "type": "string",
+          "pattern": "^content/(public/(questions|catalog|coverage|runtime/(tracks|domains|units|lessons|concepts))|answerKey/solutions)/"
+        },
+        "resourceType": {
+          "enum": [
+            "question",
+            "solution",
+            "certificationCatalog",
+            "coverageMatrix",
+            "track",
+            "domain",
+            "unit",
+            "lesson",
+            "concept"
+          ]
+        },
+        "provider": { "enum": ["aws", "gcp", "microsoft"] },
+        "certification": {
+          "type": "string",
+          "pattern": "^(aws|gcp|microsoft):[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "blueprintVersion": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+        },
+        "objective": { "type": "string", "pattern": "^(domain|section)-[1-9][0-9]*$" },
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "v1": {
+      "$ref": "#/$defs/manifest",
+      "properties": {
+        "schema": { "const": "certigo.content.manifest/v1" },
+        "items": { "items": { "$ref": "#/$defs/v1Item" } }
+      }
+    },
+    "v2": {
+      "$ref": "#/$defs/manifest",
+      "properties": {
+        "schema": { "const": "certigo.content.manifest/v2" },
+        "items": { "items": { "$ref": "#/$defs/v2Item" } }
+      }
+    },
+    "v3": {
+      "$ref": "#/$defs/manifest",
+      "properties": {
+        "schema": { "const": "certigo.content.manifest/v3" },
+        "items": { "items": { "$ref": "#/$defs/v3Item" } }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "algorithm",
+        "canonicalization",
+        "itemCount",
+        "items",
+        "manifestId",
+        "rootHash"
+      ],
+      "properties": {
+        "schema": { "type": "string" },
+        "algorithm": { "$ref": "#/$defs/base/algorithm" },
+        "canonicalization": { "$ref": "#/$defs/base/canonicalization" },
+        "itemCount": { "$ref": "#/$defs/base/itemCount" },
+        "items": { "type": "array" },
+        "manifestId": { "$ref": "#/$defs/base/manifestId" },
+        "rootHash": { "$ref": "#/$defs/base/rootHash" }
+      }
+    }
+  }
+}

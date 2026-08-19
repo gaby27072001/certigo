@@ -50,6 +50,7 @@ class ResultFeedbackWidget extends StatelessWidget {
         lessonId: lessonId,
         itemId: r.itemId,
         selected: answers[r.itemId] ?? const <String>[],
+        publicManifestId: lesson.publicManifestId,
       ),
       correct: r.correct,
     );

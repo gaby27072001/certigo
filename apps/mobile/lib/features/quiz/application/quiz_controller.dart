@@ -59,6 +59,7 @@ class QuizController extends ChangeNotifier {
   DateTime _shownAt = DateTime.now();
   final Map<String, List<String>> _answersByItem = <String, List<String>>{};
   final Map<String, int> _latencyByItem = <String, int>{};
+  String? _publicManifestId;
 
   List<QuizEntry> get items => _items;
   bool get loading => _loading;
@@ -84,6 +85,7 @@ class QuizController extends ChangeNotifier {
 
     final List<QuizEntry> entries = lesson.when(
       success: (Lesson l) {
+        _publicManifestId = l.publicManifestId;
         final List<QuizEntry> fromApi = l.blocks
             .where((LessonBlock b) => b.check != null)
             .map((LessonBlock b) => QuizEntry(item: b.check!))
@@ -96,6 +98,7 @@ class QuizController extends ChangeNotifier {
     _items = entries;
     _loadFailed = lesson.isFailure;
     _isDemo = false;
+    if (lesson.isFailure) _publicManifestId = null;
     _loading = false;
     _shownAt = DateTime.now();
     notifyListeners();
@@ -112,6 +115,7 @@ class QuizController extends ChangeNotifier {
     _correctCount = 0;
     _answersByItem.clear();
     _latencyByItem.clear();
+    _publicManifestId = null;
     _shownAt = DateTime.now();
     notifyListeners();
   }
@@ -188,6 +192,7 @@ class QuizController extends ChangeNotifier {
           trackId: trackId,
           startedAt: _startedAt,
           answers: answers,
+          publicManifestId: _publicManifestId,
         ),
       );
     } on Object catch (error, stackTrace) {

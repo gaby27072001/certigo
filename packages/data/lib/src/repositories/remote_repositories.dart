@@ -97,9 +97,10 @@ class RemoteLessonRepository implements LessonRepository {
 
   @override
   Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) =>
-      _api.getJson(
+      _api.getJsonWithHeaders(
         '/tracks/${Uri.encodeComponent(trackId)}/lessons/${Uri.encodeComponent(lessonId)}',
-        Lesson.fromJson,
+        (Map<String, dynamic> json, headers) =>
+            Lesson.fromJson(json).withPublicManifestId(headers.value('x-content-manifest-id')),
       );
 }
 

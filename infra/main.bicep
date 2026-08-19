@@ -29,6 +29,13 @@ param entraAuthority string = ''
 param entraAudience string = ''
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
+
+@description('Content repository mode. Deploy legacy first; switch only after a verified staging promotion.')
+@allowed([ 'legacy', 'versioned' ])
+param contentRepositoryMode string = 'legacy'
+
+@description('Optional service-principal object id used by the external content publication pipeline.')
+param contentPublisherPrincipalId string = ''
 @description('Azure OpenAI resource endpoint used by the tutor when enabled. Example: https://<resource>.openai.azure.com/.')
 param tutorLlmEndpoint string = ''
 @description('Azure OpenAI deployment name used by the tutor when enabled.')
@@ -191,6 +198,7 @@ var suffix = uniqueString(subscription().id, appName, env)
 // and cap the unique suffix at 6, shrinking it only when the prefix leaves less room
 // (staging => 5). dev/prod prefixes are short enough that this still yields 6.
 var kvSuffixLen = min(6, 24 - length('kv-${appName}-${env}-'))
+var contentStorageSuffixLen = min(8, 24 - length('stc${appName}${env}'))
 var rgName = 'rg-${appName}-${env}'
 // Dev token bypass is allowed ONLY in the dev environment; staging/prod enforce
 // Entra token validation ("prod" signals to the backend that Entra is required).
@@ -279,6 +287,17 @@ module storage 'modules/storage.bicep' = {
   }
 }
 
+module contentStorage 'modules/contentStorage.bicep' = {
+  scope: rg
+  name: 'contentStorage'
+  params: {
+    accountName: toLower('stc${appName}${env}${take(suffix, contentStorageSuffixLen)}')
+    location: location
+    contentPublisherPrincipalId: contentPublisherPrincipalId
+    tags: tags
+  }
+}
+
 module vault 'modules/keyvault.bicep' = {
   scope: rg
   name: 'keyvault'
@@ -326,19 +345,23 @@ module privateNetwork 'modules/privateNetwork.bicep' = {
     privateEndpointSubnetPrefix: privateEndpointSubnetPrefix
     privateEndpointSubnetName: privateEndpointSubnetName
     storageAccountName: storage.outputs.accountName
+    contentStorageAccountName: contentStorage.outputs.accountName
     keyVaultName: vault.outputs.name
     cosmosAccountName: data.outputs.accountName
     storageBlobPrivateEndpointName: storageBlobPrivateEndpointName
+    contentStorageBlobPrivateEndpointName: 'pe-content-${appName}-${env}-blob'
     storageQueuePrivateEndpointName: storageQueuePrivateEndpointName
     storageTablePrivateEndpointName: storageTablePrivateEndpointName
     keyVaultPrivateEndpointName: keyVaultPrivateEndpointName
     cosmosPrivateEndpointName: cosmosPrivateEndpointName
     storageBlobPrivateLinkConnectionName: storageBlobPrivateLinkConnectionName
+    contentStorageBlobPrivateLinkConnectionName: 'content-${appName}-${env}-blob'
     storageQueuePrivateLinkConnectionName: storageQueuePrivateLinkConnectionName
     storageTablePrivateLinkConnectionName: storageTablePrivateLinkConnectionName
     keyVaultPrivateLinkConnectionName: keyVaultPrivateLinkConnectionName
     cosmosPrivateLinkConnectionName: cosmosPrivateLinkConnectionName
     storageBlobPrivateDnsZoneGroupName: storageBlobPrivateDnsZoneGroupName
+    contentStorageBlobPrivateDnsZoneGroupName: 'content-blob'
     storageQueuePrivateDnsZoneGroupName: storageQueuePrivateDnsZoneGroupName
     storageTablePrivateDnsZoneGroupName: storageTablePrivateDnsZoneGroupName
     keyVaultPrivateDnsZoneGroupName: keyVaultPrivateDnsZoneGroupName
@@ -404,6 +427,10 @@ module api 'modules/functionApp.bicep' = {
     functionAppName: 'func-${appName}-${env}-${suffix}'
     location: location
     storageAccountName: storage.outputs.accountName
+    contentStorageAccountName: contentStorage.outputs.accountName
+    contentDescriptorContainerName: contentStorage.outputs.descriptorContainerName
+    contentPublicContainerName: contentStorage.outputs.publicContainerName
+    contentPrivateContainerName: contentStorage.outputs.privateContainerName
     deploymentContainerName: storage.outputs.deploymentContainerName
     appInsightsConnectionString: monitoring.outputs.connectionString
     appInsightsName: monitoring.outputs.name
@@ -412,6 +439,7 @@ module api 'modules/functionApp.bicep' = {
     keyVaultName: vault.outputs.name
     functionIntegrationSubnetId: privateNetwork.outputs.functionIntegrationSubnetId
     authMode: authMode
+    contentRepositoryMode: contentRepositoryMode
     authJwtSigningKeySecretUri: vault.outputs.jwtSecretUri
     authJwtPreviousSigningKeySecretUri: previousJwtSecret.?outputs.?jwtSecretUri ?? ''
     entraAuthority: entraAuthority

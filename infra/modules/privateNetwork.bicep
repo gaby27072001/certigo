@@ -21,6 +21,9 @@ param privateEndpointSubnetName string
 @description('Storage account protected by blob, queue, and table private endpoints.')
 param storageAccountName string
 
+@description('Dedicated immutable content storage account protected by a blob private endpoint.')
+param contentStorageAccountName string
+
 @description('Key Vault protected by a vault private endpoint.')
 param keyVaultName string
 
@@ -29,6 +32,9 @@ param cosmosAccountName string
 
 @description('Existing Blob private endpoint name.')
 param storageBlobPrivateEndpointName string
+
+@description('Content storage Blob private endpoint name.')
+param contentStorageBlobPrivateEndpointName string
 
 @description('Existing Queue private endpoint name.')
 param storageQueuePrivateEndpointName string
@@ -45,6 +51,9 @@ param cosmosPrivateEndpointName string
 @description('Existing Blob private link service connection name.')
 param storageBlobPrivateLinkConnectionName string
 
+@description('Content storage Blob private link service connection name.')
+param contentStorageBlobPrivateLinkConnectionName string
+
 @description('Existing Queue private link service connection name.')
 param storageQueuePrivateLinkConnectionName string
 
@@ -59,6 +68,9 @@ param cosmosPrivateLinkConnectionName string
 
 @description('Existing Blob private DNS zone group name.')
 param storageBlobPrivateDnsZoneGroupName string = 'default'
+
+@description('Content storage Blob private DNS zone group name.')
+param contentStorageBlobPrivateDnsZoneGroupName string = 'default'
 
 @description('Existing Queue private DNS zone group name.')
 param storageQueuePrivateDnsZoneGroupName string = 'default'
@@ -88,6 +100,10 @@ param tags object = {}
 
 resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
   name: storageAccountName
+}
+
+resource contentStorage 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
+  name: contentStorageAccountName
 }
 
 resource vault 'Microsoft.KeyVault/vaults@2024-04-01-preview' existing = {
@@ -166,6 +182,28 @@ resource storageBlobEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
         name: storageBlobPrivateLinkConnectionName
         properties: {
           privateLinkServiceId: storage.id
+          groupIds: [
+            'blob'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+resource contentStorageBlobEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+  name: contentStorageBlobPrivateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: '${vnet.id}/subnets/${privateEndpointSubnetName}'
+    }
+    privateLinkServiceConnections: [
+      {
+        name: contentStorageBlobPrivateLinkConnectionName
+        properties: {
+          privateLinkServiceId: contentStorage.id
           groupIds: [
             'blob'
           ]
@@ -266,6 +304,21 @@ resource cosmosEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
 resource storageBlobZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
   parent: storageBlobEndpoint
   name: storageBlobPrivateDnsZoneGroupName
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'blob'
+        properties: {
+          privateDnsZoneId: blobZoneId
+        }
+      }
+    ]
+  }
+}
+
+resource contentStorageBlobZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
+  parent: contentStorageBlobEndpoint
+  name: contentStorageBlobPrivateDnsZoneGroupName
   properties: {
     privateDnsZoneConfigs: [
       {

@@ -38,6 +38,7 @@ class Lesson {
     required this.title,
     required this.estMinutes,
     required this.blocks,
+    this.publicManifestId,
   });
 
   final String id;
@@ -47,6 +48,7 @@ class Lesson {
   final String title;
   final int estMinutes;
   final List<LessonBlock> blocks;
+  final String? publicManifestId;
 
   factory Lesson.fromJson(Map<String, dynamic> json) => Lesson(
         id: json['id'] as String,
@@ -58,6 +60,18 @@ class Lesson {
         blocks: (json['blocks'] as List<dynamic>? ?? <dynamic>[])
             .map((e) => LessonBlock.fromJson(e as Map<String, dynamic>))
             .toList(),
+        publicManifestId: json['publicManifestId'] as String?,
+      );
+
+  Lesson withPublicManifestId(String? manifestId) => Lesson(
+        id: id,
+        trackId: trackId,
+        unitId: unitId,
+        domainId: domainId,
+        title: title,
+        estMinutes: estMinutes,
+        blocks: blocks,
+        publicManifestId: manifestId,
       );
 
   /// Serialises the lesson to a JSON-ready map, symmetric with [Lesson.fromJson].
@@ -71,6 +85,7 @@ class Lesson {
         'title': title,
         'estMinutes': estMinutes,
         'blocks': blocks.map((LessonBlock b) => b.toJson()).toList(),
+        if (publicManifestId != null) 'publicManifestId': publicManifestId,
       };
 }
 

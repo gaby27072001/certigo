@@ -10,6 +10,9 @@ public sealed class CosmosContext(CosmosClient client, string? databaseName = nu
 
     public Container Users => _database.GetContainer(CosmosContainers.Users);
     public Container Content => _database.GetContainer(CosmosContainers.Content);
+    public Container ContentPublic => _database.GetContainer(CosmosContainers.ContentPublic);
+    public Container ContentPrivate => _database.GetContainer(CosmosContainers.ContentPrivate);
+    public Container ContentControl => _database.GetContainer(CosmosContainers.ContentControl);
     public Container Progress => _database.GetContainer(CosmosContainers.Progress);
     public Container Attempts => _database.GetContainer(CosmosContainers.Attempts);
     public Container Events => _database.GetContainer(CosmosContainers.Events);
