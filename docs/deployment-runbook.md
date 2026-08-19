@@ -135,7 +135,8 @@ depuis cette boîte puis relancer le test. Ne jamais déclencher volontairement 
 erreur ARM/OneDeploy en production pour tester l'Activity Log Alert. Procédure Azure
 officielle : [tester un Action Group](https://learn.microsoft.com/azure/azure-monitor/alerts/action-groups#test-an-action-group-in-the-azure-portal).
 
-La publication GitHub Pages de la politique de confidentialité suit la même
+La publication GitHub Pages des pages légales (politique de confidentialité
+`/privacy-policy/` et demande de suppression `/account-deletion/`) suit la même
 frontière de confiance :
 
 ```bash

@@ -110,10 +110,15 @@ class ApiClient {
   Future<Result<T>> postJson<T>(
     String path,
     Map<String, dynamic> body,
-    T Function(Map<String, dynamic> json) parse,
-  ) async {
+    T Function(Map<String, dynamic> json) parse, {
+    Map<String, dynamic>? headers,
+  }) async {
     return _guard(() async {
-      final Response<dynamic> res = await _dio.post<dynamic>(path, data: body);
+      final Response<dynamic> res = await _dio.post<dynamic>(
+        path,
+        data: body,
+        options: headers == null ? null : Options(headers: headers),
+      );
       return parse(_asMap(res.data));
     });
   }

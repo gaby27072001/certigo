@@ -151,5 +151,22 @@ void main() {
       expect(result, isA<Err<Map<String, dynamic>>>());
       expect((result as Err<Map<String, dynamic>>).failure, isA<AuthFailure>());
     });
+
+    test('sends a one-request reauthentication proof without replacing bearer auth', () async {
+      final adapter = _CapturingAdapter();
+      final client = buildClient(adapter, tokenProvider: () async => 'access-token');
+
+      await client.postJson<Map<String, dynamic>>(
+        '/account/deletion',
+        const <String, dynamic>{},
+        (Map<String, dynamic> json) => json,
+        headers: const <String, dynamic>{'X-Certigo-Reauthentication': 'proof-token'},
+      );
+
+      expect(adapter.lastOptions?.headers['X-Certigo-Reauthentication'], 'proof-token');
+      final Object? authorization = adapter.lastOptions?.headers['Authorization'];
+      expect(authorization, isA<String>());
+      expect(authorization as String, endsWith('access-token'));
+    });
   });
 }

@@ -39,6 +39,18 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
             logger.LogInformation("Authentication failed in function {FunctionName}.", context.FunctionDefinition.Name);
             await WriteProblemAsync(context, HttpStatusCode.Unauthorized, "Unauthorized", ex.Message, correlationId);
         }
+        catch (RecentAuthenticationRequiredException ex)
+        {
+            logger.LogInformation(
+                "Recent authentication required in function {FunctionName}.",
+                context.FunctionDefinition.Name);
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.Forbidden,
+                "Recent authentication required",
+                ex.Message,
+                correlationId);
+        }
         catch (RateLimitedException ex)
         {
             logger.LogWarning("Rate limit hit in function {FunctionName}.", context.FunctionDefinition.Name);

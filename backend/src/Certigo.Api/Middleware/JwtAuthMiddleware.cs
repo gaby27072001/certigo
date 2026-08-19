@@ -7,7 +7,11 @@ using Certigo.Application.Abstractions;
 
 namespace Certigo.Api.Middleware;
 
-public sealed class JwtAuthMiddleware(ITokenValidator tokenValidator) : IFunctionsWorkerMiddleware
+public sealed class JwtAuthMiddleware(
+    ITokenValidator tokenValidator,
+    IAccountDeletionAccessGuard? accountDeletionGuard = null,
+    IReauthenticationProofValidator? reauthenticationProofValidator = null)
+    : IFunctionsWorkerMiddleware
 {
     private static readonly HashSet<string> AnonymousPaths = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -47,6 +51,49 @@ public sealed class JwtAuthMiddleware(ITokenValidator tokenValidator) : IFunctio
             return;
         }
 
+        var userId = validation.UserId
+            ?? validation.Principal.FindFirst("oid")?.Value
+            ?? validation.Principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? validation.Principal.FindFirst("sub")?.Value;
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            await Unauthorized(context, request);
+            return;
+        }
+
+        if (accountDeletionGuard is not null
+            && !IsAccountDeletionPath(request)
+            && await accountDeletionGuard.IsBlockedAsync(userId, context.CancellationToken))
+        {
+            await Locked(context, request);
+            return;
+        }
+
+        if (IsAccountDeletionRequest(request)
+            && request.Headers.TryGetValues("X-Certigo-Reauthentication", out var proofValues)
+            && proofValues.FirstOrDefault() is { } proofToken
+            && !string.IsNullOrWhiteSpace(proofToken))
+        {
+            var proof = await (reauthenticationProofValidator is null
+                ? tokenValidator.TryValidateAsync(proofToken.Trim(), context.CancellationToken)
+                : reauthenticationProofValidator.TryValidateAsync(
+                    proofToken.Trim(),
+                    context.CancellationToken));
+            var proofUserId = proof.UserId
+                ?? proof.Principal?.FindFirst("oid")?.Value
+                ?? proof.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? proof.Principal?.FindFirst("sub")?.Value;
+            if (!proof.Succeeded
+                || proof.Principal is null
+                || !string.Equals(proofUserId, userId, StringComparison.Ordinal))
+            {
+                await Unauthorized(context, request);
+                return;
+            }
+
+            context.Items["ReauthenticatedUser"] = proof.Principal;
+        }
+
         context.Items["User"] = validation.Principal;
         FunctionUserContext.Current.Value = validation.Principal;
         try
@@ -66,6 +113,15 @@ public sealed class JwtAuthMiddleware(ITokenValidator tokenValidator) : IFunctio
         context.GetInvocationResult().Value = response;
     }
 
+    private static async Task Locked(FunctionContext context, HttpRequestData request)
+    {
+        var response = request.CreateResponse((HttpStatusCode)423);
+        await response.WriteStringAsync(
+            "Account deletion is in progress.",
+            context.CancellationToken);
+        context.GetInvocationResult().Value = response;
+    }
+
     private static bool IsAnonymousPath(HttpRequestData request)
     {
         var path = request.Url.AbsolutePath;
@@ -76,4 +132,14 @@ public sealed class JwtAuthMiddleware(ITokenValidator tokenValidator) : IFunctio
 
         return AnonymousPaths.Contains(path);
     }
+
+    private static bool IsAccountDeletionPath(HttpRequestData request)
+    {
+        var path = request.Url.AbsolutePath.TrimEnd('/');
+        return path.Equals("/api/account/deletion", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAccountDeletionRequest(HttpRequestData request) =>
+        IsAccountDeletionPath(request)
+        && request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase);
 }

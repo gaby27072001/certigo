@@ -129,7 +129,11 @@ public interface IPasswordHasher
 /// tokens are only honoured here to re-issue an access token.
 public interface ITokenIssuer
 {
-    IssuedTokens Issue(string userId, string displayName, string email);
+    IssuedTokens Issue(
+        string userId,
+        string displayName,
+        string email,
+        DateTimeOffset? authenticatedAt = null);
 
     /// Validates a refresh token (signature, lifetime, and the refresh marker)
     /// and returns the carried principal, or <see langword="null"/> when invalid.
@@ -138,7 +142,11 @@ public interface ITokenIssuer
 
 public sealed record IssuedTokens(string AccessToken, string RefreshToken, DateTimeOffset AccessTokenExpiresAt);
 
-public sealed record RefreshTokenPrincipal(string UserId, string DisplayName, string Email);
+public sealed record RefreshTokenPrincipal(
+    string UserId,
+    string DisplayName,
+    string Email,
+    DateTimeOffset AuthenticatedAt);
 
 // --- Email delivery + verification ----------------------------------------
 
