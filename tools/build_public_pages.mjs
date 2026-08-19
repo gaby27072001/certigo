@@ -65,7 +65,8 @@ export async function buildPublicPages({ root, output }) {
   <p><small>Ce site ne collecte et ne stocke aucune donnée saisie. Le lien ouvre votre application de messagerie.</small></p>
 </section>
 <h2>Ce qui est supprimé</h2>
-<p>Le profil, la progression, les tentatives, l’économie virtuelle, les relations sociales et les identifiants gérés par Certigo sont supprimés après vérification.</p>
+<p>Après vérification et exécution de la demande, les données actives sont supprimées immédiatement.</p>
+<p>Le reçu pseudonymisé expire après 30 jours. Les sauvegardes résiduelles expirent au plus tard après 30 jours. Les journaux techniques sans identité sont conservés 90 jours.</p>
 <details><summary>Politique technique complète</summary><pre>${htmlEscape(deletion)}</pre></details>`,
     ),
     'utf8',

@@ -1,6 +1,6 @@
 # Politique de confidentialité — Certigo
 
-Dernière mise à jour : 18 août 2026
+Dernière mise à jour : 19 août 2026
 
 ## Données traitées
 
@@ -51,15 +51,19 @@ ou utiliser la page publique :
 https://gchambaud_microsoft.github.io/Certigo/account-deletion/
 
 Le flux supprime les données actives associées au compte et les identifiants
-gérés par Certigo. Un reçu pseudonymisé, sans adresse e-mail, nom ni identifiant
-de compte en clair, est conservé pendant 30 jours pour reprendre une opération
-interrompue et prouver son achèvement.
+gérés par Certigo immédiatement après la vérification et l’exécution de la
+demande. Un reçu pseudonymisé, sans adresse e-mail, nom ni identifiant de compte
+en clair, est conservé pendant 30 jours pour reprendre une opération interrompue
+et prouver son achèvement.
 
 En production, les sauvegardes continues Cosmos DB ont une fenêtre de
-récupération configurée de 30 jours. Une sauvegarde n’est pas utilisée pour
+récupération maximale de 30 jours. Une sauvegarde n’est pas utilisée pour
 réactiver un compte supprimé ; les copies résiduelles expirent avec cette
 rotation. Une restauration opérationnelle doit réappliquer les suppressions
 enregistrées avant remise en service.
+
+Les journaux techniques de suppression ne contiennent aucune identité, adresse
+e-mail ni identifiant de compte. Ils sont conservés pendant 90 jours.
 
 Microsoft Entra conserve un objet utilisateur supprimé dans ses éléments
 supprimés pendant sa fenêtre de récupération documentée de 30 jours, avant

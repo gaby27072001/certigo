@@ -44,11 +44,11 @@ traité comme un succès idempotent.
 
 | Donnée | Action | Résidu |
 |---|---|---|
-| Données actives Cosmos liées au compte | suppression ordonnée | aucun document utilisateur actif |
+| Données actives Cosmos liées au compte | suppression immédiate après vérification et exécution | aucun document utilisateur actif |
 | État de suppression | sujet en clair retiré à l’achèvement | hash SHA-256, request ID, étapes, codes, dates |
 | Tombstone | TTL Cosmos | 30 jours |
-| Sauvegarde Cosmos production | expiration par rotation PITR | fenêtre configurée `Continuous30Days` |
-| Journaux de suppression | événements structurés sans PII | politique de rétention Application Insights existante |
+| Sauvegarde Cosmos production | expiration par rotation PITR | 30 jours maximum |
+| Journaux de suppression | événements structurés sans identité | 90 jours |
 | Données locales | effacement après confirmation serveur | aucun jeton, préférence ou travail hors ligne Certigo |
 
 Une restauration Cosmos doit exécuter la réconciliation des suppressions avant
@@ -99,15 +99,13 @@ Les actions humaines non liées à ce câblage restent :
 1. Enregistrer
    `https://gchambaud_microsoft.github.io/Certigo/account-deletion/` dans le champ
    URL de suppression du compte de Play Console après publication de la page.
-2. Faire valider par le responsable juridique la base légale, le contact public
-   et toute conservation réglementaire additionnelle. Aucune durée légale
-   additionnelle n’est inventée dans cette implémentation. Le dépôt ne contient
-   actuellement aucun document de CGU : cette PR n’en crée pas et ne prétend pas
-   qu’un texte contractuel a été approuvé.
 
 Cette PR ne renseigne aucune valeur de production et ne publie aucune page. Les
 promotions Bicep, le test Apple réel, le dispatch GitHub Pages et les déclarations
 des consoles store restent des actions humaines avant soumission.
+
+Le contact public approuvé est `gabriel.chambaud@icloud.com`. La politique
+approuvée ne demande aucune pièce d’identité.
 
 ## Exigences officielles consultées le 18 août 2026
 

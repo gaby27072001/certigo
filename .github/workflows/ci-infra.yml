@@ -17,6 +17,10 @@ on:
       - "docs/ACCOUNT_DELETION.md"
       - "docs/deployment-runbook.md"
       - "docs/E2E_AUTH_PREREQUIS.md"
+      - "docs/legal/account-deletion.md"
+      - "docs/legal/privacy-policy.md"
+      - "tools/build_public_pages.mjs"
+      - "tools/tests/build_public_pages.test.mjs"
   pull_request_target:
     paths:
       - "infra/**"
@@ -30,6 +34,10 @@ on:
       - "docs/ACCOUNT_DELETION.md"
       - "docs/deployment-runbook.md"
       - "docs/E2E_AUTH_PREREQUIS.md"
+      - "docs/legal/account-deletion.md"
+      - "docs/legal/privacy-policy.md"
+      - "tools/build_public_pages.mjs"
+      - "tools/tests/build_public_pages.test.mjs"
 
 concurrency:
   group: ci-infra-${{ github.event.pull_request.number || github.ref }}
@@ -72,6 +80,8 @@ jobs:
         run: node --test infra/tests/cosmos-indexing-policy.test.mjs
       - name: Validate private networking topology
         run: node --test infra/tests/private-networking.test.mjs
+      - name: Validate public account-deletion policy
+        run: node --test tools/tests/build_public_pages.test.mjs
       - name: Validate secure deployment parameter writer
         run: node --test .github/scripts/write-secure-bicep-parameters.test.mjs
       - name: Validate private URL-based OneDeploy

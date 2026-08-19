@@ -380,6 +380,10 @@ function validateRepositoryInvariants() {
     path.join(root, '.github', 'scripts', 'write-secure-bicep-parameters.mjs'),
     'utf8',
   );
+  const accountDeletionCosmosGate = fs.readFileSync(
+    path.join(root, 'backend', 'run-account-deletion-cosmos-emulator.sh'),
+    'utf8',
+  );
   const releaseEnvironmentParameters = ['staging', 'prod'].map((environment) => ({
     environment,
     content: fs.readFileSync(
@@ -495,6 +499,41 @@ function validateRepositoryInvariants() {
     if (!backend.includes(marker)) {
       errors.push(`cd-backend.yml: missing locked dependency invariant ${marker}`);
     }
+  }
+  for (const marker of [
+    "github.event_name == 'workflow_dispatch' && inputs.run_cosmos_account_deletion",
+    'runs-on: [self-hosted, Linux, X64, certigo-pr]',
+    'ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""',
+    'bash backend/run-account-deletion-cosmos-emulator.sh',
+  ]) {
+    if (!backendCi.includes(marker)) {
+      errors.push(`ci-backend.yml: missing isolated Cosmos gate invariant ${marker}`);
+    }
+  }
+  for (const marker of [
+    'openssl rand -base64 64',
+    'KEY_FILE=/run/secrets/cosmos.key',
+    '--publish 127.0.0.1:8081:8081',
+    'CERTIGO_COSMOS_TESTS=1',
+    'COSMOS_EMULATOR_ENDPOINT=https://127.0.0.1:8081',
+    'CosmosRepositoriesIntegrationTests.Account_deletion_removes_user_partitions_and_keeps_only_pseudonymous_tombstone',
+    'docker rm --force',
+    'trap cleanup EXIT',
+  ]) {
+    if (!accountDeletionCosmosGate.includes(marker)) {
+      errors.push(
+        `run-account-deletion-cosmos-emulator.sh: missing local-only invariant ${marker}`,
+      );
+    }
+  }
+  if (
+    accountDeletionCosmosGate.includes('COSMOS_ENDPOINT')
+    || accountDeletionCosmosGate.includes('AZURE_SUBSCRIPTION')
+    || accountDeletionCosmosGate.includes('secrets.')
+  ) {
+    errors.push(
+      'run-account-deletion-cosmos-emulator.sh: live Azure configuration is forbidden',
+    );
   }
   if (!backendCi.includes('dotnet restore Certigo.sln --locked-mode')) {
     errors.push('ci-backend.yml: backend build must restore committed locks in locked mode');

@@ -564,6 +564,10 @@ test('account deletion checklist records provisioned Graph and Apple prerequisit
     'docs/ACCOUNT_DELETION.md',
     'docs/deployment-runbook.md',
     'docs/E2E_AUTH_PREREQUIS.md',
+    'docs/legal/account-deletion.md',
+    'docs/legal/privacy-policy.md',
+    'tools/build_public_pages.mjs',
+    'tools/tests/build_public_pages.test.mjs',
   ]) {
     assert.equal(
       infraWorkflow.split(`- "${documentationPath}"`).length,
@@ -571,6 +575,51 @@ test('account deletion checklist records provisioned Graph and Apple prerequisit
       `${documentationPath} must trigger ci-infra for push and pull requests`,
     );
   }
+});
+
+test('approved account-deletion retention policy matches hardened infrastructure', () => {
+  const template = compileTemplate('infra/main.bicep');
+  assert.equal(
+    template.resources.monitoring.properties.parameters.retentionInDays,
+    "[if(variables('hardened'), createObject('value', 90), createObject('value', 30))]",
+  );
+
+  const prod = readFileSync(
+    path.join(repositoryRoot, 'infra', 'params', 'prod.bicepparam'),
+    'utf8',
+  );
+  const staging = readFileSync(
+    path.join(repositoryRoot, 'infra', 'params', 'staging.bicepparam'),
+    'utf8',
+  );
+  assert.match(prod, /cosmosContinuousBackupTier = 'Continuous30Days'/);
+  assert.match(staging, /cosmosContinuousBackupTier = 'Continuous7Days'/);
+
+  const accountDeletion = readFileSync(
+    path.join(repositoryRoot, 'docs', 'legal', 'account-deletion.md'),
+    'utf8',
+  );
+  const privacy = readFileSync(
+    path.join(repositoryRoot, 'docs', 'legal', 'privacy-policy.md'),
+    'utf8',
+  );
+  for (const marker of [
+    'supprimées immédiatement',
+    'expire automatiquement après 30 jours',
+    'au plus tard après 30 jours',
+    'conservés pendant 90 jours',
+    'pièce d’identité',
+    'gabriel.chambaud@icloud.com',
+  ]) {
+    assert.ok(
+      `${accountDeletion}\n${privacy}`.includes(marker),
+      `missing approved policy marker: ${marker}`,
+    );
+  }
+  assert.doesNotMatch(
+    `${accountDeletion}\n${privacy}`,
+    /validation juridique|responsable juridique|durée légale additionnelle/i,
+  );
 });
 
 test('Function deployment waits for the complete private network deployment', () => {

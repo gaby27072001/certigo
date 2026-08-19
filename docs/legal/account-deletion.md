@@ -1,6 +1,6 @@
 # Suppression de compte — Certigo
 
-Dernière mise à jour : 18 août 2026
+Dernière mise à jour : 19 août 2026
 
 ## Depuis l’application
 
@@ -11,8 +11,9 @@ d’enregistrer la demande.
 La suppression retire les données actives associées au compte : profil,
 progression, tentatives, événements d’apprentissage, économie virtuelle,
 classements, relations sociales et identifiants de connexion gérés par Certigo.
-La session locale et la file de synchronisation hors ligne sont effacées
-uniquement après confirmation du serveur.
+Ces données actives sont supprimées immédiatement après la vérification et
+l’exécution de la demande. La session locale et la file de synchronisation hors
+ligne sont effacées uniquement après confirmation du serveur.
 
 ## Sans l’application
 
@@ -35,5 +36,7 @@ horodatages. Il expire automatiquement après 30 jours.
 
 En production, les sauvegardes Cosmos DB suivent la fenêtre technique
 `Continuous30Days`. Elles ne sont pas utilisées pour restaurer un compte
-supprimé et les copies résiduelles expirent avec cette rotation. Cette durée
-technique n’est pas présentée comme une durée légale.
+supprimé et les copies résiduelles expirent au plus tard après 30 jours.
+
+Les journaux techniques de suppression ne contiennent aucune identité, adresse
+e-mail ni identifiant de compte. Ils sont conservés pendant 90 jours.
