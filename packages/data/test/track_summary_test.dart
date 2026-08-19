@@ -48,7 +48,7 @@ void main() {
 
     test('round-trips complete AWS metadata through the cache shape', () {
       const TrackSummary original = TrackSummary(
-        id: 'aws-ans-c01',
+        id: 'aws:ans-c01',
         code: 'ANS-C01',
         title: 'AWS Certified Advanced Networking - Specialty',
         level: 'specialty',
@@ -64,7 +64,22 @@ void main() {
         examGuideUrl: 'https://docs.aws.amazon.com/aws-certification/latest/'
             'advanced-networking-specialty-01/advanced-networking-specialty-01.html',
         catalogVersion: '2026-08-17',
-        retiresOn: '2026-08-25',
+        status: CertificationLifecycleStatus.activeRetiring,
+        officialCode: 'ANS-C01',
+        slug: 'ans-c01',
+        officialSlug: 'certified-advanced-networking-specialty',
+        blueprint: CertificationBlueprint(
+          version: '2026-08-17',
+          objectives: <CertificationObjective>[
+            CertificationObjective(
+              id: 'domain-1',
+              title: 'Network Design',
+              weightPercent: 30.5,
+              weightType: 'exact',
+            ),
+          ],
+        ),
+        lifecycleDetails: CertificationLifecycle(lastExamOn: '2026-08-25', note: 'Last exam date.'),
       );
 
       final TrackSummary decoded = TrackSummary.fromJson(original.toJson());
@@ -72,13 +87,17 @@ void main() {
       expect(decoded.provider, CertificationProvider.aws);
       expect(decoded.normalizedLevel, CertificationLevel.specialty);
       expect(decoded.contentStatus, CertificationContentStatus.planned);
-      expect(decoded.retiresOn, '2026-08-25');
+      expect(decoded.id, 'aws:ans-c01');
+      expect(decoded.status, CertificationLifecycleStatus.activeRetiring);
+      expect(decoded.isActive, isTrue);
+      expect(decoded.blueprint!.objectives.single.weightPercent, 30.5);
+      expect(decoded.lifecycleDetails!.lastExamOn, '2026-08-25');
       expect(decoded.hasLearningContent, isFalse);
     });
 
     test('uses a provider badge when Google publishes no public exam code', () {
       const TrackSummary track = TrackSummary(
-        id: 'gcp-cloud-digital-leader',
+        id: 'gcp:cloud-digital-leader',
         code: '',
         title: 'Cloud Digital Leader',
         level: 'foundational',
@@ -92,19 +111,62 @@ void main() {
       expect(track.displayCode, 'GCP');
     });
 
-    test('rejects unknown explicit providers and lifecycle states', () {
+    test('accepts all canonical lifecycle states and rejects unknown values', () {
+      const Map<String, CertificationLifecycleStatus> expected =
+          <String, CertificationLifecycleStatus>{
+        'announced': CertificationLifecycleStatus.announced,
+        'active': CertificationLifecycleStatus.active,
+        'active-retiring': CertificationLifecycleStatus.activeRetiring,
+        'retired': CertificationLifecycleStatus.retired,
+        'replaced': CertificationLifecycleStatus.replaced,
+      };
+      for (final MapEntry<String, CertificationLifecycleStatus> entry in expected.entries) {
+        final TrackSummary track = TrackSummary.fromJson(<String, dynamic>{
+          'id': 'aws:test',
+          'provider': 'aws',
+          'status': entry.key,
+        });
+        expect(track.status, entry.value);
+      }
+
       expect(
         () => TrackSummary.fromJson(<String, dynamic>{'id': 'unknown', 'provider': 'unknown'}),
         throwsFormatException,
       );
       expect(
         () => TrackSummary.fromJson(<String, dynamic>{
-          'id': 'aws-test',
+          'id': 'aws:test',
           'provider': 'aws',
-          'status': 'announced',
+          'status': 'preview',
         }),
         throwsFormatException,
       );
+    });
+
+    test('decodes canonical GCP metadata without inventing an exam code', () {
+      final TrackSummary track = TrackSummary.fromJson(<String, dynamic>{
+        'id': 'gcp:cloud-digital-leader',
+        'provider': 'gcp',
+        'code': '',
+        'officialCode': null,
+        'status': 'active',
+        'blueprint': <String, dynamic>{
+          'version': '2026-08-17',
+          'objectives': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 'section-1',
+              'title': 'Digital Transformation with Google Cloud',
+              'weightPercent': 18.5,
+              'weightType': 'approximate',
+            },
+          ],
+        },
+      });
+
+      expect(track.officialCode, isNull);
+      expect(track.displayCode, 'GCP');
+      expect(track.blueprint!.objectives.single.weightPercent, 18.5);
+      expect(track.blueprint!.objectives.single.weightLabel, '~18.5%');
     });
   });
 }

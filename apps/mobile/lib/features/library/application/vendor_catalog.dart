@@ -27,7 +27,7 @@ const List<VendorBrand> kShowcaseVendors = <VendorBrand>[VendorBrand.openai];
 List<TrackSummary> tracksForVendor(List<TrackSummary> catalog, VendorBrand vendor) => catalog
     .where(
       (TrackSummary track) =>
-          vendorOf(track) == vendor && (track.isActive || track.hasLearningContent),
+          vendorOf(track) == vendor && (track.isDiscoverable || track.hasLearningContent),
     )
     .toList(growable: false);
 
@@ -49,7 +49,7 @@ List<TrackSummary> pickerTracks(List<TrackSummary> catalog) => catalog
 String vendorLocation(VendorBrand vendor) => '/library/vendor/${vendor.id}';
 
 String certificationLocation(TrackSummary track) =>
-    '${vendorLocation(vendorOf(track))}/cert/${track.id}';
+    '${vendorLocation(vendorOf(track))}/cert/${Uri.encodeComponent(track.id)}';
 
 /// A thematic grouping of certifications within a vendor (Azure, Sécurité…).
 ///

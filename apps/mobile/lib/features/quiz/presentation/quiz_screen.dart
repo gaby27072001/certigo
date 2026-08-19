@@ -83,7 +83,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         },
         onNextLesson: (String nextId) {
           Navigator.of(context).pop();
-          context.go('${Routes.lesson}/${widget.trackId}/$nextId');
+          context.go(
+            '${Routes.lesson}/${Uri.encodeComponent(widget.trackId)}/${Uri.encodeComponent(nextId)}',
+          );
         },
       ),
     );
@@ -121,10 +123,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                     'Réessaie quand la connexion revient, ou lance une démo sans synchronisation.',
                 onRetry: () => unawaited(_controller.loadItems()),
               ),
-              PrismButton.ghost(
-                label: 'Essayer la démo',
-                onPressed: _controller.startDemo,
-              ),
+              PrismButton.ghost(label: 'Essayer la démo', onPressed: _controller.startDemo),
             ],
           ),
         ),

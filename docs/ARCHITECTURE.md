@@ -195,23 +195,36 @@ Certigo/content/             # instantané historique, non éditorial
   non navigable (AI-901) jusqu'à publication de son contenu. La présence ultérieure d'un track
   `ai-901` rend automatiquement son parcours navigable, sans migration destructive d'AI-900.
 
-### 7.1 Registre de certifications multi-cloud
+### 7.1 Catalogue canonique de certifications multi-cloud
 
-Le registre versionné `catalog/official-certifications-<date>.json` décrit uniquement la surface
-de découverte officielle : provider, famille, niveau normalisé, code public lorsqu'il existe,
-cycle de vie et liens fournisseur. Il est distinct des leçons/questions et embarqué dans
-`Certigo.Application`.
+Le catalogue public `content/public/catalog/certifications.json` de `certigo-content`, défini par
+l'ADR-0004 de ce dépôt éditorial et le schéma `certigo.certification-catalog/v1`, est l'unique
+inventaire canonique multi-cloud. Certigo ne conserve aucun snapshot éditorial concurrent :
+`CertificationCatalogParser` valide le contrat source et `CertificationCatalogAdapter` le projette
+vers les DTO applicatifs sans modifier les identifiants `<provider>:<slug>`, les niveaux, les
+statuts, les objectifs, le cycle de vie ni la provenance.
 
-`ContentService` fusionne ce registre avec les tracks publiés :
+L'importeur de package `certigo-content` reste la frontière d'injection prévue. Tant qu'il n'est pas
+raccordé, la production injecte explicitement `EmptyCertificationRegistry` plutôt que des données
+de test ou une copie locale. `ContentService` continue alors d'exposer les tracks publiés et la
+surcouche Microsoft `OfficialCertificationCatalog`, notamment AI-900 retiré mais navigable et
+AI-901 actif, planifié et non sélectionnable.
 
-- une certification officielle sans track reste `planned`, visible mais non sélectionnable ;
+Quand une source canonique est injectée, `ContentService` l'adapte ainsi :
+
+- une certification sans track reçoit `contentStatus: planned` et `learningAvailable: false`,
+  deux champs dérivés par l'application et absents du contrat éditorial ;
 - un track de même ID fournit les compteurs et passe à `available` ;
-- les tracks historiques sans métadonnées restent compatibles et reçoivent les valeurs Microsoft
-  ou GitHub dérivées par le serveur ;
-- le mobile utilise les champs explicites et ne déduit plus AWS/GCP d'un préfixe.
+- les statuts `retired` et `replaced` sans contenu publié sont masqués, tandis que
+  `active-retiring` reste actif ;
+- l'API annonce explicitement `certigo.app-certification-catalog/v2` et
+  `sourceSchema: certigo.certification-catalog/v1` ; le mobile refuse tout schéma inconnu ;
+- les segments de route utilisent un encodage URI afin de préserver les identifiants canoniques.
 
-Le snapshot et la stratégie de retrait/renommage sont documentés dans
-[`CERTIFICATION_CATALOG_2026-08-17.md`](CERTIFICATION_CATALOG_2026-08-17.md).
+La décision DVA au 18 août 2026 est explicite : `aws:dva-c02` reste l'entrée active et son guide est
+`https://docs.aws.amazon.com/aws-certification/latest/developer-associate-02/developer-associate-02.html`.
+`aws:dva-c03` peut être référencé comme successeur annoncé pour une inscription à compter du
+1er décembre 2026, mais n'est pas une entrée de production active.
 
 ---
 

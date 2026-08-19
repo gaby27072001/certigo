@@ -272,6 +272,21 @@ class _OfficialMetadataPanel extends StatelessWidget {
                 ],
               ),
             ),
+          for (final CertificationObjective objective
+              in track.blueprint?.objectives ?? const <CertificationObjective>[])
+            Padding(
+              padding: const EdgeInsets.only(bottom: PrismSpacing.xxs),
+              child: Row(
+                children: <Widget>[
+                  Expanded(child: Text(objective.title, style: t.bodySmall)),
+                  const SizedBox(width: PrismSpacing.sm),
+                  Text(
+                    objective.weightLabel,
+                    style: t.labelMedium?.copyWith(color: accent, fontWeight: FontWeight.w800),
+                  ),
+                ],
+              ),
+            ),
           if (track.prerequisites.isNotEmpty) ...<Widget>[
             const SizedBox(height: PrismSpacing.xs),
             _MetadataText(text: 'Prérequis : ${track.prerequisites}'),

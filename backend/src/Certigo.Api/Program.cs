@@ -237,7 +237,10 @@ var host = new HostBuilder()
             services.AddSingleton<ITutorCompletion, NullTutorCompletion>();
         }
         services.AddScoped<IUserService, UserService>();
-        services.AddSingleton<ICertificationRegistry, EmbeddedCertificationRegistry>();
+        // certigo-content is the sole multi-cloud inventory. Until its package
+        // importer is wired, production exposes authored tracks with an empty
+        // external source instead of embedding a second catalog snapshot.
+        services.AddSingleton<ICertificationRegistry>(_ => EmptyCertificationRegistry.Instance);
         services.AddScoped<IContentService, ContentService>();
         services.AddScoped<IQuizService, QuizService>();
         services.AddScoped<ILeaderboardService, LeaderboardService>();

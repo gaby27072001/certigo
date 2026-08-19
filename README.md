@@ -6,8 +6,8 @@
 
 Micro-learning mobile (iOS + Android) pour maîtriser des **concepts techniques & cloud réels**
 et atteindre la *readiness* certification sur un catalogue multi-cloud. Les parcours Microsoft
-existants restent disponibles ; les fondations de découverte AWS et Google Cloud sont versionnées
-séparément avant l'arrivée progressive des contenus.
+existants restent disponibles ; Certigo adapte le catalogue public canonique de `certigo-content`
+avant l'arrivée progressive des contenus AWS et Google Cloud.
 
 `Flutter` · `.NET 8 isolated Functions` · `Cosmos DB` · `Entra External ID` · `Bicep`
 

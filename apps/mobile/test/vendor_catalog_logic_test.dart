@@ -37,11 +37,11 @@ void main() {
       );
       expect(vendorOf(track('az-900', 'AZ-900')), VendorBrand.microsoft);
       expect(
-        vendorOf(track('aws-saa-c03', 'SAA-C03', provider: CertificationProvider.aws)),
+        vendorOf(track('aws:saa-c03', 'SAA-C03', provider: CertificationProvider.aws)),
         VendorBrand.aws,
       );
       expect(
-        vendorOf(track('gcp-cloud-digital-leader', '', provider: CertificationProvider.gcp)),
+        vendorOf(track('gcp:cloud-digital-leader', '', provider: CertificationProvider.gcp)),
         VendorBrand.google,
       );
     });
@@ -61,11 +61,11 @@ void main() {
       expect(categoryOf(track('github-foundations', 'GH-900')), CertCategory.github);
       expect(categoryOf(track('xy-1', 'XY-1')), CertCategory.other);
       expect(
-        categoryOf(track('aws-saa-c03', 'SAA-C03', family: 'architecture')),
+        categoryOf(track('aws:saa-c03', 'SAA-C03', family: 'architecture')),
         CertCategory.architecture,
       );
       expect(
-        categoryOf(track('gcp-security', '', family: 'security-operations')),
+        categoryOf(track('gcp:security', '', family: 'security-operations')),
         CertCategory.security,
       );
     });
@@ -87,7 +87,7 @@ void main() {
         track('github-foundations', 'GH-900', provider: CertificationProvider.github),
         track('sc-900', 'SC-900'),
         track(
-          'aws-ans-c01',
+          'aws:ans-c01',
           'ANS-C01',
           provider: CertificationProvider.aws,
           status: CertificationLifecycleStatus.retired,
@@ -99,6 +99,47 @@ void main() {
       expect(tracksForVendor(catalog, VendorBrand.github).single.id, 'github-foundations');
       expect(tracksForVendor(catalog, VendorBrand.aws), isEmpty);
     });
+
+    test(
+      'keeps announced and active-retiring entries but hides retired and replaced externals',
+      () {
+        final List<TrackSummary> catalog = <TrackSummary>[
+          track(
+            'aws:announced',
+            'NEW-C01',
+            provider: CertificationProvider.aws,
+            status: CertificationLifecycleStatus.announced,
+            contentStatus: CertificationContentStatus.planned,
+          ),
+          track(
+            'aws:retiring',
+            'OLD-C01',
+            provider: CertificationProvider.aws,
+            status: CertificationLifecycleStatus.activeRetiring,
+            contentStatus: CertificationContentStatus.planned,
+          ),
+          track(
+            'aws:retired',
+            'OLD-C00',
+            provider: CertificationProvider.aws,
+            status: CertificationLifecycleStatus.retired,
+            contentStatus: CertificationContentStatus.planned,
+          ),
+          track(
+            'aws:replaced',
+            'OLD-B99',
+            provider: CertificationProvider.aws,
+            status: CertificationLifecycleStatus.replaced,
+            contentStatus: CertificationContentStatus.planned,
+          ),
+        ];
+
+        expect(
+          tracksForVendor(catalog, VendorBrand.aws).map((TrackSummary item) => item.id),
+          <String>['aws:announced', 'aws:retiring'],
+        );
+      },
+    );
   });
 
   group('selectableTracks', () {
@@ -106,7 +147,7 @@ void main() {
       final List<TrackSummary> catalog = <TrackSummary>[
         track('az-900', 'AZ-900'),
         track(
-          'aws-aif-c01',
+          'aws:aif-c01',
           'AIF-C01',
           provider: CertificationProvider.aws,
           contentStatus: CertificationContentStatus.planned,
@@ -123,15 +164,15 @@ void main() {
 
   group('deep links', () {
     test('encode the provider carried by catalog metadata', () {
-      final TrackSummary aws = track('aws-saa-c03', 'SAA-C03', provider: CertificationProvider.aws);
+      final TrackSummary aws = track('aws:saa-c03', 'SAA-C03', provider: CertificationProvider.aws);
       final TrackSummary gcp = track(
-        'gcp-cloud-digital-leader',
+        'gcp:cloud-digital-leader',
         '',
         provider: CertificationProvider.gcp,
       );
 
-      expect(certificationLocation(aws), '/library/vendor/aws/cert/aws-saa-c03');
-      expect(certificationLocation(gcp), '/library/vendor/gcp/cert/gcp-cloud-digital-leader');
+      expect(certificationLocation(aws), '/library/vendor/aws/cert/aws%3Asaa-c03');
+      expect(certificationLocation(gcp), '/library/vendor/gcp/cert/gcp%3Acloud-digital-leader');
       expect(VendorBrandInfo.fromId('gcp'), VendorBrand.google);
       expect(VendorBrandInfo.fromId('google'), VendorBrand.google);
     });

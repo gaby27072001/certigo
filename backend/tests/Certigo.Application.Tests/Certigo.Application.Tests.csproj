@@ -16,4 +16,7 @@
     <ProjectReference Include="..\..\src\Certigo.Application\Certigo.Application.csproj" />
     <ProjectReference Include="..\..\src\Certigo.Domain\Certigo.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Fixtures\canonical-certification-catalog-v1.json" />
+  </ItemGroup>
 </Project>

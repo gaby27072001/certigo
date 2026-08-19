@@ -63,6 +63,7 @@ public sealed class ContentService : IContentService
         summaries.AddRange(
             _certifications.Entries
                 .Where(entry => !contentIds.Contains(entry.Id) && !summaryIds.Contains(entry.Id))
+                .Where(entry => entry.Status is not ("retired" or "replaced"))
                 .Select(ToPlannedSummary));
 
         var ordered = summaries
@@ -72,7 +73,25 @@ public sealed class ContentService : IContentService
                 summary => string.IsNullOrEmpty(summary.Code) ? summary.Title : summary.Code,
                 StringComparer.Ordinal)
             .ToArray();
-        return new CatalogDto(ordered);
+        return new CatalogDto(
+            Schema: CertificationCatalogSchemas.AppV2,
+            SourceSchema: _certifications.SourceSchema,
+            SourceAsOf: _certifications.AsOf,
+            Freshness: _certifications.Freshness is null
+                ? null
+                : new CatalogFreshnessDto(
+                    _certifications.Freshness.MaxAgeDays,
+                    _certifications.Freshness.ReviewDueOn),
+            Providers: _certifications.Providers
+                .Select(provider => new CertificationProviderDto(
+                    provider.Id,
+                    provider.Name,
+                    provider.Namespace,
+                    provider.OfficialCatalogUrl,
+                    provider.SourceHosts,
+                    provider.CheckedOn))
+                .ToArray(),
+            Tracks: ordered);
     }
 
     private TrackSummaryDto ToSummary(Track track, CertificationCatalogEntry? metadata)
@@ -128,7 +147,7 @@ public sealed class ContentService : IContentService
             summary: string.Empty,
             unitCount: 0,
             lessonCount: 0,
-            contentStatus: entry.ContentStatus);
+            contentStatus: "planned");
 
     private TrackSummaryDto ToExternalDto(
         CertificationCatalogEntry entry,
@@ -138,35 +157,98 @@ public sealed class ContentService : IContentService
         string contentStatus)
         => new(
             Id: entry.Id,
-            Code: entry.Code,
+            Code: entry.OfficialCode ?? string.Empty,
             Title: entry.Title,
             Level: entry.Level,
             Summary: summary,
             UnitCount: unitCount,
             LessonCount: lessonCount,
             Domains: Array.Empty<CertificationDomainDto>(),
-            Prerequisites: entry.Prerequisites ?? string.Empty,
-            StudyGuideUrl: entry.ExamGuideUrl ?? string.Empty,
+            Prerequisites: string.Empty,
+            StudyGuideUrl: entry.Guide.Url,
             ExamUrl: entry.OfficialUrl,
-            BlueprintDate: entry.BlueprintPublishedOn,
+            BlueprintDate: null,
             Lifecycle: entry.Status,
+            LifecycleNote: entry.Lifecycle?.Note ?? string.Empty,
             LearningAvailable: contentStatus == "available",
             Provider: entry.Provider,
-            Family: entry.Family,
+            Family: ExternalFamily(entry),
             CertificationLevel: entry.Level,
             Status: entry.Status,
             ContentStatus: contentStatus,
             OfficialUrl: entry.OfficialUrl,
-            ExamGuideUrl: entry.ExamGuideUrl,
+            ExamGuideUrl: entry.Guide.Url,
             CatalogVersion: _certifications.Version,
-            BlueprintPublishedOn: entry.BlueprintPublishedOn,
-            BlueprintVersion: entry.BlueprintVersion,
-            Languages: entry.Languages,
-            DurationMinutes: entry.DurationMinutes,
-            Aliases: entry.Aliases,
-            ReplacedBy: entry.ReplacedBy,
-            RetiresOn: entry.RetiresOn,
-            RetiredOn: entry.RetiredOn);
+            BlueprintVersion: entry.Blueprint.Version,
+            OfficialCode: entry.OfficialCode,
+            Slug: entry.Slug,
+            OfficialSlug: entry.OfficialSlug,
+            Guide: new CertificationGuideDto(
+                entry.Guide.Url,
+                entry.Guide.Version,
+                entry.Guide.PublishedOn,
+                entry.Guide.VersionSource,
+                entry.Guide.RevisionToken),
+            Blueprint: new CertificationBlueprintDto(
+                entry.Blueprint.Version,
+                entry.Blueprint.Objectives
+                    .Select(objective => new CertificationObjectiveDto(
+                        objective.Id,
+                        objective.Title,
+                        objective.WeightPercent,
+                        objective.WeightType))
+                    .ToArray()),
+            LifecycleDetails: entry.Lifecycle is null
+                ? null
+                : new CertificationLifecycleDto(
+                    entry.Lifecycle.ReviewOn,
+                    entry.Lifecycle.LastExamOn,
+                    entry.Lifecycle.Replaces,
+                    entry.Lifecycle.Successor,
+                    entry.Lifecycle.Note),
+            Provenance: new CertificationProvenanceDto(
+                entry.Provenance.CheckedOn,
+                entry.Provenance.Sources
+                    .Select(source => new CertificationSourceDto(source.Kind, source.Url))
+                    .ToArray()));
+
+    private static string ExternalFamily(CertificationCatalogEntry entry)
+    {
+        var searchable = $"{entry.OfficialSlug} {entry.Title}".ToLowerInvariant();
+        if (searchable.Contains("cloud-digital-leader", StringComparison.Ordinal)
+            || searchable.Contains("cloud-practitioner", StringComparison.Ordinal))
+            return "cloud-foundations";
+        if (searchable.Contains("architect", StringComparison.Ordinal))
+            return "architecture";
+        if (searchable.Contains("devops", StringComparison.Ordinal))
+            return "devops";
+        if (searchable.Contains("network", StringComparison.Ordinal))
+            return "networking";
+        if (searchable.Contains("security operations", StringComparison.Ordinal))
+            return "security-operations";
+        if (searchable.Contains("security", StringComparison.Ordinal))
+            return "security";
+        if (searchable.Contains("database", StringComparison.Ordinal))
+            return "database";
+        if (searchable.Contains("machine learning", StringComparison.Ordinal)
+            || searchable.Contains("machine-learning", StringComparison.Ordinal))
+            return "machine-learning";
+        if (searchable.Contains("generative ai", StringComparison.Ordinal))
+            return "generative-ai";
+        if (searchable.Contains(" ai ", StringComparison.Ordinal))
+            return "ai";
+        if (searchable.Contains("data", StringComparison.Ordinal))
+            return "data";
+        if (searchable.Contains("developer", StringComparison.Ordinal))
+            return "development";
+        if (searchable.Contains("workspace", StringComparison.Ordinal))
+            return "collaboration";
+        if (searchable.Contains("operations", StringComparison.Ordinal)
+            || searchable.Contains("cloudops", StringComparison.Ordinal)
+            || searchable.Contains("sysops", StringComparison.Ordinal))
+            return "operations";
+        return "other";
+    }
 
     private static string LegacyProvider(Track track)
         => track.Id.StartsWith("github", StringComparison.OrdinalIgnoreCase)

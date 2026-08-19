@@ -6,88 +6,97 @@ namespace Certigo.Application.Tests;
 
 public sealed class CertificationCatalogTests
 {
+    // Derived from certigo-content PR #20 head 2f0d1d9cd2d1982d615b14497310bd396b9fa7fd.
+    // Upstream certifications.json blob SHA: cd8bf014d6ff997e496ec8cc042de4b7d82d85f3.
     [Fact]
-    public void Embedded_catalog_contains_the_exact_active_AWS_and_GCP_inventory()
+    public void Parser_accepts_the_exact_canonical_v1_contract_fixture()
     {
-        var registry = new EmbeddedCertificationRegistry();
+        var document = ParseFixture();
 
-        registry.Version.Should().Be("2026-08-17");
-        registry.Entries.Should().HaveCount(26);
-        registry.Entries.Should().OnlyContain(entry => entry.Status == "active");
-        registry.Entries.Should().OnlyContain(entry => entry.ContentStatus == "planned");
-        registry.Entries.Select(entry => entry.Id).Should().OnlyHaveUniqueItems();
+        document.Schema.Should().Be(CertificationCatalogSchemas.SourceV1);
+        document.AsOf.Should().Be(new DateOnly(2026, 8, 17));
+        document.Freshness.Should().Be(new CertificationCatalogFreshness(30, new DateOnly(2026, 9, 16)));
+        document.Providers.Should().BeEquivalentTo(
+        [
+            new CertificationProviderDefinition(
+                "aws",
+                "Amazon Web Services",
+                "aws",
+                "https://docs.aws.amazon.com/aws-certification/latest/examguides/aws-certification-exam-guides.html",
+                ["aws.amazon.com", "d1.awsstatic.com", "docs.aws.amazon.com"],
+                new DateOnly(2026, 8, 17)),
+            new CertificationProviderDefinition(
+                "gcp",
+                "Google Cloud",
+                "gcp",
+                "https://cloud.google.com/learn/certification",
+                ["cloud.google.com", "services.google.com", "support.google.com"],
+                new DateOnly(2026, 8, 17)),
+            new CertificationProviderDefinition(
+                "microsoft",
+                "Microsoft",
+                "microsoft",
+                null,
+                ["learn.microsoft.com"],
+                null),
+        ], options => options.WithStrictOrdering());
 
-        var aws = registry.Entries.Where(entry => entry.Provider == "aws").ToArray();
-        aws.Should().HaveCount(12);
-        aws.Should().OnlyContain(entry => !string.IsNullOrWhiteSpace(entry.Code));
-        aws.Count(entry => entry.Level == "foundational").Should().Be(2);
-        aws.Count(entry => entry.Level == "associate").Should().Be(5);
-        aws.Count(entry => entry.Level == "professional").Should().Be(3);
-        aws.Count(entry => entry.Level == "specialty").Should().Be(2);
-        aws.Single(entry => entry.Code == "ANS-C01").RetiresOn.Should().Be(new DateOnly(2026, 8, 25));
+        document.Certifications.Select(entry => entry.Id).Should().Equal(
+            "aws:ans-c01",
+            "aws:dva-c02",
+            "gcp:cloud-digital-leader");
+        document.Certifications.Should().NotContain(entry => entry.Id == "aws:dva-c03");
 
-        var gcp = registry.Entries.Where(entry => entry.Provider == "gcp").ToArray();
-        gcp.Should().HaveCount(14);
-        gcp.Should().OnlyContain(entry => string.IsNullOrEmpty(entry.Code));
-        gcp.Count(entry => entry.Level == "foundational").Should().Be(2);
-        gcp.Count(entry => entry.Level == "associate").Should().Be(3);
-        gcp.Count(entry => entry.Level == "professional").Should().Be(9);
-        gcp.Should().NotContain(entry => entry.Level == "specialty");
-        gcp.Single(entry => entry.Id == "gcp-professional-data-engineer")
-            .BlueprintVersion.Should().Be("v4.2");
-        gcp.Single(entry => entry.Id == "gcp-professional-cloud-database-engineer")
-            .BlueprintVersion.Should().Be("v1.2");
+        var dva = document.Certifications.Single(entry => entry.Id == "aws:dva-c02");
+        dva.Status.Should().Be("active");
+        dva.Guide.Url.Should().Be(
+            "https://docs.aws.amazon.com/aws-certification/latest/developer-associate-02/developer-associate-02.html");
+        dva.Lifecycle!.Successor.Should().Be("aws:dva-c03");
+        dva.Lifecycle.LastExamOn.Should().Be(new DateOnly(2026, 11, 30));
+
+        var gcp = document.Certifications.Single(entry => entry.Id == "gcp:cloud-digital-leader");
+        gcp.OfficialCode.Should().BeNull();
+        gcp.Blueprint.Objectives.Should().OnlyContain(objective => objective.WeightType == "approximate");
     }
 
     [Fact]
-    public void Validator_accepts_a_retired_entry_with_an_official_url_and_retirement_date()
+    public void Parser_preserves_decimal_objective_weights_without_truncation()
     {
-        var document = new CertificationCatalogDocument(
-            SchemaVersion: 1,
-            AsOf: new DateOnly(2026, 8, 17),
-            Sources: new[] { "https://aws.amazon.com/certification/" },
-            Certifications: new[]
-            {
-                new CertificationCatalogEntry(
-                    Id: "aws-retired-test",
-                    Provider: "aws",
-                    Family: "security",
-                    Code: "TST-C01",
-                    Title: "Retired test certification",
-                    Level: "specialty",
-                    Status: "retired",
-                    ContentStatus: "planned",
-                    OfficialUrl: "https://aws.amazon.com/certification/",
-                    RetiredOn: new DateOnly(2026, 1, 1)),
-            });
+        var json = ReadFixture().Replace(
+            "\"weightPercent\": 18,",
+            "\"weightPercent\": 18.5,",
+            StringComparison.Ordinal);
 
-        CertificationCatalogValidator.Validate(document).Should().BeEmpty();
+        var document = new CertificationCatalogParser().Parse(json);
+
+        document.Certifications.Single(entry => entry.Id == "gcp:cloud-digital-leader")
+            .Blueprint.Objectives.First().WeightPercent.Should().Be(18.5m);
     }
 
     [Fact]
-    public void Validator_rejects_duplicates_unknown_providers_and_non_official_urls()
+    public void Parser_rejects_unknown_source_schema()
     {
-        var invalid = new CertificationCatalogEntry(
-            Id: "aws-invalid",
-            Provider: "azure",
-            Family: "Security",
-            Code: "BAD",
-            Title: "Invalid",
-            Level: "expert",
-            Status: "active",
-            ContentStatus: "available",
-            OfficialUrl: "http://example.com/certification");
-        var document = new CertificationCatalogDocument(
-            SchemaVersion: 1,
-            AsOf: new DateOnly(2026, 8, 17),
-            Sources: new[] { "https://aws.amazon.com/certification/" },
-            Certifications: new[] { invalid, invalid });
+        var json = ReadFixture().Replace(
+            CertificationCatalogSchemas.SourceV1,
+            "certigo.certification-catalog/v2",
+            StringComparison.Ordinal);
 
-        var errors = CertificationCatalogValidator.Validate(document);
+        var act = () => new CertificationCatalogParser().Parse(json);
 
-        errors.Should().Contain(error => error.Contains("duplicate id", StringComparison.Ordinal));
-        errors.Should().Contain(error => error.Contains("unsupported provider", StringComparison.Ordinal));
-        errors.Should().Contain(error => error.Contains("officialUrl", StringComparison.Ordinal));
-        errors.Should().Contain(error => error.Contains("contentStatus", StringComparison.Ordinal));
+        act.Should().Throw<InvalidDataException>()
+            .WithMessage("*schema must be 'certigo.certification-catalog/v1'*");
+    }
+
+    private static CertificationCatalogDocument ParseFixture()
+        => new CertificationCatalogParser().Parse(ReadFixture());
+
+    private static string ReadFixture()
+    {
+        var assembly = typeof(CertificationCatalogTests).Assembly;
+        var resourceName = assembly.GetManifestResourceNames()
+            .Single(name => name.EndsWith("canonical-certification-catalog-v1.json", StringComparison.Ordinal));
+        using var stream = assembly.GetManifestResourceStream(resourceName)!;
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 }

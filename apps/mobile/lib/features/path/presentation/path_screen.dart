@@ -96,8 +96,9 @@ class _PathContent extends StatelessWidget {
     return p.accentFor(di >= 0 ? di : unitIndex);
   }
 
-  void _openLesson(BuildContext context, String lessonId) =>
-      context.go('${Routes.lesson}/$trackId/$lessonId');
+  void _openLesson(BuildContext context, String lessonId) => context.go(
+        '${Routes.lesson}/${Uri.encodeComponent(trackId)}/${Uri.encodeComponent(lessonId)}',
+      );
 
   @override
   Widget build(BuildContext context) {
