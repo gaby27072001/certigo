@@ -8,10 +8,9 @@
 
 Ces runbooks portent sur le **tenant CIAM Azure**, la **subscription de facturation** et les
 **données applicatives (Cosmos DB)**. Les opérations nécessitent des accès (Global Admin du tenant
-CIAM, Owner de la subscription, opérateur Cosmos DB) que **seul l'opérateur humain possède**.
-L'agent peut exécuter les diagnostics explicitement read-only et les `what-if`, mais jamais une
-mutation live. Il prépare les commandes de changement, procédures, vérifications et rollbacks.
-**C'est vous qui exécutez** chaque mutation, après relecture et approbation.
+CIAM, Owner de la subscription, opérateur Cosmos DB) que **seul l'opérateur humain possède**. L'agent Copilot **n'a lancé aucune commande Azure** : il a **préparé**
+les commandes `az` CLI / Microsoft Graph exactes, les procédures pas-à-pas, les vérifications et les
+rollbacks. **C'est vous qui exécutez** chaque commande, après relecture.
 
 > 🔐 **Avant toute suppression** : relisez la section « Vérification préalable » du runbook concerné
 > et **confirmez chaque identifiant** (appId, keyId, nom de ressource). Une erreur d'ID peut couper

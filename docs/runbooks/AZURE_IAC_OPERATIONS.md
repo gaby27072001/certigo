@@ -17,12 +17,11 @@ Le validateur compile tous les templates et tous les paramètres. Il impose des 
 non partagés par environnement, l'accès public désactivé sur Storage / Cosmos / Key Vault, la
 topologie private endpoint/DNS complète, le peering bidirectionnel avec le VNet CI, une politique
 Cosmos explicite, un destinataire d'alerte hors dev, l'identité utilisateur FC1 préprovisionnée et
-le rôle Blob minimal du principal OIDC de déploiement. Le plan de migration des identités et
-les nouveaux rôles custom sont dans
-[`CLOUD_LEAST_PRIVILEGE.md`](./CLOUD_LEAST_PRIVILEGE.md).
+le rôle Blob minimal du principal OIDC de déploiement.
 
 ```bash
-node --test infra/tests/*.test.mjs
+node --test infra/tests/cosmos-indexing-policy.test.mjs \
+  infra/tests/private-networking.test.mjs
 checkov --directory infra --framework bicep --compact --quiet \
   --config-file .checkov.yaml
 ```
@@ -165,8 +164,8 @@ repousser sans changer la clé, et appliquer la procédure de chevauchement déc
    la propagation RBAC, publier, tester alertes et restauration PITR vers un nouveau compte.
 3. **Production** : fenêtre de changement approuvée, preuve du what-if, sauvegarde/PITR vérifiée,
    appliquer l'IaC puis publier ; ne jamais inverser cet ordre.
-4. **Runner CI** : le prévol `infra/ci-runner/lifecycle-preflight.sh` est read-only.
-   Toute mutation reste bloquée jusqu'à séparation des labels et retrait du scale-in CPU.
+4. **Runner CI** : le cycle start/stop reste une opération séparée et autorisée ; aucun script de
+   validation de ce dépôt ne démarre, n'arrête ou ne détruit une VM.
 
 ## Risques de migration
 

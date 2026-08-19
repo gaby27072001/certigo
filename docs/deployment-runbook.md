@@ -12,6 +12,12 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 >
 > Les actions humaines restantes concernent surtout la gouvernance (OIDC Azure AD, environments,
 > branch protection), pas l'édition des workflows runners.
+>
+> **Supersession sécurité (août 2026).** Les recettes historiques T0.1 qui créent des
+> identités ou attribuent `Owner` ne sont plus autorisées pour Certigo. Pour toute opération
+> OIDC/RBAC ou runner, appliquer uniquement
+> [`CLOUD_LEAST_PRIVILEGE.md`](./runbooks/CLOUD_LEAST_PRIVILEGE.md); cette PR n'exécute
+> aucune mutation live.
 
 ---
 
@@ -170,14 +176,16 @@ et la disponibilité du runner self-hosted online avec le label `certigo-trusted
 
 ### Réconciliation des labels runners
 
-Les workflows attendent des labels custom mutuellement exclusifs **`certigo-pr`** ou
-**`certigo-trusted`**, en plus des labels système (`self-hosted`, `Linux`, `X64`).
-L'inventaire du 19 août 2026 montre cependant deux runners VMSS portant **les deux**
-labels : c'est un finding bloquant avant toute automation de cycle de vie.
+Les deux runners existants (`vm-certigo-runner`) portent les labels
+custom mutuellement exclusif **`certigo-pr`** ou **`certigo-trusted`**, en plus
+des labels système
+(`self-hosted`, `Linux`, `X64`).  
+Le label a été ajouté via l'API GitHub :
+`POST /repos/{owner}/{repo}/actions/runners/{id}/labels`.
 
-Les workflows critiques `main` ciblent `certigo-trusted` et les workflows PR ciblent
-`certigo-pr`; l'isolation n'est effective qu'après séparation des pools/labels selon
-[`CLOUD_LEAST_PRIVILEGE.md`](./runbooks/CLOUD_LEAST_PRIVILEGE.md).
+Conséquence : les workflows critiques `main` ciblent `certigo-trusted` et les workflows PR
+ciblent `certigo-pr`, ce qui isole la confiance sans éditer les YAML à chaque
+ajustement.
 
 ### Sélection immuable des runners
 
@@ -225,38 +233,33 @@ az account show -o table
 
 **Acteur : admin Azure AD + admin du repo GitHub.**
 
-> ✅ **État historique inventorié en lecture seule.** L'identité OIDC existe :
+> ✅ **Déjà réalisé dans ce tenant (session Phase 0).** L'identité OIDC existe déjà :
 > app registration **`microlingo-github-actions`** (`appId 4bfc43dc-6a25-404e-a6ab-d19784ab0673`,
 > SP objectId `15d2b34a-c0a0-4b5d-8360-b895a8164706`). La configuration
-> `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` fonctionne encore,
-> mais ce principal porte historiquement `Contributor` + `User Access Administrator`
-> au scope abonnement. Il possède aussi les rôles Blob minimaux aux scopes exacts.
-> Les cinq federated credentials couvrent `main`, un sujet `workflow_dispatch`, puis
-> `dev`, `staging` et `prod`.
->
-> Cet état est conservé uniquement pour rollback pendant la migration. La cible, les preuves
-> requises et l'ordre de retrait sont dans
-> [`docs/runbooks/CLOUD_LEAST_PRIVILEGE.md`](./runbooks/CLOUD_LEAST_PRIVILEGE.md).
+> `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` est déjà
+> opérationnelle aux scopes GitHub existants, et
+> les 3 federated credentials `github-env-dev` / `github-env-staging` / `github-env-prod`
+> (sujet `repo:…:environment:<env>`) ont été **ajoutées cette session**. Les valeurs
+> `AZURE_*` sont déjà consommées par les déploiements ; leur scope ne doit pas être
+> recréé ou déplacé sans audit. Les commandes ci-dessous
+> sont la **recette de référence/reproduction** (par ex. pour un nouveau tenant) — ne pas
+> recréer une seconde app `microlingo-github-oidc` sous peine de doublon. Pour réutiliser
+> l'existant, faire `APP_ID=4bfc43dc-6a25-404e-a6ab-d19784ab0673`.
 
-### Pourquoi ni Owner, ni UAA abonnement pour la CI ?
+### Pourquoi Owner (et pas Contributor) ?
 
-Les attributions runtime exigent `Microsoft.Authorization/roleAssignments/write`, mais cela
-ne justifie pas un rôle administrateur global. `infra/governance/main.bicep` sépare :
-
-- le lancement de deployment au scope abonnement, sans droit métier ;
-- `Contributor` au seul RG de l'environnement ;
-- un writer RBAC sans `delete`, conditionné aux rôles runtime allow-listés et aux
-  service principals ;
-- un rôle réseau limité au DNS privé et aux peerings dans `rg-certigo-ci`.
-
-Les contrôles MCSB/Defender et toute administration d'attributions restent humains via PIM.
+`infra/modules/functionApp.bicep` crée **4 attributions de rôle** (Storage Blob Data Owner,
+Storage Queue Data Contributor, Key Vault Secrets User, Cosmos SQL Data Contributor). Créer des
+role assignments requiert la permission `Microsoft.Authorization/roleAssignments/write`, incluse
+dans **Owner** (mais **pas** dans Contributor). L'identité de déploiement doit donc être **Owner**
+au scope souscription, sinon `deploy-infra` échoue.
 
 ### Sujets OIDC
 
-Comme les jobs portent `environment: <env>`, le **sujet** du token OIDC émis par GitHub
-devient `repo:<org>/<repo>:environment:<env>`. La cible utilise **une UAMI et une seule
-federated credential par environnement**. Aucun sujet `main`, `workflow_dispatch` ou PR
-supplémentaire n'est nécessaire : la branch policy de l'Environment borne déjà `main`.
+Comme les jobs portent désormais `environment: <env>`, le **sujet** du token OIDC émis par GitHub
+devient `repo:<org>/<repo>:environment:<env>`. On crée donc **une federated credential par
+environnement** (dev/staging/prod). Une FC supplémentaire pour `push` sur `main` est optionnelle
+(le push déclenche l'environnement `dev`, déjà couvert par la FC `dev`).
 
 ### Secret de signature JWT par environnement
 
