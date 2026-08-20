@@ -71,6 +71,9 @@ La reconstruction n'utilise ni image mutable implicite, ni jeton dans l'IaC :
 - `imageVersion` est obligatoire et doit être une version Marketplace exacte ;
 - les tags et sorties Azure enregistrent la version d'image et le SHA-256 du bootstrap
   réellement incorporé ;
+- les tags supplémentaires sont conservés, puis le contrat canonique
+  `owner/product/env/managedBy/costCenter` de `infra/finops/scopes.json` prévaut
+  sur toute collision avec des valeurs CI non personnelles ;
 - Ubuntu 24.04, Trusted Launch, Secure Boot, vTPM et un disque Premium de 128 Gio sont
   déclarés ;
 - `allowExtensionOperations: false` interdit l'installation d'extensions VM ; le bootstrap
@@ -165,5 +168,5 @@ Les fausses différences réglables (`ddosSettings` héritée du VNet sur l'IP p
 `privateEndpointVNetPolicies` sur le réseau virtuel) ont déjà été **explicitées** dans le
 modèle : le réseau virtuel et le NSG ressortent donc en **« aucun changement »**.
 
-La compilation des deux modèles, la syntaxe Bash et les tests du probe sont vérifiés par
-`ci-infra`.
+La compilation des deux modèles, le contrat de tags, la syntaxe Bash et les tests du probe
+sont vérifiés par `infra/validate.sh` et la gate `ci-infra`.

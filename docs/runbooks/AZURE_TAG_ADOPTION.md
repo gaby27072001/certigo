@@ -18,11 +18,12 @@ doit exposer cinq valeurs non vides :
 | `costCenter` | identifiant d'allocation non personnel, par exemple `engineering` |
 
 `infra/finops/scopes.json`, fusionné avec #301, reste la source canonique des clés
-et des environnements couverts. Les templates runner déclarent séparément les
-valeurs CI non personnelles ; chaque valeur obligatoire est un paramètre Bicep
-distinct, donc aucun appelant ne peut remplacer le contrat par un objet partiel.
-Les templates effectuent une fusion additive : les tags supplémentaires sont
-conservés et, en cas de collision, le contrat obligatoire prévaut :
+et des environnements couverts. Les templates applicatifs et runner déclarent des
+valeurs non personnelles ; chaque valeur obligatoire est un paramètre Bicep
+distinct ou, pour l'application, réutilise le paramètre `env` existant. Aucun
+appelant ne peut remplacer le contrat par un objet partiel. Les templates
+effectuent une fusion additive : les tags supplémentaires sont conservés et, en
+cas de collision, le contrat obligatoire prévaut :
 
 ```bicep
 var effectiveTags = union(existingTags, requiredTags)
@@ -32,28 +33,18 @@ Les valeurs restent des paramètres des templates consommateurs. Elles ne doiven
 contenir ni adresse personnelle, ni nom de personne, ni valeur temporaire telle
 que `TBD`, `unknown`, `none` ou `n/a`.
 
-## Périmètre et ordre d'intégration
+## Périmètre intégré
 
-La PR de normalisation doit rester isolée des brouillons qui modifient déjà les
-points de composition :
+Après intégration de #302, `infra/main.bicep`, `network.bicep` et `runner.bicep`
+appliquent le contrat sans modifier les noms, SKU, réseaux, identités ou
+attributions RBAC. Les modules applicatifs reçoivent l'objet fusionné. Les
+ressources du hub partagées dans `rg-certigo-ci` conservent `env=ci`, même
+lorsqu'elles sont composées depuis staging ou production.
 
-1. #301 fournit désormais le contrat et le validateur FinOps en lecture seule ;
-2. stabiliser #290 pour le stockage de contenu et #302 pour le moindre privilège
-   (#296 et #303 sont déjà intégrés) ;
-3. rebaser la PR de tags, puis résoudre uniquement les ajouts de paramètres ;
-4. appliquer `union(existingTags, requiredTags)` dans `infra/main.bicep` avec
-   `env` déjà existant et des paramètres non personnels pour `owner`, `product`,
-   `managedBy` et `costCenter` ;
-5. transmettre l'objet résultant aux modules applicatifs existants sans modifier
-   leurs noms, SKU, réseau, identités ou attributions RBAC ;
-6. appliquer le même contrat au point de composition de #290, sans ajouter de
-   `tags` aux sous-ressources qui ne les prennent pas en charge ;
-7. ajouter le test `infra/tests/azure-tag-contract.test.mjs` à `ci-infra.yml`
-   seulement après consolidation des quatre PR qui modifient déjà ce workflow.
-
-Les templates runner `network.bicep` et `runner.bicep` appliquent déjà ce contrat.
-Les sous-réseaux, associations, diagnostics, attributions de rôles et autres
-types sans propriété `tags` restent inchangés.
+Les groupes de ressources restent `existing` dans le déploiement applicatif :
+leurs tags relèvent du bootstrap administrateur, pas de l'identité de déploiement
+au moindre privilège. Les sous-réseaux, associations, diagnostics, attributions
+de rôles et autres types sans propriété `tags` restent inchangés.
 
 Le disque OS est créé implicitement par la VM et son nom live n'est pas déclaré
 dans le template actuel. Il reste hors de cette première adoption : inventer ou
@@ -66,12 +57,16 @@ existant, sans redéclarer ni renommer le disque.
 Depuis la racine, avec les versions épinglées par la CI :
 
 ```bash
-BICEP_BIN=bicep CHECKOV_BIN=checkov bash infra/validate-tags.sh
+BICEP_BIN=bicep bash infra/validate.sh
+checkov --directory infra --framework bicep --compact --quiet \
+  --config-file .checkov.yaml
 ```
 
-Le validateur compile les deux templates runner, vérifie la présence des cinq
-tags, la conservation des tags de provenance et les invariants de nom/SKU, puis
-exécute Checkov sur `infra`. Il ne contacte pas Azure.
+Le validateur principal compile les templates et paramètres, puis vérifie la
+présence des cinq tags dans les compositions applicative et runner, la
+conservation des tags de provenance et les invariants de nom/SKU/RBAC. La gate
+de sécurité exécute Checkov séparément sur `infra`. Aucun de ces contrôles ne
+contacte Azure.
 
 ## Adoption live ultérieure
 
