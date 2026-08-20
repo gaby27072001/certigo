@@ -161,7 +161,7 @@ noms sont référencés dans le code.
 
 | Valeur | Secret Key Vault | Repli variable GitHub | Format / exemple |
 |---|---|---|---|
-| URL de base API | `mobile-app-api-base-url` | `vars.MOBILE_API_BASE_URL` | `https://api.certigo.app/api` ou `https://func-certigo-prod-<suffixe Bicep>.azurewebsites.net/api` |
+| URL de base API | `mobile-app-api-base-url` | `vars.MOBILE_API_BASE_URL` | `https://func-certigo-prod-izfhvvxjdxc2k.azurewebsites.net/api` |
 | Entra client ID | `mobile-entra-client-id` | `vars.MOBILE_ENTRA_CLIENT_ID` | GUID App Registration mobile |
 | Entra authority | `mobile-entra-authority` | `vars.MOBILE_ENTRA_AUTHORITY` | `https://<tenant-guid>.ciamlogin.com/<tenant-guid>/v2.0` |
 | Entra API scope | `mobile-entra-api-scope` | `vars.MOBILE_ENTRA_API_SCOPE` | `api://<backend-client-id>/user_impersonation` |

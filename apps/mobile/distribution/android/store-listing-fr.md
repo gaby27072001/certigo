@@ -9,7 +9,7 @@
 | Nom de l'application | **Certigo** |
 | applicationId / package | `com.certigo.mobileapp` ⚠️ NON modifiable après le 1er upload |
 | Catégorie | Éducation |
-| Adresse e-mail de contact | TODO (ex : `support@certigo.app`) |
+| Adresse e-mail de contact | `gabriel.chambaud@icloud.com` |
 | Site web | `https://gchambaud_microsoft.github.io/Certigo/` |
 | Politique de confidentialité (URL) | `https://gchambaud_microsoft.github.io/Certigo/privacy-policy/` |
 | Suppression du compte (URL) | `https://gchambaud_microsoft.github.io/Certigo/account-deletion/` |
@@ -39,7 +39,9 @@ XP, niveaux, streak quotidien, badges de progression — sans cœurs ni vies. Vo
 ⚠️ Certigo est une plateforme indépendante, non affiliée ni approuvée par Microsoft, Amazon, Cisco, CompTIA ou tout autre organisme de certification. Toutes les leçons et questions sont originales.
 
 ## Conformité (à vérifier dans la console Play)
-- **Politique de confidentialité** : URL publique en place via GitHub Pages (`/privacy-policy/`). Migration ultérieure possible vers `https://certigo.app/privacy-policy/` en conservant le même chemin.
+- **Politique de confidentialité** : URL publique canonique sur GitHub Pages
+  (`https://gchambaud_microsoft.github.io/Certigo/privacy-policy/`). Ne pas la
+  remplacer par un domaine personnalisé non contrôlé.
 - **Section "Sécurité des données"** : déclarer au minimum les informations de
   compte (e-mail pour le mode e-mail, identifiant utilisateur, nom/pseudo),
   l’activité dans l’application (progression, réponses, scores), les relations

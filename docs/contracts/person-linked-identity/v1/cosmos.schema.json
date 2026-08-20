@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://certigo.app/contracts/person-linked-identity/v1/cosmos.schema.json",
+  "$id": "urn:certigo:contract:person-linked-identity:cosmos:v1",
   "title": "Certigo Person and LinkedIdentity Cosmos documents",
   "version": "1.0.0",
   "x-certigo-reconciled-main": {
