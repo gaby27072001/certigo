@@ -71,17 +71,20 @@ Every resource group and taggable resource in the four scopes must expose:
 | `costCenter` | Non-empty allocation identifier |
 
 Azure resource-group tags are not inherited automatically by child resources.
-The read-only verifier therefore checks both the group and resources:
+The application and historical CI runner templates now merge caller-provided
+tags with the five mandatory values, with the canonical contract taking
+precedence on collisions. Shared hub resources keep `env=ci` because they live
+in `rg-certigo-ci`, including when a staging or production composition references
+them. The read-only verifier checks both the group and resources:
 
 ```powershell
 node infra/finops/verify-tags.mjs --subscription <subscription-id>
 ```
 
 The command uses only `az group show` and `az resource list`; it does not set the
-active subscription and performs no write. Adoption of this contract in the
-shared application templates and CI runner templates is intentionally deferred
-to their owning workstreams to avoid duplicate edits. Until those templates
-consume all five tags, the verifier is expected to report the exact gaps.
+active subscription and performs no write. Resource-group tags remain an
+admin/bootstrap concern because the steady-state application deployment treats
+those groups as existing and has no resource-group write permission.
 
 ## Retention without risky deletion
 
