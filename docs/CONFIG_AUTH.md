@@ -27,7 +27,7 @@ Au démarrage, `bootstrap()` appelle `AppEnv.validate()` :
 | Variable | Rôle | Requis | Exemple valide | Invalide → symptôme |
 |---|---|---|---|---|
 | `CERTIGO_ENV` | Flavor de build | Non (défaut `dev`) | `prod` | valeur inconnue → traité comme `dev` (analytics off) |
-| `API_BASE_URL` | Base de l'API backend | **Oui** (tous flavors) | `https://api.certigo.app/api` | vide → login e-mail « Pas de connexion » ; URL **dev** en prod → **erreur bloquante** ; `http://` en prod → erreur |
+| `API_BASE_URL` | Base de l'API backend | **Oui** (tous flavors) | `https://func-certigo-prod-izfhvvxjdxc2k.azurewebsites.net/api` | vide → login e-mail « Pas de connexion » ; URL **dev** en prod → **erreur bloquante** ; `http://` en prod → erreur |
 | `ENTRA_CLIENT_ID` | Client id app reg Entra | **Oui en prod/staging** (sauf `ENTRA_OPTIONAL`) | `00000000-0000-0000-0000-000000000000` | vide en prod → **erreur** (social désactivé) ; renseigné sans autorité → **erreur** (config partielle) |
 | `ENTRA_AUTHORITY` | Autorité CIAM | **Oui en prod/staging** | `https://tenant.ciamlogin.com/<tid>/v2.0` | vide alors que client id présent → **erreur** |
 | `ENTRA_REDIRECT_URI` | URI de redirection OIDC | Défaut `certigo://auth/` | `certigo://auth/` | schéma ≠ `certigo` → **erreur** (callback ne revient jamais) |

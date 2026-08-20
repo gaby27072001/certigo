@@ -4,7 +4,7 @@ import test from 'node:test';
 import { validateMobileReleaseConfig } from './validate-mobile-release-config.mjs';
 
 const validConfig = {
-  apiBaseUrl: 'https://func-certigo-prod-bk3j5ja6vw23s.azurewebsites.net/api',
+  apiBaseUrl: 'https://func-certigo-prod-izfhvvxjdxc2k.azurewebsites.net/api',
   entraClientId: '11111111-1111-4111-8111-111111111111',
   entraAuthority:
     'https://22222222-2222-4222-8222-222222222222.ciamlogin.com/22222222-2222-4222-8222-222222222222/v2.0',
@@ -61,6 +61,17 @@ test('rejects an arbitrary HTTPS API host', () => {
   const errors = validateMobileReleaseConfig({
     ...validConfig,
     apiBaseUrl: 'https://api.example.org/api',
+  });
+
+  assert.deepEqual(errors, [
+    'MOBILE_API_BASE_URL must identify the production Certigo backend.',
+  ]);
+});
+
+test('rejects the uncontrolled legacy vanity host', () => {
+  const errors = validateMobileReleaseConfig({
+    ...validConfig,
+    apiBaseUrl: `https://api.${'certigo' + '.app'}/api`,
   });
 
   assert.deepEqual(errors, [

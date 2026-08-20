@@ -3,7 +3,7 @@
 /// Never hard-code endpoints or client ids. Build flavors pass values:
 /// ```
 /// flutter run --dart-define=CERTIGO_ENV=dev \
-///   --dart-define=API_BASE_URL=https://dev.api.certigo.app \
+///   --dart-define=API_BASE_URL=https://api.example.invalid \
 ///   --dart-define=ENTRA_CLIENT_ID=... --dart-define=ENTRA_AUTHORITY=...
 /// ```
 enum AppFlavor { dev, staging, prod }

@@ -96,7 +96,7 @@ void main() {
     // Config prod complète et valide : sert de base à muter par cas.
     AppConfigReport validate({
       AppFlavor flavor = AppFlavor.prod,
-      String apiBaseUrl = 'https://api.certigo.app/api',
+      String apiBaseUrl = 'https://api.example.invalid/api',
       String entraClientId = 'client-123',
       String entraAuthority = 'https://tenant.ciamlogin.com/tid/v2.0',
       String entraRedirectUri = 'certigo://auth/',
@@ -148,7 +148,7 @@ void main() {
     });
 
     test('prod avec API en HTTP (non https) → erreur bloquante', () {
-      final AppConfigReport r = validate(apiBaseUrl: 'http://api.certigo.app/api');
+      final AppConfigReport r = validate(apiBaseUrl: 'http://api.example.invalid/api');
       expect(hasError(r, 'API_BASE_URL'), isTrue);
     });
 

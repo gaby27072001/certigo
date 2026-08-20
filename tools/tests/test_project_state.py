@@ -184,6 +184,27 @@ class ProjectStateTests(unittest.TestCase):
         self.assertEqual(self.fixture.git("rev-parse", "HEAD"), first.reference_commit)
         self.assertEqual(project_state.render(first), project_state.render(second))
 
+    def test_uncontrolled_domain_references_are_rejected(self) -> None:
+        domain = "certigo" + ".app"
+        self.fixture.write(
+            "docs/unsafe-domain.md",
+            f"https://api.{domain}/api\nsupport@{domain}\n",
+        )
+
+        with self.assertRaisesRegex(
+            project_state.ProjectStateError,
+            r"unsafe-domain\.md:1.*unsafe-domain\.md:2",
+        ):
+            project_state.validate_forbidden_domain_references(self.root)
+
+    def test_namespaces_and_historical_protocol_ids_are_not_domains(self) -> None:
+        self.fixture.write(
+            "docs/safe-identifiers.md",
+            "Certigo.Application\ncertigo.app-certification-catalog/v2\n",
+        )
+
+        project_state.validate_forbidden_domain_references(self.root)
+
     def test_observable_hash_normalizes_declared_lf_text(self) -> None:
         source = self.root / ".github/workflows/ci-mobile.yml"
         original = source.read_bytes().replace(b"\r\n", b"\n")
