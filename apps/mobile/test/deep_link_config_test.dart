@@ -49,7 +49,6 @@ void main() {
     final String manifest = resolve('android/app/src/main/AndroidManifest.xml').readAsStringSync();
 
     expect(gradle, contains('"links-disabled.invalid"'));
-    expect(gradle, contains('normalizedAppLinksHost == "certigo.app"'));
     expect(gradle, contains('appLinksHost: appLinksHost'));
     expect(gradle, contains('appLinksPathPrefix: appLinksPathPrefix'));
     expect(manifest, contains('android:autoVerify="true"'));

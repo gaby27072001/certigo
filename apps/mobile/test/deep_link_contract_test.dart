@@ -127,18 +127,6 @@ void main() {
       );
     });
 
-    test('rejects the uncontrolled domain even when explicitly configured', () {
-      const DeepLinkPolicy uncontrolledPolicy = DeepLinkPolicy(
-        enabled: true,
-        primaryHost: 'certigo.app',
-      );
-
-      expect(
-        uncontrolledPolicy.parse('https://certigo.app/assignments/a').rejection,
-        DeepLinkRejection.unconfiguredHost,
-      );
-    });
-
     test('rejects the inert placeholder even when the feature flag is enabled', () {
       const DeepLinkPolicy inertPolicy = DeepLinkPolicy(
         enabled: true,

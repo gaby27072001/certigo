@@ -97,17 +97,15 @@ class GenerateLinkAssociationsTests(unittest.TestCase):
                 android_fingerprints=[fingerprint()],
             )
 
-    def test_rejects_uncontrolled_or_inert_domains(self) -> None:
-        for domain in ("certigo.app", "links.certigo.app", "links-disabled.invalid"):
-            with self.subTest(domain=domain):
-                with self.assertRaisesRegex(ValueError, "uncontrolled|confirmed"):
-                    generator.write_associations(
-                        output_dir=Path("."),
-                        confirmed_domain=domain,
-                        apple_team_id="ABCDEFGHIJ",
-                        bundle_id="com.certigo.mobileapp",
-                        android_fingerprints=[fingerprint()],
-                    )
+    def test_rejects_inert_domain(self) -> None:
+        with self.assertRaisesRegex(ValueError, "confirmed"):
+            generator.write_associations(
+                output_dir=Path("."),
+                confirmed_domain="links-disabled.invalid",
+                apple_team_id="ABCDEFGHIJ",
+                bundle_id="com.certigo.mobileapp",
+                android_fingerprints=[fingerprint()],
+            )
 
 
 if __name__ == "__main__":

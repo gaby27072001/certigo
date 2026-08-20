@@ -16,7 +16,6 @@ DOMAIN_PATTERN = re.compile(
     r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
 )
 FINGERPRINT_PATTERN = re.compile(r"^(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$")
-UNCONTROLLED_DOMAIN = "certigo.app"
 
 
 def validate_team_id(value: str) -> str:
@@ -40,8 +39,6 @@ def validate_domain(value: str) -> str:
 
 def validate_confirmed_domain(value: str) -> str:
     normalized = validate_domain(value)
-    if normalized == UNCONTROLLED_DOMAIN or normalized.endswith(f".{UNCONTROLLED_DOMAIN}"):
-        raise ValueError("The uncontrolled certigo.app domain must not be used.")
     if normalized.endswith(".invalid"):
         raise ValueError("A confirmed domain must not use the inert .invalid suffix.")
     return normalized

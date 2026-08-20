@@ -11,8 +11,6 @@ const String certigoConfiguredLinkHost = String.fromEnvironment(
   'CERTIGO_HTTPS_LINKS_HOST',
   defaultValue: 'links-disabled.invalid',
 );
-const String _uncontrolledLinkDomain = 'certigo.app';
-
 final RegExp _identifierPattern = RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$');
 
 enum DeepLinkKind { lesson, assignment, achievement, accountDeletion }
@@ -231,9 +229,7 @@ bool _isValidIdentifier(String value) => _identifierPattern.hasMatch(value);
 
 bool _isConfirmedLinkHost(String value) {
   final String host = value.toLowerCase();
-  return !host.endsWith('.invalid') &&
-      host != _uncontrolledLinkDomain &&
-      !host.endsWith('.$_uncontrolledLinkDomain');
+  return !host.endsWith('.invalid');
 }
 
 bool _hasExplicitPort(String rawUrl) {

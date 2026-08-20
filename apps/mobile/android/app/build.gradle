@@ -19,10 +19,6 @@ def appLinksHost = project.findProperty("CERTIGO_APP_LINKS_HOST") ?: "links-disa
 if (!(appLinksHost ==~ /^[A-Za-z0-9.-]+$/)) {
     throw new GradleException("CERTIGO_APP_LINKS_HOST must be a hostname without scheme or path.")
 }
-def normalizedAppLinksHost = appLinksHost.toLowerCase()
-if (normalizedAppLinksHost == "certigo.app" || normalizedAppLinksHost.endsWith(".certigo.app")) {
-    throw new GradleException("CERTIGO_APP_LINKS_HOST must not use the uncontrolled certigo.app domain.")
-}
 def appLinksPathPrefix = project.findProperty("CERTIGO_APP_LINKS_PATH_PREFIX") ?: ""
 if (!(appLinksPathPrefix == "" ||
         appLinksPathPrefix ==~ /^\/[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)*$/)) {
