@@ -97,7 +97,9 @@ Checkov 3.2.495 reste une verification complementaire, pas la preuve principale
 sur ce module. Son parseur Bicep ne comprend pas plusieurs expressions utilisees
 par le depot : le scan de #303 retourne 31 checks passes, aucun echec et
 7 `Parsing errors`. Le meme scan sur la combinaison #303 + #296 retourne
-35 checks passes, aucun echec et toujours 7 `Parsing errors`.
+35 checks passes, aucun echec et toujours 7 `Parsing errors`. Apres alignement
+sur le `main` incluant egalement #301, la combinaison courante retourne
+37 checks passes, aucun echec et toujours 7 `Parsing errors`.
 
 ```bash
 checkov --directory infra --framework bicep --compact --quiet \
