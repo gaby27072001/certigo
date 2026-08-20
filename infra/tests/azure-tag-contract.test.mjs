@@ -18,6 +18,7 @@ const expectedRequiredTags = {
   costCenter: 'engineering',
 };
 const requiredTagKeys = Object.keys(expectedRequiredTags);
+const placeholderValues = new Set(['n/a', 'none', 'tbd', 'unknown']);
 const tagParameterNames = {
   owner: 'tagOwner',
   product: 'tagProduct',
@@ -88,21 +89,22 @@ function assertRequiredTags(template) {
   );
 }
 
-test('shared contract defines the five FinOps tags and non-personal CI defaults', () => {
+test('runner defaults implement the canonical FinOps contract without personal values', () => {
   const contract = JSON.parse(
     readFileSync(
-      path.join(repositoryRoot, 'infra', 'shared', 'tag-contract.json'),
+      path.join(repositoryRoot, 'infra', 'finops', 'scopes.json'),
       'utf8',
     ),
   );
 
   assert.deepEqual(contract.requiredTagKeys, requiredTagKeys);
-  assert.deepEqual(contract.defaults.ci, expectedRequiredTags);
-  assert.ok(Object.values(contract.defaults.ci).every((value) => value.trim() !== ''));
-  assert.ok(Object.values(contract.defaults.ci).every((value) => !value.includes('@')));
+  assert.ok(contract.scopes.some((scope) => scope.environment === 'ci'));
   assert.ok(
-    Object.values(contract.defaults.ci).every(
-      (value) => !contract.placeholderValues.includes(value.toLowerCase()),
+    Object.values(expectedRequiredTags).every((value) => value.trim() !== ''),
+  );
+  assert.ok(
+    Object.values(expectedRequiredTags).every(
+      (value) => !value.includes('@') && !placeholderValues.has(value.toLowerCase()),
     ),
   );
 });

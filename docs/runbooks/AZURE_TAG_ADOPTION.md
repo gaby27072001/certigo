@@ -17,9 +17,10 @@ doit exposer cinq valeurs non vides :
 | `managedBy` | `bicep` |
 | `costCenter` | identifiant d'allocation non personnel, par exemple `engineering` |
 
-`infra/shared/tag-contract.json` centralise les clés, les valeurs CI par défaut et
-les valeurs temporaires interdites. Chaque valeur obligatoire est un paramètre
-Bicep distinct ; aucun appelant ne peut remplacer le contrat par un objet partiel.
+`infra/finops/scopes.json`, fusionné avec #301, reste la source canonique des clés
+et des environnements couverts. Les templates runner déclarent séparément les
+valeurs CI non personnelles ; chaque valeur obligatoire est un paramètre Bicep
+distinct, donc aucun appelant ne peut remplacer le contrat par un objet partiel.
 Les templates effectuent une fusion additive : les tags supplémentaires sont
 conservés et, en cas de collision, le contrat obligatoire prévaut :
 
@@ -36,9 +37,9 @@ que `TBD`, `unknown`, `none` ou `n/a`.
 La PR de normalisation doit rester isolée des brouillons qui modifient déjà les
 points de composition :
 
-1. intégrer d'abord #301, source du contrat et du validateur FinOps en lecture seule ;
-2. stabiliser #290 pour le stockage de contenu, #296 pour la Function App, #302
-   pour le moindre privilège et #303 pour l'observabilité ;
+1. #301 fournit désormais le contrat et le validateur FinOps en lecture seule ;
+2. stabiliser #290 pour le stockage de contenu, #302 pour le moindre privilège
+   et #303 pour l'observabilité (#296 est déjà intégré) ;
 3. rebaser la PR de tags, puis résoudre uniquement les ajouts de paramètres ;
 4. appliquer `union(existingTags, requiredTags)` dans `infra/main.bicep` avec
    `env` déjà existant et des paramètres non personnels pour `owner`, `product`,
@@ -50,7 +51,7 @@ points de composition :
 7. ajouter le test `infra/tests/azure-tag-contract.test.mjs` à `ci-infra.yml`
    seulement après consolidation des quatre PR qui modifient déjà ce workflow.
 
-Les templates runner `network.bicep` et `runner.bicep` consomment déjà le helper.
+Les templates runner `network.bicep` et `runner.bicep` appliquent déjà ce contrat.
 Les sous-réseaux, associations, diagnostics, attributions de rôles et autres
 types sans propriété `tags` restent inchangés.
 
