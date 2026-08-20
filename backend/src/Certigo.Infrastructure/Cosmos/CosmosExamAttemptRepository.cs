@@ -56,12 +56,24 @@ public sealed class CosmosExamAttemptRepository(CosmosContext context) : IExamAt
 
     public async Task CreateAsync(ExamAttemptRecord attempt, CancellationToken cancellationToken = default)
     {
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            attempt.UserId,
+            cancellationToken);
+        await writeLease.MarkMutationDispatchedAsync();
         try
         {
-            await context.Attempts.CreateItemAsync(attempt, new PartitionKey(attempt.UserId), cancellationToken: cancellationToken);
+            var response = await context.Attempts.CreateItemAsync(
+                attempt,
+                new PartitionKey(attempt.UserId),
+                cancellationToken: cancellationToken);
+            await writeLease.CommitAsync(
+                CosmosContainers.Attempts,
+                response.Headers.Session,
+                cancellationToken);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
         {
+            writeLease.MarkDefinitelyNotCommitted();
             throw new DuplicateRecordException($"Exam attempt '{attempt.Id}' already exists.");
         }
     }

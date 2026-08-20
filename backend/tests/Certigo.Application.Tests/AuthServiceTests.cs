@@ -85,6 +85,20 @@ internal sealed class InMemoryUserCredentialRepository : IUserCredentialReposito
         }
     }
 
+    public void RemoveByUserId(string userId)
+    {
+        lock (_gate)
+        {
+            foreach (var id in _store.Values
+                         .Where(record => record.UserId == userId)
+                         .Select(record => record.Id)
+                         .ToArray())
+            {
+                _store.Remove(id);
+            }
+        }
+    }
+
     private string NextETag() => $"\"{Interlocked.Increment(ref _version)}\"";
 }
 
@@ -198,7 +212,11 @@ internal sealed class FakePasswordHasher : IPasswordHasher
 
 internal sealed class FakeTokenIssuer : ITokenIssuer
 {
-    public IssuedTokens Issue(string userId, string displayName, string email)
+    public IssuedTokens Issue(
+        string userId,
+        string displayName,
+        string email,
+        DateTimeOffset? authenticatedAt = null)
         => new($"access:{userId}", $"refresh:{userId}|{displayName}|{email}", DateTimeOffset.UtcNow.AddDays(1));
 
     public RefreshTokenPrincipal? ValidateRefreshToken(string refreshToken)
@@ -209,7 +227,11 @@ internal sealed class FakeTokenIssuer : ITokenIssuer
         }
 
         var parts = refreshToken["refresh:".Length..].Split('|');
-        return new RefreshTokenPrincipal(parts[0], parts.ElementAtOrDefault(1) ?? string.Empty, parts.ElementAtOrDefault(2) ?? string.Empty);
+        return new RefreshTokenPrincipal(
+            parts[0],
+            parts.ElementAtOrDefault(1) ?? string.Empty,
+            parts.ElementAtOrDefault(2) ?? string.Empty,
+            DateTimeOffset.UtcNow);
     }
 }
 
@@ -740,6 +762,19 @@ public sealed class AuthServiceTests
         var (service, _, _) = Build();
 
         var act = async () => await service.RefreshAsync(new RefreshTokenRequest("garbage"));
+
+        await act.Should().ThrowAsync<AuthFailedException>().WithMessage("*Session expirée*");
+    }
+
+    [Fact]
+    public async Task Refresh_rejects_a_previously_issued_token_after_credentials_are_deleted()
+    {
+        var (service, _, credentials) = Build();
+        var registered = await service.RegisterAsync(
+            new RegisterRequest("deleted@example.com", "password123", "Deleted"));
+        credentials.RemoveByUserId(registered.Profile.Id);
+
+        var act = () => service.RefreshAsync(new RefreshTokenRequest(registered.RefreshToken));
 
         await act.Should().ThrowAsync<AuthFailedException>().WithMessage("*Session expirée*");
     }

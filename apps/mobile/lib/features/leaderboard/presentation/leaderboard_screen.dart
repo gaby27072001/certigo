@@ -37,10 +37,8 @@ class _LeagueContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final PrismColorScheme p = context.prism;
-    final TextTheme t = Theme.of(context).textTheme;
-    final Color tierColor = _tierColor(p, league.tier);
     final int promote = league.promoteCount;
+    final PrismColorScheme p = context.prism;
 
     return CustomScrollView(
       slivers: <Widget>[
@@ -52,23 +50,11 @@ class _LeagueContent extends StatelessWidget {
               PrismSpacing.gutter,
               PrismSpacing.xs,
             ),
-            child: Row(
-              children: <Widget>[
-                Icon(Icons.emoji_events_rounded, color: tierColor, size: 28),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(_tierLabel(league.tier), style: t.headlineMedium),
-                      Text(
-                        '${_endsInLabel(league.endsAt)} · top $promote montent',
-                        style: t.bodySmall?.copyWith(color: p.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            child: PrismSectionHeader(
+              title: _tierLabel(league.tier),
+              subtitle: '${_endsInLabel(league.endsAt)} · top $promote montent',
+              icon: Icons.emoji_events_rounded,
+              iconColor: _tierColor(p, league.tier),
             ),
           ),
         ),

@@ -128,7 +128,11 @@ class _ProfileContent extends ConsumerWidget {
         ),
         const SizedBox(height: 24),
 
-        Text('Badges', style: t.titleLarge),
+        const PrismSectionHeader(
+          title: 'Badges',
+          subtitle: 'Tes jalons de progression',
+          icon: Icons.workspace_premium_rounded,
+        ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 12,
@@ -153,19 +157,19 @@ class _ProfileContent extends ConsumerWidget {
         const SizedBox(height: 24),
 
         // Mon compte -----------------------------------------------------
-        Text('Mon compte', style: t.titleLarge),
+        const PrismSectionHeader(title: 'Mon compte', icon: Icons.person_rounded),
         const SizedBox(height: 12),
         AccountSection(me: me),
         const SizedBox(height: 24),
 
         // Apprentissage --------------------------------------------------
-        Text('Apprentissage', style: t.titleLarge),
+        const PrismSectionHeader(title: 'Apprentissage', icon: Icons.school_rounded),
         const SizedBox(height: 12),
         const LearningSection(),
         const SizedBox(height: 24),
 
         // Préférences ----------------------------------------------------
-        Text('Préférences', style: t.titleLarge),
+        const PrismSectionHeader(title: 'Préférences', icon: Icons.tune_rounded),
         const SizedBox(height: 12),
         PrismCard(
           child: Column(
@@ -195,7 +199,7 @@ class _ProfileContent extends ConsumerWidget {
         const SizedBox(height: 24),
 
         // Application ----------------------------------------------------
-        Text('Application', style: t.titleLarge),
+        const PrismSectionHeader(title: 'Application', icon: Icons.info_outline_rounded),
         const SizedBox(height: 12),
         const AppInfoSection(),
 

@@ -60,7 +60,10 @@ class HttpCredentialsGateway implements CredentialsGateway {
   }
 
   @override
-  Future<AuthSession> login({required String email, required String password}) async {
+  Future<AuthSession> login({
+    required String email,
+    required String password,
+  }) async {
     final Result<AuthSession> result = await _client.postJson<AuthSession>(
       '/auth/login',
       <String, dynamic>{'email': email, 'password': password},
@@ -97,11 +100,13 @@ class HttpCredentialsGateway implements CredentialsGateway {
     final Object? profile = json['profile'];
     final String? displayName =
         profile is Map<String, dynamic> ? profile['displayName'] as String? : null;
+    final String? userId = profile is Map<String, dynamic> ? profile['id'] as String? : null;
     final Object? expiryRaw = json['accessTokenExpiresAt'];
     return AuthSession(
       accessToken: (json['accessToken'] as String?) ?? '',
       refreshToken: json['refreshToken'] as String?,
       accessTokenExpiry: expiryRaw is String ? DateTime.tryParse(expiryRaw) : null,
+      userId: userId,
       displayName: displayName,
       email: email,
       provider: AuthProvider.email,
@@ -112,7 +117,9 @@ class HttpCredentialsGateway implements CredentialsGateway {
   AuthSession _unwrap(Result<AuthSession> result) => result.when(
         success: (AuthSession session) => session,
         failure: (Failure f) {
-          final ({String message, AuthFailureCause cause}) described = _describeFor(f);
+          final ({String message, AuthFailureCause cause}) described = _describeFor(
+            f,
+          );
           throw AuthGatewayException(described.message, cause: described.cause);
         },
       );
@@ -153,6 +160,9 @@ class HttpCredentialsGateway implements CredentialsGateway {
           ),
       };
     }
-    return (message: 'Une erreur est survenue. Réessayez.', cause: AuthFailureCause.unknown);
+    return (
+      message: 'Une erreur est survenue. Réessayez.',
+      cause: AuthFailureCause.unknown,
+    );
   }
 }

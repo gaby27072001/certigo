@@ -20,6 +20,9 @@ public sealed class CosmosLearnerModelRepository(CosmosContext context) : ILearn
 
     public async Task UpsertAsync(LearnerModelRecord model, CancellationToken cancellationToken = default)
     {
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            model.UserId,
+            cancellationToken);
         var id = Id(model.TrackId);
         var partitionKey = new PartitionKey(model.UserId);
         for (var attempt = 1; attempt <= 3; attempt++)
@@ -41,16 +44,18 @@ public sealed class CosmosLearnerModelRepository(CosmosContext context) : ILearn
             var document = new LearnerModelDocument(id, model.UserId, model.TrackId, model);
             try
             {
+                ItemResponse<LearnerModelDocument> response;
+                await writeLease.MarkMutationDispatchedAsync();
                 if (existing is null)
                 {
-                    await context.Progress.CreateItemAsync(
+                    response = await context.Progress.CreateItemAsync(
                         document,
                         partitionKey,
                         cancellationToken: cancellationToken);
                 }
                 else
                 {
-                    await context.Progress.ReplaceItemAsync(
+                    response = await context.Progress.ReplaceItemAsync(
                         document,
                         id,
                         partitionKey,
@@ -58,12 +63,16 @@ public sealed class CosmosLearnerModelRepository(CosmosContext context) : ILearn
                         cancellationToken);
                 }
 
+                await writeLease.CommitAsync(
+                    CosmosContainers.Progress,
+                    response.Headers.Session,
+                    cancellationToken);
                 return;
             }
             catch (CosmosException ex) when (
-                attempt < 3
-                && ex.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed)
+                ex.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed)
             {
+                writeLease.MarkDefinitelyNotCommitted();
                 // Re-read a concurrent projection and retain whichever is newer.
             }
         }

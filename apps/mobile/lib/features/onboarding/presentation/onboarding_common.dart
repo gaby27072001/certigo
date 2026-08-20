@@ -30,46 +30,12 @@ abstract class OnboardingRoutes {
   static const String goal = '/onboarding/goal';
   static const String goalReaction = '/onboarding/goal-reaction';
   static const String notifications = '/onboarding/notifications';
-  static const String widget = '/onboarding/widget';
-  static const String widgetReaction = '/onboarding/widget-reaction';
-  static const String promise = '/onboarding/promise';
-  static const String paywall = '/onboarding/paywall';
-  static const String paywallReaction = '/onboarding/paywall-reaction';
-  static const String start = '/onboarding/start';
-  static const String startReaction = '/onboarding/start-reaction';
-  static const String login = '/login';
 
   /// Every location that belongs to the startup flow (i.e. lives *outside* the
   /// app shell). Used by the router redirect to gate entry to the app.
-  static const Set<String> all = <String>{
-    splash,
-    welcome,
-    intro,
-    birthYear,
-    certification,
-    domains,
-    building,
-    attribution,
-    level,
-    levelReaction,
-    reasons,
-    reasonsReaction,
-    routineIntro,
-    goal,
-    goalReaction,
-    notifications,
-    widget,
-    widgetReaction,
-    promise,
-    paywall,
-    paywallReaction,
-    start,
-    startReaction,
-    login,
-  };
+  static const Set<String> all = <String>{splash, welcome, certification};
 
-  static bool isStartup(String location) =>
-      all.contains(location) || location.startsWith('/onboarding');
+  static bool isStartup(String location) => all.contains(location);
 }
 
 /// A mascot paired with a tailed speech bubble — the recurring "the guide asks
@@ -121,119 +87,36 @@ class _MascotPromptState extends State<MascotPrompt> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        AnimatedSlide(
-          offset: _visible ? Offset.zero : const Offset(-0.08, 0),
+        PrismReveal(
+          visible: _visible,
+          from: const Offset(-0.08, 0),
           duration: d,
-          curve: PrismMotion.decelerate,
-          child: AnimatedOpacity(
-            opacity: _visible ? 1 : 0,
-            duration: d,
-            curve: PrismMotion.decelerate,
-            child: MascotAvatar(
-              mascot: widget.mascot,
-              mood: widget.mood,
-              size: widget.size,
-              showBadge: false,
-            ),
+          child: MascotAvatar(
+            mascot: widget.mascot,
+            mood: widget.mood,
+            size: widget.size,
+            showBadge: false,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: AnimatedSlide(
-              offset: _visible ? Offset.zero : const Offset(0.08, 0),
+            child: PrismReveal(
+              visible: _visible,
+              from: const Offset(0.08, 0),
               duration: d,
-              curve: PrismMotion.decelerate,
-              child: AnimatedOpacity(
-                opacity: _visible ? 1 : 0,
-                duration: d,
-                curve: PrismMotion.decelerate,
-                child: SpeechBubble(
-                  tail: SpeechTail.left,
-                  tailAlignment: 0.32,
-                  child: widget.typewriter
-                      ? TypewriterText(widget.message, style: bubbleStyle)
-                      : Text(widget.message, style: bubbleStyle),
-                ),
+              child: SpeechBubble(
+                tail: SpeechTail.left,
+                tailAlignment: 0.32,
+                child: widget.typewriter
+                    ? TypewriterText(widget.message, style: bubbleStyle)
+                    : Text(widget.message, style: bubbleStyle),
               ),
             ),
           ),
         ),
       ],
-    );
-  }
-}
-
-/// A discreet "bientôt" pill flagging a screen whose behaviour is a deliberate
-/// placeholder (paywall / widget / attribution) with no real business logic yet.
-class SoonTag extends StatelessWidget {
-  const SoonTag({super.key, this.label = 'Bientôt'});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final PrismColorScheme p = context.prism;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: p.surfaceAlt,
-        borderRadius: PrismRadii.pillAll,
-        border: Border.all(color: p.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(Icons.schedule_rounded, size: 13, color: p.textSecondary),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: p.textSecondary,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A big, accent-tinted "hero metric" badge — the punchy number a reaction
-/// screen shows off ("≈ N notions", "Readiness X"). Reused across reactions so
-/// the celebratory number always reads the same.
-class MetricBadge extends StatelessWidget {
-  const MetricBadge({super.key, required this.value, required this.label, this.accent});
-
-  final String value;
-  final String label;
-  final Color? accent;
-
-  @override
-  Widget build(BuildContext context) {
-    final PrismColorScheme p = context.prism;
-    final TextTheme t = Theme.of(context).textTheme;
-    final Color a = accent ?? p.primary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
-      decoration: BoxDecoration(
-        color: a.withOpacity(0.10),
-        borderRadius: PrismRadii.cardXxl,
-        border: Border.all(color: a.withOpacity(0.3), width: 1.5),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Text(
-            value,
-            style: t.displayMedium?.copyWith(color: a, fontWeight: FontWeight.w800),
-          ),
-          Text(label, style: t.labelLarge?.copyWith(color: a)),
-        ],
-      ),
     );
   }
 }

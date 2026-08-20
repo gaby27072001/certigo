@@ -39,6 +39,12 @@ public sealed class EmptyCatalogException()
 public sealed class TrackNotFoundException(string trackId)
     : Exception($"Track '{trackId}' was not found in the catalog.");
 
+public sealed class ActiveTrackRequiredException()
+    : Exception("An active certification must be selected before this operation.");
+
+public sealed class ActiveTrackConflictException()
+    : Exception("The active certification changed before this selection could be applied.");
+
 public interface IUserContext
 {
     string UserId { get; }

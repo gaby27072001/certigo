@@ -38,8 +38,8 @@ public sealed class ShareCardService(
         var goalMet = profile.DailyGoalXp > 0 && dailyXp >= profile.DailyGoalXp;
 
         var trackId = string.IsNullOrWhiteSpace(profile.ActiveTrackId)
-            ? ProfileDefaults.DefaultTrackId
-            : profile.ActiveTrackId!;
+            ? throw new ActiveTrackRequiredException()
+            : profile.ActiveTrackId;
         var pathDto = await path.GetPathAsync(trackId, cancellationToken);
 
         var referral = ShareCodec.ReferralCode(profile.Id);
@@ -87,7 +87,8 @@ public sealed class FriendService(
     IClock clock,
     IUserRepository users,
     IFriendRepository friends,
-    IEventRepository events) : IFriendService
+    IEventRepository events,
+    IAccountDeletionAccessGuard accountDeletionGuard) : IFriendService
 {
     public async Task<FriendListDto> ListAsync(CancellationToken cancellationToken = default)
     {
@@ -114,10 +115,20 @@ public sealed class FriendService(
             return await FailAsync("self", cancellationToken);
         }
 
+        if (await accountDeletionGuard.IsBlockedAsync(target.Id, cancellationToken))
+        {
+            return await FailAsync("account_unavailable", cancellationToken);
+        }
+
         var now = clock.UtcNow;
         var existing = await friends.GetAsync(userContext.UserId, target.Id, cancellationToken);
         if (existing is null)
         {
+            if (await accountDeletionGuard.IsBlockedAsync(target.Id, cancellationToken))
+            {
+                return await FailAsync("account_unavailable", cancellationToken);
+            }
+
             await friends.UpsertAsync(new FriendEdge($"{userContext.UserId}:{target.Id}", userContext.UserId, target.Id, now), cancellationToken);
             await friends.UpsertAsync(new FriendEdge($"{target.Id}:{userContext.UserId}", target.Id, userContext.UserId, now), cancellationToken);
             await events.AddAsync(new LearningEvent(Guid.NewGuid().ToString("n"), userContext.UserId, "friend.added", now, new { friendUserId = target.Id }), cancellationToken);

@@ -32,9 +32,13 @@ public sealed class CosmosUserRepository(CosmosContext context) : IUserRepositor
 
     public async Task<UserProfileDto> UpsertAsync(UserProfileDto profile, CancellationToken cancellationToken = default)
     {
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            profile.Id,
+            cancellationToken);
         // Honour the optimistic-concurrency token when present so two concurrent
         // economy mutations (e.g. a quiz submit and a shop purchase) can't clobber
         // each other; a 412 surfaces as a domain-level ConcurrencyConflictException.
+        await writeLease.MarkMutationDispatchedAsync();
         try
         {
             var response = string.IsNullOrEmpty(profile.ETag)
@@ -48,11 +52,16 @@ public sealed class CosmosUserRepository(CosmosContext context) : IUserRepositor
                     new PartitionKey(profile.Id),
                     new ItemRequestOptions { IfMatchEtag = profile.ETag },
                     cancellationToken);
+            await writeLease.CommitAsync(
+                CosmosContainers.Users,
+                response.Headers.Session,
+                cancellationToken);
             return response.Resource;
         }
         catch (CosmosException ex) when (
             ex.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed)
         {
+            writeLease.MarkDefinitelyNotCommitted();
             throw new ConcurrencyConflictException($"User profile '{profile.Id}' was modified concurrently.");
         }
         catch (CosmosException ex) when (
@@ -61,6 +70,7 @@ public sealed class CosmosUserRepository(CosmosContext context) : IUserRepositor
                 or HttpStatusCode.Forbidden
                 or HttpStatusCode.RequestEntityTooLarge)
         {
+            writeLease.MarkDefinitelyNotCommitted();
             throw new DefinitivePersistenceException(
                 $"User profile '{profile.Id}' was rejected before commit.",
                 ex);

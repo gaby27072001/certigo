@@ -14,10 +14,16 @@ import 'package:certigo/features/auth/application/session_store.dart';
 /// Passerelle OIDC factice : aucune dépendance plateforme, comportement
 /// scriptable par test (succès, échec, jeton rafraîchi…).
 class FakeAuthGateway implements AuthGateway {
-  FakeAuthGateway({this.onSignIn, this.onRefresh, this.hangSignIn = false});
+  FakeAuthGateway({
+    this.onSignIn,
+    this.onRefresh,
+    this.onRefreshFuture,
+    this.hangSignIn = false,
+  });
 
   AuthSession Function(AuthProvider provider)? onSignIn;
   AuthSession Function(String refreshToken)? onRefresh;
+  Future<AuthSession> Function(String refreshToken)? onRefreshFuture;
 
   /// Quand `true`, [signIn] renvoie une future qui ne se résout jamais (sert à
   /// tester le filet de sécurité `.timeout()` via `fake_async`).
@@ -25,6 +31,7 @@ class FakeAuthGateway implements AuthGateway {
 
   final List<AuthProvider> signInCalls = <AuthProvider>[];
   final List<String> refreshCalls = <String>[];
+  final List<AuthProvider> reauthenticateCalls = <AuthProvider>[];
   int signOutCalls = 0;
 
   @override
@@ -39,9 +46,19 @@ class FakeAuthGateway implements AuthGateway {
   @override
   Future<AuthSession> refresh(String refreshToken) async {
     refreshCalls.add(refreshToken);
+    final Future<AuthSession> Function(String)? asyncBuilder = onRefreshFuture;
+    if (asyncBuilder != null) return asyncBuilder(refreshToken);
     final AuthSession Function(String)? builder = onRefresh;
     if (builder == null) throw StateError('refresh non câblé');
     return builder(refreshToken);
+  }
+
+  @override
+  Future<AuthSession> reauthenticate(AuthProvider provider) async {
+    reauthenticateCalls.add(provider);
+    final AuthSession Function(AuthProvider)? builder = onSignIn;
+    if (builder == null) throw StateError('reauthenticate non câblé');
+    return builder(provider);
   }
 
   @override
@@ -105,9 +122,12 @@ class FakeCredentialsGateway implements CredentialsGateway {
 
 /// Stockage de session en mémoire (remplace le coffre chiffré sous test).
 class FakeSessionStore implements SessionStore {
-  FakeSessionStore([this._session]);
+  FakeSessionStore([this._session]) : failClear = false;
+
+  FakeSessionStore.failingClear([this._session]) : failClear = true;
 
   AuthSession? _session;
+  final bool failClear;
   int writeCalls = 0;
   int clearCalls = 0;
 
@@ -123,6 +143,7 @@ class FakeSessionStore implements SessionStore {
   @override
   Future<void> clear() async {
     clearCalls++;
+    if (failClear) throw StateError('clear failed');
     _session = null;
   }
 }
@@ -155,6 +176,7 @@ void main() {
     required FakeSessionStore store,
     FakeCredentialsGateway? credentials,
     FakeAuthTelemetry? telemetry,
+    AuthLocalAccountCleanup? localAccountCleanup,
     bool configured = true,
     bool required = true,
   }) {
@@ -165,6 +187,8 @@ void main() {
         sessionStoreProvider.overrideWithValue(store),
         authConfiguredProvider.overrideWithValue(configured),
         authRequiredProvider.overrideWithValue(required),
+        if (localAccountCleanup != null)
+          authLocalAccountCleanupProvider.overrideWithValue(localAccountCleanup),
         if (telemetry != null) authTelemetryProvider.overrideWithValue(telemetry),
       ],
     );
@@ -324,7 +348,15 @@ void main() {
   test('déconnexion → passerelle notifiée, stockage effacé, Unauthenticated', () async {
     final FakeSessionStore store = FakeSessionStore(session());
     final FakeAuthGateway gateway = FakeAuthGateway();
-    final ProviderContainer container = makeContainer(gateway: gateway, store: store);
+    var cleanupCalls = 0;
+    final ProviderContainer container = makeContainer(
+      gateway: gateway,
+      store: store,
+      localAccountCleanup: () async {
+        cleanupCalls++;
+        expect(await store.read(), isNotNull);
+      },
+    );
     container.read(authControllerProvider);
     await settle();
     expect(container.read(authControllerProvider), isA<Authenticated>());
@@ -332,8 +364,72 @@ void main() {
     await container.read(authControllerProvider.notifier).signOut();
 
     expect(container.read(authControllerProvider), isA<Unauthenticated>());
+    expect(
+      (container.read(authControllerProvider) as Unauthenticated).clearLocalAccountData,
+      isTrue,
+    );
     expect(gateway.signOutCalls, 1);
+    expect(cleanupCalls, 1);
     expect(store.clearCalls, 1);
+    expect(await store.read(), isNull);
+  });
+
+  test('déconnexion efface la session même si le nettoyage local échoue', () async {
+    final FakeSessionStore store = FakeSessionStore(session());
+    final ProviderContainer container = makeContainer(
+      gateway: FakeAuthGateway(),
+      store: store,
+      localAccountCleanup: () async => throw StateError('cleanup failed'),
+    );
+    container.read(authControllerProvider);
+    await settle();
+
+    await container.read(authControllerProvider.notifier).signOut();
+
+    final AuthState state = container.read(authControllerProvider);
+    expect(state, isA<Unauthenticated>());
+    expect((state as Unauthenticated).clearLocalAccountData, isTrue);
+    expect(state.message, contains('Déconnexion terminée'));
+    expect(store.clearCalls, 1);
+    expect(await store.read(), isNull);
+  });
+
+  test('déconnexion reste authentifiée si le tombstone de session échoue', () async {
+    final FakeSessionStore store = FakeSessionStore.failingClear(session());
+    final ProviderContainer container = makeContainer(
+      gateway: FakeAuthGateway(),
+      store: store,
+    );
+    container.read(authControllerProvider);
+    await settle();
+
+    await container.read(authControllerProvider.notifier).signOut();
+
+    expect(container.read(authControllerProvider), isA<Authenticated>());
+    expect(store.clearCalls, 1);
+    expect(await store.read(), isNotNull);
+  });
+
+  test('un refresh obsolète ne peut pas ressusciter une session déconnectée', () async {
+    final Completer<AuthSession> refresh = Completer<AuthSession>();
+    final FakeSessionStore store = FakeSessionStore(
+      session(expiry: DateTime.now().subtract(const Duration(minutes: 1))),
+    );
+    final ProviderContainer container = makeContainer(
+      gateway: FakeAuthGateway(onRefreshFuture: (_) => refresh.future),
+      store: store,
+    );
+    container.read(authControllerProvider);
+    await settle();
+
+    await container.read(authControllerProvider.notifier).signOut();
+    refresh.complete(session(accessToken: 'stale-refresh'));
+    await settle();
+    await settle();
+
+    final AuthState state = container.read(authControllerProvider);
+    expect(state, isA<Unauthenticated>());
+    expect((state as Unauthenticated).clearLocalAccountData, isTrue);
     expect(await store.read(), isNull);
   });
 
@@ -391,6 +487,7 @@ void main() {
       final AuthState state = container.read(authControllerProvider);
       expect(state, isA<Unauthenticated>());
       expect((state as Unauthenticated).message, 'Votre session a expiré. Reconnectez-vous.');
+      expect(state.clearLocalAccountData, isFalse);
       expect(store.clearCalls, 1);
     });
   });

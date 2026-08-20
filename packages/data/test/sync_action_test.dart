@@ -19,6 +19,7 @@ void main() {
         },
         idempotencyKey: 'k1',
         createdAt: DateTime.utc(2026, 1, 2, 3, 4, 5),
+        ownerId: 'user-1',
         status: SyncActionStatus.pending,
         attempts: 2,
         nextAttemptAt: DateTime.utc(2026, 1, 2, 3, 5),
@@ -32,6 +33,7 @@ void main() {
       expect(back.endpoint, '/quiz/L1/submit');
       expect(back.idempotencyKey, 'k1');
       expect(back.createdAt, DateTime.utc(2026, 1, 2, 3, 4, 5));
+      expect(back.ownerId, 'user-1');
       expect(back.status, SyncActionStatus.pending);
       expect(back.attempts, 2);
       expect(back.nextAttemptAt, DateTime.utc(2026, 1, 2, 3, 5));
@@ -57,6 +59,7 @@ void main() {
       expect(minimal.nextAttemptAt, isNull);
       expect(minimal.lastError, isNull);
       expect(minimal.completedAt, isNull);
+      expect(minimal.ownerId, isNull);
     });
 
     test('copyWith clear flags null-out optionals', () {

@@ -51,6 +51,12 @@ for environment in staging prod; do
   fi
   grep -F "param cosmosBackupMode = 'Continuous'" "${params}" >/dev/null
   grep -F 'param grantAlertReaderRole = true' "${params}" >/dev/null
+  if grep -Eq \
+    '^[[:space:]]*param[[:space:]]+entra(GraphTenantId|GraphClientId|GraphClientSecret|ReauthAudience)[[:space:]]*=' \
+    "${params}"; then
+    echo "${environment} Graph identity parameters must come from its GitHub Environment." >&2
+    exit 1
+  fi
 done
 
 if grep -R --include='*.bicep' --include='*.bicepparam' -n \
@@ -83,7 +89,29 @@ grep -F 'virtualNetworkSubnetId: functionIntegrationSubnetId' \
   "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F 'vnetRouteAllEnabled: false' \
   "${root}/infra/modules/functionApp.bicep" >/dev/null
-
+grep -F 'ENTRA_REAUTH_AUDIENCE: entraReauthAudience' \
+  "${root}/infra/modules/functionApp.bicep" >/dev/null
+grep -F 'ENTRA_GRAPH_TENANT_ID: entraGraphTenantId' \
+  "${root}/infra/modules/functionApp.bicep" >/dev/null
+grep -F 'ENTRA_GRAPH_CLIENT_ID: entraGraphClientId' \
+  "${root}/infra/modules/functionApp.bicep" >/dev/null
+grep -F 'ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI: entraGraphClientSecretSecretUri' \
+  "${root}/infra/modules/functionApp.bicep" >/dev/null
+grep -F 'ACCOUNT_DELETION_ENABLED: string(accountDeletionEnabled)' \
+  "${root}/infra/modules/functionApp.bicep" >/dev/null
+grep -F 'param accountDeletionEnabled bool = false' \
+  "${root}/infra/main.bicep" >/dev/null
+if grep -F 'ENTRA_GRAPH_CLIENT_SECRET:' \
+  "${root}/infra/modules/functionApp.bicep" >/dev/null; then
+  echo "The raw Graph client secret must never be emitted as a Function App setting." >&2
+  exit 1
+fi
+grep -F "name: 'ENTRA-GRAPH-CLIENT-SECRET'" \
+  "${root}/infra/modules/keyvaultGraphClientSecret.bicep" >/dev/null
+grep -F 'exp: dateTimeToEpoch(graphClientSecretExpiresOn)' \
+  "${root}/infra/modules/keyvaultGraphClientSecret.bicep" >/dev/null
+grep -F 'secretUriWithVersion' \
+  "${root}/infra/modules/keyvaultGraphClientSecret.bicep" >/dev/null
 grep -F "type: 'UserAssignedIdentity'" "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F 'userAssignedIdentityResourceId:' "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F "b7e6dc6d-f1e8-4753-8033-0f276bb0955b" "${root}/infra/modules/functionApp.bicep" >/dev/null

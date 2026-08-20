@@ -110,7 +110,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   @override
   Widget build(BuildContext context) {
     if (_controller.loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const AuroraBackground(
+        child: SafeArea(child: PrismLoadingView(label: 'Préparation du quiz…')),
+      );
     }
     if (_controller.loadFailed) {
       return Scaffold(
@@ -130,14 +132,12 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       );
     }
     if (_controller.items.isEmpty) {
-      return Scaffold(
-        body: Center(
-          child: PrismCard(
-            child: Text(
-              'Aucune question disponible pour cette leçon.',
-              style: Theme.of(context).textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
+      return const AuroraBackground(
+        child: SafeArea(
+          child: PrismStatusView.empty(
+            icon: Icons.quiz_outlined,
+            title: 'Aucune question disponible',
+            message: 'Cette leçon ne contient pas encore de quiz.',
           ),
         ),
       );

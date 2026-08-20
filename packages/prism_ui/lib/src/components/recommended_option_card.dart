@@ -71,6 +71,7 @@ class _RecommendedOptionCardState extends State<RecommendedOptionCard> {
             p.surface,
           )
         : p.surface;
+    final Duration duration = PrismMotion.resolve(context, PrismMotion.fast);
 
     final Widget card = GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -84,7 +85,7 @@ class _RecommendedOptionCardState extends State<RecommendedOptionCard> {
               widget.onTap!.call();
             },
       child: AnimatedContainer(
-        duration: PrismMotion.fast,
+        duration: duration,
         curve: PrismMotion.standard,
         margin: EdgeInsets.only(bottom: _down ? 0 : 4),
         decoration: BoxDecoration(

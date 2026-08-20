@@ -8,13 +8,20 @@ import { writeSecureParameters } from './write-secure-bicep-parameters.mjs';
 
 const expiration = '2027-12-31T00:00:00Z';
 const now = new Date('2026-08-14T22:00:00Z');
+const accountDeletionIdentityConfiguration = {
+  entraGraphTenantId: '11111111-1111-1111-1111-111111111111',
+  entraGraphClientId: '22222222-2222-2222-2222-222222222222',
+  entraGraphClientSecret: 'test-graph-client-secret',
+  entraGraphClientSecretExpiresOn: expiration,
+  entraReauthAudience: '44444444-4444-4444-4444-444444444444',
+};
 
 function outputPath() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-bicep-params-'));
   return path.join(directory, 'parameters.json');
 }
 
-function compiledParameters() {
+function compiledParameters(accountDeletionEnabled = true) {
   const file = outputPath();
   fs.writeFileSync(
     file,
@@ -24,6 +31,7 @@ function compiledParameters() {
       contentVersion: '1.0.0.0',
       parameters: {
         env: { value: 'dev' },
+        accountDeletionEnabled: { value: accountDeletionEnabled },
         authJwtSigningKeyExpiresOn: { value: '2027-08-31T00:00:00Z' },
       },
     }),
@@ -40,6 +48,11 @@ function write(overrides = {}) {
     jwtSigningKeyExpiresOn: '',
     jwtPreviousSigningKey: '',
     jwtPreviousSigningKeyExpiresOn: '',
+    entraGraphTenantId: '',
+    entraGraphClientId: '',
+    entraGraphClientSecret: '',
+    entraGraphClientSecretExpiresOn: '',
+    entraReauthAudience: '',
     inputFile: compiledParameters(),
     outputFile,
     now,
@@ -71,6 +84,7 @@ test('requires the active key and expiration together outside dev', () => {
         environment,
         alertEmail: 'alerts@example.invalid',
         jwtSigningKey: 'test-secret',
+        ...accountDeletionIdentityConfiguration,
       }),
       /must be configured together/,
     );
@@ -85,6 +99,7 @@ test('injects active and previous rotation pairs into a private parameter docume
     jwtSigningKeyExpiresOn: expiration,
     jwtPreviousSigningKey: 'old-test-secret',
     jwtPreviousSigningKeyExpiresOn: expiration,
+    ...accountDeletionIdentityConfiguration,
   });
   const parameters = JSON.parse(fs.readFileSync(outputFile, 'utf8')).parameters;
 
@@ -92,6 +107,18 @@ test('injects active and previous rotation pairs into a private parameter docume
   assert.deepEqual(parameters.authJwtSigningKey, { value: 'new-test-secret' });
   assert.deepEqual(parameters.authJwtSigningKeyExpiresOn, { value: expiration });
   assert.deepEqual(parameters.alertEmail, { value: 'alerts@example.invalid' });
+  assert.deepEqual(
+    parameters.entraGraphClientSecret,
+    { value: accountDeletionIdentityConfiguration.entraGraphClientSecret },
+  );
+  assert.deepEqual(
+    parameters.entraReauthAudience,
+    { value: accountDeletionIdentityConfiguration.entraReauthAudience },
+  );
+  assert.deepEqual(
+    parameters.entraGraphClientSecretExpiresOn,
+    { value: expiration },
+  );
   assert.deepEqual(
     parameters.authJwtPreviousSigningKey,
     { value: 'old-test-secret' },
@@ -107,6 +134,7 @@ test('requires a valid environment alert receiver outside dev', () => {
     environment: 'prod',
     jwtSigningKey: 'new-test-secret',
     jwtSigningKeyExpiresOn: expiration,
+    ...accountDeletionIdentityConfiguration,
   };
   assert.throws(
     () => write(requiredParameters),
@@ -123,6 +151,81 @@ test('requires a valid environment alert receiver outside dev', () => {
       /ALERT_EMAIL must be a valid email address/,
     );
   }
+});
+
+test('requires complete account deletion identity configuration outside dev', () => {
+  const requiredParameters = {
+    environment: 'prod',
+    alertEmail: 'alerts@example.invalid',
+    jwtSigningKey: 'new-test-secret',
+    jwtSigningKeyExpiresOn: expiration,
+  };
+  assert.throws(
+    () => write(requiredParameters),
+    /ENTRA_GRAPH_TENANT_ID.*are required for staging and production/,
+  );
+  assert.throws(
+    () => write({
+      ...requiredParameters,
+      entraGraphTenantId: accountDeletionIdentityConfiguration.entraGraphTenantId,
+    }),
+    /required for staging and production/,
+  );
+});
+
+test('feature-off deployment ignores Graph credentials and emits no Graph parameters', () => {
+  const inputFile = compiledParameters(false);
+  const { outputFile } = write({
+    environment: 'prod',
+    alertEmail: 'alerts@example.invalid',
+    jwtSigningKey: 'new-test-secret',
+    jwtSigningKeyExpiresOn: expiration,
+    inputFile,
+  });
+  const parameters = JSON.parse(fs.readFileSync(outputFile, 'utf8')).parameters;
+
+  assert.equal(parameters.entraGraphTenantId, undefined);
+  assert.equal(parameters.entraGraphClientId, undefined);
+  assert.equal(parameters.entraGraphClientSecret, undefined);
+  assert.equal(parameters.entraGraphClientSecretExpiresOn, undefined);
+  assert.equal(parameters.entraReauthAudience, undefined);
+});
+
+test('requires canonical Entra identifiers', () => {
+  assert.throws(
+    () => write({
+      environment: 'prod',
+      alertEmail: 'alerts@example.invalid',
+      jwtSigningKey: 'new-test-secret',
+      jwtSigningKeyExpiresOn: expiration,
+      ...accountDeletionIdentityConfiguration,
+      entraGraphClientId: 'not-a-guid',
+    }),
+    /ENTRA_GRAPH_CLIENT_ID must be a canonical Entra GUID/,
+  );
+});
+
+test('dev omits incomplete Graph configuration instead of persisting a partial secret', () => {
+  const { outputFile } = write({
+    entraGraphTenantId: accountDeletionIdentityConfiguration.entraGraphTenantId,
+  });
+  const parameters = JSON.parse(fs.readFileSync(outputFile, 'utf8')).parameters;
+  assert.equal(parameters.entraGraphTenantId, undefined);
+  assert.equal(parameters.entraGraphClientSecret, undefined);
+});
+
+test('returns no Graph secret material after writing secure parameters', () => {
+  const { result } = write({
+    environment: 'prod',
+    alertEmail: 'alerts@example.invalid',
+    jwtSigningKey: 'new-test-secret',
+    jwtSigningKeyExpiresOn: expiration,
+    ...accountDeletionIdentityConfiguration,
+  });
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    new RegExp(accountDeletionIdentityConfiguration.entraGraphClientSecret),
+  );
 });
 
 test('rejects incomplete previous-key rotation and non-UTC expiration', () => {
@@ -180,6 +283,11 @@ test('refuses to overwrite an existing parameter file', () => {
       jwtSigningKeyExpiresOn: '',
       jwtPreviousSigningKey: '',
       jwtPreviousSigningKeyExpiresOn: '',
+      entraGraphTenantId: '',
+      entraGraphClientId: '',
+      entraGraphClientSecret: '',
+      entraGraphClientSecretExpiresOn: '',
+      entraReauthAudience: '',
       inputFile: compiledParameters(),
       outputFile,
       now,
@@ -200,6 +308,11 @@ test('rejects a malformed compiled parameter document', () => {
       jwtSigningKeyExpiresOn: '',
       jwtPreviousSigningKey: '',
       jwtPreviousSigningKeyExpiresOn: '',
+      entraGraphTenantId: '',
+      entraGraphClientId: '',
+      entraGraphClientSecret: '',
+      entraGraphClientSecretExpiresOn: '',
+      entraReauthAudience: '',
       inputFile,
       outputFile: outputPath(),
       now,

@@ -4,6 +4,7 @@ import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_elevation.dart';
 import '../tokens/prism_radii.dart';
 import '../tokens/prism_spacing.dart';
+import 'prism_pressable.dart';
 
 /// How a [PrismCard] is filled.
 ///
@@ -132,7 +133,7 @@ class PrismCard extends StatelessWidget {
     );
 
     if (onTap != null) {
-      surface = _PressableCard(borderRadius: borderRadius, onTap: onTap!, child: surface);
+      surface = PrismPressable(borderRadius: borderRadius, onPressed: onTap!, child: surface);
     }
     return surface;
   }
@@ -143,36 +144,4 @@ class PrismCard extends StatelessWidget {
         2 => PrismElevation.level2(b),
         _ => PrismElevation.level2(b),
       };
-}
-
-/// Scale-on-press wrapper for tappable [PrismCard]s, mirroring the glass one.
-class _PressableCard extends StatefulWidget {
-  const _PressableCard({required this.child, required this.onTap, required this.borderRadius});
-
-  final Widget child;
-  final VoidCallback onTap;
-  final BorderRadius borderRadius;
-
-  @override
-  State<_PressableCard> createState() => _PressableCardState();
-}
-
-class _PressableCardState extends State<_PressableCard> {
-  bool _down = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _down = true),
-      onTapUp: (_) => setState(() => _down = false),
-      onTapCancel: () => setState(() => _down = false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _down ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        child: widget.child,
-      ),
-    );
-  }
 }

@@ -1,344 +1,135 @@
+import 'package:certigo/app/active_track_store.dart';
+import 'package:certigo/app/providers.dart';
+import 'package:certigo/features/onboarding/application/onboarding_controller.dart';
+import 'package:certigo/features/onboarding/presentation/certification_screen.dart';
+import 'package:certigo/features/onboarding/presentation/onboarding_common.dart';
+import 'package:certigo/features/onboarding/presentation/welcome_screen.dart';
+import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
-import 'package:data/data.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:certigo/app/providers.dart';
-import 'package:certigo/features/onboarding/application/onboarding_controller.dart';
-import 'package:certigo/features/notifications/notification_service.dart';
-import 'package:certigo/features/onboarding/presentation/attribution_screen.dart';
-import 'package:certigo/features/onboarding/presentation/certification_screen.dart';
-import 'package:certigo/features/onboarding/presentation/intro_screen.dart';
-import 'package:certigo/features/onboarding/presentation/mascot_reaction_screen.dart';
-import 'package:certigo/features/onboarding/presentation/notifications_screen.dart';
-import 'package:certigo/features/onboarding/presentation/onboarding_common.dart';
-import 'package:certigo/features/onboarding/presentation/path_building_screen.dart';
-import 'package:certigo/features/onboarding/presentation/paywall_screen.dart';
-import 'package:certigo/features/onboarding/presentation/value_list_screen.dart';
-import 'package:certigo/features/onboarding/presentation/widget_promo_screen.dart';
+import 'support/fake_user_repository.dart';
 
-/// Widget tests for the Part-2 onboarding screens. We host each screen under a
-/// tiny [GoRouter] (its own route + a stub target) so navigation callbacks
-/// resolve, and read the shared [onboardingControllerProvider] to prove that a
-/// selection lights up the sticky CTA path. We never depend on real network
-/// fonts and keep animations bounded so `pumpAndSettle` terminates.
 void main() {
-  Future<ProviderContainer> pumpScreen(
+  setUp(() {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
+
+  final List<TrackSummary> tracks = <TrackSummary>[
+    for (final TargetCertification certification in availableTargetCertifications)
+      TrackSummary(
+        id: certification.trackId,
+        code: certification.code,
+        title: certification.title,
+        level: 'fundamentals',
+        summary: '',
+        unitCount: 1,
+        lessonCount: 1,
+      ),
+  ];
+
+  Future<({ProviderContainer container, FakeUserRepository users})> pumpCertification(
     WidgetTester tester,
-    String location,
-    Widget child, {
-    List<GoRoute> extraRoutes = const <GoRoute>[],
-    List<Override> overrides = const <Override>[],
-  }) async {
-    final ProviderContainer container = ProviderContainer(overrides: overrides);
-    addTearDown(container.dispose);
-    final GoRouter router = GoRouter(
-      initialLocation: location,
-      routes: <RouteBase>[
-        GoRoute(path: location, builder: (_, __) => child),
-        ...extraRoutes,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final FakeUserRepository users = FakeUserRepository();
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        activeTrackStoreProvider.overrideWithValue(InMemoryActiveTrackStore()),
+        activeTrackOwnerIdProvider.overrideWithValue('user-1'),
+        onboardingControllerProvider.overrideWith(
+          (Ref ref) => OnboardingController(ownerId: 'user-1'),
+        ),
+        userRepositoryProvider.overrideWithValue(users),
+        catalogProvider.overrideWith((Ref ref) async => tracks),
       ],
     );
+    addTearDown(container.dispose);
+    final GoRouter router = GoRouter(
+      initialLocation: OnboardingRoutes.certification,
+      routes: <RouteBase>[
+        GoRoute(
+          path: OnboardingRoutes.certification,
+          builder: (_, __) => const CertificationScreen(),
+        ),
+        GoRoute(
+          path: '/home',
+          builder: (_, __) => Consumer(
+            builder: (BuildContext context, WidgetRef ref, Widget? child) {
+              return Scaffold(body: Text('HOME:${ref.watch(activeTrackProvider).asData?.value}'));
+            },
+          ),
+        ),
+        GoRoute(path: OnboardingRoutes.welcome, builder: (_, __) => const WelcomeScreen()),
+      ],
+    );
+
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp.router(
           theme: PrismTheme.light(),
           routerConfig: router,
+          builder: (BuildContext context, Widget? child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: child!,
+          ),
         ),
       ),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 60));
-    return container;
+    return (container: container, users: users);
   }
 
-  testWidgets('CertificationScreen renders and a tap selects a certification', (
-    WidgetTester tester,
-  ) async {
-    final ProviderContainer c = await pumpScreen(
-      tester,
-      '/onboarding/certification',
-      const CertificationScreen(),
-      overrides: <Override>[
-        catalogProvider.overrideWith(
-          (Ref ref) async => const <TrackSummary>[
-            TrackSummary(
-              id: 'ai-901',
-              code: 'AI-901',
-              title: 'Microsoft Azure AI Fundamentals',
-              level: 'fundamentals',
-              summary: '',
-              unitCount: 0,
-              lessonCount: 0,
-              learningAvailable: false,
-            ),
-          ],
-        ),
-      ],
-    );
-    expect(find.text('AZ-900'), findsOneWidget);
-    expect(find.text('AI-900'), findsNothing);
-    expect(find.text('AI-901'), findsOneWidget);
-    expect(find.text('Bientôt'), findsOneWidget);
-
-    await tester.tap(find.text('AI-901'));
-    await tester.pump();
-    expect(c.read(onboardingControllerProvider).targetCertification, isNull);
-
-    await tester.tap(find.text('AZ-900'));
-    await tester.pump();
-    // Selection recorded → the CTA is no longer disabled.
-    expect(
-      c.read(onboardingControllerProvider).targetCertification,
-      TargetCertification.az900,
-    );
-  });
-
-  testWidgets('CertificationScreen enables AI-901 when published content exists', (
-    WidgetTester tester,
-  ) async {
-    final ProviderContainer c = await pumpScreen(
-      tester,
-      '/onboarding/certification',
-      const CertificationScreen(),
-      overrides: <Override>[
-        catalogProvider.overrideWith(
-          (Ref ref) async => const <TrackSummary>[
-            TrackSummary(
-              id: 'ai-901',
-              code: 'AI-901',
-              title: 'Microsoft Azure AI Fundamentals',
-              level: 'fundamentals',
-              summary: '',
-              unitCount: 1,
-              lessonCount: 1,
-            ),
-          ],
-        ),
-      ],
-    );
-
-    expect(find.text('Bientôt'), findsNothing);
-    await tester.tap(find.text('AI-901'));
-    await tester.pump();
-
-    expect(
-      c.read(onboardingControllerProvider).targetCertification,
-      TargetCertification.ai901,
-    );
-  });
-
-  testWidgets(
-    'AttributionScreen shows the "bientôt" tag and records a choice',
-    (WidgetTester tester) async {
-      final ProviderContainer c = await pumpScreen(
-        tester,
-        '/onboarding/attribution',
-        const AttributionScreen(),
+  for (final TargetCertification certification in availableTargetCertifications) {
+    testWidgets('${certification.code} persists and opens its own Home', (
+      WidgetTester tester,
+    ) async {
+      final result = await pumpCertification(tester);
+      await tester.scrollUntilVisible(
+        find.text(certification.code),
+        250,
+        scrollable: find.byType(Scrollable).last,
       );
-      expect(find.text('Comment nous as-tu connus ?'), findsOneWidget);
-      expect(find.byType(SoonTag), findsOneWidget);
-
-      await tester.tap(find.text('YouTube'));
+      await tester.tap(find.text(certification.code));
       await tester.pump();
-      expect(
-        c.read(onboardingControllerProvider).attributionSource,
-        AttributionSource.youtube,
-      );
-    },
-  );
+      await tester.ensureVisible(find.text('COMMENCER CE PARCOURS'));
+      await tester.tap(find.text('COMMENCER CE PARCOURS'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
 
-  testWidgets('PaywallScreen renders both plans with a RECOMMANDÉ badge', (
+      expect(find.text('HOME:${certification.trackId}'), findsOneWidget);
+      expect(result.users.setActiveTrackCalls, <String>[certification.trackId]);
+      expect(result.container.read(activeTrackProvider).asData?.value, certification.trackId);
+    });
+  }
+
+  testWidgets('welcome and certification expose no unsupported product promise', (
     WidgetTester tester,
   ) async {
-    final ProviderContainer c = await pumpScreen(
-      tester,
-      '/onboarding/paywall',
-      const PaywallScreen(),
-    );
-    expect(find.text('Certigo Premium'), findsOneWidget);
-    expect(find.text('RECOMMANDÉ'), findsOneWidget);
+    await pumpCertification(tester);
 
-    await tester.tap(find.text('Certigo Premium'));
-    await tester.pump();
-    expect(
-      c.read(onboardingControllerProvider).premiumChoice,
-      PremiumChoice.premium,
-    );
-  });
-
-  testWidgets('MascotReactionScreen renders its message and CTA', (
-    WidgetTester tester,
-  ) async {
-    await pumpScreen(
-      tester,
-      '/r',
-      MascotReactionScreen(message: 'Excellent choix !', onPrimary: () {}),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Excellent choix !'), findsWidgets);
-    expect(find.text('CONTINUER'), findsOneWidget);
-  });
-
-  testWidgets('ValueListScreen renders its benefits', (
-    WidgetTester tester,
-  ) async {
-    await pumpScreen(
-      tester,
-      '/v',
-      ValueListScreen(
-        message: 'Voici ce que tu peux accomplir en 3 mois.',
-        primaryLabel: 'CONTINUER',
-        onPrimary: () {},
-        benefits: const <ValueBenefit>[
-          ValueBenefit(
-            icon: Icons.hub_rounded,
-            title: 'Bénéfice A',
-            subtitle: 'sous-titre A',
-          ),
-          ValueBenefit(
-            icon: Icons.quiz_rounded,
-            title: 'Bénéfice B',
-            subtitle: 'sous-titre B',
-          ),
-        ],
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Bénéfice A'), findsOneWidget);
-    expect(find.text('Bénéfice B'), findsOneWidget);
-  });
-
-  testWidgets('NimbusIntroScreen types its message without exception', (
-    WidgetTester tester,
-  ) async {
-    await pumpScreen(
-      tester,
-      '/i',
-      NimbusIntroScreen(
-        message: 'Salut, moi c\'est Nimbus !',
-        primaryLabel: 'CONTINUER',
-        onPrimary: () {},
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Salut, moi c\'est Nimbus !'), findsWidgets);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('NotificationsScreen renders the primer', (
-    WidgetTester tester,
-  ) async {
-    await pumpScreen(
-      tester,
-      '/onboarding/notifications',
-      const NotificationsScreen(),
-    );
-    expect(find.text('Reste régulier grâce aux rappels'), findsOneWidget);
-    expect(find.text('ACTIVER LES RAPPELS'), findsOneWidget);
-    expect(find.textContaining('chaque jour à 19 h'), findsOneWidget);
-  });
-
-  testWidgets(
-    'NotificationsScreen schedules and persists the 19:00 default after permission',
-    (WidgetTester tester) async {
-      TimeOfDay? scheduledTime;
-      TimeOfDay? savedTime;
-      String? savedTimezone;
-      NotificationService.debugConfigure(
-        loadLocalTimezone: () async => 'Europe/Paris',
-        initializePlugin: (_) async => true,
-        requestPlatformPermission: () async => true,
-        loadReminderTime: () async => null,
-        cancelReminder: () async {},
-        scheduleReminder: (date, _) async {
-          scheduledTime = TimeOfDay(hour: date.hour, minute: date.minute);
-        },
-        saveReminder: (TimeOfDay time, String timezone) async {
-          savedTime = time;
-          savedTimezone = timezone;
-        },
-      );
-      final ProviderContainer container = await pumpScreen(
-        tester,
-        '/onboarding/notifications',
-        const NotificationsScreen(),
-        extraRoutes: <GoRoute>[
-          GoRoute(
-            path: '/onboarding/widget',
-            builder: (_, __) => const Scaffold(body: Text('WIDGET_STUB')),
-          ),
-        ],
-      );
-
-      await tester.tap(find.text('ACTIVER LES RAPPELS'));
-      await tester.pumpAndSettle();
-
-      expect(container.read(onboardingControllerProvider).reminders, isTrue);
-      expect(scheduledTime, NotificationService.defaultReminderTime);
-      expect(savedTime, NotificationService.defaultReminderTime);
-      expect(savedTimezone, 'Europe/Paris');
-      expect(find.text('WIDGET_STUB'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'NotificationsScreen records a denied OS permission and continues',
-    (WidgetTester tester) async {
-      NotificationService.debugConfigure(
-        loadLocalTimezone: () async => 'UTC',
-        initializePlugin: (_) async => true,
-        requestPlatformPermission: () async => false,
-      );
-      final ProviderContainer container = await pumpScreen(
-        tester,
-        '/onboarding/notifications',
-        const NotificationsScreen(),
-        extraRoutes: <GoRoute>[
-          GoRoute(
-            path: '/onboarding/widget',
-            builder: (_, __) => const Scaffold(body: Text('WIDGET_STUB')),
-          ),
-        ],
-      );
-
-      await tester.tap(find.text('ACTIVER LES RAPPELS'));
-      await tester.pumpAndSettle();
-
-      expect(container.read(onboardingControllerProvider).reminders, isFalse);
-      expect(find.text('WIDGET_STUB'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'WidgetPromoScreen renders the placeholder with a "bientôt" tag',
-    (WidgetTester tester) async {
-      await pumpScreen(tester, '/onboarding/widget', const WidgetPromoScreen());
-      expect(find.byType(SoonTag), findsOneWidget);
-      expect(find.text('AJOUTER LE WIDGET'), findsOneWidget);
-    },
-  );
-
-  testWidgets('PathBuildingScreen auto-advances to attribution', (
-    WidgetTester tester,
-  ) async {
-    await pumpScreen(
-      tester,
-      '/onboarding/building',
-      const PathBuildingScreen(),
-      extraRoutes: <GoRoute>[
-        GoRoute(
-          path: '/onboarding/attribution',
-          builder: (_, __) => const Scaffold(body: Text('ATTRIBUTION_STUB')),
-        ),
-      ],
-    );
-    expect(find.textContaining('construit ton cours'), findsOneWidget);
-    // The loading beat schedules an auto-advance; let it fire.
-    await tester.pumpAndSettle(const Duration(seconds: 3));
-    expect(find.text('ATTRIBUTION_STUB'), findsOneWidget);
+    for (final String text in <String>[
+      'Certigo Premium',
+      'Essai gratuit de 7 jours',
+      'AJOUTER LE WIDGET',
+      'AJOUTER 1 AMI',
+      'J\'AI DÉJÀ UN COMPTE',
+    ]) {
+      expect(find.textContaining(text), findsNothing);
+    }
+    expect(OnboardingRoutes.all, <String>{
+      OnboardingRoutes.splash,
+      OnboardingRoutes.welcome,
+      OnboardingRoutes.certification,
+    });
   });
 }

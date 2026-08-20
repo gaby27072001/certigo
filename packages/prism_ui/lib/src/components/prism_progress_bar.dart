@@ -44,6 +44,7 @@ class PrismProgressBar extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final double clamped = value.clamp(0.0, 1.0);
     final List<Color> colors = gradient ?? <Color>[p.primary, p.primaryDark];
+    final Duration animationDuration = PrismMotion.resolve(context, duration ?? PrismMotion.slow);
 
     return Semantics(
       label: semanticLabel,
@@ -58,7 +59,7 @@ class PrismProgressBar extends StatelessWidget {
               ColoredBox(color: trackColor ?? p.surfaceAlt),
               TweenAnimationBuilder<double>(
                 tween: Tween<double>(begin: 0, end: clamped),
-                duration: duration ?? PrismMotion.slow,
+                duration: animationDuration,
                 curve: PrismMotion.standard,
                 builder: (BuildContext context, double v, _) {
                   return Align(

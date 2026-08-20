@@ -26,6 +26,10 @@ export 'src/theme/prism_theme.dart';
 // Components
 export 'src/components/glass_surface.dart';
 export 'src/components/prism_card.dart';
+export 'src/components/prism_pressable.dart';
+export 'src/components/prism_content_frame.dart';
+export 'src/components/prism_section_header.dart';
+export 'src/components/prism_reveal.dart';
 export 'src/components/prism_page_transition.dart';
 export 'src/components/aurora_background.dart';
 export 'src/components/orbit_field.dart';
@@ -75,6 +79,7 @@ export 'src/components/prism_rich_text.dart';
 // Async / state surfaces
 export 'src/components/prism_skeleton.dart';
 export 'src/components/prism_status_view.dart';
+export 'src/components/prism_loading_view.dart';
 
 // Dynamic content rendering (ADR-003)
 export 'src/rendering/content_block.dart';
