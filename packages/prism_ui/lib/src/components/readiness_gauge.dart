@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../theme/prism_color_scheme.dart';
+import '../tokens/prism_motion.dart';
 
 /// The hero progress signature of Certigo: a 270° arc gauge that renders a
 /// track's **Readiness Score** (0–100, the product's North-Star metric).
@@ -33,8 +34,8 @@ class ReadinessGauge extends StatelessWidget {
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: (previousScore ?? score).toDouble(), end: score.toDouble()),
-      duration: const Duration(milliseconds: 900),
-      curve: Curves.easeOutCubic,
+      duration: PrismMotion.resolve(context, PrismMotion.celebrate),
+      curve: PrismMotion.standard,
       builder: (BuildContext context, double value, _) {
         return SizedBox(
           width: size,

@@ -1,0 +1,344 @@
+targetScope = 'subscription'
+
+@description('Azure region for deployment identities and policy assignments.')
+param location string = 'westeurope'
+
+@description('Existing resource group that owns shared CI identities and networking.')
+param identityResourceGroupName string = 'rg-certigo-ci'
+
+@description('GitHub repository owner.')
+param githubRepositoryOwner string = 'gchambaud_microsoft'
+
+@description('GitHub repository name.')
+param githubRepositoryName string = 'Certigo'
+
+@description('Application environments receiving isolated deployment identities.')
+param environments array = [
+  {
+    name: 'dev'
+    resourceGroupName: 'rg-certigo-dev'
+  }
+  {
+    name: 'staging'
+    resourceGroupName: 'rg-certigo-staging'
+  }
+  {
+    name: 'prod'
+    resourceGroupName: 'rg-certigo-prod'
+  }
+]
+
+@description('Initial privileged-assignment policy effect. Keep Audit until all historical findings are resolved.')
+@allowed([
+  'Audit'
+  'Deny'
+  'Disabled'
+])
+param privilegedAssignmentPolicyEffect string = 'Audit'
+
+@description('Admin-only ownership of the existing audit-only MCSB assignment.')
+param manageMcsbPolicyAssignment bool = false
+
+@description('Admin-only ownership of subscription-wide Defender pricing.')
+param manageDefenderPlans bool = false
+
+@description('Paid Defender plan state when manageDefenderPlans is true.')
+param enableDefenderPlans bool = false
+
+var identityTags = {
+  product: 'Certigo'
+  managedBy: 'bicep'
+  purpose: 'github-oidc-deployment'
+}
+
+var environmentResourceGroupIds = [
+  for environment in environments: subscriptionResourceId(
+    'Microsoft.Resources/resourceGroups',
+    environment.resourceGroupName
+  )
+]
+
+var allowedRuntimeRoleDefinitionIds = [
+  // Storage Blob Data Contributor
+  'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+  // Storage Blob Data Owner
+  'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+  // Storage Blob Delegator
+  'db58b8e5-c6ad-4a2a-8342-4190687cbf4a'
+  // Storage Queue Data Contributor
+  '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
+  // Storage Table Data Contributor
+  '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
+  // Monitoring Metrics Publisher
+  '3913510d-42f4-4e42-8a64-420c390055eb'
+  // Key Vault Secrets User
+  '4633458b-17de-408a-b874-0445c86b69e6'
+  // Cognitive Services OpenAI User
+  '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+  // Log Analytics Reader
+  '73c42c96-874c-492b-b04d-ab87d138a893'
+]
+
+var privilegedRoleDefinitionIds = [
+  subscriptionResourceId(
+    'Microsoft.Authorization/roleDefinitions',
+    '8e3af657-a8ff-443c-a75c-2fe8c4bcb635' // Owner
+  )
+  subscriptionResourceId(
+    'Microsoft.Authorization/roleDefinitions',
+    'b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor
+  )
+  subscriptionResourceId(
+    'Microsoft.Authorization/roleDefinitions',
+    '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9' // User Access Administrator
+  )
+  subscriptionResourceId(
+    'Microsoft.Authorization/roleDefinitions',
+    'f58310d9-a9f6-439a-9e8d-f62e7b41a168' // Role Based Access Control Administrator
+  )
+]
+
+resource identityResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
+  name: identityResourceGroupName
+}
+
+resource environmentResourceGroups 'Microsoft.Resources/resourceGroups@2024-03-01' existing = [
+  for environment in environments: {
+    name: environment.resourceGroupName
+  }
+]
+
+resource subscriptionDeploymentLauncher 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: guid(subscription().id, 'certigo-subscription-deployment-launcher')
+  properties: {
+    roleName: 'Certigo Subscription Deployment Launcher ${take(uniqueString(subscription().id), 6)}'
+    description: 'Runs subscription what-if/deployments and reads pre-created resource groups; cannot manage resources or RBAC.'
+    type: 'CustomRole'
+    permissions: [
+      {
+        actions: [
+          'Microsoft.Resources/deployments/read'
+          'Microsoft.Resources/deployments/write'
+          'Microsoft.Resources/deployments/validate/action'
+          'Microsoft.Resources/deployments/whatIf/action'
+          'Microsoft.Resources/subscriptions/resourceGroups/read'
+        ]
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      }
+    ]
+    assignableScopes: [
+      subscription().id
+    ]
+  }
+}
+
+resource runtimeRoleAssignmentWriter 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: guid(subscription().id, 'certigo-runtime-role-assignment-writer')
+  properties: {
+    roleName: 'Certigo Runtime Role Assignment Writer ${take(uniqueString(subscription().id), 6)}'
+    description: 'Creates role assignments without delete; each assignment adds a condition that limits role definitions and principal type.'
+    type: 'CustomRole'
+    permissions: [
+      {
+        actions: [
+          'Microsoft.Authorization/roleAssignments/read'
+          'Microsoft.Authorization/roleAssignments/write'
+          'Microsoft.Authorization/roleDefinitions/read'
+          'Microsoft.Resources/subscriptions/resourceGroups/read'
+        ]
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      }
+    ]
+    assignableScopes: environmentResourceGroupIds
+  }
+}
+
+resource sharedNetworkDeploymentRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: guid(subscription().id, 'certigo-shared-network-deployment')
+  properties: {
+    roleName: 'Certigo Shared Network Deployment ${take(uniqueString(subscription().id), 6)}'
+    description: 'Updates only shared private DNS and VNet peerings; has no Compute, Key Vault, or general Contributor actions.'
+    type: 'CustomRole'
+    permissions: [
+      {
+        actions: [
+          'Microsoft.Resources/deployments/read'
+          'Microsoft.Resources/deployments/write'
+          'Microsoft.Resources/deployments/validate/action'
+          'Microsoft.Resources/deployments/whatIf/action'
+          'Microsoft.Resources/subscriptions/resourceGroups/read'
+          'Microsoft.Network/virtualNetworks/read'
+          'Microsoft.Network/virtualNetworks/virtualNetworkPeerings/read'
+          'Microsoft.Network/virtualNetworks/virtualNetworkPeerings/write'
+          'Microsoft.Network/privateDnsZones/read'
+          'Microsoft.Network/privateDnsZones/write'
+          'Microsoft.Network/privateDnsZones/join/action'
+          'Microsoft.Network/privateDnsZones/virtualNetworkLinks/read'
+          'Microsoft.Network/privateDnsZones/virtualNetworkLinks/write'
+        ]
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      }
+    ]
+    assignableScopes: [
+      identityResourceGroup.id
+    ]
+  }
+}
+
+module deploymentIdentities 'modules/githubEnvironmentIdentity.bicep' = [
+  for environment in environments: {
+    scope: identityResourceGroup
+    name: 'identity-${environment.name}'
+    params: {
+      githubEnvironmentName: environment.name
+      githubRepositoryName: githubRepositoryName
+      githubRepositoryOwner: githubRepositoryOwner
+      identityName: 'id-certigo-deploy-${environment.name}'
+      location: location
+      tags: union(identityTags, {
+        environment: environment.name
+      })
+    }
+  }
+]
+
+resource subscriptionLauncherAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for (environment, index) in environments: {
+    name: guid(subscription().id, 'id-certigo-deploy-${environment.name}', subscriptionDeploymentLauncher.id)
+    properties: {
+      description: 'Launches the ${environment.name} subscription deployment without general subscription access.'
+      principalId: deploymentIdentities[index].outputs.principalId
+      principalType: 'ServicePrincipal'
+      roleDefinitionId: subscriptionDeploymentLauncher.id
+    }
+  }
+]
+
+module environmentRbac 'modules/environmentRbac.bicep' = [
+  for (environment, index) in environments: {
+    scope: environmentResourceGroups[index]
+    name: 'rbac-${environment.name}'
+    params: {
+      allowedRoleDefinitionIds: allowedRuntimeRoleDefinitionIds
+      assignmentNameSeed: 'id-certigo-deploy-${environment.name}'
+      principalId: deploymentIdentities[index].outputs.principalId
+      roleAssignmentWriterRoleDefinitionId: runtimeRoleAssignmentWriter.id
+    }
+  }
+]
+
+module sharedNetworkAssignments 'modules/resourceGroupRoleAssignment.bicep' = [
+  for (environment, index) in environments: {
+    scope: identityResourceGroup
+    name: 'shared-network-rbac-${environment.name}'
+    params: {
+      assignmentDescription: 'Allows ${environment.name} to reconcile only shared DNS links and VNet peerings.'
+      assignmentNameSeed: 'id-certigo-deploy-${environment.name}'
+      principalId: deploymentIdentities[index].outputs.principalId
+      roleDefinitionId: sharedNetworkDeploymentRole.id
+    }
+  }
+]
+
+resource privilegedCiAssignmentPolicy 'Microsoft.Authorization/policyDefinitions@2023-04-01' = {
+  name: guid(subscription().id, 'certigo-privileged-ci-role-assignments')
+  properties: {
+    description: 'Audits or denies subscription-scoped privileged built-in roles assigned to service principals.'
+    displayName: 'Certigo: restrict privileged CI role assignments at subscription scope'
+    metadata: {
+      category: 'Authorization'
+      version: '1.0.0'
+    }
+    mode: 'All'
+    parameters: {
+      effect: {
+        type: 'String'
+        allowedValues: [
+          'Audit'
+          'Deny'
+          'Disabled'
+        ]
+        defaultValue: 'Audit'
+        metadata: {
+          displayName: 'Effect'
+          description: 'Keep Audit until historical assignments are removed and exemptions are approved.'
+        }
+      }
+    }
+    policyRule: {
+      if: {
+        allOf: [
+          {
+            field: 'type'
+            equals: 'Microsoft.Authorization/roleAssignments'
+          }
+          {
+            field: 'Microsoft.Authorization/roleAssignments/principalType'
+            equals: 'ServicePrincipal'
+          }
+          {
+            field: 'Microsoft.Authorization/roleAssignments/scope'
+            equals: subscription().id
+          }
+          {
+            field: 'Microsoft.Authorization/roleAssignments/roleDefinitionId'
+            in: privilegedRoleDefinitionIds
+          }
+        ]
+      }
+      then: {
+        effect: '[parameters(\'effect\')]'
+      }
+    }
+    policyType: 'Custom'
+  }
+}
+
+resource privilegedCiAssignmentPolicyAssignment 'Microsoft.Authorization/policyAssignments@2024-05-01' = {
+  name: 'certigo-privileged-ci-rbac'
+  location: location
+  properties: {
+    description: 'Starts in Audit. Promotion to Deny is a separate PIM-approved change after compliance evidence.'
+    displayName: 'Certigo privileged CI role assignments'
+    enforcementMode: 'Default'
+    parameters: {
+      effect: {
+        value: privilegedAssignmentPolicyEffect
+      }
+    }
+    policyDefinitionId: privilegedCiAssignmentPolicy.id
+  }
+}
+
+module mcsbPolicy '../modules/policy.bicep' = if (manageMcsbPolicyAssignment) {
+  name: 'governance-mcsb'
+  params: {
+    assignmentLocation: location
+    enforcementMode: 'DoNotEnforce'
+  }
+}
+
+module defender '../modules/defender.bicep' = if (manageDefenderPlans) {
+  name: 'governance-defender'
+  params: {
+    enablePaidPlans: enableDefenderPlans
+    managePlans: true
+  }
+}
+
+output deploymentIdentities array = [
+  for (environment, index) in environments: {
+    clientId: deploymentIdentities[index].outputs.clientId
+    environment: environment.name
+    federatedSubject: deploymentIdentities[index].outputs.federatedSubject
+    principalId: deploymentIdentities[index].outputs.principalId
+    resourceId: deploymentIdentities[index].outputs.resourceId
+    resourceGroupName: environment.resourceGroupName
+  }
+]

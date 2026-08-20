@@ -30,6 +30,12 @@
 | 7 | **Appareil Android physique** | callback `certigo` réel. |
 | 8 | **Backend déployé (optionnel)** | requis seulement pour email/pwd + validation aud. |
 
+La configuration Sign in with Apple est accomplie : App ID mobile activé,
+Service ID Certigo CIAM associé au domaine et à la return URL, fournisseur Apple
+activé dans `susi_certigo` et bouton visible. Après déploiement de la suppression
+de compte, la seule validation Apple restante est un parcours réel avec un compte
+sacrifiable, suivi du contrôle de disparition ou de révocation de l’association.
+
 ## 3. Décision préalable : scheme deep-link
 
 Code = `certigo://auth/` (source de vérité, **slash final requis**). Demande

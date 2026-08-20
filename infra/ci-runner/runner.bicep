@@ -50,6 +50,26 @@ param tags object = {
   managedBy: 'bicep'
 }
 
+@description('Owning team or service. Never use a personal identity.')
+@minLength(1)
+param tagOwner string = 'certigo-platform'
+
+@description('Product in the FinOps contract.')
+@allowed([ 'Certigo' ])
+param tagProduct string = 'Certigo'
+
+@description('Environment in the FinOps contract.')
+@allowed([ 'ci' ])
+param tagEnvironment string = 'ci'
+
+@description('Declarative owner of the resource.')
+@allowed([ 'bicep' ])
+param tagManagedBy string = 'bicep'
+
+@description('Non-personal cost allocation identifier.')
+@minLength(1)
+param tagCostCenter string = 'engineering'
+
 var bootstrapContent = loadTextContent('bootstrap.sh')
 // Bicep cannot compute a cryptographic digest. The repository validator keeps this
 // immutable tag value synchronized with the exact file embedded in customData.
@@ -57,10 +77,17 @@ var bootstrapSha256 = '526d63afa5c5da4657c6df57873dfa0c5d161400fc5d48e5f713861cd
 // Azure accepts "latest", so turn that mutable value into a deliberately invalid
 // Marketplace version while keeping the template compatible with stable Bicep.
 var pinnedImageVersion = toLower(imageVersion) == 'latest' ? 'mutable-latest-is-not-allowed' : imageVersion
+var requiredTags = {
+  owner: tagOwner
+  product: tagProduct
+  env: tagEnvironment
+  managedBy: tagManagedBy
+  costCenter: tagCostCenter
+}
 var effectiveTags = union(tags, {
   imageVersion: pinnedImageVersion
   bootstrapSha256: bootstrapSha256
-})
+}, requiredTags)
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName

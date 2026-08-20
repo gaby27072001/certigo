@@ -19,6 +19,9 @@
 #        ENTRA_CLIENT_ID    = 4d1f1075-7bc5-4764-947b-701435a85f8c
 #        ENTRA_AUTHORITY    = https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0
 #        ENTRA_API_SCOPE    = api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation
+#        ACCOUNT_DELETION_ENABLED = false until the destructive Cosmos gate passes
+#        PUBLIC_WEB_ORIGIN, PUBLIC_DOMAIN_VERIFIED and
+#        APPLE_CIAM_DOMAIN_RECONFIGURED = fail-closed public-domain contract
 #      Missing values keep social buttons hidden and/or break email login. Same
 #      values as Android (Key Vault mobile-* / GitHub vars.MOBILE_*).
 #      Plus one SECURE variable (masked, NOT a dart-define - used only to create
@@ -54,6 +57,11 @@ definitions:
     - apps/mobile/build/ios/logs/*.log
 
   steps:
+    - &step_public_domain_gate
+      name: Verify public-domain contract
+      script: |
+        set -euo pipefail
+        TARGET_ENV=prod node .github/scripts/public-domain-contract.mjs account-deletion-url
     - &step_pub_get
       name: Flutter pub get
       script: flutter pub get --enforce-lockfile
@@ -157,6 +165,7 @@ workflows:
           include: true
       cancel_previous_builds: false
     scripts:
+      - *step_public_domain_gate
       - *step_pub_get
       - *step_analyze
       - *step_test
@@ -165,12 +174,15 @@ workflows:
       - name: Build signed IPA (production)
         script: |
           set -euo pipefail
+          ACCOUNT_DELETION_ENABLED="${ACCOUNT_DELETION_ENABLED:-false}"
+          case "$ACCOUNT_DELETION_ENABLED" in true|false) ;; *) exit 1 ;; esac
           flutter build ipa --release \
             --dart-define=CERTIGO_ENV="$CERTIGO_ENV" \
             --dart-define=API_BASE_URL="$PROD_API_BASE_URL" \
             --dart-define=ENTRA_CLIENT_ID="$ENTRA_CLIENT_ID" \
             --dart-define=ENTRA_AUTHORITY="$ENTRA_AUTHORITY" \
             --dart-define=ENTRA_API_SCOPE="$ENTRA_API_SCOPE" \
+            --dart-define=ACCOUNT_DELETION_ENABLED="$ACCOUNT_DELETION_ENABLED" \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist="$HOME/export_options.plist"
@@ -227,12 +239,15 @@ workflows:
       - name: Build signed IPA (dev, no upload)
         script: |
           set -euo pipefail
+          ACCOUNT_DELETION_ENABLED="${ACCOUNT_DELETION_ENABLED:-false}"
+          case "$ACCOUNT_DELETION_ENABLED" in true|false) ;; *) exit 1 ;; esac
           flutter build ipa --release \
             --dart-define=CERTIGO_ENV="$CERTIGO_ENV" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
             --dart-define=ENTRA_CLIENT_ID="$ENTRA_CLIENT_ID" \
             --dart-define=ENTRA_AUTHORITY="$ENTRA_AUTHORITY" \
             --dart-define=ENTRA_API_SCOPE="$ENTRA_API_SCOPE" \
+            --dart-define=ACCOUNT_DELETION_ENABLED="$ACCOUNT_DELETION_ENABLED" \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist="$HOME/export_options.plist"

@@ -56,7 +56,10 @@ public sealed record UserCredentialRecord(
     // reservations shipped. New registrations stay pending until their profile
     // has been provisioned, which makes an interrupted sign-up recoverable.
     CredentialProvisioningState? ProvisioningState = null,
-    DateTimeOffset? ProvisioningLeaseExpiresAt = null)
+    DateTimeOffset? ProvisioningLeaseExpiresAt = null,
+    // Random, opaque local subject used by LinkedIdentity. It is generated once
+    // in shadow mode and is never derived from the credential email.
+    string? IdentitySubject = null)
 {
     /// Discriminator persisted alongside the document; combined with the id
     /// prefix it keeps credential docs unambiguously separate from profiles.
@@ -129,7 +132,11 @@ public interface IPasswordHasher
 /// tokens are only honoured here to re-issue an access token.
 public interface ITokenIssuer
 {
-    IssuedTokens Issue(string userId, string displayName, string email);
+    IssuedTokens Issue(
+        string userId,
+        string displayName,
+        string email,
+        DateTimeOffset? authenticatedAt = null);
 
     /// Validates a refresh token (signature, lifetime, and the refresh marker)
     /// and returns the carried principal, or <see langword="null"/> when invalid.
@@ -138,7 +145,11 @@ public interface ITokenIssuer
 
 public sealed record IssuedTokens(string AccessToken, string RefreshToken, DateTimeOffset AccessTokenExpiresAt);
 
-public sealed record RefreshTokenPrincipal(string UserId, string DisplayName, string Email);
+public sealed record RefreshTokenPrincipal(
+    string UserId,
+    string DisplayName,
+    string Email,
+    DateTimeOffset AuthenticatedAt);
 
 // --- Email delivery + verification ----------------------------------------
 

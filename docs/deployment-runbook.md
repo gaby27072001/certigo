@@ -12,6 +12,12 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 >
 > Les actions humaines restantes concernent surtout la gouvernance (OIDC Azure AD, environments,
 > branch protection), pas l'édition des workflows runners.
+>
+> **Supersession sécurité (août 2026).** Les recettes historiques T0.1 qui créent des
+> identités ou attribuent `Owner` ne sont plus autorisées pour Certigo. Pour toute opération
+> OIDC/RBAC ou runner, appliquer uniquement
+> [`CLOUD_LEAST_PRIVILEGE.md`](./runbooks/CLOUD_LEAST_PRIVILEGE.md); cette PR n'exécute
+> aucune mutation live.
 
 ---
 
@@ -25,6 +31,10 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
 | Configuration GitHub OIDC | ✅ Opérationnelle aux scopes existants ; ne pas déplacer sans audit | §T0.1 |
 | Clé JWT + expiration par Environment | ⛔ **Humain** — obligatoire avant staging/prod | §T0.4 |
+| Permissions Graph app-only minimales | ✅ Configurées et consenties ; `User.Read` non configurée/non utilisée, nettoyage séparé | §T0.1 |
+| Identité Graph de suppression + audience de preuve | ✅ Secret + 3 variables configurés dans `staging`/`prod` ; Key Vault et app settings automatisés | §T0.1 |
+| Fédération Sign in with Apple | ✅ App ID, Service ID, domaine/return URL et `susi_certigo` configurés ; bouton visible | §T0.1 |
+| Révocation Apple après suppression | ⛔ **Post-déploiement** — test réel avec compte sacrifiable, puis contrôle de disparition/révocation de l’association | §T0.1 |
 | Destinataire `ALERT_EMAIL` par Environment | ✅ Configuré dans `staging`/`prod`, valeur non divulguée et hors dépôt | §T0.4 |
 | Réseau privé atomique Storage / Key Vault / Cosmos + peering CI | ✅ IaC + hotfix OneDeploy | `infra/modules/privateNetwork.bicep` |
 | GitHub Environments `dev`/`staging`/`prod` | ✅ Créés ; staging/prod limités aux branches protégées et configurés JWT | §T0.3 |
@@ -49,10 +59,14 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
    effectivement consommé.
 5. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
    `AUTH_JWT_SIGNING_KEY` / `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`, sans afficher sa valeur.
-6. Contrôler que la variable non secrète `ALERT_EMAIL` de chaque Environment
+6. En cas d'échec du prévol de suppression de compte, contrôler le jeu complet
+   du secret `ENTRA_GRAPH_CLIENT_SECRET` et des variables
+   `ENTRA_GRAPH_TENANT_ID`, `ENTRA_GRAPH_CLIENT_ID` et
+   `ENTRA_REAUTH_AUDIENCE`. Ne jamais afficher le secret.
+7. Contrôler que la variable non secrète `ALERT_EMAIL` de chaque Environment
    `staging`/`prod` désigne une boîte réellement supervisée ; aucune valeur par
    défaut n'est committée.
-7. Pour un rollback, relever le `sourceRunId` de `previous` dans l'état de
+8. Pour un rollback, relever le `sourceRunId` de `previous` dans l'état de
    déploiement et utiliser `promote-backend` avec `operation=rollback`. Le chemin
    rollback refuse tout autre artefact et ne redéploie pas Bicep.
 
@@ -135,13 +149,27 @@ depuis cette boîte puis relancer le test. Ne jamais déclencher volontairement 
 erreur ARM/OneDeploy en production pour tester l'Activity Log Alert. Procédure Azure
 officielle : [tester un Action Group](https://learn.microsoft.com/azure/azure-monitor/alerts/action-groups#test-an-action-group-in-the-azure-portal).
 
-La publication GitHub Pages de la politique de confidentialité suit la même
-frontière de confiance :
+La publication GitHub Pages des pages légales (politique de confidentialité
+`/privacy-policy/` et demande de suppression `/account-deletion/`) est
+fail-closed. Le GitHub Environment `github-pages` doit fournir une
+`PUBLIC_WEB_ORIGIN` HTTPS canonique et `PUBLIC_DOMAIN_VERIFIED=true`; sinon le
+builder échoue avant la création de l'artefact. Ne déclencher le dispatch
+qu'après avoir suivi [`PUBLIC_DOMAIN_MIGRATION.md`](./PUBLIC_DOMAIN_MIGRATION.md) :
 
 ```bash
 gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" \
-  -f event_type=deploy-privacy-policy
+  -f event_type=publish-verified-public-pages
 ```
+
+Le dispatch historique `deploy-privacy-policy` reste neutralisé et ne doit pas
+être utilisé comme chemin d'activation.
+
+Staging et production reçoivent en plus
+`APPLE_CIAM_DOMAIN_RECONFIGURED=true` depuis leur GitHub Environment avant toute
+opération de déploiement ou rollback. L'Environment `beta` et le groupe
+Codemagic `certigo_mobile_config` fournissent le même triplet avant toute release
+mobile. Les fichiers de paramètres versionnés conservent les valeurs
+vides/fausses.
 
 ### Pourquoi Azure-first (long terme)
 
@@ -269,44 +297,76 @@ Ordre de mise en service inter-branches :
 Cet ordre est compatible avec le template actuel, où le paramètre existe déjà mais
 reste facultatif, et avec le template durci de la PR #263.
 
-### Commandes
+### Identité Graph de suppression de compte
+
+Le client confidentiel Graph dédié est créé. Les permissions d’application
+Microsoft Graph minimales `User.RevokeSessions.All` et `User.ReadWrite.All`
+sont consenties par un administrateur. `User.Read`, visible uniquement sous
+« Autres autorisations accordées », n’est ni configurée ni utilisée par Certigo ;
+son nettoyage est une tâche distincte.
+
+Les GitHub Environments `staging` et `prod` contiennent :
+
+- le **secret GitHub Environment** `ENTRA_GRAPH_CLIENT_SECRET` ;
+- `ENTRA_GRAPH_TENANT_ID` : Directory/Tenant ID du tenant External ID ;
+- `ENTRA_GRAPH_CLIENT_ID` : Application/Client ID du client Graph dédié ;
+- `ENTRA_REAUTH_AUDIENCE` : client ID de l’application mobile qui reçoit l’ID
+  token OIDC de ré-authentification.
+
+`cd-backend.yml` lit ces valeurs uniquement après l’entrée dans le GitHub
+Environment ciblé, les valide avec les autres paramètres de déploiement, puis les
+écrit dans le fichier ARM temporaire `0600`. Le secret reste un paramètre Bicep
+`@secure`; `keyvaultGraphClientSecret.bicep` crée ou rotationne sa version dans
+le Key Vault Certigo et retourne son URI versionnée. `functionApp.bicep`
+maintient les quatre app settings, dont
+`ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI`, à chaque déploiement. Aucune commande
+`az keyvault secret set`, `az functionapp config appsettings set` ni saisie
+portail post-déploiement n’est nécessaire.
+
+En `dev`, le writer ignore explicitement ces entrées, le module Key Vault n’est
+pas déployé et l’identité externe reste indisponible plutôt qu’émulée avec une
+identité réelle.
+
+### Sign in with Apple
+
+La configuration externe est accomplie : Sign in with Apple est activé sur
+l’App ID mobile, le Service ID Certigo CIAM est associé au domaine et à la
+return URL, Apple est activé dans `susi_certigo` et le bouton est visible.
+
+Après le déploiement de cette PR, la seule validation Apple restante consiste à
+utiliser un compte sacrifiable pour un parcours réel connexion → suppression,
+puis à vérifier la disparition ou la révocation de l’association Apple.
+
+### Gate de suppression de compte
+
+`ACCOUNT_DELETION_ENABLED` reste `false` par défaut. Avant toute activation,
+déclencher manuellement le `repository_dispatch`
+`test-account-deletion-cosmos`, chargé depuis `main`, sans payload. Le runner
+trusted doit être éphémère et disposer de Docker ; le workflow génère une clé
+locale, crée une base d’émulation unique et détruit le conteneur en `finally`.
+Il ne se connecte pas à Azure et ne modifie ni RBAC ni infrastructure. Un test
+skippé ou non démarré ne permet jamais d’activer la feature.
+
+### Gate Person / LinkedIdentity
+
+`PERSON_LINKED_IDENTITY_V1` est explicitement `off` dans `dev`, `staging` et
+`prod`. Le runtime courant n'accepte que `off|shadow`. `shadow` conserve le
+`userId` legacy comme autorité et ajoute uniquement des overlays/mirrors
+idempotents ; il n'active aucun endpoint ni UI de liaison. Toute activation
+requiert d'abord le gate backend/Cosmos de la PR runtime puis une décision
+opérationnelle séparée. Les valeurs futures `resolve` et `link` échouent au
+démarrage dans cette version.
+
+### Prévol read-only
 
 ```bash
-# 1) App registration + service principal
-APP_ID=$(az ad app create --display-name "$APP_NAME" --query appId -o tsv)
-az ad sp create --id "$APP_ID"
-
-# 2) Federated credentials — une par environnement
-for ENVNAME in dev staging prod; do
-  az ad app federated-credential create --id "$APP_ID" --parameters "{
-    \"name\": \"github-env-$ENVNAME\",
-    \"issuer\": \"https://token.actions.githubusercontent.com\",
-    \"subject\": \"repo:$GH_ORG/$GH_REPO:environment:$ENVNAME\",
-    \"audiences\": [\"api://AzureADTokenExchange\"]
-  }"
-done
-
-# (Optionnel) FC pour les push directs sur main sans environnement explicite.
-# Inutile si les push passent par l'environnement dev (cas par défaut).
-# az ad app federated-credential create --id "$APP_ID" --parameters "{
-#   \"name\": \"github-branch-main\",
-#   \"issuer\": \"https://token.actions.githubusercontent.com\",
-#   \"subject\": \"repo:$GH_ORG/$GH_REPO:ref:refs/heads/main\",
-#   \"audiences\": [\"api://AzureADTokenExchange\"]
-# }"
-
-# 3) Rôle Owner au scope souscription
-az role assignment create --assignee "$APP_ID" --role "Owner" \
-  --scope "/subscriptions/$SUBSCRIPTION_ID"
-
-# 4) Exemple pour un nouveau dépôt uniquement — ne pas exécuter sur Certigo sans audit
-gh secret set AZURE_CLIENT_ID       --repo "$GH_ORG/$GH_REPO" --body "$APP_ID"
-gh secret set AZURE_TENANT_ID       --repo "$GH_ORG/$GH_REPO" --body "$TENANT_ID"
-gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPTION_ID"
+export AZURE_SUBSCRIPTION_ID="<SUBSCRIPTION_ID>"
+bash infra/governance/inventory.sh > inventory.json
+bash infra/governance/what-if.sh
 ```
 
-> 💡 Si la politique de l'org restreint la création d'app registrations, faire exécuter ces
-> commandes par un administrateur du tenant `fdpo.onmicrosoft.com`.
+Toute création d'identité/rôle/policy et toute modification de GitHub Environment sont des
+actions humaines PIM hors de cette PR.
 
 ---
 
@@ -414,10 +474,12 @@ timestamp ISO 8601 absolu obligatoire. Elle n'est jamais calculée avec `utcNow(
 un redéploiement identique ne prolonge donc pas silencieusement la durée de vie du
 secret.
 
-Configurer dans chaque GitHub Environment `staging`/`prod` :
+Conserver dans chaque GitHub Environment `staging`/`prod` :
 
 - le secret `AUTH_JWT_SIGNING_KEY` ;
 - la variable non secrète `AUTH_JWT_SIGNING_KEY_EXPIRES_ON` ;
+- le secret et les trois variables de l’identité Graph décrits en §T0.1, déjà
+  configurés ;
 - la variable non secrète `ALERT_EMAIL`, pointant vers une boîte réellement
   supervisée et capable de recevoir du courrier.
 

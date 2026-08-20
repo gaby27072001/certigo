@@ -67,6 +67,26 @@ public sealed class JwtTokenIssuerTests
     }
 
     [Fact]
+    public async Task Authentication_time_is_bound_into_access_and_refresh_tokens()
+    {
+        var authenticatedAt = DateTimeOffset.FromUnixTimeSeconds(
+            DateTimeOffset.UtcNow.AddMinutes(-3).ToUnixTimeSeconds());
+        var issuer = NewIssuer();
+        var tokens = issuer.Issue(
+            "user-1",
+            "Alice",
+            "alice@example.com",
+            authenticatedAt);
+
+        var access = await NewValidator().TryValidateAsync(tokens.AccessToken);
+        var refresh = issuer.ValidateRefreshToken(tokens.RefreshToken);
+
+        access.Principal!.FindFirst("auth_time")!.Value.Should()
+            .Be(authenticatedAt.ToUnixTimeSeconds().ToString());
+        refresh!.AuthenticatedAt.Should().Be(authenticatedAt);
+    }
+
+    [Fact]
     public async Task Refresh_token_cannot_be_used_as_an_access_token()
     {
         var tokens = NewIssuer().Issue("user-1", "Alice", "alice@example.com");

@@ -64,6 +64,7 @@ class PrismButton extends StatefulWidget {
 
 class _PrismButtonState extends State<PrismButton> {
   bool _down = false;
+  bool _focused = false;
 
   bool get _enabled => widget.onPressed != null && !widget.loading;
 
@@ -75,8 +76,7 @@ class _PrismButtonState extends State<PrismButton> {
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
-    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final Duration fast = reduceMotion ? Duration.zero : PrismMotion.fast;
+    final Duration fast = PrismMotion.resolve(context, PrismMotion.fast);
     final bool depth = widget.variant != PrismButtonVariant.ghost;
     final double lip = depth ? 4 : 0;
     final double sink = depth && _down ? lip : 0;
@@ -113,45 +113,63 @@ class _PrismButtonState extends State<PrismButton> {
       button: true,
       enabled: _enabled,
       label: widget.label,
-      child: GestureDetector(
-        onTapDown: _enabled ? (_) => setState(() => _down = true) : null,
-        onTapUp: _enabled ? (_) => setState(() => _down = false) : null,
-        onTapCancel: _enabled ? () => setState(() => _down = false) : null,
-        onTap: _enabled ? _handleTap : null,
-        child: AnimatedOpacity(
-          opacity: _enabled ? 1 : 0.5,
-          duration: fast,
-          child: SizedBox(
-            height: 54 + lip,
-            child: Stack(
-              children: <Widget>[
-                if (depth)
-                  Positioned(
-                    top: lip,
-                    left: 0,
-                    right: 0,
-                    child: Container(height: 54, decoration: _baseDecoration(p)),
-                  ),
-                AnimatedPositioned(
-                  duration: fast,
-                  curve: PrismMotion.standard,
-                  top: sink,
-                  left: 0,
-                  right: 0,
-                  child: AnimatedScale(
-                    scale: _down ? 0.995 : 1.0,
-                    duration: fast,
-                    curve: PrismMotion.standard,
-                    child: Container(
-                      height: 54,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      decoration: _topDecoration(p),
-                      alignment: Alignment.center,
-                      child: content,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: PrismRadii.buttonAll,
+          overlayColor: const WidgetStatePropertyAll<Color>(Colors.transparent),
+          onFocusChange: (bool value) {
+            if (_focused != value) setState(() => _focused = value);
+          },
+          onHighlightChanged: _enabled
+              ? (bool value) {
+                  if (_down != value) setState(() => _down = value);
+                }
+              : null,
+          onTap: _enabled ? _handleTap : null,
+          child: AnimatedOpacity(
+            opacity: _enabled ? 1 : 0.5,
+            duration: fast,
+            child: Container(
+              foregroundDecoration: _focused
+                  ? BoxDecoration(
+                      borderRadius: PrismRadii.buttonAll,
+                      border: Border.all(color: p.textPrimary, width: 2),
+                    )
+                  : null,
+              child: SizedBox(
+                height: 54 + lip,
+                child: Stack(
+                  children: <Widget>[
+                    if (depth)
+                      Positioned(
+                        top: lip,
+                        left: 0,
+                        right: 0,
+                        child: Container(height: 54, decoration: _baseDecoration(p)),
+                      ),
+                    AnimatedPositioned(
+                      duration: fast,
+                      curve: PrismMotion.standard,
+                      top: sink,
+                      left: 0,
+                      right: 0,
+                      child: AnimatedScale(
+                        scale: _down ? 0.995 : 1.0,
+                        duration: fast,
+                        curve: PrismMotion.standard,
+                        child: Container(
+                          height: 54,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          decoration: _topDecoration(p),
+                          alignment: Alignment.center,
+                          child: content,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

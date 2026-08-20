@@ -42,6 +42,9 @@ public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeader
         DateTimeOffset occurredAt,
         CancellationToken cancellationToken = default)
     {
+        await using var writeLease = await context.AcquireAccountWriteLeaseAsync(
+            userId,
+            cancellationToken);
         var periodLeagueId = LeaguePeriods.ForInstant(occurredAt).Compose(Tier);
         var id = $"{periodLeagueId}:{userId}";
         var profile = await context.Users.ReadOrDefaultAsync<UserProfileDto>(userId, new PartitionKey(userId), cancellationToken);
@@ -78,13 +81,18 @@ public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeader
 
             try
             {
+                ItemResponse<LeaderboardEntryDocument> response;
+                await writeLease.MarkMutationDispatchedAsync();
                 if (existing is null)
                 {
-                    await context.Leaderboard.CreateItemAsync(updated, partitionKey, cancellationToken: cancellationToken);
+                    response = await context.Leaderboard.CreateItemAsync(
+                        updated,
+                        partitionKey,
+                        cancellationToken: cancellationToken);
                 }
                 else
                 {
-                    await context.Leaderboard.ReplaceItemAsync(
+                    response = await context.Leaderboard.ReplaceItemAsync(
                         updated,
                         id,
                         partitionKey,
@@ -92,10 +100,16 @@ public sealed class CosmosLeaderboardRepository(CosmosContext context) : ILeader
                         cancellationToken);
                 }
 
+                await writeLease.CommitAsync(
+                    CosmosContainers.Leaderboard,
+                    response.Headers.Session,
+                    cancellationToken);
                 return;
             }
-            catch (CosmosException ex) when (attempt < 3 && ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict)
+            catch (CosmosException ex) when (
+                ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict)
             {
+                writeLease.MarkDefinitelyNotCommitted();
                 // Concurrent writer won this round; re-read and retry with fresh ETag.
             }
         }

@@ -3,7 +3,7 @@
 /// Never hard-code endpoints or client ids. Build flavors pass values:
 /// ```
 /// flutter run --dart-define=CERTIGO_ENV=dev \
-///   --dart-define=API_BASE_URL=https://dev.api.certigo.app \
+///   --dart-define=API_BASE_URL=https://api.example.invalid \
 ///   --dart-define=ENTRA_CLIENT_ID=... --dart-define=ENTRA_AUTHORITY=...
 /// ```
 enum AppFlavor { dev, staging, prod }
@@ -112,6 +112,12 @@ class AppEnv {
   /// Force l'affichage de l'écran de connexion même sans Entra configuré, pour
   /// prévisualiser/tester l'UI en dev (`--dart-define=FORCE_AUTH_UI=true`).
   static const bool forceAuthUi = bool.fromEnvironment('FORCE_AUTH_UI', defaultValue: false);
+
+  /// Keeps account deletion hidden until the destructive Cosmos gate passes.
+  static const bool accountDeletionEnabled = bool.fromEnvironment(
+    'ACCOUNT_DELETION_ENABLED',
+    defaultValue: false,
+  );
 
   /// Assouplit [validate] : quand `true`, l'absence **totale** de configuration
   /// Entra (client id + autorité vides) devient un simple avertissement au lieu

@@ -12,6 +12,8 @@ Azure|https://management.azure.com/metadata/endpoints?api-version=2020-06-01}"
 
 failures=0
 report=""
+metrics=""
+probe_started_ms="$(date +%s%3N)"
 
 if [[ ! "${MIN_FREE_GB}" =~ ^[0-9]+$ ]]; then
   echo "MIN_FREE_GB must be a non-negative integer." >&2
@@ -28,16 +30,41 @@ record() {
   fi
 }
 
+record_metric() {
+  local name="$1"
+  local value="$2"
+  local unit="$3"
+  metrics+="| ${name} | ${value} | ${unit} |"$'\n'
+}
+
 record "runner" "PASS" "${RUNNER_NAME:-unknown} / ${RUNNER_OS:-unknown} / ${RUNNER_ARCH:-unknown}"
+record_metric "runner.lifecycle.active" "1" "count"
+
+if [[ -n "${RUN_QUEUE_WAIT_SECONDS:-}" ]]; then
+  if [[ ! "${RUN_QUEUE_WAIT_SECONDS}" =~ ^[0-9]+$ ]]; then
+    echo "RUN_QUEUE_WAIT_SECONDS must be a non-negative integer." >&2
+    exit 2
+  fi
+  record_metric "runner.queue.wait" "${RUN_QUEUE_WAIT_SECONDS}" "seconds"
+fi
 
 while IFS='|' read -r name url; do
   [[ -z "${name}" ]] && continue
+  request_started_ms="$(date +%s%3N)"
   if curl --fail --silent --show-error --location --retry 2 \
     --connect-timeout 10 --max-time 30 --output /dev/null "${url}"; then
     record "${name}" "PASS" "${url}"
   else
     record "${name}" "FAIL" "${url}"
   fi
+  request_finished_ms="$(date +%s%3N)"
+  case "${name}" in
+    NuGet | pub.dev | npm)
+      metric_name="$(tr '[:upper:].' '[:lower:]_' <<< "${name}")"
+      record_metric "runner.package.${metric_name}.latency" \
+        "$((request_finished_ms - request_started_ms))" "milliseconds"
+      ;;
+  esac
 done <<< "${PROBE_ENDPOINTS}"
 
 for tool in ${REQUIRED_TOOLS}; do
@@ -74,12 +101,30 @@ else
   record "free disk" "FAIL" "unable to read available space at ${DISK_PATH}"
 fi
 
+cache_kb=0
+IFS=':' read -r -a cache_paths <<< "${CACHE_PATHS:-${HOME}/.nuget/packages:${HOME}/.npm:${PUB_CACHE:-}}"
+for cache_path in "${cache_paths[@]}"; do
+  [[ -z "${cache_path}" || ! -d "${cache_path}" ]] && continue
+  current_cache_kb="$(du -sk -- "${cache_path}" | awk '{ print $1 }')"
+  if [[ "${current_cache_kb}" =~ ^[0-9]+$ ]]; then
+    cache_kb=$((cache_kb + current_cache_kb))
+  fi
+done
+record_metric "runner.cache.local" "$((cache_kb * 1024))" "bytes"
+record_metric "runner.probe.duration" "$(( $(date +%s%3N) - probe_started_ms ))" "milliseconds"
+
 {
   echo "### Certigo runner health"
   echo
   echo "| Component | Result | Detail |"
   echo "|---|---|---|"
   printf '%s' "${report}"
+  echo
+  echo "### Certigo runner metrics"
+  echo
+  echo "| Metric | Value | Unit |"
+  echo "|---|---:|---|"
+  printf '%s' "${metrics}"
 }
 
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
@@ -89,6 +134,12 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     echo "| Component | Result | Detail |"
     echo "|---|---|---|"
     printf '%s' "${report}"
+    echo
+    echo "### Certigo runner metrics"
+    echo
+    echo "| Metric | Value | Unit |"
+    echo "|---|---:|---|"
+    printf '%s' "${metrics}"
   } >> "${GITHUB_STEP_SUMMARY}"
 fi
 

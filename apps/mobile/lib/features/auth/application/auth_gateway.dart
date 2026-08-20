@@ -50,6 +50,10 @@ abstract interface class AuthGateway {
   /// Déconnexion (locale par défaut ; le nettoyage du stockage est géré par le
   /// contrôleur).
   Future<void> signOut(AuthSession session);
+
+  /// Ré-authentification interactive pour une opération sensible. Le fournisseur
+  /// doit ignorer les cookies silencieux et produire une preuve `auth_time` fraîche.
+  Future<AuthSession> reauthenticate(AuthProvider provider);
 }
 
 /// Implémentation réelle basée sur `flutter_appauth` + Microsoft Entra
@@ -87,7 +91,16 @@ class AppAuthGateway implements AuthGateway {
           : ExternalUserAgent.asWebAuthenticationSession;
 
   @override
-  Future<AuthSession> signIn(AuthProvider provider) async {
+  Future<AuthSession> signIn(AuthProvider provider) => _authenticate(provider, sensitive: false);
+
+  @override
+  Future<AuthSession> reauthenticate(AuthProvider provider) =>
+      _authenticate(provider, sensitive: true);
+
+  Future<AuthSession> _authenticate(
+    AuthProvider provider, {
+    required bool sensitive,
+  }) async {
     try {
       // Étape 1 — ouverture de l'autorisation (navigateur système). On sépare
       // volontairement `authorize()` de `token()` (plutôt que le combiné
@@ -101,10 +114,13 @@ class AppAuthGateway implements AuthGateway {
           AppEnv.entraRedirectUri,
           issuer: AppEnv.entraAuthority,
           scopes: _scopes,
-          additionalParameters: _hintFor(provider),
+          additionalParameters: <String, String>{
+            ...?_hintFor(provider),
+            if (sensitive) 'max_age': '0',
+          },
           // Laisse l'utilisateur choisir/ajouter un compte à chaque connexion
           // explicite (utile après une déconnexion).
-          promptValues: const <String>['select_account'],
+          promptValues: sensitive ? const <String>['login'] : const <String>['select_account'],
           externalUserAgent: _preferredUserAgent,
         ),
       );
@@ -162,8 +178,14 @@ class AppAuthGateway implements AuthGateway {
         provider,
       );
     } on FlutterAppAuthUserCancelledException {
-      _diagnostics.mark(AuthDiagnosticStep.failed, detail: 'annulé par l\'utilisateur');
-      throw const AuthGatewayException('Connexion annulée.', cause: AuthFailureCause.cancelled);
+      _diagnostics.mark(
+        AuthDiagnosticStep.failed,
+        detail: 'annulé par l\'utilisateur',
+      );
+      throw const AuthGatewayException(
+        'Connexion annulée.',
+        cause: AuthFailureCause.cancelled,
+      );
     } on AuthGatewayException {
       // Déjà typée + tracée (ex. code d'autorisation absent) : relayer telle quelle.
       rethrow;
@@ -172,12 +194,22 @@ class AppAuthGateway implements AuthGateway {
       // Annulation : on garde le message propre, sans bruit technique.
       final String? diagnostic =
           described.cause == AuthFailureCause.cancelled ? null : _platformDiagnostic(e);
-      _diagnostics.mark(AuthDiagnosticStep.failed, detail: diagnostic ?? described.message);
-      throw AuthGatewayException(described.message, cause: described.cause, diagnostic: diagnostic);
+      _diagnostics.mark(
+        AuthDiagnosticStep.failed,
+        detail: diagnostic ?? described.message,
+      );
+      throw AuthGatewayException(
+        described.message,
+        cause: described.cause,
+        diagnostic: diagnostic,
+      );
     } catch (e) {
       // Erreur inattendue (non PlatformException) : on ne l'avale pas, on
       // remonte son type + toString() pour diagnostic à l'écran.
-      _diagnostics.mark(AuthDiagnosticStep.failed, detail: '${e.runtimeType} : $e');
+      _diagnostics.mark(
+        AuthDiagnosticStep.failed,
+        detail: '${e.runtimeType} : $e',
+      );
       throw AuthGatewayException(
         'La connexion via ${provider.id} a échoué. Vérifiez la configuration Entra puis réessayez.',
         cause: AuthFailureCause.providerError,
@@ -274,10 +306,8 @@ class AppAuthGateway implements AuthGateway {
         null,
       );
     } on PlatformException catch (e) {
-      final ({String message, AuthFailureCause cause}) described = _describeError(
-        e,
-        AuthProvider.microsoft,
-      );
+      final ({String message, AuthFailureCause cause}) described =
+          _describeError(e, AuthProvider.microsoft);
       throw AuthGatewayException(
         described.message,
         cause: described.cause,
@@ -326,6 +356,7 @@ class AppAuthGateway implements AuthGateway {
     AuthProvider? provider,
   ) {
     final Map<String, dynamic> claims = _decodeJwtClaims(idToken);
+    final String? userId = (claims['oid'] ?? claims['sub']) as String?;
     final String? name = (claims['name'] ?? claims['preferred_username']) as String?;
     final String? email = (claims['email'] ?? claims['preferred_username']) as String?;
     return AuthSession(
@@ -335,6 +366,7 @@ class AppAuthGateway implements AuthGateway {
       refreshToken: refreshToken,
       idToken: idToken,
       accessTokenExpiry: expiry,
+      userId: userId,
       displayName: name,
       email: email,
       provider: provider,
@@ -348,7 +380,9 @@ class AppAuthGateway implements AuthGateway {
     final List<String> parts = token.split('.');
     if (parts.length != 3) return const <String, dynamic>{};
     try {
-      final String payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      final String payload = utf8.decode(
+        base64Url.decode(base64Url.normalize(parts[1])),
+      );
       final Object? decoded = jsonDecode(payload);
       return decoded is Map<String, dynamic> ? decoded : const <String, dynamic>{};
     } catch (_) {

@@ -47,11 +47,14 @@ class HomeData {
   }
 }
 
-/// Loads [HomeData] by composing the shared profile + path providers, keyed off
-/// the profile's active track (falls back to AZ-900 for fresh accounts).
+/// Loads [HomeData] from the explicit active certification.
+///
+/// There is deliberately no exam fallback: onboarding, the local cache, or the
+/// profile API must provide a track id so Home can never show the wrong path.
 final homeDataProvider = FutureProvider.autoDispose<HomeData>((Ref ref) async {
+  final String? trackId = await ref.watch(activeTrackProvider.future);
+  if (trackId == null) throw const MissingActiveTrackException();
   final UserProfile profile = await ref.watch(meProvider.future);
-  final String trackId = profile.activeTrackId ?? 'az-900';
   final LearningPath path = await ref.watch(pathProvider(trackId).future);
   return HomeData(profile: profile, path: path);
 });

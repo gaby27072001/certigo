@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/prism_color_scheme.dart';
+import '../tokens/prism_motion.dart';
 import '../tokens/prism_radii.dart';
 import 'quiz_option_tile.dart';
 
@@ -53,8 +54,8 @@ class MatchTile extends StatelessWidget {
                 onTap!.call();
               },
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOut,
+          duration: PrismMotion.resolve(context, PrismMotion.fast),
+          curve: PrismMotion.standard,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           decoration: BoxDecoration(
             color: s.fill,

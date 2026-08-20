@@ -20,6 +20,25 @@ param cosmosLocation string = ''
 @description('Base name used to derive resource names. Lowercase, no spaces.')
 param appName string = 'certigo'
 
+@description('Additional resource tags preserved when applying the mandatory FinOps contract.')
+param tags object = {}
+
+@description('Owning team or service. Never use a personal identity.')
+@minLength(1)
+param tagOwner string = 'certigo-platform'
+
+@description('Product in the FinOps contract.')
+@allowed([ 'Certigo' ])
+param tagProduct string = 'Certigo'
+
+@description('Declarative owner of the resource.')
+@allowed([ 'bicep' ])
+param tagManagedBy string = 'bicep'
+
+@description('Non-personal cost allocation identifier.')
+@minLength(1)
+param tagCostCenter string = 'engineering'
+
 @description('Entra External ID authority URL. Format: https://<domain>.ciamlogin.com/<tenant-id>/v2.0. Replace with the value from Azure Portal -> External ID tenant -> Overview. Leave empty until the tenant is created.')
 @secure()
 param entraAuthority string = ''
@@ -27,6 +46,35 @@ param entraAuthority string = ''
 @description('Entra External ID application (audience) client ID — the App Registration client ID. Replace with the value from Azure Portal -> External ID -> App registrations -> <your-app> -> Overview. Leave empty until configured.')
 @secure()
 param entraAudience string = ''
+@description('Mobile Entra application client ID expected in fresh OIDC ID-token proofs for sensitive account deletion.')
+@secure()
+param entraReauthAudience string = ''
+@description('External ID tenant ID used by the dedicated Microsoft Graph confidential client.')
+@secure()
+param entraGraphTenantId string = ''
+@description('Application client ID of the dedicated Microsoft Graph confidential client in the External ID tenant.')
+@secure()
+param entraGraphClientId string = ''
+@description('Microsoft Graph confidential-client secret. Supplied only as a secure deployment parameter; Bicep stores it in the environment Key Vault and passes only its versioned URI to the Function App.')
+@secure()
+param entraGraphClientSecret string = ''
+@description('Absolute ISO 8601 expiration of the Microsoft Graph confidential-client secret.')
+@secure()
+param entraGraphClientSecretExpiresOn string = ''
+@description('Enables the account-deletion API only after the Cosmos integration gate has passed. Defaults fail-closed.')
+param accountDeletionEnabled bool = false
+@description('Canonical HTTPS origin for a Certigo-controlled public web domain. Empty keeps every public-domain feature disabled.')
+param publicWebOrigin string = ''
+@description('Explicit evidence that the configured public domain is controlled by Certigo. Defaults fail-closed.')
+param publicDomainVerified bool = false
+@description('Explicit evidence that Apple CIAM domain and return URLs were reconfigured for the controlled domain. Defaults fail-closed.')
+param appleCiamDomainReconfigured bool = false
+@description('Person/LinkedIdentity V1 runtime mode. Shadow only writes additive mirrors; legacy userId remains authoritative.')
+@allowed([
+  'off'
+  'shadow'
+])
+param personLinkedIdentityV1 string = 'off'
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
 @description('Azure OpenAI resource endpoint used by the tutor when enabled. Example: https://<resource>.openai.azure.com/.')
@@ -199,6 +247,103 @@ var authMode = env == 'dev' ? 'dev' : 'prod'
 // auth, Key Vault purge protection + 90-day soft delete, geo-redundant + versioned
 // storage, and a locked-down CORS origin set.
 var hardened = env != 'dev'
+var publicWebOriginLower = toLower(publicWebOrigin)
+var publicWebOriginAuthority = startsWith(publicWebOriginLower, 'https://')
+  ? substring(publicWebOriginLower, 8)
+  : ''
+var publicWebOriginAllowedCharacters = [
+  'a'
+  'b'
+  'c'
+  'd'
+  'e'
+  'f'
+  'g'
+  'h'
+  'i'
+  'j'
+  'k'
+  'l'
+  'm'
+  'n'
+  'o'
+  'p'
+  'q'
+  'r'
+  's'
+  't'
+  'u'
+  'v'
+  'w'
+  'x'
+  'y'
+  'z'
+  '0'
+  '1'
+  '2'
+  '3'
+  '4'
+  '5'
+  '6'
+  '7'
+  '8'
+  '9'
+  '.'
+  '-'
+]
+var publicWebOriginAuthorityRemainder = reduce(
+  publicWebOriginAllowedCharacters,
+  publicWebOriginAuthority,
+  (remaining, character) => replace(remaining, character, '')
+)
+var publicWebOriginLabels = split(publicWebOriginAuthority, '.')
+var publicWebOriginLabelsAreValid = reduce(
+  publicWebOriginLabels,
+  true,
+  (valid, label) => valid && length(label) > 0 && length(label) <= 63 && !startsWith(label, '-') && !endsWith(label, '-')
+)
+var publicWebOriginIsPlaceholder = publicWebOriginAuthority == 'localhost' || publicWebOriginAuthority == 'example.com' || publicWebOriginAuthority == 'example.net' || publicWebOriginAuthority == 'example.org' || endsWith(publicWebOriginAuthority, '.example') || endsWith(publicWebOriginAuthority, '.invalid') || endsWith(publicWebOriginAuthority, '.localhost') || endsWith(publicWebOriginAuthority, '.test')
+var unownedLegacyDomain = join([ 'certigo', 'app' ], '.')
+var publicWebOriginIsUnownedLegacy = publicWebOriginAuthority == unownedLegacyDomain || endsWith(publicWebOriginAuthority, '.${unownedLegacyDomain}')
+var publicWebOriginIsCanonicalHttps = startsWith(publicWebOrigin, 'https://') && publicWebOrigin == trim(publicWebOrigin) && publicWebOrigin == publicWebOriginLower && length(publicWebOriginAuthority) <= 253 && contains(publicWebOriginAuthority, '.') && empty(publicWebOriginAuthorityRemainder) && publicWebOriginLabelsAreValid && !publicWebOriginIsPlaceholder && !publicWebOriginIsUnownedLegacy
+var publicDomainActivationRequested = hardened
+var publicDomainActivationReady = !publicDomainActivationRequested
+  ? false
+  : (!publicWebOriginIsCanonicalHttps
+    ? fail('publicWebOrigin must be a canonical HTTPS origin on a non-placeholder domain controlled by Certigo.')
+    : (!publicDomainVerified
+      ? fail('publicDomainVerified must be explicitly true before public-domain activation.')
+      : (!appleCiamDomainReconfigured
+        ? fail('appleCiamDomainReconfigured must be explicitly true before app-facing public-domain activation.')
+        : true)))
+var effectivePublicWebOrigin = publicDomainActivationReady ? publicWebOrigin : ''
+var requireAccountDeletionGraph = hardened && accountDeletionEnabled
+var effectiveEntraReauthAudience = requireAccountDeletionGraph
+  ? (empty(entraReauthAudience)
+    ? fail('entraReauthAudience must be supplied securely for staging and production deployments.')
+    : entraReauthAudience)
+  : ''
+var effectiveEntraGraphTenantId = requireAccountDeletionGraph
+  ? (empty(entraGraphTenantId)
+    ? fail('entraGraphTenantId must be supplied securely for staging and production deployments.')
+    : entraGraphTenantId)
+  : ''
+var effectiveEntraGraphClientId = requireAccountDeletionGraph
+  ? (empty(entraGraphClientId)
+    ? fail('entraGraphClientId must be supplied securely for staging and production deployments.')
+    : entraGraphClientId)
+  : ''
+var effectiveEntraGraphClientSecret = requireAccountDeletionGraph
+  ? (empty(entraGraphClientSecret)
+    ? fail('entraGraphClientSecret must be supplied securely for staging and production deployments.')
+    : entraGraphClientSecret)
+  : ''
+var effectiveEntraGraphClientSecretExpiresOn = requireAccountDeletionGraph
+  ? (empty(entraGraphClientSecretExpiresOn)
+    ? fail('entraGraphClientSecretExpiresOn must be supplied for account deletion.')
+    : entraGraphClientSecretExpiresOn)
+  : ''
+var useEntraGraphClientSecret = !empty(effectiveEntraGraphClientSecret)
 // The deterministic fallback is intentionally restricted to dev. fail() stops
 // staging/prod deployment evaluation with a clear error before any derivable key
 // can be provisioned.
@@ -221,16 +366,24 @@ var effectiveAlertEmail = env != 'dev' && empty(alertEmail)
 // Cosmos may live in a different region than the rest when the primary region
 // is capacity-constrained for Cosmos (cross-region Functions->Cosmos is fine).
 var cosmosRegion = empty(cosmosLocation) ? location : cosmosLocation
-var tags = {
-  product: 'Certigo'
+var requiredTags = {
+  owner: tagOwner
+  product: tagProduct
   env: env
-  managedBy: 'bicep'
+  managedBy: tagManagedBy
+  costCenter: tagCostCenter
 }
+var effectiveTags = union(tags, requiredTags)
+// Shared hub resources live in rg-certigo-ci even when an application
+// environment deployment composes them.
+var ciTags = union(effectiveTags, {
+  env: 'ci'
+})
 
-resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+// Environment resource groups are an admin/bootstrap concern. Keeping them
+// existing removes resource-group write from the steady-state deployment identity.
+resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
   name: rgName
-  location: location
-  tags: tags
 }
 
 module monitoring 'modules/appInsights.bicep' = {
@@ -240,7 +393,7 @@ module monitoring 'modules/appInsights.bicep' = {
     name: 'appi-${appName}-${env}'
     location: location
     retentionInDays: hardened ? 90 : 30
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -257,7 +410,7 @@ module data 'modules/cosmos.bicep' = {
     periodicBackupIntervalMinutes: cosmosPeriodicBackupIntervalMinutes
     periodicBackupRetentionHours: cosmosPeriodicBackupRetentionHours
     periodicBackupStorageRedundancy: cosmosPeriodicBackupStorageRedundancy
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -275,7 +428,7 @@ module storage 'modules/storage.bicep' = {
     blobSoftDeleteDays: 30
     containerSoftDeleteDays: 30
     ciDeploymentPrincipalId: ciDeploymentPrincipalId
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -292,7 +445,7 @@ module vault 'modules/keyvault.bicep' = {
     softDeleteRetentionInDays: hardened ? 90 : 7
     jwtSigningKey: effectiveAuthJwtSigningKey
     jwtSigningKeyExpiresOn: effectiveAuthJwtSigningKeyExpiresOn
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -304,11 +457,9 @@ module sharedPrivateDns 'modules/sharedPrivateDns.bicep' = {
   params: {
     ciVnetId: resourceId(subscription().subscriptionId, ciVnetResourceGroupName, 'Microsoft.Network/virtualNetworks', ciVnetName)
     ciVnetName: ciVnetName
-    tags: {
-      product: 'Certigo'
-      managedBy: 'bicep'
+    tags: union(ciTags, {
       scope: 'shared'
-    }
+    })
   }
 }
 
@@ -350,7 +501,7 @@ module privateNetwork 'modules/privateNetwork.bicep' = {
     tableZoneId: sharedPrivateDns.outputs.tableZoneId
     vaultZoneId: sharedPrivateDns.outputs.vaultZoneId
     cosmosZoneId: sharedPrivateDns.outputs.cosmosZoneId
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -360,7 +511,7 @@ module privateDnsAppLinks 'modules/privateDnsAppLinks.bicep' = {
   params: {
     appVnetId: privateNetwork.outputs.vnetId
     appVnetName: privateNetwork.outputs.vnetName
-    tags: tags
+    tags: ciTags
   }
 }
 
@@ -384,6 +535,16 @@ module previousJwtSecret 'modules/keyvaultPreviousJwtSecret.bicep' = if (usePrev
   }
 }
 
+module graphClientSecret 'modules/keyvaultGraphClientSecret.bicep' = if (useEntraGraphClientSecret) {
+  scope: rg
+  name: 'keyvaultGraphClientSecret'
+  params: {
+    keyVaultName: vault.outputs.name
+    graphClientSecret: effectiveEntraGraphClientSecret
+    graphClientSecretExpiresOn: effectiveEntraGraphClientSecretExpiresOn
+  }
+}
+
 // Azure Communication Services Email — transactional sender for the
 // email/password verification message. Global resource with an Azure-managed
 // domain (no DNS setup). Its outputs feed the Function App app settings below.
@@ -393,7 +554,7 @@ module email 'modules/communicationEmail.bicep' = {
   params: {
     name: '${appName}-${env}-${take(suffix, 8)}'
     dataLocation: emailDataLocation
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -416,6 +577,12 @@ module api 'modules/functionApp.bicep' = {
     authJwtPreviousSigningKeySecretUri: previousJwtSecret.?outputs.?jwtSecretUri ?? ''
     entraAuthority: entraAuthority
     entraAudience: entraAudience
+    entraReauthAudience: effectiveEntraReauthAudience
+    entraGraphTenantId: effectiveEntraGraphTenantId
+    entraGraphClientId: effectiveEntraGraphClientId
+    entraGraphClientSecretSecretUri: graphClientSecret.?outputs.?secretUri ?? ''
+    accountDeletionEnabled: accountDeletionEnabled
+    personLinkedIdentityV1: personLinkedIdentityV1
     tutorLlmEnabled: tutorLlmEnabled
     tutorLlmEndpoint: tutorLlmEndpoint
     tutorLlmDeployment: tutorLlmDeployment
@@ -431,7 +598,7 @@ module api 'modules/functionApp.bicep' = {
     emailVerifyBaseUrl: 'https://func-${appName}-${env}-${suffix}.azurewebsites.net/api/auth/verify-email'
     // Native mobile clients aren't subject to CORS; only dev keeps '*' (browser tooling).
     allowedCorsOrigins: env == 'dev' ? [ '*' ] : []
-    tags: tags
+    tags: effectiveTags
   }
   dependsOn: [
     privateDnsAppLinks
@@ -452,7 +619,7 @@ module tutor 'modules/openai.bicep' = if (tutorLlmEnabled) {
     location: 'swedencentral'
     deploymentName: tutorLlmDeployment
     functionAppPrincipalId: api.outputs.principalId
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -475,7 +642,7 @@ module diagnostics 'modules/diagnostics.bicep' = if (env != 'dev') {
     blobServiceDiagnosticSettingName: blobServiceDiagnosticSettingName
     queueServiceDiagnosticSettingName: queueServiceDiagnosticSettingName
     tableServiceDiagnosticSettingName: tableServiceDiagnosticSettingName
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -523,3 +690,9 @@ output keyVaultName string = vault.outputs.name
 output virtualNetworkId string = privateNetwork.outputs.vnetId
 output functionIntegrationSubnetId string = privateNetwork.outputs.functionIntegrationSubnetId
 output cosmosBackupMode string = cosmosBackupMode
+output publicDomainActivationReady bool = publicDomainActivationReady
+output publicWebOrigin string = effectivePublicWebOrigin
+output privacyPolicyUrl string = publicDomainActivationReady ? '${effectivePublicWebOrigin}/privacy-policy/' : ''
+output accountDeletionUrl string = publicDomainActivationReady ? '${effectivePublicWebOrigin}/account-deletion/' : ''
+output appleAppSiteAssociationUrl string = publicDomainActivationReady ? '${effectivePublicWebOrigin}/.well-known/apple-app-site-association' : ''
+output assetLinksUrl string = publicDomainActivationReady ? '${effectivePublicWebOrigin}/.well-known/assetlinks.json' : ''

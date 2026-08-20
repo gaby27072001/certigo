@@ -89,7 +89,9 @@ public sealed class AuthService(
     IUserRepository users,
     IClock clock,
     IEmailSender emailSender,
-    AuthEmailOptions emailOptions) : IAuthService, IEmailVerificationService
+    AuthEmailOptions emailOptions,
+    IPersonLinkedIdentityShadowRuntime? personIdentity = null)
+    : IAuthService, IEmailVerificationService
 {
     /// Failed logins allowed before an account is temporarily locked.
     private const int MaxFailedAttempts = 5;
@@ -254,6 +256,10 @@ public sealed class AuthService(
             }
         }
 
+        await TryMirrorLocalIdentityAsync(
+            profile.Id,
+            reservation,
+            cancellationToken);
         await TrySendVerificationEmailAsync(email, displayName, rawToken, cancellationToken);
 
         return BuildResult(profile, email, emailVerified: false);
@@ -307,6 +313,10 @@ public sealed class AuthService(
 
         var profile = await users.GetAsync(credential.UserId, cancellationToken)
             ?? await users.UpsertAsync(ProfileDefaults.New(credential.UserId, credential.DisplayName), cancellationToken);
+        await TryMirrorLocalIdentityAsync(
+            profile.Id,
+            credential,
+            cancellationToken);
         return BuildResult(profile, email, credential.IsEmailVerified);
     }
 
@@ -329,24 +339,46 @@ public sealed class AuthService(
         var principal = tokenIssuer.ValidateRefreshToken(request.RefreshToken ?? string.Empty)
             ?? throw new AuthFailedException("Session expirée, veuillez vous reconnecter.");
 
+        var credential = await credentials.FindByEmailAsync(principal.Email, cancellationToken);
+        if (credential is null
+            || credential.IsProvisioning
+            || !string.Equals(credential.UserId, principal.UserId, StringComparison.Ordinal))
+        {
+            throw new AuthFailedException("Session expirée, veuillez vous reconnecter.");
+        }
+
         var profile = await users.GetAsync(principal.UserId, cancellationToken)
             ?? await users.UpsertAsync(ProfileDefaults.New(principal.UserId, principal.DisplayName), cancellationToken);
+        await TryMirrorLocalIdentityAsync(
+            profile.Id,
+            credential,
+            cancellationToken);
 
         // Reflect the current verification state so a "confirm your email" banner
         // clears itself once the learner confirms, even across a silent refresh.
-        var emailVerified = true;
-        if (!string.IsNullOrWhiteSpace(principal.Email))
-        {
-            var credential = await credentials.FindByEmailAsync(principal.Email, cancellationToken);
-            emailVerified = credential?.IsEmailVerified != false;
-        }
+        var emailVerified = credential.IsEmailVerified;
 
-        return BuildResult(profile, principal.Email, emailVerified);
+        return BuildResult(profile, principal.Email, emailVerified, principal.AuthenticatedAt);
     }
 
-    private AuthResultDto BuildResult(UserProfileDto profile, string email, bool emailVerified = true)
+    private Task TryMirrorLocalIdentityAsync(
+        string personId,
+        UserCredentialRecord credential,
+        CancellationToken cancellationToken) =>
+        personIdentity?.TryMirrorLocalAsync(personId, credential, cancellationToken)
+        ?? Task.CompletedTask;
+
+    private AuthResultDto BuildResult(
+        UserProfileDto profile,
+        string email,
+        bool emailVerified = true,
+        DateTimeOffset? authenticatedAt = null)
     {
-        var tokens = tokenIssuer.Issue(profile.Id, profile.DisplayName, email);
+        var tokens = tokenIssuer.Issue(
+            profile.Id,
+            profile.DisplayName,
+            email,
+            authenticatedAt ?? clock.UtcNow);
         return new AuthResultDto(tokens.AccessToken, tokens.RefreshToken, tokens.AccessTokenExpiresAt, profile, emailVerified);
     }
 

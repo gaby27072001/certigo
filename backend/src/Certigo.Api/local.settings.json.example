@@ -21,6 +21,13 @@
     "TUTOR_LLM_API_KEY": "",
     "ENTRA_AUTHORITY": "https://<domain>.ciamlogin.com/<tenant-id>/v2.0",
     "ENTRA_AUDIENCE": "api://<client-id>",
+    "ENTRA_REAUTH_AUDIENCE": "<mobile-client-id>",
+    "ENTRA_GRAPH_TENANT_ID": "<external-tenant-id>",
+    "ENTRA_GRAPH_CLIENT_ID": "<confidential-client-id>",
+    "ENTRA_GRAPH_CLIENT_SECRET": "",
+    "ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI": "https://<vault>.vault.azure.net/secrets/<name>/<version>",
+    "ACCOUNT_DELETION_ENABLED": "false",
+    "PERSON_LINKED_IDENTITY_V1": "off",
     "APPLICATIONINSIGHTS_CONNECTION_STRING": "<connection-string>"
   }
 }

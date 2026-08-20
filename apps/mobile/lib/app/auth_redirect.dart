@@ -15,6 +15,7 @@ abstract class AuthShellRoutes {
   static const String landing = '/landing'; // écran d'ouverture façon Luma (hero + sheet)
   static const String auth = '/auth'; // écran de connexion e-mail (ouvert depuis la sheet)
   static const String home = '/home'; // accueil (dans le shell)
+  static const String accountDeleted = '/account/deleted';
   static const String onboardingSplash = '/onboarding/splash'; // ≠ [splash] (cf. #154)
 
   /// Ensemble des routes du flux de démarrage (hors shell), doit rester
@@ -22,32 +23,10 @@ abstract class AuthShellRoutes {
   static const Set<String> startupPaths = <String>{
     onboardingSplash,
     '/welcome',
-    '/onboarding/intro',
-    '/onboarding/birth-year',
     '/onboarding/certification',
-    '/onboarding/domains',
-    '/onboarding/building',
-    '/onboarding/attribution',
-    '/onboarding/level',
-    '/onboarding/level-reaction',
-    '/onboarding/reasons',
-    '/onboarding/reasons-reaction',
-    '/onboarding/routine-intro',
-    '/onboarding/goal',
-    '/onboarding/goal-reaction',
-    '/onboarding/notifications',
-    '/onboarding/widget',
-    '/onboarding/widget-reaction',
-    '/onboarding/promise',
-    '/onboarding/paywall',
-    '/onboarding/paywall-reaction',
-    '/onboarding/start',
-    '/onboarding/start-reaction',
-    '/login',
   };
 
-  static bool isStartup(String location) =>
-      startupPaths.contains(location) || location.startsWith('/onboarding');
+  static bool isStartup(String location) => startupPaths.contains(location);
 
   // --- Flux d'inscription progressif (Partie 3, façon Duo) ---------------
   //
@@ -56,13 +35,10 @@ abstract class AuthShellRoutes {
   // reste donc valable). Ils sont atteignables :
   //  - pré-création (nom/e-mail/mot de passe) tant que l'utilisateur est
   //    `Unauthenticated` ;
-  //  - post-création (contacts/amis/bienvenue) une fois `Authenticated` et
-  //    l'onboarding non terminé — le flux y pilote lui-même sa navigation.
+  //  - confirmation post-création une fois `Authenticated`, avant l'onboarding.
   static const String registerName = '/register/name';
   static const String registerEmail = '/register/email';
   static const String registerPassword = '/register/password';
-  static const String registerSyncContacts = '/register/sync-contacts';
-  static const String registerFriends = '/register/friends';
   static const String registerProfileCreated = '/register/profile-created';
 
   /// Vrai pour toute route du flux d'inscription progressif (préfixe
@@ -82,7 +58,7 @@ abstract class AuthShellRoutes {
 ///   ([AuthShellRoutes.splash], [AuthShellRoutes.landing] ou
 ///   [AuthShellRoutes.auth]) : il part vers l'onboarding ou l'accueil ; les
 ///   écrans du **flux d'inscription progressif** ([AuthShellRoutes.isRegisterFlow])
-///   font exception le temps de la post-création (contacts/amis/bienvenue), où
+///   font exception le temps de la confirmation post-création, où
 ///   le flux pilote lui-même sa navigation avant de rejoindre l'onboarding ;
 /// - la cible d'onboarding est [AuthShellRoutes.onboardingSplash]
 ///   (≠ [AuthShellRoutes.splash]), ce qui évite le piège du spinner (#154) ;
@@ -98,12 +74,16 @@ String? resolveAuthRedirect({
   final bool atOnboarding = AuthShellRoutes.isStartup(location);
   final bool atRegister = AuthShellRoutes.isRegisterFlow(location);
 
+  if (auth is AccountDeletionCompleted) {
+    return location == AuthShellRoutes.accountDeleted ? null : AuthShellRoutes.accountDeleted;
+  }
+
   // Restauration de session : rester sur le splash d'auth. Exception : les
   // écrans d'inscription affichent leur propre chargement inline (CTA en
   // loading pendant l'appel `registerWithEmail`) — on ne les éjecte PAS vers le
   // splash, sinon l'écran de mot de passe serait démonté puis la réussite
   // court-circuiterait les écrans post-création (piège du garde de la P1).
-  if (auth is AuthLoading) {
+  if (auth is AuthLoading || auth is AuthSigningOut) {
     return (atAuthSplash || atRegister) ? null : AuthShellRoutes.splash;
   }
   // Non authentifié : présenter l'écran d'ouverture (landing) par défaut, tout
@@ -112,8 +92,8 @@ String? resolveAuthRedirect({
   if (auth is Unauthenticated) {
     return (atLanding || atAuth || atRegister) ? null : AuthShellRoutes.landing;
   }
-  // Authentifié + flux d'inscription : laisser le flux enchaîner ses écrans
-  // post-création (contacts → amis → bienvenue) avant de rejoindre l'onboarding.
+  // Authentifié + flux d'inscription : laisser la confirmation post-création
+  // s'afficher avant de rejoindre l'onboarding.
   // Le dernier « CONTINUER » navigue explicitement vers l'accueil, ce qui
   // relance le garde ci-dessous (onboarding non terminé → onboardingSplash).
   if (atRegister) {

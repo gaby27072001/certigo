@@ -1,0 +1,890 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Certigo Person and LinkedIdentity",
+    "version": "1.0.0",
+    "description": "Link API contract only. The runtime implementation currently supports additive off|shadow migration and exposes no link endpoint."
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "x-certigo-status": "contract-only",
+  "x-certigo-reconciled-main": {
+    "commit": "034c1dd41e8ce7da0a84f8a6e70d821829a54e61",
+    "mergedPullRequests": [
+      289,
+      296,
+      297,
+      301,
+      302,
+      303,
+      305,
+      308,
+      300
+    ],
+    "productionIdentityRuntimeChanged": true
+  },
+  "x-certigo-prerequisites": [
+    {
+      "pullRequest": 296,
+      "baselineState": "merged",
+      "mergeCommit": "6145f35",
+      "requirement": "Before link mode, extend the merged deletion workflow to snapshot and revoke every active LinkedIdentity."
+    },
+    {
+      "pullRequest": 297,
+      "baselineState": "merged",
+      "mergeCommit": "576ef60",
+      "requirement": "activeTrack remains owner-scoped to personId with compare-and-set."
+    },
+    {
+      "pullRequest": 289,
+      "baselineState": "merged",
+      "mergeCommit": "c44ba32",
+      "requirement": "Onboarding continues to select only active catalog tracks with available learning content."
+    }
+  ],
+  "x-certigo-feature-mode": {
+    "setting": "PERSON_LINKED_IDENTITY_V1",
+    "default": "off",
+    "orderedValues": [
+      "off",
+      "shadow",
+      "resolve",
+      "link"
+    ],
+    "implementedValues": [
+      "off",
+      "shadow"
+    ],
+    "mutationRequiredValue": "link",
+    "offHttpStatus": 404,
+    "disabledMutationHttpStatus": 503
+  },
+  "x-certigo-migration": {
+    "mode": "additive",
+    "requiredEquality": "personId == profile.id == legacy userId",
+    "rewritesOwnerDocuments": false,
+    "changesPartitionKeys": false
+  },
+  "x-certigo-integrations": {
+    "accountDeletion": {
+      "routes": [
+        "GET /account/deletion",
+        "POST /account/deletion"
+      ],
+      "clientIdempotencyKey": false,
+      "pendingStatus": 202,
+      "completedStatus": 200,
+      "runtimeSetting": "ACCOUNT_DELETION_ENABLED",
+      "runtimeDefault": "off"
+    },
+    "activeTrack": {
+      "route": "POST /me/active-track",
+      "owner": "personId",
+      "compareAndSetField": "expectedTrackId"
+    },
+    "onboardingCatalog": {
+      "route": "GET /catalog/tracks",
+      "eligibility": "status in (active, active-retiring) and learningAvailable == true and contentStatus == available",
+      "owner": "personId"
+    }
+  },
+  "x-certigo-audit": {
+    "allowedFields": [
+      "requestId",
+      "operationId",
+      "eventType",
+      "provider",
+      "identityType",
+      "step",
+      "resultCode",
+      "occurredAt",
+      "correlationId"
+    ],
+    "forbiddenFields": [
+      "personId",
+      "userId",
+      "email",
+      "subject",
+      "token",
+      "password",
+      "authorizationCode"
+    ]
+  },
+  "paths": {
+    "/me/linked-identities": {
+      "get": {
+        "operationId": "listLinkedIdentities",
+        "summary": "List masked identities linked to the authenticated Person",
+        "responses": {
+          "200": {
+            "description": "Linked identities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedIdentityListDto"
+                }
+              }
+            }
+          },
+          "423": {
+            "$ref": "#/components/responses/AccountDeletionInProgress"
+          },
+          "404": {
+            "$ref": "#/components/responses/IdentitySurfaceDisabled"
+          }
+        },
+        "x-certigo-off-response": 404
+      }
+    },
+    "/me/identity-link-intents": {
+      "post": {
+        "operationId": "createIdentityLinkIntent",
+        "summary": "Begin an explicit two-identity linking ceremony",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/SourceReauthentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdentityLinkIntentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Intent created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityLinkIntentDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidReauthentication"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "423": {
+            "$ref": "#/components/responses/AccountDeletionInProgress"
+          },
+          "404": {
+            "$ref": "#/components/responses/IdentitySurfaceDisabled"
+          },
+          "503": {
+            "$ref": "#/components/responses/IdentityLinkingDisabled"
+          }
+        },
+        "x-certigo-off-response": 404
+      }
+    },
+    "/me/identity-link-intents/{intentId}/complete": {
+      "post": {
+        "operationId": "completeIdentityLinkIntent",
+        "summary": "Validate the target identity and idempotently create its deterministic binding",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IntentId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteIdentityLinkIntentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Linked or exact replay of a completed link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityLinkResultDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidReauthentication"
+          },
+          "404": {
+            "$ref": "#/components/responses/IntentNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "423": {
+            "$ref": "#/components/responses/AccountDeletionInProgress"
+          },
+          "503": {
+            "$ref": "#/components/responses/IdentityLinkingDisabled"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalIntegrityFailure"
+          }
+        },
+        "x-certigo-off-response": 404
+      }
+    },
+    "/me/linked-identities/{linkedIdentityId}": {
+      "delete": {
+        "operationId": "revokeLinkedIdentity",
+        "summary": "Revoke one linked identity without deleting the Person",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LinkedIdentityId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/SourceReauthentication"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked or exact replay"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidReauthentication"
+          },
+          "404": {
+            "$ref": "#/components/responses/LinkedIdentityNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "423": {
+            "$ref": "#/components/responses/AccountDeletionInProgress"
+          },
+          "503": {
+            "$ref": "#/components/responses/IdentityLinkingDisabled"
+          }
+        },
+        "x-certigo-off-response": 404
+      }
+    },
+    "/account/deletion": {
+      "get": {
+        "operationId": "getAccountDeletion",
+        "summary": "Read the merged #296 deletion status",
+        "responses": {
+          "200": {
+            "description": "Existing #296 AccountDeletionDto"
+          },
+          "503": {
+            "$ref": "#/components/responses/AccountDeletionDisabled"
+          }
+        },
+        "x-certigo-owner": "personId",
+        "x-certigo-baseline": "merged"
+      },
+      "post": {
+        "operationId": "requestAccountDeletion",
+        "summary": "Delete the Person and every linked identity",
+        "description": "Merged #296 baseline plus the required future multi-identity extension. The durable request is idempotent per personId without a client Idempotency-Key. Before link mode it must snapshot every active LinkedIdentity, revoke each provider target, and reconcile links before completion.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountDeletionReauthentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deletion already completed"
+          },
+          "202": {
+            "description": "Deletion accepted or still pending"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidReauthentication"
+          },
+          "403": {
+            "$ref": "#/components/responses/RecentAuthenticationRequired"
+          },
+          "503": {
+            "$ref": "#/components/responses/AccountDeletionDisabled"
+          }
+        },
+        "x-certigo-owner": "personId",
+        "x-certigo-prerequisite": 296,
+        "x-certigo-baseline": "merged",
+        "x-certigo-client-idempotency-key": false
+      }
+    },
+    "/me/active-track": {
+      "post": {
+        "operationId": "setActiveTrack",
+        "summary": "Set the active track on the Person profile",
+        "description": "Compatibility surface from #297. Every linked identity resolves to the same personId and therefore the same activeTrackId.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetActiveTrackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing UserProfileDto"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "404": {
+            "$ref": "#/components/responses/TrackNotFound"
+          },
+          "423": {
+            "$ref": "#/components/responses/AccountDeletionInProgress"
+          }
+        },
+        "x-certigo-owner": "personId",
+        "x-certigo-prerequisite": 297,
+        "x-certigo-baseline": "merged",
+        "x-certigo-catalog-validation": "content repository track must exist"
+      }
+    },
+    "/catalog/tracks": {
+      "get": {
+        "operationId": "getCatalog",
+        "summary": "Read the existing certification catalogue used by onboarding",
+        "responses": {
+          "200": {
+            "description": "Existing TrackSummaryDto array"
+          },
+          "503": {
+            "$ref": "#/components/responses/CatalogUnavailable"
+          }
+        },
+        "x-certigo-prerequisite": 289,
+        "x-certigo-baseline": "merged",
+        "x-certigo-onboarding-eligibility": "status in (active, active-retiring) and learningAvailable == true and contentStatus == available"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "Random client key with at least 128 bits of entropy.",
+        "schema": {
+          "type": "string",
+          "minLength": 22,
+          "maxLength": 200
+        }
+      },
+      "SourceReauthentication": {
+        "name": "X-Certigo-Reauthentication",
+        "in": "header",
+        "required": true,
+        "description": "Fresh proof for the currently linked source identity. Never logged or persisted.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "AccountDeletionReauthentication": {
+        "name": "X-Certigo-Reauthentication",
+        "in": "header",
+        "required": false,
+        "description": "Optional fresh proof for the same Person. When absent, #296 uses auth_time from the bearer.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "IntentId": {
+        "name": "intentId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^identity-link-intent::v1::[0-9a-f]{64}$"
+        }
+      },
+      "LinkedIdentityId": {
+        "name": "linkedIdentityId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^linked-identity::v1::[0-9a-f]{64}$"
+        }
+      }
+    },
+    "schemas": {
+      "IdentityProvider": {
+        "type": "string",
+        "enum": [
+          "certigo-local",
+          "entra-external-id"
+        ]
+      },
+      "IdentityType": {
+        "type": "string",
+        "enum": [
+          "localPassword",
+          "entraExternalId"
+        ]
+      },
+      "IdentityTenant": {
+        "oneOf": [
+          {
+            "const": "certigo"
+          },
+          {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          }
+        ]
+      },
+      "CreateIdentityLinkIntentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "targetProvider",
+          "targetType"
+        ],
+        "properties": {
+          "targetProvider": {
+            "$ref": "#/components/schemas/IdentityProvider"
+          },
+          "targetType": {
+            "$ref": "#/components/schemas/IdentityType"
+          }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "targetProvider": {
+                "const": "certigo-local"
+              },
+              "targetType": {
+                "const": "localPassword"
+              }
+            }
+          },
+          {
+            "properties": {
+              "targetProvider": {
+                "const": "entra-external-id"
+              },
+              "targetType": {
+                "const": "entraExternalId"
+              }
+            }
+          }
+        ],
+        "description": "The server selects the trusted tenant, issuer and audience. The client cannot choose them."
+      },
+      "IdentityLinkIntentDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intentId",
+          "personId",
+          "targetProvider",
+          "targetType",
+          "challenge",
+          "expiresAt"
+        ],
+        "properties": {
+          "intentId": {
+            "type": "string"
+          },
+          "personId": {
+            "type": "string"
+          },
+          "targetProvider": {
+            "$ref": "#/components/schemas/IdentityProvider"
+          },
+          "targetType": {
+            "$ref": "#/components/schemas/IdentityType"
+          },
+          "challenge": {
+            "$ref": "#/components/schemas/IdentityLinkChallengeDto"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "IdentityLinkChallengeDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nonce",
+          "tenant",
+          "issuer",
+          "audience"
+        ],
+        "properties": {
+          "nonce": {
+            "type": "string",
+            "minLength": 22
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/IdentityTenant"
+          },
+          "issuer": {
+            "type": "string",
+            "format": "uri"
+          },
+          "audience": {
+            "type": "string"
+          }
+        }
+      },
+      "CompleteIdentityLinkIntentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "targetProof"
+        ],
+        "properties": {
+          "targetProof": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LocalPasswordTargetProof"
+              },
+              {
+                "$ref": "#/components/schemas/OidcTargetProof"
+              }
+            ]
+          }
+        }
+      },
+      "LocalPasswordTargetProof": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "email",
+          "password"
+        ],
+        "properties": {
+          "kind": {
+            "const": "localPassword"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Login input only. Never a linking or merge key."
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 1,
+            "description": "Validated in memory and never stored or logged."
+          }
+        }
+      },
+      "OidcTargetProof": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "idToken",
+          "nonce"
+        ],
+        "properties": {
+          "kind": {
+            "const": "oidcIdToken"
+          },
+          "idToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Validated for signature, issuer, audience, lifetime, nonce, tid, oid and auth_time; never stored or logged."
+          },
+          "nonce": {
+            "type": "string",
+            "minLength": 22
+          }
+        }
+      },
+      "IdentityLinkResultDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationId",
+          "status",
+          "personId",
+          "identity"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "linked"
+            ]
+          },
+          "personId": {
+            "type": "string"
+          },
+          "identity": {
+            "$ref": "#/components/schemas/LinkedIdentityDto"
+          }
+        }
+      },
+      "LinkedIdentityDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "provider",
+          "tenant",
+          "type",
+          "status",
+          "verifiedAt",
+          "isCurrent",
+          "canRevoke"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/IdentityProvider"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/IdentityTenant"
+          },
+          "type": {
+            "$ref": "#/components/schemas/IdentityType"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "revocationPending",
+              "revoked"
+            ]
+          },
+          "displayHint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Masked non-authoritative label."
+          },
+          "verifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "canRevoke": {
+            "type": "boolean"
+          }
+        },
+        "description": "The internal subject is deliberately not exposed."
+      },
+      "LinkedIdentityListDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "personId",
+          "identities"
+        ],
+        "properties": {
+          "personId": {
+            "type": "string"
+          },
+          "identities": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/LinkedIdentityDto"
+            }
+          }
+        }
+      },
+      "SetActiveTrackRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trackId"
+        ],
+        "properties": {
+          "trackId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expectedTrackId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "code",
+          "title"
+        ],
+        "properties": {
+          "status": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "invalid_reauthentication",
+              "intent_not_found",
+              "identity_not_found",
+              "identity_already_linked",
+              "idempotency_conflict",
+              "replay_detected",
+              "confused_deputy",
+              "cross_tenant",
+              "same_identity",
+              "last_identity",
+              "account_deletion_in_progress",
+              "identity_hash_collision",
+              "identity_linking_disabled"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "InvalidReauthentication": {
+        "description": "A fresh, bound proof is missing or invalid.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Identity, replay, tenant, idempotency or last-identity conflict.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          }
+        }
+      },
+      "IntentNotFound": {
+        "description": "The intent is unknown, expired, or not owned by the authenticated Person.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          }
+        }
+      },
+      "LinkedIdentityNotFound": {
+        "description": "The linked identity is unknown or not owned by the authenticated Person.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          }
+        }
+      },
+      "AccountDeletionInProgress": {
+        "description": "The Person is locked by the #296 deletion workflow.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          }
+        }
+      },
+      "IdentityLinkingDisabled": {
+        "description": "PERSON_LINKED_IDENTITY_V1 is shadow or resolve. Off returns 404 instead.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          }
+        }
+      },
+      "InternalIntegrityFailure": {
+        "description": "A cryptographic identity hash collision stopped the operation fail-closed.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          }
+        }
+      },
+      "IdentitySurfaceDisabled": {
+        "description": "PERSON_LINKED_IDENTITY_V1 is off; the V1 route is intentionally absent."
+      },
+      "RecentAuthenticationRequired": {
+        "description": "The merged #296 deletion request did not have a recent bearer or optional proof."
+      },
+      "AccountDeletionDisabled": {
+        "description": "ACCOUNT_DELETION_ENABLED is false."
+      },
+      "TrackNotFound": {
+        "description": "The requested content-backed certification track does not exist."
+      },
+      "CatalogUnavailable": {
+        "description": "No certification catalogue is available."
+      }
+    }
+  }
+}

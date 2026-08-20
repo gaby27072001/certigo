@@ -2,6 +2,7 @@ using System.Text.Json;
 using FluentAssertions;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
+using Certigo.Domain.Identity;
 using Certigo.Infrastructure.Cosmos;
 using Xunit;
 
@@ -189,6 +190,70 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
     }
 
     [CosmosEmulatorFact]
+    public async Task Linked_identity_create_replays_and_hash_collision_fails_closed()
+    {
+        var context = await fixture.GetContextAsync();
+        var repository = new CosmosPersonLinkedIdentityRepository(context);
+        var now = DateTimeOffset.UtcNow;
+        var personId = $"person-{Guid.NewGuid():N}";
+        var locator = new IdentityLocator(
+            IdentityLocator.LocalProvider,
+            IdentityLocator.LocalTenant,
+            PersonIdentityDocumentIds.Hash("local-subject", personId),
+            IdentityLocator.LocalPasswordType);
+        var verification = new LinkedIdentityVerification(
+            LinkedIdentityVerification.VerifiedState,
+            LinkedIdentityVerification.LegacyCredentialBackfillMethod,
+            now,
+            now,
+            null,
+            null);
+        var candidate = LinkedIdentity.Create(personId, locator, verification, now);
+
+        var created = await repository.CreateOrReadAsync(candidate);
+        var replay = await repository.CreateOrReadAsync(candidate);
+
+        created.Status.Should().Be(LinkedIdentityCreateStatus.Created);
+        replay.Status.Should().Be(LinkedIdentityCreateStatus.Replayed);
+        replay.Identity.Should().BeEquivalentTo(created.Identity);
+
+        var collisionLocator = new IdentityLocator(
+            IdentityLocator.EntraProvider,
+            "11111111-1111-4111-8111-aaaaaaaaaaaa",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            IdentityLocator.EntraExternalIdType);
+        var collisionCandidate = LinkedIdentity.Create(
+            $"person-{Guid.NewGuid():N}",
+            collisionLocator,
+            verification,
+            now);
+        var differentLocator = new IdentityLocator(
+            IdentityLocator.EntraProvider,
+            "11111111-1111-4111-8111-aaaaaaaaaaaa",
+            "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            IdentityLocator.EntraExternalIdType);
+        var collidingDocument = LinkedIdentity.Create(
+            $"person-{Guid.NewGuid():N}",
+            differentLocator,
+            verification,
+            now) with
+        {
+            Id = collisionCandidate.Id,
+        };
+        await context.Users.CreateItemAsync(
+            collidingDocument,
+            new Microsoft.Azure.Cosmos.PartitionKey(collisionCandidate.Id));
+
+        Func<Task> collision = () => repository.CreateOrReadAsync(collisionCandidate);
+
+        await collision.Should().ThrowAsync<IdentityHashCollisionException>();
+        var persisted = await context.Users.ReadItemAsync<LinkedIdentity>(
+            collisionCandidate.Id,
+            new Microsoft.Azure.Cosmos.PartitionKey(collisionCandidate.Id));
+        persisted.Resource.Locator.Should().Be(differentLocator);
+    }
+
+    [CosmosEmulatorFact]
     public async Task Durable_economy_operation_resumes_steps_with_etag()
     {
         var context = await fixture.GetContextAsync();
@@ -221,6 +286,170 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
         afterProfile.Status.Should().Be(EconomyOperationRecord.PendingStatus);
         completed.Status.Should().Be(EconomyOperationRecord.CompletedStatus);
         completed.CompletedSteps.Should().BeEquivalentTo(["profile", "events"]);
+    }
+
+    [CosmosEmulatorFact]
+    public async Task Account_deletion_removes_user_partitions_and_keeps_only_pseudonymous_tombstone()
+    {
+        var context = await fixture.GetContextAsync();
+        var users = new CosmosUserRepository(context);
+        var credentials = new CosmosUserCredentialRepository(context);
+        var friends = new CosmosFriendRepository(context);
+        var attempts = new CosmosAttemptRepository(context);
+        var identityRepository = new CosmosPersonLinkedIdentityRepository(context);
+        var deletion = new CosmosAccountDeletionRepository(
+            context,
+            identityRepository);
+        var profile = NewProfile();
+        var now = DateTimeOffset.UtcNow;
+        var friendId = $"friend-{Guid.NewGuid():N}";
+        await users.UpsertAsync(profile);
+        await credentials.CreateAsync(new UserCredentialRecord(
+            UserCredentialRecord.CanonicalIdFor($"{profile.Id}@example.com"),
+            $"{profile.Id}@example.com",
+            profile.Id,
+            profile.DisplayName,
+            "hash",
+            now,
+            CanonicalEmail: $"{profile.Id}@example.com",
+            ProvisioningState: CredentialProvisioningState.Active,
+            IdentitySubject: PersonIdentityDocumentIds.Hash(
+                "deletion-local-subject",
+                profile.Id)));
+        var identityLocator = new IdentityLocator(
+            IdentityLocator.LocalProvider,
+            IdentityLocator.LocalTenant,
+            PersonIdentityDocumentIds.Hash("deletion-local-subject", profile.Id),
+            IdentityLocator.LocalPasswordType);
+        await identityRepository.CreateOrReadAsync(LinkedIdentity.Create(
+            profile.Id,
+            identityLocator,
+            new LinkedIdentityVerification(
+                LinkedIdentityVerification.VerifiedState,
+                LinkedIdentityVerification.LegacyCredentialBackfillMethod,
+                now,
+                now,
+                null,
+                null),
+            now));
+        var intent = new IdentityLinkIntent(
+            IdentityLinkIntent.IdFor(profile.Id, "integration-intent"),
+            IdentityLinkIntent.CurrentSchemaVersion,
+            profile.Id,
+            identityLocator.StableId(),
+            IdentityLocator.EntraProvider,
+            "11111111-1111-4111-8111-aaaaaaaaaaaa",
+            IdentityLocator.EntraExternalIdType,
+            new string('a', 64),
+            new string('b', 64),
+            "pending",
+            now,
+            now.AddMinutes(5));
+        var operation = new IdentityLinkOperation(
+            IdentityLinkOperation.IdFor(profile.Id, "integration-operation"),
+            IdentityLinkOperation.CurrentSchemaVersion,
+            profile.Id,
+            intent.Id,
+            null,
+            new string('c', 64),
+            new string('d', 64),
+            "pending",
+            null,
+            now,
+            now);
+        await context.Users.CreateItemAsync(
+            intent,
+            new Microsoft.Azure.Cosmos.PartitionKey(intent.Id));
+        await context.Users.CreateItemAsync(
+            operation,
+            new Microsoft.Azure.Cosmos.PartitionKey(operation.Id));
+        await friends.UpsertAsync(new FriendEdge(
+            $"{profile.Id}:{friendId}",
+            profile.Id,
+            friendId,
+            DateTimeOffset.UtcNow));
+        await friends.UpsertAsync(new FriendEdge(
+            $"{friendId}:{profile.Id}",
+            friendId,
+            profile.Id,
+            DateTimeOffset.UtcNow));
+        var attempt = NewAttempt(
+            profile.Id,
+            xpEarned: 10,
+            submittedAt: DateTimeOffset.UtcNow);
+        await attempts.CreateAsync(attempt);
+
+        var subjectHash = AccountDeletionSubject.Hash(profile.Id);
+        await using var admittedMutation =
+            await context.AcquireAccountWriteLeaseAsync(profile.Id);
+        await deletion.GetOrCreateAsync(new AccountDeletionRecord(
+            AccountDeletionRecord.RecordId,
+            subjectHash,
+            profile.Id,
+            Guid.NewGuid().ToString("n"),
+            AccountIdentityKind.Local,
+            ["social", "learning", "economy", "profile", "identity", "reconciliation"],
+            [],
+            AccountDeletionRecordStatus.Pending,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow));
+
+        (await context.HasActiveAccountWriteLeasesAsync(subjectHash)).Should().BeTrue();
+        await admittedMutation.DisposeAsync();
+        (await context.HasActiveAccountWriteLeasesAsync(subjectHash)).Should().BeFalse();
+
+        Func<Task> recreateProfile = () => users.UpsertAsync(profile with { ETag = null });
+        await recreateProfile.Should().ThrowAsync<AccountDeletionInProgressException>();
+        Func<Task> recreateAttempt = () => attempts.CreateAsync(NewAttempt(
+            profile.Id,
+            xpEarned: 99,
+            submittedAt: DateTimeOffset.UtcNow));
+        await recreateAttempt.Should().ThrowAsync<AccountDeletionInProgressException>();
+        Func<Task> recreateFriend = () => friends.UpsertAsync(new FriendEdge(
+            $"{friendId}:{profile.Id}",
+            friendId,
+            profile.Id,
+            DateTimeOffset.UtcNow));
+        await recreateFriend.Should().ThrowAsync<AccountDeletionInProgressException>();
+
+        (await deletion.ResolveIdentityKindAsync(profile.Id)).Should()
+            .Be(AccountIdentityKind.Local);
+        await deletion.ReconcileDataAsync(profile.Id);
+        await deletion.DeleteLinkedIdentityDataAsync(profile.Id, now);
+        var tombstone = await deletion.MarkCompletedAsync(
+            subjectHash,
+            DateTimeOffset.UtcNow,
+            (int)TimeSpan.FromDays(30).TotalSeconds);
+        var replayedFailure = await deletion.MarkFailureAsync(
+            subjectHash,
+            "late-concurrent-failure",
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddMinutes(1));
+
+        (await users.GetAsync(profile.Id)).Should().BeNull();
+        (await credentials.FindByEmailAsync($"{profile.Id}@example.com")).Should().BeNull();
+        (await friends.GetAsync(profile.Id, friendId)).Should().BeNull();
+        (await friends.GetAsync(friendId, profile.Id)).Should().BeNull();
+        (await attempts.GetByClientAttemptIdAsync(profile.Id, attempt.ClientAttemptId))
+            .Should().BeNull();
+        var linkedIdentityTombstone = await identityRepository.GetAsync(identityLocator);
+        linkedIdentityTombstone.Should().NotBeNull();
+        linkedIdentityTombstone!.Revocation.State.Should()
+            .Be(LinkedIdentityRevocation.RevokedState);
+        linkedIdentityTombstone.Revocation.Generation.Should().Be(2);
+        linkedIdentityTombstone.Revocation.Reason.Should()
+            .Be(LinkedIdentityRevocation.AccountDeletionReason);
+        (await context.Users.ReadOrDefaultAsync<IdentityLinkIntent>(
+            intent.Id,
+            new Microsoft.Azure.Cosmos.PartitionKey(intent.Id))).Should().BeNull();
+        (await context.Users.ReadOrDefaultAsync<IdentityLinkOperation>(
+            operation.Id,
+            new Microsoft.Azure.Cosmos.PartitionKey(operation.Id))).Should().BeNull();
+        tombstone.SubjectUserId.Should().BeNull();
+        tombstone.UserId.Should().Be(subjectHash);
+        tombstone.Ttl.Should().Be((int)TimeSpan.FromDays(30).TotalSeconds);
+        replayedFailure.Status.Should().Be(AccountDeletionRecordStatus.Completed);
+        replayedFailure.FailureCode.Should().BeNull();
     }
 
     [CosmosEmulatorFact]
