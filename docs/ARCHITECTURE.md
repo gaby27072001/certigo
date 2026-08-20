@@ -219,7 +219,7 @@ Quand une source canonique est injectée, `ContentService` l'adapte ainsi :
 - un track de même ID fournit les compteurs et passe à `available` ;
 - les statuts `retired` et `replaced` sans contenu publié sont masqués, tandis que
   `active-retiring` reste actif ;
-- l'API annonce explicitement `certigo-certification-catalog/v2` et
+- l'API annonce explicitement `certigo.app-certification-catalog/v2` et
   `sourceSchema: certigo.certification-catalog/v1` ; le mobile refuse tout schéma inconnu ;
 - les segments de route utilisent un encodage URI afin de préserver les identifiants canoniques.
 

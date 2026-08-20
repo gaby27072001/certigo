@@ -37,7 +37,7 @@ RemoteCatalogRepository _repository(Map<String, dynamic> payload) {
 }
 
 Map<String, dynamic> _payload({
-  String schema = 'certigo-certification-catalog/v2',
+  String schema = 'certigo.app-certification-catalog/v2',
   String sourceSchema = 'certigo.certification-catalog/v1',
 }) =>
     <String, dynamic>{
@@ -80,7 +80,7 @@ void main() {
 
   test('rejects unknown app and source schemas without a broad fallback', () async {
     final Result<List<TrackSummary>> appResult = await _repository(
-      _payload(schema: 'certigo-certification-catalog/v1'),
+      _payload(schema: 'certigo.app-certification-catalog/v1'),
     ).getCatalog();
     final Result<List<TrackSummary>> sourceResult = await _repository(
       _payload(sourceSchema: 'certigo.certification-catalog/v2'),

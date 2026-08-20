@@ -52,8 +52,37 @@ param vnetAddressPrefix string = '10.42.0.0/16'
 @description('Plage d\'adresses du sous-réseau runner.')
 param subnetAddressPrefix string = '10.42.1.0/24'
 
-@description('Étiquettes de ressources (les ressources existantes ne sont actuellement pas étiquetées).')
+@description('Étiquettes supplémentaires conservées lors de l’application du contrat FinOps.')
 param tags object = {}
+
+@description('Équipe ou service propriétaire. Ne jamais utiliser une identité personnelle.')
+@minLength(1)
+param tagOwner string = 'certigo-platform'
+
+@description('Produit du contrat FinOps.')
+@allowed([ 'Certigo' ])
+param tagProduct string = 'Certigo'
+
+@description('Environnement du contrat FinOps.')
+@allowed([ 'ci' ])
+param tagEnvironment string = 'ci'
+
+@description('Outil déclaratif propriétaire de la ressource.')
+@allowed([ 'bicep' ])
+param tagManagedBy string = 'bicep'
+
+@description('Identifiant non personnel d’allocation des coûts.')
+@minLength(1)
+param tagCostCenter string = 'engineering'
+
+var requiredTags = {
+  owner: tagOwner
+  product: tagProduct
+  env: tagEnvironment
+  managedBy: tagManagedBy
+  costCenter: tagCostCenter
+}
+var effectiveTags = union(tags, requiredTags)
 
 // IP publique Standard, statique, régionale — l'adresse d'egress stable que le
 // trafic CI présente à Internet (les listes d'autorisation en dépendent : elle ne
@@ -61,7 +90,7 @@ param tags object = {}
 resource publicIp 'Microsoft.Network/publicIPAddresses@2024-05-01' = {
   name: publicIpName
   location: location
-  tags: tags
+  tags: effectiveTags
   sku: {
     name: 'Standard'
     tier: 'Regional'
@@ -84,7 +113,7 @@ resource publicIp 'Microsoft.Network/publicIPAddresses@2024-05-01' = {
 resource natGateway 'Microsoft.Network/natGateways@2024-05-01' = {
   name: natGatewayName
   location: location
-  tags: tags
+  tags: effectiveTags
   sku: {
     name: 'Standard'
   }
@@ -104,7 +133,7 @@ resource natGateway 'Microsoft.Network/natGateways@2024-05-01' = {
 resource nsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' = {
   name: nsgName
   location: location
-  tags: tags
+  tags: effectiveTags
   properties: {
     securityRules: []
   }
@@ -117,7 +146,7 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' = {
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
   name: vnetName
   location: location
-  tags: tags
+  tags: effectiveTags
   properties: {
     addressSpace: {
       addressPrefixes: [

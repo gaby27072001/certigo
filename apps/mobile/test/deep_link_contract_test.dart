@@ -31,12 +31,10 @@ void main() {
     });
 
     test('supports achievement and public account-deletion contracts', () {
-      final DeepLinkDestination achievement = enabledPolicy
-          .parse('https://$controlledTestHost/achievements/first-lesson')
-          .destination!;
-      final DeepLinkDestination deletion = enabledPolicy
-          .parse('https://$controlledTestHost/account-deletion')
-          .destination!;
+      final DeepLinkDestination achievement =
+          enabledPolicy.parse('https://$controlledTestHost/achievements/first-lesson').destination!;
+      final DeepLinkDestination deletion =
+          enabledPolicy.parse('https://$controlledTestHost/account-deletion').destination!;
 
       expect(achievement.appLocation, '/achievements/first-lesson');
       expect(achievement.requiresAuthentication, isTrue);

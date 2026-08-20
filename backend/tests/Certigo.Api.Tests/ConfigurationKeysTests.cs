@@ -13,11 +13,15 @@ public sealed class ConfigurationKeysTests
         var prefix = $"CERTIGO_TEST_{Guid.NewGuid():N}_";
         var uriVariable = $"{prefix}KeyVault__Uri";
         var healthSecretVariable = $"{prefix}KeyVault__HealthSecretName";
+        var graphSecretUriVariable = $"{prefix}ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI";
         const string expectedUri = "https://kv-certigo-test.vault.azure.net/";
         const string expectedSecretName = "AUTH-JWT-SIGNING-KEY";
+        const string expectedGraphSecretUri =
+            "https://kv-certigo-test.vault.azure.net/secrets/graph-client/version";
 
         Environment.SetEnvironmentVariable(uriVariable, expectedUri);
         Environment.SetEnvironmentVariable(healthSecretVariable, expectedSecretName);
+        Environment.SetEnvironmentVariable(graphSecretUriVariable, expectedGraphSecretUri);
         try
         {
             var configuration = new ConfigurationBuilder()
@@ -26,11 +30,45 @@ public sealed class ConfigurationKeysTests
 
             configuration[ConfigurationKeys.KeyVaultUri].Should().Be(expectedUri);
             configuration[ConfigurationKeys.KeyVaultHealthSecretName].Should().Be(expectedSecretName);
+            configuration[ConfigurationKeys.EntraGraphClientSecretSecretUri]
+                .Should().Be(expectedGraphSecretUri);
         }
         finally
         {
             Environment.SetEnvironmentVariable(uriVariable, null);
             Environment.SetEnvironmentVariable(healthSecretVariable, null);
+            Environment.SetEnvironmentVariable(graphSecretUriVariable, null);
         }
+    }
+
+    [Theory]
+    [InlineData(true, null)]
+    [InlineData(false, "prod")]
+    [InlineData(false, null)]
+    [InlineData(false, "staging")]
+    [InlineData(false, "test")]
+    [InlineData(true, "dev")]
+    public void GraphClientSecretGuard_RejectsDirectSecretsInHardenedEnvironments(
+        bool isProduction,
+        string? authMode)
+    {
+        var action = () => GraphClientSecretGuard.EnsureIndirectConfiguration(
+            "direct-secret",
+            isProduction,
+            authMode);
+
+        action.Should().Throw<InvalidOperationException>()
+            .WithMessage("*ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI*");
+    }
+
+    [Fact]
+    public void GraphClientSecretGuard_AllowsDirectSecretsOnlyForExplicitDevelopment()
+    {
+        var action = () => GraphClientSecretGuard.EnsureIndirectConfiguration(
+            "local-development-secret",
+            isProduction: false,
+            authMode: "dev");
+
+        action.Should().NotThrow();
     }
 }

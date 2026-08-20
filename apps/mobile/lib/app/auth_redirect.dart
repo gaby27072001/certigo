@@ -15,7 +15,8 @@ abstract class AuthShellRoutes {
   static const String landing = '/landing'; // écran d'ouverture façon Luma (hero + sheet)
   static const String auth = '/auth'; // écran de connexion e-mail (ouvert depuis la sheet)
   static const String home = '/home'; // accueil (dans le shell)
-  static const String accountDeletion = '/account-deletion'; // informations publiques
+  static const String accountDeletionInfo = '/account-deletion';
+  static const String accountDeleted = '/account/deleted';
   static const String onboardingSplash = '/onboarding/splash'; // ≠ [splash] (cf. #154)
 
   /// Ensemble des routes du flux de démarrage (hors shell), doit rester
@@ -45,7 +46,7 @@ abstract class AuthShellRoutes {
   /// `/register`). Distinct du préfixe `/onboarding`.
   static bool isRegisterFlow(String location) => location.startsWith('/register');
 
-  static bool isPublic(String location) => location == accountDeletion;
+  static bool isPublic(String location) => location == accountDeletionInfo;
 }
 
 /// Décision de redirection d'authentification, **pure et testable**.
@@ -77,6 +78,9 @@ String? resolveAuthRedirect({
   final bool atOnboarding = AuthShellRoutes.isStartup(location);
   final bool atRegister = AuthShellRoutes.isRegisterFlow(location);
 
+  if (auth is AccountDeletionCompleted) {
+    return location == AuthShellRoutes.accountDeleted ? null : AuthShellRoutes.accountDeleted;
+  }
   if (atPublic) return null;
 
   // Restauration de session : rester sur le splash d'auth. Exception : les

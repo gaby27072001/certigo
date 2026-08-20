@@ -34,13 +34,13 @@ final class DeepLinkDestination {
   const DeepLinkDestination._({required this.kind, this.trackId, this.resourceId});
 
   const DeepLinkDestination.lesson({required String trackId, required String lessonId})
-    : this._(kind: DeepLinkKind.lesson, trackId: trackId, resourceId: lessonId);
+      : this._(kind: DeepLinkKind.lesson, trackId: trackId, resourceId: lessonId);
 
   const DeepLinkDestination.assignment(String assignmentId)
-    : this._(kind: DeepLinkKind.assignment, resourceId: assignmentId);
+      : this._(kind: DeepLinkKind.assignment, resourceId: assignmentId);
 
   const DeepLinkDestination.achievement(String achievementId)
-    : this._(kind: DeepLinkKind.achievement, resourceId: achievementId);
+      : this._(kind: DeepLinkKind.achievement, resourceId: achievementId);
 
   const DeepLinkDestination.accountDeletion() : this._(kind: DeepLinkKind.accountDeletion);
 
@@ -51,17 +51,16 @@ final class DeepLinkDestination {
   bool get requiresAuthentication => kind != DeepLinkKind.accountDeletion;
 
   String get appLocation => switch (kind) {
-    DeepLinkKind.lesson =>
-      '/lesson/${Uri.encodeComponent(trackId!)}/${Uri.encodeComponent(resourceId!)}',
-    DeepLinkKind.assignment => '/assignments/${Uri.encodeComponent(resourceId!)}',
-    DeepLinkKind.achievement => '/achievements/${Uri.encodeComponent(resourceId!)}',
-    DeepLinkKind.accountDeletion => '/account-deletion',
-  };
+        DeepLinkKind.lesson =>
+          '/lesson/${Uri.encodeComponent(trackId!)}/${Uri.encodeComponent(resourceId!)}',
+        DeepLinkKind.assignment => '/assignments/${Uri.encodeComponent(resourceId!)}',
+        DeepLinkKind.achievement => '/achievements/${Uri.encodeComponent(resourceId!)}',
+        DeepLinkKind.accountDeletion => '/account-deletion',
+      };
 
   Uri toHttpsUri({required String host, String pathPrefix = ''}) {
-    final String prefix = pathPrefix.endsWith('/')
-        ? pathPrefix.substring(0, pathPrefix.length - 1)
-        : pathPrefix;
+    final String prefix =
+        pathPrefix.endsWith('/') ? pathPrefix.substring(0, pathPrefix.length - 1) : pathPrefix;
     final String path = switch (kind) {
       DeepLinkKind.lesson =>
         '$prefix/learn/${Uri.encodeComponent(trackId!)}/${Uri.encodeComponent(resourceId!)}',
@@ -93,16 +92,16 @@ final class DeepLinkNavigationDecision {
   });
 
   const DeepLinkNavigationDecision.navigate(String location)
-    : this._(action: DeepLinkNavigationAction.navigate, location: location);
+      : this._(action: DeepLinkNavigationAction.navigate, location: location);
 
   const DeepLinkNavigationDecision.requireAuthentication(String pendingLocation)
-    : this._(
-        action: DeepLinkNavigationAction.requireAuthentication,
-        pendingLocation: pendingLocation,
-      );
+      : this._(
+          action: DeepLinkNavigationAction.requireAuthentication,
+          pendingLocation: pendingLocation,
+        );
 
   const DeepLinkNavigationDecision.ignore(DeepLinkRejection rejection)
-    : this._(action: DeepLinkNavigationAction.ignore, rejection: rejection);
+      : this._(action: DeepLinkNavigationAction.ignore, rejection: rejection);
 
   final DeepLinkNavigationAction action;
   final String? location;

@@ -234,3 +234,10 @@ class Unauthenticated extends AuthState {
   final String? message;
   final bool clearLocalAccountData;
 }
+
+/// The server confirmed irreversible deletion and local credentials are gone.
+/// Kept distinct from [Unauthenticated] long enough to show an explicit final
+/// confirmation instead of silently dropping the learner on the sign-in screen.
+class AccountDeletionCompleted extends AuthState {
+  const AccountDeletionCompleted();
+}

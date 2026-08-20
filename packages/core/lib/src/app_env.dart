@@ -113,6 +113,12 @@ class AppEnv {
   /// prévisualiser/tester l'UI en dev (`--dart-define=FORCE_AUTH_UI=true`).
   static const bool forceAuthUi = bool.fromEnvironment('FORCE_AUTH_UI', defaultValue: false);
 
+  /// Keeps account deletion hidden until the destructive Cosmos gate passes.
+  static const bool accountDeletionEnabled = bool.fromEnvironment(
+    'ACCOUNT_DELETION_ENABLED',
+    defaultValue: false,
+  );
+
   /// Assouplit [validate] : quand `true`, l'absence **totale** de configuration
   /// Entra (client id + autorité vides) devient un simple avertissement au lieu
   /// d'une erreur bloquante, même en prod. À n'utiliser que pour un build

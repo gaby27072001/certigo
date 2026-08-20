@@ -58,7 +58,7 @@ void main() {
               Text('achievement:${state.pathParameters['achievementId']}'),
         ),
         GoRoute(
-          path: AuthShellRoutes.accountDeletion,
+          path: AuthShellRoutes.accountDeletionInfo,
           builder: (_, __) => const Text('account-deletion'),
         ),
       ],

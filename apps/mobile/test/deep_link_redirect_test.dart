@@ -9,8 +9,8 @@ void main() {
   const String controlledTestHost = 'links.user-owned.example';
 
   DeepLinkRouterCoordinator enabledCoordinator() => DeepLinkRouterCoordinator(
-    policy: const DeepLinkPolicy(enabled: true, primaryHost: controlledTestHost),
-  );
+        policy: const DeepLinkPolicy(enabled: true, primaryHost: controlledTestHost),
+      );
 
   group('protected HTTPS navigation', () {
     test('retains only the validated internal route through auth and onboarding', () {

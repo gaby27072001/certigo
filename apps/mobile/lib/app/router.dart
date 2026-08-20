@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
+import 'package:core/core.dart';
 
 import '../features/home/presentation/home_screen.dart';
 import '../features/path/presentation/path_screen.dart';
@@ -30,6 +31,7 @@ import '../features/auth/presentation/register_profile_created_screen.dart';
 import '../features/auth/presentation/splash_screen.dart' as auth;
 import '../features/deep_links/presentation/account_deletion_screen.dart';
 import '../features/deep_links/presentation/assignment_link_screen.dart';
+import '../features/account_deletion/presentation/account_deletion_screen.dart' as account_deletion;
 import '../features/onboarding/application/onboarding_controller.dart';
 import '../features/onboarding/presentation/certification_screen.dart';
 import '../features/onboarding/presentation/onboarding_common.dart';
@@ -61,13 +63,15 @@ abstract class Routes {
   /// "Explore" destinations presented above the shell (no bottom nav).
   static const String achievements = '/achievements';
   static const String assignments = '/assignments';
-  static const String accountDeletion = '/account-deletion';
+  static const String accountDeletionInfo = '/account-deletion';
   static const String seasons = '/seasons';
   static const String quests = '/quests';
   static const String shop = '/shop';
   static const String friends = '/friends';
   static const String exam = '/exam';
   static const String dailyShare = '/share-daily';
+  static const String accountDeletion = '/account/delete';
+  static const String accountDeleted = '/account/deleted';
 }
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -116,8 +120,12 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   assert(Routes.auth == AuthShellRoutes.auth, 'Routes.auth désynchronisé');
   assert(Routes.home == AuthShellRoutes.home, 'Routes.home désynchronisé');
   assert(
-    Routes.accountDeletion == AuthShellRoutes.accountDeletion,
-    'Routes.accountDeletion désynchronisé',
+    Routes.accountDeletionInfo == AuthShellRoutes.accountDeletionInfo,
+    'Routes.accountDeletionInfo désynchronisé',
+  );
+  assert(
+    Routes.accountDeleted == AuthShellRoutes.accountDeleted,
+    'Routes.accountDeleted désynchronisé',
   );
   assert(
     OnboardingRoutes.splash == AuthShellRoutes.onboardingSplash,
@@ -146,6 +154,9 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
     initialLocation: Routes.splash,
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
+      if (!AppEnv.accountDeletionEnabled && state.matchedLocation == Routes.accountDeletion) {
+        return Routes.profile;
+      }
       final AuthState auth = ref.read(authControllerProvider);
       return deepLinks.redirect(
         uri: state.uri,
@@ -184,10 +195,21 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         ),
       ),
       GoRoute(
-        path: Routes.accountDeletion,
+        path: Routes.accountDeletionInfo,
         name: 'account-deletion',
         parentNavigatorKey: _rootKey,
         builder: (_, __) => const AccountDeletionScreen(),
+      ),
+      GoRoute(
+        path: Routes.accountDeletion,
+        parentNavigatorKey: _rootKey,
+        builder: (_, GoRouterState state) =>
+            account_deletion.AccountDeletionScreen(expectedUserId: state.extra as String?),
+      ),
+      GoRoute(
+        path: Routes.accountDeleted,
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const account_deletion.AccountDeletionCompletedScreen(),
       ),
 
       // Real account creation: name → email → password → confirmation.
@@ -382,26 +404,6 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
             highlightedAchievementId: Uri.decodeComponent(state.pathParameters['achievementId']!),
           ),
         ),
-      ),
-      GoRoute(
-        path: '/Certigo/learn/:trackId/:lessonId',
-        parentNavigatorKey: _rootKey,
-        builder: (_, __) => const SizedBox.shrink(),
-      ),
-      GoRoute(
-        path: '/Certigo/assignments/:assignmentId',
-        parentNavigatorKey: _rootKey,
-        builder: (_, __) => const SizedBox.shrink(),
-      ),
-      GoRoute(
-        path: '/Certigo/achievements/:achievementId',
-        parentNavigatorKey: _rootKey,
-        builder: (_, __) => const SizedBox.shrink(),
-      ),
-      GoRoute(
-        path: '/Certigo/account-deletion',
-        parentNavigatorKey: _rootKey,
-        builder: (_, __) => const SizedBox.shrink(),
       ),
       GoRoute(
         path: Routes.seasons,

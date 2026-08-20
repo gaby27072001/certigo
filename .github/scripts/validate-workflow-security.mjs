@@ -342,8 +342,14 @@ function validateWorkflow(file) {
 function validateRepositoryInvariants() {
   const errors = [];
   const android = fs.readFileSync(path.join(workflowsDir, 'release-android.yml'), 'utf8');
+  const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');
   const backend = fs.readFileSync(path.join(workflowsDir, 'cd-backend.yml'), 'utf8');
   const backendCi = fs.readFileSync(path.join(workflowsDir, 'ci-backend.yml'), 'utf8');
+  const accountDeletionCosmosWorkflow = fs.readFileSync(
+    path.join(workflowsDir, 'test-account-deletion-cosmos.yml'),
+    'utf8',
+  );
+  const accountDeletionCosmosControls = accountDeletionCosmosWorkflow;
   const promoteBackendPath = path.join(
     workflowsDir,
     'promote-backend-staging-prod.yml',
@@ -378,6 +384,10 @@ function validateRepositoryInvariants() {
   );
   const secureBicepWriter = fs.readFileSync(
     path.join(root, '.github', 'scripts', 'write-secure-bicep-parameters.mjs'),
+    'utf8',
+  );
+  const accountDeletionCosmosGate = fs.readFileSync(
+    path.join(root, 'backend', 'run-account-deletion-cosmos-emulator.sh'),
     'utf8',
   );
   const releaseEnvironmentParameters = ['staging', 'prod'].map((environment) => ({
@@ -433,6 +443,10 @@ function validateRepositoryInvariants() {
       'PLAY_SERVICE_ACCOUNT_JSON est obligatoire pour une publication non dry-run',
     ],
     ['production configuration gate', '--certigo-env "$CERTIGO_ENV"'],
+    [
+      'account deletion release gate',
+      '--dart-define="ACCOUNT_DELETION_ENABLED=$ACCOUNT_DELETION_ENABLED"',
+    ],
   ]);
 
   for (const [label, marker] of androidRequirements) {
@@ -442,6 +456,15 @@ function validateRepositoryInvariants() {
   }
   if (android.includes('${{ vars.API_BASE_URL }}')) {
     errors.push('release-android.yml: legacy API_BASE_URL repository variable is forbidden');
+  }
+  if (
+    codemagic.split(
+      '--dart-define=ACCOUNT_DELETION_ENABLED="$ACCOUNT_DELETION_ENABLED"',
+    ).length !== 3
+  ) {
+    errors.push(
+      'codemagic.yaml: production and dev IPA builds must carry the account deletion flag',
+    );
   }
   const directPromotion = backend.includes('promote-backend');
   if (
@@ -496,6 +519,58 @@ function validateRepositoryInvariants() {
       errors.push(`cd-backend.yml: missing locked dependency invariant ${marker}`);
     }
   }
+  for (const marker of [
+    'refs/heads/main',
+    'repository_dispatch:',
+    'types: [test-account-deletion-cosmos]',
+    'type == "object" and length == 0',
+    "github.ref == 'refs/heads/main'",
+    'ref: ${{ github.sha }}',
+    'runs-on: [self-hosted, Linux, X64, certigo-trusted]',
+    'ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""',
+    'bash backend/run-account-deletion-cosmos-emulator.sh',
+  ]) {
+    if (!accountDeletionCosmosControls.includes(marker)) {
+      errors.push(
+        `test-account-deletion-cosmos.yml: missing isolated gate invariant ${marker}`,
+      );
+    }
+  }
+  if (
+    accountDeletionCosmosControls.includes('pull_request')
+    || accountDeletionCosmosControls.includes('push:')
+    || accountDeletionCosmosControls.includes('az role assignment')
+    || accountDeletionCosmosControls.includes('az cosmosdb create')
+  ) {
+    errors.push(
+      'test-account-deletion-cosmos.yml: the destructive gate must stay manual and must not provision Azure resources or roles',
+    );
+  }
+  for (const marker of [
+    'openssl rand -base64 64',
+    'KEY_FILE=/run/secrets/cosmos.key',
+    '--publish 127.0.0.1:8081:8081',
+    'CERTIGO_COSMOS_TESTS=1',
+    'COSMOS_EMULATOR_ENDPOINT=https://127.0.0.1:8081',
+    'CosmosRepositoriesIntegrationTests.Account_deletion_removes_user_partitions_and_keeps_only_pseudonymous_tombstone',
+    'docker rm --force',
+    'trap cleanup EXIT',
+  ]) {
+    if (!accountDeletionCosmosGate.includes(marker)) {
+      errors.push(
+        `run-account-deletion-cosmos-emulator.sh: missing local-only invariant ${marker}`,
+      );
+    }
+  }
+  if (
+    accountDeletionCosmosGate.includes('COSMOS_ENDPOINT')
+    || accountDeletionCosmosGate.includes('AZURE_SUBSCRIPTION')
+    || accountDeletionCosmosGate.includes('secrets.')
+  ) {
+    errors.push(
+      'run-account-deletion-cosmos-emulator.sh: live Azure configuration is forbidden',
+    );
+  }
   if (!backendCi.includes('dotnet restore Certigo.sln --locked-mode')) {
     errors.push('ci-backend.yml: backend build must restore committed locks in locked mode');
   }
@@ -513,6 +588,11 @@ function validateRepositoryInvariants() {
     for (const marker of [
       'ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}',
       'AUTH_JWT_SIGNING_KEY: ${{ secrets.AUTH_JWT_SIGNING_KEY }}',
+      'ENTRA_GRAPH_TENANT_ID: ${{ vars.ENTRA_GRAPH_TENANT_ID }}',
+      'ENTRA_GRAPH_CLIENT_ID: ${{ vars.ENTRA_GRAPH_CLIENT_ID }}',
+      'ENTRA_GRAPH_CLIENT_SECRET: ${{ secrets.ENTRA_GRAPH_CLIENT_SECRET }}',
+      'ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON: ${{ vars.ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON }}',
+      'ENTRA_REAUTH_AUDIENCE: ${{ vars.ENTRA_REAUTH_AUDIENCE }}',
       'az bicep build-params',
       'node .github/scripts/write-secure-bicep-parameters.mjs',
       'DEPLOYMENT_OUTPUTS_FILE',
@@ -531,16 +611,32 @@ function validateRepositoryInvariants() {
         ))
       || backend.includes('authJwtSigningKey="$AUTH_JWT_SIGNING_KEY"')
       || backend.includes('--parameters authJwtSigningKey')
+      || backend.includes('--parameters entraGraphClientSecret')
+      || backend.includes('ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI: ${{ vars.')
       || promoteBackend.includes('AUTH_JWT_SIGNING_KEY')
+      || promoteBackend.includes('ENTRA_GRAPH_CLIENT_SECRET')
     ) {
       errors.push(
-        'backend deployment: JWT signing key must come from the called job environment and never a command argument',
+        'backend deployment: sensitive keys must come from the target environment and never a command argument or promotion payload',
+      );
+    }
+    if (
+      backend.includes('workflow_call:')
+      && !backend.includes('ENTRA_GRAPH_CLIENT_SECRET:\n        required: true')
+    ) {
+      errors.push(
+        'cd-backend.yml: reusable workflow must declare ENTRA_GRAPH_CLIENT_SECRET as required',
       );
     }
     for (const marker of [
       "environment !== 'dev'",
       'compiled.parameters.alertEmail',
       'compiled.parameters.authJwtSigningKey',
+      'compiled.parameters.entraGraphTenantId',
+      'compiled.parameters.entraGraphClientId',
+      'compiled.parameters.entraGraphClientSecret',
+      'compiled.parameters.entraGraphClientSecretExpiresOn',
+      'compiled.parameters.entraReauthAudience',
       'mode: 0o600',
       "flag: 'wx'",
     ]) {
@@ -552,6 +648,14 @@ function validateRepositoryInvariants() {
       if (/^\s*param\s+alertEmail\s*=/m.test(content)) {
         errors.push(
           `${environment}.bicepparam: alertEmail must come from the GitHub Environment`,
+        );
+      }
+      if (
+        /^\s*param\s+entra(GraphTenantId|GraphClientId|GraphClientSecret|ReauthAudience)\s*=/m
+          .test(content)
+      ) {
+        errors.push(
+          `${environment}.bicepparam: account deletion identity values must come from the GitHub Environment`,
         );
       }
     }
@@ -1109,7 +1213,6 @@ function validateRepositoryInvariants() {
   if (!contentWorkflow.includes('run: npm ci') || contentWorkflow.includes('npm install')) {
     errors.push('ci-content.yml: npm dependencies must be installed exclusively with npm ci');
   }
-  const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');
   if (/(?:dart|flutter)\s+pub\s+get(?!\s+--enforce-lockfile)/.test(codemagic)) {
     errors.push('codemagic.yaml: Flutter dependency resolution must enforce the lockfile');
   }

@@ -14,6 +14,7 @@ import '../models/shop.dart';
 import '../models/friend.dart';
 import '../models/exam.dart';
 import '../models/share_card.dart';
+import '../models/account_deletion.dart';
 
 /// Repository contracts consumed by the app's feature controllers.
 ///
@@ -30,6 +31,13 @@ abstract interface class UserRepository {
   });
 }
 
+abstract interface class AccountDeletionRepository {
+  Future<Result<AccountDeletion>> getStatus();
+  Future<Result<AccountDeletion>> requestDeletion({
+    String? reauthenticationToken,
+  });
+}
+
 abstract interface class PathRepository {
   Future<Result<LearningPath>> getPath(String trackId);
 }
@@ -40,7 +48,10 @@ abstract interface class CatalogRepository {
 }
 
 abstract interface class LessonRepository {
-  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId});
+  Future<Result<Lesson>> getLesson({
+    required String trackId,
+    required String lessonId,
+  });
 }
 
 abstract interface class QuizRepository {

@@ -31,6 +31,7 @@ class FakeAuthGateway implements AuthGateway {
 
   final List<AuthProvider> signInCalls = <AuthProvider>[];
   final List<String> refreshCalls = <String>[];
+  final List<AuthProvider> reauthenticateCalls = <AuthProvider>[];
   int signOutCalls = 0;
 
   @override
@@ -50,6 +51,14 @@ class FakeAuthGateway implements AuthGateway {
     final AuthSession Function(String)? builder = onRefresh;
     if (builder == null) throw StateError('refresh non câblé');
     return builder(refreshToken);
+  }
+
+  @override
+  Future<AuthSession> reauthenticate(AuthProvider provider) async {
+    reauthenticateCalls.add(provider);
+    final AuthSession Function(AuthProvider)? builder = onSignIn;
+    if (builder == null) throw StateError('reauthenticate non câblé');
+    return builder(provider);
   }
 
   @override

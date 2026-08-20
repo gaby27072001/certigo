@@ -7,20 +7,21 @@ avec le reste des livrables ; les noms de ressources Azure reprennent ceux du po
 ## Pourquoi
 
 Les runners hébergés par GitHub sont **désactivés par la politique d'entreprise EMU**.
-La CI s'exécute donc sur un pool de machines virtuelles Azure auto-hébergées
-(dont `vm-certigo-runner` et `vm-certigo-runner-2`, dans le groupe de ressources
-`rg-certigo-ci`). Ces
-machines **n'ont aucune IP publique propre** : leur seul accès à Internet passe par une
-**Passerelle NAT (NAT Gateway)** attachée à leur sous-réseau. Le runbook de redondance,
-de failover et de preuve opérationnelle est dans
+L'inventaire live consolidé au 20 août 2026 montre désormais un VMSS flexible
+`vmss-certigo-runner-zonal` et non les deux VM autonomes historiques. Le dossier reste une
+référence de reconstruction; il ne doit pas être appliqué à ce VMSS sans migration approuvée.
+Le runbook de redondance, de moindre privilège et de preuve opérationnelle est dans
 [`docs/CI_RUNNER_RESILIENCE.md`](../../docs/CI_RUNNER_RESILIENCE.md).
 
-Ce chemin a d'abord été créé **manuellement** (az CLI) pour débloquer la CI en urgence.
-Tant qu'il n'existait que « à la main », un futur redéploiement ou une correction de
-dérive pouvait le **détruire silencieusement** et casser la CI de façon permanente.
-`network.bicep` le **fige en code** pour empêcher cela.
+Le live comporte une NAT Gateway, un Load Balancer et un autoscale CPU. La réconciliation
+classe `22f7fb52-Certigo` comme absent d'Azure, les bindings exacts f55/runner 27 et
+bbf/runner 28 comme gérés (running/online), et `4153d1dd` comme VM externe/deallocated.
+Cette dernière n'est ni comptée ni ciblée; toute autre VM non réconciliée bloque le plan.
+`network.bicep`
+décrit l'ancienne réconciliation et son déploiement est suspendu; seul son `what-if`
+read-only est autorisé.
 
-## Chemin d'egress réconcilié
+## Modèle historique versionné (pas l'état live)
 
 ```
 vm-certigo-runner (carte réseau, pas d'IP publique)
@@ -43,7 +44,10 @@ Passerelle NAT nat-certigo  ──►  IP publique pip-certigo-nat (20.86.156.64
 | `snet-runners` | Sous-réseau (`10.42.1.0/24`) | La carte réseau du runner s'y rattache ; associé à la Passerelle NAT + NSG |
 | `vnet-certigo-ci-snet-runners-nsg-westeurope` | Groupe de sécurité réseau (NSG) | Vide (règles Azure par défaut) ; conservé pour matcher l'état réel |
 
-## Périmètre IaC
+Le schéma et les noms ci-dessous décrivent `network.bicep`. Ils ne correspondent plus au
+VMSS/NAT/LB live et ne constituent pas une autorisation de déploiement.
+
+## Périmètre IaC historique
 
 Deux modèles complémentaires sont versionnés :
 
@@ -67,6 +71,9 @@ La reconstruction n'utilise ni image mutable implicite, ni jeton dans l'IaC :
 - `imageVersion` est obligatoire et doit être une version Marketplace exacte ;
 - les tags et sorties Azure enregistrent la version d'image et le SHA-256 du bootstrap
   réellement incorporé ;
+- les tags supplémentaires sont conservés, puis le contrat canonique
+  `owner/product/env/managedBy/costCenter` de `infra/finops/scopes.json` prévaut
+  sur toute collision avec des valeurs CI non personnelles ;
 - Ubuntu 24.04, Trusted Launch, Secure Boot, vTPM et un disque Premium de 128 Gio sont
   déclarés ;
 - `allowExtensionOperations: false` interdit l'installation d'extensions VM ; le bootstrap
@@ -102,62 +109,54 @@ npm, Azure, l'espace disque et les commandes nécessaires.
 
 ## Capacité et cycle de vie
 
-Chaque VM créée par `runner.bicep` est une `Standard_D4s_v5` et exécute un seul job GitHub
-Actions à la fois. La capacité nominale du pool Linux est donc **deux jobs concurrents**,
-à condition que les deux VMs soient `running`, que les deux runners soient `online` et
-qu'ils portent `certigo-ci`. Il n'y a pas d'autoscaling : une file d'attente est un signal
-opérationnel de démarrer les deux VMs ou d'ajouter une troisième instance via une
-reconstruction planifiée.
+Le VMSS live est `Standard_D2ads_v6`, autoscale min 2 / défaut 2 / max 4. Son scale-in CPU
+est dangereux car il ignore GitHub `busy`, et les runners portent simultanément
+`certigo-pr` et `certigo-trusted`. Toute automation mutable est donc bloquée.
 
-Le démarrage et la déallocation sont des opérations humaines décrites dans
-[`docs/runbooks/CI_RUNNERS.md`](../../docs/runbooks/CI_RUNNERS.md) ; l'IaC, le bootstrap
-et les validations locales ne démarrent, n'arrêtent ni ne suppriment de ressource Azure.
-Avant de déallouer une VM, l'opérateur vérifie que son runner est `online` et `busy: false`.
-Pendant une session CI, conserver les deux instances disponibles : l'une absorbe la perte
-ou la maintenance de l'autre.
+Le script `lifecycle-preflight.sh` inventorie sans mutation et refuse une déallocation en
+présence d'un label double, d'un job actif/en file, d'un scale-in CPU ou d'un écart entre VM
+et runners. La cible sérialisée et son rollback sont dans
+[`docs/runbooks/CLOUD_LEAST_PRIVILEGE.md`](../../docs/runbooks/CLOUD_LEAST_PRIVILEGE.md).
+
+Le planificateur `capacity-plan.sh` ajoute une réconciliation de drift et un modèle
+queue-driven `workflow_job` avec trois modes par classe (`idle=0+0`, `normal=1+1`,
+`boost=6 PR + 2 trusted`). Cette cible est celle d'un pilote ultérieur, pas un plafond
+de production final. Le feature flag est **off**; aucun code de mutation n'est présent.
+L'état v3 exige power Azure + runner online, conserve le slot exact à réarmer et refuse les
+IDs 22f/459. Labels, frontières d'identité et sous-réseaux exclusifs sont des prérequis. Le scale-in
+exige une quiet period resettable de 5 minutes, deux gardes, un lease et un réarmement
+sur toute activité postérieure. Le baseline 30 jours est
+242,06 USD pour 413 jobs, 18,84 runner-heures, 3,78 % CPU moyen, avec une file P95 de
+5 108 s et P99 de 12 628 s.
 
 > À noter : le compte **Azure OpenAI** (`certigo-openai`), autre ressource en drift citée
 > par le finding G, est lui **réintégré en IaC** dans ce livrable via
 > `infra/modules/openai.bicep` (câblé dans `infra/main.bicep`, module `tutor`).
 
-## Dérive constatée — candidats au nettoyage (à traiter manuellement)
+## Nettoyage
 
-L'inventaire du groupe `rg-certigo-ci` révèle des ressources **orphelines ou en
-double**, vestiges des tâtonnements de mise en place. Elles ne sont **ni importées ni
-supprimées automatiquement** ici (suppression = décision humaine), mais documentées :
+Les quatre anciens candidats documentés ne sont plus présents dans l'inventaire live. Les
+disques, NIC, IP, NAT, NSG et backends LB actuels ont des attachements prouvés. Aucune
+suppression n'est planifiée. Une ressource sans preuve d'usage reste `non classée` tant que
+les références ARM, RBAC, logs, propriétaires et rollback ne sont pas établis.
 
-| Ressource | Constat | Action suggérée |
-| --- | --- | --- |
-| `pip-certigo-test` (`20.61.109.230`) | IP publique **orpheline** (aucune configuration IP, aucune Passerelle NAT) | Supprimer (fuite de coût) |
-| `vm-certigo-runnerVNET` | **Réseau virtuel en double** non utilisé par le runner | Supprimer après vérification |
-| `vm-certigo-runnerVNET-vm-certigo-runnerSubnet-nsg-westeurope` | NSG du sous-réseau du VNet en double | Supprimer avec le VNet ci-dessus |
-| `vm-certigo-runnerNSG` | NSG par défaut de la VM, non rattaché au chemin d'egress | Vérifier puis supprimer si inutilisé |
+## Commande read-only
 
-## Commandes
-
-Valider sans rien changer — n'affiche que des différences **bénignes** (voir
-« Différences résiduelles du what-if » plus bas) ; aucune ne modifie le chemin d'egress :
+Valider sans rien changer. Le résultat doit être traité comme une preuve de drift; il n'est
+plus présumé bénin :
 
 ```bash
 az deployment group what-if -g rg-certigo-ci \
   --template-file infra/ci-runner/network.bicep
 ```
 
-Déployer (incrémentiel — ne touche que les 5 ressources d'egress) :
+### Anciennes différences résiduelles
 
-```bash
-az deployment group create -g rg-certigo-ci \
-  --template-file infra/ci-runner/network.bicep
-```
-
-### Différences résiduelles du what-if — **bénignes et attendues**
-
-Le what-if affiche encore trois « suppressions » de propriétés, sur deux ressources.
+Avant la migration VMSS, le what-if affichait trois « suppressions » de propriétés.
 Ce sont des **valeurs par défaut injectées par Azure** que l'API renvoie en lecture mais
 que le modèle **ne peut pas** repositionner (propriétés réservées, en lecture seule, ou
-absentes du schéma Bicep stable). Un déploiement réel **ne modifie pas** le chemin
-d'egress : adresse IP, allocation statique, lien IP↔Passerelle NAT et association
-sous-réseau↔NAT↔NSG restent **identiques au bit près**.
+absentes du schéma Bicep stable). Ces observations historiques ne permettent plus de
+conclure sur le live actuel. Ne pas exécuter `az deployment group create`.
 
 | Ressource | Propriété signalée | Pourquoi on ne la fige pas |
 | --- | --- | --- |
@@ -169,5 +168,5 @@ Les fausses différences réglables (`ddosSettings` héritée du VNet sur l'IP p
 `privateEndpointVNetPolicies` sur le réseau virtuel) ont déjà été **explicitées** dans le
 modèle : le réseau virtuel et le NSG ressortent donc en **« aucun changement »**.
 
-La compilation des deux modèles, la syntaxe Bash et les tests du probe sont vérifiés par
-`ci-infra`.
+La compilation des deux modèles, le contrat de tags, la syntaxe Bash et les tests du probe
+sont vérifiés par `infra/validate.sh` et la gate `ci-infra`.

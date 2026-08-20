@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://schemas.certigo.invalid/track.schema.json",
+  "$id": "urn:certigo:schema:track:v1",
   "title": "Certigo Track",
   "description": "A certification track: weighted exam domains and an ordered list of units. Domain weights MUST sum to 1.0 and drive the Readiness Score.",
   "type": "object",

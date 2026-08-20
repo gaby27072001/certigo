@@ -224,6 +224,102 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
     }
 
     [CosmosEmulatorFact]
+    public async Task Account_deletion_removes_user_partitions_and_keeps_only_pseudonymous_tombstone()
+    {
+        var context = await fixture.GetContextAsync();
+        var users = new CosmosUserRepository(context);
+        var credentials = new CosmosUserCredentialRepository(context);
+        var friends = new CosmosFriendRepository(context);
+        var attempts = new CosmosAttemptRepository(context);
+        var deletion = new CosmosAccountDeletionRepository(context);
+        var profile = NewProfile();
+        var friendId = $"friend-{Guid.NewGuid():N}";
+        await users.UpsertAsync(profile);
+        await credentials.CreateAsync(new UserCredentialRecord(
+            UserCredentialRecord.CanonicalIdFor($"{profile.Id}@example.com"),
+            $"{profile.Id}@example.com",
+            profile.Id,
+            profile.DisplayName,
+            "hash",
+            DateTimeOffset.UtcNow,
+            CanonicalEmail: $"{profile.Id}@example.com",
+            ProvisioningState: CredentialProvisioningState.Active));
+        await friends.UpsertAsync(new FriendEdge(
+            $"{profile.Id}:{friendId}",
+            profile.Id,
+            friendId,
+            DateTimeOffset.UtcNow));
+        await friends.UpsertAsync(new FriendEdge(
+            $"{friendId}:{profile.Id}",
+            friendId,
+            profile.Id,
+            DateTimeOffset.UtcNow));
+        var attempt = NewAttempt(
+            profile.Id,
+            xpEarned: 10,
+            submittedAt: DateTimeOffset.UtcNow);
+        await attempts.CreateAsync(attempt);
+
+        var subjectHash = AccountDeletionSubject.Hash(profile.Id);
+        await using var admittedMutation =
+            await context.AcquireAccountWriteLeaseAsync(profile.Id);
+        await deletion.GetOrCreateAsync(new AccountDeletionRecord(
+            AccountDeletionRecord.RecordId,
+            subjectHash,
+            profile.Id,
+            Guid.NewGuid().ToString("n"),
+            AccountIdentityKind.Local,
+            ["social", "learning", "economy", "profile", "identity", "reconciliation"],
+            [],
+            AccountDeletionRecordStatus.Pending,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow));
+
+        (await context.HasActiveAccountWriteLeasesAsync(subjectHash)).Should().BeTrue();
+        await admittedMutation.DisposeAsync();
+        (await context.HasActiveAccountWriteLeasesAsync(subjectHash)).Should().BeFalse();
+
+        Func<Task> recreateProfile = () => users.UpsertAsync(profile with { ETag = null });
+        await recreateProfile.Should().ThrowAsync<AccountDeletionInProgressException>();
+        Func<Task> recreateAttempt = () => attempts.CreateAsync(NewAttempt(
+            profile.Id,
+            xpEarned: 99,
+            submittedAt: DateTimeOffset.UtcNow));
+        await recreateAttempt.Should().ThrowAsync<AccountDeletionInProgressException>();
+        Func<Task> recreateFriend = () => friends.UpsertAsync(new FriendEdge(
+            $"{friendId}:{profile.Id}",
+            friendId,
+            profile.Id,
+            DateTimeOffset.UtcNow));
+        await recreateFriend.Should().ThrowAsync<AccountDeletionInProgressException>();
+
+        (await deletion.ResolveIdentityKindAsync(profile.Id)).Should()
+            .Be(AccountIdentityKind.Local);
+        await deletion.ReconcileDataAsync(profile.Id);
+        var tombstone = await deletion.MarkCompletedAsync(
+            subjectHash,
+            DateTimeOffset.UtcNow,
+            (int)TimeSpan.FromDays(30).TotalSeconds);
+        var replayedFailure = await deletion.MarkFailureAsync(
+            subjectHash,
+            "late-concurrent-failure",
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddMinutes(1));
+
+        (await users.GetAsync(profile.Id)).Should().BeNull();
+        (await credentials.FindByEmailAsync($"{profile.Id}@example.com")).Should().BeNull();
+        (await friends.GetAsync(profile.Id, friendId)).Should().BeNull();
+        (await friends.GetAsync(friendId, profile.Id)).Should().BeNull();
+        (await attempts.GetByClientAttemptIdAsync(profile.Id, attempt.ClientAttemptId))
+            .Should().BeNull();
+        tombstone.SubjectUserId.Should().BeNull();
+        tombstone.UserId.Should().Be(subjectHash);
+        tombstone.Ttl.Should().Be((int)TimeSpan.FromDays(30).TotalSeconds);
+        replayedFailure.Status.Should().Be(AccountDeletionRecordStatus.Completed);
+        replayedFailure.FailureCode.Should().BeNull();
+    }
+
+    [CosmosEmulatorFact]
     public async Task Attempt_recent_activity_aggregates_count_and_xp_within_window()
     {
         var context = await fixture.GetContextAsync();

@@ -48,6 +48,10 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+
       - name: Validate committed NuGet dependency graphs
         run: |
           python -P "$TRUSTED_CONTROL_DIR/tools/validate_dependency_locks.py" \

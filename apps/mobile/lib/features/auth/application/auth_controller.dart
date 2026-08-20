@@ -47,6 +47,18 @@ final authLocalAccountCleanupProvider = Provider<AuthLocalAccountCleanup>(
 /// session, pilotant le garde de navigation et l'injection du jeton d'API.
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(AuthController.new);
 
+class SensitiveReauthenticationResult {
+  const SensitiveReauthenticationResult._(this.succeeded, this.message, this.reauthenticationToken);
+
+  const SensitiveReauthenticationResult.success([String? token]) : this._(true, null, token);
+
+  const SensitiveReauthenticationResult.failure(String message) : this._(false, message, null);
+
+  final bool succeeded;
+  final String? message;
+  final String? reauthenticationToken;
+}
+
 /// Orchestration de l'authentification multi-fournisseurs + persistance.
 ///
 /// `Notifier` (synchrone) — et non `AsyncNotifier` — afin que le `redirect` de
@@ -362,6 +374,77 @@ class AuthController extends Notifier<AuthState> {
       return;
     }
     state = Unauthenticated.signedOut(cleanupMessage);
+  }
+
+  Future<SensitiveReauthenticationResult> reauthenticateForAccountDeletion({
+    required String expectedUserId,
+    String? password,
+  }) async {
+    final AuthState current = state;
+    if (current is! Authenticated) {
+      return const SensitiveReauthenticationResult.failure(
+        'Votre session a expiré. Reconnectez-vous avant de supprimer le compte.',
+      );
+    }
+
+    final AuthProvider? provider = current.session.provider;
+    if (provider == null) {
+      return const SensitiveReauthenticationResult.failure(
+        'Impossible de vérifier votre identité. Reconnectez-vous puis réessayez.',
+      );
+    }
+
+    try {
+      final AuthSession fresh;
+      if (provider == AuthProvider.email) {
+        final String? email = current.session.email;
+        if (email == null || email.isEmpty || password == null || password.isEmpty) {
+          return const SensitiveReauthenticationResult.failure(
+            'Saisissez votre mot de passe pour confirmer la suppression.',
+          );
+        }
+        fresh = await _credentials.login(email: email, password: password).timeout(_emailTimeout);
+      } else {
+        fresh = await _gateway.reauthenticate(provider).timeout(_socialTimeout);
+      }
+
+      if (fresh.accessToken.isEmpty || fresh.userId == null || fresh.userId != expectedUserId) {
+        return const SensitiveReauthenticationResult.failure(
+          'Le compte vérifié ne correspond pas au compte à supprimer.',
+        );
+      }
+
+      await _store.write(fresh);
+      state = Authenticated(fresh);
+      return SensitiveReauthenticationResult.success(
+        provider == AuthProvider.email ? null : fresh.idToken,
+      );
+    } on TimeoutException catch (error, stackTrace) {
+      _logAuthError('reauthenticateForAccountDeletion(timeout)', error, stackTrace);
+      return const SensitiveReauthenticationResult.failure('La vérification a expiré. Réessayez.');
+    } on AuthGatewayException catch (error) {
+      return SensitiveReauthenticationResult.failure(error.message);
+    } catch (error, stackTrace) {
+      _logAuthError('reauthenticateForAccountDeletion', error, stackTrace);
+      return const SensitiveReauthenticationResult.failure('La vérification a échoué. Réessayez.');
+    }
+  }
+
+  Future<void> completeAccountDeletion() async {
+    final AuthState current = state;
+    if (current is Authenticated) {
+      try {
+        await _gateway.signOut(current.session);
+      } catch (error, stackTrace) {
+        _logAuthError('completeAccountDeletion', error, stackTrace);
+      }
+    }
+    await _store.clear();
+    state = const AccountDeletionCompleted();
+  }
+
+  void finishAccountDeletion() {
+    state = const Unauthenticated('Votre compte et vos données Certigo ont été supprimés.');
   }
 
   /// Renvoie l'e-mail de vérification pour le compte connecté (best-effort).

@@ -9,9 +9,10 @@ Les workflows Linux ciblent deux classes de confiance fixes et jamais un nom de 
 ["self-hosted", "Linux", "X64", "certigo-trusted"]
 ```
 
-`vm-certigo-runner` porte `certigo-pr` sans identité/secrets ; `vm-certigo-runner-2`
-porte `certigo-trusted` pour les gates agrégées sans source PR et les opérations
-release/déploiement. Les labels sont mutuellement exclusifs :
+La **cible** impose un pool `certigo-pr` sans identité/secrets et un pool
+`certigo-trusted` pour les gates agrégées sans source PR et les opérations
+release/déploiement. Les labels, frontières d'identité et sous-réseaux doivent être
+mutuellement exclusifs :
 
 - les PR de fork ne peuvent pas exécuter de code sur les runners persistants ;
 - les PR internes n'obtiennent ni environnement, ni secret, ni identité Azure ;
@@ -22,19 +23,34 @@ release/déploiement. Les labels sont mutuellement exclusifs :
 
 ## Capacité et stratégie de cycle de vie
 
-Chaque VM Linux est une `Standard_D4s_v5` qui exécute un seul job à la fois. Il n'y a
-pas d'autoscaling ni de failover entre classes : l'indisponibilité du runner PR bloque
-les analyses PR, celle du runner trusted bloque gates finales et opérations.
+L'inventaire read-only consolidé au 20 août 2026 constate le VMSS legacy
+`vmss-certigo-runner-zonal` et le pilote `vmss-certigo-pr-pilot-z1`.
+Cet état ne respecte pas la cible ci-dessus. Le scale-in CPU ignore l'état GitHub `busy`.
 
-La stratégie normale est **démarrer les deux VMs avant une session CI, attendre deux
-runners `online`, puis déallouer les deux VMs seulement quand tous sont `busy: false`**.
-Pendant une session, conserver les deux slots permet à l'un d'absorber une panne ou une
-maintenance de l'autre. Les commandes sont strictement opérateur dans
-[`docs/runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md) : l'IaC et les scripts locaux ne
-démarrent, n'arrêtent, ne déallouent ni ne détruisent aucune ressource live.
+La réconciliation classe `22f7fb52-Certigo` comme runner **absent** d'Azure,
+`f55d176e`/runner 27 et `bbf83c5c`/runner 28 comme paires **gérées** running/online,
+et `4153d1dd` comme VM **externe** (deallocated). Le pilote zone 1 est PR-only, sans
+identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; f55 zone 2 conserve son identité
+et `snet-runners`, mais ses labels doubles bloquent encore l'activation. L'externe n'est ni comptée,
+ni adoptée, ni ciblée. Toute nouvelle VM sans runner est non classée et bloque le plan.
+Aucune de ces entrées n'est supprimée ou réparée par ce livrable.
+
+Toute automation mutable est donc bloquée. Le prévol
+`infra/ci-runner/lifecycle-preflight.sh` est read-only et doit refuser cet état. La
+séparation en pools, le lease anti-concurrence, l'ordre start/deallocate et le rollback
+sont dans [`CLOUD_LEAST_PRIVILEGE.md`](./runbooks/CLOUD_LEAST_PRIVILEGE.md).
 
 La release Android reste volontairement sur `certigo-trusted`. Elle peut
 utiliser l'identité managée Azure du runner pour lire Key Vault.
+
+Le contrôleur versionné reste `enabled=false`. Son état v3 lie les deux couples exacts et
+considère une capacité utilisable seulement si la VM est powered **et** le runner online.
+La cible d'un pilote ultérieur est limitée à
+**6 runners `certigo-pr` + 2 runners `certigo-trusted`**, avec un incrément par plan.
+Cette limite de pilote n'est pas un plafond de production final. Tout scale-in exige
+5 minutes continues sans activité, remises à zéro par tout job `queued/in_progress`
+ou runner `busy`, puis deux gardes distinctes. Une activité post-scale-in conserve et
+restaure le slot exact supprimé, même si la flotte restante dépasse encore le mode normal.
 
 ## Politique des pull requests
 
@@ -57,12 +73,10 @@ Ces opérations modifient Azure ou GitHub et ne peuvent pas être prouvées par 
      --jq '.runners[] | {name,status,busy,labels:[.labels[].name]}'
    ```
 
-2. Conserver au moins deux VM dans `snet-runners` ; toute nouvelle instance ou
-   reconstruction utilise `infra/ci-runner/runner.bicep` et l'accès NAT décrit dans
-   `infra/ci-runner/README.md`.
-3. Enregistrer `vm-certigo-runner` avec `certigo-pr` et sans rôle Azure ; enregistrer
-   `vm-certigo-runner-2` avec `certigo-trusted` et n'accorder les droits minimaux
-   nécessaires qu'à cette seconde identité.
+2. Conserver au moins un pool sain par classe dans deux sous-réseaux distincts; ne pas
+   appliquer `runner.bicep` au VMSS flexible live.
+3. Enregistrer le pool PR avec `certigo-pr` seulement et le pool opérations avec
+   `certigo-trusted` seulement; n'accorder les droits minimaux qu'au second.
 4. Vérifier qu'un runner en ligne existe dans chaque classe :
 
    ```bash
@@ -109,7 +123,7 @@ gh api repos/gchambaud_microsoft/Certigo/actions/runners \
   --jq '.runners[] | {name,status,busy,labels:[.labels[].name]}'
 az vm list -g RG-CERTIGO-CI --show-details \
   --query "[].{Nom:name, Etat:powerState}" -o table
-az network nat gateway show -g rg-certigo-ci -n nat-certigo
+az network nat gateway show -g rg-certigo-ci -n nat-vm-certigo-runner-2
 az network vnet subnet show -g rg-certigo-ci --vnet-name vnet-certigo-ci \
   -n snet-runners --query natGateway.id -o tsv
 df -h
@@ -153,19 +167,18 @@ Le code fournit désormais :
   idempotente, avec version et SHA-256 épinglés ;
 - `.github/workflows/runner-health.yml` pour le probe quotidien.
 
-Preuve externe existante à conserver sans la réinterpréter comme une exécution de ce
-changement : le drill
+Preuve **historique** à conserver sans la réinterpréter comme l'état live actuel : le drill
 [31090379901](https://github.com/gchambaud_microsoft/Certigo/actions/runs/31090379901)
 a été réalisé avec `vm-certigo-runner` hors ligne ; `vm-certigo-runner-2` a pris le job,
 puis les deux runners ont été remis en ligne. Le disque primaire a aussi été nettoyé à
 **12 GB libres**. Le probe quotidien impose un plancher de 10 Gio.
 
-Un complément externe du 2026-08-06 confirme aussi que l'identité système de
+Un complément historique du 2026-08-06 confirme aussi que l'identité système de
 `vm-certigo-runner-2` (`principalId`
 `2c3a78ab-3c16-4eef-9cfb-f763d0fc699c`) a reçu uniquement le rôle
-`Key Vault Secrets User` au scope exact de `kv-certigo-dev-bk3j5j`. Cette preuve couvre
-le runner secondaire actuel ; la procédure ci-dessous reste obligatoire pour chaque
-runner reconstruit.
+`Key Vault Secrets User` au scope exact de `kv-certigo-dev-bk3j5j`. Cette identité n'est
+plus celle du VMSS live; la procédure ci-dessous reste une référence de migration, pas une
+commande applicable au pool actuel.
 
 ## Reconstruction reproductible d'un runner
 
@@ -402,9 +415,9 @@ jusqu'à restauration d'une VM saine de sa propre classe ; aucun fallback de cla
 ## Reconstruction, rotation et révocation
 
 - **Reconstruction** : si une VM runner devient irrécupérable, reprovisionner une VM
-  Linux dans `RG-CERTIGO-CI`, la raccorder au sous-réseau `snet-runners`, réappliquer
-  le bootstrap idempotent, puis réenregistrer le runner GitHub avec son label de rôle
-  `certigo-pr` ou `certigo-trusted`.
+  Linux dans `RG-CERTIGO-CI`, la raccorder au sous-réseau exclusif de sa classe,
+  réappliquer le bootstrap idempotent, puis réenregistrer le runner GitHub avec son
+  unique label de rôle `certigo-pr` ou `certigo-trusted`.
 - **Rotation** : lors de la rotation d'un outil, d'un certificat ou d'un accès
   managé, mettre à jour la documentation opérateur correspondante puis valider la VM
   reconstruite avec la sonde quotidienne et le drill manuel.

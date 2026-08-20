@@ -60,6 +60,30 @@ void main() {
       );
     });
 
+    group('resolveAuthRedirect — suppression confirmée', () {
+      test('force la confirmation finale depuis toute autre route', () {
+        expect(
+          resolveAuthRedirect(
+            auth: const AccountDeletionCompleted(),
+            location: AuthShellRoutes.home,
+            onboardingCompleted: true,
+          ),
+          AuthShellRoutes.accountDeleted,
+        );
+      });
+
+      test('reste sur la confirmation finale sans boucle', () {
+        expect(
+          resolveAuthRedirect(
+            auth: const AccountDeletionCompleted(),
+            location: AuthShellRoutes.accountDeleted,
+            onboardingCompleted: true,
+          ),
+          isNull,
+        );
+      });
+    });
+
     test('sur /auth → reste (connexion e-mail ouverte depuis la sheet)', () {
       expect(
         resolveAuthRedirect(
@@ -86,7 +110,7 @@ void main() {
       expect(
         resolveAuthRedirect(
           auth: const Unauthenticated(),
-          location: AuthShellRoutes.accountDeletion,
+          location: AuthShellRoutes.accountDeletionInfo,
           onboardingCompleted: false,
         ),
         isNull,
@@ -265,7 +289,7 @@ void main() {
       expect(
         resolveAuthRedirect(
           auth: const AuthLoading(),
-          location: AuthShellRoutes.accountDeletion,
+          location: AuthShellRoutes.accountDeletionInfo,
           onboardingCompleted: false,
         ),
         isNull,
@@ -273,7 +297,7 @@ void main() {
       expect(
         resolveAuthRedirect(
           auth: const Authenticated(validSession),
-          location: AuthShellRoutes.accountDeletion,
+          location: AuthShellRoutes.accountDeletionInfo,
           onboardingCompleted: false,
         ),
         isNull,

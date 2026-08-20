@@ -3,6 +3,7 @@ using System.Security.Claims;
 using FluentAssertions;
 using Certigo.Api.Auth;
 using Certigo.Api.Middleware;
+using Certigo.Application.Abstractions;
 using Microsoft.Azure.Functions.Worker;
 using Xunit;
 
@@ -242,5 +243,170 @@ public sealed class JwtAuthMiddlewareTests
         });
 
         resolvedUserId.Should().Be("sub-only-user");
+    }
+
+    [Fact]
+    public async Task Pending_deletion_blocks_every_non_deletion_endpoint()
+    {
+        var principal = TestPrincipal.With(oid: "deleting-user");
+        var validator = FakeTokenValidator.Succeeding(principal, "deleting-user");
+        var guard = new FakeAccountDeletionAccessGuard(blocked: true);
+        var middleware = new JwtAuthMiddleware(validator, guard);
+        var invocation = FunctionTestHarness.CreateHttp(
+            method: "GET",
+            path: "/api/me",
+            headers: new Dictionary<string, string>
+            {
+                ["Authorization"] = "Bearer deleting-token",
+            });
+
+        var nextCalled = false;
+        await middleware.Invoke(invocation.Context, _ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        nextCalled.Should().BeFalse();
+        invocation.Response!.StatusCode.Should().Be((HttpStatusCode)423);
+        guard.Subjects.Should().Equal("deleting-user");
+    }
+
+    [Fact]
+    public async Task Pending_deletion_can_resume_only_through_deletion_endpoint()
+    {
+        var principal = TestPrincipal.With(oid: "deleting-user");
+        var validator = FakeTokenValidator.Succeeding(principal, "deleting-user");
+        var middleware = new JwtAuthMiddleware(
+            validator,
+            new FakeAccountDeletionAccessGuard(blocked: true));
+        var invocation = FunctionTestHarness.CreateHttp(
+            method: "POST",
+            path: "/api/account/deletion",
+            headers: new Dictionary<string, string>
+            {
+                ["Authorization"] = "Bearer deleting-token",
+            });
+
+        var nextCalled = false;
+        await middleware.Invoke(invocation.Context, _ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        nextCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Reauthentication_proof_must_match_the_bearer_subject()
+    {
+        var validator = new TokenByValueValidator(
+            new Dictionary<string, TokenValidationResult>
+            {
+                ["bearer"] = Valid("user-1"),
+                ["proof"] = Valid("attacker"),
+            });
+        var middleware = new JwtAuthMiddleware(
+            validator,
+            new FakeAccountDeletionAccessGuard(blocked: false));
+        var invocation = FunctionTestHarness.CreateHttp(
+            method: "POST",
+            path: "/api/account/deletion",
+            headers: new Dictionary<string, string>
+            {
+                ["Authorization"] = "Bearer bearer",
+                ["X-Certigo-Reauthentication"] = "proof",
+            });
+
+        var nextCalled = false;
+        await middleware.Invoke(invocation.Context, _ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        nextCalled.Should().BeFalse();
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        invocation.Context.Items.Should().NotContainKey("ReauthenticatedUser");
+    }
+
+    [Fact]
+    public async Task Reauthentication_proof_can_use_the_mobile_id_token_audience()
+    {
+        var middleware = new JwtAuthMiddleware(
+            new TokenByValueValidator(
+                new Dictionary<string, TokenValidationResult>
+                {
+                    ["bearer"] = Valid("user-1"),
+                }),
+            new FakeAccountDeletionAccessGuard(blocked: false),
+            new ProofByValueValidator(
+                new Dictionary<string, TokenValidationResult>
+                {
+                    ["mobile-id-token"] = Valid("user-1"),
+                }));
+        var invocation = FunctionTestHarness.CreateHttp(
+            method: "POST",
+            path: "/api/account/deletion",
+            headers: new Dictionary<string, string>
+            {
+                ["Authorization"] = "Bearer bearer",
+                ["X-Certigo-Reauthentication"] = "mobile-id-token",
+            });
+
+        var nextCalled = false;
+        await middleware.Invoke(invocation.Context, _ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        nextCalled.Should().BeTrue();
+        invocation.Context.Items.Should().ContainKey("ReauthenticatedUser");
+    }
+
+    private static TokenValidationResult Valid(string userId)
+    {
+        var principal = TestPrincipal.With(oid: userId);
+        return new TokenValidationResult(true, principal, userId);
+    }
+
+    private sealed class FakeAccountDeletionAccessGuard(bool blocked)
+        : IAccountDeletionAccessGuard
+    {
+        public List<string> Subjects { get; } = [];
+
+        public Task<bool> IsBlockedAsync(
+            string subjectUserId,
+            CancellationToken cancellationToken = default)
+        {
+            Subjects.Add(subjectUserId);
+            return Task.FromResult(blocked);
+        }
+    }
+
+    private sealed class TokenByValueValidator(
+        IReadOnlyDictionary<string, TokenValidationResult> results)
+        : ITokenValidator
+    {
+        public Task<TokenValidationResult> TryValidateAsync(
+            string token,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(results.GetValueOrDefault(
+                token,
+                new TokenValidationResult(false, null, null)));
+    }
+
+    private sealed class ProofByValueValidator(
+        IReadOnlyDictionary<string, TokenValidationResult> results)
+        : IReauthenticationProofValidator
+    {
+        public Task<TokenValidationResult> TryValidateAsync(
+            string token,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(results.GetValueOrDefault(
+                token,
+                new TokenValidationResult(false, null, null)));
     }
 }

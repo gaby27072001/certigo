@@ -34,6 +34,8 @@ NuGet|https://example.invalid/nuget
 pub.dev|https://example.invalid/pub
 npm|https://example.invalid/npm
 Azure|https://example.invalid/azure" \
+  RUN_QUEUE_WAIT_SECONDS=42 \
+  CACHE_PATHS="${work_dir}" \
   GITHUB_STEP_SUMMARY="${summary}" \
   bash "${repo_root}/infra/ci-runner/health-probe.sh"
 
@@ -43,6 +45,12 @@ grep -F "| pub.dev | PASS |" "${summary}" >/dev/null
 grep -F "| npm | PASS |" "${summary}" >/dev/null
 grep -F "| Azure | PASS |" "${summary}" >/dev/null
 grep -F "| free disk | PASS |" "${summary}" >/dev/null
+grep -F "| runner.lifecycle.active | 1 | count |" "${summary}" >/dev/null
+grep -F "| runner.queue.wait | 42 | seconds |" "${summary}" >/dev/null
+grep -F "| runner.package.nuget.latency |" "${summary}" >/dev/null
+grep -F "| runner.package.pub_dev.latency |" "${summary}" >/dev/null
+grep -F "| runner.package.npm.latency |" "${summary}" >/dev/null
+grep -F "| runner.cache.local |" "${summary}" >/dev/null
 
 if PATH="${bin_dir}:${PATH}" \
   FAKE_DF_KB=1024 \

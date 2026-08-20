@@ -71,9 +71,10 @@ param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
 // alertEmail is injected by CD from the non-secret ALERT_EMAIL variable on the
 // prod GitHub Environment. Never commit an operator address here.
 
-// Turn on paid Microsoft Defender for Cloud plans in production.
-param enableDefenderPlans = true
-param manageDefenderPlans = true
+// Existing paid plans are retained live. Future reconciliation is owned by the
+// PIM-approved governance stack, never by an environment deployment identity.
+param enableDefenderPlans = false
+param manageDefenderPlans = false
 
 // Production PITR is explicit. Changing an existing Periodic account is irreversible.
 param cosmosBackupMode = 'Continuous'
@@ -81,8 +82,8 @@ param cosmosBackupMode = 'Continuous'
 // silently downgrade the established recovery window.
 param cosmosContinuousBackupTier = 'Continuous30Days'
 
-// MCSB remains audit-only until remediation identities and exemptions are reviewed.
-param deployMcsbPolicyAssignment = true
+// MCSB remains live and moves to the PIM-approved governance stack.
+param deployMcsbPolicyAssignment = false
 param mcsbEnforcementMode = 'DoNotEnforce'
 param grantAlertReaderRole = true
 

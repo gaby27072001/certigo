@@ -77,7 +77,7 @@ param manageDefenderPlans = false
 param cosmosBackupMode = 'Continuous'
 param cosmosContinuousBackupTier = 'Continuous7Days'
 
-// Audit-only MCSB assignment is explicit and cannot deny staging deployments.
-param deployMcsbPolicyAssignment = true
+// Subscription security controls are owned by the PIM-approved governance stack.
+param deployMcsbPolicyAssignment = false
 param mcsbEnforcementMode = 'DoNotEnforce'
 param grantAlertReaderRole = true

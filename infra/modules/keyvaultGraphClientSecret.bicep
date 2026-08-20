@@ -1,0 +1,29 @@
+@description('Existing environment Key Vault name.')
+param keyVaultName string
+
+@description('Microsoft Graph confidential-client secret supplied by the protected GitHub Environment.')
+@secure()
+param graphClientSecret string
+
+@description('Absolute ISO 8601 expiration timestamp for the Graph client credential.')
+@secure()
+param graphClientSecretExpiresOn string
+
+resource vault 'Microsoft.KeyVault/vaults@2024-04-01-preview' existing = {
+  name: keyVaultName
+}
+
+resource secret 'Microsoft.KeyVault/vaults/secrets@2024-04-01-preview' = {
+  parent: vault
+  name: 'ENTRA-GRAPH-CLIENT-SECRET'
+  properties: {
+    value: graphClientSecret
+    contentType: 'application/x-certigo-entra-graph-client-secret'
+    attributes: {
+      exp: dateTimeToEpoch(graphClientSecretExpiresOn)
+    }
+  }
+}
+
+@description('Version-pinned URI consumed by the Function App through its managed identity.')
+output secretUri string = secret.properties.secretUriWithVersion
