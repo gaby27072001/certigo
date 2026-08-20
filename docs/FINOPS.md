@@ -26,7 +26,19 @@ one monthly resource-group budget per scope with actual-cost notifications at
 consumption. Cost data can lag by 8-24 hours and Azure evaluates budgets daily.
 
 No personal address is committed. A future approved deployment must inject the
-existing `ALERT_EMAIL` value:
+existing `ALERT_EMAIL` value. The repository-default preview does not need that
+value because all budget modules remain disabled:
+
+```powershell
+az deployment sub what-if `
+  --name certigo-finops-default-preview `
+  --location westeurope `
+  --template-file infra/finops/main.bicep `
+  --parameters infra/params/finops.bicepparam
+```
+
+The expected result is `No changes`. Enabling budgets is a separate, future
+activation preview:
 
 ```powershell
 if ([string]::IsNullOrWhiteSpace($env:ALERT_EMAIL)) {

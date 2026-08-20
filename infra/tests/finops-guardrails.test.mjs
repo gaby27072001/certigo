@@ -24,6 +24,18 @@ function compileTemplate(relativePath) {
   );
 }
 
+function compileParameters(relativePath) {
+  const bicep = process.env.BICEP_CLI || 'bicep';
+  const output = JSON.parse(
+    execFileSync(
+      bicep,
+      ['build-params', path.join(repositoryRoot, relativePath), '--stdout'],
+      { encoding: 'utf8' },
+    ),
+  );
+  return JSON.parse(output.parametersJson);
+}
+
 test('monthly budget has actual-cost alerts at 50, 80, and 100 percent', () => {
   const template = compileTemplate('infra/finops/budget.bicep');
   const [budget] = template.resources.filter(
@@ -46,6 +58,26 @@ test('monthly budget has actual-cost alerts at 50, 80, and 100 percent', () => {
         notification.operator === 'GreaterThanOrEqualTo' &&
         notification.thresholdType === 'Actual' &&
         notification.contactEmails.length === 1,
+    ),
+  );
+});
+
+test('default preview evaluates to zero budget writes', () => {
+  const template = compileTemplate('infra/finops/main.bicep');
+  const parameters = compileParameters('infra/params/finops.bicepparam');
+  const deployments = template.resources.filter(
+    (resource) => resource.type === 'Microsoft.Resources/deployments',
+  );
+
+  assert.equal(template.parameters.enableBudgets.defaultValue, false);
+  assert.equal(template.parameters.alertEmail.type, 'securestring');
+  assert.equal(template.parameters.alertEmail.defaultValue, '');
+  assert.equal(parameters.parameters.enableBudgets.value, false);
+  assert.equal(parameters.parameters.alertEmail, undefined);
+  assert.equal(deployments.length, 4);
+  assert.ok(
+    deployments.every(
+      (deployment) => deployment.condition === "[parameters('enableBudgets')]",
     ),
   );
 });
