@@ -62,6 +62,12 @@ param entraAuthority = 'https://certigo.ciamlogin.com/00000000-0000-0000-0000-00
 param entraAudience = '00000000-0000-0000-0000-000000000000'
 param personLinkedIdentityV1 = 'off'
 
+// Public-domain features stay neutral in dev. Hardened environments receive
+// these values from their GitHub Environment through the private parameter writer.
+param publicWebOrigin = ''
+param publicDomainVerified = false
+param appleCiamDomainReconfigured = false
+
 // authJwtSigningKey is intentionally omitted in dev. main.bicep derives a stable
 // value that is explicitly gated to the non-hardened dev environment.
 // Its expiration is fixed and reviewable: deployments do not extend it implicitly.

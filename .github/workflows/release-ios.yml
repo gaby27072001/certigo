@@ -53,6 +53,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Exiger le domaine public vérifié avant toute release
+        env:
+          TARGET_ENV: prod
+          PUBLIC_WEB_ORIGIN: ${{ vars.PUBLIC_WEB_ORIGIN }}
+          PUBLIC_DOMAIN_VERIFIED: ${{ vars.PUBLIC_DOMAIN_VERIFIED }}
+          APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}
+        run: node .github/scripts/public-domain-contract.mjs account-deletion-url
+
       - name: Installer Flutter vérifié ${{ env.FLUTTER_VERSION }}
         shell: bash
         run: |

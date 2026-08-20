@@ -71,6 +71,9 @@ param personLinkedIdentityV1 = 'off'
 
 // alertEmail is injected by CD from the non-secret ALERT_EMAIL variable on the
 // prod GitHub Environment. Never commit an operator address here.
+// PUBLIC_WEB_ORIGIN, PUBLIC_DOMAIN_VERIFIED and
+// APPLE_CIAM_DOMAIN_RECONFIGURED are also injected from this GitHub Environment.
+// They remain empty/false until a controlled public domain is verified.
 
 // Existing paid plans are retained live. Future reconciliation is owned by the
 // PIM-approved governance stack, never by an environment deployment identity.

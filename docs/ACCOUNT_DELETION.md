@@ -123,15 +123,15 @@ Effectuer un test réel avec un compte Apple sacrifiable : créer la connexion v
 l’association Apple n’existe plus ou est révoquée. C’est la seule validation
 Apple encore ouverte pour ce flux.
 
-Les actions humaines non liées à ce câblage restent :
-
-1. Enregistrer
-   `https://gchambaud_microsoft.github.io/Certigo/account-deletion/` dans le champ
-   URL de suppression du compte de Play Console après publication de la page.
+L'URL publique de suppression de compte reste volontairement non configurée.
+Elle ne peut être publiée ou inscrite dans Play Console qu'après satisfaction du
+contrat fail-closed décrit dans
+[`PUBLIC_DOMAIN_MIGRATION.md`](./PUBLIC_DOMAIN_MIGRATION.md). Une URL GitHub
+Pages n'est pas un fallback implicite : sa possession, sa stabilité et sa
+compatibilité stores doivent être prouvées comme pour toute autre origine.
 
 Cette PR ne renseigne aucune valeur de production et ne publie aucune page. Les
-promotions Bicep, le test Apple réel, le dispatch GitHub Pages et les déclarations
-des consoles store restent des actions humaines avant soumission.
+actions humaines post-acquisition sont regroupées dans le guide de migration.
 
 Le contact public approuvé est `gabriel.chambaud@icloud.com`. La politique
 approuvée ne demande aucune pièce d’identité.

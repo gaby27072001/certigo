@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { validatePublicDomainConfiguration } from './public-domain-contract.mjs';
+
 const absoluteUtcTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const guidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -123,6 +125,9 @@ export function writeSecureParameters({
   entraGraphClientSecret,
   entraGraphClientSecretExpiresOn,
   entraReauthAudience,
+  publicWebOrigin,
+  publicDomainVerified,
+  appleCiamDomainReconfigured,
   inputFile,
   outputFile,
   now = new Date(),
@@ -155,6 +160,14 @@ export function writeSecureParameters({
       entraReauthAudience,
       now,
     });
+  const publicDomainConfiguration = validatePublicDomainConfiguration({
+    environment,
+    feature: 'infrastructure',
+    publicWebOrigin,
+    publicDomainVerified,
+    appleCiamDomainReconfigured,
+    activationRequested: environment !== 'dev',
+  });
 
   const hasActiveKey = requirePair(
     jwtSigningKey,
@@ -200,6 +213,15 @@ export function writeSecureParameters({
   if (validatedAlertEmail.length > 0) {
     compiled.parameters.alertEmail = { value: validatedAlertEmail };
   }
+  compiled.parameters.publicWebOrigin = {
+    value: publicDomainConfiguration.publicWebOrigin,
+  };
+  compiled.parameters.publicDomainVerified = {
+    value: publicDomainConfiguration.publicDomainVerified,
+  };
+  compiled.parameters.appleCiamDomainReconfigured = {
+    value: publicDomainConfiguration.appleCiamDomainReconfigured,
+  };
 
   if (hasActiveKey) {
     compiled.parameters.authJwtSigningKey = { value: jwtSigningKey };
@@ -253,6 +275,9 @@ function main() {
       entraGraphClientSecretExpiresOn:
         process.env.ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON,
       entraReauthAudience: process.env.ENTRA_REAUTH_AUDIENCE,
+      publicWebOrigin: process.env.PUBLIC_WEB_ORIGIN,
+      publicDomainVerified: process.env.PUBLIC_DOMAIN_VERIFIED,
+      appleCiamDomainReconfigured: process.env.APPLE_CIAM_DOMAIN_RECONFIGURED,
       inputFile: process.env.BASE_PARAMETERS_FILE,
       outputFile: process.env.AUTH_PARAMETERS_FILE,
     });
