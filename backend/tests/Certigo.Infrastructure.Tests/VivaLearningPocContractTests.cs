@@ -13,10 +13,9 @@ public sealed class VivaLearningPocContractTests
     [Fact]
     public async Task Feature_flag_blocks_all_requests_when_disabled()
     {
-        var handler = new FixtureGraphMessageHandler(FixtureDirectory());
-        using var httpClient = new HttpClient(handler);
-        var client = new VivaLearningGraphClient(
-            httpClient,
+        using var handler = new FixtureGraphMessageHandler(FixtureDirectory());
+        using var client = new VivaLearningGraphClient(
+            handler,
             new VivaLearningPocOptions(
                 Enabled: false,
                 GraphBaseUri: new Uri("https://graph.microsoft.com/v1.0/")));
@@ -70,17 +69,17 @@ public sealed class VivaLearningPocContractTests
     [InlineData("https://example.invalid/v1.0/")]
     public void Graph_client_rejects_non_v1_graph_endpoints(string endpoint)
     {
-        using var httpClient = new HttpClient(new FixtureGraphMessageHandler(FixtureDirectory()));
+        using var handler = new FixtureGraphMessageHandler(FixtureDirectory());
 
         var act = () => new VivaLearningGraphClient(
-            httpClient,
+            handler,
             new VivaLearningPocOptions(true, new Uri(endpoint)));
 
         act.Should().Throw<ArgumentException>();
     }
 
     [Fact]
-    public void Adapter_maps_certigo_lesson_to_existing_router_path()
+    public void Adapter_maps_certigo_lesson_to_stable_https_ingress_path()
     {
         var adapter = new CertigoVivaLearningAdapter(new Uri("https://certigo.invalid/"));
 
@@ -96,7 +95,7 @@ public sealed class VivaLearningPocContractTests
 
         content.ExternalId.Should().Be("certigo:az-900:az900-l-cloud-benefits");
         content.ContentWebUrl.Should()
-            .Be("https://certigo.invalid/lesson/az-900/az900-l-cloud-benefits");
+            .Be("https://certigo.invalid/learn/az-900/az900-l-cloud-benefits");
         content.Duration.Should().Be("PT5M");
         content.Level.Should().Be("Beginner");
         content.IsPremium.Should().BeTrue();
@@ -105,10 +104,9 @@ public sealed class VivaLearningPocContractTests
     [Fact]
     public async Task Offline_scenario_proves_provider_content_assignment_link_and_progress_contracts()
     {
-        var handler = new FixtureGraphMessageHandler(FixtureDirectory());
-        using var httpClient = new HttpClient(handler);
-        var client = new VivaLearningGraphClient(
-            httpClient,
+        using var handler = new FixtureGraphMessageHandler(FixtureDirectory());
+        using var client = new VivaLearningGraphClient(
+            handler,
             new VivaLearningPocOptions(
                 Enabled: true,
                 GraphBaseUri: new Uri("https://graph.microsoft.com/v1.0/")));
@@ -122,7 +120,9 @@ public sealed class VivaLearningPocContractTests
         result.Content.Id.Should().Be("22222222-2222-2222-2222-222222222222");
         result.Assignment.Id.Should().Be("33333333-3333-3333-3333-333333333333");
         result.DeepLink.AbsoluteUri.Should()
-            .Be("https://certigo.invalid/lesson/az-900/az900-l-cloud-benefits");
+            .Be("https://certigo.invalid/learn/az-900/az900-l-cloud-benefits");
+        result.Assignment.EnterpriseLearnerObjectId.Should()
+            .Be("44444444-4444-4444-4444-444444444444");
         result.InProgress.Status.Should().Be("inProgress");
         result.Completed.Status.Should().Be("completed");
         result.Completed.CompletedDateTime.Should().Be(ObservedAt.AddMinutes(5));
@@ -148,7 +148,7 @@ public sealed class VivaLearningPocContractTests
         contentBody.GetProperty("externalId").GetString().Should()
             .Be("certigo:az-900:az900-l-cloud-benefits");
         contentBody.GetProperty("contentWebUrl").GetString().Should()
-            .Be("https://certigo.invalid/lesson/az-900/az900-l-cloud-benefits");
+            .Be("https://certigo.invalid/learn/az-900/az900-l-cloud-benefits");
         contentBody.GetProperty("isPremium").GetBoolean().Should().BeTrue();
 
         var assignmentRequest = handler.Requests[2];
@@ -177,6 +177,68 @@ public sealed class VivaLearningPocContractTests
         var act = () => CertigoVivaLearningAdapter.ToAssignmentProgress(percentage, ObservedAt);
 
         act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void Enterprise_assignment_contract_does_not_expose_person_or_personal_acquisition_fields()
+    {
+        var properties = typeof(LearningCourseActivityDto)
+            .GetProperties()
+            .Select(property => property.Name);
+
+        properties.Should().Contain(nameof(LearningCourseActivityDto.EnterpriseLearnerObjectId));
+        properties.Should().NotContain(
+            property => property == "PersonId"
+                || property == "UserId"
+                || property == "Email"
+                || property == "Mastery"
+                || property == "Readiness");
+    }
+
+    [Theory]
+    [InlineData("https://example.invalid/")]
+    [InlineData("https://links-disabled.invalid/")]
+    public void Adapter_accepts_only_reserved_offline_origins(string origin)
+    {
+        var act = () => new CertigoVivaLearningAdapter(new Uri(origin));
+
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData("http://example.invalid/")]
+    [InlineData("https://example.invalid:444/")]
+    [InlineData("https://example.invalid/path")]
+    public void Adapter_rejects_routable_or_ambiguous_origins(string origin)
+    {
+        var act = () => new CertigoVivaLearningAdapter(new Uri(origin));
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData("..", "lesson")]
+    [InlineData("track id", "lesson")]
+    [InlineData("track", "lesson:id")]
+    [InlineData("_track", "lesson")]
+    public void Adapter_rejects_identifiers_outside_the_stable_public_link_contract(
+        string trackId,
+        string lessonId)
+    {
+        var adapter = new CertigoVivaLearningAdapter(new Uri("https://certigo.invalid/"));
+        var lesson = new CertigoLessonDescriptor(
+            trackId,
+            lessonId,
+            "Title",
+            "Summary",
+            5,
+            "fr-fr",
+            "fundamentals",
+            ObservedAt);
+
+        var act = () => adapter.ToLearningContent(lesson);
+
+        act.Should().Throw<ArgumentException>();
     }
 
     private static JsonElement ReadBody(CapturedGraphRequest request)

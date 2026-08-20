@@ -9,7 +9,7 @@ if (args.Contains("--help", StringComparer.OrdinalIgnoreCase))
         This executable never contacts a tenant. It replays contractual Microsoft Graph fixtures.
 
         Usage:
-          $env:CERTIGO_VIVA_LEARNING_POC_ENABLED = "true"
+          $env:CERTIGO_VIVA_LEARNING_POC_OFFLINE_ENABLED = "true"
           dotnet run --project backend\spikes\Certigo.VivaLearning.Poc -- --non-interactive
         """);
     return 0;
@@ -36,10 +36,9 @@ if (!nonInteractive)
 }
 
 var fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "Fixtures");
-var handler = new FixtureGraphMessageHandler(fixtureDirectory);
-using var httpClient = new HttpClient(handler);
-var graphClient = new VivaLearningGraphClient(
-    httpClient,
+using var handler = new FixtureGraphMessageHandler(fixtureDirectory);
+using var graphClient = new VivaLearningGraphClient(
+    handler,
     new VivaLearningPocOptions(
         Enabled: true,
         GraphBaseUri: new Uri("https://graph.microsoft.com/v1.0/")));
@@ -67,5 +66,5 @@ foreach (var operation in VivaLearningOperationContract.All)
 
 Console.WriteLine();
 Console.WriteLine("GO: offline request, response, mapping, and progress contracts.");
-Console.WriteLine("NO-GO: live integration until the consent runbook and HTTPS app-link test pass.");
+Console.WriteLine("NO-GO: no live transport, tenant activation, consent, or publication exists.");
 return 0;

@@ -56,7 +56,7 @@ rollbacks. **C'est vous qui exécutez** chaque commande, après relecture.
 | **Tags Azure** | 🟠 Moyen | Contrat FinOps additif pour applications et runners | [`AZURE_TAG_ADOPTION.md`](./AZURE_TAG_ADOPTION.md) | Aucun pour la validation statique; Reader pour l'inventaire live ultérieur | Versionné — aucun déploiement dans la PR |
 | **Cloud least privilege** | 🔴 Haut | Migration OIDC/RBAC, policy, runners et rollback | [`CLOUD_LEAST_PRIVILEGE.md`](./CLOUD_LEAST_PRIVILEGE.md) | Reader pour inventaire; admin PIM pour toute mutation | Plan versionné — aucune mutation dans la PR |
 | **Observabilité** | 🟠 Moyen | Webtests, alertes, cold-start, workbook, signaux runner, coût et confidentialité | [`OBSERVABILITY.md`](./OBSERVABILITY.md) | Reader pour diagnostic ; Contributor pour appliquer après approbation | Préparé — aucun déploiement dans la PR |
-| **Viva Learning POC** | 🟠 Moyen | Consentement minimal, preuve live et nettoyage du provider POC | [`VIVA_LEARNING_POC_LIVE_VALIDATION.md`](./VIVA_LEARNING_POC_LIVE_VALIDATION.md) | Tenant M365 non-prod licencié; Knowledge Administrator; approbation explicite | Contrats validés — live **NO-GO non testé** |
+| **Viva Learning POC** | 🟠 Moyen | Readiness contractuelle sans activation live | [`VIVA_LEARNING_POC_READINESS.md`](./VIVA_LEARNING_POC_READINESS.md) | Tenant M365 non-prod licencié; Knowledge Administrator; approbation explicite | Contrats offline validés — live **NO-GO** |
 
 ## Ordre d'exécution conseillé
 

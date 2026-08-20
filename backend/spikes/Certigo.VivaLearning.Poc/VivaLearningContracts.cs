@@ -107,7 +107,8 @@ public sealed class LearningCourseActivityDto
     public string? ExternalCourseActivityId { get; init; }
     public required string LearningContentId { get; init; }
     public required string LearningProviderId { get; init; }
-    public required string LearnerUserId { get; init; }
+    [JsonPropertyName("learnerUserId")]
+    public required string EnterpriseLearnerObjectId { get; init; }
     public required string Status { get; init; }
     public int? CompletionPercentage { get; init; }
     public DateTimeOffset? CompletedDateTime { get; init; }

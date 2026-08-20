@@ -10,6 +10,8 @@ public sealed class CertigoVivaLearningAdapter(Uri certigoPublicBaseUri)
         ArgumentException.ThrowIfNullOrWhiteSpace(lesson.TrackId);
         ArgumentException.ThrowIfNullOrWhiteSpace(lesson.LessonId);
         ArgumentException.ThrowIfNullOrWhiteSpace(lesson.Title);
+        ValidatePublicLinkIdentifier(lesson.TrackId, nameof(lesson.TrackId));
+        ValidatePublicLinkIdentifier(lesson.LessonId, nameof(lesson.LessonId));
         if (lesson.EstimatedMinutes <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -19,7 +21,7 @@ public sealed class CertigoVivaLearningAdapter(Uri certigoPublicBaseUri)
 
         var deepLink = new Uri(
             _certigoPublicBaseUri,
-            $"lesson/{Uri.EscapeDataString(lesson.TrackId)}/{Uri.EscapeDataString(lesson.LessonId)}");
+            $"learn/{Uri.EscapeDataString(lesson.TrackId)}/{Uri.EscapeDataString(lesson.LessonId)}");
 
         return new LearningContentWriteDto
         {
@@ -112,10 +114,17 @@ public sealed class CertigoVivaLearningAdapter(Uri certigoPublicBaseUri)
     private static Uri ValidateBaseUri(Uri baseUri)
     {
         ArgumentNullException.ThrowIfNull(baseUri);
-        if (!baseUri.IsAbsoluteUri || baseUri.Scheme != Uri.UriSchemeHttps)
+        if (!baseUri.IsAbsoluteUri
+            || baseUri.Scheme != Uri.UriSchemeHttps
+            || !baseUri.Host.EndsWith(".invalid", StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrEmpty(baseUri.UserInfo)
+            || !baseUri.IsDefaultPort
+            || baseUri.AbsolutePath != "/"
+            || !string.IsNullOrEmpty(baseUri.Query)
+            || !string.IsNullOrEmpty(baseUri.Fragment))
         {
             throw new ArgumentException(
-                "The Certigo Viva Learning content URL must use absolute HTTPS.",
+                "The offline POC only accepts an absolute HTTPS origin under .invalid.",
                 nameof(baseUri));
         }
 
@@ -135,4 +144,22 @@ public sealed class CertigoVivaLearningAdapter(Uri certigoPublicBaseUri)
             "advanced" or "expert" => "Advanced",
             _ => "Intermediate"
         };
+
+    private static void ValidatePublicLinkIdentifier(string value, string parameterName)
+    {
+        if (value.Length is < 1 or > 128
+            || !IsAsciiLetterOrDigit(value[0])
+            || value.Any(character =>
+                !IsAsciiLetterOrDigit(character) && character is not '.' and not '_' and not '-'))
+        {
+            throw new ArgumentException(
+                "Public link identifiers must match [A-Za-z0-9][A-Za-z0-9._-]{0,127}.",
+                parameterName);
+        }
+    }
+
+    private static bool IsAsciiLetterOrDigit(char value)
+        => value is >= 'A' and <= 'Z'
+            or >= 'a' and <= 'z'
+            or >= '0' and <= '9';
 }

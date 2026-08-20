@@ -1,10 +1,10 @@
-# ADR-014 — POC isolé d'intégration Certigo avec Viva Learning
+# ADR-015 — POC isolé d'intégration Certigo avec Viva Learning
 
 | Champ | Valeur |
 |---|---|
-| **ADR** | 014 |
+| **ADR** | 015 |
 | **Statut** | **Accepté pour preuve contractuelle** ; **NO-GO live/production** |
-| **Date** | 2026-08-19 |
+| **Date** | 2026-08-20 |
 | **Portée** | Phase 1 du plan directeur, sans déploiement ni modification des fonctionnalités de production |
 
 ## Contexte
@@ -17,11 +17,13 @@ La Phase 1 doit déterminer si Certigo peut :
 4. mapper ce contenu vers une leçon Certigo ;
 5. synchroniser progression et complétion.
 
-Le dépôt contient déjà la route Flutter
-`/lesson/:trackId/:lessonId` (`apps/mobile/lib/app/router.dart`), mais aucun
-Android App Link HTTPS ni iOS Universal Link. Le schéma `certigo://` est
-actuellement déclaré uniquement pour l'authentification iOS ; Android ne
-déclare pas d'intent-filter de contenu.
+Le contrat stable de la PR #298 sépare le chemin HTTPS public
+`/learn/{trackId}/{lessonId}` de la route Flutter interne
+`/lesson/:trackId/:lessonId`. Son host reste neutralisé par
+`links-disabled.invalid` et son feature flag est désactivé. Les garde-fous
+fusionnés par #312 et #313 interdisent tout domaine tiers et exigent
+`PUBLIC_WEB_ORIGIN`, `PUBLIC_DOMAIN_VERIFIED=true` et
+`APPLE_CIAM_DOMAIN_RECONFIGURED=true` avant une activation future.
 
 ## Constat d'autorisation
 
@@ -56,12 +58,17 @@ Créer un projet .NET 8 **isolé** sous
 - `IVivaLearningGraphClient` et `VivaLearningGraphClient` matérialisent les
   méthodes, chemins, statuts HTTP et payloads Graph.
 - `CertigoVivaLearningAdapter` produit un `externalId` stable
-  `certigo:{trackId}:{lessonId}` et un `contentWebUrl` HTTPS dont le chemin
-  correspond à la route Flutter existante.
+  `certigo:{trackId}:{lessonId}` et le chemin HTTPS #298
+  `/learn/{trackId}/{lessonId}`. Dans le spike, l'origine doit appartenir au
+  domaine réservé `.invalid`.
 - `FixtureGraphMessageHandler` simule Graph à partir de fixtures contractuelles
   et capture chaque requête.
-- `CERTIGO_VIVA_LEARNING_POC_ENABLED` est `false` par défaut. Même activé, le
-  harness ne contacte aucun réseau et utilise le domaine réservé `.invalid`.
+- `CERTIGO_VIVA_LEARNING_POC_OFFLINE_ENABLED` est `false` par défaut. Même
+  activé, le harness ne contacte aucun réseau : le client n'accepte que
+  `FixtureGraphMessageHandler` et l'adapter refuse toute origine routable.
+- Le `learnerUserId` Graph est nommé `EnterpriseLearnerObjectId` dans le DTO.
+  Il n'est jamais résolu vers `Person` ou `LinkedIdentity`, ni utilisé pour
+  importer progression, maîtrise, readiness, récompenses ou acquis personnels.
 - Les tests vérifient le découpage des permissions, les cinq appels simulés,
   le filtrage `learningAssignment`, le deep-link, et les transitions 40 % puis
   100 %.
@@ -73,7 +80,7 @@ Créer un projet .NET 8 **isolé** sous
 | Enregistrer un provider | Contrat `POST`, payload logos/sync, fixture `201` | **GO contractuel** |
 | Publier un contenu | Contrat `PATCH` par `externalId`, fixture `202` | **GO contractuel** |
 | Lire une assignation | Contrat `/me`, header d'enum évolutive, fixture `200` | **GO contractuel**, permission live à confirmer |
-| Mapper/deep-linker | Mapping vers `/lesson/az-900/az900-l-cloud-benefits` | **GO mapping**, **NO-GO ouverture app HTTPS** |
+| Mapper/deep-linker | Publication de `/learn/az-900/az900-l-cloud-benefits` selon #298 | **GO mapping**, **NO-GO ouverture app HTTPS** |
 | Synchroniser la progression | `PATCH` 40 % `inProgress`, puis 100 % `completed` | **GO contractuel** |
 
 Le verdict global est donc :
@@ -87,6 +94,9 @@ Le verdict global est donc :
 
 - Aucune fonctionnalité de production, configuration d'authentification,
   permission Entra, ressource Azure ou application mobile n'est modifiée.
+- Les données d'assignation Viva restent des données d'entreprise. Elles ne
+  fusionnent pas avec les acquis personnels détenus par `Person`; toute
+  corrélation future exige une `LinkedIdentity` vérifiée et un ADR distinct.
 - Le futur design doit séparer au minimum l'interaction administrateur,
   l'interaction utilisateur et le worker application.
 - L'ingestion de contenu est asynchrone (`202 Accepted`) ; le test live doit

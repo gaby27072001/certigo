@@ -25,14 +25,17 @@ public interface IVivaLearningGraphClient
         CancellationToken cancellationToken = default);
 }
 
-public sealed class VivaLearningGraphClient : IVivaLearningGraphClient
+public sealed class VivaLearningGraphClient : IVivaLearningGraphClient, IDisposable
 {
     private const string LearningAssignmentType = "#microsoft.graph.learningAssignment";
     private readonly HttpClient _httpClient;
     private readonly VivaLearningPocOptions _options;
 
-    public VivaLearningGraphClient(HttpClient httpClient, VivaLearningPocOptions options)
+    public VivaLearningGraphClient(
+        FixtureGraphMessageHandler fixtureHandler,
+        VivaLearningPocOptions options)
     {
+        ArgumentNullException.ThrowIfNull(fixtureHandler);
         if (!options.GraphBaseUri.IsAbsoluteUri
             || options.GraphBaseUri.Scheme != Uri.UriSchemeHttps
             || !string.Equals(options.GraphBaseUri.Host, "graph.microsoft.com", StringComparison.OrdinalIgnoreCase))
@@ -54,10 +57,12 @@ public sealed class VivaLearningGraphClient : IVivaLearningGraphClient
                 nameof(options));
         }
 
-        _httpClient = httpClient;
+        _httpClient = new HttpClient(fixtureHandler, disposeHandler: false);
         _options = options;
         _httpClient.BaseAddress = normalizedGraphBaseUri;
     }
+
+    public void Dispose() => _httpClient.Dispose();
 
     public Task<LearningProviderDto> RegisterProviderAsync(
         LearningProviderWriteDto provider,

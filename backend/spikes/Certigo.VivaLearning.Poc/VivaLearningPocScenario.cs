@@ -2,7 +2,7 @@ namespace Certigo.VivaLearning.Poc;
 
 public static class VivaLearningPocGate
 {
-    public const string FeatureFlag = "CERTIGO_VIVA_LEARNING_POC_ENABLED";
+    public const string FeatureFlag = "CERTIGO_VIVA_LEARNING_POC_OFFLINE_ENABLED";
 
     public static bool IsEnabled(string? value)
         => string.Equals(value?.Trim(), "true", StringComparison.OrdinalIgnoreCase);
