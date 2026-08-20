@@ -16,6 +16,19 @@
     }
   ],
   "x-certigo-status": "contract-only",
+  "x-certigo-reconciled-main": {
+    "commit": "978c38e9b64d12144ccc4bbe02ff1fe37c5c0458",
+    "mergedPullRequests": [
+      289,
+      296,
+      297,
+      301,
+      302,
+      303,
+      308
+    ],
+    "productionIdentityRuntimeChanged": false
+  },
   "x-certigo-prerequisites": [
     {
       "pullRequest": 296,
@@ -181,7 +194,7 @@
     "/me/identity-link-intents/{intentId}/complete": {
       "post": {
         "operationId": "completeIdentityLinkIntent",
-        "summary": "Validate the target identity and atomically create its binding",
+        "summary": "Validate the target identity and idempotently create its deterministic binding",
         "parameters": [
           {
             "$ref": "#/components/parameters/IntentId"

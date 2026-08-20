@@ -3,6 +3,19 @@
   "$id": "https://certigo.app/contracts/person-linked-identity/v1/cosmos.schema.json",
   "title": "Certigo Person and LinkedIdentity Cosmos documents",
   "version": "1.0.0",
+  "x-certigo-reconciled-main": {
+    "commit": "978c38e9b64d12144ccc4bbe02ff1fe37c5c0458",
+    "mergedPullRequests": [
+      289,
+      296,
+      297,
+      301,
+      302,
+      303,
+      308
+    ],
+    "productionIdentityRuntimeChanged": false
+  },
   "x-certigo-cosmos": {
     "container": "users",
     "partitionKey": "/id",

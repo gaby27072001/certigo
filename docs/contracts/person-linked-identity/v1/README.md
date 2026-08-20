@@ -13,9 +13,10 @@ Ce répertoire est la surface versionnée de la phase préparatoire :
 - les tests exécutables vivent dans
   `backend/tests/Certigo.Application.Tests/PersonLinkedIdentityContractTests.cs`.
 
-Les baselines #289, #296 et #297 sont fusionnées sur `main`. Ce contrat les décrit telles
-qu'elles existent et spécifie les adaptations futures, mais n'active ni suppression de compte,
-ni resolver Person, ni liaison d'identité.
+Le contrat est réconcilié avec `main@978c38e9b64d12144ccc4bbe02ff1fe37c5c0458`.
+Les baselines #289, #296 et #297 y sont fusionnées ; #301, #302, #303 et #308 n'ajoutent aucun
+runtime identité. Ce contrat décrit les surfaces existantes et spécifie les adaptations futures,
+mais n'active ni suppression de compte, ni resolver Person, ni liaison d'identité.
 
 ## Règles de compatibilité
 

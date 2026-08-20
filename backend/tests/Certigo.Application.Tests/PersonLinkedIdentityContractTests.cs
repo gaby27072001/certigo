@@ -25,6 +25,14 @@ public sealed class PersonLinkedIdentityContractTests
             .Should().Be("1.0.0");
         api.RootElement.GetProperty("x-certigo-status").GetString()
             .Should().Be("contract-only");
+        var reconciledMain = api.RootElement.GetProperty("x-certigo-reconciled-main");
+        reconciledMain.GetProperty("commit").GetString()
+            .Should().Be("978c38e9b64d12144ccc4bbe02ff1fe37c5c0458");
+        reconciledMain.GetProperty("mergedPullRequests").EnumerateArray()
+            .Select(pullRequest => pullRequest.GetInt32())
+            .Should().Equal(289, 296, 297, 301, 302, 303, 308);
+        reconciledMain.GetProperty("productionIdentityRuntimeChanged").GetBoolean()
+            .Should().BeFalse();
         api.RootElement.GetProperty("x-certigo-feature-mode").GetProperty("default").GetString()
             .Should().Be("off");
 
@@ -135,6 +143,10 @@ public sealed class PersonLinkedIdentityContractTests
 
         using var cosmos = LoadContract("cosmos.schema.json");
         cosmos.RootElement.GetProperty("version").GetString().Should().Be("1.0.0");
+        cosmos.RootElement.GetProperty("x-certigo-reconciled-main").GetProperty("commit")
+            .GetString().Should().Be("978c38e9b64d12144ccc4bbe02ff1fe37c5c0458");
+        cosmos.RootElement.GetProperty("x-certigo-reconciled-main")
+            .GetProperty("productionIdentityRuntimeChanged").GetBoolean().Should().BeFalse();
         var storage = cosmos.RootElement.GetProperty("x-certigo-cosmos");
         storage.GetProperty("container").GetString().Should().Be("users");
         storage.GetProperty("partitionKey").GetString().Should().Be("/id");

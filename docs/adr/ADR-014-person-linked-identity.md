@@ -7,6 +7,7 @@
 | **Date** | 2026-08-20 |
 | **Activation runtime** | Aucune dans cette PR ; `PERSON_LINKED_IDENTITY_V1=off` reste l'unique état livré |
 | **Contrat** | `docs/contracts/person-linked-identity/v1` |
+| **Baseline réconciliée** | `main@978c38e9b64d12144ccc4bbe02ff1fe37c5c0458` |
 | **Périmètre de cette PR** | Documentation, schémas et fakes de test ; aucun code de production, aucune infra, aucun déploiement |
 
 > Cette décision prépare l’évolution d’identité. Elle ne branche aucun resolver, endpoint,
@@ -56,9 +57,9 @@ logique.
 - #289 (merge `c44ba32`) fournit l'onboarding et le catalogue mobile actuels. L'écran de
   certification ne propose que les entrées dont `isActive && hasLearningContent`, puis appelle le
   même `POST /api/me/active-track`. Le cache `active_track_v2` est owner-scopé par l'id du profil.
-- #301 et #303 (merges `9c517ac` et `4157d0c`) ajoutent des garde-fous FinOps et de
-  l'observabilité ; ils ne modifient ni le principal métier, ni les routes identité, ni la topologie
-  Cosmos décrite ici.
+- #301, #302, #303 et #308 (baseline finale `978c38e`) ajoutent des garde-fous FinOps, de moindre
+  privilège cloud et d'observabilité ; leur delta ne contient aucun fichier backend ou mobile et ne
+  modifie ni le principal métier, ni les routes identité, ni la topologie Cosmos décrite ici.
 
 La phase LinkedIdentity ne contourne aucune de ces baselines. Elle étend explicitement leurs
 contrats dans des PR ultérieures, toujours derrière un mode désactivé par défaut.
@@ -389,4 +390,5 @@ Chaque PR reste indépendante, sans changement de clé de partition ni migration
 - [NIST SP 800-63B — Authentication and Lifecycle Management](https://pages.nist.gov/800-63-4/sp800-63b.html)
 - Code actuel : `FunctionUserContext`, `AuthService`, `CosmosUserRepository`,
   `CosmosUserCredentialRepository`, `CosmosContainers`, repositories progress/friends/economy
-- Baselines fusionnées : #289, #296 et #297 ; #301/#303 sans effet sur le contrat identité
+- Baseline réconciliée : `main@978c38e`, incluant #289/#296/#297 et les changements
+  #301/#302/#303/#308 sans effet runtime sur le contrat identité
