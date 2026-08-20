@@ -20,6 +20,25 @@ param cosmosLocation string = ''
 @description('Base name used to derive resource names. Lowercase, no spaces.')
 param appName string = 'certigo'
 
+@description('Additional resource tags preserved when applying the mandatory FinOps contract.')
+param tags object = {}
+
+@description('Owning team or service. Never use a personal identity.')
+@minLength(1)
+param tagOwner string = 'certigo-platform'
+
+@description('Product in the FinOps contract.')
+@allowed([ 'Certigo' ])
+param tagProduct string = 'Certigo'
+
+@description('Declarative owner of the resource.')
+@allowed([ 'bicep' ])
+param tagManagedBy string = 'bicep'
+
+@description('Non-personal cost allocation identifier.')
+@minLength(1)
+param tagCostCenter string = 'engineering'
+
 @description('Entra External ID authority URL. Format: https://<domain>.ciamlogin.com/<tenant-id>/v2.0. Replace with the value from Azure Portal -> External ID tenant -> Overview. Leave empty until the tenant is created.')
 @secure()
 param entraAuthority string = ''
@@ -265,11 +284,19 @@ var effectiveAlertEmail = env != 'dev' && empty(alertEmail)
 // Cosmos may live in a different region than the rest when the primary region
 // is capacity-constrained for Cosmos (cross-region Functions->Cosmos is fine).
 var cosmosRegion = empty(cosmosLocation) ? location : cosmosLocation
-var tags = {
-  product: 'Certigo'
+var requiredTags = {
+  owner: tagOwner
+  product: tagProduct
   env: env
-  managedBy: 'bicep'
+  managedBy: tagManagedBy
+  costCenter: tagCostCenter
 }
+var effectiveTags = union(tags, requiredTags)
+// Shared hub resources live in rg-certigo-ci even when an application
+// environment deployment composes them.
+var ciTags = union(effectiveTags, {
+  env: 'ci'
+})
 
 // Environment resource groups are an admin/bootstrap concern. Keeping them
 // existing removes resource-group write from the steady-state deployment identity.
@@ -284,7 +311,7 @@ module monitoring 'modules/appInsights.bicep' = {
     name: 'appi-${appName}-${env}'
     location: location
     retentionInDays: hardened ? 90 : 30
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -301,7 +328,7 @@ module data 'modules/cosmos.bicep' = {
     periodicBackupIntervalMinutes: cosmosPeriodicBackupIntervalMinutes
     periodicBackupRetentionHours: cosmosPeriodicBackupRetentionHours
     periodicBackupStorageRedundancy: cosmosPeriodicBackupStorageRedundancy
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -319,7 +346,7 @@ module storage 'modules/storage.bicep' = {
     blobSoftDeleteDays: 30
     containerSoftDeleteDays: 30
     ciDeploymentPrincipalId: ciDeploymentPrincipalId
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -336,7 +363,7 @@ module vault 'modules/keyvault.bicep' = {
     softDeleteRetentionInDays: hardened ? 90 : 7
     jwtSigningKey: effectiveAuthJwtSigningKey
     jwtSigningKeyExpiresOn: effectiveAuthJwtSigningKeyExpiresOn
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -348,11 +375,9 @@ module sharedPrivateDns 'modules/sharedPrivateDns.bicep' = {
   params: {
     ciVnetId: resourceId(subscription().subscriptionId, ciVnetResourceGroupName, 'Microsoft.Network/virtualNetworks', ciVnetName)
     ciVnetName: ciVnetName
-    tags: {
-      product: 'Certigo'
-      managedBy: 'bicep'
+    tags: union(ciTags, {
       scope: 'shared'
-    }
+    })
   }
 }
 
@@ -394,7 +419,7 @@ module privateNetwork 'modules/privateNetwork.bicep' = {
     tableZoneId: sharedPrivateDns.outputs.tableZoneId
     vaultZoneId: sharedPrivateDns.outputs.vaultZoneId
     cosmosZoneId: sharedPrivateDns.outputs.cosmosZoneId
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -404,7 +429,7 @@ module privateDnsAppLinks 'modules/privateDnsAppLinks.bicep' = {
   params: {
     appVnetId: privateNetwork.outputs.vnetId
     appVnetName: privateNetwork.outputs.vnetName
-    tags: tags
+    tags: ciTags
   }
 }
 
@@ -447,7 +472,7 @@ module email 'modules/communicationEmail.bicep' = {
   params: {
     name: '${appName}-${env}-${take(suffix, 8)}'
     dataLocation: emailDataLocation
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -490,7 +515,7 @@ module api 'modules/functionApp.bicep' = {
     emailVerifyBaseUrl: 'https://func-${appName}-${env}-${suffix}.azurewebsites.net/api/auth/verify-email'
     // Native mobile clients aren't subject to CORS; only dev keeps '*' (browser tooling).
     allowedCorsOrigins: env == 'dev' ? [ '*' ] : []
-    tags: tags
+    tags: effectiveTags
   }
   dependsOn: [
     privateDnsAppLinks
@@ -511,7 +536,7 @@ module tutor 'modules/openai.bicep' = if (tutorLlmEnabled) {
     location: 'swedencentral'
     deploymentName: tutorLlmDeployment
     functionAppPrincipalId: api.outputs.principalId
-    tags: tags
+    tags: effectiveTags
   }
 }
 
@@ -534,7 +559,7 @@ module diagnostics 'modules/diagnostics.bicep' = if (env != 'dev') {
     blobServiceDiagnosticSettingName: blobServiceDiagnosticSettingName
     queueServiceDiagnosticSettingName: queueServiceDiagnosticSettingName
     tableServiceDiagnosticSettingName: tableServiceDiagnosticSettingName
-    tags: tags
+    tags: effectiveTags
   }
 }
 

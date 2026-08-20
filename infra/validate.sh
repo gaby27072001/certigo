@@ -64,6 +64,8 @@ while IFS= read -r -d '' parameters; do
   "${bicep_bin}" build-params "${parameters}" --outfile "${output_dir}/params-${index}.json"
 done < <(find "${root}/infra/params" -type f -name '*.bicepparam' -print0 | sort -z)
 
+BICEP_CLI="${bicep_bin}" node --test "${root}/infra/tests/azure-tag-contract.test.mjs"
+
 for environment in dev staging prod; do
   params="${root}/infra/params/${environment}.bicepparam"
   grep -F 'param vnetAddressPrefix =' "${params}" >/dev/null
