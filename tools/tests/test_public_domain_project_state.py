@@ -42,6 +42,14 @@ class PublicDomainProjectStateTests(unittest.TestCase):
             self.assertIn(marker, codemagic)
 
         self.assertIn("environment: github-pages", pages)
+        self.assertLess(
+            backend.index("validate-public-domain:"),
+            backend.index("resolve-release:"),
+        )
+        self.assertIn(
+            "Require verified public-domain contract before Azure access",
+            backend,
+        )
         self.assertIn("PAGES_ORIGIN: ${{ steps.pages.outputs.origin }}", pages)
         self.assertIn(
             "PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}",

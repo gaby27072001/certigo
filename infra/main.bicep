@@ -245,10 +245,61 @@ var publicWebOriginLower = toLower(publicWebOrigin)
 var publicWebOriginAuthority = startsWith(publicWebOriginLower, 'https://')
   ? substring(publicWebOriginLower, 8)
   : ''
+var publicWebOriginAllowedCharacters = [
+  'a'
+  'b'
+  'c'
+  'd'
+  'e'
+  'f'
+  'g'
+  'h'
+  'i'
+  'j'
+  'k'
+  'l'
+  'm'
+  'n'
+  'o'
+  'p'
+  'q'
+  'r'
+  's'
+  't'
+  'u'
+  'v'
+  'w'
+  'x'
+  'y'
+  'z'
+  '0'
+  '1'
+  '2'
+  '3'
+  '4'
+  '5'
+  '6'
+  '7'
+  '8'
+  '9'
+  '.'
+  '-'
+]
+var publicWebOriginAuthorityRemainder = reduce(
+  publicWebOriginAllowedCharacters,
+  publicWebOriginAuthority,
+  (remaining, character) => replace(remaining, character, '')
+)
+var publicWebOriginLabels = split(publicWebOriginAuthority, '.')
+var publicWebOriginLabelsAreValid = reduce(
+  publicWebOriginLabels,
+  true,
+  (valid, label) => valid && length(label) > 0 && length(label) <= 63 && !startsWith(label, '-') && !endsWith(label, '-')
+)
 var publicWebOriginIsPlaceholder = publicWebOriginAuthority == 'localhost' || publicWebOriginAuthority == 'example.com' || publicWebOriginAuthority == 'example.net' || publicWebOriginAuthority == 'example.org' || endsWith(publicWebOriginAuthority, '.example') || endsWith(publicWebOriginAuthority, '.invalid') || endsWith(publicWebOriginAuthority, '.localhost') || endsWith(publicWebOriginAuthority, '.test')
 var unownedLegacyDomain = join([ 'certigo', 'app' ], '.')
 var publicWebOriginIsUnownedLegacy = publicWebOriginAuthority == unownedLegacyDomain || endsWith(publicWebOriginAuthority, '.${unownedLegacyDomain}')
-var publicWebOriginIsCanonicalHttps = startsWith(publicWebOrigin, 'https://') && publicWebOrigin == trim(publicWebOrigin) && publicWebOrigin == publicWebOriginLower && length(publicWebOriginAuthority) > 0 && contains(publicWebOriginAuthority, '.') && !endsWith(publicWebOriginAuthority, '.') && !contains(publicWebOriginAuthority, ' ') && !contains(publicWebOriginAuthority, '\t') && !contains(publicWebOriginAuthority, '\r') && !contains(publicWebOriginAuthority, '\n') && !contains(publicWebOriginAuthority, '%') && !contains(publicWebOriginAuthority, '\\') && !contains(publicWebOriginAuthority, '/') && !contains(publicWebOriginAuthority, ':') && !contains(publicWebOriginAuthority, '?') && !contains(publicWebOriginAuthority, '#') && !contains(publicWebOriginAuthority, '@') && !publicWebOriginIsPlaceholder && !publicWebOriginIsUnownedLegacy
+var publicWebOriginIsCanonicalHttps = startsWith(publicWebOrigin, 'https://') && publicWebOrigin == trim(publicWebOrigin) && publicWebOrigin == publicWebOriginLower && length(publicWebOriginAuthority) <= 253 && contains(publicWebOriginAuthority, '.') && empty(publicWebOriginAuthorityRemainder) && publicWebOriginLabelsAreValid && !publicWebOriginIsPlaceholder && !publicWebOriginIsUnownedLegacy
 var publicDomainActivationRequested = hardened
 var publicDomainActivationReady = !publicDomainActivationRequested
   ? false

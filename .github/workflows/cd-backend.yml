@@ -83,9 +83,29 @@ jobs:
           echo "operation=$OPERATION" >> "$GITHUB_OUTPUT"
           echo "source-run-id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
 
+  validate-public-domain:
+    name: Validate public-domain deployment gate
+    needs: validate-target
+    environment: ${{ needs.validate-target.outputs.target }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      contents: read
+    env:
+      TARGET_ENV: ${{ needs.validate-target.outputs.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require verified public-domain contract before Azure access
+        env:
+          PUBLIC_WEB_ORIGIN: ${{ vars.PUBLIC_WEB_ORIGIN }}
+          PUBLIC_DOMAIN_VERIFIED: ${{ vars.PUBLIC_DOMAIN_VERIFIED }}
+          APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}
+        run: node .github/scripts/public-domain-contract.mjs infrastructure
+
   build-release:
     name: Build immutable backend release
-    needs: validate-target
+    needs: [validate-target, validate-public-domain]
     if: ${{ github.event_name == 'push' }}
     environment: dev
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
@@ -200,11 +220,12 @@ jobs:
 
   resolve-release:
     name: Resolve trusted release source
-    needs: [validate-target, build-release]
+    needs: [validate-target, validate-public-domain, build-release]
     if: >-
       ${{
         always()
         && needs.validate-target.result == 'success'
+        && needs.validate-public-domain.result == 'success'
         && (needs.build-release.result == 'success' || needs.build-release.result == 'skipped')
       }}
     environment: dev

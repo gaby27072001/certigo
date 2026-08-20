@@ -722,12 +722,20 @@ function validateRepositoryInvariants() {
     );
   }
   for (const marker of [
+    'validate-public-domain:',
+    'Require verified public-domain contract before Azure access',
     'Require verified public-domain contract before deploy or rollback',
     'node .github/scripts/public-domain-contract.mjs infrastructure',
   ]) {
     if (!backend.includes(marker)) {
       errors.push(`cd-backend.yml: missing public-domain deploy/rollback gate ${marker}`);
     }
+  }
+  if (
+    backend.indexOf('validate-public-domain:')
+    > backend.indexOf('resolve-release:')
+  ) {
+    errors.push('cd-backend.yml: public-domain preflight must precede Azure release retrieval');
   }
   for (const [file, content] of [
     ['release-android.yml', android],

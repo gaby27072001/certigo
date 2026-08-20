@@ -37,8 +37,9 @@ compris, et toute release mobile exigent les trois conditions.
 - `infra/main.bicep` répète les contrôles au plan de déploiement. Tout plan
   staging/prod échoue lorsque le contrat n'est pas prêt, même si la suppression
   de compte reste désactivée.
-- `cd-backend.yml` valide le contrat avant l'authentification Azure pour les
-  promotions comme pour les rollbacks. Les pipelines Android, iOS historique et
+- `cd-backend.yml` exécute un job de préflight lié à l'Environment cible avant
+  tout job qui accède à Azure pour les promotions comme pour les rollbacks, puis
+  répète le contrôle dans le job IaC. Les pipelines Android, iOS historique et
   Codemagic appliquent le même gate avant de produire un binaire de release.
 - Les outputs `privacyPolicyUrl`, `accountDeletionUrl`,
   `appleAppSiteAssociationUrl` et `assetLinksUrl` restent vides tant que

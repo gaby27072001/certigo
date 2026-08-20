@@ -46,15 +46,19 @@ test('compiled ARM defaults every public-domain input fail-closed', () => {
   );
   assert.match(
     template.variables.publicWebOriginIsCanonicalHttps,
-    /endsWith.*publicWebOriginAuthority.*'\.'/,
+    /publicWebOriginAuthorityRemainder/,
   );
   assert.match(
     template.variables.publicWebOriginIsCanonicalHttps,
     /trim\(parameters\('publicWebOrigin'\)\)/,
   );
   assert.match(
-    template.variables.publicWebOriginIsCanonicalHttps,
-    /contains.*publicWebOriginAuthority.*%/,
+    template.variables.publicWebOriginAuthorityRemainder,
+    /reduce.*publicWebOriginAllowedCharacters.*replace/,
+  );
+  assert.match(
+    template.variables.publicWebOriginLabelsAreValid,
+    /reduce.*publicWebOriginLabels.*length.*63.*startsWith.*endsWith/,
   );
   assert.match(
     template.variables.unownedLegacyDomain,
