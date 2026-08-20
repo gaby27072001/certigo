@@ -1,7 +1,4 @@
-// Security observability: routes the security-relevant logs/metrics from the
-// core resources to Log Analytics, and raises log-search alerts on authentication /
-// authorization failure and server-error spikes. All resources here are cheap
-// (alert rules ~€0.10/mo each; cost is Log Analytics ingestion only).
+// Cost-bounded operational and security observability for the backend.
 //
 // Alerts are LOG-SEARCH alerts (Microsoft.Insights/scheduledQueryRules) over the
 // workspace-based Application Insights `AppRequests` table, NOT metric alerts on
@@ -192,32 +189,52 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
   }
 }
 
-// One low-frequency standard test continuously exercises the existing readiness
-// endpoint. It covers public availability and the endpoint's Cosmos, Storage and
-// Key Vault checks without introducing a second synthetic transaction.
-var availabilityTestName = 'availability-${functionAppName}'
+// Preserve the deployed readiness resource names during incremental deployments;
+// only the liveness test and its alert are new. The probes send no headers, body,
+// query string or user data. The new liveness test disables retries so its
+// execution cost stays strictly bounded.
+var availabilityTests = [
+  {
+    name: 'ready'
+    resourceName: 'availability-${functionAppName}'
+    alertName: 'alert-certigo-availability'
+    path: '/api/health/ready'
+    description: 'Certigo backend availability and dependency-readiness probe.'
+    alertDescription: 'Readiness failed from both probe locations; inspect the Function App and Cosmos/Storage/Key Vault dependencies.'
+    retryEnabled: true
+  }
+  {
+    name: 'live'
+    resourceName: 'availability-${functionAppName}-live'
+    alertName: 'alert-certigo-availability-live'
+    path: '/api/health/live'
+    description: 'Certigo backend process liveness probe.'
+    alertDescription: 'Liveness failed from both probe locations; inspect the Function App process.'
+    retryEnabled: false
+  }
+]
 
-resource readinessAvailabilityTest 'Microsoft.Insights/webtests@2022-06-15' = {
-  name: availabilityTestName
+resource availabilityWebTests 'Microsoft.Insights/webtests@2022-06-15' = [for test in availabilityTests: {
+  name: test.resourceName
   location: location
   kind: 'standard'
   tags: union(tags, {
     'hidden-link:${appInsights.id}': 'Resource'
   })
   properties: {
-    Name: availabilityTestName
-    Description: 'Certigo backend availability and dependency-readiness probe.'
+    Name: test.resourceName
+    Description: test.description
     Enabled: true
     Frequency: 300
     Timeout: 30
     Kind: 'standard'
-    RetryEnabled: true
+    RetryEnabled: test.retryEnabled
     Locations: [
       { Id: 'emea-nl-ams-azr' }
       { Id: 'us-va-ash-azr' }
     ]
     Request: {
-      RequestUrl: 'https://${functionAppHostName}/api/health/ready'
+      RequestUrl: 'https://${functionAppHostName}${test.path}'
       HttpVerb: 'GET'
       FollowRedirects: false
       ParseDependentRequests: false
@@ -227,30 +244,30 @@ resource readinessAvailabilityTest 'Microsoft.Insights/webtests@2022-06-15' = {
       SSLCheck: true
       SSLCertRemainingLifetimeCheck: 14
     }
-    SyntheticMonitorId: availabilityTestName
+    SyntheticMonitorId: test.resourceName
   }
-}
+}]
 
-resource availabilityAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
-  name: 'alert-certigo-availability'
+resource availabilityAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [for (test, i) in availabilityTests: {
+  name: test.alertName
   location: 'global'
   tags: union(tags, {
     'hidden-link:${appInsights.id}': 'Resource'
-    'hidden-link:${readinessAvailabilityTest.id}': 'Resource'
+    'hidden-link:${availabilityWebTests[i].id}': 'Resource'
   })
   properties: {
-    description: 'Readiness failed from both probe locations; inspect the Function App and Cosmos/Storage/Key Vault dependencies.'
+    description: test.alertDescription
     severity: 1
     enabled: true
     scopes: [
-      readinessAvailabilityTest.id
+      availabilityWebTests[i].id
       appInsights.id
     ]
     evaluationFrequency: 'PT5M'
     windowSize: 'PT15M'
     criteria: {
       'odata.type': 'Microsoft.Azure.Monitor.WebtestLocationAvailabilityCriteria'
-      webTestId: readinessAvailabilityTest.id
+      webTestId: availabilityWebTests[i].id
       componentId: appInsights.id
       failedLocationCount: 2
     }
@@ -260,7 +277,7 @@ resource availabilityAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
       }
     ]
   }
-}
+}]
 
 // Activity Log alerts are free and catch failures before application telemetry is
 // available, including ARM infrastructure deployments and Function OneDeploy.
@@ -343,12 +360,21 @@ var logAlerts = [
   }
   {
     name: 'http5xx-spike'
-    // 5xx server errors — API instability or active attack. Strict regex on the
-    // string ResultCode avoids toint() failures on empty/non-numeric values.
-    query: 'AppRequests | where ResultCode matches regex "^5[0-9][0-9]$"'
-    threshold: 25
-    severity: 2
-    desc: 'Spike of 5xx server errors — API instability or active attack.'
+    // Traffic is intentionally low, so one non-health 5xx in the window is
+    // actionable. Health failures have their own readiness/availability alerts.
+    query: 'AppRequests | where Url !endswith "/api/health/live" and Url !endswith "/api/health/ready" | where ResultCode matches regex "^5[0-9][0-9]$"'
+    threshold: 0
+    severity: 1
+    desc: 'A non-health API request returned 5xx; inspect the failing operation and dependencies.'
+  }
+  {
+    name: 'telemetry-absent'
+    // The synthetic probes guarantee requests in every healthy 15-minute window.
+    // summarize returns one row only when the request count is zero.
+    query: 'AppRequests | summarize RequestCount = count() | where RequestCount == 0'
+    threshold: 0
+    severity: 1
+    desc: 'No request telemetry arrived in 15 minutes despite the scheduled availability probes.'
   }
 ]
 
@@ -409,5 +435,128 @@ resource alertReaderGrants 'Microsoft.Authorization/roleAssignments@2022-04-01' 
     principalType: 'ServicePrincipal'
   }
 }]
+
+// Aggregated-only workbook: no request URLs, operation ids, partition keys,
+// payloads or identities are rendered.
+var workbookDefinition = {
+  version: 'Notebook/1.0'
+  items: [
+    {
+      type: 1
+      content: {
+        json: '# Certigo minimal observability\nAggregated Functions, Cosmos DB and Storage signals. No user-level fields are displayed.'
+      }
+      name: 'overview'
+    }
+    {
+      type: 3
+      content: {
+        version: 'KqlItem/1.0'
+        title: 'Functions requests, 5xx and P95 latency'
+        query: 'AppRequests | summarize Requests=count(), Failures=countif(ResultCode matches regex "^5[0-9][0-9]$"), P95DurationMs=round(percentile(DurationMs, 95), 1) by bin(TimeGenerated, 1h) | order by TimeGenerated asc'
+        size: 0
+        timeContext: {
+          durationMs: 86400000
+        }
+        queryType: 0
+        resourceType: 'microsoft.operationalinsights/workspaces'
+      }
+      name: 'functions-requests'
+    }
+    {
+      type: 3
+      content: {
+        version: 'KqlItem/1.0'
+        title: 'Functions cold starts'
+        query: 'AppMetrics | where Name == "functions.cold_start" | summarize ColdStarts=sum(Sum) by bin(TimeGenerated, 1h) | order by TimeGenerated asc'
+        size: 0
+        timeContext: {
+          durationMs: 86400000
+        }
+        queryType: 0
+        resourceType: 'microsoft.operationalinsights/workspaces'
+      }
+      name: 'functions-cold-starts'
+    }
+    {
+      type: 3
+      content: {
+        version: 'KqlItem/1.0'
+        title: 'Cosmos requests, throttles and RU'
+        query: 'CDBDataPlaneRequests | summarize Requests=count(), Throttles=countif(tostring(StatusCode) == "429"), RequestUnits=sum(todouble(RequestCharge)) by bin(TimeGenerated, 1h) | order by TimeGenerated asc'
+        size: 0
+        timeContext: {
+          durationMs: 86400000
+        }
+        queryType: 0
+        resourceType: 'microsoft.operationalinsights/workspaces'
+      }
+      name: 'cosmos-requests'
+    }
+    {
+      type: 3
+      content: {
+        version: 'KqlItem/1.0'
+        title: 'Cosmos partition RU distribution (no partition keys)'
+        query: 'CDBPartitionKeyRUConsumption | extend RU=todouble(column_ifexists("RequestCharge", 0.0)), Partition=tostring(column_ifexists("PartitionKey", "")) | summarize P95RU=percentile(RU, 95), MaxRU=max(RU), PartitionCount=dcount(Partition) by DatabaseName, CollectionName, bin(TimeGenerated, 1h)'
+        size: 0
+        timeContext: {
+          durationMs: 86400000
+        }
+        queryType: 0
+        resourceType: 'microsoft.operationalinsights/workspaces'
+      }
+      name: 'cosmos-partition-ru'
+    }
+    {
+      type: 3
+      content: {
+        version: 'KqlItem/1.0'
+        title: 'Cosmos partition storage distribution (no partition keys)'
+        query: 'CDBPartitionKeyStatistics | extend SizeKB=todouble(column_ifexists("SizeKb", 0.0)), Partition=tostring(column_ifexists("PartitionKey", "")) | summarize TotalStorageKB=sum(SizeKB), MaxPartitionKB=max(SizeKB), PartitionCount=dcount(Partition) by DatabaseName, CollectionName'
+        size: 0
+        timeContext: {
+          durationMs: 86400000
+        }
+        queryType: 0
+        resourceType: 'microsoft.operationalinsights/workspaces'
+      }
+      name: 'cosmos-partition-storage'
+    }
+    {
+      type: 3
+      content: {
+        version: 'KqlItem/1.0'
+        title: 'Storage availability, transactions and latency'
+        query: 'AzureMetrics | where toupper(ResourceProvider) == "MICROSOFT.STORAGE" | where MetricName in ("Transactions", "Availability", "SuccessE2ELatency", "SuccessServerLatency") | summarize AverageValue=avg(Average), TotalValue=sum(Total) by MetricName, bin(TimeGenerated, 1h) | order by TimeGenerated asc'
+        size: 0
+        timeContext: {
+          durationMs: 86400000
+        }
+        queryType: 0
+        resourceType: 'microsoft.operationalinsights/workspaces'
+      }
+      name: 'storage-platform'
+    }
+  ]
+  fallbackResourceIds: [
+    workspaceId
+  ]
+}
+
+resource observabilityWorkbook 'Microsoft.Insights/workbooks@2023-06-01' = {
+  name: guid(resourceGroup().id, 'certigo-minimal-observability')
+  location: location
+  kind: 'shared'
+  tags: tags
+  properties: {
+    displayName: 'Certigo - Functions, Cosmos and Storage'
+    serializedData: string(workbookDefinition)
+    version: 'Notebook/1.0'
+    sourceId: workspaceId
+    category: 'workbook'
+    description: 'Cost-bounded operational view with aggregate-only signals.'
+  }
+}
 
 output actionGroupId string = actionGroup.id
