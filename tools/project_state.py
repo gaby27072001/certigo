@@ -51,6 +51,7 @@ PACKAGE_MANIFEST_DIGEST_FIELDS = ("manifestId", "rootHash")
 FORBIDDEN_DOMAIN_PATTERN = re.compile(
     rb"(?i)(?<![a-z0-9])(?:[a-z0-9-]+\.)*certigo\.app(?=$|[^a-z0-9-])"
 )
+ALLOWED_DOMAIN_AUDIT_PATH = Path("docs/UNIVERSAL_APP_LINKS.md")
 
 
 class ProjectStateError(ValueError):
@@ -175,8 +176,17 @@ def validate_forbidden_domain_references(root: Path) -> None:
         content = _read_bytes(root, relative)
         if b"\0" in content[:8000]:
             continue
-        for line_number, line in enumerate(content.splitlines(), start=1):
-            if FORBIDDEN_DOMAIN_PATTERN.search(line):
+        lines = content.splitlines()
+        for line_number, line in enumerate(lines, start=1):
+            if not FORBIDDEN_DOMAIN_PATTERN.search(line):
+                continue
+            context = b" ".join(lines[line_number - 1 : line_number + 1]).lower()
+            allowed_audit_mention = (
+                relative == ALLOWED_DOMAIN_AUDIT_PATH
+                and b"tiers" in context
+                and b"interdit" in context
+            )
+            if not allowed_audit_mention:
                 violations.append(f"{relative.as_posix()}:{line_number}")
     if violations:
         domain = "certigo" + ".app"

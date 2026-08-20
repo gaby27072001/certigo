@@ -205,6 +205,24 @@ class ProjectStateTests(unittest.TestCase):
 
         project_state.validate_forbidden_domain_references(self.root)
 
+    def test_explicit_third_party_audit_mention_is_the_only_allowlist(self) -> None:
+        domain = "certigo" + ".app"
+        self.fixture.write(
+            project_state.ALLOWED_DOMAIN_AUDIT_PATH.as_posix(),
+            f"Le domaine {domain} est tiers et non controle. Il est explicitement interdit.\n",
+        )
+        project_state.validate_forbidden_domain_references(self.root)
+
+        self.fixture.write(
+            "docs/other.md",
+            f"Le domaine {domain} est tiers et explicitement interdit.\n",
+        )
+        with self.assertRaisesRegex(
+            project_state.ProjectStateError,
+            r"docs/other\.md:1",
+        ):
+            project_state.validate_forbidden_domain_references(self.root)
+
     def test_observable_hash_normalizes_declared_lf_text(self) -> None:
         source = self.root / ".github/workflows/ci-mobile.yml"
         original = source.read_bytes().replace(b"\r\n", b"\n")
