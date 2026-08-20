@@ -19,11 +19,21 @@
   "x-certigo-prerequisites": [
     {
       "pullRequest": 296,
-      "requirement": "Account deletion snapshots and revokes every active LinkedIdentity."
+      "baselineState": "merged",
+      "mergeCommit": "6145f35",
+      "requirement": "Before link mode, extend the merged deletion workflow to snapshot and revoke every active LinkedIdentity."
     },
     {
       "pullRequest": 297,
+      "baselineState": "merged",
+      "mergeCommit": "576ef60",
       "requirement": "activeTrack remains owner-scoped to personId with compare-and-set."
+    },
+    {
+      "pullRequest": 289,
+      "baselineState": "merged",
+      "mergeCommit": "c44ba32",
+      "requirement": "Onboarding continues to select only active catalog tracks with available learning content."
     }
   ],
   "x-certigo-feature-mode": {
@@ -35,7 +45,38 @@
       "resolve",
       "link"
     ],
-    "mutationRequiredValue": "link"
+    "mutationRequiredValue": "link",
+    "offHttpStatus": 404,
+    "disabledMutationHttpStatus": 503
+  },
+  "x-certigo-migration": {
+    "mode": "additive",
+    "requiredEquality": "personId == profile.id == legacy userId",
+    "rewritesOwnerDocuments": false,
+    "changesPartitionKeys": false
+  },
+  "x-certigo-integrations": {
+    "accountDeletion": {
+      "routes": [
+        "GET /account/deletion",
+        "POST /account/deletion"
+      ],
+      "clientIdempotencyKey": false,
+      "pendingStatus": 202,
+      "completedStatus": 200,
+      "runtimeSetting": "ACCOUNT_DELETION_ENABLED",
+      "runtimeDefault": "off"
+    },
+    "activeTrack": {
+      "route": "POST /me/active-track",
+      "owner": "personId",
+      "compareAndSetField": "expectedTrackId"
+    },
+    "onboardingCatalog": {
+      "route": "GET /catalog/tracks",
+      "eligibility": "status in (active, active-retiring) and learningAvailable == true and contentStatus == available",
+      "owner": "personId"
+    }
   },
   "x-certigo-audit": {
     "allowedFields": [
@@ -77,8 +118,12 @@
           },
           "423": {
             "$ref": "#/components/responses/AccountDeletionInProgress"
+          },
+          "404": {
+            "$ref": "#/components/responses/IdentitySurfaceDisabled"
           }
-        }
+        },
+        "x-certigo-off-response": 404
       }
     },
     "/me/identity-link-intents": {
@@ -123,10 +168,14 @@
           "423": {
             "$ref": "#/components/responses/AccountDeletionInProgress"
           },
+          "404": {
+            "$ref": "#/components/responses/IdentitySurfaceDisabled"
+          },
           "503": {
             "$ref": "#/components/responses/IdentityLinkingDisabled"
           }
-        }
+        },
+        "x-certigo-off-response": 404
       }
     },
     "/me/identity-link-intents/{intentId}/complete": {
@@ -180,7 +229,8 @@
           "500": {
             "$ref": "#/components/responses/InternalIntegrityFailure"
           }
-        }
+        },
+        "x-certigo-off-response": 404
       }
     },
     "/me/linked-identities/{linkedIdentityId}": {
@@ -217,32 +267,55 @@
           "503": {
             "$ref": "#/components/responses/IdentityLinkingDisabled"
           }
-        }
+        },
+        "x-certigo-off-response": 404
       }
     },
     "/account/deletion": {
-      "post": {
-        "operationId": "requestAccountDeletion",
-        "summary": "Delete the Person and every linked identity",
-        "description": "Extension point for #296. The durable workflow is keyed by personId, snapshots every active LinkedIdentity, revokes each provider target, and reconciles links before completion.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "$ref": "#/components/parameters/SourceReauthentication"
-          }
-        ],
+      "get": {
+        "operationId": "getAccountDeletion",
+        "summary": "Read the merged #296 deletion status",
         "responses": {
           "200": {
             "description": "Existing #296 AccountDeletionDto"
           },
-          "401": {
-            "$ref": "#/components/responses/InvalidReauthentication"
+          "503": {
+            "$ref": "#/components/responses/AccountDeletionDisabled"
           }
         },
         "x-certigo-owner": "personId",
-        "x-certigo-prerequisite": 296
+        "x-certigo-baseline": "merged"
+      },
+      "post": {
+        "operationId": "requestAccountDeletion",
+        "summary": "Delete the Person and every linked identity",
+        "description": "Merged #296 baseline plus the required future multi-identity extension. The durable request is idempotent per personId without a client Idempotency-Key. Before link mode it must snapshot every active LinkedIdentity, revoke each provider target, and reconcile links before completion.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountDeletionReauthentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deletion already completed"
+          },
+          "202": {
+            "description": "Deletion accepted or still pending"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidReauthentication"
+          },
+          "403": {
+            "$ref": "#/components/responses/RecentAuthenticationRequired"
+          },
+          "503": {
+            "$ref": "#/components/responses/AccountDeletionDisabled"
+          }
+        },
+        "x-certigo-owner": "personId",
+        "x-certigo-prerequisite": 296,
+        "x-certigo-baseline": "merged",
+        "x-certigo-client-idempotency-key": false
       }
     },
     "/me/active-track": {
@@ -266,10 +339,35 @@
           },
           "409": {
             "$ref": "#/components/responses/Conflict"
+          },
+          "404": {
+            "$ref": "#/components/responses/TrackNotFound"
+          },
+          "423": {
+            "$ref": "#/components/responses/AccountDeletionInProgress"
           }
         },
         "x-certigo-owner": "personId",
-        "x-certigo-prerequisite": 297
+        "x-certigo-prerequisite": 297,
+        "x-certigo-baseline": "merged",
+        "x-certigo-catalog-validation": "content repository track must exist"
+      }
+    },
+    "/catalog/tracks": {
+      "get": {
+        "operationId": "getCatalog",
+        "summary": "Read the existing certification catalogue used by onboarding",
+        "responses": {
+          "200": {
+            "description": "Existing TrackSummaryDto array"
+          },
+          "503": {
+            "$ref": "#/components/responses/CatalogUnavailable"
+          }
+        },
+        "x-certigo-prerequisite": 289,
+        "x-certigo-baseline": "merged",
+        "x-certigo-onboarding-eligibility": "status in (active, active-retiring) and learningAvailable == true and contentStatus == available"
       }
     }
   },
@@ -298,6 +396,16 @@
         "in": "header",
         "required": true,
         "description": "Fresh proof for the currently linked source identity. Never logged or persisted.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "AccountDeletionReauthentication": {
+        "name": "X-Certigo-Reauthentication",
+        "in": "header",
+        "required": false,
+        "description": "Optional fresh proof for the same Person. When absent, #296 uses auth_time from the bearer.",
         "schema": {
           "type": "string",
           "minLength": 1
@@ -337,6 +445,17 @@
           "entraExternalId"
         ]
       },
+      "IdentityTenant": {
+        "oneOf": [
+          {
+            "const": "certigo"
+          },
+          {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          }
+        ]
+      },
       "CreateIdentityLinkIntentRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -352,6 +471,28 @@
             "$ref": "#/components/schemas/IdentityType"
           }
         },
+        "oneOf": [
+          {
+            "properties": {
+              "targetProvider": {
+                "const": "certigo-local"
+              },
+              "targetType": {
+                "const": "localPassword"
+              }
+            }
+          },
+          {
+            "properties": {
+              "targetProvider": {
+                "const": "entra-external-id"
+              },
+              "targetType": {
+                "const": "entraExternalId"
+              }
+            }
+          }
+        ],
         "description": "The server selects the trusted tenant, issuer and audience. The client cannot choose them."
       },
       "IdentityLinkIntentDto": {
@@ -402,7 +543,7 @@
             "minLength": 22
           },
           "tenant": {
-            "type": "string"
+            "$ref": "#/components/schemas/IdentityTenant"
           },
           "issuer": {
             "type": "string",
@@ -528,7 +669,7 @@
             "$ref": "#/components/schemas/IdentityProvider"
           },
           "tenant": {
-            "type": "string"
+            "$ref": "#/components/schemas/IdentityTenant"
           },
           "type": {
             "$ref": "#/components/schemas/IdentityType"
@@ -691,7 +832,7 @@
         }
       },
       "IdentityLinkingDisabled": {
-        "description": "PERSON_LINKED_IDENTITY_V1 is lower than link.",
+        "description": "PERSON_LINKED_IDENTITY_V1 is shadow or resolve. Off returns 404 instead.",
         "content": {
           "application/problem+json": {
             "schema": {
@@ -709,6 +850,21 @@
             }
           }
         }
+      },
+      "IdentitySurfaceDisabled": {
+        "description": "PERSON_LINKED_IDENTITY_V1 is off; the V1 route is intentionally absent."
+      },
+      "RecentAuthenticationRequired": {
+        "description": "The merged #296 deletion request did not have a recent bearer or optional proof."
+      },
+      "AccountDeletionDisabled": {
+        "description": "ACCOUNT_DELETION_ENABLED is false."
+      },
+      "TrackNotFound": {
+        "description": "The requested content-backed certification track does not exist."
+      },
+      "CatalogUnavailable": {
+        "description": "No certification catalogue is available."
       }
     }
   }

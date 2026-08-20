@@ -7,11 +7,13 @@
     "container": "users",
     "partitionKey": "/id",
     "topologyChangeRequired": false,
+    "partitionKeyChangeRequired": false,
     "uniqueKeyPolicyRequired": false,
-    "identityIdStrategy": "linked-identity::v1::<sha256(canonical provider, tenant, subject and type)>",
+    "identityIdStrategy": "linked-identity::v1::<sha256(certigo-linked-identity:v1 NUL provider NUL tenant NUL subject NUL type)>",
     "intentIdStrategy": "identity-link-intent::v1::<sha256(personId and Idempotency-Key)>",
     "operationIdStrategy": "identity-link-operation::v1::<sha256(personId and Idempotency-Key)>",
     "currentIndexingPolicy": {
+      "indexingMode": "consistent",
       "automatic": true,
       "includedPaths": [
         "/*"
@@ -46,8 +48,52 @@
         "kind": "crossPartitionQuery",
         "predicate": "documentType = 'linkedIdentity' AND personId = @personId",
         "compositeIndexRequired": false
+      },
+      {
+        "name": "reconcileAccountDeletionIdentities",
+        "kind": "crossPartitionQuery",
+        "predicate": "documentType = 'linkedIdentity' AND personId = @personId",
+        "compositeIndexRequired": false
       }
     ]
+  },
+  "x-certigo-migration": {
+    "mode": "additive",
+    "personIdSource": "legacy userId",
+    "requiredEquality": "personId == profile.id == legacy userId",
+    "rewritesOwnerDocuments": false,
+    "partitionKeyChanges": false,
+    "existingOwnerContainers": [
+      "users",
+      "progress",
+      "attempts",
+      "events",
+      "economy",
+      "friends",
+      "leaderboard"
+    ]
+  },
+  "x-certigo-integrations": {
+    "accountDeletion": {
+      "baselinePullRequest": 296,
+      "baselineState": "merged",
+      "stateContainer": "attempts",
+      "statePartitionKey": "/userId",
+      "statePartitionValue": "sha256(personId)",
+      "linkModeRequiresMultiIdentitySnapshot": true
+    },
+    "activeTrack": {
+      "baselinePullRequest": 297,
+      "baselineState": "merged",
+      "owner": "personId",
+      "profileDocumentUnchanged": true
+    },
+    "onboardingCatalog": {
+      "baselinePullRequest": 289,
+      "baselineState": "merged",
+      "owner": "personId",
+      "catalogDocumentsUnchanged": true
+    }
   },
   "oneOf": [
     {
@@ -112,6 +158,7 @@
         },
         "identityMetadata": {
           "type": "object",
+          "x-certigo-equality": "personId == legacyUserId == containing profile id",
           "additionalProperties": false,
           "required": [
             "schemaVersion",
@@ -228,7 +275,7 @@
         },
         "subject": {
           "type": "string",
-          "minLength": 16,
+          "minLength": 32,
           "description": "Opaque local subject or validated Entra oid."
         },
         "type": {
@@ -238,7 +285,41 @@
             "entraExternalId"
           ]
         }
-      }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "provider": {
+              "const": "certigo-local"
+            },
+            "tenant": {
+              "const": "certigo"
+            },
+            "subject": {
+              "pattern": "^[0-9a-f]{32,}$"
+            },
+            "type": {
+              "const": "localPassword"
+            }
+          }
+        },
+        {
+          "properties": {
+            "provider": {
+              "const": "entra-external-id"
+            },
+            "tenant": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "subject": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "type": {
+              "const": "entraExternalId"
+            }
+          }
+        }
+      ]
     },
     "verification": {
       "type": "object",
@@ -377,13 +458,22 @@
           "type": "string"
         },
         "targetProvider": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "certigo-local",
+            "entra-external-id"
+          ]
         },
         "targetTenant": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "targetType": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "localPassword",
+            "entraExternalId"
+          ]
         },
         "nonceHash": {
           "type": "string",
@@ -426,7 +516,35 @@
         "_etag": {
           "type": "string"
         }
-      }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "targetProvider": {
+              "const": "certigo-local"
+            },
+            "targetTenant": {
+              "const": "certigo"
+            },
+            "targetType": {
+              "const": "localPassword"
+            }
+          }
+        },
+        {
+          "properties": {
+            "targetProvider": {
+              "const": "entra-external-id"
+            },
+            "targetTenant": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "targetType": {
+              "const": "entraExternalId"
+            }
+          }
+        }
+      ]
     },
     "identityLinkOperation": {
       "type": "object",

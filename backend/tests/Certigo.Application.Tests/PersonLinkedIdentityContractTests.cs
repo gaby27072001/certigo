@@ -8,8 +8,14 @@ namespace Certigo.Application.Tests;
 
 public sealed class PersonLinkedIdentityContractTests
 {
+    private const string TenantA = "11111111-1111-4111-8111-aaaaaaaaaaaa";
+    private const string TenantB = "22222222-2222-4222-8222-bbbbbbbbbbbb";
+    private const string ExternalObjectA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    private const string ExternalObjectB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    private const string ExternalObjectC = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
     private static readonly DateTimeOffset Now =
-        new(2026, 8, 19, 12, 0, 0, TimeSpan.Zero);
+        new(2026, 8, 20, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public void Versioned_contracts_are_machine_readable_and_runtime_disabled()
@@ -29,12 +35,14 @@ public sealed class PersonLinkedIdentityContractTests
             .Should().BeTrue();
         paths.TryGetProperty("/account/deletion", out _).Should().BeTrue();
         paths.TryGetProperty("/me/active-track", out _).Should().BeTrue();
+        paths.TryGetProperty("/catalog/tracks", out _).Should().BeTrue();
 
         var createResponses = paths
             .GetProperty("/me/identity-link-intents")
             .GetProperty("post")
             .GetProperty("responses");
-        createResponses.TryGetProperty("404", out _).Should().BeFalse();
+        createResponses.GetProperty("404").GetProperty("$ref").GetString()
+            .Should().Be("#/components/responses/IdentitySurfaceDisabled");
         createResponses.TryGetProperty("500", out _).Should().BeFalse();
 
         var completeResponses = paths
@@ -53,14 +61,68 @@ public sealed class PersonLinkedIdentityContractTests
         revokeResponses.GetProperty("404").GetProperty("$ref").GetString()
             .Should().Be("#/components/responses/LinkedIdentityNotFound");
 
-        paths.GetProperty("/account/deletion").GetProperty("post")
-            .GetProperty("x-certigo-owner").GetString().Should().Be("personId");
-        paths.GetProperty("/account/deletion").GetProperty("post")
+        var deletionPath = paths.GetProperty("/account/deletion");
+        deletionPath.GetProperty("get").GetProperty("x-certigo-baseline").GetString()
+            .Should().Be("merged");
+        var deletionPost = deletionPath.GetProperty("post");
+        deletionPost.GetProperty("x-certigo-owner").GetString().Should().Be("personId");
+        deletionPost
             .GetProperty("x-certigo-prerequisite").GetInt32().Should().Be(296);
-        paths.GetProperty("/me/active-track").GetProperty("post")
+        deletionPost.GetProperty("x-certigo-client-idempotency-key").GetBoolean()
+            .Should().BeFalse();
+        deletionPost.GetProperty("responses").TryGetProperty("202", out _).Should().BeTrue();
+        deletionPost.GetProperty("parameters")
+            .EnumerateArray()
+            .Select(parameter => parameter.GetProperty("$ref").GetString())
+            .Should().Equal("#/components/parameters/AccountDeletionReauthentication");
+
+        var activeTrack = paths.GetProperty("/me/active-track").GetProperty("post");
+        activeTrack
             .GetProperty("x-certigo-owner").GetString().Should().Be("personId");
-        paths.GetProperty("/me/active-track").GetProperty("post")
+        activeTrack
             .GetProperty("x-certigo-prerequisite").GetInt32().Should().Be(297);
+        activeTrack.GetProperty("responses").TryGetProperty("404", out _).Should().BeTrue();
+        activeTrack.GetProperty("responses").TryGetProperty("423", out _).Should().BeTrue();
+
+        paths.GetProperty("/catalog/tracks").GetProperty("get")
+            .GetProperty("x-certigo-onboarding-eligibility").GetString()
+            .Should().Contain("active-retiring")
+            .And.Contain("learningAvailable == true")
+            .And.Contain("contentStatus == available");
+
+        var prerequisites = api.RootElement.GetProperty("x-certigo-prerequisites")
+            .EnumerateArray()
+            .ToDictionary(
+                prerequisite => prerequisite.GetProperty("pullRequest").GetInt32(),
+                prerequisite => prerequisite.GetProperty("baselineState").GetString());
+        prerequisites.Should().ContainKeys(289, 296, 297);
+        prerequisites.Values.Should().OnlyContain(state => state == "merged");
+
+        var featureMode = api.RootElement.GetProperty("x-certigo-feature-mode");
+        featureMode.GetProperty("offHttpStatus").GetInt32().Should().Be(404);
+        featureMode.GetProperty("disabledMutationHttpStatus").GetInt32().Should().Be(503);
+
+        var components = api.RootElement.GetProperty("components");
+        components.GetProperty("schemas").GetProperty("CreateIdentityLinkIntentRequest")
+            .GetProperty("oneOf").GetArrayLength().Should().Be(2);
+        var componentResponses = components.GetProperty("responses");
+        foreach (var responseName in new[]
+                 {
+                     "IdentitySurfaceDisabled",
+                     "RecentAuthenticationRequired",
+                     "AccountDeletionDisabled",
+                     "TrackNotFound",
+                     "CatalogUnavailable",
+                 })
+        {
+            componentResponses.TryGetProperty(responseName, out _).Should().BeTrue();
+        }
+
+        var apiMigration = api.RootElement.GetProperty("x-certigo-migration");
+        apiMigration.GetProperty("requiredEquality").GetString()
+            .Should().Be("personId == profile.id == legacy userId");
+        apiMigration.GetProperty("rewritesOwnerDocuments").GetBoolean().Should().BeFalse();
+        apiMigration.GetProperty("changesPartitionKeys").GetBoolean().Should().BeFalse();
 
         var forbiddenAuditFields = api.RootElement
             .GetProperty("x-certigo-audit")
@@ -77,9 +139,42 @@ public sealed class PersonLinkedIdentityContractTests
         storage.GetProperty("container").GetString().Should().Be("users");
         storage.GetProperty("partitionKey").GetString().Should().Be("/id");
         storage.GetProperty("topologyChangeRequired").GetBoolean().Should().BeFalse();
+        storage.GetProperty("partitionKeyChangeRequired").GetBoolean().Should().BeFalse();
         storage.GetProperty("uniqueKeyPolicyRequired").GetBoolean().Should().BeFalse();
         storage.GetProperty("intentIdStrategy").GetString().Should().Contain("personId");
         storage.GetProperty("operationIdStrategy").GetString().Should().Contain("personId");
+
+        var indexingPolicy = storage.GetProperty("currentIndexingPolicy");
+        indexingPolicy.GetProperty("indexingMode").GetString().Should().Be("consistent");
+        indexingPolicy.GetProperty("automatic").GetBoolean().Should().BeTrue();
+        indexingPolicy.GetProperty("includedPaths").EnumerateArray()
+            .Select(path => path.GetString()).Should().Equal("/*");
+        indexingPolicy.GetProperty("excludedPaths").EnumerateArray()
+            .Select(path => path.GetString()).Should().Equal("/\"_etag\"/?");
+
+        var cosmosMigration = cosmos.RootElement.GetProperty("x-certigo-migration");
+        cosmosMigration.GetProperty("requiredEquality").GetString()
+            .Should().Be("personId == profile.id == legacy userId");
+        cosmosMigration.GetProperty("rewritesOwnerDocuments").GetBoolean().Should().BeFalse();
+        cosmosMigration.GetProperty("partitionKeyChanges").GetBoolean().Should().BeFalse();
+        cosmosMigration.GetProperty("existingOwnerContainers").EnumerateArray()
+            .Select(container => container.GetString())
+            .Should().Equal(
+                "users",
+                "progress",
+                "attempts",
+                "events",
+                "economy",
+                "friends",
+                "leaderboard");
+
+        var integrations = cosmos.RootElement.GetProperty("x-certigo-integrations");
+        integrations.GetProperty("accountDeletion").GetProperty("baselineState").GetString()
+            .Should().Be("merged");
+        integrations.GetProperty("activeTrack").GetProperty("baselineState").GetString()
+            .Should().Be("merged");
+        integrations.GetProperty("onboardingCatalog").GetProperty("baselineState").GetString()
+            .Should().Be("merged");
 
         var locatorProperties = cosmos.RootElement
             .GetProperty("$defs")
@@ -90,6 +185,73 @@ public sealed class PersonLinkedIdentityContractTests
         locatorProperties.TryGetProperty("subject", out _).Should().BeTrue();
         locatorProperties.TryGetProperty("type", out _).Should().BeTrue();
         locatorProperties.TryGetProperty("email", out _).Should().BeFalse();
+        cosmos.RootElement.GetProperty("$defs").GetProperty("identityLocator")
+            .GetProperty("oneOf").GetArrayLength().Should().Be(2);
+    }
+
+    [Fact]
+    public void Contracts_match_merged_deletion_onboarding_catalog_and_cosmos_baselines()
+    {
+        var containers = LoadRepositoryFile(
+            "backend",
+            "src",
+            "Certigo.Infrastructure",
+            "Cosmos",
+            "CosmosContainers.cs");
+        containers.Should().Contain("new(Users, \"/id\")");
+        containers.Should().Contain("new(Progress, \"/userId\")");
+        containers.Should().Contain("new(Attempts, \"/userId\", DefaultTimeToLive: -1)");
+
+        var cosmosBicep = LoadRepositoryFile("infra", "modules", "cosmos.bicep");
+        cosmosBicep.Should().Contain("{ name: 'users', pk: '/id' }");
+        cosmosBicep.Should().Contain("path: '/*'");
+        cosmosBicep.Should().Contain("path: '/\"_etag\"/?'");
+
+        var deletionFunctions = LoadRepositoryFile(
+            "backend",
+            "src",
+            "Certigo.Api",
+            "Functions",
+            "AccountDeletionFunctions.cs");
+        deletionFunctions.Should().Contain("\"get\", Route = \"account/deletion\"");
+        deletionFunctions.Should().Contain("\"post\", Route = \"account/deletion\"");
+        deletionFunctions.Should().Contain("HttpStatusCode.Accepted");
+
+        var activeTrackFunctions = LoadRepositoryFile(
+            "backend",
+            "src",
+            "Certigo.Api",
+            "Functions",
+            "UserFunctions.cs");
+        activeTrackFunctions.Should().Contain("Route = \"me/active-track\"");
+        activeTrackFunctions.Should().Contain("body.ExpectedTrackId");
+
+        var onboarding = LoadRepositoryFile(
+            "apps",
+            "mobile",
+            "lib",
+            "features",
+            "onboarding",
+            "presentation",
+            "certification_screen.dart");
+        onboarding.Should().Contain("track.hasLearningContent && track.isActive");
+        onboarding.Should().Contain("activeTrackProvider.notifier");
+
+        var activeTrackStore = LoadRepositoryFile(
+            "apps",
+            "mobile",
+            "lib",
+            "app",
+            "active_track_store.dart");
+        activeTrackStore.Should().Contain("required this.ownerId");
+        activeTrackStore.Should().Contain("'ownerId': ownerId");
+
+        var program = LoadRepositoryFile(
+            "backend",
+            "src",
+            "Certigo.Api",
+            "Program.cs");
+        program.Should().NotContain("PERSON_LINKED_IDENTITY_V1");
     }
 
     [Fact]
@@ -162,15 +324,19 @@ public sealed class PersonLinkedIdentityContractTests
             [],
             identityIdFactory: _ => forcedId);
         store.Bind(
-            new IdentityLocator("certigo-local", "certigo", "subject-a-opaque", "localPassword"),
+            new IdentityLocator(
+                "certigo-local",
+                "certigo",
+                Hash("subject-a-opaque"),
+                "localPassword"),
             "person-a",
             Now);
 
         var act = () => store.Bind(
             new IdentityLocator(
                 "entra-external-id",
-                "tenant-a",
-                "subject-b-opaque",
+                TenantA,
+                ExternalObjectB,
                 "entraExternalId"),
             "person-b",
             Now);
@@ -183,11 +349,11 @@ public sealed class PersonLinkedIdentityContractTests
     [Fact]
     public void External_backfill_requires_validated_tid_and_oid_and_never_uses_email()
     {
-        var store = new FakeIdentityStore(["entra-object-a"], []);
+        var store = new FakeIdentityStore([ExternalObjectA], []);
         var observation = new ExternalObservation(
-            LegacyPersonId: "entra-object-a",
-            Tenant: "tenant-a",
-            ObjectId: "entra-object-a",
+            LegacyPersonId: ExternalObjectA,
+            Tenant: TenantA,
+            ObjectId: ExternalObjectA,
             Email: "shared@example.com",
             SignatureAndClaimsValidated: false);
 
@@ -201,10 +367,51 @@ public sealed class PersonLinkedIdentityContractTests
             SignatureAndClaimsValidated = true,
         });
 
-        valid.Identity.PersonId.Should().Be("entra-object-a");
-        valid.Identity.Locator.Subject.Should().Be("entra-object-a");
-        valid.Identity.Locator.Tenant.Should().Be("tenant-a");
+        valid.Identity.PersonId.Should().Be(ExternalObjectA);
+        valid.Identity.Locator.Subject.Should().Be(ExternalObjectA);
+        valid.Identity.Locator.Tenant.Should().Be(TenantA);
         store.BindingCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void Locator_canonicalization_rejects_ambiguous_values_instead_of_correcting_them()
+    {
+        var store = new FakeIdentityStore(["person-a"], []);
+
+        var paddedProvider = () => store.Bind(
+            new IdentityLocator(
+                "certigo-local ",
+                "certigo",
+                Hash("local-subject"),
+                "localPassword"),
+            "person-a",
+            Now);
+        paddedProvider.Should().Throw<ContractViolationException>()
+            .Which.Code.Should().Be("invalid_identity_locator");
+
+        var uppercaseTenant = () => store.Bind(
+            new IdentityLocator(
+                "entra-external-id",
+                TenantA.ToUpperInvariant(),
+                ExternalObjectA,
+                "entraExternalId"),
+            "person-a",
+            Now);
+        uppercaseTenant.Should().Throw<ContractViolationException>()
+            .Which.Code.Should().Be("invalid_identity_locator");
+
+        var mismatchedProviderAndType = () => store.Bind(
+            new IdentityLocator(
+                "certigo-local",
+                "certigo",
+                Hash("another-local-subject"),
+                "entraExternalId"),
+            "person-a",
+            Now);
+        mismatchedProviderAndType.Should().Throw<ContractViolationException>()
+            .Which.Code.Should().Be("invalid_identity_locator");
+
+        store.BindingCount.Should().Be(0);
     }
 
     [Fact]
@@ -269,7 +476,7 @@ public sealed class PersonLinkedIdentityContractTests
             "other-complete-key",
             targetProof with
             {
-                Locator = targetProof.Locator with { Subject = "different-target" },
+                Locator = targetProof.Locator with { Subject = ExternalObjectC },
             });
 
         conflictingReplay.Should().Throw<ContractViolationException>()
@@ -317,7 +524,7 @@ public sealed class PersonLinkedIdentityContractTests
         var coordinator = new FakeLinkCoordinator(
             store,
             Now,
-            "tenant-a",
+            TenantA,
             "api://certigo-mobile");
 
         var intentA = coordinator.Begin(
@@ -380,7 +587,7 @@ public sealed class PersonLinkedIdentityContractTests
         var intent = fixture.Begin();
         var proof = fixture.TargetProof(intent) with
         {
-            Locator = fixture.TargetProof(intent).Locator with { Tenant = "tenant-b" },
+            Locator = fixture.TargetProof(intent).Locator with { Tenant = TenantB },
         };
 
         var act = () => fixture.Coordinator.Complete(intent.Id, "complete-key", proof);
@@ -397,8 +604,8 @@ public sealed class PersonLinkedIdentityContractTests
         var source = store.Bind(
             new IdentityLocator(
                 "entra-external-id",
-                "tenant-a",
-                "source-object-id",
+                TenantA,
+                ExternalObjectA,
                 "entraExternalId"),
             "source-person",
             Now).Identity;
@@ -482,6 +689,30 @@ public sealed class PersonLinkedIdentityContractTests
     }
 
     [Fact]
+    public void Account_deletion_lock_blocks_begin_and_complete_before_any_new_binding()
+    {
+        var blockedBegin = LinkFixture.Create();
+        blockedBegin.Store.BeginDeletion(blockedBegin.SourcePersonId);
+
+        var begin = () => blockedBegin.Begin();
+        begin.Should().Throw<ContractViolationException>()
+            .Which.Code.Should().Be("account_deletion_in_progress");
+        blockedBegin.Store.BindingCount.Should().Be(1);
+
+        var blockedComplete = LinkFixture.Create();
+        var intent = blockedComplete.Begin();
+        blockedComplete.Store.BeginDeletion(blockedComplete.SourcePersonId);
+
+        var complete = () => blockedComplete.Coordinator.Complete(
+            intent.Id,
+            "complete-key",
+            blockedComplete.TargetProof(intent));
+        complete.Should().Throw<ContractViolationException>()
+            .Which.Code.Should().Be("account_deletion_in_progress");
+        blockedComplete.Store.BindingCount.Should().Be(1);
+    }
+
+    [Fact]
     public void Wrong_nonce_cannot_be_used_to_complete_an_intent()
     {
         var fixture = LinkFixture.Create();
@@ -511,8 +742,8 @@ public sealed class PersonLinkedIdentityContractTests
         var second = fixture.Store.Bind(
             new IdentityLocator(
                 "entra-external-id",
-                "tenant-a",
-                "second-object-id",
+                TenantA,
+                ExternalObjectC,
                 "entraExternalId"),
             fixture.SourcePersonId,
             Now).Identity;
@@ -536,28 +767,31 @@ public sealed class PersonLinkedIdentityContractTests
         fixture.Store.BindingCount.Should().Be(2);
     }
 
-    private static JsonDocument LoadContract(string fileName)
-    {
-        var relativePath = Path.Combine(
+    private static JsonDocument LoadContract(string fileName) =>
+        JsonDocument.Parse(LoadRepositoryFile(
             "docs",
             "contracts",
             "person-linked-identity",
             "v1",
-            fileName);
+            fileName));
+
+    private static string LoadRepositoryFile(params string[] pathSegments)
+    {
+        var relativePath = Path.Combine(pathSegments);
         var directory = AppContext.BaseDirectory;
         while (directory is not null)
         {
             var candidate = Path.Combine(directory, relativePath);
             if (File.Exists(candidate))
             {
-                return JsonDocument.Parse(File.ReadAllText(candidate));
+                return File.ReadAllText(candidate);
             }
 
             directory = Directory.GetParent(directory)?.FullName;
         }
 
         throw new InvalidOperationException(
-            $"{fileName} not found walking up from {AppContext.BaseDirectory}");
+            $"{relativePath} not found walking up from {AppContext.BaseDirectory}");
     }
 
     private sealed record OwnerDocument(string Container, string PartitionKey, string OwnerId);
@@ -590,11 +824,31 @@ public sealed class PersonLinkedIdentityContractTests
         string Subject,
         string Type)
     {
-        public IdentityLocator Canonical() => new(
-            Provider.Trim().ToLowerInvariant(),
-            Tenant.Trim().ToLowerInvariant(),
-            Subject.Trim(),
-            Type.Trim());
+        public IdentityLocator Canonical()
+        {
+            if (!IsCanonicalText(Provider)
+                || !IsCanonicalText(Tenant)
+                || !IsCanonicalText(Subject)
+                || !IsCanonicalText(Type))
+            {
+                throw new ContractViolationException("invalid_identity_locator");
+            }
+
+            var isLocal = Provider == "certigo-local"
+                && Tenant == "certigo"
+                && Type == "localPassword"
+                && IsLowerHex(Subject, 32);
+            var isEntra = Provider == "entra-external-id"
+                && Type == "entraExternalId"
+                && IsCanonicalGuid(Tenant)
+                && IsCanonicalGuid(Subject);
+            if (!isLocal && !isEntra)
+            {
+                throw new ContractViolationException("invalid_identity_locator");
+            }
+
+            return this;
+        }
 
         public string StableId()
         {
@@ -608,6 +862,21 @@ public sealed class PersonLinkedIdentityContractTests
                 canonical.Type);
             return $"linked-identity::v1::{Hash(material)}";
         }
+
+        private static bool IsCanonicalText(string value) =>
+            !string.IsNullOrWhiteSpace(value)
+            && value == value.Trim()
+            && !value.Any(char.IsControl);
+
+        private static bool IsLowerHex(string value, int minimumLength) =>
+            value.Length >= minimumLength
+            && value.All(character =>
+                character is >= '0' and <= '9'
+                || character is >= 'a' and <= 'f');
+
+        private static bool IsCanonicalGuid(string value) =>
+            Guid.TryParseExact(value, "D", out var parsed)
+            && parsed.ToString("D") == value;
     }
 
     private sealed record LinkedIdentity(
@@ -626,6 +895,7 @@ public sealed class PersonLinkedIdentityContractTests
         private readonly HashSet<string> _personIds;
         private readonly Dictionary<string, LinkedIdentity> _bindings = new(StringComparer.Ordinal);
         private readonly Dictionary<string, LegacyCredential> _credentials = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _deletingPersonIds = new(StringComparer.Ordinal);
         private readonly Func<IdentityLocator, string> _identityIdFactory;
 
         public FakeIdentityStore(
@@ -646,6 +916,14 @@ public sealed class PersonLinkedIdentityContractTests
         public int BindingCount => _bindings.Count;
 
         public void AddPerson(string personId) => _personIds.Add(personId);
+
+        public void BeginDeletion(string personId)
+        {
+            EnsurePerson(personId);
+            _deletingPersonIds.Add(personId);
+        }
+
+        public bool IsDeletionInProgress(string personId) => _deletingPersonIds.Contains(personId);
 
         public MigrationOutcome BackfillLocal(LegacyCredential credential)
         {
@@ -847,6 +1125,7 @@ public sealed class PersonLinkedIdentityContractTests
             string targetType,
             string idempotencyKey)
         {
+            EnsureLinkingAllowed(personId);
             ValidateFresh(sourceProof);
             if (!string.Equals(sourceProof.Audience, targetAudience, StringComparison.Ordinal))
             {
@@ -896,6 +1175,7 @@ public sealed class PersonLinkedIdentityContractTests
         {
             var intent = _intents.GetValueOrDefault(intentId)
                 ?? throw new ContractViolationException("intent_not_found");
+            EnsureLinkingAllowed(intent.PersonId);
             var targetIdentityId = store.IdentityId(targetProof.Locator);
 
             if (intent.Result is not null)
@@ -961,6 +1241,7 @@ public sealed class PersonLinkedIdentityContractTests
             string idempotencyKey,
             ReauthenticationProof proof)
         {
+            EnsureLinkingAllowed(personId);
             ValidateFresh(proof);
             if (!string.Equals(proof.Audience, targetAudience, StringComparison.Ordinal)
                 || !string.Equals(store.Resolve(proof.Locator), personId, StringComparison.Ordinal))
@@ -982,6 +1263,14 @@ public sealed class PersonLinkedIdentityContractTests
             var result = store.Revoke(identityId, personId, now);
             _revokeByKey.Add(scopedKey, (identityId, result));
             return result;
+        }
+
+        private void EnsureLinkingAllowed(string personId)
+        {
+            if (store.IsDeletionInProgress(personId))
+            {
+                throw new ContractViolationException("account_deletion_in_progress");
+            }
         }
 
         private void ValidateFresh(ReauthenticationProof proof)
@@ -1014,7 +1303,7 @@ public sealed class PersonLinkedIdentityContractTests
             var coordinator = new FakeLinkCoordinator(
                 store,
                 Now,
-                "tenant-a",
+                TenantA,
                 "api://certigo-mobile");
             var sourceProof = new ReauthenticationProof(
                 sourceLocator,
@@ -1042,8 +1331,8 @@ public sealed class PersonLinkedIdentityContractTests
         public ReauthenticationProof TargetProof(LinkIntent intent) => new(
             new IdentityLocator(
                 "entra-external-id",
-                "tenant-a",
-                "target-object-id",
+                TenantA,
+                ExternalObjectB,
                 "entraExternalId"),
             "api://certigo-mobile",
             intent.Nonce,

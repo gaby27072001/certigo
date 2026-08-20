@@ -3,15 +3,16 @@
 | Champ | Valeur |
 |---|---|
 | **ADR** | 014 |
-| **Statut** | Proposé — contrat et tests seulement |
-| **Date** | 2026-08-19 |
-| **Activation runtime** | Interdite avant fusion et réconciliation de #296 et #297 |
+| **Statut** | Proposé — contrat réconcilié avec `main`, tests seulement |
+| **Date** | 2026-08-20 |
+| **Activation runtime** | Aucune dans cette PR ; `PERSON_LINKED_IDENTITY_V1=off` reste l'unique état livré |
 | **Contrat** | `docs/contracts/person-linked-identity/v1` |
 | **Périmètre de cette PR** | Documentation, schémas et fakes de test ; aucun code de production, aucune infra, aucun déploiement |
 
 > Cette décision prépare l’évolution d’identité. Elle ne branche aucun resolver, endpoint,
-> migrateur ou feature flag au runtime. La suppression de compte #296 et la certification active
-> owner-scopée #297 restent les prérequis fonctionnels.
+> migrateur ou feature flag au runtime. La suppression de compte #296, la certification active
+> owner-scopée #297 et l'onboarding/catalogue de #289 sont désormais les baselines fusionnées à
+> préserver, pas du runtime livré par cette PR.
 
 ## Contexte observé
 
@@ -43,14 +44,24 @@ clés uniques Cosmos ne résolvent pas ce problème : elles sont définies à la
 ne peuvent pas être ajoutées ensuite et ne garantissent l’unicité qu’à l’intérieur d’une partition
 logique.
 
-### Contrats amont
+### Baselines fusionnées sur `main`
 
-- La draft #296 (`8d4158996a9bf7ca9f6b6879e53e12f6e3663752`) implémente une suppression
-  idempotente par `userId`, mais son étape identité ne connaît qu’un choix `Local` ou `External`.
-- La draft #297 (`19c68ed9f07657e20e5ad18e48ccbde91260033c`) écrit `activeTrackId` dans le
-  profil du `IUserContext.UserId`, avec compare-and-set `expectedTrackId`.
+- #296 (merge `6145f35`) implémente une suppression idempotente par `userId`, désactivée par défaut
+  via `ACCOUNT_DELETION_ENABLED`. Son record durable vit dans `attempts`, dans la partition
+  `sha256(userId)`, et conserve le `SubjectUserId` jusqu'à la fin. Ses étapes sont
+  `social -> learning -> economy -> profile -> reconciliation -> identity`; l'étape identité ne
+  connaît encore qu'un choix `Local` ou `External`.
+- #297 (merge `576ef60`) écrit `activeTrackId` dans le profil du `IUserContext.UserId`, après
+  validation du track par le repository de contenu et compare-and-set `expectedTrackId`.
+- #289 (merge `c44ba32`) fournit l'onboarding et le catalogue mobile actuels. L'écran de
+  certification ne propose que les entrées dont `isActive && hasLearningContent`, puis appelle le
+  même `POST /api/me/active-track`. Le cache `active_track_v2` est owner-scopé par l'id du profil.
+- #301 et #303 (merges `9c517ac` et `4157d0c`) ajoutent des garde-fous FinOps et de
+  l'observabilité ; ils ne modifient ni le principal métier, ni les routes identité, ni la topologie
+  Cosmos décrite ici.
 
-La phase LinkedIdentity ne doit ni contourner ces travaux, ni les fusionner implicitement.
+La phase LinkedIdentity ne contourne aucune de ces baselines. Elle étend explicitement leurs
+contrats dans des PR ultérieures, toujours derrière un mode désactivé par défaut.
 
 ## Décision
 
@@ -148,7 +159,11 @@ La liaison est un protocole en deux appels :
    - la preuve cible est validée indépendamment ;
    - la preuve est liée à l’intent, au nonce, à l’audience, au tenant et au client ;
    - l’intent non expiré est consommé par ETag ;
-   - le document LinkedIdentity est créé atomiquement.
+   - le document LinkedIdentity est créé par un `CreateItem` idempotent.
+
+L'intent et la LinkedIdentity ont des partitions `/id` distinctes. V1 ne prétend donc pas disposer
+d'une transaction Cosmos cross-partition : un retry relit le binding déterministe, vérifie locator
+et `personId`, puis termine la consommation ETag de l'intent.
 
 Les deux preuves doivent dater de moins de cinq minutes. Le bearer seul ne compte pas comme
 ré-authentification. Les secrets, mots de passe, authorization codes et tokens ne sont jamais
@@ -214,9 +229,13 @@ Le document n’est pas supprimé immédiatement. Il passe à `revocation.state 
 génération et un résultat fournisseur. Ce tombstone empêche un replay ancien de réactiver la
 liaison. Une reliaison ultérieure exige un nouvel intent et une nouvelle génération.
 
-### 7. Intégration obligatoire avec la suppression #296
+### 7. Intégration obligatoire avec la suppression #296 fusionnée
 
-Le mode `link` ne peut pas être activé tant que #296 ne sait pas supprimer plusieurs identités.
+Le mode `link` ne peut pas être activé tant que la baseline #296 ne sait pas supprimer plusieurs
+identités. Son endpoint fusionné expose `GET` et `POST /api/account/deletion`; le `POST` est
+idempotent par record Person et retourne `202` tant que le workflow est pending, puis `200`. Il
+n'exige pas d'`Idempotency-Key` client. Une preuve `X-Certigo-Reauthentication` peut remplacer le
+bearer récent, mais le middleware compare encore leurs `userId` bruts.
 
 À la première persistance d’une suppression :
 
@@ -229,8 +248,7 @@ Le mode `link` ne peut pas être activé tant que #296 ne sait pas supprimer plu
 7. il expurge les subjects du reçu achevé tout en conservant les codes et identifiants opaques
    nécessaires à l’audit.
 
-Le middleware de #296 compare actuellement les `userId` bruts du bearer et de la preuve. Après
-introduction du resolver, cette comparaison doit utiliser le résultat validé :
+Après introduction du resolver, cette comparaison doit utiliser le résultat validé :
 
 - liaison : la preuve source doit correspondre à la même `linkedIdentityId` que la session source ;
 - suppression Person : bearer et preuve doivent résoudre vers le même `personId`.
@@ -243,7 +261,7 @@ suppression est calculé depuis `personId`, jamais depuis un subject fournisseur
 Les logs reprennent la discipline de #296 : `requestId`, `operationId`, provider/type, étape, code,
 résultat et timestamp, sans e-mail, subject, token ni mot de passe.
 
-### 8. Intégration obligatoire avec activeTrack #297
+### 8. Intégration obligatoire avec activeTrack, onboarding et catalogue
 
 `activeTrackId` reste une propriété de la Person dans le profil existant. Le endpoint
 `POST /api/me/active-track` continue :
@@ -253,8 +271,14 @@ résultat et timestamp, sans e-mail, subject, token ni mot de passe.
 - à appliquer `expectedTrackId` et l’ETag ;
 - à présenter le même choix depuis toutes les identités liées.
 
-Le cache owner-scopé mobile doit utiliser l’identifiant de profil Person, pas `oid`, `sub`, e-mail
-ou provider. Aucun document activeTrack n’est migré.
+L'onboarding continue à lire `GET /api/catalog/tracks` et à n'afficher que les certifications
+`active|active-retiring` dont `learningAvailable == true` et `contentStatus == available`. La
+liaison d'identité ne rend jamais un track planifié ou retiré sélectionnable et ne duplique pas le
+catalogue.
+
+Le cache owner-scopé mobile et le flag d'onboarding utilisent l’identifiant de profil Person, pas
+`oid`, `sub`, e-mail ou provider. Aucun document activeTrack, cache de catalogue ou état onboarding
+n’est migré ; seul l'owner résolu devient `personId`.
 
 ### 9. Feature mode progressif
 
@@ -265,7 +289,7 @@ Une seule configuration ordonnée évite les combinaisons de flags incohérentes
 | `off` (défaut) | Comportement legacy strict ; endpoints V1 retournent `404` |
 | `shadow` | Backfill/reconciliation seulement ; le resolver legacy reste autoritaire |
 | `resolve` | LinkedIdentity est autoritaire ; fallback legacy contrôlé et métriqué pour le JIT |
-| `link` | Ajout/révocation utilisateur activés après couverture migration et adaptation #296 |
+| `link` | Ajout/révocation utilisateur activés après couverture migration et adaptation multi-identité de #296 |
 
 Le passage est monotone `off -> shadow -> resolve -> link`. Le kill switch opérationnel descend de
 `link` à `resolve`, ce qui bloque les mutations sans casser les connexions secondaires. Après la
@@ -275,7 +299,8 @@ création de liens secondaires, revenir de `resolve` à `off` n’est pas un rol
 
 1. **Inventaire** : compter profils, credentials locaux, documents owner-scopés et anomalies ; ne
    rien écrire.
-2. **Backfill Person** : ajouter `identityMetadata` au profil avec ETag ; conserver `id`.
+2. **Backfill Person** : ajouter `identityMetadata` au profil avec ETag ; conserver strictement
+   `personId == profile.id == legacy userId`.
 3. **Backfill local** : générer/persister une fois le sujet opaque du credential sous ETag, puis
    créer LinkedIdentity vers son `UserId`.
 4. **Backfill externe JIT** : seulement après validation d’un token `tid + oid`; créer la liaison
@@ -291,7 +316,8 @@ sont ni copiés ni réécrits.
 
 ### 11. Indexes et requêtes Cosmos
 
-Le contrat V1 utilise le policy actuel `/*`, avec exclusion de `_etag`.
+Le contrat V1 utilise exactement la policy actuelle de `infra/modules/cosmos.bicep` :
+indexation automatique et cohérente de `/*`, avec exclusion de `/"_etag"/?`.
 
 | Requête | Stratégie | Index additionnel |
 |---|---|---|
@@ -333,15 +359,14 @@ ferait l’objet d’une PR infra séparée, jamais de cette phase.
 
 | Ordre | PR | Contenu | Gate |
 |---|---|---|---|
-| 0 | Cette draft | ADR, contrats V1, fakes migration/sécurité | aucun runtime |
-| 1 | Réconciliation amont | Rebaser le contrat après fusion de #296/#297 | mêmes invariants |
-| 2 | Modèles/repositories | Documents Person overlay, LinkedIdentity, intent et opération | unit tests, flag `off` |
-| 3 | Migrateur shadow | inventaire + backfill local + dry-run + collision report | aucune résolution runtime |
-| 4 | Resolver JIT | `tid + oid`/local subject vers `personId`, mode `shadow/resolve` | cohortes, métriques sans PII |
-| 5 | Liaison API | endpoints begin/complete/list/revoke | tests takeover/replay/deputy/tenant |
-| 6 | Suppression multi-identités | snapshot/révocation de toutes les LinkedIdentity dans #296 | E2E suppression |
-| 7 | Mobile | UX explicite, double ré-auth, owner cache Person | #297 déjà stable |
-| 8 | Activation | `resolve`, puis `link` par cohortes | rollback documenté |
+| 0 | Cette draft | ADR, contrats V1, fakes migration/sécurité réconciliés avec #289/#296/#297 | aucun runtime |
+| 1 | Modèles/repositories | Documents Person overlay, LinkedIdentity, intent et opération | unit tests, flag `off` |
+| 2 | Migrateur shadow | inventaire + backfill local + dry-run + collision report | aucune résolution runtime |
+| 3 | Resolver JIT | `tid + oid`/local subject vers `personId`, mode `shadow/resolve` | cohortes, métriques sans PII |
+| 4 | Liaison API | endpoints begin/complete/list/revoke | tests takeover/replay/deputy/tenant |
+| 5 | Suppression multi-identités | snapshot/révocation de toutes les LinkedIdentity dans #296 | E2E suppression |
+| 6 | Mobile | UX explicite, double ré-auth, owner cache Person | onboarding/catalogue inchangés |
+| 7 | Activation | `resolve`, puis `link` par cohortes | rollback documenté |
 
 Chaque PR reste indépendante, sans changement de clé de partition ni migration big-bang.
 
@@ -364,4 +389,4 @@ Chaque PR reste indépendante, sans changement de clé de partition ni migration
 - [NIST SP 800-63B — Authentication and Lifecycle Management](https://pages.nist.gov/800-63-4/sp800-63b.html)
 - Code actuel : `FunctionUserContext`, `AuthService`, `CosmosUserRepository`,
   `CosmosUserCredentialRepository`, `CosmosContainers`, repositories progress/friends/economy
-- Drafts amont : #296 et #297
+- Baselines fusionnées : #289, #296 et #297 ; #301/#303 sans effet sur le contrat identité
