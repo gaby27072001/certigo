@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
 
 const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -348,11 +349,6 @@ function validateRepositoryInvariants() {
   const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');
   const backend = fs.readFileSync(path.join(workflowsDir, 'cd-backend.yml'), 'utf8');
   const backendCi = fs.readFileSync(path.join(workflowsDir, 'ci-backend.yml'), 'utf8');
-  const accountDeletionCosmosWorkflow = fs.readFileSync(
-    path.join(workflowsDir, 'test-account-deletion-cosmos.yml'),
-    'utf8',
-  );
-  const accountDeletionCosmosControls = accountDeletionCosmosWorkflow;
   const promoteBackendPath = path.join(
     workflowsDir,
     'promote-backend-staging-prod.yml',
@@ -529,33 +525,6 @@ function validateRepositoryInvariants() {
     if (!backend.includes(marker)) {
       errors.push(`cd-backend.yml: missing locked dependency invariant ${marker}`);
     }
-  }
-  for (const marker of [
-    'refs/heads/main',
-    'repository_dispatch:',
-    'types: [test-account-deletion-cosmos]',
-    'type == "object" and length == 0',
-    "github.ref == 'refs/heads/main'",
-    'ref: ${{ github.sha }}',
-    'runs-on: [self-hosted, Linux, X64, certigo-trusted]',
-    'ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""',
-    'bash backend/run-account-deletion-cosmos-emulator.sh',
-  ]) {
-    if (!accountDeletionCosmosControls.includes(marker)) {
-      errors.push(
-        `test-account-deletion-cosmos.yml: missing isolated gate invariant ${marker}`,
-      );
-    }
-  }
-  if (
-    accountDeletionCosmosControls.includes('pull_request')
-    || accountDeletionCosmosControls.includes('push:')
-    || accountDeletionCosmosControls.includes('az role assignment')
-    || accountDeletionCosmosControls.includes('az cosmosdb create')
-  ) {
-    errors.push(
-      'test-account-deletion-cosmos.yml: the destructive gate must stay manual and must not provision Azure resources or roles',
-    );
   }
   for (const marker of [
     'openssl rand -base64 64',
@@ -1356,6 +1325,7 @@ const workflowFiles = fs
   .sort()
   .map((file) => path.join(workflowsDir, file));
 const errors = [
+  ...validateAccountDeletionCosmosLayout(root),
   ...(fs.existsSync(path.join(workflowsDir, 'copilot-auto-merge.yml'))
     ? ['copilot-auto-merge.yml: privileged auto-merge workflow must remain removed']
     : []),
