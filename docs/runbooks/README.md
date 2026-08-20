@@ -51,7 +51,8 @@ rollbacks. **C'est vous qui exécutez** chaque commande, après relecture.
 | **O-01** | 🔴 Haut | Décision : Tutor IA en production (note ADR) | [`O-01_decision-tutor-ia-prod.md`](./O-01_decision-tutor-ia-prod.md) | Décision produit/technique (aucune commande destructive) | À arbitrer |
 | **O-02** | 🔴 Haut | Plan de test de charge Azure OpenAI + bump capacity | [`O-02_plan-test-charge-openai.md`](./O-02_plan-test-charge-openai.md) | Cognitive Services OpenAI User (test) + Contributor (bump) | À exécuter |
 | **R-02** | 🟠 Moyen | Restauration Point-In-Time (PITR) du compte Cosmos DB | [`R-02_cosmos-pitr-restauration.md`](./R-02_cosmos-pitr-restauration.md) | Cosmos DB Operator/Contributor + `CosmosRestoreOperator` (sub staging/prod) | Remédiation IaC ✅ (PR #178) — restore-test à planifier |
-| **Azure IaC** | 🔴 Haut | Prévol, diagnostics read-only, ordre de déploiement et risques | [`AZURE_IAC_OPERATIONS.md`](./AZURE_IAC_OPERATIONS.md) | Reader pour diagnostic ; Contributor + User Access Administrator pour appliquer | Versionné — exécution live soumise à autorisation |
+| **Azure IaC** | 🔴 Haut | Prévol, diagnostics read-only, ordre de déploiement et risques | [`AZURE_IAC_OPERATIONS.md`](./AZURE_IAC_OPERATIONS.md) | Reader pour diagnostic; rôles custom cibles ou admin PIM pour bootstrap | Versionné — exécution live soumise à autorisation |
+| **Cloud least privilege** | 🔴 Haut | Migration OIDC/RBAC, policy, runners et rollback | [`CLOUD_LEAST_PRIVILEGE.md`](./CLOUD_LEAST_PRIVILEGE.md) | Reader pour inventaire; admin PIM pour toute mutation | Plan versionné — aucune mutation dans la PR |
 | **Observabilité** | 🟠 Moyen | Webtests, alertes, cold-start, workbook, signaux runner, coût et confidentialité | [`OBSERVABILITY.md`](./OBSERVABILITY.md) | Reader pour diagnostic ; Contributor pour appliquer après approbation | Préparé — aucun déploiement dans la PR |
 
 ## Ordre d'exécution conseillé

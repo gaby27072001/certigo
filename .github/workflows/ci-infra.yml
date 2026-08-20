@@ -56,6 +56,9 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
       # CI-09 : le runner-2 n'a PAS l'Azure CLI (`az`). On installe le CLI Bicep
       # standalone dans un répertoire écrivable ($RUNNER_TEMP) et on l'ajoute au PATH,
       # de sorte que le lint fonctionne à l'identique sur les DEUX runners.
@@ -90,3 +93,5 @@ jobs:
         run: node --test .github/scripts/write-secure-bicep-parameters.test.mjs
       - name: Validate private URL-based OneDeploy
         run: node --test .github/scripts/deploy-flex-onedeploy.test.mjs
+      - name: Validate least-privilege cloud guardrails
+        run: node --test infra/tests/least-privilege.test.mjs
