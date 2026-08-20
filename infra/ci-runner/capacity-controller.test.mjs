@@ -9,12 +9,19 @@ import {
 import { reconcileRunnerDrift } from './reconcile-drift.mjs';
 import { reconcileRunnerInstances } from './runner-inventory.mjs';
 
-const config = JSON.parse(
+const repositoryConfig = JSON.parse(
   readFileSync(
     new URL('./capacity-controller.config.json', import.meta.url),
     'utf8',
   ),
 );
+const config = {
+  ...repositoryConfig,
+  inventory: {
+    ...repositoryConfig.inventory,
+    managedRunnerBindings: [],
+  },
+};
 const f55VmName = 'vmss-certigo-runner-zonal_f55d176e';
 const f55VmId =
   '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
@@ -480,7 +487,7 @@ test('real inventory binds f55 and the PR pilot while keeping 22f absent and 415
         { id: 28 },
       ),
     ],
-    config.inventory,
+    repositoryConfig.inventory,
   );
 
   assert.deepEqual(result.absentRunners, [
@@ -499,6 +506,43 @@ test('real inventory binds f55 and the PR pilot while keeping 22f absent and 415
       (managedInstance) => managedInstance.binding === 'explicit',
     ),
   );
+});
+
+test('explicit bindings reject an additional name-matched runner and VM', () => {
+  const result = reconcileRunnerInstances(
+    [
+      {
+        id: '/subscriptions/example/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm-approved',
+        name: 'vm-approved',
+      },
+      {
+        id: '/subscriptions/example/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm-extra',
+        name: 'vm-extra',
+      },
+    ],
+    [
+      runner('runner-approved', ['certigo-pr'], { id: 101 }),
+      runner('vm-extra-Certigo', ['certigo-pr'], { id: 102 }),
+    ],
+    {
+      externalVirtualMachines: [],
+      forbiddenVirtualMachines: [],
+      managedRunnerBindings: [
+        {
+          githubRunnerId: 101,
+          runnerName: 'runner-approved',
+          virtualMachineId:
+            '/subscriptions/example/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm-approved',
+          virtualMachineName: 'vm-approved',
+        },
+      ],
+    },
+  );
+
+  assert.deepEqual(result.managedMachineNames, ['vm-approved']);
+  assert.deepEqual(result.unboundRunnerVirtualMachinePairs, [
+    'vm-extra-Certigo -> vm-extra',
+  ]);
 });
 
 test('drift reconciliation reports live VMSS, SKU, CPU scale-in, and labels', () => {
@@ -577,7 +621,7 @@ test('drift reconciliation reports live VMSS, SKU, CPU scale-in, and labels', ()
   const result = reconcileRunnerDrift(
     live,
     "param vmSize string = 'Standard_D4s_v5'\nresource vm 'Microsoft.Compute/virtualMachines@2024-07-01' = {}",
-    config,
+    repositoryConfig,
   );
   assert.equal(result.readOnly, true);
   assert.deepEqual(

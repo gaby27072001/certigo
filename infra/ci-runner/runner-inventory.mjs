@@ -257,6 +257,7 @@ export function reconcileRunnerInstances(
     forbiddenVirtualMachines.map((name) => String(name).toLowerCase()),
   );
   const forbiddenVirtualMachinesPresent = [];
+  const unboundRunnerVirtualMachinePairs = [];
   for (const runner of certigoRunners) {
     const runnerName = String(runner.name).toLowerCase();
     if (consumedRunnerNames.has(runnerName)) {
@@ -271,6 +272,12 @@ export function reconcileRunnerInstances(
     consumedMachineNames.add(machineName);
     if (forbiddenNames.has(machineName)) {
       forbiddenVirtualMachinesPresent.push(virtualMachine.name);
+      continue;
+    }
+    if (managedRunnerBindings.length > 0) {
+      unboundRunnerVirtualMachinePairs.push(
+        `${runner.name} -> ${virtualMachine.name}`,
+      );
       continue;
     }
     managedInstances.push({
@@ -308,6 +315,8 @@ export function reconcileRunnerInstances(
       .sort(),
     missingManagedRunnerVirtualMachines:
       missingManagedRunnerVirtualMachines.sort(),
+    unboundRunnerVirtualMachinePairs:
+      unboundRunnerVirtualMachinePairs.sort(),
     unclassifiedVirtualMachines: unclassifiedVirtualMachines.sort(),
   };
 }

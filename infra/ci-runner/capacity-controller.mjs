@@ -303,6 +303,7 @@ export function createCapacityPlan({
     instanceInventory.bindingMismatches.length === 0 &&
     instanceInventory.forbiddenVirtualMachinesPresent.length === 0 &&
     instanceInventory.missingManagedRunnerVirtualMachines.length === 0 &&
+    instanceInventory.unboundRunnerVirtualMachinePairs.length === 0 &&
     instanceInventory.unclassifiedVirtualMachines.length === 0 &&
     physicalManagedCapacity >= aggregateCapacity(modeCapacity(config, 'normal'));
   const exclusiveBoundariesReady =
@@ -532,6 +533,8 @@ export function createCapacityPlan({
         poolBoundaries.poolsWithMixedTrustLabels,
       sharedIdentityIds: poolBoundaries.sharedIdentityIds,
       sharedSubnetIds: poolBoundaries.sharedSubnetIds,
+      unboundRunnerVirtualMachinePairs:
+        instanceInventory.unboundRunnerVirtualMachinePairs,
       unclassifiedVirtualMachines:
         instanceInventory.unclassifiedVirtualMachines,
       vmScaleSetCount: vmScaleSets.length,

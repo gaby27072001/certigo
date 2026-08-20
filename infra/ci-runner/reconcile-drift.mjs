@@ -88,14 +88,16 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
   }
   if (
     instanceInventory.bindingMismatches.length > 0 ||
-    instanceInventory.missingManagedRunnerVirtualMachines.length > 0
+    instanceInventory.missingManagedRunnerVirtualMachines.length > 0 ||
+    instanceInventory.unboundRunnerVirtualMachinePairs.length > 0
   ) {
     findings.push({
       severity: 'blocking',
       code: 'MANAGED_BINDING_DRIFT',
       detail:
         `Managed binding mismatches: ${instanceInventory.bindingMismatches.join(', ') || 'none'}; ` +
-        `VMs without the bound runner: ${instanceInventory.missingManagedRunnerVirtualMachines.join(', ') || 'none'}.`,
+        `VMs without the bound runner: ${instanceInventory.missingManagedRunnerVirtualMachines.join(', ') || 'none'}; ` +
+        `unbound pairs: ${instanceInventory.unboundRunnerVirtualMachinePairs.join(', ') || 'none'}.`,
     });
   }
   if (instanceInventory.forbiddenVirtualMachinesPresent.length > 0) {
@@ -230,6 +232,8 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
       poweredManagedCapacity: poweredManagedInstances.length,
       sharedIdentityIds: poolBoundaries.sharedIdentityIds,
       sharedSubnetIds: poolBoundaries.sharedSubnetIds,
+      unboundRunnerVirtualMachinePairs:
+        instanceInventory.unboundRunnerVirtualMachinePairs,
       unclassifiedVirtualMachines:
         instanceInventory.unclassifiedVirtualMachines,
       usableCapacity,

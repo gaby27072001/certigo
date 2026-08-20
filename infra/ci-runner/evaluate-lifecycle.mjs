@@ -119,6 +119,11 @@ export function evaluateLifecycle({
       `managed VMs without their bound runner: ${instanceInventory.missingManagedRunnerVirtualMachines.join(', ')}`,
     );
   }
+  if (instanceInventory.unboundRunnerVirtualMachinePairs.length > 0) {
+    reasons.push(
+      `unbound runner/VM pairs: ${instanceInventory.unboundRunnerVirtualMachinePairs.join(', ')}`,
+    );
+  }
   if (instanceInventory.forbiddenVirtualMachinesPresent.length > 0) {
     reasons.push(
       `forbidden Azure VMs are present: ${instanceInventory.forbiddenVirtualMachinesPresent.join(', ')}`,
@@ -278,6 +283,8 @@ export function evaluateLifecycle({
         instanceInventory.unclassifiedVirtualMachines,
       prRunners: prRunners.length,
       queuedRuns: queuedRuns.total_count ?? 0,
+      unboundRunnerVirtualMachinePairs:
+        instanceInventory.unboundRunnerVirtualMachinePairs,
       distinctIdentityBoundaryCount:
         poolBoundaries.distinctIdentityBoundaryCount,
       distinctSubnetCount: poolBoundaries.distinctSubnetCount,

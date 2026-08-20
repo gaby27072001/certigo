@@ -4,12 +4,19 @@ import test from 'node:test';
 
 import { evaluateLifecycle } from './evaluate-lifecycle.mjs';
 
-const config = JSON.parse(
+const repositoryConfig = JSON.parse(
   readFileSync(
     new URL('./capacity-controller.config.json', import.meta.url),
     'utf8',
   ),
 );
+const config = {
+  ...repositoryConfig,
+  inventory: {
+    ...repositoryConfig.inventory,
+    managedRunnerBindings: [],
+  },
+};
 const f55VmName = 'vmss-certigo-runner-zonal_f55d176e';
 const f55VmId =
   '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
@@ -220,7 +227,7 @@ test('idle exclusive pools require five minutes, two guards, then arm reactivati
 
 test('equal VM and runner counts still fail when their names do not reconcile', () => {
   const result = evaluateLifecycle({
-    config,
+    config: repositoryConfig,
     operation: 'deallocate',
     runners: {
       runners: [
