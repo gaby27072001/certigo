@@ -6,9 +6,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   const AuthSession session = AuthSession(accessToken: 'token');
+  const String controlledTestHost = 'links.user-owned.example';
 
-  DeepLinkRouterCoordinator enabledCoordinator() =>
-      DeepLinkRouterCoordinator(policy: const DeepLinkPolicy(enabled: true));
+  DeepLinkRouterCoordinator enabledCoordinator() => DeepLinkRouterCoordinator(
+    policy: const DeepLinkPolicy(enabled: true, primaryHost: controlledTestHost),
+  );
 
   group('protected HTTPS navigation', () {
     test('retains only the validated internal route through auth and onboarding', () {
@@ -16,7 +18,7 @@ void main() {
 
       expect(
         coordinator.redirect(
-          uri: Uri.parse('https://certigo.app/learn/az-900/identity-basics'),
+          uri: Uri.parse('https://$controlledTestHost/learn/az-900/identity-basics'),
           location: '/learn/az-900/identity-basics',
           auth: const Unauthenticated(),
           onboardingCompleted: false,
@@ -53,7 +55,7 @@ void main() {
 
       expect(
         coordinator.redirect(
-          uri: Uri.parse('https://certigo.app/achievements/first-lesson'),
+          uri: Uri.parse('https://$controlledTestHost/achievements/first-lesson'),
           location: '/achievements/first-lesson',
           auth: const Authenticated(session),
           onboardingCompleted: true,
@@ -95,7 +97,7 @@ void main() {
 
       expect(
         coordinator.redirect(
-          uri: Uri.parse('https://certigo.app/account-deletion'),
+          uri: Uri.parse('https://$controlledTestHost/account-deletion'),
           location: '/account-deletion',
           auth: const Unauthenticated(),
           onboardingCompleted: false,
@@ -109,7 +111,7 @@ void main() {
 
       expect(
         coordinator.redirect(
-          uri: Uri.parse('https://certigo.app.evil.example/assignments/a'),
+          uri: Uri.parse('https://$controlledTestHost.evil.example/assignments/a'),
           location: '/assignments/a',
           auth: const Authenticated(session),
           onboardingCompleted: true,

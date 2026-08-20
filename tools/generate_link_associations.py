@@ -16,6 +16,7 @@ DOMAIN_PATTERN = re.compile(
     r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
 )
 FINGERPRINT_PATTERN = re.compile(r"^(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$")
+UNCONTROLLED_DOMAIN = "certigo.app"
 
 
 def validate_team_id(value: str) -> str:
@@ -34,6 +35,15 @@ def validate_domain(value: str) -> str:
     normalized = value.lower().rstrip(".")
     if not DOMAIN_PATTERN.fullmatch(normalized):
         raise ValueError("Domain must be a hostname without scheme, port, or path.")
+    return normalized
+
+
+def validate_confirmed_domain(value: str) -> str:
+    normalized = validate_domain(value)
+    if normalized == UNCONTROLLED_DOMAIN or normalized.endswith(f".{UNCONTROLLED_DOMAIN}"):
+        raise ValueError("The uncontrolled certigo.app domain must not be used.")
+    if normalized.endswith(".invalid"):
+        raise ValueError("A confirmed domain must not use the inert .invalid suffix.")
     return normalized
 
 
@@ -101,13 +111,13 @@ def association_payloads(
 def write_associations(
     *,
     output_dir: Path,
-    domain: str,
+    confirmed_domain: str,
     apple_team_id: str,
     bundle_id: str,
     android_fingerprints: list[str],
     path_prefix: str = "",
 ) -> tuple[Path, Path]:
-    normalized_domain = validate_domain(domain)
+    normalized_domain = validate_confirmed_domain(confirmed_domain)
     apple, android = association_payloads(
         apple_team_id=apple_team_id,
         bundle_id=bundle_id,
@@ -125,7 +135,11 @@ def write_associations(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--domain", required=True, help="Association origin hostname.")
+    parser.add_argument(
+        "--confirmed-domain",
+        required=True,
+        help="Purchased and ownership-verified association hostname.",
+    )
     parser.add_argument("--apple-team-id", required=True, help="Verified 10-character Apple Team ID.")
     parser.add_argument(
         "--bundle-id",
@@ -141,7 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--path-prefix",
         default="",
-        help="Optional URL prefix such as /Certigo for the documented Pages fallback.",
+        help="Optional verified deployment path prefix.",
     )
     parser.add_argument("--output-dir", type=Path, required=True)
     return parser
@@ -152,7 +166,7 @@ def main() -> int:
     try:
         apple_path, android_path = write_associations(
             output_dir=args.output_dir,
-            domain=args.domain,
+            confirmed_domain=args.confirmed_domain,
             apple_team_id=args.apple_team_id,
             bundle_id=args.bundle_id,
             android_fingerprints=args.android_sha256,

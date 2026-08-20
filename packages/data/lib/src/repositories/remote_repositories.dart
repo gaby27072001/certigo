@@ -21,7 +21,7 @@ import 'repositories.dart';
 /// single REST endpoint to a typed model via [ApiClient]. Routes mirror the
 /// backend exactly (userId is always derived from the JWT, never sent).
 
-const String _kAppCatalogSchema = 'certigo.app-certification-catalog/v2';
+const String _kAppCatalogSchema = 'certigo-certification-catalog/v2';
 const String _kCanonicalCatalogSchema = 'certigo.certification-catalog/v1';
 
 List<TrackSummary> _decodeTrackSummaries(Map<String, dynamic> json) {

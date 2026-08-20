@@ -7,9 +7,11 @@ const bool certigoHttpsLinksEnabled = bool.fromEnvironment(
   defaultValue: false,
 );
 
-const String certigoPrimaryLinkHost = 'certigo.app';
-const String certigoPagesFallbackHost = 'gchambaud_microsoft.github.io';
-const String certigoPagesFallbackPrefix = '/Certigo';
+const String certigoConfiguredLinkHost = String.fromEnvironment(
+  'CERTIGO_HTTPS_LINKS_HOST',
+  defaultValue: 'links-disabled.invalid',
+);
+const String _uncontrolledLinkDomain = 'certigo.app';
 
 final RegExp _identifierPattern = RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$');
 
@@ -23,6 +25,7 @@ enum DeepLinkRejection {
   unexpectedParameters,
   unsupportedPath,
   invalidIdentifier,
+  unconfiguredHost,
 }
 
 enum DeepLinkNavigationAction { navigate, requireAuthentication, ignore }
@@ -31,13 +34,13 @@ final class DeepLinkDestination {
   const DeepLinkDestination._({required this.kind, this.trackId, this.resourceId});
 
   const DeepLinkDestination.lesson({required String trackId, required String lessonId})
-      : this._(kind: DeepLinkKind.lesson, trackId: trackId, resourceId: lessonId);
+    : this._(kind: DeepLinkKind.lesson, trackId: trackId, resourceId: lessonId);
 
   const DeepLinkDestination.assignment(String assignmentId)
-      : this._(kind: DeepLinkKind.assignment, resourceId: assignmentId);
+    : this._(kind: DeepLinkKind.assignment, resourceId: assignmentId);
 
   const DeepLinkDestination.achievement(String achievementId)
-      : this._(kind: DeepLinkKind.achievement, resourceId: achievementId);
+    : this._(kind: DeepLinkKind.achievement, resourceId: achievementId);
 
   const DeepLinkDestination.accountDeletion() : this._(kind: DeepLinkKind.accountDeletion);
 
@@ -48,16 +51,17 @@ final class DeepLinkDestination {
   bool get requiresAuthentication => kind != DeepLinkKind.accountDeletion;
 
   String get appLocation => switch (kind) {
-        DeepLinkKind.lesson =>
-          '/lesson/${Uri.encodeComponent(trackId!)}/${Uri.encodeComponent(resourceId!)}',
-        DeepLinkKind.assignment => '/assignments/${Uri.encodeComponent(resourceId!)}',
-        DeepLinkKind.achievement => '/achievements/${Uri.encodeComponent(resourceId!)}',
-        DeepLinkKind.accountDeletion => '/account-deletion',
-      };
+    DeepLinkKind.lesson =>
+      '/lesson/${Uri.encodeComponent(trackId!)}/${Uri.encodeComponent(resourceId!)}',
+    DeepLinkKind.assignment => '/assignments/${Uri.encodeComponent(resourceId!)}',
+    DeepLinkKind.achievement => '/achievements/${Uri.encodeComponent(resourceId!)}',
+    DeepLinkKind.accountDeletion => '/account-deletion',
+  };
 
-  Uri toHttpsUri({String host = certigoPrimaryLinkHost, String pathPrefix = ''}) {
-    final String prefix =
-        pathPrefix.endsWith('/') ? pathPrefix.substring(0, pathPrefix.length - 1) : pathPrefix;
+  Uri toHttpsUri({required String host, String pathPrefix = ''}) {
+    final String prefix = pathPrefix.endsWith('/')
+        ? pathPrefix.substring(0, pathPrefix.length - 1)
+        : pathPrefix;
     final String path = switch (kind) {
       DeepLinkKind.lesson =>
         '$prefix/learn/${Uri.encodeComponent(trackId!)}/${Uri.encodeComponent(resourceId!)}',
@@ -89,16 +93,16 @@ final class DeepLinkNavigationDecision {
   });
 
   const DeepLinkNavigationDecision.navigate(String location)
-      : this._(action: DeepLinkNavigationAction.navigate, location: location);
+    : this._(action: DeepLinkNavigationAction.navigate, location: location);
 
   const DeepLinkNavigationDecision.requireAuthentication(String pendingLocation)
-      : this._(
-          action: DeepLinkNavigationAction.requireAuthentication,
-          pendingLocation: pendingLocation,
-        );
+    : this._(
+        action: DeepLinkNavigationAction.requireAuthentication,
+        pendingLocation: pendingLocation,
+      );
 
   const DeepLinkNavigationDecision.ignore(DeepLinkRejection rejection)
-      : this._(action: DeepLinkNavigationAction.ignore, rejection: rejection);
+    : this._(action: DeepLinkNavigationAction.ignore, rejection: rejection);
 
   final DeepLinkNavigationAction action;
   final String? location;
@@ -107,21 +111,17 @@ final class DeepLinkNavigationDecision {
 }
 
 final class DeepLinkPolicy {
-  const DeepLinkPolicy({
-    this.enabled = certigoHttpsLinksEnabled,
-    this.primaryHost = certigoPrimaryLinkHost,
-    this.pagesFallbackHost = certigoPagesFallbackHost,
-    this.pagesFallbackPrefix = certigoPagesFallbackPrefix,
-  });
+  const DeepLinkPolicy({required this.primaryHost, this.enabled = certigoHttpsLinksEnabled});
 
   final bool enabled;
   final String primaryHost;
-  final String pagesFallbackHost;
-  final String pagesFallbackPrefix;
 
   DeepLinkParseResult parse(String rawUrl) {
     if (!enabled) {
       return const DeepLinkParseResult.rejected(DeepLinkRejection.disabled);
+    }
+    if (!_isConfirmedLinkHost(primaryHost)) {
+      return const DeepLinkParseResult.rejected(DeepLinkRejection.unconfiguredHost);
     }
 
     final Uri? uri = Uri.tryParse(rawUrl);
@@ -138,20 +138,11 @@ final class DeepLinkPolicy {
       return const DeepLinkParseResult.rejected(DeepLinkRejection.unexpectedParameters);
     }
 
-    final bool isPrimary = uri.host == primaryHost;
-    final bool isPagesFallback = uri.host == pagesFallbackHost;
-    if (!isPrimary && !isPagesFallback) {
+    if (uri.host != primaryHost) {
       return const DeepLinkParseResult.rejected(DeepLinkRejection.untrustedOrigin);
     }
 
     List<String> segments = uri.pathSegments;
-    if (isPagesFallback) {
-      final List<String> prefixSegments = Uri(path: pagesFallbackPrefix).pathSegments;
-      if (segments.length < prefixSegments.length || !_startsWith(segments, prefixSegments)) {
-        return const DeepLinkParseResult.rejected(DeepLinkRejection.unsupportedPath);
-      }
-      segments = segments.sublist(prefixSegments.length);
-    }
 
     final bool hasTrailingSlash = segments.isNotEmpty && segments.last.isEmpty;
     if (hasTrailingSlash) {
@@ -178,13 +169,7 @@ final class DeepLinkPolicy {
       return const DeepLinkParseResult.rejected(DeepLinkRejection.unexpectedParameters);
     }
 
-    final bool usesFallbackPrefix =
-        uri.path == pagesFallbackPrefix || uri.path.startsWith('$pagesFallbackPrefix/');
-    final Uri absolute = Uri(
-      scheme: 'https',
-      host: usesFallbackPrefix ? pagesFallbackHost : primaryHost,
-      path: uri.path,
-    );
+    final Uri absolute = Uri(scheme: 'https', host: primaryHost, path: uri.path);
     return parse(absolute.toString());
   }
 
@@ -193,16 +178,11 @@ final class DeepLinkPolicy {
   /// This intentionally checks only route prefixes. Full shape and identifier
   /// validation still happens in [parseRouterUri].
   bool isPotentialRouterPath(String path) {
-    final String candidate = path == pagesFallbackPrefix
-        ? '/'
-        : path.startsWith('$pagesFallbackPrefix/')
-            ? path.substring(pagesFallbackPrefix.length)
-            : path;
-    return candidate.startsWith('/learn/') ||
-        candidate.startsWith('/assignments/') ||
-        candidate.startsWith('/achievements/') ||
-        candidate == '/account-deletion' ||
-        candidate == '/account-deletion/';
+    return path.startsWith('/learn/') ||
+        path.startsWith('/assignments/') ||
+        path.startsWith('/achievements/') ||
+        path == '/account-deletion' ||
+        path == '/account-deletion/';
   }
 
   DeepLinkNavigationDecision resolveNavigation({
@@ -248,14 +228,14 @@ final class DeepLinkPolicy {
   }
 }
 
-bool _startsWith(List<String> values, List<String> prefix) {
-  for (int index = 0; index < prefix.length; index++) {
-    if (values[index] != prefix[index]) return false;
-  }
-  return true;
-}
-
 bool _isValidIdentifier(String value) => _identifierPattern.hasMatch(value);
+
+bool _isConfirmedLinkHost(String value) {
+  final String host = value.toLowerCase();
+  return !host.endsWith('.invalid') &&
+      host != _uncontrolledLinkDomain &&
+      !host.endsWith('.$_uncontrolledLinkDomain');
+}
 
 bool _hasExplicitPort(String rawUrl) {
   final int authorityStart = rawUrl.indexOf('://') + 3;

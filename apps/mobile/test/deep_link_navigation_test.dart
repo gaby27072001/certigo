@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 void main() {
   const AuthSession session = AuthSession(accessToken: 'token');
+  const String controlledTestHost = 'links.user-owned.example';
 
   late ValueNotifier<AuthState> auth;
   late ValueNotifier<bool> onboardingCompleted;
@@ -20,7 +21,9 @@ void main() {
   }) {
     auth = ValueNotifier<AuthState>(initialAuth);
     onboardingCompleted = ValueNotifier<bool>(initialOnboardingCompleted);
-    coordinator = DeepLinkRouterCoordinator(policy: const DeepLinkPolicy(enabled: true));
+    coordinator = DeepLinkRouterCoordinator(
+      policy: const DeepLinkPolicy(enabled: true, primaryHost: controlledTestHost),
+    );
     router = GoRouter(
       initialLocation: AuthShellRoutes.landing,
       refreshListenable: Listenable.merge(<Listenable>[auth, onboardingCompleted]),
@@ -77,7 +80,7 @@ void main() {
     createRouter();
     await pumpRouter(tester);
 
-    router.go('https://certigo.app/learn/az-900/identity-basics');
+    router.go('https://$controlledTestHost/learn/az-900/identity-basics');
     await tester.pumpAndSettle();
 
     expect(find.text('landing'), findsOneWidget);
@@ -95,16 +98,16 @@ void main() {
     createRouter(initialAuth: const Authenticated(session), initialOnboardingCompleted: true);
     await pumpRouter(tester);
 
-    router.go('https://certigo.app/assignments/assignment-42');
+    router.go('https://$controlledTestHost/assignments/assignment-42');
     await tester.pumpAndSettle();
     expect(find.text('assignment:assignment-42'), findsOneWidget);
 
-    router.go('https://certigo.app/achievements/first-lesson');
+    router.go('https://$controlledTestHost/achievements/first-lesson');
     await tester.pumpAndSettle();
     expect(find.text('achievement:first-lesson'), findsOneWidget);
 
     auth.value = const Unauthenticated();
-    router.go('https://certigo.app/account-deletion');
+    router.go('https://$controlledTestHost/account-deletion');
     await tester.pumpAndSettle();
     expect(find.text('account-deletion'), findsOneWidget);
   });
@@ -115,7 +118,7 @@ void main() {
     createRouter(initialAuth: const Authenticated(session), initialOnboardingCompleted: true);
     await pumpRouter(tester);
 
-    router.go('https://certigo.app.evil.example/assignments/assignment-42');
+    router.go('https://$controlledTestHost.evil.example/assignments/assignment-42');
     await tester.pumpAndSettle();
 
     expect(find.text('home'), findsOneWidget);

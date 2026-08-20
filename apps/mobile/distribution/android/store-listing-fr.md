@@ -9,7 +9,7 @@
 | Nom de l'application | **Certigo** |
 | applicationId / package | `com.certigo.mobileapp` ⚠️ NON modifiable après le 1er upload |
 | Catégorie | Éducation |
-| Adresse e-mail de contact | TODO (ex : `support@certigo.app`) |
+| Adresse e-mail de contact | TODO — fournir une adresse réellement contrôlée |
 | Site web | `https://gchambaud_microsoft.github.io/Certigo/` |
 | Politique de confidentialité (URL) | `https://gchambaud_microsoft.github.io/Certigo/privacy-policy/` |
 
@@ -38,7 +38,7 @@ XP, niveaux, streak quotidien, badges de progression — sans cœurs ni vies. Vo
 ⚠️ Certigo est une plateforme indépendante, non affiliée ni approuvée par Microsoft, Amazon, Cisco, CompTIA ou tout autre organisme de certification. Toutes les leçons et questions sont originales.
 
 ## Conformité (à vérifier dans la console Play)
-- **Politique de confidentialité** : URL publique en place via GitHub Pages (`/privacy-policy/`). Migration ultérieure possible vers `https://certigo.app/privacy-policy/` en conservant le même chemin.
+- **Politique de confidentialité** : URL publique en place via GitHub Pages (`/privacy-policy/`). Toute migration exige d'abord un domaine acheté et vérifié.
 - **Section "Sécurité des données"** : déclarer les données collectées. La bêta
   stocke des préférences locales (`shared_preferences`) et appelle l'API
   Certigo authentifiée (Entra External ID). TODO : compléter le formulaire.

@@ -14,11 +14,14 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
-// Native HTTPS link capture stays inert until the domain associations are live.
-// Activate with ORG_GRADLE_PROJECT_CERTIGO_APP_LINKS_HOST=certigo.app.
+// Native HTTPS link capture stays inert until a newly purchased domain is verified.
 def appLinksHost = project.findProperty("CERTIGO_APP_LINKS_HOST") ?: "links-disabled.invalid"
 if (!(appLinksHost ==~ /^[A-Za-z0-9.-]+$/)) {
     throw new GradleException("CERTIGO_APP_LINKS_HOST must be a hostname without scheme or path.")
+}
+def normalizedAppLinksHost = appLinksHost.toLowerCase()
+if (normalizedAppLinksHost == "certigo.app" || normalizedAppLinksHost.endsWith(".certigo.app")) {
+    throw new GradleException("CERTIGO_APP_LINKS_HOST must not use the uncontrolled certigo.app domain.")
 }
 def appLinksPathPrefix = project.findProperty("CERTIGO_APP_LINKS_PATH_PREFIX") ?: ""
 if (!(appLinksPathPrefix == "" ||

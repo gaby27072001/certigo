@@ -2,14 +2,18 @@ import 'package:certigo/features/deep_links/application/deep_link_contract.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const DeepLinkPolicy enabledPolicy = DeepLinkPolicy(enabled: true);
+  const String controlledTestHost = 'links.user-owned.example';
+  const DeepLinkPolicy enabledPolicy = DeepLinkPolicy(
+    enabled: true,
+    primaryHost: controlledTestHost,
+  );
 
   group('HTTPS deep-link parsing', () {
     test('is disabled by default', () {
-      const DeepLinkPolicy policy = DeepLinkPolicy();
+      const DeepLinkPolicy policy = DeepLinkPolicy(primaryHost: controlledTestHost);
 
       final DeepLinkParseResult result = policy.parse(
-        'https://certigo.app/learn/az-900/shared-responsibility',
+        'https://$controlledTestHost/learn/az-900/shared-responsibility',
       );
 
       expect(result.rejection, DeepLinkRejection.disabled);
@@ -17,7 +21,7 @@ void main() {
 
     test('maps the canonical lesson URL to the existing lesson route', () {
       final DeepLinkParseResult result = enabledPolicy.parse(
-        'https://certigo.app/learn/az-900/shared-responsibility',
+        'https://$controlledTestHost/learn/az-900/shared-responsibility',
       );
 
       expect(result.isAccepted, isTrue);
@@ -26,19 +30,13 @@ void main() {
       expect(result.destination!.requiresAuthentication, isTrue);
     });
 
-    test('accepts the explicit GitHub Pages project fallback prefix', () {
-      final DeepLinkParseResult result = enabledPolicy.parse(
-        'https://gchambaud_microsoft.github.io/Certigo/assignments/assignment-42',
-      );
-
-      expect(result.destination!.appLocation, '/assignments/assignment-42');
-    });
-
     test('supports achievement and public account-deletion contracts', () {
-      final DeepLinkDestination achievement =
-          enabledPolicy.parse('https://certigo.app/achievements/first-lesson').destination!;
-      final DeepLinkDestination deletion =
-          enabledPolicy.parse('https://certigo.app/account-deletion').destination!;
+      final DeepLinkDestination achievement = enabledPolicy
+          .parse('https://$controlledTestHost/achievements/first-lesson')
+          .destination!;
+      final DeepLinkDestination deletion = enabledPolicy
+          .parse('https://$controlledTestHost/account-deletion')
+          .destination!;
 
       expect(achievement.appLocation, '/achievements/first-lesson');
       expect(achievement.requiresAuthentication, isTrue);
@@ -52,14 +50,17 @@ void main() {
         lessonId: 'identity-basics',
       );
 
-      expect(lesson.toHttpsUri().toString(), 'https://certigo.app/learn/az-900/identity-basics');
+      expect(
+        lesson.toHttpsUri(host: controlledTestHost).toString(),
+        'https://$controlledTestHost/learn/az-900/identity-basics',
+      );
     });
   });
 
   group('authentication boundary', () {
     test('does not navigate to a protected route before authentication', () {
       final DeepLinkNavigationDecision decision = enabledPolicy.resolveNavigation(
-        rawUrl: 'https://certigo.app/assignments/assignment-42',
+        rawUrl: 'https://$controlledTestHost/assignments/assignment-42',
         isAuthenticated: false,
       );
 
@@ -70,7 +71,7 @@ void main() {
 
     test('allows a protected route only after authentication', () {
       final DeepLinkNavigationDecision decision = enabledPolicy.resolveNavigation(
-        rawUrl: 'https://certigo.app/achievements/first-lesson',
+        rawUrl: 'https://$controlledTestHost/achievements/first-lesson',
         isAuthenticated: true,
       );
 
@@ -80,7 +81,7 @@ void main() {
 
     test('keeps account deletion public', () {
       final DeepLinkNavigationDecision decision = enabledPolicy.resolveNavigation(
-        rawUrl: 'https://certigo.app/account-deletion',
+        rawUrl: 'https://$controlledTestHost/account-deletion',
         isAuthenticated: false,
       );
 
@@ -102,14 +103,7 @@ void main() {
       );
     });
 
-    test('recognizes the Pages prefix and rejects relative redirect parameters', () {
-      expect(
-        enabledPolicy
-            .parseRouterUri(Uri.parse('/Certigo/achievements/first-lesson'))
-            .destination!
-            .appLocation,
-        '/achievements/first-lesson',
-      );
+    test('rejects relative redirect parameters', () {
       expect(
         enabledPolicy
             .parseRouterUri(Uri.parse('/assignments/a?next=https://evil.example'))
@@ -122,48 +116,79 @@ void main() {
   group('origin and open-redirect hardening', () {
     test('rejects non-HTTPS and foreign origins', () {
       expect(
-        enabledPolicy.parse('http://certigo.app/assignments/a').rejection,
+        enabledPolicy.parse('http://$controlledTestHost/assignments/a').rejection,
         DeepLinkRejection.insecureScheme,
       );
       expect(
-        enabledPolicy.parse('https://certigo.app.evil.example/assignments/a').rejection,
+        enabledPolicy.parse('https://$controlledTestHost.evil.example/assignments/a').rejection,
         DeepLinkRejection.untrustedOrigin,
       );
       expect(
-        enabledPolicy.parse('https://certigo.app@evil.example/assignments/a').rejection,
+        enabledPolicy.parse('https://$controlledTestHost@evil.example/assignments/a').rejection,
         DeepLinkRejection.untrustedOrigin,
+      );
+    });
+
+    test('rejects the uncontrolled domain even when explicitly configured', () {
+      const DeepLinkPolicy uncontrolledPolicy = DeepLinkPolicy(
+        enabled: true,
+        primaryHost: 'certigo.app',
+      );
+
+      expect(
+        uncontrolledPolicy.parse('https://certigo.app/assignments/a').rejection,
+        DeepLinkRejection.unconfiguredHost,
+      );
+    });
+
+    test('rejects the inert placeholder even when the feature flag is enabled', () {
+      const DeepLinkPolicy inertPolicy = DeepLinkPolicy(
+        enabled: true,
+        primaryHost: certigoConfiguredLinkHost,
+      );
+
+      expect(
+        inertPolicy.parse('https://links-disabled.invalid/assignments/a').rejection,
+        DeepLinkRejection.unconfiguredHost,
       );
     });
 
     test('rejects redirect parameters, fragments, ports, and unsupported paths', () {
       expect(
         enabledPolicy
-            .parse('https://certigo.app/assignments/a?redirect=https://evil.example')
+            .parse('https://$controlledTestHost/assignments/a?redirect=https://evil.example')
             .rejection,
         DeepLinkRejection.unexpectedParameters,
       );
       expect(
-        enabledPolicy.parse('https://certigo.app/assignments/a#https://evil.example').rejection,
+        enabledPolicy
+            .parse('https://$controlledTestHost/assignments/a#https://evil.example')
+            .rejection,
         DeepLinkRejection.unexpectedParameters,
       );
       expect(
-        enabledPolicy.parse('https://certigo.app:443/assignments/a').rejection,
+        enabledPolicy.parse('https://$controlledTestHost:443/assignments/a').rejection,
         DeepLinkRejection.untrustedOrigin,
       );
       expect(
-        enabledPolicy.parse('https://certigo.app/unknown/a').rejection,
+        enabledPolicy.parse('https://$controlledTestHost/unknown/a').rejection,
         DeepLinkRejection.unsupportedPath,
       );
     });
 
     test('rejects traversal and encoded separators in identifiers', () {
-      expect(enabledPolicy.parse('https://certigo.app/assignments/..').rejection, isNotNull);
       expect(
-        enabledPolicy.parse('https://certigo.app/learn/az-900%2F..%2Fadmin/lesson').rejection,
+        enabledPolicy.parse('https://$controlledTestHost/assignments/..').rejection,
+        isNotNull,
+      );
+      expect(
+        enabledPolicy
+            .parse('https://$controlledTestHost/learn/az-900%2F..%2Fadmin/lesson')
+            .rejection,
         DeepLinkRejection.invalidIdentifier,
       );
       expect(
-        enabledPolicy.parse('https://certigo.app/assignments/a%5Cb').rejection,
+        enabledPolicy.parse('https://$controlledTestHost/assignments/a%5Cb').rejection,
         DeepLinkRejection.invalidIdentifier,
       );
     });

@@ -25,7 +25,7 @@ class GenerateLinkAssociationsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             apple_path, android_path = generator.write_associations(
                 output_dir=Path(temporary),
-                domain="certigo.app",
+                confirmed_domain="links.user-owned.example",
                 apple_team_id="ABCDEFGHIJ",
                 bundle_id="com.certigo.mobileapp",
                 android_fingerprints=[fingerprint()],
@@ -53,7 +53,7 @@ class GenerateLinkAssociationsTests(unittest.TestCase):
             self.assertEqual(apple_path.name, "apple-app-site-association")
             self.assertEqual(android_path.name, "assetlinks.json")
 
-    def test_pages_prefix_is_applied_to_apple_routes(self) -> None:
+    def test_verified_path_prefix_is_applied_to_apple_routes(self) -> None:
         apple, _ = generator.association_payloads(
             apple_team_id="ABCDEFGHIJ",
             bundle_id="com.certigo.mobileapp",
@@ -91,11 +91,23 @@ class GenerateLinkAssociationsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "hostname"):
             generator.write_associations(
                 output_dir=Path("."),
-                domain="https://certigo.app",
+                confirmed_domain="https://links.user-owned.example",
                 apple_team_id="ABCDEFGHIJ",
                 bundle_id="com.certigo.mobileapp",
                 android_fingerprints=[fingerprint()],
             )
+
+    def test_rejects_uncontrolled_or_inert_domains(self) -> None:
+        for domain in ("certigo.app", "links.certigo.app", "links-disabled.invalid"):
+            with self.subTest(domain=domain):
+                with self.assertRaisesRegex(ValueError, "uncontrolled|confirmed"):
+                    generator.write_associations(
+                        output_dir=Path("."),
+                        confirmed_domain=domain,
+                        apple_team_id="ABCDEFGHIJ",
+                        bundle_id="com.certigo.mobileapp",
+                        android_fingerprints=[fingerprint()],
+                    )
 
 
 if __name__ == "__main__":

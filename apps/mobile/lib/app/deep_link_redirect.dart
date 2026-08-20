@@ -7,7 +7,8 @@ import 'auth_redirect.dart';
 /// Only internal locations produced by [DeepLinkPolicy] are retained. Raw URLs
 /// and query parameters are never persisted or replayed after authentication.
 final class DeepLinkRouterCoordinator {
-  DeepLinkRouterCoordinator({this.policy = const DeepLinkPolicy()});
+  DeepLinkRouterCoordinator({DeepLinkPolicy? policy})
+    : policy = policy ?? const DeepLinkPolicy(primaryHost: certigoConfiguredLinkHost);
 
   final DeepLinkPolicy policy;
   String? _pendingLocation;
@@ -64,7 +65,8 @@ final class DeepLinkRouterCoordinator {
   }
 
   DeepLinkParseResult? _parseIncoming(Uri uri) {
-    final bool isAbsoluteWebLink = uri.hasScheme &&
+    final bool isAbsoluteWebLink =
+        uri.hasScheme &&
         (uri.scheme.toLowerCase() == 'https' || uri.scheme.toLowerCase() == 'http');
     final bool isRelativeIngress = !uri.hasScheme && policy.isPotentialRouterPath(uri.path);
     if (!isAbsoluteWebLink && !isRelativeIngress) {
