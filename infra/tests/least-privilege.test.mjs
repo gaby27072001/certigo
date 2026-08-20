@@ -325,6 +325,20 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
   );
 });
 
+test('infra validation bootstraps pinned Node for bare Linux runners', () => {
+  const validation = readFileSync(
+    path.join(repositoryRoot, 'infra', 'validate.sh'),
+    'utf8',
+  );
+  assert.match(validation, /version="20\.20\.2"/);
+  assert.match(
+    validation,
+    /df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d/,
+  );
+  assert.match(validation, /sha256sum --check --strict/);
+  assert.match(validation, /GITHUB_PATH/);
+});
+
 test('environment parameters retain historical principals only for staged cutover', () => {
   for (const environment of ['dev', 'staging', 'prod']) {
     const parameters = readFileSync(
