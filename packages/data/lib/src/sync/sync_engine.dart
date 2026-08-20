@@ -188,10 +188,7 @@ class SyncEngine {
         ..addAll(
           persisted.map(
             (SyncAction action) => action.ownerId == null && action.isPending
-                ? action.copyWith(
-                    status: SyncActionStatus.dead,
-                    lastError: 'legacy-owner-missing',
-                  )
+                ? action.copyWith(status: SyncActionStatus.dead, lastError: 'legacy-owner-missing')
                 : action,
           ),
         );
@@ -212,6 +209,7 @@ class SyncEngine {
     required Map<String, dynamic> payload,
     required String idempotencyKey,
     String? ownerId,
+    String? publicManifestId,
   }) async {
     _ensureActive();
     await ensureLoaded();
@@ -230,6 +228,7 @@ class SyncEngine {
       idempotencyKey: idempotencyKey,
       createdAt: _clock(),
       ownerId: resolvedOwner,
+      publicManifestId: publicManifestId,
     );
     _queue.add(action);
     await _persist();
@@ -244,9 +243,7 @@ class SyncEngine {
     _ensureActive();
     final Future<SyncFlushReport>? running = _inFlight;
     if (running != null) return running;
-    final Future<SyncFlushReport> pass = _flush().whenComplete(
-      () => _inFlight = null,
-    );
+    final Future<SyncFlushReport> pass = _flush().whenComplete(() => _inFlight = null);
     _inFlight = pass;
     return pass;
   }
@@ -433,9 +430,7 @@ class SyncEngine {
 
   void _emit({bool syncing = false}) {
     if (_status.isClosed) return;
-    _status.add(
-      SyncStatus(pending: pendingCount, dead: deadCount, syncing: syncing),
-    );
+    _status.add(SyncStatus(pending: pendingCount, dead: deadCount, syncing: syncing));
   }
 
   void _ensureActive() {

@@ -23,6 +23,11 @@ export 'src/models/account_deletion.dart';
 
 export 'src/api/api_client.dart';
 export 'src/api/correlation_interceptor.dart';
+export 'src/content/api_public_content_source.dart';
+export 'src/content/runtime_content.dart';
+export 'src/content/runtime_content_store.dart';
+export 'src/content/runtime_content_sync.dart';
+export 'src/content/runtime_content_lesson_repository.dart';
 
 export 'src/repositories/repositories.dart';
 export 'src/repositories/remote_repositories.dart';

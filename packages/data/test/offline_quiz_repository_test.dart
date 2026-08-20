@@ -34,6 +34,7 @@ SubmitQuizRequest _request(String key) => SubmitQuizRequest(
       trackId: 'az-900',
       startedAt: DateTime.utc(2026),
       answers: const <QuizAnswer>[],
+      publicManifestId: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     );
 
 Future<SyncDispatch> _alwaysSucceed(SyncAction _) async => SyncDispatch.success;
@@ -84,6 +85,7 @@ void main() {
       expect(queued.endpoint, '/quiz/L1/submit');
       expect(queued.idempotencyKey, 'k1');
       expect(queued.payload['clientAttemptId'], 'k1');
+      expect(queued.publicManifestId, _request('k1').publicManifestId);
       await engine.dispose();
     });
 

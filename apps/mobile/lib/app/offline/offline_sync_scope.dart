@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/auth/application/auth_controller.dart';
 import '../../features/auth/application/auth_state.dart';
 import '../providers.dart';
+import '../content/runtime_content_providers.dart';
 
 /// Drains the offline action queue whenever the app regains connectivity, is
 /// resumed from the background, or finishes restoring an authenticated session.
@@ -70,17 +71,26 @@ class _OfflineSyncScopeState extends ConsumerState<OfflineSyncScope> with Widget
     final AuthState auth = ref.read(authControllerProvider);
     if (!canFlushOfflineActions(auth)) return;
     unawaited(
-      _flushAuthenticated().catchError((Object error, StackTrace stackTrace) {
+      _flushAuthenticated(auth as Authenticated).catchError((Object error, StackTrace stackTrace) {
         _reportError(error, stackTrace, 'while flushing the offline queue');
       }),
     );
   }
 
-  Future<void> _flushAuthenticated() async {
-    await Future.wait<void>(<Future<void>>[
+  Future<void> _flushAuthenticated(Authenticated auth) async {
+    final List<Future<void>> operations = <Future<void>>[
       _engine.flush().then<void>((SyncFlushReport _) {}),
       ref.read(activeTrackProvider.notifier).syncPending(),
-    ]);
+    ];
+    if (ref.read(runtimeContentSyncEnabledProvider)) {
+      final String? ownerId = auth.session.userId;
+      if (ownerId != null && ownerId.isNotEmpty) {
+        operations.add(
+          ref.read(runtimeContentControllerProvider.notifier).syncNow(ownerId),
+        );
+      }
+    }
+    await Future.wait<void>(operations);
   }
 
   void _reportError(Object error, StackTrace stackTrace, String operation) {
