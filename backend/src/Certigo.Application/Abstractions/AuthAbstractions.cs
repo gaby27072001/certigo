@@ -56,7 +56,10 @@ public sealed record UserCredentialRecord(
     // reservations shipped. New registrations stay pending until their profile
     // has been provisioned, which makes an interrupted sign-up recoverable.
     CredentialProvisioningState? ProvisioningState = null,
-    DateTimeOffset? ProvisioningLeaseExpiresAt = null)
+    DateTimeOffset? ProvisioningLeaseExpiresAt = null,
+    // Random, opaque local subject used by LinkedIdentity. It is generated once
+    // in shadow mode and is never derived from the credential email.
+    string? IdentitySubject = null)
 {
     /// Discriminator persisted alongside the document; combined with the id
     /// prefix it keeps credential docs unambiguously separate from profiles.

@@ -6,6 +6,7 @@ using Certigo.Api.Http;
 using Certigo.Application.Dtos;
 using Certigo.Application.Services;
 using Certigo.Domain.Content;
+using Certigo.Domain.Identity;
 using Xunit;
 
 namespace Certigo.Api.Tests;
@@ -146,6 +147,9 @@ public sealed class CriticalHttpFunctionsTests
                         "{\"xpEarned\":10}"),
                 ],
                 AppliedEconomyOperations = ["operation::quiz::legacy"],
+                IdentityMetadata = PersonIdentityMetadata.Shadow(
+                    expected.Profile.Id,
+                    DateTimeOffset.UtcNow),
             },
         };
         var service = new FakeAuthService { RegisterResult = expected };
@@ -165,6 +169,7 @@ public sealed class CriticalHttpFunctionsTests
         var rawPayload = await response.ReadBodyAsStringAsync();
         rawPayload.Should().NotContain("economyReceipts");
         rawPayload.Should().NotContain("appliedEconomyOperations");
+        rawPayload.Should().NotContain("identityMetadata");
         var payload = JsonSerializer.Deserialize<AuthResultDto>(
             rawPayload,
             new JsonSerializerOptions(JsonSerializerDefaults.Web))!;

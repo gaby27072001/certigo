@@ -67,6 +67,7 @@ param entraAuthority = 'https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.c
 // client id (12910b8e-...), NOT the mobile client id (4d1f1075-...), both in the
 // same tenant (af721be8-...).
 param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
+param personLinkedIdentityV1 = 'off'
 
 // alertEmail is injected by CD from the non-secret ALERT_EMAIL variable on the
 // prod GitHub Environment. Never commit an operator address here.

@@ -111,6 +111,10 @@ public interface IAccountDeletionRepository
     Task DeleteEconomyDataAsync(string subjectUserId, CancellationToken cancellationToken = default);
     Task DeleteProfileAsync(string subjectUserId, CancellationToken cancellationToken = default);
     Task DeleteCredentialsAsync(string subjectUserId, CancellationToken cancellationToken = default);
+    Task DeleteLinkedIdentityDataAsync(
+        string subjectUserId,
+        DateTimeOffset revokedAt,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IExternalIdentityDeletion

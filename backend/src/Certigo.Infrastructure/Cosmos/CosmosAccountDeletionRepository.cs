@@ -1,10 +1,13 @@
 using System.Net;
 using Microsoft.Azure.Cosmos;
 using Certigo.Application.Abstractions;
+using Certigo.Domain.Identity;
 
 namespace Certigo.Infrastructure.Cosmos;
 
-public sealed class CosmosAccountDeletionRepository(CosmosContext context)
+public sealed class CosmosAccountDeletionRepository(
+    CosmosContext context,
+    IPersonLinkedIdentityRepository personIdentities)
     : IAccountDeletionRepository
 {
     private const int MaximumStateWriteAttempts = 5;
@@ -306,6 +309,31 @@ public sealed class CosmosAccountDeletionRepository(CosmosContext context)
         catch (CosmosException ex)
         {
             throw new AccountDeletionStepException("credential-delete-failed", ex);
+        }
+    }
+
+    public async Task DeleteLinkedIdentityDataAsync(
+        string subjectUserId,
+        DateTimeOffset revokedAt,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await personIdentities.CleanupForAccountDeletionAsync(
+                subjectUserId,
+                revokedAt,
+                cancellationToken);
+        }
+        catch (Exception ex) when (
+            ex is CosmosException
+                or ConcurrencyConflictException
+                or PersonIdentityIntegrityException
+                or IdentityHashCollisionException
+                or InvalidIdentityLocatorException)
+        {
+            throw new AccountDeletionStepException(
+                "linked-identity-delete-failed",
+                ex);
         }
     }
 

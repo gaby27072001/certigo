@@ -55,6 +55,12 @@ param entraGraphClientId string = ''
 param entraGraphClientSecretSecretUri string = ''
 @description('Feature flag for the account-deletion API. Keep false until the destructive Cosmos integration gate passes.')
 param accountDeletionEnabled bool = false
+@description('Person/LinkedIdentity V1 mode. Only off and additive shadow writes are supported by this runtime.')
+@allowed([
+  'off'
+  'shadow'
+])
+param personLinkedIdentityV1 string = 'off'
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
 @description('Azure OpenAI resource endpoint used by the tutor when the feature flag is enabled. Example: https://<resource>.openai.azure.com/.')
@@ -309,6 +315,7 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     ENTRA_AUTHORITY: entraAuthority
     ENTRA_AUDIENCE: entraAudience
     ACCOUNT_DELETION_ENABLED: string(accountDeletionEnabled)
+    PERSON_LINKED_IDENTITY_V1: personLinkedIdentityV1
     TUTOR_LLM_ENABLED: string(tutorLlmEnabled)
     TUTOR_LLM_ENDPOINT: tutorLlmEndpoint
     TUTOR_LLM_DEPLOYMENT: tutorLlmDeployment

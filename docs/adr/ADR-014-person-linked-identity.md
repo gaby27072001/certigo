@@ -3,17 +3,17 @@
 | Champ | Valeur |
 |---|---|
 | **ADR** | 014 |
-| **Statut** | Proposé — contrat réconcilié avec `main`, tests seulement |
+| **Statut** | Accepté — premier runtime `off|shadow` |
 | **Date** | 2026-08-20 |
-| **Activation runtime** | Aucune dans cette PR ; `PERSON_LINKED_IDENTITY_V1=off` reste l'unique état livré |
+| **Activation runtime** | `off` par défaut ; `shadow` ajoute uniquement migration et miroir, sans autorité |
 | **Contrat** | `docs/contracts/person-linked-identity/v1` |
-| **Baseline réconciliée** | `main@01ac86554445e4e3dd29efa5e95beaa8ed41400e` |
-| **Périmètre de cette PR** | Documentation, schémas et fakes de test ; aucun code de production, aucune infra, aucun déploiement |
+| **Baseline réconciliée** | `main@034c1dd41e8ce7da0a84f8a6e70d821829a54e61` |
+| **Périmètre de cette PR** | Modèles, ports, persistence Cosmos additive, migration/mirror shadow, télémétrie sans PII et nettoyage #296 ; aucun endpoint link, aucune UI, aucun déploiement |
 
-> Cette décision prépare l’évolution d’identité. Elle ne branche aucun resolver, endpoint,
-> migrateur ou feature flag au runtime. La suppression de compte #296, la certification active
-> owner-scopée #297 et l'onboarding/catalogue de #289 sont désormais les baselines fusionnées à
-> préserver, pas du runtime livré par cette PR.
+> Cette décision livre uniquement un observateur shadow. Le resolver legacy reste autoritaire :
+> aucun endpoint de liaison, aucune UI et aucune mutation utilisateur d'identité ne sont branchés.
+> La suppression de compte #296, la certification active owner-scopée #297 et
+> l'onboarding/catalogue de #289 restent inchangés.
 
 ## Contexte observé
 
@@ -297,6 +297,9 @@ Le passage est monotone `off -> shadow -> resolve -> link`. Le kill switch opér
 `link` à `resolve`, ce qui bloque les mutations sans casser les connexions secondaires. Après la
 création de liens secondaires, revenir de `resolve` à `off` n’est pas un rollback sûr.
 
+Le premier runtime implémente exclusivement `off|shadow`. Les valeurs `resolve` et `link`
+restent des états contractuels futurs et sont rejetées au démarrage dans ce lot.
+
 ### 10. Migration additive, sans perte
 
 1. **Inventaire** : compter profils, credentials locaux, documents owner-scopés et anomalies ; ne
@@ -361,14 +364,13 @@ ferait l’objet d’une PR infra séparée, jamais de cette phase.
 
 | Ordre | PR | Contenu | Gate |
 |---|---|---|---|
-| 0 | Cette draft | ADR, contrats V1, fakes migration/sécurité réconciliés avec #289/#296/#297 | aucun runtime |
-| 1 | Modèles/repositories | Documents Person overlay, LinkedIdentity, intent et opération | unit tests, flag `off` |
-| 2 | Migrateur shadow | inventaire + backfill local + dry-run + collision report | aucune résolution runtime |
-| 3 | Resolver JIT | `tid + oid`/local subject vers `personId`, mode `shadow/resolve` | cohortes, métriques sans PII |
-| 4 | Liaison API | endpoints begin/complete/list/revoke | tests takeover/replay/deputy/tenant |
-| 5 | Suppression multi-identités | snapshot/révocation de toutes les LinkedIdentity dans #296 | E2E suppression |
-| 6 | Mobile | UX explicite, double ré-auth, owner cache Person | onboarding/catalogue inchangés |
-| 7 | Activation | `resolve`, puis `link` par cohortes | rollback documenté |
+| 0 | #300 fusionnée | ADR, contrats V1 et harnais migration/sécurité | aucun runtime |
+| 1 | Cette PR runtime | Modèles/ports, repository, lazy migration locale/Entra et comparaison shadow | `off` par défaut, métriques sans PII |
+| 2 | Resolver autoritaire | Résolution `LinkedIdentity -> personId`, mode `resolve` | cohortes et fallback métriqué |
+| 3 | Liaison API | endpoints begin/complete/list/revoke | tests takeover/replay/deputy/tenant |
+| 4 | Suppression multi-identités | actions fournisseur par LinkedIdentity dans #296 | E2E suppression |
+| 5 | Mobile | UX explicite, double ré-auth, owner cache Person | onboarding/catalogue inchangés |
+| 6 | Activation | `resolve`, puis `link` par cohortes | rollback documenté |
 
 Chaque PR reste indépendante, sans changement de clé de partition ni migration big-bang.
 
@@ -391,5 +393,5 @@ Chaque PR reste indépendante, sans changement de clé de partition ni migration
 - [NIST SP 800-63B — Authentication and Lifecycle Management](https://pages.nist.gov/800-63-4/sp800-63b.html)
 - Code actuel : `FunctionUserContext`, `AuthService`, `CosmosUserRepository`,
   `CosmosUserCredentialRepository`, `CosmosContainers`, repositories progress/friends/economy
-- Baseline réconciliée : `main@01ac865`, incluant #289/#296/#297 et les changements
-  #301/#302/#303/#305/#308 sans effet runtime sur le contrat identité
+- Baseline runtime : `main@034c1dd`, incluant le contrat #300 et les baselines
+  #289/#296/#297 ; aucun changement de PK, d'autorité ou de surface mobile

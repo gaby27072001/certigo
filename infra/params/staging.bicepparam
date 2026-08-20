@@ -61,6 +61,7 @@ param cosmosLocation = 'northeurope'
 param entraAuthority = 'https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0'
 // Audience = Application ID URI of the staging backend app registration.
 param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
+param personLinkedIdentityV1 = 'off'
 
 // authJwtSigningKey and authJwtSigningKeyExpiresOn are supplied out-of-band by CD
 // from the staging Environment secret/variable pair. main.bicep rejects an omitted

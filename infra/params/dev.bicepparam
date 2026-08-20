@@ -60,6 +60,7 @@ param cosmosLocation = 'northeurope'
 // (see the F-02 note at the top of this file). Leave as-is unless testing Entra locally.
 param entraAuthority = 'https://certigo.ciamlogin.com/00000000-0000-0000-0000-000000000000/v2.0'
 param entraAudience = '00000000-0000-0000-0000-000000000000'
+param personLinkedIdentityV1 = 'off'
 
 // authJwtSigningKey is intentionally omitted in dev. main.bicep derives a stable
 // value that is explicitly gated to the non-hardened dev environment.

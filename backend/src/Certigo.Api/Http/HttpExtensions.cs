@@ -26,7 +26,9 @@ public static class HttpExtensions
             }
 
             foreach (var property in typeInfo.Properties.Where(property =>
-                         property.Name is "economyReceipts" or "appliedEconomyOperations"))
+                         property.Name is "economyReceipts"
+                             or "appliedEconomyOperations"
+                             or "identityMetadata"))
             {
                 property.ShouldSerialize = static (_, _) => false;
             }
