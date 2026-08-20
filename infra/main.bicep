@@ -69,6 +69,12 @@ param publicWebOrigin string = ''
 param publicDomainVerified bool = false
 @description('Explicit evidence that Apple CIAM domain and return URLs were reconfigured for the controlled domain. Defaults fail-closed.')
 param appleCiamDomainReconfigured bool = false
+@description('Person/LinkedIdentity V1 runtime mode. Shadow only writes additive mirrors; legacy userId remains authoritative.')
+@allowed([
+  'off'
+  'shadow'
+])
+param personLinkedIdentityV1 string = 'off'
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
 @description('Azure OpenAI resource endpoint used by the tutor when enabled. Example: https://<resource>.openai.azure.com/.')
@@ -576,6 +582,7 @@ module api 'modules/functionApp.bicep' = {
     entraGraphClientId: effectiveEntraGraphClientId
     entraGraphClientSecretSecretUri: graphClientSecret.?outputs.?secretUri ?? ''
     accountDeletionEnabled: accountDeletionEnabled
+    personLinkedIdentityV1: personLinkedIdentityV1
     tutorLlmEnabled: tutorLlmEnabled
     tutorLlmEndpoint: tutorLlmEndpoint
     tutorLlmDeployment: tutorLlmDeployment

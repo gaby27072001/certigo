@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Certigo.Domain.Identity;
 
 namespace Certigo.Application.Dtos;
 
@@ -44,7 +45,8 @@ public sealed record UserProfileDto(
     // Read-only migration bridge for profiles written before bounded receipts.
     // New operations never append to this list; matching entries are migrated
     // to EconomyReceipts when their durable journal is resumed.
-    List<string>? AppliedEconomyOperations = null)
+    List<string>? AppliedEconomyOperations = null,
+    PersonIdentityMetadata? IdentityMetadata = null)
 {
     /// Cosmos optimistic-concurrency token (the system `_etag`). Null for freshly
     /// constructed or in-memory profiles; populated on read and honoured on write

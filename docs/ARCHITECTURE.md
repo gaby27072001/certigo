@@ -120,12 +120,16 @@ gitignorés).
 | `GET`  | `/me/league` | `LeaderboardFunctions` |
 
 **Règles transverses** : `userId` est extrait du JWT (`FunctionUserContext`), jamais du corps.
+Avec `PERSON_LINKED_IDENTITY_V1=shadow`, ce même `userId` reste autoritaire et devient
+`personId` par égalité stricte ; le runtime écrit seulement l'overlay et le miroir
+LinkedIdentity additifs.
 Les soumissions de quiz sont **idempotentes** via `clientAttemptId`. Les `QuizItem` envoyés au
 client n'embarquent pas la réponse correcte (notation serveur).
 
 ### 4.3 Configuration consommée
 
-`Cosmos__Endpoint`, `Cosmos__Database`, `KeyVault__Uri`, `Auth__Issuer`, `Auth__Audience`.
+`COSMOS_ENDPOINT`, `COSMOS_DATABASE`, `KeyVault__Uri`, les paramètres d'authentification
+et `PERSON_LINKED_IDENTITY_V1` (`off` par défaut, `shadow` seul autre état accepté).
 En local : `local.settings.json` (gabarit `.example` fourni, fichier réel gitignoré).
 
 ---
@@ -136,7 +140,7 @@ Base `certigo`, mode **serverless**. Huit containers, partitionnés pour la loca
 
 | Container | Partition key | Contenu |
 |---|---|---|
-| `users` | `/id` | profil, stats lifetime (avec ETag pour la concurrence optimiste) |
+| `users` | `/id` | profil/overlay Person, credentials et LinkedIdentity additifs (ETag, ids déterministes) |
 | `content` | `/trackId` | tracks, leçons publiques, clés de réponse |
 | `progress` | `/userId` | maîtrise par concept, état FSRS |
 | `attempts` | `/userId` | tentatives de quiz/examen (id déterministe `attempt::{clientAttemptId}` → idempotence atomique) |
@@ -319,6 +323,9 @@ la décision et **verrouille** la non-régression par les tests anti-rejeu.
   mappe les claims `oid` → `NameIdentifier` → `sub`.
 - Tous les services consomment `IUserContext.UserId`. **Aucun DTO** économie/quiz ne transporte de
   `userId` fourni par le client : l'identité ne peut pas être usurpée via le corps de requête.
+- Le mode Person/LinkedIdentity livré est limité à `off|shadow`. `shadow` compare le locator
+  validé au propriétaire legacy, mais ne remplace jamais `IUserContext.UserId`, ne fusionne
+  jamais par e-mail et n'expose aucun endpoint/UI de liaison.
 
 **Idempotence — clé cliente + ids déterministes (sens d'échec sûr).**
 

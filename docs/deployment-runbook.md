@@ -347,6 +347,16 @@ locale, crée une base d’émulation unique et détruit le conteneur en `finall
 Il ne se connecte pas à Azure et ne modifie ni RBAC ni infrastructure. Un test
 skippé ou non démarré ne permet jamais d’activer la feature.
 
+### Gate Person / LinkedIdentity
+
+`PERSON_LINKED_IDENTITY_V1` est explicitement `off` dans `dev`, `staging` et
+`prod`. Le runtime courant n'accepte que `off|shadow`. `shadow` conserve le
+`userId` legacy comme autorité et ajoute uniquement des overlays/mirrors
+idempotents ; il n'active aucun endpoint ni UI de liaison. Toute activation
+requiert d'abord le gate backend/Cosmos de la PR runtime puis une décision
+opérationnelle séparée. Les valeurs futures `resolve` et `link` échouent au
+démarrage dans cette version.
+
 ### Prévol read-only
 
 ```bash
