@@ -73,7 +73,7 @@ param tagCostCenter string = 'engineering'
 var bootstrapContent = loadTextContent('bootstrap.sh')
 // Bicep cannot compute a cryptographic digest. The repository validator keeps this
 // immutable tag value synchronized with the exact file embedded in customData.
-var bootstrapSha256 = '526d63afa5c5da4657c6df57873dfa0c5d161400fc5d48e5f713861cd44fbd74'
+var bootstrapSha256 = '16e12b8bf058f77fc1dab47be25016f4961de9d0f80440dd284fc58296dc14d8'
 // Azure accepts "latest", so turn that mutable value into a deliberately invalid
 // Marketplace version while keeping the template compatible with stable Bicep.
 var pinnedImageVersion = toLower(imageVersion) == 'latest' ? 'mutable-latest-is-not-allowed' : imageVersion

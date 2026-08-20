@@ -54,15 +54,15 @@ L'état live ne correspond plus aux anciennes VM autonomes documentées :
 | Autoscale | activé, minimum `2`, défaut `2`, maximum `4` |
 | Scale-out | CPU moyenne > 70 % pendant 10 min |
 | Scale-in | CPU moyenne < 20 % pendant 45 min — **non conscient des jobs GitHub** |
-| Inventaire GitHub | runner `27` `f55d176e-Certigo` online/labels doubles; runner `28` `certigo-prIVJAN8` online, PR-only; `22f7fb52-Certigo` offline/stale |
+| Inventaire GitHub | runner `27` `f55d176e-Certigo` online/labels doubles; runner `28` `certigo-prIVJAN8` online, PR-only; runner `26` `22f7fb52-Certigo` offline/stale et hors scope |
 | Cloisonnement | le pilote est sans identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; `f55d176e` conserve UAMI + `snet-runners` mais ses labels doubles restent **bloquants** |
 | Capacité réellement réconciliée | **2 instances gérées/online** : `f55d176e` et `bbf83c5c`; `4153d1dd` reste externe |
 
 Le premier snapshot avait vu trois VM, avant le scale-in CPU. L'état consolidé prouve qu'un
 simple comptage « VM Azure / runners GitHub » est faux. La réconciliation explicite classe
-`22f7fb52-Certigo` comme **absent**, les bindings exacts `f55d176e`/runner `27` et
-`bbf83c5c`/runner `28` comme **gérés**, et `4153d1dd` comme **externe**. Externe ne
-signifie ni orpheline ni adoptable : cette VM est
+le runner 26 (`22f7fb52-Certigo`) et la VM `4153d1dd` comme **externes**, et les bindings
+exacts `f55d176e`/runner `27` et `bbf83c5c`/runner `28` comme **gérés**. Externe ne
+signifie ni orphelin ni adoptable : ces ressources sont
 exclue de `currentCapacity`, de toute sélection de cible et de toute opération future par
 une classification exacte dans `inventory.externalVirtualMachines`. Toute autre VM sans
 runner reste `unclassifiedVirtualMachines` et bloque le plan; elle n'est jamais implicitement
@@ -214,11 +214,13 @@ mutable :
 2. supprimer le scale-in CPU, qui ne connaît pas l'état `busy` GitHub ;
 3. utiliser une identité d'automatisation avec uniquement `read`, `start/action`,
    `deallocate/action` aux scopes exacts des deux pools ;
-4. acquérir un lease Blob dédié avant toute opération, avec un seul contrôleur autorisé ;
+4. acquérir un lease Blob dédié avant toute opération, avec un seul contrôleur autorisé,
+   une génération de fencing positive et une écriture d'état compare-and-swap ;
 5. pour déallouer, exiger une quiet period continue de **5 minutes** avec `busy=false` et
    zéro run `queued/in_progress`; toute activité remet le compteur à zéro ;
-6. après ces 5 minutes, exiger deux gardes distinctes sur l'inventaire complet, puis traiter
-   **un pool à la fois**; revalider avant le second pool et ne jamais lancer deux
+6. après ces 5 minutes, exiger deux gardes distinctes sur l'inventaire complet, puis une garde
+   finale `busy=false`, zéro job actif/en file et révision d'état inchangée; désallouer le
+   pilote PR avant le primaire trusted, **un pool à la fois**, et ne jamais lancer deux
    déallocations concurrentes ;
 7. au démarrage, attendre l'état Azure `running`, l'enregistrement GitHub `online`, puis
    restaurer le label exclusif ;
@@ -231,8 +233,9 @@ Les éléments versionnés restent tous read-only :
 - `reconcile-drift.mjs` compare le VMSS/SKU/autoscale/labels live au modèle du dépôt ;
 - `capacity-controller.config.json` fixe `enabled=false`, le trigger `workflow_job`, la
   quiet period de 300 s, les deux gardes et la cible de pilote ultérieur
-  `6 certigo-pr + 2 certigo-trusted`; son état v3 lie les IDs exacts f55/pilote, exclut
-  `4153d1dd` et interdit `22f7fb52`/`4596a9d5`, sans règle générique qui masquerait une
+  `6 certigo-pr + 2 certigo-trusted`; son état v3 lie les IDs exacts f55/pilote, garde le
+  runner 26 et la VM `4153d1dd` hors scope et interdit les VMs `22f7fb52`/`4596a9d5`,
+  sans règle générique qui masquerait une
   nouvelle VM non réconciliée ;
 - `capacity-controller.mjs` réduit un snapshot d'événements et produit uniquement le
   prochain plan ;
@@ -270,15 +273,19 @@ VM externe ne s'annulent donc pas.
 
 Les fichiers d'état référencés par `CAPACITY_STATE_FILE` ou `LIFECYCLE_STATE_FILE` sont des
 snapshots read-only fournis par un orchestrateur externe. Les scripts affichent `nextState`
-mais ne l'écrivent jamais. Seule une future PR d'activation pourra définir la persistance,
-l'acquittement du réarmement et le chemin mutable. Tant que `enabled=false`,
+mais ne l'écrivent jamais. Avant toute mutation future, l'orchestrateur devra persister ce
+`nextState` par compare-and-swap sur `mutationFence.requiredStateRevision`, sous la même
+`mutationFence.leaseGeneration`; un échec CAS, un lease renouvelé ou une révision plus récente
+impose une nouvelle quiet period complète. Seule une future PR d'activation pourra définir
+la persistance, l'acquittement du réarmement et le chemin mutable. Tant que `enabled=false`,
 `lifecycle-preflight.sh` bloque aussi bien `start` que `deallocate` et n'arme aucune action.
 
 La passation opérationnelle externe v3 possède temporairement uniquement les IDs exacts
-`f55d176e` et `bbf83c5c`. Elle maintient les deux pendant l'activité, applique une quiet
-period coordonnée de 5 minutes resettable, contrôle 2 + garde finale, puis réarme la capacité
-exacte supprimée si une course apparaît. Ce processus hors dépôt n'active pas le contrôleur
-versionné : `enabled=false` reste le contrat de cette PR.
+`f55d176e` et `bbf83c5c`; le runner 26 et la VM 415 restent hors scope. Elle maintient les
+deux pendant l'activité, applique une quiet period coordonnée de 5 minutes resettable,
+contrôle 2 + garde finale sous la même génération de lease, désalloue le pilote puis le
+primaire et réarme les capacités exactes supprimées si une activité apparaît. Ce processus
+hors dépôt n'active pas le contrôleur versionné : `enabled=false` reste le contrat de cette PR.
 
 ### Reconstruction de redondance avant activation
 

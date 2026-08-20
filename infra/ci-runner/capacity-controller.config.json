@@ -10,7 +10,14 @@
   "quietPeriodSeconds": 300,
   "requiredPostQuietGuards": 2,
   "leaseRequired": true,
+  "scaleInOrder": [
+    "certigo-pr",
+    "certigo-trusted"
+  ],
   "inventory": {
+    "externalGithubRunnerIds": [
+      26
+    ],
     "externalVirtualMachines": [
       "vmss-certigo-runner-zonal_4153d1dd"
     ],

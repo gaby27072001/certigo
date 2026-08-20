@@ -294,6 +294,11 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
   assert.equal(config.requiredPostQuietGuards, 2);
   assert.equal(config.minimumExclusivePools, 2);
   assert.equal(config.minimumExclusiveSubnets, 2);
+  assert.deepEqual(config.scaleInOrder, [
+    'certigo-pr',
+    'certigo-trusted',
+  ]);
+  assert.deepEqual(config.inventory.externalGithubRunnerIds, [26]);
   assert.deepEqual(config.inventory.externalVirtualMachines, [
     'vmss-certigo-runner-zonal_4153d1dd',
   ]);
