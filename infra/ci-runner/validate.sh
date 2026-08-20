@@ -62,4 +62,5 @@ done
 bash "${test_health}"
 node --test "${root}/infra/ci-runner/evaluate-lifecycle.test.mjs"
 node --test "${root}/infra/ci-runner/capacity-controller.test.mjs"
+node --check "${root}/infra/ci-runner/scale-in-safety.mjs"
 echo "ci-runner validation passed"

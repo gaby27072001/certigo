@@ -269,6 +269,35 @@ test('read-only scripts contain no live mutation commands', () => {
   }
 });
 
+test('runner capacity planning stays off and encodes the guarded pilot contract', () => {
+  const config = JSON.parse(
+    readFileSync(
+      path.join(
+        repositoryRoot,
+        'infra',
+        'ci-runner',
+        'capacity-controller.config.json',
+      ),
+      'utf8',
+    ),
+  );
+
+  assert.equal(config.enabled, false);
+  assert.equal('maxAggregateCapacity' in config, false);
+  assert.deepEqual(config.pilotTarget, {
+    'certigo-pr': 6,
+    'certigo-trusted': 2,
+  });
+  assert.deepEqual(config.modes.boost, config.pilotTarget);
+  assert.equal(config.quietPeriodSeconds, 300);
+  assert.equal(config.requiredPostQuietGuards, 2);
+  assert.equal(config.minimumExclusivePools, 2);
+  assert.equal(config.minimumExclusiveSubnets, 2);
+  assert.deepEqual(config.inventory.externalVirtualMachines, [
+    'vmss-certigo-runner-zonal_4153d1dd',
+  ]);
+});
+
 test('environment parameters retain historical principals only for staged cutover', () => {
   for (const environment of ['dev', 'staging', 'prod']) {
     const parameters = readFileSync(

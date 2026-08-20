@@ -1,21 +1,35 @@
 {
   "enabled": false,
   "trigger": "workflow_job",
-  "maxAggregateCapacity": 4,
   "scaleStep": 1,
   "minimumExclusivePools": 2,
+  "minimumExclusiveSubnets": 2,
   "boostQueueDepth": 2,
   "boostOldestQueuedSeconds": 300,
+  "quietPeriodSeconds": 300,
+  "requiredPostQuietGuards": 2,
   "leaseRequired": true,
+  "inventory": {
+    "externalVirtualMachines": [
+      "vmss-certigo-runner-zonal_4153d1dd"
+    ]
+  },
+  "pilotTarget": {
+    "certigo-pr": 6,
+    "certigo-trusted": 2
+  },
   "modes": {
     "idle": {
-      "aggregateCapacity": 0
+      "certigo-pr": 0,
+      "certigo-trusted": 0
     },
     "normal": {
-      "aggregateCapacity": 2
+      "certigo-pr": 1,
+      "certigo-trusted": 1
     },
     "boost": {
-      "aggregateCapacity": 4
+      "certigo-pr": 6,
+      "certigo-trusted": 2
     }
   },
   "observedBaseline30Days": {

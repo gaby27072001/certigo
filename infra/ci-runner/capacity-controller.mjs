@@ -3,27 +3,105 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import {
+  isPoweredCapacity,
   labelsOf,
   reconcileRunnerInstances,
+  summarizePoolBoundaries,
+  trustClassOfRunner,
 } from './runner-inventory.mjs';
+import {
+  advanceScaleInSafety,
+  armScaleInReactivation,
+} from './scale-in-safety.mjs';
 
 function isCertigoJob(job) {
   const labels = new Set(job.labels ?? []);
   return labels.has('certigo-pr') || labels.has('certigo-trusted');
 }
 
-function identitiesOf(scaleSet) {
-  const userAssigned = Object.keys(
-    scaleSet.identity?.userAssignedIdentities ?? {},
+function modeCapacity(config, mode) {
+  const capacity = config.modes?.[mode];
+  if (!capacity) {
+    throw new Error(`Missing capacity mode: ${mode}`);
+  }
+  return {
+    'certigo-pr': capacity['certigo-pr'],
+    'certigo-trusted': capacity['certigo-trusted'],
+  };
+}
+
+function aggregateCapacity(capacityByTrust) {
+  return (
+    capacityByTrust['certigo-pr'] +
+    capacityByTrust['certigo-trusted']
   );
-  const systemAssigned = scaleSet.identity?.principalId
-    ? [scaleSet.identity.principalId]
-    : [];
-  return [...userAssigned, ...systemAssigned];
+}
+
+function validateCapacityConfig(config) {
+  const trustClasses = ['certigo-pr', 'certigo-trusted'];
+  if (config.scaleStep !== 1) {
+    throw new Error('scaleStep must remain exactly 1');
+  }
+  if (
+    config.minimumExclusivePools < 2 ||
+    config.minimumExclusiveSubnets < 2
+  ) {
+    throw new Error('at least two exclusive pools and subnets are required');
+  }
+  if (
+    !Array.isArray(config.inventory?.externalVirtualMachines) ||
+    config.inventory.externalVirtualMachines.some(
+      (name) => typeof name !== 'string' || name.length === 0,
+    )
+  ) {
+    throw new Error(
+      'inventory.externalVirtualMachines must be an array of exact names',
+    );
+  }
+  for (const trustClass of trustClasses) {
+    if (
+      !Number.isInteger(config.pilotTarget?.[trustClass]) ||
+      config.pilotTarget[trustClass] <= 0
+    ) {
+      throw new Error(`pilotTarget.${trustClass} must be a positive integer`);
+    }
+  }
+  for (const mode of ['idle', 'normal', 'boost']) {
+    const capacity = modeCapacity(config, mode);
+    for (const trustClass of trustClasses) {
+      if (
+        !Number.isInteger(capacity[trustClass]) ||
+        capacity[trustClass] < 0 ||
+        capacity[trustClass] > config.pilotTarget[trustClass]
+      ) {
+        throw new Error(
+          `modes.${mode}.${trustClass} must be within the pilot target`,
+        );
+      }
+    }
+  }
+  if (
+    trustClasses.some(
+      (trustClass) =>
+        modeCapacity(config, 'boost')[trustClass] !==
+        config.pilotTarget[trustClass],
+    )
+  ) {
+    throw new Error('boost mode must equal the approved pilot target');
+  }
+  if (
+    config.quietPeriodSeconds !== 300 ||
+    config.requiredPostQuietGuards !== 2
+  ) {
+    throw new Error(
+      'scale-in requires a resettable 300-second quiet period and two guards',
+    );
+  }
 }
 
 export function reduceWorkflowJobState(state, event, now) {
   const nextState = {
+    ...state,
     jobs: { ...(state.jobs ?? {}) },
   };
   if (!event?.workflow_job || !isCertigoJob(event.workflow_job)) {
@@ -75,9 +153,7 @@ export function createCapacityPlan({
   if (config.trigger !== 'workflow_job') {
     throw new Error(`Unsupported capacity trigger: ${config.trigger}`);
   }
-  if (config.maxAggregateCapacity > 4) {
-    throw new Error('maxAggregateCapacity must never exceed 4');
-  }
+  validateCapacityConfig(config);
 
   const nextState = reduceWorkflowJobState(state, event, now);
   const jobs = Object.values(nextState.jobs);
@@ -88,100 +164,225 @@ export function createCapacityPlan({
   const queued = Math.max(stateQueued, queuedRuns);
   const active = Math.max(stateActive, activeRuns);
   const oldestQueuedSeconds = queueAgeSeconds(nextState.jobs, now);
+  const queuedByTrust = {
+    'certigo-pr': 0,
+    'certigo-trusted': 0,
+  };
+  for (const job of jobs.filter((candidate) => candidate.status === 'queued')) {
+    const trustClass = trustClassOfRunner(job);
+    if (
+      trustClass === 'certigo-pr' ||
+      trustClass === 'certigo-trusted'
+    ) {
+      queuedByTrust[trustClass] += 1;
+    }
+  }
 
   const runners = inventory.runners?.github?.runners ?? [];
   const virtualMachines = inventory.runners?.virtualMachines ?? [];
-  const instanceInventory = reconcileRunnerInstances(virtualMachines, runners);
+  const instanceInventory = reconcileRunnerInstances(
+    virtualMachines,
+    runners,
+    config.inventory,
+  );
   const certigoRunners = instanceInventory.certigoRunners;
   const busy = certigoRunners.filter((runner) => runner.busy).length;
   const dualTrust = certigoRunners.filter((runner) => {
     const labels = labelsOf(runner);
     return labels.has('certigo-pr') && labels.has('certigo-trusted');
   });
-  const exclusivePr = certigoRunners.filter((runner) => {
-    const labels = labelsOf(runner);
-    return labels.has('certigo-pr') && !labels.has('certigo-trusted');
-  });
-  const exclusiveTrusted = certigoRunners.filter((runner) => {
-    const labels = labelsOf(runner);
-    return labels.has('certigo-trusted') && !labels.has('certigo-pr');
-  });
+  const managedByTrust = {
+    'certigo-pr': [],
+    'certigo-trusted': [],
+  };
+  for (const managedInstance of instanceInventory.managedInstances) {
+    const trustClass = trustClassOfRunner(managedInstance.runner);
+    if (
+      trustClass === 'certigo-pr' ||
+      trustClass === 'certigo-trusted'
+    ) {
+      managedByTrust[trustClass].push(managedInstance);
+    }
+  }
+  const exclusivePr = managedByTrust['certigo-pr'].map(({ runner }) => runner);
+  const exclusiveTrusted = managedByTrust['certigo-trusted'].map(
+    ({ runner }) => runner,
+  );
 
-  const currentCapacity = virtualMachines.length;
-  const usableCapacity = instanceInventory.reconciled.filter(
+  const poweredManagedInstances = instanceInventory.managedInstances.filter(
+    ({ virtualMachine }) => isPoweredCapacity(virtualMachine),
+  );
+  const currentCapacity = poweredManagedInstances.length;
+  const physicalManagedCapacity = instanceInventory.managedInstances.length;
+  const usableCapacity = poweredManagedInstances.filter(
     ({ runner }) => runner.status === 'online',
   ).length;
+  const currentCapacityByTrust = Object.fromEntries(
+    Object.entries(managedByTrust).map(([trustClass, managedInstances]) => [
+      trustClass,
+      managedInstances.filter(({ virtualMachine }) =>
+        isPoweredCapacity(virtualMachine),
+      ).length,
+    ]),
+  );
+  const usableCapacityByTrust = Object.fromEntries(
+    Object.entries(managedByTrust).map(([trustClass, managedInstances]) => [
+      trustClass,
+      managedInstances.filter(
+        ({ runner, virtualMachine }) =>
+          runner.status === 'online' &&
+          isPoweredCapacity(virtualMachine),
+      ).length,
+    ]),
+  );
   const vmScaleSets = inventory.runners?.vmScaleSets ?? [];
-  const distinctPoolIdentities = new Set(
-    vmScaleSets.flatMap((scaleSet) => identitiesOf(scaleSet)),
+  const poolBoundaries = summarizePoolBoundaries(
+    vmScaleSets,
+    instanceInventory.managedInstances,
   );
   const identitiesReady =
-    vmScaleSets.every((scaleSet) => identitiesOf(scaleSet).length > 0) &&
-    distinctPoolIdentities.size >= config.minimumExclusivePools;
+    poolBoundaries.distinctIdentityBoundaryCount >=
+      config.minimumExclusivePools &&
+    poolBoundaries.sharedIdentityIds.length === 0;
+  const subnetsReady =
+    poolBoundaries.distinctSubnetCount >= config.minimumExclusiveSubnets &&
+    poolBoundaries.poolsWithoutSubnet.length === 0 &&
+    poolBoundaries.sharedSubnetIds.length === 0;
   const instanceInventoryReady =
-    instanceInventory.missingAzureForRunners.length === 0 &&
-    instanceInventory.unregisteredAzureMachines.length === 0 &&
-    usableCapacity >= config.modes.normal.aggregateCapacity;
-  const exclusivePoolsReady =
+    instanceInventory.absentRunners.length === 0 &&
+    instanceInventory.unclassifiedVirtualMachines.length === 0 &&
+    physicalManagedCapacity >= aggregateCapacity(modeCapacity(config, 'normal'));
+  const exclusiveBoundariesReady =
     dualTrust.length === 0 &&
     exclusivePr.length > 0 &&
     exclusiveTrusted.length > 0 &&
-    vmScaleSets.length >= config.minimumExclusivePools &&
+    poolBoundaries.managedPoolCount >= config.minimumExclusivePools &&
+    poolBoundaries.managedInstancesWithoutPool.length === 0 &&
+    poolBoundaries.missingManagedScaleSets.length === 0 &&
+    poolBoundaries.poolsWithMixedTrustLabels.length === 0 &&
+    poolBoundaries.trustClassPoolCounts['certigo-pr'] > 0 &&
+    poolBoundaries.trustClassPoolCounts['certigo-trusted'] > 0 &&
     identitiesReady &&
+    subnetsReady &&
     instanceInventoryReady;
 
+  const normalCapacity = aggregateCapacity(modeCapacity(config, 'normal'));
   let mode = 'normal';
   if (queued === 0 && active === 0 && busy === 0) {
     mode = 'idle';
   } else if (
     queued >= config.boostQueueDepth ||
     oldestQueuedSeconds >= config.boostOldestQueuedSeconds ||
-    (queued > 0 && busy >= config.modes.normal.aggregateCapacity)
+    (queued > 0 && busy >= normalCapacity)
   ) {
     mode = 'boost';
   }
 
-  const targetCapacity = Math.min(
-    config.modes[mode].aggregateCapacity,
-    config.maxAggregateCapacity,
-  );
-  const scaleInSafe =
-    queued === 0 &&
-    active === 0 &&
-    busy === 0 &&
-    exclusivePoolsReady;
+  const targetCapacityByTrust = modeCapacity(config, mode);
+  const targetCapacity = aggregateCapacity(targetCapacityByTrust);
+  const workloadIdle = queued === 0 && active === 0 && busy === 0;
+  const normalCapacityByTrust = modeCapacity(config, 'normal');
+  const scaleInBaseSafe =
+    workloadIdle &&
+    exclusiveBoundariesReady &&
+    Object.keys(normalCapacityByTrust).every(
+      (trustClass) =>
+        usableCapacityByTrust[trustClass] >=
+        normalCapacityByTrust[trustClass],
+    );
+  const scaleInSafety = advanceScaleInSafety({
+    idle: scaleInBaseSafe,
+    now,
+    quietPeriodSeconds: config.quietPeriodSeconds,
+    rearmSatisfied:
+      !workloadIdle &&
+      Object.keys(targetCapacityByTrust).every(
+        (trustClass) =>
+          usableCapacityByTrust[trustClass] >=
+          targetCapacityByTrust[trustClass],
+      ),
+    requiredGuards: config.requiredPostQuietGuards,
+    state: nextState.scaleInSafety,
+  });
+  nextState.scaleInSafety = scaleInSafety.nextState;
+  const scaleInSafe = scaleInBaseSafe && scaleInSafety.ready;
 
   let action = 'hold';
   let nextCapacity = currentCapacity;
-  if (targetCapacity > currentCapacity && exclusivePoolsReady) {
+  let targetTrustClass = null;
+  const nextCapacityByTrust = { ...currentCapacityByTrust };
+  const scaleOutCandidates = Object.keys(targetCapacityByTrust).filter(
+    (trustClass) =>
+      targetCapacityByTrust[trustClass] >
+      currentCapacityByTrust[trustClass],
+  );
+  if (
+    scaleOutCandidates.length > 0 &&
+    currentCapacity < aggregateCapacity(config.pilotTarget) &&
+    exclusiveBoundariesReady
+  ) {
     action = 'scale-out-one';
-    nextCapacity = Math.min(
-      currentCapacity + config.scaleStep,
-      targetCapacity,
-      config.maxAggregateCapacity,
-    );
+    targetTrustClass = scaleOutCandidates
+      .sort((left, right) => {
+        const queuePriority =
+          Number(queuedByTrust[right] > 0) -
+          Number(queuedByTrust[left] > 0);
+        if (queuePriority !== 0) {
+          return queuePriority;
+        }
+        return (
+          targetCapacityByTrust[right] -
+          currentCapacityByTrust[right] -
+          (targetCapacityByTrust[left] - currentCapacityByTrust[left])
+        );
+      })[0];
+    nextCapacity = currentCapacity + config.scaleStep;
+    nextCapacityByTrust[targetTrustClass] += config.scaleStep;
   } else if (targetCapacity < currentCapacity && scaleInSafe) {
     action = 'scale-in-one';
-    nextCapacity = Math.max(
-      currentCapacity - config.scaleStep,
-      targetCapacity,
-    );
+    targetTrustClass = Object.keys(targetCapacityByTrust)
+      .filter(
+        (trustClass) =>
+          currentCapacityByTrust[trustClass] >
+          targetCapacityByTrust[trustClass],
+      )
+      .sort(
+        (left, right) =>
+          currentCapacityByTrust[right] -
+          targetCapacityByTrust[right] -
+          (currentCapacityByTrust[left] - targetCapacityByTrust[left]),
+      )[0];
+    nextCapacity = Math.max(currentCapacity - config.scaleStep, targetCapacity);
+    nextCapacityByTrust[targetTrustClass] -= config.scaleStep;
   }
 
   const blockers = [];
   if (!config.enabled) {
     blockers.push('capacity controller feature flag is off');
   }
-  if (!exclusivePoolsReady) {
+  if (!exclusiveBoundariesReady) {
     blockers.push(
-      'exclusive certigo-pr/certigo-trusted pools and identities are not reconciled',
+      'exclusive certigo-pr/certigo-trusted labels, identities, and subnets are not reconciled',
     );
   }
   if (config.leaseRequired && !leaseHeld) {
     blockers.push('a distributed lease is required before any mutable action');
   }
   if (targetCapacity < currentCapacity && !scaleInSafe) {
-    blockers.push('scale-in requires an empty queue, zero active jobs, and no busy runner');
+    blockers.push(
+      'scale-in requires a resettable five-minute quiet period followed by two guards',
+    );
+  }
+
+  const canRequestChange =
+    config.enabled &&
+    exclusiveBoundariesReady &&
+    (!config.leaseRequired || leaseHeld) &&
+    action !== 'hold';
+  if (action === 'scale-in-one' && canRequestChange) {
+    nextState.scaleInSafety = armScaleInReactivation(
+      nextState.scaleInSafety,
+    );
   }
 
   return {
@@ -191,19 +392,32 @@ export function createCapacityPlan({
     mode,
     action,
     currentCapacity,
+    currentCapacityByTrust,
+    physicalManagedCapacity,
     usableCapacity,
+    usableCapacityByTrust,
     targetCapacity,
+    targetCapacityByTrust,
+    targetTrustClass,
     nextCapacity,
-    maxAggregateCapacity: config.maxAggregateCapacity,
+    nextCapacityByTrust,
+    pilotTarget: config.pilotTarget,
+    pilotTargetCapacity: aggregateCapacity(config.pilotTarget),
     scaleInSafe,
-    canRequestChange:
-      config.enabled &&
-      exclusivePoolsReady &&
-      (!config.leaseRequired || leaseHeld) &&
-      action !== 'hold',
+    canRequestChange,
     blockers,
+    safety: {
+      guardCount: scaleInSafety.guardCount,
+      quietComplete: scaleInSafety.quietComplete,
+      quietElapsedSeconds: scaleInSafety.quietElapsedSeconds,
+      quietReset: scaleInSafety.quietReset,
+      rearmRequired: scaleInSafety.rearmRequired,
+      requiredGuards: config.requiredPostQuietGuards,
+      quietPeriodSeconds: config.quietPeriodSeconds,
+    },
     workload: {
       queued,
+      queuedByTrust,
       active,
       busy,
       oldestQueuedSeconds,
@@ -212,9 +426,23 @@ export function createCapacityPlan({
       dualTrustRunners: dualTrust.map((runner) => runner.name),
       exclusivePrRunners: exclusivePr.map((runner) => runner.name),
       exclusiveTrustedRunners: exclusiveTrusted.map((runner) => runner.name),
-      distinctPoolIdentityCount: distinctPoolIdentities.size,
-      missingAzureForRunners: instanceInventory.missingAzureForRunners,
-      unregisteredAzureMachines: instanceInventory.unregisteredAzureMachines,
+      absentRunners: instanceInventory.absentRunners,
+      distinctIdentityBoundaryCount:
+        poolBoundaries.distinctIdentityBoundaryCount,
+      distinctSubnetCount: poolBoundaries.distinctSubnetCount,
+      externalVirtualMachines: instanceInventory.externalVirtualMachines,
+      managedMachineNames: instanceInventory.managedMachineNames,
+      managedPoolNames: poolBoundaries.managedPoolNames,
+      managedInstancesWithoutPool:
+        poolBoundaries.managedInstancesWithoutPool,
+      missingManagedScaleSets: poolBoundaries.missingManagedScaleSets,
+      poolsWithoutSubnet: poolBoundaries.poolsWithoutSubnet,
+      poolsWithMixedTrustLabels:
+        poolBoundaries.poolsWithMixedTrustLabels,
+      sharedIdentityIds: poolBoundaries.sharedIdentityIds,
+      sharedSubnetIds: poolBoundaries.sharedSubnetIds,
+      unclassifiedVirtualMachines:
+        instanceInventory.unclassifiedVirtualMachines,
       vmScaleSetCount: vmScaleSets.length,
     },
     nextState,

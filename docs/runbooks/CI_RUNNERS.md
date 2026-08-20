@@ -8,7 +8,7 @@
 | **Périmètre** | Repo `gchambaud_microsoft/Certigo` · RG `RG-CERTIGO-CI` · subscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**). |
 | **Statut** | **Migration bloquée** : aucune déallocation automatisée avant séparation des labels et retrait du scale-in CPU. |
 
-> **Dérive live constatée le 19 août 2026.** Le pool est désormais
+> **Dérive live consolidée au 20 août 2026.** Le pool est désormais
 > `vmss-certigo-runner-zonal` (Flexible, autoscale 2–4). Les deux runners GitHub
 > enregistrés portent simultanément `certigo-pr` et `certigo-trusted`; le scale-in CPU
 > ignore l'état `busy`. Les anciennes commandes visant `vm-certigo-runner` et
@@ -54,11 +54,11 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 | Élément | Valeur |
 |---|---|
 | **VMSS live** | `vmss-certigo-runner-zonal` · Flexible · `Standard_D2ads_v6` |
-| **Capacité Azure live** | `f55d176e` et `4153d1dd` running; `22f7fb52` absent (`ResourceNotFound`) |
+| **Capacité Azure live** | `f55d176e` gérée/running; `4153d1dd` externe/deallocated et hors scope; `22f7fb52` absent (`ResourceNotFound`) |
 | **Resource group** | `RG-CERTIGO-CI` |
 | **Subscription** | `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**) |
-| **Runners GitHub live** | `22f7fb52` offline/stale; `f55d176e` est passé d'online à offline entre deux snapshots; labels doubles |
-| **Capacité utilisable** | dynamique : 1 puis 0; `4153d1dd` est intacte mais non enregistrée |
+| **Runners GitHub live** | `22f7fb52` offline/stale et absent d'Azure; `f55d176e` est le seul runner géré/online; labels doubles encore bloquants |
+| **Classification contrôleur** | `22f7fb52` absent · `f55d176e` géré · `4153d1dd` externe explicitement allow-listée, jamais comptée ou ciblée |
 | **Identité VMSS** | UAMI `id-vm-certigo-runner-2-vmss`, rôle `Key Vault Secrets User` au coffre CI exact |
 | **Repo desservi** | `gchambaud_microsoft/Certigo` |
 
@@ -80,13 +80,15 @@ Baseline 30 jours : **242,06 USD**, 413 jobs, 18,84 runner-heures, CPU moyen 3,7
 file P95 5 108 s et P99 12 628 s. Le CPU faible combiné à une file longue justifie un
 contrôleur `workflow_job` queue-driven, pas un seuil CPU. Son feature flag reste désactivé.
 Le plan réconcilie les noms Azure/GitHub à chaque lecture et ne suppose jamais deux instances
-fixes. La redondance doit être reconstruite et prouvée avant toute activation.
+fixes. La redondance doit être reconstruite avec labels, identités et sous-réseaux séparés,
+puis prouvée avant toute activation. La cible du pilote ultérieur est **6 PR + 2 trusted**;
+ce n'est ni le plafond live actuel de 4, ni un maximum de production définitif.
 
 | Situation | État requis | Décision opérateur |
 |---|---|---|
 | Avant une session CI | un runner exclusif `certigo-pr` et un exclusif `certigo-trusted`, `online` | Tant que les labels sont doubles, corriger la configuration avant toute automation. |
 | Pendant une session | zéro scale-in CPU | Ne jamais laisser Azure retirer une instance sur simple faible CPU. |
-| Après la session | tous `busy: false`, zéro run queued/in-progress, deux sondes successives | Prévol seulement; changement sous lease et un pool à la fois. |
+| Après la session | 5 min continues à zéro, reset sur toute activité, puis deux gardes | Prévol seulement; changement sous lease, un pool à la fois, avec réarmement sur nouvelle activité. |
 | Panne/maintenance | autre classe préservée | Ne jamais déplacer son label pour contourner la panne. |
 
 Le détail de reconstruction, de santé et de révocation est dans
@@ -126,8 +128,11 @@ Attendre `status: online` **avant** d'approuver un run de PR (sinon les jobs res
 
 ## 5. Éteindre la CI (après usage — pour le coût)
 
-Le prévol ci-dessous vérifie les labels, jobs actifs/en file, autoscale et réconciliation
-Azure/GitHub. Il n'effectue aucune déallocation.
+Le prévol ci-dessous vérifie les labels, jobs actifs/en file, autoscale, frontières
+d'identité/sous-réseau et réconciliation Azure/GitHub. Il n'effectue aucune déallocation.
+Dans le présent livrable, `enabled=false` bloque tous les prévols. Après une future activation
+séparée, le premier passage démarrera seulement la quiet period; un snapshot d'état externe
+devra prouver les 5 minutes continues puis deux gardes distinctes.
 
 ```bash
 bash infra/ci-runner/lifecycle-preflight.sh deallocate
@@ -208,8 +213,8 @@ Si, après un `az vm start` et ~1–2 minutes d'attente, un runner reste `offlin
 
 - **Ne jamais laisser les VMs allumées H24.** Une VM `running` — ou seulement `stopped` (non
   déallouée) — facture le compute **même à vide**. C'est le principal poste d'économie.
-- **`deallocate` systématique** après chaque session de CI (cf. §5). Réflexe : *j'allume → j'utilise →
-  je déalloue*.
+- **Aucune déallocation immédiate** après une session : attendre 5 minutes continues sans
+  activité, deux gardes, le lease et la garde finale; réarmer si un run apparaît ensuite.
 - **Vérifier `busy: false`** avant de déallouer (§6) pour ne pas tuer un run en cours.
 - **Grouper les runs.** Plutôt que d'allumer/éteindre pour une micro-PR, regrouper les besoins CI d'une
   même session réduit les cycles de démarrage.
@@ -271,5 +276,5 @@ validations PR ne peut donc être restauré sur le pool trusted.
 
 > **Paramètres confirmés** : RG `RG-CERTIGO-CI` · VMSS
 > `vmss-certigo-runner-zonal` · subscription
-> `b8952c8c-8f72-469d-99cd-ac906da4e2fc` · labels live doubles
-> `certigo-pr` / `certigo-trusted` à corriger.
+> `b8952c8c-8f72-469d-99cd-ac906da4e2fc` · `22f7fb52` absent ·
+> `f55d176e` géré · `4153d1dd` externe · labels live doubles à corriger.

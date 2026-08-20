@@ -11,7 +11,8 @@ Les workflows Linux ciblent deux classes de confiance fixes et jamais un nom de 
 
 La **cible** impose un pool `certigo-pr` sans identité/secrets et un pool
 `certigo-trusted` pour les gates agrégées sans source PR et les opérations
-release/déploiement. Les labels doivent être mutuellement exclusifs :
+release/déploiement. Les labels, frontières d'identité et sous-réseaux doivent être
+mutuellement exclusifs :
 
 - les PR de fork ne peuvent pas exécuter de code sur les runners persistants ;
 - les PR internes n'obtiennent ni environnement, ni secret, ni identité Azure ;
@@ -22,16 +23,17 @@ release/déploiement. Les labels doivent être mutuellement exclusifs :
 
 ## Capacité et stratégie de cycle de vie
 
-L'inventaire read-only du 19 août 2026 a constaté un VMSS flexible
+L'inventaire read-only consolidé au 20 août 2026 a constaté un VMSS flexible
 `vmss-certigo-runner-zonal`, un autoscale CPU min 2/max 4 et des labels
 `certigo-pr` + `certigo-trusted` simultanés sur les deux runners enregistrés.
 Cet état ne respecte pas la cible ci-dessus. Le scale-in CPU ignore l'état GitHub `busy`.
 
-Un snapshot réconciliait seulement `f55d176e` (VM running, runner online), puis le runner
-est passé offline pendant les validations. `22f7fb52-Certigo` reste enregistré mais sa VM
-Azure retourne `ResourceNotFound`; `4153d1dd` est une VM running intacte sans runner
-correspondant. La capacité utile observée est donc passée de un à zéro. Aucune de ces
-entrées n'est supprimée ou réparée par ce livrable.
+La réconciliation classe `22f7fb52-Certigo` comme runner **absent** d'Azure,
+`f55d176e` comme seule paire **gérée** (running/online), et `4153d1dd` comme VM
+**externe** au contrôleur (deallocated) via son nom exact. L'externe n'est ni comptée,
+ni adoptée, ni ciblée. Toute nouvelle VM sans runner est non classée et bloque le plan.
+Aucune de ces entrées n'est
+supprimée ou réparée par ce livrable.
 
 Toute automation mutable est donc bloquée. Le prévol
 `infra/ci-runner/lifecycle-preflight.sh` est read-only et doit refuser cet état. La
@@ -40,6 +42,13 @@ sont dans [`CLOUD_LEAST_PRIVILEGE.md`](./runbooks/CLOUD_LEAST_PRIVILEGE.md).
 
 La release Android reste volontairement sur `certigo-trusted`. Elle peut
 utiliser l'identité managée Azure du runner pour lire Key Vault.
+
+Le contrôleur reste `enabled=false`. La cible d'un pilote ultérieur est limitée à
+**6 runners `certigo-pr` + 2 runners `certigo-trusted`**, avec un incrément par plan.
+Cette limite de pilote n'est pas un plafond de production final. Tout scale-in exige
+5 minutes continues sans activité, remises à zéro par tout job `queued/in_progress`
+ou runner `busy`, puis deux gardes distinctes. Une activité post-scale-in déclenche
+le réarmement de la capacité gérée avant toute nouvelle réduction.
 
 ## Politique des pull requests
 
@@ -62,8 +71,8 @@ Ces opérations modifient Azure ou GitHub et ne peuvent pas être prouvées par 
      --jq '.runners[] | {name,status,busy,labels:[.labels[].name]}'
    ```
 
-2. Conserver au moins un pool sain par classe dans `snet-runners`; ne pas appliquer
-   `runner.bicep` au VMSS flexible live.
+2. Conserver au moins un pool sain par classe dans deux sous-réseaux distincts; ne pas
+   appliquer `runner.bicep` au VMSS flexible live.
 3. Enregistrer le pool PR avec `certigo-pr` seulement et le pool opérations avec
    `certigo-trusted` seulement; n'accorder les droits minimaux qu'au second.
 4. Vérifier qu'un runner en ligne existe dans chaque classe :
@@ -404,9 +413,9 @@ jusqu'à restauration d'une VM saine de sa propre classe ; aucun fallback de cla
 ## Reconstruction, rotation et révocation
 
 - **Reconstruction** : si une VM runner devient irrécupérable, reprovisionner une VM
-  Linux dans `RG-CERTIGO-CI`, la raccorder au sous-réseau `snet-runners`, réappliquer
-  le bootstrap idempotent, puis réenregistrer le runner GitHub avec son label de rôle
-  `certigo-pr` ou `certigo-trusted`.
+  Linux dans `RG-CERTIGO-CI`, la raccorder au sous-réseau exclusif de sa classe,
+  réappliquer le bootstrap idempotent, puis réenregistrer le runner GitHub avec son
+  unique label de rôle `certigo-pr` ou `certigo-trusted`.
 - **Rotation** : lors de la rotation d'un outil, d'un certificat ou d'un accès
   managé, mettre à jour la documentation opérateur correspondante puis valider la VM
   reconstruite avec la sonde quotidienne et le drill manuel.

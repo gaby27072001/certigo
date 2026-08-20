@@ -3,8 +3,10 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import {
+  isPoweredCapacity,
   labelsOf,
   reconcileRunnerInstances,
+  summarizePoolBoundaries,
 } from './runner-inventory.mjs';
 
 function scaleInRules(autoscaleSettings) {
@@ -17,13 +19,11 @@ function scaleInRules(autoscaleSettings) {
   );
 }
 
-function identitiesOf(scaleSet) {
-  return [
-    ...Object.keys(scaleSet.identity?.userAssignedIdentities ?? {}),
-    ...(scaleSet.identity?.principalId
-      ? [scaleSet.identity.principalId]
-      : []),
-  ];
+function aggregateCapacity(capacityByTrust) {
+  return (
+    capacityByTrust['certigo-pr'] +
+    capacityByTrust['certigo-trusted']
+  );
 }
 
 export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
@@ -45,12 +45,14 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
         .filter(Boolean),
     ),
   ];
-  const distinctPoolIdentities = new Set(
-    liveVmScaleSets.flatMap((scaleSet) => identitiesOf(scaleSet)),
-  );
   const instanceInventory = reconcileRunnerInstances(
     inventory.runners?.virtualMachines ?? [],
     inventory.runners?.github?.runners ?? [],
+    config.inventory,
+  );
+  const poolBoundaries = summarizePoolBoundaries(
+    liveVmScaleSets,
+    instanceInventory.managedInstances,
   );
 
   if (
@@ -63,24 +65,39 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
       detail: 'IaC models standalone VMs while Azure runs a VMSS.',
     });
   }
-  if (
-    instanceInventory.missingAzureForRunners.length > 0 ||
-    instanceInventory.unregisteredAzureMachines.length > 0
-  ) {
+  if (instanceInventory.absentRunners.length > 0) {
     findings.push({
       severity: 'blocking',
-      code: 'INSTANCE_REGISTRATION_DRIFT',
-      detail: `Missing Azure for runners: ${instanceInventory.missingAzureForRunners.join(', ') || 'none'}; Azure VM without runner: ${instanceInventory.unregisteredAzureMachines.join(', ') || 'none'}.`,
+      code: 'ABSENT_RUNNER_DRIFT',
+      detail: `GitHub runners without an Azure VM: ${instanceInventory.absentRunners.join(', ')}.`,
     });
   }
-  const usableCapacity = instanceInventory.reconciled.filter(
+  if (instanceInventory.externalVirtualMachines.length > 0) {
+    findings.push({
+      severity: 'informational',
+      code: 'EXTERNAL_INSTANCE_OBSERVED',
+      detail: `Azure VMs outside controller ownership: ${instanceInventory.externalVirtualMachines.join(', ')}. They must not be adopted, relabelled, or changed implicitly.`,
+    });
+  }
+  if (instanceInventory.unclassifiedVirtualMachines.length > 0) {
+    findings.push({
+      severity: 'blocking',
+      code: 'UNCLASSIFIED_INSTANCE_DRIFT',
+      detail: `Azure VMs without a runner or explicit external classification: ${instanceInventory.unclassifiedVirtualMachines.join(', ')}.`,
+    });
+  }
+  const poweredManagedInstances = instanceInventory.managedInstances.filter(
+    ({ virtualMachine }) => isPoweredCapacity(virtualMachine),
+  );
+  const usableCapacity = poweredManagedInstances.filter(
     ({ runner }) => runner.status === 'online',
   ).length;
-  if (usableCapacity < config.modes.normal.aggregateCapacity) {
+  const normalTarget = aggregateCapacity(config.modes.normal);
+  if (usableCapacity < normalTarget) {
     findings.push({
       severity: 'blocking',
       code: 'REDUNDANCY_DRIFT',
-      detail: `Usable reconciled capacity is ${usableCapacity}; normal target is ${config.modes.normal.aggregateCapacity}.`,
+      detail: `Usable managed capacity is ${usableCapacity}; normal target is ${normalTarget}.`,
     });
   }
   if (
@@ -102,22 +119,48 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
     });
   }
   if (
-    liveVmScaleSets.length < config.minimumExclusivePools ||
-    distinctPoolIdentities.size < config.minimumExclusivePools
+    poolBoundaries.managedPoolCount < config.minimumExclusivePools ||
+    poolBoundaries.managedInstancesWithoutPool.length > 0 ||
+    poolBoundaries.missingManagedScaleSets.length > 0 ||
+    poolBoundaries.distinctIdentityBoundaryCount <
+      config.minimumExclusivePools ||
+    poolBoundaries.sharedIdentityIds.length > 0
   ) {
     findings.push({
       severity: 'blocking',
       code: 'POOL_IDENTITY_DRIFT',
-      detail: `Expected ${config.minimumExclusivePools} pools with distinct identities; observed ${liveVmScaleSets.length} pools and ${distinctPoolIdentities.size} identities.`,
+      detail: `Expected ${config.minimumExclusivePools} managed pools with exclusive identity boundaries; observed ${poolBoundaries.managedPoolCount} managed pools and ${poolBoundaries.distinctIdentityBoundaryCount} boundaries.`,
+    });
+  }
+  if (
+    poolBoundaries.distinctSubnetCount < config.minimumExclusiveSubnets ||
+    poolBoundaries.poolsWithoutSubnet.length > 0 ||
+    poolBoundaries.sharedSubnetIds.length > 0
+  ) {
+    findings.push({
+      severity: 'blocking',
+      code: 'POOL_SUBNET_DRIFT',
+      detail: `Expected ${config.minimumExclusiveSubnets} exclusive runner subnets; observed ${poolBoundaries.distinctSubnetCount}.`,
+    });
+  }
+  if (
+    poolBoundaries.poolsWithMixedTrustLabels.length > 0 ||
+    poolBoundaries.trustClassPoolCounts['certigo-pr'] === 0 ||
+    poolBoundaries.trustClassPoolCounts['certigo-trusted'] === 0
+  ) {
+    findings.push({
+      severity: 'blocking',
+      code: 'POOL_TRUST_BOUNDARY_DRIFT',
+      detail: `Managed pools do not map one trust class per pool: ${poolBoundaries.poolsWithMixedTrustLabels.join(', ') || 'missing class pool'}.`,
     });
   }
 
-  const dualTrustRunners = (inventory.runners?.github?.runners ?? [])
-    .filter((runner) => {
+  const dualTrustRunners = instanceInventory.managedInstances
+    .filter(({ runner }) => {
       const labels = labelsOf(runner);
       return labels.has('certigo-pr') && labels.has('certigo-trusted');
     })
-    .map((runner) => runner.name);
+    .map(({ runner }) => runner.name);
   if (dualTrustRunners.length > 0) {
     findings.push({
       severity: 'blocking',
@@ -132,8 +175,12 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
     findings,
     expected: {
       controllerEnabled: false,
-      maxAggregateCapacity: config.maxAggregateCapacity,
       minimumExclusivePools: config.minimumExclusivePools,
+      minimumExclusiveSubnets: config.minimumExclusiveSubnets,
+      pilotTarget: config.pilotTarget,
+      pilotTargetCapacity: aggregateCapacity(config.pilotTarget),
+      quietPeriodSeconds: config.quietPeriodSeconds,
+      requiredPostQuietGuards: config.requiredPostQuietGuards,
       trigger: config.trigger,
       vmSize: expectedVmSize,
     },
@@ -145,9 +192,22 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
         inventory.runners?.virtualMachines?.length ?? 0,
       githubRunnerCount:
         inventory.runners?.github?.runners?.length ?? 0,
-      distinctPoolIdentityCount: distinctPoolIdentities.size,
-      missingAzureForRunners: instanceInventory.missingAzureForRunners,
-      unregisteredAzureMachines: instanceInventory.unregisteredAzureMachines,
+      absentRunners: instanceInventory.absentRunners,
+      distinctIdentityBoundaryCount:
+        poolBoundaries.distinctIdentityBoundaryCount,
+      distinctSubnetCount: poolBoundaries.distinctSubnetCount,
+      externalVirtualMachines: instanceInventory.externalVirtualMachines,
+      managedMachineNames: instanceInventory.managedMachineNames,
+      managedPoolCount: poolBoundaries.managedPoolCount,
+      managedPoolNames: poolBoundaries.managedPoolNames,
+      poolsWithMixedTrustLabels:
+        poolBoundaries.poolsWithMixedTrustLabels,
+      physicalManagedCapacity: instanceInventory.managedInstances.length,
+      poweredManagedCapacity: poweredManagedInstances.length,
+      sharedIdentityIds: poolBoundaries.sharedIdentityIds,
+      sharedSubnetIds: poolBoundaries.sharedSubnetIds,
+      unclassifiedVirtualMachines:
+        instanceInventory.unclassifiedVirtualMachines,
       usableCapacity,
     },
     baseline30Days: config.observedBaseline30Days,

@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { evaluateLifecycle } from './evaluate-lifecycle.mjs';
+
+const config = JSON.parse(
+  readFileSync(
+    new URL('./capacity-controller.config.json', import.meta.url),
+    'utf8',
+  ),
+);
 
 function runner(name, labels, { busy = false, status = 'online' } = {}) {
   return {
@@ -12,8 +20,35 @@ function runner(name, labels, { busy = false, status = 'online' } = {}) {
   };
 }
 
+function scaleSet(name, subnet, identity = `/identities/${name}`) {
+  return {
+    name,
+    identity: identity
+      ? { userAssignedIdentities: { [identity]: {} } }
+      : {},
+    virtualMachineProfile: {
+      networkProfile: {
+        networkInterfaceConfigurations: [
+          {
+            properties: {
+              ipConfigurations: [
+                {
+                  properties: {
+                    subnet: { id: subnet },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
 test('deallocation is blocked for the observed dual-label busy autoscaled pool', () => {
   const result = evaluateLifecycle({
+    config,
     operation: 'deallocate',
     runners: {
       runners: [
@@ -32,6 +67,9 @@ test('deallocation is blocked for the observed dual-label busy autoscaled pool',
       ],
     },
     virtualMachines: [{ name: 'vm-a' }, { name: 'vm-b' }, { name: 'vm-c' }],
+    vmScaleSets: [
+      scaleSet('pool-shared', '/networks/shared/subnets/runners'),
+    ],
   });
 
   assert.equal(result.preflightOnly, true);
@@ -42,8 +80,51 @@ test('deallocation is blocked for the observed dual-label busy autoscaled pool',
   assert.ok(result.reasons.includes('active workflow runs: 1'));
 });
 
-test('idle reconciled exclusive pools pass the read-only preflight', () => {
+test('feature-off blocks an otherwise valid start preflight', () => {
   const result = evaluateLifecycle({
+    config,
+    operation: 'start',
+    runners: {
+      runners: [
+        runner('vm-pr-Certigo', ['certigo-pr']),
+        runner('vm-trusted-Certigo', ['certigo-trusted']),
+      ],
+    },
+    queuedRuns: { total_count: 0 },
+    activeRuns: { total_count: 0 },
+    autoscale: { enabled: false, profiles: [] },
+    virtualMachines: [
+      {
+        name: 'vm-pr',
+        powerState: 'VM deallocated',
+        virtualMachineScaleSet: { id: '/vmss/pool-pr' },
+      },
+      {
+        name: 'vm-trusted',
+        powerState: 'VM deallocated',
+        virtualMachineScaleSet: { id: '/vmss/pool-trusted' },
+      },
+    ],
+    vmScaleSets: [
+      scaleSet('pool-pr', '/networks/pr/subnets/runners', null),
+      scaleSet(
+        'pool-trusted',
+        '/networks/trusted/subnets/runners',
+        '/identities/trusted',
+      ),
+    ],
+  });
+
+  assert.equal(result.safeToRequestChange, false);
+  assert.ok(
+    result.reasons.includes('capacity controller feature flag is off'),
+  );
+});
+
+test('idle exclusive pools require five minutes, two guards, then arm reactivation', () => {
+  const start = Date.parse('2026-08-20T06:00:00Z');
+  const input = {
+    config: { ...config, enabled: true },
     operation: 'deallocate',
     runners: {
       runners: [
@@ -57,15 +138,73 @@ test('idle reconciled exclusive pools pass the read-only preflight', () => {
       enabled: false,
       profiles: [],
     },
-    virtualMachines: [{ name: 'vm-pr' }, { name: 'vm-trusted' }],
-  });
+    virtualMachines: [
+      {
+        name: 'vm-pr',
+        powerState: 'VM running',
+        virtualMachineScaleSet: { id: '/vmss/pool-pr' },
+      },
+      {
+        name: 'vm-trusted',
+        powerState: 'VM running',
+        virtualMachineScaleSet: { id: '/vmss/pool-trusted' },
+      },
+    ],
+    vmScaleSets: [
+      scaleSet('pool-pr', '/networks/pr/subnets/runners', null),
+      scaleSet(
+        'pool-trusted',
+        '/networks/trusted/subnets/runners',
+        '/identities/trusted',
+      ),
+    ],
+  };
 
-  assert.equal(result.safeToRequestChange, true);
-  assert.deepEqual(result.reasons, []);
+  const quietStarted = evaluateLifecycle({ ...input, now: start });
+  assert.equal(quietStarted.safeToRequestChange, false);
+  assert.equal(quietStarted.safety.guardCount, 0);
+
+  const firstGuard = evaluateLifecycle({
+    ...input,
+    now: start + 300_000,
+    state: quietStarted.nextState,
+  });
+  assert.equal(firstGuard.safeToRequestChange, false);
+  assert.equal(firstGuard.safety.guardCount, 1);
+
+  const secondGuard = evaluateLifecycle({
+    ...input,
+    now: start + 301_000,
+    state: firstGuard.nextState,
+  });
+  assert.equal(secondGuard.safeToRequestChange, true);
+  assert.deepEqual(secondGuard.reasons, []);
+  assert.equal(secondGuard.safety.guardCount, 2);
+  assert.equal(secondGuard.nextState.scaleInSafety.rearmArmed, true);
+  assert.equal(secondGuard.nextState.scaleInSafety.guardCount, 0);
+
+  const stoppedInput = structuredClone(input);
+  stoppedInput.runners.runners[1].status = 'offline';
+  stoppedInput.virtualMachines[1].powerState = 'VM deallocated';
+  const activity = evaluateLifecycle({
+    ...stoppedInput,
+    now: start + 302_000,
+    queuedRuns: { total_count: 1 },
+    state: secondGuard.nextState,
+  });
+  assert.equal(activity.safeToRequestChange, false);
+  assert.equal(activity.safety.quietReset, false);
+  assert.equal(activity.safety.rearmRequired, true);
+  assert.ok(
+    activity.reasons.includes(
+      'post-scale-in activity requires managed capacity rearm',
+    ),
+  );
 });
 
 test('equal VM and runner counts still fail when their names do not reconcile', () => {
   const result = evaluateLifecycle({
+    config,
     operation: 'deallocate',
     runners: {
       runners: [
@@ -90,28 +229,38 @@ test('equal VM and runner counts still fail when their names do not reconcile', 
       { name: 'vmss-certigo-runner-zonal_4153d1dd' },
       { name: 'vmss-certigo-runner-zonal_f55d176e' },
     ],
+    vmScaleSets: [
+      scaleSet(
+        'vmss-certigo-runner-zonal',
+        '/networks/live/subnets/runners',
+      ),
+    ],
   });
 
   assert.equal(result.safeToRequestChange, false);
   assert.ok(
-    result.reasons.some(
-      (reason) =>
-        reason.includes('22f7fb52-Certigo') &&
-        reason.includes('4153d1dd'),
-    ),
+    result.reasons.some((reason) => reason.includes('22f7fb52-Certigo')),
   );
+  assert.deepEqual(result.observed.managedMachineNames, [
+    'vmss-certigo-runner-zonal_f55d176e',
+  ]);
+  assert.deepEqual(result.observed.externalVirtualMachines, [
+    'vmss-certigo-runner-zonal_4153d1dd',
+  ]);
 });
 
 test('unknown lifecycle operations fail closed', () => {
   assert.throws(
     () =>
       evaluateLifecycle({
+        config,
         operation: 'delete',
         runners: { runners: [] },
         queuedRuns: { total_count: 0 },
         activeRuns: { total_count: 0 },
         autoscale: {},
         virtualMachines: [],
+        vmScaleSets: [],
       }),
     /Unsupported lifecycle operation/,
   );

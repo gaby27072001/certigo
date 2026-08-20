@@ -17,9 +17,10 @@ bash infra/ci-runner/lifecycle-preflight.sh deallocate
 ```
 
 `lifecycle-preflight.sh` ne possède volontairement aucun chemin `apply`. Il retourne `2` dès
-qu'une déallocation serait dangereuse.
+qu'une déallocation serait dangereuse et, dans cette PR, pour toute demande puisque le
+feature flag reste `off`.
 
-## Inventaire read-only du 19 août 2026
+## Inventaire read-only consolidé au 20 août 2026
 
 Périmètre observé : subscription
 `b8952c8c-8f72-469d-99cd-ac906da4e2fc`, groupes `rg-certigo-dev`,
@@ -49,21 +50,22 @@ L'état live ne correspond plus aux anciennes VM autonomes documentées :
 | Élément | État observé |
 |---|---|
 | Compute | VMSS flexible `vmss-certigo-runner-zonal`, `Standard_D2ads_v6`, zones 1 et 2 |
-| Inventaire Azure courant | `f55d176e` running; `4153d1dd` running; `22f7fb52` retourne `ResourceNotFound` |
+| Inventaire Azure courant | `f55d176e` est la seule instance gérée et reste running; `4153d1dd` est externe/deallocated et hors scope; `22f7fb52` retourne `ResourceNotFound` |
 | Autoscale | activé, minimum `2`, défaut `2`, maximum `4` |
 | Scale-out | CPU moyenne > 70 % pendant 10 min |
 | Scale-in | CPU moyenne < 20 % pendant 45 min — **non conscient des jobs GitHub** |
-| Inventaire GitHub | snapshot demandé : `f55d176e-Certigo` online, `22f7fb52-Certigo` offline; validation ultérieure : les deux offline |
+| Inventaire GitHub | `f55d176e-Certigo` est l'enregistrement géré/online; `22f7fb52-Certigo` est offline/stale et sa VM est absente |
 | Cloisonnement | les deux portent simultanément `certigo-pr` et `certigo-trusted` — **bloquant** |
-| Capacité réellement réconciliée | **1 puis 0** selon le snapshot; calculée à chaque plan, jamais supposée |
+| Capacité réellement réconciliée | **1 instance gérée** (`f55d176e`); `4153d1dd` est classée externe et n'entre jamais dans la capacité du contrôleur |
 
-Le premier snapshot avait vu trois VM, avant le scale-in CPU. Le snapshot courant prouve qu'un
-simple comptage « 2 VM / 2 runners » est faux : les noms ne correspondent que pour `f55d176e`.
-La VM `4153d1dd` est running et intacte mais sans runner GitHub correspondant; elle n'est
-**pas orpheline**. Le runner `22f7fb52-Certigo` est un enregistrement stale tant que son
-absence Azure n'a pas été investiguée et approuvée. Le passage de `f55d176e-Certigo`
-d'online à offline pendant les lectures confirme que seul l'inventaire instantané peut
-déterminer la capacité utile.
+Le premier snapshot avait vu trois VM, avant le scale-in CPU. L'état consolidé prouve qu'un
+simple comptage « VM Azure / runners GitHub » est faux. La réconciliation par nom classe
+`22f7fb52-Certigo` comme **absent**, la paire `f55d176e` comme **gérée** et
+`4153d1dd` comme **externe**. Externe ne signifie ni orpheline ni adoptable : cette VM est
+exclue de `currentCapacity`, de toute sélection de cible et de toute opération future par
+une classification exacte dans `inventory.externalVirtualMachines`. Toute autre VM sans
+runner reste `unclassifiedVirtualMachines` et bloque le plan; elle n'est jamais implicitement
+considérée externe.
 
 ### Baseline capacité et coût sur 30 jours
 
@@ -98,8 +100,8 @@ réinventoriées avant toute décision :
 - l'UAMI `id-vm-certigo-runner-2-vmss` est liée au VMSS et possède uniquement
   `Key Vault Secrets User` sur `kv-certigo-ci-081423`.
 
-`4153d1dd` est explicitement gelée pour diagnostic, adoption ou reconstruction planifiée.
-Ne pas la supprimer, réenregistrer ou relabelliser depuis cette PR.
+`4153d1dd` est explicitement externe et gelée. Ne pas la démarrer, déallouer, supprimer,
+réenregistrer, relabelliser ou adopter depuis cette PR.
 
 `kv-certigo-ci-pub814` et tout autre artefact sans chaîne d'usage complète restent
 **non classés**, jamais « orphelins par intuition ». Une suppression n'est envisageable que si
@@ -206,23 +208,30 @@ Sans les dix preuves pour prod, les rôles abonnement historiques restent en pla
 L'automatisation de puissance est **bloquée dans l'état actuel**. Avant de lui donner un chemin
 mutable :
 
-1. séparer les pools/VMSS `certigo-pr` et `certigo-trusted`, avec labels mutuellement exclusifs ;
+1. séparer les pools/VMSS `certigo-pr` et `certigo-trusted`, avec labels, frontières
+   d'identité et sous-réseaux mutuellement exclusifs ;
 2. supprimer le scale-in CPU, qui ne connaît pas l'état `busy` GitHub ;
 3. utiliser une identité d'automatisation avec uniquement `read`, `start/action`,
    `deallocate/action` aux scopes exacts des deux pools ;
 4. acquérir un lease Blob dédié avant toute opération, avec un seul contrôleur autorisé ;
-5. pour déallouer, retirer le label de routage, attendre deux sondes successives
-   `busy=false`, zéro run `queued/in_progress`, puis traiter **un pool à la fois** ;
-6. revalider avant le second pool; ne jamais lancer deux déallocations concurrentes ;
+5. pour déallouer, exiger une quiet period continue de **5 minutes** avec `busy=false` et
+   zéro run `queued/in_progress`; toute activité remet le compteur à zéro ;
+6. après ces 5 minutes, exiger deux gardes distinctes sur l'inventaire complet, puis traiter
+   **un pool à la fois**; revalider avant le second pool et ne jamais lancer deux
+   déallocations concurrentes ;
 7. au démarrage, attendre l'état Azure `running`, l'enregistrement GitHub `online`, puis
    restaurer le label exclusif ;
-8. conserver un timeout qui relâche le lease et ne force jamais la déallocation.
+8. armer le réallumage après chaque scale-in : toute nouvelle activité avant stabilisation
+   demande le redémarrage de la seule capacité gérée affectée; conserver un timeout qui
+   relâche le lease et ne force jamais la déallocation.
 
 Les éléments versionnés restent tous read-only :
 
 - `reconcile-drift.mjs` compare le VMSS/SKU/autoscale/labels live au modèle du dépôt ;
-- `capacity-controller.config.json` fixe `enabled=false`, le trigger `workflow_job`, les
-  états et le plafond absolu `4` ;
+- `capacity-controller.config.json` fixe `enabled=false`, le trigger `workflow_job`, la
+  quiet period de 300 s, les deux gardes et la cible de pilote ultérieur
+  `6 certigo-pr + 2 certigo-trusted`; il contient aussi l'unique exclusion externe
+  `4153d1dd`, sans règle générique qui masquerait une nouvelle VM non réconciliée ;
 - `capacity-controller.mjs` réduit un snapshot d'événements et produit uniquement le
   prochain plan ;
 - `capacity-plan.sh` collecte l'inventaire, affiche le drift puis le plan, sans appeler
@@ -235,23 +244,33 @@ qu'un job du contrôleur génère lui-même une nouvelle boucle d'événements.
 
 | Mode | Condition | Capacité agrégée cible |
 |---|---|---:|
-| `idle` | file vide, zéro actif, aucun runner `busy` | 0 |
-| `normal` | demande présente sous les seuils boost | 2 (un slot par classe) |
-| `boost` | file ≥ 2, attente la plus ancienne ≥ 300 s, ou slots normaux occupés + file | 4 maximum |
+| `idle` | file vide, zéro actif, aucun runner `busy` | 0 PR + 0 trusted |
+| `normal` | demande présente sous les seuils boost | 1 PR + 1 trusted |
+| `boost` | file ≥ 2, attente la plus ancienne ≥ 300 s, ou slots normaux occupés + file | 6 PR + 2 trusted |
 
 Un événement `workflow_job: waiting` (approbation d'Environment) est mémorisé mais ne
 consomme pas de runner et ne déclenche donc pas de boost.
 
-Chaque plan ne propose qu'un incrément de `1`. Il ne peut donc ni dépasser `4`, ni
-déallouer plusieurs instances simultanément. Un scale-in reste impossible tant que la file
-n'est pas vide, qu'un job est actif, qu'un runner est `busy`, que les deux pools exclusifs
-ne sont pas prouvés ou que le lease distribué n'est pas détenu. La séparation des labels
-**et des identités** est un prérequis, jamais une action implicite du contrôleur.
+`6 + 2` est une **limite de pilote ultérieur**, pas un maximum de production définitif.
+Chaque plan ne propose qu'un incrément de `1` dans une seule classe et ne peut pas dépasser
+la cible de pilote de cette classe. Un scale-in reste impossible tant que la quiet period
+resettable de 5 minutes et les deux gardes ne sont pas terminées, que les deux pools
+exclusifs ne sont pas prouvés ou que le lease distribué n'est pas détenu. La séparation
+des labels, des frontières d'identité **et des sous-réseaux** est un prérequis, jamais une
+action implicite du contrôleur.
 
 Le contrôleur découvre à chaque plan les VM et runners réels et les réconcilie par nom. Il
-ne suppose jamais deux IDs fixes. `currentCapacity` compte les VM physiques, tandis que
-`usableCapacity` compte uniquement les paires VM↔runner `online`. Un runner stale et une
-VM non enregistrée ne s'annulent donc pas.
+ne suppose jamais deux IDs fixes. `physicalManagedCapacity` compte seulement les paires
+gérées, `currentCapacity` seulement ces paires alimentées, et `usableCapacity` uniquement
+les paires alimentées dont le runner est `online`. Les sorties distinguent explicitement
+`absentRunners`, `managedMachineNames` et `externalVirtualMachines`; un runner stale et une
+VM externe ne s'annulent donc pas.
+
+Les fichiers d'état référencés par `CAPACITY_STATE_FILE` ou `LIFECYCLE_STATE_FILE` sont des
+snapshots read-only fournis par un orchestrateur externe. Les scripts affichent `nextState`
+mais ne l'écrivent jamais. Seule une future PR d'activation pourra définir la persistance,
+l'acquittement du réarmement et le chemin mutable. Tant que `enabled=false`,
+`lifecycle-preflight.sh` bloque aussi bien `start` que `deallocate` et n'arme aucune action.
 
 ### Reconstruction de redondance avant activation
 
@@ -260,8 +279,8 @@ VM non enregistrée ne s'annulent donc pas.
    `ResourceNotFound` de `22f7fb52` ;
 3. ne supprimer ni le runner stale `22f7fb52-Certigo`, ni la VM intacte `4153d1dd` pendant
    l'analyse de cause et la décision d'adoption/reconstruction ;
-4. faire approuver le modèle cible : deux pools/VMSS, deux identités distinctes, un label
-   exclusif par pool et au moins deux zones ;
+4. faire approuver le modèle cible : deux pools/VMSS, frontières d'identité distinctes,
+   sous-réseaux distincts, un label exclusif par pool et au moins deux zones ;
 5. reconstruire ou adopter une seconde instance via une fenêtre opérateur, puis
    l'enregistrer avec son identité et son label exclusifs ;
 6. prouver deux paires VM↔runner `online`, les probes de santé, la file drainée et un drill

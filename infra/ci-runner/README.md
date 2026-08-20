@@ -7,15 +7,17 @@ avec le reste des livrables ; les noms de ressources Azure reprennent ceux du po
 ## Pourquoi
 
 Les runners hébergés par GitHub sont **désactivés par la politique d'entreprise EMU**.
-L'inventaire live du 19 août 2026 montre désormais un VMSS flexible
+L'inventaire live consolidé au 20 août 2026 montre désormais un VMSS flexible
 `vmss-certigo-runner-zonal` et non les deux VM autonomes historiques. Le dossier reste une
 référence de reconstruction; il ne doit pas être appliqué à ce VMSS sans migration approuvée.
 Le runbook de redondance, de moindre privilège et de preuve opérationnelle est dans
 [`docs/CI_RUNNER_RESILIENCE.md`](../../docs/CI_RUNNER_RESILIENCE.md).
 
-Le live comporte une NAT Gateway, un Load Balancer, un autoscale CPU et deux VM running.
-Une seule (`f55d176e`) correspond à un runner GitHub online; `4153d1dd` n'est pas
-enregistrée et le runner stale `22f7fb52-Certigo` n'a plus de VM Azure. `network.bicep`
+Le live comporte une NAT Gateway, un Load Balancer et un autoscale CPU. La réconciliation
+classe `22f7fb52-Certigo` comme absent d'Azure, `f55d176e` comme seule paire gérée
+(running/online), et `4153d1dd` comme VM externe/deallocated explicitement allow-listée.
+Cette dernière n'est ni comptée ni ciblée; toute autre VM non réconciliée bloque le plan.
+`network.bicep`
 décrit l'ancienne réconciliation et son déploiement est suspendu; seul son `what-if`
 read-only est autorisé.
 
@@ -114,8 +116,12 @@ et runners. La cible sérialisée et son rollback sont dans
 [`docs/runbooks/CLOUD_LEAST_PRIVILEGE.md`](../../docs/runbooks/CLOUD_LEAST_PRIVILEGE.md).
 
 Le planificateur `capacity-plan.sh` ajoute une réconciliation de drift et un modèle
-queue-driven `workflow_job` avec trois modes (`idle=0`, `normal=2`, `boost=4`). Le feature
-flag est **off**; aucun code de mutation n'est présent. Le baseline 30 jours est
+queue-driven `workflow_job` avec trois modes par classe (`idle=0+0`, `normal=1+1`,
+`boost=6 PR + 2 trusted`). Cette cible est celle d'un pilote ultérieur, pas un plafond
+de production final. Le feature flag est **off**; aucun code de mutation n'est présent.
+Labels, frontières d'identité et sous-réseaux exclusifs sont des prérequis. Le scale-in
+exige une quiet period resettable de 5 minutes, deux gardes, un lease et un réarmement
+sur toute activité postérieure. Le baseline 30 jours est
 242,06 USD pour 413 jobs, 18,84 runner-heures, 3,78 % CPU moyen, avec une file P95 de
 5 108 s et P99 de 12 628 s.
 
