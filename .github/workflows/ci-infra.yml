@@ -101,6 +101,8 @@ jobs:
         run: node --test infra/tests/cosmos-indexing-policy.test.mjs
       - name: Validate private networking topology
         run: node --test infra/tests/private-networking.test.mjs
+      - name: Validate immutable content storage topology
+        run: node --test infra/tests/content-storage.test.mjs
       - name: Validate FinOps guardrails
         run: node --test infra/tests/finops-guardrails.test.mjs
       - name: Validate public account-deletion policy
