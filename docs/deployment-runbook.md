@@ -12,6 +12,12 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 >
 > Les actions humaines restantes concernent surtout la gouvernance (OIDC Azure AD, environments,
 > branch protection), pas l'édition des workflows runners.
+>
+> **Supersession sécurité (août 2026).** Les recettes historiques T0.1 qui créent des
+> identités ou attribuent `Owner` ne sont plus autorisées pour Certigo. Pour toute opération
+> OIDC/RBAC ou runner, appliquer uniquement
+> [`CLOUD_LEAST_PRIVILEGE.md`](./runbooks/CLOUD_LEAST_PRIVILEGE.md); cette PR n'exécute
+> aucune mutation live.
 
 ---
 
@@ -328,44 +334,16 @@ locale, crée une base d’émulation unique et détruit le conteneur en `finall
 Il ne se connecte pas à Azure et ne modifie ni RBAC ni infrastructure. Un test
 skippé ou non démarré ne permet jamais d’activer la feature.
 
-### Commandes
+### Prévol read-only
 
 ```bash
-# 1) App registration + service principal
-APP_ID=$(az ad app create --display-name "$APP_NAME" --query appId -o tsv)
-az ad sp create --id "$APP_ID"
-
-# 2) Federated credentials — une par environnement
-for ENVNAME in dev staging prod; do
-  az ad app federated-credential create --id "$APP_ID" --parameters "{
-    \"name\": \"github-env-$ENVNAME\",
-    \"issuer\": \"https://token.actions.githubusercontent.com\",
-    \"subject\": \"repo:$GH_ORG/$GH_REPO:environment:$ENVNAME\",
-    \"audiences\": [\"api://AzureADTokenExchange\"]
-  }"
-done
-
-# (Optionnel) FC pour les push directs sur main sans environnement explicite.
-# Inutile si les push passent par l'environnement dev (cas par défaut).
-# az ad app federated-credential create --id "$APP_ID" --parameters "{
-#   \"name\": \"github-branch-main\",
-#   \"issuer\": \"https://token.actions.githubusercontent.com\",
-#   \"subject\": \"repo:$GH_ORG/$GH_REPO:ref:refs/heads/main\",
-#   \"audiences\": [\"api://AzureADTokenExchange\"]
-# }"
-
-# 3) Rôle Owner au scope souscription
-az role assignment create --assignee "$APP_ID" --role "Owner" \
-  --scope "/subscriptions/$SUBSCRIPTION_ID"
-
-# 4) Exemple pour un nouveau dépôt uniquement — ne pas exécuter sur Certigo sans audit
-gh secret set AZURE_CLIENT_ID       --repo "$GH_ORG/$GH_REPO" --body "$APP_ID"
-gh secret set AZURE_TENANT_ID       --repo "$GH_ORG/$GH_REPO" --body "$TENANT_ID"
-gh secret set AZURE_SUBSCRIPTION_ID --repo "$GH_ORG/$GH_REPO" --body "$SUBSCRIPTION_ID"
+export AZURE_SUBSCRIPTION_ID="<SUBSCRIPTION_ID>"
+bash infra/governance/inventory.sh > inventory.json
+bash infra/governance/what-if.sh
 ```
 
-> 💡 Si la politique de l'org restreint la création d'app registrations, faire exécuter ces
-> commandes par un administrateur du tenant `fdpo.onmicrosoft.com`.
+Toute création d'identité/rôle/policy et toute modification de GitHub Environment sont des
+actions humaines PIM hors de cette PR.
 
 ---
 

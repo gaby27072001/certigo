@@ -271,10 +271,10 @@ var tags = {
   managedBy: 'bicep'
 }
 
-resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+// Environment resource groups are an admin/bootstrap concern. Keeping them
+// existing removes resource-group write from the steady-state deployment identity.
+resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
   name: rgName
-  location: location
-  tags: tags
 }
 
 module monitoring 'modules/appInsights.bicep' = {

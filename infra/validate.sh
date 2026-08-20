@@ -6,10 +6,51 @@ bicep_bin="${BICEP_BIN:-bicep}"
 output_dir="$(mktemp -d)"
 trap 'rm -rf "${output_dir}"' EXIT
 
+ensure_node() {
+  if command -v node >/dev/null 2>&1; then
+    return
+  fi
+  if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
+    echo "Node.js is required; automatic bootstrap supports Linux x64 only." >&2
+    exit 1
+  fi
+
+  local version="20.20.2"
+  local archive_name="node-v${version}-linux-x64.tar.xz"
+  local expected_sha="df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d"
+  local install_root="${RUNNER_TEMP:?RUNNER_TEMP is required to bootstrap Node.js.}"
+  local archive="${install_root}/${archive_name}"
+  local node_home="${install_root}/node-v${version}-linux-x64"
+
+  if [[ ! -x "${node_home}/bin/node" ]]; then
+    curl --fail --silent --show-error --location --retry 3 \
+      --output "${archive}" \
+      "https://nodejs.org/dist/v${version}/${archive_name}"
+    echo "${expected_sha}  ${archive}" | sha256sum --check --strict
+    tar -xJf "${archive}" -C "${install_root}"
+    rm -f -- "${archive}"
+  fi
+
+  export PATH="${node_home}/bin:${PATH}"
+  if [[ -n "${GITHUB_PATH:-}" ]]; then
+    printf '%s\n' "${node_home}/bin" >> "${GITHUB_PATH}"
+  fi
+  [[ "$(node --version)" == "v${version}" ]]
+}
+
 command -v "${bicep_bin}" >/dev/null 2>&1 || {
   echo "Bicep CLI is required. Set BICEP_BIN to a pinned executable." >&2
   exit 1
 }
+ensure_node
+
+for script in \
+  "${root}/infra/governance/inventory.sh" \
+  "${root}/infra/governance/what-if.sh"; do
+  bash -n "${script}"
+done
+node --check "${root}/infra/governance/render-inventory.mjs"
+node --check "${root}/infra/governance/validate-what-if.mjs"
 
 index=0
 while IFS= read -r -d '' template; do
@@ -28,12 +69,17 @@ for environment in dev staging prod; do
   grep -F 'param vnetAddressPrefix =' "${params}" >/dev/null
   grep -F 'param functionIntegrationSubnetPrefix =' "${params}" >/dev/null
   grep -F 'param privateEndpointSubnetPrefix =' "${params}" >/dev/null
-  grep -F "param ciDeploymentPrincipalId = '15d2b34a-c0a0-4b5d-8360-b895a8164706'" \
-    "${params}" >/dev/null
+  grep -Eq "^param ciDeploymentPrincipalId = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'$" \
+    "${params}"
   grep -F 'param cosmosBackupMode =' "${params}" >/dev/null
   grep -F 'param deployMcsbPolicyAssignment =' "${params}" >/dev/null
   grep -F 'param manageDefenderPlans =' "${params}" >/dev/null
 done
+
+grep -F 'param manageMcsbPolicyAssignment = false' \
+  "${root}/infra/params/least-privilege.bicepparam" >/dev/null
+grep -F "param privilegedAssignmentPolicyEffect = 'Audit'" \
+  "${root}/infra/params/least-privilege.bicepparam" >/dev/null
 
 grep -F "param authJwtSigningKeyExpiresOn = '2027-08-31T00:00:00Z'" \
   "${root}/infra/params/dev.bicepparam" >/dev/null

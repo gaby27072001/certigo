@@ -5,10 +5,12 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 bootstrap="${root}/infra/ci-runner/bootstrap.sh"
 health="${root}/infra/ci-runner/health-probe.sh"
 test_health="${root}/infra/ci-runner/test-health-probe.sh"
+lifecycle_preflight="${root}/infra/ci-runner/lifecycle-preflight.sh"
+capacity_plan="${root}/infra/ci-runner/capacity-plan.sh"
 validate="${root}/infra/ci-runner/validate.sh"
 runner_bicep="${root}/infra/ci-runner/runner.bicep"
 
-for script in "${bootstrap}" "${health}" "${test_health}" "${validate}"; do
+for script in "${bootstrap}" "${health}" "${test_health}" "${lifecycle_preflight}" "${capacity_plan}" "${validate}"; do
   bash -n "${script}"
 done
 
@@ -58,4 +60,7 @@ for endpoint in api.github.com api.nuget.org pub.dev registry.npmjs.org manageme
 done
 
 bash "${test_health}"
+node --test "${root}/infra/ci-runner/evaluate-lifecycle.test.mjs"
+node --test "${root}/infra/ci-runner/capacity-controller.test.mjs"
+node --check "${root}/infra/ci-runner/scale-in-safety.mjs"
 echo "ci-runner validation passed"
