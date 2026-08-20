@@ -53,13 +53,13 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 
 | Élément | Valeur |
 |---|---|
-| **VMSS live** | `vmss-certigo-runner-zonal` · Flexible · `Standard_D2ads_v6` |
-| **Capacité Azure live** | `f55d176e` gérée/running; `4153d1dd` externe/deallocated et hors scope; `22f7fb52` absent (`ResourceNotFound`) |
+| **VMSS live** | legacy `vmss-certigo-runner-zonal` zone 2 + pilote PR `vmss-certigo-pr-pilot-z1` zone 1 |
+| **Capacité Azure live** | `f55d176e` et `bbf83c5c` gérées/running; `4153d1dd` externe/deallocated; `22f7fb52` et `4596a9d5` absentes/interdites |
 | **Resource group** | `RG-CERTIGO-CI` |
 | **Subscription** | `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**) |
-| **Runners GitHub live** | `22f7fb52` offline/stale et absent d'Azure; `f55d176e` est le seul runner géré/online; labels doubles encore bloquants |
-| **Classification contrôleur** | `22f7fb52` absent · `f55d176e` géré · `4153d1dd` externe explicitement allow-listée, jamais comptée ou ciblée |
-| **Identité VMSS** | UAMI `id-vm-certigo-runner-2-vmss`, rôle `Key Vault Secrets User` au coffre CI exact |
+| **Runners GitHub live** | ID 27 `f55d176e-Certigo` online/labels doubles; ID 28 `certigo-prIVJAN8` online/non-busy, labels `certigo-pr` + `certigo-pr-pilot` |
+| **Classification contrôleur** | f55 + bbf bindings exacts gérés · `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit |
+| **Identités** | f55 : UAMI `id-vm-certigo-runner-2-vmss`; pilote PR : aucune identité |
 | **Repo desservi** | `gchambaud_microsoft/Certigo` |
 
 > 📌 Les labels `certigo-pr` et `certigo-trusted` doivent redevenir mutuellement exclusifs. Un éventuel
@@ -79,9 +79,9 @@ par le contrôleur sérialisé décrit dans le runbook moindre privilège.
 Baseline 30 jours : **242,06 USD**, 413 jobs, 18,84 runner-heures, CPU moyen 3,78 %,
 file P95 5 108 s et P99 12 628 s. Le CPU faible combiné à une file longue justifie un
 contrôleur `workflow_job` queue-driven, pas un seuil CPU. Son feature flag reste désactivé.
-Le plan réconcilie les noms Azure/GitHub à chaque lecture et ne suppose jamais deux instances
-fixes. La redondance doit être reconstruite avec labels, identités et sous-réseaux séparés,
-puis prouvée avant toute activation. La cible du pilote ultérieur est **6 PR + 2 trusted**;
+Le plan réconcilie les bindings Azure/GitHub exacts et exige simultanément power Azure
+**et** runner GitHub online. Le label trusted doit encore être séparé, puis la redondance
+prouvée avant toute activation. La cible du pilote ultérieur est **6 PR + 2 trusted**;
 ce n'est ni le plafond live actuel de 4, ni un maximum de production définitif.
 
 | Situation | État requis | Décision opérateur |
@@ -132,7 +132,8 @@ Le prévol ci-dessous vérifie les labels, jobs actifs/en file, autoscale, front
 d'identité/sous-réseau et réconciliation Azure/GitHub. Il n'effectue aucune déallocation.
 Dans le présent livrable, `enabled=false` bloque tous les prévols. Après une future activation
 séparée, le premier passage démarrera seulement la quiet period; un snapshot d'état externe
-devra prouver les 5 minutes continues puis deux gardes distinctes.
+devra prouver les 5 minutes continues puis deux gardes distinctes. L'état v3 conserve la
+capacité exacte supprimée par classe jusqu'à son réarmement réel.
 
 ```bash
 bash infra/ci-runner/lifecycle-preflight.sh deallocate
@@ -276,5 +277,6 @@ validations PR ne peut donc être restauré sur le pool trusted.
 
 > **Paramètres confirmés** : RG `RG-CERTIGO-CI` · VMSS
 > `vmss-certigo-runner-zonal` · subscription
-> `b8952c8c-8f72-469d-99cd-ac906da4e2fc` · `22f7fb52` absent ·
-> `f55d176e` géré · `4153d1dd` externe · labels live doubles à corriger.
+> `b8952c8c-8f72-469d-99cd-ac906da4e2fc` · f55 + bbf gérés ·
+> `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit ·
+> label double f55 à corriger.

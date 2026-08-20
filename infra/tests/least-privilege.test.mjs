@@ -283,6 +283,7 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
   );
 
   assert.equal(config.enabled, false);
+  assert.equal(config.stateVersion, 3);
   assert.equal('maxAggregateCapacity' in config, false);
   assert.deepEqual(config.pilotTarget, {
     'certigo-pr': 6,
@@ -296,6 +297,32 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
   assert.deepEqual(config.inventory.externalVirtualMachines, [
     'vmss-certigo-runner-zonal_4153d1dd',
   ]);
+  assert.deepEqual(config.inventory.forbiddenVirtualMachines, [
+    'vmss-certigo-runner-zonal_22f7fb52',
+    'vmss-certigo-pr-pilot-z1_4596a9d5',
+  ]);
+  assert.deepEqual(
+    config.inventory.managedRunnerBindings.map(
+      ({ githubRunnerId, runnerName, virtualMachineName }) => ({
+        githubRunnerId,
+        runnerName,
+        virtualMachineName,
+      }),
+    ),
+    [
+      {
+        githubRunnerId: 27,
+        runnerName:
+          'vmss-certigo-runner-zonal_f55d176e-Certigo',
+        virtualMachineName: 'vmss-certigo-runner-zonal_f55d176e',
+      },
+      {
+        githubRunnerId: 28,
+        runnerName: 'certigo-prIVJAN8',
+        virtualMachineName: 'vmss-certigo-pr-pilot-z1_bbf83c5c',
+      },
+    ],
+  );
 });
 
 test('environment parameters retain historical principals only for staged cutover', () => {

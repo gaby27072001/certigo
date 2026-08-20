@@ -86,6 +86,25 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
       detail: `Azure VMs without a runner or explicit external classification: ${instanceInventory.unclassifiedVirtualMachines.join(', ')}.`,
     });
   }
+  if (
+    instanceInventory.bindingMismatches.length > 0 ||
+    instanceInventory.missingManagedRunnerVirtualMachines.length > 0
+  ) {
+    findings.push({
+      severity: 'blocking',
+      code: 'MANAGED_BINDING_DRIFT',
+      detail:
+        `Managed binding mismatches: ${instanceInventory.bindingMismatches.join(', ') || 'none'}; ` +
+        `VMs without the bound runner: ${instanceInventory.missingManagedRunnerVirtualMachines.join(', ') || 'none'}.`,
+    });
+  }
+  if (instanceInventory.forbiddenVirtualMachinesPresent.length > 0) {
+    findings.push({
+      severity: 'blocking',
+      code: 'FORBIDDEN_INSTANCE_PRESENT',
+      detail: `Forbidden Azure VMs are present: ${instanceInventory.forbiddenVirtualMachinesPresent.join(', ')}.`,
+    });
+  }
   const poweredManagedInstances = instanceInventory.managedInstances.filter(
     ({ virtualMachine }) => isPoweredCapacity(virtualMachine),
   );
@@ -193,13 +212,18 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
       githubRunnerCount:
         inventory.runners?.github?.runners?.length ?? 0,
       absentRunners: instanceInventory.absentRunners,
+      bindingMismatches: instanceInventory.bindingMismatches,
       distinctIdentityBoundaryCount:
         poolBoundaries.distinctIdentityBoundaryCount,
       distinctSubnetCount: poolBoundaries.distinctSubnetCount,
       externalVirtualMachines: instanceInventory.externalVirtualMachines,
+      forbiddenVirtualMachinesPresent:
+        instanceInventory.forbiddenVirtualMachinesPresent,
       managedMachineNames: instanceInventory.managedMachineNames,
       managedPoolCount: poolBoundaries.managedPoolCount,
       managedPoolNames: poolBoundaries.managedPoolNames,
+      missingManagedRunnerVirtualMachines:
+        instanceInventory.missingManagedRunnerVirtualMachines,
       poolsWithMixedTrustLabels:
         poolBoundaries.poolsWithMixedTrustLabels,
       physicalManagedCapacity: instanceInventory.managedInstances.length,

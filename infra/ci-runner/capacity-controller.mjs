@@ -37,8 +37,21 @@ function aggregateCapacity(capacityByTrust) {
   );
 }
 
+function capacitySatisfies(actual, required) {
+  if (required === null || required === undefined) {
+    return false;
+  }
+  return Object.entries(required).every(
+    ([trustClass, capacity]) =>
+      (actual[trustClass] ?? 0) >= capacity,
+  );
+}
+
 function validateCapacityConfig(config) {
   const trustClasses = ['certigo-pr', 'certigo-trusted'];
+  if (config.stateVersion !== 3) {
+    throw new Error('capacity controller stateVersion must be 3');
+  }
   if (config.scaleStep !== 1) {
     throw new Error('scaleStep must remain exactly 1');
   }
@@ -50,13 +63,41 @@ function validateCapacityConfig(config) {
   }
   if (
     !Array.isArray(config.inventory?.externalVirtualMachines) ||
+    !Array.isArray(config.inventory?.forbiddenVirtualMachines) ||
+    !Array.isArray(config.inventory?.managedRunnerBindings) ||
     config.inventory.externalVirtualMachines.some(
       (name) => typeof name !== 'string' || name.length === 0,
+    ) ||
+    config.inventory.forbiddenVirtualMachines.some(
+      (name) => typeof name !== 'string' || name.length === 0,
+    ) ||
+    config.inventory.managedRunnerBindings.some(
+      (binding) =>
+        !Number.isInteger(binding.githubRunnerId) ||
+        binding.githubRunnerId <= 0 ||
+        typeof binding.runnerName !== 'string' ||
+        binding.runnerName.length === 0 ||
+        typeof binding.virtualMachineId !== 'string' ||
+        binding.virtualMachineId.length === 0 ||
+        typeof binding.virtualMachineName !== 'string' ||
+        binding.virtualMachineName.length === 0,
     )
   ) {
     throw new Error(
-      'inventory.externalVirtualMachines must be an array of exact names',
+      'inventory classifications and managed runner bindings are invalid',
     );
+  }
+  const managedMachineNames = config.inventory.managedRunnerBindings.map(
+    (binding) => binding.virtualMachineName.toLowerCase(),
+  );
+  const managedRunnerNames = config.inventory.managedRunnerBindings.map(
+    (binding) => binding.runnerName.toLowerCase(),
+  );
+  if (
+    new Set(managedMachineNames).size !== managedMachineNames.length ||
+    new Set(managedRunnerNames).size !== managedRunnerNames.length
+  ) {
+    throw new Error('managed runner bindings must be one-to-one');
   }
   for (const trustClass of trustClasses) {
     if (
@@ -154,8 +195,17 @@ export function createCapacityPlan({
     throw new Error(`Unsupported capacity trigger: ${config.trigger}`);
   }
   validateCapacityConfig(config);
+  if (
+    state.version !== undefined &&
+    state.version !== config.stateVersion
+  ) {
+    throw new Error(
+      `capacity state version ${state.version} is not supported`,
+    );
+  }
 
   const nextState = reduceWorkflowJobState(state, event, now);
+  nextState.version = config.stateVersion;
   const jobs = Object.values(nextState.jobs);
   const stateQueued = jobs.filter((job) => job.status === 'queued').length;
   const stateActive = jobs.filter((job) => job.status === 'in_progress').length;
@@ -250,6 +300,9 @@ export function createCapacityPlan({
     poolBoundaries.sharedSubnetIds.length === 0;
   const instanceInventoryReady =
     instanceInventory.absentRunners.length === 0 &&
+    instanceInventory.bindingMismatches.length === 0 &&
+    instanceInventory.forbiddenVirtualMachinesPresent.length === 0 &&
+    instanceInventory.missingManagedRunnerVirtualMachines.length === 0 &&
     instanceInventory.unclassifiedVirtualMachines.length === 0 &&
     physicalManagedCapacity >= aggregateCapacity(modeCapacity(config, 'normal'));
   const exclusiveBoundariesReady =
@@ -282,6 +335,8 @@ export function createCapacityPlan({
   const targetCapacity = aggregateCapacity(targetCapacityByTrust);
   const workloadIdle = queued === 0 && active === 0 && busy === 0;
   const normalCapacityByTrust = modeCapacity(config, 'normal');
+  const pendingRearmTarget =
+    nextState.scaleInSafety?.rearmTargetCapacityByTrust ?? null;
   const scaleInBaseSafe =
     workloadIdle &&
     exclusiveBoundariesReady &&
@@ -294,27 +349,44 @@ export function createCapacityPlan({
     idle: scaleInBaseSafe,
     now,
     quietPeriodSeconds: config.quietPeriodSeconds,
-    rearmSatisfied:
-      !workloadIdle &&
-      Object.keys(targetCapacityByTrust).every(
-        (trustClass) =>
-          usableCapacityByTrust[trustClass] >=
-          targetCapacityByTrust[trustClass],
-      ),
+    rearmSatisfied: capacitySatisfies(
+      usableCapacityByTrust,
+      pendingRearmTarget,
+    ),
     requiredGuards: config.requiredPostQuietGuards,
     state: nextState.scaleInSafety,
   });
   nextState.scaleInSafety = scaleInSafety.nextState;
   const scaleInSafe = scaleInBaseSafe && scaleInSafety.ready;
+  const effectiveTargetCapacityByTrust = {
+    ...targetCapacityByTrust,
+  };
+  if (scaleInSafety.rearmRequired) {
+    for (const [trustClass, capacity] of Object.entries(
+      scaleInSafety.rearmTargetCapacityByTrust,
+    )) {
+      effectiveTargetCapacityByTrust[trustClass] = Math.max(
+        effectiveTargetCapacityByTrust[trustClass] ?? 0,
+        capacity,
+      );
+    }
+  }
 
   let action = 'hold';
   let nextCapacity = currentCapacity;
   let targetTrustClass = null;
   const nextCapacityByTrust = { ...currentCapacityByTrust };
-  const scaleOutCandidates = Object.keys(targetCapacityByTrust).filter(
+  const requestedScaleOutCandidates = Object.keys(
+    effectiveTargetCapacityByTrust,
+  ).filter(
     (trustClass) =>
-      targetCapacityByTrust[trustClass] >
-      currentCapacityByTrust[trustClass],
+      effectiveTargetCapacityByTrust[trustClass] >
+      usableCapacityByTrust[trustClass],
+  );
+  const scaleOutCandidates = requestedScaleOutCandidates.filter(
+    (trustClass) =>
+      currentCapacityByTrust[trustClass] <
+      config.pilotTarget[trustClass],
   );
   if (
     scaleOutCandidates.length > 0 &&
@@ -331,9 +403,10 @@ export function createCapacityPlan({
           return queuePriority;
         }
         return (
-          targetCapacityByTrust[right] -
-          currentCapacityByTrust[right] -
-          (targetCapacityByTrust[left] - currentCapacityByTrust[left])
+          effectiveTargetCapacityByTrust[right] -
+          usableCapacityByTrust[right] -
+          (effectiveTargetCapacityByTrust[left] -
+            usableCapacityByTrust[left])
         );
       })[0];
     nextCapacity = currentCapacity + config.scaleStep;
@@ -373,6 +446,15 @@ export function createCapacityPlan({
       'scale-in requires a resettable five-minute quiet period followed by two guards',
     );
   }
+  if (
+    requestedScaleOutCandidates.length > 0 &&
+    (scaleOutCandidates.length === 0 ||
+      currentCapacity >= aggregateCapacity(config.pilotTarget))
+  ) {
+    blockers.push(
+      'usable capacity is below target but the pilot capacity boundary forbids another instance',
+    );
+  }
 
   const canRequestChange =
     config.enabled &&
@@ -382,6 +464,7 @@ export function createCapacityPlan({
   if (action === 'scale-in-one' && canRequestChange) {
     nextState.scaleInSafety = armScaleInReactivation(
       nextState.scaleInSafety,
+      usableCapacityByTrust,
     );
   }
 
@@ -398,6 +481,7 @@ export function createCapacityPlan({
     usableCapacityByTrust,
     targetCapacity,
     targetCapacityByTrust,
+    effectiveTargetCapacityByTrust,
     targetTrustClass,
     nextCapacity,
     nextCapacityByTrust,
@@ -412,6 +496,8 @@ export function createCapacityPlan({
       quietElapsedSeconds: scaleInSafety.quietElapsedSeconds,
       quietReset: scaleInSafety.quietReset,
       rearmRequired: scaleInSafety.rearmRequired,
+      rearmTargetCapacityByTrust:
+        scaleInSafety.rearmTargetCapacityByTrust,
       requiredGuards: config.requiredPostQuietGuards,
       quietPeriodSeconds: config.quietPeriodSeconds,
     },
@@ -427,15 +513,20 @@ export function createCapacityPlan({
       exclusivePrRunners: exclusivePr.map((runner) => runner.name),
       exclusiveTrustedRunners: exclusiveTrusted.map((runner) => runner.name),
       absentRunners: instanceInventory.absentRunners,
+      bindingMismatches: instanceInventory.bindingMismatches,
       distinctIdentityBoundaryCount:
         poolBoundaries.distinctIdentityBoundaryCount,
       distinctSubnetCount: poolBoundaries.distinctSubnetCount,
       externalVirtualMachines: instanceInventory.externalVirtualMachines,
+      forbiddenVirtualMachinesPresent:
+        instanceInventory.forbiddenVirtualMachinesPresent,
       managedMachineNames: instanceInventory.managedMachineNames,
       managedPoolNames: poolBoundaries.managedPoolNames,
       managedInstancesWithoutPool:
         poolBoundaries.managedInstancesWithoutPool,
       missingManagedScaleSets: poolBoundaries.missingManagedScaleSets,
+      missingManagedRunnerVirtualMachines:
+        instanceInventory.missingManagedRunnerVirtualMachines,
       poolsWithoutSubnet: poolBoundaries.poolsWithoutSubnet,
       poolsWithMixedTrustLabels:
         poolBoundaries.poolsWithMixedTrustLabels,

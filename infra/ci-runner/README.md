@@ -14,8 +14,8 @@ Le runbook de redondance, de moindre privilège et de preuve opérationnelle est
 [`docs/CI_RUNNER_RESILIENCE.md`](../../docs/CI_RUNNER_RESILIENCE.md).
 
 Le live comporte une NAT Gateway, un Load Balancer et un autoscale CPU. La réconciliation
-classe `22f7fb52-Certigo` comme absent d'Azure, `f55d176e` comme seule paire gérée
-(running/online), et `4153d1dd` comme VM externe/deallocated explicitement allow-listée.
+classe `22f7fb52-Certigo` comme absent d'Azure, les bindings exacts f55/runner 27 et
+bbf/runner 28 comme gérés (running/online), et `4153d1dd` comme VM externe/deallocated.
 Cette dernière n'est ni comptée ni ciblée; toute autre VM non réconciliée bloque le plan.
 `network.bicep`
 décrit l'ancienne réconciliation et son déploiement est suspendu; seul son `what-if`
@@ -119,7 +119,8 @@ Le planificateur `capacity-plan.sh` ajoute une réconciliation de drift et un mo
 queue-driven `workflow_job` avec trois modes par classe (`idle=0+0`, `normal=1+1`,
 `boost=6 PR + 2 trusted`). Cette cible est celle d'un pilote ultérieur, pas un plafond
 de production final. Le feature flag est **off**; aucun code de mutation n'est présent.
-Labels, frontières d'identité et sous-réseaux exclusifs sont des prérequis. Le scale-in
+L'état v3 exige power Azure + runner online, conserve le slot exact à réarmer et refuse les
+IDs 22f/459. Labels, frontières d'identité et sous-réseaux exclusifs sont des prérequis. Le scale-in
 exige une quiet period resettable de 5 minutes, deux gardes, un lease et un réarmement
 sur toute activité postérieure. Le baseline 30 jours est
 242,06 USD pour 413 jobs, 18,84 runner-heures, 3,78 % CPU moyen, avec une file P95 de

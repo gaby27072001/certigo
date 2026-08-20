@@ -176,7 +176,11 @@ export function isPoweredCapacity(virtualMachine) {
 export function reconcileRunnerInstances(
   virtualMachines,
   runners,
-  { externalVirtualMachines = [] } = {},
+  {
+    externalVirtualMachines = [],
+    forbiddenVirtualMachines = [],
+    managedRunnerBindings = [],
+  } = {},
 ) {
   const azureByName = new Map(
     (virtualMachines ?? []).map((virtualMachine) => [
@@ -185,47 +189,125 @@ export function reconcileRunnerInstances(
     ]),
   );
   const certigoRunners = (runners ?? []).filter(isCertigoRunner);
-  const runnerByMachineName = new Map(
+  const runnerByName = new Map(
     certigoRunners.map((runner) => [
-      machineNameForRunner(runner.name).toLowerCase(),
+      String(runner.name).toLowerCase(),
       runner,
     ]),
   );
 
+  const consumedMachineNames = new Set();
+  const consumedRunnerNames = new Set();
   const managedInstances = [];
   const absentRunners = [];
-  for (const [machineName, runner] of runnerByMachineName) {
+  const bindingMismatches = [];
+  const missingManagedRunnerVirtualMachines = [];
+  for (const binding of managedRunnerBindings) {
+    const machineName = String(binding.virtualMachineName).toLowerCase();
+    const runnerName = String(binding.runnerName).toLowerCase();
     const virtualMachine = azureByName.get(machineName);
-    if (virtualMachine) {
-      managedInstances.push({ virtualMachine, runner });
-    } else {
-      absentRunners.push(runner.name);
+    const runner = runnerByName.get(runnerName);
+    if (!virtualMachine && !runner) {
+      continue;
     }
+    if (virtualMachine) {
+      consumedMachineNames.add(machineName);
+    }
+    if (runner) {
+      consumedRunnerNames.add(runnerName);
+    }
+    if (!virtualMachine) {
+      absentRunners.push(runner.name);
+      continue;
+    }
+    if (!runner) {
+      missingManagedRunnerVirtualMachines.push(virtualMachine.name);
+      continue;
+    }
+
+    const mismatches = [];
+    if (Number(runner.id) !== binding.githubRunnerId) {
+      mismatches.push(
+        `runner id ${runner.id ?? 'missing'} != ${binding.githubRunnerId}`,
+      );
+    }
+    if (
+      String(virtualMachine.id ?? '').toLowerCase() !==
+      String(binding.virtualMachineId).toLowerCase()
+    ) {
+      mismatches.push('Azure virtual machine resource id differs');
+    }
+    if (mismatches.length > 0) {
+      bindingMismatches.push(
+        `${binding.runnerName} -> ${binding.virtualMachineName}: ${mismatches.join('; ')}`,
+      );
+      continue;
+    }
+    managedInstances.push({
+      binding: 'explicit',
+      runner,
+      virtualMachine,
+    });
   }
 
   const externalNames = new Set(
     externalVirtualMachines.map((name) => String(name).toLowerCase()),
   );
+  const forbiddenNames = new Set(
+    forbiddenVirtualMachines.map((name) => String(name).toLowerCase()),
+  );
+  const forbiddenVirtualMachinesPresent = [];
+  for (const runner of certigoRunners) {
+    const runnerName = String(runner.name).toLowerCase();
+    if (consumedRunnerNames.has(runnerName)) {
+      continue;
+    }
+    const machineName = machineNameForRunner(runner.name).toLowerCase();
+    const virtualMachine = azureByName.get(machineName);
+    if (!virtualMachine) {
+      absentRunners.push(runner.name);
+      continue;
+    }
+    consumedMachineNames.add(machineName);
+    if (forbiddenNames.has(machineName)) {
+      forbiddenVirtualMachinesPresent.push(virtualMachine.name);
+      continue;
+    }
+    managedInstances.push({
+      binding: 'name',
+      runner,
+      virtualMachine,
+    });
+  }
+
   const classifiedExternalVirtualMachines = [];
   const unclassifiedVirtualMachines = [];
   for (const [machineName, virtualMachine] of azureByName) {
-    if (!runnerByMachineName.has(machineName)) {
-      if (externalNames.has(machineName)) {
-        classifiedExternalVirtualMachines.push(virtualMachine.name);
-      } else {
-        unclassifiedVirtualMachines.push(virtualMachine.name);
-      }
+    if (consumedMachineNames.has(machineName)) {
+      continue;
+    }
+    if (forbiddenNames.has(machineName)) {
+      forbiddenVirtualMachinesPresent.push(virtualMachine.name);
+    } else if (externalNames.has(machineName)) {
+      classifiedExternalVirtualMachines.push(virtualMachine.name);
+    } else {
+      unclassifiedVirtualMachines.push(virtualMachine.name);
     }
   }
 
   return {
     absentRunners: absentRunners.sort(),
+    bindingMismatches: bindingMismatches.sort(),
     certigoRunners,
     externalVirtualMachines: classifiedExternalVirtualMachines.sort(),
+    forbiddenVirtualMachinesPresent:
+      forbiddenVirtualMachinesPresent.sort(),
     managedInstances,
     managedMachineNames: managedInstances
       .map(({ virtualMachine }) => virtualMachine.name)
       .sort(),
+    missingManagedRunnerVirtualMachines:
+      missingManagedRunnerVirtualMachines.sort(),
     unclassifiedVirtualMachines: unclassifiedVirtualMachines.sort(),
   };
 }

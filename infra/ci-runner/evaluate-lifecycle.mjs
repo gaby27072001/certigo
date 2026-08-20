@@ -7,6 +7,7 @@ import {
   labelsOf,
   reconcileRunnerInstances,
   summarizePoolBoundaries,
+  trustClassOfRunner,
 } from './runner-inventory.mjs';
 import {
   advanceScaleInSafety,
@@ -28,6 +29,16 @@ function aggregateCapacity(capacityByTrust) {
   );
 }
 
+function capacitySatisfies(actual, required) {
+  if (required === null || required === undefined) {
+    return false;
+  }
+  return Object.entries(required).every(
+    ([trustClass, capacity]) =>
+      (actual[trustClass] ?? 0) >= capacity,
+  );
+}
+
 export function evaluateLifecycle({
   config,
   operation,
@@ -42,6 +53,14 @@ export function evaluateLifecycle({
 }) {
   if (!['start', 'deallocate'].includes(operation)) {
     throw new Error(`Unsupported lifecycle operation: ${operation}`);
+  }
+  if (
+    state.version !== undefined &&
+    state.version !== config.stateVersion
+  ) {
+    throw new Error(
+      `capacity state version ${state.version} is not supported`,
+    );
   }
 
   const reasons = [];
@@ -90,6 +109,21 @@ export function evaluateLifecycle({
       `unclassified Azure VMs: ${instanceInventory.unclassifiedVirtualMachines.join(', ')}`,
     );
   }
+  if (instanceInventory.bindingMismatches.length > 0) {
+    reasons.push(
+      `managed runner binding mismatches: ${instanceInventory.bindingMismatches.join(', ')}`,
+    );
+  }
+  if (instanceInventory.missingManagedRunnerVirtualMachines.length > 0) {
+    reasons.push(
+      `managed VMs without their bound runner: ${instanceInventory.missingManagedRunnerVirtualMachines.join(', ')}`,
+    );
+  }
+  if (instanceInventory.forbiddenVirtualMachinesPresent.length > 0) {
+    reasons.push(
+      `forbidden Azure VMs are present: ${instanceInventory.forbiddenVirtualMachinesPresent.join(', ')}`,
+    );
+  }
 
   const poolBoundaries = summarizePoolBoundaries(
     vmScaleSets,
@@ -129,8 +163,23 @@ export function evaluateLifecycle({
       runner.status === 'online' &&
       isPoweredCapacity(virtualMachine),
   ).length;
+  const usableCapacityByTrust = {
+    'certigo-pr': 0,
+    'certigo-trusted': 0,
+  };
+  for (const { runner, virtualMachine } of instanceInventory.managedInstances) {
+    const trustClass = trustClassOfRunner(runner);
+    if (
+      (trustClass === 'certigo-pr' ||
+        trustClass === 'certigo-trusted') &&
+      runner.status === 'online' &&
+      isPoweredCapacity(virtualMachine)
+    ) {
+      usableCapacityByTrust[trustClass] += 1;
+    }
+  }
   let scaleInSafety = null;
-  let nextState = { ...state };
+  let nextState = { ...state, version: config.stateVersion };
   if (operation === 'deallocate') {
     const busyRunners = certigoRunners.filter((runner) => runner.busy);
     if (busyRunners.length > 0) {
@@ -166,8 +215,10 @@ export function evaluateLifecycle({
       idle: quietEligible,
       now,
       quietPeriodSeconds: config.quietPeriodSeconds,
-      rearmSatisfied:
-        usableManagedCapacity >= aggregateCapacity(config.modes.normal),
+      rearmSatisfied: capacitySatisfies(
+        usableCapacityByTrust,
+        state.scaleInSafety?.rearmTargetCapacityByTrust,
+      ),
       requiredGuards: config.requiredPostQuietGuards,
       state: state.scaleInSafety,
     });
@@ -186,6 +237,7 @@ export function evaluateLifecycle({
   if (operation === 'deallocate' && safeToRequestChange) {
     nextState.scaleInSafety = armScaleInReactivation(
       nextState.scaleInSafety,
+      usableCapacityByTrust,
     );
   }
 
@@ -203,18 +255,25 @@ export function evaluateLifecycle({
             quietElapsedSeconds: scaleInSafety.quietElapsedSeconds,
             quietReset: scaleInSafety.quietReset,
             rearmRequired: scaleInSafety.rearmRequired,
+            rearmTargetCapacityByTrust:
+              scaleInSafety.rearmTargetCapacityByTrust,
             requiredGuards: config.requiredPostQuietGuards,
             quietPeriodSeconds: config.quietPeriodSeconds,
           },
     observed: {
       activeRuns: activeRuns.total_count ?? 0,
       absentRunners: instanceInventory.absentRunners,
+      bindingMismatches: instanceInventory.bindingMismatches,
       azureVirtualMachines: (virtualMachines ?? []).length,
       certigoRunners: certigoRunners.length,
       dualTrustRunners: dualTrustRunners.length,
       externalVirtualMachines: instanceInventory.externalVirtualMachines,
+      forbiddenVirtualMachinesPresent:
+        instanceInventory.forbiddenVirtualMachinesPresent,
       managedMachineNames: instanceInventory.managedMachineNames,
       managedPoolNames: poolBoundaries.managedPoolNames,
+      missingManagedRunnerVirtualMachines:
+        instanceInventory.missingManagedRunnerVirtualMachines,
       unclassifiedVirtualMachines:
         instanceInventory.unclassifiedVirtualMachines,
       prRunners: prRunners.length,
@@ -223,6 +282,8 @@ export function evaluateLifecycle({
         poolBoundaries.distinctIdentityBoundaryCount,
       distinctSubnetCount: poolBoundaries.distinctSubnetCount,
       trustedRunners: trustedRunners.length,
+      usableManagedCapacity,
+      usableCapacityByTrust,
     },
     nextState,
   };

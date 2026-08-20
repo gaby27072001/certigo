@@ -49,19 +49,20 @@ L'état live ne correspond plus aux anciennes VM autonomes documentées :
 
 | Élément | État observé |
 |---|---|
-| Compute | VMSS flexible `vmss-certigo-runner-zonal`, `Standard_D2ads_v6`, zones 1 et 2 |
-| Inventaire Azure courant | `f55d176e` est la seule instance gérée et reste running; `4153d1dd` est externe/deallocated et hors scope; `22f7fb52` retourne `ResourceNotFound` |
+| Compute géré | `f55d176e` dans `vmss-certigo-runner-zonal` zone 2; pilote `bbf83c5c` dans `vmss-certigo-pr-pilot-z1` zone 1 |
+| Inventaire Azure courant | `f55d176e` et `bbf83c5c` running; `4153d1dd` externe/deallocated; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
 | Autoscale | activé, minimum `2`, défaut `2`, maximum `4` |
 | Scale-out | CPU moyenne > 70 % pendant 10 min |
 | Scale-in | CPU moyenne < 20 % pendant 45 min — **non conscient des jobs GitHub** |
-| Inventaire GitHub | `f55d176e-Certigo` est l'enregistrement géré/online; `22f7fb52-Certigo` est offline/stale et sa VM est absente |
-| Cloisonnement | les deux portent simultanément `certigo-pr` et `certigo-trusted` — **bloquant** |
-| Capacité réellement réconciliée | **1 instance gérée** (`f55d176e`); `4153d1dd` est classée externe et n'entre jamais dans la capacité du contrôleur |
+| Inventaire GitHub | runner `27` `f55d176e-Certigo` online/labels doubles; runner `28` `certigo-prIVJAN8` online, PR-only; `22f7fb52-Certigo` offline/stale |
+| Cloisonnement | le pilote est sans identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; `f55d176e` conserve UAMI + `snet-runners` mais ses labels doubles restent **bloquants** |
+| Capacité réellement réconciliée | **2 instances gérées/online** : `f55d176e` et `bbf83c5c`; `4153d1dd` reste externe |
 
 Le premier snapshot avait vu trois VM, avant le scale-in CPU. L'état consolidé prouve qu'un
-simple comptage « VM Azure / runners GitHub » est faux. La réconciliation par nom classe
-`22f7fb52-Certigo` comme **absent**, la paire `f55d176e` comme **gérée** et
-`4153d1dd` comme **externe**. Externe ne signifie ni orpheline ni adoptable : cette VM est
+simple comptage « VM Azure / runners GitHub » est faux. La réconciliation explicite classe
+`22f7fb52-Certigo` comme **absent**, les bindings exacts `f55d176e`/runner `27` et
+`bbf83c5c`/runner `28` comme **gérés**, et `4153d1dd` comme **externe**. Externe ne
+signifie ni orpheline ni adoptable : cette VM est
 exclue de `currentCapacity`, de toute sélection de cible et de toute opération future par
 une classification exacte dans `inventory.externalVirtualMachines`. Toute autre VM sans
 runner reste `unclassifiedVirtualMachines` et bloque le plan; elle n'est jamais implicitement
@@ -230,8 +231,9 @@ Les éléments versionnés restent tous read-only :
 - `reconcile-drift.mjs` compare le VMSS/SKU/autoscale/labels live au modèle du dépôt ;
 - `capacity-controller.config.json` fixe `enabled=false`, le trigger `workflow_job`, la
   quiet period de 300 s, les deux gardes et la cible de pilote ultérieur
-  `6 certigo-pr + 2 certigo-trusted`; il contient aussi l'unique exclusion externe
-  `4153d1dd`, sans règle générique qui masquerait une nouvelle VM non réconciliée ;
+  `6 certigo-pr + 2 certigo-trusted`; son état v3 lie les IDs exacts f55/pilote, exclut
+  `4153d1dd` et interdit `22f7fb52`/`4596a9d5`, sans règle générique qui masquerait une
+  nouvelle VM non réconciliée ;
 - `capacity-controller.mjs` réduit un snapshot d'événements et produit uniquement le
   prochain plan ;
 - `capacity-plan.sh` collecte l'inventaire, affiche le drift puis le plan, sans appeler
@@ -271,6 +273,12 @@ snapshots read-only fournis par un orchestrateur externe. Les scripts affichent 
 mais ne l'écrivent jamais. Seule une future PR d'activation pourra définir la persistance,
 l'acquittement du réarmement et le chemin mutable. Tant que `enabled=false`,
 `lifecycle-preflight.sh` bloque aussi bien `start` que `deallocate` et n'arme aucune action.
+
+La passation opérationnelle externe v3 possède temporairement uniquement les IDs exacts
+`f55d176e` et `bbf83c5c`. Elle maintient les deux pendant l'activité, applique une quiet
+period coordonnée de 5 minutes resettable, contrôle 2 + garde finale, puis réarme la capacité
+exacte supprimée si une course apparaît. Ce processus hors dépôt n'active pas le contrôleur
+versionné : `enabled=false` reste le contrat de cette PR.
 
 ### Reconstruction de redondance avant activation
 

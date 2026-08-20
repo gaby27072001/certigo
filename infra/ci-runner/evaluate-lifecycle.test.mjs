@@ -10,9 +10,19 @@ const config = JSON.parse(
     'utf8',
   ),
 );
+const f55VmName = 'vmss-certigo-runner-zonal_f55d176e';
+const f55VmId =
+  '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
+  'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
+  `virtualMachines/${f55VmName}`;
 
-function runner(name, labels, { busy = false, status = 'online' } = {}) {
+function runner(
+  name,
+  labels,
+  { busy = false, id, status = 'online' } = {},
+) {
   return {
+    ...(id === undefined ? {} : { id }),
     name,
     labels: labels.map((label) => ({ name: label })),
     busy,
@@ -180,7 +190,13 @@ test('idle exclusive pools require five minutes, two guards, then arm reactivati
   assert.equal(secondGuard.safeToRequestChange, true);
   assert.deepEqual(secondGuard.reasons, []);
   assert.equal(secondGuard.safety.guardCount, 2);
-  assert.equal(secondGuard.nextState.scaleInSafety.rearmArmed, true);
+  assert.deepEqual(
+    secondGuard.nextState.scaleInSafety.rearmTargetCapacityByTrust,
+    {
+      'certigo-pr': 1,
+      'certigo-trusted': 1,
+    },
+  );
   assert.equal(secondGuard.nextState.scaleInSafety.guardCount, 0);
 
   const stoppedInput = structuredClone(input);
@@ -216,6 +232,7 @@ test('equal VM and runner counts still fail when their names do not reconcile', 
         runner(
           'vmss-certigo-runner-zonal_f55d176e-Certigo',
           ['certigo-trusted'],
+          { id: 27 },
         ),
       ],
     },
@@ -227,7 +244,14 @@ test('equal VM and runner counts still fail when their names do not reconcile', 
     },
     virtualMachines: [
       { name: 'vmss-certigo-runner-zonal_4153d1dd' },
-      { name: 'vmss-certigo-runner-zonal_f55d176e' },
+      {
+        id: f55VmId,
+        name: f55VmName,
+        powerState: 'VM running',
+        virtualMachineScaleSet: {
+          id: '/vmss/vmss-certigo-runner-zonal',
+        },
+      },
     ],
     vmScaleSets: [
       scaleSet(

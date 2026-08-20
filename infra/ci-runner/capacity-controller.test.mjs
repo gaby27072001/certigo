@@ -15,13 +15,24 @@ const config = JSON.parse(
     'utf8',
   ),
 );
+const f55VmName = 'vmss-certigo-runner-zonal_f55d176e';
+const f55VmId =
+  '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
+  'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
+  `virtualMachines/${f55VmName}`;
+const pilotVmName = 'vmss-certigo-pr-pilot-z1_bbf83c5c';
+const pilotVmId =
+  '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
+  'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
+  `virtualMachines/${pilotVmName}`;
 
 function runner(
   name,
   labels,
-  { busy = false, status = 'online' } = {},
+  { busy = false, id, status = 'online' } = {},
 ) {
   return {
+    ...(id === undefined ? {} : { id }),
     name,
     busy,
     status,
@@ -233,6 +244,22 @@ test('a queued trusted job selects trusted capacity before the larger PR deficit
   });
 });
 
+test('a powered runner that is offline remains a usable-capacity deficit', () => {
+  const live = inventory({ queued: 1 });
+  live.runners.github.runners[0].status = 'offline';
+  const plan = createCapacityPlan({
+    config: { ...config, enabled: true },
+    inventory: live,
+    leaseHeld: true,
+  });
+
+  assert.equal(plan.currentCapacityByTrust['certigo-pr'], 1);
+  assert.equal(plan.usableCapacityByTrust['certigo-pr'], 0);
+  assert.equal(plan.action, 'scale-out-one');
+  assert.equal(plan.targetTrustClass, 'certigo-pr');
+  assert.equal(plan.canRequestChange, true);
+});
+
 test('scale-in requires a resettable five-minute quiet period, two guards, and rearm', () => {
   const enabledConfig = { ...config, enabled: true };
   const start = Date.parse('2026-08-20T06:00:00Z');
@@ -284,15 +311,21 @@ test('scale-in requires a resettable five-minute quiet period, two guards, and r
   assert.equal(secondGuard.action, 'scale-in-one');
   assert.equal(secondGuard.nextCapacity, 3);
   assert.equal(secondGuard.safety.guardCount, 2);
-  assert.equal(secondGuard.nextState.scaleInSafety.rearmArmed, true);
+  assert.deepEqual(
+    secondGuard.nextState.scaleInSafety.rearmTargetCapacityByTrust,
+    {
+      'certigo-pr': 2,
+      'certigo-trusted': 2,
+    },
+  );
   assert.equal(secondGuard.nextState.scaleInSafety.guardCount, 0);
   assert.equal(secondGuard.nextState.scaleInSafety.quietSince, null);
 
   const rearm = createCapacityPlan({
     config: enabledConfig,
     inventory: inventory({
-      capacity: 2,
-      poweredCapacity: 1,
+      capacity: 4,
+      poweredCapacity: 3,
       queued: 1,
     }),
     leaseHeld: true,
@@ -300,8 +333,13 @@ test('scale-in requires a resettable five-minute quiet period, two guards, and r
     state: secondGuard.nextState,
   });
   assert.equal(rearm.action, 'scale-out-one');
+  assert.equal(rearm.targetTrustClass, 'certigo-trusted');
   assert.equal(rearm.safety.quietReset, false);
   assert.equal(rearm.safety.rearmRequired, true);
+  assert.deepEqual(rearm.safety.rearmTargetCapacityByTrust, {
+    'certigo-pr': 2,
+    'certigo-trusted': 2,
+  });
 });
 
 test('forged quiet-period guard state fails closed', () => {
@@ -319,7 +357,7 @@ test('forged quiet-period guard state fails closed', () => {
             guardCount: 2,
             lastGuardAt: null,
             quietSince: new Date(now - 300_000).toISOString(),
-            rearmArmed: false,
+            rearmTargetCapacityByTrust: null,
           },
         },
       }),
@@ -406,11 +444,24 @@ test('an unmatched VM without explicit external classification fails closed', ()
   ]);
 });
 
-test('real inventory classifies 22f absent, f55 managed, and 415 external', () => {
+test('real inventory binds f55 and the PR pilot while keeping 22f absent and 415 external', () => {
   const result = reconcileRunnerInstances(
     [
       { name: 'vmss-certigo-runner-zonal_4153d1dd' },
-      { name: 'vmss-certigo-runner-zonal_f55d176e' },
+      {
+        id: f55VmId,
+        name: f55VmName,
+        powerState: 'VM running',
+        virtualMachineScaleSet: { id: '/vmss/vmss-certigo-runner-zonal' },
+        zones: ['2'],
+      },
+      {
+        id: pilotVmId,
+        name: pilotVmName,
+        powerState: 'VM running',
+        virtualMachineScaleSet: { id: '/vmss/vmss-certigo-pr-pilot-z1' },
+        zones: ['1'],
+      },
     ],
     [
       runner(
@@ -420,7 +471,13 @@ test('real inventory classifies 22f absent, f55 managed, and 415 external', () =
       ),
       runner(
         'vmss-certigo-runner-zonal_f55d176e-Certigo',
-        ['certigo-trusted'],
+        ['certigo-pr', 'certigo-trusted'],
+        { id: 27 },
+      ),
+      runner(
+        'certigo-prIVJAN8',
+        ['certigo-pr', 'certigo-pr-pilot'],
+        { id: 28 },
       ),
     ],
     config.inventory,
@@ -430,11 +487,18 @@ test('real inventory classifies 22f absent, f55 managed, and 415 external', () =
     'vmss-certigo-runner-zonal_22f7fb52-Certigo',
   ]);
   assert.deepEqual(result.managedMachineNames, [
-    'vmss-certigo-runner-zonal_f55d176e',
+    pilotVmName,
+    f55VmName,
   ]);
   assert.deepEqual(result.externalVirtualMachines, [
     'vmss-certigo-runner-zonal_4153d1dd',
   ]);
+  assert.deepEqual(result.bindingMismatches, []);
+  assert.ok(
+    result.managedInstances.every(
+      (managedInstance) => managedInstance.binding === 'explicit',
+    ),
+  );
 });
 
 test('drift reconciliation reports live VMSS, SKU, CPU scale-in, and labels', () => {
@@ -487,8 +551,12 @@ test('drift reconciliation reports live VMSS, SKU, CPU scale-in, and labels', ()
       powerState: 'VM deallocated',
     },
     {
+      id: f55VmId,
       name: 'vmss-certigo-runner-zonal_f55d176e',
       powerState: 'VM running',
+      virtualMachineScaleSet: {
+        id: '/vmss/vmss-certigo-runner-zonal',
+      },
     },
   ];
   live.runners.github.runners = [
@@ -500,6 +568,7 @@ test('drift reconciliation reports live VMSS, SKU, CPU scale-in, and labels', ()
       ...runner(
         'vmss-certigo-runner-zonal_f55d176e-Certigo',
         ['certigo-pr', 'certigo-trusted'],
+        { id: 27 },
       ),
       status: 'online',
     },

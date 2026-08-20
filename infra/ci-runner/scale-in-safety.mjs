@@ -9,6 +9,24 @@ function parseOptionalTimestamp(value, name) {
   return timestamp;
 }
 
+function parseOptionalCapacityTarget(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.values(value).some(
+      (capacity) => !Number.isInteger(capacity) || capacity < 0,
+    )
+  ) {
+    throw new Error(
+      'scaleInSafety.rearmTargetCapacityByTrust must contain non-negative integers',
+    );
+  }
+  return { ...value };
+}
+
 export function advanceScaleInSafety({
   idle,
   now = Date.now(),
@@ -70,7 +88,13 @@ export function advanceScaleInSafety({
     }
   }
 
-  const rearmArmed = state.rearmArmed === true && !rearmSatisfied;
+  const previousRearmTarget = parseOptionalCapacityTarget(
+    state.rearmTargetCapacityByTrust,
+  );
+  const rearmTargetCapacityByTrust = rearmSatisfied
+    ? null
+    : previousRearmTarget;
+  const rearmRequired = rearmTargetCapacityByTrust !== null;
   if (!idle) {
     return {
       guardCount: 0,
@@ -78,12 +102,13 @@ export function advanceScaleInSafety({
       quietElapsedSeconds: 0,
       quietReset: previousQuietSince !== null,
       ready: false,
-      rearmRequired: rearmArmed,
+      rearmRequired,
+      rearmTargetCapacityByTrust,
       nextState: {
         guardCount: 0,
         lastGuardAt: null,
         quietSince: null,
-        rearmArmed,
+        rearmTargetCapacityByTrust,
       },
     };
   }
@@ -111,21 +136,43 @@ export function advanceScaleInSafety({
     quietReset: false,
     ready: quietComplete && guardCount >= requiredGuards,
     rearmRequired: false,
+    rearmTargetCapacityByTrust,
     nextState: {
       guardCount,
       lastGuardAt:
         lastGuardAt === null ? null : new Date(lastGuardAt).toISOString(),
       quietSince: new Date(quietSince).toISOString(),
-      rearmArmed,
+      rearmTargetCapacityByTrust,
     },
   };
 }
 
-export function armScaleInReactivation(state) {
+export function armScaleInReactivation(
+  state,
+  requiredCapacityByTrust,
+) {
+  const previousTarget = parseOptionalCapacityTarget(
+    state.rearmTargetCapacityByTrust,
+  );
+  const requiredTarget = parseOptionalCapacityTarget(
+    requiredCapacityByTrust,
+  );
+  if (requiredTarget === null) {
+    throw new Error('requiredCapacityByTrust is required');
+  }
+  const rearmTargetCapacityByTrust = Object.fromEntries(
+    Object.keys(requiredTarget).map((trustClass) => [
+      trustClass,
+      Math.max(
+        previousTarget?.[trustClass] ?? 0,
+        requiredTarget[trustClass],
+      ),
+    ]),
+  );
   return {
     guardCount: 0,
     lastGuardAt: null,
     quietSince: null,
-    rearmArmed: true,
+    rearmTargetCapacityByTrust,
   };
 }

@@ -23,17 +23,17 @@ mutuellement exclusifs :
 
 ## Capacité et stratégie de cycle de vie
 
-L'inventaire read-only consolidé au 20 août 2026 a constaté un VMSS flexible
-`vmss-certigo-runner-zonal`, un autoscale CPU min 2/max 4 et des labels
-`certigo-pr` + `certigo-trusted` simultanés sur les deux runners enregistrés.
+L'inventaire read-only consolidé au 20 août 2026 constate le VMSS legacy
+`vmss-certigo-runner-zonal` et le pilote `vmss-certigo-pr-pilot-z1`.
 Cet état ne respecte pas la cible ci-dessus. Le scale-in CPU ignore l'état GitHub `busy`.
 
 La réconciliation classe `22f7fb52-Certigo` comme runner **absent** d'Azure,
-`f55d176e` comme seule paire **gérée** (running/online), et `4153d1dd` comme VM
-**externe** au contrôleur (deallocated) via son nom exact. L'externe n'est ni comptée,
+`f55d176e`/runner 27 et `bbf83c5c`/runner 28 comme paires **gérées** running/online,
+et `4153d1dd` comme VM **externe** (deallocated). Le pilote zone 1 est PR-only, sans
+identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; f55 zone 2 conserve son identité
+et `snet-runners`, mais ses labels doubles bloquent encore l'activation. L'externe n'est ni comptée,
 ni adoptée, ni ciblée. Toute nouvelle VM sans runner est non classée et bloque le plan.
-Aucune de ces entrées n'est
-supprimée ou réparée par ce livrable.
+Aucune de ces entrées n'est supprimée ou réparée par ce livrable.
 
 Toute automation mutable est donc bloquée. Le prévol
 `infra/ci-runner/lifecycle-preflight.sh` est read-only et doit refuser cet état. La
@@ -43,12 +43,14 @@ sont dans [`CLOUD_LEAST_PRIVILEGE.md`](./runbooks/CLOUD_LEAST_PRIVILEGE.md).
 La release Android reste volontairement sur `certigo-trusted`. Elle peut
 utiliser l'identité managée Azure du runner pour lire Key Vault.
 
-Le contrôleur reste `enabled=false`. La cible d'un pilote ultérieur est limitée à
+Le contrôleur versionné reste `enabled=false`. Son état v3 lie les deux couples exacts et
+considère une capacité utilisable seulement si la VM est powered **et** le runner online.
+La cible d'un pilote ultérieur est limitée à
 **6 runners `certigo-pr` + 2 runners `certigo-trusted`**, avec un incrément par plan.
 Cette limite de pilote n'est pas un plafond de production final. Tout scale-in exige
 5 minutes continues sans activité, remises à zéro par tout job `queued/in_progress`
-ou runner `busy`, puis deux gardes distinctes. Une activité post-scale-in déclenche
-le réarmement de la capacité gérée avant toute nouvelle réduction.
+ou runner `busy`, puis deux gardes distinctes. Une activité post-scale-in conserve et
+restaure le slot exact supprimé, même si la flotte restante dépasse encore le mode normal.
 
 ## Politique des pull requests
 

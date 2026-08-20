@@ -1,5 +1,6 @@
 {
   "enabled": false,
+  "stateVersion": 3,
   "trigger": "workflow_job",
   "scaleStep": 1,
   "minimumExclusivePools": 2,
@@ -12,6 +13,24 @@
   "inventory": {
     "externalVirtualMachines": [
       "vmss-certigo-runner-zonal_4153d1dd"
+    ],
+    "forbiddenVirtualMachines": [
+      "vmss-certigo-runner-zonal_22f7fb52",
+      "vmss-certigo-pr-pilot-z1_4596a9d5"
+    ],
+    "managedRunnerBindings": [
+      {
+        "githubRunnerId": 27,
+        "runnerName": "vmss-certigo-runner-zonal_f55d176e-Certigo",
+        "virtualMachineId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/virtualMachines/vmss-certigo-runner-zonal_f55d176e",
+        "virtualMachineName": "vmss-certigo-runner-zonal_f55d176e"
+      },
+      {
+        "githubRunnerId": 28,
+        "runnerName": "certigo-prIVJAN8",
+        "virtualMachineId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/virtualMachines/vmss-certigo-pr-pilot-z1_bbf83c5c",
+        "virtualMachineName": "vmss-certigo-pr-pilot-z1_bbf83c5c"
+      }
     ]
   },
   "pilotTarget": {
