@@ -38,8 +38,8 @@ La PR de normalisation doit rester isolée des brouillons qui modifient déjà l
 points de composition :
 
 1. #301 fournit désormais le contrat et le validateur FinOps en lecture seule ;
-2. stabiliser #290 pour le stockage de contenu, #302 pour le moindre privilège
-   et #303 pour l'observabilité (#296 est déjà intégré) ;
+2. stabiliser #290 pour le stockage de contenu et #302 pour le moindre privilège
+   (#296 et #303 sont déjà intégrés) ;
 3. rebaser la PR de tags, puis résoudre uniquement les ajouts de paramètres ;
 4. appliquer `union(existingTags, requiredTags)` dans `infra/main.bicep` avec
    `env` déjà existant et des paramètres non personnels pour `owner`, `product`,
