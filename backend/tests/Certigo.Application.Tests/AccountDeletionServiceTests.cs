@@ -48,7 +48,8 @@ public sealed class AccountDeletionServiceTests
             "economy",
             "profile",
             "social",
-            "identity");
+            "identity",
+            "linked-identity");
         identity.Subjects.Should().Equal("external-user-1");
         repository.Record!.SubjectUserId.Should().BeNull();
         repository.Record.Ttl.Should().Be((int)TimeSpan.FromDays(30).TotalSeconds);
@@ -91,7 +92,8 @@ public sealed class AccountDeletionServiceTests
             "economy",
             "profile",
             "social",
-            "identity");
+            "identity",
+            "linked-identity");
     }
 
     [Fact]
@@ -249,6 +251,12 @@ public sealed class AccountDeletionServiceTests
             string subjectUserId,
             CancellationToken cancellationToken = default)
             => Execute("identity");
+
+        public Task DeleteLinkedIdentityDataAsync(
+            string subjectUserId,
+            DateTimeOffset revokedAt,
+            CancellationToken cancellationToken = default)
+            => Execute("linked-identity");
 
         private Task Execute(string step)
         {

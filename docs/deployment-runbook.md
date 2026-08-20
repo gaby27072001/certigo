@@ -150,13 +150,26 @@ erreur ARM/OneDeploy en production pour tester l'Activity Log Alert. Procédure 
 officielle : [tester un Action Group](https://learn.microsoft.com/azure/azure-monitor/alerts/action-groups#test-an-action-group-in-the-azure-portal).
 
 La publication GitHub Pages des pages légales (politique de confidentialité
-`/privacy-policy/` et demande de suppression `/account-deletion/`) suit la même
-frontière de confiance :
+`/privacy-policy/` et demande de suppression `/account-deletion/`) est
+fail-closed. Le GitHub Environment `github-pages` doit fournir une
+`PUBLIC_WEB_ORIGIN` HTTPS canonique et `PUBLIC_DOMAIN_VERIFIED=true`; sinon le
+builder échoue avant la création de l'artefact. Ne déclencher le dispatch
+qu'après avoir suivi [`PUBLIC_DOMAIN_MIGRATION.md`](./PUBLIC_DOMAIN_MIGRATION.md) :
 
 ```bash
 gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" \
-  -f event_type=deploy-privacy-policy
+  -f event_type=publish-verified-public-pages
 ```
+
+Le dispatch historique `deploy-privacy-policy` reste neutralisé et ne doit pas
+être utilisé comme chemin d'activation.
+
+Staging et production reçoivent en plus
+`APPLE_CIAM_DOMAIN_RECONFIGURED=true` depuis leur GitHub Environment avant toute
+opération de déploiement ou rollback. L'Environment `beta` et le groupe
+Codemagic `certigo_mobile_config` fournissent le même triplet avant toute release
+mobile. Les fichiers de paramètres versionnés conservent les valeurs
+vides/fausses.
 
 ### Pourquoi Azure-first (long terme)
 
@@ -333,6 +346,16 @@ trusted doit être éphémère et disposer de Docker ; le workflow génère une 
 locale, crée une base d’émulation unique et détruit le conteneur en `finally`.
 Il ne se connecte pas à Azure et ne modifie ni RBAC ni infrastructure. Un test
 skippé ou non démarré ne permet jamais d’activer la feature.
+
+### Gate Person / LinkedIdentity
+
+`PERSON_LINKED_IDENTITY_V1` est explicitement `off` dans `dev`, `staging` et
+`prod`. Le runtime courant n'accepte que `off|shadow`. `shadow` conserve le
+`userId` legacy comme autorité et ajoute uniquement des overlays/mirrors
+idempotents ; il n'active aucun endpoint ni UI de liaison. Toute activation
+requiert d'abord le gate backend/Cosmos de la PR runtime puis une décision
+opérationnelle séparée. Les valeurs futures `resolve` et `link` échouent au
+démarrage dans cette version.
 
 ### Prévol read-only
 

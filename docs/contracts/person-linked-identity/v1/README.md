@@ -2,21 +2,22 @@
 
 **Version :** `1.0.0`
 
-**Statut :** contract-only, runtime désactivé
+**Statut :** contrat V1, runtime de migration `off|shadow`
 
 **ADR :** [ADR-014](../../../adr/ADR-014-person-linked-identity.md)
 
-Ce répertoire est la surface versionnée de la phase préparatoire :
+Ce répertoire reste la surface versionnée de la phase Person / LinkedIdentity :
 
 - `openapi.json` décrit les endpoints, DTO, erreurs, preuves et feature mode ;
 - `cosmos.schema.json` décrit les documents additifs et les contraintes de stockage ;
-- les tests exécutables vivent dans
+- les tests contractuels vivent dans
   `backend/tests/Certigo.Application.Tests/PersonLinkedIdentityContractTests.cs`.
 
-Le contrat est réconcilié avec `main@01ac86554445e4e3dd29efa5e95beaa8ed41400e`.
-Les baselines #289, #296 et #297 y sont fusionnées ; #301, #302, #303, #305 et #308 n'ajoutent
-aucun runtime identité. Ce contrat décrit les surfaces existantes et spécifie les adaptations
-futures, mais n'active ni suppression de compte, ni resolver Person, ni liaison d'identité.
+Le contrat est réconcilié avec `main@034c1dd41e8ce7da0a84f8a6e70d821829a54e61`,
+qui inclut #300. Le premier runtime accepte uniquement `off` (défaut) et `shadow`.
+`shadow` ajoute l'overlay Person, le sujet local opaque et le miroir LinkedIdentity,
+mais le `userId` legacy reste l'unique autorité. Les endpoints list/begin/complete/revoke
+et toute UI de liaison restent contractuels et ne sont pas livrés.
 
 ## Règles de compatibilité
 

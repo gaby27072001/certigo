@@ -63,7 +63,8 @@ public sealed class AccountDeletionEndToEndTests
             "profile",
             "social",
             "credentials",
-            "credentials");
+            "credentials",
+            "linked-identity");
         repository.Record!.Status.Should().Be(AccountDeletionRecordStatus.Completed);
         repository.Record.SubjectUserId.Should().BeNull();
 
@@ -227,6 +228,12 @@ public sealed class AccountDeletionEndToEndTests
             string subjectUserId,
             CancellationToken cancellationToken = default)
             => RecordCall("credentials");
+
+        public Task DeleteLinkedIdentityDataAsync(
+            string subjectUserId,
+            DateTimeOffset revokedAt,
+            CancellationToken cancellationToken = default)
+            => RecordCall("linked-identity");
 
         private Task RecordCall(string call)
         {

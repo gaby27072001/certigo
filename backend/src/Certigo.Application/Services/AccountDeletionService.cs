@@ -177,9 +177,17 @@ public sealed class AccountDeletionService(
                 break;
             case IdentityStep when identityKind == AccountIdentityKind.Local:
                 await repository.DeleteCredentialsAsync(subjectUserId, cancellationToken);
+                await repository.DeleteLinkedIdentityDataAsync(
+                    subjectUserId,
+                    clock.UtcNow,
+                    cancellationToken);
                 break;
             case IdentityStep when identityKind == AccountIdentityKind.External:
                 await externalIdentityDeletion.DeleteAsync(subjectUserId, cancellationToken);
+                await repository.DeleteLinkedIdentityDataAsync(
+                    subjectUserId,
+                    clock.UtcNow,
+                    cancellationToken);
                 break;
             case ReconciliationStep:
                 // Writers hold distributed leases acquired against the same

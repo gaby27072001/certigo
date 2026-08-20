@@ -54,6 +54,7 @@ const reusableScannerFiles = new Set([
 const trustedOnlyWorkflowFiles = new Set([
   'cd-backend.yml',
   'deploy-privacy-policy.yml',
+  'publish-verified-public-pages.yml',
   'promote-backend-staging-prod.yml',
   'release-android.yml',
   'release-ios.yml',
@@ -69,6 +70,7 @@ const trustedAggregateJobs = new Map([
 const privilegedDispatchTypes = new Map([
   ['cd-backend.yml', 'promote-backend'],
   ['deploy-privacy-policy.yml', 'deploy-privacy-policy'],
+  ['publish-verified-public-pages.yml', 'publish-verified-public-pages'],
   ['promote-backend-staging-prod.yml', 'promote-backend-staging-prod'],
   ['release-android.yml', 'release-android'],
   ['release-ios.yml', 'release-ios-legacy'],
@@ -342,6 +344,7 @@ function validateWorkflow(file) {
 function validateRepositoryInvariants() {
   const errors = [];
   const android = fs.readFileSync(path.join(workflowsDir, 'release-android.yml'), 'utf8');
+  const iosRelease = fs.readFileSync(path.join(workflowsDir, 'release-ios.yml'), 'utf8');
   const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');
   const backend = fs.readFileSync(path.join(workflowsDir, 'cd-backend.yml'), 'utf8');
   const backendCi = fs.readFileSync(path.join(workflowsDir, 'ci-backend.yml'), 'utf8');
@@ -384,6 +387,14 @@ function validateRepositoryInvariants() {
   );
   const secureBicepWriter = fs.readFileSync(
     path.join(root, '.github', 'scripts', 'write-secure-bicep-parameters.mjs'),
+    'utf8',
+  );
+  const publicDomainContract = fs.readFileSync(
+    path.join(root, '.github', 'scripts', 'public-domain-contract.mjs'),
+    'utf8',
+  );
+  const publicPagesWorkflow = fs.readFileSync(
+    path.join(workflowsDir, 'publish-verified-public-pages.yml'),
     'utf8',
   );
   const accountDeletionCosmosGate = fs.readFileSync(
@@ -593,6 +604,9 @@ function validateRepositoryInvariants() {
       'ENTRA_GRAPH_CLIENT_SECRET: ${{ secrets.ENTRA_GRAPH_CLIENT_SECRET }}',
       'ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON: ${{ vars.ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON }}',
       'ENTRA_REAUTH_AUDIENCE: ${{ vars.ENTRA_REAUTH_AUDIENCE }}',
+      'PUBLIC_WEB_ORIGIN: ${{ vars.PUBLIC_WEB_ORIGIN }}',
+      'PUBLIC_DOMAIN_VERIFIED: ${{ vars.PUBLIC_DOMAIN_VERIFIED }}',
+      'APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}',
       'az bicep build-params',
       'node .github/scripts/write-secure-bicep-parameters.mjs',
       'DEPLOYMENT_OUTPUTS_FILE',
@@ -637,6 +651,9 @@ function validateRepositoryInvariants() {
       'compiled.parameters.entraGraphClientSecret',
       'compiled.parameters.entraGraphClientSecretExpiresOn',
       'compiled.parameters.entraReauthAudience',
+      'compiled.parameters.publicWebOrigin',
+      'compiled.parameters.publicDomainVerified',
+      'compiled.parameters.appleCiamDomainReconfigured',
       'mode: 0o600',
       "flag: 'wx'",
     ]) {
@@ -657,6 +674,82 @@ function validateRepositoryInvariants() {
         errors.push(
           `${environment}.bicepparam: account deletion identity values must come from the GitHub Environment`,
         );
+      }
+      if (
+        /^\s*param\s+(publicWebOrigin|publicDomainVerified|appleCiamDomainReconfigured)\s*=/m
+          .test(content)
+      ) {
+        errors.push(
+          `${environment}.bicepparam: public-domain values must come from the GitHub Environment`,
+        );
+      }
+    }
+  }
+  for (const marker of [
+    "'infrastructure'",
+    'PUBLIC_WEB_ORIGIN must be a canonical HTTPS origin',
+    'PUBLIC_DOMAIN_VERIFIED must be explicitly true',
+    'APPLE_CIAM_DOMAIN_RECONFIGURED must be explicitly true',
+    "host.endsWith('.invalid')",
+    "host.endsWith('.')",
+    "host.endsWith('.test')",
+    "['certigo', 'app'].join('.')",
+  ]) {
+    if (!publicDomainContract.includes(marker)) {
+      errors.push(`public-domain-contract.mjs: missing fail-closed invariant ${marker}`);
+    }
+  }
+  for (const marker of [
+    'environment: github-pages',
+    'PUBLIC_WEB_ORIGIN: ${{ vars.PUBLIC_WEB_ORIGIN }}',
+    'PUBLIC_DOMAIN_VERIFIED: ${{ vars.PUBLIC_DOMAIN_VERIFIED }}',
+    'APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}',
+    'PAGES_ORIGIN: ${{ steps.pages.outputs.origin }}',
+    'PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}',
+    'node .github/scripts/public-domain-contract.mjs legal-pages',
+    'node tools/build_public_pages.mjs --output _site',
+  ]) {
+    if (!publicPagesWorkflow.includes(marker)) {
+      errors.push(`publish-verified-public-pages.yml: missing verified-domain invariant ${marker}`);
+    }
+  }
+  if (
+    publicPagesWorkflow.indexOf('node tools/build_public_pages.mjs --output _site')
+    > publicPagesWorkflow.indexOf('actions/upload-pages-artifact@')
+  ) {
+    errors.push(
+      'publish-verified-public-pages.yml: domain validation must run before the Pages artifact upload',
+    );
+  }
+  for (const marker of [
+    'validate-public-domain:',
+    'Require verified public-domain contract before Azure access',
+    'Require verified public-domain contract before deploy or rollback',
+    'node .github/scripts/public-domain-contract.mjs infrastructure',
+  ]) {
+    if (!backend.includes(marker)) {
+      errors.push(`cd-backend.yml: missing public-domain deploy/rollback gate ${marker}`);
+    }
+  }
+  if (
+    backend.indexOf('validate-public-domain:')
+    > backend.indexOf('resolve-release:')
+  ) {
+    errors.push('cd-backend.yml: public-domain preflight must precede Azure release retrieval');
+  }
+  for (const [file, content] of [
+    ['release-android.yml', android],
+    ['release-ios.yml', iosRelease],
+    ['codemagic.yaml', codemagic],
+  ]) {
+    for (const marker of [
+      'PUBLIC_WEB_ORIGIN',
+      'PUBLIC_DOMAIN_VERIFIED',
+      'APPLE_CIAM_DOMAIN_RECONFIGURED',
+      'public-domain-contract.mjs account-deletion-url',
+    ]) {
+      if (!content.includes(marker)) {
+        errors.push(`${file}: missing public-domain release gate ${marker}`);
       }
     }
   }

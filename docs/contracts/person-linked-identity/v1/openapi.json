@@ -3,7 +3,7 @@
   "info": {
     "title": "Certigo Person and LinkedIdentity",
     "version": "1.0.0",
-    "description": "Contract-only API. No production runtime is enabled by this artifact."
+    "description": "Link API contract only. The runtime implementation currently supports additive off|shadow migration and exposes no link endpoint."
   },
   "servers": [
     {
@@ -17,7 +17,7 @@
   ],
   "x-certigo-status": "contract-only",
   "x-certigo-reconciled-main": {
-    "commit": "01ac86554445e4e3dd29efa5e95beaa8ed41400e",
+    "commit": "034c1dd41e8ce7da0a84f8a6e70d821829a54e61",
     "mergedPullRequests": [
       289,
       296,
@@ -26,9 +26,10 @@
       302,
       303,
       305,
-      308
+      308,
+      300
     ],
-    "productionIdentityRuntimeChanged": false
+    "productionIdentityRuntimeChanged": true
   },
   "x-certigo-prerequisites": [
     {
@@ -58,6 +59,10 @@
       "shadow",
       "resolve",
       "link"
+    ],
+    "implementedValues": [
+      "off",
+      "shadow"
     ],
     "mutationRequiredValue": "link",
     "offHttpStatus": 404,

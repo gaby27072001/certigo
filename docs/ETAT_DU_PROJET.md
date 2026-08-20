@@ -29,15 +29,15 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-08-20** |
-| Commit de référence analysé | `84eef3b2c20c2ecf0b853714ddde66528907465a` |
+| Commit de référence analysé | `0d5c7e6c0ecc2e466b92e2ec88516718828fccfe` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
 | Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `55a512821dabbea8b65d3403f9c83571b4a33ed8` du **2026-08-14** |
 | Package public actif | **146 fichiers** — `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
 | Package privé actif (`answerKey`) | **146 fichiers** — `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
-| Workflows GitHub Actions | **22** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-project-state.yml`, `codeql.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `lint-workflows.yml`, `promote-backend-staging-prod.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml`, `test-account-deletion-cosmos.yml` |
-| Tests découverts | **179 fichiers** — .NET : 4 projets / 75 fichiers ; Flutter/Dart : 6 racines / 99 fichiers ; Python : 1 racine / 5 fichier |
+| Workflows GitHub Actions | **23** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-project-state.yml`, `codeql.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `lint-workflows.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml`, `test-account-deletion-cosmos.yml` |
+| Tests découverts | **181 fichiers** — .NET : 4 projets / 80 fichiers ; Flutter/Dart : 6 racines / 96 fichiers ; Python : 1 racine / 5 fichier |
 | Corpus **historique** local | **91 pistes**, **146 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
@@ -83,6 +83,7 @@ dépend ni de l'objet Git capturé ni de son ascendance et reste donc valide apr
 | **Anti‑triche / intégrité** | 🟢 (shadow) | Domain `Integrity/` | Évaluateur déterministe des tentatives — **mode détection** (signale, ne sanctionne pas encore). |
 | **Offline‑first** | 🟢 | `packages/data` (sync) + `app/offline` | File de synchro idempotente, backoff, rejouable — **câblée dans l'app**. *(Seule la leçon en cours est disponible hors‑ligne pour l'instant ; la synchronisation complète du catalogue est planifiée — P3.)* |
 | **Authentification** | 🟢 | API `Middleware/` + mobile `features/auth` | **Microsoft / Google / Apple** fédérés derrière **Entra External ID**, JWT validé serveur. |
+| **Person / LinkedIdentity** | 🟡 (shadow) | Domain `Identity/` + Application/Infrastructure | Runtime additif `off|shadow`, `off` dans tous les environnements. `shadow` conserve `personId == userId` et le resolver legacy autoritaire ; aucun endpoint/UI de liaison. |
 | **Design system (Prism)** | 🟢 | `packages/prism_ui` | Composants + tokens + thèmes ; tests/goldens dans `ci-mobile.yml`. |
 | **App mobile (Flutter)** | 🟢 | `apps/mobile` | Les moteurs de gamification sont branchés en écran + tests widget (`ci-mobile.yml`). Validation E2E appareil : **non vérifiée / manuelle**. |
 | **Cortex (algos partagés)** | 🟢 | `packages/cortex` | SRS, scoring, fil pédagogique — partagé client/serveur. |
@@ -170,6 +171,7 @@ flowchart LR
 | **Anti‑triche / intégrité** | 🟢 | — | Évaluateur déterministe (mode détection, événement `attempt.flagged`). **Fenêtre de cadence** (XP/tentatives sur 1 h, conteneur `attempts`) câblée pour **quiz et examens** → détecteurs de débit actifs. |
 | **Offline‑first** | 🟢 | 🟢 | Synchro idempotente rejouable, backoff. |
 | **Authentification** | 🟢 | 🟢 | Microsoft / Google / Apple via Entra External ID (Android + iOS natifs câblés). |
+| **Person / LinkedIdentity** | 🟡 (`off|shadow`) | — | Overlay Person et miroirs locaux/Entra idempotents, collisions fail-closed, télémétrie sans PII et tombstones de suppression ; aucune résolution autoritaire ni liaison utilisateur. |
 
 > **Lecture clé :** l'écart backend ↔ UI est désormais **comblé pour la gamification** : saisons, quêtes,
 > succès, boutique, amis et examens disposent d'un **écran mobile + test widget**. Restent à exposer le
@@ -344,6 +346,7 @@ déclarée est dans `codemagic.yaml`.
 
 | Date | Évolution |
 |---|---|
+| 2026‑08‑20 | 🪪 **Premier runtime Person / LinkedIdentity** : modèles/ports, persistence Cosmos additive dans `users` sans changement de PK, lazy migration `personId == userId`, miroir local/Entra idempotent en `shadow`, collisions visibles sans bloquer le legacy, télémétrie sans PII et nettoyage #296. `PERSON_LINKED_IDENTITY_V1=off` reste explicite en dev/staging/prod ; aucun endpoint/UI de liaison, déploiement ou activation. |
 | 2026‑08‑06 | 🤖 **État observable généré (#247)** : versions, workflows, tests, corpus historique, types pédagogiques et référence analysée sont désormais produits par `tools/project_state.py` et gardés par `ci-project-state.yml`. `wp-p2-01` est clôturé après fusion de la PR #251 ; `wp-p2-08` est en revue dans la PR #254. |
 | 2026‑08‑06 | 📦 **Phase 2 avancée** : `wp-p2-02` et `wp-p2-03` sont `done` après fusion des PR `certigo-content` #7/#8 ; `wp-p2-04`, `wp-p2-07` et `wp-p2-09` sont en cours dans leurs sessions dédiées. |
 | 2026‑08‑05 | 📚 **Registre de migration réconcilié** : seuls les lots Phase 1 dont la DoD complète est satisfaite sont alignés à `done` dans le manifeste, les états JSON et la vue humaine ; les lots incomplets restent ouverts même si une PR associée a été fusionnée. Démarrage de `wp-p2-01` documentaire ; `wp-p2-02..09` ont alors été enregistrés à `todo`, avant leur exécution dans des sessions distinctes. |
@@ -382,6 +385,9 @@ déclarée est dans `codemagic.yaml`.
 **Chantiers techniques :**
 - 🏗️ **Provisionner `staging`** par Bicep et valider `/health` ; `dev`, `prod` et CI sont déjà déployés.
 - 🔐 **Valider l'auth de bout en bout** sur un vrai tenant Entra External ID (E2E).
+- 🪪 **Person / LinkedIdentity — prochain lot** : observer le mode `shadow`, traiter toute collision,
+  puis livrer séparément le resolver autoritaire `resolve`. Les endpoints/UI `link` restent hors
+  périmètre jusqu'à validation des cohortes et de la suppression multi-identités.
 - 🔍 **Faire passer l'anti‑triche** du mode détection au mode application des sanctions (lot suivant) — la **fenêtre de cadence** (débit XP/tentatives sur 1 h) est désormais câblée pour **quiz et examens** ; reste la calibration puis la bascule en mode sanction.
 - ✅ **Tests d'intégration Cosmos exécutés sur émulateur réel** (le projet `Certigo.Infrastructure.Tests` est gated `CERTIGO_COSMOS_TESTS=1`). Les **6 cas ont tourné** (0 ignoré) contre l'émulateur Docker `mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview` (ARM64, HTTPS) : **5/6 verts**. Le 6e — `Attempt_recent_activity_aggregates_count_and_xp_within_window` (`CosmosAttemptRepository.GetRecentActivityAsync`, agrégat `COUNT(1)`/`SUM` projeté en objet `VALUE { … }`) — échoue **uniquement** sur l'émulateur _vnext-preview_ (back‑end PostgreSQL) avec `RewrittenAggregateProjections was not an array for a value aggregate query`. **Ce n'est pas un bug de production** : la requête est valide contre Cosmos réel et l'émulateur classic ; on **ne réécrit pas** la requête pour contourner une limite de l'émulateur preview. L'émulateur **classic amd64** est **inutilisable sur cet hôte ARM64** (`exec format error` sans QEMU ; `segfault signal 11` même avec QEMU x86_64 binfmt installé), d'où la cible 6/6 hors de portée localement — à confirmer en CI/Cosmos réel.
   - _Relancer la suite_ : `docker run -d --name cosmos-emulator -p 8081:8081 -p 1234:1234 -e PROTOCOL=https mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview` (attendre `PostgreSQL=OK, Gateway=OK, Explorer=OK` dans `docker logs`), puis exporter `CERTIGO_COSMOS_TESTS=1`, `COSMOS_EMULATOR_ENDPOINT=https://localhost:8081`, `COSMOS_EMULATOR_KEY=<clé publique émulateur>` et lancer `dotnet test backend\tests\Certigo.Infrastructure.Tests`.

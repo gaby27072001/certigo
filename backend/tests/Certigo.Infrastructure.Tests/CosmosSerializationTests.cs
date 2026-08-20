@@ -4,6 +4,7 @@ using FluentAssertions;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
 using Certigo.Domain.Content;
+using Certigo.Domain.Identity;
 using Xunit;
 
 namespace Certigo.Infrastructure.Tests;
@@ -39,7 +40,10 @@ public sealed class CosmosSerializationTests
                     "operation::quiz::a1",
                     new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero),
                     "{\"attemptId\":\"result-1\"}"),
-            ])
+            ],
+            IdentityMetadata: PersonIdentityMetadata.Shadow(
+                "user-1",
+                new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero)))
         {
             ETag = "\"etag-1\"",
         };
@@ -51,9 +55,80 @@ public sealed class CosmosSerializationTests
         using var document = JsonDocument.Parse(json);
         document.RootElement.GetProperty("_etag").GetString().Should().Be("\"etag-1\"");
         json.Should().Contain("\"economyReceipts\"");
+        document.RootElement.GetProperty("identityMetadata")
+            .GetProperty("personId").GetString().Should().Be("user-1");
+        document.RootElement.GetProperty("identityMetadata")
+            .GetProperty("legacyUserId").GetString().Should().Be("user-1");
         document.RootElement.GetProperty("appliedEconomyOperations").ValueKind
             .Should().Be(JsonValueKind.Null);
         restored.Should().BeEquivalentTo(profile);
+    }
+
+    [Fact]
+    public void Linked_identity_round_trips_contract_shape_without_email()
+    {
+        var now = new DateTimeOffset(2026, 8, 20, 12, 0, 0, TimeSpan.Zero);
+        var locator = new IdentityLocator(
+            IdentityLocator.LocalProvider,
+            IdentityLocator.LocalTenant,
+            "0123456789abcdef0123456789abcdef",
+            IdentityLocator.LocalPasswordType);
+        var identity = LinkedIdentity.Create(
+            "user-1",
+            locator,
+            new LinkedIdentityVerification(
+                LinkedIdentityVerification.VerifiedState,
+                LinkedIdentityVerification.LegacyCredentialBackfillMethod,
+                now,
+                now,
+                null,
+                null),
+            now) with
+        {
+            ETag = "\"identity-etag\"",
+        };
+
+        var json = JsonSerializer.Serialize(identity, SerializerOptions());
+        var restored = JsonSerializer.Deserialize<LinkedIdentity>(
+            json,
+            SerializerOptions());
+        using var document = JsonDocument.Parse(json);
+
+        document.RootElement.GetProperty("documentType").GetString()
+            .Should().Be("linkedIdentity");
+        document.RootElement.GetProperty("schemaVersion").GetInt32().Should().Be(1);
+        document.RootElement.GetProperty("locator").GetProperty("provider").GetString()
+            .Should().Be("certigo-local");
+        document.RootElement.GetProperty("verification").GetProperty("method").GetString()
+            .Should().Be("legacyCredentialBackfill");
+        document.RootElement.GetProperty("revocation").GetProperty("state").GetString()
+            .Should().Be("active");
+        document.RootElement.TryGetProperty("email", out _).Should().BeFalse();
+        document.RootElement.GetProperty("locator").TryGetProperty("email", out _)
+            .Should().BeFalse();
+        restored.Should().BeEquivalentTo(identity);
+    }
+
+    [Fact]
+    public void Credential_identity_subject_is_additive_and_opaque()
+    {
+        var credential = new UserCredentialRecord(
+            UserCredentialRecord.CanonicalIdFor("learner@example.com"),
+            "learner@example.com",
+            "user-1",
+            "Learner",
+            "hash",
+            new DateTimeOffset(2026, 8, 20, 12, 0, 0, TimeSpan.Zero),
+            IdentitySubject: "0123456789abcdef0123456789abcdef");
+
+        var json = JsonSerializer.Serialize(credential, SerializerOptions());
+        var restored = JsonSerializer.Deserialize<UserCredentialRecord>(
+            json,
+            SerializerOptions());
+
+        restored!.IdentitySubject.Should().Be("0123456789abcdef0123456789abcdef");
+        restored.IdentitySubject.Should().NotContain("@");
+        restored.IdentitySubject.Should().NotContain("learner");
     }
 
     [Fact]
