@@ -9,7 +9,8 @@ name: cd-backend
 # Required staging/prod environment configuration:
 #   secrets AUTH_JWT_SIGNING_KEY and ENTRA_GRAPH_CLIENT_SECRET
 #   variables AUTH_JWT_SIGNING_KEY_EXPIRES_ON, ENTRA_GRAPH_TENANT_ID,
-#   ENTRA_GRAPH_CLIENT_ID and ENTRA_REAUTH_AUDIENCE
+#   ENTRA_GRAPH_CLIENT_ID, ENTRA_REAUTH_AUDIENCE, PUBLIC_WEB_ORIGIN,
+#   PUBLIC_DOMAIN_VERIFIED and APPLE_CIAM_DOMAIN_RECONFIGURED
 # Optional only during a planned overlap:
 #   secret AUTH_JWT_PREVIOUS_SIGNING_KEY
 #   variable AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON
@@ -314,6 +315,13 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Require verified public-domain contract before deploy or rollback
+        env:
+          PUBLIC_WEB_ORIGIN: ${{ vars.PUBLIC_WEB_ORIGIN }}
+          PUBLIC_DOMAIN_VERIFIED: ${{ vars.PUBLIC_DOMAIN_VERIFIED }}
+          APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}
+        run: node .github/scripts/public-domain-contract.mjs infrastructure
+
       - name: Azure login (OIDC)
         uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
         with:
@@ -371,6 +379,9 @@ jobs:
           ENTRA_GRAPH_CLIENT_SECRET: ${{ secrets.ENTRA_GRAPH_CLIENT_SECRET }}
           ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON: ${{ vars.ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON }}
           ENTRA_REAUTH_AUDIENCE: ${{ vars.ENTRA_REAUTH_AUDIENCE }}
+          PUBLIC_WEB_ORIGIN: ${{ vars.PUBLIC_WEB_ORIGIN }}
+          PUBLIC_DOMAIN_VERIFIED: ${{ vars.PUBLIC_DOMAIN_VERIFIED }}
+          APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}
           BASE_PARAMETERS_FILE: ${{ runner.temp }}/certigo-base-parameters.json
           AUTH_PARAMETERS_FILE: ${{ runner.temp }}/certigo-auth-parameters.json
           DEPLOYMENT_OUTPUTS_FILE: ${{ runner.temp }}/certigo-deployment-outputs.json

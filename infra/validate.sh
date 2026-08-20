@@ -105,6 +105,12 @@ for environment in staging prod; do
     echo "${environment} Graph identity parameters must come from its GitHub Environment." >&2
     exit 1
   fi
+  if grep -Eq \
+    '^[[:space:]]*param[[:space:]]+(publicWebOrigin|publicDomainVerified|appleCiamDomainReconfigured)[[:space:]]*=' \
+    "${params}"; then
+    echo "${environment} public-domain parameters must come from its GitHub Environment." >&2
+    exit 1
+  fi
 done
 
 if grep -R --include='*.bicep' --include='*.bicepparam' -n \
@@ -148,6 +154,12 @@ grep -F 'ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI: entraGraphClientSecretSecretUri' 
 grep -F 'ACCOUNT_DELETION_ENABLED: string(accountDeletionEnabled)' \
   "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F 'param accountDeletionEnabled bool = false' \
+  "${root}/infra/main.bicep" >/dev/null
+grep -F 'param publicWebOrigin string = '\'''\''' \
+  "${root}/infra/main.bicep" >/dev/null
+grep -F 'param publicDomainVerified bool = false' \
+  "${root}/infra/main.bicep" >/dev/null
+grep -F 'param appleCiamDomainReconfigured bool = false' \
   "${root}/infra/main.bicep" >/dev/null
 if grep -F 'ENTRA_GRAPH_CLIENT_SECRET:' \
   "${root}/infra/modules/functionApp.bicep" >/dev/null; then

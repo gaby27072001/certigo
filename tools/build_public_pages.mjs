@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { validatePublicDomainConfiguration } from '../.github/scripts/public-domain-contract.mjs';
+
 const supportEmail = 'gabriel.chambaud@icloud.com';
 
 function htmlEscape(value) {
@@ -13,13 +15,14 @@ function htmlEscape(value) {
     .replaceAll("'", '&#39;');
 }
 
-function layout(title, content) {
+function layout(title, canonicalUrl, content) {
   return `<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${htmlEscape(title)}</title>
+  <link rel="canonical" href="${htmlEscape(canonicalUrl)}">
   <style>
     :root { color-scheme: light dark; }
     body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; line-height: 1.55; }
@@ -34,7 +37,20 @@ function layout(title, content) {
 </html>`;
 }
 
-export async function buildPublicPages({ root, output }) {
+export async function buildPublicPages({
+  root,
+  output,
+  publicWebOrigin,
+  publicDomainVerified,
+  appleCiamDomainReconfigured,
+}) {
+  const publicDomain = validatePublicDomainConfiguration({
+    environment: 'prod',
+    feature: 'legal-pages',
+    publicWebOrigin,
+    publicDomainVerified,
+    appleCiamDomainReconfigured,
+  });
   const privacy = await readFile(resolve(root, 'docs/legal/privacy-policy.md'), 'utf8');
   const deletion = await readFile(resolve(root, 'docs/legal/account-deletion.md'), 'utf8');
   const mailto = `mailto:${supportEmail}?subject=${encodeURIComponent('Suppression de compte Certigo')}`;
@@ -48,6 +64,7 @@ export async function buildPublicPages({ root, output }) {
     privacyPath,
     layout(
       'Politique de confidentialité — Certigo',
+      `${publicDomain.publicWebOrigin}/privacy-policy/`,
       `<h1>Politique de confidentialité — Certigo</h1><pre>${htmlEscape(privacy)}</pre>`,
     ),
     'utf8',
@@ -56,6 +73,7 @@ export async function buildPublicPages({ root, output }) {
     deletionPath,
     layout(
       'Suppression de compte — Certigo',
+      `${publicDomain.publicWebOrigin}/account-deletion/`,
       `<h1>Demander la suppression d’un compte Certigo</h1>
 <p>Cette page reste utilisable après la désinstallation de l’application.</p>
 <section class="card" aria-labelledby="request-title">
@@ -77,5 +95,11 @@ const currentFile = fileURLToPath(import.meta.url);
 if (process.argv[1] && resolve(process.argv[1]) === currentFile) {
   const outputIndex = process.argv.indexOf('--output');
   const output = outputIndex >= 0 ? process.argv[outputIndex + 1] : '_site';
-  await buildPublicPages({ root: process.cwd(), output: resolve(output) });
+  await buildPublicPages({
+    root: process.cwd(),
+    output: resolve(output),
+    publicWebOrigin: process.env.PUBLIC_WEB_ORIGIN,
+    publicDomainVerified: process.env.PUBLIC_DOMAIN_VERIFIED,
+    appleCiamDomainReconfigured: process.env.APPLE_CIAM_DOMAIN_RECONFIGURED,
+  });
 }

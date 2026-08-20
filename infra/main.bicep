@@ -63,6 +63,12 @@ param entraGraphClientSecret string = ''
 param entraGraphClientSecretExpiresOn string = ''
 @description('Enables the account-deletion API only after the Cosmos integration gate has passed. Defaults fail-closed.')
 param accountDeletionEnabled bool = false
+@description('Canonical HTTPS origin for a Certigo-controlled public web domain. Empty keeps every public-domain feature disabled.')
+param publicWebOrigin string = ''
+@description('Explicit evidence that the configured public domain is controlled by Certigo. Defaults fail-closed.')
+param publicDomainVerified bool = false
+@description('Explicit evidence that Apple CIAM domain and return URLs were reconfigured for the controlled domain. Defaults fail-closed.')
+param appleCiamDomainReconfigured bool = false
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
 @description('Azure OpenAI resource endpoint used by the tutor when enabled. Example: https://<resource>.openai.azure.com/.')
@@ -235,6 +241,25 @@ var authMode = env == 'dev' ? 'dev' : 'prod'
 // auth, Key Vault purge protection + 90-day soft delete, geo-redundant + versioned
 // storage, and a locked-down CORS origin set.
 var hardened = env != 'dev'
+var publicWebOriginLower = toLower(publicWebOrigin)
+var publicWebOriginAuthority = startsWith(publicWebOriginLower, 'https://')
+  ? substring(publicWebOriginLower, 8)
+  : ''
+var publicWebOriginIsPlaceholder = publicWebOriginAuthority == 'localhost' || publicWebOriginAuthority == 'example.com' || publicWebOriginAuthority == 'example.net' || publicWebOriginAuthority == 'example.org' || endsWith(publicWebOriginAuthority, '.example') || endsWith(publicWebOriginAuthority, '.invalid') || endsWith(publicWebOriginAuthority, '.localhost') || endsWith(publicWebOriginAuthority, '.test')
+var unownedLegacyDomain = join([ 'certigo', 'app' ], '.')
+var publicWebOriginIsUnownedLegacy = publicWebOriginAuthority == unownedLegacyDomain || endsWith(publicWebOriginAuthority, '.${unownedLegacyDomain}')
+var publicWebOriginIsCanonicalHttps = startsWith(publicWebOrigin, 'https://') && publicWebOrigin == trim(publicWebOrigin) && publicWebOrigin == publicWebOriginLower && length(publicWebOriginAuthority) > 0 && contains(publicWebOriginAuthority, '.') && !endsWith(publicWebOriginAuthority, '.') && !contains(publicWebOriginAuthority, ' ') && !contains(publicWebOriginAuthority, '\t') && !contains(publicWebOriginAuthority, '\r') && !contains(publicWebOriginAuthority, '\n') && !contains(publicWebOriginAuthority, '%') && !contains(publicWebOriginAuthority, '\\') && !contains(publicWebOriginAuthority, '/') && !contains(publicWebOriginAuthority, ':') && !contains(publicWebOriginAuthority, '?') && !contains(publicWebOriginAuthority, '#') && !contains(publicWebOriginAuthority, '@') && !publicWebOriginIsPlaceholder && !publicWebOriginIsUnownedLegacy
+var publicDomainActivationRequested = hardened
+var publicDomainActivationReady = !publicDomainActivationRequested
+  ? false
+  : (!publicWebOriginIsCanonicalHttps
+    ? fail('publicWebOrigin must be a canonical HTTPS origin on a non-placeholder domain controlled by Certigo.')
+    : (!publicDomainVerified
+      ? fail('publicDomainVerified must be explicitly true before public-domain activation.')
+      : (!appleCiamDomainReconfigured
+        ? fail('appleCiamDomainReconfigured must be explicitly true before app-facing public-domain activation.')
+        : true)))
+var effectivePublicWebOrigin = publicDomainActivationReady ? publicWebOrigin : ''
 var requireAccountDeletionGraph = hardened && accountDeletionEnabled
 var effectiveEntraReauthAudience = requireAccountDeletionGraph
   ? (empty(entraReauthAudience)
@@ -607,3 +632,9 @@ output keyVaultName string = vault.outputs.name
 output virtualNetworkId string = privateNetwork.outputs.vnetId
 output functionIntegrationSubnetId string = privateNetwork.outputs.functionIntegrationSubnetId
 output cosmosBackupMode string = cosmosBackupMode
+output publicDomainActivationReady bool = publicDomainActivationReady
+output publicWebOrigin string = effectivePublicWebOrigin
+output privacyPolicyUrl string = publicDomainActivationReady ? '${effectivePublicWebOrigin}/privacy-policy/' : ''
+output accountDeletionUrl string = publicDomainActivationReady ? '${effectivePublicWebOrigin}/account-deletion/' : ''
+output appleAppSiteAssociationUrl string = publicDomainActivationReady ? '${effectivePublicWebOrigin}/.well-known/apple-app-site-association' : ''
+output assetLinksUrl string = publicDomainActivationReady ? '${effectivePublicWebOrigin}/.well-known/assetlinks.json' : ''

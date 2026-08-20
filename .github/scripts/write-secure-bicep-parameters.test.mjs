@@ -15,6 +15,11 @@ const accountDeletionIdentityConfiguration = {
   entraGraphClientSecretExpiresOn: expiration,
   entraReauthAudience: '44444444-4444-4444-4444-444444444444',
 };
+const publicDomainConfiguration = {
+  publicWebOrigin: 'https://github.com',
+  publicDomainVerified: 'true',
+  appleCiamDomainReconfigured: 'true',
+};
 
 function outputPath() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-bicep-params-'));
@@ -53,6 +58,7 @@ function write(overrides = {}) {
     entraGraphClientSecret: '',
     entraGraphClientSecretExpiresOn: '',
     entraReauthAudience: '',
+    ...publicDomainConfiguration,
     inputFile: compiledParameters(),
     outputFile,
     now,
@@ -173,8 +179,21 @@ test('requires complete account deletion identity configuration outside dev', ()
   );
 });
 
-test('feature-off deployment ignores Graph credentials and emits no Graph parameters', () => {
+test('feature-off hardened deployment still requires the verified public domain', () => {
   const inputFile = compiledParameters(false);
+  assert.throws(
+    () => write({
+      environment: 'prod',
+      alertEmail: 'alerts@example.invalid',
+      jwtSigningKey: 'new-test-secret',
+      jwtSigningKeyExpiresOn: expiration,
+      publicWebOrigin: '',
+      publicDomainVerified: '',
+      appleCiamDomainReconfigured: '',
+      inputFile,
+    }),
+    /PUBLIC_WEB_ORIGIN is required/,
+  );
   const { outputFile } = write({
     environment: 'prod',
     alertEmail: 'alerts@example.invalid',
@@ -189,6 +208,31 @@ test('feature-off deployment ignores Graph credentials and emits no Graph parame
   assert.equal(parameters.entraGraphClientSecret, undefined);
   assert.equal(parameters.entraGraphClientSecretExpiresOn, undefined);
   assert.equal(parameters.entraReauthAudience, undefined);
+  assert.deepEqual(parameters.publicWebOrigin, { value: 'https://github.com' });
+  assert.deepEqual(parameters.publicDomainVerified, { value: true });
+  assert.deepEqual(parameters.appleCiamDomainReconfigured, { value: true });
+});
+
+test('requires the verified public-domain contract before hardened activation', () => {
+  const requiredParameters = {
+    environment: 'prod',
+    alertEmail: 'alerts@example.invalid',
+    jwtSigningKey: 'new-test-secret',
+    jwtSigningKeyExpiresOn: expiration,
+    ...accountDeletionIdentityConfiguration,
+  };
+  assert.throws(
+    () => write({ ...requiredParameters, publicWebOrigin: '' }),
+    /PUBLIC_WEB_ORIGIN is required/,
+  );
+  assert.throws(
+    () => write({ ...requiredParameters, publicDomainVerified: 'false' }),
+    /PUBLIC_DOMAIN_VERIFIED must be explicitly true/,
+  );
+  assert.throws(
+    () => write({ ...requiredParameters, appleCiamDomainReconfigured: 'false' }),
+    /APPLE_CIAM_DOMAIN_RECONFIGURED must be explicitly true/,
+  );
 });
 
 test('requires canonical Entra identifiers', () => {
@@ -288,6 +332,9 @@ test('refuses to overwrite an existing parameter file', () => {
       entraGraphClientSecret: '',
       entraGraphClientSecretExpiresOn: '',
       entraReauthAudience: '',
+      publicWebOrigin: '',
+      publicDomainVerified: '',
+      appleCiamDomainReconfigured: '',
       inputFile: compiledParameters(),
       outputFile,
       now,
@@ -313,6 +360,9 @@ test('rejects a malformed compiled parameter document', () => {
       entraGraphClientSecret: '',
       entraGraphClientSecretExpiresOn: '',
       entraReauthAudience: '',
+      publicWebOrigin: '',
+      publicDomainVerified: '',
+      appleCiamDomainReconfigured: '',
       inputFile,
       outputFile: outputPath(),
       now,
