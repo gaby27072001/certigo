@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
 
 const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -30,9 +31,12 @@ const usesPattern =
 const runPattern = /^(?<indent>\s*)(?:-\s+)?run:\s*(?<value>.*)$/;
 const prLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-pr]';
 const trustedLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-trusted]';
+const cosmosLinuxRunner =
+  'runs-on: [self-hosted, Linux, X64, certigo-cosmos-emulator]';
 const allowedRunnerLines = new Set([
   prLinuxRunner,
   trustedLinuxRunner,
+  cosmosLinuxRunner,
   'runs-on: [self-hosted, macOS, certigo-trusted]',
 ]);
 const forbiddenRunnerConfiguration = [
@@ -142,6 +146,7 @@ function validateWorkflow(file) {
   const errors = [];
   const fileName = path.basename(file);
   const hasTrustedJob = text.includes('certigo-trusted');
+  const hasCosmosJob = text.includes('certigo-cosmos-emulator');
 
   if (!lines.some((line) => /^permissions:\s*(?:\{\})?\s*$/.test(line))) {
     errors.push(`${file}: missing explicit top-level permissions`);
@@ -189,6 +194,30 @@ function validateWorkflow(file) {
     && !/^ {4}branches:\s*/m.test(text)
   ) {
     errors.push(`${file}: certigo-trusted push triggers must be restricted to named branches`);
+  }
+  if (hasCosmosJob) {
+    if (
+      !/^ {2}workflow_dispatch:\s*$/m.test(text)
+      || text.includes('repository_dispatch:')
+      || text.includes('pull_request_target:')
+      || /^ {2}pull_request:\s*$/m.test(text)
+      || /^ {2}push:/m.test(text)
+    ) {
+      errors.push(
+        `${file}: certigo-cosmos-emulator workflows must be manual and must not run for repository events`,
+      );
+    }
+    if (
+      !text.includes("github.event_name == 'workflow_dispatch'")
+      || !text.includes("github.repository == 'gchambaud_microsoft/Certigo'")
+      || !text.includes("github.ref == 'refs/heads/main'")
+      || !text.includes('ref: refs/heads/main')
+      || !text.includes("vars.CERTIGO_COSMOS_EMULATOR_ENABLED == 'true'")
+    ) {
+      errors.push(
+        `${file}: certigo-cosmos-emulator workflows must explicitly gate manual execution and checkout merged main`,
+      );
+    }
   }
   const expectedDispatchType = privilegedDispatchTypes.get(fileName);
   if (
@@ -255,6 +284,28 @@ function validateWorkflow(file) {
       )
     ) {
       errors.push(`${file}: certigo-trusted job ${job.id} must not checkout or parse PR source`);
+    }
+    if (job.text.includes('certigo-cosmos-emulator')) {
+      if (
+        job.text.includes('secrets.')
+        || /^\s+environment:\s*/m.test(job.text)
+        || job.text.includes('azure/login@')
+        || /key\s*vault|keyvault/i.test(job.text)
+        || /^\s+id-token:\s*write\s*$/m.test(job.text)
+      ) {
+        errors.push(
+          `${file}: certigo-cosmos-emulator job ${job.id} must not receive secrets, environments, or cloud identity`,
+        );
+      }
+      if (
+        job.text.includes('github.event.pull_request')
+        || job.text.includes('.untrusted-source')
+        || job.text.includes('.untrusted-restore')
+      ) {
+        errors.push(
+          `${file}: certigo-cosmos-emulator job ${job.id} must consume merged main only`,
+        );
+      }
     }
   }
   if (text.includes('pull_request_target:')) {
@@ -348,11 +399,6 @@ function validateRepositoryInvariants() {
   const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');
   const backend = fs.readFileSync(path.join(workflowsDir, 'cd-backend.yml'), 'utf8');
   const backendCi = fs.readFileSync(path.join(workflowsDir, 'ci-backend.yml'), 'utf8');
-  const accountDeletionCosmosWorkflow = fs.readFileSync(
-    path.join(workflowsDir, 'test-account-deletion-cosmos.yml'),
-    'utf8',
-  );
-  const accountDeletionCosmosControls = accountDeletionCosmosWorkflow;
   const promoteBackendPath = path.join(
     workflowsDir,
     'promote-backend-staging-prod.yml',
@@ -529,33 +575,6 @@ function validateRepositoryInvariants() {
     if (!backend.includes(marker)) {
       errors.push(`cd-backend.yml: missing locked dependency invariant ${marker}`);
     }
-  }
-  for (const marker of [
-    'refs/heads/main',
-    'repository_dispatch:',
-    'types: [test-account-deletion-cosmos]',
-    'type == "object" and length == 0',
-    "github.ref == 'refs/heads/main'",
-    'ref: ${{ github.sha }}',
-    'runs-on: [self-hosted, Linux, X64, certigo-trusted]',
-    'ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""',
-    'bash backend/run-account-deletion-cosmos-emulator.sh',
-  ]) {
-    if (!accountDeletionCosmosControls.includes(marker)) {
-      errors.push(
-        `test-account-deletion-cosmos.yml: missing isolated gate invariant ${marker}`,
-      );
-    }
-  }
-  if (
-    accountDeletionCosmosControls.includes('pull_request')
-    || accountDeletionCosmosControls.includes('push:')
-    || accountDeletionCosmosControls.includes('az role assignment')
-    || accountDeletionCosmosControls.includes('az cosmosdb create')
-  ) {
-    errors.push(
-      'test-account-deletion-cosmos.yml: the destructive gate must stay manual and must not provision Azure resources or roles',
-    );
   }
   for (const marker of [
     'openssl rand -base64 64',
@@ -1356,6 +1375,7 @@ const workflowFiles = fs
   .sort()
   .map((file) => path.join(workflowsDir, file));
 const errors = [
+  ...validateAccountDeletionCosmosLayout(root),
   ...(fs.existsSync(path.join(workflowsDir, 'copilot-auto-merge.yml'))
     ? ['copilot-auto-merge.yml: privileged auto-merge workflow must remain removed']
     : []),

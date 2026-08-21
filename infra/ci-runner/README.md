@@ -14,9 +14,9 @@ Le runbook de redondance, de moindre privilège et de preuve opérationnelle est
 [`docs/CI_RUNNER_RESILIENCE.md`](../../docs/CI_RUNNER_RESILIENCE.md).
 
 Le live comporte une NAT Gateway, un Load Balancer et un autoscale CPU. La réconciliation
-classe `22f7fb52-Certigo` comme absent d'Azure, les bindings exacts f55/runner 27 et
-bbf/runner 28 comme gérés (running/online), et `4153d1dd` comme VM externe/deallocated.
-Cette dernière n'est ni comptée ni ciblée; toute autre VM non réconciliée bloque le plan.
+classe le runner historique 26 (`22f7fb52-Certigo`) et la VM `4153d1dd` hors scope, les
+bindings exacts f55/runner 27 et bbf/runner 28 comme gérés (running/online).
+Ces entrées externes ne sont ni comptées ni ciblées; toute autre VM non réconciliée bloque le plan.
 `network.bicep`
 décrit l'ancienne réconciliation et son déploiement est suspendu; seul son `what-if`
 read-only est autorisé.
@@ -49,11 +49,14 @@ VMSS/NAT/LB live et ne constituent pas une autorisation de déploiement.
 
 ## Périmètre IaC historique
 
-Deux modèles complémentaires sont versionnés :
+Trois modèles complémentaires sont versionnés :
 
 - `network.bicep` réconcilie l'egress partagé sans toucher aux VM existantes ;
 - `runner.bicep` reconstruit une VM, sa NIC privée, son disque et son identité managée.
   Il référence le sous-réseau existant et exécute `bootstrap.sh` au premier démarrage.
+- `pilot.bicep` crée un VMSS Flexible PR-only dans un VNet dédié non appairé, avec son
+  propre NAT/NSG. Il n'accorde aucune identité, IP publique, route privée applicative ou
+  label trusted.
 
 `runner.bicep` sert à créer une nouvelle instance ou à reconstruire une instance
 préalablement supprimée. **Ne pas l'appliquer au nom d'une VM vivante** : les propriétés
@@ -63,6 +66,150 @@ et le rollback sont dans
 
 > ⚠️ **Ne jamais déployer ce modèle en mode « complet » (Complete)** : il supprimerait
 > tout ce qui n'est pas listé (dont la VM, sa carte réseau et son disque).
+
+## Pilote PR-only isolé
+
+Le pilote transitoire absorbe la file `certigo-pr` sans étendre la frontière de confiance.
+Il reste persistant pour être piloté par le contrôleur de drain global ; la cible durable
+reste un pool éphémère. Un même runner ne doit jamais porter à la fois `certigo-pr` et
+`certigo-trusted`.
+
+| Propriété | Valeur épinglée |
+| --- | --- |
+| VMSS | `vmss-certigo-pr-pilot-z1`, Flexible, capacité 1, zone 1 |
+| Taille / disque | `Standard_D2ads_v6` / Premium SSD LRS 128 Gio |
+| Image | `Canonical:ubuntu-24_04-lts:server:24.04.202608070` |
+| Sécurité | Trusted Launch, Secure Boot, vTPM, chiffrement hôte |
+| Réseau | `10.43.0.0/16`, sous-réseau privé `10.43.1.0/24`, NAT dédié, aucun peering |
+| Identité / métadonnées | aucune identité ; IMDS bloqué par iptables persistant puis NSG |
+| Runner | `2.336.0`, SHA-256 `04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d` |
+| Labels | `certigo-pr,certigo-pr-pilot` exclusivement |
+| Bootstrap désiré | SHA-256 `6e798d4eeddc032eb948336cf17aef3539a91b8a33097b3cb877c4f3019c844c` du `customData` enveloppé |
+
+Le bootstrap partagé ne bloque IMDS que lorsque `pilot.bicep` positionne explicitement
+`CERTIGO_BLOCK_IMDS=true`. Une reconstruction trusted conserve ainsi son accès à
+l'identité prévue par `runner.bicep`, tandis que le pilote PR échoue fermé.
+
+### Séquence de provisionnement et d'enregistrement
+
+Toujours utiliser un nom de VMSS neuf et le mode incrémentiel. Le premier déploiement
+laisse temporairement la règle NSG IMDS absente pour que l'agent Azure et cloud-init
+terminent ; il ne contient aucun jeton et le bootstrap installe immédiatement le bloc OS.
+
+```bash
+IMAGE_VERSION=24.04.202608070
+PILOT_VMSS=vmss-certigo-pr-pilot-z1
+
+bicep build infra/ci-runner/pilot.bicep --stdout >/dev/null
+az deployment group what-if \
+  --subscription <SUBSCRIPTION_ID> \
+  --resource-group RG-CERTIGO-CI \
+  --template-file infra/ci-runner/pilot.bicep \
+  --parameters imageVersion="$IMAGE_VERSION" \
+               adminSshPublicKey="$(cat <BREAK_GLASS_PUBLIC_KEY>)" \
+               blockImdsAtNsg=false
+az deployment group create \
+  --subscription <SUBSCRIPTION_ID> \
+  --resource-group RG-CERTIGO-CI \
+  --mode Incremental \
+  --template-file infra/ci-runner/pilot.bicep \
+  --parameters imageVersion="$IMAGE_VERSION" \
+               adminSshPublicKey="$(cat <BREAK_GLASS_PUBLIC_KEY>)" \
+               blockImdsAtNsg=false
+```
+
+Après `Provisioning succeeded`, exécuter `pilot-preflight.sh` comme Managed Run Command
+sans paramètre protégé. Son succès prouve dans cet ordre : cloud-init terminé, service
+iptables actif, IMDS inaccessible, outils/egress publics sains et absence de `.runner`.
+Ne demander aucun token avant ce marqueur.
+
+Appliquer ensuite le deny NSG final, après un second `what-if` qui ne doit modifier que
+`nsg-certigo-pr-pilot`, puis réexécuter le preflight :
+
+```bash
+az deployment group what-if \
+  --subscription <SUBSCRIPTION_ID> \
+  --resource-group RG-CERTIGO-CI \
+  --template-file infra/ci-runner/pilot.bicep \
+  --parameters imageVersion="$IMAGE_VERSION" \
+               adminSshPublicKey="$(cat <BREAK_GLASS_PUBLIC_KEY>)" \
+               blockImdsAtNsg=true
+az deployment group create \
+  --subscription <SUBSCRIPTION_ID> \
+  --resource-group RG-CERTIGO-CI \
+  --mode Incremental \
+  --template-file infra/ci-runner/pilot.bicep \
+  --parameters imageVersion="$IMAGE_VERSION" \
+               adminSshPublicKey="$(cat <BREAK_GLASS_PUBLIC_KEY>)" \
+               blockImdsAtNsg=true
+```
+
+`register-pilot.ps1` vérifie alors VMSS, power state, absence d'identité/IP publique et
+deny NSG ; il relance le preflight **avant** de demander le token repo-scoped. Le token
+reste en mémoire dans le processus PowerShell, passe à ARM comme `protectedParameter`
+sans nom (argument positionnel `$1` côté Linux), puis la ressource Run Command est
+supprimée. Ne jamais ajouter le token à une ligne de commande, un fichier, `customData`,
+une variable d'environnement ou un journal.
+
+```powershell
+.\infra\ci-runner\register-pilot.ps1 `
+  -SubscriptionId <SUBSCRIPTION_ID> `
+  -VmName <NEW_FLEX_VM_NAME>
+```
+
+Terminer avec `pilot-health.sh` comme Managed Run Command sans secret et vérifier via
+l'API GitHub : runner `online`, labels exacts, service actif, IMDS inaccessible et egress
+GitHub/NuGet/pub.dev/npm fonctionnel. Le pilote ne crée volontairement aucun runner dans
+`certigo-content`.
+
+La sortie structurée de `register-pilot.ps1` fournit l'`id` et le `name` GitHub. Avant toute
+activation future du contrôleur, reporter ces deux valeurs avec le nom et l'ID ARM exacts de
+la nouvelle VM dans `inventory.managedRunnerBindings`, puis mettre à jour les assertions de
+`infra/tests/least-privilege.test.mjs` et l'inventaire
+`docs/runbooks/CLOUD_LEAST_PRIVILEGE.md`. Un nom de runner Flexible diffère du nom de VM :
+sans binding explicite, le contrôleur doit rester bloqué. Ne jamais réutiliser le binding d'une
+instance pilote remplacée ni retirer les exclusions du runner 26 et de la VM `4153d1dd`.
+
+### Coût retail estimé
+
+Estimation Azure Retail Prices du 2026-08-20, West Europe, Linux PAYG, 730 h/mois,
+hors taxes, remises, Savings Plan et transfert sortant :
+
+| Poste | Prix unitaire USD | Estimation mensuelle USD |
+| --- | ---: | ---: |
+| `Standard_D2ads_v6` | 0,138/h | 100,74 |
+| Premium SSD P10 LRS 128 Gio | 21,68/mois | 21,68 |
+| NAT Gateway Standard | 0,045/h | 32,85 |
+| IP publique Standard IPv4 | 0,005/h | 3,65 |
+| **Total allumé 730 h** |  | **158,92** |
+
+Ajouter `0,045 USD/Go` traité par le NAT et le transfert Internet sortant. Quand la VM
+est désallouée par le contrôleur après quiet period, le compute s'arrête mais disque,
+NAT et IP persistent : socle estimé **58,18 USD/mois**, puis `0,138 USD` par heure de VM.
+
+### Rollback ciblé
+
+Ne jamais lancer le rollback pendant qu'un job est `busy`. Après accord du propriétaire
+du lifecycle, supprimer d'abord uniquement l'enregistrement GitHub du pilote, puis la VM
+Flexible exacte, son VMSS et son réseau dédié. Ne jamais cibler `f55d176e` ni
+`4153d1dd`.
+
+```bash
+RUNNER_ID="$(gh api repos/gchambaud_microsoft/Certigo/actions/runners \
+  --jq '.runners[] | select(.labels[].name == "certigo-pr-pilot") | .id')"
+gh api --method DELETE \
+  "repos/gchambaud_microsoft/Certigo/actions/runners/$RUNNER_ID"
+
+az vm delete -g RG-CERTIGO-CI -n <EXACT_NEW_FLEX_VM_NAME>
+az vmss delete -g RG-CERTIGO-CI -n vmss-certigo-pr-pilot-z1
+az network vnet delete -g RG-CERTIGO-CI -n vnet-certigo-pr-pilot
+az network nsg delete -g RG-CERTIGO-CI -n nsg-certigo-pr-pilot
+az network nat gateway delete -g RG-CERTIGO-CI -n nat-certigo-pr-pilot
+az network public-ip delete -g RG-CERTIGO-CI -n pip-certigo-pr-pilot-nat
+```
+
+Confirmer ensuite `ResourceNotFound` pour chaque ID pilote et relire les états Azure et
+GitHub de `f55d176e`/`4153d1dd`. La clé break-glass privée est détruite hors dépôt.
 
 ## Configuration reproductible et provenance
 
@@ -122,10 +269,13 @@ Le planificateur `capacity-plan.sh` ajoute une réconciliation de drift et un mo
 queue-driven `workflow_job` avec trois modes par classe (`idle=0+0`, `normal=1+1`,
 `boost=6 PR + 2 trusted`). Cette cible est celle d'un pilote ultérieur, pas un plafond
 de production final. Le feature flag est **off**; aucun code de mutation n'est présent.
-L'état v3 exige power Azure + runner online, conserve le slot exact à réarmer et refuse les
-IDs 22f/459. Labels, frontières d'identité et sous-réseaux exclusifs sont des prérequis. Le scale-in
-exige une quiet period resettable de 5 minutes, deux gardes, un lease et un réarmement
-sur toute activité postérieure. Le baseline 30 jours est
+L'état v3 exige power Azure + runner online, conserve le slot exact à réarmer, garde le runner
+26 et la VM 415 hors scope et refuse les VMs 22f/459. Labels, frontières d'identité et
+sous-réseaux exclusifs sont des prérequis. Le scale-in exige une quiet period resettable de
+5 minutes, deux gardes, un lease à génération stable et un compare-and-swap de révision.
+La garde finale relit `busy` et les jobs; le pilote PR est désalloué avant le primaire trusted.
+Le réarmement de tous les slots supprimés ne devient obligatoire qu'à la première activité
+postérieure. Le baseline 30 jours est
 242,06 USD pour 413 jobs, 18,84 runner-heures, 3,78 % CPU moyen, avec une file P95 de
 5 108 s et P99 de 12 628 s.
 

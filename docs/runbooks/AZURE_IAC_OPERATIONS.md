@@ -20,11 +20,18 @@ Cosmos explicite, un destinataire d'alerte hors dev, l'identité utilisateur FC1
 le rôle Blob minimal du principal OIDC de déploiement.
 
 ```bash
-node --test infra/tests/cosmos-indexing-policy.test.mjs \
-  infra/tests/private-networking.test.mjs
+BICEP_CLI="$BICEP_BIN" node --test infra/tests/cosmos-indexing-policy.test.mjs \
+  infra/tests/private-networking.test.mjs \
+  infra/tests/content-storage.test.mjs
 checkov --directory infra --framework bicep --compact --quiet \
   --config-file .checkov.yaml
 ```
+
+Le stack de publication de contenu est volontairement séparé des environnements
+applicatifs. Il fournit un endpoint Blob unique, trois conteneurs et une UAMI
+reader que #304 doit attacher à la Function App. Son what-if, son futur lock
+WORM et son rollback sont décrits dans
+[`IMMUTABLE_CONTENT_STORAGE.md`](./IMMUTABLE_CONTENT_STORAGE.md).
 
 ## Diagnostics Azure read-only
 

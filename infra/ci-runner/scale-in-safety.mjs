@@ -91,10 +91,21 @@ export function advanceScaleInSafety({
   const previousRearmTarget = parseOptionalCapacityTarget(
     state.rearmTargetCapacityByTrust,
   );
+  const previousRearmRequired = state.rearmRequired ?? false;
+  if (typeof previousRearmRequired !== 'boolean') {
+    throw new Error('scaleInSafety.rearmRequired must be a boolean');
+  }
+  if (previousRearmRequired && previousRearmTarget === null) {
+    throw new Error(
+      'scaleInSafety.rearmRequired requires rearmTargetCapacityByTrust',
+    );
+  }
   const rearmTargetCapacityByTrust = rearmSatisfied
     ? null
     : previousRearmTarget;
-  const rearmRequired = rearmTargetCapacityByTrust !== null;
+  const rearmRequired =
+    rearmTargetCapacityByTrust !== null &&
+    (previousRearmRequired || !idle);
   if (!idle) {
     return {
       guardCount: 0,
@@ -108,6 +119,25 @@ export function advanceScaleInSafety({
         guardCount: 0,
         lastGuardAt: null,
         quietSince: null,
+        rearmRequired,
+        rearmTargetCapacityByTrust,
+      },
+    };
+  }
+  if (rearmRequired) {
+    return {
+      guardCount: 0,
+      quietComplete: false,
+      quietElapsedSeconds: 0,
+      quietReset: previousQuietSince !== null,
+      ready: false,
+      rearmRequired: true,
+      rearmTargetCapacityByTrust,
+      nextState: {
+        guardCount: 0,
+        lastGuardAt: null,
+        quietSince: null,
+        rearmRequired: true,
         rearmTargetCapacityByTrust,
       },
     };
@@ -142,6 +172,7 @@ export function advanceScaleInSafety({
       lastGuardAt:
         lastGuardAt === null ? null : new Date(lastGuardAt).toISOString(),
       quietSince: new Date(quietSince).toISOString(),
+      rearmRequired: false,
       rearmTargetCapacityByTrust,
     },
   };
@@ -173,6 +204,7 @@ export function armScaleInReactivation(
     guardCount: 0,
     lastGuardAt: null,
     quietSince: null,
+    rearmRequired: false,
     rearmTargetCapacityByTrust,
   };
 }

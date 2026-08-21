@@ -62,13 +62,87 @@ test('governance identities trust one protected environment subject each', () =>
   assert.doesNotMatch(credential.properties.subject, /workflow_dispatch|pull_request/);
 });
 
+test('content plan identity is separate and trusts exactly its protected environment', () => {
+  const source = readFileSync(
+    path.join(repositoryRoot, 'infra', 'governance', 'main.bicep'),
+    'utf8',
+  );
+  const parameters = readFileSync(
+    path.join(repositoryRoot, 'infra', 'params', 'least-privilege.bicepparam'),
+    'utf8',
+  );
+  const template = compileTemplate('infra/governance/main.bicep');
+
+  assert.match(
+    parameters,
+    /contentInfrastructurePlanIdentityName = 'id-certigo-content-infra-plan'/,
+  );
+  assert.match(
+    parameters,
+    /contentInfrastructurePlanEnvironmentName = 'azure-content-infra-plan'/,
+  );
+  assert.doesNotMatch(
+    source,
+    /contentInfrastructurePlanIdentityName:\s*'id-certigo-deploy-/,
+  );
+  for (const output of [
+    'contentInfrastructurePlanAzureClientId',
+    'contentInfrastructurePlanAzureTenantId',
+    'contentInfrastructurePlanAzureSubscriptionId',
+    'contentInfrastructurePlanFederatedSubject',
+  ]) {
+    assert.ok(template.outputs[output], `missing content plan output ${output}`);
+  }
+
+  const identityDeployment = resourcesOfType(
+    template,
+    'Microsoft.Resources/deployments',
+  ).find((deployment) => deployment.name === 'identity-content-infra-plan');
+  assert.ok(identityDeployment);
+  assert.equal(
+    identityDeployment.resourceGroup,
+    "[parameters('identityResourceGroupName')]",
+  );
+  assert.equal(
+    identityDeployment.properties.parameters.identityName.value,
+    "[parameters('contentInfrastructurePlanIdentityName')]",
+  );
+  assert.equal(
+    identityDeployment.properties.parameters.githubEnvironmentName.value,
+    "[parameters('contentInfrastructurePlanEnvironmentName')]",
+  );
+
+  const nestedResources = identityDeployment.properties.template.resources;
+  assert.equal(
+    nestedResources.filter(
+      (resource) =>
+        resource.type === 'Microsoft.ManagedIdentity/userAssignedIdentities',
+    ).length,
+    1,
+  );
+  const [credential] = nestedResources.filter(
+    (resource) =>
+      resource.type ===
+      'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials',
+  );
+  assert.ok(credential);
+  assert.equal(
+    credential.properties.issuer,
+    'https://token.actions.githubusercontent.com',
+  );
+  assert.deepEqual(credential.properties.audiences, [
+    'api://AzureADTokenExchange',
+  ]);
+  assert.match(credential.properties.subject, /environment:\{2\}/);
+});
+
 test('custom deployment roles avoid wildcard, delete, compute, and general RBAC admin', () => {
   const template = compileTemplate('infra/governance/main.bicep');
   const definitions = resourcesOfType(
     template,
     'Microsoft.Authorization/roleDefinitions',
   );
-  assert.equal(definitions.length, 3);
+  assert.equal(definitions.length, 6);
 
   for (const definition of definitions) {
     const actions = definition.properties.permissions.flatMap(
@@ -98,6 +172,157 @@ test('custom deployment roles avoid wildcard, delete, compute, and general RBAC 
     sharedNetwork.properties.permissions[0].actions.every(
       (action) => !/Microsoft\.Compute|Microsoft\.KeyVault/i.test(action),
     ),
+  );
+
+  const contentPlan = definitions.find((definition) =>
+    definition.properties.roleName.includes(
+      'Content Infrastructure Plan Executor',
+    ),
+  );
+  assert.ok(contentPlan);
+  assert.deepEqual(contentPlan.properties.permissions[0].actions.sort(), [
+    'Microsoft.Authorization/roleAssignments/read',
+    'Microsoft.Authorization/roleAssignments/write',
+    'Microsoft.Authorization/roleDefinitions/read',
+    'Microsoft.ManagedIdentity/userAssignedIdentities/read',
+    'Microsoft.Network/privateEndpoints/privateDnsZoneGroups/read',
+    'Microsoft.Network/privateEndpoints/privateDnsZoneGroups/write',
+    'Microsoft.Network/privateEndpoints/read',
+    'Microsoft.Network/privateEndpoints/write',
+    'Microsoft.Resources/deployments/read',
+    'Microsoft.Resources/deployments/validate/action',
+    'Microsoft.Resources/deployments/whatIf/action',
+    'Microsoft.Resources/deployments/write',
+    'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/read',
+    'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/write',
+    'Microsoft.Storage/storageAccounts/blobServices/containers/read',
+    'Microsoft.Storage/storageAccounts/blobServices/containers/write',
+    'Microsoft.Storage/storageAccounts/blobServices/read',
+    'Microsoft.Storage/storageAccounts/blobServices/write',
+    'Microsoft.Storage/storageAccounts/managementPolicies/read',
+    'Microsoft.Storage/storageAccounts/managementPolicies/write',
+    'Microsoft.Storage/storageAccounts/PrivateEndpointConnectionsApproval/action',
+    'Microsoft.Storage/storageAccounts/read',
+    'Microsoft.Storage/storageAccounts/write',
+  ].sort());
+  assert.ok(
+    contentPlan.properties.assignableScopes.every((scope) =>
+      scope.includes("parameters('contentResourceGroupName')"),
+    ),
+  );
+  assert.deepEqual(contentPlan.properties.permissions[0].dataActions, []);
+  assert.equal(
+    contentPlan.properties.permissions[0].actions.filter(
+      (action) =>
+        action ===
+        'Microsoft.Storage/storageAccounts/PrivateEndpointConnectionsApproval/action',
+    ).length,
+    1,
+  );
+
+  const externalJoin = definitions.find((definition) =>
+    definition.properties.roleName.includes(
+      'Content Infrastructure Plan External Join',
+    ),
+  );
+  assert.ok(externalJoin);
+  assert.deepEqual(externalJoin.properties.permissions[0].actions.sort(), [
+    'Microsoft.Network/privateDnsZones/join/action',
+    'Microsoft.Network/privateDnsZones/read',
+    'Microsoft.Network/virtualNetworks/subnets/join/action',
+    'Microsoft.Network/virtualNetworks/subnets/read',
+  ]);
+  assert.deepEqual(externalJoin.properties.permissions[0].dataActions, []);
+  assert.ok(
+    externalJoin.properties.permissions[0].actions.every(
+      (action) => !action.includes('PrivateEndpointConnectionsApproval'),
+    ),
+  );
+});
+
+test('content plan assignments are limited to the content RG, subnet, and DNS zone', () => {
+  const template = compileTemplate('infra/governance/main.bicep');
+  const deployments = resourcesOfType(
+    template,
+    'Microsoft.Resources/deployments',
+  );
+  const executor = deployments.find(
+    (deployment) => deployment.name === 'content-infra-plan-executor-rbac',
+  );
+  const external = deployments.find(
+    (deployment) =>
+      deployment.name === 'content-infra-plan-external-join-rbac',
+  );
+
+  assert.ok(executor);
+  assert.equal(
+    executor.resourceGroup,
+    "[parameters('contentResourceGroupName')]",
+  );
+  assert.match(
+    executor.properties.parameters.roleDefinitionId.value,
+    /certigo-content-infrastructure-plan-executor/,
+  );
+  assert.equal(
+    executor.properties.parameters.publisherRoleDefinitionGuid.value,
+    'c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de',
+  );
+  assert.equal(
+    executor.properties.parameters.readerRoleDefinitionGuid.value,
+    '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1',
+  );
+  assert.equal(
+    executor.properties.parameters.publisherPrincipalIds.value.length,
+    3,
+  );
+  assert.match(
+    executor.properties.parameters.readerPrincipalId.value,
+    /content-reader-identity/,
+  );
+  assert.doesNotMatch(
+    executor.properties.parameters.roleDefinitionId.value,
+    /subscription-deployment-launcher/,
+  );
+
+  assert.ok(external);
+  assert.equal(
+    external.resourceGroup,
+    "[parameters('identityResourceGroupName')]",
+  );
+  assert.match(
+    external.properties.parameters.roleDefinitionId.value,
+    /certigo-content-infrastructure-plan-external-join/,
+  );
+  assert.deepEqual(
+    external.properties.template.resources.map((assignment) => assignment.scope),
+    [
+      "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('ciVnetName'), parameters('ciRunnerSubnetName'))]",
+      "[resourceId('Microsoft.Network/privateDnsZones', parameters('blobPrivateDnsZoneName'))]",
+    ],
+  );
+  assert.ok(
+    external.properties.template.resources.every(
+      (assignment) =>
+        assignment.type === 'Microsoft.Authorization/roleAssignments',
+    ),
+  );
+  const [executorAssignment] = executor.properties.template.resources;
+  assert.equal(executorAssignment.properties.conditionVersion, '2.0');
+  assert.match(
+    executor.properties.template.variables.roleAssignmentCondition,
+    /RoleDefinitionId/,
+  );
+  assert.match(
+    executor.properties.template.variables.roleAssignmentCondition,
+    /PrincipalType/,
+  );
+  assert.match(
+    executor.properties.template.variables.roleAssignmentCondition,
+    /PrincipalId.*ForAnyOfAnyValues:GuidEquals/,
+  );
+  assert.doesNotMatch(
+    executor.properties.template.variables.roleAssignmentCondition,
+    /\/subscriptions\//,
   );
 });
 
@@ -248,6 +473,231 @@ test('what-if validation rejects deletes and resources outside Certigo scopes', 
       ),
     /resource type is not approved/,
   );
+
+  assert.throws(
+    () =>
+      validateWhatIf(
+        {
+          changes: [
+            {
+              changeType: 'Create',
+              resourceId:
+                `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/` +
+                'providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-unapproved',
+            },
+          ],
+        },
+        subscription,
+      ),
+    /managed identity is outside the approved set/,
+  );
+
+  assert.throws(
+    () =>
+      validateWhatIf(
+        {
+          changes: [
+            {
+              changeType: 'Create',
+              resourceId:
+                `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/` +
+                'providers/Microsoft.ManagedIdentity/userAssignedIdentities/' +
+                'id-certigo-content-infra-plan/federatedIdentityCredentials/attacker',
+              after: {
+                properties: {
+                  audiences: ['api://AzureADTokenExchange'],
+                  issuer: 'https://token.actions.githubusercontent.com',
+                  subject:
+                    'repo:attacker/repository:environment:azure-content-infra-plan',
+                },
+              },
+            },
+          ],
+        },
+        subscription,
+      ),
+    /federated credential is outside the exact contract/,
+  );
+
+  assert.throws(
+    () =>
+      validateWhatIf(
+        {
+          changes: [
+            {
+              changeType: 'Create',
+              resourceId:
+                `/subscriptions/${subscription}/providers/` +
+                'Microsoft.Authorization/roleAssignments/arbitrary-owner',
+              after: {
+                properties: {
+                  description: 'Owner',
+                  roleDefinitionId:
+                    `/subscriptions/${subscription}/providers/` +
+                    'Microsoft.Authorization/roleDefinitions/' +
+                    '8e3af657-a8ff-443c-a75c-2fe8c4bcb635',
+                },
+              },
+            },
+          ],
+        },
+        subscription,
+      ),
+    /subscription role assignment is outside the approved launcher set/,
+  );
+
+  assert.throws(
+    () =>
+      validateWhatIf(
+        {
+          changes: [
+            {
+              changeType: 'Create',
+              resourceId:
+                `/subscriptions/${subscription}/resourceGroups/rg-certigo-content/` +
+                'providers/Microsoft.Authorization/roleAssignments/arbitrary-owner',
+              after: {
+                properties: {
+                  description: 'Owner',
+                  principalId: '00000000-0000-0000-0000-000000000099',
+                  principalType: 'ServicePrincipal',
+                  roleDefinitionId:
+                    `/subscriptions/${subscription}/providers/` +
+                    'Microsoft.Authorization/roleDefinitions/' +
+                    '8e3af657-a8ff-443c-a75c-2fe8c4bcb635',
+                },
+              },
+            },
+          ],
+        },
+        subscription,
+      ),
+    /role assignment is outside the exact contract/,
+  );
+
+  const governance = compileTemplate('infra/governance/main.bicep');
+  const executorRole = resourcesOfType(
+    governance,
+    'Microsoft.Authorization/roleDefinitions',
+  ).find((definition) =>
+    definition.properties.roleName.includes(
+      'Content Infrastructure Plan Executor',
+    ),
+  );
+  const executorRoleId =
+    `/subscriptions/${subscription}/providers/` +
+    'Microsoft.Authorization/roleDefinitions/content-plan-executor';
+  const principalIds = {
+    'id-certigo-content-infra-plan':
+      '00000000-0000-0000-0000-000000000010',
+    'id-certigo-content-release':
+      '00000000-0000-0000-0000-000000000011',
+    'id-certigo-content-public':
+      '00000000-0000-0000-0000-000000000012',
+    'id-certigo-content-answer-key':
+      '00000000-0000-0000-0000-000000000013',
+    'id-certigo-content-reader':
+      '00000000-0000-0000-0000-000000000014',
+  };
+  assert.throws(
+    () =>
+      validateWhatIf(
+        {
+          changes: [
+            {
+              changeType: 'Create',
+              resourceId: executorRoleId,
+              after: {
+                properties: {
+                  ...executorRole.properties,
+                  assignableScopes: [
+                    `/subscriptions/${subscription}/resourceGroups/rg-certigo-content`,
+                  ],
+                  roleName:
+                    'Certigo Content Infrastructure Plan Executor abc123',
+                },
+              },
+            },
+            ...Object.entries(principalIds).map(([name, principalId]) => ({
+              changeType: 'Create',
+              resourceId:
+                `/subscriptions/${subscription}/resourceGroups/` +
+                `${name === 'id-certigo-content-infra-plan' ? 'rg-certigo-ci' : 'rg-certigo-content'}/` +
+                `providers/Microsoft.ManagedIdentity/userAssignedIdentities/${name}`,
+              after: { properties: { principalId } },
+            })),
+            {
+              changeType: 'Create',
+              resourceId:
+                `/subscriptions/${subscription}/resourceGroups/rg-certigo-content/` +
+                'providers/Microsoft.Authorization/roleAssignments/content-plan',
+              after: {
+                properties: {
+                  condition: 'true',
+                  conditionVersion: '2.0',
+                  description:
+                    'Plans the content stack and may assign only approved content roles to service principals.',
+                  principalId:
+                    principalIds['id-certigo-content-infra-plan'],
+                  principalType: 'ServicePrincipal',
+                  roleDefinitionId: executorRoleId,
+                },
+              },
+            },
+          ],
+        },
+        subscription,
+      ),
+    /role assignment is outside the exact contract/,
+  );
+
+  assert.throws(
+    () =>
+      validateWhatIf(
+        {
+          changes: [
+            {
+              changeType: 'Create',
+              resourceId:
+                `/subscriptions/${subscription}/providers/` +
+                'Microsoft.Authorization/roleDefinitions/fake-launcher',
+              after: {
+                properties: {
+                  assignableScopes: [`/subscriptions/${subscription}`],
+                  permissions: [
+                    {
+                      actions: ['Microsoft.Authorization/*'],
+                      dataActions: [],
+                      notActions: [],
+                      notDataActions: [],
+                    },
+                  ],
+                  roleName: 'Certigo Subscription Deployment Launcher abc123',
+                  type: 'CustomRole',
+                },
+              },
+            },
+            {
+              changeType: 'Create',
+              resourceId:
+                `/subscriptions/${subscription}/providers/` +
+                'Microsoft.Authorization/roleAssignments/fake-launcher',
+              after: {
+                properties: {
+                  description:
+                    'Launches the dev subscription deployment without general subscription access.',
+                  roleDefinitionId:
+                    `/subscriptions/${subscription}/providers/` +
+                    'Microsoft.Authorization/roleDefinitions/fake-launcher',
+                },
+              },
+            },
+          ],
+        },
+        subscription,
+      ),
+    /subscription role assignment is outside the approved launcher set/,
+  );
 });
 
 test('read-only scripts contain no live mutation commands', () => {
@@ -267,6 +717,22 @@ test('read-only scripts contain no live mutation commands', () => {
       /\bgh\s+api\s+(?:--method\s+)?(?:POST|PUT|PATCH|DELETE)\b/,
     );
   }
+});
+
+test('governance what-if fails closed on adopted plan identity federation', () => {
+  const script = readFileSync(
+    path.join(repositoryRoot, 'infra', 'governance', 'what-if.sh'),
+    'utf8',
+  );
+  assert.match(script, /az identity federated-credential list/);
+  assert.match(script, /credentials\.length !== 1/);
+  assert.match(script, /github-azure-content-infra-plan/);
+  assert.match(
+    script,
+    /repo:gchambaud_microsoft\/Certigo:environment:azure-content-infra-plan/,
+  );
+  assert.match(script, /api:\/\/AzureADTokenExchange/);
+  assert.match(script, /ResourceNotFound\|could not be found/);
 });
 
 test('runner capacity planning stays off and encodes the guarded pilot contract', () => {
@@ -294,6 +760,11 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
   assert.equal(config.requiredPostQuietGuards, 2);
   assert.equal(config.minimumExclusivePools, 2);
   assert.equal(config.minimumExclusiveSubnets, 2);
+  assert.deepEqual(config.scaleInOrder, [
+    'certigo-pr',
+    'certigo-trusted',
+  ]);
+  assert.deepEqual(config.inventory.externalGithubRunnerIds, [26]);
   assert.deepEqual(config.inventory.externalVirtualMachines, [
     'vmss-certigo-runner-zonal_4153d1dd',
   ]);

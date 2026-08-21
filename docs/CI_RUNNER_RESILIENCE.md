@@ -27,9 +27,9 @@ L'inventaire read-only consolidé au 20 août 2026 constate le VMSS legacy
 `vmss-certigo-runner-zonal` et le pilote `vmss-certigo-pr-pilot-z1`.
 Cet état ne respecte pas la cible ci-dessus. Le scale-in CPU ignore l'état GitHub `busy`.
 
-La réconciliation classe `22f7fb52-Certigo` comme runner **absent** d'Azure,
-`f55d176e`/runner 27 et `bbf83c5c`/runner 28 comme paires **gérées** running/online,
-et `4153d1dd` comme VM **externe** (deallocated). Le pilote zone 1 est PR-only, sans
+La réconciliation classe le runner 26 (`22f7fb52-Certigo`) et la VM `4153d1dd`
+**hors scope**, `f55d176e`/runner 27 et `bbf83c5c`/runner 28 comme paires **gérées**
+running/online. Le pilote zone 1 est PR-only, sans
 identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; f55 zone 2 conserve son identité
 et `snet-runners`, mais ses labels doubles bloquent encore l'activation. L'externe n'est ni comptée,
 ni adoptée, ni ciblée. Toute nouvelle VM sans runner est non classée et bloque le plan.
@@ -47,10 +47,12 @@ Le contrôleur versionné reste `enabled=false`. Son état v3 lie les deux coupl
 considère une capacité utilisable seulement si la VM est powered **et** le runner online.
 La cible d'un pilote ultérieur est limitée à
 **6 runners `certigo-pr` + 2 runners `certigo-trusted`**, avec un incrément par plan.
-Cette limite de pilote n'est pas un plafond de production final. Tout scale-in exige
-5 minutes continues sans activité, remises à zéro par tout job `queued/in_progress`
-ou runner `busy`, puis deux gardes distinctes. Une activité post-scale-in conserve et
-restaure le slot exact supprimé, même si la flotte restante dépasse encore le mode normal.
+Cette limite de pilote n'est pas un plafond de production final. Tout scale-in exige 5 minutes continues sans activité, remises à zéro par tout job
+`queued/in_progress` ou runner `busy`, puis deux gardes distinctes et une garde finale.
+Chaque plan mutable porte la génération du lease et la révision d'état à comparer
+atomiquement; un watcher en retard ne peut donc pas réutiliser un quiet obsolète. Le pilote
+PR est désalloué avant le primaire trusted. Une activité post-scale-in conserve et restaure
+tous les slots exacts supprimés, même si la flotte restante dépasse encore le mode normal.
 
 ## Politique des pull requests
 

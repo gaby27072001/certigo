@@ -177,6 +177,7 @@ export function reconcileRunnerInstances(
   virtualMachines,
   runners,
   {
+    externalGithubRunnerIds = [],
     externalVirtualMachines = [],
     forbiddenVirtualMachines = [],
     managedRunnerBindings = [],
@@ -188,7 +189,16 @@ export function reconcileRunnerInstances(
       virtualMachine,
     ]),
   );
-  const certigoRunners = (runners ?? []).filter(isCertigoRunner);
+  const externalRunnerIds = new Set(
+    externalGithubRunnerIds.map((id) => Number(id)),
+  );
+  const allCertigoRunners = (runners ?? []).filter(isCertigoRunner);
+  const externalGitHubRunners = allCertigoRunners.filter((runner) =>
+    externalRunnerIds.has(Number(runner.id)),
+  );
+  const certigoRunners = allCertigoRunners.filter(
+    (runner) => !externalRunnerIds.has(Number(runner.id)),
+  );
   const runnerByName = new Map(
     certigoRunners.map((runner) => [
       String(runner.name).toLowerCase(),
@@ -306,6 +316,9 @@ export function reconcileRunnerInstances(
     absentRunners: absentRunners.sort(),
     bindingMismatches: bindingMismatches.sort(),
     certigoRunners,
+    externalGitHubRunners: externalGitHubRunners.sort(
+      (left, right) => Number(left.id) - Number(right.id),
+    ),
     externalVirtualMachines: classifiedExternalVirtualMachines.sort(),
     forbiddenVirtualMachinesPresent:
       forbiddenVirtualMachinesPresent.sort(),

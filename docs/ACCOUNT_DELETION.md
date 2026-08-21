@@ -103,18 +103,18 @@ expiration est appliquée au secret Key Vault et contrôlée par Checkov.
 
 ### Gate d’intégration Cosmos
 
-Le workflow trusted `test-account-deletion-cosmos.yml`, chargé uniquement depuis
-`main` par un `repository_dispatch` manuel sans payload, autorise uniquement un
-émulateur Docker local sur runner éphémère. Il génère une clé aléatoire pour le
-run, crée une base unique et supprime le conteneur en `finally`. Il n’utilise
-aucune identité Azure, aucun rôle data-plane et aucune donnée live.
+Le gate historique `test-account-deletion-cosmos.yml` est retiré de
+`.github/workflows/` : il ciblait le pool `certigo-trusted` et ne constitue pas
+une preuve d’isolement suffisante. Son remplacement one-shot reste **feature-off**
+dans `.github/workflows-disabled/post-merge-cosmos-account-deletion.yml`.
 
-Déclenchement opérateur, après présence du workflow sur `main` :
-
-```powershell
-'{"event_type":"test-account-deletion-cosmos","client_payload":{}}' |
-  gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input -
-```
+Il ne peut être déplacé sous `.github/workflows/` que par une PR d’activation
+séparée, variable `CERTIGO_COSMOS_EMULATOR_ENABLED=false`. Le test post-merge
+requiert ensuite une VM jetable sans identité managée, le label exclusif
+`certigo-cosmos-emulator`, un checkout vérifié de `main`, puis un unique
+`workflow_dispatch` avec la variable temporairement à `true`. Les prérequis,
+permissions, bornes et preuves de destruction sont détaillés dans
+`docs/runbooks/COSMOS_EMULATOR_RUNNER.md`.
 
 ### Validation Apple restante après déploiement
 

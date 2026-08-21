@@ -340,12 +340,13 @@ puis à vérifier la disparition ou la révocation de l’association Apple.
 ### Gate de suppression de compte
 
 `ACCOUNT_DELETION_ENABLED` reste `false` par défaut. Avant toute activation,
-déclencher manuellement le `repository_dispatch`
-`test-account-deletion-cosmos`, chargé depuis `main`, sans payload. Le runner
-trusted doit être éphémère et disposer de Docker ; le workflow génère une clé
-locale, crée une base d’émulation unique et détruit le conteneur en `finally`.
-Il ne se connecte pas à Azure et ne modifie ni RBAC ni infrastructure. Un test
-skippé ou non démarré ne permet jamais d’activer la feature.
+le gate historique sur `certigo-trusted` reste retiré de `.github/workflows/`.
+Activer séparément le workflow one-shot décrit dans
+`docs/runbooks/COSMOS_EMULATOR_RUNNER.md`, puis exécuter un unique
+`workflow_dispatch` depuis `main` sur une VM jetable sans identité managée et
+portant seulement le label `certigo-cosmos-emulator`. La variable
+`CERTIGO_COSMOS_EMULATOR_ENABLED` reste `false` hors de cette fenêtre. Un test
+skippé, absent, non unique ou non réussi ne permet jamais d’activer la feature.
 
 ### Gate Person / LinkedIdentity
 
