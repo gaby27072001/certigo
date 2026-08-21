@@ -127,12 +127,12 @@ class PublicContentFile {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-    'id': id,
-    'path': path,
-    'resourceType': resourceType,
-    'hash': hash,
-    'size': size,
-  };
+        'id': id,
+        'path': path,
+        'resourceType': resourceType,
+        'hash': hash,
+        'size': size,
+      };
 }
 
 class PublicContentManifest {
@@ -151,8 +151,8 @@ class PublicContentManifest {
   final Map<String, dynamic> rawJson;
 
   int get totalBytes => files.fold<int>(0, (int total, PublicContentFile file) {
-    return total + file.size;
-  });
+        return total + file.size;
+      });
 
   factory PublicContentManifest.fromJson(
     Map<String, dynamic> json, {
@@ -258,7 +258,7 @@ class PublicManifestFetch {
   const PublicManifestFetch.notModified(String etag) : this._(notModified: true, etag: etag);
 
   const PublicManifestFetch.fetched(PublicContentManifest manifest, String etag)
-    : this._(notModified: false, manifest: manifest, etag: etag);
+      : this._(notModified: false, manifest: manifest, etag: etag);
 
   final bool notModified;
   final PublicContentManifest? manifest;
