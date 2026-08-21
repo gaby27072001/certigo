@@ -56,6 +56,7 @@ rollbacks. **C'est vous qui exécutez** chaque commande, après relecture.
 | **Cloud least privilege** | 🔴 Haut | Migration OIDC/RBAC, policy, runners et rollback | [`CLOUD_LEAST_PRIVILEGE.md`](./CLOUD_LEAST_PRIVILEGE.md) | Reader pour inventaire; admin PIM pour toute mutation | Plan versionné — aucune mutation dans la PR |
 | **Observabilité** | 🟠 Moyen | Webtests, alertes, cold-start, workbook, signaux runner, coût et confidentialité | [`OBSERVABILITY.md`](./OBSERVABILITY.md) | Reader pour diagnostic ; Contributor pour appliquer après approbation | Préparé — aucun déploiement dans la PR |
 | **Contenu WORM** | 🔴 Haut | Release descriptor + paquets public/privé, OIDC, reader runtime et rollback | [`IMMUTABLE_CONTENT_STORAGE.md`](./IMMUTABLE_CONTENT_STORAGE.md) | Identité de bootstrap Azure + approbation OPS/compliance | Réconcilié avec #304 — aucun déploiement live |
+| **Conformité B2B** | 🔴 Bloquant | Qualification employee monitoring, transparence, droits, rétention, résidence et Go/No-Go pilote | [`B2B_COMPLIANCE_PILOT.md`](./B2B_COMPLIANCE_PILOT.md) | Product, conseil juridique, Privacy/DPO, Security et client pilote | **NO-GO — feature off** |
 
 ## Ordre d'exécution conseillé
 

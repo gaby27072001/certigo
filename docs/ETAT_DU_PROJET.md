@@ -85,7 +85,7 @@ dépend ni de l'objet Git capturé ni de son ascendance et reste donc valide apr
 | **Authentification** | 🟢 | API `Middleware/` + mobile `features/auth` | **Microsoft / Google / Apple** fédérés derrière **Entra External ID**, JWT validé serveur. |
 | **Person / LinkedIdentity** | 🟡 (shadow) | Domain `Identity/` + Application/Infrastructure | Runtime additif `off|shadow`, `off` dans tous les environnements. `shadow` conserve `personId == userId` et le resolver legacy autoritaire ; aucun endpoint/UI de liaison. |
 | **Organization / Membership** | 🟡 (dormant) | Domain `Organizations/` + Application/Infrastructure | Isolation tenant et policies anti-IDOR par opération, Membership active/CAS, `404` cross-tenant ; feature strictement `off`, aucun endpoint live. |
-| **Métriques d'apprentissage entreprise** | 🟡 (dormant) | Domain `Organizations/` + contrat `enterprise-learning-metrics/v1` | Sessions/heartbeats idempotents, agrégats Organization-scoped, CAS/offboarding/TTL et minimisation PII ; feature strictement `off`, aucun endpoint live. |
+| **Métriques d'apprentissage entreprise** | 🟡 (dormant) | Domain `Organizations/` + contrats `enterprise-learning-metrics/v1` et `b2b-compliance/v1` | Sessions/heartbeats idempotents, agrégats Organization-scoped, CAS/offboarding/TTL et minimisation PII ; garde-fous employee monitoring, cohorte, rôles, droits et résidence documentés sans conclusion juridique ; feature strictement `off`, aucun endpoint live. |
 | **Design system (Prism)** | 🟢 | `packages/prism_ui` | Composants + tokens + thèmes ; tests/goldens dans `ci-mobile.yml`. |
 | **App mobile (Flutter)** | 🟢 | `apps/mobile` | Les moteurs de gamification sont branchés en écran + tests widget (`ci-mobile.yml`). Validation E2E appareil : **non vérifiée / manuelle**. |
 | **Cortex (algos partagés)** | 🟢 | `packages/cortex` | SRS, scoring, fil pédagogique — partagé client/serveur. |
@@ -175,6 +175,7 @@ flowchart LR
 | **Authentification** | 🟢 | 🟢 | Microsoft / Google / Apple via Entra External ID (Android + iOS natifs câblés). |
 | **Person / LinkedIdentity** | 🟡 (`off|shadow`) | — | Overlay Person et miroirs locaux/Entra idempotents, collisions fail-closed, télémétrie sans PII et tombstones de suppression ; aucune résolution autoritaire ni liaison utilisateur. |
 | **Organization / Membership** | 🟡 (`off`) | — | Contexte tenant explicite, résolution Person/Membership active, matrice owner/admin/manager/learner, anti-IDOR invitations/teams/offboarding et policies réservées aux futures assignations ; aucun endpoint live. |
+| **Conformité B2B avant pilote** | 🟡 (`NO-GO`) | — | ADR-017, matrice données-rétention-rôles, contrat machine-readable et runbook Go/No-Go ; avis juridique, DPIA/AIPD, notice, DPA, résidence/transferts et drills humains restent bloquants. |
 
 > **Lecture clé :** l'écart backend ↔ UI est désormais **comblé pour la gamification** : saisons, quêtes,
 > succès, boutique, amis et examens disposent d'un **écran mobile + test widget**. Restent à exposer le
