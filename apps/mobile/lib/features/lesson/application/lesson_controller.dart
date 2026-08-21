@@ -30,11 +30,10 @@ class LessonController extends StateNotifier<LessonSessionState> {
     required this.args,
     this._feedback = const HapticLessonFeedback(),
     RuntimeContentPinRegistry? contentPins,
-  })  :
-        // Keep the optional dependency source-compatible with direct controller tests.
-        // ignore: prefer_initializing_formals
-        _contentPins = contentPins,
-        super(const LessonSessionState()) {
+  }) : // Keep the optional dependency source-compatible with direct controller tests.
+       // ignore: prefer_initializing_formals
+       _contentPins = contentPins,
+       super(const LessonSessionState()) {
     unawaited(load());
   }
 
@@ -157,8 +156,9 @@ class LessonController extends StateNotifier<LessonSessionState> {
         if (next.contains(optionId)) {
           next.remove(optionId);
         } else {
-          final int cap =
-              item.type == ItemType.cloze ? clozeBlankCount(item.stem) : item.options.length;
+          final int cap = item.type == ItemType.cloze
+              ? clozeBlankCount(item.stem)
+              : item.options.length;
           if (next.length < cap) next.add(optionId);
         }
       case ItemType.mcq:
@@ -224,11 +224,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
     }
     final int next = state.index + 1;
     if (next >= state.steps.length) return;
-    state = state.copyWith(
-      status: LessonStatus.ready,
-      index: next,
-      selection: const <String>[],
-    );
+    state = state.copyWith(status: LessonStatus.ready, index: next, selection: const <String>[]);
     _stepShownAt = DateTime.now();
   }
 
@@ -405,16 +401,13 @@ class LessonController extends StateNotifier<LessonSessionState> {
 
 /// Family provider keyed by [LessonArgs]; auto-disposed so leaving a lesson
 /// resets its session.
-final lessonControllerProvider =
-    StateNotifierProvider.autoDispose.family<LessonController, LessonSessionState, LessonArgs>((
-  Ref ref,
-  LessonArgs args,
-) {
-  return LessonController(
-    lessons: ref.watch(lessonRepositoryProvider),
-    quiz: ref.watch(quizRepositoryProvider),
-    args: args,
-    feedback: ref.watch(lessonFeedbackProvider),
-    contentPins: ref.watch(runtimeContentPinRegistryProvider),
-  );
-});
+final lessonControllerProvider = StateNotifierProvider.autoDispose
+    .family<LessonController, LessonSessionState, LessonArgs>((Ref ref, LessonArgs args) {
+      return LessonController(
+        lessons: ref.watch(lessonRepositoryProvider),
+        quiz: ref.watch(quizRepositoryProvider),
+        args: args,
+        feedback: ref.watch(lessonFeedbackProvider),
+        contentPins: ref.watch(runtimeContentPinRegistryProvider),
+      );
+    });

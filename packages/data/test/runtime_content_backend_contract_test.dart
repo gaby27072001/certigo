@@ -10,13 +10,11 @@ import 'package:test/test.dart';
 import 'runtime_content_test_support.dart';
 
 class _ContractAdapter implements HttpClientAdapter {
-  _ContractAdapter(this.manifest, this.fixture);
+  _ContractAdapter(this.manifest);
 
   final PublicContentManifest manifest;
-  final ContentFixture fixture;
   final List<String> paths = <String>[];
   bool returnNotModified = false;
-  bool omitContentLength = false;
 
   @override
   Future<ResponseBody> fetch(
@@ -45,22 +43,7 @@ class _ContractAdapter implements HttpClientAdapter {
         },
       );
     }
-    final PublicContentFile file = manifest.files.single;
-    final Map<String, List<String>> headers = <String, List<String>>{
-      Headers.contentTypeHeader: <String>[Headers.jsonContentType],
-      'etag': <String>['"${file.hash}"'],
-      'cache-control': <String>['private, max-age=31536000, immutable'],
-      'x-content-manifest-id': <String>[manifest.manifestId],
-      'x-content-resource-type': <String>[file.resourceType],
-    };
-    if (!omitContentLength) {
-      headers[Headers.contentLengthHeader] = <String>[fixture.bytes.length.toString()];
-    }
-    return ResponseBody.fromBytes(
-      fixture.bytes,
-      200,
-      headers: headers,
-    );
+    return ResponseBody.fromString('Not found', 404);
   }
 
   @override
@@ -77,7 +60,10 @@ void main() {
 
     expect(contract['backendPullRequest'], 304);
     expect(contract['activeManifestRoute'], kActivePublicManifestRoute);
-    expect(contract['publicFileRoute'], kPublicContentFileRoute);
+    expect(contract['publicFileRoute'], isNull);
+    expect(contract['releaseIdExposed'], isFalse);
+    expect(contract['lessonSnapshotHeader'], 'X-Content-Manifest-Id');
+    expect(contract['quizRevisionField'], 'publicManifestId');
     expect(
       contract['manifestSchemas'],
       <String>[kPackageManifestV1, kPackageManifestV2, kPackageManifestV3],
@@ -86,23 +72,13 @@ void main() {
       contract['activeManifestHeaders'],
       containsAll(<String>['ETag', 'Cache-Control']),
     );
-    expect(
-      contract['publicFileHeaders'],
-      containsAll(<String>[
-        'ETag',
-        'Cache-Control',
-        'Content-Length',
-        'Content-Type',
-        'X-Content-Manifest-Id',
-        'X-Content-Resource-Type',
-      ]),
-    );
+    expect(kPublicContentFileDeliveryAvailable, isFalse);
   });
 
-  test('source consumes the exact manifest/file headers and honors 304', () async {
+  test('source consumes the exact active-manifest headers and honors 304', () async {
     final ContentFixture fixture = questionFixture('microsoft.az-900.section-1.cloud.001');
     final PublicContentManifest release = manifest(<ContentFixture>[fixture]);
-    final _ContractAdapter adapter = _ContractAdapter(release, fixture);
+    final _ContractAdapter adapter = _ContractAdapter(release);
     final Dio dio = Dio()..httpClientAdapter = adapter;
     final ApiPublicContentSource source = ApiPublicContentSource(
       ApiClient(
@@ -113,30 +89,23 @@ void main() {
     );
 
     final Result<PublicManifestFetch> fetched = await source.fetchActiveManifest();
-    final Result<PublicContentFileFetch> file = await source.fetchFile(
-      publicManifestId: release.manifestId,
-      file: release.files.single,
-    );
     adapter.returnNotModified = true;
     final Result<PublicManifestFetch> unchanged = await source.fetchActiveManifest(
       ifNoneMatch: '"${release.manifestId}"',
     );
 
     expect(fetched.valueOrNull!.manifest!.manifestId, release.manifestId);
-    expect(file.valueOrNull!.bytes, fixture.bytes);
     expect(unchanged.valueOrNull!.notModified, isTrue);
-    expect(adapter.paths.first, '/$kActivePublicManifestRoute');
-    expect(
-      adapter.paths[1],
-      '/content/releases/${Uri.encodeComponent(release.manifestId)}/files/'
-      '${Uri.encodeComponent(fixture.id)}',
-    );
+    expect(adapter.paths, <String>[
+      '/$kActivePublicManifestRoute',
+      '/$kActivePublicManifestRoute',
+    ]);
   });
 
-  test('source accepts chunked delivery without Content-Length', () async {
+  test('file delivery fails closed because #304 exposes no file endpoint', () async {
     final ContentFixture fixture = questionFixture('microsoft.az-900.section-1.cloud.001');
     final PublicContentManifest release = manifest(<ContentFixture>[fixture]);
-    final _ContractAdapter adapter = _ContractAdapter(release, fixture)..omitContentLength = true;
+    final _ContractAdapter adapter = _ContractAdapter(release);
     final Dio dio = Dio()..httpClientAdapter = adapter;
     final ApiPublicContentSource source = ApiPublicContentSource(
       ApiClient(
@@ -151,6 +120,10 @@ void main() {
       file: release.files.single,
     );
 
-    expect(result.isSuccess, isTrue);
+    expect(result.isFailure, isTrue);
+    final Failure failure = (result as Err<PublicContentFileFetch>).failure;
+    expect(failure, isA<NotFoundFailure>());
+    expect(failure.message, kPublicContentFileDeliveryBlocker);
+    expect(adapter.paths, isEmpty);
   });
 }

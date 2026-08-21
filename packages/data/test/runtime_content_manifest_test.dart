@@ -24,10 +24,7 @@ void main() {
       final Map<String, dynamic> json = manifestJson(<ContentFixture>[question]);
       json['channel'] = 'answerKey';
 
-      expect(
-        () => PublicContentManifest.fromJson(json),
-        throwsA(isA<FormatException>()),
-      );
+      expect(() => PublicContentManifest.fromJson(json), throwsA(isA<FormatException>()));
     });
 
     test('rejects path traversal and duplicate ids', () {
@@ -35,10 +32,7 @@ void main() {
       final Map<String, dynamic> unsafe = manifestJson(<ContentFixture>[question]);
       (unsafe['files'] as List<dynamic>).single['path'] = '../solutions/key.json';
 
-      expect(
-        () => PublicContentManifest.fromJson(unsafe),
-        throwsA(isA<FormatException>()),
-      );
+      expect(() => PublicContentManifest.fromJson(unsafe), throwsA(isA<FormatException>()));
     });
   });
 
@@ -55,8 +49,9 @@ void main() {
 
     test('rejects recursively leaked rationale', () {
       final ContentFixture question = questionFixture('microsoft.az-900.section-1.cloud.001');
-      final Map<String, dynamic> leaked =
-          Map<String, dynamic>.from(jsonDecode(utf8.decode(question.bytes)) as Map);
+      final Map<String, dynamic> leaked = Map<String, dynamic>.from(
+        jsonDecode(utf8.decode(question.bytes)) as Map,
+      );
       leaked['metadata'] = <String, dynamic>{
         ...(leaked['metadata'] as Map<String, dynamic>),
         'rationale': 'secret',
@@ -70,10 +65,28 @@ void main() {
         size: bytes.length,
       );
 
-      expect(
-        () => validatePublicContentPayload(file, bytes),
-        throwsA(isA<FormatException>()),
+      expect(() => validatePublicContentPayload(file, bytes), throwsA(isA<FormatException>()));
+    });
+
+    test('rejects recursively leaked releaseId', () {
+      final ContentFixture question = questionFixture('microsoft.az-900.section-1.cloud.001');
+      final Map<String, dynamic> leaked = Map<String, dynamic>.from(
+        jsonDecode(utf8.decode(question.bytes)) as Map,
       );
+      leaked['metadata'] = <String, dynamic>{
+        ...(leaked['metadata'] as Map<String, dynamic>),
+        'releaseId': 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      };
+      final Uint8List bytes = Uint8List.fromList(utf8.encode('${jsonEncode(leaked)}\n'));
+      final PublicContentFile file = PublicContentFile(
+        id: question.id,
+        path: question.path,
+        resourceType: question.resourceType,
+        hash: sha256.convert(bytes).toString(),
+        size: bytes.length,
+      );
+
+      expect(() => validatePublicContentPayload(file, bytes), throwsA(isA<FormatException>()));
     });
   });
 }

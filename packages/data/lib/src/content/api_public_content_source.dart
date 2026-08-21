@@ -7,7 +7,9 @@ import '../api/api_client.dart';
 import 'runtime_content.dart';
 
 const String kActivePublicManifestRoute = 'content/releases/active/manifest';
-const String kPublicContentFileRoute = 'content/releases/{publicManifestId}/files/{fileId}';
+const bool kPublicContentFileDeliveryAvailable = false;
+const String kPublicContentFileDeliveryBlocker =
+    'Le contrat backend #304 n\'expose aucun endpoint API pour les fichiers du manifeste public.';
 
 class ApiPublicContentSource implements PublicContentSource {
   const ApiPublicContentSource(this._api);
@@ -80,48 +82,8 @@ class ApiPublicContentSource implements PublicContentSource {
   Future<Result<PublicContentFileFetch>> fetchFile({
     required String publicManifestId,
     required PublicContentFile file,
-  }) async {
-    final String manifest = Uri.encodeComponent(publicManifestId);
-    final String fileId = Uri.encodeComponent(file.id);
-    final Result<ApiResponse<Uint8List>> response = await _api.getBytesResponse(
-      '/${kPublicContentFileRoute.replaceAll('{publicManifestId}', manifest).replaceAll('{fileId}', fileId)}',
-    );
-    return response.when(
-      success: (ApiResponse<Uint8List> value) {
-        final Uint8List? bytes = value.data;
-        if (value.statusCode != 200 || bytes == null) {
-          return const Err<PublicContentFileFetch>(
-            ParseFailure('Réponse inattendue pour un fichier de contenu public.'),
-          );
-        }
-        final String? etag = value.header('etag');
-        final String? responseManifest = value.header('x-content-manifest-id');
-        final String? resourceType = value.header('x-content-resource-type');
-        final String? contentLength = value.header('content-length');
-        final String? contentType = value.header('content-type');
-        final String? cacheControl = value.header('cache-control');
-        if (etag != '"${file.hash}"' ||
-            responseManifest != publicManifestId ||
-            resourceType != file.resourceType ||
-            contentType == null ||
-            !contentType.startsWith('application/json') ||
-            cacheControl == null ||
-            !cacheControl.contains('immutable') ||
-            (contentLength != null && contentLength != file.size.toString())) {
-          return const Err<PublicContentFileFetch>(
-            ParseFailure('Les en-têtes du fichier public ne correspondent pas au manifeste.'),
-          );
-        }
-        return Success<PublicContentFileFetch>(
-          PublicContentFileFetch(
-            bytes: bytes,
-            etag: etag!,
-            publicManifestId: responseManifest!,
-            resourceType: resourceType!,
-          ),
-        );
-      },
-      failure: Err<PublicContentFileFetch>.new,
-    );
-  }
+  }) async =>
+      const Err<PublicContentFileFetch>(
+        NotFoundFailure(kPublicContentFileDeliveryBlocker),
+      );
 }
