@@ -81,6 +81,7 @@ dépend ni de l'objet Git capturé ni de son ascendance et reste donc valide apr
 | **Recommandation + coach** | 🟢 | Domain `Recommendation/` + `home/coach_section` | Moteur « next best » + coach IA sur l'accueil. |
 | **Notifications** | 🟢 | Domain `Notifications/` | Planification **serveur‑autoritaire**, estimation de la meilleure heure d'envoi. |
 | **Anti‑triche / intégrité** | 🟢 (shadow) | Domain `Integrity/` | Évaluateur déterministe des tentatives — **mode détection** (signale, ne sanctionne pas encore). |
+| **Acquis portables** | 🟡 (feature off) | Domain `PortableAchievements/` + Application/API | Contrat signé/minimisé et runtime abstrait prêts ; aucun stockage ou signataire Azure, flag désactivé, legacy autoritaire. |
 | **Offline‑first** | 🟢 | `packages/data` (sync) + `app/offline` | File de synchro idempotente, backoff, rejouable — **câblée dans l'app**. *(Seule la leçon en cours est disponible hors‑ligne pour l'instant ; la synchronisation complète du catalogue est planifiée — P3.)* |
 | **Authentification** | 🟢 | API `Middleware/` + mobile `features/auth` | **Microsoft / Google / Apple** fédérés derrière **Entra External ID**, JWT validé serveur. |
 | **Design system (Prism)** | 🟢 | `packages/prism_ui` | Composants + tokens + thèmes ; tests/goldens dans `ci-mobile.yml`. |
@@ -168,6 +169,7 @@ flowchart LR
 | **Recommandation + coach** | 🟢 | 🟢 | `GET /me/recommendations/{trackId}` + coach IA sur l'accueil. |
 | **Notifications intelligentes** | 🟢 | 🟡 | `GET /me/notifications/plan` + réglages ; meilleure heure d'envoi estimée. |
 | **Anti‑triche / intégrité** | 🟢 | — | Évaluateur déterministe (mode détection, événement `attempt.flagged`). **Fenêtre de cadence** (XP/tentatives sur 1 h, conteneur `attempts`) câblée pour **quiz et examens** → détecteurs de débit actifs. |
+| **Acquis portables signés** | 🟡 (off) | — | Badges, compétences, certifications et complétions : contrat `certigo.portable-achievement/v1`, propriété `Person`, pins `releaseId`/`publicManifestId`, idempotence/anti-rejeu, rotation de clés et révocation auditée. `PORTABLE_ACHIEVEMENTS_ENABLED=false`; aucun adaptateur live. Voir ADR 0012. |
 | **Offline‑first** | 🟢 | 🟢 | Synchro idempotente rejouable, backoff. |
 | **Authentification** | 🟢 | 🟢 | Microsoft / Google / Apple via Entra External ID (Android + iOS natifs câblés). |
 

@@ -293,6 +293,23 @@ var host = new HostBuilder()
         services.AddScoped<IEconomyOperationRepository, CosmosEconomyOperationRepository>();
         services.AddScoped<IFriendRepository, CosmosFriendRepository>();
         services.AddScoped<ILearnerModelRepository, CosmosLearnerModelRepository>();
+        services.AddSingleton(new PortableAchievementOptions(
+            string.Equals(
+                configuration[ConfigurationKeys.PortableAchievementsEnabled],
+                "true",
+                StringComparison.OrdinalIgnoreCase),
+            configuration[ConfigurationKeys.PortableAchievementsIssuerId] ?? "certigo"));
+        // Deliberately unconfigured while the feature is off. Enabling the flag without
+        // managed-key and durable-store adapters fails explicitly instead of using a
+        // local secret or an ephemeral proof registry.
+        services.AddSingleton<IPortableAchievementStore, UnconfiguredPortableAchievementStore>();
+        services.AddSingleton<IPortableProofCryptography, UnconfiguredPortableProofCryptography>();
+        services.AddSingleton<IPortableSubjectIdProvider, UnconfiguredPortableSubjectIdProvider>();
+        services.AddSingleton<
+            IPortableCompletionEvidenceResolver,
+            UnconfiguredPortableCompletionEvidenceResolver>();
+        services.AddSingleton<IPortableActorContext, UnconfiguredPortableActorContext>();
+        services.AddSingleton<IPortableNonceSource, CryptographicPortableNonceSource>();
         services.AddSingleton<ITutorLlmTelemetry, NullTutorLlmTelemetry>();
         var tutorLlmEnabled = string.Equals(configuration["TUTOR_LLM_ENABLED"], "true", StringComparison.OrdinalIgnoreCase);
         if (tutorLlmEnabled)
@@ -331,6 +348,11 @@ var host = new HostBuilder()
         services.AddScoped<ITutorService, TutorService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<ISeasonService, SeasonService>();
+        services.AddScoped<PortableAchievementService>();
+        services.AddScoped<IPortableAchievementService>(
+            sp => sp.GetRequiredService<PortableAchievementService>());
+        services.AddScoped<IPortableAchievementAdministrationService>(
+            sp => sp.GetRequiredService<PortableAchievementService>());
     })
     .Build();
 

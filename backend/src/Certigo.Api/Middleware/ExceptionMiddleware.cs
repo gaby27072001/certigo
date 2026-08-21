@@ -117,6 +117,33 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
                 ex.Message,
                 correlationId);
         }
+        catch (PortableAchievementsDisabledException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.NotFound,
+                "Feature unavailable",
+                ex.Message,
+                correlationId);
+        }
+        catch (PortableAchievementNotFoundException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.NotFound,
+                "Portable achievement not found",
+                ex.Message,
+                correlationId);
+        }
+        catch (PortableAchievementConflictException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.Conflict,
+                "Portable achievement conflict",
+                ex.Message,
+                correlationId);
+        }
         catch (EmptyCatalogException)
         {
             logger.LogWarning(

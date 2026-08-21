@@ -14,4 +14,6 @@ internal static class ConfigurationKeys
     public const string ContentRepositoryMode = "CONTENT_REPOSITORY_MODE";
     public const string ContentAdminRole = "CONTENT_ADMIN_ROLE";
     public const string ContentAdminAllowDev = "CONTENT_ADMIN_ALLOW_DEV";
+    public const string PortableAchievementsEnabled = "PORTABLE_ACHIEVEMENTS_ENABLED";
+    public const string PortableAchievementsIssuerId = "PORTABLE_ACHIEVEMENTS_ISSUER_ID";
 }
