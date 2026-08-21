@@ -363,7 +363,10 @@ démarrage dans cette version.
 ```bash
 export AZURE_SUBSCRIPTION_ID="<SUBSCRIPTION_ID>"
 bash infra/governance/inventory.sh > inventory.json
-bash infra/governance/what-if.sh
+bash infra/governance/what-if-phase-a.sh
+# Après deployment Phase A approuvé et réussi :
+PHASE_A_DEPLOYMENT_NAME='<deployment-phase-a>' \
+  bash infra/governance/what-if-phase-b.sh
 ```
 
 Toute création d'identité/rôle/policy et toute modification de GitHub Environment sont des

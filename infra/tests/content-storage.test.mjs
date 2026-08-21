@@ -162,7 +162,9 @@ test('publishers are isolated and the runtime reader is read-only on every conta
 });
 
 test('custom publisher role grants create and read but no delete', () => {
-  const template = compileTemplate('infra/governance/main.bicep');
+  const template = compileTemplate(
+    'infra/governance/bootstrap-identities.bicep',
+  );
   const [role] = resourcesOfType(
     template,
     'Microsoft.Authorization/roleDefinitions',
@@ -269,7 +271,9 @@ test('dedicated stack creates support identities but no application runtime', ()
 });
 
 test('publisher identities have exact OIDC subjects and reader has no federation', () => {
-  const template = compileTemplate('infra/governance/main.bicep');
+  const template = compileTemplate(
+    'infra/governance/bootstrap-identities.bicep',
+  );
   assert.equal(
     template.variables.descriptorEnvironmentName,
     'azure-content-release',

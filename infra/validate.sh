@@ -46,7 +46,8 @@ ensure_node
 
 for script in \
   "${root}/infra/governance/inventory.sh" \
-  "${root}/infra/governance/what-if.sh"; do
+  "${root}/infra/governance/what-if-phase-a.sh" \
+  "${root}/infra/governance/what-if-phase-b.sh"; do
   bash -n "${script}"
 done
 node --check "${root}/infra/governance/render-inventory.mjs"
@@ -78,10 +79,12 @@ for environment in dev staging prod; do
   grep -F 'param manageDefenderPlans =' "${params}" >/dev/null
 done
 
-grep -F 'param manageMcsbPolicyAssignment = false' \
-  "${root}/infra/params/least-privilege.bicepparam" >/dev/null
-grep -F "param privilegedAssignmentPolicyEffect = 'Audit'" \
-  "${root}/infra/params/least-privilege.bicepparam" >/dev/null
+if grep -R --include='bootstrap-identities.bicep' -n \
+  -E "^resource .*'Microsoft\.Authorization/(roleAssignments|policyAssignments)@" \
+  "${root}/infra/governance" >/dev/null; then
+  echo "Phase A must not declare role or policy assignments." >&2
+  exit 1
+fi
 
 grep -F "param authJwtSigningKeyExpiresOn = '2027-08-31T00:00:00Z'" \
   "${root}/infra/params/dev.bicepparam" >/dev/null

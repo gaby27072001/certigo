@@ -12,7 +12,8 @@ Les commandes d'inventaire et de `what-if` sont read-only :
 ```bash
 export AZURE_SUBSCRIPTION_ID=b8952c8c-8f72-469d-99cd-ac906da4e2fc
 bash infra/governance/inventory.sh > inventory.json
-bash infra/governance/what-if.sh
+bash infra/governance/what-if-phase-a.sh
+# Phase B exige ensuite le nom d'un deployment Phase A réussi et approuvé.
 bash infra/ci-runner/lifecycle-preflight.sh deallocate
 ```
 
@@ -136,14 +137,28 @@ Blob Data Contributor/Owner/Delegator, Queue/Table Data Contributor, Monitoring 
 Publisher, Key Vault Secrets User, Cognitive Services OpenAI User et Log Analytics Reader.
 Il ne peut ni créer Owner/Contributor/UAA, ni supprimer une attribution.
 
-## Bootstrap de l'identité de plan du contenu
+## Bootstrap gouvernance en deux phases
 
 Le workflow `azure-content-infra-plan` ne réutilise aucune identité dev, staging, prod ou
 VMSS. Le `what-if` ARM exige les mêmes permissions `write` que le déploiement évalué : le rôle
 subscription launcher seul est donc insuffisant et n'est pas attribué à cette UAMI.
 
-Le bootstrap admin/PIM crée ou adopte `rg-certigo-content`, crée le rôle publisher existant de
-GUID fixe, puis crée l'UAMI et son unique federated credential. L'UAMI reçoit :
+Le plan monolithique réel #317 (`37 Create`, `59 Ignore`, `2 Unsupported`, `0 Modify/Delete`)
+est refusé : les 13 attributions visant des UAMI futures ne sont pas validables avant création
+des principals, et les deux scopes `extensionResourceId` subnet/DNS ne sont pas matérialisables
+par le moteur de what-if. Le bootstrap est donc séparé et fail-closed :
+
+- **Phase A — `bootstrap-identities`** : crée ou adopte `rg-certigo-content`, les six custom
+  roles, les huit UAMI, les sept FIC exactes et la policyDefinition. Elle ne contient aucun
+  `roleAssignment`, aucun `policyAssignment` et ne donne aucune permission effective. Son output
+  `phaseA` versionné contient les `clientId`, `principalId`, `resourceId`, les six role definition
+  IDs, le policy definition ID, le tenant et la subscription.
+- **Phase B — `bootstrap-rbac`** : ne crée ni identité, ni rôle, ni policyDefinition. Elle
+  consomme les huit UAMI, les six rôles, la policyDefinition et les cinq RG en `existing`, puis
+  crée exactement les 13 attributions internes, les deux attributions externes et l'unique
+  policyAssignment en `Audit`.
+
+L'UAMI de plan reçoit seulement en Phase B :
 
 - `Certigo Content Infrastructure Plan Executor` uniquement sur `rg-certigo-content`, avec
   `deployments` read/write/validate/what-if et les read/write explicites nécessaires pour
@@ -156,7 +171,7 @@ GUID fixe, puis crée l'UAMI et son unique federated credential. L'UAMI reçoit 
   `rg-certigo-ci/privatelink.blob.core.windows.net`, avec seulement subnet read/join et private
   DNS zone read/join.
 
-Le bootstrap crée aussi dans `rg-certigo-content` les trois UAMI publisher avec leur FIC
+La Phase A crée aussi dans `rg-certigo-content` les trois UAMI publisher avec leur FIC
 exacte et l'UAMI reader sans fédération. Le template de plan les traite comme `existing` :
 l'identité de plan n'a donc aucun write UAMI/FIC.
 
@@ -172,32 +187,124 @@ permission `Microsoft.Network/privateDnsZones/write` ne pourrait être envisagé
 revue séparée et avec attribution conservée sur cette zone exacte, jamais au scope abonnement
 ou `rg-certigo-ci`.
 
-Le bootstrap est strictement séquencé :
+### What-if Phase A
 
-1. **What-if gouvernance sans mutation.** Depuis une session admin PIM séparée, définir
-   `AZURE_SUBSCRIPTION_ID`, puis exécuter `bash infra/governance/what-if.sh`. Le plan doit rester
-   borné aux cinq groupes Certigo, aux types de gouvernance allow-listés et aux seules UAMI
-   `id-certigo-deploy-{dev,staging,prod}` plus `id-certigo-content-infra-plan`. Refuser tout
-   `Delete`, toute autre identité et tout rôle large. Le rôle publisher est le seul rôle de ce
-   bootstrap avec des dataActions, exactement blob read/write et sans delete.
-2. **Déploiement admin séparé.** Après revue et approbation du plan archivé, un administrateur
-   activé via PIM déploie `infra/governance/main.bicep` dans une fenêtre dédiée. Cette PR et le
-   workflow de plan ne réalisent jamais cette mutation.
-3. **Variables GitHub non secrètes.** Reporter les outputs
-   `contentInfrastructurePlanAzureClientId`, `contentInfrastructurePlanAzureTenantId` et
-   `contentInfrastructurePlanAzureSubscriptionId` dans les variables `AZURE_CLIENT_ID`,
-   `AZURE_TENANT_ID` et `AZURE_SUBSCRIPTION_ID` de l'Environment
+Depuis une session admin/PIM séparée, sans déploiement :
+
+```bash
+export AZURE_SUBSCRIPTION_ID='<subscription-uuid>'
+bash infra/governance/what-if-phase-a.sh
+```
+
+Le validateur accepte seulement `Create`, `Ignore` ou `NoEffect` pour les ressources exactes de
+Phase A et les deployments ARM imbriqués attendus. `NoEffect` permet de reprendre après une Phase
+A partiellement appliquée uniquement si le payload complet (`id`, `name`, `type`, propriétés)
+revalide le même rôle/actions, la même UAMI, la même FIC ou la même policyDefinition. Un payload
+absent/incomplet, un doublon ou une divergence est refusé. Il exige `0 Modify`, `0 Delete`,
+`0 Unsupported`, refuse tout wildcard/action delete et toute ressource hors contrat. L'allowlist
+de création est :
+
+- `rg-certigo-content` ;
+- les six custom roles nommés dans `bootstrap-identities.bicep` ;
+- `id-certigo-deploy-{dev,staging,prod}`, `id-certigo-content-infra-plan`,
+  `id-certigo-content-{release,public,answer-key,reader}` ;
+- les sept FIC et sujets GitHub Environment exacts ;
+- la policyDefinition `Certigo: restrict privileged CI role assignments at subscription scope`.
+
+Après archivage et approbation humaine du JSON, l'admin PIM peut exécuter séparément, hors workflow :
+
+```bash
+az deployment sub create \
+  --subscription "$AZURE_SUBSCRIPTION_ID" \
+  --name "certigo-governance-bootstrap-identities-<ticket>" \
+  --location westeurope \
+  --template-file infra/governance/bootstrap-identities.bicep \
+  --parameters infra/params/bootstrap-identities.bicepparam
+
+az deployment sub show \
+  --subscription "$AZURE_SUBSCRIPTION_ID" \
+  --name "certigo-governance-bootstrap-identities-<ticket>" \
+  --query properties.outputs.phaseA.value \
+  --output json > phase-a-output.json
+chmod 600 phase-a-output.json
+```
+
+Le fichier d'output est un artefact de changement contrôlé, jamais committé.
+
+### What-if Phase B
+
+La Phase B ne peut démarrer qu'avec le nom du deployment Phase A approuvé :
+
+```bash
+export AZURE_SUBSCRIPTION_ID='<subscription-uuid>'
+export PHASE_A_DEPLOYMENT_NAME='certigo-governance-bootstrap-identities-<ticket>'
+bash infra/governance/what-if-phase-b.sh
+```
+
+Le script exige `provisioningState=Succeeded`, valide chaque output, relit chaque ressource par son
+ID réel, compare `clientId`/`principalId`, puis exige exactement zéro ou une FIC conforme par UAMI.
+Toute ressource/output absent ou divergent bloque avant le what-if. Le validateur B accepte
+seulement les 15 roleAssignments exacts et `certigo-privileged-ci-rbac` en `Audit`, plus leurs
+deployments ARM attendus. Les deux scopes externes sont comparés après normalisation stricte aux
+seuls IDs complets :
+
+```text
+/subscriptions/<id>/resourceGroups/rg-certigo-ci/providers/Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners
+/subscriptions/<id>/resourceGroups/rg-certigo-ci/providers/Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net
+```
+
+Un scope RG, un autre subnet/DNS, un préfixe générique ou une expression non matérialisée est
+refusé. Un retry B peut contenir `NoEffect` seulement pour une attribution ou policyAssignment
+dont le payload complet correspond au scope, principal, rôle, condition et effet exacts. Le
+mélange `Create`/`NoEffect` est accepté quand chaque contrat apparaît une seule fois; tout payload
+manquant, doublon ou écart est refusé. La Phase B exige aussi `0 Modify`, `0 Delete`,
+`0 Unsupported`.
+
+Les deployments ARM imbriqués ne sont pas une échappatoire à l'allowlist. Chaque nom est lié à
+son resource ID complet et sensible à la casse : identités applicatives et plan sous
+`rg-certigo-ci`, identités contenu sous `rg-certigo-content`, RBAC environnement sous son RG,
+réseau partagé sous `rg-certigo-ci`, exécuteur contenu sous `rg-certigo-content` et joins externes
+sous `rg-certigo-ci`. Pour `Ignore` ou `NoEffect`, le payload doit contenir le type deployment
+exact et un état ARM matérialisé (`provisioningState`, `templateHash` ou `templateLink` non vide).
+Les valeurs vides ou composées d'espaces sont également refusées. Un même leaf name sous un autre
+RG/subscription, une casse différente ou `properties: {}` est refusé.
+
+Après archivage et approbation humaine du second JSON, l'admin PIM peut déployer séparément :
+
+```bash
+az deployment sub create \
+  --subscription "$AZURE_SUBSCRIPTION_ID" \
+  --name "certigo-governance-bootstrap-rbac-<ticket>" \
+  --location westeurope \
+  --template-file infra/governance/bootstrap-rbac.bicep \
+  --parameters phaseA=@phase-a-output.json
+```
+
+Les workflows `governance-bootstrap-phase-{a,b}-what-if.yml` utilisent chacun un
+`repository_dispatch` dédié, un payload exact et `refs/heads/main`. Ils n'appellent jamais
+`deployment create` et échouent tant qu'un admin n'a pas configuré séparément leurs variables
+d'Environment. **Cette PR ne configure aucune variable GitHub.** Le workflow contenu reste un
+`deployment group what-if`, inchangé.
+
+Déclenchements opérateur après revue PIM :
+
+```bash
+gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
+  -f event_type=governance-bootstrap-phase-a-what-if
+
+gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
+  -f event_type=governance-bootstrap-phase-b-what-if \
+  -F 'client_payload[phase_a_deployment_name]=certigo-governance-bootstrap-identities-<ticket>'
+```
+
+Après les deux phases :
+
+1. **Variables GitHub non secrètes.** Reporter les outputs du plan contenu dans
+   `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` et `AZURE_SUBSCRIPTION_ID` de l'Environment
    `azure-content-infra-plan`. Aucun secret client n'est créé ou stocké.
-4. **Protection de l'Environment.** Après le bootstrap Azure et avant le premier run, limiter
+2. **Protection de l'Environment.** Limiter
    `azure-content-infra-plan` à la branche `main` et exiger un reviewer. Cette configuration
    GitHub est une opération séparée, non réalisée par la PR.
-
-Le what-if gouvernance attendu pour ce bootstrap contient la création/adoption de
-`rg-certigo-content`, du rôle publisher, des deux rôles de plan, de l'UAMI
-`id-certigo-content-infra-plan`, de son unique federated credential
-`github-azure-content-infra-plan`, des quatre identités contenu précréées et des trois
-attributions bornées. Les ressources de
-gouvernance déjà conformes doivent être `NoChange`/`Ignore`.
 
 Après ce bootstrap, `infra/content/main.bicep` s'exécute au scope resource group. Le workflow
 utilise exclusivement `az deployment group what-if --resource-group rg-certigo-content` et
@@ -211,42 +318,44 @@ Chaque étape est bloquante. Ne jamais anticiper le retrait de l'ancienne identi
 
 1. **Geler l'état de rollback.** Exporter l'inventaire, les IDs des attributions actuelles,
    les federated credentials et les métadonnées des GitHub Environments. Ne rien retirer.
-2. **Prévol admin.** Un administrateur active via PIM un rôle `Owner` ou l'ensemble minimal
-   permettant identités, custom roles, policy et role assignments. Il exécute uniquement
-   `infra/governance/what-if.sh` et archive le JSON.
-3. **Revue du plan.** Refuser tout `Delete`, tout scope hors des cinq RG Certigo, tout droit
-   Compute dans le rôle réseau, tout wildcard ou droit RBAC delete.
-4. **Provisionnement gouvernance approuvé.** Dans une fenêtre séparée de cette PR, l'admin
-   déploie `infra/governance/main.bicep` en mode incrémentiel. Cela ajoute les trois UAMI
-   applicatives, l'UAMI de plan contenu, `rg-certigo-content`, les custom roles, les attributions
-   cibles et la policy en `Audit`; cela ne retire rien.
-5. **Configuration GitHub.** Créer les `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` et
+2. **Prévol admin Phase A.** Activer via PIM l'ensemble minimal permettant RG, UAMI/FIC,
+   custom roles et policyDefinition. Exécuter `what-if-phase-a.sh`, archiver et approuver le JSON.
+3. **Provisionnement Phase A.** Déployer `bootstrap-identities.bicep` en incrémentiel; archiver
+   l'output `phaseA`. Vérifier explicitement qu'aucune attribution effective n'existe.
+4. **Access review intermédiaire.** Un second reviewer compare les huit principal/client/resource
+   IDs, les sept FIC, les six rôles et la policyDefinition à l'output. Il confirme que la Phase A
+   n'accorde aucun accès.
+5. **Prévol admin Phase B.** Exécuter `what-if-phase-b.sh` avec le deployment A approuvé. Refuser
+   tout `Modify/Delete/Unsupported`, scope générique ou principal/role/condition divergent.
+6. **Provisionnement Phase B.** Déployer `bootstrap-rbac.bicep` en incrémentiel seulement après
+   approbation distincte du plan B. Archiver les 16 assignment IDs créés.
+7. **Configuration GitHub.** Créer les `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` et
    `AZURE_SUBSCRIPTION_ID` au niveau de chaque Environment. Le client ID doit être celui de
    l'UAMI correspondante. Garder la configuration historique disponible pour rollback.
-6. **Préparer l'IaC applicative.** Les RG sont désormais `existing`; leur création et MCSB/
+8. **Préparer l'IaC applicative.** Les RG sont désormais `existing`; leur création et MCSB/
    Defender sortent du chemin applicatif. Reporter le principal de la nouvelle UAMI dans
    `ciDeploymentPrincipalId` pour l'environnement canari seulement.
-7. **Canari dev.** Avec `dev` approuvé : `what-if` sans suppression, déploiement infra,
+9. **Canari dev.** Avec `dev` approuvé : `what-if` sans suppression, déploiement infra,
    upload/download du package, OneDeploy, `/health/live`, `/health/ready`, puis second
    déploiement no-op. Prouver aussi l'échec d'accès à staging/prod et l'impossibilité
    d'attribuer Contributor/UAA.
-8. **Canari staging.** Refaire les mêmes preuves avec approbation et rollback d'artefact.
+10. **Canari staging.** Refaire les mêmes preuves avec approbation et rollback d'artefact.
    Aucun accès dev/prod ne doit être hérité.
-9. **Production.** Refaire le cycle après fenêtre de changement et preuve staging du même
+11. **Production.** Refaire le cycle après fenêtre de changement et preuve staging du même
    artefact. Conserver l'ancienne identité et ses rôles pendant au moins deux déploiements
    prod réussis et la durée de soak approuvée.
-10. **Migration corrective contenu après #290.** Bootstrapper d'abord la gouvernance et les
+12. **Migration corrective contenu après #290.** Bootstrapper d'abord la gouvernance et les
     protections de l'Environment, puis exécuter le what-if resource-group. Utiliser les identités
     public/answer-key et l'identité de plan dédiées; ne jamais réutiliser une identité applicative.
-11. **Retrait data-plane historique.** Un admin PIM retire, environnement par environnement,
+13. **Retrait data-plane historique.** Un admin PIM retire, environnement par environnement,
     les anciens Blob Data Contributor/Delegator seulement après preuve du nouveau principal.
-12. **Retrait abonnement historique.** Quand dev, staging, prod et contenu ont leurs preuves,
+14. **Retrait abonnement historique.** Quand dev, staging, prod et contenu ont leurs preuves,
     l'admin PIM retire `Contributor` puis `User Access Administrator` du principal
     `15d2...4706`. Vérifier entre les deux opérations que le nouveau chemin reste vert.
-13. **Fédération historique.** Après le soak final, retirer les credentials `main`,
+15. **Fédération historique.** Après le soak final, retirer les credentials `main`,
     `workflow_dispatch`, puis `dev/staging/prod` de l'ancienne application. Désactiver ou
     supprimer l'application seulement après access review.
-14. **Policy.** Résoudre toutes les non-conformités et exemptions approuvées, puis promouvoir
+16. **Policy.** Résoudre toutes les non-conformités et exemptions approuvées, puis promouvoir
     `Audit` vers `Deny` dans une PR et une fenêtre distinctes.
 
 ## Preuves minimales avant retrait des rôles abonnement
@@ -393,6 +502,24 @@ Si une opération future échoue :
    scale-in non conscient des jobs ;
 5. relâcher le lease et archiver les états Azure/GitHub ;
 6. déclencher un probe de santé et le drill de résilience avant de reprendre.
+
+## Rollback et access review du bootstrap
+
+- **Échec/rejet Phase A** : ne jamais lancer B. Conserver les UAMI/rôles sans attribution pour
+  investigation; ils n'accordent aucun accès. Corriger en avant et refaire le what-if A. Toute
+  suppression éventuelle est une opération admin séparée, inventoriée et approuvée.
+- **Échec/rejet Phase B avant deployment** : aucune mutation n'a eu lieu. Rejeter le plan, corriger
+  en avant et refaire la preuve live Phase A.
+- **Rollback après Phase B** : exporter d'abord les 16 assignment IDs et l'inventaire d'accès.
+  Un admin PIM retire uniquement ces IDs, en ordre inverse (policyAssignment, joins externes,
+  exécuteur contenu, réseau partagé, writers/contributors environnement, launchers). Ne pas
+  supprimer les identités/rôles tant que les attributions ne sont pas prouvées absentes.
+- **Access review** : deux reviewers comparent après A les huit identities et sept FIC aux outputs,
+  puis après B les 15 roleAssignments (scope, principal, role, condition) et la policyAssignment.
+  Archiver les exports avant/après, le ticket, les approbations PIM et les deux JSON what-if.
+
+Le rollback ne réintroduit jamais automatiquement Owner, Contributor abonnement ou UAA. Les accès
+historiques restent inchangés jusqu'aux canaris et au soak décrits ci-dessous.
 
 ## Rollback OIDC/RBAC
 

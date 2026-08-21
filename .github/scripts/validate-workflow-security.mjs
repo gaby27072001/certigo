@@ -58,6 +58,8 @@ const reusableScannerFiles = new Set([
 const trustedOnlyWorkflowFiles = new Set([
   'cd-backend.yml',
   'deploy-privacy-policy.yml',
+  'governance-bootstrap-phase-a-what-if.yml',
+  'governance-bootstrap-phase-b-what-if.yml',
   'publish-verified-public-pages.yml',
   'promote-backend-staging-prod.yml',
   'release-android.yml',
@@ -74,6 +76,14 @@ const trustedAggregateJobs = new Map([
 const privilegedDispatchTypes = new Map([
   ['cd-backend.yml', 'promote-backend'],
   ['deploy-privacy-policy.yml', 'deploy-privacy-policy'],
+  [
+    'governance-bootstrap-phase-a-what-if.yml',
+    'governance-bootstrap-phase-a-what-if',
+  ],
+  [
+    'governance-bootstrap-phase-b-what-if.yml',
+    'governance-bootstrap-phase-b-what-if',
+  ],
   ['publish-verified-public-pages.yml', 'publish-verified-public-pages'],
   ['promote-backend-staging-prod.yml', 'promote-backend-staging-prod'],
   ['release-android.yml', 'release-android'],

@@ -9,16 +9,6 @@ param identityResourceGroupName string = 'rg-certigo-ci'
 @description('Dedicated resource group created or adopted for immutable content resources.')
 param contentResourceGroupName string = 'rg-certigo-content'
 
-@description('Existing trusted CI virtual network.')
-param ciVnetName string = 'vnet-certigo-ci'
-
-@description('Existing trusted runner subnet used by the content private endpoint.')
-param ciRunnerSubnetName string = 'snet-runners'
-
-@description('Existing shared Blob private DNS zone.')
-#disable-next-line no-hardcoded-env-urls
-param blobPrivateDnsZoneName string = 'privatelink.blob.core.windows.net'
-
 @description('GitHub repository owner.')
 param githubRepositoryOwner string = 'gchambaud_microsoft'
 
@@ -53,23 +43,6 @@ param environments array = [
   }
 ]
 
-@description('Initial privileged-assignment policy effect. Keep Audit until all historical findings are resolved.')
-@allowed([
-  'Audit'
-  'Deny'
-  'Disabled'
-])
-param privilegedAssignmentPolicyEffect string = 'Audit'
-
-@description('Admin-only ownership of the existing audit-only MCSB assignment.')
-param manageMcsbPolicyAssignment bool = false
-
-@description('Admin-only ownership of subscription-wide Defender pricing.')
-param manageDefenderPlans bool = false
-
-@description('Paid Defender plan state when manageDefenderPlans is true.')
-param enableDefenderPlans bool = false
-
 var identityTags = {
   product: 'Certigo'
   managedBy: 'bicep'
@@ -95,27 +68,6 @@ var environmentResourceGroupIds = [
     'Microsoft.Resources/resourceGroups',
     environment.resourceGroupName
   )
-]
-
-var allowedRuntimeRoleDefinitionIds = [
-  // Storage Blob Data Contributor
-  'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
-  // Storage Blob Data Owner
-  'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
-  // Storage Blob Delegator
-  'db58b8e5-c6ad-4a2a-8342-4190687cbf4a'
-  // Storage Queue Data Contributor
-  '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
-  // Storage Table Data Contributor
-  '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
-  // Monitoring Metrics Publisher
-  '3913510d-42f4-4e42-8a64-420c390055eb'
-  // Key Vault Secrets User
-  '4633458b-17de-408a-b874-0445c86b69e6'
-  // Cognitive Services OpenAI User
-  '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
-  // Log Analytics Reader
-  '73c42c96-874c-492b-b04d-ab87d138a893'
 ]
 
 var privilegedRoleDefinitionIds = [
@@ -146,12 +98,6 @@ resource contentResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = 
   location: location
   tags: contentTags
 }
-
-resource environmentResourceGroups 'Microsoft.Resources/resourceGroups@2024-03-01' existing = [
-  for environment in environments: {
-    name: environment.resourceGroupName
-  }
-]
 
 resource subscriptionDeploymentLauncher 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
   name: guid(subscription().id, 'certigo-subscription-deployment-launcher')
@@ -412,74 +358,6 @@ module contentReaderIdentity '../modules/contentReaderIdentity.bicep' = {
   }
 }
 
-resource subscriptionLauncherAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
-  for (environment, index) in environments: {
-    name: guid(subscription().id, 'id-certigo-deploy-${environment.name}', subscriptionDeploymentLauncher.id)
-    properties: {
-      description: 'Launches the ${environment.name} subscription deployment without general subscription access.'
-      principalId: deploymentIdentities[index].outputs.principalId
-      principalType: 'ServicePrincipal'
-      roleDefinitionId: subscriptionDeploymentLauncher.id
-    }
-  }
-]
-
-module contentInfrastructurePlanExecutorAssignment 'modules/contentPlanExecutorAssignment.bicep' = {
-  scope: contentResourceGroup
-  name: 'content-infra-plan-executor-rbac'
-  params: {
-    assignmentNameSeed: contentInfrastructurePlanIdentityName
-    principalId: contentInfrastructurePlanIdentity.outputs.principalId
-    publisherPrincipalIds: [
-      descriptorPublisherIdentity.outputs.principalId
-      publicPublisherIdentity.outputs.principalId
-      privatePublisherIdentity.outputs.principalId
-    ]
-    publisherRoleDefinitionGuid: contentPublisherRole.name
-    readerPrincipalId: contentReaderIdentity.outputs.principalId
-    readerRoleDefinitionGuid: '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
-    roleDefinitionId: contentInfrastructurePlanExecutorRole.id
-  }
-}
-
-module contentInfrastructurePlanExternalJoinAssignments 'modules/contentPlanExternalJoinAssignments.bicep' = {
-  scope: identityResourceGroup
-  name: 'content-infra-plan-external-join-rbac'
-  params: {
-    blobPrivateDnsZoneName: blobPrivateDnsZoneName
-    ciRunnerSubnetName: ciRunnerSubnetName
-    ciVnetName: ciVnetName
-    principalId: contentInfrastructurePlanIdentity.outputs.principalId
-    roleDefinitionId: contentInfrastructurePlanExternalJoinRole.id
-  }
-}
-
-module environmentRbac 'modules/environmentRbac.bicep' = [
-  for (environment, index) in environments: {
-    scope: environmentResourceGroups[index]
-    name: 'rbac-${environment.name}'
-    params: {
-      allowedRoleDefinitionIds: allowedRuntimeRoleDefinitionIds
-      assignmentNameSeed: 'id-certigo-deploy-${environment.name}'
-      principalId: deploymentIdentities[index].outputs.principalId
-      roleAssignmentWriterRoleDefinitionId: runtimeRoleAssignmentWriter.id
-    }
-  }
-]
-
-module sharedNetworkAssignments 'modules/resourceGroupRoleAssignment.bicep' = [
-  for (environment, index) in environments: {
-    scope: identityResourceGroup
-    name: 'shared-network-rbac-${environment.name}'
-    params: {
-      assignmentDescription: 'Allows ${environment.name} to reconcile only shared DNS links and VNet peerings.'
-      assignmentNameSeed: 'id-certigo-deploy-${environment.name}'
-      principalId: deploymentIdentities[index].outputs.principalId
-      roleDefinitionId: sharedNetworkDeploymentRole.id
-    }
-  }
-]
-
 resource privilegedCiAssignmentPolicy 'Microsoft.Authorization/policyDefinitions@2023-04-01' = {
   name: guid(subscription().id, 'certigo-privileged-ci-role-assignments')
   properties: {
@@ -534,58 +412,72 @@ resource privilegedCiAssignmentPolicy 'Microsoft.Authorization/policyDefinitions
   }
 }
 
-resource privilegedCiAssignmentPolicyAssignment 'Microsoft.Authorization/policyAssignments@2024-05-01' = {
-  name: 'certigo-privileged-ci-rbac'
-  location: location
-  properties: {
-    description: 'Starts in Audit. Promotion to Deny is a separate PIM-approved change after compliance evidence.'
-    displayName: 'Certigo privileged CI role assignments'
-    enforcementMode: 'Default'
-    parameters: {
-      effect: {
-        value: privilegedAssignmentPolicyEffect
-      }
+output phaseA object = {
+  schemaVersion: 1
+  subscriptionId: subscription().subscriptionId
+  tenantId: tenant().tenantId
+  contentResourceGroupId: contentResourceGroup.id
+  identities: {
+    contentAnswerKey: {
+      clientId: privatePublisherIdentity.outputs.clientId
+      name: privatePublisherIdentityName
+      principalId: privatePublisherIdentity.outputs.principalId
+      resourceId: privatePublisherIdentity.outputs.resourceId
     }
-    policyDefinitionId: privilegedCiAssignmentPolicy.id
+    contentInfrastructurePlan: {
+      clientId: contentInfrastructurePlanIdentity.outputs.clientId
+      federatedSubject: contentInfrastructurePlanIdentity.outputs.federatedSubject
+      name: contentInfrastructurePlanIdentityName
+      principalId: contentInfrastructurePlanIdentity.outputs.principalId
+      resourceId: contentInfrastructurePlanIdentity.outputs.resourceId
+    }
+    contentPublic: {
+      clientId: publicPublisherIdentity.outputs.clientId
+      name: publicPublisherIdentityName
+      principalId: publicPublisherIdentity.outputs.principalId
+      resourceId: publicPublisherIdentity.outputs.resourceId
+    }
+    contentReader: {
+      clientId: contentReaderIdentity.outputs.clientId
+      name: readerIdentityName
+      principalId: contentReaderIdentity.outputs.principalId
+      resourceId: contentReaderIdentity.outputs.resourceId
+    }
+    contentRelease: {
+      clientId: descriptorPublisherIdentity.outputs.clientId
+      name: descriptorPublisherIdentityName
+      principalId: descriptorPublisherIdentity.outputs.principalId
+      resourceId: descriptorPublisherIdentity.outputs.resourceId
+    }
+    deployDev: {
+      clientId: deploymentIdentities[0].outputs.clientId
+      federatedSubject: deploymentIdentities[0].outputs.federatedSubject
+      name: 'id-certigo-deploy-dev'
+      principalId: deploymentIdentities[0].outputs.principalId
+      resourceId: deploymentIdentities[0].outputs.resourceId
+    }
+    deployProd: {
+      clientId: deploymentIdentities[2].outputs.clientId
+      federatedSubject: deploymentIdentities[2].outputs.federatedSubject
+      name: 'id-certigo-deploy-prod'
+      principalId: deploymentIdentities[2].outputs.principalId
+      resourceId: deploymentIdentities[2].outputs.resourceId
+    }
+    deployStaging: {
+      clientId: deploymentIdentities[1].outputs.clientId
+      federatedSubject: deploymentIdentities[1].outputs.federatedSubject
+      name: 'id-certigo-deploy-staging'
+      principalId: deploymentIdentities[1].outputs.principalId
+      resourceId: deploymentIdentities[1].outputs.resourceId
+    }
+  }
+  policyDefinitionId: privilegedCiAssignmentPolicy.id
+  roleDefinitionIds: {
+    contentInfrastructurePlanExecutor: contentInfrastructurePlanExecutorRole.id
+    contentInfrastructurePlanExternalJoin: contentInfrastructurePlanExternalJoinRole.id
+    contentPublisher: contentPublisherRole.id
+    runtimeRoleAssignmentWriter: runtimeRoleAssignmentWriter.id
+    sharedNetworkDeployment: sharedNetworkDeploymentRole.id
+    subscriptionDeploymentLauncher: subscriptionDeploymentLauncher.id
   }
 }
-
-module mcsbPolicy '../modules/policy.bicep' = if (manageMcsbPolicyAssignment) {
-  name: 'governance-mcsb'
-  params: {
-    assignmentLocation: location
-    enforcementMode: 'DoNotEnforce'
-  }
-}
-
-module defender '../modules/defender.bicep' = if (manageDefenderPlans) {
-  name: 'governance-defender'
-  params: {
-    enablePaidPlans: enableDefenderPlans
-    managePlans: true
-  }
-}
-
-output deploymentIdentities array = [
-  for (environment, index) in environments: {
-    clientId: deploymentIdentities[index].outputs.clientId
-    environment: environment.name
-    federatedSubject: deploymentIdentities[index].outputs.federatedSubject
-    principalId: deploymentIdentities[index].outputs.principalId
-    resourceId: deploymentIdentities[index].outputs.resourceId
-    resourceGroupName: environment.resourceGroupName
-  }
-]
-
-output contentInfrastructurePlanAzureClientId string = contentInfrastructurePlanIdentity.outputs.clientId
-output contentInfrastructurePlanAzureTenantId string = tenant().tenantId
-output contentInfrastructurePlanAzureSubscriptionId string = subscription().subscriptionId
-output contentInfrastructurePlanFederatedSubject string = contentInfrastructurePlanIdentity.outputs.federatedSubject
-output contentInfrastructurePlanPrincipalId string = contentInfrastructurePlanIdentity.outputs.principalId
-output contentPublisherRoleDefinitionId string = contentPublisherRole.id
-output contentInfrastructurePlanExecutorRoleDefinitionId string = contentInfrastructurePlanExecutorRole.id
-output azureDescriptorPublisherClientId string = descriptorPublisherIdentity.outputs.clientId
-output azurePublicPublisherClientId string = publicPublisherIdentity.outputs.clientId
-output azurePrivatePublisherClientId string = privatePublisherIdentity.outputs.clientId
-output azureContentReaderClientId string = contentReaderIdentity.outputs.clientId
-output azureContentReaderPrincipalId string = contentReaderIdentity.outputs.principalId

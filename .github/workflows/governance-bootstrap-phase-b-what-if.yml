@@ -1,0 +1,61 @@
+name: Governance bootstrap Phase B what-if
+
+on:
+  repository_dispatch:
+    types: [governance-bootstrap-phase-b-what-if]
+
+permissions: {}
+
+concurrency:
+  group: governance-bootstrap-phase-b-what-if
+  cancel-in-progress: false
+
+jobs:
+  what-if:
+    name: Admin/PIM Phase B what-if only
+    if: ${{ github.ref == 'refs/heads/main' }}
+    environment: azure-governance-bootstrap-phase-b
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Validate exact payload
+        shell: bash
+        env:
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          jq -e '
+            type == "object" and
+            keys == ["phase_a_deployment_name"] and
+            (.phase_a_deployment_name | type == "string") and
+            (.phase_a_deployment_name | test("^certigo-governance-bootstrap-identities-[a-zA-Z0-9._-]+$"))
+          ' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
+      - name: Fail closed until admin planning variables exist
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          : "${AZURE_CLIENT_ID:?No GitHub variable is configured by this repository.}"
+          : "${AZURE_TENANT_ID:?No GitHub variable is configured by this repository.}"
+          : "${AZURE_SUBSCRIPTION_ID:?No GitHub variable is configured by this repository.}"
+      - name: Azure login with approved admin planning identity
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Run Phase B what-if after proving Phase A
+        shell: bash
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          PHASE_A_DEPLOYMENT_NAME: ${{ github.event.client_payload.phase_a_deployment_name }}
+        run: bash infra/governance/what-if-phase-b.sh

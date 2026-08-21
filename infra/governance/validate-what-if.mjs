@@ -1,107 +1,109 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
-const allowedResourceGroups = new Set([
-  'rg-certigo-ci',
-  'rg-certigo-content',
-  'rg-certigo-dev',
-  'rg-certigo-staging',
-  'rg-certigo-prod',
-]);
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const allowedCiIdentityNames = new Set([
-  'id-certigo-content-infra-plan',
-  'id-certigo-deploy-dev',
-  'id-certigo-deploy-prod',
-  'id-certigo-deploy-staging',
-]);
-
-const allowedContentIdentityNames = new Set([
-  'id-certigo-content-answer-key',
-  'id-certigo-content-public',
-  'id-certigo-content-reader',
-  'id-certigo-content-release',
-]);
-
-const expectedFederatedCredentials = new Map([
-  ...['dev', 'staging', 'prod'].map((environment) => [
-    `id-certigo-deploy-${environment}`,
-    {
-      name: `github-${environment}`,
-      subject:
-        `repo:gchambaud_microsoft/Certigo:environment:${environment}`,
+const identityContracts = {
+  deployDev: {
+    name: 'id-certigo-deploy-dev',
+    resourceGroup: 'rg-certigo-ci',
+    credential: {
+      name: 'github-dev',
+      subject: 'repo:gchambaud_microsoft/Certigo:environment:dev',
     },
-  ]),
-  [
-    'id-certigo-content-infra-plan',
-    {
+  },
+  deployStaging: {
+    name: 'id-certigo-deploy-staging',
+    resourceGroup: 'rg-certigo-ci',
+    credential: {
+      name: 'github-staging',
+      subject: 'repo:gchambaud_microsoft/Certigo:environment:staging',
+    },
+  },
+  deployProd: {
+    name: 'id-certigo-deploy-prod',
+    resourceGroup: 'rg-certigo-ci',
+    credential: {
+      name: 'github-prod',
+      subject: 'repo:gchambaud_microsoft/Certigo:environment:prod',
+    },
+  },
+  contentInfrastructurePlan: {
+    name: 'id-certigo-content-infra-plan',
+    resourceGroup: 'rg-certigo-ci',
+    credential: {
       name: 'github-azure-content-infra-plan',
       subject:
         'repo:gchambaud_microsoft/Certigo:environment:azure-content-infra-plan',
     },
-  ],
-  [
-    'id-certigo-content-release',
-    {
+  },
+  contentRelease: {
+    name: 'id-certigo-content-release',
+    resourceGroup: 'rg-certigo-content',
+    credential: {
       name: 'github-azure-content-release',
       subject:
         'repo:gchambaud_microsoft/certigo-content:environment:azure-content-release',
     },
-  ],
-  [
-    'id-certigo-content-public',
-    {
+  },
+  contentPublic: {
+    name: 'id-certigo-content-public',
+    resourceGroup: 'rg-certigo-content',
+    credential: {
       name: 'github-azure-content-public',
       subject:
         'repo:gchambaud_microsoft/certigo-content:environment:azure-content-public',
     },
-  ],
-  [
-    'id-certigo-content-answer-key',
-    {
+  },
+  contentAnswerKey: {
+    name: 'id-certigo-content-answer-key',
+    resourceGroup: 'rg-certigo-content',
+    credential: {
       name: 'github-azure-content-answer-key',
       subject:
         'repo:gchambaud_microsoft/certigo-content:environment:azure-content-answer-key',
     },
-  ],
-]);
+  },
+  contentReader: {
+    name: 'id-certigo-content-reader',
+    resourceGroup: 'rg-certigo-content',
+  },
+};
 
-const subscriptionLauncherActions = [
-  'Microsoft.Resources/deployments/read',
-  'Microsoft.Resources/deployments/validate/action',
-  'Microsoft.Resources/deployments/whatIf/action',
-  'Microsoft.Resources/deployments/write',
-  'Microsoft.Resources/subscriptions/resourceGroups/read',
-].sort();
-
-const roleContracts = [
-  {
-    kind: 'launcher',
-    name: /^Certigo Subscription Deployment Launcher [a-z0-9]{6}$/,
-    actions: subscriptionLauncherActions,
-    dataActions: [],
+const roleContracts = {
+  subscriptionDeploymentLauncher: {
+    seed: 'certigo-subscription-deployment-launcher',
+    roleName: /^Certigo Subscription Deployment Launcher [a-z0-9]{6}$/,
+    actions: [
+      'Microsoft.Resources/deployments/read',
+      'Microsoft.Resources/deployments/validate/action',
+      'Microsoft.Resources/deployments/whatIf/action',
+      'Microsoft.Resources/deployments/write',
+      'Microsoft.Resources/subscriptions/resourceGroups/read',
+    ],
     scopes: (subscriptionId) => [`/subscriptions/${subscriptionId}`],
   },
-  {
-    kind: 'runtime-writer',
-    name: /^Certigo Runtime Role Assignment Writer [a-z0-9]{6}$/,
+  runtimeRoleAssignmentWriter: {
+    seed: 'certigo-runtime-role-assignment-writer',
+    roleName: /^Certigo Runtime Role Assignment Writer [a-z0-9]{6}$/,
     actions: [
       'Microsoft.Authorization/roleAssignments/read',
       'Microsoft.Authorization/roleAssignments/write',
       'Microsoft.Authorization/roleDefinitions/read',
       'Microsoft.Resources/subscriptions/resourceGroups/read',
-    ].sort(),
-    dataActions: [],
+    ],
     scopes: (subscriptionId) =>
       ['dev', 'staging', 'prod'].map(
         (environment) =>
           `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-${environment}`,
       ),
   },
-  {
-    kind: 'shared-network',
-    name: /^Certigo Shared Network Deployment [a-z0-9]{6}$/,
+  sharedNetworkDeployment: {
+    seed: 'certigo-shared-network-deployment',
+    roleName: /^Certigo Shared Network Deployment [a-z0-9]{6}$/,
     actions: [
       'Microsoft.Network/privateDnsZones/join/action',
       'Microsoft.Network/privateDnsZones/read',
@@ -116,30 +118,29 @@ const roleContracts = [
       'Microsoft.Resources/deployments/whatIf/action',
       'Microsoft.Resources/deployments/write',
       'Microsoft.Resources/subscriptions/resourceGroups/read',
-    ].sort(),
-    dataActions: [],
+    ],
     scopes: (subscriptionId) => [
       `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci`,
     ],
   },
-  {
-    kind: 'publisher',
-    name: /^Certigo Immutable Content Publisher [a-z0-9]{6}$/,
+  contentPublisher: {
+    fixedId: 'c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de',
+    roleName: /^Certigo Immutable Content Publisher [a-z0-9]{6}$/,
     actions: [
       'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/read',
       'Microsoft.Storage/storageAccounts/blobServices/containers/read',
-    ].sort(),
+    ],
     dataActions: [
       'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read',
       'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write',
-    ].sort(),
+    ],
     scopes: (subscriptionId) => [
       `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-content`,
     ],
   },
-  {
-    kind: 'content-plan',
-    name: /^Certigo Content Infrastructure Plan Executor [a-z0-9]{6}$/,
+  contentInfrastructurePlanExecutor: {
+    seed: 'certigo-content-infrastructure-plan-executor',
+    roleName: /^Certigo Content Infrastructure Plan Executor [a-z0-9]{6}$/,
     actions: [
       'Microsoft.Authorization/roleAssignments/read',
       'Microsoft.Authorization/roleAssignments/write',
@@ -153,6 +154,7 @@ const roleContracts = [
       'Microsoft.Resources/deployments/validate/action',
       'Microsoft.Resources/deployments/whatIf/action',
       'Microsoft.Resources/deployments/write',
+      'Microsoft.Storage/storageAccounts/PrivateEndpointConnectionsApproval/action',
       'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/read',
       'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/write',
       'Microsoft.Storage/storageAccounts/blobServices/containers/read',
@@ -161,428 +163,924 @@ const roleContracts = [
       'Microsoft.Storage/storageAccounts/blobServices/write',
       'Microsoft.Storage/storageAccounts/managementPolicies/read',
       'Microsoft.Storage/storageAccounts/managementPolicies/write',
-      'Microsoft.Storage/storageAccounts/PrivateEndpointConnectionsApproval/action',
       'Microsoft.Storage/storageAccounts/read',
       'Microsoft.Storage/storageAccounts/write',
-    ].sort(),
-    dataActions: [],
+    ],
     scopes: (subscriptionId) => [
       `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-content`,
     ],
   },
-  {
-    kind: 'external-join',
-    name: /^Certigo Content Infrastructure Plan External Join [a-z0-9]{6}$/,
+  contentInfrastructurePlanExternalJoin: {
+    seed: 'certigo-content-infrastructure-plan-external-join',
+    roleName: /^Certigo Content Infrastructure Plan External Join [a-z0-9]{6}$/,
     actions: [
       'Microsoft.Network/privateDnsZones/join/action',
       'Microsoft.Network/privateDnsZones/read',
       'Microsoft.Network/virtualNetworks/subnets/join/action',
       'Microsoft.Network/virtualNetworks/subnets/read',
-    ].sort(),
-    dataActions: [],
+    ],
     scopes: (subscriptionId) => [
       `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci`,
     ],
   },
-];
+};
+
+function phaseADeploymentIds(subscriptionId) {
+  const resourceId = (resourceGroup, name) =>
+    `/subscriptions/${subscriptionId}/resourceGroups/${resourceGroup}/` +
+    `providers/Microsoft.Resources/deployments/${name}`;
+  return new Map([
+    ['identity-dev', resourceId('rg-certigo-ci', 'identity-dev')],
+    ['identity-staging', resourceId('rg-certigo-ci', 'identity-staging')],
+    ['identity-prod', resourceId('rg-certigo-ci', 'identity-prod')],
+    [
+      'identity-content-infra-plan',
+      resourceId('rg-certigo-ci', 'identity-content-infra-plan'),
+    ],
+    [
+      'content-release-publisher-identity',
+      resourceId('rg-certigo-content', 'content-release-publisher-identity'),
+    ],
+    [
+      'content-public-publisher-identity',
+      resourceId('rg-certigo-content', 'content-public-publisher-identity'),
+    ],
+    [
+      'content-private-publisher-identity',
+      resourceId('rg-certigo-content', 'content-private-publisher-identity'),
+    ],
+    [
+      'content-reader-identity',
+      resourceId('rg-certigo-content', 'content-reader-identity'),
+    ],
+  ]);
+}
+
+function phaseBDeploymentIds(subscriptionId) {
+  const resourceId = (resourceGroup, name) =>
+    `/subscriptions/${subscriptionId}/resourceGroups/${resourceGroup}/` +
+    `providers/Microsoft.Resources/deployments/${name}`;
+  return new Map([
+    ['rbac-dev', resourceId('rg-certigo-dev', 'rbac-dev')],
+    ['rbac-staging', resourceId('rg-certigo-staging', 'rbac-staging')],
+    ['rbac-prod', resourceId('rg-certigo-prod', 'rbac-prod')],
+    [
+      'shared-network-rbac-dev',
+      resourceId('rg-certigo-ci', 'shared-network-rbac-dev'),
+    ],
+    [
+      'shared-network-rbac-staging',
+      resourceId('rg-certigo-ci', 'shared-network-rbac-staging'),
+    ],
+    [
+      'shared-network-rbac-prod',
+      resourceId('rg-certigo-ci', 'shared-network-rbac-prod'),
+    ],
+    [
+      'content-infra-plan-executor-rbac',
+      resourceId('rg-certigo-content', 'content-infra-plan-executor-rbac'),
+    ],
+    [
+      'content-infra-plan-external-join-rbac',
+      resourceId('rg-certigo-ci', 'content-infra-plan-external-join-rbac'),
+    ],
+  ]);
+}
+
+function normalizeId(value) {
+  return String(value ?? '').replace(/\/+$/, '').toLowerCase();
+}
+
+export function armGuid(...values) {
+  const namespace = Buffer.from(
+    '11fb06fb712d4ddd98c7e71bbd588830',
+    'hex',
+  );
+  const hash = createHash('sha1')
+    .update(namespace)
+    .update(values.join('-'))
+    .digest()
+    .subarray(0, 16);
+  hash[6] = (hash[6] & 0x0f) | 0x50;
+  hash[8] = (hash[8] & 0x3f) | 0x80;
+  const hex = hash.toString('hex');
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20),
+  ].join('-');
+}
 
 function sameStrings(actual = [], expected = []) {
   return (
-    JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort())
+    JSON.stringify([...actual].map(normalizeId).sort()) ===
+    JSON.stringify([...expected].map(normalizeId).sort())
   );
 }
-
-function matchRoleContract(change, subscriptionId) {
-  const properties = change.after?.properties;
-  const [permissions] = properties?.permissions ?? [];
-  const contract = roleContracts.find((candidate) =>
-    candidate.name.test(properties?.roleName ?? ''),
-  );
-  if (
-    !contract ||
-    properties?.type !== 'CustomRole' ||
-    (properties.permissions ?? []).length !== 1 ||
-    !sameStrings(permissions.actions, contract.actions) ||
-    !sameStrings(permissions.dataActions, contract.dataActions) ||
-    !sameStrings(permissions.notActions, []) ||
-    !sameStrings(permissions.notDataActions, []) ||
-    !sameStrings(properties.assignableScopes, contract.scopes(subscriptionId))
-  ) {
-    return null;
-  }
-  if (
-    contract.kind === 'publisher' &&
-    !(change.resourceId ?? '')
-      .toLowerCase()
-      .endsWith('/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de')
-  ) {
-    return null;
-  }
-  return contract.kind;
-}
-
-function expectedResourceGroupAssignment(
-  description,
-  resourceGroup,
-  scope,
-  subscriptionId,
-) {
-  const environmentMatch = description.match(
-    /^Allows (dev|staging|prod) to reconcile only shared DNS links and VNet peerings\.$/,
-  );
-  if (environmentMatch && resourceGroup === 'rg-certigo-ci') {
-    return {
-      conditioned: false,
-      identityName: `id-certigo-deploy-${environmentMatch[1]}`,
-      roleKind: 'shared-network',
-      scope:
-        `/subscriptions/${subscriptionId}/resourcegroups/rg-certigo-ci`,
-    };
-  }
-  if (
-    description ===
-      'Certigo environment deployment; no role-assignment administration.' &&
-    /^rg-certigo-(dev|staging|prod)$/.test(resourceGroup ?? '')
-  ) {
-    return {
-      conditioned: false,
-      identityName: `id-certigo-deploy-${resourceGroup.slice('rg-certigo-'.length)}`,
-      roleKind: 'builtin-contributor',
-      scope: `/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}`,
-    };
-  }
-  if (
-    description ===
-      'May create only approved runtime roles for service principals in this environment.' &&
-    /^rg-certigo-(dev|staging|prod)$/.test(resourceGroup ?? '')
-  ) {
-    return {
-      conditioned: true,
-      identityName: `id-certigo-deploy-${resourceGroup.slice('rg-certigo-'.length)}`,
-      roleKind: 'runtime-writer',
-      scope: `/subscriptions/${subscriptionId}/resourcegroups/${resourceGroup}`,
-    };
-  }
-  if (
-    description ===
-      'Plans the content stack and may assign only approved content roles to service principals.' &&
-    resourceGroup === 'rg-certigo-content'
-  ) {
-    return {
-      conditioned: true,
-      identityName: 'id-certigo-content-infra-plan',
-      roleKind: 'content-plan',
-      scope:
-        `/subscriptions/${subscriptionId}/resourcegroups/rg-certigo-content`,
-    };
-  }
-  if (
-    description ===
-      'Allows the content plan to read and join only the trusted CI runner subnet.' &&
-    scope.endsWith(
-      '/resourcegroups/rg-certigo-ci/providers/microsoft.network/virtualnetworks/vnet-certigo-ci/subnets/snet-runners',
-    )
-  ) {
-    return {
-      conditioned: false,
-      identityName: 'id-certigo-content-infra-plan',
-      roleKind: 'external-join',
-      scope,
-    };
-  }
-  if (
-    description ===
-      'Allows the content plan to read and join only the shared Blob private DNS zone.' &&
-    scope.endsWith(
-      '/resourcegroups/rg-certigo-ci/providers/microsoft.network/privatednszones/privatelink.blob.core.windows.net',
-    )
-  ) {
-    return {
-      conditioned: false,
-      identityName: 'id-certigo-content-infra-plan',
-      roleKind: 'external-join',
-      scope,
-    };
-  }
-  return null;
-}
-
-function contentPlanRoleAssignmentCondition(principalIdsByIdentityName) {
-  const publisherPrincipalIds = [
-    'id-certigo-content-release',
-    'id-certigo-content-public',
-    'id-certigo-content-answer-key',
-  ].map((name) => principalIdsByIdentityName.get(name));
-  const readerPrincipalId = principalIdsByIdentityName.get(
-    'id-certigo-content-reader',
-  );
-  if (
-    publisherPrincipalIds.some((principalId) => !principalId) ||
-    !readerPrincipalId
-  ) {
-    return null;
-  }
-  return (
-    "((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR " +
-    '(((@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ' +
-    'GuidEquals c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de) AND ' +
-    '(@Request[Microsoft.Authorization/roleAssignments:PrincipalId] ' +
-    `ForAnyOfAnyValues:GuidEquals {${publisherPrincipalIds.join(', ')}})) OR ` +
-    '((@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ' +
-    'GuidEquals 2a2b9908-6ea1-4ae2-8e65-a410df84e7d1) AND ' +
-    '(@Request[Microsoft.Authorization/roleAssignments:PrincipalId] ' +
-    `GuidEquals ${readerPrincipalId}))) AND ` +
-    '(@Request[Microsoft.Authorization/roleAssignments:PrincipalType] ' +
-    "StringEqualsIgnoreCase 'ServicePrincipal'))"
-  );
-}
-
-const allowedSubscriptionTypes = new Set([
-  'microsoft.authorization/policyassignments',
-  'microsoft.authorization/policydefinitions',
-  'microsoft.authorization/roleassignments',
-  'microsoft.authorization/roledefinitions',
-  'microsoft.resources/deployments',
-  'microsoft.resources/resourcegroups',
-]);
-
-const allowedResourceGroupTypes = new Map([
-  [
-    'rg-certigo-content',
-    new Set([
-      'microsoft.authorization/roleassignments',
-      'microsoft.managedidentity/userassignedidentities',
-      'microsoft.managedidentity/userassignedidentities/federatedidentitycredentials',
-      'microsoft.resources/deployments',
-    ]),
-  ],
-  [
-    'rg-certigo-ci',
-    new Set([
-      'microsoft.authorization/roleassignments',
-      'microsoft.managedidentity/userassignedidentities',
-      'microsoft.managedidentity/userassignedidentities/federatedidentitycredentials',
-      'microsoft.resources/deployments',
-    ]),
-  ],
-  ...['rg-certigo-dev', 'rg-certigo-staging', 'rg-certigo-prod'].map(
-    (resourceGroup) => [
-      resourceGroup,
-      new Set([
-        'microsoft.authorization/roleassignments',
-        'microsoft.resources/deployments',
-      ]),
-    ],
-  ),
-]);
 
 function parseResourceId(resourceId) {
-  const parts = resourceId.split('/').filter(Boolean);
+  const parts = String(resourceId).split('/').filter(Boolean);
   const resourceGroupIndex = parts.findIndex(
     (part) => part.toLowerCase() === 'resourcegroups',
   );
   const providerIndex = parts.findLastIndex(
     (part) => part.toLowerCase() === 'providers',
   );
-  const resourceTypes = [];
+  const types = [];
+  const names = [];
   if (providerIndex >= 0) {
     for (let index = providerIndex + 2; index < parts.length; index += 2) {
-      resourceTypes.push(parts[index]);
+      types.push(parts[index]);
+      names.push(parts[index + 1]);
     }
   }
-
   return {
+    names,
     resourceGroup:
       resourceGroupIndex >= 0 ? parts[resourceGroupIndex + 1]?.toLowerCase() : null,
     type:
       providerIndex >= 0
-        ? `${parts[providerIndex + 1]}/${resourceTypes.join('/')}`.toLowerCase()
+        ? `${parts[providerIndex + 1]}/${types.join('/')}`.toLowerCase()
         : null,
-    names:
-      providerIndex >= 0
-        ? parts.filter(
-            (_, index) =>
-              index >= providerIndex + 3 &&
-              (index - providerIndex) % 2 === 1,
-          )
-        : [],
   };
 }
 
-export function validateWhatIf(plan, subscriptionId) {
+function expectedIdentityResourceId(subscriptionId, contract) {
+  return (
+    `/subscriptions/${subscriptionId}/resourceGroups/${contract.resourceGroup}/` +
+    `providers/Microsoft.ManagedIdentity/userAssignedIdentities/${contract.name}`
+  );
+}
+
+export function validatePhaseAProof(phaseA, subscriptionId) {
+  const errors = [];
+  if (!phaseA || phaseA.schemaVersion !== 1) {
+    throw new Error('Phase A proof is missing or has an unsupported schemaVersion');
+  }
+  if (normalizeId(phaseA.subscriptionId) !== normalizeId(subscriptionId)) {
+    errors.push('Phase A proof subscriptionId does not match the target subscription');
+  }
+  if (!uuidPattern.test(phaseA.tenantId ?? '')) {
+    errors.push('Phase A proof tenantId is missing or invalid');
+  }
+  const expectedContentResourceGroupId =
+    `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-content`;
+  if (
+    normalizeId(phaseA.contentResourceGroupId) !==
+    normalizeId(expectedContentResourceGroupId)
+  ) {
+    errors.push('Phase A proof content resource group is outside the exact contract');
+  }
+
+  const principalIds = new Set();
+  const clientIds = new Set();
+  for (const [key, contract] of Object.entries(identityContracts)) {
+    const identity = phaseA.identities?.[key];
+    if (
+      !identity ||
+      identity.name !== contract.name ||
+      normalizeId(identity.resourceId) !==
+        normalizeId(expectedIdentityResourceId(subscriptionId, contract)) ||
+      !uuidPattern.test(identity.principalId ?? '') ||
+      !uuidPattern.test(identity.clientId ?? '')
+    ) {
+      errors.push(`Phase A proof identity ${key} is missing or invalid`);
+      continue;
+    }
+    principalIds.add(identity.principalId.toLowerCase());
+    clientIds.add(identity.clientId.toLowerCase());
+    if (
+      contract.credential &&
+      key === 'contentInfrastructurePlan' &&
+      identity.federatedSubject !== contract.credential.subject
+    ) {
+      errors.push(`Phase A proof identity ${key} has an invalid federated subject`);
+    }
+  }
+  if (principalIds.size !== Object.keys(identityContracts).length) {
+    errors.push('Phase A proof principal IDs must be present and unique');
+  }
+  if (clientIds.size !== Object.keys(identityContracts).length) {
+    errors.push('Phase A proof client IDs must be present and unique');
+  }
+
+  const roleIds = new Set();
+  for (const [key, contract] of Object.entries(roleContracts)) {
+    const roleDefinitionId = phaseA.roleDefinitionIds?.[key];
+    const parsed = parseResourceId(roleDefinitionId ?? '');
+    const roleGuid = parsed.names[0] ?? '';
+    if (
+      normalizeId(roleDefinitionId).split(
+        `/subscriptions/${subscriptionId.toLowerCase()}/providers/` +
+          'microsoft.authorization/roledefinitions/',
+      ).length !== 2 ||
+      parsed.type !== 'microsoft.authorization/roledefinitions' ||
+      !uuidPattern.test(roleGuid) ||
+      roleGuid.toLowerCase() !==
+        (contract.fixedId ??
+          armGuid(`/subscriptions/${subscriptionId}`, contract.seed))
+    ) {
+      errors.push(`Phase A proof role ${key} is missing or invalid`);
+      continue;
+    }
+    roleIds.add(normalizeId(roleDefinitionId));
+  }
+  if (roleIds.size !== Object.keys(roleContracts).length) {
+    errors.push('Phase A proof role definition IDs must be present and unique');
+  }
+
+  const policy = parseResourceId(phaseA.policyDefinitionId ?? '');
+  if (
+    policy.type !== 'microsoft.authorization/policydefinitions' ||
+    !uuidPattern.test(policy.names[0] ?? '') ||
+    !normalizeId(phaseA.policyDefinitionId).startsWith(
+      `/subscriptions/${subscriptionId.toLowerCase()}/providers/` +
+        'microsoft.authorization/policydefinitions/',
+    )
+  ) {
+    errors.push('Phase A proof policyDefinitionId is missing or invalid');
+  }
+
+  if (errors.length > 0) {
+    throw new Error(errors.join('\n'));
+  }
+  return phaseA;
+}
+
+function identifyRoleContract(change, subscriptionId) {
+  const properties = change.after?.properties;
+  const [permissions] = properties?.permissions ?? [];
+  const entry = Object.entries(roleContracts).find(([, contract]) =>
+    contract.roleName.test(properties?.roleName ?? ''),
+  );
+  if (!entry) {
+    return null;
+  }
+  const [key, contract] = entry;
+  const roleGuid = parseResourceId(change.resourceId).names[0]?.toLowerCase();
+  const expectedRoleGuid =
+    contract.fixedId ??
+    armGuid(`/subscriptions/${subscriptionId}`, contract.seed);
+  if (
+    properties.type !== 'CustomRole' ||
+    (properties.permissions ?? []).length !== 1 ||
+    !sameStrings(permissions.actions, contract.actions) ||
+    !sameStrings(permissions.dataActions, contract.dataActions ?? []) ||
+    !sameStrings(permissions.notActions, []) ||
+    !sameStrings(permissions.notDataActions, []) ||
+    !sameStrings(properties.assignableScopes, contract.scopes(subscriptionId)) ||
+    roleGuid !== expectedRoleGuid
+  ) {
+    return null;
+  }
+  return key;
+}
+
+function hasCompletePayload(change) {
+  const after = change.after;
+  const parsed = parseResourceId(change.resourceId);
+  const expectedName = String(change.resourceId).split('/').filter(Boolean).at(-1);
+  const payloadName = String(after?.name ?? '').toLowerCase();
+  const expectedType =
+    parsed.type ??
+    (parsed.resourceGroup && /\/resourceGroups\/[^/]+$/i.test(change.resourceId)
+      ? 'microsoft.resources/resourcegroups'
+      : null);
+  return Boolean(
+    after &&
+      typeof after === 'object' &&
+      normalizeId(after.id) === normalizeId(change.resourceId) &&
+      typeof after.name === 'string' &&
+      (payloadName === expectedName?.toLowerCase() ||
+        payloadName.endsWith(`/${expectedName?.toLowerCase()}`)) &&
+      typeof after.type === 'string' &&
+      normalizeId(after.type) === expectedType &&
+      after.properties &&
+      typeof after.properties === 'object',
+  );
+}
+
+function validateIdentityChange(
+  change,
+  subscriptionId,
+  requireMaterialized = false,
+) {
+  const parsed = parseResourceId(change.resourceId);
+  const contract = Object.values(identityContracts).find(
+    (candidate) =>
+      normalizeId(change.resourceId) ===
+      normalizeId(expectedIdentityResourceId(subscriptionId, candidate)),
+  );
+  if (!contract || parsed.names.length !== 1) {
+    return false;
+  }
+  const properties = change.after?.properties ?? {};
+  return Boolean(
+    (!requireMaterialized ||
+      (hasCompletePayload(change) &&
+        uuidPattern.test(properties.clientId ?? '') &&
+        uuidPattern.test(properties.principalId ?? ''))) &&
+      (!properties.principalId || uuidPattern.test(properties.principalId)),
+  );
+}
+
+function validateCredentialChange(change, subscriptionId) {
+  const contract = Object.values(identityContracts).find((candidate) => {
+    if (!candidate.credential) {
+      return false;
+    }
+    return (
+      normalizeId(change.resourceId) ===
+      normalizeId(
+        `${expectedIdentityResourceId(subscriptionId, candidate)}/` +
+          `federatedIdentityCredentials/${candidate.credential.name}`,
+      )
+    );
+  });
+  const properties = change.after?.properties ?? {};
+  return Boolean(
+    contract &&
+      properties.issuer === 'https://token.actions.githubusercontent.com' &&
+      properties.subject === contract.credential.subject &&
+      sameStrings(properties.audiences, ['api://AzureADTokenExchange']),
+  );
+}
+
+function validatePolicyDefinition(change, subscriptionId) {
+  const properties = change.after?.properties ?? {};
+  const expectedPrivilegedRoles = [
+    '8e3af657-a8ff-443c-a75c-2fe8c4bcb635',
+    'b24988ac-6180-42a0-ab88-20f7382dd24c',
+    '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9',
+    'f58310d9-a9f6-439a-9e8d-f62e7b41a168',
+  ].map(
+    (role) =>
+      `/subscriptions/${subscriptionId}/providers/Microsoft.Authorization/` +
+      `roleDefinitions/${role}`,
+  );
+  const clauses = properties.policyRule?.if?.allOf ?? [];
+  return (
+    parseResourceId(change.resourceId).type ===
+      'microsoft.authorization/policydefinitions' &&
+    normalizeId(change.resourceId) ===
+      normalizeId(
+        `/subscriptions/${subscriptionId}/providers/` +
+          'Microsoft.Authorization/policyDefinitions/' +
+          armGuid(
+            `/subscriptions/${subscriptionId}`,
+            'certigo-privileged-ci-role-assignments',
+          ),
+      ) &&
+    properties.policyType === 'Custom' &&
+    properties.mode === 'All' &&
+    properties.parameters?.effect?.defaultValue === 'Audit' &&
+    sameStrings(properties.parameters?.effect?.allowedValues, [
+      'Audit',
+      'Deny',
+      'Disabled',
+    ]) &&
+    clauses.length === 4 &&
+    clauses[0]?.field === 'type' &&
+    clauses[0]?.equals === 'Microsoft.Authorization/roleAssignments' &&
+    clauses[1]?.field ===
+      'Microsoft.Authorization/roleAssignments/principalType' &&
+    clauses[1]?.equals === 'ServicePrincipal' &&
+    clauses[2]?.field === 'Microsoft.Authorization/roleAssignments/scope' &&
+    normalizeId(clauses[2]?.equals) ===
+      normalizeId(`/subscriptions/${subscriptionId}`) &&
+    clauses[3]?.field ===
+      'Microsoft.Authorization/roleAssignments/roleDefinitionId' &&
+    sameStrings(clauses[3]?.in, expectedPrivilegedRoles) &&
+    properties.policyRule?.then?.effect === "[parameters('effect')]"
+  );
+}
+
+export function contentPlanCondition(phaseA) {
+  const publishers = [
+    phaseA.identities.contentRelease.principalId,
+    phaseA.identities.contentPublic.principalId,
+    phaseA.identities.contentAnswerKey.principalId,
+  ];
+  return (
+    "((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR " +
+    '(((@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ' +
+    'GuidEquals c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de) AND ' +
+    '(@Request[Microsoft.Authorization/roleAssignments:PrincipalId] ' +
+    `ForAnyOfAnyValues:GuidEquals {${publishers.join(', ')}})) OR ` +
+    '((@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ' +
+    'GuidEquals 2a2b9908-6ea1-4ae2-8e65-a410df84e7d1) AND ' +
+    '(@Request[Microsoft.Authorization/roleAssignments:PrincipalId] ' +
+    `GuidEquals ${phaseA.identities.contentReader.principalId}))) AND ` +
+    '(@Request[Microsoft.Authorization/roleAssignments:PrincipalType] ' +
+    "StringEqualsIgnoreCase 'ServicePrincipal'))"
+  );
+}
+
+export function runtimeWriterCondition() {
+  const roles = [
+    'ba92f5b4-2d11-453d-a403-e96b0029c9fe',
+    'b7e6dc6d-f1e8-4753-8033-0f276bb0955b',
+    'db58b8e5-c6ad-4a2a-8342-4190687cbf4a',
+    '974c5e8b-45b9-4653-ba55-5f855dd0fb88',
+    '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3',
+    '3913510d-42f4-4e42-8a64-420c390055eb',
+    '4633458b-17de-408a-b874-0445c86b69e6',
+    '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd',
+    '73c42c96-874c-492b-b04d-ab87d138a893',
+  ];
+  return (
+    "((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR " +
+    '((@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ' +
+    `ForAnyOfAnyValues:GuidEquals {${roles.join(', ')}}) AND ` +
+    '(@Request[Microsoft.Authorization/roleAssignments:PrincipalType] ' +
+    "StringEqualsIgnoreCase 'ServicePrincipal')))"
+  );
+}
+
+function expectedRoleAssignment(properties, scope, subscriptionId, phaseA) {
+  const roleIds = Object.fromEntries(
+    Object.entries(phaseA.roleDefinitionIds).map(([key, value]) => [
+      key,
+      normalizeId(value),
+    ]),
+  );
+  const contributorRoleId =
+    `/subscriptions/${subscriptionId}/providers/Microsoft.Authorization/` +
+    'roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c';
+  const normalizedScope = normalizeId(scope);
+  const descriptions = [];
+
+  for (const environment of ['dev', 'staging', 'prod']) {
+    const identity =
+      phaseA.identities[
+        `deploy${environment[0].toUpperCase()}${environment.slice(1)}`
+      ];
+    descriptions.push({
+      condition: null,
+      description:
+        `Launches the ${environment} subscription deployment without general ` +
+        'subscription access.',
+      principalId: identity.principalId,
+      roleDefinitionId: roleIds.subscriptionDeploymentLauncher,
+      scope: `/subscriptions/${subscriptionId}`,
+    });
+    descriptions.push({
+      condition: null,
+      description: 'Certigo environment deployment; no role-assignment administration.',
+      principalId: identity.principalId,
+      roleDefinitionId: contributorRoleId,
+      scope:
+        `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-${environment}`,
+    });
+    descriptions.push({
+      condition: runtimeWriterCondition(),
+      description:
+        'May create only approved runtime roles for service principals in this environment.',
+      principalId: identity.principalId,
+      roleDefinitionId: roleIds.runtimeRoleAssignmentWriter,
+      scope:
+        `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-${environment}`,
+    });
+    descriptions.push({
+      condition: null,
+      description:
+        `Allows ${environment} to reconcile only shared DNS links and VNet peerings.`,
+      principalId: identity.principalId,
+      roleDefinitionId: roleIds.sharedNetworkDeployment,
+      scope: `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci`,
+    });
+  }
+
+  descriptions.push(
+    {
+      condition: contentPlanCondition(phaseA),
+      description:
+        'Plans the content stack and may assign only approved content roles to service principals.',
+      principalId: phaseA.identities.contentInfrastructurePlan.principalId,
+      roleDefinitionId: roleIds.contentInfrastructurePlanExecutor,
+      scope: `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-content`,
+    },
+    {
+      condition: null,
+      description:
+        'Allows the content plan to read and join only the trusted CI runner subnet.',
+      principalId: phaseA.identities.contentInfrastructurePlan.principalId,
+      roleDefinitionId: roleIds.contentInfrastructurePlanExternalJoin,
+      scope:
+        `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/providers/` +
+        'Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners',
+    },
+    {
+      condition: null,
+      description:
+        'Allows the content plan to read and join only the shared Blob private DNS zone.',
+      principalId: phaseA.identities.contentInfrastructurePlan.principalId,
+      roleDefinitionId: roleIds.contentInfrastructurePlanExternalJoin,
+      scope:
+        `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/providers/` +
+        'Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net',
+    },
+  );
+
+  return descriptions.find(
+    (candidate) =>
+      candidate.description === properties.description &&
+      normalizeId(candidate.scope) === normalizedScope,
+  );
+}
+
+function roleAssignmentScope(resourceId) {
+  const marker = '/providers/microsoft.authorization/roleassignments/';
+  const normalized = normalizeId(resourceId);
+  const index = normalized.lastIndexOf(marker);
+  return index >= 0 ? normalized.slice(0, index) : null;
+}
+
+function validateRoleAssignment(change, subscriptionId, phaseA) {
+  const properties = change.after?.properties ?? {};
+  const scope = roleAssignmentScope(change.resourceId);
+  if (!scope) {
+    return false;
+  }
+  const expected = expectedRoleAssignment(
+    properties,
+    scope,
+    subscriptionId,
+    phaseA,
+  );
+  return Boolean(
+    expected &&
+      properties.principalType === 'ServicePrincipal' &&
+      normalizeId(properties.principalId) === normalizeId(expected.principalId) &&
+      normalizeId(properties.roleDefinitionId) ===
+        normalizeId(expected.roleDefinitionId) &&
+      (properties.condition ?? null) === expected.condition &&
+      (expected.condition === null ||
+        properties.conditionVersion === '2.0'),
+  );
+}
+
+function validatePolicyAssignment(change, subscriptionId, phaseA) {
+  const properties = change.after?.properties ?? {};
+  return (
+    normalizeId(change.resourceId) ===
+      normalizeId(
+        `/subscriptions/${subscriptionId}/providers/Microsoft.Authorization/` +
+          'policyAssignments/certigo-privileged-ci-rbac',
+      ) &&
+    normalizeId(properties.policyDefinitionId) ===
+      normalizeId(phaseA.policyDefinitionId) &&
+    properties.enforcementMode === 'Default' &&
+    properties.parameters?.effect?.value === 'Audit'
+  );
+}
+
+function validateDeployment(change, expectedIds) {
+  const parsed = parseResourceId(change.resourceId);
+  const expectedId = expectedIds.get(parsed.names[0]);
+  const requireMaterialized =
+    change.changeType === 'Ignore' || change.changeType === 'NoEffect';
+  const properties = change.after?.properties;
+  const nonEmptyString = (value) =>
+    typeof value === 'string' && value.trim().length > 0;
+  const hasDeploymentState = Boolean(
+    nonEmptyString(properties?.provisioningState) ||
+      nonEmptyString(properties?.templateHash) ||
+      (properties?.templateLink &&
+        typeof properties.templateLink === 'object' &&
+        ['id', 'relativePath', 'uri'].some((key) =>
+          nonEmptyString(properties.templateLink[key]),
+        )),
+  );
+  return (
+    parsed.type === 'microsoft.resources/deployments' &&
+    change.resourceId === expectedId &&
+    (!requireMaterialized ||
+      (hasCompletePayload(change) &&
+        change.after.type === 'Microsoft.Resources/deployments' &&
+        hasDeploymentState))
+  );
+}
+
+function phaseAContract(change, subscriptionId) {
+  const id = normalizeId(change.resourceId);
+  const parsed = parseResourceId(id);
+  const requireMaterialized = change.changeType === 'NoEffect';
+  if (requireMaterialized && !hasCompletePayload(change)) {
+    return null;
+  }
+  if (
+    id ===
+    normalizeId(
+      `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-content`,
+    )
+  ) {
+    if (
+      requireMaterialized &&
+      (change.after.location?.toLowerCase() !== 'westeurope' ||
+        change.after.tags?.product !== 'Certigo' ||
+        change.after.tags?.workload !== 'immutable-content' ||
+        change.after.tags?.managedBy !== 'bicep')
+    ) {
+      return null;
+    }
+    return 'resource-group:rg-certigo-content';
+  }
+
+  if (parsed.type === 'microsoft.authorization/roledefinitions') {
+    const role = identifyRoleContract(change, subscriptionId);
+    return role ? `role:${role}` : null;
+  }
+  if (parsed.type === 'microsoft.managedidentity/userassignedidentities') {
+    return validateIdentityChange(change, subscriptionId, requireMaterialized)
+      ? `identity:${parsed.names[0]}`
+      : null;
+  }
+  if (
+    parsed.type ===
+    'microsoft.managedidentity/userassignedidentities/federatedidentitycredentials'
+  ) {
+    return (
+      validateCredentialChange(change, subscriptionId)
+    )
+      ? `credential:${parsed.names.join('/')}`
+      : null;
+  }
+  if (parsed.type === 'microsoft.authorization/policydefinitions') {
+    return validatePolicyDefinition(change, subscriptionId)
+      ? 'policy-definition'
+      : null;
+  }
+  if (validateDeployment(change, phaseADeploymentIds(subscriptionId))) {
+    return `deployment:${parsed.names[0]}`;
+  }
+  if (
+    id ===
+    normalizeId(`/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci`)
+  ) {
+    return 'auxiliary:rg-certigo-ci';
+  }
+  return null;
+}
+
+export function validatePhaseAResource(resource, subscriptionId) {
+  const contract = phaseAContract(
+    {
+      changeType: 'Create',
+      resourceId: resource?.id,
+      after: resource,
+    },
+    subscriptionId,
+  );
+  if (!contract || contract.startsWith('auxiliary:')) {
+    throw new Error(
+      `live resource violates the exact Phase A contract: ${resource?.id}`,
+    );
+  }
+  return contract;
+}
+
+function phaseBContract(change, subscriptionId, phaseA) {
+  const id = normalizeId(change.resourceId);
+  const parsed = parseResourceId(id);
+  const requireMaterialized = change.changeType === 'NoEffect';
+  if (requireMaterialized && !hasCompletePayload(change)) {
+    return null;
+  }
+  if (
+    parsed.type === 'microsoft.authorization/roleassignments' &&
+    validateRoleAssignment(change, subscriptionId, phaseA)
+  ) {
+    return `role-assignment:${roleAssignmentScope(change.resourceId)}:${
+      change.after?.properties?.description
+    }`;
+  }
+  if (
+    parsed.type === 'microsoft.authorization/policyassignments' &&
+    validatePolicyAssignment(change, subscriptionId, phaseA)
+  ) {
+    return 'policy-assignment';
+  }
+  if (validateDeployment(change, phaseBDeploymentIds(subscriptionId))) {
+    return `deployment:${parsed.names[0]}`;
+  }
+  const inputIdentity = Object.values(phaseA.identities).find(
+    (identity) => normalizeId(identity.resourceId) === id,
+  );
+  if (
+    inputIdentity &&
+    (!requireMaterialized ||
+      (normalizeId(change.after.properties.clientId) ===
+        normalizeId(inputIdentity.clientId) &&
+        normalizeId(change.after.properties.principalId) ===
+          normalizeId(inputIdentity.principalId)))
+  ) {
+    return `input:identity:${id}`;
+  }
+  const inputRole = Object.entries(phaseA.roleDefinitionIds).find(
+    ([, roleId]) => normalizeId(roleId) === id,
+  );
+  if (
+    inputRole &&
+    (!requireMaterialized ||
+      identifyRoleContract(change, subscriptionId) === inputRole[0])
+  ) {
+    return `input:role:${id}`;
+  }
+  if (
+    normalizeId(phaseA.policyDefinitionId) === id &&
+    (!requireMaterialized || validatePolicyDefinition(change, subscriptionId))
+  ) {
+    return 'input:policy-definition';
+  }
+  const exactInputs = new Set(
+    [
+      'rg-certigo-ci',
+      'rg-certigo-content',
+      'rg-certigo-dev',
+      'rg-certigo-staging',
+      'rg-certigo-prod',
+    ].map((resourceGroup) =>
+      normalizeId(
+        `/subscriptions/${subscriptionId}/resourceGroups/${resourceGroup}`,
+      ),
+    ),
+  );
+  exactInputs.add(
+    normalizeId(
+      `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/providers/` +
+        'Microsoft.Network/virtualNetworks/vnet-certigo-ci',
+    ),
+  );
+  exactInputs.add(
+    normalizeId(
+      `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/providers/` +
+        'Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners',
+    ),
+  );
+  exactInputs.add(
+    normalizeId(
+      `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/providers/` +
+        'Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net',
+    ),
+  );
+  return exactInputs.has(id) ? `input:resource:${id}` : null;
+}
+
+function requiredPhaseAContracts() {
+  return new Set([
+    'resource-group:rg-certigo-content',
+    ...Object.keys(roleContracts).map((key) => `role:${key}`),
+    ...Object.values(identityContracts).map(
+      (identity) => `identity:${identity.name}`,
+    ),
+    ...Object.values(identityContracts)
+      .filter((identity) => identity.credential)
+      .map(
+        (identity) =>
+          `credential:${identity.name}/${identity.credential.name}`,
+      ),
+    'policy-definition',
+  ]);
+}
+
+function requiredPhaseBContracts(subscriptionId, phaseA) {
+  const contracts = new Set(['policy-assignment']);
+  const descriptions = [
+    ...['dev', 'staging', 'prod'].flatMap((environment) => [
+      {
+        description:
+          `Launches the ${environment} subscription deployment without general ` +
+          'subscription access.',
+        scope: `/subscriptions/${subscriptionId}`,
+      },
+      {
+        description:
+          'Certigo environment deployment; no role-assignment administration.',
+        scope:
+          `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-${environment}`,
+      },
+      {
+        description:
+          'May create only approved runtime roles for service principals in this environment.',
+        scope:
+          `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-${environment}`,
+      },
+      {
+        description:
+          `Allows ${environment} to reconcile only shared DNS links and VNet peerings.`,
+        scope: `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci`,
+      },
+    ]),
+    {
+      description:
+        'Plans the content stack and may assign only approved content roles to service principals.',
+      scope: `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-content`,
+    },
+    {
+      description:
+        'Allows the content plan to read and join only the trusted CI runner subnet.',
+      scope:
+        `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/providers/` +
+        'Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners',
+    },
+    {
+      description:
+        'Allows the content plan to read and join only the shared Blob private DNS zone.',
+      scope:
+        `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/providers/` +
+        'Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net',
+    },
+  ];
+  for (const assignment of descriptions) {
+    contracts.add(
+      `role-assignment:${normalizeId(assignment.scope)}:${assignment.description}`,
+    );
+  }
+  return contracts;
+}
+
+export function validateWhatIf(
+  plan,
+  subscriptionId,
+  { phase = 'A', phaseA = null } = {},
+) {
+  if (!uuidPattern.test(subscriptionId ?? '')) {
+    throw new Error('subscription id must be an explicit UUID');
+  }
+  if (!['A', 'B'].includes(phase)) {
+    throw new Error('phase must be A or B');
+  }
+  const proof = phase === 'B' ? validatePhaseAProof(phaseA, subscriptionId) : null;
   const changes = plan.changes ?? [];
   const errors = [];
   const counts = {};
-  const roleKindsById = new Map(
-    changes
-      .filter(
-        (change) =>
-          parseResourceId(change.resourceId ?? '').type ===
-          'microsoft.authorization/roledefinitions',
-      )
-      .map((change) => [
-        (change.resourceId ?? '').toLowerCase(),
-        matchRoleContract(change, subscriptionId),
-      ]),
-  );
-  const principalIdsByIdentityName = new Map(
-    changes
-      .filter(
-        (change) =>
-          parseResourceId(change.resourceId ?? '').type ===
-          'microsoft.managedidentity/userassignedidentities',
-      )
-      .map((change) => [
-        parseResourceId(change.resourceId ?? '').names[0]?.toLowerCase(),
-        change.after?.properties?.principalId?.toLowerCase(),
-      ])
-      .filter(([, principalId]) => principalId),
-  );
+  const seenContracts = new Set();
 
   for (const change of changes) {
     const changeType = change.changeType ?? 'Unknown';
     const resourceId = change.resourceId ?? '';
     counts[changeType] = (counts[changeType] ?? 0) + 1;
 
-    if (changeType === 'Ignore') {
+    if (!['Create', 'Ignore', 'NoEffect'].includes(changeType)) {
+      errors.push(
+        `Phase ${phase} forbids ${changeType}: ${resourceId || '<missing resource id>'}`,
+      );
       continue;
     }
-
-    if (changeType === 'Delete') {
-      errors.push(`delete is forbidden: ${resourceId}`);
-      continue;
-    }
-
-    const expectedPrefix = `/subscriptions/${subscriptionId}/`;
-    if (!resourceId.toLowerCase().startsWith(expectedPrefix.toLowerCase())) {
+    if (
+      !normalizeId(resourceId).startsWith(
+        `/subscriptions/${subscriptionId.toLowerCase()}`,
+      )
+    ) {
       errors.push(`resource is outside subscription ${subscriptionId}: ${resourceId}`);
       continue;
     }
-
-    const { names, resourceGroup, type } = parseResourceId(resourceId);
-    if (
-      type === 'microsoft.authorization/roledefinitions' &&
-      !roleKindsById.get(resourceId.toLowerCase())
-    ) {
-      errors.push(`custom role definition is outside the exact contract: ${resourceId}`);
+    if (changeType === 'Ignore' || changeType === 'NoEffect') {
+      const contract =
+        phase === 'A'
+          ? phaseAContract(change, subscriptionId)
+          : phaseBContract(change, subscriptionId, proof);
+      if (!contract) {
+        errors.push(
+          `${changeType} resource is outside the Phase ${phase} allowlist: ${resourceId}`,
+        );
+      } else if (seenContracts.has(contract)) {
+        errors.push(`duplicate Phase ${phase} contract resource: ${contract}`);
+      } else {
+        seenContracts.add(contract);
+      }
       continue;
     }
-    if (resourceGroup !== null && !allowedResourceGroups.has(resourceGroup)) {
-      errors.push(`resource group is outside the approved set: ${resourceId}`);
-    } else if (
-      resourceGroup !== null &&
-      type !== null &&
-      !allowedResourceGroupTypes.get(resourceGroup)?.has(type)
-    ) {
-      errors.push(
-        `resource type is not approved in ${resourceGroup}: ${resourceId}`,
-      );
-    } else if (
-      resourceGroup === null &&
-      type === 'microsoft.authorization/roleassignments'
-    ) {
-      const roleDefinitionId =
-        change.after?.properties?.roleDefinitionId?.toLowerCase();
-      const description = change.after?.properties?.description ?? '';
-      if (
-        !roleDefinitionId ||
-        roleKindsById.get(roleDefinitionId) !== 'launcher' ||
-        !/^Launches the (dev|staging|prod) subscription deployment without general subscription access\.$/.test(
-          description,
-        ) ||
-        change.after?.properties?.principalType !== 'ServicePrincipal' ||
-        change.after?.properties?.principalId?.toLowerCase() !==
-          principalIdsByIdentityName.get(
-            `id-certigo-deploy-${description.match(/^Launches the (dev|staging|prod)/)?.[1]}`,
-          )
-      ) {
-        errors.push(
-          `subscription role assignment is outside the approved launcher set: ${resourceId}`,
-        );
-      }
-    } else if (type === 'microsoft.authorization/roleassignments') {
-      const properties = change.after?.properties ?? {};
-      const roleDefinitionId = properties.roleDefinitionId?.toLowerCase();
-      const contributorRoleDefinitionId =
-        `/subscriptions/${subscriptionId.toLowerCase()}/providers/` +
-        'microsoft.authorization/roledefinitions/' +
-        'b24988ac-6180-42a0-ab88-20f7382dd24c';
-      const roleKind =
-        roleDefinitionId === contributorRoleDefinitionId
-          ? 'builtin-contributor'
-          : roleKindsById.get(roleDefinitionId);
-      const scope = resourceId
-        .toLowerCase()
-        .split('/providers/microsoft.authorization/roleassignments/')[0];
-      const expected = expectedResourceGroupAssignment(
-        properties.description ?? '',
-        resourceGroup,
-        scope,
-        subscriptionId.toLowerCase(),
-      );
-      const expectedCondition =
-        expected?.roleKind === 'content-plan'
-          ? contentPlanRoleAssignmentCondition(principalIdsByIdentityName)
-          : null;
-      if (
-        !expected ||
-        scope !== expected.scope ||
-        roleKind !== expected.roleKind ||
-        properties.principalType !== 'ServicePrincipal' ||
-        properties.principalId?.toLowerCase() !==
-          principalIdsByIdentityName.get(expected.identityName) ||
-        Boolean(properties.condition) !== expected.conditioned ||
-        (expected.conditioned && properties.conditionVersion !== '2.0') ||
-        (expected.roleKind === 'content-plan' &&
-          properties.condition !== expectedCondition)
-      ) {
-        errors.push(`role assignment is outside the exact contract: ${resourceId}`);
-      }
-    } else if (
-      type ===
-      'microsoft.managedidentity/userassignedidentities/federatedidentitycredentials'
-    ) {
-      const expected = expectedFederatedCredentials.get(
-        names[0]?.toLowerCase(),
-      );
-      const properties = change.after?.properties ?? {};
-      if (
-        !expected ||
-        names[1]?.toLowerCase() !== expected.name ||
-        properties.issuer !== 'https://token.actions.githubusercontent.com' ||
-        properties.subject !== expected.subject ||
-        !sameStrings(properties.audiences, ['api://AzureADTokenExchange'])
-      ) {
-        errors.push(
-          `federated credential is outside the exact contract: ${resourceId}`,
-        );
-      }
-    } else if (
-      resourceGroup === 'rg-certigo-ci' &&
-      type?.startsWith('microsoft.managedidentity/userassignedidentities') &&
-      !allowedCiIdentityNames.has(names[0]?.toLowerCase())
-    ) {
-      errors.push(`managed identity is outside the approved set: ${resourceId}`);
-    } else if (
-      resourceGroup === 'rg-certigo-content' &&
-      type?.startsWith('microsoft.managedidentity/userassignedidentities') &&
-      !allowedContentIdentityNames.has(names[0]?.toLowerCase())
-    ) {
-      errors.push(`managed identity is outside the approved set: ${resourceId}`);
-    } else if (
-      resourceGroup === null &&
-      type !== null &&
-      !allowedSubscriptionTypes.has(type)
-    ) {
-      errors.push(`subscription resource type is not approved: ${resourceId}`);
-    }
 
+    const contract =
+      phase === 'A'
+        ? phaseAContract(change, subscriptionId)
+        : phaseBContract(change, subscriptionId, proof);
+
+    if (!contract) {
+      errors.push(`resource is outside the exact Phase ${phase} contract: ${resourceId}`);
+    } else if (seenContracts.has(contract)) {
+      errors.push(`duplicate Phase ${phase} contract resource: ${contract}`);
+    } else {
+      seenContracts.add(contract);
+    }
+  }
+
+  const required =
+    phase === 'A'
+      ? requiredPhaseAContracts()
+      : requiredPhaseBContracts(subscriptionId, proof);
+  const missing = [...required].filter((contract) => !seenContracts.has(contract));
+  if (missing.length > 0) {
+    errors.push(`Phase ${phase} plan is incomplete: ${missing.join(', ')}`);
   }
 
   if (errors.length > 0) {
     throw new Error(errors.join('\n'));
   }
-
   return { counts, total: changes.length };
 }
 
@@ -594,27 +1092,37 @@ function parseArguments(argv) {
   return result;
 }
 
-const isMain =
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
-
-if (isMain) {
+function main() {
   const args = parseArguments(process.argv.slice(2));
-  if (!args['--plan'] || !args['--subscription']) {
+  const planPath = args['--plan'];
+  const subscriptionId = args['--subscription'];
+  const phase = args['--phase'];
+  const phaseAPath = args['--phase-a'];
+  if (!planPath || !subscriptionId || !phase || (phase === 'B' && !phaseAPath)) {
     throw new Error(
-      'Usage: node validate-what-if.mjs --plan <path> --subscription <id>',
+      'Usage: node validate-what-if.mjs --plan <path> --subscription <id> ' +
+        '--phase <A|B> [--phase-a <outputs.json>]',
     );
   }
-
-  const plan = JSON.parse(fs.readFileSync(args['--plan'], 'utf8'));
-  const summary = validateWhatIf(plan, args['--subscription']);
-  const markdown =
-    `## Least-privilege governance what-if\n\n` +
-    `No deployment was executed. No deletes or out-of-scope resources were found.\n\n` +
-    `\`\`\`json\n${JSON.stringify(summary, null, 2)}\n\`\`\`\n`;
-
-  process.stdout.write(markdown);
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
+  const plan = JSON.parse(fs.readFileSync(path.resolve(planPath), 'utf8'));
+  const phaseA = phaseAPath
+    ? JSON.parse(fs.readFileSync(path.resolve(phaseAPath), 'utf8'))
+    : null;
+  const result = validateWhatIf(plan, subscriptionId, { phase, phaseA });
+  const summary = process.env.GITHUB_STEP_SUMMARY;
+  if (summary) {
+    fs.appendFileSync(
+      summary,
+      `## Certigo governance bootstrap Phase ${phase} what-if\n\n` +
+        'No deployment was executed. Only exact `Create`, `Ignore`, and ' +
+        '`NoEffect` resources are allowed; ' +
+        '`Modify`, `Delete`, and `Unsupported` fail closed.\n\n' +
+        `\`\`\`json\n${JSON.stringify(result.counts, null, 2)}\n\`\`\`\n`,
+    );
   }
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  main();
 }
