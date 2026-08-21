@@ -43,8 +43,10 @@ de repli dans ce lot. Les adaptateurs par défaut échouent explicitement si le 
 flag est activé sans stockage durable et gestionnaire de clés.
 
 `PORTABLE_ACHIEVEMENTS_ENABLED` vaut `false` par défaut. Tant qu'il reste désactivé,
-la surface HTTP répond comme une fonctionnalité indisponible et les acquis legacy
-restent l'autorité produit.
+un middleware répond `404` sur toute la surface avant authentification et lecture du
+corps ; les acquis legacy restent l'autorité produit. Les lectures personnelles sont
+partitionnées par l'identifiant interne issu du JWT : connaître un `proofId` ne donne
+aucun accès inter-utilisateur.
 
 ## Idempotence, anti-rejeu et audit
 

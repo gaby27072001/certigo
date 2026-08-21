@@ -35,6 +35,8 @@ var host = new HostBuilder()
         // downstream exception is mapped to ProblemDetails.
         worker.UseMiddleware<SecurityHeadersMiddleware>();
         worker.UseMiddleware<ExceptionMiddleware>();
+        // Hide dormant portable-achievement routes before JWT validation or body parsing.
+        worker.UseMiddleware<PortableAchievementFeatureMiddleware>();
         worker.UseMiddleware<JwtAuthMiddleware>();
     })
     .ConfigureServices((context, services) =>

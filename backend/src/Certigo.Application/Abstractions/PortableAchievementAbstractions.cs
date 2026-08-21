@@ -27,7 +27,12 @@ public interface IPortableAchievementStore
         PortableAchievementRecord record,
         CancellationToken cancellationToken = default);
 
-    Task<PortableAchievementRecord?> GetAsync(
+    Task<PortableAchievementRecord?> GetOwnedAsync(
+        string ownerId,
+        string proofId,
+        CancellationToken cancellationToken = default);
+
+    Task<PortableAchievementRecord?> GetByProofIdAsync(
         string proofId,
         CancellationToken cancellationToken = default);
 
@@ -120,7 +125,12 @@ public sealed class UnconfiguredPortableAchievementStore : IPortableAchievementS
         PortableAchievementRecord record,
         CancellationToken cancellationToken = default) => throw Missing();
 
-    public Task<PortableAchievementRecord?> GetAsync(
+    public Task<PortableAchievementRecord?> GetOwnedAsync(
+        string ownerId,
+        string proofId,
+        CancellationToken cancellationToken = default) => throw Missing();
+
+    public Task<PortableAchievementRecord?> GetByProofIdAsync(
         string proofId,
         CancellationToken cancellationToken = default) => throw Missing();
 

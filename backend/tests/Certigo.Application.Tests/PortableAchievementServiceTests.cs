@@ -85,6 +85,18 @@ public sealed class PortableAchievementServiceTests
     }
 
     [Fact]
+    public async Task Personal_get_is_owner_scoped_and_cross_user_lookup_fails_closed()
+    {
+        var fixture = new Fixture();
+        var issued = await fixture.Service.IssueAsync(Request());
+        var otherUserService = fixture.CreateServiceFor("person-2");
+
+        var act = () => otherUserService.GetAsync(issued.Proof.ProofId);
+
+        await act.Should().ThrowAsync<PortableAchievementNotFoundException>();
+    }
+
+    [Fact]
     public async Task Completion_evidence_cannot_be_replayed_under_another_request_id()
     {
         var fixture = new Fixture();
@@ -194,21 +206,14 @@ public sealed class PortableAchievementServiceTests
     private sealed class Fixture
     {
         private readonly InMemoryPortableAchievementStore _store = new();
+        private readonly IPortableCompletionEvidenceResolver _evidenceResolver;
 
         public Fixture(IPortableCompletionEvidenceResolver? evidenceResolver = null)
         {
+            _evidenceResolver = evidenceResolver ?? new TestCompletionEvidenceResolver();
             Cryptography = new TestPortableProofCryptography();
             ActorContext = new TestActorContext();
-            Service = new PortableAchievementService(
-                new PortableAchievementOptions(true, "certigo"),
-                new FakeUserContext("person-1", "Private Name"),
-                new FakeClock(Now),
-                _store,
-                Cryptography,
-                new SequentialNonceSource(),
-                new TestSubjectIdProvider(),
-                evidenceResolver ?? new TestCompletionEvidenceResolver(),
-                ActorContext);
+            Service = CreateServiceFor("person-1");
             Administration = Service;
         }
 
@@ -216,6 +221,18 @@ public sealed class PortableAchievementServiceTests
         public IPortableAchievementAdministrationService Administration { get; }
         public TestPortableProofCryptography Cryptography { get; }
         public TestActorContext ActorContext { get; }
+
+        public PortableAchievementService CreateServiceFor(string userId) =>
+            new(
+                new PortableAchievementOptions(true, "certigo"),
+                new FakeUserContext(userId, "Private Name"),
+                new FakeClock(Now),
+                _store,
+                Cryptography,
+                new SequentialNonceSource(),
+                new TestSubjectIdProvider(),
+                _evidenceResolver,
+                ActorContext);
     }
 
     private sealed class SequentialNonceSource : IPortableNonceSource
@@ -284,6 +301,7 @@ public sealed class PortableAchievementServiceTests
     private sealed class InMemoryPortableAchievementStore : IPortableAchievementStore
     {
         private readonly Dictionary<string, PortableAchievementRecord> _proofs = new();
+        private readonly Dictionary<string, string> _owners = new();
         private readonly Dictionary<string, string> _requests = new();
         private readonly Dictionary<string, string> _evidence = new();
 
@@ -312,6 +330,7 @@ public sealed class PortableAchievementServiceTests
             }
 
             _proofs.Add(record.Proof.ProofId, record);
+            _owners.Add(record.Proof.ProofId, ownerId);
             _requests.Add(requestKey, record.Proof.ProofId);
             _evidence.Add(evidenceKey, record.Proof.ProofId);
             return Task.FromResult(new PortableAchievementCreateResult(
@@ -319,7 +338,17 @@ public sealed class PortableAchievementServiceTests
                 record));
         }
 
-        public Task<PortableAchievementRecord?> GetAsync(
+        public Task<PortableAchievementRecord?> GetOwnedAsync(
+            string ownerId,
+            string proofId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(
+                _owners.TryGetValue(proofId, out var storedOwner)
+                && string.Equals(storedOwner, ownerId, StringComparison.Ordinal)
+                    ? _proofs.GetValueOrDefault(proofId)
+                    : null);
+
+        public Task<PortableAchievementRecord?> GetByProofIdAsync(
             string proofId,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(_proofs.GetValueOrDefault(proofId));
@@ -429,7 +458,12 @@ public sealed class PortableAchievementServiceTests
             PortableAchievementRecord record,
             CancellationToken cancellationToken = default) => throw Unexpected();
 
-        public Task<PortableAchievementRecord?> GetAsync(
+        public Task<PortableAchievementRecord?> GetOwnedAsync(
+            string ownerId,
+            string proofId,
+            CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<PortableAchievementRecord?> GetByProofIdAsync(
             string proofId,
             CancellationToken cancellationToken = default) => throw Unexpected();
 

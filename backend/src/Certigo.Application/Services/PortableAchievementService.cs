@@ -130,7 +130,10 @@ public sealed class PortableAchievementService(
         CancellationToken cancellationToken = default)
     {
         EnsureEnabled();
-        var record = await store.GetAsync(proofId, cancellationToken)
+        var record = await store.GetOwnedAsync(
+                userContext.UserId,
+                proofId,
+                cancellationToken)
             ?? throw new PortableAchievementNotFoundException(proofId);
         return ToView(record);
     }
@@ -150,7 +153,7 @@ public sealed class PortableAchievementService(
         }
 
         var proof = request.Proof!;
-        var stored = await store.GetAsync(proof.ProofId, cancellationToken);
+        var stored = await store.GetByProofIdAsync(proof.ProofId, cancellationToken);
         if (stored is null
             || !string.Equals(
                 stored.Proof.IssuerType,
@@ -194,7 +197,7 @@ public sealed class PortableAchievementService(
         CancellationToken cancellationToken = default)
     {
         EnsureEnabled();
-        _ = await store.GetAsync(command.ProofId, cancellationToken)
+        _ = await store.GetByProofIdAsync(command.ProofId, cancellationToken)
             ?? throw new PortableAchievementNotFoundException(command.ProofId);
         Require(command.AttestationId, nameof(command.AttestationId));
         var actor = await actorContext.RequireAsync(
