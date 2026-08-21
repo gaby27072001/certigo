@@ -29,7 +29,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-08-21** |
-| Commit de référence analysé | `490a77a66958f898f20e52072f9abce8128aa9e4` |
+| Commit de référence analysé | `b98093aee62b0c19a23fe5ee93eca00843932fc7` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
@@ -37,7 +37,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Package public actif | **259 fichiers** — `sha256:a3ab2254673515990410268a93f95afd5605f19e29637373d7b20d412fa08869` |
 | Package privé actif (`answerKey`) | **232 fichiers** — `sha256:e3bfa7c20c03503384a68d8e261bcbb88f749292a273744a5ba4a309fc48c901` |
 | Workflows GitHub Actions | **21** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-project-state.yml`, `codeql.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `lint-workflows.yml`, `promote-backend-staging-prod.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **177 fichiers** — .NET : 4 projets / 77 fichiers ; Flutter/Dart : 6 racines / 96 fichiers ; Python : 1 racine / 4 fichier |
+| Tests découverts | **178 fichiers** — .NET : 4 projets / 78 fichiers ; Flutter/Dart : 6 racines / 96 fichiers ; Python : 1 racine / 4 fichier |
 | Corpus **historique** local | **91 pistes**, **146 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
