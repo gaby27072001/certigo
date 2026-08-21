@@ -128,12 +128,82 @@ les quatre preuves suivantes sont archivées :
 | Sécurité abonnement | MCSB/Defender gérés par un admin PIM via `infra/governance`, jamais par l'identité d'environnement |
 | Policy | audit des Owner/Contributor/UAA/RBAC Admin attribués à un service principal au scope abonnement; `Deny` seulement après assainissement |
 | Contenu #290 | identités distinctes du dépôt `certigo-content`, environnements `azure-content-public` et `azure-content-answer-key` |
+| Plan contenu post-#290 | UAMI dédiée `id-certigo-content-infra-plan` dans `rg-certigo-ci`, sujet unique `repo:gchambaud_microsoft/Certigo:environment:azure-content-infra-plan`; exécuteur exact sur `rg-certigo-content` et joins externes aux deux ressources réseau exactes |
 | Administration RBAC | PIM JIT pour l'humain; comptes break-glass contrôlés, jamais utilisés par CI |
 
 Le rôle conditionnel peut seulement créer les rôles nécessaires aux modules actuels :
 Blob Data Contributor/Owner/Delegator, Queue/Table Data Contributor, Monitoring Metrics
 Publisher, Key Vault Secrets User, Cognitive Services OpenAI User et Log Analytics Reader.
 Il ne peut ni créer Owner/Contributor/UAA, ni supprimer une attribution.
+
+## Bootstrap de l'identité de plan du contenu
+
+Le workflow `azure-content-infra-plan` ne réutilise aucune identité dev, staging, prod ou
+VMSS. Le `what-if` ARM exige les mêmes permissions `write` que le déploiement évalué : le rôle
+subscription launcher seul est donc insuffisant et n'est pas attribué à cette UAMI.
+
+Le bootstrap admin/PIM crée ou adopte `rg-certigo-content`, crée le rôle publisher existant de
+GUID fixe, puis crée l'UAMI et son unique federated credential. L'UAMI reçoit :
+
+- `Certigo Content Infrastructure Plan Executor` uniquement sur `rg-certigo-content`, avec
+  `deployments` read/write/validate/what-if et les read/write explicites nécessaires pour
+  Storage, private endpoint/DNS zone group et role assignments du template contenu, plus la
+  lecture des UAMI publisher/reader précréées par le bootstrap. L'unique action d'approbation
+  est `Microsoft.Storage/storageAccounts/PrivateEndpointConnectionsApproval/action`, nécessaire
+  à l'auto-approbation de la connexion privée du compte Storage ;
+- `Certigo Content Infrastructure Plan External Join` uniquement sur
+  `rg-certigo-ci/vnet-certigo-ci/snet-runners` et la zone
+  `rg-certigo-ci/privatelink.blob.core.windows.net`, avec seulement subnet read/join et private
+  DNS zone read/join.
+
+Le bootstrap crée aussi dans `rg-certigo-content` les trois UAMI publisher avec leur FIC
+exacte et l'UAMI reader sans fédération. Le template de plan les traite comme `existing` :
+l'identité de plan n'a donc aucun write UAMI/FIC.
+
+Ces rôles n'ont aucun wildcard, aucune action `delete`, aucun data-plane, aucun
+`resourceGroups/write`, aucun `roleDefinitions/write`, et ne donnent aucun accès à
+dev/staging/prod. Le `roleAssignments/write` est conditionné aux couples exacts : rôle
+Immutable Content Publisher vers les trois principal IDs publisher, et Storage Blob Data
+Reader vers le seul principal ID reader, tous de type `ServicePrincipal`. Le rôle externe
+n'inclut pas
+`privateDnsZones/write` : si un what-if Azure
+prouve que `join/action` ne suffit pas pour le DNS zone group, le bootstrap doit s'arrêter. Une
+permission `Microsoft.Network/privateDnsZones/write` ne pourrait être envisagée que dans une
+revue séparée et avec attribution conservée sur cette zone exacte, jamais au scope abonnement
+ou `rg-certigo-ci`.
+
+Le bootstrap est strictement séquencé :
+
+1. **What-if gouvernance sans mutation.** Depuis une session admin PIM séparée, définir
+   `AZURE_SUBSCRIPTION_ID`, puis exécuter `bash infra/governance/what-if.sh`. Le plan doit rester
+   borné aux cinq groupes Certigo, aux types de gouvernance allow-listés et aux seules UAMI
+   `id-certigo-deploy-{dev,staging,prod}` plus `id-certigo-content-infra-plan`. Refuser tout
+   `Delete`, toute autre identité et tout rôle large. Le rôle publisher est le seul rôle de ce
+   bootstrap avec des dataActions, exactement blob read/write et sans delete.
+2. **Déploiement admin séparé.** Après revue et approbation du plan archivé, un administrateur
+   activé via PIM déploie `infra/governance/main.bicep` dans une fenêtre dédiée. Cette PR et le
+   workflow de plan ne réalisent jamais cette mutation.
+3. **Variables GitHub non secrètes.** Reporter les outputs
+   `contentInfrastructurePlanAzureClientId`, `contentInfrastructurePlanAzureTenantId` et
+   `contentInfrastructurePlanAzureSubscriptionId` dans les variables `AZURE_CLIENT_ID`,
+   `AZURE_TENANT_ID` et `AZURE_SUBSCRIPTION_ID` de l'Environment
+   `azure-content-infra-plan`. Aucun secret client n'est créé ou stocké.
+4. **Protection de l'Environment.** Après le bootstrap Azure et avant le premier run, limiter
+   `azure-content-infra-plan` à la branche `main` et exiger un reviewer. Cette configuration
+   GitHub est une opération séparée, non réalisée par la PR.
+
+Le what-if gouvernance attendu pour ce bootstrap contient la création/adoption de
+`rg-certigo-content`, du rôle publisher, des deux rôles de plan, de l'UAMI
+`id-certigo-content-infra-plan`, de son unique federated credential
+`github-azure-content-infra-plan`, des quatre identités contenu précréées et des trois
+attributions bornées. Les ressources de
+gouvernance déjà conformes doivent être `NoChange`/`Ignore`.
+
+Après ce bootstrap, `infra/content/main.bicep` s'exécute au scope resource group. Le workflow
+utilise exclusivement `az deployment group what-if --resource-group rg-certigo-content` et
+refuse toute ressource hors de ce RG. Son plan durable ne crée plus le RG ni le roleDefinition
+publisher ; il ne contient que Storage, identités contenu, FIC, private endpoint/DNS zone group
+et attributions runtime du stack dédié.
 
 ## Ordre exact de migration
 
@@ -144,11 +214,12 @@ Chaque étape est bloquante. Ne jamais anticiper le retrait de l'ancienne identi
 2. **Prévol admin.** Un administrateur active via PIM un rôle `Owner` ou l'ensemble minimal
    permettant identités, custom roles, policy et role assignments. Il exécute uniquement
    `infra/governance/what-if.sh` et archive le JSON.
-3. **Revue du plan.** Refuser tout `Delete`, tout scope hors des quatre RG Certigo, tout droit
+3. **Revue du plan.** Refuser tout `Delete`, tout scope hors des cinq RG Certigo, tout droit
    Compute dans le rôle réseau, tout wildcard ou droit RBAC delete.
 4. **Provisionnement gouvernance approuvé.** Dans une fenêtre séparée de cette PR, l'admin
-   déploie `infra/governance/main.bicep` en mode incrémentiel. Cela ajoute les trois UAMI,
-   custom roles, attributions cibles et la policy en `Audit`; cela ne retire rien.
+   déploie `infra/governance/main.bicep` en mode incrémentiel. Cela ajoute les trois UAMI
+   applicatives, l'UAMI de plan contenu, `rg-certigo-content`, les custom roles, les attributions
+   cibles et la policy en `Audit`; cela ne retire rien.
 5. **Configuration GitHub.** Créer les `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` et
    `AZURE_SUBSCRIPTION_ID` au niveau de chaque Environment. Le client ID doit être celui de
    l'UAMI correspondante. Garder la configuration historique disponible pour rollback.
@@ -164,8 +235,9 @@ Chaque étape est bloquante. Ne jamais anticiper le retrait de l'ancienne identi
 9. **Production.** Refaire le cycle après fenêtre de changement et preuve staging du même
    artefact. Conserver l'ancienne identité et ses rôles pendant au moins deux déploiements
    prod réussis et la durée de soak approuvée.
-10. **Contenu.** Après merge et preuve séparée de #290, utiliser ses identités public/
-    answer-key et son identité de plan. Ne jamais réutiliser une identité applicative.
+10. **Migration corrective contenu après #290.** Bootstrapper d'abord la gouvernance et les
+    protections de l'Environment, puis exécuter le what-if resource-group. Utiliser les identités
+    public/answer-key et l'identité de plan dédiées; ne jamais réutiliser une identité applicative.
 11. **Retrait data-plane historique.** Un admin PIM retire, environnement par environnement,
     les anciens Blob Data Contributor/Delegator seulement après preuve du nouveau principal.
 12. **Retrait abonnement historique.** Quand dev, staging, prod et contenu ont leurs preuves,

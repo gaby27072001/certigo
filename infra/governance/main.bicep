@@ -6,11 +6,36 @@ param location string = 'westeurope'
 @description('Existing resource group that owns shared CI identities and networking.')
 param identityResourceGroupName string = 'rg-certigo-ci'
 
+@description('Dedicated resource group created or adopted for immutable content resources.')
+param contentResourceGroupName string = 'rg-certigo-content'
+
+@description('Existing trusted CI virtual network.')
+param ciVnetName string = 'vnet-certigo-ci'
+
+@description('Existing trusted runner subnet used by the content private endpoint.')
+param ciRunnerSubnetName string = 'snet-runners'
+
+@description('Existing shared Blob private DNS zone.')
+#disable-next-line no-hardcoded-env-urls
+param blobPrivateDnsZoneName string = 'privatelink.blob.core.windows.net'
+
 @description('GitHub repository owner.')
 param githubRepositoryOwner string = 'gchambaud_microsoft'
 
 @description('GitHub repository name.')
 param githubRepositoryName string = 'Certigo'
+
+@description('GitHub repository owner for immutable content publication identities.')
+param contentRepositoryOwner string = 'gchambaud_microsoft'
+
+@description('GitHub repository for immutable content publication identities.')
+param contentRepositoryName string = 'certigo-content'
+
+@description('Dedicated managed identity used only by the content infrastructure planning workflow.')
+param contentInfrastructurePlanIdentityName string = 'id-certigo-content-infra-plan'
+
+@description('Protected GitHub Environment trusted by the content infrastructure planning identity.')
+param contentInfrastructurePlanEnvironmentName string = 'azure-content-infra-plan'
 
 @description('Application environments receiving isolated deployment identities.')
 param environments array = [
@@ -50,6 +75,20 @@ var identityTags = {
   managedBy: 'bicep'
   purpose: 'github-oidc-deployment'
 }
+
+var contentTags = {
+  product: 'Certigo'
+  workload: 'immutable-content'
+  managedBy: 'bicep'
+}
+
+var descriptorEnvironmentName = 'azure-content-release'
+var publicEnvironmentName = 'azure-content-public'
+var privateEnvironmentName = 'azure-content-answer-key'
+var descriptorPublisherIdentityName = 'id-certigo-content-release'
+var publicPublisherIdentityName = 'id-certigo-content-public'
+var privatePublisherIdentityName = 'id-certigo-content-answer-key'
+var readerIdentityName = 'id-certigo-content-reader'
 
 var environmentResourceGroupIds = [
   for environment in environments: subscriptionResourceId(
@@ -100,6 +139,12 @@ var privilegedRoleDefinitionIds = [
 
 resource identityResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
   name: identityResourceGroupName
+}
+
+resource contentResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+  name: contentResourceGroupName
+  location: location
+  tags: contentTags
 }
 
 resource environmentResourceGroups 'Microsoft.Resources/resourceGroups@2024-03-01' existing = [
@@ -191,6 +236,101 @@ resource sharedNetworkDeploymentRole 'Microsoft.Authorization/roleDefinitions@20
   }
 }
 
+resource contentPublisherRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: 'c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de'
+  properties: {
+    roleName: 'Certigo Immutable Content Publisher ${take(uniqueString(subscription().id), 6)}'
+    description: 'Creates and verifies immutable content blobs without delete or immutability-policy mutation.'
+    type: 'CustomRole'
+    permissions: [
+      {
+        actions: [
+          'Microsoft.Storage/storageAccounts/blobServices/containers/read'
+          'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/read'
+        ]
+        notActions: []
+        dataActions: [
+          'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read'
+          'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write'
+        ]
+        notDataActions: []
+      }
+    ]
+    assignableScopes: [
+      contentResourceGroup.id
+    ]
+  }
+}
+
+resource contentInfrastructurePlanExecutorRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: guid(subscription().id, 'certigo-content-infrastructure-plan-executor')
+  properties: {
+    roleName: 'Certigo Content Infrastructure Plan Executor ${take(uniqueString(subscription().id), 6)}'
+    description: 'Runs resource-group what-if for the dedicated content stack without delete, resource-group, or role-definition permissions.'
+    type: 'CustomRole'
+    permissions: [
+      {
+        actions: [
+          'Microsoft.Resources/deployments/read'
+          'Microsoft.Resources/deployments/write'
+          'Microsoft.Resources/deployments/validate/action'
+          'Microsoft.Resources/deployments/whatIf/action'
+          'Microsoft.Storage/storageAccounts/read'
+          'Microsoft.Storage/storageAccounts/write'
+          'Microsoft.Storage/storageAccounts/blobServices/read'
+          'Microsoft.Storage/storageAccounts/blobServices/write'
+          'Microsoft.Storage/storageAccounts/blobServices/containers/read'
+          'Microsoft.Storage/storageAccounts/blobServices/containers/write'
+          'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/read'
+          'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/write'
+          'Microsoft.Storage/storageAccounts/managementPolicies/read'
+          'Microsoft.Storage/storageAccounts/managementPolicies/write'
+          'Microsoft.Storage/storageAccounts/PrivateEndpointConnectionsApproval/action'
+          'Microsoft.ManagedIdentity/userAssignedIdentities/read'
+          'Microsoft.Network/privateEndpoints/read'
+          'Microsoft.Network/privateEndpoints/write'
+          'Microsoft.Network/privateEndpoints/privateDnsZoneGroups/read'
+          'Microsoft.Network/privateEndpoints/privateDnsZoneGroups/write'
+          'Microsoft.Authorization/roleAssignments/read'
+          'Microsoft.Authorization/roleAssignments/write'
+          'Microsoft.Authorization/roleDefinitions/read'
+        ]
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      }
+    ]
+    assignableScopes: [
+      contentResourceGroup.id
+    ]
+  }
+}
+
+resource contentInfrastructurePlanExternalJoinRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: guid(subscription().id, 'certigo-content-infrastructure-plan-external-join')
+  properties: {
+    roleName: 'Certigo Content Infrastructure Plan External Join ${take(uniqueString(subscription().id), 6)}'
+    description: 'Reads and joins only the exact trusted subnet and private DNS zone through resource-scoped assignments.'
+    type: 'CustomRole'
+    permissions: [
+      {
+        actions: [
+          'Microsoft.Network/virtualNetworks/subnets/read'
+          'Microsoft.Network/virtualNetworks/subnets/join/action'
+          'Microsoft.Network/privateDnsZones/read'
+          'Microsoft.Network/privateDnsZones/join/action'
+        ]
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      }
+    ]
+    assignableScopes: [
+      identityResourceGroup.id
+    ]
+  }
+}
+
 module deploymentIdentities 'modules/githubEnvironmentIdentity.bicep' = [
   for environment in environments: {
     scope: identityResourceGroup
@@ -208,6 +348,70 @@ module deploymentIdentities 'modules/githubEnvironmentIdentity.bicep' = [
   }
 ]
 
+module contentInfrastructurePlanIdentity 'modules/githubEnvironmentIdentity.bicep' = {
+  scope: identityResourceGroup
+  name: 'identity-content-infra-plan'
+  params: {
+    githubEnvironmentName: contentInfrastructurePlanEnvironmentName
+    githubRepositoryName: githubRepositoryName
+    githubRepositoryOwner: githubRepositoryOwner
+    identityName: contentInfrastructurePlanIdentityName
+    location: location
+    tags: union(identityTags, {
+      purpose: 'content-infrastructure-plan'
+    })
+  }
+}
+
+module descriptorPublisherIdentity '../modules/contentIdentity.bicep' = {
+  scope: contentResourceGroup
+  name: 'content-release-publisher-identity'
+  params: {
+    githubEnvironmentName: descriptorEnvironmentName
+    githubRepositoryName: contentRepositoryName
+    githubRepositoryOwner: contentRepositoryOwner
+    identityName: descriptorPublisherIdentityName
+    location: location
+    tags: contentTags
+  }
+}
+
+module publicPublisherIdentity '../modules/contentIdentity.bicep' = {
+  scope: contentResourceGroup
+  name: 'content-public-publisher-identity'
+  params: {
+    githubEnvironmentName: publicEnvironmentName
+    githubRepositoryName: contentRepositoryName
+    githubRepositoryOwner: contentRepositoryOwner
+    identityName: publicPublisherIdentityName
+    location: location
+    tags: contentTags
+  }
+}
+
+module privatePublisherIdentity '../modules/contentIdentity.bicep' = {
+  scope: contentResourceGroup
+  name: 'content-private-publisher-identity'
+  params: {
+    githubEnvironmentName: privateEnvironmentName
+    githubRepositoryName: contentRepositoryName
+    githubRepositoryOwner: contentRepositoryOwner
+    identityName: privatePublisherIdentityName
+    location: location
+    tags: contentTags
+  }
+}
+
+module contentReaderIdentity '../modules/contentReaderIdentity.bicep' = {
+  scope: contentResourceGroup
+  name: 'content-reader-identity'
+  params: {
+    identityName: readerIdentityName
+    location: location
+    tags: contentTags
+  }
+}
+
 resource subscriptionLauncherAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
   for (environment, index) in environments: {
     name: guid(subscription().id, 'id-certigo-deploy-${environment.name}', subscriptionDeploymentLauncher.id)
@@ -219,6 +423,36 @@ resource subscriptionLauncherAssignments 'Microsoft.Authorization/roleAssignment
     }
   }
 ]
+
+module contentInfrastructurePlanExecutorAssignment 'modules/contentPlanExecutorAssignment.bicep' = {
+  scope: contentResourceGroup
+  name: 'content-infra-plan-executor-rbac'
+  params: {
+    assignmentNameSeed: contentInfrastructurePlanIdentityName
+    principalId: contentInfrastructurePlanIdentity.outputs.principalId
+    publisherPrincipalIds: [
+      descriptorPublisherIdentity.outputs.principalId
+      publicPublisherIdentity.outputs.principalId
+      privatePublisherIdentity.outputs.principalId
+    ]
+    publisherRoleDefinitionGuid: contentPublisherRole.name
+    readerPrincipalId: contentReaderIdentity.outputs.principalId
+    readerRoleDefinitionGuid: '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
+    roleDefinitionId: contentInfrastructurePlanExecutorRole.id
+  }
+}
+
+module contentInfrastructurePlanExternalJoinAssignments 'modules/contentPlanExternalJoinAssignments.bicep' = {
+  scope: identityResourceGroup
+  name: 'content-infra-plan-external-join-rbac'
+  params: {
+    blobPrivateDnsZoneName: blobPrivateDnsZoneName
+    ciRunnerSubnetName: ciRunnerSubnetName
+    ciVnetName: ciVnetName
+    principalId: contentInfrastructurePlanIdentity.outputs.principalId
+    roleDefinitionId: contentInfrastructurePlanExternalJoinRole.id
+  }
+}
 
 module environmentRbac 'modules/environmentRbac.bicep' = [
   for (environment, index) in environments: {
@@ -342,3 +576,16 @@ output deploymentIdentities array = [
     resourceGroupName: environment.resourceGroupName
   }
 ]
+
+output contentInfrastructurePlanAzureClientId string = contentInfrastructurePlanIdentity.outputs.clientId
+output contentInfrastructurePlanAzureTenantId string = tenant().tenantId
+output contentInfrastructurePlanAzureSubscriptionId string = subscription().subscriptionId
+output contentInfrastructurePlanFederatedSubject string = contentInfrastructurePlanIdentity.outputs.federatedSubject
+output contentInfrastructurePlanPrincipalId string = contentInfrastructurePlanIdentity.outputs.principalId
+output contentPublisherRoleDefinitionId string = contentPublisherRole.id
+output contentInfrastructurePlanExecutorRoleDefinitionId string = contentInfrastructurePlanExecutorRole.id
+output azureDescriptorPublisherClientId string = descriptorPublisherIdentity.outputs.clientId
+output azurePublicPublisherClientId string = publicPublisherIdentity.outputs.clientId
+output azurePrivatePublisherClientId string = privatePublisherIdentity.outputs.clientId
+output azureContentReaderClientId string = contentReaderIdentity.outputs.clientId
+output azureContentReaderPrincipalId string = contentReaderIdentity.outputs.principalId

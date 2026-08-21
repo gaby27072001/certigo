@@ -162,18 +162,17 @@ test('publishers are isolated and the runtime reader is read-only on every conta
 });
 
 test('custom publisher role grants create and read but no delete', () => {
-  const template = compileTemplate('infra/content/main.bicep');
+  const template = compileTemplate('infra/governance/main.bicep');
   const [role] = resourcesOfType(
     template,
     'Microsoft.Authorization/roleDefinitions',
-  );
-  assert.equal(
-    template.variables.contentPublisherRoleDefinitionGuid,
-    'c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de',
+  ).filter(
+    (definition) =>
+      definition.name === 'c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de',
   );
   assert.equal(
     role.name,
-    "[variables('contentPublisherRoleDefinitionGuid')]",
+    'c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de',
   );
   const [permissions] = role.properties.permissions;
   assert.deepEqual(permissions.actions.sort(), [
@@ -255,20 +254,22 @@ test('dedicated stack creates support identities but no application runtime', ()
   assert.deepEqual(
     template.resources.map(({ type, name }) => `${type}:${name}`).sort(),
     [
-      "Microsoft.Authorization/roleDefinitions:[variables('contentPublisherRoleDefinitionGuid')]",
       'Microsoft.Resources/deployments:content-private-endpoint',
-      'Microsoft.Resources/deployments:content-private-publisher-identity',
-      'Microsoft.Resources/deployments:content-public-publisher-identity',
-      'Microsoft.Resources/deployments:content-reader-identity',
-      'Microsoft.Resources/deployments:content-release-publisher-identity',
       'Microsoft.Resources/deployments:content-storage',
-      "Microsoft.Resources/resourceGroups:[parameters('contentResourceGroupName')]",
     ].sort(),
+  );
+  assert.equal(
+    template.parameters.contentPublisherRoleDefinitionGuid.defaultValue,
+    'c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de',
+  );
+  assert.ok(
+    template.$schema.includes('/deploymentTemplate.json#'),
+    'content deployment must target an existing resource group',
   );
 });
 
 test('publisher identities have exact OIDC subjects and reader has no federation', () => {
-  const template = compileTemplate('infra/content/main.bicep');
+  const template = compileTemplate('infra/governance/main.bicep');
   assert.equal(
     template.variables.descriptorEnvironmentName,
     'azure-content-release',
@@ -309,6 +310,25 @@ test('publisher identities have exact OIDC subjects and reader has no federation
       'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials',
     ).length,
     0,
+  );
+
+  const identityDeployments = resourcesOfType(
+    template,
+    'Microsoft.Resources/deployments',
+  ).filter((deployment) =>
+    [
+      'content-release-publisher-identity',
+      'content-public-publisher-identity',
+      'content-private-publisher-identity',
+      'content-reader-identity',
+    ].includes(deployment.name),
+  );
+  assert.equal(identityDeployments.length, 4);
+  assert.ok(
+    identityDeployments.every(
+      (deployment) =>
+        deployment.resourceGroup === "[parameters('contentResourceGroupName')]",
+    ),
   );
 });
 
@@ -351,16 +371,15 @@ test('what-if workflow evaluates current main and cannot deploy', () => {
   );
   assert.doesNotMatch(workflow, /workflow_dispatch:/);
   assert.match(workflow, /ref: refs\/heads\/main/);
-  assert.match(workflow, /az deployment sub what-if/);
+  assert.match(workflow, /az deployment group what-if/);
+  assert.match(workflow, /--resource-group rg-certigo-content/);
+  assert.doesNotMatch(workflow, /az deployment sub what-if/);
   assert.doesNotMatch(workflow, /az deployment (?:sub|group) (?:create|validate)/);
   assert.doesNotMatch(workflow, /\bsecrets\./);
   assert.match(workflow, /environment: azure-content-infra-plan/);
   assert.match(workflow, /outsideAllowedScope/);
-  assert.match(
-    workflow,
-    /c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de/,
-  );
-  assert.doesNotMatch(workflow, /startsWith\(roleDefinitionScope\)/);
+  assert.doesNotMatch(workflow, /roledefinitions/i);
+  assert.match(workflow, /!normalized\.startsWith\(`\$\{contentScope\}\//);
   assert.match(workflow, /Delete/);
   assert.match(workflow, /Resource ID/);
 });
