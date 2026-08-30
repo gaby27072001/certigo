@@ -1,7 +1,8 @@
 using '../governance/bootstrap-identities.bicep'
 
 param location = 'westeurope'
-param identityResourceGroupName = 'rg-certigo-ci'
+param identityResourceGroupName = 'rg-certigo-identities'
+param ciResourceGroupName = 'rg-certigo-ci'
 param contentResourceGroupName = 'rg-certigo-content'
 param githubRepositoryOwner = 'gchambaud_microsoft'
 param githubRepositoryName = 'Certigo'

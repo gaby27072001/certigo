@@ -63,6 +63,7 @@ for (const roleDefinitionId of Object.values(phaseA.roleDefinitionIds)) {
 }
 process.stdout.write(`resource\t${phaseA.policyDefinitionId}\t-\t-\n`);
 process.stdout.write(`resource\t${phaseA.contentResourceGroupId}\t-\t-\n`);
+process.stdout.write(`resource\t${phaseA.identityResourceGroupId}\t-\t-\n`);
 NODE
 
 while IFS=$'\t' read -r kind resource_id expected_client_id expected_principal_id; do
@@ -123,6 +124,7 @@ for (const roleDefinitionId of Object.values(phaseA.roleDefinitionIds)) {
 }
 process.stdout.write(`resource\t${phaseA.policyDefinitionId}\t-\t-\n`);
 process.stdout.write(`resource\t${phaseA.contentResourceGroupId}\t-\t-\n`);
+process.stdout.write(`resource\t${phaseA.identityResourceGroupId}\t-\t-\n`);
 NODE
 )
 

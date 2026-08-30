@@ -3,8 +3,11 @@ targetScope = 'subscription'
 @description('Azure region for deployment identities and policy assignments.')
 param location string = 'westeurope'
 
-@description('Existing resource group that owns shared CI identities and networking.')
-param identityResourceGroupName string = 'rg-certigo-ci'
+@description('Dedicated resource group created or adopted for governance identities.')
+param identityResourceGroupName string = 'rg-certigo-identities'
+
+@description('Existing resource group that owns shared CI networking.')
+param ciResourceGroupName string = 'rg-certigo-ci'
 
 @description('Dedicated resource group created or adopted for immutable content resources.')
 param contentResourceGroupName string = 'rg-certigo-content'
@@ -89,14 +92,16 @@ var privilegedRoleDefinitionIds = [
   )
 ]
 
-resource identityResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
-  name: identityResourceGroupName
-}
-
 resource contentResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: contentResourceGroupName
   location: location
   tags: contentTags
+}
+
+resource identityResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+  name: identityResourceGroupName
+  location: location
+  tags: identityTags
 }
 
 resource subscriptionDeploymentLauncher 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
@@ -177,7 +182,7 @@ resource sharedNetworkDeploymentRole 'Microsoft.Authorization/roleDefinitions@20
       }
     ]
     assignableScopes: [
-      identityResourceGroup.id
+      subscriptionResourceId('Microsoft.Resources/resourceGroups', ciResourceGroupName)
     ]
   }
 }
@@ -195,10 +200,7 @@ resource contentPublisherRole 'Microsoft.Authorization/roleDefinitions@2022-04-0
           'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/read'
         ]
         notActions: []
-        dataActions: [
-          'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read'
-          'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write'
-        ]
+        dataActions: []
         notDataActions: []
       }
     ]
@@ -272,7 +274,7 @@ resource contentInfrastructurePlanExternalJoinRole 'Microsoft.Authorization/role
       }
     ]
     assignableScopes: [
-      identityResourceGroup.id
+      subscriptionResourceId('Microsoft.Resources/resourceGroups', ciResourceGroupName)
     ]
   }
 }
@@ -310,7 +312,7 @@ module contentInfrastructurePlanIdentity 'modules/githubEnvironmentIdentity.bice
 }
 
 module descriptorPublisherIdentity '../modules/contentIdentity.bicep' = {
-  scope: contentResourceGroup
+  scope: identityResourceGroup
   name: 'content-release-publisher-identity'
   params: {
     githubEnvironmentName: descriptorEnvironmentName
@@ -323,7 +325,7 @@ module descriptorPublisherIdentity '../modules/contentIdentity.bicep' = {
 }
 
 module publicPublisherIdentity '../modules/contentIdentity.bicep' = {
-  scope: contentResourceGroup
+  scope: identityResourceGroup
   name: 'content-public-publisher-identity'
   params: {
     githubEnvironmentName: publicEnvironmentName
@@ -336,7 +338,7 @@ module publicPublisherIdentity '../modules/contentIdentity.bicep' = {
 }
 
 module privatePublisherIdentity '../modules/contentIdentity.bicep' = {
-  scope: contentResourceGroup
+  scope: identityResourceGroup
   name: 'content-private-publisher-identity'
   params: {
     githubEnvironmentName: privateEnvironmentName
@@ -349,7 +351,7 @@ module privatePublisherIdentity '../modules/contentIdentity.bicep' = {
 }
 
 module contentReaderIdentity '../modules/contentReaderIdentity.bicep' = {
-  scope: contentResourceGroup
+  scope: identityResourceGroup
   name: 'content-reader-identity'
   params: {
     identityName: readerIdentityName
@@ -413,10 +415,11 @@ resource privilegedCiAssignmentPolicy 'Microsoft.Authorization/policyDefinitions
 }
 
 output phaseA object = {
-  schemaVersion: 1
+  schemaVersion: 2
   subscriptionId: subscription().subscriptionId
   tenantId: tenant().tenantId
   contentResourceGroupId: contentResourceGroup.id
+  identityResourceGroupId: identityResourceGroup.id
   identities: {
     contentAnswerKey: {
       clientId: privatePublisherIdentity.outputs.clientId

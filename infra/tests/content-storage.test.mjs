@@ -161,7 +161,7 @@ test('publishers are isolated and the runtime reader is read-only on every conta
   );
 });
 
-test('custom publisher role grants create and read but no delete', () => {
+test('custom publisher role grants metadata reads without data-plane access', () => {
   const template = compileTemplate(
     'infra/governance/bootstrap-identities.bicep',
   );
@@ -181,15 +181,14 @@ test('custom publisher role grants create and read but no delete', () => {
     'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/read',
     'Microsoft.Storage/storageAccounts/blobServices/containers/read',
   ]);
-  assert.deepEqual(permissions.dataActions.sort(), [
-    'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read',
-    'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write',
-  ]);
+  assert.deepEqual(permissions.dataActions, []);
   assert.deepEqual(permissions.notActions, []);
   assert.deepEqual(permissions.notDataActions, []);
   assert.ok(
     [...permissions.actions, ...permissions.dataActions].every(
-      (action) => !action.toLowerCase().includes('delete'),
+      (action) =>
+        !action.toLowerCase().includes('delete') &&
+        !action.toLowerCase().includes('immutabilitypolicies/write'),
     ),
   );
 });
@@ -319,20 +318,63 @@ test('publisher identities have exact OIDC subjects and reader has no federation
   const identityDeployments = resourcesOfType(
     template,
     'Microsoft.Resources/deployments',
-  ).filter((deployment) =>
+  );
+  assert.equal(identityDeployments.length, 6);
+  assert.ok(
+    identityDeployments.every(
+      (deployment) =>
+        deployment.resourceGroup === "[parameters('identityResourceGroupName')]",
+    ),
+  );
+  const publisherDeployments = identityDeployments.filter((deployment) =>
     [
       'content-release-publisher-identity',
       'content-public-publisher-identity',
       'content-private-publisher-identity',
-      'content-reader-identity',
     ].includes(deployment.name),
   );
-  assert.equal(identityDeployments.length, 4);
-  assert.ok(
-    identityDeployments.every(
-      (deployment) =>
-        deployment.resourceGroup === "[parameters('contentResourceGroupName')]",
-    ),
+  assert.deepEqual(
+    publisherDeployments.map((deployment) => ({
+      environment:
+        deployment.properties.parameters.githubEnvironmentName.value,
+      repository:
+        `${deployment.properties.parameters.githubRepositoryOwner.value}/` +
+        deployment.properties.parameters.githubRepositoryName.value,
+    })),
+    [
+      {
+        environment: "[variables('descriptorEnvironmentName')]",
+        repository:
+          "[parameters('contentRepositoryOwner')]/" +
+          "[parameters('contentRepositoryName')]",
+      },
+      {
+        environment: "[variables('publicEnvironmentName')]",
+        repository:
+          "[parameters('contentRepositoryOwner')]/" +
+          "[parameters('contentRepositoryName')]",
+      },
+      {
+        environment: "[variables('privateEnvironmentName')]",
+        repository:
+          "[parameters('contentRepositoryOwner')]/" +
+          "[parameters('contentRepositoryName')]",
+      },
+    ],
+  );
+  const readerDeployment = identityDeployments.find(
+    ({ name }) => name === 'content-reader-identity',
+  );
+  assert.ok(readerDeployment);
+  assert.equal(
+    readerDeployment.properties.parameters.githubEnvironmentName,
+    undefined,
+  );
+  assert.equal(
+    resourcesOfType(template, 'Microsoft.Resources/resourceGroups').find(
+      ({ name }) => name === "[parameters('contentResourceGroupName')]",
+    ).name,
+    "[parameters('contentResourceGroupName')]",
   );
 });
 

@@ -6,8 +6,11 @@ param phaseA object
 @description('Azure region for the audit policy assignment.')
 param location string = 'westeurope'
 
-@description('Existing resource group that owns shared CI identities and networking.')
-param identityResourceGroupName string = 'rg-certigo-ci'
+@description('Existing dedicated governance identity resource group.')
+param identityResourceGroupName string = 'rg-certigo-identities'
+
+@description('Existing resource group that owns shared CI networking.')
+param ciResourceGroupName string = 'rg-certigo-ci'
 
 @description('Existing dedicated immutable-content resource group.')
 param contentResourceGroupName string = 'rg-certigo-content'
@@ -62,6 +65,10 @@ resource identityResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' e
   name: identityResourceGroupName
 }
 
+resource ciResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
+  name: ciResourceGroupName
+}
+
 resource contentResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
   name: contentResourceGroupName
 }
@@ -91,7 +98,7 @@ resource contentIdentities 'Microsoft.ManagedIdentity/userAssignedIdentities@202
     phaseA.identities.contentAnswerKey
     phaseA.identities.contentReader
   ]: {
-    scope: contentResourceGroup
+    scope: identityResourceGroup
     name: identity.name
   }
 ]
@@ -151,7 +158,7 @@ module environmentRbac 'modules/environmentRbac.bicep' = [
 
 module sharedNetworkAssignments 'modules/resourceGroupRoleAssignment.bicep' = [
   for (environment, index) in environments: {
-    scope: identityResourceGroup
+    scope: ciResourceGroup
     name: 'shared-network-rbac-${environment.name}'
     params: {
       assignmentDescription: 'Allows ${environment.name} to reconcile only shared DNS links and VNet peerings.'
@@ -181,7 +188,7 @@ module contentInfrastructurePlanExecutorAssignment 'modules/contentPlanExecutorA
 }
 
 module contentInfrastructurePlanExternalJoinAssignments 'modules/contentPlanExternalJoinAssignments.bicep' = {
-  scope: identityResourceGroup
+  scope: ciResourceGroup
   name: 'content-infra-plan-external-join-rbac'
   params: {
     blobPrivateDnsZoneName: blobPrivateDnsZoneName

@@ -71,20 +71,22 @@ function makePhaseAProof() {
     `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
     `roleDefinitions/${armGuid(`/subscriptions/${subscription}`, seed)}`;
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     subscriptionId: subscription,
     tenantId: tenant,
     contentResourceGroupId:
       `/subscriptions/${subscription}/resourceGroups/rg-certigo-content`,
+    identityResourceGroupId:
+      `/subscriptions/${subscription}/resourceGroups/rg-certigo-identities`,
     identities: {
       contentAnswerKey: identity(
         'id-certigo-content-answer-key',
-        'rg-certigo-content',
+        'rg-certigo-identities',
         '01',
       ),
       contentInfrastructurePlan: identity(
         'id-certigo-content-infra-plan',
-        'rg-certigo-ci',
+        'rg-certigo-identities',
         '02',
         {
           federatedSubject:
@@ -93,24 +95,24 @@ function makePhaseAProof() {
       ),
       contentPublic: identity(
         'id-certigo-content-public',
-        'rg-certigo-content',
+        'rg-certigo-identities',
         '03',
       ),
       contentReader: identity(
         'id-certigo-content-reader',
-        'rg-certigo-content',
+        'rg-certigo-identities',
         '04',
       ),
       contentRelease: identity(
         'id-certigo-content-release',
-        'rg-certigo-content',
+        'rg-certigo-identities',
         '05',
       ),
-      deployDev: identity('id-certigo-deploy-dev', 'rg-certigo-ci', '06'),
-      deployProd: identity('id-certigo-deploy-prod', 'rg-certigo-ci', '07'),
+      deployDev: identity('id-certigo-deploy-dev', 'rg-certigo-identities', '06'),
+      deployProd: identity('id-certigo-deploy-prod', 'rg-certigo-identities', '07'),
       deployStaging: identity(
         'id-certigo-deploy-staging',
-        'rg-certigo-ci',
+        'rg-certigo-identities',
         '08',
       ),
     },
@@ -141,7 +143,7 @@ function makePhaseAProof() {
   };
 }
 
-function materializeNoEffect(change) {
+function materializeNoChange(change) {
   const result = structuredClone(change);
   const parts = result.resourceId.split('/').filter(Boolean);
   const providerIndex = parts.lastIndexOf('providers');
@@ -153,7 +155,7 @@ function materializeNoEffect(change) {
   ) {
     types.push(parts[index]);
   }
-  result.changeType = 'NoEffect';
+  result.changeType = 'NoChange';
   result.after = {
     ...result.after,
     id: result.resourceId,
@@ -168,14 +170,28 @@ function materializeNoEffect(change) {
 }
 
 function deploymentChange(changeType, resourceId, properties = {}) {
-  const change = materializeNoEffect({
+  const change = materializeNoChange({
     resourceId,
     after: {
       properties,
     },
   });
   change.changeType = changeType;
+  if (changeType === 'Ignore') {
+    change.before = structuredClone(change.after);
+    change.delta = null;
+  }
   return change;
+}
+
+function whatIfPlan(changes) {
+  return {
+    changes,
+    diagnostics: null,
+    error: null,
+    potentialChanges: null,
+    status: 'Succeeded',
+  };
 }
 
 function makeCompletePhaseAPlan(proof) {
@@ -222,7 +238,7 @@ function makeCompletePhaseAPlan(proof) {
     ],
   ];
   const changes = [
-    materializeNoEffect({
+    materializeNoChange({
       resourceId: proof.contentResourceGroupId,
       after: {
         location: 'westeurope',
@@ -234,11 +250,23 @@ function makeCompletePhaseAPlan(proof) {
         properties: {},
       },
     }),
+    materializeNoChange({
+      resourceId: proof.identityResourceGroupId,
+      after: {
+        location: 'westeurope',
+        tags: {
+          managedBy: 'bicep',
+          product: 'Certigo',
+          purpose: 'github-oidc-deployment',
+        },
+        properties: {},
+      },
+    }),
   ];
   for (let index = 0; index < roleFixtures.length; index += 1) {
     const [key, roleName, assignableScopes] = roleFixtures[index];
     changes.push(
-      materializeNoEffect({
+      materializeNoChange({
         resourceId: proof.roleDefinitionIds[key],
         after: {
           properties: {
@@ -253,7 +281,7 @@ function makeCompletePhaseAPlan(proof) {
   }
   for (const identity of Object.values(proof.identities)) {
     changes.push(
-      materializeNoEffect({
+      materializeNoChange({
         resourceId: identity.resourceId,
         after: {
           properties: {
@@ -303,7 +331,7 @@ function makeCompletePhaseAPlan(proof) {
   ];
   for (const [identity, credentialName, subject] of credentialFixtures) {
     changes.push(
-      materializeNoEffect({
+      materializeNoChange({
         resourceId:
           `${identity.resourceId}/federatedIdentityCredentials/${credentialName}`,
         after: {
@@ -317,7 +345,7 @@ function makeCompletePhaseAPlan(proof) {
     );
   }
   changes.push(
-    materializeNoEffect({
+    materializeNoChange({
       resourceId: proof.policyDefinitionId,
       after: {
         properties: {
@@ -367,7 +395,7 @@ function makeCompletePhaseAPlan(proof) {
       },
     }),
   );
-  return { changes };
+  return whatIfPlan(changes);
 }
 
 function roleAssignmentChange(scope, name, properties) {
@@ -495,12 +523,25 @@ function makeCompletePhaseBPlan(proof) {
       },
     },
   );
-  return { changes };
+  return whatIfPlan(changes);
 }
 
 test('Phase A creates identities and definitions without effective permissions', () => {
   const template = compileTemplate(
     'infra/governance/bootstrap-identities.bicep',
+  );
+  const source = readFileSync(
+    path.join(repositoryRoot, 'infra', 'governance', 'bootstrap-identities.bicep'),
+    'utf8',
+  );
+  assert.deepEqual(
+    resourcesOfType(template, 'Microsoft.Resources/resourceGroups').map(
+      ({ name }) => name,
+    ),
+    [
+      "[parameters('contentResourceGroupName')]",
+      "[parameters('identityResourceGroupName')]",
+    ],
   );
   assert.equal(
     resourcesOfType(template, 'Microsoft.Authorization/roleDefinitions').length,
@@ -534,6 +575,11 @@ test('Phase A creates identities and definitions without effective permissions',
     resourcesOfType(template, 'Microsoft.Authorization/policyAssignments').length,
     0,
   );
+  assert.doesNotMatch(
+    source,
+    /resource\s+\w+\s+'Microsoft\.Resources\/resourceGroups@[^']+'\s+existing\s*=\s*\{\s*name:\s*ciResourceGroupName/s,
+  );
+  assert.doesNotMatch(source, /scope:\s*ciResourceGroup/);
   assert.ok(template.outputs.phaseA);
 });
 
@@ -551,6 +597,10 @@ test('Phase A custom roles contain no wildcard or delete action', () => {
     ]);
     assert.ok(permissions.every((permission) => !permission.includes('*')));
     assert.ok(permissions.every((permission) => !/delete/i.test(permission)));
+    assert.deepEqual(
+      role.properties.permissions.flatMap((value) => value.dataActions ?? []),
+      [],
+    );
   }
 });
 
@@ -642,7 +692,7 @@ test('Phase B proof validation is mandatory, complete, and subscription-bound', 
   const proof = makePhaseAProof();
   assert.equal(validatePhaseAProof(proof, subscription), proof);
   assert.throws(
-    () => validateWhatIf({ changes: [] }, subscription, { phase: 'B' }),
+    () => validateWhatIf(whatIfPlan([]), subscription, { phase: 'B' }),
     /Phase A proof is missing/,
   );
   assert.throws(
@@ -674,23 +724,21 @@ test('Phase B proof validation is mandatory, complete, and subscription-bound', 
 
 test('phase validators reject mutation types and RBAC in Phase A', () => {
   assert.throws(
-    () => validateWhatIf({ changes: [] }, subscription, { phase: 'A' }),
+    () => validateWhatIf(whatIfPlan([]), subscription, { phase: 'A' }),
     /Phase A plan is incomplete/,
   );
   for (const changeType of ['Modify', 'Delete', 'Unsupported']) {
     assert.throws(
       () =>
         validateWhatIf(
-          {
-            changes: [
+          whatIfPlan([
               {
                 changeType,
                 resourceId:
                   `/subscriptions/${subscription}/resourceGroups/` +
                   'rg-certigo-content',
               },
-            ],
-          },
+          ]),
           subscription,
           { phase: 'A' },
         ),
@@ -700,8 +748,7 @@ test('phase validators reject mutation types and RBAC in Phase A', () => {
   assert.throws(
     () =>
       validateWhatIf(
-        {
-          changes: [
+        whatIfPlan([
             {
               changeType: 'Create',
               resourceId:
@@ -709,8 +756,7 @@ test('phase validators reject mutation types and RBAC in Phase A', () => {
                 'providers/Microsoft.Authorization/roleAssignments/attack',
               after: { properties: {} },
             },
-          ],
-        },
+        ]),
         subscription,
         { phase: 'A' },
       ),
@@ -718,12 +764,44 @@ test('phase validators reject mutation types and RBAC in Phase A', () => {
   );
 });
 
-test('Phase A accepts exact NoEffect and mixed retry plans only', () => {
+test('phase validators reject incomplete or diagnostic what-if payloads', () => {
+  const invalidPlans = [
+    [{ ...whatIfPlan([]), status: 'Failed' }, /status must be Succeeded/],
+    [{ ...whatIfPlan([]), error: { code: 'InvalidTemplate' } }, /error payload/],
+    [
+      {
+        ...whatIfPlan([]),
+        diagnostics: [{ level: 'Warning', message: 'Expansion limited' }],
+      },
+      /returned diagnostics/,
+    ],
+    [
+      { ...whatIfPlan([]), potentialChanges: [{ resourceId: 'unknown' }] },
+      /expansion is incomplete/,
+    ],
+    [{ ...whatIfPlan([]), changes: null }, /materialized array/],
+  ];
+  for (const [plan, expected] of invalidPlans) {
+    assert.throws(
+      () => validateWhatIf(plan, subscription, { phase: 'A' }),
+      expected,
+    );
+  }
+
+  const unsupported = makeCompletePhaseAPlan(makePhaseAProof());
+  unsupported.changes[0].unsupportedReason = 'Resource expansion was limited';
+  assert.throws(
+    () => validateWhatIf(unsupported, subscription, { phase: 'A' }),
+    /rejects unsupported resource expansion/,
+  );
+});
+
+test('Phase A accepts exact NoChange and mixed retry plans only', () => {
   const proof = makePhaseAProof();
   const exact = makeCompletePhaseAPlan(proof);
   assert.equal(
     validateWhatIf(exact, subscription, { phase: 'A' }).total,
-    23,
+    24,
   );
 
   const mixed = structuredClone(exact);
@@ -732,7 +810,7 @@ test('Phase A accepts exact NoEffect and mixed retry plans only', () => {
   }
   assert.equal(
     validateWhatIf(mixed, subscription, { phase: 'A' }).total,
-    23,
+    24,
   );
 
   const wrongRole = structuredClone(exact);
@@ -745,7 +823,7 @@ test('Phase A accepts exact NoEffect and mixed retry plans only', () => {
     );
   assert.throws(
     () => validateWhatIf(wrongRole, subscription, { phase: 'A' }),
-    /NoEffect resource is outside the Phase A allowlist/,
+    /NoChange resource is outside the Phase A allowlist/,
   );
 
   const wrongCredential = structuredClone(exact);
@@ -756,14 +834,14 @@ test('Phase A accepts exact NoEffect and mixed retry plans only', () => {
     .after.properties.subject = 'repo:attacker/repository:environment:prod';
   assert.throws(
     () => validateWhatIf(wrongCredential, subscription, { phase: 'A' }),
-    /NoEffect resource is outside the Phase A allowlist/,
+    /NoChange resource is outside the Phase A allowlist/,
   );
 
   const missingPayload = structuredClone(exact);
   delete missingPayload.changes[0].after;
   assert.throws(
     () => validateWhatIf(missingPayload, subscription, { phase: 'A' }),
-    /NoEffect resource is outside the Phase A allowlist/,
+    /NoChange resource is outside the Phase A allowlist/,
   );
 
   const duplicate = structuredClone(exact);
@@ -777,19 +855,63 @@ test('Phase A accepts exact NoEffect and mixed retry plans only', () => {
   );
 });
 
+test('Phase A rejects unlisted and non-inert Ignore payloads', () => {
+  const proof = makePhaseAProof();
+  const attacker = makeCompletePhaseAPlan(proof);
+  attacker.changes.push(
+    deploymentChange(
+      'Ignore',
+      `/subscriptions/${subscription}/resourceGroups/rg-attacker/providers/` +
+        'Microsoft.Compute/virtualMachines/attacker',
+    ),
+  );
+  assert.throws(
+    () => validateWhatIf(attacker, subscription, { phase: 'A' }),
+    /Ignore resource is outside the Phase A allowlist/,
+  );
+
+  const unlisted = makeCompletePhaseAPlan(proof);
+  unlisted.changes.push(
+    deploymentChange(
+      'Ignore',
+      `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/providers/` +
+        'Microsoft.Compute/virtualMachines/unlisted',
+    ),
+  );
+  assert.throws(
+    () => validateWhatIf(unlisted, subscription, { phase: 'A' }),
+    /Ignore resource is outside the Phase A allowlist/,
+  );
+
+  const changed = makeCompletePhaseAPlan(proof);
+  const resourceGroup = deploymentChange(
+    'Ignore',
+    `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci`,
+  );
+  resourceGroup.delta = {
+    path: 'tags.attacker',
+    propertyChangeType: 'Create',
+  };
+  changed.changes.push(resourceGroup);
+  assert.throws(
+    () => validateWhatIf(changed, subscription, { phase: 'A' }),
+    /Phase A rejects non-inert Ignore/,
+  );
+});
+
 test('Phase A deployment wrappers require exact scope and materialized retries', () => {
   const proof = makePhaseAProof();
   const exactId =
-    `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/providers/` +
+    `/subscriptions/${subscription}/resourceGroups/rg-certigo-identities/providers/` +
     'Microsoft.Resources/deployments/identity-dev';
-  for (const changeType of ['Create', 'Ignore', 'NoEffect']) {
+  for (const changeType of ['Create', 'Ignore', 'NoChange']) {
     const plan = makeCompletePhaseAPlan(proof);
     plan.changes.push(
       deploymentChange(changeType, exactId, { templateHash: '123456789' }),
     );
     assert.equal(
       validateWhatIf(plan, subscription, { phase: 'A' }).total,
-      24,
+      25,
     );
   }
 
@@ -797,13 +919,13 @@ test('Phase A deployment wrappers require exact scope and materialized retries',
     `/subscriptions/${subscription}/resourceGroups/rg-attacker/providers/` +
       'Microsoft.Resources/deployments/identity-dev',
     '/subscriptions/00000000-0000-0000-0000-000000000099/resourceGroups/' +
-      'rg-certigo-ci/providers/Microsoft.Resources/deployments/identity-dev',
-    `/subscriptions/${subscription}/resourcegroups/rg-certigo-ci/providers/` +
+      'rg-certigo-identities/providers/Microsoft.Resources/deployments/identity-dev',
+    `/subscriptions/${subscription}/resourcegroups/rg-certigo-content/providers/` +
       'Microsoft.Resources/deployments/identity-dev',
   ]) {
     const plan = makeCompletePhaseAPlan(proof);
     plan.changes.push(
-      deploymentChange('NoEffect', invalidId, { templateHash: '123456789' }),
+      deploymentChange('NoChange', invalidId, { templateHash: '123456789' }),
     );
     assert.throws(
       () => validateWhatIf(plan, subscription, { phase: 'A' }),
@@ -811,7 +933,7 @@ test('Phase A deployment wrappers require exact scope and materialized retries',
     );
   }
 
-  for (const changeType of ['Ignore', 'NoEffect']) {
+  for (const changeType of ['Ignore', 'NoChange']) {
     const plan = makeCompletePhaseAPlan(proof);
     plan.changes.push(deploymentChange(changeType, exactId));
     assert.throws(
@@ -825,10 +947,10 @@ test('Phase A deployment wrappers require exact scope and materialized retries',
     { templateLink: { uri: ' ' } },
   ]) {
     const plan = makeCompletePhaseAPlan(proof);
-    plan.changes.push(deploymentChange('NoEffect', exactId, properties));
+    plan.changes.push(deploymentChange('NoChange', exactId, properties));
     assert.throws(
       () => validateWhatIf(plan, subscription, { phase: 'A' }),
-      /NoEffect resource is outside the Phase A allowlist/,
+      /NoChange resource is outside the Phase A allowlist/,
     );
   }
 
@@ -836,7 +958,7 @@ test('Phase A deployment wrappers require exact scope and materialized retries',
   duplicateLeaf.changes.push(
     deploymentChange('Create', exactId),
     deploymentChange(
-      'NoEffect',
+      'NoChange',
       `/subscriptions/${subscription}/resourceGroups/rg-attacker/providers/` +
         'Microsoft.Resources/deployments/identity-dev',
       { provisioningState: 'Succeeded' },
@@ -844,7 +966,7 @@ test('Phase A deployment wrappers require exact scope and materialized retries',
   );
   assert.throws(
     () => validateWhatIf(duplicateLeaf, subscription, { phase: 'A' }),
-    /NoEffect resource is outside the Phase A allowlist/,
+    /NoChange resource is outside the Phase A allowlist/,
   );
 });
 
@@ -886,19 +1008,17 @@ test('Phase B accepts only exact external subnet and DNS scopes', () => {
   }
 });
 
-test('Phase B accepts exact NoEffect and mixed retry plans only', () => {
+test('Phase B accepts exact NoChange and mixed retry plans only', () => {
   const proof = makePhaseAProof();
   const createPlan = makeCompletePhaseBPlan(proof);
-  const noEffect = {
-    changes: createPlan.changes.map(materializeNoEffect),
-  };
+  const noChange = whatIfPlan(createPlan.changes.map(materializeNoChange));
   assert.equal(
-    validateWhatIf(noEffect, subscription, { phase: 'B', phaseA: proof })
+    validateWhatIf(noChange, subscription, { phase: 'B', phaseA: proof })
       .total,
     16,
   );
 
-  const mixed = structuredClone(noEffect);
+  const mixed = structuredClone(noChange);
   for (let index = 0; index < mixed.changes.length; index += 2) {
     mixed.changes[index] = structuredClone(createPlan.changes[index]);
   }
@@ -907,7 +1027,7 @@ test('Phase B accepts exact NoEffect and mixed retry plans only', () => {
     16,
   );
 
-  const wrongPrincipal = structuredClone(noEffect);
+  const wrongPrincipal = structuredClone(noChange);
   wrongPrincipal.changes[0].after.properties.principalId =
     '90000000-0000-0000-0000-000000000001';
   assert.throws(
@@ -916,10 +1036,10 @@ test('Phase B accepts exact NoEffect and mixed retry plans only', () => {
         phase: 'B',
         phaseA: proof,
       }),
-    /NoEffect resource is outside the Phase B allowlist/,
+    /NoChange resource is outside the Phase B allowlist/,
   );
 
-  const wrongRole = structuredClone(noEffect);
+  const wrongRole = structuredClone(noChange);
   wrongRole.changes[0].after.properties.roleDefinitionId =
     `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
     'roleDefinitions/8e3af657-a8ff-443c-a75c-2fe8c4bcb635';
@@ -929,10 +1049,10 @@ test('Phase B accepts exact NoEffect and mixed retry plans only', () => {
         phase: 'B',
         phaseA: proof,
       }),
-    /NoEffect resource is outside the Phase B allowlist/,
+    /NoChange resource is outside the Phase B allowlist/,
   );
 
-  const wrongCondition = structuredClone(noEffect);
+  const wrongCondition = structuredClone(noChange);
   wrongCondition.changes.find(
     ({ after }) => after.properties.conditionVersion === '2.0',
   ).after.properties.condition = 'true';
@@ -942,10 +1062,10 @@ test('Phase B accepts exact NoEffect and mixed retry plans only', () => {
         phase: 'B',
         phaseA: proof,
       }),
-    /NoEffect resource is outside the Phase B allowlist/,
+    /NoChange resource is outside the Phase B allowlist/,
   );
 
-  const wrongScope = structuredClone(noEffect);
+  const wrongScope = structuredClone(noChange);
   wrongScope.changes.find(
     ({ after }) =>
       after.properties.description ===
@@ -961,10 +1081,10 @@ test('Phase B accepts exact NoEffect and mixed retry plans only', () => {
         phase: 'B',
         phaseA: proof,
       }),
-    /NoEffect resource is outside the Phase B allowlist/,
+    /NoChange resource is outside the Phase B allowlist/,
   );
 
-  const missingPayload = structuredClone(noEffect);
+  const missingPayload = structuredClone(noChange);
   delete missingPayload.changes[0].after;
   assert.throws(
     () =>
@@ -972,10 +1092,10 @@ test('Phase B accepts exact NoEffect and mixed retry plans only', () => {
         phase: 'B',
         phaseA: proof,
       }),
-    /NoEffect resource is outside the Phase B allowlist/,
+    /NoChange resource is outside the Phase B allowlist/,
   );
 
-  const duplicate = structuredClone(noEffect);
+  const duplicate = structuredClone(noChange);
   duplicate.changes.push({
     ...structuredClone(createPlan.changes[0]),
     changeType: 'Create',
@@ -995,7 +1115,7 @@ test('Phase B deployment wrappers require exact scope and materialized retries',
   const exactId =
     `/subscriptions/${subscription}/resourceGroups/rg-certigo-content/providers/` +
     'Microsoft.Resources/deployments/content-infra-plan-executor-rbac';
-  for (const changeType of ['Create', 'Ignore', 'NoEffect']) {
+  for (const changeType of ['Create', 'Ignore', 'NoChange']) {
     const plan = makeCompletePhaseBPlan(proof);
     plan.changes.push(
       deploymentChange(changeType, exactId, {
@@ -1030,7 +1150,7 @@ test('Phase B deployment wrappers require exact scope and materialized retries',
     );
   }
 
-  for (const changeType of ['Ignore', 'NoEffect']) {
+  for (const changeType of ['Ignore', 'NoChange']) {
     const plan = makeCompletePhaseBPlan(proof);
     plan.changes.push(deploymentChange(changeType, exactId));
     assert.throws(
@@ -1078,7 +1198,7 @@ test('Phase B rejects empty plans and policy assignment below subscription scope
   assert.throws(
     () =>
       validateWhatIf(
-        { changes: [] },
+        whatIfPlan([]),
         subscription,
         { phase: 'B', phaseA: proof },
       ),
@@ -1121,6 +1241,10 @@ test('Phase B script proves Phase A and all live resources before what-if', () =
   assert.match(script, /provisioning_state.*Succeeded/s);
   assert.match(script, /validatePhaseAProof/);
   assert.match(script, /live identity does not match Phase A proof/);
+  assert.equal(
+    script.match(/phaseA\.identityResourceGroupId/g)?.length,
+    2,
+  );
 });
 
 test('read-only governance scripts contain no live mutation commands', () => {
@@ -1141,6 +1265,20 @@ test('read-only governance scripts contain no live mutation commands', () => {
       /\bgh\s+api\s+(?:--method\s+)?(?:POST|PUT|PATCH|DELETE)\b/,
     );
   }
+});
+
+test('Phase A what-if preserves the complete raw ARM payload', () => {
+  const script = readFileSync(
+    path.join(
+      repositoryRoot,
+      'infra',
+      'governance',
+      'what-if-phase-a.sh',
+    ),
+    'utf8',
+  );
+  assert.doesNotMatch(script, /--exclude-change-types/);
+  assert.match(script, /--result-format FullResourcePayloads/);
 });
 
 test('application template uses pre-created environment resource groups', () => {

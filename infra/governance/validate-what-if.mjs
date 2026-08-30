@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -9,7 +10,7 @@ const uuidPattern =
 const identityContracts = {
   deployDev: {
     name: 'id-certigo-deploy-dev',
-    resourceGroup: 'rg-certigo-ci',
+    resourceGroup: 'rg-certigo-identities',
     credential: {
       name: 'github-dev',
       subject: 'repo:gchambaud_microsoft/Certigo:environment:dev',
@@ -17,7 +18,7 @@ const identityContracts = {
   },
   deployStaging: {
     name: 'id-certigo-deploy-staging',
-    resourceGroup: 'rg-certigo-ci',
+    resourceGroup: 'rg-certigo-identities',
     credential: {
       name: 'github-staging',
       subject: 'repo:gchambaud_microsoft/Certigo:environment:staging',
@@ -25,7 +26,7 @@ const identityContracts = {
   },
   deployProd: {
     name: 'id-certigo-deploy-prod',
-    resourceGroup: 'rg-certigo-ci',
+    resourceGroup: 'rg-certigo-identities',
     credential: {
       name: 'github-prod',
       subject: 'repo:gchambaud_microsoft/Certigo:environment:prod',
@@ -33,7 +34,7 @@ const identityContracts = {
   },
   contentInfrastructurePlan: {
     name: 'id-certigo-content-infra-plan',
-    resourceGroup: 'rg-certigo-ci',
+    resourceGroup: 'rg-certigo-identities',
     credential: {
       name: 'github-azure-content-infra-plan',
       subject:
@@ -42,7 +43,7 @@ const identityContracts = {
   },
   contentRelease: {
     name: 'id-certigo-content-release',
-    resourceGroup: 'rg-certigo-content',
+    resourceGroup: 'rg-certigo-identities',
     credential: {
       name: 'github-azure-content-release',
       subject:
@@ -51,7 +52,7 @@ const identityContracts = {
   },
   contentPublic: {
     name: 'id-certigo-content-public',
-    resourceGroup: 'rg-certigo-content',
+    resourceGroup: 'rg-certigo-identities',
     credential: {
       name: 'github-azure-content-public',
       subject:
@@ -60,7 +61,7 @@ const identityContracts = {
   },
   contentAnswerKey: {
     name: 'id-certigo-content-answer-key',
-    resourceGroup: 'rg-certigo-content',
+    resourceGroup: 'rg-certigo-identities',
     credential: {
       name: 'github-azure-content-answer-key',
       subject:
@@ -69,7 +70,7 @@ const identityContracts = {
   },
   contentReader: {
     name: 'id-certigo-content-reader',
-    resourceGroup: 'rg-certigo-content',
+    resourceGroup: 'rg-certigo-identities',
   },
 };
 
@@ -130,10 +131,6 @@ const roleContracts = {
       'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/read',
       'Microsoft.Storage/storageAccounts/blobServices/containers/read',
     ],
-    dataActions: [
-      'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read',
-      'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write',
-    ],
     scopes: (subscriptionId) => [
       `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-content`,
     ],
@@ -190,28 +187,28 @@ function phaseADeploymentIds(subscriptionId) {
     `/subscriptions/${subscriptionId}/resourceGroups/${resourceGroup}/` +
     `providers/Microsoft.Resources/deployments/${name}`;
   return new Map([
-    ['identity-dev', resourceId('rg-certigo-ci', 'identity-dev')],
-    ['identity-staging', resourceId('rg-certigo-ci', 'identity-staging')],
-    ['identity-prod', resourceId('rg-certigo-ci', 'identity-prod')],
+    ['identity-dev', resourceId('rg-certigo-identities', 'identity-dev')],
+    ['identity-staging', resourceId('rg-certigo-identities', 'identity-staging')],
+    ['identity-prod', resourceId('rg-certigo-identities', 'identity-prod')],
     [
       'identity-content-infra-plan',
-      resourceId('rg-certigo-ci', 'identity-content-infra-plan'),
+      resourceId('rg-certigo-identities', 'identity-content-infra-plan'),
     ],
     [
       'content-release-publisher-identity',
-      resourceId('rg-certigo-content', 'content-release-publisher-identity'),
+      resourceId('rg-certigo-identities', 'content-release-publisher-identity'),
     ],
     [
       'content-public-publisher-identity',
-      resourceId('rg-certigo-content', 'content-public-publisher-identity'),
+      resourceId('rg-certigo-identities', 'content-public-publisher-identity'),
     ],
     [
       'content-private-publisher-identity',
-      resourceId('rg-certigo-content', 'content-private-publisher-identity'),
+      resourceId('rg-certigo-identities', 'content-private-publisher-identity'),
     ],
     [
       'content-reader-identity',
-      resourceId('rg-certigo-content', 'content-reader-identity'),
+      resourceId('rg-certigo-identities', 'content-reader-identity'),
     ],
   ]);
 }
@@ -280,6 +277,16 @@ function sameStrings(actual = [], expected = []) {
   );
 }
 
+function isInertIgnore(change) {
+  return Boolean(
+    change.before &&
+      change.after &&
+      isDeepStrictEqual(change.before, change.after) &&
+      change.delta == null &&
+      change.unsupportedReason == null,
+  );
+}
+
 function parseResourceId(resourceId) {
   const parts = String(resourceId).split('/').filter(Boolean);
   const resourceGroupIndex = parts.findIndex(
@@ -316,7 +323,7 @@ function expectedIdentityResourceId(subscriptionId, contract) {
 
 export function validatePhaseAProof(phaseA, subscriptionId) {
   const errors = [];
-  if (!phaseA || phaseA.schemaVersion !== 1) {
+  if (!phaseA || phaseA.schemaVersion !== 2) {
     throw new Error('Phase A proof is missing or has an unsupported schemaVersion');
   }
   if (normalizeId(phaseA.subscriptionId) !== normalizeId(subscriptionId)) {
@@ -327,11 +334,19 @@ export function validatePhaseAProof(phaseA, subscriptionId) {
   }
   const expectedContentResourceGroupId =
     `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-content`;
+  const expectedIdentityResourceGroupId =
+    `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-identities`;
   if (
     normalizeId(phaseA.contentResourceGroupId) !==
     normalizeId(expectedContentResourceGroupId)
   ) {
     errors.push('Phase A proof content resource group is outside the exact contract');
+  }
+  if (
+    normalizeId(phaseA.identityResourceGroupId) !==
+    normalizeId(expectedIdentityResourceGroupId)
+  ) {
+    errors.push('Phase A proof identity resource group is outside the exact contract');
   }
 
   const principalIds = new Set();
@@ -741,7 +756,7 @@ function validateDeployment(change, expectedIds) {
   const parsed = parseResourceId(change.resourceId);
   const expectedId = expectedIds.get(parsed.names[0]);
   const requireMaterialized =
-    change.changeType === 'Ignore' || change.changeType === 'NoEffect';
+    change.changeType === 'Ignore' || change.changeType === 'NoChange';
   const properties = change.after?.properties;
   const nonEmptyString = (value) =>
     typeof value === 'string' && value.trim().length > 0;
@@ -767,7 +782,8 @@ function validateDeployment(change, expectedIds) {
 function phaseAContract(change, subscriptionId) {
   const id = normalizeId(change.resourceId);
   const parsed = parseResourceId(id);
-  const requireMaterialized = change.changeType === 'NoEffect';
+  const requireMaterialized =
+    change.changeType === 'Ignore' || change.changeType === 'NoChange';
   if (requireMaterialized && !hasCompletePayload(change)) {
     return null;
   }
@@ -787,6 +803,23 @@ function phaseAContract(change, subscriptionId) {
       return null;
     }
     return 'resource-group:rg-certigo-content';
+  }
+  if (
+    id ===
+    normalizeId(
+      `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-identities`,
+    )
+  ) {
+    if (
+      requireMaterialized &&
+      (change.after.location?.toLowerCase() !== 'westeurope' ||
+        change.after.tags?.product !== 'Certigo' ||
+        change.after.tags?.managedBy !== 'bicep' ||
+        change.after.tags?.purpose !== 'github-oidc-deployment')
+    ) {
+      return null;
+    }
+    return 'resource-group:rg-certigo-identities';
   }
 
   if (parsed.type === 'microsoft.authorization/roledefinitions') {
@@ -816,12 +849,6 @@ function phaseAContract(change, subscriptionId) {
   if (validateDeployment(change, phaseADeploymentIds(subscriptionId))) {
     return `deployment:${parsed.names[0]}`;
   }
-  if (
-    id ===
-    normalizeId(`/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci`)
-  ) {
-    return 'auxiliary:rg-certigo-ci';
-  }
   return null;
 }
 
@@ -845,7 +872,8 @@ export function validatePhaseAResource(resource, subscriptionId) {
 function phaseBContract(change, subscriptionId, phaseA) {
   const id = normalizeId(change.resourceId);
   const parsed = parseResourceId(id);
-  const requireMaterialized = change.changeType === 'NoEffect';
+  const requireMaterialized =
+    change.changeType === 'Ignore' || change.changeType === 'NoChange';
   if (requireMaterialized && !hasCompletePayload(change)) {
     return null;
   }
@@ -898,6 +926,7 @@ function phaseBContract(change, subscriptionId, phaseA) {
   const exactInputs = new Set(
     [
       'rg-certigo-ci',
+      'rg-certigo-identities',
       'rg-certigo-content',
       'rg-certigo-dev',
       'rg-certigo-staging',
@@ -932,6 +961,7 @@ function phaseBContract(change, subscriptionId, phaseA) {
 function requiredPhaseAContracts() {
   return new Set([
     'resource-group:rg-certigo-content',
+    'resource-group:rg-certigo-identities',
     ...Object.keys(roleContracts).map((key) => `role:${key}`),
     ...Object.values(identityContracts).map(
       (identity) => `identity:${identity.name}`,
@@ -1013,9 +1043,30 @@ export function validateWhatIf(
   if (!['A', 'B'].includes(phase)) {
     throw new Error('phase must be A or B');
   }
-  const proof = phase === 'B' ? validatePhaseAProof(phaseA, subscriptionId) : null;
-  const changes = plan.changes ?? [];
   const errors = [];
+  if (plan.status !== 'Succeeded') {
+    errors.push(`what-if status must be Succeeded, received ${plan.status ?? '<missing>'}`);
+  }
+  if (plan.error != null) {
+    errors.push('what-if returned an error payload');
+  }
+  if (
+    plan.diagnostics != null &&
+    (!Array.isArray(plan.diagnostics) || plan.diagnostics.length > 0)
+  ) {
+    errors.push('what-if returned diagnostics');
+  }
+  if (plan.potentialChanges != null) {
+    errors.push('what-if expansion is incomplete: potentialChanges must be null');
+  }
+  if (!Array.isArray(plan.changes)) {
+    errors.push('what-if changes must be a materialized array');
+  }
+  if (errors.length > 0) {
+    throw new Error(errors.join('\n'));
+  }
+  const proof = phase === 'B' ? validatePhaseAProof(phaseA, subscriptionId) : null;
+  const changes = plan.changes;
   const counts = {};
   const seenContracts = new Set();
 
@@ -1024,7 +1075,15 @@ export function validateWhatIf(
     const resourceId = change.resourceId ?? '';
     counts[changeType] = (counts[changeType] ?? 0) + 1;
 
-    if (!['Create', 'Ignore', 'NoEffect'].includes(changeType)) {
+    if (change.unsupportedReason != null) {
+      errors.push(
+        `Phase ${phase} rejects unsupported resource expansion: ${
+          resourceId || '<missing resource id>'
+        }`,
+      );
+      continue;
+    }
+    if (!['Create', 'Ignore', 'NoChange'].includes(changeType)) {
       errors.push(
         `Phase ${phase} forbids ${changeType}: ${resourceId || '<missing resource id>'}`,
       );
@@ -1038,7 +1097,13 @@ export function validateWhatIf(
       errors.push(`resource is outside subscription ${subscriptionId}: ${resourceId}`);
       continue;
     }
-    if (changeType === 'Ignore' || changeType === 'NoEffect') {
+    if (changeType === 'Ignore' && !isInertIgnore(change)) {
+      errors.push(
+        `Phase ${phase} rejects non-inert Ignore: ${resourceId || '<missing resource id>'}`,
+      );
+      continue;
+    }
+    if (changeType === 'Ignore' || changeType === 'NoChange') {
       const contract =
         phase === 'A'
           ? phaseAContract(change, subscriptionId)
@@ -1115,7 +1180,7 @@ function main() {
       summary,
       `## Certigo governance bootstrap Phase ${phase} what-if\n\n` +
         'No deployment was executed. Only exact `Create`, `Ignore`, and ' +
-        '`NoEffect` resources are allowed; ' +
+        '`NoChange` resources are allowed; ' +
         '`Modify`, `Delete`, and `Unsupported` fail closed.\n\n' +
         `\`\`\`json\n${JSON.stringify(result.counts, null, 2)}\n\`\`\`\n`,
     );

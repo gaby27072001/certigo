@@ -129,7 +129,7 @@ les quatre preuves suivantes sont archivées :
 | Sécurité abonnement | MCSB/Defender gérés par un admin PIM via `infra/governance`, jamais par l'identité d'environnement |
 | Policy | audit des Owner/Contributor/UAA/RBAC Admin attribués à un service principal au scope abonnement; `Deny` seulement après assainissement |
 | Contenu #290 | identités distinctes du dépôt `certigo-content`, environnements `azure-content-public` et `azure-content-answer-key` |
-| Plan contenu post-#290 | UAMI dédiée `id-certigo-content-infra-plan` dans `rg-certigo-ci`, sujet unique `repo:gchambaud_microsoft/Certigo:environment:azure-content-infra-plan`; exécuteur exact sur `rg-certigo-content` et joins externes aux deux ressources réseau exactes |
+| Plan contenu post-#290 | UAMI dédiée `id-certigo-content-infra-plan` dans `rg-certigo-identities`, sujet unique `repo:gchambaud_microsoft/Certigo:environment:azure-content-infra-plan`; exécuteur exact sur `rg-certigo-content` et joins externes aux deux ressources réseau exactes |
 | Administration RBAC | PIM JIT pour l'humain; comptes break-glass contrôlés, jamais utilisés par CI |
 
 Le rôle conditionnel peut seulement créer les rôles nécessaires aux modules actuels :
@@ -148,13 +148,14 @@ est refusé : les 13 attributions visant des UAMI futures ne sont pas validables
 des principals, et les deux scopes `extensionResourceId` subnet/DNS ne sont pas matérialisables
 par le moteur de what-if. Le bootstrap est donc séparé et fail-closed :
 
-- **Phase A — `bootstrap-identities`** : crée ou adopte `rg-certigo-content`, les six custom
-  roles, les huit UAMI, les sept FIC exactes et la policyDefinition. Elle ne contient aucun
+- **Phase A — `bootstrap-identities`** : crée ou adopte `rg-certigo-identities` pour les huit
+  UAMI et sept FIC exactes, et `rg-certigo-content` pour le futur stack contenu. Elle crée aussi
+  les six custom roles et la policyDefinition au scope subscription. Elle ne contient aucun
   `roleAssignment`, aucun `policyAssignment` et ne donne aucune permission effective. Son output
-  `phaseA` versionné contient les `clientId`, `principalId`, `resourceId`, les six role definition
-  IDs, le policy definition ID, le tenant et la subscription.
+  `phaseA` versionné contient les deux resource group IDs, les `clientId`, `principalId`,
+  `resourceId`, les six role definition IDs, le policy definition ID, le tenant et la subscription.
 - **Phase B — `bootstrap-rbac`** : ne crée ni identité, ni rôle, ni policyDefinition. Elle
-  consomme les huit UAMI, les six rôles, la policyDefinition et les cinq RG en `existing`, puis
+  consomme les huit UAMI, les six rôles, la policyDefinition et les six RG en `existing`, puis
   crée exactement les 13 attributions internes, les deux attributions externes et l'unique
   policyAssignment en `Audit`.
 
@@ -171,8 +172,9 @@ L'UAMI de plan reçoit seulement en Phase B :
   `rg-certigo-ci/privatelink.blob.core.windows.net`, avec seulement subnet read/join et private
   DNS zone read/join.
 
-La Phase A crée aussi dans `rg-certigo-content` les trois UAMI publisher avec leur FIC
-exacte et l'UAMI reader sans fédération. Le template de plan les traite comme `existing` :
+La Phase A crée dans `rg-certigo-identities` les trois UAMI de déploiement, l'UAMI de plan, les
+trois UAMI publisher avec leur FIC exacte et l'UAMI reader sans fédération. Le template de plan
+les traite comme `existing` :
 l'identité de plan n'a donc aucun write UAMI/FIC.
 
 Ces rôles n'ont aucun wildcard, aucune action `delete`, aucun data-plane, aucun
@@ -196,14 +198,19 @@ export AZURE_SUBSCRIPTION_ID='<subscription-uuid>'
 bash infra/governance/what-if-phase-a.sh
 ```
 
-Le validateur accepte seulement `Create`, `Ignore` ou `NoEffect` pour les ressources exactes de
-Phase A et les deployments ARM imbriqués attendus. `NoEffect` permet de reprendre après une Phase
-A partiellement appliquée uniquement si le payload complet (`id`, `name`, `type`, propriétés)
-revalide le même rôle/actions, la même UAMI, la même FIC ou la même policyDefinition. Un payload
-absent/incomplet, un doublon ou une divergence est refusé. Il exige `0 Modify`, `0 Delete`,
-`0 Unsupported`, refuse tout wildcard/action delete et toute ressource hors contrat. L'allowlist
-de création est :
+Le script conserve le JSON ARM brut complet (`FullResourcePayloads`) et ne filtre aucun type de
+changement. Phase A ne cible aucun module sous `rg-certigo-ci` : elle calcule seulement cet ID pour
+les `assignableScopes` réseau, ce qui évite l'énumération de l'inventaire CI sans l'autoriser.
+Le validateur exige `status == Succeeded`, `error == null`, aucun diagnostic, aucune
+`potentialChanges` et aucun `unsupportedReason`. Il accepte seulement `Create`, `NoChange`, ou un
+`Ignore` strictement inerte (`before == after`, `delta == null`) pour un ID exact du contrat.
+`NoChange` permet de reprendre après une Phase A partiellement appliquée uniquement si le payload
+complet (`id`, `name`, `type`, propriétés) revalide le même rôle/actions, la même UAMI, la même FIC,
+la même policyDefinition ou l'un des deux RG. Un payload absent/incomplet, un doublon ou une
+divergence est refusé. Il exige `0 Modify`, `0 Delete`, `0 Unsupported`, refuse tout wildcard,
+action delete, `dataActions` et toute ressource hors contrat. L'allowlist de création est :
 
+- `rg-certigo-identities` ;
 - `rg-certigo-content` ;
 - les six custom roles nommés dans `bootstrap-identities.bicep` ;
 - `id-certigo-deploy-{dev,staging,prod}`, `id-certigo-content-infra-plan`,
@@ -254,17 +261,17 @@ seuls IDs complets :
 ```
 
 Un scope RG, un autre subnet/DNS, un préfixe générique ou une expression non matérialisée est
-refusé. Un retry B peut contenir `NoEffect` seulement pour une attribution ou policyAssignment
+refusé. Un retry B peut contenir `NoChange` seulement pour une attribution ou policyAssignment
 dont le payload complet correspond au scope, principal, rôle, condition et effet exacts. Le
-mélange `Create`/`NoEffect` est accepté quand chaque contrat apparaît une seule fois; tout payload
+mélange `Create`/`NoChange` est accepté quand chaque contrat apparaît une seule fois; tout payload
 manquant, doublon ou écart est refusé. La Phase B exige aussi `0 Modify`, `0 Delete`,
 `0 Unsupported`.
 
 Les deployments ARM imbriqués ne sont pas une échappatoire à l'allowlist. Chaque nom est lié à
-son resource ID complet et sensible à la casse : identités applicatives et plan sous
-`rg-certigo-ci`, identités contenu sous `rg-certigo-content`, RBAC environnement sous son RG,
+son resource ID complet et sensible à la casse : toutes les identités sous
+`rg-certigo-identities`, RBAC environnement sous son RG,
 réseau partagé sous `rg-certigo-ci`, exécuteur contenu sous `rg-certigo-content` et joins externes
-sous `rg-certigo-ci`. Pour `Ignore` ou `NoEffect`, le payload doit contenir le type deployment
+sous `rg-certigo-ci`. Pour `Ignore` ou `NoChange`, le payload doit contenir le type deployment
 exact et un état ARM matérialisé (`provisioningState`, `templateHash` ou `templateLink` non vide).
 Les valeurs vides ou composées d'espaces sont également refusées. Un même leaf name sous un autre
 RG/subscription, une casse différente ou `properties: {}` est refusé.
