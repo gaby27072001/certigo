@@ -24,7 +24,8 @@
 - chaque opération résout une Membership active côté serveur et compare exactement
   l'`organizationId` du contexte avec le body, la route et chaque ressource chargée ;
 - feature-off, absence de Person/Membership et mismatch cross-tenant sont masqués en `404` ;
-- offboarding supprime uniquement les accès et artefacts organisationnels ;
+- offboarding révoque atomiquement l'accès, puis purge les artefacts par pages idempotentes ;
+- rejoin bloqué pendant purge, puis Membership et sujet métrique passent au cycle suivant ;
 - `ORGANIZATION_MEMBERSHIP_V1=off` dans tous les environnements ; toute autre valeur est refusée.
 
 ## Matrice d'autorisation
@@ -37,6 +38,8 @@
 | Créer/révoquer une invitation | oui | oui | non | non |
 | Voir équipes/assignations | oui | oui | oui | oui |
 | Gérer équipes/assignations | oui | oui | oui | non |
+| Enregistrer ses métriques entreprise | oui | oui | oui | oui |
+| Voir les agrégats entreprise | oui | oui | oui | non |
 | Offboarder sa propre Membership | non | oui | oui | oui |
 | Offboarder une autre Membership | non-owner | manager/learner | non | non |
 

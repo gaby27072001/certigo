@@ -129,6 +129,14 @@ public sealed class OrganizationService(
         {
             throw new OrganizationInvitationReplayException();
         }
+        var latestOffboarding = await organizations.GetLatestOffboardingAsync(
+            organizationId,
+            personId,
+            cancellationToken);
+        if (latestOffboarding?.PurgeCompletedAt is null && latestOffboarding is not null)
+        {
+            throw new OrganizationOffboardingInProgressException();
+        }
 
         var invitation = await organizations.GetInvitationAsync(
             organizationId,
@@ -151,7 +159,8 @@ public sealed class OrganizationService(
             organizationId,
             personId,
             accepted.Role,
-            clock.UtcNow);
+            clock.UtcNow,
+            (latestOffboarding?.MembershipCycle ?? 0) + 1);
         var stored = await organizations.AcceptInvitationAsync(
             issuer,
             accepted,
@@ -228,7 +237,43 @@ public sealed class OrganizationService(
             organizationId,
             OrganizationOperation.ViewOrganization,
             cancellationToken: cancellationToken);
-        var target = await memberships.ResolveActiveAsync(
+        var target = await organizations.GetMembershipAsync(
+            organizationId,
+            personId,
+            cancellationToken);
+        if (target is null)
+        {
+            var tombstone = await organizations.GetLatestOffboardingAsync(
+                organizationId,
+                personId,
+                cancellationToken);
+            if (tombstone is null)
+            {
+                throw new OrganizationMembershipNotFoundException();
+            }
+            var selfRecovery = string.Equals(
+                context.PersonId,
+                personId,
+                StringComparison.Ordinal);
+            var privilegedRecovery = context.Membership.Role is
+                OrganizationRole.Owner or OrganizationRole.Admin;
+            if (!selfRecovery && !privilegedRecovery)
+            {
+                throw new OrganizationMembershipNotFoundException();
+            }
+            if (tombstone.PurgeCompletedAt is null)
+            {
+                await organizations.PurgeOffboardingAsync(
+                    organizationId,
+                    tombstone.Id,
+                    cancellationToken);
+            }
+            return new OrganizationOffboardingDto(
+                organizationId,
+                personId,
+                tombstone.RevokedAt);
+        }
+        target = await memberships.ResolveActiveAsync(
             organizationId,
             personId,
             cancellationToken);
@@ -240,7 +285,11 @@ public sealed class OrganizationService(
                 target.PersonId,
                 target.Role));
 
-        await organizations.OffboardAsync(context.Membership, target, cancellationToken);
+        await organizations.OffboardAsync(
+            context.Membership,
+            target,
+            clock.UtcNow,
+            cancellationToken);
         return new OrganizationOffboardingDto(
             organizationId,
             personId,
@@ -260,6 +309,7 @@ public sealed class OrganizationService(
             membership.OrganizationId,
             membership.PersonId,
             membership.Role,
+            membership.Cycle,
             membership.JoinedAt);
 
     private static OrganizationTeamDto ToDto(OrganizationTeam team) =>

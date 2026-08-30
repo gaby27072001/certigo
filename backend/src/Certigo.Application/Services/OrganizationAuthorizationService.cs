@@ -53,6 +53,7 @@ public sealed class OrganizationMembershipResolver(
             || membership.SchemaVersion != OrganizationMembership.CurrentSchemaVersion
             || membership.DocumentType != OrganizationMembership.Type
             || !Enum.IsDefined(membership.Role)
+            || membership.Cycle <= 0
             || string.IsNullOrWhiteSpace(membership.ETag))
         {
             throw new OrganizationMembershipNotFoundException();

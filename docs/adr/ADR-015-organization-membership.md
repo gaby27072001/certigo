@@ -7,7 +7,7 @@
 | **Date** | 2026-08-20 |
 | **Activation runtime** | `off` uniquement ; aucune activation dev/staging/prod |
 | **Contrat** | `docs/contracts/organization-membership/v1` |
-| **Baseline** | `origin/main@90ad8a33` (#322), avec Person/LinkedIdentity #300/#311 |
+| **Baseline** | `origin/main@8cd955f` avec Person/LinkedIdentity #300/#311 |
 
 ## Contexte
 
@@ -105,15 +105,15 @@ offboardé ou rétrogradé ne peut donc pas réutiliser un token conservé.
 
 ### Offboarding
 
-L'offboarding supprime atomiquement la Membership et ses TeamMembership dans la partition de
-l'Organization. Il ne supprime ni la Person, ni LinkedIdentity, ni progression, tentatives,
-économie, amis ou préférences. Les données et accès entreprise deviennent inaccessibles dès que
-la Membership disparaît.
+L'offboarding CAS l'acteur, crée un tombstone durable et supprime atomiquement la Membership cible.
+Les accès sont donc révoqués avant tout nettoyage volumique. Les TeamMembership et artefacts
+métriques pseudonymes sont ensuite purgés par pages idempotentes ; une reprise peut repartir du
+tombstone sans restaurer la Membership. Il ne supprime ni la Person, ni LinkedIdentity, ni
+progression, tentatives, économie, amis ou préférences.
 
-Le batch Cosmos est limité à 100 opérations. V1 refuse fail-closed un offboarding dépassant
-99 team edges pour un départ volontaire, ou 98 team edges quand un acteur privilégié distinct
-est aussi CAS dans le batch, plutôt que de laisser un état partiel. La phase shadow devra mesurer
-ce seuil avant toute activation.
+Une réadhésion est bloquée tant que le tombstone du cycle courant est incomplet. Une fois la purge
+terminée, la Membership suivante reçoit `cycle+1`; ses leases, sujets métriques et futurs tombstones
+sont donc distincts des cycles antérieurs.
 
 Toute mutation privilégiée CAS la Membership de l'acteur dans son batch mono-partition après
 avoir revérifié son rôle côté repository. Une invitation, une équipe ou une assignation ne peut

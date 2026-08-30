@@ -18,6 +18,7 @@ public sealed record OrganizationMembershipDto(
     string OrganizationId,
     string PersonId,
     OrganizationRole Role,
+    int Cycle,
     DateTimeOffset JoinedAt);
 
 public sealed record OrganizationInvitationDto(

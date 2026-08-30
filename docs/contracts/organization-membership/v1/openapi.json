@@ -37,6 +37,8 @@
       "manageTeams": ["owner", "admin", "manager"],
       "viewAssignments": ["owner", "admin", "manager", "learner"],
       "manageAssignments": ["owner", "admin", "manager"],
+      "recordEnterpriseMetrics": ["owner", "admin", "manager", "learner"],
+      "viewEnterpriseMetrics": ["owner", "admin", "manager"],
       "offboardMembership": ["owner", "admin", "manager", "learner"]
     }
   },
@@ -156,7 +158,7 @@
           { "name": "personId", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
         "responses": {
-          "200": { "description": "Organization access removed; Person and personal achievements preserved" },
+          "200": { "description": "Organization access revoked before paged artifact purge; Person and personal achievements preserved" },
           "404": { "$ref": "#/components/responses/SurfaceDisabled" },
           "409": { "description": "Owner offboarding or concurrency conflict" }
         }

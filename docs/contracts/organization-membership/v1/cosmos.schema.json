@@ -13,7 +13,7 @@
     "container": "organizations",
     "partitionKey": "/organizationId",
     "defaultTtl": -1,
-    "topologyChange": "additive-container",
+    "topologyChange": "additive-containers",
     "existingContainersChanged": false,
     "uniqueKeyPolicyRequired": false,
     "indexingPolicy": {
@@ -28,7 +28,8 @@
       "issuer membership CAS + invitation consumption + membership",
       "actor membership CAS + team",
       "actor and target membership CAS + team membership",
-      "membership + team memberships offboarding"
+      "actor membership CAS + offboarding tombstone + target membership revoke",
+      "paged idempotent team memberships and pseudonymous metric artifact purge"
     ]
   },
   "x-certigo-ownership": {
@@ -42,7 +43,12 @@
     { "$ref": "#/$defs/team" },
     { "$ref": "#/$defs/teamMembership" },
     { "$ref": "#/$defs/invitation" },
-    { "$ref": "#/$defs/invitationReceipt" }
+    { "$ref": "#/$defs/invitationReceipt" },
+    { "$ref": "../../enterprise-learning-metrics/v1/cosmos.schema.json#/$defs/lease" },
+    { "$ref": "../../enterprise-learning-metrics/v1/cosmos.schema.json#/$defs/receiptIntent" },
+    { "$ref": "../../enterprise-learning-metrics/v1/cosmos.schema.json#/$defs/dailyAggregateShard" },
+    { "$ref": "../../enterprise-learning-metrics/v1/cosmos.schema.json#/$defs/activeSubjectShard" },
+    { "$ref": "../../enterprise-learning-metrics/v1/cosmos.schema.json#/$defs/offboardingTombstone" }
   ],
   "$defs": {
     "base": {
@@ -77,11 +83,12 @@
         { "$ref": "#/$defs/base" },
         {
           "type": "object",
-          "required": ["personId", "role", "joinedAt", "updatedAt"],
+          "required": ["personId", "role", "cycle", "joinedAt", "updatedAt"],
           "properties": {
             "documentType": { "const": "organizationMembership" },
             "personId": { "type": "string", "minLength": 1 },
             "role": { "enum": ["owner", "admin", "manager", "learner"] },
+            "cycle": { "type": "integer", "minimum": 1 },
             "joinedAt": { "type": "string", "format": "date-time" },
             "updatedAt": { "type": "string", "format": "date-time" }
           }
@@ -110,11 +117,12 @@
         { "$ref": "#/$defs/base" },
         {
           "type": "object",
-          "required": ["teamId", "personId", "addedAt"],
+          "required": ["teamId", "personId", "membershipId", "addedAt"],
           "properties": {
             "documentType": { "const": "organizationTeamMembership" },
             "teamId": { "type": "string", "minLength": 1 },
             "personId": { "type": "string", "minLength": 1 },
+            "membershipId": { "type": "string", "minLength": 1 },
             "addedAt": { "type": "string", "format": "date-time" }
           }
         }

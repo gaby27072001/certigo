@@ -96,6 +96,133 @@ public sealed class OrganizationServiceTests
     }
 
     [Fact]
+    public async Task Offboarding_revokes_before_purging_more_than_one_hundred_metric_documents()
+    {
+        var repository = new MemoryOrganizationRepository();
+        var ownerService = CreateService("owner-person", repository);
+        var organization = await ownerService.CreateAsync(
+            "Contoso Learning",
+            "organization-key-0001");
+        var invitation = await ownerService.InviteAsync(
+            organization.Id,
+            "learner@example.test",
+            OrganizationRole.Learner,
+            "invitation-key-0001");
+        await CreateService("portable-person", repository).AcceptInvitationAsync(
+            organization.Id,
+            invitation.Id,
+            invitation.Token);
+        repository.SeedMetricDocuments(250);
+
+        await ownerService.OffboardAsync(organization.Id, "portable-person");
+
+        repository.MembershipWasRemovedBeforePurge.Should().BeTrue();
+        repository.RemainingMetricDocuments.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Rejoin_is_blocked_until_recovery_completes_then_uses_new_cycle()
+    {
+        var repository = new MemoryOrganizationRepository { FailPurgeAttempts = 1 };
+        var owner = CreateService("owner-person", repository);
+        var organization = await owner.CreateAsync("Contoso", "organization-key-0001");
+        var firstInvitation = await owner.InviteAsync(
+            organization.Id,
+            "learner@example.test",
+            OrganizationRole.Learner,
+            "invitation-key-0001");
+        var learner = CreateService("portable-person", repository);
+        await learner.AcceptInvitationAsync(
+            organization.Id,
+            firstInvitation.Id,
+            firstInvitation.Token);
+        var offboard = () => owner.OffboardAsync(organization.Id, "portable-person");
+        await offboard.Should().ThrowAsync<InvalidOperationException>();
+        var secondInvitation = await owner.InviteAsync(
+            organization.Id,
+            "learner@example.test",
+            OrganizationRole.Learner,
+            "invitation-key-0002");
+
+        var blocked = () => learner.AcceptInvitationAsync(
+            organization.Id,
+            secondInvitation.Id,
+            secondInvitation.Token);
+        await blocked.Should().ThrowAsync<OrganizationOffboardingInProgressException>();
+
+        repository.FailPurgeAttempts = 2;
+        var worker = new OrganizationOffboardingRecoveryWorker(repository);
+        (await worker.RunBatchAsync(10)).Should().Be(1);
+        var rejoined = await learner.AcceptInvitationAsync(
+            organization.Id,
+            secondInvitation.Id,
+            secondInvitation.Token);
+        repository.Memberships[(organization.Id, "portable-person")].Cycle.Should().Be(2);
+        rejoined.PersonId.Should().Be("portable-person");
+    }
+
+    [Fact]
+    public async Task Offboarding_api_retry_resumes_tombstone_when_membership_is_absent()
+    {
+        var repository = new MemoryOrganizationRepository { FailPurgeAttempts = 1 };
+        var owner = CreateService("owner-person", repository);
+        var organization = await owner.CreateAsync("Contoso", "organization-key-0001");
+        var invitation = await owner.InviteAsync(
+            organization.Id,
+            "learner@example.test",
+            OrganizationRole.Learner,
+            "invitation-key-0001");
+        await CreateService("portable-person", repository).AcceptInvitationAsync(
+            organization.Id,
+            invitation.Id,
+            invitation.Token);
+        var first = () => owner.OffboardAsync(organization.Id, "portable-person");
+        await first.Should().ThrowAsync<InvalidOperationException>();
+
+        var retried = await owner.OffboardAsync(organization.Id, "portable-person");
+
+        retried.PersonId.Should().Be("portable-person");
+        (await repository.GetLatestOffboardingAsync(
+            organization.Id,
+            "portable-person"))!.PurgeCompletedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Manager_cannot_recover_another_members_tombstone()
+    {
+        var repository = new MemoryOrganizationRepository { FailPurgeAttempts = 1 };
+        var owner = CreateService("owner-person", repository);
+        var organization = await owner.CreateAsync("Contoso", "organization-key-0001");
+        var managerInvitation = await owner.InviteAsync(
+            organization.Id,
+            "manager@example.test",
+            OrganizationRole.Manager,
+            "manager-invite-0001");
+        var manager = CreateService("manager-person", repository);
+        await manager.AcceptInvitationAsync(
+            organization.Id,
+            managerInvitation.Id,
+            managerInvitation.Token);
+        var learnerInvitation = await owner.InviteAsync(
+            organization.Id,
+            "learner@example.test",
+            OrganizationRole.Learner,
+            "learner-invite-0001");
+        await CreateService("learner-person", repository).AcceptInvitationAsync(
+            organization.Id,
+            learnerInvitation.Id,
+            learnerInvitation.Token);
+        var first = () => owner.OffboardAsync(organization.Id, "learner-person");
+        await first.Should().ThrowAsync<InvalidOperationException>();
+
+        var unauthorized = () => manager.OffboardAsync(
+            organization.Id,
+            "learner-person");
+
+        await unauthorized.Should().ThrowAsync<OrganizationMembershipNotFoundException>();
+    }
+
+    [Fact]
     public async Task Owner_cannot_be_offboarded()
     {
         var repository = new MemoryOrganizationRepository();
@@ -453,6 +580,7 @@ public sealed class OrganizationServiceTests
         private readonly Dictionary<(string OrganizationId, string Id), OrganizationInvitation>
             _invitations = [];
         private readonly Dictionary<(string OrganizationId, string Id), OrganizationTeam> _teams = [];
+        private readonly List<OrganizationOffboardingTombstone> _tombstones = [];
 
         public Dictionary<(string OrganizationId, string PersonId), OrganizationMembership>
             Memberships
@@ -463,6 +591,9 @@ public sealed class OrganizationServiceTests
         public int OrganizationWriteCount { get; private set; }
         public int MembershipReadCount { get; private set; }
         public int OrganizationReadCount { get; private set; }
+        public int RemainingMetricDocuments { get; private set; }
+        public bool MembershipWasRemovedBeforePurge { get; private set; }
+        public int FailPurgeAttempts { get; set; }
         public (int Memberships, int Organizations) ReadCounts =>
             (MembershipReadCount, OrganizationReadCount);
 
@@ -574,14 +705,74 @@ public sealed class OrganizationServiceTests
         public Task OffboardAsync(
             OrganizationMembership actor,
             OrganizationMembership target,
+            DateTimeOffset revokedAt,
             CancellationToken cancellationToken = default)
         {
             RequireCurrent(actor);
             RequireCurrent(target, invokeHook: false);
+            var tombstone = OrganizationOffboardingTombstone.Create(target, revokedAt)
+                with { ETag = $"tombstone-{target.Cycle}" };
+            _tombstones.Add(tombstone);
             Memberships.Remove((target.OrganizationId, target.PersonId));
+            MembershipWasRemovedBeforePurge = !Memberships.ContainsKey(
+                (target.OrganizationId, target.PersonId));
             OffboardedPersonIds.Add(target.PersonId);
+            return PurgeOffboardingAsync(
+                target.OrganizationId,
+                tombstone.Id,
+                cancellationToken);
+        }
+
+        public Task PurgeOffboardingAsync(
+            string organizationId,
+            string tombstoneId,
+            CancellationToken cancellationToken = default)
+        {
+            if (FailPurgeAttempts > 0)
+            {
+                FailPurgeAttempts--;
+                throw new InvalidOperationException("simulated purge crash");
+            }
+            while (RemainingMetricDocuments > 0)
+            {
+                RemainingMetricDocuments -= Math.Min(50, RemainingMetricDocuments);
+            }
+            var index = _tombstones.FindIndex(item =>
+                item.OrganizationId == organizationId && item.Id == tombstoneId);
+            if (index >= 0)
+            {
+                _tombstones[index] = _tombstones[index] with
+                {
+                    PurgeCompletedAt = Now,
+                    Ttl = 2_592_000,
+                };
+            }
             return Task.CompletedTask;
         }
+
+        public Task<OrganizationOffboardingTombstone?> GetLatestOffboardingAsync(
+            string organizationId,
+            string personId,
+            CancellationToken cancellationToken = default)
+        {
+            var membershipId = OrganizationDocumentIds.Membership(organizationId, personId);
+            return Task.FromResult(_tombstones
+                .Where(item => item.TargetMembershipId == membershipId)
+                .OrderByDescending(item => item.MembershipCycle)
+                .FirstOrDefault());
+        }
+
+        public Task<IReadOnlyList<OrganizationOffboardingTombstone>>
+            ListIncompleteOffboardingsAsync(
+                int maximumTombstones,
+                CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<OrganizationOffboardingTombstone>>(
+                _tombstones
+                    .Where(item => item.PurgeCompletedAt is null)
+                    .Take(maximumTombstones)
+                    .ToArray());
+
+        public void SeedMetricDocuments(int count) => RemainingMetricDocuments = count;
 
         private void RequireCurrent(
             OrganizationMembership membership,

@@ -97,6 +97,15 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
                 ex.Message,
                 correlationId);
         }
+        catch (EnterpriseLearningMetricsFeatureDisabledException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.NotFound,
+                "Not found",
+                ex.Message,
+                correlationId);
+        }
         catch (OrganizationNotFoundException ex)
         {
             await WriteProblemAsync(context, HttpStatusCode.NotFound, "Not found", ex.Message, correlationId);
@@ -121,6 +130,10 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
         {
             await WriteProblemAsync(context, HttpStatusCode.BadRequest, "Invalid request", ex.Message, correlationId);
         }
+        catch (EnterpriseLearningSequenceException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict", ex.Message, correlationId);
+        }
         catch (OrganizationInvitationTokenException ex)
         {
             await WriteProblemAsync(context, HttpStatusCode.Unauthorized, "Unauthorized", ex.Message, correlationId);
@@ -138,6 +151,14 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
             await WriteProblemAsync(context, HttpStatusCode.Gone, "Invitation expired", ex.Message, correlationId);
         }
         catch (OrganizationOwnerOffboardingException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict", ex.Message, correlationId);
+        }
+        catch (OrganizationOffboardingInProgressException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict", ex.Message, correlationId);
+        }
+        catch (EnterpriseLearningLeaseConflictException ex)
         {
             await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict", ex.Message, correlationId);
         }

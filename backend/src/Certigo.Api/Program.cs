@@ -31,6 +31,7 @@ var host = new HostBuilder()
         // downstream exception is mapped to ProblemDetails.
         worker.UseMiddleware<SecurityHeadersMiddleware>();
         worker.UseMiddleware<ExceptionMiddleware>();
+        worker.UseMiddleware<EnterpriseLearningMetricsFeatureMiddleware>();
         worker.UseMiddleware<OrganizationFeatureMiddleware>();
         worker.UseMiddleware<JwtAuthMiddleware>();
     })
@@ -41,6 +42,9 @@ var host = new HostBuilder()
             configuration["PERSON_LINKED_IDENTITY_V1"]);
         var organizationFeatureOptions = OrganizationFeatureOptions.Parse(
             configuration["ORGANIZATION_MEMBERSHIP_V1"]);
+        var enterpriseLearningMetricsFeatureOptions =
+            EnterpriseLearningMetricsFeatureOptions.Parse(
+                configuration["ENTERPRISE_LEARNING_METRICS_V1"]);
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
         services.AddHostedService<ColdStartTelemetryService>();
@@ -234,6 +238,7 @@ var host = new HostBuilder()
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(personLinkedIdentityOptions);
         services.AddSingleton(organizationFeatureOptions);
+        services.AddSingleton(enterpriseLearningMetricsFeatureOptions);
         services.AddSingleton<IIdentitySubjectGenerator, CryptographicIdentitySubjectGenerator>();
         services.AddSingleton<IPersonLinkedIdentityRepository, CosmosPersonLinkedIdentityRepository>();
         services.AddSingleton<
@@ -253,6 +258,28 @@ var host = new HostBuilder()
         services.AddScoped<IOrganizationMembershipResolver, OrganizationMembershipResolver>();
         services.AddScoped<IOrganizationAuthorizationHandler, OrganizationAuthorizationHandler>();
         services.AddScoped<IOrganizationService, OrganizationService>();
+        services.AddScoped<
+            IOrganizationOffboardingRecoveryWorker,
+            OrganizationOffboardingRecoveryWorker>();
+        services.AddScoped<
+            IEnterpriseLearningMetricsRepository,
+            CosmosEnterpriseLearningMetricsRepository>();
+        services.AddScoped<
+            IEnterpriseLearningReceiptOutboxRepository,
+            CosmosEnterpriseLearningMetricsRepository>();
+        services.AddScoped<
+            IEnterpriseLearningMetricReceiptRepository,
+            CosmosEnterpriseLearningMetricReceiptRepository>();
+        services.AddSingleton<
+            IEnterpriseLearningLeaseGenerator,
+            CryptographicEnterpriseLearningLeaseGenerator>();
+        services.AddSingleton<
+            IEnterpriseLearningFactSource,
+            UnavailableEnterpriseLearningFactSource>();
+        services.AddScoped<
+            IEnterpriseLearningReceiptOutboxWorker,
+            EnterpriseLearningReceiptOutboxWorker>();
+        services.AddScoped<IEnterpriseLearningMetricsService, EnterpriseLearningMetricsService>();
         services.AddSingleton<IAccountDeletionRepository, CosmosAccountDeletionRepository>();
         services.AddSingleton<IAccountDeletionAccessGuard, AccountDeletionAccessGuard>();
         services.AddSingleton<IAccountDeletionAudit, AccountDeletionAudit>();

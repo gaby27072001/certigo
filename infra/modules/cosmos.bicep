@@ -95,6 +95,9 @@ var containers = [
   // B2B aggregate documents share one partition so invitation acceptance and
   // offboarding remain atomic without touching portable Person-owned data.
   { name: 'organizations', pk: '/organizationId' }
+  // High-volume immutable metric receipts are isolated from the Organization
+  // transaction partition and spread by organization + UTC day + 128-way shard.
+  { name: 'enterpriseMetricReceipts', pk: '/partitionKey' }
 ]
 
 resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [
@@ -125,7 +128,9 @@ resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
             ]
           }
         },
-        c.name == 'attempts' || c.name == 'organizations' ? { defaultTtl: -1 } : {}
+        c.name == 'attempts' || c.name == 'organizations' || c.name == 'enterpriseMetricReceipts'
+          ? { defaultTtl: -1 }
+          : {}
       )
     }
   }

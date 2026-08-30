@@ -116,6 +116,18 @@ public interface IOrganizationRepository : IOrganizationInvitationReader
     Task OffboardAsync(
         OrganizationMembership actor,
         OrganizationMembership target,
+        DateTimeOffset revokedAt,
+        CancellationToken cancellationToken = default);
+    Task PurgeOffboardingAsync(
+        string organizationId,
+        string tombstoneId,
+        CancellationToken cancellationToken = default);
+    Task<OrganizationOffboardingTombstone?> GetLatestOffboardingAsync(
+        string organizationId,
+        string personId,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<OrganizationOffboardingTombstone>> ListIncompleteOffboardingsAsync(
+        int maximumTombstones,
         CancellationToken cancellationToken = default);
 }
 

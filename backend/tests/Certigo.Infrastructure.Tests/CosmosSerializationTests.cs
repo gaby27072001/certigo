@@ -5,6 +5,7 @@ using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
 using Certigo.Domain.Content;
 using Certigo.Domain.Identity;
+using Certigo.Domain.Organizations;
 using Xunit;
 
 namespace Certigo.Infrastructure.Tests;
@@ -16,6 +17,68 @@ public sealed class CosmosSerializationTests
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
         return options;
+    }
+
+    [Fact]
+    public void Enterprise_receipt_serializes_sharded_partition_and_item_ttl_without_person()
+    {
+        var now = new DateTimeOffset(2026, 8, 21, 10, 0, 0, TimeSpan.Zero);
+        var membership = OrganizationMembership.Create(
+            "organization-a",
+            "portable-person",
+            OrganizationRole.Learner,
+            now);
+        var lease = EnterpriseLearningSessionLease.Create(
+            membership,
+            "server-session-0000000000000001",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            now);
+        var heartbeat = lease.PrepareHeartbeat(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            1,
+            "operation-id-000001",
+            now.AddMinutes(1),
+            EnterpriseLearningFact.Create(60, 0, 0, null),
+            now.AddMinutes(1));
+        var receipt = EnterpriseLearningMetricReceipt.From(heartbeat, now.AddMinutes(1));
+
+        var json = JsonSerializer.Serialize(receipt, SerializerOptions());
+        using var document = JsonDocument.Parse(json);
+
+        document.RootElement.GetProperty("partitionKey").GetString()
+            .Should().MatchRegex(@"^organization-a\|20260821\|\d{3}$");
+        document.RootElement.GetProperty("ttl").GetInt32().Should().Be(2_592_000);
+        json.Should().NotContain("portable-person");
+    }
+
+    [Fact]
+    public void Receipt_intent_state_serializes_as_camel_case_for_cosmos_queries()
+    {
+        var now = new DateTimeOffset(2026, 8, 21, 10, 0, 0, TimeSpan.Zero);
+        var membership = OrganizationMembership.Create(
+            "organization-a",
+            "person-a",
+            OrganizationRole.Learner,
+            now);
+        var lease = EnterpriseLearningSessionLease.Create(
+            membership,
+            "server-session-0000000000000001",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            now);
+        var heartbeat = lease.PrepareHeartbeat(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            1,
+            "operation-id-000001",
+            now.AddMinutes(1),
+            EnterpriseLearningFact.Create(60, 0, 0, null),
+            now.AddMinutes(1));
+
+        var json = JsonSerializer.Serialize(
+            EnterpriseLearningReceiptIntent.From(heartbeat, now.AddMinutes(1)),
+            SerializerOptions());
+
+        using var document = JsonDocument.Parse(json);
+        document.RootElement.GetProperty("state").GetString().Should().Be("pending");
     }
 
     [Fact]

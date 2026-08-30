@@ -322,6 +322,8 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     ACCOUNT_DELETION_ENABLED: string(accountDeletionEnabled)
     PERSON_LINKED_IDENTITY_V1: personLinkedIdentityV1
     ORGANIZATION_MEMBERSHIP_V1: organizationMembershipV1
+    ENTERPRISE_LEARNING_METRICS_V1: 'off'
+    ENTERPRISE_LEARNING_RECOVERY_SCHEDULE: '0 */5 * * * *'
     TUTOR_LLM_ENABLED: string(tutorLlmEnabled)
     TUTOR_LLM_ENDPOINT: tutorLlmEndpoint
     TUTOR_LLM_DEPLOYMENT: tutorLlmDeployment

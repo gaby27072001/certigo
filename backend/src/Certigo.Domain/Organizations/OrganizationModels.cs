@@ -30,6 +30,8 @@ public enum OrganizationOperation
     ManageTeams,
     ViewAssignments,
     ManageAssignments,
+    RecordEnterpriseMetrics,
+    ViewEnterpriseMetrics,
     OffboardMembership,
 }
 
@@ -80,6 +82,7 @@ public sealed record OrganizationMembership(
     string DocumentType,
     string PersonId,
     OrganizationRole Role,
+    int Cycle,
     DateTimeOffset JoinedAt,
     DateTimeOffset UpdatedAt)
 {
@@ -93,7 +96,8 @@ public sealed record OrganizationMembership(
         string organizationId,
         string personId,
         OrganizationRole role,
-        DateTimeOffset joinedAt)
+        DateTimeOffset joinedAt,
+        int cycle = 1)
     {
         OrganizationDomainRules.EnsureIdentifier(organizationId, nameof(organizationId));
         OrganizationDomainRules.EnsureIdentifier(personId, nameof(personId));
@@ -104,6 +108,9 @@ public sealed record OrganizationMembership(
             Type,
             personId,
             role,
+            cycle > 0
+                ? cycle
+                : throw new OrganizationValidationException("Membership cycle must be positive."),
             joinedAt,
             joinedAt);
     }
@@ -157,6 +164,7 @@ public sealed record OrganizationTeamMembership(
     string DocumentType,
     string TeamId,
     string PersonId,
+    string MembershipId,
     DateTimeOffset AddedAt)
 {
     public const int CurrentSchemaVersion = 1;
@@ -178,6 +186,7 @@ public sealed record OrganizationTeamMembership(
             Type,
             teamId,
             personId,
+            OrganizationDocumentIds.Membership(organizationId, personId),
             addedAt);
     }
 }
@@ -330,10 +339,12 @@ public static class OrganizationAuthorization
         {
             OrganizationOperation.ViewOrganization
                 or OrganizationOperation.ViewTeams
-                or OrganizationOperation.ViewAssignments => Enum.IsDefined(role),
+                or OrganizationOperation.ViewAssignments
+                or OrganizationOperation.RecordEnterpriseMetrics => Enum.IsDefined(role),
             OrganizationOperation.ViewMemberships
                 or OrganizationOperation.ManageTeams
-                or OrganizationOperation.ManageAssignments =>
+                or OrganizationOperation.ManageAssignments
+                or OrganizationOperation.ViewEnterpriseMetrics =>
                 role is OrganizationRole.Owner
                     or OrganizationRole.Admin
                     or OrganizationRole.Manager,
@@ -487,3 +498,5 @@ public sealed class OrganizationInvitationTokenException()
     : Exception("The invitation token is invalid.");
 public sealed class OrganizationOwnerOffboardingException()
     : Exception("The organization owner cannot be offboarded.");
+public sealed class OrganizationOffboardingInProgressException()
+    : Exception("Organization offboarding cleanup is still in progress.");

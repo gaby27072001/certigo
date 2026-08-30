@@ -68,13 +68,15 @@ test('compiled Cosmos ARM preserves container topology and TTL scope', () => {
     { name: 'economy', pk: '/userId' },
     { name: 'friends', pk: '/userId' },
     { name: 'organizations', pk: '/organizationId' },
+    { name: 'enterpriseMetricReceipts', pk: '/partitionKey' },
   ]);
 
   const compiledResource = containerResource.properties.resource;
   assert.equal(typeof compiledResource, 'string');
   const ttlCondition =
-    "if(or(equals(variables('containers')[copyIndex()].name, 'attempts'), " +
+    "if(or(or(equals(variables('containers')[copyIndex()].name, 'attempts'), " +
     "equals(variables('containers')[copyIndex()].name, 'organizations')), " +
+    "equals(variables('containers')[copyIndex()].name, 'enterpriseMetricReceipts')), " +
     "createObject('defaultTtl', -1), createObject())";
   assert.ok(compiledResource.endsWith(`${ttlCondition})]`));
   assert.equal(compiledResource.match(/defaultTtl/g)?.length, 1);

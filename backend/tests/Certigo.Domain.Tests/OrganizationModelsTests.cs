@@ -183,4 +183,20 @@ public sealed class OrganizationModelsTests
 
         invite.Should().Throw<OrganizationValidationException>();
     }
+
+    [Fact]
+    public void Offboarding_tombstone_contains_no_portable_person_identifier()
+    {
+        var membership = OrganizationMembership.Create(
+            "organization-a",
+            "portable-person",
+            OrganizationRole.Learner,
+            Now);
+
+        var tombstone = OrganizationOffboardingTombstone.Create(membership, Now);
+
+        tombstone.ToString().Should().NotContain("portable-person");
+        tombstone.MetricSubjectId.Should().StartWith("enterprise-metric-subject::v3::");
+        tombstone.Ttl.Should().Be(-1);
+    }
 }
