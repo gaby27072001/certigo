@@ -113,6 +113,45 @@ public sealed class OrganizationModelsTests
         OrganizationAuthorization.CanManageTeams(role).Should().Be(canManageTeams);
     }
 
+    [Theory]
+    [InlineData(OrganizationRole.Owner, true, true, true, true)]
+    [InlineData(OrganizationRole.Admin, true, true, true, true)]
+    [InlineData(OrganizationRole.Manager, false, true, true, true)]
+    [InlineData(OrganizationRole.Learner, false, false, false, true)]
+    public void Operation_matrix_is_fail_closed(
+        OrganizationRole role,
+        bool canManageInvitations,
+        bool canManageTeams,
+        bool canManageAssignments,
+        bool canViewAssignments)
+    {
+        OrganizationAuthorization.CanPerform(role, OrganizationOperation.CreateInvitation)
+            .Should().Be(canManageInvitations);
+        OrganizationAuthorization.CanPerform(role, OrganizationOperation.ManageTeams)
+            .Should().Be(canManageTeams);
+        OrganizationAuthorization.CanPerform(role, OrganizationOperation.ManageAssignments)
+            .Should().Be(canManageAssignments);
+        OrganizationAuthorization.CanPerform(role, OrganizationOperation.ViewAssignments)
+            .Should().Be(canViewAssignments);
+    }
+
+    [Fact]
+    public void Undefined_roles_and_owner_grants_are_denied()
+    {
+        OrganizationAuthorization.CanPerform(
+                (OrganizationRole)999,
+                OrganizationOperation.ViewOrganization)
+            .Should().BeFalse();
+        OrganizationAuthorization.CanGrantInvitationRole(
+                OrganizationRole.Admin,
+                OrganizationRole.Owner)
+            .Should().BeFalse();
+        OrganizationAuthorization.CanChangeRole(
+                OrganizationRole.Admin,
+                OrganizationRole.Admin)
+            .Should().BeFalse();
+    }
+
     [Fact]
     public void Owner_role_cannot_be_invited_or_offboarded()
     {

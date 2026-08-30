@@ -1,6 +1,6 @@
 # Contrat Organization / Membership V1
 
-**Version :** `1.0.0`
+**Version :** `1.1.0`
 
 **Statut :** contrat et implémentation dormante (`off` uniquement)
 
@@ -19,8 +19,30 @@
 - invitation pending, non expirée, consommée une seule fois par ETag ;
 - issuer encore actif et autorisé, CAS dans le batch d'acceptation ;
 - acteur privilégié actif et rôle inchangé, CAS dans chaque batch d'écriture ;
+- le bearer validé doit résoudre une `Person` existante ; aucun rôle, `organizationId` ou e-mail
+  fourni par le client ne définit l'acteur ;
+- chaque opération résout une Membership active côté serveur et compare exactement
+  l'`organizationId` du contexte avec le body, la route et chaque ressource chargée ;
+- feature-off, absence de Person/Membership et mismatch cross-tenant sont masqués en `404` ;
 - offboarding supprime uniquement les accès et artefacts organisationnels ;
 - `ORGANIZATION_MEMBERSHIP_V1=off` dans tous les environnements ; toute autre valeur est refusée.
+
+## Matrice d'autorisation
+
+| Opération | owner | admin | manager | learner |
+|---|:---:|:---:|:---:|:---:|
+| Voir l'Organization | oui | oui | oui | oui |
+| Voir les Memberships | oui | oui | oui | non |
+| Changer un rôle | oui | oui* | non | non |
+| Créer/révoquer une invitation | oui | oui | non | non |
+| Voir équipes/assignations | oui | oui | oui | oui |
+| Gérer équipes/assignations | oui | oui | oui | non |
+| Offboarder sa propre Membership | non | oui | oui | oui |
+| Offboarder une autre Membership | non-owner | manager/learner | non | non |
+
+\* Un admin ne peut attribuer que `manager` ou `learner`. Seul l'owner peut attribuer `admin`.
+Le rôle `owner` n'est jamais attribuable et l'owner ne peut pas être offboardé. Les opérations
+d'assignation sont réservées pour la future surface et n'exposent encore aucun endpoint.
 
 ## Compatibilité
 

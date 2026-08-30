@@ -12,7 +12,7 @@ public sealed class OrganizationMembershipContractTests
         using var openApi = Load("openapi.json");
         var root = openApi.RootElement;
 
-        root.GetProperty("info").GetProperty("version").GetString().Should().Be("1.0.0");
+        root.GetProperty("info").GetProperty("version").GetString().Should().Be("1.1.0");
         root.GetProperty("x-certigo-feature-mode")
             .GetProperty("implementedValues")
             .EnumerateArray()
@@ -29,6 +29,16 @@ public sealed class OrganizationMembershipContractTests
             .GetString()
             .Should()
             .Be("personId");
+        var authorization = root.GetProperty("x-certigo-authorization");
+        authorization.GetProperty("clientClaimsTrusted").GetBoolean().Should().BeFalse();
+        authorization.GetProperty("emailTrusted").GetBoolean().Should().BeFalse();
+        authorization.GetProperty("crossTenantHttpStatus").GetInt32().Should().Be(404);
+        authorization.GetProperty("permissionMatrix")
+            .GetProperty("manageAssignments")
+            .EnumerateArray()
+            .Select(value => value.GetString())
+            .Should()
+            .Equal("owner", "admin", "manager");
     }
 
     [Fact]

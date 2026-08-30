@@ -41,6 +41,43 @@ public sealed record OrganizationTeamCreateResult(
     OrganizationCreateStatus Status,
     OrganizationTeam Team);
 
+public sealed record OrganizationContext(
+    string OrganizationId,
+    string PersonId,
+    OrganizationMembership Membership);
+
+public sealed record OrganizationAuthorizationTarget(
+    string OrganizationId,
+    string? PersonId = null,
+    OrganizationRole? Role = null);
+
+public interface IOrganizationPersonResolver
+{
+    Task<string> ResolveAsync(CancellationToken cancellationToken = default);
+}
+
+public interface IOrganizationMembershipResolver
+{
+    Task<OrganizationMembership> ResolveActiveAsync(
+        string organizationId,
+        string personId,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IOrganizationAuthorizationHandler
+{
+    Task<OrganizationContext> AuthorizeAsync(
+        string organizationId,
+        OrganizationOperation operation,
+        OrganizationAuthorizationTarget? target = null,
+        CancellationToken cancellationToken = default);
+
+    void AuthorizeMembership(
+        OrganizationMembership actor,
+        OrganizationOperation operation,
+        OrganizationAuthorizationTarget? target = null);
+}
+
 public interface IOrganizationRepository : IOrganizationInvitationReader
 {
     Task<OrganizationCreateResult> CreateOrganizationAsync(

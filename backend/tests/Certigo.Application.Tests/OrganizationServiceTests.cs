@@ -1,4 +1,5 @@
 using Certigo.Application.Abstractions;
+using Certigo.Application.Dtos;
 using Certigo.Application.Services;
 using Certigo.Domain.Organizations;
 using FluentAssertions;
@@ -235,6 +236,149 @@ public sealed class OrganizationServiceTests
         await action.Should().ThrowAsync<ConcurrencyConflictException>();
     }
 
+    [Fact]
+    public async Task Identity_without_person_is_rejected_before_any_organization_write()
+    {
+        var repository = new MemoryOrganizationRepository();
+        var service = CreateService("missing-person", repository, seedPerson: false);
+
+        var action = () => service.CreateAsync("Contoso", "organization-key-0001");
+
+        await action.Should().ThrowAsync<OrganizationPersonNotFoundException>();
+        repository.OrganizationWriteCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Cross_tenant_and_unknown_organization_share_the_same_lookup_shape()
+    {
+        var repository = new MemoryOrganizationRepository();
+        var first = CreateService("first-owner", repository);
+        var firstOrganization = await first.CreateAsync(
+            "First",
+            "organization-key-0001");
+        var second = CreateService("second-owner", repository);
+        var secondOrganization = await second.CreateAsync(
+            "Second",
+            "organization-key-0002");
+
+        repository.ResetReadCounts();
+        var crossTenant = () => first.GetAsync(secondOrganization.Id);
+        await crossTenant.Should().ThrowAsync<OrganizationMembershipNotFoundException>();
+        var crossTenantReads = repository.ReadCounts;
+
+        repository.ResetReadCounts();
+        var unknown = () => first.GetAsync("organization::v1::unknown");
+        await unknown.Should().ThrowAsync<OrganizationMembershipNotFoundException>();
+
+        repository.ReadCounts.Should().Be(crossTenantReads);
+        crossTenantReads.Should().Be((1, 0));
+        firstOrganization.Id.Should().NotBe(secondOrganization.Id);
+    }
+
+    [Fact]
+    public async Task Client_requested_role_never_elevates_a_manager_membership()
+    {
+        var repository = new MemoryOrganizationRepository();
+        var owner = CreateService("owner-person", repository);
+        var organization = await owner.CreateAsync(
+            "Contoso",
+            "organization-key-0001");
+        var managerInvitation = await owner.InviteAsync(
+            organization.Id,
+            "manager@example.test",
+            OrganizationRole.Manager,
+            "manager-key-00001");
+        var manager = CreateService("manager-person", repository);
+        await manager.AcceptInvitationAsync(
+            organization.Id,
+            managerInvitation.Id,
+            managerInvitation.Token);
+
+        var action = () => manager.InviteAsync(
+            organization.Id,
+            "admin@example.test",
+            OrganizationRole.Admin,
+            "admin-key-0000001");
+
+        await action.Should().ThrowAsync<OrganizationAccessDeniedException>();
+    }
+
+    [Fact]
+    public async Task Team_resource_from_another_partition_is_hidden_as_not_found()
+    {
+        var repository = new MemoryOrganizationRepository();
+        var firstOwner = CreateService("first-owner", repository);
+        var firstOrganization = await firstOwner.CreateAsync(
+            "First",
+            "organization-key-0001");
+        var foreignTeam = await firstOwner.CreateTeamAsync(
+            firstOrganization.Id,
+            "Foreign team",
+            "team-key-0000001");
+        var secondOwner = CreateService("second-owner", repository);
+        var secondOrganization = await secondOwner.CreateAsync(
+            "Second",
+            "organization-key-0002");
+        repository.SeedTeam(secondOrganization.Id, foreignTeam.Id, firstOrganization.Id);
+
+        var action = () => secondOwner.AddTeamMemberAsync(
+            secondOrganization.Id,
+            foreignTeam.Id,
+            "second-owner");
+
+        await action.Should().ThrowAsync<OrganizationNotFoundException>();
+    }
+
+    [Fact]
+    public async Task Invitation_resource_cannot_be_used_as_a_confused_deputy()
+    {
+        var repository = new MemoryOrganizationRepository();
+        var firstOwner = CreateService("first-owner", repository);
+        var firstOrganization = await firstOwner.CreateAsync(
+            "First",
+            "organization-key-0001");
+        var invitation = await firstOwner.InviteAsync(
+            firstOrganization.Id,
+            "learner@example.test",
+            OrganizationRole.Learner,
+            "invitation-key-0001");
+        var secondOwner = CreateService("second-owner", repository);
+        var secondOrganization = await secondOwner.CreateAsync(
+            "Second",
+            "organization-key-0002");
+        repository.SeedInvitation(
+            secondOrganization.Id,
+            invitation.Id,
+            firstOrganization.Id,
+            "first-owner");
+        var learner = CreateService("learner-person", repository);
+
+        var action = () => learner.AcceptInvitationAsync(
+            secondOrganization.Id,
+            invitation.Id,
+            invitation.Token);
+
+        await action.Should().ThrowAsync<OrganizationNotFoundException>();
+        repository.Memberships.Should()
+            .NotContainKey((secondOrganization.Id, "learner-person"));
+    }
+
+    [Fact]
+    public async Task Membership_without_current_cas_token_is_not_active()
+    {
+        var repository = new MemoryOrganizationRepository();
+        var owner = CreateService("owner-person", repository);
+        var organization = await owner.CreateAsync(
+            "Contoso",
+            "organization-key-0001");
+        var key = (organization.Id, "owner-person");
+        repository.Memberships[key] = repository.Memberships[key] with { ETag = null };
+
+        var action = () => owner.GetAsync(organization.Id);
+
+        await action.Should().ThrowAsync<OrganizationMembershipNotFoundException>();
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -254,12 +398,38 @@ public sealed class OrganizationServiceTests
 
     private static OrganizationService CreateService(
         string personId,
-        MemoryOrganizationRepository repository) =>
-        new(
+        MemoryOrganizationRepository repository,
+        bool seedPerson = true)
+    {
+        if (seedPerson)
+        {
+            repository.People.Seed(new UserProfileDto(
+                personId,
+                personId,
+                personId,
+                null,
+                0,
+                1,
+                0,
+                0,
+                50,
+                0,
+                0,
+                null));
+        }
+        var people = new OrganizationPersonResolver(
             new StubUserContext(personId),
+            repository.People);
+        var memberships = new OrganizationMembershipResolver(repository);
+        var authorization = new OrganizationAuthorizationHandler(people, memberships);
+        return new OrganizationService(
+            people,
+            memberships,
+            authorization,
             repository,
             new StubTokenGenerator(),
             new StubClock());
+    }
 
     private sealed class StubUserContext(string userId) : IUserContext
     {
@@ -287,14 +457,21 @@ public sealed class OrganizationServiceTests
         public Dictionary<(string OrganizationId, string PersonId), OrganizationMembership>
             Memberships
         { get; } = [];
+        public InMemoryUserRepository People { get; } = new();
         public List<string> OffboardedPersonIds { get; } = [];
         public Action? BeforePrivilegedWrite { get; set; }
+        public int OrganizationWriteCount { get; private set; }
+        public int MembershipReadCount { get; private set; }
+        public int OrganizationReadCount { get; private set; }
+        public (int Memberships, int Organizations) ReadCounts =>
+            (MembershipReadCount, OrganizationReadCount);
 
         public Task<OrganizationCreateResult> CreateOrganizationAsync(
             Organization organization,
             OrganizationMembership ownerMembership,
             CancellationToken cancellationToken = default)
         {
+            OrganizationWriteCount++;
             if (_organizations.TryGetValue(organization.Id, out var existing))
             {
                 return Task.FromResult(new OrganizationCreateResult(
@@ -312,14 +489,20 @@ public sealed class OrganizationServiceTests
 
         public Task<Organization?> GetOrganizationAsync(
             string organizationId,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(_organizations.GetValueOrDefault(organizationId));
+            CancellationToken cancellationToken = default)
+        {
+            OrganizationReadCount++;
+            return Task.FromResult(_organizations.GetValueOrDefault(organizationId));
+        }
 
         public Task<OrganizationMembership?> GetMembershipAsync(
             string organizationId,
             string personId,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(Memberships.GetValueOrDefault((organizationId, personId)));
+            CancellationToken cancellationToken = default)
+        {
+            MembershipReadCount++;
+            return Task.FromResult(Memberships.GetValueOrDefault((organizationId, personId)));
+        }
 
         public Task<OrganizationInvitationCreateResult> CreateInvitationAsync(
             OrganizationMembership actor,
@@ -419,6 +602,42 @@ public sealed class OrganizationServiceTests
                 throw new ConcurrencyConflictException(
                     "The organization membership changed before commit.");
             }
+        }
+
+        public void ResetReadCounts()
+        {
+            MembershipReadCount = 0;
+            OrganizationReadCount = 0;
+        }
+
+        public void SeedTeam(string partitionOrganizationId, string teamId, string resourceOrganizationId)
+        {
+            _teams[(partitionOrganizationId, teamId)] = OrganizationTeam.Create(
+                resourceOrganizationId,
+                "first-owner",
+                "Foreign team",
+                "seed-team-key-0001",
+                Now) with { Id = teamId };
+        }
+
+        public void SeedInvitation(
+            string partitionOrganizationId,
+            string invitationId,
+            string resourceOrganizationId,
+            string issuerPersonId)
+        {
+            _invitations[(partitionOrganizationId, invitationId)] = OrganizationInvitation.Create(
+                resourceOrganizationId,
+                issuerPersonId,
+                "learner@example.test",
+                OrganizationRole.Learner,
+                "seed-invite-key-01",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                Now) with
+            {
+                Id = invitationId,
+                ETag = "etag",
+            };
         }
     }
 }

@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Certigo Organization Membership",
-    "version": "1.0.0",
-    "description": "Dormant B2B API contract. Runtime mode supports off only; legacy remains authoritative."
+    "version": "1.1.0",
+    "description": "Dormant B2B API contract with fail-closed tenant authorization. Runtime mode supports off only; legacy remains authoritative."
   },
   "servers": [{ "url": "/api" }],
   "security": [{ "bearerAuth": [] }],
@@ -19,6 +19,26 @@
     "automaticEmailMerge": false,
     "personalLearningOwnership": "personId",
     "organizationArtifactsOwnership": "organizationId"
+  },
+  "x-certigo-authorization": {
+    "actorIdentitySource": "validated bearer resolved to an existing Person",
+    "organizationSource": "route or body, then exact-match checked against every loaded resource",
+    "roleSource": "active server-side OrganizationMembership only",
+    "clientClaimsTrusted": false,
+    "emailTrusted": false,
+    "crossTenantHttpStatus": 404,
+    "permissionMatrix": {
+      "viewOrganization": ["owner", "admin", "manager", "learner"],
+      "viewMemberships": ["owner", "admin", "manager"],
+      "changeMembershipRole": ["owner", "admin"],
+      "createInvitation": ["owner", "admin"],
+      "revokeInvitation": ["owner", "admin"],
+      "viewTeams": ["owner", "admin", "manager", "learner"],
+      "manageTeams": ["owner", "admin", "manager"],
+      "viewAssignments": ["owner", "admin", "manager", "learner"],
+      "manageAssignments": ["owner", "admin", "manager"],
+      "offboardMembership": ["owner", "admin", "manager", "learner"]
+    }
   },
   "paths": {
     "/v1/organizations": {
@@ -201,7 +221,7 @@
     },
     "responses": {
       "SurfaceDisabled": {
-        "description": "Surface absent while ORGANIZATION_MEMBERSHIP_V1=off"
+        "description": "Not found: surface disabled, Person/membership absent, or tenant/resource mismatch. These cases are intentionally indistinguishable."
       }
     }
   }

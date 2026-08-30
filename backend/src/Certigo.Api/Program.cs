@@ -249,6 +249,9 @@ var host = new HostBuilder()
                 sp.GetRequiredService<ILegacyIdentityObservationSource>()));
         services.AddSingleton<IOrganizationTokenGenerator, CryptographicOrganizationTokenGenerator>();
         services.AddScoped<IOrganizationRepository, CosmosOrganizationRepository>();
+        services.AddScoped<IOrganizationPersonResolver, OrganizationPersonResolver>();
+        services.AddScoped<IOrganizationMembershipResolver, OrganizationMembershipResolver>();
+        services.AddScoped<IOrganizationAuthorizationHandler, OrganizationAuthorizationHandler>();
         services.AddScoped<IOrganizationService, OrganizationService>();
         services.AddSingleton<IAccountDeletionRepository, CosmosAccountDeletionRepository>();
         services.AddSingleton<IAccountDeletionAccessGuard, AccountDeletionAccessGuard>();
