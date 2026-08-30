@@ -92,6 +92,9 @@ var containers = [
   { name: 'leaderboard', pk: '/periodLeagueId' }
   { name: 'economy', pk: '/userId' }
   { name: 'friends', pk: '/userId' }
+  // B2B aggregate documents share one partition so invitation acceptance and
+  // offboarding remain atomic without touching portable Person-owned data.
+  { name: 'organizations', pk: '/organizationId' }
 ]
 
 resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [
@@ -122,7 +125,7 @@ resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
             ]
           }
         },
-        c.name == 'attempts' ? { defaultTtl: -1 } : {}
+        c.name == 'attempts' || c.name == 'organizations' ? { defaultTtl: -1 } : {}
       )
     }
   }

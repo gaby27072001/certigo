@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:certigo:contract:organization-membership:cosmos:v1",
+  "title": "Certigo Organization Membership Cosmos documents",
+  "version": "1.0.0",
+  "x-certigo-runtime": {
+    "setting": "ORGANIZATION_MEMBERSHIP_V1",
+    "default": "off",
+    "implementedValues": ["off"],
+    "legacyRemainsAuthoritative": true
+  },
+  "x-certigo-cosmos": {
+    "container": "organizations",
+    "partitionKey": "/organizationId",
+    "defaultTtl": -1,
+    "topologyChange": "additive-container",
+    "existingContainersChanged": false,
+    "uniqueKeyPolicyRequired": false,
+    "indexingPolicy": {
+      "indexingMode": "consistent",
+      "automatic": true,
+      "includedPaths": ["/*"],
+      "excludedPaths": ["/\"_etag\"/?"]
+    },
+    "transactionalBoundaries": [
+      "organization + owner membership",
+      "actor membership CAS + invitation capability + durable idempotency receipt",
+      "issuer membership CAS + invitation consumption + membership",
+      "actor membership CAS + team",
+      "actor and target membership CAS + team membership",
+      "membership + team memberships offboarding"
+    ]
+  },
+  "x-certigo-ownership": {
+    "personOwned": ["progress", "attempts", "economy", "friends", "preferences"],
+    "organizationOwned": ["memberships", "teams", "assignments", "metrics", "privateContent"],
+    "automaticEmailMerge": false
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/organization" },
+    { "$ref": "#/$defs/membership" },
+    { "$ref": "#/$defs/team" },
+    { "$ref": "#/$defs/teamMembership" },
+    { "$ref": "#/$defs/invitation" },
+    { "$ref": "#/$defs/invitationReceipt" }
+  ],
+  "$defs": {
+    "base": {
+      "type": "object",
+      "required": ["id", "organizationId", "schemaVersion", "documentType"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "organizationId": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "const": 1 },
+        "documentType": { "type": "string" }
+      }
+    },
+    "organization": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "required": ["name", "ownerPersonId", "creationRequestHash", "createdAt", "updatedAt"],
+          "properties": {
+            "documentType": { "const": "organization" },
+            "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+            "ownerPersonId": { "type": "string", "minLength": 1 },
+            "creationRequestHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "updatedAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      ]
+    },
+    "membership": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "required": ["personId", "role", "joinedAt", "updatedAt"],
+          "properties": {
+            "documentType": { "const": "organizationMembership" },
+            "personId": { "type": "string", "minLength": 1 },
+            "role": { "enum": ["owner", "admin", "manager", "learner"] },
+            "joinedAt": { "type": "string", "format": "date-time" },
+            "updatedAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      ]
+    },
+    "team": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "required": ["name", "createdByPersonId", "creationRequestHash", "createdAt", "updatedAt"],
+          "properties": {
+            "documentType": { "const": "organizationTeam" },
+            "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+            "createdByPersonId": { "type": "string", "minLength": 1 },
+            "creationRequestHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "updatedAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      ]
+    },
+    "teamMembership": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "required": ["teamId", "personId", "addedAt"],
+          "properties": {
+            "documentType": { "const": "organizationTeamMembership" },
+            "teamId": { "type": "string", "minLength": 1 },
+            "personId": { "type": "string", "minLength": 1 },
+            "addedAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      ]
+    },
+    "invitation": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "required": [
+            "tokenHash",
+            "recipientHintHash",
+            "role",
+            "status",
+            "createdByPersonId",
+            "creationRequestHash",
+            "createdAt",
+            "expiresAt",
+            "ttl"
+          ],
+          "properties": {
+            "documentType": { "const": "organizationInvitation" },
+            "tokenHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "recipientHintHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "role": { "enum": ["admin", "manager", "learner"] },
+            "status": { "enum": ["pending", "accepted", "revoked"] },
+            "createdByPersonId": { "type": "string", "minLength": 1 },
+            "creationRequestHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "expiresAt": { "type": "string", "format": "date-time" },
+            "acceptedAt": { "type": ["string", "null"], "format": "date-time" },
+            "acceptedByPersonId": { "type": ["string", "null"] },
+            "ttl": { "type": "integer" }
+          }
+        }
+      ]
+    },
+    "invitationReceipt": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "required": ["invitationId", "creationRequestHash", "createdAt"],
+          "properties": {
+            "documentType": { "const": "organizationInvitationReceipt" },
+            "invitationId": { "type": "string", "minLength": 1 },
+            "creationRequestHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "createdAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      ]
+    }
+  }
+}

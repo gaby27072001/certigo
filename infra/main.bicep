@@ -75,6 +75,11 @@ param appleCiamDomainReconfigured bool = false
   'shadow'
 ])
 param personLinkedIdentityV1 string = 'off'
+@description('Organization/Membership V1 mode. This contract increment supports off only.')
+@allowed([
+  'off'
+])
+param organizationMembershipV1 string = 'off'
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
 @description('Azure OpenAI resource endpoint used by the tutor when enabled. Example: https://<resource>.openai.azure.com/.')
@@ -583,6 +588,7 @@ module api 'modules/functionApp.bicep' = {
     entraGraphClientSecretSecretUri: graphClientSecret.?outputs.?secretUri ?? ''
     accountDeletionEnabled: accountDeletionEnabled
     personLinkedIdentityV1: personLinkedIdentityV1
+    organizationMembershipV1: organizationMembershipV1
     tutorLlmEnabled: tutorLlmEnabled
     tutorLlmEndpoint: tutorLlmEndpoint
     tutorLlmDeployment: tutorLlmDeployment

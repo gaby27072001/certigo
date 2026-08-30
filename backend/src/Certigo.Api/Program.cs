@@ -31,6 +31,7 @@ var host = new HostBuilder()
         // downstream exception is mapped to ProblemDetails.
         worker.UseMiddleware<SecurityHeadersMiddleware>();
         worker.UseMiddleware<ExceptionMiddleware>();
+        worker.UseMiddleware<OrganizationFeatureMiddleware>();
         worker.UseMiddleware<JwtAuthMiddleware>();
     })
     .ConfigureServices((context, services) =>
@@ -38,6 +39,8 @@ var host = new HostBuilder()
         var configuration = context.Configuration;
         var personLinkedIdentityOptions = PersonLinkedIdentityOptions.Parse(
             configuration["PERSON_LINKED_IDENTITY_V1"]);
+        var organizationFeatureOptions = OrganizationFeatureOptions.Parse(
+            configuration["ORGANIZATION_MEMBERSHIP_V1"]);
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
         services.AddHostedService<ColdStartTelemetryService>();
@@ -230,6 +233,7 @@ var host = new HostBuilder()
         services.AddScoped<IUserContext>(sp => sp.GetRequiredService<FunctionUserContext>());
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(personLinkedIdentityOptions);
+        services.AddSingleton(organizationFeatureOptions);
         services.AddSingleton<IIdentitySubjectGenerator, CryptographicIdentitySubjectGenerator>();
         services.AddSingleton<IPersonLinkedIdentityRepository, CosmosPersonLinkedIdentityRepository>();
         services.AddSingleton<
@@ -243,6 +247,9 @@ var host = new HostBuilder()
                 sp.GetRequiredService<CosmosUserRepository>(),
                 sp.GetRequiredService<IPersonLinkedIdentityShadowRuntime>(),
                 sp.GetRequiredService<ILegacyIdentityObservationSource>()));
+        services.AddSingleton<IOrganizationTokenGenerator, CryptographicOrganizationTokenGenerator>();
+        services.AddScoped<IOrganizationRepository, CosmosOrganizationRepository>();
+        services.AddScoped<IOrganizationService, OrganizationService>();
         services.AddSingleton<IAccountDeletionRepository, CosmosAccountDeletionRepository>();
         services.AddSingleton<IAccountDeletionAccessGuard, AccountDeletionAccessGuard>();
         services.AddSingleton<IAccountDeletionAudit, AccountDeletionAudit>();

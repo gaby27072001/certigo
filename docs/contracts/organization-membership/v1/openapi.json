@@ -1,0 +1,208 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Certigo Organization Membership",
+    "version": "1.0.0",
+    "description": "Dormant B2B API contract. Runtime mode supports off only; legacy remains authoritative."
+  },
+  "servers": [{ "url": "/api" }],
+  "security": [{ "bearerAuth": [] }],
+  "x-certigo-feature-mode": {
+    "setting": "ORGANIZATION_MEMBERSHIP_V1",
+    "default": "off",
+    "implementedValues": ["off"],
+    "offHttpStatus": 404
+  },
+  "x-certigo-person-contract": {
+    "permanent": true,
+    "portable": true,
+    "automaticEmailMerge": false,
+    "personalLearningOwnership": "personId",
+    "organizationArtifactsOwnership": "organizationId"
+  },
+  "paths": {
+    "/v1/organizations": {
+      "post": {
+        "operationId": "createOrganizationV1",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateOrganizationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Organization created" },
+          "404": { "$ref": "#/components/responses/SurfaceDisabled" }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}": {
+      "get": {
+        "operationId": "getOrganizationV1",
+        "parameters": [{ "$ref": "#/components/parameters/OrganizationId" }],
+        "responses": {
+          "200": { "description": "Organization visible to the member" },
+          "404": { "$ref": "#/components/responses/SurfaceDisabled" }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/invitations": {
+      "post": {
+        "operationId": "createOrganizationInvitationV1",
+        "parameters": [
+          { "$ref": "#/components/parameters/OrganizationId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateInvitationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Single-use invitation token returned once" },
+          "403": { "description": "Role cannot invite" },
+          "404": { "$ref": "#/components/responses/SurfaceDisabled" },
+          "409": { "description": "Idempotency conflict or token replay" }
+        }
+      }
+    },
+    "/v1/organization-invitations/{invitationId}/accept": {
+      "post": {
+        "operationId": "acceptOrganizationInvitationV1",
+        "parameters": [{ "$ref": "#/components/parameters/InvitationId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AcceptInvitationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Membership created for authenticated Person only while invitation issuer remains an active owner or admin" },
+          "401": { "description": "Invalid invitation token" },
+          "404": { "$ref": "#/components/responses/SurfaceDisabled" },
+          "409": { "description": "Invitation already consumed" },
+          "410": { "description": "Invitation expired" }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/teams": {
+      "post": {
+        "operationId": "createOrganizationTeamV1",
+        "parameters": [
+          { "$ref": "#/components/parameters/OrganizationId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateTeamRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Organization-scoped team created" },
+          "404": { "$ref": "#/components/responses/SurfaceDisabled" }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/teams/{teamId}/members/{personId}": {
+      "put": {
+        "operationId": "addOrganizationTeamMemberV1",
+        "parameters": [
+          { "$ref": "#/components/parameters/OrganizationId" },
+          { "name": "teamId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "personId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "204": { "description": "Team membership created idempotently" },
+          "404": { "$ref": "#/components/responses/SurfaceDisabled" }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/memberships/{personId}": {
+      "delete": {
+        "operationId": "offboardOrganizationMemberV1",
+        "parameters": [
+          { "$ref": "#/components/parameters/OrganizationId" },
+          { "name": "personId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Organization access removed; Person and personal achievements preserved" },
+          "404": { "$ref": "#/components/responses/SurfaceDisabled" },
+          "409": { "description": "Owner offboarding or concurrency conflict" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "parameters": {
+      "OrganizationId": {
+        "name": "organizationId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      "InvitationId": {
+        "name": "invitationId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "minLength": 16, "maxLength": 200 }
+      }
+    },
+    "schemas": {
+      "CreateOrganizationRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string", "minLength": 2, "maxLength": 120 } }
+      },
+      "CreateInvitationRequest": {
+        "type": "object",
+        "required": ["recipientEmail", "role"],
+        "properties": {
+          "recipientEmail": {
+            "type": "string",
+            "format": "email",
+            "description": "Delivery hint only; never used to resolve or merge a Person."
+          },
+          "role": { "type": "string", "enum": ["admin", "manager", "learner"] }
+        }
+      },
+      "AcceptInvitationRequest": {
+        "type": "object",
+        "required": ["organizationId", "token"],
+        "properties": {
+          "organizationId": { "type": "string" },
+          "token": { "type": "string", "minLength": 32, "writeOnly": true }
+        }
+      },
+      "CreateTeamRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string", "minLength": 2, "maxLength": 120 } }
+      }
+    },
+    "responses": {
+      "SurfaceDisabled": {
+        "description": "Surface absent while ORGANIZATION_MEMBERSHIP_V1=off"
+      }
+    }
+  }
+}

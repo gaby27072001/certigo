@@ -48,7 +48,7 @@ test('Cosmos containers preserve the live default indexing policy', () => {
   assert.ok(compiledResource.includes(indexingPolicy));
 });
 
-test('compiled Cosmos ARM emits TTL only for attempts', () => {
+test('compiled Cosmos ARM preserves container topology and TTL scope', () => {
   const template = compileCosmosTemplate();
   const containerResource = template.resources.find(
     (resource) =>
@@ -67,12 +67,14 @@ test('compiled Cosmos ARM emits TTL only for attempts', () => {
     { name: 'leaderboard', pk: '/periodLeagueId' },
     { name: 'economy', pk: '/userId' },
     { name: 'friends', pk: '/userId' },
+    { name: 'organizations', pk: '/organizationId' },
   ]);
 
   const compiledResource = containerResource.properties.resource;
   assert.equal(typeof compiledResource, 'string');
   const ttlCondition =
-    "if(equals(variables('containers')[copyIndex()].name, 'attempts'), " +
+    "if(or(equals(variables('containers')[copyIndex()].name, 'attempts'), " +
+    "equals(variables('containers')[copyIndex()].name, 'organizations')), " +
     "createObject('defaultTtl', -1), createObject())";
   assert.ok(compiledResource.endsWith(`${ttlCondition})]`));
   assert.equal(compiledResource.match(/defaultTtl/g)?.length, 1);
