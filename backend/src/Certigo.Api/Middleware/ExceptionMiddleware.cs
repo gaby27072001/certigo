@@ -105,6 +105,10 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
         {
             await WriteProblemAsync(context, HttpStatusCode.NotFound, "Not found", ex.Message, correlationId);
         }
+        catch (OrganizationPersonNotFoundException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.NotFound, "Not found", ex.Message, correlationId);
+        }
         catch (OrganizationTeamNotFoundException ex)
         {
             await WriteProblemAsync(context, HttpStatusCode.NotFound, "Not found", ex.Message, correlationId);

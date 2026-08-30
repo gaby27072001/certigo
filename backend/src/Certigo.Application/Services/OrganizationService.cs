@@ -14,7 +14,9 @@ public sealed class CryptographicOrganizationTokenGenerator : IOrganizationToken
 }
 
 public sealed class OrganizationService(
-    IUserContext userContext,
+    IOrganizationPersonResolver people,
+    IOrganizationMembershipResolver memberships,
+    IOrganizationAuthorizationHandler authorization,
     IOrganizationRepository organizations,
     IOrganizationTokenGenerator tokenGenerator,
     IClock clock) : IOrganizationService
@@ -24,14 +26,15 @@ public sealed class OrganizationService(
         string idempotencyKey,
         CancellationToken cancellationToken = default)
     {
+        var personId = await people.ResolveAsync(cancellationToken);
         var organization = Organization.Create(
-            userContext.UserId,
+            personId,
             name,
             idempotencyKey,
             clock.UtcNow);
         var owner = OrganizationMembership.Create(
             organization.Id,
-            userContext.UserId,
+            personId,
             OrganizationRole.Owner,
             clock.UtcNow);
         var result = await organizations.CreateOrganizationAsync(
@@ -52,9 +55,17 @@ public sealed class OrganizationService(
         string organizationId,
         CancellationToken cancellationToken = default)
     {
-        _ = await RequireMembershipAsync(organizationId, userContext.UserId, cancellationToken);
-        return ToDto(await organizations.GetOrganizationAsync(organizationId, cancellationToken)
-            ?? throw new OrganizationNotFoundException());
+        _ = await authorization.AuthorizeAsync(
+            organizationId,
+            OrganizationOperation.ViewOrganization,
+            cancellationToken: cancellationToken);
+        var organization = await organizations.GetOrganizationAsync(
+            organizationId,
+            cancellationToken) ?? throw new OrganizationNotFoundException();
+        OrganizationAuthorizationHandler.EnsureOrganization(
+            organizationId,
+            organization.OrganizationId);
+        return ToDto(organization);
     }
 
     public async Task<OrganizationInvitationDto> InviteAsync(
@@ -64,26 +75,23 @@ public sealed class OrganizationService(
         string idempotencyKey,
         CancellationToken cancellationToken = default)
     {
-        var actor = await RequireMembershipAsync(
+        var context = await authorization.AuthorizeAsync(
             organizationId,
-            userContext.UserId,
+            OrganizationOperation.CreateInvitation,
+            new OrganizationAuthorizationTarget(organizationId, Role: role),
             cancellationToken);
-        if (!OrganizationAuthorization.CanInvite(actor.Role))
-        {
-            throw new OrganizationAccessDeniedException();
-        }
 
         var token = tokenGenerator.NewToken();
         var candidate = OrganizationInvitation.Create(
             organizationId,
-            userContext.UserId,
+            context.PersonId,
             recipientEmail,
             role,
             idempotencyKey,
             token,
             clock.UtcNow);
         var result = await organizations.CreateInvitationAsync(
-            actor,
+            context.Membership,
             candidate,
             cancellationToken);
         if (!string.Equals(
@@ -112,9 +120,10 @@ public sealed class OrganizationService(
         string token,
         CancellationToken cancellationToken = default)
     {
+        var personId = await people.ResolveAsync(cancellationToken);
         var existing = await organizations.GetMembershipAsync(
             organizationId,
-            userContext.UserId,
+            personId,
             cancellationToken);
         if (existing is not null)
         {
@@ -126,18 +135,21 @@ public sealed class OrganizationService(
             invitationId,
             cancellationToken)
             ?? throw new OrganizationInvitationTokenException();
-        var issuer = await RequireMembershipAsync(
+        OrganizationAuthorizationHandler.EnsureOrganization(
+            organizationId,
+            invitation.OrganizationId);
+        var issuer = await memberships.ResolveActiveAsync(
             organizationId,
             invitation.CreatedByPersonId,
             cancellationToken);
-        if (!OrganizationAuthorization.CanInvite(issuer.Role))
-        {
-            throw new OrganizationAccessDeniedException();
-        }
-        var accepted = invitation.Accept(userContext.UserId, token, clock.UtcNow);
+        authorization.AuthorizeMembership(
+            issuer,
+            OrganizationOperation.CreateInvitation,
+            new OrganizationAuthorizationTarget(organizationId, Role: invitation.Role));
+        var accepted = invitation.Accept(personId, token, clock.UtcNow);
         var membership = OrganizationMembership.Create(
             organizationId,
-            userContext.UserId,
+            personId,
             accepted.Role,
             clock.UtcNow);
         var stored = await organizations.AcceptInvitationAsync(
@@ -154,22 +166,21 @@ public sealed class OrganizationService(
         string idempotencyKey,
         CancellationToken cancellationToken = default)
     {
-        var actor = await RequireMembershipAsync(
+        var context = await authorization.AuthorizeAsync(
             organizationId,
-            userContext.UserId,
-            cancellationToken);
-        if (!OrganizationAuthorization.CanManageTeams(actor.Role))
-        {
-            throw new OrganizationAccessDeniedException();
-        }
+            OrganizationOperation.ManageTeams,
+            cancellationToken: cancellationToken);
 
         var candidate = OrganizationTeam.Create(
             organizationId,
-            userContext.UserId,
+            context.PersonId,
             name,
             idempotencyKey,
             clock.UtcNow);
-        var result = await organizations.CreateTeamAsync(actor, candidate, cancellationToken);
+        var result = await organizations.CreateTeamAsync(
+            context.Membership,
+            candidate,
+            cancellationToken);
         if (!string.Equals(
                 result.Team.CreationRequestHash,
                 candidate.CreationRequestHash,
@@ -186,19 +197,19 @@ public sealed class OrganizationService(
         string personId,
         CancellationToken cancellationToken = default)
     {
-        var actor = await RequireMembershipAsync(
+        var context = await authorization.AuthorizeAsync(
             organizationId,
-            userContext.UserId,
+            OrganizationOperation.ManageTeams,
+            cancellationToken: cancellationToken);
+        var target = await memberships.ResolveActiveAsync(
+            organizationId,
+            personId,
             cancellationToken);
-        if (!OrganizationAuthorization.CanManageTeams(actor.Role))
-        {
-            throw new OrganizationAccessDeniedException();
-        }
-        var target = await RequireMembershipAsync(organizationId, personId, cancellationToken);
-        _ = await organizations.GetTeamAsync(organizationId, teamId, cancellationToken)
+        var team = await organizations.GetTeamAsync(organizationId, teamId, cancellationToken)
             ?? throw new OrganizationTeamNotFoundException();
+        OrganizationAuthorizationHandler.EnsureOrganization(organizationId, team.OrganizationId);
         await organizations.AddTeamMemberAsync(
-            actor,
+            context.Membership,
             target,
             OrganizationTeamMembership.Create(
                 organizationId,
@@ -213,34 +224,28 @@ public sealed class OrganizationService(
         string personId,
         CancellationToken cancellationToken = default)
     {
-        var actor = await RequireMembershipAsync(
+        var context = await authorization.AuthorizeAsync(
             organizationId,
-            userContext.UserId,
+            OrganizationOperation.ViewOrganization,
+            cancellationToken: cancellationToken);
+        var target = await memberships.ResolveActiveAsync(
+            organizationId,
+            personId,
             cancellationToken);
-        var target = await RequireMembershipAsync(organizationId, personId, cancellationToken);
-        if (target.Role == OrganizationRole.Owner)
-        {
-            throw new OrganizationOwnerOffboardingException();
-        }
-        if (!string.Equals(actor.PersonId, target.PersonId, StringComparison.Ordinal)
-            && !OrganizationAuthorization.CanRemove(actor.Role, target.Role))
-        {
-            throw new OrganizationAccessDeniedException();
-        }
+        authorization.AuthorizeMembership(
+            context.Membership,
+            OrganizationOperation.OffboardMembership,
+            new OrganizationAuthorizationTarget(
+                target.OrganizationId,
+                target.PersonId,
+                target.Role));
 
-        await organizations.OffboardAsync(actor, target, cancellationToken);
+        await organizations.OffboardAsync(context.Membership, target, cancellationToken);
         return new OrganizationOffboardingDto(
             organizationId,
             personId,
             clock.UtcNow);
     }
-
-    private async Task<OrganizationMembership> RequireMembershipAsync(
-        string organizationId,
-        string personId,
-        CancellationToken cancellationToken) =>
-        await organizations.GetMembershipAsync(organizationId, personId, cancellationToken)
-        ?? throw new OrganizationMembershipNotFoundException();
 
     private static OrganizationDto ToDto(Organization organization) =>
         new(

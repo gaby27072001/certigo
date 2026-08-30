@@ -7,7 +7,7 @@
 | **Date** | 2026-08-20 |
 | **Activation runtime** | `off` uniquement ; aucune activation dev/staging/prod |
 | **Contrat** | `docs/contracts/organization-membership/v1` |
-| **Baseline** | `origin/main@102025d1` (#329), avec Person/LinkedIdentity #300/#311 |
+| **Baseline** | `origin/main@90ad8a33` (#322), avec Person/LinkedIdentity #300/#311 |
 
 ## Contexte
 
@@ -35,6 +35,28 @@ Le domaine additif définit :
 Les rôles V1 sont `owner`, `admin`, `manager`, `learner`. Owner/admin peuvent inviter,
 owner/admin/manager peuvent gérer les équipes. Un owner ne peut être ni invité ni offboardé.
 Un admin ne peut retirer qu'un manager ou learner.
+
+### Contexte tenant et autorisation anti-IDOR
+
+Chaque opération B2B construit un `OrganizationContext` serveur à partir de trois preuves
+indépendantes :
+
+1. le bearer validé fournit uniquement un identifiant candidat ;
+2. cet identifiant doit résoudre exactement une `Person` existante ;
+3. la Membership active est relue dans la partition `organizationId` et son rôle serveur est le
+   seul rôle autoritatif.
+
+Les claims de rôle ou d'Organization, l'e-mail et les champs d'identité du body ne sont jamais
+utilisés pour accorder un droit. Chaque ressource chargée (Organization, Membership, Invitation,
+Team et futures Assignment) doit porter exactement l'`organizationId` du contexte. Un mismatch,
+une Person absente, une Membership absente/invalide ou une feature désactivée est masqué en `404`.
+Une Membership active mais insuffisante reçoit `403`. La résolution d'un Organization inconnu et
+d'un Organization d'un autre tenant s'arrête sur le même point-read Membership afin de limiter
+l'énumération et les différences de timing.
+
+La policy par opération est documentée dans
+`docs/contracts/organization-membership/v1/README.md`. Les futures assignations réutilisent
+`ViewAssignments` et `ManageAssignments`; aucun endpoint correspondant n'est activé par ce lot.
 
 ### Cosmos additif et transactions
 

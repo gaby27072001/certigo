@@ -19,6 +19,20 @@ public enum OrganizationInvitationStatus
     Revoked,
 }
 
+public enum OrganizationOperation
+{
+    ViewOrganization,
+    ViewMemberships,
+    ChangeMembershipRole,
+    CreateInvitation,
+    RevokeInvitation,
+    ViewTeams,
+    ManageTeams,
+    ViewAssignments,
+    ManageAssignments,
+    OffboardMembership,
+}
+
 public sealed record Organization(
     string Id,
     string OrganizationId,
@@ -301,15 +315,51 @@ public sealed record OrganizationInvitationReceipt(
 public static class OrganizationAuthorization
 {
     public static bool CanInvite(OrganizationRole role) =>
-        role is OrganizationRole.Owner or OrganizationRole.Admin;
+        CanPerform(role, OrganizationOperation.CreateInvitation);
 
     public static bool CanManageTeams(OrganizationRole role) =>
-        role is OrganizationRole.Owner or OrganizationRole.Admin or OrganizationRole.Manager;
+        CanPerform(role, OrganizationOperation.ManageTeams);
 
     public static bool CanRemove(OrganizationRole actor, OrganizationRole target) =>
         actor == OrganizationRole.Owner && target != OrganizationRole.Owner
         || actor == OrganizationRole.Admin
             && target is OrganizationRole.Manager or OrganizationRole.Learner;
+
+    public static bool CanPerform(OrganizationRole role, OrganizationOperation operation) =>
+        operation switch
+        {
+            OrganizationOperation.ViewOrganization
+                or OrganizationOperation.ViewTeams
+                or OrganizationOperation.ViewAssignments => Enum.IsDefined(role),
+            OrganizationOperation.ViewMemberships
+                or OrganizationOperation.ManageTeams
+                or OrganizationOperation.ManageAssignments =>
+                role is OrganizationRole.Owner
+                    or OrganizationRole.Admin
+                    or OrganizationRole.Manager,
+            OrganizationOperation.CreateInvitation
+                or OrganizationOperation.RevokeInvitation
+                or OrganizationOperation.ChangeMembershipRole =>
+                role is OrganizationRole.Owner or OrganizationRole.Admin,
+            OrganizationOperation.OffboardMembership => Enum.IsDefined(role),
+            _ => false,
+        };
+
+    public static bool CanGrantInvitationRole(
+        OrganizationRole actor,
+        OrganizationRole requested) =>
+        CanPerform(actor, OrganizationOperation.CreateInvitation)
+        && requested != OrganizationRole.Owner
+        && Enum.IsDefined(requested);
+
+    public static bool CanChangeRole(
+        OrganizationRole actor,
+        OrganizationRole requested) =>
+        actor == OrganizationRole.Owner
+            && requested != OrganizationRole.Owner
+            && Enum.IsDefined(requested)
+        || actor == OrganizationRole.Admin
+            && requested is OrganizationRole.Manager or OrganizationRole.Learner;
 }
 
 public static class OrganizationDocumentIds
@@ -423,6 +473,8 @@ public sealed class OrganizationNotFoundException()
     : Exception("The organization was not found.");
 public sealed class OrganizationMembershipNotFoundException()
     : Exception("The organization membership was not found.");
+public sealed class OrganizationPersonNotFoundException()
+    : Exception("The authenticated Person was not found.");
 public sealed class OrganizationTeamNotFoundException()
     : Exception("The organization team was not found.");
 public sealed class OrganizationIdempotencyConflictException()
