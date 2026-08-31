@@ -41,7 +41,7 @@ export function evaluateOsvJson(file, options = {}) {
     throw new Error('OSV-Scanner JSON must contain a results array.');
   }
   let sourceContract;
-  const allowedEmptyNugetPackages = new Set();
+  const expectedSources = new Set();
   if (options.expectedSources !== undefined) {
     sourceContract = options.expectedSources;
     if (
@@ -50,23 +50,20 @@ export function evaluateOsvJson(file, options = {}) {
       || Array.isArray(sourceContract)
       || !Array.isArray(sourceContract.sources)
       || !Array.isArray(sourceContract.pubManifests)
-      || !Array.isArray(sourceContract.allowedEmptyNugetPackages)
       || Object.keys(sourceContract).some(
-        (key) => !['sources', 'pubManifests', 'allowedEmptyNugetPackages'].includes(key),
+        (key) => !['sources', 'pubManifests'].includes(key),
       )
     ) {
       throw new Error(
-        'Expected OSV source contract must contain sources, pubManifests, and '
-        + 'allowedEmptyNugetPackages arrays only.',
+        'Expected OSV source contract must contain sources and pubManifests arrays only.',
       );
     }
-    for (const [index, value] of sourceContract.allowedEmptyNugetPackages.entries()) {
-      allowedEmptyNugetPackages.add(
-        requiredString(
-          value,
-          `expectedSources.allowedEmptyNugetPackages[${index}]`,
-        ).toLowerCase(),
-      );
+    for (const [index, value] of sourceContract.sources.entries()) {
+      const expected = requiredString(value, `expectedSources.sources[${index}]`);
+      if (path.isAbsolute(expected) || expected.split(/[\\/]/u).includes('..')) {
+        throw new Error(`expectedSources.sources[${index}] must be repository-relative.`);
+      }
+      expectedSources.add(expected.replaceAll('\\', '/'));
     }
   }
 
@@ -98,7 +95,13 @@ export function evaluateOsvJson(file, options = {}) {
       if (relative.startsWith('..') || path.isAbsolute(relative)) {
         throw new Error(`${source}.source.path escapes the scanned repository.`);
       }
-      scannedSources.add(relative.split(path.sep).join('/'));
+      const normalizedSource = relative.split(path.sep).join('/');
+      if (sourceContract !== undefined && !expectedSources.has(normalizedSource)) {
+        throw new Error(
+          `${source}.source.path was not present in the validated lockfile contract.`,
+        );
+      }
+      scannedSources.add(normalizedSource);
     }
 
     for (const [packageIndex, packageResult] of result.packages.entries()) {
@@ -120,14 +123,15 @@ export function evaluateOsvJson(file, options = {}) {
           `${packageSource} must contain a package and valid vulnerability/group arrays.`,
         );
       }
-      const packageName = requiredString(
+      requiredString(
         packageResult.package.name,
         `${packageSource}.package.name`,
       );
-      if (typeof packageResult.package.version !== 'string') {
-        throw new Error(`${packageSource}.package.version must be a string.`);
-      }
-      const ecosystem = requiredString(
+      requiredString(
+        packageResult.package.version,
+        `${packageSource}.package.version`,
+      );
+      requiredString(
         packageResult.package.ecosystem,
         `${packageSource}.package.ecosystem`,
       );
@@ -135,20 +139,6 @@ export function evaluateOsvJson(file, options = {}) {
       const packageVulnerabilityIds = new Set();
       const vulnerabilities = packageResult.vulnerabilities ?? [];
       const groups = packageResult.groups ?? [];
-      if (
-        packageResult.package.version === ''
-        && (
-          ecosystem !== 'NuGet'
-          || !allowedEmptyNugetPackages.has(packageName.toLowerCase())
-          || vulnerabilities.length > 0
-          || groups.length > 0
-        )
-      ) {
-        throw new Error(
-          `${packageSource}.package.version may be empty only for a validated `
-          + 'tracked NuGet project reference without findings.',
-        );
-      }
       for (const [vulnerabilityIndex, vulnerability] of vulnerabilities.entries()) {
         if (
           typeof vulnerability !== 'object'
@@ -199,25 +189,6 @@ export function evaluateOsvJson(file, options = {}) {
       vulnerabilityCount += groups.length;
     }
   }
-  if (sourceContract !== undefined) {
-    const expectedSources = new Set();
-    for (const [index, value] of sourceContract.sources.entries()) {
-      const expected = requiredString(value, `expectedSources.sources[${index}]`);
-      if (path.isAbsolute(expected) || expected.split(/[\\/]/).includes('..')) {
-        throw new Error(`expectedSources.sources[${index}] must be repository-relative.`);
-      }
-      expectedSources.add(expected.replaceAll('\\', '/'));
-    }
-    const missingSources = [...expectedSources]
-      .filter((source) => !scannedSources.has(source))
-      .sort();
-    if (missingSources.length > 0) {
-      throw new Error(
-        `OSV-Scanner omitted expected tracked lockfiles: ${missingSources.join(', ')}.`,
-      );
-    }
-  }
-
   return {
     resultCount: report.results.length,
     sourceCount: scannedSources.size,

@@ -101,8 +101,7 @@ class DependencyLockValidatorTests(unittest.TestCase):
                 "pubManifests": [
                     "packages/app/pubspec.yaml",
                     "packages/core/pubspec.yaml",
-                ],
-                "allowedEmptyNugetPackages": ["app"],
+                ]
             },
             json.loads(output.read_text(encoding="utf-8")),
         )

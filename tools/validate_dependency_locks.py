@@ -188,13 +188,6 @@ def validate_repository(
     expected_sources = sorted(
         str(path) for path in npm_locks | pub_locks | (nuget_locks - empty_locks)
     )
-    allowed_empty_nuget_packages = sorted(
-        path.stem.casefold()
-        for path in tracked
-        if path.parts
-        and path.parts[0] == "backend"
-        and path.suffix.casefold() == ".csproj"
-    )
     if expected_sources_file is not None:
         expected_sources_file.parent.mkdir(parents=True, exist_ok=True)
         expected_sources_file.write_text(
@@ -202,7 +195,6 @@ def validate_repository(
                 {
                     "sources": expected_sources,
                     "pubManifests": sorted(str(path) for path in pub_manifests),
-                    "allowedEmptyNugetPackages": allowed_empty_nuget_packages,
                 },
                 indent=2,
             )

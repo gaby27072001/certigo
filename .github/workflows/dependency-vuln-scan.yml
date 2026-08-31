@@ -8,7 +8,7 @@ permissions: {}
 
 jobs:
   osv-scan:
-    name: OSV-Scanner (all dependencies, JSON)
+    name: OSV-Scanner (validated lockfiles, JSON)
     runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
@@ -118,10 +118,12 @@ jobs:
           output_temp="$RUNNER_TEMP/osv-results.$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT.json"
           rm -f -- "$output_temp" "$OSV_RESULTS_FILE" "$OSV_SCAN_LOG" "$OSV_ENFORCE_LOG"
           set +e
-          "$OSV_BINARY" scan --format=json --recursive --no-ignore --all-packages \
-            --config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml" \
+          node "$TRUSTED_CONTROL_DIR/.github/scripts/run-osv-scan.mjs" \
+            "$OSV_BINARY" \
+            "$EXPECTED_LOCKS_FILE" \
             "$UNTRUSTED_SOURCE_DIR" \
-            --output-file "$output_temp" 2> "$OSV_SCAN_LOG"
+            "$output_temp" \
+            "$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml" > "$OSV_SCAN_LOG" 2>&1
           scan_status=$?
           set -e
           if [ -e "$output_temp" ]; then
@@ -168,21 +170,17 @@ jobs:
               process.stdout.write(String(summary.vulnerabilityCount));
             ' "$evaluation"
           )"
-          source_coverage="$(
+          tracked_lock_count="$(
             node -e '
-              const evaluation = JSON.parse(process.argv[1].split(/\r?\n/, 1)[0]);
-              const contract = JSON.parse(require("fs").readFileSync(process.argv[2], "utf8"));
-              process.stdout.write(
-                `${evaluation.sourceCount} reported`
-                + ` / ${contract.sources.length} expected non-empty locks`,
-              );
-            ' "$evaluation" "$EXPECTED_LOCKS_FILE"
+              const contract = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+              process.stdout.write(String(contract.sources.length));
+            ' "$EXPECTED_LOCKS_FILE"
           )"
           {
             echo "## OSV dependency scan"
             echo
             echo "- Findings: **$finding_count**"
-            echo "- Tracked lockfile coverage: **$source_coverage**"
+            echo "- Explicit lockfiles scanned: **$tracked_lock_count**"
             echo "- Scanner exit code: \`$scan_status\`"
             echo "- Structured validation result and scanner diagnostics are in the job logs."
           } >> "$GITHUB_STEP_SUMMARY"
