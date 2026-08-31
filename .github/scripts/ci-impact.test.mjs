@@ -163,3 +163,31 @@ test('workflow inputs must be regular files contained by the PR checkout', (cont
     fs.rmSync(temporary, { recursive: true, force: true });
   }
 });
+
+test('workflow input ancestors must not be symbolic links', (context) => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-impact-ancestor-'));
+  try {
+    const redirected = path.join(temporary, 'redirected-github', 'workflows');
+    fs.mkdirSync(redirected, { recursive: true });
+    fs.writeFileSync(path.join(redirected, 'unsafe.yml'), 'name: unsafe\n', 'utf8');
+    try {
+      fs.symlinkSync(
+        path.join(temporary, 'redirected-github'),
+        path.join(temporary, '.github'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+    } catch (error) {
+      if (error.code === 'EPERM') {
+        context.skip('directory symlink creation requires an unavailable Windows privilege');
+        return;
+      }
+      throw error;
+    }
+    assert.throws(
+      () => validateWorkflowInputs(temporary),
+      /path contains a symbolic link/,
+    );
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+});

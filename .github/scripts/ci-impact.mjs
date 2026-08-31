@@ -222,12 +222,19 @@ export function changedPaths(workspace, base, head) {
 function safeWorkspaceFile(workspace, relative) {
   const root = fs.realpathSync(workspace);
   const candidate = path.resolve(root, relative);
+  if (candidate !== root && !candidate.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`Untrusted input escapes the workspace: ${relative}`);
+  }
+  let current = root;
+  for (const component of path.relative(root, candidate).split(path.sep).filter(Boolean)) {
+    current = path.join(current, component);
+    if (fs.lstatSync(current).isSymbolicLink()) {
+      throw new Error(`Untrusted input path contains a symbolic link: ${relative}`);
+    }
+  }
   const resolved = fs.realpathSync(candidate);
   if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
-    throw new Error(`Bicep target escapes the workspace: ${relative}`);
-  }
-  if (fs.lstatSync(candidate).isSymbolicLink()) {
-    throw new Error(`Untrusted input must not be a symbolic link: ${relative}`);
+    throw new Error(`Untrusted input resolves outside the workspace: ${relative}`);
   }
   return resolved;
 }
