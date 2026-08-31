@@ -46,6 +46,9 @@ jobs:
       - name: Test project-state generator
         working-directory: .trusted-control
         run: python -P -m unittest discover -s tools/tests -p "test_*.py" -v
+      - name: Validate generated source contracts
+        working-directory: .untrusted-source
+        run: python -P tools/generated_contracts.py --check
       - name: Validate committed active-content reference and generated state
         working-directory: .trusted-control
         run: python -P tools/project_state.py --root "$PROJECT_WORKSPACE" --check

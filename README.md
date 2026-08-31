@@ -78,7 +78,9 @@ depuis le dépôt :
 
 ```bash
 # Après avoir commité les sources observables :
+python tools/generated_contracts.py --refresh
 python tools/project_state.py --refresh-reference
+python tools/generated_contracts.py --check
 python tools/project_state.py --check   # contrôle local identique à la gate CI
 python -m unittest discover -s tools/tests -p "test_*.py" -v
 ```
