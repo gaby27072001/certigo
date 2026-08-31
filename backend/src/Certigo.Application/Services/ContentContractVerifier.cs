@@ -742,6 +742,43 @@ public sealed partial class ContentContractVerifier(
                         }
                     }
                 }
+
+                if (string.Equals(track.Mode, "questionBank", StringComparison.Ordinal))
+                {
+                    foreach (var domainId in track.DomainIds)
+                    {
+                        if (!graph.Questions.Values.Any(question =>
+                                string.Equals(
+                                    question.CertificationId,
+                                    track.CertificationId,
+                                    StringComparison.Ordinal)
+                                && string.Equals(
+                                    question.DomainId,
+                                    domainId,
+                                    StringComparison.Ordinal)))
+                        {
+                            throw Invalid(
+                                $"Distributable question-bank track '{track.Id}' has no "
+                                + $"questions for domain '{domainId}'.");
+                        }
+                    }
+
+                    foreach (var question in graph.Questions.Values.Where(question =>
+                                 string.Equals(
+                                     question.CertificationId,
+                                     track.CertificationId,
+                                     StringComparison.Ordinal)
+                                 && trackDomainIds.Contains(question.DomainId)))
+                    {
+                        var concept = Required(graph.Concepts, question.ConceptId, "concept");
+                        if (!IsDistributableStatus(concept.Lifecycle.Status))
+                        {
+                            throw Invalid(
+                                $"Distributable question-bank track '{track.Id}' references "
+                                + $"non-distributable concept '{concept.Id}'.");
+                        }
+                    }
+                }
             }
 
             if (string.Equals(track.Mode, "guided", StringComparison.Ordinal) && track.UnitIds.Count == 0)

@@ -140,4 +140,145 @@ public sealed class ContentContractVerifierValidationTests
         action.Should().Throw<ContentReleaseValidationException>()
             .WithMessage($"*Guided track '{trackId}' has orphan questions*{questionId}*");
     }
+
+    [Fact]
+    public void Active_question_bank_rejects_non_distributable_concepts()
+    {
+        const string certificationId = "aws:clf-c02";
+        const string trackId = "aws.clf-c02.track.main";
+        const string domainId = "aws.clf-c02.domain.domain-1";
+        const string conceptId = "aws.clf-c02.concept.cloud";
+        const string questionId = "aws.clf-c02.domain-1.cloud.001";
+        var active = new CanonicalContentLifecycle("active");
+        var graph = new CanonicalContentGraph(
+            new Dictionary<string, CanonicalCertification>(StringComparer.Ordinal)
+            {
+                [certificationId] = new(
+                    certificationId,
+                    "clf-c02",
+                    "CLF-C02",
+                    "Cloud Practitioner",
+                    "foundational",
+                    "active",
+                    "2026-08-17",
+                    [new CanonicalCertificationObjective("domain-1", "Cloud concepts", 100m)]),
+            },
+            new Dictionary<string, CanonicalTrackResource>(StringComparer.Ordinal)
+            {
+                [trackId] = new(
+                    trackId,
+                    null,
+                    certificationId,
+                    "2026-08-17",
+                    "questionBank",
+                    "Cloud practice",
+                    [domainId],
+                    [],
+                    active),
+            },
+            new Dictionary<string, CanonicalDomainResource>(StringComparer.Ordinal)
+            {
+                [domainId] = new(
+                    domainId,
+                    null,
+                    certificationId,
+                    "2026-08-17",
+                    "domain-1",
+                    active),
+            },
+            new Dictionary<string, CanonicalUnitResource>(StringComparer.Ordinal),
+            new Dictionary<string, CanonicalLessonResource>(StringComparer.Ordinal),
+            new Dictionary<string, CanonicalConceptResource>(StringComparer.Ordinal)
+            {
+                [conceptId] = new(
+                    conceptId,
+                    null,
+                    certificationId,
+                    "2026-08-17",
+                    domainId,
+                    "Cloud",
+                    new CanonicalContentLifecycle("planned")),
+            },
+            new Dictionary<string, CanonicalQuestion>(StringComparer.Ordinal)
+            {
+                [questionId] = new(
+                    questionId,
+                    null,
+                    certificationId,
+                    "2026-08-17",
+                    "domain-1",
+                    domainId,
+                    conceptId,
+                    ItemType.Mcq,
+                    2,
+                    "Which model?",
+                    [new CheckOption("iaas", "IaaS"), new CheckOption("paas", "PaaS")]),
+            },
+            new Dictionary<string, CanonicalSolution>(StringComparer.Ordinal)
+            {
+                [questionId] = new(questionId, ["paas"], "PaaS is managed."),
+            });
+
+        var action = () => ContentContractVerifier.ValidateGraph(graph);
+
+        action.Should().Throw<ContentReleaseValidationException>()
+            .WithMessage(
+                $"*question-bank track '{trackId}'*non-distributable concept '{conceptId}'*");
+    }
+
+    [Fact]
+    public void Active_question_bank_rejects_empty_domains()
+    {
+        const string certificationId = "aws:clf-c02";
+        const string trackId = "aws.clf-c02.track.main";
+        const string domainId = "aws.clf-c02.domain.domain-1";
+        var active = new CanonicalContentLifecycle("active");
+        var graph = new CanonicalContentGraph(
+            new Dictionary<string, CanonicalCertification>(StringComparer.Ordinal)
+            {
+                [certificationId] = new(
+                    certificationId,
+                    "clf-c02",
+                    "CLF-C02",
+                    "Cloud Practitioner",
+                    "foundational",
+                    "active",
+                    "2026-08-17",
+                    [new CanonicalCertificationObjective("domain-1", "Cloud concepts", 100m)]),
+            },
+            new Dictionary<string, CanonicalTrackResource>(StringComparer.Ordinal)
+            {
+                [trackId] = new(
+                    trackId,
+                    null,
+                    certificationId,
+                    "2026-08-17",
+                    "questionBank",
+                    "Cloud practice",
+                    [domainId],
+                    [],
+                    active),
+            },
+            new Dictionary<string, CanonicalDomainResource>(StringComparer.Ordinal)
+            {
+                [domainId] = new(
+                    domainId,
+                    null,
+                    certificationId,
+                    "2026-08-17",
+                    "domain-1",
+                    active),
+            },
+            new Dictionary<string, CanonicalUnitResource>(StringComparer.Ordinal),
+            new Dictionary<string, CanonicalLessonResource>(StringComparer.Ordinal),
+            new Dictionary<string, CanonicalConceptResource>(StringComparer.Ordinal),
+            new Dictionary<string, CanonicalQuestion>(StringComparer.Ordinal),
+            new Dictionary<string, CanonicalSolution>(StringComparer.Ordinal));
+
+        var action = () => ContentContractVerifier.ValidateGraph(graph);
+
+        action.Should().Throw<ContentReleaseValidationException>()
+            .WithMessage(
+                $"*question-bank track '{trackId}' has no questions for domain '{domainId}'*");
+    }
 }

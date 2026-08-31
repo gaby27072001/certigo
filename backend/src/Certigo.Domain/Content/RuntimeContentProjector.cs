@@ -39,7 +39,7 @@ public sealed class RuntimeContentProjector
         CanonicalCertification certification,
         DateOnly? asOf)
     {
-        if (track.Lifecycle.Status is "retired" or "replaced")
+        if (track.Lifecycle.Status is not ("active" or "retiring"))
         {
             return false;
         }

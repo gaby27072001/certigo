@@ -106,6 +106,29 @@ public sealed class RuntimeContentProjectorTests
     }
 
     [Fact]
+    public void Planned_track_and_its_children_are_excluded_from_the_active_projection()
+    {
+        var graph = BuildGraph(questionBank: false);
+        var track = graph.Tracks.Values.Single();
+        graph = graph with
+        {
+            Tracks = new Dictionary<string, CanonicalTrackResource>(StringComparer.Ordinal)
+            {
+                [track.Id] = track with
+                {
+                    Lifecycle = new CanonicalContentLifecycle("planned"),
+                },
+            },
+        };
+
+        var projection = new RuntimeContentProjector().Project(graph);
+
+        projection.Tracks.Should().BeEmpty();
+        projection.Lessons.Should().BeEmpty();
+        projection.AnswerKeys.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Track_past_its_recommendation_window_is_excluded()
     {
         var graph = BuildGraph(questionBank: true);
@@ -142,7 +165,7 @@ public sealed class RuntimeContentProjectorTests
         var questionId = $"{provider}.{certificationSlug}.domain-1.cloud-value.001";
         var unitId = $"{provider}.{certificationSlug}.unit.cloud-concepts";
         var lessonId = $"{provider}.{certificationSlug}.lesson.cloud-value";
-        var lifecycle = new CanonicalContentLifecycle(questionBank ? "planned" : "active");
+        var lifecycle = new CanonicalContentLifecycle("active");
         var track = new CanonicalTrackResource(
             trackId,
             questionBank ? null : "az-900",
@@ -226,7 +249,7 @@ public sealed class RuntimeContentProjectorTests
                     questionBank ? "CLF-C02" : "AZ-900",
                     "Cloud certification",
                     "foundational",
-                    questionBank ? "announced" : "active",
+                    "active",
                     "2026-08-17",
                     [new CanonicalCertificationObjective("domain-1", "Cloud concepts", 100m)]),
             },
