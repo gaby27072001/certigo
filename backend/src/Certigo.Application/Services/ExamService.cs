@@ -58,10 +58,11 @@ public sealed class ExamService(
     public async Task<MockExamDto> GenerateAsync(MockExamRequest request, CancellationToken cancellationToken = default)
     {
         var now = clock.UtcNow;
-        var track = await content.GetTrackAsync(request.TrackId, cancellationToken)
+        var snapshot = await ResolveGenerationSnapshotAsync(request.PublicManifestId, cancellationToken);
+        var track = await content.GetTrackAsync(snapshot, request.TrackId, cancellationToken)
             ?? throw new InvalidOperationException($"Track '{request.TrackId}' was not found.");
 
-        var answerKeys = await content.ListAnswerKeysAsync(request.TrackId, cancellationToken);
+        var answerKeys = await content.ListAnswerKeysAsync(snapshot, request.TrackId, cancellationToken);
         var pool = answerKeys
             .SelectMany(key => key.Items.Select(item =>
                 new ExamItemRef(item.ItemId, key.LessonId, key.DomainId, item.ConceptId, item.Type, item.Difficulty)))
@@ -76,11 +77,14 @@ public sealed class ExamService(
                 Array.Empty<string>(),
                 0,
                 now,
+                snapshot,
                 cancellationToken);
             return new MockExamDto(
                 emptyExamId, track.Id, track.Code, OfficialCertificationCatalog.TitleFor(track.Code, track.Title),
                 0, ExamConstants.PassingScore,
-                Array.Empty<MockExamBlueprintDomainDto>(), Array.Empty<MockExamItemDto>());
+                Array.Empty<MockExamBlueprintDomainDto>(),
+                Array.Empty<MockExamItemDto>(),
+                snapshot.PublicManifestId);
         }
 
         var cap = Math.Min(ExamConstants.MaxLength, pool.Length);
@@ -102,7 +106,11 @@ public sealed class ExamService(
         var checkById = new Dictionary<string, LessonCheck>(StringComparer.OrdinalIgnoreCase);
         foreach (var lessonId in chosen.Select(i => i.LessonId).Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            var lesson = await content.GetLessonAsync(request.TrackId, lessonId, cancellationToken);
+            var lesson = await content.GetLessonAsync(
+                snapshot,
+                request.TrackId,
+                lessonId,
+                cancellationToken);
             if (lesson is null)
             {
                 continue;
@@ -147,11 +155,12 @@ public sealed class ExamService(
             items.Select(item => item.ItemId).ToArray(),
             timeLimit,
             now,
+            snapshot,
             cancellationToken);
 
         return new MockExamDto(
             examId, track.Id, track.Code, OfficialCertificationCatalog.TitleFor(track.Code, track.Title),
-            timeLimit, ExamConstants.PassingScore, blueprint, items);
+            timeLimit, ExamConstants.PassingScore, blueprint, items, snapshot.PublicManifestId);
     }
 
     public async Task<MockExamResultDto> SubmitAsync(SubmitMockExamRequest request, CancellationToken cancellationToken = default)
@@ -196,6 +205,15 @@ public sealed class ExamService(
             throw new RequestValidationException($"Exam '{request.ExamId}' has expired.");
         }
 
+        var snapshot = exam.PublicManifestId is null
+            ? ContentSnapshot.Legacy
+            : await content.ResolveSnapshotAsync(exam.PublicManifestId, cancellationToken);
+        if (!string.Equals(snapshot.ReleaseId, exam.ReleaseId, StringComparison.Ordinal))
+        {
+            throw new ContentReleaseStateException(
+                $"Exam '{request.ExamId}' content release no longer resolves consistently.");
+        }
+
         SubmissionValidation.EnsureDistinctItemIds(request.Answers);
         var issuedItemIds = new HashSet<string>(exam.ItemIds, StringComparer.OrdinalIgnoreCase);
         var unissuedItemIds = request.Answers
@@ -211,9 +229,9 @@ public sealed class ExamService(
                 $"{string.Join(", ", unissuedItemIds)}.");
         }
 
-        var track = await content.GetTrackAsync(request.TrackId, cancellationToken)
+        var track = await content.GetTrackAsync(snapshot, request.TrackId, cancellationToken)
             ?? throw new InvalidOperationException($"Track '{request.TrackId}' was not found.");
-        var answerKeys = await content.ListAnswerKeysAsync(request.TrackId, cancellationToken);
+        var answerKeys = await content.ListAnswerKeysAsync(snapshot, request.TrackId, cancellationToken);
 
         var keyItemById = new Dictionary<string, (AnswerKeyItem Item, string LessonId, string DomainId)>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in answerKeys)
@@ -407,7 +425,7 @@ public sealed class ExamService(
             };
             var rejectedAttempt = new ExamAttemptRecord(
                 $"examattempt::{request.ExamId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
-                request.StartedAt, now, suppressedResult);
+                request.StartedAt, now, suppressedResult, snapshot.ReleaseId, snapshot.PublicManifestId);
             var signal = new AttemptIntegritySignal(
                 "exam",
                 request.ExamId,
@@ -433,7 +451,7 @@ public sealed class ExamService(
 
         var attempt = new ExamAttemptRecord(
             $"examattempt::{request.ExamId}", userContext.UserId, request.ClientAttemptId, request.TrackId, request.ExamId,
-            request.StartedAt, now, result);
+            request.StartedAt, now, result, snapshot.ReleaseId, snapshot.PublicManifestId);
         var integritySignal = integrity.IsClean
             ? null
             : new AttemptIntegritySignal(
@@ -662,6 +680,7 @@ public sealed class ExamService(
         IReadOnlyList<string> itemIds,
         int durationSeconds,
         DateTimeOffset createdAt,
+        ContentSnapshot snapshot,
         CancellationToken cancellationToken)
     {
         var validitySeconds = Math.Max(durationSeconds, 0) + ExamConstants.SubmissionGraceSeconds;
@@ -675,15 +694,39 @@ public sealed class ExamService(
             createdAt,
             durationSeconds,
             expiresAt,
-            validitySeconds + ExamConstants.RetentionAfterExpirySeconds);
+            validitySeconds + ExamConstants.RetentionAfterExpirySeconds,
+            snapshot.ReleaseId,
+            snapshot.PublicManifestId);
         await exams.CreateAsync(record, cancellationToken);
         await events.AddAsync(new LearningEvent(
             Guid.NewGuid().ToString("n"),
             userContext.UserId,
             "exam.generated",
             createdAt,
-            new { examId, trackId, length = itemIds.Count, durationSeconds, expiresAt }),
+            new
+            {
+                examId,
+                trackId,
+                length = itemIds.Count,
+                durationSeconds,
+                expiresAt,
+                snapshot.ReleaseId,
+                snapshot.PublicManifestId,
+            }),
             cancellationToken);
+    }
+
+    private async Task<ContentSnapshot> ResolveGenerationSnapshotAsync(
+        string? publicManifestId,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(publicManifestId))
+        {
+            return await content.ResolveSnapshotAsync(publicManifestId, cancellationToken);
+        }
+
+        var snapshot = await content.ResolveActiveSnapshotAsync(cancellationToken);
+        return snapshot;
     }
 
     private static int StableSeed(string userId, string trackId, DateOnly date)

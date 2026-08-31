@@ -54,6 +54,13 @@ rapports automatisés sans impact démontré.
 - **Identités managées** pour l'accès à Cosmos DB et Key Vault — pas de secrets
   applicatifs en clair.
 - Notation des quiz **autoritative côté serveur** (clé de correction non exposée).
+- Releases de contenu lues depuis des versions Blob WORM par une identité
+  `Storage Blob Data Reader`; aucune URL arbitraire ni package HTTP n'est accepté.
+- Questions/corrigés séparés dans des containers Blob et Cosmos distincts.
+  L'import valide tout le canal public contre une deny-list anti-fuite avant
+  mutation et après projection.
+- Import, promotion et rollback exigent l'app role Entra
+  `Content.Release.Admin` et une précondition ETag; aucune Function key.
 - Analyse continue bloquante sur runners Azure : **CodeQL** (SAST), **OSV**
   (dépendances NuGet/csproj, npm et pub), **Checkov** (IaC), et posture cloud via
   **Microsoft Defender for Cloud**. CodeQL transmet son SARIF à Code Scanning et

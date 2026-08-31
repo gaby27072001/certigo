@@ -75,6 +75,7 @@ class ActiveContentReference:
     revision: str
     date: str
     committed_at: str
+    package_schema: str
     public: ActiveManifestReference
     private: ActiveManifestReference
 
@@ -485,8 +486,9 @@ def load_active_content_reference(root: Path) -> ActiveContentReference:
     if contract != expected_contract:
         raise ProjectStateError(
             f"{ACTIVE_CONTENT_REFERENCE_FILE}.packageContract: contract does not match "
-            "certigo.content.package-manifest/v1."
+            f"{PACKAGE_MANIFEST_SCHEMA}."
         )
+    package_schema = PACKAGE_MANIFEST_SCHEMA
 
     manifests = value["manifests"]
     if not isinstance(manifests, dict):
@@ -507,7 +509,14 @@ def load_active_content_reference(root: Path) -> ActiveContentReference:
         "private",
     )
     return ActiveContentReference(
-        repository, branch, revision, date, committed_at, public, private
+        repository,
+        branch,
+        revision,
+        date,
+        committed_at,
+        package_schema,
+        public,
+        private,
     )
 
 
@@ -526,7 +535,9 @@ def _canonical_manifest_id(manifest: dict[str, object]) -> str:
 
 
 def _validate_manifest(
-    active_root: Path, reference: ActiveManifestReference
+    active_root: Path,
+    reference: ActiveManifestReference,
+    expected_schema: str,
 ) -> None:
     source = reference.path
     raw = _read_bytes(active_root, source)
@@ -544,7 +555,7 @@ def _validate_manifest(
         raise ProjectStateError(f"{source}: expected a JSON object.")
     expected_fields = set(PACKAGE_MANIFEST_BODY_FIELDS + PACKAGE_MANIFEST_DIGEST_FIELDS)
     _exact_keys(manifest, expected_fields, source)
-    if manifest["schema"] != PACKAGE_MANIFEST_SCHEMA:
+    if manifest["schema"] != expected_schema:
         raise ProjectStateError(f"{source}.schema: unexpected package manifest schema.")
     if manifest["algorithm"] != PACKAGE_MANIFEST_ALGORITHM:
         raise ProjectStateError(f"{source}.algorithm: expected sha256.")
@@ -570,26 +581,138 @@ def _validate_manifest(
         raise ProjectStateError(
             f"{source}.fileCount: expected {reference.file_count} and len(files) equality."
         )
-    expected_path = (
-        r"questions/[^/]+\.json"
-        if reference.channel == "public"
-        else r"solutions/[^/]+\.json"
-    )
+    if expected_schema.endswith("/v1"):
+        expected_path = (
+            r"questions/[^/]+\.json"
+            if reference.channel == "public"
+            else r"solutions/[^/]+\.json"
+        )
+        required_entry_keys = {"id", "path", "hash", "size"}
+        allowed_entry_keys = required_entry_keys
+    else:
+        public_prefixes = (
+            r"(?:questions|catalog|coverage)"
+            if expected_schema.endswith("/v2")
+            else r"(?:questions|catalog|coverage|runtime/(?:tracks|domains|units|lessons|concepts))"
+        )
+        expected_path = (
+            rf"{public_prefixes}/.+\.json"
+            if reference.channel == "public"
+            else r"solutions/.+\.json"
+        )
+        required_entry_keys = {"id", "path", "resourceType", "hash", "size"}
+        allowed_entry_keys = required_entry_keys | {
+            "provider",
+            "certification",
+            "blueprintVersion",
+            "objective",
+        }
     manifest_paths: list[str] = []
     for index, file_entry in enumerate(files):
         entry_source = f"{source}.files[{index}]"
         if not isinstance(file_entry, dict):
             raise ProjectStateError(f"{entry_source}: expected an object.")
-        _exact_keys(file_entry, {"id", "path", "hash", "size"}, entry_source)
+        actual_entry_keys = set(file_entry)
+        if not required_entry_keys.issubset(actual_entry_keys) or not actual_entry_keys.issubset(
+            allowed_entry_keys
+        ):
+            raise ProjectStateError(
+                f"{entry_source}: expected required fields {sorted(required_entry_keys)} "
+                f"and optional metadata {sorted(allowed_entry_keys - required_entry_keys)}, "
+                f"found {sorted(actual_entry_keys)}."
+            )
         item_id = file_entry["id"]
         item_path = file_entry["path"]
         item_hash = file_entry["hash"]
         item_size = file_entry["size"]
+        resource_type = file_entry.get("resourceType")
+        if not expected_schema.endswith("/v1") and not isinstance(
+            resource_type, str
+        ):
+            raise ProjectStateError(
+                f"{entry_source}.resourceType: expected a string."
+            )
         if not isinstance(item_id, str) or not item_id or "/" in item_id:
             raise ProjectStateError(f"{entry_source}.id: expected a non-empty item id.")
         if not isinstance(item_path, str) or not re.fullmatch(expected_path, item_path):
             raise ProjectStateError(
                 f"{entry_source}.path: unexpected path for {reference.channel}."
+            )
+        if resource_type is not None:
+            allowed_resource_types = {
+                "question",
+                "solution",
+                "certificationCatalog",
+                "coverageMatrix",
+            }
+            if expected_schema.endswith("/v3"):
+                allowed_resource_types.update(
+                    {"track", "domain", "unit", "lesson", "concept"}
+                )
+            if resource_type not in allowed_resource_types:
+                raise ProjectStateError(f"{entry_source}.resourceType: unsupported value.")
+            if reference.channel == "public" and resource_type == "solution":
+                raise ProjectStateError(
+                    f"{entry_source}: public manifest cannot contain solutions."
+                )
+            if reference.channel == "answerKey" and resource_type != "solution":
+                raise ProjectStateError(
+                    f"{entry_source}: private manifest accepts only solutions."
+                )
+            expected_resource_path = {
+                "question": r"questions/.+\.json",
+                "solution": r"solutions/.+\.json",
+                "certificationCatalog": r"catalog/certifications\.json",
+                "coverageMatrix": r"coverage/.+\.json",
+                "track": r"runtime/tracks/.+\.json",
+                "domain": r"runtime/domains/.+\.json",
+                "unit": r"runtime/units/.+\.json",
+                "lesson": r"runtime/lessons/.+\.json",
+                "concept": r"runtime/concepts/.+\.json",
+            }[resource_type]
+            if not re.fullmatch(expected_resource_path, item_path):
+                raise ProjectStateError(
+                    f"{entry_source}.path: does not match resourceType {resource_type}."
+                )
+        provider = file_entry.get("provider")
+        if provider is not None and provider not in {"aws", "gcp", "microsoft"}:
+            raise ProjectStateError(
+                f"{entry_source}.provider: unsupported value."
+            )
+        certification = file_entry.get("certification")
+        if certification is not None and (
+            not isinstance(certification, str)
+            or not re.fullmatch(
+                r"(aws|gcp|microsoft):[a-z0-9]+(?:-[a-z0-9]+)*",
+                certification,
+            )
+        ):
+            raise ProjectStateError(
+                f"{entry_source}.certification: expected a canonical id."
+            )
+        blueprint_version = file_entry.get("blueprintVersion")
+        if blueprint_version is not None and (
+            not isinstance(blueprint_version, str)
+            or not re.fullmatch(
+                r"[a-z0-9]+(?:[._-][a-z0-9]+)*",
+                blueprint_version,
+            )
+        ):
+            raise ProjectStateError(
+                f"{entry_source}.blueprintVersion: unsupported value."
+            )
+        objective = file_entry.get("objective")
+        objective_pattern = (
+            r"(domain|section)-[1-9][0-9]*"
+            if expected_schema.endswith("/v3")
+            else r"[a-z0-9]+(?:-[a-z0-9]+)*"
+        )
+        if objective is not None and (
+            not isinstance(objective, str)
+            or not re.fullmatch(objective_pattern, objective)
+        ):
+            raise ProjectStateError(
+                f"{entry_source}.objective: unsupported value."
             )
         if not isinstance(item_hash, str) or not re.fullmatch(
             r"[0-9a-f]{64}", item_hash
@@ -597,9 +720,9 @@ def _validate_manifest(
             raise ProjectStateError(
                 f"{entry_source}.hash: expected 64 lowercase hex characters."
             )
-        if isinstance(item_size, bool) or not isinstance(item_size, int) or item_size < 0:
+        if isinstance(item_size, bool) or not isinstance(item_size, int) or item_size <= 0:
             raise ProjectStateError(
-                f"{entry_source}.size: expected a non-negative integer."
+                f"{entry_source}.size: expected a positive integer."
             )
         manifest_paths.append(item_path)
     if manifest_paths != sorted(manifest_paths) or len(manifest_paths) != len(
@@ -651,8 +774,8 @@ def validate_active_content_repository(root: Path, active_root: Path) -> None:
             f"Active content commit time {committed_at} does not match "
             f"{reference.committed_at}."
         )
-    _validate_manifest(active_root, reference.public)
-    _validate_manifest(active_root, reference.private)
+    _validate_manifest(active_root, reference.public, reference.package_schema)
+    _validate_manifest(active_root, reference.private, reference.package_schema)
 
 
 def parse_versions(root: Path) -> tuple[str, str, str]:

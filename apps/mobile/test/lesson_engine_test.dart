@@ -299,7 +299,7 @@ void main() {
     );
 
     test(
-      'treats server content without checks as unavailable and exposes demo',
+      'accepts valid instructional content without checks',
       () async {
         final ProviderContainer noCheckContainer = ProviderContainer(
           overrides: <Override>[
@@ -316,19 +316,13 @@ void main() {
         );
 
         await controller.load();
-        expect(
-          noCheckContainer.read(lessonControllerProvider(args)).status,
-          LessonStatus.error,
-        );
-
-        controller.startDemo();
         final LessonSessionState state = noCheckContainer.read(
           lessonControllerProvider(args),
         );
         expect(state.status, LessonStatus.ready);
-        expect(state.isDemo, isTrue);
-        expect(state.lesson?.id, 'certigo-demo');
-        expect(state.checksTotal, 7);
+        expect(state.isDemo, isFalse);
+        expect(state.lesson?.id, args.lessonId);
+        expect(state.checksTotal, 0);
       },
     );
 

@@ -41,18 +41,21 @@ class SubmitQuizRequest {
     required this.trackId,
     required this.startedAt,
     required this.answers,
+    this.publicManifestId,
   });
 
   final String clientAttemptId;
   final String trackId;
   final DateTime startedAt;
   final List<QuizAnswer> answers;
+  final String? publicManifestId;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'clientAttemptId': clientAttemptId,
         'trackId': trackId,
         'startedAt': startedAt.toUtc().toIso8601String(),
         'answers': answers.map((a) => a.toJson()).toList(),
+        if (publicManifestId != null) 'publicManifestId': publicManifestId,
       };
 }
 

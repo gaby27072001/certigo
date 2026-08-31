@@ -8,7 +8,8 @@ public sealed record TutorExplainRequest(
     string TrackId,
     string LessonId,
     string ItemId,
-    List<string> Selected);
+    List<string> Selected,
+    string? PublicManifestId = null);
 
 // What the tutor knows about this learner for the concept under test, surfaced so
 // the client can show "you've struggled with this before / great comeback" UX.

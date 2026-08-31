@@ -4,7 +4,10 @@ namespace Certigo.Application.Dtos;
 
 // --- Mock exam (adaptive practice exam) ------------------------------------
 
-public sealed record MockExamRequest(string TrackId, int? Length = null);
+public sealed record MockExamRequest(
+    string TrackId,
+    int? Length = null,
+    string? PublicManifestId = null);
 
 // Public, answer-free exam item: stem + options come from the lesson's public
 // check; the correct answer stays server-side in the answer key.
@@ -26,7 +29,8 @@ public sealed record MockExamDto(
     int TimeLimitSeconds,
     int PassingScore,
     IReadOnlyList<MockExamBlueprintDomainDto> Blueprint,
-    IReadOnlyList<MockExamItemDto> Items);
+    IReadOnlyList<MockExamItemDto> Items,
+    string? PublicManifestId = null);
 
 public sealed record SubmitMockExamRequest(
     string ClientAttemptId,

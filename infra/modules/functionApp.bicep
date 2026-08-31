@@ -9,6 +9,24 @@ param location string
 @description('Storage account (in this RG) used by the Functions runtime.')
 param storageAccountName string
 
+@description('External immutable content Blob endpoint from PR #290.')
+param contentBlobEndpoint string = ''
+
+@description('External immutable content reader UAMI client id from PR #290.')
+param contentReaderClientId string = ''
+
+@description('External immutable content reader UAMI resource id from PR #290.')
+param contentReaderResourceId string = ''
+
+@description('Container holding immutable content release descriptors.')
+param contentDescriptorContainerName string
+
+@description('Container holding immutable public content packages.')
+param contentPublicContainerName string
+
+@description('Container holding immutable private answer-key packages.')
+param contentPrivateContainerName string
+
 @description('Blob container (in the storage account) holding the deployment package.')
 param deploymentContainerName string = 'app-package'
 
@@ -36,6 +54,10 @@ param functionIntegrationSubnetId string
 @description('Authentication mode. "dev" enables the permissive dev token validator (safe default for local/dev); "prod" enforces Entra External ID token validation. Set to "prod" in staging/production once the Entra External ID tenant is configured. Any value other than "dev" also enables Entra validation.')
 @allowed([ 'dev', 'prod', '' ])
 param authMode string = 'dev'
+
+@description('Active content repository implementation. Keep legacy until a verified release is promoted.')
+@allowed([ 'legacy', 'versioned' ])
+param contentRepositoryMode string = 'legacy'
 
 @description('Entra External ID authority URL. Format: https://<domain>.ciamlogin.com/<tenant-id>/v2.0. Replace with the value from Azure Portal → External ID tenant → Overview. Leave empty until the tenant is created.')
 @secure()
@@ -215,6 +237,10 @@ resource hostVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
   }
 }
 
+var contentReaderIdentityAssignment = empty(contentReaderResourceId) ? {} : {
+  '${contentReaderResourceId}': {}
+}
+
 resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: 'plan-${functionAppName}'
   location: location
@@ -233,9 +259,9 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
   kind: 'functionapp,linux'
   identity: {
     type: 'SystemAssigned, UserAssigned'
-    userAssignedIdentities: {
+    userAssignedIdentities: union({
       '${hostStorageIdentity.id}': {}
-    }
+    }, contentReaderIdentityAssignment)
   }
   properties: {
     serverFarmId: plan.id
@@ -297,6 +323,10 @@ var accountDeletionGraphSettings = accountDeletionEnabled ? {
   ENTRA_GRAPH_CLIENT_ID: entraGraphClientId
   ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI: entraGraphClientSecretSecretUri
 } : {}
+var contentRuntimeSettings = empty(contentBlobEndpoint) ? {} : {
+  CONTENT_BLOB_ENDPOINT: contentBlobEndpoint
+  CONTENT_STORAGE_CLIENT_ID: contentReaderClientId
+}
 
 resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
   parent: functionApp
@@ -313,6 +343,17 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     COSMOS_DATABASE: cosmosDatabaseName
     BLOB_ENDPOINT: storage.properties.primaryEndpoints.blob
     DEPLOYMENT_CONTAINER_NAME: deploymentContainerName
+    CONTENT_DESCRIPTOR_CONTAINER: contentDescriptorContainerName
+    CONTENT_PUBLIC_CONTAINER: contentPublicContainerName
+    CONTENT_PRIVATE_CONTAINER: contentPrivateContainerName
+    CONTENT_REPOSITORY_MODE: contentRepositoryMode
+    CONTENT_ADMIN_ROLE: 'Content.Release.Admin'
+    CONTENT_ADMIN_ALLOW_DEV: authMode == 'dev' ? 'true' : 'false'
+    CONTENT_ALLOW_MUTABLE_BLOBS: 'false'
+    CONTENT_IMPORT_MAX_FILES: '10000'
+    CONTENT_IMPORT_MAX_FILE_BYTES: '2097152'
+    CONTENT_IMPORT_MAX_RELEASE_BYTES: '134217728'
+    CONTENT_IMPORT_MAX_COSMOS_ITEM_BYTES: '1900000'
     HEALTH_PROBE_TIMEOUT_SECONDS: '5'
     HEALTH_PLATFORM_CLIENT_ID: hostStorageIdentity.properties.clientId
     KeyVault__HealthSecretName: 'AUTH-JWT-SIGNING-KEY'
@@ -339,7 +380,7 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     ACS_EMAIL_SENDER: acsEmailSender
     ACS_EMAIL_CONNECTION_STRING: acsEmailConnectionString
     EMAIL_VERIFY_BASE_URL: emailVerifyBaseUrl
-  }, accountDeletionGraphSettings)
+  }, accountDeletionGraphSettings, contentRuntimeSettings)
 }
 
 // Grant the Function App's managed identity Cosmos DB data-plane access via the

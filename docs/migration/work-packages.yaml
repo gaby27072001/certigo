@@ -380,21 +380,21 @@ work_packages:
 
   - id: wp-p2-04
     phase: 2
-    title: "Importer les releases de contenu dans le backend avec rollback par manifestId"
+    title: "Importer les releases de contenu dans le backend avec rollback par releaseId"
     size: M
     effort_pweeks: 1
     depends_on: [wp-p2-03]
     precondition: "Si le backend importe déjà une release vérifiée, idempotente et restaurable par manifeste, le lot est terminé."
     steps:
       - "Définir et versionner le contrat d'import public/privé, puis vérifier tous les SHA-256 avant écriture."
-      - "Rendre l'import idempotent par manifestId et séparer les accès aux questions publiques et corrigés."
+      - "Rendre l'import idempotent par releaseId et séparer les accès aux questions publiques et corrigés."
       - "Enregistrer les versions active et précédente, ajouter promotion staging vers prod et rollback N-1."
       - "Exposer uniquement le manifeste public actif et tester qu'aucun endpoint ne sérialise answerKey, correct ou rationale."
       - "Instrumenter import, promotion, rejet et rollback dans Application Insights."
     dod: "Import répété sans doublon ; hash invalide rejeté avant mutation ; rollback N-1 testé en staging ; tests HTTP anti-fuite verts ; le backend expose le manifestId public actif."
     rollback: "Réactiver le manifeste précédent ; conserver les artefacts immuables et ne supprimer aucune version pendant le lot."
-    status: in_progress
-    notes: "Source : gchambaud_microsoft/Certigo#244. Implémentation active dans la session dédiée 5cf299a4-4f53-453a-8d1d-671f70f54913."
+    status: in_review
+    notes: "Source : gchambaud_microsoft/Certigo#244. PR draft #304 : implémentation et gates machine terminées ; preuve staging import/promotion/rollback encore manuelle."
 
   - id: wp-p2-05
     phase: 2

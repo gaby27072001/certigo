@@ -9,14 +9,16 @@ import 'quiz.dart' show ItemResult, QuizAnswer, QuizRewards;
 /// Request body for `POST /exam/generate`. [length] is optional — omit it to let
 /// the server pick the blueprint's default exam length.
 class MockExamRequest {
-  const MockExamRequest({required this.trackId, this.length});
+  const MockExamRequest({required this.trackId, this.length, this.publicManifestId});
 
   final String trackId;
   final int? length;
+  final String? publicManifestId;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'trackId': trackId,
         if (length != null) 'length': length,
+        if (publicManifestId != null) 'publicManifestId': publicManifestId,
       };
 }
 
@@ -85,6 +87,7 @@ class MockExam {
     required this.passingScore,
     required this.blueprint,
     required this.items,
+    this.publicManifestId,
   });
 
   final String examId;
@@ -95,6 +98,7 @@ class MockExam {
   final int passingScore;
   final List<MockExamBlueprintDomain> blueprint;
   final List<MockExamItem> items;
+  final String? publicManifestId;
 
   factory MockExam.fromJson(Map<String, dynamic> json) => MockExam(
         examId: json['examId'] as String,
@@ -109,6 +113,7 @@ class MockExam {
         items: (json['items'] as List<dynamic>? ?? <dynamic>[])
             .map((e) => MockExamItem.fromJson(e as Map<String, dynamic>))
             .toList(),
+        publicManifestId: json['publicManifestId'] as String?,
       );
 }
 

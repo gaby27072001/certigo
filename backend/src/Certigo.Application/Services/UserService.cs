@@ -49,7 +49,8 @@ public sealed class UserService(
         var expected = string.IsNullOrWhiteSpace(expectedTrackId)
             ? null
             : expectedTrackId.Trim().ToLowerInvariant();
-        var track = await content.GetTrackAsync(normalized, cancellationToken)
+        var snapshot = await content.ResolveActiveSnapshotAsync(cancellationToken);
+        var track = await content.GetTrackAsync(snapshot, normalized, cancellationToken)
             ?? throw new TrackNotFoundException(normalized);
 
         return await OptimisticConcurrency.ExecuteAsync(async () =>

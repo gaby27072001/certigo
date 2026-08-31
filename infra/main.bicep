@@ -82,6 +82,28 @@ param personLinkedIdentityV1 string = 'off'
 param organizationMembershipV1 string = 'off'
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
+
+@description('Content repository mode. Deploy legacy first; switch only after a verified staging promotion.')
+@allowed([ 'legacy', 'versioned' ])
+param contentRepositoryMode string = 'legacy'
+
+@description('Blob endpoint output azureBlobEndpoint from the immutable content stack (PR #290).')
+param contentBlobEndpoint string = ''
+
+@description('Reader client-id output azureContentReaderClientId from the immutable content stack (PR #290).')
+param contentReaderClientId string = ''
+
+@description('Reader resource-id output azureContentReaderResourceId from the immutable content stack (PR #290).')
+param contentReaderResourceId string = ''
+
+@description('Descriptor container output azureDescriptorContainer from the immutable content stack (PR #290).')
+param contentDescriptorContainerName string = 'content-release-descriptors'
+
+@description('Public container output azurePublicContainer from the immutable content stack (PR #290).')
+param contentPublicContainerName string = 'content-public-releases'
+
+@description('Private container output azurePrivateContainer from the immutable content stack (PR #290).')
+param contentPrivateContainerName string = 'content-private-releases'
 @description('Azure OpenAI resource endpoint used by the tutor when enabled. Example: https://<resource>.openai.azure.com/.')
 param tutorLlmEndpoint string = ''
 @description('Azure OpenAI deployment name used by the tutor when enabled.')
@@ -248,6 +270,15 @@ var rgName = 'rg-${appName}-${env}'
 // Dev token bypass is allowed ONLY in the dev environment; staging/prod enforce
 // Entra token validation ("prod" signals to the backend that Entra is required).
 var authMode = env == 'dev' ? 'dev' : 'prod'
+var contentContractConfigured = !empty(contentBlobEndpoint) && !empty(contentReaderClientId) && !empty(contentReaderResourceId)
+var contentContractAbsent = empty(contentBlobEndpoint) && empty(contentReaderClientId) && empty(contentReaderResourceId)
+var contentContractValid = contentContractConfigured || contentContractAbsent
+  ? true
+  : fail('contentBlobEndpoint, contentReaderClientId and contentReaderResourceId must be configured together from PR #290 outputs.')
+var contentModeReady = contentRepositoryMode == 'legacy' || contentContractConfigured
+  ? true
+  : fail('contentRepositoryMode=versioned requires the complete PR #290 storage and reader outputs.')
+var effectiveContentBlobEndpoint = contentContractValid && contentModeReady ? contentBlobEndpoint : ''
 // Production-grade hardening is on for every non-dev environment: Cosmos RBAC-only
 // auth, Key Vault purge protection + 90-day soft delete, geo-redundant + versioned
 // storage, and a locked-down CORS origin set.
@@ -572,6 +603,12 @@ module api 'modules/functionApp.bicep' = {
     functionAppName: 'func-${appName}-${env}-${suffix}'
     location: location
     storageAccountName: storage.outputs.accountName
+    contentBlobEndpoint: effectiveContentBlobEndpoint
+    contentReaderClientId: contentReaderClientId
+    contentReaderResourceId: contentReaderResourceId
+    contentDescriptorContainerName: contentDescriptorContainerName
+    contentPublicContainerName: contentPublicContainerName
+    contentPrivateContainerName: contentPrivateContainerName
     deploymentContainerName: storage.outputs.deploymentContainerName
     appInsightsConnectionString: monitoring.outputs.connectionString
     appInsightsName: monitoring.outputs.name
@@ -581,6 +618,7 @@ module api 'modules/functionApp.bicep' = {
     keyVaultName: vault.outputs.name
     functionIntegrationSubnetId: privateNetwork.outputs.functionIntegrationSubnetId
     authMode: authMode
+    contentRepositoryMode: contentRepositoryMode
     authJwtSigningKeySecretUri: vault.outputs.jwtSecretUri
     authJwtPreviousSigningKeySecretUri: previousJwtSecret.?outputs.?jwtSecretUri ?? ''
     entraAuthority: entraAuthority

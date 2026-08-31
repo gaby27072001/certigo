@@ -482,6 +482,9 @@ class ProjectStateTests(unittest.TestCase):
                                 if channel == "public"
                                 else "solutions/lesson.json"
                             ),
+                            "resourceType": (
+                                "question" if channel == "public" else "solution"
+                            ),
                             "hash": "6" * 64,
                             "size": 123,
                         }
@@ -563,6 +566,89 @@ class ProjectStateTests(unittest.TestCase):
         ).encode("utf-8")
         expected = f"sha256:{hashlib.sha256(canonical).hexdigest()}"
         self.assertEqual(expected, project_state._canonical_manifest_id(manifest))
+
+    def test_v3_manifest_rejects_resource_path_and_metadata_mismatches(self) -> None:
+        with tempfile.TemporaryDirectory() as active_temp:
+            active_root = Path(active_temp)
+            manifest_path = active_root / "dist/public/manifest.json"
+            manifest_path.parent.mkdir(parents=True)
+
+            def validate(entry: dict[str, object]) -> None:
+                manifest: dict[str, object] = {
+                    "schema": project_state.PACKAGE_MANIFEST_SCHEMA,
+                    "channel": "public",
+                    "artifact": "public",
+                    "algorithm": project_state.PACKAGE_MANIFEST_ALGORITHM,
+                    "serialization": project_state.PACKAGE_MANIFEST_SERIALIZATION,
+                    "fileCount": 1,
+                    "files": [entry],
+                    "manifestId": "",
+                    "rootHash": "",
+                }
+                manifest["manifestId"] = project_state._canonical_manifest_id(
+                    manifest
+                )
+                manifest["rootHash"] = str(manifest["manifestId"]).removeprefix(
+                    "sha256:"
+                )
+                manifest_path.write_text(
+                    json.dumps(manifest, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+                raw = manifest_path.read_bytes()
+                reference = project_state.ActiveManifestReference(
+                    "dist/public/manifest.json",
+                    "public",
+                    "public",
+                    str(manifest["manifestId"]),
+                    1,
+                    hashlib.sha256(raw).hexdigest(),
+                )
+                project_state._validate_manifest(
+                    active_root,
+                    reference,
+                    project_state.PACKAGE_MANIFEST_SCHEMA,
+                )
+
+            common = {
+                "id": "track",
+                "hash": "6" * 64,
+                "size": 123,
+            }
+            with self.assertRaisesRegex(
+                project_state.ProjectStateError,
+                "does not match resourceType lesson",
+            ):
+                validate(
+                    {
+                        **common,
+                        "path": "runtime/tracks/track.json",
+                        "resourceType": "lesson",
+                    }
+                )
+            with self.assertRaisesRegex(
+                project_state.ProjectStateError,
+                "provider: unsupported value",
+            ):
+                validate(
+                    {
+                        **common,
+                        "path": "runtime/tracks/track.json",
+                        "resourceType": "track",
+                        "provider": 7,
+                    }
+                )
+            with self.assertRaisesRegex(
+                project_state.ProjectStateError,
+                "resourceType: expected a string",
+            ):
+                validate(
+                    {
+                        **common,
+                        "path": "runtime/tracks/track.json",
+                        "resourceType": None,
+                    }
+                )
 
     def test_manifest_reference_rejects_paths_outside_active_content(self) -> None:
         reference_path = self.root / project_state.ACTIVE_CONTENT_REFERENCE_FILE

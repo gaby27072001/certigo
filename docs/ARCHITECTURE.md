@@ -196,12 +196,31 @@ Certigo/content/             # instantané historique, non éditorial
   titres, domaines pondérés, prérequis, liens Microsoft Learn, date de blueprint et statut de
   cycle de vie maintenus dans `OfficialCertificationCatalog`. Cette couche factuelle ne contient
   ni leçons ni questions et ne transforme pas l'instantané `Certigo/content/` en source éditoriale.
-- **Remplacement d'un examen** : un examen retiré reste navigable si sa progression historique
-  existe (AI-900), tandis que son successeur actif peut apparaître comme entrée informative
-  non navigable (AI-901) jusqu'à publication de son contenu. La présence ultérieure d'un track
-  `ai-901` rend automatiquement son parcours navigable, sans migration destructive d'AI-900.
+- **Remplacement d'un examen** : un examen retiré reste visible pour sa progression historique,
+  mais son track est exclu de la projection active (AI-900). Son successeur actif peut apparaître
+  comme entrée informative non navigable (AI-901) jusqu'à publication de son contenu, sans
+  migration destructive de l'historique AI-900.
 
-### 7.1 Catalogue canonique de certifications multi-cloud
+### 7.1 Releases runtime immuables
+
+Le contrat runtime final fusionné dans `certigo-content` au SHA
+`07ab6b0453a49c7ac5800837851ae83edf159768` lie un package public et un package
+privé via `certigo.content.release/v1`. Le backend lit les versions Blob WORM
+depuis un compte dédié et vérifie descriptor, manifestes, chemins, schémas,
+hashes, tailles, graphe et anti-fuite avant la première écriture.
+
+La projection canonique produit des `Track`/`Lesson` publics et des
+`LessonAnswerKey` privés. Les parcours guided ne dupliquent pas les questions;
+les question banks synthétisent une lesson de pratique par domaine. Les
+documents sont create-only dans `content-public` et `content-private`, avec
+`content-control` pour les receipts et le pointeur active/previous sous ETag.
+
+Une requête métier résout un `ContentSnapshot` une fois, afin qu'une promotion
+concurrente ne mélange jamais deux releases. Quiz, examens et tuteur épinglent
+les opérations par `publicManifestId`/`releaseId`. Le container `content`
+historique reste disponible via `CONTENT_REPOSITORY_MODE=legacy`.
+
+### 7.2 Catalogue canonique de certifications multi-cloud
 
 Le catalogue public `content/public/catalog/certifications.json` de `certigo-content`, défini par
 l'ADR-0004 de ce dépôt éditorial et le schéma `certigo.certification-catalog/v1`, est l'unique
@@ -213,8 +232,8 @@ statuts, les objectifs, le cycle de vie ni la provenance.
 L'importeur de package `certigo-content` reste la frontière d'injection prévue. Tant qu'il n'est pas
 raccordé, la production injecte explicitement `EmptyCertificationRegistry` plutôt que des données
 de test ou une copie locale. `ContentService` continue alors d'exposer les tracks publiés et la
-surcouche Microsoft `OfficialCertificationCatalog`, notamment AI-900 retiré mais navigable et
-AI-901 actif, planifié et non sélectionnable.
+surcouche Microsoft `OfficialCertificationCatalog`, notamment AI-900 retiré, visible pour
+l'historique mais exclu de la projection active, et AI-901 actif, planifié et non sélectionnable.
 
 Quand une source canonique est injectée, `ContentService` l'adapte ainsi :
 

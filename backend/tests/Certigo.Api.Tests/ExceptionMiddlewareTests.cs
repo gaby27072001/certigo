@@ -54,6 +54,26 @@ public sealed class ExceptionMiddlewareTests
     }
 
     [Fact]
+    public async Task ContentReleaseValidationException_MapsTo422_ProblemDetails()
+    {
+        var middleware = CreateMiddleware();
+        var invocation = FunctionTestHarness.CreateHttp();
+
+        await middleware.Invoke(
+            invocation.Context,
+            _ => throw new ContentReleaseValidationException(
+                "Certification catalog is invalid."));
+
+        invocation.Response.Should().NotBeNull();
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        var problem = await invocation.ReadProblemAsync();
+        problem!.Status.Should().Be(422);
+        problem.Title.Should().Be("Invalid content release");
+        problem.Detail.Should().Be("Certification catalog is invalid.");
+    }
+
+    [Fact]
     public async Task AuthFailedException_MapsTo401_ProblemDetails()
     {
         var middleware = CreateMiddleware();
