@@ -117,7 +117,8 @@ jobs:
           PYTHONSAFEPATH: "1"
         run: |
           set -euo pipefail
-          python -P "$TRUSTED_CONTROL_DIR/tools/project_state.py" \
+          bash "$TRUSTED_CONTROL_DIR/.github/scripts/run-python.sh" \
+            "$TRUSTED_CONTROL_DIR/tools/project_state.py" \
             --root "$UNTRUSTED_SOURCE_DIR" \
             --check
 

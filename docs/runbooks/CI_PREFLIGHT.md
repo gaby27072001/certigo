@@ -20,7 +20,9 @@ outputs fail closed.
 1. Validate the trusted impact contract and the PR's candidate contract.
 2. Run actionlint when workflow YAML or the contract changes.
 3. Run adversarial selector tests and the trusted workflow security policy.
-4. Validate project-state from the trusted generator against PR source.
+4. Resolve an explicit Python 3 launcher outside the untrusted checkout, require
+   safe-path support, then validate project-state from the trusted generator
+   against PR source.
 5. Download the checksum-pinned Bicep CLI only for impacted IaC, then compile
    `infra/main.bicep` plus each changed extant Bicep or parameter source.
 

@@ -473,6 +473,11 @@ function validateRepositoryInvariants() {
     'utf8',
   );
   const lint = fs.readFileSync(path.join(workflowsDir, 'lint-workflows.yml'), 'utf8');
+  const preflight = fs.readFileSync(path.join(workflowsDir, 'ci-preflight.yml'), 'utf8');
+  const pythonLauncher = fs.readFileSync(
+    path.join(root, '.github', 'scripts', 'run-python.sh'),
+    'utf8',
+  );
   const projectState = fs.readFileSync(
     path.join(workflowsDir, 'ci-project-state.yml'),
     'utf8',
@@ -960,6 +965,36 @@ function validateRepositoryInvariants() {
     !lint.includes('node --test .github/scripts/*.test.mjs')
   ) {
     errors.push('lint-workflows.yml: workflow security script tests are not enforced');
+  }
+  for (const marker of [
+    'pull_request_target:',
+    prLinuxRunner,
+    'github.event.pull_request.head.repo.full_name == github.repository',
+    'path: .untrusted-source',
+    'path: .trusted-control',
+    'bash "$TRUSTED_CONTROL_DIR/.github/scripts/run-python.sh"',
+    '"$TRUSTED_CONTROL_DIR/tools/project_state.py"',
+    '--root "$UNTRUSTED_SOURCE_DIR"',
+  ]) {
+    if (!preflight.includes(marker)) {
+      errors.push(`ci-preflight.yml: missing trusted Python launcher invariant ${marker}`);
+    }
+  }
+  if (/(?:^|\s)(?:python|python3|py)\s+-P\s+["']?\$TRUSTED_CONTROL_DIR/mu.test(preflight)) {
+    errors.push('ci-preflight.yml: project-state must use the trusted Python launcher');
+  }
+  for (const marker of [
+    'try_launcher python3',
+    'try_launcher python',
+    'try_launcher py -3',
+    'Python 3.11+ with safe-path mode is required',
+    'UNTRUSTED_SOURCE_DIR',
+    'Refusing Python launcher from untrusted source',
+    'exec "${canonical}" "${launcher_arguments[@]}" -P "${python_arguments[@]}"',
+  ]) {
+    if (!pythonLauncher.includes(marker)) {
+      errors.push(`run-python.sh: missing fail-closed launcher invariant ${marker}`);
+    }
   }
   for (const marker of [
     'validate-source:',
