@@ -219,23 +219,38 @@ export function validatePhaseBTransition(
   stage,
 ) {
   const observed = new Set(existingContracts);
-  const b1 = expectedPhaseBContracts(subscriptionId, proof, 'B1');
+  const b1a = expectedPhaseBContracts(subscriptionId, proof, 'B1a');
+  const b1b = expectedPhaseBContracts(subscriptionId, proof, 'B1b');
   const b2 = expectedPhaseBContracts(subscriptionId, proof, 'B2');
-  const allowed = new Set(stage === 'B1' ? b1 : [...b1, ...b2]);
+  const allowed = new Set(
+    stage === 'B1a'
+      ? b1a
+      : stage === 'B1b'
+        ? [...b1a, ...b1b]
+        : [...b1a, ...b1b, ...b2],
+  );
   for (const contract of observed) {
     if (!allowed.has(contract)) {
       throw new Error(`unexpected live assignment before ${stage}: ${contract}`);
     }
   }
-  if (stage === 'B2') {
-    for (const contract of b1) {
+  if (stage === 'B1b' || stage === 'B2') {
+    for (const contract of b1a) {
       if (!observed.has(contract)) {
-        throw new Error(`B1 transition is incomplete: ${contract}`);
+        throw new Error(`B1a transition is incomplete: ${contract}`);
+      }
+    }
+  }
+  if (stage === 'B2') {
+    for (const contract of b1b) {
+      if (!observed.has(contract)) {
+        throw new Error(`B1b transition is incomplete: ${contract}`);
       }
     }
   }
   return {
-    b1Complete: b1.every((contract) => observed.has(contract)),
+    b1aComplete: b1a.every((contract) => observed.has(contract)),
+    b1bComplete: b1b.every((contract) => observed.has(contract)),
     existingB2Count: b2.filter((contract) => observed.has(contract)).length,
   };
 }
@@ -287,7 +302,9 @@ export function validateExistingPhaseBAssignments(
       '/providers/microsoft.network/',
     )
       ? 'B2'
-      : 'B1';
+      : assignment.description?.startsWith('Launches the ')
+        ? 'B1b'
+        : 'B1a';
     const contract = validatePhaseBResource(
       {
         id: assignment.id,
@@ -325,7 +342,7 @@ export function validateExistingPhaseBAssignments(
       },
       subscriptionId,
       proof,
-      'B1',
+      'B1b',
     );
     if (contracts.has(contract)) {
       throw new Error(`duplicate live Phase B assignment: ${contract}`);
@@ -399,7 +416,7 @@ export function verifyDeploymentApproval(input) {
   });
   const rawPlan = readJson(planPath);
   let effectivePlan = rawPlan;
-  if (manifest.phase === 'B1' && manifest.normalization) {
+  if (manifest.phase === 'B1a' && manifest.normalization) {
     const normalized = normalizePrincipalTypes(
       rawPlan,
       readJson(compiledTemplatePath),
@@ -455,6 +472,7 @@ export function validatePriorDeployment(input) {
     sourceRoot,
     expectedManifestSha256,
     phaseAProof,
+    expectedPhase,
   } = input;
   verifyManifestFiles(manifest, {
     manifestPath,
@@ -464,9 +482,44 @@ export function validatePriorDeployment(input) {
     sourceRoot,
     expectedManifestSha256,
   });
-  requireEqual(manifest.phase, 'B1', 'prior deployment phase mismatch');
-  validateWhatIf(plan, manifest.subscriptionId, {
-    phase: 'B1',
+  requireEqual(manifest.phase, expectedPhase, 'prior deployment phase mismatch');
+  let effectivePlan = plan;
+  if (expectedPhase === 'B1a' && manifest.normalization) {
+    const normalized = normalizePrincipalTypes(
+      plan,
+      readJson(compiledTemplatePath),
+      phaseAProof,
+    );
+    const artifactDirectory = path.dirname(manifestPath);
+    const normalizedPlanPath = path.join(artifactDirectory, 'normalized-plan.json');
+    const provenancePath = path.join(
+      artifactDirectory,
+      'principal-type-provenance.json',
+    );
+    requireEqual(
+      JSON.stringify(normalized.plan),
+      JSON.stringify(readJson(normalizedPlanPath)),
+      'normalized plan mismatch',
+    );
+    requireEqual(
+      JSON.stringify(normalized.provenance),
+      JSON.stringify(readJson(provenancePath)),
+      'principalType provenance mismatch',
+    );
+    requireEqual(
+      sha256File(normalizedPlanPath),
+      manifest.normalization.normalizedPlanSha256,
+      'normalized plan hash mismatch',
+    );
+    requireEqual(
+      sha256File(provenancePath),
+      manifest.normalization.provenanceSha256,
+      'principalType provenance hash mismatch',
+    );
+    effectivePlan = normalized.plan;
+  }
+  validateWhatIf(effectivePlan, manifest.subscriptionId, {
+    phase: expectedPhase,
     phaseA: phaseAProof,
   });
   requireEqual(
@@ -562,6 +615,7 @@ function main() {
       sourceRoot: path.resolve(args['--source-root']),
       expectedManifestSha256: args['--expected-manifest-sha256'],
       phaseAProof: readJson(args['--phase-a-proof']),
+      expectedPhase: args['--phase'],
     });
     return;
   }

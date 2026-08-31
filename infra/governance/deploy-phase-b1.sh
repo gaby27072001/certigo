@@ -12,7 +12,7 @@ trap 'rm -rf -- "${work_dir}"' EXIT
 [[ -z "$(git -C "${root}" status --porcelain)" ]]
 tenant_id="$(az account show --query tenantId --output tsv)"
 export PHASE_B_WORK_DIR="${work_dir}/fresh-binding"
-export PHASE_B_STAGE=B1
+export PHASE_B_STAGE=B1a
 bash "${root}/infra/governance/prepare-phase-b.sh"
 az bicep build \
   --file "${root}/infra/governance/bootstrap-rbac.bicep" \

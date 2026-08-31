@@ -69,8 +69,26 @@ node "${root}/infra/governance/validate-evidence.mjs" prior-b1-deployment \
   --compiled-template "${b1_evidence_dir}/compiled-template.json" \
   --deployment "${evidence_dir}/b1-deployment.json" \
   --phase-a-proof "${evidence_dir}/phase-a.json" \
+  --phase B1a \
   --source-root "${root}" \
   --expected-manifest-sha256 "${b1_evidence_sha}"
+b1b_evidence_dir="${PHASE_B1B_EVIDENCE_DIR:?Set approved B1b evidence.}"
+b1b_evidence_sha="${PHASE_B1B_EVIDENCE_MANIFEST_SHA256:?Set approved B1b manifest hash.}"
+b1b_deployment="${PHASE_B1B_DEPLOYMENT_NAME:?Set approved B1b deployment name.}"
+az deployment sub show \
+  --subscription "${subscription_id}" \
+  --name "${b1b_deployment}" \
+  --output json > "${evidence_dir}/b1b-deployment.json"
+node "${root}/infra/governance/validate-evidence.mjs" prior-b1-deployment \
+  --manifest "${b1b_evidence_dir}/manifest.json" \
+  --plan "${b1b_evidence_dir}/plan.json" \
+  --parameters "${b1b_evidence_dir}/parameters.json" \
+  --compiled-template "${b1b_evidence_dir}/compiled-template.json" \
+  --deployment "${evidence_dir}/b1b-deployment.json" \
+  --phase-a-proof "${evidence_dir}/phase-a.json" \
+  --phase B1b \
+  --source-root "${root}" \
+  --expected-manifest-sha256 "${b1b_evidence_sha}"
 cp "${evidence_dir}/b2-parameters.json" "${evidence_dir}/parameters.json"
 set +e
 az deployment group what-if \

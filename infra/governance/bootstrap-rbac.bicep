@@ -3,20 +3,11 @@ targetScope = 'subscription'
 @description('Verified output object from a successful Phase A deployment.')
 param phaseA object
 
-@description('Azure region for the audit policy assignment.')
-param location string = 'westeurope'
-
 @description('Existing resource group that owns shared CI networking.')
 param ciResourceGroupName string = 'rg-certigo-ci'
 
 @description('Existing dedicated immutable-content resource group.')
 param contentResourceGroupName string = 'rg-certigo-content'
-
-@description('Policy effect. Keep Audit until a separately approved promotion.')
-@allowed([
-  'Audit'
-])
-param privilegedAssignmentPolicyEffect string = 'Audit'
 
 var environments = [
   {
@@ -59,22 +50,6 @@ resource contentResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' ex
 resource environmentResourceGroups 'Microsoft.Resources/resourceGroups@2024-03-01' existing = [
   for environment in environments: {
     name: environment.resourceGroupName
-  }
-]
-
-resource subscriptionLauncherAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
-  for environment in environments: {
-    name: guid(
-      subscription().id,
-      environment.identity.name,
-      phaseA.roleDefinitionIds.subscriptionDeploymentLauncher
-    )
-    properties: {
-      description: 'Launches the ${environment.name} subscription deployment without general subscription access.'
-      principalId: environment.identity.principalId
-      principalType: 'ServicePrincipal'
-      roleDefinitionId: phaseA.roleDefinitionIds.subscriptionDeploymentLauncher
-    }
   }
 ]
 
@@ -122,20 +97,4 @@ module contentInfrastructurePlanExecutorAssignment 'modules/contentPlanExecutorA
   }
 }
 
-resource privilegedCiAssignmentPolicyAssignment 'Microsoft.Authorization/policyAssignments@2024-05-01' = {
-  name: 'certigo-privileged-ci-rbac'
-  location: location
-  properties: {
-    description: 'Starts in Audit. Promotion to Deny is a separate PIM-approved change after compliance evidence.'
-    displayName: 'Certigo privileged CI role assignments'
-    enforcementMode: 'Default'
-    parameters: {
-      effect: {
-        value: privilegedAssignmentPolicyEffect
-      }
-    }
-    policyDefinitionId: phaseA.policyDefinitionId
-  }
-}
-
-output assignmentCount int = 14
+output assignmentCount int = 10
