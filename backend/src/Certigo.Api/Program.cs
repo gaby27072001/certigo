@@ -140,7 +140,14 @@ var host = new HostBuilder()
             ContentReleaseContracts.VersionedSource,
             StringComparison.Ordinal);
         services.AddSingleton(new PublicContentDeliveryOptions(versionedContentEnabled));
-        services.AddScoped<IPublicContentFileService, PublicContentFileService>();
+        if (versionedContentEnabled)
+        {
+            services.AddScoped<IPublicContentFileService, PublicContentFileService>();
+        }
+        else
+        {
+            services.AddSingleton<IPublicContentFileService, DisabledPublicContentFileService>();
+        }
         services.AddSingleton<IContentReleaseTelemetry, ApplicationInsightsContentReleaseTelemetry>();
         services.AddSingleton(new ContentAdminAuthorization(
             configuration[ConfigurationKeys.ContentAdminRole] ?? "Content.Release.Admin",

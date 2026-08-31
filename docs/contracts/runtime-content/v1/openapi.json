@@ -15,12 +15,6 @@
       "bearerAuth": []
     }
   ],
-  "x-certigo-feature-mode": {
-    "setting": "CONTENT_REPOSITORY_MODE",
-    "enabledValue": "versioned",
-    "default": "legacy",
-    "disabledHttpStatus": 404
-  },
   "x-certigo-storage": {
     "credentialSetting": "CONTENT_STORAGE_CLIENT_ID",
     "access": "external-reader-uami",
@@ -63,7 +57,21 @@
             }
           },
           "304": {
-            "description": "The active public manifest is unchanged"
+            "description": "The active public manifest is unchanged",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ManifestETag"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/RevalidatedPrivateCache"
+              },
+              "X-Content-Release-Id": {
+                "$ref": "#/components/headers/ReleaseId"
+              },
+              "X-Content-Manifest-Id": {
+                "$ref": "#/components/headers/PublicManifestId"
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -80,6 +88,12 @@
         "summary": "Download one immutable file declared by a pinned public manifest",
         "x-certigo-route-template": "content/releases/{releaseId}/manifests/{publicManifestId}/files/{hash}/{*path}",
         "x-certigo-anti-enumeration": "Invalid release, manifest, hash and path bindings return the same 404 response.",
+        "x-certigo-feature-mode": {
+          "setting": "CONTENT_REPOSITORY_MODE",
+          "enabledValue": "versioned",
+          "default": "legacy",
+          "disabledHttpStatus": 404
+        },
         "parameters": [
           {
             "$ref": "#/components/parameters/ReleaseId"
@@ -139,7 +153,30 @@
             }
           },
           "304": {
-            "description": "The immutable file ETag matches If-None-Match"
+            "description": "The immutable file ETag matches If-None-Match",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/FileETag"
+              },
+              "Content-Type": {
+                "$ref": "#/components/headers/ContentType"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/ImmutablePrivateCache"
+              },
+              "Accept-Ranges": {
+                "$ref": "#/components/headers/NoRanges"
+              },
+              "X-Content-SHA256": {
+                "$ref": "#/components/headers/Hash"
+              },
+              "X-Content-Release-Id": {
+                "$ref": "#/components/headers/ReleaseId"
+              },
+              "X-Content-Manifest-Id": {
+                "$ref": "#/components/headers/PublicManifestId"
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -204,6 +241,7 @@
         "name": "If-None-Match",
         "in": "header",
         "required": false,
+        "description": "Uses weak comparison and accepts wildcard or comma-separated entity tags.",
         "schema": {
           "type": "string"
         }
@@ -266,6 +304,11 @@
           "const": "private, max-age=31536000, immutable"
         }
       },
+      "NoStoreCache": {
+        "schema": {
+          "const": "no-store"
+        }
+      },
       "NoRanges": {
         "schema": {
           "const": "none"
@@ -297,11 +340,7 @@
         ],
         "properties": {
           "schema": {
-            "enum": [
-              "certigo.content.package-manifest/v1",
-              "certigo.content.package-manifest/v2",
-              "certigo.content.package-manifest/v3"
-            ]
+            "const": "certigo.content.package-manifest/v3"
           },
           "channel": {
             "const": "public"
@@ -405,6 +444,9 @@
         "headers": {
           "Accept-Ranges": {
             "$ref": "#/components/headers/NoRanges"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStoreCache"
           },
           "Content-Range": {
             "schema": {

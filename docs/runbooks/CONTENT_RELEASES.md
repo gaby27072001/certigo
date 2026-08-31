@@ -79,8 +79,9 @@ si un pointeur existe.
    `X-Content-Release-Id`, `X-Content-Manifest-Id`,
    `Cache-Control: private, max-age=31536000, immutable` et
    `Accept-Ranges: none`.
-4. Vérifier un 304 avec `If-None-Match`, un 416 avec `Range`, et le même 404
-   pour release, manifeste, hash ou path incorrect, traversal inclus.
+4. Vérifier un 304 avec `If-None-Match` (fort, faible, wildcard et liste), un
+   416 non cacheable avec `Range`, et le même 404 pour release, manifeste, hash
+   ou path incorrect, traversal inclus.
 5. Vérifier que `GET /tracks/{trackId}/lessons/{lessonId}` retourne le même
    identifiant dans `X-Content-Manifest-Id`; le client doit le conserver dans
    son cache et l'envoyer aux requêtes quiz/tuteur.

@@ -53,30 +53,69 @@ public sealed class PublicContentFileServiceTests
     }
 
     [Theory]
-    [InlineData("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    [InlineData("sha256:invalid",
+        "valid", "valid", "questions/microsoft.az-900.question-1.json")]
+    [InlineData("valid", "sha256:invalid",
         "valid", "questions/microsoft.az-900.question-1.json")]
-    [InlineData("valid",
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    [InlineData("valid", "valid", "invalid",
         "questions/microsoft.az-900.question-1.json")]
-    [InlineData("valid", "valid", "../private/answer-key.json")]
-    [InlineData("valid", "valid", "questions%2f..%2fprivate.json")]
+    [InlineData("valid", "valid", "valid", "../private/answer-key.json")]
+    [InlineData("valid", "valid", "valid", "questions%2f..%2fprivate.json")]
     public async Task Wrong_pins_and_unsafe_paths_share_the_same_not_found_response(
         string releaseId,
+        string publicManifestId,
         string hash,
         string path)
     {
         var fixture = CreateFixture();
         releaseId = releaseId == "valid" ? ReleaseId : releaseId;
+        publicManifestId = publicManifestId == "valid"
+            ? fixture.ManifestId
+            : publicManifestId;
         hash = hash == "valid" ? FileHash : hash;
 
         var action = () => fixture.Service.GetAsync(
             releaseId,
-            fixture.ManifestId,
+            publicManifestId,
             hash,
             path);
 
         await action.Should().ThrowAsync<ContentReleaseNotFoundException>()
             .WithMessage("Public content file was not found.");
+        fixture.Store.ReadCount.Should().Be(0);
+        fixture.Source.ReadCount.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("unknown-release", 0)]
+    [InlineData("unknown-manifest", 0)]
+    [InlineData("unknown-hash", 1)]
+    public async Task Well_formed_unknown_bindings_share_the_same_not_found_response(
+        string unknownBinding,
+        int expectedSourceReads)
+    {
+        var fixture = CreateFixture();
+        var releaseId = unknownBinding == "unknown-release"
+            ? "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            : ReleaseId;
+        var publicManifestId = unknownBinding == "unknown-manifest"
+            ? "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            : fixture.ManifestId;
+        var hash = unknownBinding == "unknown-hash"
+            ? "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            : FileHash;
+
+        var action = () => fixture.Service.GetAsync(
+            releaseId,
+            publicManifestId,
+            hash,
+            Path);
+
+        await action.Should().ThrowAsync<ContentReleaseNotFoundException>()
+            .WithMessage("Public content file was not found.");
+        fixture.Store.ReadCount.Should().Be(1);
+        fixture.Source.ReadCount.Should().Be(expectedSourceReads);
+        fixture.Source.FileReadCount.Should().Be(0);
     }
 
     [Fact]
@@ -100,8 +139,14 @@ public sealed class PublicContentFileServiceTests
 
         (await wrongManifest.Should().ThrowAsync<ContentReleaseNotFoundException>())
             .Which.Message.Should().Be("Public content file was not found.");
+        fixture.Source.ReadCount.Should().Be(0);
+        fixture.Store.Receipt = fixture.Store.Receipt! with
+        {
+            PublicManifestId = fixture.ManifestId,
+        };
         (await wrongPath.Should().ThrowAsync<ContentReleaseNotFoundException>())
             .Which.Message.Should().Be("Public content file was not found.");
+        fixture.Source.ReadCount.Should().Be(1);
     }
 
     [Theory]
@@ -141,6 +186,22 @@ public sealed class PublicContentFileServiceTests
 
         await action.Should().ThrowAsync<ContentReleaseNotFoundException>()
             .WithMessage("Public content file was not found.");
+    }
+
+    [Fact]
+    public async Task Invalid_public_blob_read_fails_as_unavailable()
+    {
+        var fixture = CreateFixture();
+        fixture.Source.FileValidationFailure = true;
+
+        var action = () => fixture.Service.GetAsync(
+            ReleaseId,
+            fixture.ManifestId,
+            FileHash,
+            Path);
+
+        await action.Should().ThrowAsync<ContentUnavailableException>()
+            .WithMessage("Public content is temporarily unavailable.");
     }
 
     [Fact]
@@ -247,6 +308,7 @@ public sealed class PublicContentFileServiceTests
         public byte[] FileBytes { get; set; } = [];
         public bool FileImmutable { get; set; } = true;
         public bool FileMissing { get; set; }
+        public bool FileValidationFailure { get; set; }
         public int ReadCount { get; private set; }
         public int FileReadCount { get; private set; }
         public List<ContentArtifact> Artifacts { get; } = [];
@@ -273,6 +335,10 @@ public sealed class PublicContentFileServiceTests
             if (FileMissing)
             {
                 throw new ContentReleaseNotFoundException("Sensitive blob coordinates.");
+            }
+            if (FileValidationFailure)
+            {
+                throw new ContentReleaseValidationException("Sensitive blob validation details.");
             }
 
             return Task.FromResult(Blob(path, FileBytes, FileImmutable));

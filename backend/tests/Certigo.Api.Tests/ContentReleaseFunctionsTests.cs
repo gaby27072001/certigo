@@ -89,13 +89,17 @@ public sealed class ContentReleaseFunctionsTests
         body.Should().NotContain("answerKey");
     }
 
-    [Fact]
-    public async Task Active_manifest_honors_if_none_match()
+    [Theory]
+    [InlineData("\"sha256:e5663734ac88ac916cff3b6e1206dc03bacf7f6d530e8b115e3f198a1e6304ee\"")]
+    [InlineData("W/\"sha256:e5663734ac88ac916cff3b6e1206dc03bacf7f6d530e8b115e3f198a1e6304ee\"")]
+    [InlineData("\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", W/\"sha256:e5663734ac88ac916cff3b6e1206dc03bacf7f6d530e8b115e3f198a1e6304ee\"")]
+    [InlineData("*")]
+    public async Task Active_manifest_honors_if_none_match(string ifNoneMatch)
     {
         var function = CreateFunction(new FakeContentReleaseService());
         var context = TestFunctionContext.Authenticated();
         var headers = new HttpHeadersCollection();
-        headers.Add("If-None-Match", $"\"{PublicManifestId}\"");
+        headers.Add("If-None-Match", ifNoneMatch);
         var request = Request(
             context,
             "GET",
@@ -107,10 +111,12 @@ public sealed class ContentReleaseFunctionsTests
         response.StatusCode.Should().Be(HttpStatusCode.NotModified);
         response.Headers.GetValues("Access-Control-Expose-Headers").Should().Equal("ETag");
         (await response.ReadBodyAsStringAsync()).Should().BeEmpty();
+        response.Headers.GetValues("ETag").Should().Equal($"\"{PublicManifestId}\"");
         response.Headers.GetValues("Cache-Control").Single().Should()
             .Contain("private")
             .And.Contain("no-cache");
         response.Headers.GetValues("X-Content-Release-Id").Should().Equal(ReleaseId);
+        response.Headers.GetValues("X-Content-Manifest-Id").Should().Equal(PublicManifestId);
     }
 
     [Fact]
@@ -126,7 +132,7 @@ public sealed class ContentReleaseFunctionsTests
             hash,
             "application/json; charset=utf-8",
             bytes));
-        var function = CreateFunction(new FakeContentReleaseService(), files);
+        var function = new PublicContentFunctions(files);
         var context = TestFunctionContext.Authenticated();
         var request = Request(
             context,
@@ -157,16 +163,18 @@ public sealed class ContentReleaseFunctionsTests
         response.Headers.GetValues("Accept-Ranges").Should().Equal("none");
     }
 
-    [Fact]
-    public async Task Public_file_honors_if_none_match_before_refusing_ranges()
+    [Theory]
+    [InlineData("W/\"sha256:{0}\"")]
+    [InlineData("\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"sha256:{0}\"")]
+    [InlineData("*")]
+    public async Task Public_file_honors_if_none_match_before_refusing_ranges(
+        string ifNoneMatchTemplate)
     {
         var file = PublicFile();
-        var function = CreateFunction(
-            new FakeContentReleaseService(),
-            new FakePublicContentFileService(file));
+        var function = new PublicContentFunctions(new FakePublicContentFileService(file));
         var context = TestFunctionContext.Authenticated();
         var headers = new HttpHeadersCollection();
-        headers.Add("If-None-Match", $"W/\"sha256:{file.Hash}\"");
+        headers.Add("If-None-Match", string.Format(ifNoneMatchTemplate, file.Hash));
         headers.Add("Range", "bytes=0-1");
         var request = Request(context, "GET", "/api/content/file", headers);
 
@@ -180,15 +188,22 @@ public sealed class ContentReleaseFunctionsTests
 
         response.StatusCode.Should().Be(HttpStatusCode.NotModified);
         (await response.ReadBodyAsStringAsync()).Should().BeEmpty();
+        response.Headers.GetValues("ETag").Should().Equal($"\"sha256:{file.Hash}\"");
+        response.Headers.GetValues("Cache-Control").Single().Should()
+            .Contain("max-age=31536000")
+            .And.Contain("immutable");
+        response.Headers.GetValues("Accept-Ranges").Should().Equal("none");
+        response.Headers.GetValues("X-Content-SHA256").Should().Equal(file.Hash);
+        response.Headers.GetValues("X-Content-Release-Id").Should().Equal(ReleaseId);
+        response.Headers.GetValues("X-Content-Manifest-Id").Should().Equal(PublicManifestId);
+        response.Headers.Contains("Content-Length").Should().BeFalse();
     }
 
     [Fact]
     public async Task Public_file_refuses_range_requests_explicitly()
     {
         var file = PublicFile();
-        var function = CreateFunction(
-            new FakeContentReleaseService(),
-            new FakePublicContentFileService(file));
+        var function = new PublicContentFunctions(new FakePublicContentFileService(file));
         var context = TestFunctionContext.Authenticated();
         var headers = new HttpHeadersCollection();
         headers.Add("Range", "bytes=0-1");
@@ -206,6 +221,7 @@ public sealed class ContentReleaseFunctionsTests
         response.Headers.GetValues("Content-Range").Should()
             .Equal($"bytes */{file.Content.Length}");
         response.Headers.GetValues("Accept-Ranges").Should().Equal("none");
+        response.Headers.GetValues("Cache-Control").Should().Equal("no-store");
         (await response.ReadBodyAsStringAsync()).Should().BeEmpty();
     }
 
@@ -213,9 +229,8 @@ public sealed class ContentReleaseFunctionsTests
     public async Task Public_file_requires_an_authenticated_learner()
     {
         var file = PublicFile();
-        var function = CreateFunction(
-            new FakeContentReleaseService(),
-            new FakePublicContentFileService(file));
+        var service = new FakePublicContentFileService(file);
+        var function = new PublicContentFunctions(service);
         var context = new TestFunctionContext();
         var request = Request(context, "GET", "/api/content/file");
 
@@ -228,14 +243,31 @@ public sealed class ContentReleaseFunctionsTests
             context);
 
         await action.Should().ThrowAsync<UnauthorizedAccessException>();
+        service.ReadCount.Should().Be(0);
     }
 
-    private static ContentReleaseFunctions CreateFunction(
-        IContentReleaseService service,
-        IPublicContentFileService? publicFiles = null)
+    [Fact]
+    public async Task Disabled_public_file_service_returns_generic_not_found()
+    {
+        var function = new PublicContentFunctions(new DisabledPublicContentFileService());
+        var context = TestFunctionContext.Authenticated();
+        var request = Request(context, "GET", "/api/content/file");
+
+        var action = () => function.GetPublicFile(
+            request,
+            ReleaseId,
+            PublicManifestId,
+            new string('a', 64),
+            "questions/question-1.json",
+            context);
+
+        await action.Should().ThrowAsync<ContentReleaseNotFoundException>()
+            .WithMessage("Public content file was not found.");
+    }
+
+    private static ContentReleaseFunctions CreateFunction(IContentReleaseService service)
         => new(
             service,
-            publicFiles ?? new DisabledPublicContentFileService(),
             new ContentAdminAuthorization("Content.Release.Admin", allowDevIdentity: false));
 
     private static PublicContentFileResult PublicFile()
@@ -350,26 +382,20 @@ public sealed class ContentReleaseFunctionsTests
             };
     }
 
-    private sealed class DisabledPublicContentFileService : IPublicContentFileService
-    {
-        public Task<PublicContentFileResult> GetAsync(
-            string releaseId,
-            string publicManifestId,
-            string hash,
-            string path,
-            CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-    }
-
     private sealed class FakePublicContentFileService(PublicContentFileResult result)
         : IPublicContentFileService
     {
+        public int ReadCount { get; private set; }
+
         public Task<PublicContentFileResult> GetAsync(
             string releaseId,
             string publicManifestId,
             string hash,
             string path,
             CancellationToken cancellationToken = default)
-            => Task.FromResult(result);
+        {
+            ReadCount++;
+            return Task.FromResult(result);
+        }
     }
 }

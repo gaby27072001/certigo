@@ -10,7 +10,6 @@ namespace Certigo.Api.Functions;
 
 public sealed class ContentReleaseFunctions(
     IContentReleaseService releases,
-    IPublicContentFileService publicFiles,
     ContentAdminAuthorization adminAuthorization)
 {
     [Function("ImportContentRelease")]
@@ -100,9 +99,8 @@ public sealed class ContentReleaseFunctions(
         context.GetUser();
         var result = await releases.GetActivePublicManifestAsync(context.CancellationToken)
             ?? throw new ContentUnavailableException("No active public content manifest exists.");
-        var etag = QuoteETag(result.ETag);
-        if (request.Headers.TryGetValues("If-None-Match", out var values)
-            && values.Any(value => string.Equals(value, etag, StringComparison.Ordinal)))
+        var etag = ContentHttpCaching.QuoteETag(result.ETag);
+        if (ContentHttpCaching.MatchesIfNoneMatch(request, etag))
         {
             var notModified = request.CreateResponse(HttpStatusCode.NotModified);
             notModified.Headers.Add("ETag", etag);
@@ -128,50 +126,6 @@ public sealed class ContentReleaseFunctions(
         return response;
     }
 
-    [Function("GetPublicContentReleaseFile")]
-    public async Task<HttpResponseData> GetPublicFile(
-        [HttpTrigger(
-            AuthorizationLevel.Anonymous,
-            "get",
-            Route =
-                "content/releases/{releaseId}/manifests/{publicManifestId}/files/{hash}/{*path}")]
-        HttpRequestData request,
-        string releaseId,
-        string publicManifestId,
-        string hash,
-        string path,
-        FunctionContext context)
-    {
-        context.GetUser();
-        var file = await publicFiles.GetAsync(
-            releaseId,
-            publicManifestId,
-            hash,
-            path,
-            context.CancellationToken);
-        var etag = QuoteETag($"sha256:{file.Hash}");
-
-        if (MatchesIfNoneMatch(request, etag))
-        {
-            var notModified = request.CreateResponse(HttpStatusCode.NotModified);
-            AddPublicFileHeaders(notModified, file, etag, includeLength: false);
-            return notModified;
-        }
-
-        if (request.Headers.TryGetValues("Range", out _))
-        {
-            var rangeNotSatisfiable = request.CreateResponse(HttpStatusCode.RequestedRangeNotSatisfiable);
-            AddPublicFileHeaders(rangeNotSatisfiable, file, etag, includeLength: false);
-            rangeNotSatisfiable.Headers.Add("Content-Range", $"bytes */{file.Content.Length}");
-            return rangeNotSatisfiable;
-        }
-
-        var response = request.CreateResponse(HttpStatusCode.OK);
-        AddPublicFileHeaders(response, file, etag, includeLength: true);
-        await response.Body.WriteAsync(file.Content, context.CancellationToken);
-        return response;
-    }
-
     private static string RequireIfMatch(HttpRequestData request)
     {
         var value = request.Headers.TryGetValues("If-Match", out var values)
@@ -183,34 +137,4 @@ public sealed class ContentReleaseFunctions(
             : value.Trim();
     }
 
-    private static string QuoteETag(string value)
-        => value.StartsWith('"') ? value : $"\"{value}\"";
-
-    private static bool MatchesIfNoneMatch(HttpRequestData request, string etag)
-        => request.Headers.TryGetValues("If-None-Match", out var values)
-           && values
-               .SelectMany(value => value.Split(','))
-               .Select(value => value.Trim())
-               .Any(value => value == "*"
-                             || string.Equals(value, etag, StringComparison.Ordinal)
-                             || string.Equals(value, $"W/{etag}", StringComparison.Ordinal));
-
-    private static void AddPublicFileHeaders(
-        HttpResponseData response,
-        PublicContentFileResult file,
-        string etag,
-        bool includeLength)
-    {
-        response.Headers.Add("ETag", etag);
-        response.Headers.Add("Cache-Control", "private, max-age=31536000, immutable");
-        response.Headers.Add("Accept-Ranges", "none");
-        response.Headers.Add("Content-Type", file.ContentType);
-        response.Headers.Add("X-Content-SHA256", file.Hash);
-        response.Headers.Add("X-Content-Release-Id", file.ReleaseId);
-        response.Headers.Add("X-Content-Manifest-Id", file.PublicManifestId);
-        if (includeLength)
-        {
-            response.Headers.Add("Content-Length", file.Content.Length.ToString());
-        }
-    }
 }

@@ -14,6 +14,17 @@ public interface IPublicContentFileService
         CancellationToken cancellationToken = default);
 }
 
+public sealed class DisabledPublicContentFileService : IPublicContentFileService
+{
+    public Task<PublicContentFileResult> GetAsync(
+        string releaseId,
+        string publicManifestId,
+        string hash,
+        string path,
+        CancellationToken cancellationToken = default)
+        => throw new ContentReleaseNotFoundException("Public content file was not found.");
+}
+
 public sealed partial class PublicContentFileService(
     IContentReleaseStore store,
     IContentReleaseSource source,
@@ -104,6 +115,10 @@ public sealed partial class PublicContentFileService(
         catch (ContentReleaseNotFoundException)
         {
             throw NotFound();
+        }
+        catch (ContentReleaseValidationException)
+        {
+            throw new ContentUnavailableException("Public content is temporarily unavailable.");
         }
 
         if (!blob.IsImmutable

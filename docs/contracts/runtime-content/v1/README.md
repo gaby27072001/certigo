@@ -11,4 +11,7 @@ solutions or answer keys.
 
 `CONTENT_REPOSITORY_MODE=legacy` remains the default. In that mode the new file
 route returns the same generic 404 used for invalid bindings and performs no
-content-storage read. Range requests are explicitly refused with 416.
+content-storage read or release-service activation. Range requests are
+explicitly refused with a non-cacheable 416. Conditional requests accept weak,
+wildcard and comma-separated `If-None-Match` validators and preserve the pinned
+identity headers on 304 responses.
