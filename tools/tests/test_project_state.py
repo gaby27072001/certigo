@@ -149,6 +149,26 @@ class Fixture:
                 },
             },
         )
+        for relative in (
+            project_state.CONTENT_PACKAGE_CONTRACT_FILE,
+            Path("contracts/cosmos-containers.json"),
+        ):
+            self.write(
+                relative.as_posix(),
+                (REPO_ROOT / relative).read_text(encoding="utf-8"),
+            )
+        subprocess.run(
+            [
+                sys.executable,
+                str(MODULE_PATH.with_name("generated_contracts.py")),
+                "--root",
+                str(self.root),
+                "--refresh",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         self.write("tools/project_state.py", "# fixture generator source\n")
         self.write("tools/tests/test_generator.py", "def test_placeholder(): pass\n")
         self.git("init")
@@ -283,6 +303,16 @@ class ProjectStateTests(unittest.TestCase):
             encoding="utf-8",
         )
         with self.assertRaisesRegex(project_state.ProjectStateError, "is stale"):
+            project_state.update(self.root, check=True)
+
+    def test_project_state_check_rejects_stale_generated_contracts(self) -> None:
+        self.assertTrue(project_state.update(self.root, check=False))
+        generated = self.root / "backend/src/Certigo.Infrastructure/Cosmos/CosmosContainers.cs"
+        generated.write_text(
+            generated.read_text(encoding="utf-8") + "// stale\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(project_state.ProjectStateError, "generated contracts are stale"):
             project_state.update(self.root, check=True)
 
     def test_source_change_requires_a_new_exact_reference(self) -> None:

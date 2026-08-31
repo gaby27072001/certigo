@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import re
 import subprocess
@@ -26,7 +27,6 @@ OBSERVABLE_PATHS = (
     "README.md",
     "package.json",
     "content",
-    "contracts",
     "backend/src/Certigo.Domain/Content/ContentModels.cs",
     "backend/tests",
     "apps/mobile/test",
@@ -881,6 +881,17 @@ def replace_generated(document: str, generated: str) -> str:
 
 
 def update(root: Path, check: bool, document_path: Path = DEFAULT_DOCUMENT) -> bool:
+    if check:
+        generator_path = Path(__file__).with_name("generated_contracts.py")
+        spec = importlib.util.spec_from_file_location("generated_contracts", generator_path)
+        if spec is None or spec.loader is None:
+            raise ProjectStateError(f"Cannot load generated-contract checker {generator_path}.")
+        generated_contracts = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(generated_contracts)
+        try:
+            generated_contracts.refresh(root, check=True)
+        except generated_contracts.ContractError as exc:
+            raise ProjectStateError(str(exc)) from exc
     path = root / document_path
     current = _read(root, document_path)
     expected = replace_generated(current, render(collect(root)))

@@ -402,13 +402,15 @@ module monitoring 'modules/appInsights.bicep' = {
   }
 }
 
+var cosmosContract = loadJsonContent('../contracts/cosmos-containers.json')
+
 module data 'modules/cosmos.bicep' = {
   scope: rg
   name: 'cosmos'
   params: {
     accountName: 'cosmos-${appName}-${env}-${suffix}'
     location: cosmosRegion
-    databaseName: 'certigo'
+    databaseName: cosmosContract.databaseName
     disableLocalAuth: hardened
     backupMode: cosmosBackupMode
     continuousBackupTier: cosmosContinuousBackupTier
@@ -574,6 +576,7 @@ module api 'modules/functionApp.bicep' = {
     appInsightsConnectionString: monitoring.outputs.connectionString
     appInsightsName: monitoring.outputs.name
     cosmosEndpoint: data.outputs.endpoint
+    cosmosDatabaseName: cosmosContract.databaseName
     cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
     functionIntegrationSubnetId: privateNetwork.outputs.functionIntegrationSubnetId

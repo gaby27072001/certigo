@@ -21,6 +21,9 @@ param appInsightsName string
 @description('Cosmos DB account endpoint.')
 param cosmosEndpoint string
 
+@description('Cosmos DB database name.')
+param cosmosDatabaseName string
+
 @description('Key Vault name for RBAC secret access.')
 param keyVaultName string
 
@@ -307,7 +310,7 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsConnectionString
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${hostStorageIdentity.properties.clientId};Authorization=AAD'
     COSMOS_ENDPOINT: cosmosEndpoint
-    COSMOS_DATABASE: 'certigo'
+    COSMOS_DATABASE: cosmosDatabaseName
     BLOB_ENDPOINT: storage.properties.primaryEndpoints.blob
     DEPLOYMENT_CONTAINER_NAME: deploymentContainerName
     HEALTH_PROBE_TIMEOUT_SECONDS: '5'
