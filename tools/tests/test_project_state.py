@@ -149,6 +149,26 @@ class Fixture:
                 },
             },
         )
+        for relative in (
+            project_state.CONTENT_PACKAGE_CONTRACT_FILE,
+            Path("contracts/cosmos-containers.json"),
+        ):
+            self.write(
+                relative.as_posix(),
+                (REPO_ROOT / relative).read_text(encoding="utf-8"),
+            )
+        subprocess.run(
+            [
+                sys.executable,
+                str(MODULE_PATH.with_name("generated_contracts.py")),
+                "--root",
+                str(self.root),
+                "--refresh",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         self.write("tools/project_state.py", "# fixture generator source\n")
         self.write("tools/tests/test_generator.py", "def test_placeholder(): pass\n")
         self.git("init")
@@ -285,6 +305,16 @@ class ProjectStateTests(unittest.TestCase):
         with self.assertRaisesRegex(project_state.ProjectStateError, "is stale"):
             project_state.update(self.root, check=True)
 
+    def test_project_state_check_rejects_stale_generated_contracts(self) -> None:
+        self.assertTrue(project_state.update(self.root, check=False))
+        generated = self.root / "backend/src/Certigo.Infrastructure/Cosmos/CosmosContainers.cs"
+        generated.write_text(
+            generated.read_text(encoding="utf-8") + "// stale\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(project_state.ProjectStateError, "generated contracts are stale"):
+            project_state.update(self.root, check=True)
+
     def test_source_change_requires_a_new_exact_reference(self) -> None:
         project_state.update(self.root, check=False)
         self.fixture.json("package.json", {"engines": {"node": ">=22"}})
@@ -410,29 +440,19 @@ class ProjectStateTests(unittest.TestCase):
 
     def test_active_content_reference_is_pinned_exactly(self) -> None:
         active = project_state.load_active_content_reference(REPO_ROOT)
-        self.assertEqual(
-            "55a512821dabbea8b65d3403f9c83571b4a33ed8", active.revision
+        reference = json.loads(
+            (REPO_ROOT / project_state.ACTIVE_CONTENT_REFERENCE_FILE).read_text(
+                encoding="utf-8"
+            )
         )
-        self.assertEqual("2026-08-14", active.date)
-        self.assertEqual("2026-08-14T21:42:01Z", active.committed_at)
-        self.assertEqual(146, active.public.file_count)
-        self.assertEqual(
-            "sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff",
-            active.public.manifest_id,
-        )
-        self.assertEqual(
-            "d067b47b9d96593ea58e5dbb22289e6abeef48fcc960ca74f74905c71644ed02",
-            active.public.file_sha256,
-        )
-        self.assertEqual(146, active.private.file_count)
-        self.assertEqual(
-            "sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b",
-            active.private.manifest_id,
-        )
-        self.assertEqual(
-            "06c42204be85737f149c1aff9c21da393c3dbdc6eeeeebe5621fa83777b2c102",
-            active.private.file_sha256,
-        )
+        self.assertEqual(reference["revision"], active.revision)
+        self.assertEqual(reference["date"], active.date)
+        self.assertEqual(reference["committedAt"], active.committed_at)
+        for name, manifest in (("public", active.public), ("private", active.private)):
+            expected = reference["manifests"][name]
+            self.assertEqual(expected["manifestId"], manifest.manifest_id)
+            self.assertEqual(expected["fileCount"], manifest.file_count)
+            self.assertEqual(expected["fileSha256"], manifest.file_sha256)
 
     def test_active_content_revision_and_manifests_are_validated(self) -> None:
         with tempfile.TemporaryDirectory() as active_temp:

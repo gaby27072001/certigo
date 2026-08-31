@@ -1,0 +1,66 @@
+{
+  "schema": "certigo.source-contract/cosmos-containers/v1",
+  "databaseName": "certigo",
+  "containers": [
+    {
+      "symbol": "Users",
+      "name": "users",
+      "partitionKeyPath": "/id",
+      "defaultTimeToLive": null
+    },
+    {
+      "symbol": "Content",
+      "name": "content",
+      "partitionKeyPath": "/trackId",
+      "defaultTimeToLive": null
+    },
+    {
+      "symbol": "Progress",
+      "name": "progress",
+      "partitionKeyPath": "/userId",
+      "defaultTimeToLive": null
+    },
+    {
+      "symbol": "Attempts",
+      "name": "attempts",
+      "partitionKeyPath": "/userId",
+      "defaultTimeToLive": -1
+    },
+    {
+      "symbol": "Events",
+      "name": "events",
+      "partitionKeyPath": "/userId",
+      "defaultTimeToLive": null
+    },
+    {
+      "symbol": "Leaderboard",
+      "name": "leaderboard",
+      "partitionKeyPath": "/periodLeagueId",
+      "defaultTimeToLive": null
+    },
+    {
+      "symbol": "Economy",
+      "name": "economy",
+      "partitionKeyPath": "/userId",
+      "defaultTimeToLive": null
+    },
+    {
+      "symbol": "Friends",
+      "name": "friends",
+      "partitionKeyPath": "/userId",
+      "defaultTimeToLive": null
+    },
+    {
+      "symbol": "Organizations",
+      "name": "organizations",
+      "partitionKeyPath": "/organizationId",
+      "defaultTimeToLive": -1
+    },
+    {
+      "symbol": "EnterpriseMetricReceipts",
+      "name": "enterpriseMetricReceipts",
+      "partitionKeyPath": "/partitionKey",
+      "defaultTimeToLive": -1
+    }
+  ]
+}
