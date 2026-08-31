@@ -45,13 +45,21 @@ command -v "${bicep_bin}" >/dev/null 2>&1 || {
 ensure_node
 
 for script in \
+  "${root}/infra/governance/deploy-phase-a.sh" \
+  "${root}/infra/governance/deploy-phase-b1.sh" \
+  "${root}/infra/governance/deploy-phase-b2.sh" \
   "${root}/infra/governance/inventory.sh" \
+  "${root}/infra/governance/prepare-phase-b.sh" \
   "${root}/infra/governance/what-if-phase-a.sh" \
-  "${root}/infra/governance/what-if-phase-b.sh"; do
+  "${root}/infra/governance/what-if-phase-b.sh" \
+  "${root}/infra/governance/what-if-phase-b1.sh" \
+  "${root}/infra/governance/what-if-phase-b2.sh"; do
   bash -n "${script}"
 done
 node --check "${root}/infra/governance/render-inventory.mjs"
 node --check "${root}/infra/governance/validate-what-if.mjs"
+node --check "${root}/infra/governance/validate-evidence.mjs"
+node --check "${root}/infra/governance/write-what-if-manifest.mjs"
 
 index=0
 while IFS= read -r -d '' template; do
@@ -66,6 +74,8 @@ while IFS= read -r -d '' parameters; do
 done < <(find "${root}/infra/params" -type f -name '*.bicepparam' -print0 | sort -z)
 
 BICEP_CLI="${bicep_bin}" node --test "${root}/infra/tests/azure-tag-contract.test.mjs"
+BICEP_CLI="${bicep_bin}" node --test \
+  "${root}/infra/tests/governance-evidence.test.mjs"
 
 for environment in dev staging prod; do
   params="${root}/infra/params/${environment}.bicepparam"

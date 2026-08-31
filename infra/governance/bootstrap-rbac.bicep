@@ -6,24 +6,11 @@ param phaseA object
 @description('Azure region for the audit policy assignment.')
 param location string = 'westeurope'
 
-@description('Existing dedicated governance identity resource group.')
-param identityResourceGroupName string = 'rg-certigo-identities'
-
 @description('Existing resource group that owns shared CI networking.')
 param ciResourceGroupName string = 'rg-certigo-ci'
 
 @description('Existing dedicated immutable-content resource group.')
 param contentResourceGroupName string = 'rg-certigo-content'
-
-@description('Existing trusted CI virtual network.')
-param ciVnetName string = 'vnet-certigo-ci'
-
-@description('Existing trusted runner subnet.')
-param ciRunnerSubnetName string = 'snet-runners'
-
-@description('Existing shared Blob private DNS zone.')
-#disable-next-line no-hardcoded-env-urls
-param blobPrivateDnsZoneName string = 'privatelink.blob.core.windows.net'
 
 @description('Policy effect. Keep Audit until a separately approved promotion.')
 @allowed([
@@ -61,10 +48,6 @@ var allowedRuntimeRoleDefinitionIds = [
   '73c42c96-874c-492b-b04d-ab87d138a893'
 ]
 
-resource identityResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
-  name: identityResourceGroupName
-}
-
 resource ciResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
   name: ciResourceGroupName
 }
@@ -79,66 +62,18 @@ resource environmentResourceGroups 'Microsoft.Resources/resourceGroups@2024-03-0
   }
 ]
 
-resource deploymentIdentities 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = [
-  for environment in environments: {
-    scope: identityResourceGroup
-    name: environment.identity.name
-  }
-]
-
-resource contentInfrastructurePlanIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
-  scope: identityResourceGroup
-  name: phaseA.identities.contentInfrastructurePlan.name
-}
-
-resource contentIdentities 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = [
-  for identity in [
-    phaseA.identities.contentRelease
-    phaseA.identities.contentPublic
-    phaseA.identities.contentAnswerKey
-    phaseA.identities.contentReader
-  ]: {
-    scope: identityResourceGroup
-    name: identity.name
-  }
-]
-
-resource subscriptionDeploymentLauncher 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: last(split(phaseA.roleDefinitionIds.subscriptionDeploymentLauncher, '/'))
-}
-
-resource runtimeRoleAssignmentWriter 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: last(split(phaseA.roleDefinitionIds.runtimeRoleAssignmentWriter, '/'))
-}
-
-resource sharedNetworkDeploymentRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: last(split(phaseA.roleDefinitionIds.sharedNetworkDeployment, '/'))
-}
-
-resource contentPublisherRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: last(split(phaseA.roleDefinitionIds.contentPublisher, '/'))
-}
-
-resource contentInfrastructurePlanExecutorRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: last(split(phaseA.roleDefinitionIds.contentInfrastructurePlanExecutor, '/'))
-}
-
-resource contentInfrastructurePlanExternalJoinRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: last(split(phaseA.roleDefinitionIds.contentInfrastructurePlanExternalJoin, '/'))
-}
-
-resource privilegedCiAssignmentPolicy 'Microsoft.Authorization/policyDefinitions@2023-04-01' existing = {
-  name: last(split(phaseA.policyDefinitionId, '/'))
-}
-
 resource subscriptionLauncherAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
-  for (environment, index) in environments: {
-    name: guid(subscription().id, environment.identity.name, subscriptionDeploymentLauncher.id)
+  for environment in environments: {
+    name: guid(
+      subscription().id,
+      environment.identity.name,
+      phaseA.roleDefinitionIds.subscriptionDeploymentLauncher
+    )
     properties: {
       description: 'Launches the ${environment.name} subscription deployment without general subscription access.'
-      principalId: deploymentIdentities[index].properties.principalId
+      principalId: environment.identity.principalId
       principalType: 'ServicePrincipal'
-      roleDefinitionId: subscriptionDeploymentLauncher.id
+      roleDefinitionId: phaseA.roleDefinitionIds.subscriptionDeploymentLauncher
     }
   }
 ]
@@ -150,8 +85,8 @@ module environmentRbac 'modules/environmentRbac.bicep' = [
     params: {
       allowedRoleDefinitionIds: allowedRuntimeRoleDefinitionIds
       assignmentNameSeed: environment.identity.name
-      principalId: deploymentIdentities[index].properties.principalId
-      roleAssignmentWriterRoleDefinitionId: runtimeRoleAssignmentWriter.id
+      principalId: environment.identity.principalId
+      roleAssignmentWriterRoleDefinitionId: phaseA.roleDefinitionIds.runtimeRoleAssignmentWriter
     }
   }
 ]
@@ -163,8 +98,8 @@ module sharedNetworkAssignments 'modules/resourceGroupRoleAssignment.bicep' = [
     params: {
       assignmentDescription: 'Allows ${environment.name} to reconcile only shared DNS links and VNet peerings.'
       assignmentNameSeed: environment.identity.name
-      principalId: deploymentIdentities[index].properties.principalId
-      roleDefinitionId: sharedNetworkDeploymentRole.id
+      principalId: environment.identity.principalId
+      roleDefinitionId: phaseA.roleDefinitionIds.sharedNetworkDeployment
     }
   }
 ]
@@ -174,28 +109,16 @@ module contentInfrastructurePlanExecutorAssignment 'modules/contentPlanExecutorA
   name: 'content-infra-plan-executor-rbac'
   params: {
     assignmentNameSeed: phaseA.identities.contentInfrastructurePlan.name
-    principalId: contentInfrastructurePlanIdentity.properties.principalId
+    principalId: phaseA.identities.contentInfrastructurePlan.principalId
     publisherPrincipalIds: [
-      contentIdentities[0].properties.principalId
-      contentIdentities[1].properties.principalId
-      contentIdentities[2].properties.principalId
+      phaseA.identities.contentRelease.principalId
+      phaseA.identities.contentPublic.principalId
+      phaseA.identities.contentAnswerKey.principalId
     ]
-    publisherRoleDefinitionGuid: contentPublisherRole.name
-    readerPrincipalId: contentIdentities[3].properties.principalId
+    publisherRoleDefinitionGuid: last(split(phaseA.roleDefinitionIds.contentPublisher, '/'))
+    readerPrincipalId: phaseA.identities.contentReader.principalId
     readerRoleDefinitionGuid: '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
-    roleDefinitionId: contentInfrastructurePlanExecutorRole.id
-  }
-}
-
-module contentInfrastructurePlanExternalJoinAssignments 'modules/contentPlanExternalJoinAssignments.bicep' = {
-  scope: ciResourceGroup
-  name: 'content-infra-plan-external-join-rbac'
-  params: {
-    blobPrivateDnsZoneName: blobPrivateDnsZoneName
-    ciRunnerSubnetName: ciRunnerSubnetName
-    ciVnetName: ciVnetName
-    principalId: contentInfrastructurePlanIdentity.properties.principalId
-    roleDefinitionId: contentInfrastructurePlanExternalJoinRole.id
+    roleDefinitionId: phaseA.roleDefinitionIds.contentInfrastructurePlanExecutor
   }
 }
 
@@ -211,8 +134,8 @@ resource privilegedCiAssignmentPolicyAssignment 'Microsoft.Authorization/policyA
         value: privilegedAssignmentPolicyEffect
       }
     }
-    policyDefinitionId: privilegedCiAssignmentPolicy.id
+    policyDefinitionId: phaseA.policyDefinitionId
   }
 }
 
-output assignmentCount int = 16
+output assignmentCount int = 14

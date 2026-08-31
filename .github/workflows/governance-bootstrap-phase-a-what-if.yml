@@ -30,6 +30,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: refs/heads/main
+          fetch-depth: 0
           persist-credentials: false
       - name: Fail closed until admin planning variables exist
         shell: bash
@@ -52,4 +53,13 @@ jobs:
         shell: bash
         env:
           AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          PHASE_A_EVIDENCE_DIR: ${{ runner.temp }}/governance-phase-a-evidence
         run: bash infra/governance/what-if-phase-a.sh
+      - name: Upload immutable Phase A evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: governance-phase-a-evidence
+          path: ${{ runner.temp }}/governance-phase-a-evidence/**
+          if-no-files-found: error
+          retention-days: 90

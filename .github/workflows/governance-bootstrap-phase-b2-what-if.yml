@@ -1,0 +1,101 @@
+name: Governance bootstrap Phase B2 what-if
+
+on:
+  repository_dispatch:
+    types: [governance-bootstrap-phase-b2-what-if]
+
+permissions: {}
+
+concurrency:
+  group: governance-bootstrap-phase-b2-what-if
+  cancel-in-progress: false
+
+jobs:
+  what-if:
+    name: Admin/PIM Phase B2 what-if only
+    if: ${{ github.ref == 'refs/heads/main' }}
+    environment: azure-governance-bootstrap-phase-b
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - name: Validate exact payload
+        shell: bash
+        env:
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          jq -e '
+            type == "object" and
+            keys == [
+              "phase_a_deployment_name",
+              "phase_a_evidence_manifest_sha256",
+              "phase_a_evidence_run_id",
+              "phase_b1_deployment_name",
+              "phase_b1_evidence_manifest_sha256",
+              "phase_b1_evidence_run_id"
+            ] and
+            (.phase_a_deployment_name | type == "string") and
+            (.phase_b1_deployment_name | type == "string") and
+            (.phase_a_evidence_run_id | type == "number" and . > 0) and
+            (.phase_b1_evidence_run_id | type == "number" and . > 0) and
+            (.phase_a_evidence_manifest_sha256 | test("^[0-9a-fA-F]{64}$")) and
+            (.phase_b1_evidence_manifest_sha256 | test("^[0-9a-fA-F]{64}$"))
+          ' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: refs/heads/main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate planning variables
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          : "${AZURE_CLIENT_ID:?Missing AZURE_CLIENT_ID.}"
+          : "${AZURE_TENANT_ID:?Missing AZURE_TENANT_ID.}"
+          : "${AZURE_SUBSCRIPTION_ID:?Missing AZURE_SUBSCRIPTION_ID.}"
+      - uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Download approved Phase A and B1 evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PHASE_A_RUN_ID: ${{ github.event.client_payload.phase_a_evidence_run_id }}
+          PHASE_B1_RUN_ID: ${{ github.event.client_payload.phase_b1_evidence_run_id }}
+        run: |
+          set -euo pipefail
+          gh run download "$PHASE_A_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name governance-phase-a-evidence \
+            --dir "$RUNNER_TEMP/approved-phase-a-evidence"
+          gh run download "$PHASE_B1_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name governance-phase-b1-evidence \
+            --dir "$RUNNER_TEMP/approved-phase-b1-evidence"
+      - name: Run post-B1 Phase B2 what-if
+        shell: bash
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          PHASE_A_DEPLOYMENT_NAME: ${{ github.event.client_payload.phase_a_deployment_name }}
+          PHASE_A_EVIDENCE_DIR: ${{ runner.temp }}/approved-phase-a-evidence
+          PHASE_A_EVIDENCE_MANIFEST_SHA256: ${{ github.event.client_payload.phase_a_evidence_manifest_sha256 }}
+          PHASE_B1_DEPLOYMENT_NAME: ${{ github.event.client_payload.phase_b1_deployment_name }}
+          PHASE_B1_EVIDENCE_DIR: ${{ runner.temp }}/approved-phase-b1-evidence
+          PHASE_B1_EVIDENCE_MANIFEST_SHA256: ${{ github.event.client_payload.phase_b1_evidence_manifest_sha256 }}
+          PHASE_B2_EVIDENCE_DIR: ${{ runner.temp }}/governance-phase-b2-evidence
+        run: bash infra/governance/what-if-phase-b2.sh
+      - name: Upload immutable Phase B2 evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: governance-phase-b2-evidence
+          path: ${{ runner.temp }}/governance-phase-b2-evidence/**
+          if-no-files-found: error
+          retention-days: 90

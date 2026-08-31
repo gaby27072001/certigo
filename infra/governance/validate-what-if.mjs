@@ -213,7 +213,7 @@ function phaseADeploymentIds(subscriptionId) {
   ]);
 }
 
-function phaseBDeploymentIds(subscriptionId) {
+function phaseB1DeploymentIds(subscriptionId) {
   const resourceId = (resourceGroup, name) =>
     `/subscriptions/${subscriptionId}/resourceGroups/${resourceGroup}/` +
     `providers/Microsoft.Resources/deployments/${name}`;
@@ -236,10 +236,6 @@ function phaseBDeploymentIds(subscriptionId) {
     [
       'content-infra-plan-executor-rbac',
       resourceId('rg-certigo-content', 'content-infra-plan-executor-rbac'),
-    ],
-    [
-      'content-infra-plan-external-join-rbac',
-      resourceId('rg-certigo-ci', 'content-infra-plan-external-join-rbac'),
     ],
   ]);
 }
@@ -495,7 +491,8 @@ function validateIdentityChange(
   return Boolean(
     (!requireMaterialized ||
       (hasCompletePayload(change) &&
-        uuidPattern.test(properties.clientId ?? '') &&
+      change.after.location?.toLowerCase() === 'westeurope' &&
+      uuidPattern.test(properties.clientId ?? '') &&
         uuidPattern.test(properties.principalId ?? ''))) &&
       (!properties.principalId || uuidPattern.test(properties.principalId)),
   );
@@ -614,17 +611,23 @@ export function runtimeWriterCondition() {
   );
 }
 
-function expectedRoleAssignment(properties, scope, subscriptionId, phaseA) {
+function assignmentResourceId(scope, nameSeed, roleDefinitionId) {
+  return (
+    `${scope}/providers/Microsoft.Authorization/roleAssignments/` +
+    armGuid(scope, nameSeed, roleDefinitionId)
+  );
+}
+
+function expectedRoleAssignments(subscriptionId, phaseA) {
   const roleIds = Object.fromEntries(
     Object.entries(phaseA.roleDefinitionIds).map(([key, value]) => [
       key,
-      normalizeId(value),
+      value,
     ]),
   );
   const contributorRoleId =
     `/subscriptions/${subscriptionId}/providers/Microsoft.Authorization/` +
     'roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c';
-  const normalizedScope = normalizeId(scope);
   const descriptions = [];
 
   for (const environment of ['dev', 'staging', 'prod']) {
@@ -633,6 +636,7 @@ function expectedRoleAssignment(properties, scope, subscriptionId, phaseA) {
         `deploy${environment[0].toUpperCase()}${environment.slice(1)}`
       ];
     descriptions.push({
+      nameSeed: identity.name,
       condition: null,
       description:
         `Launches the ${environment} subscription deployment without general ` +
@@ -642,6 +646,7 @@ function expectedRoleAssignment(properties, scope, subscriptionId, phaseA) {
       scope: `/subscriptions/${subscriptionId}`,
     });
     descriptions.push({
+      nameSeed: identity.name,
       condition: null,
       description: 'Certigo environment deployment; no role-assignment administration.',
       principalId: identity.principalId,
@@ -650,6 +655,7 @@ function expectedRoleAssignment(properties, scope, subscriptionId, phaseA) {
         `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-${environment}`,
     });
     descriptions.push({
+      nameSeed: identity.name,
       condition: runtimeWriterCondition(),
       description:
         'May create only approved runtime roles for service principals in this environment.',
@@ -659,6 +665,7 @@ function expectedRoleAssignment(properties, scope, subscriptionId, phaseA) {
         `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-${environment}`,
     });
     descriptions.push({
+      nameSeed: identity.name,
       condition: null,
       description:
         `Allows ${environment} to reconcile only shared DNS links and VNet peerings.`,
@@ -670,6 +677,7 @@ function expectedRoleAssignment(properties, scope, subscriptionId, phaseA) {
 
   descriptions.push(
     {
+      nameSeed: phaseA.identities.contentInfrastructurePlan.name,
       condition: contentPlanCondition(phaseA),
       description:
         'Plans the content stack and may assign only approved content roles to service principals.',
@@ -678,6 +686,7 @@ function expectedRoleAssignment(properties, scope, subscriptionId, phaseA) {
       scope: `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-content`,
     },
     {
+      nameSeed: phaseA.identities.contentInfrastructurePlan.principalId,
       condition: null,
       description:
         'Allows the content plan to read and join only the trusted CI runner subnet.',
@@ -688,6 +697,7 @@ function expectedRoleAssignment(properties, scope, subscriptionId, phaseA) {
         'Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners',
     },
     {
+      nameSeed: phaseA.identities.contentInfrastructurePlan.principalId,
       condition: null,
       description:
         'Allows the content plan to read and join only the shared Blob private DNS zone.',
@@ -699,7 +709,19 @@ function expectedRoleAssignment(properties, scope, subscriptionId, phaseA) {
     },
   );
 
-  return descriptions.find(
+  return descriptions.map((description) => ({
+    ...description,
+    resourceId: assignmentResourceId(
+      description.scope,
+      description.nameSeed,
+      description.roleDefinitionId,
+    ),
+  }));
+}
+
+function expectedRoleAssignment(properties, scope, subscriptionId, phaseA) {
+  const normalizedScope = normalizeId(scope);
+  return expectedRoleAssignments(subscriptionId, phaseA).find(
     (candidate) =>
       candidate.description === properties.description &&
       normalizeId(candidate.scope) === normalizedScope,
@@ -727,6 +749,7 @@ function validateRoleAssignment(change, subscriptionId, phaseA) {
   );
   return Boolean(
     expected &&
+      normalizeId(change.resourceId) === normalizeId(expected.resourceId) &&
       properties.principalType === 'ServicePrincipal' &&
       normalizeId(properties.principalId) === normalizeId(expected.principalId) &&
       normalizeId(properties.roleDefinitionId) ===
@@ -855,7 +878,7 @@ function phaseAContract(change, subscriptionId) {
 export function validatePhaseAResource(resource, subscriptionId) {
   const contract = phaseAContract(
     {
-      changeType: 'Create',
+      changeType: 'NoChange',
       resourceId: resource?.id,
       after: resource,
     },
@@ -869,7 +892,51 @@ export function validatePhaseAResource(resource, subscriptionId) {
   return contract;
 }
 
-function phaseBContract(change, subscriptionId, phaseA) {
+export function expectedPhaseBContracts(subscriptionId, phaseA, phase) {
+  const proof = validatePhaseAProof(phaseA, subscriptionId);
+  if (phase === 'B1') {
+    return [...requiredPhaseB1Contracts(subscriptionId, proof)].sort();
+  }
+  if (phase === 'B2') {
+    return [...requiredPhaseB2Contracts(subscriptionId, proof)].sort();
+  }
+  throw new Error('phase must be B1 or B2');
+}
+
+export function validatePhaseBResource(resource, subscriptionId, phaseA, phase) {
+  if (!['B1', 'B2'].includes(phase)) {
+    throw new Error('Phase B resource validation requires B1 or B2');
+  }
+  const proof = validatePhaseAProof(phaseA, subscriptionId);
+  const contract = phaseBContract(
+    {
+      changeType: 'Create',
+      resourceId: resource?.id,
+      after: resource,
+    },
+    subscriptionId,
+    proof,
+    phase,
+  );
+  if (
+    !contract ||
+    (!contract.startsWith('role-assignment:') &&
+      contract !== 'policy-assignment')
+  ) {
+    throw new Error(
+      `live resource violates the exact Phase ${phase} contract: ${resource?.id}`,
+    );
+  }
+  return contract;
+}
+
+function assignmentContract(candidate) {
+  return (
+    `role-assignment:${normalizeId(candidate.scope)}:${candidate.description}`
+  );
+}
+
+function phaseBContract(change, subscriptionId, phaseA, phase) {
   const id = normalizeId(change.resourceId);
   const parsed = parseResourceId(id);
   const requireMaterialized =
@@ -881,80 +948,56 @@ function phaseBContract(change, subscriptionId, phaseA) {
     parsed.type === 'microsoft.authorization/roleassignments' &&
     validateRoleAssignment(change, subscriptionId, phaseA)
   ) {
-    return `role-assignment:${roleAssignmentScope(change.resourceId)}:${
+    const contract = `role-assignment:${roleAssignmentScope(change.resourceId)}:${
       change.after?.properties?.description
     }`;
+    const allowed =
+      phase === 'B1'
+        ? requiredPhaseB1Contracts(subscriptionId, phaseA)
+        : requiredPhaseB2Contracts(subscriptionId, phaseA);
+    return allowed.has(contract) ? contract : null;
   }
   if (
+    phase === 'B1' &&
     parsed.type === 'microsoft.authorization/policyassignments' &&
     validatePolicyAssignment(change, subscriptionId, phaseA)
   ) {
     return 'policy-assignment';
   }
-  if (validateDeployment(change, phaseBDeploymentIds(subscriptionId))) {
+  if (
+    phase === 'B1' &&
+    validateDeployment(change, phaseB1DeploymentIds(subscriptionId))
+  ) {
     return `deployment:${parsed.names[0]}`;
   }
-  const inputIdentity = Object.values(phaseA.identities).find(
-    (identity) => normalizeId(identity.resourceId) === id,
-  );
-  if (
-    inputIdentity &&
-    (!requireMaterialized ||
-      (normalizeId(change.after.properties.clientId) ===
-        normalizeId(inputIdentity.clientId) &&
-        normalizeId(change.after.properties.principalId) ===
-          normalizeId(inputIdentity.principalId)))
-  ) {
-    return `input:identity:${id}`;
+  if (change.changeType === 'Create') {
+    return null;
   }
-  const inputRole = Object.entries(phaseA.roleDefinitionIds).find(
-    ([, roleId]) => normalizeId(roleId) === id,
-  );
-  if (
-    inputRole &&
-    (!requireMaterialized ||
-      identifyRoleContract(change, subscriptionId) === inputRole[0])
-  ) {
-    return `input:role:${id}`;
-  }
-  if (
-    normalizeId(phaseA.policyDefinitionId) === id &&
-    (!requireMaterialized || validatePolicyDefinition(change, subscriptionId))
-  ) {
-    return 'input:policy-definition';
-  }
-  const exactInputs = new Set(
-    [
-      'rg-certigo-ci',
-      'rg-certigo-identities',
-      'rg-certigo-content',
-      'rg-certigo-dev',
-      'rg-certigo-staging',
-      'rg-certigo-prod',
-    ].map((resourceGroup) =>
-      normalizeId(
-        `/subscriptions/${subscriptionId}/resourceGroups/${resourceGroup}`,
-      ),
-    ),
-  );
-  exactInputs.add(
-    normalizeId(
-      `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/providers/` +
-        'Microsoft.Network/virtualNetworks/vnet-certigo-ci',
-    ),
-  );
-  exactInputs.add(
-    normalizeId(
-      `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/providers/` +
-        'Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners',
-    ),
-  );
-  exactInputs.add(
-    normalizeId(
-      `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/providers/` +
-        'Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net',
-    ),
-  );
+  const resourceGroupId = (name) =>
+    normalizeId(`/subscriptions/${subscriptionId}/resourceGroups/${name}`);
+  const exactInputs =
+    phase === 'B1'
+      ? new Set(
+          ['rg-certigo-ci', 'rg-certigo-content', 'rg-certigo-dev',
+            'rg-certigo-staging', 'rg-certigo-prod'].map(resourceGroupId),
+        )
+      : new Set([
+          resourceGroupId('rg-certigo-ci'),
+          normalizeId(
+            `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/` +
+              'providers/Microsoft.Network/virtualNetworks/vnet-certigo-ci',
+          ),
+          normalizeId(
+            `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/` +
+              'providers/Microsoft.Network/virtualNetworks/vnet-certigo-ci/' +
+              'subnets/snet-runners',
+          ),
+          normalizeId(
+            `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/` +
+              'providers/Microsoft.Network/privateDnsZones/' +
+              'privatelink.blob.core.windows.net',
+          ),
+        ]);
   return exactInputs.has(id) ? `input:resource:${id}` : null;
 }
 
@@ -976,60 +1019,27 @@ function requiredPhaseAContracts() {
   ]);
 }
 
-function requiredPhaseBContracts(subscriptionId, phaseA) {
-  const contracts = new Set(['policy-assignment']);
-  const descriptions = [
-    ...['dev', 'staging', 'prod'].flatMap((environment) => [
-      {
-        description:
-          `Launches the ${environment} subscription deployment without general ` +
-          'subscription access.',
-        scope: `/subscriptions/${subscriptionId}`,
-      },
-      {
-        description:
-          'Certigo environment deployment; no role-assignment administration.',
-        scope:
-          `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-${environment}`,
-      },
-      {
-        description:
-          'May create only approved runtime roles for service principals in this environment.',
-        scope:
-          `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-${environment}`,
-      },
-      {
-        description:
-          `Allows ${environment} to reconcile only shared DNS links and VNet peerings.`,
-        scope: `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci`,
-      },
-    ]),
-    {
-      description:
-        'Plans the content stack and may assign only approved content roles to service principals.',
-      scope: `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-content`,
-    },
-    {
-      description:
-        'Allows the content plan to read and join only the trusted CI runner subnet.',
-      scope:
-        `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/providers/` +
-        'Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners',
-    },
-    {
-      description:
-        'Allows the content plan to read and join only the shared Blob private DNS zone.',
-      scope:
-        `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci/providers/` +
-        'Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net',
-    },
-  ];
-  for (const assignment of descriptions) {
-    contracts.add(
-      `role-assignment:${normalizeId(assignment.scope)}:${assignment.description}`,
-    );
-  }
-  return contracts;
+function isExternalJoinAssignment(candidate) {
+  return candidate.description.startsWith(
+    'Allows the content plan to read and join only the ',
+  );
+}
+
+function requiredPhaseB1Contracts(subscriptionId, phaseA) {
+  return new Set([
+    'policy-assignment',
+    ...expectedRoleAssignments(subscriptionId, phaseA)
+      .filter((candidate) => !isExternalJoinAssignment(candidate))
+      .map(assignmentContract),
+  ]);
+}
+
+function requiredPhaseB2Contracts(subscriptionId, phaseA) {
+  return new Set(
+    expectedRoleAssignments(subscriptionId, phaseA)
+      .filter(isExternalJoinAssignment)
+      .map(assignmentContract),
+  );
 }
 
 export function validateWhatIf(
@@ -1040,8 +1050,8 @@ export function validateWhatIf(
   if (!uuidPattern.test(subscriptionId ?? '')) {
     throw new Error('subscription id must be an explicit UUID');
   }
-  if (!['A', 'B'].includes(phase)) {
-    throw new Error('phase must be A or B');
+  if (!['A', 'B1', 'B2'].includes(phase)) {
+    throw new Error('phase must be A, B1, or B2');
   }
   const errors = [];
   if (plan.status !== 'Succeeded') {
@@ -1065,7 +1075,7 @@ export function validateWhatIf(
   if (errors.length > 0) {
     throw new Error(errors.join('\n'));
   }
-  const proof = phase === 'B' ? validatePhaseAProof(phaseA, subscriptionId) : null;
+  const proof = phase !== 'A' ? validatePhaseAProof(phaseA, subscriptionId) : null;
   const changes = plan.changes;
   const counts = {};
   const seenContracts = new Set();
@@ -1107,7 +1117,7 @@ export function validateWhatIf(
       const contract =
         phase === 'A'
           ? phaseAContract(change, subscriptionId)
-          : phaseBContract(change, subscriptionId, proof);
+          : phaseBContract(change, subscriptionId, proof, phase);
       if (!contract) {
         errors.push(
           `${changeType} resource is outside the Phase ${phase} allowlist: ${resourceId}`,
@@ -1123,7 +1133,7 @@ export function validateWhatIf(
     const contract =
       phase === 'A'
         ? phaseAContract(change, subscriptionId)
-        : phaseBContract(change, subscriptionId, proof);
+        : phaseBContract(change, subscriptionId, proof, phase);
 
     if (!contract) {
       errors.push(`resource is outside the exact Phase ${phase} contract: ${resourceId}`);
@@ -1137,7 +1147,9 @@ export function validateWhatIf(
   const required =
     phase === 'A'
       ? requiredPhaseAContracts()
-      : requiredPhaseBContracts(subscriptionId, proof);
+      : phase === 'B1'
+        ? requiredPhaseB1Contracts(subscriptionId, proof)
+        : requiredPhaseB2Contracts(subscriptionId, proof);
   const missing = [...required].filter((contract) => !seenContracts.has(contract));
   if (missing.length > 0) {
     errors.push(`Phase ${phase} plan is incomplete: ${missing.join(', ')}`);
@@ -1163,10 +1175,15 @@ function main() {
   const subscriptionId = args['--subscription'];
   const phase = args['--phase'];
   const phaseAPath = args['--phase-a'];
-  if (!planPath || !subscriptionId || !phase || (phase === 'B' && !phaseAPath)) {
+  if (
+    !planPath ||
+    !subscriptionId ||
+    !phase ||
+    (phase !== 'A' && !phaseAPath)
+  ) {
     throw new Error(
       'Usage: node validate-what-if.mjs --plan <path> --subscription <id> ' +
-        '--phase <A|B> [--phase-a <outputs.json>]',
+        '--phase <A|B1|B2> [--phase-a <outputs.json>]',
     );
   }
   const plan = JSON.parse(fs.readFileSync(path.resolve(planPath), 'utf8'));

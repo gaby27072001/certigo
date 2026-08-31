@@ -154,10 +154,11 @@ par le moteur de what-if. Le bootstrap est donc séparé et fail-closed :
   `roleAssignment`, aucun `policyAssignment` et ne donne aucune permission effective. Son output
   `phaseA` versionné contient les deux resource group IDs, les `clientId`, `principalId`,
   `resourceId`, les six role definition IDs, le policy definition ID, le tenant et la subscription.
-- **Phase B — `bootstrap-rbac`** : ne crée ni identité, ni rôle, ni policyDefinition. Elle
-  consomme les huit UAMI, les six rôles, la policyDefinition et les six RG en `existing`, puis
-  crée exactement les 13 attributions internes, les deux attributions externes et l'unique
-  policyAssignment en `Audit`.
+- **Phase B1 — `bootstrap-rbac`** : ne crée ni identité, ni rôle, ni policyDefinition. Elle
+  consomme les IDs Phase A comme paramètres littéraux, puis planifie exactement les 13
+  attributions internes et l'unique policyAssignment en `Audit`.
+- **Phase B2 — `contentPlanExternalJoinAssignments`** : cible directement `rg-certigo-ci` et
+  planifie séparément les deux attributions externes sur le subnet et la zone DNS exacts.
 
 L'UAMI de plan reçoit seulement en Phase B :
 
@@ -218,15 +219,16 @@ action delete, `dataActions` et toute ressource hors contrat. L'allowlist de cr�
 - les sept FIC et sujets GitHub Environment exacts ;
 - la policyDefinition `Certigo: restrict privileged CI role assignments at subscription scope`.
 
-Après archivage et approbation humaine du JSON, l'admin PIM peut exécuter séparément, hors workflow :
+Après archivage, l'admin PIM crée un JSON d'approbation Phase A hors dépôt avec
+`schemaVersion: 1`, `approved: true`, `phase: "A"`, `manifestSha256`, `planSha256` et
+`sourceCommit`. Le deployment utilise uniquement le template ARM compilé et les paramètres
+résolus contenus dans l'artifact approuvé :
 
 ```bash
-az deployment sub create \
-  --subscription "$AZURE_SUBSCRIPTION_ID" \
-  --name "certigo-governance-bootstrap-identities-<ticket>" \
-  --location westeurope \
-  --template-file infra/governance/bootstrap-identities.bicep \
-  --parameters infra/params/bootstrap-identities.bicepparam
+PHASE_A_EVIDENCE_DIR='<approved-phase-a-artifact>' \
+PHASE_A_APPROVAL_FILE='<approved-phase-a.json>' \
+PHASE_A_DEPLOYMENT_NAME='certigo-governance-bootstrap-identities-<ticket>' \
+  bash infra/governance/deploy-phase-a.sh
 
 az deployment sub show \
   --subscription "$AZURE_SUBSCRIPTION_ID" \
@@ -245,15 +247,31 @@ La Phase B ne peut démarrer qu'avec le nom du deployment Phase A approuvé :
 ```bash
 export AZURE_SUBSCRIPTION_ID='<subscription-uuid>'
 export PHASE_A_DEPLOYMENT_NAME='certigo-governance-bootstrap-identities-<ticket>'
+export PHASE_A_EVIDENCE_DIR='<downloaded-governance-phase-a-evidence>'
+export PHASE_A_EVIDENCE_MANIFEST_SHA256='<approved-manifest-sha256>'
+export PHASE_B_EVIDENCE_DIR='<private-output-directory>'
 bash infra/governance/what-if-phase-b.sh
 ```
 
-Le script exige `provisioningState=Succeeded`, valide chaque output, relit chaque ressource par son
-ID réel, compare `clientId`/`principalId`, puis exige exactement zéro ou une FIC conforme par UAMI.
-Toute ressource/output absent ou divergent bloque avant le what-if. Le validateur B accepte
-seulement les 15 roleAssignments exacts et `certigo-privileged-ci-rbac` en `Audit`, plus leurs
-deployments ARM attendus. Les deux scopes externes sont comparés après normalisation stricte aux
-seuls IDs complets :
+Le dispatch Phase B exécute uniquement `what-if-phase-b1.sh`. Après approbation et deployment B1,
+un nouveau dispatch `governance-bootstrap-phase-b2-what-if` télécharge les preuves Phase A et B1,
+vérifie le deployment B1 `Succeeded` et la transition live complète, puis exécute
+`what-if-phase-b2.sh`. B2 n'est jamais planifié ou scellé avant B1. Chaque script exige
+`provisioningState=Succeeded`, valide chaque output Phase A, relit chaque ressource par son ID réel,
+compare `clientId`/`principalId`, puis exige exactement zéro ou une FIC conforme par UAMI. Toute
+ressource/output absent ou divergent bloque avant son what-if. Le manifest Phase A approuvé lie le
+commit source, les hashes des sources/templates/paramètres, le template ARM compilé et le plan brut.
+Le prévol compare son hash approuvé au fichier téléchargé, le `templateHash` du deployment live,
+toutes les opérations subscription et imbriquées, puis énumère les role/policy assignments des huit
+principals. Seul un replay partiel conforme à B1/B2 est accepté; tout assignment supplémentaire
+bloque. B1 passe l'objet Phase A validé comme
+paramètre littéral : aucun `principalId` d'assignment ne dépend d'un `reference()`. Son manifeste
+indépendant couvre les 13 roleAssignments internes et `certigo-privileged-ci-rbac` en `Audit`.
+B2 reçoit uniquement le principal de plan et le role definition ID externes littéraux; son
+manifeste indépendant couvre les deux assignments externes. Les artifacts B1/B2 conservent le plan
+brut, les paramètres, le template compilé, la preuve/binding Phase A et un manifest SHA-256 incluant
+le contexte GitHub. Leurs scopes sont comparés après
+normalisation stricte aux seuls IDs complets :
 
 ```text
 /subscriptions/<id>/resourceGroups/rg-certigo-ci/providers/Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners
@@ -261,30 +279,53 @@ seuls IDs complets :
 ```
 
 Un scope RG, un autre subnet/DNS, un préfixe générique ou une expression non matérialisée est
-refusé. Un retry B peut contenir `NoChange` seulement pour une attribution ou policyAssignment
+refusé. Un retry B1 ou B2 peut contenir `NoChange` seulement pour une attribution ou policyAssignment
 dont le payload complet correspond au scope, principal, rôle, condition et effet exacts. Le
 mélange `Create`/`NoChange` est accepté quand chaque contrat apparaît une seule fois; tout payload
-manquant, doublon ou écart est refusé. La Phase B exige aussi `0 Modify`, `0 Delete`,
-`0 Unsupported`.
+manquant, doublon ou écart est refusé. Chaque plan exige aussi `0 Modify`, `0 Delete`,
+`0 Unsupported`, aucun diagnostic et aucune expansion incomplète.
 
 Les deployments ARM imbriqués ne sont pas une échappatoire à l'allowlist. Chaque nom est lié à
 son resource ID complet et sensible à la casse : toutes les identités sous
 `rg-certigo-identities`, RBAC environnement sous son RG,
-réseau partagé sous `rg-certigo-ci`, exécuteur contenu sous `rg-certigo-content` et joins externes
-sous `rg-certigo-ci`. Pour `Ignore` ou `NoChange`, le payload doit contenir le type deployment
+réseau partagé sous `rg-certigo-ci` et exécuteur contenu sous `rg-certigo-content`. B2 est un
+what-if RG séparé sans deployment ARM imbriqué. Pour `Ignore` ou `NoChange`, le payload B1 doit
+contenir le type deployment
 exact et un état ARM matérialisé (`provisioningState`, `templateHash` ou `templateLink` non vide).
 Les valeurs vides ou composées d'espaces sont également refusées. Un même leaf name sous un autre
 RG/subscription, une casse différente ou `properties: {}` est refusé.
 
-Après archivage et approbation humaine du second JSON, l'admin PIM peut déployer séparément :
+Après archivage et approbation humaine distincte des manifestes B1 et B2, l'admin PIM crée pour
+chaque phase un JSON d'approbation hors dépôt contenant `schemaVersion: 1`, `approved: true`,
+`phase`, `manifestSha256`, `planSha256`, `sourceCommit` et
+`phaseAEvidenceManifestSha256`. Les outils revalident l'état Phase A live, HEAD, sources, template
+compilé, paramètres, plan et approval avant toute création. L'admin déploie séparément B1 puis B2;
+un GO B1 n'autorise jamais B2 implicitement :
 
 ```bash
-az deployment sub create \
-  --subscription "$AZURE_SUBSCRIPTION_ID" \
-  --name "certigo-governance-bootstrap-rbac-<ticket>" \
-  --location westeurope \
-  --template-file infra/governance/bootstrap-rbac.bicep \
-  --parameters phaseA=@phase-a-output.json
+PHASE_A_EVIDENCE_DIR='<approved-phase-a-artifact>' \
+PHASE_A_EVIDENCE_MANIFEST_SHA256='<approved-phase-a-manifest-sha256>' \
+PHASE_A_DEPLOYMENT_NAME='<phase-a-deployment>' \
+PHASE_B1_EVIDENCE_DIR='<approved-b1-artifact>' \
+PHASE_B1_APPROVAL_FILE='<approved-b1.json>' \
+PHASE_B1_DEPLOYMENT_NAME='certigo-governance-bootstrap-rbac-<ticket>' \
+  bash infra/governance/deploy-phase-b1.sh
+
+# Conserver exactement ces outputs non secrets pour le dispatch/what-if B2 :
+export PHASE_B1_EVIDENCE_DIR='<approved-b1-artifact>'
+export PHASE_B1_EVIDENCE_MANIFEST_SHA256='<approved-b1-manifest-sha256>'
+export PHASE_B1_DEPLOYMENT_NAME='certigo-governance-bootstrap-rbac-<ticket>'
+
+PHASE_A_EVIDENCE_DIR='<approved-phase-a-artifact>' \
+PHASE_A_EVIDENCE_MANIFEST_SHA256='<approved-phase-a-manifest-sha256>' \
+PHASE_A_DEPLOYMENT_NAME='<phase-a-deployment>' \
+PHASE_B1_EVIDENCE_DIR="$PHASE_B1_EVIDENCE_DIR" \
+PHASE_B1_EVIDENCE_MANIFEST_SHA256="$PHASE_B1_EVIDENCE_MANIFEST_SHA256" \
+PHASE_B1_DEPLOYMENT_NAME="$PHASE_B1_DEPLOYMENT_NAME" \
+PHASE_B2_EVIDENCE_DIR='<approved-b2-artifact>' \
+PHASE_B2_APPROVAL_FILE='<approved-b2.json>' \
+PHASE_B2_DEPLOYMENT_NAME='certigo-governance-bootstrap-rbac-external-<ticket>' \
+  bash infra/governance/deploy-phase-b2.sh
 ```
 
 Les workflows `governance-bootstrap-phase-{a,b}-what-if.yml` utilisent chacun un
@@ -301,7 +342,18 @@ gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
 
 gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
   -f event_type=governance-bootstrap-phase-b-what-if \
-  -F 'client_payload[phase_a_deployment_name]=certigo-governance-bootstrap-identities-<ticket>'
+  -F 'client_payload[phase_a_deployment_name]=certigo-governance-bootstrap-identities-<ticket>' \
+  -F 'client_payload[phase_a_evidence_run_id]=<phase-a-workflow-run-id>' \
+  -F 'client_payload[phase_a_evidence_manifest_sha256]=<approved-manifest-sha256>'
+
+gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
+  -f event_type=governance-bootstrap-phase-b2-what-if \
+  -F 'client_payload[phase_a_deployment_name]=<phase-a-deployment>' \
+  -F 'client_payload[phase_a_evidence_run_id]=<phase-a-run-id>' \
+  -F 'client_payload[phase_a_evidence_manifest_sha256]=<phase-a-manifest-sha256>' \
+  -F 'client_payload[phase_b1_deployment_name]=<phase-b1-deployment>' \
+  -F 'client_payload[phase_b1_evidence_run_id]=<phase-b1-run-id>' \
+  -F 'client_payload[phase_b1_evidence_manifest_sha256]=<phase-b1-manifest-sha256>'
 ```
 
 Après les deux phases :
@@ -332,10 +384,13 @@ Chaque étape est bloquante. Ne jamais anticiper le retrait de l'ancienne identi
 4. **Access review intermédiaire.** Un second reviewer compare les huit principal/client/resource
    IDs, les sept FIC, les six rôles et la policyDefinition à l'output. Il confirme que la Phase A
    n'accorde aucun accès.
-5. **Prévol admin Phase B.** Exécuter `what-if-phase-b.sh` avec le deployment A approuvé. Refuser
-   tout `Modify/Delete/Unsupported`, scope générique ou principal/role/condition divergent.
-6. **Provisionnement Phase B.** Déployer `bootstrap-rbac.bicep` en incrémentiel seulement après
-   approbation distincte du plan B. Archiver les 16 assignment IDs créés.
+5. **Prévol admin B1.** Exécuter `what-if-phase-b.sh` avec le deployment A approuvé. Refuser tout
+   `Modify/Delete/Unsupported`, diagnostic, scope générique ou principal/role/condition divergent.
+6. **Provisionnement B1.** Déployer B1 avec `deploy-phase-b1.sh` après approbation hashée.
+7. **Prévol admin B2.** Sur l'état post-B1, exécuter le dispatch B2 avec les preuves A/B1 et le
+   deployment B1; approuver son nouveau manifeste séparément.
+8. **Provisionnement B2.** Déployer B2 avec `deploy-phase-b2.sh`, puis archiver les 16 assignment
+   IDs. Aucun plan B2 antérieur à B1 n'est réutilisable.
 7. **Configuration GitHub.** Créer les `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` et
    `AZURE_SUBSCRIPTION_ID` au niveau de chaque Environment. Le client ID doit être celui de
    l'UAMI correspondante. Garder la configuration historique disponible pour rollback.

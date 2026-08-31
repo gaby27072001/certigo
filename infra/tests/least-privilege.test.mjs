@@ -284,6 +284,7 @@ function makeCompletePhaseAPlan(proof) {
       materializeNoChange({
         resourceId: identity.resourceId,
         after: {
+          location: 'westeurope',
           properties: {
             clientId: identity.clientId,
             principalId: identity.principalId,
@@ -398,28 +399,27 @@ function makeCompletePhaseAPlan(proof) {
   return whatIfPlan(changes);
 }
 
-function roleAssignmentChange(scope, name, properties) {
+function roleAssignmentChange(scope, nameSeed, properties) {
   return {
     changeType: 'Create',
     resourceId:
-      `${scope}/providers/Microsoft.Authorization/roleAssignments/${name}`,
+      `${scope}/providers/Microsoft.Authorization/roleAssignments/` +
+      armGuid(scope, nameSeed, properties.roleDefinitionId),
     after: { properties },
   };
 }
 
-function makeCompletePhaseBPlan(proof) {
-  const changes = [];
-  let assignment = 1;
-  const nextName = () =>
-    `50000000-0000-0000-0000-${String(assignment++).padStart(12, '0')}`;
+function makeCompletePhaseBPlans(proof) {
+  const b1Changes = [];
+  const b2Changes = [];
   const contributor =
     `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
     'roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c';
   for (const environment of ['dev', 'staging', 'prod']) {
     const key = `deploy${environment[0].toUpperCase()}${environment.slice(1)}`;
     const principalId = proof.identities[key].principalId;
-    changes.push(
-      roleAssignmentChange(`/subscriptions/${subscription}`, nextName(), {
+    b1Changes.push(
+      roleAssignmentChange(`/subscriptions/${subscription}`, proof.identities[key].name, {
         description:
           `Launches the ${environment} subscription deployment without general ` +
           'subscription access.',
@@ -430,7 +430,7 @@ function makeCompletePhaseBPlan(proof) {
       }),
       roleAssignmentChange(
         `/subscriptions/${subscription}/resourceGroups/rg-certigo-${environment}`,
-        nextName(),
+        proof.identities[key].name,
         {
           description:
             'Certigo environment deployment; no role-assignment administration.',
@@ -441,7 +441,7 @@ function makeCompletePhaseBPlan(proof) {
       ),
       roleAssignmentChange(
         `/subscriptions/${subscription}/resourceGroups/rg-certigo-${environment}`,
-        nextName(),
+        proof.identities[key].name,
         {
           condition: runtimeWriterCondition(),
           conditionVersion: '2.0',
@@ -455,7 +455,7 @@ function makeCompletePhaseBPlan(proof) {
       ),
       roleAssignmentChange(
         `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci`,
-        nextName(),
+        proof.identities[key].name,
         {
           description:
             `Allows ${environment} to reconcile only shared DNS links and VNet peerings.`,
@@ -468,10 +468,10 @@ function makeCompletePhaseBPlan(proof) {
   }
   const contentPrincipal =
     proof.identities.contentInfrastructurePlan.principalId;
-  changes.push(
+  b1Changes.push(
     roleAssignmentChange(
       `/subscriptions/${subscription}/resourceGroups/rg-certigo-content`,
-      nextName(),
+      proof.identities.contentInfrastructurePlan.name,
       {
         condition: contentPlanCondition(proof),
         conditionVersion: '2.0',
@@ -481,32 +481,6 @@ function makeCompletePhaseBPlan(proof) {
         principalType: 'ServicePrincipal',
         roleDefinitionId:
           proof.roleDefinitionIds.contentInfrastructurePlanExecutor,
-      },
-    ),
-    roleAssignmentChange(
-      `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/providers/` +
-        'Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners',
-      nextName(),
-      {
-        description:
-          'Allows the content plan to read and join only the trusted CI runner subnet.',
-        principalId: contentPrincipal,
-        principalType: 'ServicePrincipal',
-        roleDefinitionId:
-          proof.roleDefinitionIds.contentInfrastructurePlanExternalJoin,
-      },
-    ),
-    roleAssignmentChange(
-      `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/providers/` +
-        'Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net',
-      nextName(),
-      {
-        description:
-          'Allows the content plan to read and join only the shared Blob private DNS zone.',
-        principalId: contentPrincipal,
-        principalType: 'ServicePrincipal',
-        roleDefinitionId:
-          proof.roleDefinitionIds.contentInfrastructurePlanExternalJoin,
       },
     ),
     {
@@ -523,7 +497,38 @@ function makeCompletePhaseBPlan(proof) {
       },
     },
   );
-  return whatIfPlan(changes);
+  b2Changes.push(
+    roleAssignmentChange(
+      `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/providers/` +
+        'Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners',
+      contentPrincipal,
+      {
+        description:
+          'Allows the content plan to read and join only the trusted CI runner subnet.',
+        principalId: contentPrincipal,
+        principalType: 'ServicePrincipal',
+        roleDefinitionId:
+          proof.roleDefinitionIds.contentInfrastructurePlanExternalJoin,
+      },
+    ),
+    roleAssignmentChange(
+      `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/providers/` +
+        'Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net',
+      contentPrincipal,
+      {
+        description:
+          'Allows the content plan to read and join only the shared Blob private DNS zone.',
+        principalId: contentPrincipal,
+        principalType: 'ServicePrincipal',
+        roleDefinitionId:
+          proof.roleDefinitionIds.contentInfrastructurePlanExternalJoin,
+      },
+    ),
+  );
+  return {
+    b1: whatIfPlan(b1Changes),
+    b2: whatIfPlan(b2Changes),
+  };
 }
 
 test('Phase A creates identities and definitions without effective permissions', () => {
@@ -604,7 +609,7 @@ test('Phase A custom roles contain no wildcard or delete action', () => {
   }
 });
 
-test('Phase B consumes Phase A resources as existing and creates exact assignments', () => {
+test('Phase B1 uses literal Phase A IDs and creates only internal assignments', () => {
   const template = compileTemplate('infra/governance/bootstrap-rbac.bicep');
   const source = readFileSync(
     path.join(repositoryRoot, 'infra', 'governance', 'bootstrap-rbac.bicep'),
@@ -636,7 +641,6 @@ test('Phase B consumes Phase A resources as existing and creates exact assignmen
       { copy: "[length(variables('environments'))]", nested: 2 },
       { copy: "[length(variables('environments'))]", nested: 1 },
       { copy: null, nested: 1 },
-      { copy: null, nested: 2 },
     ],
   );
   assert.equal(
@@ -654,23 +658,17 @@ test('Phase B consumes Phase A resources as existing and creates exact assignmen
     ).length,
     0,
   );
+  assert.doesNotMatch(source, /\.properties\.principalId/);
+  assert.doesNotMatch(source, /\breference\s*\(/);
+  assert.match(source, /principalId: environment\.identity\.principalId/);
   assert.match(
     source,
-    /resource deploymentIdentities .* existing =/s,
+    /principalId: phaseA\.identities\.contentInfrastructurePlan\.principalId/,
   );
-  assert.match(
-    source,
-    /resource contentInfrastructurePlanIdentity .* existing =/s,
-  );
-  assert.match(source, /resource contentIdentities .* existing =/s);
-  assert.match(
-    source,
-    /resource subscriptionDeploymentLauncher .* existing =/s,
-  );
-  assert.match(source, /resource privilegedCiAssignmentPolicy .* existing =/s);
+  assert.equal(template.outputs.assignmentCount.value, 14);
 });
 
-test('external assignments use only literal expected subnet and DNS resources', () => {
+test('Phase B2 uses only literal exact subnet and DNS resources', () => {
   const template = compileTemplate(
     'infra/governance/modules/contentPlanExternalJoinAssignments.bicep',
   );
@@ -692,7 +690,7 @@ test('Phase B proof validation is mandatory, complete, and subscription-bound', 
   const proof = makePhaseAProof();
   assert.equal(validatePhaseAProof(proof, subscription), proof);
   assert.throws(
-    () => validateWhatIf(whatIfPlan([]), subscription, { phase: 'B' }),
+    () => validateWhatIf(whatIfPlan([]), subscription, { phase: 'B1' }),
     /Phase A proof is missing/,
   );
   assert.throws(
@@ -970,288 +968,159 @@ test('Phase A deployment wrappers require exact scope and materialized retries',
   );
 });
 
-test('Phase B accepts only exact external subnet and DNS scopes', () => {
+test('Phase B1 and B2 accept only their exact assignment contracts', () => {
   const proof = makePhaseAProof();
-  const plan = makeCompletePhaseBPlan(proof);
-  const valid = validateWhatIf(
-    plan,
-    subscription,
-    { phase: 'B', phaseA: proof },
+  const { b1, b2 } = makeCompletePhaseBPlans(proof);
+  assert.equal(
+    validateWhatIf(b1, subscription, { phase: 'B1', phaseA: proof }).total,
+    14,
   );
-  assert.equal(valid.total, 16);
+  assert.equal(
+    validateWhatIf(b2, subscription, { phase: 'B2', phaseA: proof }).total,
+    2,
+  );
+  assert.throws(
+    () => validateWhatIf(b2, subscription, { phase: 'B1', phaseA: proof }),
+    /outside the exact Phase B1 contract|Phase B1 plan is incomplete/,
+  );
+  assert.throws(
+    () => validateWhatIf(b1, subscription, { phase: 'B2', phaseA: proof }),
+    /outside the exact Phase B2 contract|Phase B2 plan is incomplete/,
+  );
+});
 
-  for (const invalidScope of [
-    `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci`,
-    `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/providers/` +
-      'Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/other',
-    `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/providers/` +
-      'Microsoft.Network/privateDnsZones/other.example',
-  ]) {
-    const invalid = structuredClone(plan);
-    const subnetAssignment = invalid.changes.find(
-      (change) =>
-        change.after?.properties?.description ===
-        'Allows the content plan to read and join only the trusted CI runner subnet.',
-    );
-    subnetAssignment.resourceId =
-      `${invalidScope}/providers/Microsoft.Authorization/roleAssignments/` +
-      '50000000-0000-0000-0000-000000000013';
+test('Phase B validators reject IDs, principals, types, scopes, and conditions', () => {
+  const proof = makePhaseAProof();
+  const mutations = [
+    (plans) => {
+      plans.b1.changes[0].resourceId = plans.b1.changes[0].resourceId.replace(
+        /[0-9a-f-]{36}$/,
+        '90000000-0000-0000-0000-000000000001',
+      );
+      return ['b1', 'B1'];
+    },
+    (plans) => {
+      plans.b1.changes[0].after.properties.principalId =
+        '90000000-0000-0000-0000-000000000001';
+      return ['b1', 'B1'];
+    },
+    (plans) => {
+      plans.b1.changes[0].after.properties.principalType = 'User';
+      return ['b1', 'B1'];
+    },
+    (plans) => {
+      plans.b1.changes.find(
+        ({ after }) => after.properties.conditionVersion === '2.0',
+      ).after.properties.condition = 'true';
+      return ['b1', 'B1'];
+    },
+    (plans) => {
+      plans.b2.changes[0].resourceId = plans.b2.changes[0].resourceId.replace(
+        '/subnets/snet-runners/',
+        '/subnets/attacker/',
+      );
+      return ['b2', 'B2'];
+    },
+  ];
+  for (const mutate of mutations) {
+    const plans = makeCompletePhaseBPlans(proof);
+    const [key, phase] = mutate(plans);
     assert.throws(
       () =>
-        validateWhatIf(
-          invalid,
-          subscription,
-          { phase: 'B', phaseA: proof },
-        ),
-      /outside the exact Phase B contract/,
+        validateWhatIf(plans[key], subscription, { phase, phaseA: proof }),
+      new RegExp(`outside the exact Phase ${phase} contract`),
     );
   }
 });
 
-test('Phase B accepts exact NoChange and mixed retry plans only', () => {
+test('Phase B validators accept exact NoChange retries only', () => {
   const proof = makePhaseAProof();
-  const createPlan = makeCompletePhaseBPlan(proof);
-  const noChange = whatIfPlan(createPlan.changes.map(materializeNoChange));
-  assert.equal(
-    validateWhatIf(noChange, subscription, { phase: 'B', phaseA: proof })
-      .total,
-    16,
-  );
-
-  const mixed = structuredClone(noChange);
-  for (let index = 0; index < mixed.changes.length; index += 2) {
-    mixed.changes[index] = structuredClone(createPlan.changes[index]);
-  }
-  assert.equal(
-    validateWhatIf(mixed, subscription, { phase: 'B', phaseA: proof }).total,
-    16,
-  );
-
-  const wrongPrincipal = structuredClone(noChange);
-  wrongPrincipal.changes[0].after.properties.principalId =
-    '90000000-0000-0000-0000-000000000001';
-  assert.throws(
-    () =>
-      validateWhatIf(wrongPrincipal, subscription, {
-        phase: 'B',
-        phaseA: proof,
-      }),
-    /NoChange resource is outside the Phase B allowlist/,
-  );
-
-  const wrongRole = structuredClone(noChange);
-  wrongRole.changes[0].after.properties.roleDefinitionId =
-    `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
-    'roleDefinitions/8e3af657-a8ff-443c-a75c-2fe8c4bcb635';
-  assert.throws(
-    () =>
-      validateWhatIf(wrongRole, subscription, {
-        phase: 'B',
-        phaseA: proof,
-      }),
-    /NoChange resource is outside the Phase B allowlist/,
-  );
-
-  const wrongCondition = structuredClone(noChange);
-  wrongCondition.changes.find(
-    ({ after }) => after.properties.conditionVersion === '2.0',
-  ).after.properties.condition = 'true';
-  assert.throws(
-    () =>
-      validateWhatIf(wrongCondition, subscription, {
-        phase: 'B',
-        phaseA: proof,
-      }),
-    /NoChange resource is outside the Phase B allowlist/,
-  );
-
-  const wrongScope = structuredClone(noChange);
-  wrongScope.changes.find(
-    ({ after }) =>
-      after.properties.description ===
-      'Allows the content plan to read and join only the trusted CI runner subnet.',
-  ).resourceId =
-    `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/providers/` +
-    'Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/other/providers/' +
-    'Microsoft.Authorization/roleAssignments/' +
-    '50000000-0000-0000-0000-000000000013';
-  assert.throws(
-    () =>
-      validateWhatIf(wrongScope, subscription, {
-        phase: 'B',
-        phaseA: proof,
-      }),
-    /NoChange resource is outside the Phase B allowlist/,
-  );
-
-  const missingPayload = structuredClone(noChange);
-  delete missingPayload.changes[0].after;
-  assert.throws(
-    () =>
-      validateWhatIf(missingPayload, subscription, {
-        phase: 'B',
-        phaseA: proof,
-      }),
-    /NoChange resource is outside the Phase B allowlist/,
-  );
-
-  const duplicate = structuredClone(noChange);
-  duplicate.changes.push({
-    ...structuredClone(createPlan.changes[0]),
-    changeType: 'Create',
-  });
-  assert.throws(
-    () =>
-      validateWhatIf(duplicate, subscription, {
-        phase: 'B',
-        phaseA: proof,
-      }),
-    /duplicate Phase B contract resource/,
-  );
-});
-
-test('Phase B deployment wrappers require exact scope and materialized retries', () => {
-  const proof = makePhaseAProof();
-  const exactId =
-    `/subscriptions/${subscription}/resourceGroups/rg-certigo-content/providers/` +
-    'Microsoft.Resources/deployments/content-infra-plan-executor-rbac';
-  for (const changeType of ['Create', 'Ignore', 'NoChange']) {
-    const plan = makeCompletePhaseBPlan(proof);
-    plan.changes.push(
-      deploymentChange(changeType, exactId, {
-        templateLink: { id: 'sha256:fixture' },
-      }),
-    );
+  for (const [key, phase, total] of [
+    ['b1', 'B1', 14],
+    ['b2', 'B2', 2],
+  ]) {
+    const create = makeCompletePhaseBPlans(proof)[key];
+    const noChange = whatIfPlan(create.changes.map(materializeNoChange));
     assert.equal(
-      validateWhatIf(plan, subscription, { phase: 'B', phaseA: proof }).total,
-      17,
+      validateWhatIf(noChange, subscription, { phase, phaseA: proof }).total,
+      total,
     );
-  }
-
-  for (const invalidId of [
-    `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/providers/` +
-      'Microsoft.Resources/deployments/content-infra-plan-executor-rbac',
-    '/subscriptions/00000000-0000-0000-0000-000000000099/resourceGroups/' +
-      'rg-certigo-content/providers/Microsoft.Resources/deployments/' +
-      'content-infra-plan-executor-rbac',
-    `/subscriptions/${subscription}/resourceGroups/rg-certigo-content/providers/` +
-      'microsoft.resources/deployments/content-infra-plan-executor-rbac',
-  ]) {
-    const plan = makeCompletePhaseBPlan(proof);
-    plan.changes.push(
-      deploymentChange('Ignore', invalidId, {
-        provisioningState: 'Succeeded',
-      }),
-    );
+    const missing = structuredClone(noChange);
+    delete missing.changes[0].after;
     assert.throws(
-      () =>
-        validateWhatIf(plan, subscription, { phase: 'B', phaseA: proof }),
-      /outside (subscription|the Phase B allowlist)/,
+      () => validateWhatIf(missing, subscription, { phase, phaseA: proof }),
+      new RegExp(`NoChange resource is outside the Phase ${phase} allowlist`),
     );
   }
-
-  for (const changeType of ['Ignore', 'NoChange']) {
-    const plan = makeCompletePhaseBPlan(proof);
-    plan.changes.push(deploymentChange(changeType, exactId));
-    assert.throws(
-      () =>
-        validateWhatIf(plan, subscription, { phase: 'B', phaseA: proof }),
-      new RegExp(`${changeType} resource is outside the Phase B allowlist`),
-    );
-  }
-  for (const properties of [
-    { provisioningState: '' },
-    { templateHash: '   ' },
-    { templateLink: { id: '' } },
-  ]) {
-    const plan = makeCompletePhaseBPlan(proof);
-    plan.changes.push(deploymentChange('Ignore', exactId, properties));
-    assert.throws(
-      () =>
-        validateWhatIf(plan, subscription, { phase: 'B', phaseA: proof }),
-      /Ignore resource is outside the Phase B allowlist/,
-    );
-  }
-
-  const duplicateLeaf = makeCompletePhaseBPlan(proof);
-  duplicateLeaf.changes.push(
-    deploymentChange('Create', exactId),
-    deploymentChange(
-      'Ignore',
-      `/subscriptions/${subscription}/resourceGroups/rg-attacker/providers/` +
-        'Microsoft.Resources/deployments/content-infra-plan-executor-rbac',
-      { templateHash: '123456789' },
-    ),
-  );
-  assert.throws(
-    () =>
-      validateWhatIf(duplicateLeaf, subscription, {
-        phase: 'B',
-        phaseA: proof,
-      }),
-    /Ignore resource is outside the Phase B allowlist/,
-  );
 });
 
-test('Phase B rejects empty plans and policy assignment below subscription scope', () => {
+test('Phase B requires a complete Phase A proof and exact policy scope', () => {
   const proof = makePhaseAProof();
   assert.throws(
-    () =>
-      validateWhatIf(
-        whatIfPlan([]),
-        subscription,
-        { phase: 'B', phaseA: proof },
-      ),
-    /Phase B plan is incomplete/,
+    () => validateWhatIf(whatIfPlan([]), subscription, { phase: 'B1' }),
+    /Phase A proof is missing/,
   );
-  const plan = makeCompletePhaseBPlan(proof);
-  const policy = plan.changes.find(({ resourceId }) =>
+  const { b1 } = makeCompletePhaseBPlans(proof);
+  const policy = b1.changes.find(({ resourceId }) =>
     resourceId.includes('/policyAssignments/'),
   );
   policy.resourceId =
     `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/providers/` +
     'Microsoft.Authorization/policyAssignments/certigo-privileged-ci-rbac';
   assert.throws(
-    () =>
-      validateWhatIf(plan, subscription, { phase: 'B', phaseA: proof }),
-    /outside the exact Phase B contract/,
+    () => validateWhatIf(b1, subscription, { phase: 'B1', phaseA: proof }),
+    /outside the exact Phase B1 contract/,
   );
 });
 
-test('Phase B script proves Phase A and all live resources before what-if', () => {
-  const script = readFileSync(
-    path.join(
-      repositoryRoot,
-      'infra',
-      'governance',
-      'what-if-phase-b.sh',
-    ),
+test('Phase B1 and B2 prove Phase A before independent what-if plans', () => {
+  const governance = path.join(repositoryRoot, 'infra', 'governance');
+  const prepare = readFileSync(
+    path.join(governance, 'prepare-phase-b.sh'),
     'utf8',
   );
-  const proofIndex = script.indexOf('provisioningState');
-  const resourceIndex = script.indexOf('az resource show');
-  const credentialIndex = script.indexOf(
+  const b1 = readFileSync(
+    path.join(governance, 'what-if-phase-b1.sh'),
+    'utf8',
+  );
+  const b2 = readFileSync(
+    path.join(governance, 'what-if-phase-b2.sh'),
+    'utf8',
+  );
+  const orchestrator = readFileSync(
+    path.join(governance, 'what-if-phase-b.sh'),
+    'utf8',
+  );
+  const proofIndex = prepare.indexOf('provisioningState');
+  const resourceIndex = prepare.indexOf('az resource show');
+  const credentialIndex = prepare.indexOf(
     'az identity federated-credential list',
   );
-  const whatIfIndex = script.indexOf('az deployment sub what-if');
   assert.ok(proofIndex >= 0);
   assert.ok(resourceIndex > proofIndex);
   assert.ok(credentialIndex > resourceIndex);
-  assert.ok(whatIfIndex > credentialIndex);
-  assert.match(script, /provisioning_state.*Succeeded/s);
-  assert.match(script, /validatePhaseAProof/);
-  assert.match(script, /live identity does not match Phase A proof/);
-  assert.equal(
-    script.match(/phaseA\.identityResourceGroupId/g)?.length,
-    2,
-  );
+  assert.match(prepare, /provisioning_state.*Succeeded/s);
+  assert.match(prepare, /validatePhaseAProof/);
+  assert.match(prepare, /live identity does not match Phase A proof/);
+  assert.match(prepare, /phaseA\.identityResourceGroupId/);
+  assert.ok(b1.indexOf('prepare-phase-b.sh') < b1.indexOf('deployment sub what-if'));
+  assert.ok(b2.indexOf('prepare-phase-b.sh') < b2.indexOf('deployment group what-if'));
+  assert.match(b1, /--phase B1/);
+  assert.match(b2, /--phase B2/);
+  assert.match(b1, /manifest\.json/);
+  assert.match(b2, /manifest\.json/);
+  assert.match(orchestrator, /what-if-phase-b1\.sh/);
+  assert.doesNotMatch(orchestrator, /what-if-phase-b2\.sh/);
 });
 
 test('read-only governance scripts contain no live mutation commands', () => {
   for (const relativePath of [
     'infra/governance/inventory.sh',
+    'infra/governance/prepare-phase-b.sh',
     'infra/governance/what-if-phase-a.sh',
     'infra/governance/what-if-phase-b.sh',
+    'infra/governance/what-if-phase-b1.sh',
+    'infra/governance/what-if-phase-b2.sh',
     'infra/ci-runner/capacity-plan.sh',
     'infra/ci-runner/lifecycle-preflight.sh',
   ]) {
