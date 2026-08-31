@@ -84,8 +84,14 @@ what_if_status=$?
 set -e
 printf '%s\n' "${what_if_status}" > "${evidence_dir}/what-if-exit-code.txt"
 [[ "${what_if_status}" -eq 0 ]]
+node "${root}/infra/governance/normalize-principal-types.mjs" \
+  "${evidence_dir}/plan.json" \
+  "${evidence_dir}/compiled-template.json" \
+  "${evidence_dir}/phase-a.json" \
+  "${evidence_dir}/normalized-plan.json" \
+  "${evidence_dir}/principal-type-provenance.json"
 node "${root}/infra/governance/validate-what-if.mjs" \
-  --plan "${evidence_dir}/plan.json" \
+  --plan "${evidence_dir}/normalized-plan.json" \
   --subscription "${subscription_id}" \
   --phase B1 \
   --phase-a "${evidence_dir}/phase-a.json"

@@ -10,6 +10,7 @@ import {
   validateWhatIf,
 } from './validate-what-if.mjs';
 import { sha256File } from './write-what-if-manifest.mjs';
+import { normalizePrincipalTypes } from './normalize-principal-types.mjs';
 
 function parseArguments(argv) {
   const result = {};
@@ -396,8 +397,46 @@ export function verifyDeploymentApproval(input) {
     sourceRoot,
     requireHead: true,
   });
-  const plan = readJson(planPath);
-  validateWhatIf(plan, manifest.subscriptionId, {
+  const rawPlan = readJson(planPath);
+  let effectivePlan = rawPlan;
+  if (manifest.phase === 'B1' && manifest.normalization) {
+    const normalized = normalizePrincipalTypes(
+      rawPlan,
+      readJson(compiledTemplatePath),
+      phaseAProof,
+    );
+    const artifactDirectory = path.dirname(manifestPath);
+    const normalizedPlanPath = path.join(
+      artifactDirectory,
+      'normalized-plan.json',
+    );
+    const provenancePath = path.join(
+      artifactDirectory,
+      'principal-type-provenance.json',
+    );
+    requireEqual(
+      JSON.stringify(normalized.plan),
+      JSON.stringify(readJson(normalizedPlanPath)),
+      'normalized plan mismatch',
+    );
+    requireEqual(
+      JSON.stringify(normalized.provenance),
+      JSON.stringify(readJson(provenancePath)),
+      'principalType provenance mismatch',
+    );
+    requireEqual(
+      sha256File(normalizedPlanPath),
+      manifest.normalization.normalizedPlanSha256,
+      'normalized plan hash mismatch',
+    );
+    requireEqual(
+      sha256File(provenancePath),
+      manifest.normalization.provenanceSha256,
+      'principalType provenance hash mismatch',
+    );
+    effectivePlan = normalized.plan;
+  }
+  validateWhatIf(effectivePlan, manifest.subscriptionId, {
     phase: manifest.phase,
     phaseA: manifest.phase === 'A' ? null : phaseAProof,
   });

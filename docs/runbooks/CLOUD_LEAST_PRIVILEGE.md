@@ -267,6 +267,11 @@ principals. Seul un replay partiel conforme à B1/B2 est accepté; tout assignme
 bloque. B1 passe l'objet Phase A validé comme
 paramètre littéral : aucun `principalId` d'assignment ne dépend d'un `reference()`. Son manifeste
 indépendant couvre les 13 roleAssignments internes et `certigo-privileged-ci-rbac` en `Audit`.
+Si ARM omet `principalType` (`null`) dans le payload what-if, B1 ne l'infère qu'après avoir prouvé
+que la déclaration correspondante du template ARM compilé contient le littéral
+`ServicePrincipal` et que le `principalId` littéral correspond exactement à une UAMI Phase A live.
+Le plan normalisé et la provenance `compiled-template+live-uami` sont hashés dans le manifeste;
+toute autre valeur, expression dynamique, principal non-UAMI ou preuve manquante reste refusée.
 B2 reçoit uniquement le principal de plan et le role definition ID externes littéraux; son
 manifeste indépendant couvre les deux assignments externes. Les artifacts B1/B2 conservent le plan
 brut, les paramètres, le template compilé, la preuve/binding Phase A et un manifest SHA-256 incluant

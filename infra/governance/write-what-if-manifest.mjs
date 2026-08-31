@@ -119,6 +119,27 @@ export function createManifest(options) {
       bindingSha256: sha256File(phaseABindingPath),
     };
   }
+  const normalizedPlanPath = path.join(
+    artifactDirectory,
+    'normalized-plan.json',
+  );
+  const provenancePath = path.join(
+    artifactDirectory,
+    'principal-type-provenance.json',
+  );
+  if (fs.existsSync(normalizedPlanPath) || fs.existsSync(provenancePath)) {
+    if (!fs.existsSync(normalizedPlanPath) || !fs.existsSync(provenancePath)) {
+      throw new Error('principalType normalization evidence is incomplete');
+    }
+    const provenance = JSON.parse(fs.readFileSync(provenancePath, 'utf8'));
+    manifest.normalization = {
+      normalizedPlanSha256: sha256File(normalizedPlanPath),
+      provenanceSha256: sha256File(provenancePath),
+      effectivePrincipalType: 'ServicePrincipal',
+      provenance: 'compiled-template+live-uami',
+      normalizedCount: provenance.normalizedCount,
+    };
+  }
   manifest.artifacts = fs
     .readdirSync(artifactDirectory, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())

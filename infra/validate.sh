@@ -57,6 +57,7 @@ for script in \
   bash -n "${script}"
 done
 node --check "${root}/infra/governance/render-inventory.mjs"
+node --check "${root}/infra/governance/normalize-principal-types.mjs"
 node --check "${root}/infra/governance/validate-what-if.mjs"
 node --check "${root}/infra/governance/validate-evidence.mjs"
 node --check "${root}/infra/governance/write-what-if-manifest.mjs"

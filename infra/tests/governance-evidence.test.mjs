@@ -17,11 +17,14 @@ import {
   '../governance/validate-evidence.mjs';
 import { createManifest, sha256File } from
   '../governance/write-what-if-manifest.mjs';
+import { normalizePrincipalTypes } from
+  '../governance/normalize-principal-types.mjs';
 import {
   armGuid,
   contentPlanCondition,
   runtimeWriterCondition,
   validatePhaseAResource,
+  validateWhatIf,
 } from '../governance/validate-what-if.mjs';
 
 const repositoryRoot = path.resolve(
@@ -123,7 +126,10 @@ function makeB1Plan(proof) {
       resourceId:
         `${scope}/providers/Microsoft.Authorization/roleAssignments/` +
         armGuid(scope, seed, properties.roleDefinitionId),
-      after: { properties },
+      after: {
+        type: 'Microsoft.Authorization/roleAssignments',
+        properties,
+      },
     });
   };
   for (const environment of ['dev', 'staging', 'prod']) {
@@ -173,6 +179,7 @@ function makeB1Plan(proof) {
       },
     );
   }
+
   add(
     `/subscriptions/${subscription}/resourceGroups/rg-certigo-content`,
     proof.identities.contentInfrastructurePlan.name,
@@ -206,6 +213,61 @@ function makeB1Plan(proof) {
     error: null,
     potentialChanges: null,
     status: 'Succeeded',
+  };
+}
+
+function compiledB1PrincipalTypes(principalType = 'ServicePrincipal') {
+  return {
+    resources: [
+      {
+        type: 'Microsoft.Authorization/roleAssignments',
+        properties: {
+          description:
+            "[format('Launches the {0} subscription deployment without general subscription access.', variables('environments')[copyIndex()].name)]",
+          principalType,
+        },
+      },
+      {
+        type: 'Microsoft.Resources/deployments',
+        properties: {
+          template: {
+            resources: [
+              {
+                type: 'Microsoft.Authorization/roleAssignments',
+                properties: {
+                  description:
+                    'Certigo environment deployment; no role-assignment administration.',
+                  principalType,
+                },
+              },
+              {
+                type: 'Microsoft.Authorization/roleAssignments',
+                properties: {
+                  description:
+                    'May create only approved runtime roles for service principals in this environment.',
+                  principalType,
+                },
+              },
+              {
+                type: 'Microsoft.Authorization/roleAssignments',
+                properties: {
+                  description: "[parameters('assignmentDescription')]",
+                  principalType,
+                },
+              },
+              {
+                type: 'Microsoft.Authorization/roleAssignments',
+                properties: {
+                  description:
+                    'Plans the content stack and may assign only approved content roles to service principals.',
+                  principalType,
+                },
+              },
+            ],
+          },
+        },
+      },
+    ],
   };
 }
 
@@ -457,6 +519,156 @@ test('deployment parameters, locations, and B1 transition are exact', () => {
       () => validatePhaseBTransition([], subscription, proof, 'B2'),
       /B1 transition is incomplete/,
     );
+});
+
+test('omitted principalType requires compiled literal and live Phase A UAMI', () => {
+  const proof = makePhaseAProof();
+  const raw = makeB1Plan(proof);
+  for (const change of raw.changes) {
+    if (change.after?.type === 'Microsoft.Authorization/roleAssignments') {
+      change.after.properties.principalType = null;
+    }
+  }
+  const normalized = normalizePrincipalTypes(
+    raw,
+    compiledB1PrincipalTypes(),
+    proof,
+  );
+  assert.equal(normalized.provenance.normalizedCount, 13);
+  assert.ok(
+    normalized.provenance.entries.every(
+      ({ effectivePrincipalType, provenance }) =>
+        effectivePrincipalType === 'ServicePrincipal' &&
+        provenance === 'compiled-template+live-uami',
+    ),
+  );
+  assert.equal(
+    validateWhatIf(normalized.plan, subscription, {
+      phase: 'B1',
+      phaseA: proof,
+    }).total,
+    14,
+  );
+
+  for (const compiled of [
+    { resources: [] },
+    compiledB1PrincipalTypes("[parameters('principalType')]"),
+  ]) {
+    assert.throws(
+      () => normalizePrincipalTypes(raw, compiled, proof),
+      /compiled assignment declaration is missing|not literal ServicePrincipal/,
+    );
+  }
+  const nonUami = structuredClone(raw);
+  nonUami.changes.find(
+    ({ after }) => after?.type === 'Microsoft.Authorization/roleAssignments',
+  ).after.properties.principalId =
+    '90000000-0000-0000-0000-000000000001';
+  assert.throws(
+    () =>
+      normalizePrincipalTypes(nonUami, compiledB1PrincipalTypes(), proof),
+    /does not match a Phase A UAMI/,
+  );
+  for (const principalType of ['User', 'Group']) {
+    const wrongType = structuredClone(raw);
+    wrongType.changes.find(
+      ({ after }) => after?.type === 'Microsoft.Authorization/roleAssignments',
+    ).after.properties.principalType = principalType;
+    assert.throws(
+      () =>
+        validateWhatIf(wrongType, subscription, {
+          phase: 'B1',
+          phaseA: proof,
+        }),
+      /outside the exact Phase B1 contract/,
+    );
+  }
+});
+
+test('deployment approval recomputes normalized principalType evidence', () => {
+  const evidence = makeB1Evidence();
+  const rawPlan = JSON.parse(fs.readFileSync(evidence.planPath, 'utf8'));
+  for (const change of rawPlan.changes) {
+    if (change.after?.type === 'Microsoft.Authorization/roleAssignments') {
+      change.after.properties.principalType = null;
+    }
+  }
+  fs.writeFileSync(evidence.planPath, `${JSON.stringify(rawPlan)}\n`);
+  const compiled = JSON.parse(
+    fs.readFileSync(evidence.compiledTemplatePath, 'utf8'),
+  );
+  const normalized = normalizePrincipalTypes(rawPlan, compiled, evidence.proof);
+  const normalizedPlanPath = writeJson(
+    evidence.directory,
+    'normalized-plan.json',
+    normalized.plan,
+  );
+  const provenancePath = writeJson(
+    evidence.directory,
+    'principal-type-provenance.json',
+    normalized.provenance,
+  );
+  const bindingPath = writeJson(evidence.directory, 'phase-a-binding.json', {
+    schemaVersion: 1,
+  });
+  evidence.manifest.plan.sha256 = sha256File(evidence.planPath);
+  evidence.manifest.normalization = {
+    normalizedPlanSha256: sha256File(normalizedPlanPath),
+    provenanceSha256: sha256File(provenancePath),
+    effectivePrincipalType: 'ServicePrincipal',
+    provenance: 'compiled-template+live-uami',
+    normalizedCount: 13,
+  };
+  evidence.manifest.phaseA = {
+    evidenceManifestSha256: 'a'.repeat(64),
+    bindingSha256: sha256File(bindingPath),
+  };
+  evidence.manifest.artifacts = [
+    evidence.compiledTemplatePath,
+    evidence.parametersPath,
+    bindingPath,
+    normalizedPlanPath,
+    evidence.planPath,
+    provenancePath,
+  ]
+    .map((file) => ({
+      path: path.basename(file),
+      sha256: sha256File(file),
+    }))
+    .sort((left, right) => left.path.localeCompare(right.path));
+  fs.writeFileSync(
+    evidence.manifestPath,
+    `${JSON.stringify(evidence.manifest, null, 2)}\n`,
+  );
+  const approval = {
+    schemaVersion: 1,
+    approved: true,
+    phase: 'B1',
+    manifestSha256: sha256File(evidence.manifestPath),
+    planSha256: evidence.manifest.plan.sha256,
+    sourceCommit: evidence.sourceCommit,
+    phaseAEvidenceManifestSha256: 'a'.repeat(64),
+  };
+  const verify = () =>
+    verifyDeploymentApproval({
+      approval,
+      manifest: evidence.manifest,
+      phaseAProof: evidence.proof,
+      phaseABindingPath: bindingPath,
+      manifestPath: evidence.manifestPath,
+      planPath: evidence.planPath,
+      parametersPath: evidence.parametersPath,
+      compiledTemplatePath: evidence.compiledTemplatePath,
+      sourceRoot: repositoryRoot,
+      subscriptionId: subscription,
+      tenantId: tenant,
+    });
+  assert.doesNotThrow(verify);
+  fs.appendFileSync(provenancePath, '\n');
+  assert.throws(
+    verify,
+    /artifact inventory mismatch|principalType provenance mismatch/,
+  );
 });
 
 test('manifest verification rejects omitted and renamed artifacts', () => {
