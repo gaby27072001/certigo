@@ -520,6 +520,7 @@ class _CommencerButton extends StatefulWidget {
 
 class _CommencerButtonState extends State<_CommencerButton> {
   bool _down = false;
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
@@ -538,41 +539,60 @@ class _CommencerButtonState extends State<_CommencerButton> {
     return Semantics(
       button: true,
       label: 'Commencer',
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _down = true),
-        onTapUp: (_) => setState(() => _down = false),
-        onTapCancel: () => setState(() => _down = false),
-        onTap: widget.onPressed,
-        child: AnimatedScale(
-          scale: _down ? 0.98 : 1,
-          duration: PrismMotion.resolve(context, PrismMotion.fast),
-          curve: PrismMotion.standard,
-          child: Container(
-            height: 58,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(PrismRadii.pill),
-              gradient: LinearGradient(
-                colors: <Color>[base, baseDark],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: _down
-                  ? const <BoxShadow>[]
-                  : <BoxShadow>[
-                      BoxShadow(
-                        color: base.withOpacity(0.38),
-                        blurRadius: 28,
-                        offset: const Offset(0, 14),
-                        spreadRadius: -6,
+      onTap: widget.onPressed,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          excludeFromSemantics: true,
+          borderRadius: BorderRadius.circular(PrismRadii.pill),
+          overlayColor: const WidgetStatePropertyAll<Color>(Colors.transparent),
+          onFocusChange: (bool value) {
+            if (_focused != value) setState(() => _focused = value);
+          },
+          onHighlightChanged: (bool value) {
+            if (_down != value) setState(() => _down = value);
+          },
+          onTap: widget.onPressed,
+          child: ExcludeSemantics(
+            child: AnimatedScale(
+              scale: _down ? 0.98 : 1,
+              duration: PrismMotion.resolve(context, PrismMotion.fast),
+              curve: PrismMotion.standard,
+              child: Container(
+                height: 58,
+                alignment: Alignment.center,
+                foregroundDecoration: _focused
+                    ? BoxDecoration(
+                        borderRadius: BorderRadius.circular(PrismRadii.pill),
+                        border: Border.all(color: Colors.white, width: 2),
+                      )
+                    : null,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(PrismRadii.pill),
+                  gradient: LinearGradient(
+                    colors: <Color>[base, baseDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: _down
+                      ? const <BoxShadow>[]
+                      : <BoxShadow>[
+                          BoxShadow(
+                            color: base.withOpacity(0.38),
+                            blurRadius: 28,
+                            offset: const Offset(0, 14),
+                            spreadRadius: -6,
+                          ),
+                        ],
+                ),
+                child: Text(
+                  'Commencer',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
                       ),
-                    ],
-            ),
-            child: Text(
-              'Commencer',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                ),
+              ),
             ),
           ),
         ),
