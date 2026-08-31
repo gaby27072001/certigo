@@ -46,6 +46,9 @@
               },
               "X-Content-Manifest-Id": {
                 "$ref": "#/components/headers/PublicManifestId"
+              },
+              "Access-Control-Expose-Headers": {
+                "$ref": "#/components/headers/ExposedManifestHeaders"
               }
             },
             "content": {
@@ -70,6 +73,9 @@
               },
               "X-Content-Manifest-Id": {
                 "$ref": "#/components/headers/PublicManifestId"
+              },
+              "Access-Control-Expose-Headers": {
+                "$ref": "#/components/headers/ExposedManifestHeaders"
               }
             }
           },
@@ -141,6 +147,9 @@
               },
               "X-Content-Manifest-Id": {
                 "$ref": "#/components/headers/PublicManifestId"
+              },
+              "Access-Control-Expose-Headers": {
+                "$ref": "#/components/headers/ExposedFileHeaders"
               }
             },
             "content": {
@@ -175,6 +184,9 @@
               },
               "X-Content-Manifest-Id": {
                 "$ref": "#/components/headers/PublicManifestId"
+              },
+              "Access-Control-Expose-Headers": {
+                "$ref": "#/components/headers/ExposedFileHeaders"
               }
             }
           },
@@ -313,6 +325,16 @@
         "schema": {
           "const": "none"
         }
+      },
+      "ExposedManifestHeaders": {
+        "schema": {
+          "const": "ETag, X-Content-Release-Id, X-Content-Manifest-Id"
+        }
+      },
+      "ExposedFileHeaders": {
+        "schema": {
+          "const": "ETag, Accept-Ranges, Content-Range, X-Content-SHA256, X-Content-Release-Id, X-Content-Manifest-Id"
+        }
       }
     },
     "schemas": {
@@ -447,6 +469,9 @@
           },
           "Cache-Control": {
             "$ref": "#/components/headers/NoStoreCache"
+          },
+          "Access-Control-Expose-Headers": {
+            "$ref": "#/components/headers/ExposedFileHeaders"
           },
           "Content-Range": {
             "schema": {

@@ -26,7 +26,13 @@ public sealed class RuntimeContentApiContractTests
         manifest.GetProperty("responses").TryGetProperty("304", out _).Should().BeTrue();
         manifest.GetProperty("responses").GetProperty("304").GetProperty("headers")
             .EnumerateObject().Select(header => header.Name).Should().Contain(
-                ["ETag", "Cache-Control", "X-Content-Release-Id", "X-Content-Manifest-Id"]);
+                [
+                    "ETag",
+                    "Cache-Control",
+                    "X-Content-Release-Id",
+                    "X-Content-Manifest-Id",
+                    "Access-Control-Expose-Headers",
+                ]);
         root.GetProperty("components").GetProperty("schemas")
             .GetProperty("ActivePublicManifest").GetProperty("required")
             .EnumerateArray().Select(value => value.GetString())
@@ -60,6 +66,7 @@ public sealed class RuntimeContentApiContractTests
                 "X-Content-SHA256",
                 "X-Content-Release-Id",
                 "X-Content-Manifest-Id",
+                "Access-Control-Expose-Headers",
             ]);
         file.GetProperty("responses").GetProperty("304").GetProperty("headers")
             .EnumerateObject().Select(header => header.Name).Should().Contain(
@@ -71,11 +78,16 @@ public sealed class RuntimeContentApiContractTests
                     "X-Content-SHA256",
                     "X-Content-Release-Id",
                     "X-Content-Manifest-Id",
+                    "Access-Control-Expose-Headers",
                 ]);
         root.GetProperty("components").GetProperty("responses")
             .GetProperty("RangeNotSatisfiable").GetProperty("headers")
             .GetProperty("Cache-Control").GetProperty("$ref").GetString()
             .Should().Be("#/components/headers/NoStoreCache");
+        root.GetProperty("components").GetProperty("responses")
+            .GetProperty("RangeNotSatisfiable").GetProperty("headers")
+            .GetProperty("Access-Control-Expose-Headers").GetProperty("$ref").GetString()
+            .Should().Be("#/components/headers/ExposedFileHeaders");
     }
 
     private static string LoadContract()

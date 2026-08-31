@@ -76,6 +76,10 @@ public sealed class PublicContentFunctions(IPublicContentFileService publicFiles
         response.Headers.Add("X-Content-SHA256", file.Hash);
         response.Headers.Add("X-Content-Release-Id", file.ReleaseId);
         response.Headers.Add("X-Content-Manifest-Id", file.PublicManifestId);
+        response.Headers.Add(
+            "Access-Control-Expose-Headers",
+            "ETag, Accept-Ranges, Content-Range, X-Content-SHA256, "
+            + "X-Content-Release-Id, X-Content-Manifest-Id");
         if (includeLength)
         {
             response.Headers.Add(

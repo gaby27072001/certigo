@@ -80,7 +80,8 @@ public sealed class ContentReleaseFunctionsTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Headers.GetValues("ETag").Should().Equal($"\"{PublicManifestId}\"");
-        response.Headers.GetValues("Access-Control-Expose-Headers").Should().Equal("ETag");
+        response.Headers.GetValues("Access-Control-Expose-Headers").Should()
+            .Equal("ETag, X-Content-Release-Id, X-Content-Manifest-Id");
         body.Should().Contain(PublicManifestId);
         body.Should().NotContain("privateManifestId");
         body.Should().Contain(ReleaseId);
@@ -109,7 +110,8 @@ public sealed class ContentReleaseFunctionsTests
         var response = await function.GetActivePublicManifest(request, context);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotModified);
-        response.Headers.GetValues("Access-Control-Expose-Headers").Should().Equal("ETag");
+        response.Headers.GetValues("Access-Control-Expose-Headers").Should()
+            .Equal("ETag, X-Content-Release-Id, X-Content-Manifest-Id");
         (await response.ReadBodyAsStringAsync()).Should().BeEmpty();
         response.Headers.GetValues("ETag").Should().Equal($"\"{PublicManifestId}\"");
         response.Headers.GetValues("Cache-Control").Single().Should()
@@ -161,6 +163,11 @@ public sealed class ContentReleaseFunctionsTests
             .And.Contain("max-age=31536000")
             .And.Contain("immutable");
         response.Headers.GetValues("Accept-Ranges").Should().Equal("none");
+        response.Headers.GetValues("Access-Control-Expose-Headers").Single().Should()
+            .Contain("ETag")
+            .And.Contain("X-Content-SHA256")
+            .And.Contain("X-Content-Release-Id")
+            .And.Contain("X-Content-Manifest-Id");
     }
 
     [Theory]
@@ -196,6 +203,9 @@ public sealed class ContentReleaseFunctionsTests
         response.Headers.GetValues("X-Content-SHA256").Should().Equal(file.Hash);
         response.Headers.GetValues("X-Content-Release-Id").Should().Equal(ReleaseId);
         response.Headers.GetValues("X-Content-Manifest-Id").Should().Equal(PublicManifestId);
+        response.Headers.GetValues("Access-Control-Expose-Headers").Single().Should()
+            .Contain("ETag")
+            .And.Contain("X-Content-SHA256");
         response.Headers.Contains("Content-Length").Should().BeFalse();
     }
 
@@ -222,6 +232,8 @@ public sealed class ContentReleaseFunctionsTests
             .Equal($"bytes */{file.Content.Length}");
         response.Headers.GetValues("Accept-Ranges").Should().Equal("none");
         response.Headers.GetValues("Cache-Control").Should().Equal("no-store");
+        response.Headers.GetValues("Access-Control-Expose-Headers").Single().Should()
+            .Contain("Content-Range");
         (await response.ReadBodyAsStringAsync()).Should().BeEmpty();
     }
 
