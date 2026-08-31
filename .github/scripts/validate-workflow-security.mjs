@@ -970,6 +970,12 @@ function validateRepositoryInvariants() {
     'pull_request_target:',
     prLinuxRunner,
     'github.event.pull_request.head.repo.full_name == github.repository',
+    'uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0',
+    'python-version: "3.12.10"',
+    'architecture: "x64"',
+    'check-latest: false',
+    'name: Verify trusted Python bootstrap',
+    'sys.flags.safe_path',
     'path: .untrusted-source',
     'path: .trusted-control',
     'bash "$TRUSTED_CONTROL_DIR/.github/scripts/run-python.sh"',
@@ -979,6 +985,28 @@ function validateRepositoryInvariants() {
     if (!preflight.includes(marker)) {
       errors.push(`ci-preflight.yml: missing trusted Python launcher invariant ${marker}`);
     }
+  }
+  const pythonBootstrap = preflight.indexOf('uses: actions/setup-python@');
+  const firstPreflightCheckout = preflight.indexOf('uses: actions/checkout@');
+  if (
+    pythonBootstrap < 0
+    || firstPreflightCheckout < 0
+    || pythonBootstrap > firstPreflightCheckout
+  ) {
+    errors.push('ci-preflight.yml: trusted Python must be bootstrapped before any checkout');
+  }
+  const bootstrapBlock = preflight.slice(pythonBootstrap, firstPreflightCheckout);
+  if (/^\s+cache:/mu.test(bootstrapBlock)) {
+    errors.push('ci-preflight.yml: trusted Python bootstrap must not use a persistent cache');
+  }
+  if (bootstrapBlock.includes('continue-on-error:')) {
+    errors.push('ci-preflight.yml: trusted Python bootstrap must fail closed');
+  }
+  if (
+    bootstrapBlock.includes('.untrusted-source')
+    || bootstrapBlock.includes('UNTRUSTED_SOURCE_DIR')
+  ) {
+    errors.push('ci-preflight.yml: trusted Python bootstrap must not inspect PR source');
   }
   if (/(?:^|\s)(?:python|python3|py)\s+-P\s+["']?\$TRUSTED_CONTROL_DIR/mu.test(preflight)) {
     errors.push('ci-preflight.yml: project-state must use the trusted Python launcher');

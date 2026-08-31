@@ -17,13 +17,17 @@ outputs fail closed.
 
 ## Fast-fail order
 
-1. Validate the trusted impact contract and the PR's candidate contract.
-2. Run actionlint when workflow YAML or the contract changes.
-3. Run adversarial selector tests and the trusted workflow security policy.
-4. Resolve an explicit Python 3 launcher outside the untrusted checkout, require
+1. Before any checkout, bootstrap the SHA-pinned `actions/setup-python` v5.6.0
+   action with exact CPython 3.12.10/x64, no dependency cache and no
+   `continue-on-error`; verify its tool-cache path, exact patch version and
+   safe-path support.
+2. Validate the trusted impact contract and the PR's candidate contract.
+3. Run actionlint when workflow YAML or the contract changes.
+4. Run adversarial selector tests and the trusted workflow security policy.
+5. Resolve the bootstrapped launcher outside the untrusted checkout, require
    safe-path support, then validate project-state from the trusted generator
    against PR source.
-5. Download the checksum-pinned Bicep CLI only for impacted IaC, then compile
+6. Download the checksum-pinned Bicep CLI only for impacted IaC, then compile
    `infra/main.bicep` plus each changed extant Bicep or parameter source.
 
 Heavy required workflows remain authoritative and continue to preserve coverage.
@@ -57,6 +61,7 @@ Run from the repository root before pushing CI changes:
 ```powershell
 npm ci --ignore-scripts
 node --test .github/scripts/ci-impact.test.mjs .github/scripts/workflow-security-cache-policy.test.mjs
+node --test .github/scripts/run-python.test.mjs
 node .github/scripts/validate-workflow-security.mjs
 python -P -m unittest discover -s tools/tests -p "test_*.py" -v
 python -P tools/project_state.py --check
