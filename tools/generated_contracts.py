@@ -16,10 +16,41 @@ ACTIVE_CONTENT_REFERENCE = Path("docs/active-content-reference.json")
 COSMOS_CSHARP = Path(
     "backend/src/Certigo.Infrastructure/Cosmos/CosmosContainers.cs"
 )
+COSMOS_RESOURCE_NAME_MAX_LENGTH = 255
+COSMOS_RESOURCE_NAME_FORBIDDEN_CHARACTERS = frozenset("/\\?#")
 
 
 class ContractError(ValueError):
     """Raised when a source contract or generated output is invalid."""
+
+
+def _validate_cosmos_resource_name(value: object, source: str) -> str:
+    if not isinstance(value, str) or not value or value.isspace():
+        raise ContractError(f"{source}: expected a non-empty Cosmos resource name.")
+    if len(value) > COSMOS_RESOURCE_NAME_MAX_LENGTH:
+        raise ContractError(
+            f"{source}: Cosmos resource names cannot exceed "
+            f"{COSMOS_RESOURCE_NAME_MAX_LENGTH} characters."
+        )
+    invalid = sorted(set(value) & COSMOS_RESOURCE_NAME_FORBIDDEN_CHARACTERS)
+    if invalid:
+        characters = ", ".join(repr(character) for character in invalid)
+        raise ContractError(
+            f"{source}: Cosmos resource names cannot contain {characters}."
+        )
+    if value.endswith(" "):
+        raise ContractError(f"{source}: Cosmos resource names cannot end with a space.")
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise ContractError(
+            f"{source}: expected valid Unicode for a Cosmos resource name."
+        ) from exc
+    return value
+
+
+def _csharp_string_literal(value: str) -> str:
+    return json.dumps(value, ensure_ascii=True)
 
 
 def _load_json(root: Path, relative: Path) -> dict[str, object]:
@@ -51,10 +82,10 @@ def _cosmos_contract(root: Path) -> tuple[str, list[dict[str, object]]]:
         raise ContractError(f"{COSMOS_CONTRACT}: unexpected fields.")
     if value["schema"] != "certigo.source-contract/cosmos-containers/v1":
         raise ContractError(f"{COSMOS_CONTRACT}: unsupported schema.")
-    database_name = value["databaseName"]
+    database_name = _validate_cosmos_resource_name(
+        value["databaseName"], f"{COSMOS_CONTRACT}.databaseName"
+    )
     containers = value["containers"]
-    if not isinstance(database_name, str) or not database_name:
-        raise ContractError(f"{COSMOS_CONTRACT}.databaseName: expected a string.")
     if not isinstance(containers, list) or not containers:
         raise ContractError(f"{COSMOS_CONTRACT}.containers: expected a non-empty array.")
 
@@ -72,22 +103,25 @@ def _cosmos_contract(root: Path) -> tuple[str, list[dict[str, object]]]:
         if not isinstance(item, dict) or set(item) != expected_fields:
             raise ContractError(f"{source}: unexpected fields.")
         symbol = item["symbol"]
-        name = item["name"]
+        name = _validate_cosmos_resource_name(item["name"], f"{source}.name")
         partition_key = item["partitionKeyPath"]
         ttl = item["defaultTimeToLive"]
         if not isinstance(symbol, str) or not re.fullmatch(r"[A-Z][A-Za-z0-9]*", symbol):
             raise ContractError(f"{source}.symbol: expected a C# identifier.")
-        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9]*", name):
-            raise ContractError(f"{source}.name: expected a container identifier.")
         if not isinstance(partition_key, str) or not re.fullmatch(
             r"/[A-Za-z][A-Za-z0-9]*", partition_key
         ):
             raise ContractError(f"{source}.partitionKeyPath: expected one path segment.")
         if ttl not in (None, -1):
             raise ContractError(f"{source}.defaultTimeToLive: expected null or -1.")
-        if name in names or symbol in symbols:
-            raise ContractError(f"{source}: container names and symbols must be unique.")
-        names.add(name)
+        normalized_name = name.casefold()
+        if normalized_name in names:
+            raise ContractError(
+                f"{source}.name: container names must be unique ignoring case."
+            )
+        if symbol in symbols:
+            raise ContractError(f"{source}.symbol: container symbols must be unique.")
+        names.add(normalized_name)
         symbols.add(symbol)
         validated.append(item)
     return database_name, validated
@@ -104,7 +138,8 @@ def _active_content_output(root: Path) -> str:
 def _cosmos_csharp_output(root: Path) -> str:
     database_name, containers = _cosmos_contract(root)
     constants = "\n".join(
-        f'    public const string {item["symbol"]} = "{item["name"]}";'
+        f'    public const string {item["symbol"]} = '
+        f'{_csharp_string_literal(item["name"])};'
         for item in containers
     )
     definitions = []
@@ -115,7 +150,8 @@ def _cosmos_csharp_output(root: Path) -> str:
             else ""
         )
         definitions.append(
-            f'        new({item["symbol"]}, "{item["partitionKeyPath"]}"{suffix})'
+            f"        new({item['symbol']}, "
+            f"{_csharp_string_literal(item['partitionKeyPath'])}{suffix})"
         )
     all_definitions = ",\n".join(definitions)
     return f"""// <auto-generated by tools/generated_contracts.py>
@@ -123,7 +159,7 @@ namespace Certigo.Infrastructure.Cosmos;
 
 public static class CosmosContainers
 {{
-    public const string DatabaseName = "{database_name}";
+    public const string DatabaseName = {_csharp_string_literal(database_name)};
 {constants}
 
     public static IReadOnlyList<CosmosContainerDefinition> All {{ get; }} =
