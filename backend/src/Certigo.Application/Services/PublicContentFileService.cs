@@ -49,9 +49,10 @@ public sealed partial class PublicContentFileService(
             throw NotFound();
         }
 
-        var receipt = await store.GetReceiptAsync(releaseId, cancellationToken);
-        if (receipt is null
-            || !string.Equals(receipt.PublicManifestId, publicManifestId, StringComparison.Ordinal))
+        var snapshot = await store.ResolveSnapshotAsync(publicManifestId, cancellationToken);
+        if (snapshot is null
+            || !string.Equals(snapshot.ReleaseId, releaseId, StringComparison.Ordinal)
+            || !string.Equals(snapshot.PublicManifestId, publicManifestId, StringComparison.Ordinal))
         {
             throw NotFound();
         }

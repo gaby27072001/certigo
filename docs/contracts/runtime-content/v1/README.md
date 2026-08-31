@@ -5,9 +5,10 @@ authenticated learners. The active response adds `releaseId` as API metadata;
 it does not alter the canonical package-manifest hash inputs.
 
 File downloads are pinned by `releaseId`, `publicManifestId`, declared SHA-256
-and canonical relative path. The backend reads only the public Blob container
-through the existing external reader UAMI. It never resolves private manifests,
-solutions or answer keys.
+and canonical relative path, and require the release's immutable activation
+marker. Imported releases that were never promoted remain inaccessible. The
+backend reads only the public Blob container through the existing external
+reader UAMI. It never resolves private manifests, solutions or answer keys.
 
 `CONTENT_REPOSITORY_MODE=legacy` remains the default. In that mode the new file
 route returns the same generic 404 used for invalid bindings and performs no

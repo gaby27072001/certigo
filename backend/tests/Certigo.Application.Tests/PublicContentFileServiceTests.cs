@@ -52,6 +52,23 @@ public sealed class PublicContentFileServiceTests
         fixture.Source.ReadCount.Should().Be(0);
     }
 
+    [Fact]
+    public async Task Staged_but_never_activated_release_is_not_downloadable()
+    {
+        var fixture = CreateFixture();
+        fixture.Store.Activated = false;
+
+        var action = () => fixture.Service.GetAsync(
+            ReleaseId,
+            fixture.ManifestId,
+            FileHash,
+            Path);
+
+        await action.Should().ThrowAsync<ContentReleaseNotFoundException>()
+            .WithMessage("Public content file was not found.");
+        fixture.Source.ReadCount.Should().Be(0);
+    }
+
     [Theory]
     [InlineData("sha256:invalid",
         "valid", "valid", "questions/microsoft.az-900.question-1.json")]
@@ -362,6 +379,7 @@ public sealed class PublicContentFileServiceTests
     private sealed class FakeStore : IContentReleaseStore
     {
         public ContentReleaseReceipt? Receipt { get; set; }
+        public bool Activated { get; set; } = true;
         public int ReadCount { get; private set; }
 
         public Task<ContentReleaseReceipt?> GetReceiptAsync(
@@ -389,7 +407,20 @@ public sealed class PublicContentFileServiceTests
         public Task<ContentSnapshot?> ResolveSnapshotAsync(
             string publicManifestId,
             CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
+        {
+            ReadCount++;
+            return Task.FromResult(
+                Activated
+                && string.Equals(
+                    Receipt?.PublicManifestId,
+                    publicManifestId,
+                    StringComparison.Ordinal)
+                    ? new ContentSnapshot(
+                        ContentReleaseContracts.VersionedSource,
+                        Receipt!.ReleaseId,
+                        Receipt.PublicManifestId)
+                    : null);
+        }
 
         public Task<ActiveContentPointer> PromoteAsync(
             string releaseId,

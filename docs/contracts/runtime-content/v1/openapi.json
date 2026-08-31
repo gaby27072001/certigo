@@ -93,7 +93,7 @@
         "operationId": "getPublicContentReleaseFile",
         "summary": "Download one immutable file declared by a pinned public manifest",
         "x-certigo-route-template": "content/releases/{releaseId}/manifests/{publicManifestId}/files/{hash}/{*path}",
-        "x-certigo-anti-enumeration": "Invalid release, manifest, hash and path bindings return the same 404 response.",
+        "x-certigo-anti-enumeration": "Inactive releases and invalid release, manifest, hash or path bindings return the same 404 response.",
         "x-certigo-feature-mode": {
           "setting": "CONTENT_REPOSITORY_MODE",
           "enabledValue": "versioned",
@@ -459,7 +459,7 @@
         "description": "Missing or invalid learner JWT"
       },
       "PublicFileNotFound": {
-        "description": "Generic anti-enumeration response for disabled mode or any invalid release, manifest, hash or path binding"
+        "description": "Generic anti-enumeration response for disabled mode, an inactive release, or any invalid release, manifest, hash or path binding"
       },
       "RangeNotSatisfiable": {
         "description": "Range delivery is explicitly unsupported",
