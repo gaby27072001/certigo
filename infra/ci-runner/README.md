@@ -254,6 +254,13 @@ Les SDK de workload restent épinglés par les actions de setup de chaque workfl
 workflow quotidien `runner-health.yml` les installe puis vérifie GitHub, NuGet, pub.dev,
 npm, Azure, l'espace disque et les commandes nécessaires.
 
+Le livrable PR1 de préchauffage immuable est isolé sous
+[`image/`](./image/README.md). Il ajoute manifest, SBOM, lock Python, attestation,
+validation boot fail-closed, hooks de disque temporaire one-job et mesures, mais
+ne câble aucune image dans `runner.bicep`, `pilot.bicep` ou le VMSS live. La
+création Azure Compute Gallery, le `what-if` relu et le canari appartiennent
+explicitement à une PR2 séparée.
+
 ## Capacité et cycle de vie
 
 Le VMSS live est `Standard_D2ads_v6`, autoscale min 2 / défaut 2 / max 4. Son scale-in CPU

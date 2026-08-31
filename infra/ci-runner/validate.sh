@@ -14,6 +14,7 @@ capacity_plan="${root}/infra/ci-runner/capacity-plan.sh"
 validate="${root}/infra/ci-runner/validate.sh"
 runner_bicep="${root}/infra/ci-runner/runner.bicep"
 pilot_bicep="${root}/infra/ci-runner/pilot.bicep"
+image_dir="${root}/infra/ci-runner/image"
 
 for script in \
   "${bootstrap}" \
@@ -24,6 +25,13 @@ for script in \
   "${test_health}" \
   "${lifecycle_preflight}" \
   "${capacity_plan}" \
+  "${image_dir}/prewarm-toolchain.sh" \
+  "${image_dir}/validate-toolchain.sh" \
+  "${image_dir}/job-temp.sh" \
+  "${image_dir}/inventory-toolchain.sh" \
+  "${image_dir}/seal-runner-state.sh" \
+  "${image_dir}/measure-cold-start.sh" \
+  "${image_dir}/certigo-toolchain-guard-generator" \
   "${validate}"; do
   bash -n "${script}"
 done
@@ -151,4 +159,38 @@ bash "${test_health}"
 node --test "${root}/infra/ci-runner/evaluate-lifecycle.test.mjs"
 node --test "${root}/infra/ci-runner/capacity-controller.test.mjs"
 node --check "${root}/infra/ci-runner/scale-in-safety.mjs"
+node "${image_dir}/generate-toolchain-sbom.mjs" --check
+bash "${image_dir}/validate-toolchain.sh" --contract
+node --test "${image_dir}/toolchain-contract.test.mjs"
+
+contract_fixture="$(mktemp -d)"
+generator_fixture="$(mktemp -d)"
+trap 'rm -rf "${contract_fixture}" "${generator_fixture}"' EXIT
+cp \
+  "${image_dir}/toolchain-manifest.json" \
+  "${image_dir}/toolchain-sbom.cdx.json" \
+  "${image_dir}/toolchain-requirements.lock" \
+  "${contract_fixture}/"
+printf ' ' >>"${contract_fixture}/toolchain-sbom.cdx.json"
+if CERTIGO_IMAGE_ROOT="${contract_fixture}" \
+  bash "${image_dir}/validate-toolchain.sh" --contract >/dev/null 2>&1; then
+  echo "Toolchain contract must fail closed when the SBOM hash changes." >&2
+  exit 1
+fi
+
+mkdir -p "${generator_fixture}/units" "${generator_fixture}/generated"
+touch "${generator_fixture}/units/actions.runner.Certigo.test.service"
+CERTIGO_SYSTEMD_UNIT_DIR="${generator_fixture}/units" \
+  bash "${image_dir}/certigo-toolchain-guard-generator" \
+  "${generator_fixture}/generated" \
+  "${generator_fixture}/early" \
+  "${generator_fixture}/late"
+generated_guard="$(
+  find "${generator_fixture}/generated" -type f -name '50-certigo-toolchain-guard.conf'
+)"
+[[ -n "${generated_guard}" ]]
+grep -F 'Requires=certigo-toolchain-validate.service' "${generated_guard}" >/dev/null
+grep -F 'Requires=certigo-job-temp-mount.service' "${generated_guard}" >/dev/null
+rm -rf "${contract_fixture}" "${generator_fixture}"
+trap - EXIT
 echo "ci-runner validation passed"
