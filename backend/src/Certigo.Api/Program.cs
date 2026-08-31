@@ -33,6 +33,7 @@ var host = new HostBuilder()
         worker.UseMiddleware<ExceptionMiddleware>();
         worker.UseMiddleware<EnterpriseLearningMetricsFeatureMiddleware>();
         worker.UseMiddleware<OrganizationFeatureMiddleware>();
+        worker.UseMiddleware<EnterpriseIdentityFeatureMiddleware>();
         worker.UseMiddleware<JwtAuthMiddleware>();
     })
     .ConfigureServices((context, services) =>
@@ -42,6 +43,8 @@ var host = new HostBuilder()
             configuration["PERSON_LINKED_IDENTITY_V1"]);
         var organizationFeatureOptions = OrganizationFeatureOptions.Parse(
             configuration["ORGANIZATION_MEMBERSHIP_V1"]);
+        var enterpriseIdentityFeatureOptions = EnterpriseIdentityFeatureOptions.Parse(
+            configuration["ENTERPRISE_IDENTITY_V1"]);
         var enterpriseLearningMetricsFeatureOptions =
             EnterpriseLearningMetricsFeatureOptions.Parse(
                 configuration["ENTERPRISE_LEARNING_METRICS_V1"]);
@@ -238,6 +241,7 @@ var host = new HostBuilder()
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(personLinkedIdentityOptions);
         services.AddSingleton(organizationFeatureOptions);
+        services.AddSingleton(enterpriseIdentityFeatureOptions);
         services.AddSingleton(enterpriseLearningMetricsFeatureOptions);
         services.AddSingleton<IIdentitySubjectGenerator, CryptographicIdentitySubjectGenerator>();
         services.AddSingleton<IPersonLinkedIdentityRepository, CosmosPersonLinkedIdentityRepository>();
