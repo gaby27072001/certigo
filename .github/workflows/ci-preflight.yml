@@ -29,6 +29,42 @@ jobs:
       BICEP_VERSION: "0.44.1"
       BICEP_SHA256: "e17dc9a9888184886bb0c0051a3230b83b19f342749999f707bc571c3dfd2f45"
     steps:
+      - name: Bootstrap trusted Python
+        id: python-bootstrap
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12.10"
+          architecture: "x64"
+          check-latest: false
+
+      - name: Verify trusted Python bootstrap
+        shell: bash
+        env:
+          EXPECTED_PYTHON_VERSION: "3.12.10"
+          PYTHON_PATH: ${{ steps.python-bootstrap.outputs.python-path }}
+        run: |
+          set -euo pipefail
+          test -n "$PYTHON_PATH"
+          toolcache_root="$(cd -P -- "$RUNNER_TOOL_CACHE" && pwd)"
+          canonical_python="$(readlink -f -- "$PYTHON_PATH")"
+          case "$canonical_python" in
+            "$toolcache_root"/Python/"$EXPECTED_PYTHON_VERSION"/x64/bin/python*)
+              ;;
+            *)
+              echo "::error::setup-python returned an interpreter outside the trusted tool cache."
+              exit 126
+              ;;
+          esac
+          "$canonical_python" -P -c '
+          import os
+          import sys
+
+          expected = tuple(map(int, os.environ["EXPECTED_PYTHON_VERSION"].split(".")))
+          raise SystemExit(
+              0 if sys.version_info[:3] == expected and sys.flags.safe_path else 1
+          )
+          '
+
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}

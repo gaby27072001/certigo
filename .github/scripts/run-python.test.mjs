@@ -17,6 +17,12 @@ const script = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   'run-python.sh',
 );
+const preflightWorkflow = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'workflows',
+  'ci-preflight.yml',
+);
 
 function bashPath(file) {
   return file.replaceAll('\\', '/');
@@ -33,13 +39,13 @@ function bashExecutable() {
   return result.stdout.trim();
 }
 
-function writeLauncher(file) {
+function writeLauncher(file, { supportsSafePath = true } = {}) {
   writeFileSync(
     file,
     `#!/usr/bin/bash
 set -euo pipefail
 if [[ " $* " == *" -c "* ]]; then
-  exit 0
+  exit ${supportsSafePath ? 0 : 1}
 fi
 printf '%s\\n' "$@" > "$CAPTURE_FILE"
 `,
@@ -50,13 +56,17 @@ printf '%s\\n' "$@" > "$CAPTURE_FILE"
 
 function harness() {
   const root = mkdtempSync(path.join(tmpdir(), 'certigo-python-launcher-'));
-  const bin = path.join(root, 'bin');
+  const runnerBin = path.join(root, 'runner-bin');
+  const setupBin = path.join(root, 'setup-bin');
   const untrusted = path.join(root, 'untrusted');
-  mkdirSync(bin);
+  mkdirSync(runnerBin);
+  mkdirSync(setupBin);
   mkdirSync(untrusted);
   return {
     root,
-    bin,
+    pathEntries: [runnerBin],
+    runnerBin,
+    setupBin,
     untrusted,
     capture: path.join(root, 'arguments.txt'),
   };
@@ -70,7 +80,7 @@ function run(harnessState) {
       encoding: 'utf8',
       env: {
         ...process.env,
-        PATH: bashPath(harnessState.bin),
+        PATH: harnessState.pathEntries.map(bashPath).join(':'),
         CAPTURE_FILE: bashPath(harnessState.capture),
         UNTRUSTED_SOURCE_DIR: bashPath(harnessState.untrusted),
       },
@@ -78,14 +88,19 @@ function run(harnessState) {
   );
 }
 
-test('uses python3 explicitly when the python alias is absent', () => {
+test('uses setup Python 3.12 ahead of runner Python 3.10', () => {
   const state = harness();
   try {
-    writeLauncher(path.join(state.bin, 'python3'));
+    writeLauncher(
+      path.join(state.runnerBin, 'python3'),
+      { supportsSafePath: false },
+    );
+    writeLauncher(path.join(state.setupBin, 'python3'));
+    state.pathEntries = [state.setupBin, state.runnerBin];
     const result = run(state);
 
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stderr, /Using Python launcher: .*python3/u);
+    assert.match(result.stderr, /Using Python launcher: .*\/setup-bin\/python3/u);
     assert.deepEqual(
       readFileSync(state.capture, 'utf8').trim().split(/\r?\n/u),
       ['-P', 'fixture.py', '--check'],
@@ -95,12 +110,17 @@ test('uses python3 explicitly when the python alias is absent', () => {
   }
 });
 
-test('fails closed when no Python interpreter is available', () => {
+test('fails closed when setup is absent and the runner only has Python 3.10', () => {
   const state = harness();
   try {
+    writeLauncher(
+      path.join(state.runnerBin, 'python3'),
+      { supportsSafePath: false },
+    );
     const result = run(state);
 
     assert.equal(result.status, 127);
+    assert.match(result.stderr, /Python 3\.11\+ safe-path mode is unavailable/u);
     assert.match(result.stderr, /tried python3, python, and py -3/u);
   } finally {
     rmSync(state.root, { recursive: true, force: true });
@@ -110,9 +130,10 @@ test('fails closed when no Python interpreter is available', () => {
 test('rejects a Python launcher resolved from the untrusted checkout', () => {
   const state = harness();
   try {
-    state.bin = path.join(state.untrusted, 'bin');
-    mkdirSync(state.bin);
-    writeLauncher(path.join(state.bin, 'python3'));
+    const untrustedBin = path.join(state.untrusted, 'bin');
+    mkdirSync(untrustedBin);
+    writeLauncher(path.join(untrustedBin, 'python3'));
+    state.pathEntries = [untrustedBin];
     const result = run(state);
 
     assert.equal(result.status, 126);
@@ -120,4 +141,23 @@ test('rejects a Python launcher resolved from the untrusted checkout', () => {
   } finally {
     rmSync(state.root, { recursive: true, force: true });
   }
+});
+
+test('pins a fail-closed cache-free bootstrap before either checkout', () => {
+  const workflow = readFileSync(preflightWorkflow, 'utf8');
+  const bootstrap = workflow.indexOf(
+    'uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0',
+  );
+  const firstCheckout = workflow.indexOf('uses: actions/checkout@');
+  const bootstrapBlock = workflow.slice(bootstrap, firstCheckout);
+
+  assert.notEqual(bootstrap, -1);
+  assert.ok(bootstrap < firstCheckout);
+  assert.match(bootstrapBlock, /python-version: "3\.12\.10"/u);
+  assert.match(bootstrapBlock, /architecture: "x64"/u);
+  assert.match(bootstrapBlock, /check-latest: false/u);
+  assert.match(bootstrapBlock, /sys\.flags\.safe_path/u);
+  assert.doesNotMatch(bootstrapBlock, /^\s+cache:/mu);
+  assert.doesNotMatch(bootstrapBlock, /continue-on-error:/u);
+  assert.doesNotMatch(bootstrapBlock, /\.untrusted-source|UNTRUSTED_SOURCE_DIR/u);
 });

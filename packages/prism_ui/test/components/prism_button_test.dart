@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show SemanticsAction;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prism_ui/prism_ui.dart';
 
@@ -19,32 +20,60 @@ void main() {
 
     testWidgets('shows a spinner and suppresses taps while loading', (WidgetTester tester) async {
       int taps = 0;
+      final SemanticsHandle handle = tester.ensureSemantics();
       await pumpPrism(
         tester,
         PrismButton(label: 'Chargement', onPressed: () => taps++, loading: true),
       );
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.bySemanticsLabel('Chargement, chargement'), findsOneWidget);
+      expect(
+        tester
+            .getSemantics(find.byType(PrismButton))
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isFalse,
+      );
 
       await tester.tap(find.byType(PrismButton), warnIfMissed: false);
       await tester.pump();
 
       expect(taps, 0);
+      handle.dispose();
     });
 
-    testWidgets('is marked as a disabled button without an onPressed', (WidgetTester tester) async {
+    testWidgets('exposes one label and the disabled state without an onPressed', (
+      WidgetTester tester,
+    ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpPrism(tester, const PrismButton(label: 'Indispo'));
 
-      // The visible Text('Indispo') merges into the Semantics(label: 'Indispo')
-      // node, so the merged label reads 'Indispo\nIndispo'. Assert the
-      // disabled-button accessibility flags here and check the rendered label
-      // separately via find.text.
+      expect(find.bySemanticsLabel('Indispo'), findsOneWidget);
       expect(
-        tester.getSemantics(find.byType(PrismButton)),
-        containsSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
+        tester
+            .getSemantics(find.byType(PrismButton))
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isFalse,
       );
       expect(find.text('Indispo'), findsOneWidget);
+
+      handle.dispose();
+    });
+
+    testWidgets('exposes one actionable label when enabled', (WidgetTester tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await pumpPrism(tester, PrismButton(label: 'Continuer', onPressed: () {}));
+
+      expect(find.bySemanticsLabel('Continuer'), findsOneWidget);
+      expect(
+        tester
+            .getSemantics(find.byType(PrismButton))
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
 
       handle.dispose();
     });

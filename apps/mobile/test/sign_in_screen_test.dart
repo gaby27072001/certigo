@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/semantics.dart' show SemanticsAction;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:certigo/features/auth/application/auth_controller.dart';
 import 'package:certigo/features/auth/application/auth_gateway.dart';
@@ -69,6 +71,51 @@ void main() {
     expect(find.text('Continuer avec Microsoft'), findsOneWidget);
     expect(find.text('Continuer avec Google'), findsOneWidget);
     expect(find.text('Continuer avec Apple'), findsOneWidget);
+  });
+
+  testWidgets('un fournisseur en chargement reste annoncé sans action', (tester) async {
+    final SemanticsHandle semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: PrismTheme.light(),
+        home: Scaffold(
+          body: AuthProviderButton(
+            provider: AuthProvider.microsoft,
+            onPressed: () {},
+            loading: true,
+          ),
+        ),
+      ),
+    );
+
+    final Finder button = find.byType(AuthProviderButton);
+    expect(find.bySemanticsLabel('Continuer avec Microsoft, chargement'), findsOneWidget);
+    expect(tester.getSemantics(button).getSemanticsData().hasAction(SemanticsAction.tap), isFalse);
+    semantics.dispose();
+  });
+
+  testWidgets('un fournisseur reste activable au clavier avec un focus visible', (tester) async {
+    var taps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: PrismTheme.light(),
+        home: Scaffold(
+          body: AuthProviderButton(provider: AuthProvider.microsoft, onPressed: () => taps++),
+        ),
+      ),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+
+    final Iterable<Container> containers = tester.widgetList<Container>(
+      find.ancestor(of: find.text('Continuer avec Microsoft'), matching: find.byType(Container)),
+    );
+    expect(containers.any((Container container) => container.foregroundDecoration != null), isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(taps, 1);
   });
 
   testWidgets('sans Entra, les boutons sociaux disparaissent mais le formulaire reste', (

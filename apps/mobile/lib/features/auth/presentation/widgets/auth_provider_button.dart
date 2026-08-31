@@ -47,6 +47,7 @@ class AuthProviderButton extends StatefulWidget {
 
 class _AuthProviderButtonState extends State<AuthProviderButton> {
   bool _down = false;
+  bool _focused = false;
 
   bool get _interactive => widget.enabled && !widget.loading;
 
@@ -109,67 +110,88 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
     return Semantics(
       button: true,
       enabled: _interactive,
-      label: brand.label,
-      child: GestureDetector(
-        onTapDown: _interactive ? (_) => setState(() => _down = true) : null,
-        onTapUp: _interactive ? (_) => setState(() => _down = false) : null,
-        onTapCancel: _interactive ? () => setState(() => _down = false) : null,
-        onTap: _interactive ? _handleTap : null,
-        child: AnimatedScale(
-          scale: _down ? 0.97 : 1.0,
-          duration: duration,
-          curve: PrismMotion.standard,
-          child: AnimatedOpacity(
-            opacity: _interactive ? 1 : 0.55,
-            duration: duration,
-            child: Container(
-              height: 56,
-              padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.md),
-              decoration: BoxDecoration(
-                color: brand.background,
-                borderRadius: const BorderRadius.all(Radius.circular(16)),
-                border: brand.border == null ? null : Border.all(color: brand.border!),
-                boxShadow: _down
-                    ? null
-                    : <BoxShadow>[
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.10),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
-                          spreadRadius: -8,
+      liveRegion: widget.loading,
+      label: widget.loading ? '${brand.label}, chargement' : brand.label,
+      onTap: _interactive ? _handleTap : null,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          excludeFromSemantics: true,
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+          overlayColor: const WidgetStatePropertyAll<Color>(Colors.transparent),
+          onFocusChange: (bool value) {
+            if (_focused != value) setState(() => _focused = value);
+          },
+          onHighlightChanged: _interactive
+              ? (bool value) {
+                  if (_down != value) setState(() => _down = value);
+                }
+              : null,
+          onTap: _interactive ? _handleTap : null,
+          child: ExcludeSemantics(
+            child: AnimatedScale(
+              scale: _down ? 0.97 : 1.0,
+              duration: duration,
+              curve: PrismMotion.standard,
+              child: AnimatedOpacity(
+                opacity: _interactive ? 1 : 0.55,
+                duration: duration,
+                child: Container(
+                  height: 56,
+                  padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.md),
+                  foregroundDecoration: _focused
+                      ? BoxDecoration(
+                          borderRadius: const BorderRadius.all(Radius.circular(16)),
+                          border: Border.all(color: brand.foreground, width: 2),
+                        )
+                      : null,
+                  decoration: BoxDecoration(
+                    color: brand.background,
+                    borderRadius: const BorderRadius.all(Radius.circular(16)),
+                    border: brand.border == null ? null : Border.all(color: brand.border!),
+                    boxShadow: _down
+                        ? null
+                        : <BoxShadow>[
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.10),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
+                              spreadRadius: -8,
+                            ),
+                          ],
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Center(
+                          child: widget.loading
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(brand.foreground),
+                                  ),
+                                )
+                              : Icon(brand.icon, size: 20, color: brand.iconColor),
                         ),
-                      ],
-              ),
-              child: Row(
-                children: <Widget>[
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Center(
-                      child: widget.loading
-                          ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                valueColor: AlwaysStoppedAnimation<Color>(brand.foreground),
-                              ),
-                            )
-                          : Icon(brand.icon, size: 20, color: brand.iconColor),
-                    ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          brand.label,
+                          textAlign: TextAlign.center,
+                          style: labelStyle,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // Symétrie visuelle : réserve la largeur du logo à droite pour
+                      // que le libellé reste optiquement centré.
+                      const SizedBox(width: 24),
+                    ],
                   ),
-                  Expanded(
-                    child: Text(
-                      brand.label,
-                      textAlign: TextAlign.center,
-                      style: labelStyle,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  // Symétrie visuelle : réserve la largeur du logo à droite pour
-                  // que le libellé reste optiquement centré.
-                  const SizedBox(width: 24),
-                ],
+                ),
               ),
             ),
           ),
