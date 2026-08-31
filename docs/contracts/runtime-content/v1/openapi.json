@@ -1,0 +1,422 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Certigo Runtime Public Content",
+    "version": "1.0.0",
+    "description": "Authenticated delivery of immutable public runtime content. No private artifact or answer key is addressable."
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "x-certigo-feature-mode": {
+    "setting": "CONTENT_REPOSITORY_MODE",
+    "enabledValue": "versioned",
+    "default": "legacy",
+    "disabledHttpStatus": 404
+  },
+  "x-certigo-storage": {
+    "credentialSetting": "CONTENT_STORAGE_CLIENT_ID",
+    "access": "external-reader-uami",
+    "provisionsStorage": false,
+    "provisionsRbac": false
+  },
+  "paths": {
+    "/content/releases/active/manifest": {
+      "get": {
+        "operationId": "getActivePublicContentManifest",
+        "summary": "Get the active public manifest and its release identity",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active public manifest",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ManifestETag"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/RevalidatedPrivateCache"
+              },
+              "X-Content-Release-Id": {
+                "$ref": "#/components/headers/ReleaseId"
+              },
+              "X-Content-Manifest-Id": {
+                "$ref": "#/components/headers/PublicManifestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivePublicManifest"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The active public manifest is unchanged"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/ContentUnavailable"
+          }
+        }
+      }
+    },
+    "/content/releases/{releaseId}/manifests/{publicManifestId}/files/{hash}/{path}": {
+      "get": {
+        "operationId": "getPublicContentReleaseFile",
+        "summary": "Download one immutable file declared by a pinned public manifest",
+        "x-certigo-route-template": "content/releases/{releaseId}/manifests/{publicManifestId}/files/{hash}/{*path}",
+        "x-certigo-anti-enumeration": "Invalid release, manifest, hash and path bindings return the same 404 response.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ReleaseId"
+          },
+          {
+            "$ref": "#/components/parameters/PublicManifestId"
+          },
+          {
+            "$ref": "#/components/parameters/Hash"
+          },
+          {
+            "$ref": "#/components/parameters/Path"
+          },
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          },
+          {
+            "$ref": "#/components/parameters/Range"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact verified public file bytes",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/FileETag"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Content-Type": {
+                "$ref": "#/components/headers/ContentType"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/ImmutablePrivateCache"
+              },
+              "Accept-Ranges": {
+                "$ref": "#/components/headers/NoRanges"
+              },
+              "X-Content-SHA256": {
+                "$ref": "#/components/headers/Hash"
+              },
+              "X-Content-Release-Id": {
+                "$ref": "#/components/headers/ReleaseId"
+              },
+              "X-Content-Manifest-Id": {
+                "$ref": "#/components/headers/PublicManifestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The immutable file ETag matches If-None-Match"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicFileNotFound"
+          },
+          "416": {
+            "$ref": "#/components/responses/RangeNotSatisfiable"
+          },
+          "503": {
+            "$ref": "#/components/responses/ContentUnavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "parameters": {
+      "ReleaseId": {
+        "name": "releaseId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/DigestId"
+        }
+      },
+      "PublicManifestId": {
+        "name": "publicManifestId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/DigestId"
+        }
+      },
+      "Hash": {
+        "name": "hash",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/HexDigest"
+        }
+      },
+      "Path": {
+        "name": "path",
+        "in": "path",
+        "required": true,
+        "description": "Catch-all canonical relative path. It must exactly match the public manifest allowlist.",
+        "schema": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      },
+      "IfNoneMatch": {
+        "name": "If-None-Match",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Range": {
+        "name": "Range",
+        "in": "header",
+        "required": false,
+        "description": "Ranges are not supported and return 416 unless If-None-Match first resolves to 304.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "headers": {
+      "ManifestETag": {
+        "schema": {
+          "type": "string"
+        }
+      },
+      "FileETag": {
+        "schema": {
+          "type": "string",
+          "pattern": "^\"sha256:[0-9a-f]{64}\"$"
+        }
+      },
+      "ReleaseId": {
+        "schema": {
+          "$ref": "#/components/schemas/DigestId"
+        }
+      },
+      "PublicManifestId": {
+        "schema": {
+          "$ref": "#/components/schemas/DigestId"
+        }
+      },
+      "Hash": {
+        "schema": {
+          "$ref": "#/components/schemas/HexDigest"
+        }
+      },
+      "ContentLength": {
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "ContentType": {
+        "schema": {
+          "const": "application/json; charset=utf-8"
+        }
+      },
+      "RevalidatedPrivateCache": {
+        "schema": {
+          "const": "private, no-cache"
+        }
+      },
+      "ImmutablePrivateCache": {
+        "schema": {
+          "const": "private, max-age=31536000, immutable"
+        }
+      },
+      "NoRanges": {
+        "schema": {
+          "const": "none"
+        }
+      }
+    },
+    "schemas": {
+      "DigestId": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      },
+      "HexDigest": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "ActivePublicManifest": {
+        "type": "object",
+        "required": [
+          "schema",
+          "channel",
+          "artifact",
+          "algorithm",
+          "serialization",
+          "fileCount",
+          "files",
+          "manifestId",
+          "rootHash",
+          "releaseId"
+        ],
+        "properties": {
+          "schema": {
+            "enum": [
+              "certigo.content.package-manifest/v1",
+              "certigo.content.package-manifest/v2",
+              "certigo.content.package-manifest/v3"
+            ]
+          },
+          "channel": {
+            "const": "public"
+          },
+          "artifact": {
+            "const": "public"
+          },
+          "algorithm": {
+            "const": "sha256"
+          },
+          "serialization": {
+            "const": "json-sorted-keys-compact-utf8-lf"
+          },
+          "fileCount": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicFile"
+            }
+          },
+          "manifestId": {
+            "$ref": "#/components/schemas/DigestId"
+          },
+          "rootHash": {
+            "$ref": "#/components/schemas/HexDigest"
+          },
+          "releaseId": {
+            "$ref": "#/components/schemas/DigestId"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PublicFile": {
+        "type": "object",
+        "required": [
+          "id",
+          "path",
+          "hash",
+          "size"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "resourceType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hash": {
+            "$ref": "#/components/schemas/HexDigest"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "certification": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "blueprintVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "objective": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid learner JWT"
+      },
+      "PublicFileNotFound": {
+        "description": "Generic anti-enumeration response for disabled mode or any invalid release, manifest, hash or path binding"
+      },
+      "RangeNotSatisfiable": {
+        "description": "Range delivery is explicitly unsupported",
+        "headers": {
+          "Accept-Ranges": {
+            "$ref": "#/components/headers/NoRanges"
+          },
+          "Content-Range": {
+            "schema": {
+              "type": "string",
+              "pattern": "^bytes \\*/[1-9][0-9]*$"
+            }
+          }
+        }
+      },
+      "ContentUnavailable": {
+        "description": "A pinned public artifact failed immutable integrity verification"
+      }
+    }
+  }
+}

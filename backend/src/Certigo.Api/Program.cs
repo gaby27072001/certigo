@@ -135,6 +135,12 @@ var host = new HostBuilder()
         services.AddScoped<ContentContractVerifier>();
         services.AddScoped<IContentReleaseStore, CosmosContentReleaseStore>();
         services.AddScoped<IContentReleaseService, ContentReleaseService>();
+        var versionedContentEnabled = string.Equals(
+            configuration[ConfigurationKeys.ContentRepositoryMode],
+            ContentReleaseContracts.VersionedSource,
+            StringComparison.Ordinal);
+        services.AddSingleton(new PublicContentDeliveryOptions(versionedContentEnabled));
+        services.AddScoped<IPublicContentFileService, PublicContentFileService>();
         services.AddSingleton<IContentReleaseTelemetry, ApplicationInsightsContentReleaseTelemetry>();
         services.AddSingleton(new ContentAdminAuthorization(
             configuration[ConfigurationKeys.ContentAdminRole] ?? "Content.Release.Admin",

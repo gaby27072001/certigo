@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using Certigo.Api.Auth;
 using Certigo.Api.Functions;
 using Certigo.Application.Abstractions;
@@ -82,7 +83,7 @@ public sealed class ContentReleaseFunctionsTests
         response.Headers.GetValues("Access-Control-Expose-Headers").Should().Equal("ETag");
         body.Should().Contain(PublicManifestId);
         body.Should().NotContain("privateManifestId");
-        body.Should().NotContain("releaseId");
+        body.Should().Contain(ReleaseId);
         body.Should().NotContain("correctOptionIds");
         body.Should().NotContain("rationale");
         body.Should().NotContain("answerKey");
@@ -106,10 +107,150 @@ public sealed class ContentReleaseFunctionsTests
         response.StatusCode.Should().Be(HttpStatusCode.NotModified);
         response.Headers.GetValues("Access-Control-Expose-Headers").Should().Equal("ETag");
         (await response.ReadBodyAsStringAsync()).Should().BeEmpty();
+        response.Headers.GetValues("Cache-Control").Single().Should()
+            .Contain("private")
+            .And.Contain("no-cache");
+        response.Headers.GetValues("X-Content-Release-Id").Should().Equal(ReleaseId);
     }
 
-    private static ContentReleaseFunctions CreateFunction(IContentReleaseService service)
-        => new(service, new ContentAdminAuthorization("Content.Release.Admin", allowDevIdentity: false));
+    [Fact]
+    public async Task Public_file_returns_pinned_integrity_and_immutable_cache_headers()
+    {
+        var bytes = Encoding.UTF8.GetBytes("""{"id":"question-1"}""");
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes))
+            .ToLowerInvariant();
+        var files = new FakePublicContentFileService(new PublicContentFileResult(
+            ReleaseId,
+            PublicManifestId,
+            "questions/question-1.json",
+            hash,
+            "application/json; charset=utf-8",
+            bytes));
+        var function = CreateFunction(new FakeContentReleaseService(), files);
+        var context = TestFunctionContext.Authenticated();
+        var request = Request(
+            context,
+            "GET",
+            $"/api/content/releases/{ReleaseId}/manifests/{PublicManifestId}/files/"
+            + $"{hash}/questions/question-1.json");
+
+        var response = await function.GetPublicFile(
+            request,
+            ReleaseId,
+            PublicManifestId,
+            hash,
+            "questions/question-1.json",
+            context);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.ReadBodyAsStringAsync()).Should().Be("""{"id":"question-1"}""");
+        response.Headers.GetValues("ETag").Should().Equal($"\"sha256:{hash}\"");
+        response.Headers.GetValues("Content-Length").Should().Equal(bytes.Length.ToString());
+        response.Headers.GetValues("Content-Type").Should().Equal("application/json; charset=utf-8");
+        response.Headers.GetValues("X-Content-SHA256").Should().Equal(hash);
+        response.Headers.GetValues("X-Content-Release-Id").Should().Equal(ReleaseId);
+        response.Headers.GetValues("X-Content-Manifest-Id").Should().Equal(PublicManifestId);
+        response.Headers.GetValues("Cache-Control").Single().Should()
+            .Contain("private")
+            .And.Contain("max-age=31536000")
+            .And.Contain("immutable");
+        response.Headers.GetValues("Accept-Ranges").Should().Equal("none");
+    }
+
+    [Fact]
+    public async Task Public_file_honors_if_none_match_before_refusing_ranges()
+    {
+        var file = PublicFile();
+        var function = CreateFunction(
+            new FakeContentReleaseService(),
+            new FakePublicContentFileService(file));
+        var context = TestFunctionContext.Authenticated();
+        var headers = new HttpHeadersCollection();
+        headers.Add("If-None-Match", $"W/\"sha256:{file.Hash}\"");
+        headers.Add("Range", "bytes=0-1");
+        var request = Request(context, "GET", "/api/content/file", headers);
+
+        var response = await function.GetPublicFile(
+            request,
+            ReleaseId,
+            PublicManifestId,
+            file.Hash,
+            file.Path,
+            context);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotModified);
+        (await response.ReadBodyAsStringAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Public_file_refuses_range_requests_explicitly()
+    {
+        var file = PublicFile();
+        var function = CreateFunction(
+            new FakeContentReleaseService(),
+            new FakePublicContentFileService(file));
+        var context = TestFunctionContext.Authenticated();
+        var headers = new HttpHeadersCollection();
+        headers.Add("Range", "bytes=0-1");
+        var request = Request(context, "GET", "/api/content/file", headers);
+
+        var response = await function.GetPublicFile(
+            request,
+            ReleaseId,
+            PublicManifestId,
+            file.Hash,
+            file.Path,
+            context);
+
+        response.StatusCode.Should().Be(HttpStatusCode.RequestedRangeNotSatisfiable);
+        response.Headers.GetValues("Content-Range").Should()
+            .Equal($"bytes */{file.Content.Length}");
+        response.Headers.GetValues("Accept-Ranges").Should().Equal("none");
+        (await response.ReadBodyAsStringAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Public_file_requires_an_authenticated_learner()
+    {
+        var file = PublicFile();
+        var function = CreateFunction(
+            new FakeContentReleaseService(),
+            new FakePublicContentFileService(file));
+        var context = new TestFunctionContext();
+        var request = Request(context, "GET", "/api/content/file");
+
+        var action = () => function.GetPublicFile(
+            request,
+            ReleaseId,
+            PublicManifestId,
+            file.Hash,
+            file.Path,
+            context);
+
+        await action.Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    private static ContentReleaseFunctions CreateFunction(
+        IContentReleaseService service,
+        IPublicContentFileService? publicFiles = null)
+        => new(
+            service,
+            publicFiles ?? new DisabledPublicContentFileService(),
+            new ContentAdminAuthorization("Content.Release.Admin", allowDevIdentity: false));
+
+    private static PublicContentFileResult PublicFile()
+    {
+        var bytes = Encoding.UTF8.GetBytes("""{"id":"question-1"}""");
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes))
+            .ToLowerInvariant();
+        return new PublicContentFileResult(
+            ReleaseId,
+            PublicManifestId,
+            "questions/question-1.json",
+            hash,
+            "application/json; charset=utf-8",
+            bytes);
+    }
 
     private static TestHttpRequestData Request(
         TestFunctionContext context,
@@ -176,6 +317,7 @@ public sealed class ContentReleaseFunctionsTests
                     ],
                     PublicManifestId,
                     PublicManifestId[7..]),
+                ReleaseId,
                 PublicManifestId));
 
         private static ContentReleaseReceipt Receipt(string releaseId)
@@ -206,5 +348,28 @@ public sealed class ContentReleaseFunctionsTests
             {
                 ETag = "\"pointer-etag\"",
             };
+    }
+
+    private sealed class DisabledPublicContentFileService : IPublicContentFileService
+    {
+        public Task<PublicContentFileResult> GetAsync(
+            string releaseId,
+            string publicManifestId,
+            string hash,
+            string path,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
+
+    private sealed class FakePublicContentFileService(PublicContentFileResult result)
+        : IPublicContentFileService
+    {
+        public Task<PublicContentFileResult> GetAsync(
+            string releaseId,
+            string publicManifestId,
+            string hash,
+            string path,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(result);
     }
 }
