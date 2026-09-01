@@ -10,13 +10,22 @@ on:
 permissions: {}
 
 concurrency:
-  group: ci-preflight-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: ci-preflight-${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.number > 0 && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.event_name, github.run_id) }}
+  cancel-in-progress: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.action == 'synchronize' && github.event.pull_request.number > 0 && github.event.pull_request.head.sha != '' }}
 
 jobs:
+  freshness:
+    uses: ./.github/workflows/pr-head-freshness.yml
+    with:
+      pull-request-number: ${{ github.event.pull_request.number }}
+      event-head-sha: ${{ github.event.pull_request.head.sha }}
+    permissions:
+      pull-requests: read
+
   preflight:
     name: Fast fail
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: freshness
+    if: ${{ always() && needs.freshness.outputs.current == 'true' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
@@ -142,6 +151,7 @@ jobs:
           set -euo pipefail
           node --test \
             "$TRUSTED_CONTROL_DIR/.github/scripts/ci-impact.test.mjs" \
+            "$TRUSTED_CONTROL_DIR/.github/scripts/workflow-concurrency-policy.test.mjs" \
             "$TRUSTED_CONTROL_DIR/.github/scripts/workflow-security-cache-policy.test.mjs"
           node "$TRUSTED_CONTROL_DIR/.github/scripts/validate-workflow-security.mjs" \
             --workspace "$UNTRUSTED_SOURCE_DIR"

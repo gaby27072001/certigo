@@ -63,6 +63,22 @@ explicitement le SHA de tête avant toute exécution. Une PR de fork n'est pas s
 échouer `Fork PR policy / Required gate`. Ce contexte requis empêche tout faux vert lié
 aux autres jobs non applicables, sans exécuter une seule instruction du fork.
 
+Chaque workflow PR possède un groupe de concurrence stable `workflow + numéro de PR`.
+Seul un événement `synchronize` portant un SHA de tête non vide peut demander
+l'annulation du run précédent de cette même PR. Les événements `push`, `schedule`,
+`workflow_dispatch`, `repository_dispatch` et `merge_group` utilisent un groupe unique
+par `run_id`; les workflows de gouvernance, déploiement et publication n'annulent jamais
+un run en cours. Le préfixe propre au workflow empêche aussi toute collision avec une
+autre PR ou avec les runs dynamiques Dependabot.
+
+Une réponse positive de l'API d'annulation GitHub **n'est pas un état terminal** : un run
+encore `queued` peut malgré tout être assigné à un runner après cette réponse. Aucun
+contrôleur de cycle de vie ne doit donc déduire une capacité libre de la seule acceptation
+de l'annulation. Le job réutilisable `pr-head-freshness.yml`, chargé depuis `main`, relit
+le SHA courant via l'API GitHub avant de rendre les jobs coûteux éligibles. Si le SHA de
+l'événement est obsolète ou absent, ces jobs restent non planifiables même en cas de
+course annulation/assignation.
+
 ## Actions d'infrastructure externes
 
 Ces opérations modifient Azure ou GitHub et ne peuvent pas être prouvées par un commit :

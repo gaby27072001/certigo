@@ -11,16 +11,26 @@ on:
     paths: [ "content/**", "tools/validate_content.mjs", ".github/workflows/ci-content.yml" ]
 
 concurrency:
-  group: ci-content-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ci-content-${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.number > 0 && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.event_name, github.run_id) }}
+  cancel-in-progress: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.action == 'synchronize' && github.event.pull_request.number > 0 && github.event.pull_request.head.sha != '' }}
 
 permissions:
   contents: read
 
 jobs:
+  freshness:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+    uses: ./.github/workflows/pr-head-freshness.yml
+    with:
+      pull-request-number: ${{ github.event.pull_request.number }}
+      event-head-sha: ${{ github.event.pull_request.head.sha }}
+    permissions:
+      pull-requests: read
+
   validate:
     name: Validate tracks & lessons
-    if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: freshness
+    if: ${{ always() && (github.event_name != 'pull_request_target' || (needs.freshness.outputs.current == 'true' && github.event.pull_request.head.repo.full_name == github.repository)) }}
     runs-on: [self-hosted, Linux, X64, certigo-pr]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
