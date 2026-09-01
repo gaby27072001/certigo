@@ -799,6 +799,20 @@ public sealed partial class ContentContractVerifier(
             EnsureLifecycleCompatible(track.Id, track.Lifecycle.Status, certification.Status);
         }
 
+        foreach (var unit in graph.Units.Values)
+        {
+            var owners = graph.Tracks.Values
+                .Where(track => track.UnitIds.Contains(unit.Id, StringComparer.Ordinal))
+                .Select(track => track.Id)
+                .ToArray();
+            if (owners.Length != 1)
+            {
+                throw Invalid(
+                    $"Canonical unit '{unit.Id}' must have exactly one owning track; "
+                    + $"owners=[{string.Join(",", owners)}].");
+            }
+        }
+
         EnsureExactReferenceClosure(
             graph.Tracks.Values.SelectMany(track => track.DomainIds),
             graph.Domains.Keys,
@@ -909,6 +923,16 @@ public sealed partial class ContentContractVerifier(
                         throw Invalid($"Lesson check '{block.Id}' references an incompatible question.");
                     }
                 }
+            }
+
+            var track = graph.Tracks.Values.Single(candidate =>
+                candidate.UnitIds.Contains(unit.Id, StringComparer.Ordinal));
+            if (string.Equals(track.Mode, "guided", StringComparison.Ordinal)
+                && IsDistributableStatus(track.Lifecycle.Status)
+                && lessonQuestionIds.Count == 0)
+            {
+                throw Invalid(
+                    $"Distributable guided lesson '{lesson.Id}' must contain at least one check.");
             }
         }
 

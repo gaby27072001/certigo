@@ -47,7 +47,7 @@ public sealed class RuntimeContentProjectorTests
     }
 
     [Fact]
-    public void Guided_content_only_lesson_has_an_empty_server_answer_key()
+    public void Guided_content_only_lesson_is_rejected()
     {
         var graph = BuildGraph(questionBank: false);
         var lesson = graph.Lessons.Values.Single();
@@ -74,10 +74,10 @@ public sealed class RuntimeContentProjectorTests
             },
         };
 
-        var projection = new RuntimeContentProjector().Project(graph);
+        var action = () => new RuntimeContentProjector().Project(graph);
 
-        projection.AnswerKeys.Should().ContainSingle();
-        projection.AnswerKeys[0].AnswerKey.Items.Should().BeEmpty();
+        action.Should().Throw<ContentProjectionException>()
+            .WithMessage($"*Guided lesson '{lesson.Id}' must contain at least one check*");
     }
 
     [Fact]

@@ -46,6 +46,12 @@ public sealed class CosmosContentReleaseStoreIntegrationTests(CosmosEmulatorFixt
             DateTimeOffset.UtcNow);
         await stalePromotion.Should().ThrowAsync<ContentReleasePreconditionException>();
 
+        var staleRollback = () => store.RollbackAsync(
+            firstPointer.ETag!,
+            "admin-1",
+            DateTimeOffset.UtcNow);
+        await staleRollback.Should().ThrowAsync<ContentReleasePreconditionException>();
+
         var rolledBack = await store.RollbackAsync(
             secondPointer.ETag!,
             "admin-1",

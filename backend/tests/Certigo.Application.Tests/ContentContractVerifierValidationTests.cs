@@ -10,6 +10,17 @@ namespace Certigo.Application.Tests;
 public sealed class ContentContractVerifierValidationTests
 {
     [Fact]
+    public void Invalid_public_manifest_id_is_rejected_before_repository_access()
+    {
+        var action = () => ContentReleaseContracts.RequireDigestId(
+            "sha256:not-a-digest",
+            "publicManifestId");
+
+        action.Should().Throw<ContentReleaseValidationException>()
+            .WithMessage("publicManifestId must be a lowercase sha256 content identity.");
+    }
+
+    [Fact]
     public void Invalid_catalog_is_a_deterministic_release_validation_failure()
     {
         using var catalog = JsonDocument.Parse("""{"schema":"unsupported"}""");
@@ -27,7 +38,7 @@ public sealed class ContentContractVerifierValidationTests
     }
 
     [Fact]
-    public void Guided_question_without_a_lesson_check_is_rejected()
+    public void Guided_lesson_without_a_check_is_rejected()
     {
         const string certificationId = "microsoft:az-900";
         const string trackId = "microsoft.az-900.track.main";
@@ -35,7 +46,6 @@ public sealed class ContentContractVerifierValidationTests
         const string unitId = "microsoft.az-900.unit.cloud";
         const string lessonId = "microsoft.az-900.lesson.cloud";
         const string conceptId = "microsoft.az-900.concept.cloud";
-        const string questionId = "microsoft.az-900.section-1.cloud.001";
         var lifecycle = new CanonicalContentLifecycle("active");
         var graph = new CanonicalContentGraph(
             new Dictionary<string, CanonicalCertification>(StringComparer.Ordinal)
@@ -115,30 +125,27 @@ public sealed class ContentContractVerifierValidationTests
                     "Cloud",
                     lifecycle),
             },
-            new Dictionary<string, CanonicalQuestion>(StringComparer.Ordinal)
-            {
-                [questionId] = new(
-                    questionId,
-                    null,
-                    certificationId,
-                    "2026-08-17",
-                    "section-1",
-                    domainId,
-                    conceptId,
-                    ItemType.Mcq,
-                    2,
-                    "Which model?",
-                    [new CheckOption("iaas", "IaaS"), new CheckOption("paas", "PaaS")]),
-            },
-            new Dictionary<string, CanonicalSolution>(StringComparer.Ordinal)
-            {
-                [questionId] = new(questionId, ["paas"], "PaaS is managed."),
-            });
+            new Dictionary<string, CanonicalQuestion>(StringComparer.Ordinal),
+            new Dictionary<string, CanonicalSolution>(StringComparer.Ordinal));
 
         var action = () => ContentContractVerifier.ValidateGraph(graph);
 
         action.Should().Throw<ContentReleaseValidationException>()
-            .WithMessage($"*Guided track '{trackId}' has orphan questions*{questionId}*");
+            .WithMessage($"*guided lesson '{lessonId}' must contain at least one check*");
+
+        var track = graph.Tracks.Values.Single();
+        graph = graph with
+        {
+            Tracks = new Dictionary<string, CanonicalTrackResource>(StringComparer.Ordinal)
+            {
+                [track.Id] = track,
+                [$"{track.Id}.duplicate"] = track with { Id = $"{track.Id}.duplicate" },
+            },
+        };
+        var sharedUnitAction = () => ContentContractVerifier.ValidateGraph(graph);
+
+        sharedUnitAction.Should().Throw<ContentReleaseValidationException>()
+            .WithMessage($"*unit '{unitId}' must have exactly one owning track*");
     }
 
     [Fact]

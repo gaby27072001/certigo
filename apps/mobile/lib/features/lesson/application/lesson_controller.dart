@@ -75,6 +75,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
         .map((LessonBlock block) => block.check)
         .toList();
     if (lesson.blocks.isEmpty ||
+        checks.isEmpty ||
         checks.any(
           (QuizItem? check) => check == null || !isAnswerableCheck(check),
         )) {

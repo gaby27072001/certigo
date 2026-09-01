@@ -91,6 +91,12 @@ public sealed class RuntimeContentProjector
                     }
                 }
 
+                if (answers.Count == 0)
+                {
+                    throw new ContentProjectionException(
+                        $"Guided lesson '{lesson.Id}' must contain at least one check.");
+                }
+
                 lessonIds.Add(runtimeLessonId);
                 projectedLessons.Add(new ProjectedLessonDocument(
                     lesson.Id,

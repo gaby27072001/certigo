@@ -56,6 +56,18 @@ public sealed class ContentReleaseFunctionsTests
     }
 
     [Fact]
+    public async Task Rollback_without_if_match_fails_closed()
+    {
+        var function = CreateFunction(new FakeContentReleaseService());
+        var context = TestFunctionContext.Authenticated(role: "Content.Release.Admin");
+        var request = Request(context, "POST", "/api/admin/content/releases/rollback");
+
+        var action = () => function.Rollback(request, context);
+
+        await action.Should().ThrowAsync<ContentReleasePreconditionRequiredException>();
+    }
+
+    [Fact]
     public async Task Active_manifest_serialization_contains_only_public_contract_fields()
     {
         var function = CreateFunction(new FakeContentReleaseService());

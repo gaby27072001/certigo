@@ -14,6 +14,21 @@ public static class ContentReleaseContracts
     public const string RuntimeScope = "runtime-content";
     public const string LegacySource = "legacy";
     public const string VersionedSource = "versioned";
+
+    public static void RequireDigestId(string value, string parameterName)
+    {
+        const string prefix = "sha256:";
+        if (value.Length == prefix.Length + 64
+            && value.StartsWith(prefix, StringComparison.Ordinal)
+            && value[prefix.Length..].All(character =>
+                character is >= '0' and <= '9' or >= 'a' and <= 'f'))
+        {
+            return;
+        }
+
+        throw new ContentReleaseValidationException(
+            $"{parameterName} must be a lowercase sha256 content identity.");
+    }
 }
 
 public enum ContentArtifact

@@ -299,7 +299,7 @@ void main() {
     );
 
     test(
-      'accepts valid instructional content without checks',
+      'rejects instructional content without checks until progression supports it',
       () async {
         final ProviderContainer noCheckContainer = ProviderContainer(
           overrides: <Override>[
@@ -319,10 +319,9 @@ void main() {
         final LessonSessionState state = noCheckContainer.read(
           lessonControllerProvider(args),
         );
-        expect(state.status, LessonStatus.ready);
+        expect(state.status, LessonStatus.error);
         expect(state.isDemo, isFalse);
-        expect(state.lesson?.id, args.lessonId);
-        expect(state.checksTotal, 0);
+        expect(state.lesson, isNull);
       },
     );
 

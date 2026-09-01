@@ -36,7 +36,10 @@ public sealed class ContentRepositoryRouter : IContentRepository
     public Task<ContentSnapshot> ResolveSnapshotAsync(
         string publicManifestId,
         CancellationToken cancellationToken = default)
-        => _versioned.ResolveSnapshotAsync(publicManifestId, cancellationToken);
+    {
+        ContentReleaseContracts.RequireDigestId(publicManifestId, "publicManifestId");
+        return _versioned.ResolveSnapshotAsync(publicManifestId, cancellationToken);
+    }
 
     public Task<CertificationCatalogDocument?> GetCertificationCatalogAsync(
         ContentSnapshot snapshot,

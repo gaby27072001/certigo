@@ -91,14 +91,27 @@ si un pointeur existe.
 
 ```bash
 curl --fail-with-body \
+  -D rollback-pointer.headers \
+  -H "Authorization: ******" \
+  "$API/admin/content/releases/pointer" \
+  -o rollback-pointer.json
+
+ROLLBACK_ETAG="$(
+  awk 'BEGIN{IGNORECASE=1} /^etag:/ {gsub(/\r/,""); print $2}' \
+    rollback-pointer.headers
+)"
+
+curl --fail-with-body \
   -X POST \
   -H "Authorization: Bearer $TOKEN" \
-  -H "If-Match: $ETAG" \
+  -H "If-Match: $ROLLBACK_ETAG" \
   "$API/admin/content/releases/rollback"
 ```
 
 Le rollback active `previous`, vide les champs previous et conserve tous les
-artefacts. Un second rollback sans nouvelle promotion retourne 409.
+artefacts. L'ETag doit être relu immédiatement avant l'opération : toute
+promotion ou rollback concurrent rend le CAS obsolète et retourne 412, sans
+écraser le pointeur. Un second rollback sans nouvelle promotion retourne 409.
 
 ## Rollback applicatif
 
@@ -135,18 +148,25 @@ backend.
 4. Copier les six outputs #290 dans l'Environment GitHub staging. Laisser
    `CONTENT_REPOSITORY_MODE` absent: la Function attache uniquement l'UAMI reader
    externe et reste en `legacy`.
-5. Publier au plus deux releases candidates, 10 GiB cumulés versions incluses.
+5. Redéployer la même révision backend en staging afin de matérialiser l'endpoint
+   et l'UAMI reader externes, tout en conservant `CONTENT_REPOSITORY_MODE=legacy`.
+   Vérifier les app settings effectifs avant tout import.
+6. Publier au plus deux releases candidates, 10 GiB cumulés versions incluses.
    Vérifier un `versionId` et une policy non expirée sur chaque blob.
-6. Importer la première release, vérifier le receipt complet et le replay
+7. Importer la première release, vérifier le receipt complet et le replay
    idempotent, puis promouvoir avec l'ETag courant.
-7. Définir `CONTENT_REPOSITORY_MODE=versioned` dans staging seulement, déployer
+8. Avant toute bascule, prouver que les versions mobiles encore admises en
+   staging envoient `publicManifestId` pour quiz et tuteur. Drainer les actions
+   offline créées avant cette version, ou les invalider explicitement avec une
+   information utilisateur; une requête sans pin doit rester rejetée fail-closed.
+9. Définir `CONTENT_REPOSITORY_MODE=versioned` dans staging seulement, déployer
    la même révision backend et vérifier manifeste/ETag, catalog, lesson, quiz,
    exam, tutor et absence de données privées.
-8. Publier et promouvoir la seconde release, puis prouver le rollback N-1 avec
+10. Publier et promouvoir la seconde release, puis prouver le rollback N-1 avec
    `If-Match`; un second rollback doit retourner 409 et aucun artefact ne doit
    être supprimé ou réécrit.
-9. En cas d'échec, remettre staging en `legacy`; ne modifier ni prod ni les
+11. En cas d'échec, remettre staging en `legacy`; ne modifier ni prod ni les
    policies. Examiner coûts et preuves avant toute suite.
-10. Ne verrouiller aucune policy pendant le pilote. Un futur lock WORM,
+12. Ne verrouiller aucune policy pendant le pilote. Un futur lock WORM,
     irréversible, exige une décision OPS/compliance et une procédure séparée;
     aucune commande de lock ne doit entrer dans un workflow.
