@@ -29,7 +29,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-09-01** |
-| Commit de référence analysé | `ba2edb072c95f063cfb0075759a116b26a1b5531` |
+| Commit de référence analysé | `2851624334bb7401902529fd98a8c8e4ca4cf997` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
