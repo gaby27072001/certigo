@@ -168,10 +168,10 @@ generator_fixture="$(mktemp -d)"
 trap 'rm -rf "${contract_fixture}" "${generator_fixture}"' EXIT
 cp \
   "${image_dir}/toolchain-manifest.json" \
-  "${image_dir}/toolchain-sbom.cdx.json" \
+  "${image_dir}/toolchain-sbom.cyclonedx.document" \
   "${image_dir}/toolchain-requirements.lock" \
   "${contract_fixture}/"
-printf ' ' >>"${contract_fixture}/toolchain-sbom.cdx.json"
+printf ' ' >>"${contract_fixture}/toolchain-sbom.cyclonedx.document"
 if CERTIGO_IMAGE_ROOT="${contract_fixture}" \
   bash "${image_dir}/validate-toolchain.sh" --contract >/dev/null 2>&1; then
   echo "Toolchain contract must fail closed when the SBOM hash changes." >&2

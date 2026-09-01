@@ -180,7 +180,7 @@
     "prewarmedProjectDependencies": []
   },
   "artifacts": {
-    "cycloneDxSbom": "toolchain-sbom.cdx.json",
+    "cycloneDxSbom": "toolchain-sbom.cyclonedx.document",
     "pythonLock": "toolchain-requirements.lock",
     "pythonLockSha256": "fd95e916913fa05320ec5f7ff5e3fb07345afe5802294b4eec6bd1ccece79062",
     "sbomSha256": "50c91591ad53910997eba00003a8840594f3c9c1238821adc56df8d278026838"

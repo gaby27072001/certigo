@@ -122,8 +122,12 @@ jobs:
             "$OSV_BINARY" \
             "$EXPECTED_LOCKS_FILE" \
             "$UNTRUSTED_SOURCE_DIR" \
-            "$output_temp" \
-            "$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml" > "$OSV_SCAN_LOG" 2>&1
+            --format=json \
+            --no-ignore \
+            --forbid-argument=--all-packages \
+            --forbid-argument=--recursive \
+            --config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml" \
+            --output-file "$output_temp" > "$OSV_SCAN_LOG" 2>&1
           scan_status=$?
           set -e
           if [ -e "$output_temp" ]; then

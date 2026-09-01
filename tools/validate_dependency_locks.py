@@ -33,6 +33,20 @@ class DependencyLockError(RuntimeError):
     """Raised when tracked dependency manifests and locks diverge."""
 
 
+LEGACY_EMPTY_VERSION_FIELD = "allowedEmptyNugetPackages"
+
+
+def _reject_legacy_expected_sources(path: Path) -> None:
+    if not path.exists():
+        return
+    value = _load_json(path, PurePosixPath(path.name))
+    if LEGACY_EMPTY_VERSION_FIELD in value:
+        raise DependencyLockError(
+            f"{path}: {LEGACY_EMPTY_VERSION_FIELD} is forbidden; "
+            "every scanned package must have a non-empty version."
+        )
+
+
 def _tracked_paths(root: Path) -> tuple[PurePosixPath, ...]:
     try:
         result = subprocess.run(
@@ -149,6 +163,8 @@ def validate_repository(
     root: Path,
     expected_sources_file: Path | None = None,
 ) -> tuple[int, int, int]:
+    if expected_sources_file is not None:
+        _reject_legacy_expected_sources(expected_sources_file)
     canonical_root = root.resolve(strict=True)
     tracked = tuple(path for path in _tracked_paths(canonical_root) if _included(path))
     npm_manifests = {path for path in tracked if path.name == "package.json"}

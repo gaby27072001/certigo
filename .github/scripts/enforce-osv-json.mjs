@@ -11,6 +11,9 @@ function requiredString(value, source) {
   return value;
 }
 
+const legacyEmptyVersionField = 'allowedEmptyNugetPackages';
+const legacyEmptyVersionPolicy = 'may be empty only for a validated NuGet project reference';
+
 export function evaluateOsvJson(file, options = {}) {
   let descriptor;
   let report;
@@ -44,6 +47,16 @@ export function evaluateOsvJson(file, options = {}) {
   const expectedSources = new Set();
   if (options.expectedSources !== undefined) {
     sourceContract = options.expectedSources;
+    if (
+      typeof sourceContract === 'object'
+      && sourceContract !== null
+      && Object.hasOwn(sourceContract, legacyEmptyVersionField)
+    ) {
+      throw new Error(
+        `${legacyEmptyVersionField} is forbidden: the legacy rule that a package version `
+        + `${legacyEmptyVersionPolicy} has been removed; every reported package must have a version.`,
+      );
+    }
     if (
       typeof sourceContract !== 'object'
       || sourceContract === null
@@ -98,7 +111,8 @@ export function evaluateOsvJson(file, options = {}) {
       const normalizedSource = relative.split(path.sep).join('/');
       if (sourceContract !== undefined && !expectedSources.has(normalizedSource)) {
         throw new Error(
-          `${source}.source.path was not present in the validated lockfile contract.`,
+          `${source}.source.path was not present in the validated lockfile contract; `
+          + 'result-source mismatches can indicate omitted expected tracked lockfiles.',
         );
       }
       scannedSources.add(normalizedSource);

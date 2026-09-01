@@ -7,6 +7,7 @@ import test from 'node:test';
 import {
   assertOsvScannedEveryLockfile,
   buildOsvScanArguments,
+  parseOsvPolicyArguments,
 } from './run-osv-scan.mjs';
 
 function harness() {
@@ -85,6 +86,34 @@ test('fails closed unless OSV confirms every explicit lockfile was scanned', () 
       'Scanned /workspace/package-lock.json file and found 10 packages\n',
       args,
     ),
-    /did not confirm scanning lockfiles: \/workspace\/pubspec\.lock/u,
+    /omitted expected tracked lockfiles.*\/workspace\/pubspec\.lock/u,
+  );
+});
+
+test('requires active scan policy and forbids recursive all-package discovery', () => {
+  const policy = parseOsvPolicyArguments([
+    '--format=json',
+    '--no-ignore',
+    '--forbid-argument=--all-packages',
+    '--forbid-argument=--recursive',
+    '--config=/workspace/osv-scanner.toml',
+    '--output-file',
+    '/workspace/results.json',
+  ]);
+  assert.equal(policy.format, 'json');
+  assert.equal(policy.noIgnore, true);
+  assert.deepEqual(
+    [...policy.forbiddenArguments].sort(),
+    ['--all-packages', '--recursive'],
+  );
+  assert.throws(
+    () => parseOsvPolicyArguments([
+      '--format=json',
+      '--no-ignore',
+      '--config=/workspace/osv-scanner.toml',
+      '--output-file',
+      '/workspace/results.json',
+    ]),
+    /must forbid --all-packages/u,
   );
 });

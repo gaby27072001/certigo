@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
+import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
 
 const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -492,6 +493,7 @@ function validateRepositoryInvariants() {
     path.join(workflowsDir, 'dependency-vuln-scan.yml'),
     'utf8',
   );
+  errors.push(...validateOsvWorkflowPolicy(dependencyScan));
   const iacScan = fs.readFileSync(path.join(workflowsDir, 'security-scan.yml'), 'utf8');
   const branchProtection = JSON.parse(
     fs.readFileSync(path.join(root, '.github', 'branch-protection-main.json'), 'utf8'),

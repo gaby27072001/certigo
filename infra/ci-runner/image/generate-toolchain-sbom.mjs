@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
 const imageRoot = new URL('./', import.meta.url);
-const sbomPath = new URL('toolchain-sbom.cdx.json', imageRoot);
+const sbomPath = new URL('toolchain-sbom.cyclonedx.document', imageRoot);
 const lock = await readFile(
   new URL('toolchain-requirements.lock', imageRoot),
   'utf8',
@@ -50,7 +50,7 @@ const generated = `${JSON.stringify(
 if (process.argv[2] === '--check') {
   const existing = await readFile(sbomPath, 'utf8');
   if (existing !== generated) {
-    throw new Error('toolchain-sbom.cdx.json is stale; regenerate it.');
+    throw new Error('toolchain-sbom.cyclonedx.document is stale; regenerate it.');
   }
 } else if (process.argv.length === 2) {
   await writeFile(sbomPath, generated, 'utf8');

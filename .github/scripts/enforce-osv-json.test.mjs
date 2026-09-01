@@ -194,6 +194,19 @@ test('accepts no findings when explicit lockfile invocation returns no results',
   );
 });
 
+test('rejects the removed empty-version exception contract', () => {
+  assert.throws(
+    () => evaluateOsvJson(path.join(fixtureRoot, 'osv-clean.json'), {
+      expectedSources: {
+        sources: ['package-lock.json'],
+        pubManifests: [],
+        allowedEmptyNugetPackages: ['ProjectReference'],
+      },
+    }),
+    /allowedEmptyNugetPackages is forbidden/u,
+  );
+});
+
 test('CLI exit codes distinguish clean, vulnerable, and invalid reports', () => {
   const script = path.join(path.dirname(fileURLToPath(import.meta.url)), 'enforce-osv-json.mjs');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-osv-cli-'));

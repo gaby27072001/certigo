@@ -68,6 +68,46 @@ export function buildOsvScanArguments(contract, sourceRoot, outputFile, configFi
   ];
 }
 
+export function parseOsvPolicyArguments(args) {
+  const policy = {
+    format: undefined,
+    noIgnore: false,
+    forbiddenArguments: new Set(),
+    configFile: undefined,
+    outputFile: undefined,
+  };
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (argument === '--format=json') {
+      policy.format = 'json';
+    } else if (argument === '--no-ignore') {
+      policy.noIgnore = true;
+    } else if (argument.startsWith('--forbid-argument=')) {
+      policy.forbiddenArguments.add(argument.slice('--forbid-argument='.length));
+    } else if (argument.startsWith('--config=')) {
+      policy.configFile = argument.slice('--config='.length);
+    } else if (argument === '--output-file') {
+      index += 1;
+      policy.outputFile = args[index];
+    } else if (argument.startsWith('--output-file=')) {
+      policy.outputFile = argument.slice('--output-file='.length);
+    } else {
+      throw new Error(`Unsupported OSV policy argument: ${argument}.`);
+    }
+  }
+  if (policy.format !== 'json' || !policy.noIgnore) {
+    throw new Error('OSV policy must require JSON output and --no-ignore.');
+  }
+  for (const forbidden of ['--all-packages', '--recursive']) {
+    if (!policy.forbiddenArguments.has(forbidden)) {
+      throw new Error(`OSV policy must forbid ${forbidden}.`);
+    }
+  }
+  requiredString(policy.configFile, '--config');
+  requiredString(policy.outputFile, '--output-file');
+  return policy;
+}
+
 export function assertOsvScannedEveryLockfile(output, args) {
   const missing = args
     .filter((argument) => argument.startsWith('--lockfile='))
@@ -75,7 +115,9 @@ export function assertOsvScannedEveryLockfile(output, args) {
     .filter((source) => !output.includes(`Scanned ${source} file and found`));
   if (missing.length > 0) {
     throw new Error(
-      `OSV-Scanner did not confirm scanning lockfiles: ${missing.join(', ')}.`,
+      'OSV-Scanner did not confirm scanning lockfiles and omitted expected tracked lockfiles '
+      + 'from its scan confirmations: '
+      + `${missing.join(', ')}.`,
     );
   }
 }
@@ -84,20 +126,26 @@ function main() {
   const scanner = process.argv[2];
   const contractFile = process.argv[3];
   const sourceRoot = process.argv[4];
-  const outputFile = process.argv[5];
-  const configFile = process.argv[6];
-  if (!scanner || !contractFile || !sourceRoot || !outputFile || !configFile) {
+  if (!scanner || !contractFile || !sourceRoot) {
     console.error(
       'Usage: run-osv-scan.mjs <scanner> <expected-sources-json> '
-      + '<source-root> <output-file> <config-file>',
+      + '<source-root> --format=json --no-ignore '
+      + '--forbid-argument=--all-packages --forbid-argument=--recursive '
+      + '--config=<config-file> --output-file=<output-file>',
     );
     process.exitCode = 2;
     return;
   }
 
   try {
+    const policy = parseOsvPolicyArguments(process.argv.slice(5));
     const contract = JSON.parse(fs.readFileSync(contractFile, 'utf8'));
-    const args = buildOsvScanArguments(contract, sourceRoot, outputFile, configFile);
+    const args = buildOsvScanArguments(
+      contract,
+      sourceRoot,
+      policy.outputFile,
+      policy.configFile,
+    );
     const result = spawnSync(scanner, args, {
       encoding: 'utf8',
       maxBuffer: 16 * 1024 * 1024,
