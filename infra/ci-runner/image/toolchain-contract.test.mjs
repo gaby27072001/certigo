@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
 const imageRoot = new URL('./', import.meta.url);
@@ -8,7 +8,7 @@ const manifest = JSON.parse(
   await readFile(new URL('toolchain-manifest.json', imageRoot), 'utf8'),
 );
 const sbom = JSON.parse(
-  await readFile(new URL('toolchain-sbom.cdx.json', imageRoot), 'utf8'),
+  await readFile(new URL('toolchain-sbom.cyclonedx.document', imageRoot), 'utf8'),
 );
 const prewarm = await readFile(new URL('prewarm-toolchain.sh', imageRoot), 'utf8');
 const validator = await readFile(new URL('validate-toolchain.sh', imageRoot), 'utf8');
@@ -53,6 +53,7 @@ test('manifest pins every downloaded artifact and forbids project caches', () =>
 });
 
 test('CycloneDX SBOM covers every manifest component version', () => {
+  assert.equal(manifest.artifacts.cycloneDxSbom, 'toolchain-sbom.cyclonedx.document');
   assert.equal(sbom.bomFormat, 'CycloneDX');
   assert.equal(sbom.specVersion, '1.6');
   const versions = new Set(
@@ -82,6 +83,18 @@ test('CycloneDX SBOM covers every manifest component version', () => {
     (dependency) => dependency.ref === `pkg:pypi/checkov@3.2.495`,
   );
   assert.equal(checkovDependency.dependsOn.length, lockedPackages.size - 1);
+});
+
+test('repository SBOM name is explicit but not auto-detected by legacy recursive scanners', async () => {
+  await assert.rejects(
+    access(new URL('toolchain-sbom.cdx.json', imageRoot)),
+    { code: 'ENOENT' },
+  );
+  assert.doesNotMatch(
+    manifest.artifacts.cycloneDxSbom,
+    /(?:^|[.])(?:cdx|spdx)[.]json$/u,
+  );
+  assert.match(manifest.artifacts.cycloneDxSbom, /cyclonedx[.]document$/u);
 });
 
 test('prewarm verifies downloads and never resolves project dependencies', () => {

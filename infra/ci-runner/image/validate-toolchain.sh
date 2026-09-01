@@ -7,7 +7,7 @@ case "${mode}" in
   --boot | --job)
     image_root="${CERTIGO_IMAGE_ROOT:-/opt/certigo/runner-image}"
     manifest="${image_root}/toolchain-manifest.json"
-    sbom="${image_root}/toolchain-sbom.cdx.json"
+    sbom="${image_root}/toolchain-sbom.cyclonedx.document"
     python_lock="${image_root}/toolchain-requirements.lock"
     toolchain_inventory="${image_root}/toolchain-inventory.tsv"
     attestation="${image_root}/attestation.json"
@@ -15,7 +15,7 @@ case "${mode}" in
   --contract)
     image_root="${CERTIGO_IMAGE_ROOT:-${script_dir}}"
     manifest="${image_root}/toolchain-manifest.json"
-    sbom="${image_root}/toolchain-sbom.cdx.json"
+    sbom="${image_root}/toolchain-sbom.cyclonedx.document"
     python_lock="${image_root}/toolchain-requirements.lock"
     attestation=""
     ;;

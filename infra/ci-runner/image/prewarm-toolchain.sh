@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 manifest="${CERTIGO_TOOLCHAIN_MANIFEST:-${script_dir}/toolchain-manifest.json}"
-sbom="${script_dir}/toolchain-sbom.cdx.json"
+sbom="${script_dir}/toolchain-sbom.cyclonedx.document"
 python_lock="${script_dir}/toolchain-requirements.lock"
 image_root="${CERTIGO_IMAGE_ROOT:-/opt/certigo/runner-image}"
 toolchain_root="${CERTIGO_TOOLCHAIN_ROOT:-/opt/certigo/toolchains}"
@@ -206,7 +206,7 @@ ln -sfn "${toolchain_root}/python-${python_version}/bin/checkov" /usr/local/bin/
 ln -sfn "${toolchain_root}/python-${python_version}/bin/python" /usr/local/bin/python3
 
 install -m 0644 "${manifest}" "${image_root}/toolchain-manifest.json"
-install -m 0644 "${sbom}" "${image_root}/toolchain-sbom.cdx.json"
+install -m 0644 "${sbom}" "${image_root}/toolchain-sbom.cyclonedx.document"
 install -m 0644 "${python_lock}" "${image_root}/toolchain-requirements.lock"
 install -m 0755 "${script_dir}/validate-toolchain.sh" \
   /usr/local/sbin/certigo-validate-toolchain
@@ -232,7 +232,7 @@ chmod 0755 "${RUNNER_HOME:-/opt/actions-runner}"
 /usr/local/sbin/certigo-inventory-toolchain \
   "${image_root}/toolchain-inventory.tsv"
 manifest_sha="$(sha256sum "${image_root}/toolchain-manifest.json" | awk '{print $1}')"
-sbom_sha="$(sha256sum "${image_root}/toolchain-sbom.cdx.json" | awk '{print $1}')"
+sbom_sha="$(sha256sum "${image_root}/toolchain-sbom.cyclonedx.document" | awk '{print $1}')"
 lock_sha="$(sha256sum "${image_root}/toolchain-requirements.lock" | awk '{print $1}')"
 toolchain_inventory_sha="$(
   sha256sum "${image_root}/toolchain-inventory.tsv" | awk '{print $1}'

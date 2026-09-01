@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
+import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
 
 const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -425,6 +426,10 @@ function validateRepositoryInvariants() {
     path.join(root, '.github', 'scripts', 'enforce-osv-json.mjs'),
     'utf8',
   );
+  const osvRunner = fs.readFileSync(
+    path.join(root, '.github', 'scripts', 'run-osv-scan.mjs'),
+    'utf8',
+  );
   const nugetLockValidator = fs.readFileSync(
     path.join(root, 'tools', 'validate_nuget_locks.py'),
     'utf8',
@@ -488,6 +493,7 @@ function validateRepositoryInvariants() {
     path.join(workflowsDir, 'dependency-vuln-scan.yml'),
     'utf8',
   );
+  errors.push(...validateOsvWorkflowPolicy(dependencyScan));
   const iacScan = fs.readFileSync(path.join(workflowsDir, 'security-scan.yml'), 'utf8');
   const branchProtection = JSON.parse(
     fs.readFileSync(path.join(root, '.github', 'branch-protection-main.json'), 'utf8'),
@@ -1162,9 +1168,7 @@ function validateRepositoryInvariants() {
   }
   for (const marker of [
     'OSV-Scanner output is missing or malformed.',
-    '--format=json',
-    '--no-ignore',
-    '--all-packages',
+    'node "$TRUSTED_CONTROL_DIR/.github/scripts/run-osv-scan.mjs"',
     'python -P "$TRUSTED_CONTROL_DIR/tools/validate_dependency_locks.py"',
     '--root "$UNTRUSTED_SOURCE_DIR"',
     '--write-expected-sources "$EXPECTED_LOCKS_FILE"',
@@ -1181,8 +1185,6 @@ function validateRepositoryInvariants() {
     'FLUTTER_EXECUTABLE="$FLUTTER_INSTALL_DIR/flutter/bin/flutter"',
     'name: Verify trusted controls remain immutable',
     'git -C "$TRUSTED_CONTROL_DIR" status --porcelain --untracked-files=all',
-    '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
-    '--output-file "$output_temp"',
     'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
     '"$EXPECTED_LOCKS_FILE"',
     '"$UNTRUSTED_SOURCE_DIR" 2> "$OSV_ENFORCE_LOG"',
@@ -1196,14 +1198,30 @@ function validateRepositoryInvariants() {
     }
   }
   for (const marker of [
+    "'--format=json'",
+    "'--no-ignore'",
+    '`--config=${path.resolve(configFile)}`',
+    "'--output-file'",
+    '`--lockfile=${canonicalSource}`',
+    'Expected OSV source contract must contain at least one lockfile.',
+    'Expected OSV source contract contains duplicate lockfiles.',
+    'must reference a regular lockfile.',
+    'spawnSync(scanner, args',
+    'assertOsvScannedEveryLockfile',
+    'OSV-Scanner did not confirm scanning lockfiles',
+  ]) {
+    if (!osvRunner.includes(marker)) {
+      errors.push(`run-osv-scan.mjs: missing explicit lockfile invariant ${marker}`);
+    }
+  }
+  for (const marker of [
     'OSV-Scanner JSON must contain a results array.',
     'packageResult.vulnerabilities',
     'packageResult.groups',
     'references unknown vulnerability',
-    'omitted expected tracked lockfiles',
+    'was not present in the validated lockfile contract',
     'pubManifests',
-    'allowedEmptyNugetPackages',
-    'may be empty only for a validated',
+    'package.version',
     'vulnerabilityCount',
   ]) {
     if (!osvEnforcer.includes(marker)) {
@@ -1242,7 +1260,6 @@ function validateRepositoryInvariants() {
     'core.hooksPath=/dev/null',
     'validate_nuget_locks.py',
     'pubManifests',
-    'allowedEmptyNugetPackages',
   ]) {
     if (!dependencyLockValidator.includes(marker)) {
       errors.push(`validate_dependency_locks.py: missing fail-closed invariant ${marker}`);

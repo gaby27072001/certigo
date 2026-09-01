@@ -12,7 +12,7 @@ inventaires live et les IDs hors scope ne referencent pas cette image dans PR1.
 ## Contenu
 
 - `toolchain-manifest.json` est la source de verite des versions et empreintes;
-- `toolchain-sbom.cdx.json` est le SBOM CycloneDX 1.6 de l'image, y compris
+- `toolchain-sbom.cyclonedx.document` est le SBOM CycloneDX 1.6 de l'image, y compris
   chaque paquet transitif de l'environnement Python;
 - `toolchain-requirements.lock` verrouille avec hashes tout l'environnement
   Checkov/PyYAML Python 3.12;

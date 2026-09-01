@@ -792,9 +792,7 @@ class ProjectStateTests(unittest.TestCase):
         expected_markers = {
             "dependency-vuln-scan.yml": [
                 "OSV-Scanner output is missing or malformed.",
-                "--format=json",
-                "--no-ignore",
-                "--all-packages",
+                'node "$TRUSTED_CONTROL_DIR/.github/scripts/run-osv-scan.mjs"',
                 'python -P "$TRUSTED_CONTROL_DIR/tools/validate_dependency_locks.py"',
                 '--root "$UNTRUSTED_SOURCE_DIR"',
                 '--write-expected-sources "$EXPECTED_LOCKS_FILE"',
@@ -808,8 +806,6 @@ class ProjectStateTests(unittest.TestCase):
                 '--pub-cache "$PUB_CACHE"',
                 'FLUTTER_EXECUTABLE="$FLUTTER_INSTALL_DIR/flutter/bin/flutter"',
                 "name: Verify trusted controls remain immutable",
-                '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
-                '--output-file "$output_temp"',
                 'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
                 '"$EXPECTED_LOCKS_FILE"',
                 '"$UNTRUSTED_SOURCE_DIR" 2> "$OSV_ENFORCE_LOG"',
