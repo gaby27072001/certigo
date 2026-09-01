@@ -12,11 +12,27 @@ jobs:
     runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
+      pull-requests: read
     env:
       UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
       TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
       CHECKOV_SCAN_LOG: ${{ github.workspace }}/.scanner-state/checkov-results.log
     steps:
+      - name: Recheck current PR head after assignment
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const eventHead = context.payload.pull_request.head.sha;
+            if (!eventHead || pull.head.sha !== eventHead) {
+              core.setFailed(`Superseded PR event ${eventHead || '<missing>'}; current head is ${pull.head.sha}.`);
+            }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}

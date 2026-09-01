@@ -159,6 +159,8 @@ function validateWorkflow(file) {
   const fileName = path.basename(file);
   const hasTrustedJob = text.includes('certigo-trusted');
   const hasCosmosJob = text.includes('certigo-cosmos-emulator');
+  const hasPrTrigger =
+    /^ {2}pull_request(?:_target)?:\s*$/m.test(text);
 
   if (!lines.some((line) => /^permissions:\s*(?:\{\})?\s*$/.test(line))) {
     errors.push(`${file}: missing explicit top-level permissions`);
@@ -287,6 +289,49 @@ function validateWorkflow(file) {
           `${file}: certigo-pr job ${job.id} must not receive secrets, environments, or cloud identity`,
         );
       }
+    }
+    const prHeadCheckoutIndexes = [
+      "ref: ${{ github.event.pull_request.head.sha }}",
+      "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
+    ]
+      .map((marker) => job.text.indexOf(marker))
+      .filter((index) => index >= 0);
+    const prHeadCheckout = prHeadCheckoutIndexes.length > 0
+      ? Math.min(...prHeadCheckoutIndexes)
+      : -1;
+    const assignedHeadRecheck = job.text.indexOf(
+      'name: Recheck current PR head after assignment',
+    );
+    const initialHeadCheck = job.text.indexOf(
+      'name: Enforce initial PR freshness validation',
+    );
+    if (
+      hasPrTrigger
+      && assignedHeadRecheck >= 0
+      && (
+        initialHeadCheck < 0
+        || initialHeadCheck > assignedHeadRecheck
+        || !job.text.includes('needs.freshness.result')
+      )
+    ) {
+      errors.push(
+        `${file}: PR job ${job.id} must fail closed when initial freshness validation fails`,
+      );
+    }
+    if (
+      prHeadCheckout >= 0
+      && (
+        assignedHeadRecheck < 0
+        || assignedHeadRecheck > prHeadCheckout
+        || !job.text.includes(
+          'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0',
+        )
+        || !job.text.includes('pull-requests: read')
+      )
+    ) {
+      errors.push(
+        `${file}: PR-consuming job ${job.id} must recheck the current head after assignment`,
+      );
     }
     if (
       job.text.includes('certigo-trusted')
@@ -1077,18 +1122,20 @@ function validateRepositoryInvariants() {
     '--validate-active-content',
     'CERTIGO_CONTENT_',
     'actions/create-github-app-token',
-    'token: ${{',
   ]) {
     if (projectState.includes(forbiddenMarker)) {
       errors.push(`ci-project-state.yml: forbidden App/PAT fallback ${forbiddenMarker}`);
     }
+  }
+  if (!projectState.includes('github-token: ${{ github.token }}')) {
+    errors.push('ci-project-state.yml: current-head validation must use github.token');
   }
   for (const marker of [
     'name: Security / Required gate',
     'needs: [freshness, changes, osv, checkov]',
     'uses: ./.github/workflows/dependency-vuln-scan.yml',
     'uses: ./.github/workflows/security-scan.yml',
-    "needs.freshness.outputs.current == 'true'",
+    "needs.freshness.outputs.current != 'false'",
   ]) {
     if (!securityGate.includes(marker)) {
       errors.push(`security-gate.yml: missing required invariant ${marker}`);

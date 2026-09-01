@@ -3,10 +3,10 @@ import path from 'node:path';
 const pullRequestEvents = new Set(['pull_request', 'pull_request_target']);
 
 export const pullRequestGroupExpression =
-  "${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.number > 0 && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.event_name, github.run_id) }}";
+  "${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && (github.event.action == 'opened' || github.event.action == 'synchronize') && github.run_attempt == 1 && github.event.pull_request.number > 0 && github.event.pull_request.head.sha != '' && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}-{2}', github.event_name, github.run_id, github.run_attempt) }}";
 
 export const pullRequestCancellationExpression =
-  "${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.action == 'synchronize' && github.event.pull_request.number > 0 && github.event.pull_request.head.sha != '' }}";
+  "${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.action == 'synchronize' && github.run_attempt == 1 && github.event.pull_request.number > 0 && github.event.pull_request.head.sha != '' }}";
 
 function workflowKey(file) {
   return path.basename(file).replace(/\.ya?ml$/u, '');
@@ -17,17 +17,28 @@ function concurrencyBlock(text) {
 }
 
 export function resolveWorkflowConcurrency(workflow, event) {
-  const isPullRequest =
-    pullRequestEvents.has(event.name) && Number.isInteger(event.pullRequestNumber)
-    && event.pullRequestNumber > 0;
-  const suffix = isPullRequest
+  const isPullRequest = pullRequestEvents.has(event.name);
+  const runAttempt = event.runAttempt ?? 1;
+  const joinsSupersessionGroup =
+    isPullRequest
+    && (event.action === 'opened' || event.action === 'synchronize')
+    && runAttempt === 1
+    && Number.isInteger(event.pullRequestNumber)
+    && event.pullRequestNumber > 0
+    && Boolean(event.headSha);
+  const suffix = joinsSupersessionGroup
     ? `pr-${event.pullRequestNumber}`
-    : `${event.name || 'missing'}-${event.runId || 'missing'}`;
+    : `${event.name || 'missing'}-${event.runId || 'missing'}-${runAttempt}`;
 
   return {
     group: `${workflow}-${suffix}`,
     cancelInProgress:
-      isPullRequest && event.action === 'synchronize' && Boolean(event.headSha),
+      isPullRequest
+      && event.action === 'synchronize'
+      && Number.isInteger(event.pullRequestNumber)
+      && event.pullRequestNumber > 0
+      && runAttempt === 1
+      && Boolean(event.headSha),
   };
 }
 
@@ -59,7 +70,10 @@ export function validateWorkflowConcurrency(text, file) {
       'freshness:',
       'uses: ./.github/workflows/pr-head-freshness.yml',
       'needs: freshness',
-      "needs.freshness.outputs.current == 'true'",
+      "needs.freshness.outputs.current != 'false'",
+      'name: Enforce initial PR freshness validation',
+      'needs.freshness.result',
+      'name: Recheck current PR head after assignment',
     ]) {
       if (!text.includes(marker)) {
         errors.push(`${file}: superseded PR orchestration guard is missing ${marker}`);

@@ -616,7 +616,7 @@ class ProjectStateTests(unittest.TestCase):
         self.assertIn("validate-source:", workflow)
         self.assertIn("needs: [freshness, validate-source]", workflow)
         self.assertIn("uses: ./.github/workflows/pr-head-freshness.yml", workflow)
-        self.assertIn("needs.freshness.outputs.current == 'true'", workflow)
+        self.assertIn("needs.freshness.outputs.current != 'false'", workflow)
         source_job = workflow[
             workflow.index("  validate-source:") : workflow.index(
                 "  validate:\n", workflow.index("  validate-source:")
@@ -635,7 +635,7 @@ class ProjectStateTests(unittest.TestCase):
         self.assertNotIn("ssh-known-hosts:", workflow)
         self.assertNotIn("CERTIGO_CONTENT_", workflow)
         self.assertNotIn("create-github-app-token", workflow)
-        self.assertNotIn("token: ${{", workflow)
+        self.assertEqual(workflow.count("github-token: ${{ github.token }}"), 1)
         self.assertNotIn("actions/setup-node@", workflow)
         self.assertNotIn("npm ci", workflow)
         self.assertNotIn("npm run", workflow)
@@ -852,7 +852,7 @@ class ProjectStateTests(unittest.TestCase):
         self.assertIn(
             "uses: ./.github/workflows/pr-head-freshness.yml", security_gate
         )
-        self.assertIn("needs.freshness.outputs.current == 'true'", security_gate)
+        self.assertIn("needs.freshness.outputs.current != 'false'", security_gate)
         self.assertIn("- '.gitignore'", security_gate)
         self.assertIn("- '**/.gitignore'", security_gate)
         self.assertIn("- 'tools/validate_nuget_locks.py'", security_gate)

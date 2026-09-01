@@ -24,7 +24,12 @@ jobs:
     uses: ./.github/workflows/pr-head-freshness.yml
   validate:
     needs: freshness
-    if: \${{ needs.freshness.outputs.current == 'true' }}
+    if: \${{ needs.freshness.outputs.current != 'false' }}
+    steps:
+      - name: Enforce initial PR freshness validation
+        env:
+          FRESHNESS_RESULT: \${{ needs.freshness.result }}
+      - name: Recheck current PR head after assignment
 `;
 }
 
@@ -91,7 +96,7 @@ test('push main, schedules, manual and governance runs never cancel', () => {
     });
 
     assert.equal(result.cancelInProgress, false, `${workflowName}/${eventName}`);
-    assert.equal(result.group, `${workflowName}-${eventName}-3001`);
+    assert.equal(result.group, `${workflowName}-${eventName}-3001-1`);
   }
 });
 
@@ -109,26 +114,67 @@ test('missing PR number or head SHA fails safe', () => {
     runId: 4002,
   });
 
-  assert.equal(missingNumber.group, 'ci-backend-pull_request_target-4001');
+  assert.equal(missingNumber.group, 'ci-backend-pull_request_target-4001-1');
   assert.equal(missingNumber.cancelInProgress, false);
-  assert.equal(missingHead.group, 'ci-backend-pr-41');
+  assert.equal(missingHead.group, 'ci-backend-pull_request_target-4002-1');
   assert.equal(missingHead.cancelInProgress, false);
 });
 
 test('an accepted cancellation is not terminal when the queued run is assigned later', () => {
   const racedRun = {
     cancellationAccepted: true,
-    state: 'assigned',
+    statesAfterAcceptance: ['assigned', 'in_progress', 'completed', 'cancelled'],
+    completedJobs: ['changes', 'build-test'],
     eventHeadSha: 'e'.repeat(40),
   };
   const currentHeadSha = 'f'.repeat(40);
 
   assert.equal(racedRun.cancellationAccepted, true);
-  assert.equal(racedRun.state, 'assigned');
+  assert.deepEqual(
+    racedRun.statesAfterAcceptance,
+    ['assigned', 'in_progress', 'completed', 'cancelled'],
+  );
+  assert.equal(racedRun.completedJobs.length, 2);
   assert.equal(
     shouldSchedulePullRequestWork(racedRun.eventHeadSha, currentHeadSha),
     false,
   );
+});
+
+test('rerunning an old synchronize event cannot cancel the current head run', () => {
+  const oldRerun = resolveWorkflowConcurrency('ci-backend', {
+    name: 'pull_request_target',
+    action: 'synchronize',
+    runAttempt: 2,
+    pullRequestNumber: 41,
+    headSha: 'e'.repeat(40),
+    runId: 4003,
+  });
+
+  assert.equal(oldRerun.group, 'ci-backend-pull_request_target-4003-2');
+  assert.equal(oldRerun.cancelInProgress, false);
+});
+
+test('an obsolete rerun cannot evict the current-head pending run', () => {
+  const currentHead = resolveWorkflowConcurrency('ci-backend', {
+    name: 'pull_request_target',
+    action: 'synchronize',
+    runAttempt: 1,
+    pullRequestNumber: 41,
+    headSha: 'f'.repeat(40),
+    runId: 4004,
+  });
+  const obsoleteRerun = resolveWorkflowConcurrency('ci-backend', {
+    name: 'pull_request_target',
+    action: 'synchronize',
+    runAttempt: 2,
+    pullRequestNumber: 41,
+    headSha: 'e'.repeat(40),
+    runId: 4003,
+  });
+
+  assert.notEqual(obsoleteRerun.group, currentHead.group);
+  assert.equal(obsoleteRerun.cancelInProgress, false);
 });
 
 test('the orchestration guard schedules work only for the current event head', () => {

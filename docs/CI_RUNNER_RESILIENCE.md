@@ -64,20 +64,29 @@ explicitement le SHA de tête avant toute exécution. Une PR de fork n'est pas s
 aux autres jobs non applicables, sans exécuter une seule instruction du fork.
 
 Chaque workflow PR possède un groupe de concurrence stable `workflow + numéro de PR`.
-Seul un événement `synchronize` portant un SHA de tête non vide peut demander
-l'annulation du run précédent de cette même PR. Les événements `push`, `schedule`,
+Seuls le premier essai de `opened` et les premiers essais de `synchronize` portant
+un SHA de tête non vide rejoignent ce groupe. Un ancien rerun, un événement `reopened`
+ou un contexte PR incomplet reçoit un groupe unique `event + run_id + run_attempt` :
+il ne peut donc ni annuler un run actif, ni évincer le run `pending` de la tête courante
+(GitHub remplace toujours le run en attente d'un même groupe, indépendamment de
+`cancel-in-progress`). Seul `synchronize` peut demander l'annulation du run précédent
+de cette PR. Les événements `push`, `schedule`,
 `workflow_dispatch`, `repository_dispatch` et `merge_group` utilisent un groupe unique
 par `run_id`; les workflows de gouvernance, déploiement et publication n'annulent jamais
 un run en cours. Le préfixe propre au workflow empêche aussi toute collision avec une
 autre PR ou avec les runs dynamiques Dependabot.
 
 Une réponse positive de l'API d'annulation GitHub **n'est pas un état terminal** : un run
-encore `queued` peut malgré tout être assigné à un runner après cette réponse. Aucun
-contrôleur de cycle de vie ne doit donc déduire une capacité libre de la seule acceptation
-de l'annulation. Le job réutilisable `pr-head-freshness.yml`, chargé depuis `main`, relit
-le SHA courant via l'API GitHub avant de rendre les jobs coûteux éligibles. Si le SHA de
-l'événement est obsolète ou absent, ces jobs restent non planifiables même en cas de
-course annulation/assignation.
+encore `queued` peut malgré tout être assigné à un runner après cette réponse ; le cas
+observé a même laissé deux jobs backend finir en succès avant la conclusion finale de
+l'annulation. Aucun contrôleur de cycle de vie ne doit donc déduire une capacité libre ou
+l'absence d'exécution de la seule acceptation de l'annulation. Le job réutilisable
+`pr-head-freshness.yml`, chargé depuis `main`, relit
+le SHA courant via l'API GitHub avant de rendre les jobs coûteux éligibles. Comme la tête
+peut encore changer pendant l'attente en file, chaque job qui consomme le checkout PR
+répète ce contrôle immédiatement après son assignation et avant le checkout. Si le SHA
+de l'événement est obsolète ou absent, le travail coûteux ne démarre pas ; une erreur API
+fait échouer le check requis au lieu de le convertir en succès `skipped`.
 
 ## Actions d'infrastructure externes
 
