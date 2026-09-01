@@ -29,7 +29,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-09-01** |
-| Commit de référence analysé | `05eb491c94b3a257c26198524d2be91ed2a8a63c` |
+| Commit de référence analysé | `81821da908ffbd572940ff5d4743a4f9ad7c224a` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
@@ -37,7 +37,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Package public actif | **146 fichiers** — `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
 | Package privé actif (`answerKey`) | **146 fichiers** — `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
 | Workflows GitHub Actions | **26** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `codeql.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **201 fichiers** — .NET : 4 projets / 98 fichiers ; Flutter/Dart : 6 racines / 97 fichiers ; Python : 1 racine / 6 fichier |
+| Tests découverts | **203 fichiers** — .NET : 4 projets / 100 fichiers ; Flutter/Dart : 6 racines / 97 fichiers ; Python : 1 racine / 6 fichier |
 | Corpus **historique** local | **91 pistes**, **146 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
