@@ -1,4 +1,4 @@
-# Image runner immuable - PR1
+# Image runner immuable
 
 Ce dossier est un livrable **hors deploiement**. Il fige la toolchain deja utilisee
 par Certigo, telecharge chaque artefact par URL versionnee, verifie son empreinte,
@@ -93,3 +93,107 @@ construit et ne deploie rien. PR2 devra publier la sortie de
    supprimer son enregistrement GitHub exact, puis le nouveau VMSS et la version
    d'image exacte. Relire ensuite le VMSS live et ses bindings hors scope; ne
    jamais modifier sa capacite, son SKU, ses IDs, son NAT/LB ou ses exclusions.
+
+## PR2 code-only
+
+PR2 ajoute uniquement des ressources **nouvelles et desactivees par defaut**:
+
+- `image-build-contract.json` conserve le commit PR1
+  `f8e23b2952e8ca39c59f30081b8950170abb701a` comme origine du toolchain et
+  lie les sources au commit integre exact
+  `e70e62407f939b04b3e9d3b532f4a6ae06994a43`, a l'image Marketplace exacte
+  `24.04.202608070`, a la version Gallery `1.0.337` et aux SHA-256 de chaque
+  entree;
+- le contrat reste fail-closed avec `reproducibleInputsReady=false`: le template
+  ne peut creer aucune ressource, meme avec `deploymentEnabled=true`, tant que
+  les paquets transitifs Ubuntu/Microsoft ne sont pas lies a un snapshot APT et
+  a leurs hashes, et que les artefacts du `flutter precache` ne sont pas tous
+  enumeres et hashes. PR2 n'assimile jamais une version seule a une preuve de
+  reproductibilite;
+- `image-build.bicep` declare la Gallery, la definition et le template Azure VM
+  Image Builder. `deploymentEnabled=false` et `autoRun=Disabled`: compiler ou
+  deployer le modele sans parametre explicite ne construit rien;
+- le build utilise une identite user-assigned dediee uniquement pour ecrire la
+  nouvelle version Gallery. Cette identite n'entre pas dans l'image. Les
+  sources viennent du commit exact, AIB reverifie chaque hash, la validation
+  in-VM refuse `.runner`, credentials, cle privee, cache ou boot non conforme;
+- lorsque les locks seront complets dans une PR ulterieure, le tout premier
+  customizer bloque IMDS et en apporte la preuve avant les telechargements
+  necessaires. La validation finale et le bootstrap canari exigent aussi le
+  service actif, la regle iptables et un probe IMDS en echec;
+- `canary-main.bicep` cree conditionnellement le groupe runtime dedie et le
+  marque avec le meme TTL que ses ressources; `canary.bicep` declare un reseau
+  non peere et un VMSS neuf de capacite 1,
+  sans identite managee ni IP publique. IMDS est bloque dans l'image et par le
+  NSG; le seul label metier est `certigo-pr-image-canary`. Les deux templates
+  calculent `effectiveDeploymentEnabled=false` tant que les locks reproductibles
+  ou la politique signataire ne sont pas actifs, meme si un appelant force
+  `deploymentEnabled=true`;
+- `canary-contract.json` reserve explicitement les runners 24/26 et la VM 415,
+  refuse les noms/labels existants, exige 20 mesures cold et 20 warm, et borne
+  le canari a 72 heures / 15 USD. Le tarif Linux VM observe est 0,138 USD/h;
+- `validate-canary-evidence.mjs` refuse toute cible hors subscription, groupe,
+  type et nom attendus. Une creation initiale doit contenir l'ensemble complet;
+  chaque payload de creation est relu (absence d'identite/PIP runner/label
+  existant, capacite/SKU/image, deny-only NSG, VNet non peere, NAT dedie,
+  Trusted Launch et authentification sans mot de passe);
+  une transition ne peut modifier que l'ID image et ses fingerprints sur le
+  nouveau VMSS, avec les versions avant/apres exactes. Le validateur lie aussi
+  les hashes du what-if et du descripteur Azure, les attestations, les
+  percentiles recalcules, le TTL et la version precedente;
+- `canary-transition.ps1` exige une autorisation litterale avant le moindre
+  appel Azure, compile une seule fois le graphe Bicep complet en ARM, hash ce
+  fichier, l'utilise pour le what-if et le deploiement, puis reverifie son hash
+  juste avant application. Il refuse aussi un descripteur de plus de 24 heures et
+  re-hashe la sortie AIB, le template AIB et la version Gallery courants avant le
+  what-if puis avant l'application. Il sauvegarde le what-if complet, le valide,
+  puis promeut ou remet
+  la version Gallery precedente exacte dans un deploiement subscription limite
+  au groupe canari. Avant application, il verifie les deux attestations GitHub,
+  observe et sauvegarde l'image courante reelle. Le seul exemplaire est ensuite
+  mis a jour avant verification du modele; il reste hors routing pendant la
+  transition;
+- `canary-cleanup.ps1` exige une autorisation distincte, l'expiration du TTL,
+  des tags de possession sur chaque ressource et l'absence de tout token hors
+  scope avant de supprimer le seul groupe runtime dedie;
+- le scan Checkov compile d'abord les trois Bicep en ARM, car Checkov 3.2.495 ne
+  sait pas analyser `loadJsonContent`. L'exception locale `CKV_AZURE_95`
+  interdit seulement l'auto-upgrade OS qui contournerait la version Gallery
+  exacte et ses attestations; SSH par cle, chiffrement host, Trusted Launch,
+  NSG et authentification sans mot de passe restent controles;
+- la limite de 15 USD est un plafond operationnel **estime**, pas un Azure
+  Budget: 72 h du SKU observe valent 9,94 USD avant reseau et stockage. Le TTL
+  est refuse au-dela de 72 h et le cleanup reste une operation separee,
+  explicitement autorisee et fail-closed;
+- `canary-evidence.json` reste volontairement `planned`: aucune mesure,
+  attestation ou sortie what-if live n'est inventee;
+- `.github/workflows-disabled/runner-image-attest.yml` utilise Azure OIDC pour
+  lire la sortie AIB, le deploiement et la version Gallery attendus dans
+  l'abonnement exact. Il recompile le Bicep avec le binaire epingle, compare le
+  template ARM canonique exporte, valide tous les parametres, l'identite du
+  deploiement, sa correlation et l'absence de mutation AIB dans l'Activity Log,
+  puis publie ces preuves dans un artifact GitHub immuable. Le descripteur signe
+  contient l'ID et le digest de cet artifact; les tags Azure mutables ne servent
+  jamais de preuve de provenance. Il atteste ce descripteur avec la provenance
+  SLSA et le SBOM CycloneDX. Aucun ID image ou digest de sujet n'est accepte
+  depuis le dispatcher. Son
+  activation demande une PR separee et l'environnement protege
+  `runner-image-canary-attestation`. Il cible exclusivement le nouveau label
+  `certigo-image-attestation-canary`; aucun workflow actif ne route ce label.
+  La transition reste bloquee jusqu'a ce que cette future activation inscrive
+  son SHA Git exact dans `attestation-policy.json`, puis `gh attestation
+  verify` impose repo, workflow, SHA signataire, ref source et SHA source.
+
+Le deploiement image, l'appel AIB, le what-if Azure, l'enregistrement GitHub du
+nouveau runner et toute promotion restent interdits tant qu'une autorisation
+ulterieure n'a pas ete donnee. Le rollback reutilise le meme modele Incremental
+avec `galleryImageVersionId` positionne sur
+`previousGalleryImageVersionId`; il ne cible que le nouveau groupe runtime.
+Le premier `Promote` accepte un VMSS absent uniquement si le what-if valide le
+`Create` complet de chaque ressource dediee, sans `Modify`; tout `Create`
+partiel, mixte, rollback initial ou drift entre what-if et etat observe est
+refuse. Le validateur exige les ressources developpees et refuse aussi toute
+entree de delta `Microsoft.Resources/deployments`, meme en `NoChange`. Cette
+premiere autorisation produit seulement le statut
+`provision-authorized`: les mesures cold/warm et la preuve de rollback restent
+obligatoires apres provisioning, sans jamais etre inventees avant.

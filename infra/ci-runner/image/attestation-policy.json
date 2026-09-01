@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "signerWorkflow": "gchambaud_microsoft/Certigo/.github/workflows/runner-image-attest.yml",
+  "sourceRef": "refs/heads/main",
+  "signerDigest": null,
+  "maximumEvidenceAgeHours": 24,
+  "activation": {
+    "status": "blocked",
+    "requiresTwoStageMerge": true
+  }
+}

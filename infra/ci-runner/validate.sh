@@ -8,6 +8,8 @@ pilot_health="${root}/infra/ci-runner/pilot-health.sh"
 pilot_preflight="${root}/infra/ci-runner/pilot-preflight.sh"
 pilot_register="${root}/infra/ci-runner/pilot-register.sh"
 register_pilot="${root}/infra/ci-runner/register-pilot.ps1"
+canary_transition="${root}/infra/ci-runner/image/canary-transition.ps1"
+canary_cleanup="${root}/infra/ci-runner/image/canary-cleanup.ps1"
 test_health="${root}/infra/ci-runner/test-health-probe.sh"
 lifecycle_preflight="${root}/infra/ci-runner/lifecycle-preflight.sh"
 capacity_plan="${root}/infra/ci-runner/capacity-plan.sh"
@@ -161,7 +163,26 @@ node --test "${root}/infra/ci-runner/capacity-controller.test.mjs"
 node --check "${root}/infra/ci-runner/scale-in-safety.mjs"
 node "${image_dir}/generate-toolchain-sbom.mjs" --check
 bash "${image_dir}/validate-toolchain.sh" --contract
-node --test "${image_dir}/toolchain-contract.test.mjs"
+node --test \
+  "${image_dir}/toolchain-contract.test.mjs" \
+  "${image_dir}/runner-image-canary.test.mjs"
+node "${image_dir}/validate-canary-evidence.mjs" --plan
+canary_transition_ps="${canary_transition}"
+canary_cleanup_ps="${canary_cleanup}"
+if command -v cygpath >/dev/null 2>&1; then
+  canary_transition_ps="$(cygpath -w "${canary_transition}")"
+  canary_cleanup_ps="$(cygpath -w "${canary_cleanup}")"
+elif command -v wslpath >/dev/null 2>&1 &&
+  grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
+  canary_transition_ps="$(wslpath -w "${canary_transition}")"
+  canary_cleanup_ps="$(wslpath -w "${canary_cleanup}")"
+fi
+if command -v pwsh >/dev/null 2>&1; then
+  pwsh -NoProfile -NonInteractive -Command \
+    "\$errors = \$null; [System.Management.Automation.Language.Parser]::ParseFile('${canary_transition_ps}', [ref]\$null, [ref]\$errors) > \$null; if (\$errors.Count -ne 0) { \$errors | Out-String | Write-Error; exit 1 }; \$errors = \$null; [System.Management.Automation.Language.Parser]::ParseFile('${canary_cleanup_ps}', [ref]\$null, [ref]\$errors) > \$null; if (\$errors.Count -ne 0) { \$errors | Out-String | Write-Error; exit 1 }"
+else
+  echo "PowerShell parser unavailable; Node contract tests enforce script guards."
+fi
 
 contract_fixture="$(mktemp -d)"
 generator_fixture="$(mktemp -d)"
