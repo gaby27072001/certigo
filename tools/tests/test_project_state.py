@@ -482,9 +482,6 @@ class ProjectStateTests(unittest.TestCase):
                                 if channel == "public"
                                 else "solutions/lesson.json"
                             ),
-                            "resourceType": (
-                                "question" if channel == "public" else "solution"
-                            ),
                             "hash": "6" * 64,
                             "size": 123,
                         }
@@ -492,6 +489,10 @@ class ProjectStateTests(unittest.TestCase):
                     "manifestId": "",
                     "rootHash": "",
                 }
+                if not project_state.PACKAGE_MANIFEST_SCHEMA.endswith("/v1"):
+                    manifest["files"][0]["resourceType"] = (
+                        "question" if channel == "public" else "solution"
+                    )
                 manifest["manifestId"] = project_state._canonical_manifest_id(manifest)
                 manifest["rootHash"] = str(manifest["manifestId"]).removeprefix(
                     "sha256:"
@@ -574,8 +575,9 @@ class ProjectStateTests(unittest.TestCase):
             manifest_path.parent.mkdir(parents=True)
 
             def validate(entry: dict[str, object]) -> None:
+                schema = "certigo.content.package-manifest/v3"
                 manifest: dict[str, object] = {
-                    "schema": project_state.PACKAGE_MANIFEST_SCHEMA,
+                    "schema": schema,
                     "channel": "public",
                     "artifact": "public",
                     "algorithm": project_state.PACKAGE_MANIFEST_ALGORITHM,
@@ -607,7 +609,7 @@ class ProjectStateTests(unittest.TestCase):
                 project_state._validate_manifest(
                     active_root,
                     reference,
-                    project_state.PACKAGE_MANIFEST_SCHEMA,
+                    schema,
                 )
 
             common = {
