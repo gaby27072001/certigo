@@ -9,7 +9,15 @@ import {
   validatePhaseBResource,
   validateWhatIf,
 } from './validate-what-if.mjs';
-import { sha256File } from './write-what-if-manifest.mjs';
+import {
+  collectArtifactFiles,
+  normalizeEvidencePath,
+  relativeEvidenceFile,
+  requireRegularFile,
+  resolveEvidenceFile,
+  sha256File,
+  validateEvidenceEntries,
+} from './evidence-files.mjs';
 import { normalizePrincipalTypes } from './normalize-principal-types.mjs';
 
 function parseArguments(argv) {
@@ -28,6 +36,121 @@ function requireEqual(actual, expected, message) {
   if (actual !== expected) {
     throw new Error(`${message}: expected ${expected}, received ${actual}`);
   }
+}
+
+function requireExactFields(value, expected, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+  const actual = Object.keys(value).sort();
+  const required = [...expected].sort();
+  if (JSON.stringify(actual) !== JSON.stringify(required)) {
+    throw new Error(`${label} has missing or extra fields`);
+  }
+}
+
+function requireSha256(value, label) {
+  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/.test(value)) {
+    throw new Error(`${label} is not a lowercase SHA-256`);
+  }
+}
+
+function validateManifestSchema(manifest) {
+  const topLevelFields = [
+    'artifacts',
+    'context',
+    'deploymentExecuted',
+    'parameters',
+    'phase',
+    'plan',
+    'schemaVersion',
+    'sourceCommit',
+    'sources',
+    'subscriptionId',
+    'template',
+    'tenantId',
+  ];
+  if (manifest.phaseA !== undefined) {
+    topLevelFields.push('phaseA');
+  }
+  if (manifest.normalization !== undefined) {
+    topLevelFields.push('normalization');
+  }
+  requireExactFields(manifest, topLevelFields, 'evidence manifest');
+  requireExactFields(manifest.context, ['ref', 'repository', 'runId'], 'manifest context');
+  requireExactFields(
+    manifest.template,
+    ['armTemplateHash', 'compiledSha256', 'path', 'sha256'],
+    'manifest template',
+  );
+  requireExactFields(manifest.parameters, ['path', 'sha256'], 'manifest parameters');
+  requireExactFields(
+    manifest.plan,
+    [
+      'counts',
+      'diagnostics',
+      'error',
+      'path',
+      'potentialChanges',
+      'sha256',
+      'status',
+      'total',
+    ],
+    'manifest plan',
+  );
+  if (manifest.phaseA) {
+    requireExactFields(
+      manifest.phaseA,
+      [
+        'bindingSha256',
+        'deploymentId',
+        'deploymentName',
+        'deploymentTemplateHash',
+        'evidenceManifestSha256',
+      ],
+      'manifest Phase A binding',
+    );
+    requireSha256(manifest.phaseA.bindingSha256, 'manifest Phase A binding hash');
+    requireSha256(
+      manifest.phaseA.evidenceManifestSha256,
+      'manifest Phase A evidence hash',
+    );
+  }
+  if (manifest.normalization) {
+    requireExactFields(
+      manifest.normalization,
+      [
+        'effectivePrincipalType',
+        'normalizedCount',
+        'normalizedPlanSha256',
+        'provenance',
+        'provenanceSha256',
+      ],
+      'manifest normalization',
+    );
+    requireSha256(
+      manifest.normalization.normalizedPlanSha256,
+      'manifest normalized plan hash',
+    );
+    requireSha256(
+      manifest.normalization.provenanceSha256,
+      'manifest provenance hash',
+    );
+  }
+  if (manifest.schemaVersion !== 2 || manifest.deploymentExecuted !== false) {
+    throw new Error('unsupported evidence schema');
+  }
+  normalizeEvidencePath(manifest.template.path, 'manifest template path');
+  normalizeEvidencePath(manifest.parameters.path, 'manifest parameters path');
+  normalizeEvidencePath(manifest.plan.path, 'manifest plan path');
+  requireSha256(manifest.template.sha256, 'manifest template source hash');
+  requireSha256(manifest.template.compiledSha256, 'manifest compiled template hash');
+  requireSha256(manifest.parameters.sha256, 'manifest parameters hash');
+  requireSha256(manifest.plan.sha256, 'manifest plan hash');
+  return {
+    artifacts: validateEvidenceEntries(manifest.artifacts, 'manifest artifacts'),
+    sources: validateEvidenceEntries(manifest.sources, 'manifest sources'),
+  };
 }
 
 function canonicalJson(value) {
@@ -61,28 +184,12 @@ export function validateDeploymentParameters(deployment, approvedParameters) {
 }
 
 function verifySource(root, source) {
-  const filePath = path.resolve(root, source.path);
+  const filePath = resolveEvidenceFile(root, source.path, 'manifest source');
   requireEqual(
     sha256File(filePath),
     source.sha256,
     `source hash mismatch for ${source.path}`,
   );
-}
-
-function artifactFiles(directory) {
-  return fs
-    .readdirSync(directory, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => path.join(entry.parentPath, entry.name))
-    .filter(
-      (file) =>
-        !['manifest.json', 'manifest.sha256'].includes(path.basename(file)),
-    )
-    .map((file) => ({
-      path: path.relative(directory, file).replaceAll('\\', '/'),
-      sha256: sha256File(file),
-    }))
-    .sort((left, right) => left.path.localeCompare(right.path));
 }
 
 export function verifyManifestFiles(manifest, options) {
@@ -95,35 +202,71 @@ export function verifyManifestFiles(manifest, options) {
     expectedManifestSha256,
     requireHead = false,
   } = options;
-  requireEqual(manifest.schemaVersion, 2, 'unsupported evidence schema');
+  const manifestFile = requireRegularFile(manifestPath, 'evidence manifest');
+  const artifactDirectory = path.dirname(manifestFile);
+  const normalizedManifest = validateManifestSchema(manifest);
   requireEqual(
-    JSON.stringify(manifest.artifacts),
-    JSON.stringify(artifactFiles(path.dirname(manifestPath))),
+    JSON.stringify(normalizedManifest.artifacts),
+    JSON.stringify(
+      collectArtifactFiles(artifactDirectory, [
+        path.basename(manifestFile),
+        'manifest.sha256',
+      ]),
+    ),
     'artifact inventory mismatch',
   );
   if (expectedManifestSha256) {
     requireEqual(
-      sha256File(manifestPath),
+      sha256File(manifestFile),
       expectedManifestSha256.toLowerCase(),
       'evidence manifest hash mismatch',
     );
   }
+  requireEqual(
+    relativeEvidenceFile(artifactDirectory, planPath, 'raw plan').path,
+    normalizeEvidencePath(manifest.plan.path),
+    'raw plan path mismatch',
+  );
   requireEqual(
     sha256File(planPath),
     manifest.plan.sha256,
     'raw plan hash mismatch',
   );
   requireEqual(
+    relativeEvidenceFile(
+      artifactDirectory,
+      parametersPath,
+      'deployment parameters',
+    ).path,
+    normalizeEvidencePath(manifest.parameters.path),
+    'parameter path mismatch',
+  );
+  requireEqual(
     sha256File(parametersPath),
     manifest.parameters.sha256,
     'parameter hash mismatch',
+  );
+  relativeEvidenceFile(
+    artifactDirectory,
+    compiledTemplatePath,
+    'compiled template',
   );
   requireEqual(
     sha256File(compiledTemplatePath),
     manifest.template.compiledSha256,
     'compiled template hash mismatch',
   );
-  for (const source of manifest.sources) {
+  const templateSource = relativeEvidenceFile(
+    sourceRoot,
+    resolveEvidenceFile(sourceRoot, manifest.template.path, 'manifest template'),
+    'manifest template',
+  );
+  requireEqual(
+    templateSource.sha256,
+    manifest.template.sha256,
+    'template source hash mismatch',
+  );
+  for (const source of normalizedManifest.sources) {
     verifySource(sourceRoot, source);
   }
   const head = execFileSync('git', ['rev-parse', 'HEAD'], {
@@ -192,11 +335,15 @@ export function validatePhaseABinding(input) {
     'Succeeded',
     'Phase A deployment state mismatch',
   );
-  requireEqual(
-    String(deployment.properties?.templateHash ?? ''),
-    manifest.template.armTemplateHash,
-    'Phase A deployment template hash mismatch',
-  );
+  if (
+    String(deployment.properties?.templateHash ?? '') !==
+    manifest.template.armTemplateHash
+  ) {
+    throw new Error(
+      'Phase A deployment template hash mismatch. Never substitute local proof; ' +
+        'run and approve a separate repair what-if/deployment tied to the current template.',
+    );
+  }
   validateDeploymentParameters(deployment, approvedParameters);
   const proof = validatePhaseAProof(
     deployment.properties?.outputs?.phaseA?.value,

@@ -19,6 +19,25 @@ phase_a_binding_file="${work_dir}/phase-a-binding.json"
 b1_parameters_file="${work_dir}/b1-parameters.json"
 b2_parameters_file="${work_dir}/b2-parameters.json"
 inventory_file="${work_dir}/phase-a-inventory.tsv"
+legacy_transition_source="${LEGACY_TRANSITION_FILE:?Set LEGACY_TRANSITION_FILE to the approved transition evidence.}"
+legacy_transition_sha="${LEGACY_TRANSITION_SHA256:?Set LEGACY_TRANSITION_SHA256 to the approved transition evidence hash.}"
+legacy_transition_file="${work_dir}/legacy-transition.json"
+legacy_assignments_file="${work_dir}/legacy-live-assignments.json"
+legacy_schedule_instances_file="${work_dir}/legacy-live-schedule-instances.json"
+
+for evidence_file in \
+  "${phase_a_evidence_dir}/manifest.json" \
+  "${phase_a_evidence_dir}/plan.json" \
+  "${phase_a_evidence_dir}/parameters.json" \
+  "${phase_a_evidence_dir}/compiled-template.json"; do
+  if ! node "${root}/infra/governance/evidence-files.mjs" require-file \
+    "${evidence_file}"; then
+    echo \
+      "Approved Phase A evidence is missing or unsafe. Never reconstruct it locally; run and approve a separate repair what-if/deployment tied to the current template." \
+      >&2
+    exit 1
+  fi
+done
 
 mkdir -p "${work_dir}"
 chmod 700 "${work_dir}"
@@ -104,6 +123,32 @@ inventory.push(`resource\t${phaseA.contentResourceGroupId}\t-\t-`);
 inventory.push(`resource\t${phaseA.identityResourceGroupId}\t-\t-`);
 fs.writeFileSync(inventoryPath, `${inventory.join('\n')}\n`, { mode: 0o600 });
 NODE
+
+node "${root}/infra/governance/evidence-files.mjs" require-file \
+  "${legacy_transition_source}"
+actual_transition_sha="$(
+  node "${root}/infra/governance/evidence-files.mjs" hash \
+    "${legacy_transition_source}"
+)"
+if [[ "${actual_transition_sha}" != "${legacy_transition_sha,,}" ]]; then
+  echo "Legacy transition evidence hash does not match the approved SHA-256." >&2
+  exit 1
+fi
+cp "${legacy_transition_source}" "${legacy_transition_file}"
+legacy_principal_id="$(
+  node -p "require(process.argv[1]).legacyPrincipalId" "${legacy_transition_file}"
+)"
+az role assignment list \
+  --subscription "${subscription_id}" \
+  --assignee-object-id "${legacy_principal_id}" \
+  --include-inherited \
+  --all \
+  --output json > "${legacy_assignments_file}"
+node "${root}/infra/governance/collect-role-assignment-schedules.mjs" \
+  "${legacy_schedule_instances_file}" "${subscription_id}" "${legacy_principal_id}"
+node "${root}/infra/governance/legacy-transition-contract.mjs" \
+  "${legacy_transition_file}" "${phase_a_file}" \
+  "${legacy_assignments_file}" "${legacy_schedule_instances_file}"
 
 resource_index=0
 while IFS=$'\t' read -r kind resource_id expected_client_id expected_principal_id; do

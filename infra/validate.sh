@@ -60,6 +60,10 @@ for script in \
   bash -n "${script}"
 done
 node --check "${root}/infra/governance/render-inventory.mjs"
+node --check "${root}/infra/governance/bicep-parameters.mjs"
+node --check "${root}/infra/governance/collect-role-assignment-schedules.mjs"
+node --check "${root}/infra/governance/evidence-files.mjs"
+node --check "${root}/infra/governance/legacy-transition-contract.mjs"
 node --check "${root}/infra/governance/planner-pim-contract.mjs"
 node --check "${root}/infra/governance/validate-planner-what-if.mjs"
 node --check "${root}/infra/governance/normalize-principal-types.mjs"
@@ -84,6 +88,7 @@ BICEP_CLI="${bicep_bin}" node --test \
   "${root}/infra/tests/governance-evidence.test.mjs"
 BICEP_CLI="${bicep_bin}" node --test \
   "${root}/infra/tests/governance-planner.test.mjs"
+node --test "${root}/infra/tests/governance-tooling.test.mjs"
 
 for environment in dev staging prod; do
   params="${root}/infra/params/${environment}.bicepparam"

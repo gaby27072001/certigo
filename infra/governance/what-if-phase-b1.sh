@@ -6,6 +6,8 @@ subscription_id="${AZURE_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID explicitly.}
 location="${AZURE_LOCATION:-westeurope}"
 evidence_dir="${PHASE_B1_EVIDENCE_DIR:?Set PHASE_B1_EVIDENCE_DIR.}"
 mkdir -p "${evidence_dir}"
+node "${root}/infra/governance/evidence-files.mjs" require-directory \
+  "${evidence_dir}"
 chmod 700 "${evidence_dir}"
 exec > "${evidence_dir}/stdout.log" 2> "${evidence_dir}/stderr.log"
 export PHASE_B_WORK_DIR="${evidence_dir}"
@@ -59,8 +61,8 @@ NODE
     )
   fi
   "${manifest_args[@]}"
-  sha256sum "${evidence_dir}/manifest.json" > \
-    "${evidence_dir}/manifest.sha256"
+  node "${root}/infra/governance/evidence-files.mjs" seal \
+    "${evidence_dir}/manifest.json" "${evidence_dir}/manifest.sha256"
   exit "${status}"
 }
 trap finalize EXIT
@@ -70,6 +72,8 @@ az bicep build \
   --stdout > "${evidence_dir}/compiled-template.json"
 bash "${root}/infra/governance/prepare-phase-b.sh"
 cp "${evidence_dir}/b1-parameters.json" "${evidence_dir}/parameters.json"
+node "${root}/infra/governance/bicep-parameters.mjs" validate \
+  "${evidence_dir}/parameters.json"
 set +e
 az deployment sub what-if \
   --subscription "${subscription_id}" \

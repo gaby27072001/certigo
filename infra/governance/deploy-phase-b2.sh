@@ -61,8 +61,8 @@ node "${root}/infra/governance/validate-evidence.mjs" deployment-approval \
   --approval "${approval_file}" \
   --manifest "${evidence_dir}/manifest.json" \
   --plan "${evidence_dir}/plan.json" \
-  --parameters "${work_dir}/parameters.json" \
-  --compiled-template "${work_dir}/template.json" \
+  --parameters "${evidence_dir}/parameters.json" \
+  --compiled-template "${evidence_dir}/compiled-template.json" \
   --phase-a-proof "${PHASE_B_WORK_DIR}/phase-a.json" \
   --phase-a-binding "${PHASE_B_WORK_DIR}/phase-a-binding.json" \
   --source-root "${root}" \
@@ -77,9 +77,11 @@ expected_parameters_hash="$(
   node -p "require(process.argv[1]).parameters.sha256" \
     "${evidence_dir}/manifest.json"
 )"
-[[ "$(sha256sum "${work_dir}/template.json" | cut -d' ' -f1)" == \
+[[ "$(node "${root}/infra/governance/evidence-files.mjs" hash \
+  "${work_dir}/template.json")" == \
   "${expected_template_hash}" ]]
-[[ "$(sha256sum "${work_dir}/parameters.json" | cut -d' ' -f1)" == \
+[[ "$(node "${root}/infra/governance/evidence-files.mjs" hash \
+  "${work_dir}/parameters.json")" == \
   "${expected_parameters_hash}" ]]
 az deployment group create \
   --subscription "${subscription_id}" \

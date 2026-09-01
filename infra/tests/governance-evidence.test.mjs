@@ -335,6 +335,9 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
     phaseAEvidenceManifestSha256: 'a'.repeat(64),
   };
   evidence.manifest.phaseA = {
+    deploymentId: `/subscriptions/${subscription}/providers/Microsoft.Resources/deployments/phase-a`,
+    deploymentName: 'phase-a',
+    deploymentTemplateHash: '123',
     evidenceManifestSha256: 'a'.repeat(64),
     bindingSha256: sha256File(phaseABindingPath),
   };
@@ -685,6 +688,9 @@ test('deployment approval recomputes normalized principalType evidence', () => {
     normalizedCount: 6,
   };
   evidence.manifest.phaseA = {
+    deploymentId: `/subscriptions/${subscription}/providers/Microsoft.Resources/deployments/phase-a`,
+    deploymentName: 'phase-a',
+    deploymentTemplateHash: '123',
     evidenceManifestSha256: 'a'.repeat(64),
     bindingSha256: sha256File(bindingPath),
   };
@@ -863,11 +869,20 @@ test('governance workflows persist evidence and deploy tools require approvals',
     );
     assert.match(source, /APPROVAL_FILE/);
     assert.match(source, /fresh-compiled-template\.json/);
+    assert.match(
+      source,
+      /--parameters "\$\{evidence_dir\}\/parameters\.json"/,
+    );
+    assert.match(
+      source,
+      /--compiled-template "\$\{evidence_dir\}\/compiled-template\.json"/,
+    );
     assert.match(source, /template\.compiledSha256/);
     assert.match(source, /parameters\.sha256/);
     assert.match(source, /--template-file "\$\{work_dir\}\/template\.json"/);
     assert.ok(
-      source.lastIndexOf('sha256sum') < source.lastIndexOf('az deployment '),
+      source.lastIndexOf('evidence-files.mjs" hash') <
+        source.lastIndexOf('az deployment '),
     );
   }
   const phaseADeploy = fs.readFileSync(
@@ -913,6 +928,10 @@ test('Phase A writes evidence before validation and manifest CLI handles spaces'
       'infra/governance/write-what-if-manifest.mjs',
     ),
     scriptPath,
+  );
+  fs.copyFileSync(
+    path.join(repositoryRoot, 'infra/governance/evidence-files.mjs'),
+    path.join(directory, 'evidence-files.mjs'),
   );
   assert.throws(
     () => execFileSync(process.execPath, [scriptPath], { encoding: 'utf8' }),
