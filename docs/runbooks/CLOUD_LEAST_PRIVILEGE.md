@@ -17,6 +17,15 @@ bash infra/governance/what-if-phase-a.sh
 bash infra/ci-runner/lifecycle-preflight.sh deallocate
 ```
 
+La cible **future** exécutable de Phase B est désormais la subscription personnelle
+`f434ec55-f342-4948-9298-f99af5216204` dans le tenant
+`e9174162-1033-40c0-b0c9-f31825914fbe`. Les snapshots `16b3…/b895…` ci-dessous restent un
+historique d'inventaire Non-Production, pas une autorisation d'exécution. Tout manifeste, preuve
+Phase A ou binding portant cette ancienne paire est stale et refusé. Aucun identifiant n'est
+substitué : il faut régénérer Phase A/A0 et toutes les preuves contre la paire personnelle explicite,
+puis confirmer que les RG, identités et scopes attendus y existent. En leur absence, Phase B reste
+**NO-GO**; le tooling ne crée ni compte, ni rôle, ni ressource automatiquement.
+
 `lifecycle-preflight.sh` ne possède volontairement aucun chemin `apply`. Il retourne `2` dès
 qu'une déallocation serait dangereuse et, dans cette PR, pour toute demande puisque le
 feature flag reste `off`.
@@ -621,10 +630,11 @@ comme tenant ID. Les deux comptes doivent appartenir au tenant management exact 
 un Global Administrator d'un tenant CIAM distinct ne prouve jamais le non-lockout RBAC/PIM de la
 subscription. L'observation read-only corrigée confirme un compte CIAM Member actif sur un domaine
 UPN secondaire, mais avec zéro authentication method/default/preferred MFA : il est présent, pas
-qualifié ni testé pour Phase B. Dans le tenant management exact de la subscription
-`16b3c013-d300-468d-ac64-7eda0820b6d3`, l'inventaire read-only trouve actuellement zéro compte
-emergency cloud-only natif; la gate retourne donc explicitement **NO-GO**. Deux comptes qualifiés
-dans ce tenant restent obligatoires, sans création ou enrôlement automatique. Un
+qualifié ni testé pour Phase B. Les recherches partielles dans l'ancien tenant management ne
+prouvent pas l'absence de comptes lorsque la visibilité Entra est incomplète : leur état est
+`UNKNOWN/BLOCKED`, jamais « absent ». Cette ancienne dépendance à un Global Administrator
+professionnel est interdite pour la cible exécutable. Deux comptes qualifiés dans le tenant
+personnel explicitement sélectionné restent obligatoires, sans création ou enrôlement automatique. Un
 utilisateur guest interne ou externe, notamment un compte B2B `#EXT#`, ne peut pas
 enregistrer de passkey FIDO2 et n'est jamais une voie admissible pour ces comptes; un échec
 Authenticator/My Security Info sur ce parcours guest ne doit pas conduire à affaiblir la gate. Ces

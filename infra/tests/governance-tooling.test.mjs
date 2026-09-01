@@ -601,6 +601,14 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
     nonLockoutVerified: true,
     temporaryAssignmentCount: 8,
   });
+
+  const staleProfessionalProof = structuredClone(transition);
+  staleProfessionalProof.subscriptionId =
+    'f434ec55-f342-4948-9298-f99af5216204';
+  assert.throws(
+    () => validateLegacyTransition(staleProfessionalProof, proof, now),
+    /subscriptionId does not match the target subscription/,
+  );
   const liveAssignments = transition.temporaryAssignments.map(
     ({
       createdAt,
@@ -984,6 +992,15 @@ test('runbook fixes planner count, transition ordering, and Phase A repair proof
   assert.match(runbook, /deux passkeys\s+Authenticator device-bound/);
   assert.match(runbook, /WHfB ne compte qu'après preuve/);
   assert.match(runbook, /téléphone unique est refusé/);
+  assert.match(
+    runbook,
+    /f434ec55-f342-4948-9298-f99af5216204/,
+  );
+  assert.match(
+    runbook,
+    /e9174162-1033-40c0-b0c9-f31825914fbe/,
+  );
+  assert.match(runbook, /ancienne paire est stale et refusé/);
   const prepare = fs.readFileSync(
     path.join(root, 'infra/governance/prepare-phase-b.sh'),
     'utf8',
