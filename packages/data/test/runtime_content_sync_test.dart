@@ -349,6 +349,74 @@ void main() {
     await synchronizer.dispose();
   });
 
+  test('rollbacks remain distinct across owners and intervening sync barriers', () async {
+    final ContentFixture first =
+        questionFixture('microsoft.az-900.section-1.cloud.001', prompt: 'N');
+    final PublicContentManifest releaseN = manifest(<ContentFixture>[first]);
+    final ContentFixture second =
+        questionFixture('microsoft.az-900.section-1.cloud.001', prompt: 'N+1');
+    final PublicContentManifest releaseN1 = manifest(<ContentFixture>[second]);
+    final InMemoryRuntimeContentStore store = InMemoryRuntimeContentStore();
+    await store.prepare(releaseN);
+    await store.writeStagedFile(releaseN, releaseN.files.single, first.bytes);
+    await store.activate(
+      ownerScope: runtimeContentScopeKey('person-a'),
+      manifest: releaseN,
+      etag: '"${releaseN.manifestId}"',
+    );
+    await store.activate(
+      ownerScope: runtimeContentScopeKey('person-b'),
+      manifest: releaseN,
+      etag: '"${releaseN.manifestId}"',
+    );
+    await store.prepare(releaseN1);
+    await store.writeStagedFile(releaseN1, releaseN1.files.single, second.bytes);
+    await store.activate(
+      ownerScope: runtimeContentScopeKey('person-a'),
+      manifest: releaseN1,
+      etag: '"${releaseN1.manifestId}"',
+    );
+    await store.activate(
+      ownerScope: runtimeContentScopeKey('person-b'),
+      manifest: releaseN1,
+      etag: '"${releaseN1.manifestId}"',
+    );
+    final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
+      source: FakePublicContentSource(releaseN1, <ContentFixture>[second]),
+      store: store,
+      delay: (_) async {},
+    );
+
+    final Future<RuntimeContentActivation?> rollbackA = synchronizer.rollback(ownerId: 'person-a');
+    final Future<RuntimeContentActivation?> rollbackB = synchronizer.rollback(ownerId: 'person-b');
+    expect(identical(rollbackA, rollbackB), isFalse);
+    await Future.wait<RuntimeContentActivation?>(<Future<RuntimeContentActivation?>>[
+      rollbackA,
+      rollbackB,
+    ]);
+    final Future<RuntimeContentActivation?> firstBarrierRollback =
+        synchronizer.rollback(ownerId: 'person-a');
+    final Future<RuntimeContentSyncReport> interveningSync = synchronizer.sync(ownerId: 'person-a');
+    final Future<RuntimeContentActivation?> secondBarrierRollback =
+        synchronizer.rollback(ownerId: 'person-a');
+    expect(identical(firstBarrierRollback, secondBarrierRollback), isFalse);
+    await Future.wait<Object?>(<Future<Object?>>[
+      firstBarrierRollback,
+      interveningSync,
+      secondBarrierRollback,
+    ]);
+
+    expect(
+      (await store.readActivation(runtimeContentScopeKey('person-a')))!.activeManifestId,
+      releaseN.manifestId,
+    );
+    expect(
+      (await store.readActivation(runtimeContentScopeKey('person-b')))!.activeManifestId,
+      releaseN.manifestId,
+    );
+    await synchronizer.dispose();
+  });
+
   test('sync requested after rollback runs after the rollback barrier', () async {
     final ContentFixture first =
         questionFixture('microsoft.az-900.section-1.cloud.001', prompt: 'N');

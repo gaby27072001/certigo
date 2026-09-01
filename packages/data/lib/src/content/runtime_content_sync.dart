@@ -154,6 +154,7 @@ class RuntimeContentSynchronizer {
   RuntimeContentStatus _current = const RuntimeContentStatus.idle();
   Future<RuntimeContentSyncReport>? _inFlight;
   Future<RuntimeContentActivation?>? _inFlightRollback;
+  String? _inFlightRollbackOwnerId;
   Future<void> _operationTail = Future<void>.value();
   String? _inFlightOwnerId;
   Set<String> _inFlightPins = <String>{};
@@ -175,6 +176,8 @@ class RuntimeContentSynchronizer {
         return running;
       }
     }
+    _inFlightRollback = null;
+    _inFlightRollbackOwnerId = null;
     _inFlightOwnerId = ownerId;
     _inFlightPins = requestedPins;
     _retainPendingPins(requestedPins);
@@ -204,13 +207,14 @@ class RuntimeContentSynchronizer {
   Future<RuntimeContentActivation?> rollback({required String ownerId}) {
     if (_disposed) throw StateError('Runtime content synchronizer has been disposed.');
     final Future<RuntimeContentActivation?>? running = _inFlightRollback;
-    if (running != null) return running;
+    if (running != null && _inFlightRollbackOwnerId == ownerId) return running;
     _inFlight = null;
     _inFlightOwnerId = null;
     _inFlightPins = <String>{};
     late final Future<RuntimeContentActivation?> operation;
     operation = _enqueueOperation(() => _rollback(ownerId));
     _inFlightRollback = operation;
+    _inFlightRollbackOwnerId = ownerId;
     unawaited(
       operation.then<void>(
         (_) => _clearInFlightRollback(operation),
@@ -278,6 +282,7 @@ class RuntimeContentSynchronizer {
   void _clearInFlightRollback(Future<RuntimeContentActivation?> operation) {
     if (identical(_inFlightRollback, operation)) {
       _inFlightRollback = null;
+      _inFlightRollbackOwnerId = null;
     }
   }
 
