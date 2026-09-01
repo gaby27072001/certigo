@@ -29,15 +29,15 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-09-01** |
-| Commit de référence analysé | `4cb2f0031b45f1873b8116c6792b43ff0f53c88c` |
+| Commit de référence analysé | `160909785861b6743ce373ff4daf042f60454107` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
-| Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `55a512821dabbea8b65d3403f9c83571b4a33ed8` du **2026-08-14** |
-| Package public actif | **146 fichiers** — `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
-| Package privé actif (`answerKey`) | **146 fichiers** — `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
+| Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `07ab6b0453a49c7ac5800837851ae83edf159768` du **2026-08-31** |
+| Package public actif | **1735 fichiers** — `sha256:dd95aafc2ac3e7859df31cb4e7aee271cf2c25cdcfee1fa23ac3eab8ca7ced79` |
+| Package privé actif (`answerKey`) | **812 fichiers** — `sha256:65b1914f4cbeb87d7be9cd939a7cd3d03deb344b408b6ef6de91e0346410f793` |
 | Workflows GitHub Actions | **26** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `codeql.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **194 fichiers** — .NET : 4 projets / 92 fichiers ; Flutter/Dart : 6 racines / 96 fichiers ; Python : 1 racine / 6 fichier |
+| Tests découverts | **201 fichiers** — .NET : 4 projets / 98 fichiers ; Flutter/Dart : 6 racines / 97 fichiers ; Python : 1 racine / 6 fichier |
 | Corpus **historique** local | **91 pistes**, **146 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
