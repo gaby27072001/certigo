@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
   b1aPlannerAssignments,
+  plannerAccessScopes,
+  validatePlannerAccess,
+  validateLivePlannerResources,
   validatePlannerDeployment,
   validateB1aPlannerAssignments,
 } from '../governance/planner-pim-contract.mjs';
@@ -169,7 +173,10 @@ function plannerPlan() {
         changeType: 'Create',
         resourceId:
           `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
-          'roleDefinitions/40000000-0000-0000-0000-000000000001',
+          `roleDefinitions/${armGuid(
+            `/subscriptions/${subscription}`,
+            'certigo-governance-phase-b1a-planner',
+          )}`,
         after: {
           type: 'Microsoft.Authorization/roleDefinitions',
           properties: {
@@ -220,6 +227,14 @@ test('planner validator rejects confused-deputy and privilege escalation', () =>
       );
     },
     (plan) => {
+      plan.changes[2].after.properties.permissions.push({
+        actions: ['*'],
+        notActions: [],
+        dataActions: ['*'],
+        notDataActions: [],
+      });
+    },
+    (plan) => {
       plan.changes.push({
         changeType: 'Create',
         resourceId:
@@ -257,6 +272,136 @@ test('A0 deployment instructions verify the complete approved evidence', () => {
     runbook,
     /validate-planner-what-if\.mjs evidence[\s\S]+approved-planner-manifest-sha256/,
   );
+  const contract = fs.readFileSync(
+    path.join(root, 'infra/governance/planner-pim-contract.mjs'),
+    'utf8',
+  );
+  assert.match(contract, /validatePlannerEvidence\(\{/);
+  assert.match(contract, /transitiveMemberOf/);
+  assert.doesNotMatch(contract, /ConsistencyLevel=eventual|\$count=true/);
+  assert.match(
+    contract,
+    /--scope[\s\S]+\/subscriptions\/\$\{phaseA\.subscriptionId\}[\s\S]+--include-inherited/,
+  );
+});
+
+test('planner evidence CLI parses arguments after the subcommand', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'planner-evidence-cli-'));
+  const manifestPath = path.join(directory, 'manifest.json');
+  fs.writeFileSync(manifestPath, '{}\n');
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.join(root, 'infra/governance/validate-planner-what-if.mjs'),
+      'evidence',
+      manifestPath,
+      'a'.repeat(64),
+      root,
+      subscription,
+      proof().tenantId,
+    ],
+    { encoding: 'utf8' },
+  );
+  fs.rmSync(directory, { recursive: true, force: true });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /planner evidence scope or phase mismatch/);
+  assert.doesNotMatch(result.stderr, /ENOENT.*evidence/);
+});
+
+test('planner contract rejects every pre-existing active or eligible access', () => {
+  const empty = {
+    visibilityComplete: true,
+    groupIds: [],
+    scopes: [`/subscriptions/${subscription}`],
+    activeAssignments: [],
+    eligibleSchedules: [],
+    activeSchedules: [],
+  };
+  assert.doesNotThrow(() => validatePlannerAccess(empty));
+  for (const name of [
+    'activeAssignments',
+    'eligibleSchedules',
+    'activeSchedules',
+  ]) {
+    const inventory = structuredClone(empty);
+    inventory[name].push({ id: 'unexpected' });
+    assert.throws(
+      () => validatePlannerAccess(inventory),
+      /planner has pre-existing/,
+    );
+  }
+  assert.throws(
+    () => validatePlannerAccess({ ...empty, visibilityComplete: false }),
+    /visibility is incomplete/,
+  );
+  assert.throws(
+    () =>
+      validatePlannerAccess({
+        ...empty,
+        groupIds: ['90000000-0000-0000-0000-000000000001'],
+        activeAssignments: [{ principalType: 'Group' }],
+      }),
+    /pre-existing active role assignments/,
+  );
+});
+
+test('planner access scopes follow only complete management-group parent IDs', () => {
+  const rootId =
+    `/providers/Microsoft.Management/managementGroups/${
+      proof().tenantId
+    }`;
+  const childId =
+    '/providers/Microsoft.Management/managementGroups/platform';
+  const entities = [
+    {
+      id: `/subscriptions/${subscription}`,
+      name: subscription,
+      parent: { id: childId },
+      parentNameChain: ['ignored-display-name'],
+    },
+    {
+      id: childId,
+      properties: { parent: { id: rootId } },
+    },
+    {
+      properties: { id: rootId },
+    },
+  ];
+  assert.deepEqual(plannerAccessScopes(entities, subscription, proof().tenantId), [
+    `/subscriptions/${subscription}`,
+    childId,
+    rootId,
+  ]);
+  assert.throws(
+    () =>
+      plannerAccessScopes(
+        entities.slice(0, 2),
+        subscription,
+        proof().tenantId,
+      ),
+    /ancestry is incomplete/,
+  );
+  const cycle = structuredClone(entities);
+  cycle[2].properties.parent = { id: childId };
+  assert.throws(
+    () => plannerAccessScopes(cycle, subscription, proof().tenantId),
+    /ancestry contains a cycle/,
+  );
+  assert.throws(
+    () =>
+      plannerAccessScopes(
+        [{ id: `/subscriptions/${subscription}`, parent: { id: 'invalid' } }],
+        subscription,
+        proof().tenantId,
+      ),
+    /parent ID is malformed/,
+  );
+  const truncated = structuredClone(entities);
+  truncated[1].properties.parent = undefined;
+  assert.throws(
+    () => plannerAccessScopes(truncated, subscription, proof().tenantId),
+    /did not reach the tenant root/,
+  );
 });
 
 test('B1a PIM assignments pin exact principals roles and structural scopes', () => {
@@ -289,6 +434,11 @@ test('B1a PIM assignments pin exact principals roles and structural scopes', () 
     template: { armTemplateHash: '123456789' },
   };
   const deployment = {
+    id:
+      `${subscriptionScope}/providers/Microsoft.Resources/deployments/` +
+      'certigo-governance-b1a-planner-bootstrap-test',
+    name: 'certigo-governance-b1a-planner-bootstrap-test',
+    location: 'westeurope',
     properties: {
       provisioningState: 'Succeeded',
       templateHash: '123456789',
@@ -299,6 +449,50 @@ test('B1a PIM assignments pin exact principals roles and structural scopes', () 
   const approvedParameters = {
     parameters: { location: { value: 'westeurope' } },
   };
+  const liveIdentity = {
+    id: planner.resourceId,
+    name: planner.identityName,
+    location: 'westeurope',
+    properties: {
+      clientId: planner.clientId,
+      principalId: planner.principalId,
+    },
+  };
+  const liveCredential = {
+    id:
+      `${planner.resourceId}/federatedIdentityCredentials/` +
+      'github-azure-governance-bootstrap-phase-b',
+    properties: {
+      issuer: 'https://token.actions.githubusercontent.com',
+      subject: planner.subject,
+      audiences: ['api://AzureADTokenExchange'],
+    },
+  };
+  const liveRole = {
+    id: planner.roleDefinitionId,
+    properties: {
+      type: 'CustomRole',
+      permissions: [
+        {
+          actions: [
+            'Microsoft.Authorization/roleAssignments/read',
+            'Microsoft.Authorization/roleAssignments/write',
+            'Microsoft.Authorization/roleDefinitions/read',
+          ],
+          notActions: [],
+          dataActions: [],
+          notDataActions: [],
+        },
+      ],
+      assignableScopes: [
+        'rg-certigo-dev',
+        'rg-certigo-staging',
+        'rg-certigo-prod',
+        'rg-certigo-ci',
+        'rg-certigo-content',
+      ].map((name) => `${subscriptionScope}/resourceGroups/${name}`),
+    },
+  };
   assert.equal(
     validatePlannerDeployment(
       phaseA,
@@ -307,10 +501,107 @@ test('B1a PIM assignments pin exact principals roles and structural scopes', () 
       'a'.repeat(64),
       'a'.repeat(64),
       approvedParameters,
+      deployment.name,
     ),
     planner,
   );
+  assert.equal(
+    validateLivePlannerResources(
+      phaseA,
+      planner,
+      approvedParameters,
+      liveIdentity,
+      [liveCredential],
+      liveRole,
+    ),
+    planner,
+  );
+  for (const [resource, mutate] of [
+    [liveIdentity, (value) => {
+      value.properties.principalId = '90000000-0000-0000-0000-000000000001';
+    }],
+    [liveCredential, (value) => {
+      value.properties.subject =
+        'repo:attacker/repository:environment:azure-governance-bootstrap-phase-b';
+    }],
+    [liveRole, (value) => {
+      value.properties.permissions[0].actions.push(
+        'Microsoft.Authorization/policyAssignments/write',
+      );
+    }],
+    [liveRole, (value) => {
+      value.properties.permissions.push({
+        actions: ['*'],
+        notActions: [],
+        dataActions: ['*'],
+        notDataActions: [],
+      });
+    }],
+  ]) {
+    const identity = structuredClone(liveIdentity);
+    const credential = structuredClone(liveCredential);
+    const role = structuredClone(liveRole);
+    const target =
+      resource === liveIdentity
+        ? identity
+        : resource === liveCredential
+          ? credential
+          : role;
+    mutate(target);
+    assert.throws(
+      () =>
+        validateLivePlannerResources(
+          phaseA,
+          planner,
+          approvedParameters,
+          identity,
+          [credential],
+          role,
+        ),
+      /live planner/,
+    );
+  }
+  assert.throws(
+    () =>
+      validateLivePlannerResources(
+        phaseA,
+        planner,
+        approvedParameters,
+        liveIdentity,
+        [
+          liveCredential,
+          {
+            ...structuredClone(liveCredential),
+            id:
+              `${planner.resourceId}/federatedIdentityCredentials/` +
+              'github-attacker',
+            properties: {
+              ...liveCredential.properties,
+              subject:
+                'repo:attacker/repository:environment:' +
+                'azure-governance-bootstrap-phase-b',
+            },
+          },
+        ],
+        liveRole,
+      ),
+    /exactly one federated credential/,
+  );
   for (const mutate of [
+    (value) => {
+      value.name = 'replayed-deployment';
+    },
+    (value) => {
+      value.id =
+        `${subscriptionScope}/providers/Microsoft.Resources/deployments/` +
+        'replayed-deployment';
+    },
+    (value) => {
+      value.location = 'eastus';
+    },
+    (value) => {
+      value.properties.templateHash = 'stale-template';
+    },
     (value) => {
       value.properties.outputs.governancePlanner.value.roleDefinitionId =
         `${subscriptionScope}/providers/Microsoft.Authorization/roleDefinitions/` +
@@ -338,10 +629,24 @@ test('B1a PIM assignments pin exact principals roles and structural scopes', () 
           'a'.repeat(64),
           'a'.repeat(64),
           approvedParameters,
+          deployment.name,
         ),
       /planner .* mismatch/,
     );
   }
+  assert.throws(
+    () =>
+      validatePlannerDeployment(
+        phaseA,
+        deployment,
+        manifest,
+        'b'.repeat(64),
+        'a'.repeat(64),
+        approvedParameters,
+        deployment.name,
+      ),
+    /manifest hash mismatch/,
+  );
   const wrongParameters = structuredClone(deployment);
   wrongParameters.properties.parameters.location.value = 'eastus';
   assert.throws(
@@ -353,6 +658,7 @@ test('B1a PIM assignments pin exact principals roles and structural scopes', () 
         'a'.repeat(64),
         'a'.repeat(64),
         approvedParameters,
+        deployment.name,
       ),
     /deployment parameter mismatch/,
   );
@@ -419,5 +725,44 @@ test('A0 and B1b templates are human-only nonconditionable operations', () => {
       ({ type }) => type === 'Microsoft.Authorization/roleAssignments',
     ).length,
     1,
+  );
+});
+
+test('subscription launcher adds only the reads required by Phase A binding', () => {
+  const template = JSON.parse(
+    execFileSync(
+      process.env.BICEP_CLI || 'bicep',
+      [
+        'build',
+        path.join(root, 'infra/governance/bootstrap-identities.bicep'),
+        '--stdout',
+      ],
+      { encoding: 'utf8' },
+    ),
+  );
+  const launcher = resources(template).find(
+    ({ type, properties }) =>
+      type === 'Microsoft.Authorization/roleDefinitions' &&
+      properties.roleName.includes('Subscription Deployment Launcher'),
+  );
+  const actions = launcher.properties.permissions[0].actions;
+  assert.ok(
+    [
+      'Microsoft.Authorization/policyAssignments/read',
+      'Microsoft.Authorization/policyDefinitions/read',
+      'Microsoft.Authorization/roleAssignments/read',
+      'Microsoft.Authorization/roleDefinitions/read',
+      'Microsoft.ManagedIdentity/userAssignedIdentities/read',
+      'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/read',
+      'Microsoft.Resources/deployments/operations/read',
+    ].every((action) => actions.includes(action)),
+  );
+  assert.equal(
+    actions.filter(
+      (action) =>
+        action.endsWith('/write') &&
+        action !== 'Microsoft.Resources/deployments/write',
+    ).length,
+    0,
   );
 });

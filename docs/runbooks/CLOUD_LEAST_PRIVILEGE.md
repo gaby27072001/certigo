@@ -154,6 +154,9 @@ Un admin PIM attribue séparément le rôle deployment-launcher existant au scop
 le rôle B1a à chacun des cinq RG. `planner-pim-contract.mjs` génère et valide pour chaque RG la
 condition `2.0` qui borne `PrincipalId`, `RoleDefinitionId` et `PrincipalType`. Le scope est borné
 structurellement par l'attribution RBAC au RG; Azure n'expose pas d'attribut ABAC `Scope`.
+Le launcher conserve pour seul write `Microsoft.Resources/deployments/write`; ses lectures
+additionnelles sont bornées aux deployments, RG, role/policy definitions et assignments, UAMI et
+FIC nécessaires au binding Phase A live. Il n'accorde aucun autre write ni dataAction.
 
 ```bash
 # Prévol A0 humain, lecture seule
@@ -181,13 +184,20 @@ az deployment sub create \
   --parameters '@<private-output-directory>/parameters.json'
 
 # Après Phase A, produire le contrat PIM depuis le deployment A0 relu en direct
+# L'outil relit également l'UAMI, toutes ses FIC paginées et le roleDefinition
+# live; il exige une seule FIC et refuse tout drift de principal, sujet,
+# audience, actions ou scopes.
 node infra/governance/planner-pim-contract.mjs \
-  phase-a-output.json \
   '<private-output-directory>/manifest.json' \
   '<approved-planner-manifest-sha256>' \
   'certigo-governance-b1a-planner-bootstrap-<ticket>' \
   b1a-pim-contract.json
 ```
+
+Le générateur réexécute le binding Phase A complet via `prepare-phase-b.sh` à partir des variables
+`PHASE_A_*`; il n'accepte aucun fichier Phase A fourni directement. Il refuse aussi tout accès
+RBAC actif, hérité, éligible ou activé déjà présent sur le principal planner. Le contrat doit être
+généré avant les six attributions PIM décrites, jamais pour légitimer une identité déjà privilégiée.
 
 La migration réutilise les ressources Phase A live et leurs preuves v2; elle ne les recrée pas.
 Avant activation, retirer/downscoper le legacy `microlingo-github-actions` Contributor+UAA

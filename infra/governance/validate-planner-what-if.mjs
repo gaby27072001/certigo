@@ -3,6 +3,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { verifyManifestFiles } from './validate-evidence.mjs';
+import { armGuid } from './validate-what-if.mjs';
 
 const identityName = 'id-certigo-governance-phase-b1a-plan';
 const environmentName = 'azure-governance-bootstrap-phase-b';
@@ -68,12 +69,24 @@ export function validatePlannerWhatIf(plan, subscriptionId) {
           ? 'credential'
           : null;
     } else if (after.type === 'Microsoft.Authorization/roleDefinitions') {
-      const permission = after.properties?.permissions?.[0] ?? {};
+      const permissions = after.properties?.permissions;
+      const permission =
+        Array.isArray(permissions) && permissions.length === 1
+          ? permissions[0]
+          : {};
+      const expectedRoleId =
+        `/subscriptions/${subscriptionId}/providers/Microsoft.Authorization/` +
+        `roleDefinitions/${armGuid(
+          `/subscriptions/${subscriptionId}`,
+          'certigo-governance-phase-b1a-planner',
+        )}`;
       contract =
+        id === normalize(expectedRoleId) &&
         /^Certigo Governance Phase B1a Planner [a-z0-9]{6}$/.test(
           after.properties?.roleName ?? '',
         ) &&
         after.properties?.type === 'CustomRole' &&
+        permissions?.length === 1 &&
         same(permission.actions, [
           'Microsoft.Authorization/roleAssignments/read',
           'Microsoft.Authorization/roleAssignments/write',
@@ -150,14 +163,12 @@ export function validatePlannerEvidence(input) {
 function main() {
   if (process.argv[2] === 'evidence') {
     const [
-      ,
-      ,
       manifestPath,
       expectedManifestSha256,
       sourceRoot,
       subscriptionId,
       tenantId,
-    ] = process.argv;
+    ] = process.argv.slice(3);
     process.stdout.write(
       `${JSON.stringify(
         validatePlannerEvidence({

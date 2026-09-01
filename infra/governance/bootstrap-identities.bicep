@@ -108,16 +108,23 @@ resource subscriptionDeploymentLauncher 'Microsoft.Authorization/roleDefinitions
   name: guid(subscription().id, 'certigo-subscription-deployment-launcher')
   properties: {
     roleName: 'Certigo Subscription Deployment Launcher ${take(uniqueString(subscription().id), 6)}'
-    description: 'Runs subscription what-if/deployments and reads pre-created resource groups; cannot manage resources or RBAC.'
+    description: 'Runs subscription what-if/deployments and reads exact governance evidence inputs; cannot manage resources or RBAC.'
     type: 'CustomRole'
     permissions: [
       {
         actions: [
           'Microsoft.Resources/deployments/read'
+          'Microsoft.Resources/deployments/operations/read'
           'Microsoft.Resources/deployments/write'
           'Microsoft.Resources/deployments/validate/action'
           'Microsoft.Resources/deployments/whatIf/action'
           'Microsoft.Resources/subscriptions/resourceGroups/read'
+          'Microsoft.Authorization/policyAssignments/read'
+          'Microsoft.Authorization/policyDefinitions/read'
+          'Microsoft.Authorization/roleAssignments/read'
+          'Microsoft.Authorization/roleDefinitions/read'
+          'Microsoft.ManagedIdentity/userAssignedIdentities/read'
+          'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/read'
         ]
         notActions: []
         dataActions: []
