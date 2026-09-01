@@ -1047,7 +1047,15 @@ function requiredPhaseB1aContracts(subscriptionId, phaseA) {
       .filter(
         (candidate) =>
           !isExternalJoinAssignment(candidate) &&
-          !isSubscriptionLauncherAssignment(candidate),
+          !isSubscriptionLauncherAssignment(candidate) &&
+          ![
+            phaseA.roleDefinitionIds.runtimeRoleAssignmentWriter,
+            phaseA.roleDefinitionIds.contentInfrastructurePlanExecutor,
+          ].some(
+            (roleDefinitionId) =>
+              normalizeId(roleDefinitionId) ===
+              normalizeId(candidate.roleDefinitionId),
+          ),
       )
       .map(assignmentContract),
   );
@@ -1058,6 +1066,18 @@ function requiredPhaseB1bContracts(subscriptionId, phaseA) {
     'policy-assignment',
     ...expectedRoleAssignments(subscriptionId, phaseA)
       .filter(isSubscriptionLauncherAssignment)
+      .concat(
+        expectedRoleAssignments(subscriptionId, phaseA).filter((candidate) =>
+          [
+            phaseA.roleDefinitionIds.runtimeRoleAssignmentWriter,
+            phaseA.roleDefinitionIds.contentInfrastructurePlanExecutor,
+          ].some(
+            (roleDefinitionId) =>
+              normalizeId(roleDefinitionId) ===
+              normalizeId(candidate.roleDefinitionId),
+          ),
+        ),
+      )
       .map(assignmentContract),
   ]);
 }

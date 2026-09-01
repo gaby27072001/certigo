@@ -14,7 +14,6 @@ const exactScopes = [
   'rg-certigo-staging',
   'rg-certigo-prod',
   'rg-certigo-ci',
-  'rg-certigo-content',
 ];
 
 function normalize(value) {

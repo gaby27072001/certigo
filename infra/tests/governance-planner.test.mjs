@@ -129,7 +129,7 @@ test('A0 planner bootstrap creates one B1a identity and no assignments', () => {
     role.properties.assignableScopes,
     "[variables('exactAssignmentScopes')]",
   );
-  assert.equal(template.variables.exactAssignmentScopes.length, 5);
+  assert.equal(template.variables.exactAssignmentScopes.length, 4);
 });
 
 function plannerPlan() {
@@ -199,7 +199,6 @@ function plannerPlan() {
               'rg-certigo-staging',
               'rg-certigo-prod',
               'rg-certigo-ci',
-              'rg-certigo-content',
             ].map(
               (name) =>
                 `/subscriptions/${subscription}/resourceGroups/${name}`,
@@ -489,7 +488,6 @@ test('B1a PIM assignments pin exact principals roles and structural scopes', () 
         'rg-certigo-staging',
         'rg-certigo-prod',
         'rg-certigo-ci',
-        'rg-certigo-content',
       ].map((name) => `${subscriptionScope}/resourceGroups/${name}`),
     },
   };
@@ -663,7 +661,7 @@ test('B1a PIM assignments pin exact principals roles and structural scopes', () 
     /deployment parameter mismatch/,
   );
   const assignments = b1aPlannerAssignments(phaseA, planner);
-  assert.equal(assignments.length, 6);
+  assert.equal(assignments.length, 5);
   assert.equal(
     validateB1aPlannerAssignments(assignments, phaseA, planner),
     assignments,
@@ -724,8 +722,9 @@ test('A0 and B1b templates are human-only nonconditionable operations', () => {
     resources(template).filter(
       ({ type }) => type === 'Microsoft.Authorization/roleAssignments',
     ).length,
-    1,
+    3,
   );
+  assert.equal(template.outputs.assignmentCount.value, 8);
 });
 
 test('subscription launcher adds only the reads required by Phase A binding', () => {

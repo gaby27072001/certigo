@@ -25,7 +25,6 @@ const exactResourceGroups = [
   'rg-certigo-staging',
   'rg-certigo-prod',
   'rg-certigo-ci',
-  'rg-certigo-content',
 ];
 
 function requireEqual(actual, expected, message) {
@@ -325,17 +324,11 @@ export function b1aPlannerAssignments(phaseA, planner) {
       principalId: planner.principalId,
       principalType: 'ServicePrincipal',
       roleDefinitionId: planner.roleDefinitionId,
-      condition: condition([
-        [
-          environment(name).principalId,
-          `${subscriptionScope}/providers/Microsoft.Authorization/` +
-            'roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c',
-        ],
-        [
-          environment(name).principalId,
-          proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
-        ],
-      ]),
+      condition: condition([[
+        environment(name).principalId,
+        `${subscriptionScope}/providers/Microsoft.Authorization/` +
+          'roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c',
+      ]]),
       conditionVersion: '2.0',
     })),
     {
@@ -349,19 +342,6 @@ export function b1aPlannerAssignments(phaseA, planner) {
           proof.roleDefinitionIds.sharedNetworkDeployment,
         ]),
       ),
-      conditionVersion: '2.0',
-    },
-    {
-      scope: rg('rg-certigo-content'),
-      principalId: planner.principalId,
-      principalType: 'ServicePrincipal',
-      roleDefinitionId: planner.roleDefinitionId,
-      condition: condition([
-        [
-          proof.identities.contentInfrastructurePlan.principalId,
-          proof.roleDefinitionIds.contentInfrastructurePlanExecutor,
-        ],
-      ]),
       conditionVersion: '2.0',
     },
   ];

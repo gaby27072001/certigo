@@ -298,11 +298,18 @@ export function validateExistingPhaseBAssignments(
 ) {
   const contracts = new Set();
   for (const assignment of roleAssignments) {
+    const roleDefinitionId = String(assignment.roleDefinitionId).toLowerCase();
+    const isDelegator = [
+      proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
+      proof.roleDefinitionIds.contentInfrastructurePlanExecutor,
+    ].some(
+      (expected) => String(expected).toLowerCase() === roleDefinitionId,
+    );
     const phase = assignment.scope?.toLowerCase().includes(
       '/providers/microsoft.network/',
     )
       ? 'B2'
-      : assignment.description?.startsWith('Launches the ')
+      : assignment.description?.startsWith('Launches the ') || isDelegator
         ? 'B1b'
         : 'B1a';
     const contract = validatePhaseBResource(

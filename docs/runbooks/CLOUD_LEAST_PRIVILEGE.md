@@ -149,9 +149,9 @@ ces actions. `bootstrap-planning-identity.bicep`, exécuté seulement dans A0 hu
 Le template ne crée aucune attribution.
 
 Le rôle B1a contient uniquement `roleAssignments/read`, `roleAssignments/write` et
-`roleDefinitions/read`; ses assignable scopes sont les cinq RG exacts dev/staging/prod/CI/content.
+`roleDefinitions/read`; ses assignable scopes sont les quatre RG exacts dev/staging/prod/CI.
 Un admin PIM attribue séparément le rôle deployment-launcher existant au scope subscription, puis
-le rôle B1a à chacun des cinq RG. `planner-pim-contract.mjs` génère et valide pour chaque RG la
+le rôle B1a à chacun des quatre RG. `planner-pim-contract.mjs` génère et valide pour chaque RG la
 condition `2.0` qui borne `PrincipalId`, `RoleDefinitionId` et `PrincipalType`. Le scope est borné
 structurellement par l'attribution RBAC au RG; Azure n'expose pas d'attribut ABAC `Scope`.
 Le launcher conserve pour seul write `Microsoft.Resources/deployments/write`; ses lectures
@@ -219,11 +219,12 @@ par le moteur de what-if. Le bootstrap est donc séparé et fail-closed :
   `phaseA` versionné contient les deux resource group IDs, les `clientId`, `principalId`,
   `resourceId`, les six role definition IDs, le policy definition ID, le tenant et la subscription.
 - **Phase B1a automatisable — `bootstrap-rbac`** : consomme les IDs Phase A comme paramètres
-  littéraux et planifie exactement les dix attributions RG conditionnables. Elle ne contient ni
-  launcher subscription ni policyAssignment.
-- **Phase B1b humain PIM — `bootstrap-rbac-admin`** : planifie séparément les trois launchers
-  subscription et l'unique policyAssignment en `Audit`. Aucun workload ne reçoit
-  `policyAssignments/write`.
+  littéraux et planifie six attributions RG sans délégation RBAC : Contributor sur
+  dev/staging/prod et réseau partagé sur CI. Elle ne contient ni launcher subscription,
+  rôle accordant `roleAssignments/write`, ni policyAssignment.
+- **Phase B1b humain PIM — `bootstrap-rbac-admin`** : planifie séparément les trois launchers,
+  les trois runtime writers conditionnés, l'exécuteur contenu conditionné et l'unique
+  policyAssignment en `Audit`. Aucun workload ne peut créer ces attributions délégatrices.
 - **Phase B2 — `contentPlanExternalJoinAssignments`** : cible directement `rg-certigo-ci` et
   planifie séparément les deux attributions externes sur le subnet et la zone DNS exacts.
 
@@ -336,7 +337,8 @@ toutes les opérations subscription et imbriquées, puis énumère les role/poli
 principals. Seul un replay partiel conforme à B1/B2 est accepté; tout assignment supplémentaire
 bloque. B1 passe l'objet Phase A validé comme
 paramètre littéral : aucun `principalId` d'assignment ne dépend d'un `reference()`. Son manifeste
-indépendant B1a couvre les dix roleAssignments RG. Le manifeste B1b couvre les trois launchers et
+indépendant B1a couvre les six roleAssignments RG sans délégation. Le manifeste B1b couvre les
+trois launchers, les quatre attributions délégatrices conditionnées et
 `certigo-privileged-ci-rbac` en `Audit`, sous identité humaine PIM.
 Si ARM omet `principalType` (`null`) dans le payload what-if, B1 ne l'infère qu'après avoir prouvé
 que la déclaration correspondante du template ARM compilé contient le littéral

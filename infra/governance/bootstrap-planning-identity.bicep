@@ -12,7 +12,6 @@ var exactAssignmentScopes = [
   subscriptionResourceId('Microsoft.Resources/resourceGroups', 'rg-certigo-staging')
   subscriptionResourceId('Microsoft.Resources/resourceGroups', 'rg-certigo-prod')
   subscriptionResourceId('Microsoft.Resources/resourceGroups', 'rg-certigo-ci')
-  subscriptionResourceId('Microsoft.Resources/resourceGroups', 'rg-certigo-content')
 ]
 
 resource identityResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {

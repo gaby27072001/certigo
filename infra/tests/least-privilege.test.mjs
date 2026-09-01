@@ -443,6 +443,19 @@ function makeCompletePhaseBPlans(proof) {
         },
       ),
       roleAssignmentChange(
+        `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci`,
+        proof.identities[key].name,
+        {
+          description:
+            `Allows ${environment} to reconcile only shared DNS links and VNet peerings.`,
+          principalId,
+          principalType: 'ServicePrincipal',
+          roleDefinitionId: proof.roleDefinitionIds.sharedNetworkDeployment,
+        },
+      ),
+    );
+    b1bChanges.push(
+      roleAssignmentChange(
         `/subscriptions/${subscription}/resourceGroups/rg-certigo-${environment}`,
         proof.identities[key].name,
         {
@@ -456,22 +469,11 @@ function makeCompletePhaseBPlans(proof) {
             proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
         },
       ),
-      roleAssignmentChange(
-        `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci`,
-        proof.identities[key].name,
-        {
-          description:
-            `Allows ${environment} to reconcile only shared DNS links and VNet peerings.`,
-          principalId,
-          principalType: 'ServicePrincipal',
-          roleDefinitionId: proof.roleDefinitionIds.sharedNetworkDeployment,
-        },
-      ),
     );
   }
   const contentPrincipal =
     proof.identities.contentInfrastructurePlan.principalId;
-  b1aChanges.push(
+  b1bChanges.push(
     roleAssignmentChange(
       `/subscriptions/${subscription}/resourceGroups/rg-certigo-content`,
       proof.identities.contentInfrastructurePlan.name,
@@ -640,9 +642,8 @@ test('Phase B1a uses literal Phase A IDs and creates only RG assignments', () =>
       ).length,
     })),
     [
-      { copy: "[length(variables('environments'))]", nested: 2 },
       { copy: "[length(variables('environments'))]", nested: 1 },
-      { copy: null, nested: 1 },
+      { copy: "[length(variables('environments'))]", nested: 1 },
     ],
   );
   assert.equal(
@@ -663,11 +664,11 @@ test('Phase B1a uses literal Phase A IDs and creates only RG assignments', () =>
   assert.doesNotMatch(source, /\.properties\.principalId/);
   assert.doesNotMatch(source, /\breference\s*\(/);
   assert.match(source, /principalId: environment\.identity\.principalId/);
-  assert.match(
+  assert.doesNotMatch(
     source,
     /principalId: phaseA\.identities\.contentInfrastructurePlan\.principalId/,
   );
-  assert.equal(template.outputs.assignmentCount.value, 10);
+  assert.equal(template.outputs.assignmentCount.value, 6);
 });
 
 test('Phase B2 uses only literal exact subnet and DNS resources', () => {
@@ -975,11 +976,11 @@ test('Phase B1a B1b and B2 accept only their exact assignment contracts', () => 
   const { b1a, b1b, b2 } = makeCompletePhaseBPlans(proof);
   assert.equal(
     validateWhatIf(b1a, subscription, { phase: 'B1a', phaseA: proof }).total,
-    10,
+    6,
   );
   assert.equal(
     validateWhatIf(b1b, subscription, { phase: 'B1b', phaseA: proof }).total,
-    4,
+    8,
   );
   assert.equal(
     validateWhatIf(b2, subscription, { phase: 'B2', phaseA: proof }).total,
@@ -1015,10 +1016,10 @@ test('Phase B validators reject IDs, principals, types, scopes, and conditions',
       return ['b1a', 'B1a'];
     },
     (plans) => {
-      plans.b1a.changes.find(
+      plans.b1b.changes.find(
         ({ after }) => after.properties.conditionVersion === '2.0',
       ).after.properties.condition = 'true';
-      return ['b1a', 'B1a'];
+      return ['b1b', 'B1b'];
     },
     (plans) => {
       plans.b2.changes[0].resourceId = plans.b2.changes[0].resourceId.replace(
@@ -1042,8 +1043,8 @@ test('Phase B validators reject IDs, principals, types, scopes, and conditions',
 test('Phase B validators accept exact NoChange retries only', () => {
   const proof = makePhaseAProof();
   for (const [key, phase, total] of [
-    ['b1a', 'B1a', 10],
-    ['b1b', 'B1b', 4],
+    ['b1a', 'B1a', 6],
+    ['b1b', 'B1b', 8],
     ['b2', 'B2', 2],
   ]) {
     const create = makeCompletePhaseBPlans(proof)[key];

@@ -212,7 +212,11 @@ function makeB1Plan(proof) {
     changes: changes.filter(
       (change) =>
         !change.resourceId.includes('/policyAssignments/') &&
-        !change.after?.properties?.description?.startsWith('Launches the '),
+        !change.after?.properties?.description?.startsWith('Launches the ') &&
+        ![
+          proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
+          proof.roleDefinitionIds.contentInfrastructurePlanExecutor,
+        ].includes(change.after?.properties?.roleDefinitionId),
     ),
     diagnostics: null,
     error: null,
@@ -518,6 +522,70 @@ test('deployment parameters, locations, and B1 transition are exact', () => {
     );
 });
 
+test('live Phase B binding classifies delegator roles as human B1b', () => {
+  const proof = makePhaseAProof();
+  const all = makeB1Plan(proof).changes;
+  const delegators = [];
+  for (const environment of ['dev', 'staging', 'prod']) {
+    const key = `deploy${environment[0].toUpperCase()}${environment.slice(1)}`;
+    const identity = proof.identities[key];
+    const scope =
+      `/subscriptions/${subscription}/resourceGroups/rg-certigo-${environment}`;
+    delegators.push({
+      id:
+        `${scope}/providers/Microsoft.Authorization/roleAssignments/` +
+        armGuid(
+          scope,
+          identity.name,
+          proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
+        ),
+      name: 'runtime-writer',
+      scope,
+      condition: runtimeWriterCondition(),
+      conditionVersion: '2.0',
+      description:
+        'May create only approved runtime roles for service principals in this environment.',
+      principalId: identity.principalId,
+      principalType: 'ServicePrincipal',
+      roleDefinitionId: proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
+    });
+  }
+  const contentScope =
+    `/subscriptions/${subscription}/resourceGroups/rg-certigo-content`;
+  delegators.push({
+    id:
+      `${contentScope}/providers/Microsoft.Authorization/roleAssignments/` +
+      armGuid(
+        contentScope,
+        proof.identities.contentInfrastructurePlan.name,
+        proof.roleDefinitionIds.contentInfrastructurePlanExecutor,
+      ),
+    name: 'content-executor',
+    scope: contentScope,
+    condition: contentPlanCondition(proof),
+    conditionVersion: '2.0',
+    description:
+      'Plans the content stack and may assign only approved content roles to service principals.',
+    principalId: proof.identities.contentInfrastructurePlan.principalId,
+    principalType: 'ServicePrincipal',
+    roleDefinitionId: proof.roleDefinitionIds.contentInfrastructurePlanExecutor,
+  });
+  const b1a = all.map((change) => ({
+    id: change.resourceId,
+    name: change.resourceId.split('/').at(-1),
+    scope: change.resourceId.split('/providers/Microsoft.Authorization/')[0],
+    ...change.after.properties,
+  }));
+  assert.doesNotThrow(() =>
+    validateExistingPhaseBAssignments(
+      [...b1a, ...delegators],
+      [],
+      subscription,
+      proof,
+    ),
+  );
+});
+
 test('omitted principalType requires compiled literal and live Phase A UAMI', () => {
   const proof = makePhaseAProof();
   const raw = makeB1Plan(proof);
@@ -531,7 +599,7 @@ test('omitted principalType requires compiled literal and live Phase A UAMI', ()
     compiledB1PrincipalTypes(),
     proof,
   );
-  assert.equal(normalized.provenance.normalizedCount, 10);
+  assert.equal(normalized.provenance.normalizedCount, 6);
   assert.ok(
     normalized.provenance.entries.every(
       ({ effectivePrincipalType, provenance }) =>
@@ -544,7 +612,7 @@ test('omitted principalType requires compiled literal and live Phase A UAMI', ()
       phase: 'B1a',
       phaseA: proof,
     }).total,
-    10,
+    6,
   );
 
   for (const compiled of [
@@ -614,7 +682,7 @@ test('deployment approval recomputes normalized principalType evidence', () => {
     provenanceSha256: sha256File(provenancePath),
     effectivePrincipalType: 'ServicePrincipal',
     provenance: 'compiled-template+live-uami',
-    normalizedCount: 10,
+    normalizedCount: 6,
   };
   evidence.manifest.phaseA = {
     evidenceManifestSha256: 'a'.repeat(64),

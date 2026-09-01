@@ -1,0 +1,60 @@
+✔ runner defaults implement the canonical FinOps contract without personal values (1.678ms)
+✔ runner network applies parameterized non-personal tags additively (7327.6749ms)
+✔ runner compute preserves provenance tags under the mandatory contract (7127.8443ms)
+✔ application composition applies the canonical contract additively by scope (12358.06ms)
+✔ only directly declared taggable runner resources receive the contract (0.2691ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27006.2494
+file:///C:/Users/GCHAMB%7E1/AppData/Local/Temp/certigo-governance-evidence-Be6Nsh/directory%20with%20spaces/write-what-if-manifest.mjs:181
+      throw new Error(`Missing required argument ${key}`);
+            ^
+
+Error: Missing required argument --phase
+    at main (file:///C:/Users/GCHAMB%7E1/AppData/Local/Temp/certigo-governance-evidence-Be6Nsh/directory%20with%20spaces/write-what-if-manifest.mjs:181:13)
+    at file:///C:/Users/GCHAMB%7E1/AppData/Local/Temp/certigo-governance-evidence-Be6Nsh/directory%20with%20spaces/write-what-if-manifest.mjs:213:3
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:643:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.19.0
+✔ deployment approval rejects missing, tampered, and wrong-commit evidence (6864.4495ms)
+✔ Phase A binding rejects extra and out-of-contract assignments (7025.1957ms)
+✔ Phase A operation binding rejects missing and assignment operations (0.3145ms)
+✔ deployment parameters, locations, and B1 transition are exact (1.3046ms)
+✔ omitted principalType requires compiled literal and live Phase A UAMI (5.6316ms)
+✔ deployment approval recomputes normalized principalType evidence (6016.6087ms)
+✔ manifest verification rejects omitted and renamed artifacts (6692.7555ms)
+✔ governance workflows persist evidence and deploy tools require approvals (3.5538ms)
+✔ Phase A writes evidence before validation and manifest CLI handles spaces (137.255ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 26914.7861
+✔ A0 planner bootstrap creates one B1a identity and no assignments (6832.6413ms)
+✔ planner validator rejects confused-deputy and privilege escalation (2.1322ms)
+✔ A0 deployment instructions verify the complete approved evidence (2.7714ms)
+✔ planner evidence CLI parses arguments after the subcommand (128.9627ms)
+✔ planner contract rejects every pre-existing active or eligible access (0.5285ms)
+✔ planner access scopes follow only complete management-group parent IDs (0.9716ms)
+✔ B1a PIM assignments pin exact principals roles and structural scopes (14.294ms)
+✔ A0 and B1b templates are human-only nonconditionable operations (6572.1852ms)
+✔ subscription launcher adds only the reads required by Phase A binding (7236.1398ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20969.0172
+Azure IaC validation passed (7 parameter files).
