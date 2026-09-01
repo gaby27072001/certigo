@@ -1196,22 +1196,22 @@ function validateRepositoryInvariants() {
     if (!dependencyScan.includes(marker)) {
       errors.push(`dependency-vuln-scan.yml: missing fail-closed output invariant ${marker}`);
     }
-    for (const marker of [
-      "'--format=json'",
-      "'--no-ignore'",
-      '`--config=${path.resolve(configFile)}`',
-      "'--output-file'",
-      '`--lockfile=${canonicalSource}`',
-      'Expected OSV source contract must contain at least one lockfile.',
-      'Expected OSV source contract contains duplicate lockfiles.',
-      'must reference a regular lockfile.',
-      'spawnSync(scanner, args',
-      'assertOsvScannedEveryLockfile',
-      'OSV-Scanner did not confirm scanning lockfiles',
-    ]) {
-      if (!osvRunner.includes(marker)) {
-        errors.push(`run-osv-scan.mjs: missing explicit lockfile invariant ${marker}`);
-      }
+  }
+  for (const marker of [
+    "'--format=json'",
+    "'--no-ignore'",
+    '`--config=${path.resolve(configFile)}`',
+    "'--output-file'",
+    '`--lockfile=${canonicalSource}`',
+    'Expected OSV source contract must contain at least one lockfile.',
+    'Expected OSV source contract contains duplicate lockfiles.',
+    'must reference a regular lockfile.',
+    'spawnSync(scanner, args',
+    'assertOsvScannedEveryLockfile',
+    'OSV-Scanner did not confirm scanning lockfiles',
+  ]) {
+    if (!osvRunner.includes(marker)) {
+      errors.push(`run-osv-scan.mjs: missing explicit lockfile invariant ${marker}`);
     }
   }
   for (const marker of [
