@@ -438,8 +438,7 @@ export function validateLegacyTransition(
       transition.changeControl.soloModeControls,
       [
         'alertingEnabled',
-        'breakGlassAccountUpns',
-        'breakGlassAccountUserType',
+        'breakGlassAccounts',
         'breakGlassAccountsCloudOnly',
         'breakGlassEvidenceSha256',
         'breakGlassGlobalAdministratorActivePermanent',
@@ -462,7 +461,8 @@ export function validateLegacyTransition(
         'riskAcceptance',
         'rollbackEvidenceSha256',
         'sameHumanControlAcknowledged',
-        'tenantInitialDomain',
+        'managementTenantId',
+        'tenantIssuerDomain',
         'whfbPolicyEligibleAndTested',
       ],
       'solo-mode compensating controls',
@@ -515,11 +515,20 @@ export function validateLegacyTransition(
     );
     const expectedRiskScope =
       `/subscriptions/${transition.subscriptionId}/governance-phase-b`;
-    const tenantInitialDomain = normalize(
-      transition.changeControl.soloModeControls.tenantInitialDomain,
+    const tenantIssuerDomain = normalize(
+      transition.changeControl.soloModeControls.tenantIssuerDomain,
     );
-    const breakGlassAccountUpns =
-      transition.changeControl.soloModeControls.breakGlassAccountUpns;
+    const managementTenantId = requireUuid(
+      transition.changeControl.soloModeControls.managementTenantId,
+      'solo-mode management tenant ID',
+    );
+    const breakGlassAccounts =
+      transition.changeControl.soloModeControls.breakGlassAccounts;
+    if (!Array.isArray(breakGlassAccounts) || breakGlassAccounts.length !== 2) {
+      throw new Error(
+        'NO-GO: exactly two qualified emergency accounts are required in the subscription management tenant',
+      );
+    }
     const credentialMode =
       transition.changeControl.soloModeControls.credentialMode;
     const attestationAaguids =
@@ -534,17 +543,56 @@ export function validateLegacyTransition(
       soloRiskApprovedAt > now ||
       riskExpiresAt <= now ||
       recoveryDrillTestedAt > now ||
-      transition.changeControl.soloModeControls.breakGlassAccountUserType !==
-        'Member' ||
-      !/^[a-z0-9][a-z0-9.-]*\.onmicrosoft\.com$/.test(tenantInitialDomain) ||
-      !Array.isArray(breakGlassAccountUpns) ||
-      breakGlassAccountUpns.length !== 2 ||
-      new Set(breakGlassAccountUpns.map(normalize)).size !== 2 ||
-      breakGlassAccountUpns.some(
-        (upn) =>
-          typeof upn !== 'string' ||
-          !normalize(upn).endsWith(`@${tenantInitialDomain}`) ||
-          normalize(upn).includes('#ext#'),
+      !/^[a-z0-9][a-z0-9.-]*\.onmicrosoft\.com$/.test(tenantIssuerDomain) ||
+      breakGlassAccounts.some((account) => {
+        requireExactFields(
+          account,
+          [
+            'accountEnabled',
+            'authenticationMethodCount',
+            'authenticationMethodsTested',
+            'creationType',
+            'issuer',
+            'managementAccessVerified',
+            'objectId',
+            'onPremisesSyncEnabled',
+            'tenantId',
+            'userPrincipalName',
+            'userType',
+          ],
+          'solo-mode break-glass account',
+        );
+        return (
+          account.accountEnabled !== true ||
+          account.userType !== 'Member' ||
+          requireUuid(account.tenantId, 'break-glass account tenant ID') !==
+            normalize(proof.tenantId) ||
+          requireUuid(account.objectId, 'break-glass account object ID') ===
+            managementTenantId ||
+          account.managementAccessVerified !== true ||
+          !Number.isInteger(account.authenticationMethodCount) ||
+          account.authenticationMethodCount < 1 ||
+          account.authenticationMethodsTested !== true ||
+          typeof account.userPrincipalName !== 'string' ||
+          !/^[^@]+@[^@]+\.onmicrosoft\.com$/i.test(
+            account.userPrincipalName,
+          ) ||
+          normalize(account.userPrincipalName).includes('#ext#') ||
+          normalize(account.issuer) !== tenantIssuerDomain ||
+          normalize(account.creationType) === 'invitation' ||
+          account.onPremisesSyncEnabled === true
+        );
+      }) ||
+      new Set(
+        breakGlassAccounts.map((account) =>
+          normalize(account.userPrincipalName),
+        ),
+      ).size !== 2 ||
+      managementTenantId !== normalize(proof.tenantId) ||
+      breakGlassAccounts.some(
+        (account) =>
+          typeof account.creationType !== 'string' &&
+          account.creationType !== null,
       ) ||
       transition.changeControl.soloModeControls
         .dailyAndAdminAccountsSeparated !== true ||
@@ -597,7 +645,7 @@ export function validateLegacyTransition(
           1000
     ) {
       throw new Error(
-        'solo mode requires current scoped risk acceptance, separated daily/admin accounts, two tested cloud-only Member accounts in the inventoried initial tenant domain with permanent Global Admin, two admissible distinct credentials, no guest passkey path, separate recovery, Conditional Access exclusions, alerting, and a current recovery drill',
+        'solo mode requires current scoped risk acceptance, separated daily/admin accounts, two tested active cloud-only native Member accounts bound to the subscription management tenant with verified management access, authentication methods, tenant issuer, and permanent Global Admin, two admissible distinct credentials, no guest passkey path, separate recovery, Conditional Access exclusions, alerting, and a current recovery drill',
       );
     }
   } else {

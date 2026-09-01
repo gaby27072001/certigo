@@ -713,11 +713,35 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
     },
     dailyAndAdminAccountsSeparated: true,
     sameHumanControlAcknowledged: true,
-    tenantInitialDomain: 'certigo.onmicrosoft.com',
-    breakGlassAccountUserType: 'Member',
-    breakGlassAccountUpns: [
-      'certigo-emergency-1@certigo.onmicrosoft.com',
-      'certigo-emergency-2@certigo.onmicrosoft.com',
+    managementTenantId: tenant,
+    tenantIssuerDomain: 'fdpo.onmicrosoft.com',
+    breakGlassAccounts: [
+      {
+        userPrincipalName: 'certigo-emergency-1@certigoapp.onmicrosoft.com',
+        userType: 'Member',
+        accountEnabled: true,
+        tenantId: tenant,
+        objectId: '6503a9b1-1e64-4c39-9ec7-c15a1c911c80',
+        managementAccessVerified: true,
+        authenticationMethodCount: 1,
+        authenticationMethodsTested: true,
+        creationType: null,
+        onPremisesSyncEnabled: false,
+        issuer: 'fdpo.onmicrosoft.com',
+      },
+      {
+        userPrincipalName: 'certigo-emergency-2@fdpo.onmicrosoft.com',
+        userType: 'Member',
+        accountEnabled: true,
+        tenantId: tenant,
+        objectId: '6503a9b1-1e64-4c39-9ec7-c15a1c911c81',
+        managementAccessVerified: true,
+        authenticationMethodCount: 1,
+        authenticationMethodsTested: true,
+        creationType: null,
+        onPremisesSyncEnabled: null,
+        issuer: 'fdpo.onmicrosoft.com',
+      },
     ],
     breakGlassAccountsCloudOnly: true,
     breakGlassGlobalAdministratorActivePermanent: true,
@@ -745,6 +769,13 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
     rollbackEvidenceSha256: 'c'.repeat(64),
   };
   assert.doesNotThrow(() => validate(approvedSolo));
+  const noManagementEmergencyAccounts = structuredClone(approvedSolo);
+  noManagementEmergencyAccounts.changeControl.soloModeControls
+    .breakGlassAccounts = [];
+  assert.throws(
+    () => validate(noManagementEmergencyAccounts),
+    /NO-GO: exactly two qualified emergency accounts.*management tenant/,
+  );
   approvedSolo.changeControl.soloModeControls.riskAcceptance.evidenceSha256 =
     null;
   assert.throws(
@@ -757,20 +788,21 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
     false;
   assert.throws(
     () => validate(approvedSolo),
-    /two tested cloud-only Member accounts/,
+    /two tested active cloud-only native Member accounts/,
   );
   approvedSolo.changeControl.soloModeControls.credentialsDistinctAndTested =
     true;
-  approvedSolo.changeControl.soloModeControls.breakGlassAccountUpns[0] =
-    'guest_example.com#EXT#@certigo.onmicrosoft.com';
+  approvedSolo.changeControl.soloModeControls.breakGlassAccounts[0]
+    .userPrincipalName = 'guest_example.com#EXT#@fdpo.onmicrosoft.com';
   assert.throws(
     () => validate(approvedSolo),
-    /inventoried initial tenant domain/,
+    /active cloud-only native Member accounts/,
   );
 
   const oneDevicePasskeys = structuredClone(approvedSolo);
-  oneDevicePasskeys.changeControl.soloModeControls.breakGlassAccountUpns[0] =
-    'certigo-emergency-1@certigo.onmicrosoft.com';
+  oneDevicePasskeys.changeControl.soloModeControls.breakGlassAccounts[0]
+    .userPrincipalName =
+    'certigo-emergency-1@certigoapp.onmicrosoft.com';
   oneDevicePasskeys.changeControl.soloModeControls.credentialAttestationAaguids[1] =
     oneDevicePasskeys.changeControl.soloModeControls
       .credentialAttestationAaguids[0];
@@ -792,13 +824,57 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
   );
 
   const retrospectiveAcceptance = structuredClone(approvedSolo);
-  retrospectiveAcceptance.changeControl.soloModeControls.breakGlassAccountUpns[0] =
-    'certigo-emergency-1@certigo.onmicrosoft.com';
+  retrospectiveAcceptance.changeControl.soloModeControls.breakGlassAccounts[0]
+    .userPrincipalName =
+    'certigo-emergency-1@certigoapp.onmicrosoft.com';
   retrospectiveAcceptance.changeControl.soloModeControls.riskAcceptance.approvedAt =
     retrospectiveAcceptance.broadRemoval.uaaRemovedAt;
   assert.throws(
     () => validate(retrospectiveAcceptance),
     /cannot be removed before two JIT activations/,
+  );
+
+  const invitedMember = structuredClone(approvedSolo);
+  invitedMember.changeControl.soloModeControls.breakGlassAccounts[0]
+    .userPrincipalName =
+    'certigo-emergency-1@certigoapp.onmicrosoft.com';
+  invitedMember.changeControl.soloModeControls.breakGlassAccounts[0]
+    .creationType = 'Invitation';
+  assert.throws(
+    () => validate(invitedMember),
+    /active cloud-only native Member accounts/,
+  );
+
+  const wrongIssuer = structuredClone(invitedMember);
+  wrongIssuer.changeControl.soloModeControls.breakGlassAccounts[0]
+    .creationType = null;
+  wrongIssuer.changeControl.soloModeControls.breakGlassAccounts[0].issuer =
+    'other.onmicrosoft.com';
+  assert.throws(
+    () => validate(wrongIssuer),
+    /tenant issuer/,
+  );
+
+  const crossTenantAccount = structuredClone(wrongIssuer);
+  crossTenantAccount.changeControl.soloModeControls.breakGlassAccounts[0]
+    .issuer = 'fdpo.onmicrosoft.com';
+  crossTenantAccount.changeControl.soloModeControls.breakGlassAccounts[0]
+    .tenantId = 'af721be8-5901-422a-b299-b9c57847b968';
+  assert.throws(
+    () => validate(crossTenantAccount),
+    /subscription management tenant/,
+  );
+
+  const missingAuthenticationEvidence = structuredClone(crossTenantAccount);
+  missingAuthenticationEvidence.changeControl.soloModeControls
+    .breakGlassAccounts[0].tenantId = tenant;
+  missingAuthenticationEvidence.changeControl.soloModeControls
+    .breakGlassAccounts[0].authenticationMethodCount = 0;
+  missingAuthenticationEvidence.changeControl.soloModeControls
+    .breakGlassAccounts[0].authenticationMethodsTested = false;
+  assert.throws(
+    () => validate(missingAuthenticationEvidence),
+    /authentication methods/,
   );
 
   const equalBoundary = structuredClone(transition);
@@ -903,7 +979,7 @@ test('runbook fixes planner count, transition ordering, and Phase A repair proof
   assert.match(runbook, /Never reconstruct it locally|reconstruit ne constituent jamais/);
   assert.match(runbook, /changement de réparation séparé/);
   assert.match(runbook, /LEGACY_TRANSITION_FILE/);
-  assert.match(runbook, /fdpo\.onmicrosoft\.com/);
+  assert.match(runbook, /domaines UPN secondaires `\*\.onmicrosoft\.com`/);
   assert.match(runbook, /B2B `#EXT#`/);
   assert.match(runbook, /deux passkeys\s+Authenticator device-bound/);
   assert.match(runbook, /WHfB ne compte qu'après preuve/);

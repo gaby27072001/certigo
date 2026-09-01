@@ -610,11 +610,22 @@ Pour Certigo en contexte unipersonnel, l'acceptation explicite du risque résidu
 enregistrée le 2026-09-01; elle satisfait uniquement le prérequis de décision. Elle ne fournit aucune
 indépendance humaine et ne vaut pas GO opérationnel. `soloModeControls` doit encore prouver, avant
 Phase B, une acceptation datée, scopée à l'abonnement/Phase B et non expirée, la séparation des
-comptes quotidien/admin, et deux comptes emergency-access cloud-only de type `Member`, avec des UPN
-dans le domaine initial inventorié du tenant, Global Administrator actifs en permanence. Le domaine
-ne vient jamais d'une convention de nommage : l'observation read-only courante donne
-`fdpo.onmicrosoft.com`, aucun compte `breakglass@certigoapp.onmicrosoft.com` et zéro Member cloud-only
-admissible. Un utilisateur guest interne ou externe, notamment un compte B2B `#EXT#`, ne peut pas
+comptes quotidien/admin, et deux comptes emergency-access cloud-only de type `Member`, Global
+Administrator actifs en permanence. Les domaines UPN secondaires `*.onmicrosoft.com` sont admis :
+la gate découvre le domaine issuer du tenant et exige pour chaque compte `accountEnabled: true`,
+`creationType` différent de `Invitation`, `onPremisesSyncEnabled` différent de `true` et un issuer
+identique à celui du tenant. Une présence, un UPN secondaire ou `userType: Member` seuls ne prouvent
+pas la qualification cloud-native. Chaque preuve scelle séparément `tenantId` et `objectId`,
+réconcilie l'issuer/sign-in identifier, confirme l'accès management et refuse de traiter un object ID
+comme tenant ID. Les deux comptes doivent appartenir au tenant management exact de la subscription;
+un Global Administrator d'un tenant CIAM distinct ne prouve jamais le non-lockout RBAC/PIM de la
+subscription. L'observation read-only corrigée confirme un compte CIAM Member actif sur un domaine
+UPN secondaire, mais avec zéro authentication method/default/preferred MFA : il est présent, pas
+qualifié ni testé pour Phase B. Dans le tenant management exact de la subscription
+`16b3c013-d300-468d-ac64-7eda0820b6d3`, l'inventaire read-only trouve actuellement zéro compte
+emergency cloud-only natif; la gate retourne donc explicitement **NO-GO**. Deux comptes qualifiés
+dans ce tenant restent obligatoires, sans création ou enrôlement automatique. Un
+utilisateur guest interne ou externe, notamment un compte B2B `#EXT#`, ne peut pas
 enregistrer de passkey FIDO2 et n'est jamais une voie admissible pour ces comptes; un échec
 Authenticator/My Security Info sur ce parcours guest ne doit pas conduire à affaiblir la gate. Ces
 comptes recovery restent séparés du compte admin mais sont explicitement
