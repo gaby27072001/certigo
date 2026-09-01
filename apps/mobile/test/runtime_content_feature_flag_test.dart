@@ -1,4 +1,4 @@
-import 'package:certigo/app/content/runtime_content_dependencies.dart';
+import 'package:certigo/app/content/runtime_content_providers.dart';
 import 'package:certigo/app/providers.dart';
 import 'package:data/data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,5 +35,23 @@ void main() {
 
     expect(container.read(runtimeContentSyncEnabledProvider), isFalse);
     expect(container.read(lessonRepositoryProvider), isA<OfflineLessonRepository>());
+  });
+
+  test('runtime cache namespace includes the normalized API base path', () {
+    final String first = runtimeContentSpaceScopeFor(
+      flavor: 'staging',
+      apiBaseUri: Uri.parse('https://api.example.test/api-a/'),
+    );
+    final String equivalent = runtimeContentSpaceScopeFor(
+      flavor: 'staging',
+      apiBaseUri: Uri.parse('https://api.example.test/api-a'),
+    );
+    final String second = runtimeContentSpaceScopeFor(
+      flavor: 'staging',
+      apiBaseUri: Uri.parse('https://api.example.test/api-b'),
+    );
+
+    expect(first, equivalent);
+    expect(first, isNot(second));
   });
 }

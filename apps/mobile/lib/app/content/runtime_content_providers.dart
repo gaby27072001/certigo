@@ -79,6 +79,17 @@ final runtimeContentControllerProvider =
 });
 
 String runtimeContentSpaceScope() {
-  final Uri api = Uri.parse(AppEnv.apiBaseUrl);
-  return runtimeContentScopeKey('${AppEnv.flavor.name}|${api.origin}');
+  return runtimeContentSpaceScopeFor(
+    flavor: AppEnv.flavor.name,
+    apiBaseUri: Uri.parse(AppEnv.apiBaseUrl),
+  );
+}
+
+String runtimeContentSpaceScopeFor({
+  required String flavor,
+  required Uri apiBaseUri,
+}) {
+  final Uri normalizedUri = apiBaseUri.replace(query: null, fragment: null).normalizePath();
+  final String normalized = normalizedUri.toString().replaceFirst(RegExp(r'/$'), '');
+  return runtimeContentScopeKey('$flavor|$normalized');
 }
