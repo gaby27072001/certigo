@@ -64,20 +64,23 @@ class ContentUpdateBanner extends ConsumerWidget {
               dense: true,
               leading: Icon(icon, color: colors.primary),
               title: Text(message),
-              trailing: retry
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        if (status.canRollback)
+              subtitle: retry
+                  ? Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: Wrap(
+                        alignment: WrapAlignment.end,
+                        children: <Widget>[
+                          if (status.canRollback)
+                            TextButton(
+                              onPressed: () => _rollback(ref),
+                              child: const Text('Version précédente'),
+                            ),
                           TextButton(
-                            onPressed: () => _rollback(ref),
-                            child: const Text('Version précédente'),
+                            onPressed: () => _retry(ref),
+                            child: const Text('Réessayer'),
                           ),
-                        TextButton(
-                          onPressed: () => _retry(ref),
-                          child: const Text('Réessayer'),
-                        ),
-                      ],
+                        ],
+                      ),
                     )
                   : null,
             ),

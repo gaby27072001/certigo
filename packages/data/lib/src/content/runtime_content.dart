@@ -142,12 +142,14 @@ class PublicContentManifest {
     required this.manifestId,
     required this.rootHash,
     required this.rawJson,
+    this.releaseId,
   });
 
   final String schema;
   final List<PublicContentFile> files;
   final String manifestId;
   final String rootHash;
+  final String? releaseId;
   final Map<String, dynamic> rawJson;
 
   int get totalBytes => files.fold<int>(0, (int total, PublicContentFile file) {
@@ -171,7 +173,7 @@ class PublicContentManifest {
         'manifestId',
         'rootHash',
       },
-      optional: const <String>{},
+      optional: const <String>{'releaseId'},
       name: 'package manifest',
     );
     final String schema = _requiredString(json, 'schema');
@@ -192,7 +194,7 @@ class PublicContentManifest {
       throw const FormatException('Package manifest files must be an array');
     }
     final int fileCount = _requiredInt(json, 'fileCount');
-    if (fileCount != rawFiles.length || fileCount > limits.maxFiles) {
+    if (fileCount <= 0 || fileCount != rawFiles.length || fileCount > limits.maxFiles) {
       throw FormatException('Package manifest fileCount is invalid: $fileCount');
     }
     final List<PublicContentFile> files = rawFiles
@@ -224,12 +226,17 @@ class PublicContentManifest {
 
     final String manifestId = _requiredString(json, 'manifestId');
     final String rootHash = _requiredString(json, 'rootHash');
+    final String? releaseId = json['releaseId'] as String?;
     if (!_digestId.hasMatch(manifestId) || !_hexDigest.hasMatch(rootHash)) {
       throw const FormatException('Package manifest identities are invalid');
     }
+    if (releaseId != null && !_digestId.hasMatch(releaseId)) {
+      throw const FormatException('Package manifest release identity is invalid');
+    }
     final Map<String, dynamic> digestBody = Map<String, dynamic>.from(json)
       ..remove('manifestId')
-      ..remove('rootHash');
+      ..remove('rootHash')
+      ..remove('releaseId');
     final String digest = sha256.convert(utf8.encode(_canonicalJson(digestBody))).toString();
     if (manifestId != 'sha256:$digest' || rootHash != digest) {
       throw const FormatException('Package manifest canonical digest is invalid');
@@ -240,9 +247,26 @@ class PublicContentManifest {
       files: files,
       manifestId: manifestId,
       rootHash: rootHash,
+      releaseId: releaseId,
       rawJson: Map<String, dynamic>.unmodifiable(Map<String, dynamic>.from(json)),
     );
   }
+
+  PublicContentManifest withReleaseId(String value) {
+    if (!_digestId.hasMatch(value)) {
+      throw const FormatException('Package manifest release identity is invalid');
+    }
+    return PublicContentManifest(
+      schema: schema,
+      files: files,
+      manifestId: manifestId,
+      rootHash: rootHash,
+      releaseId: value,
+      rawJson: Map<String, dynamic>.unmodifiable(<String, dynamic>{...rawJson, 'releaseId': value}),
+    );
+  }
+
+  Map<String, dynamic> get canonicalJson => Map<String, dynamic>.from(rawJson)..remove('releaseId');
 
   PublicContentFile? fileById(String id) {
     for (final PublicContentFile file in files) {
@@ -253,28 +277,62 @@ class PublicContentManifest {
 }
 
 class PublicManifestFetch {
-  const PublicManifestFetch._({required this.notModified, this.manifest, this.etag});
+  const PublicManifestFetch._({
+    required this.notModified,
+    required this.etag,
+    required this.releaseId,
+    required this.publicManifestId,
+    this.manifest,
+  });
 
-  const PublicManifestFetch.notModified(String etag) : this._(notModified: true, etag: etag);
+  const PublicManifestFetch.notModified({
+    required String etag,
+    required String releaseId,
+    required String publicManifestId,
+  }) : this._(
+          notModified: true,
+          etag: etag,
+          releaseId: releaseId,
+          publicManifestId: publicManifestId,
+        );
 
-  const PublicManifestFetch.fetched(PublicContentManifest manifest, String etag)
-      : this._(notModified: false, manifest: manifest, etag: etag);
+  PublicManifestFetch.fetched(PublicContentManifest manifest, String etag)
+      : this._(
+          notModified: false,
+          manifest: manifest,
+          etag: etag,
+          releaseId: manifest.releaseId,
+          publicManifestId: manifest.manifestId,
+        );
 
   final bool notModified;
   final PublicContentManifest? manifest;
-  final String? etag;
+  final String etag;
+  final String? releaseId;
+  final String publicManifestId;
 }
 
 class PublicContentFileFetch {
-  const PublicContentFileFetch({
+  const PublicContentFileFetch.fetched({
     required this.bytes,
     required this.etag,
+    required this.releaseId,
     required this.publicManifestId,
     required this.resourceType,
-  });
+  }) : notModified = false;
 
-  final Uint8List bytes;
+  const PublicContentFileFetch.notModified({
+    required this.etag,
+    required this.releaseId,
+    required this.publicManifestId,
+    required this.resourceType,
+  })  : notModified = true,
+        bytes = null;
+
+  final bool notModified;
+  final Uint8List? bytes;
   final String etag;
+  final String releaseId;
   final String publicManifestId;
   final String resourceType;
 }
@@ -286,8 +344,10 @@ abstract interface class PublicContentSource {
   });
 
   Future<Result<PublicContentFileFetch>> fetchFile({
+    required String releaseId,
     required String publicManifestId,
     required PublicContentFile file,
+    String? ifNoneMatch,
   });
 }
 

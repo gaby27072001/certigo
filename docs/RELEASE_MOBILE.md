@@ -581,6 +581,12 @@ fixe et revenir à `flutter.ndkVersion` (vérifier avec `flutter doctor -v`).
 ## 8. Checklist pré-release
 
 - [ ] `ci-mobile` au vert sur la branche à publier (format/analyze/test).
+- [ ] Toute modification du cache ou du contrat de contenu runtime a passé
+      `flutter test integration_test -d <device>` sur un appareil ou émulateur
+      **Android**, puis sur un simulateur ou appareil **iOS**. Un device web ou
+      desktop ne remplace pas cette preuve. Si l'un des deux environnements
+      physiques manque, conserver la PR en draft et enregistrer ce blocker ;
+      ne pas installer un émulateur lourd uniquement pour contourner ce gate.
 - [ ] `version:` de `pubspec.yaml` à jour si nouvelle version publique.
 - [ ] Notes de version `apps/mobile/distribution/android/whatsnew/*` actualisées.
 - [ ] Secrets présents : `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:core/core.dart';
@@ -7,19 +8,23 @@ import '../repositories/repositories.dart';
 import '../sync/sync_dispatcher.dart';
 import 'runtime_content.dart';
 import 'runtime_content_store.dart';
+import 'runtime_content_sync.dart';
 
 class RuntimeContentLessonRepository implements LessonRepository {
   const RuntimeContentLessonRepository({
     required LessonRepository inner,
     required RuntimeContentStore store,
     required String? Function() ownerIdProvider,
+    RuntimeContentPinRegistry? pins,
   })  : _inner = inner,
         _store = store,
-        _ownerIdProvider = ownerIdProvider;
+        _ownerIdProvider = ownerIdProvider,
+        _pins = pins;
 
   final LessonRepository _inner;
   final RuntimeContentStore _store;
   final String? Function() _ownerIdProvider;
+  final RuntimeContentPinRegistry? _pins;
 
   @override
   Future<Result<Lesson>> getLesson({
@@ -45,6 +50,8 @@ class RuntimeContentLessonRepository implements LessonRepository {
       return cached == null ? remote : Success<Lesson>(cached);
     } on FormatException {
       return remote;
+    } on FileSystemException {
+      return remote;
     } on TypeError {
       return remote;
     }
@@ -55,8 +62,33 @@ class RuntimeContentLessonRepository implements LessonRepository {
     required String trackId,
     required String lessonId,
   }) async {
-    final PublicContentManifest? manifest = await _store.readActiveManifest(ownerScope);
-    if (manifest == null || manifest.schema != kPackageManifestV3) return null;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final RuntimeContentActivation? selected = await _store.readActivation(ownerScope);
+      if (selected == null) return null;
+      final RuntimeContentPin? pin = _pins?.pin(selected.activeManifestId);
+      try {
+        final PublicContentManifest? manifest = await _store.readActiveManifest(ownerScope);
+        if (manifest == null || manifest.manifestId != selected.activeManifestId) {
+          continue;
+        }
+        if (manifest.schema != kPackageManifestV3) return null;
+        return _projectManifest(
+          manifest: manifest,
+          trackId: trackId,
+          lessonId: lessonId,
+        );
+      } finally {
+        pin?.release();
+      }
+    }
+    return null;
+  }
+
+  Future<Lesson?> _projectManifest({
+    required PublicContentManifest manifest,
+    required String trackId,
+    required String lessonId,
+  }) async {
     final Map<String, Map<String, dynamic>> resources = <String, Map<String, dynamic>>{};
     for (final PublicContentFile file in manifest.files) {
       if (!const <String>{

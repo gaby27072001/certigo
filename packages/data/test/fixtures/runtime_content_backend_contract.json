@@ -1,9 +1,10 @@
 {
   "schema": "certigo.mobile.runtime-content-contract/v1",
-  "backendPullRequest": 304,
+  "backendPullRequest": 333,
   "activeManifestRoute": "content/releases/active/manifest",
-  "publicFileRoute": null,
-  "releaseIdExposed": false,
+  "publicFileRoute": "content/releases/{releaseId}/manifests/{publicManifestId}/files/{hash}/{path}",
+  "publicFileRouteTemplate": "content/releases/{releaseId}/manifests/{publicManifestId}/files/{hash}/{*path}",
+  "releaseIdExposed": true,
   "lessonSnapshotHeader": "X-Content-Manifest-Id",
   "quizRevisionField": "publicManifestId",
   "manifestSchemas": [
@@ -13,7 +14,19 @@
   ],
   "activeManifestHeaders": [
     "ETag",
-    "Cache-Control"
+    "Cache-Control",
+    "X-Content-Release-Id",
+    "X-Content-Manifest-Id"
+  ],
+  "publicFileHeaders": [
+    "ETag",
+    "Content-Length",
+    "Content-Type",
+    "Cache-Control",
+    "Accept-Ranges",
+    "X-Content-SHA256",
+    "X-Content-Release-Id",
+    "X-Content-Manifest-Id"
   ],
   "forbiddenPublicFields": [
     "answerKey",

@@ -4,17 +4,23 @@ import 'dart:typed_data';
 
 import 'runtime_content.dart';
 
+final RegExp _activationDigestId = RegExp(r'^sha256:[0-9a-f]{64}$');
+
 class RuntimeContentActivation {
   const RuntimeContentActivation({
     required this.activeManifestId,
     required this.etag,
     required this.generation,
     required this.activatedAt,
+    this.activeReleaseId,
     this.previousManifestId,
+    this.previousReleaseId,
     this.recovered = false,
   });
 
+  final String? activeReleaseId;
   final String activeManifestId;
+  final String? previousReleaseId;
   final String? previousManifestId;
   final String etag;
   final int generation;
@@ -23,7 +29,9 @@ class RuntimeContentActivation {
 
   RuntimeContentActivation copyWith({bool? recovered}) => RuntimeContentActivation(
         activeManifestId: activeManifestId,
+        activeReleaseId: activeReleaseId,
         previousManifestId: previousManifestId,
+        previousReleaseId: previousReleaseId,
         etag: etag,
         generation: generation,
         activatedAt: activatedAt,
@@ -32,7 +40,9 @@ class RuntimeContentActivation {
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'schema': 'certigo.mobile.content-activation/v1',
+        if (activeReleaseId != null) 'activeReleaseId': activeReleaseId,
         'activeManifestId': activeManifestId,
+        if (previousReleaseId != null) 'previousReleaseId': previousReleaseId,
         if (previousManifestId != null) 'previousManifestId': previousManifestId,
         'etag': etag,
         'generation': generation,
@@ -43,23 +53,57 @@ class RuntimeContentActivation {
     if (json['schema'] != 'certigo.mobile.content-activation/v1') {
       throw const FormatException('Unsupported mobile content activation schema');
     }
+    final String activeManifestId = _requiredActivationDigest(json, 'activeManifestId');
+    final String? activeReleaseId = _optionalActivationDigest(json, 'activeReleaseId');
+    final String? previousManifestId = _optionalActivationDigest(json, 'previousManifestId');
+    final String? previousReleaseId = _optionalActivationDigest(json, 'previousReleaseId');
+    final dynamic rawGeneration = json['generation'];
+    final dynamic rawEtag = json['etag'];
+    if (rawGeneration is! num ||
+        rawGeneration.toInt() != rawGeneration ||
+        rawGeneration.toInt() < 1 ||
+        rawEtag is! String ||
+        rawEtag.isEmpty) {
+      throw const FormatException('Invalid mobile content activation metadata');
+    }
     return RuntimeContentActivation(
-      activeManifestId: json['activeManifestId'] as String,
-      previousManifestId: json['previousManifestId'] as String?,
-      etag: json['etag'] as String,
-      generation: (json['generation'] as num).toInt(),
+      activeManifestId: activeManifestId,
+      activeReleaseId: activeReleaseId,
+      previousManifestId: previousManifestId,
+      previousReleaseId: previousReleaseId,
+      etag: rawEtag,
+      generation: rawGeneration.toInt(),
       activatedAt: DateTime.parse(json['activatedAt'] as String),
     );
   }
 }
 
+String _requiredActivationDigest(Map<String, dynamic> json, String key) {
+  final dynamic value = json[key];
+  if (value is! String || !_activationDigestId.hasMatch(value)) {
+    throw FormatException('Invalid mobile content activation $key');
+  }
+  return value;
+}
+
+String? _optionalActivationDigest(Map<String, dynamic> json, String key) {
+  final dynamic value = json[key];
+  if (value == null) return null;
+  if (value is! String || !_activationDigestId.hasMatch(value)) {
+    throw FormatException('Invalid mobile content activation $key');
+  }
+  return value;
+}
+
 class CachedPublicContentFile {
   const CachedPublicContentFile({
+    required this.releaseId,
     required this.publicManifestId,
     required this.file,
     required this.bytes,
   });
 
+  final String? releaseId;
   final String publicManifestId;
   final PublicContentFile file;
   final Uint8List bytes;
@@ -116,7 +160,10 @@ class InMemoryRuntimeContentStore implements RuntimeContentStore {
   @override
   Future<PublicContentManifest?> readActiveManifest(String ownerScope) async {
     final RuntimeContentActivation? activation = _activations[ownerScope];
-    return activation == null ? null : _manifests[activation.activeManifestId];
+    final PublicContentManifest? manifest =
+        activation == null ? null : _manifests[activation.activeManifestId];
+    final String? releaseId = activation?.activeReleaseId;
+    return manifest == null || releaseId == null ? manifest : manifest.withReleaseId(releaseId);
   }
 
   @override
@@ -186,7 +233,11 @@ class InMemoryRuntimeContentStore implements RuntimeContentStore {
     _staging.remove(manifest.manifestId);
     final RuntimeContentActivation? current = _activations[ownerScope];
     final RuntimeContentActivation next = RuntimeContentActivation(
+      activeReleaseId: manifest.releaseId,
       activeManifestId: manifest.manifestId,
+      previousReleaseId: current?.activeManifestId == manifest.manifestId
+          ? current?.previousReleaseId
+          : current?.activeReleaseId,
       previousManifestId: current?.activeManifestId == manifest.manifestId
           ? current?.previousManifestId
           : current?.activeManifestId,
@@ -206,7 +257,9 @@ class InMemoryRuntimeContentStore implements RuntimeContentStore {
       return null;
     }
     final RuntimeContentActivation next = RuntimeContentActivation(
+      activeReleaseId: current.previousReleaseId,
       activeManifestId: previous,
+      previousReleaseId: current.activeReleaseId,
       previousManifestId: current.activeManifestId,
       etag: '"$previous"',
       generation: current.generation + 1,
@@ -242,6 +295,7 @@ class InMemoryRuntimeContentStore implements RuntimeContentStore {
         file == null ? null : _releases[activation.activeManifestId]?[file.hash];
     if (file == null || bytes == null) return null;
     return CachedPublicContentFile(
+      releaseId: activation.activeReleaseId,
       publicManifestId: activation.activeManifestId,
       file: file,
       bytes: _copy(bytes)!,
@@ -326,9 +380,12 @@ class FileRuntimeContentStore implements RuntimeContentStore {
   @override
   Future<PublicContentManifest?> readActiveManifest(String ownerScope) async {
     final RuntimeContentActivation? activation = await readActivation(ownerScope);
-    return activation == null
-        ? null
-        : _readManifest(_releaseDirectory(activation.activeManifestId));
+    if (activation == null) return null;
+    final PublicContentManifest manifest = await _readManifest(
+      _releaseDirectory(activation.activeManifestId),
+    );
+    final String? releaseId = activation.activeReleaseId;
+    return releaseId == null ? manifest : manifest.withReleaseId(releaseId);
   }
 
   @override
@@ -355,7 +412,7 @@ class FileRuntimeContentStore implements RuntimeContentStore {
       await stage.delete(recursive: true);
       await Directory('${stage.path}${Platform.pathSeparator}files').create(recursive: true);
     }
-    await _writeNewFile(manifestFile, utf8.encode(jsonEncode(manifest.rawJson)));
+    await _writeNewFile(manifestFile, utf8.encode(jsonEncode(manifest.canonicalJson)));
   }
 
   @override
@@ -439,7 +496,11 @@ class FileRuntimeContentStore implements RuntimeContentStore {
 
     final RuntimeContentActivation? current = await readActivation(ownerScope);
     final RuntimeContentActivation next = RuntimeContentActivation(
+      activeReleaseId: manifest.releaseId,
       activeManifestId: manifest.manifestId,
+      previousReleaseId: current?.activeManifestId == manifest.manifestId
+          ? current?.previousReleaseId
+          : current?.activeReleaseId,
       previousManifestId: current?.activeManifestId == manifest.manifestId
           ? current?.previousManifestId
           : current?.activeManifestId,
@@ -459,7 +520,9 @@ class FileRuntimeContentStore implements RuntimeContentStore {
       return null;
     }
     final RuntimeContentActivation next = RuntimeContentActivation(
+      activeReleaseId: current.previousReleaseId,
       activeManifestId: previous,
+      previousReleaseId: current.activeReleaseId,
       previousManifestId: current.activeManifestId,
       etag: '"$previous"',
       generation: current.generation + 1,
@@ -520,6 +583,7 @@ class FileRuntimeContentStore implements RuntimeContentStore {
     if (bytes == null) return null;
     validatePublicContentPayload(file, bytes);
     return CachedPublicContentFile(
+      releaseId: activation.activeReleaseId,
       publicManifestId: activation.activeManifestId,
       file: file,
       bytes: bytes,

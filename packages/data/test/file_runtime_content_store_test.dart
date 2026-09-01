@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:data/data.dart';
@@ -44,7 +45,9 @@ void main() {
     final CachedPublicContentFile? cached = await store.readActiveFile(owner, first.id);
 
     expect(rolledBack!.activeManifestId, releaseN.manifestId);
+    expect(rolledBack.activeReleaseId, releaseN.releaseId);
     expect(cached!.publicManifestId, releaseN.manifestId);
+    expect(cached.releaseId, releaseN.releaseId);
     expect(cached.bytes, first.bytes);
   });
 
@@ -110,6 +113,47 @@ void main() {
 
     expect(await store.readActiveFile(ownerA, first.id), isNotNull);
     expect(await store.readActiveFile(ownerB, second.id), isNotNull);
+  });
+
+  test('keeps the persisted cache readable by the previous mobile schema', () async {
+    final FileRuntimeContentStore store = FileRuntimeContentStore(
+      root: root,
+      spaceScope: 'test-space',
+    );
+    final String owner = runtimeContentScopeKey('person-1');
+    final ContentFixture fixture = questionFixture('microsoft.az-900.section-1.cloud.001');
+    final PublicContentManifest release = manifest(<ContentFixture>[fixture]);
+    await store.prepare(release);
+    await store.writeStagedFile(release, release.files.single, fixture.bytes);
+    await store.activate(ownerScope: owner, manifest: release, etag: '"${release.manifestId}"');
+    final String cacheRoot = '${root.path}${Platform.pathSeparator}public'
+        '${Platform.pathSeparator}spaces${Platform.pathSeparator}test-space';
+    final File persistedManifest = File(
+      '$cacheRoot${Platform.pathSeparator}releases${Platform.pathSeparator}'
+      '${release.manifestId.substring(7)}${Platform.pathSeparator}manifest.json',
+    );
+    final Directory activations = Directory(
+      '${root.path}${Platform.pathSeparator}person${Platform.pathSeparator}$owner'
+      '${Platform.pathSeparator}spaces${Platform.pathSeparator}test-space'
+      '${Platform.pathSeparator}activations',
+    );
+    final File activationFile = (await activations
+            .list()
+            .where((FileSystemEntity entity) => entity is File)
+            .cast<File>()
+            .toList())
+        .single;
+    final Map<String, dynamic> manifestJson = Map<String, dynamic>.from(
+      jsonDecode(await persistedManifest.readAsString()) as Map,
+    );
+    final Map<String, dynamic> activationJson = Map<String, dynamic>.from(
+      jsonDecode(await activationFile.readAsString()) as Map,
+    );
+
+    expect(manifestJson, isNot(contains('releaseId')));
+    expect(activationJson['schema'], 'certigo.mobile.content-activation/v1');
+    expect(activationJson['activeReleaseId'], release.releaseId);
+    expect(PublicContentManifest.fromJson(manifestJson).manifestId, release.manifestId);
   });
 
   test('same-size corruption invalidates the newest activation', () async {

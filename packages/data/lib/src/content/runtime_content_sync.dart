@@ -94,14 +94,17 @@ class RuntimeContentSynchronizer {
   RuntimeContentSynchronizer({
     required PublicContentSource source,
     required RuntimeContentStore store,
+    RuntimeContentPinRegistry? pins,
     this.limits = const RuntimeContentLimits(),
     Future<void> Function(Duration duration)? delay,
   })  : _source = source,
         _store = store,
+        _pins = pins,
         _delay = delay ?? Future<void>.delayed;
 
   final PublicContentSource _source;
   final RuntimeContentStore _store;
+  final RuntimeContentPinRegistry? _pins;
   final RuntimeContentLimits limits;
   final Future<void> Function(Duration duration) _delay;
   final StreamController<RuntimeContentStatus> _statuses =
@@ -195,7 +198,31 @@ class RuntimeContentSynchronizer {
     required String ownerScope,
     required Set<String> pinnedManifestIds,
   }) async {
-    RuntimeContentActivation? activation = await _store.readActivation(ownerScope);
+    RuntimeContentActivation? activation;
+    try {
+      activation = await _store.readActivation(ownerScope);
+    } on FormatException catch (error) {
+      _failed(
+        'Le cache local du contenu est invalide.',
+        null,
+        canRollback: false,
+      );
+      throw RuntimeContentSyncException(error.message);
+    } on FileSystemException catch (error) {
+      _failed(
+        'Le cache local du contenu est indisponible.',
+        null,
+        canRollback: false,
+      );
+      throw RuntimeContentSyncException(error.message);
+    } on StateError catch (error) {
+      _failed(
+        'Le cache local du contenu est indisponible.',
+        null,
+        canRollback: false,
+      );
+      throw RuntimeContentSyncException(error.message);
+    }
     if (activation?.recovered ?? false) {
       _emit(
         RuntimeContentStatus(
@@ -220,7 +247,28 @@ class RuntimeContentSynchronizer {
         if (activation == null) {
           throw const RuntimeContentSyncException('Le serveur a répondu 304 sans cache actif.');
         }
-        await _store.cleanup(ownerScope: ownerScope, protectedManifestIds: pinnedManifestIds);
+        if (fetched.etag != activation.etag ||
+            fetched.publicManifestId != activation.activeManifestId ||
+            fetched.releaseId == null) {
+          throw const FormatException('La réponse 304 ne correspond pas au cache actif.');
+        }
+        if (activation.activeReleaseId == null) {
+          final PublicContentManifest? cached = await _store.readActiveManifest(ownerScope);
+          if (cached == null || cached.manifestId != fetched.publicManifestId) {
+            throw const FormatException('Le cache actif ne correspond pas à la réponse 304.');
+          }
+          activation = await _store.activate(
+            ownerScope: ownerScope,
+            manifest: cached.withReleaseId(fetched.releaseId!),
+            etag: fetched.etag,
+          );
+        } else if (fetched.releaseId != activation.activeReleaseId) {
+          throw const FormatException('Le manifeste public est déjà lié à une autre version.');
+        }
+        await _store.cleanup(
+          ownerScope: ownerScope,
+          protectedManifestIds: _protectedManifestIds(pinnedManifestIds),
+        );
         _emit(
           RuntimeContentStatus(
             phase: RuntimeContentPhase.ready,
@@ -235,13 +283,29 @@ class RuntimeContentSynchronizer {
         );
       }
 
-      final PublicContentManifest manifest = fetched.manifest!;
-      final String etag = fetched.etag!;
+      final PublicContentManifest? fetchedManifest = fetched.manifest;
+      if (fetchedManifest == null ||
+          fetchedManifest.releaseId == null ||
+          fetched.releaseId != fetchedManifest.releaseId ||
+          fetched.publicManifestId != fetchedManifest.manifestId) {
+        throw const FormatException('Les identifiants de la version publique sont invalides.');
+      }
+      final PublicContentManifest manifest = fetchedManifest;
+      final String etag = fetched.etag;
       if (activation?.activeManifestId == manifest.manifestId) {
+        if (activation!.activeReleaseId == null) {
+          activation = await _store.activate(
+            ownerScope: ownerScope,
+            manifest: manifest,
+            etag: etag,
+          );
+        } else if (activation.activeReleaseId != manifest.releaseId) {
+          throw const FormatException('Le manifeste public actif est associé à une autre version.');
+        }
         _emit(
           RuntimeContentStatus(
             phase: RuntimeContentPhase.ready,
-            activeManifestId: activation!.activeManifestId,
+            activeManifestId: activation.activeManifestId,
           ),
         );
         return RuntimeContentSyncReport(
@@ -259,11 +323,11 @@ class RuntimeContentSynchronizer {
         );
         await _store.cleanup(
           ownerScope: ownerScope,
-          protectedManifestIds: <String>{
+          protectedManifestIds: _protectedManifestIds(<String>{
             ...pinnedManifestIds,
             activation.activeManifestId,
             if (activation.previousManifestId != null) activation.previousManifestId!,
-          },
+          }),
         );
         _emit(
           RuntimeContentStatus(
@@ -284,7 +348,7 @@ class RuntimeContentSynchronizer {
       await _store.ensureCapacity(
         ownerScope: ownerScope,
         target: manifest,
-        protectedManifestIds: pinnedManifestIds,
+        protectedManifestIds: _protectedManifestIds(pinnedManifestIds),
       );
       await _store.prepare(manifest);
 
@@ -300,10 +364,23 @@ class RuntimeContentSynchronizer {
             reused++;
           } else {
             final PublicContentFileFetch response = await _retry<PublicContentFileFetch>(
-              () => _source.fetchFile(publicManifestId: manifest.manifestId, file: file),
+              () => _source.fetchFile(
+                releaseId: manifest.releaseId!,
+                publicManifestId: manifest.manifestId,
+                file: file,
+              ),
             );
-            validatePublicContentPayload(file, response.bytes);
-            await _store.writeStagedFile(manifest, file, response.bytes);
+            final Uint8List? downloadedBytes = response.bytes;
+            if (response.notModified ||
+                downloadedBytes == null ||
+                response.releaseId != manifest.releaseId ||
+                response.publicManifestId != manifest.manifestId ||
+                response.resourceType != file.resourceType ||
+                response.etag != '"sha256:${file.hash}"') {
+              throw const FormatException('La réponse du fichier public est incohérente.');
+            }
+            validatePublicContentPayload(file, downloadedBytes);
+            await _store.writeStagedFile(manifest, file, downloadedBytes);
             downloaded++;
           }
         } else {
@@ -331,11 +408,11 @@ class RuntimeContentSynchronizer {
       activation = await _store.activate(ownerScope: ownerScope, manifest: manifest, etag: etag);
       await _store.cleanup(
         ownerScope: ownerScope,
-        protectedManifestIds: <String>{
+        protectedManifestIds: _protectedManifestIds(<String>{
           ...pinnedManifestIds,
           activation.activeManifestId,
           if (activation.previousManifestId != null) activation.previousManifestId!,
-        },
+        }),
       );
       _emit(
         RuntimeContentStatus(
@@ -402,6 +479,11 @@ class RuntimeContentSynchronizer {
       return false;
     }
   }
+
+  Set<String> _protectedManifestIds(Set<String> requested) => <String>{
+        ...requested,
+        ...?_pins?.manifestIds,
+      };
 
   Future<T> _retry<T>(Future<Result<T>> Function() operation) async {
     Failure? lastFailure;

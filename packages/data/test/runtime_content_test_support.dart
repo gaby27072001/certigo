@@ -92,10 +92,12 @@ Map<String, dynamic> manifestJson(List<ContentFixture> fixtures) {
         .toList(growable: false),
   };
   final String digest = sha256.convert(utf8.encode(jsonEncode(_sort(body)))).toString();
+  final String releaseDigest = sha256.convert(utf8.encode('release:$digest')).toString();
   return <String, dynamic>{
     ...body,
     'manifestId': 'sha256:$digest',
     'rootHash': digest,
+    'releaseId': 'sha256:$releaseDigest',
   };
 }
 
@@ -112,6 +114,7 @@ class FakePublicContentSource implements PublicContentSource {
   PublicContentManifest _manifest;
   final Map<String, Uint8List> _files;
   bool corruptNextFile = false;
+  Failure? manifestFailure;
   int manifestRequests = 0;
   int fileRequests = 0;
 
@@ -128,18 +131,26 @@ class FakePublicContentSource implements PublicContentSource {
     RuntimeContentLimits limits = const RuntimeContentLimits(),
   }) async {
     manifestRequests++;
+    final Failure? failure = manifestFailure;
+    if (failure != null) return Err<PublicManifestFetch>(failure);
     final String etag = '"${_manifest.manifestId}"';
     return Success<PublicManifestFetch>(
       ifNoneMatch == etag
-          ? PublicManifestFetch.notModified(etag)
+          ? PublicManifestFetch.notModified(
+              etag: etag,
+              releaseId: _manifest.releaseId!,
+              publicManifestId: _manifest.manifestId,
+            )
           : PublicManifestFetch.fetched(_manifest, etag),
     );
   }
 
   @override
   Future<Result<PublicContentFileFetch>> fetchFile({
+    required String releaseId,
     required String publicManifestId,
     required PublicContentFile file,
+    String? ifNoneMatch,
   }) async {
     fileRequests++;
     final Uint8List bytes = Uint8List.fromList(_files[file.id]!);
@@ -148,9 +159,10 @@ class FakePublicContentSource implements PublicContentSource {
       bytes[0] = bytes[0] ^ 0xff;
     }
     return Success<PublicContentFileFetch>(
-      PublicContentFileFetch(
+      PublicContentFileFetch.fetched(
         bytes: bytes,
-        etag: '"${file.hash}"',
+        etag: '"sha256:${file.hash}"',
+        releaseId: releaseId,
         publicManifestId: publicManifestId,
         resourceType: file.resourceType,
       ),

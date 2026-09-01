@@ -91,6 +91,7 @@ final lessonRepositoryProvider = Provider<LessonRepository>((Ref ref) {
   return RuntimeContentLessonRepository(
     inner: repository,
     store: ref.watch(runtimeContentStoreProvider),
+    pins: ref.watch(runtimeContentPinRegistryProvider),
     ownerIdProvider: () {
       final AuthState auth = ref.read(authControllerProvider);
       return auth is Authenticated ? auth.session.userId : null;

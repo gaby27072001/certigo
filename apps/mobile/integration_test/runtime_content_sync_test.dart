@@ -33,21 +33,28 @@ class _IntegrationSource implements PublicContentSource {
     final String etag = '"${manifest.manifestId}"';
     return Success<PublicManifestFetch>(
       ifNoneMatch == etag
-          ? PublicManifestFetch.notModified(etag)
+          ? PublicManifestFetch.notModified(
+              etag: etag,
+              releaseId: manifest.releaseId!,
+              publicManifestId: manifest.manifestId,
+            )
           : PublicManifestFetch.fetched(manifest, etag),
     );
   }
 
   @override
   Future<Result<PublicContentFileFetch>> fetchFile({
+    required String releaseId,
     required String publicManifestId,
     required PublicContentFile file,
+    String? ifNoneMatch,
   }) async {
     downloads++;
     return Success<PublicContentFileFetch>(
-      PublicContentFileFetch(
+      PublicContentFileFetch.fetched(
         bytes: Uint8List.fromList(utf8.encode(_questionJson)),
-        etag: '"${file.hash}"',
+        etag: '"sha256:${file.hash}"',
+        releaseId: releaseId,
         publicManifestId: publicManifestId,
         resourceType: file.resourceType,
       ),
@@ -84,6 +91,7 @@ void main() {
         ],
         'manifestId': _manifestId,
         'rootHash': _manifestId.substring(7),
+        'releaseId': 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       },
     );
     final _IntegrationSource source = _IntegrationSource(manifest);
@@ -113,6 +121,10 @@ void main() {
     expect(report.changed, isFalse);
     expect(source.downloads, 1);
     expect(cached!.publicManifestId, _manifestId);
+    expect(
+      cached.releaseId,
+      'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    );
     expect(utf8.decode(cached.bytes), _questionJson);
     await restarted.dispose();
   });

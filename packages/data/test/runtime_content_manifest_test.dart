@@ -34,6 +34,28 @@ void main() {
 
       expect(() => PublicContentManifest.fromJson(unsafe), throwsA(isA<FormatException>()));
     });
+
+    test('keeps release identity outside the canonical manifest digest', () {
+      final ContentFixture question = questionFixture('microsoft.az-900.section-1.cloud.001');
+      final Map<String, dynamic> json = manifestJson(<ContentFixture>[question]);
+      final String manifestId = json['manifestId'] as String;
+
+      final PublicContentManifest parsed = PublicContentManifest.fromJson(json);
+
+      expect(parsed.releaseId, startsWith('sha256:'));
+      expect(parsed.manifestId, manifestId);
+      expect(parsed.canonicalJson, isNot(contains('releaseId')));
+    });
+
+    test('rejects an empty package and an invalid release identity', () {
+      final Map<String, dynamic> empty = manifestJson(const <ContentFixture>[]);
+      final ContentFixture question = questionFixture('microsoft.az-900.section-1.cloud.001');
+      final Map<String, dynamic> invalidRelease = manifestJson(<ContentFixture>[question])
+        ..['releaseId'] = 'release-latest';
+
+      expect(() => PublicContentManifest.fromJson(empty), throwsA(isA<FormatException>()));
+      expect(() => PublicContentManifest.fromJson(invalidRelease), throwsA(isA<FormatException>()));
+    });
   });
 
   group('validatePublicContentPayload', () {

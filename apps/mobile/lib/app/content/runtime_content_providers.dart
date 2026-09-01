@@ -17,6 +17,7 @@ final runtimeContentSynchronizerProvider = Provider<RuntimeContentSynchronizer>(
   final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
     source: ref.watch(runtimeContentSourceProvider),
     store: ref.watch(runtimeContentStoreProvider),
+    pins: ref.watch(runtimeContentPinRegistryProvider),
   );
   ref.onDispose(() => unawaited(synchronizer.dispose()));
   return synchronizer;

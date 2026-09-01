@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:test/test.dart';
@@ -11,6 +13,28 @@ class _OfflineLessons implements LessonRepository {
     required String lessonId,
   }) async =>
       const Err<Lesson>(NetworkFailure());
+}
+
+class _PinObservingStore extends InMemoryRuntimeContentStore {
+  _PinObservingStore(this.pins);
+
+  final RuntimeContentPinRegistry pins;
+  bool observedPinnedRead = false;
+
+  @override
+  Future<PublicContentManifest?> readActiveManifest(String ownerScope) async {
+    final RuntimeContentActivation? activation = await readActivation(ownerScope);
+    observedPinnedRead =
+        activation != null && pins.manifestIds.contains(activation.activeManifestId);
+    return super.readActiveManifest(ownerScope);
+  }
+}
+
+class _BrokenCacheStore extends InMemoryRuntimeContentStore {
+  @override
+  Future<RuntimeContentActivation?> readActivation(String ownerScope) async {
+    throw const FileSystemException('cache unavailable');
+  }
 }
 
 void main() {
@@ -181,6 +205,22 @@ void main() {
     expect(lesson.title, 'Cloud Concepts practice');
     expect(lesson.blocks.single.check, isNotNull);
   });
+
+  test('treats a local storage failure as an offline cache miss', () async {
+    final RuntimeContentLessonRepository repository = RuntimeContentLessonRepository(
+      inner: _OfflineLessons(),
+      store: _BrokenCacheStore(),
+      ownerIdProvider: () => 'person-1',
+    );
+
+    final Result<Lesson> result = await repository.getLesson(
+      trackId: 'az-900',
+      lessonId: 'lesson-1',
+    );
+
+    expect(result, isA<Err<Lesson>>());
+    expect((result as Err<Lesson>).failure, isA<NetworkFailure>());
+  });
 }
 
 Future<Lesson> _syncAndRead(
@@ -189,16 +229,19 @@ Future<Lesson> _syncAndRead(
   required String lessonId,
 }) async {
   final PublicContentManifest release = manifest(fixtures);
-  final InMemoryRuntimeContentStore store = InMemoryRuntimeContentStore();
+  final RuntimeContentPinRegistry pins = RuntimeContentPinRegistry();
+  final _PinObservingStore store = _PinObservingStore(pins);
   final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
     source: FakePublicContentSource(release, fixtures),
     store: store,
+    pins: pins,
     delay: (_) async {},
   );
   await synchronizer.sync(ownerId: 'person-1');
   final RuntimeContentLessonRepository repository = RuntimeContentLessonRepository(
     inner: _OfflineLessons(),
     store: store,
+    pins: pins,
     ownerIdProvider: () => 'person-1',
   );
 
@@ -207,6 +250,7 @@ Future<Lesson> _syncAndRead(
     lessonId: lessonId,
   );
   await synchronizer.dispose();
+  expect(store.observedPinnedRead, isTrue);
   return result.valueOrNull!;
 }
 

@@ -16,8 +16,10 @@ class _NeverSource implements PublicContentSource {
 
   @override
   Future<Result<PublicContentFileFetch>> fetchFile({
+    required String releaseId,
     required String publicManifestId,
     required PublicContentFile file,
+    String? ifNoneMatch,
   }) async =>
       const Err<PublicContentFileFetch>(NetworkFailure());
 }
@@ -119,5 +121,49 @@ void main() {
     expect(find.text('Mise à jour du contenu 2/4'), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(find.byType(Dialog), findsNothing);
+  });
+
+  testWidgets('recovery actions remain accessible with large text on a narrow screen', (
+    WidgetTester tester,
+  ) async {
+    final SemanticsHandle semantics = tester.ensureSemantics();
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
+      source: _NeverSource(),
+      store: InMemoryRuntimeContentStore(),
+    );
+    addTearDown(synchronizer.dispose);
+    final _StatusController controller = _StatusController(
+      const RuntimeContentStatus(
+        phase: RuntimeContentPhase.failed,
+        message: 'Mise à jour indisponible. Le contenu actuel est conservé.',
+        canRollback: true,
+      ),
+      synchronizer,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          runtimeContentSyncEnabledProvider.overrideWithValue(true),
+          runtimeContentControllerProvider.overrideWith((Ref ref) => controller),
+        ],
+        child: const MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(2)),
+            child: Scaffold(body: ContentUpdateBanner()),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.bySemanticsLabel('Réessayer'), findsOneWidget);
+    expect(find.bySemanticsLabel('Version précédente'), findsOneWidget);
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    semantics.dispose();
   });
 }
