@@ -54,10 +54,11 @@ jobs:
 
   packages:
     name: Pure-Dart packages (core, cortex, data)
-    needs: [changes]
+    needs: [freshness, changes]
     # Only internal head SHAs selected by the trusted base workflow execute here.
     if: >-
       always()
+      && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current == 'true')
       && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
       && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
     runs-on: [self-hosted, Linux, X64, certigo-pr]
@@ -100,10 +101,11 @@ jobs:
 
   app:
     name: Flutter app + UI packages
-    needs: [changes]
+    needs: [freshness, changes]
     # Only internal head SHAs selected by the trusted base workflow execute here.
     if: >-
       always()
+      && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current == 'true')
       && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
       && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
     runs-on: [self-hosted, Linux, X64, certigo-pr]
@@ -179,12 +181,13 @@ jobs:
 
   prism-goldens:
     name: Prism UI renderer goldens
-    needs: [changes]
+    needs: [freshness, changes]
     # Uses the same Flutter/Dart toolchain as the app and package jobs so
     # dependency resolution and golden rendering cannot drift independently.
     # Only internal head SHAs selected by the trusted base workflow execute here.
     if: >-
       always()
+      && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current == 'true')
       && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
       && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
     runs-on: [self-hosted, Linux, X64, certigo-pr]

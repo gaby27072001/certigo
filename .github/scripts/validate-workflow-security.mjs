@@ -912,7 +912,7 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'pull_request_target:',
     prLinuxRunner,
-    "github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository",
+    'github.event.pull_request.head.repo.full_name == github.repository',
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
     'path: .untrusted-source',
@@ -1038,7 +1038,7 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'validate-source:',
     'name: Validate project-state source',
-    'needs: validate-source',
+    'needs: [freshness, validate-source]',
     'name: Generated state equals committed state',
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
@@ -1085,10 +1085,10 @@ function validateRepositoryInvariants() {
   }
   for (const marker of [
     'name: Security / Required gate',
-    'needs: [changes, osv, checkov]',
+    'needs: [freshness, changes, osv, checkov]',
     'uses: ./.github/workflows/dependency-vuln-scan.yml',
     'uses: ./.github/workflows/security-scan.yml',
-    "if: ${{ always() && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) }}",
+    "needs.freshness.outputs.current == 'true'",
   ]) {
     if (!securityGate.includes(marker)) {
       errors.push(`security-gate.yml: missing required invariant ${marker}`);

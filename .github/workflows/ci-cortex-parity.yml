@@ -62,10 +62,11 @@ jobs:
 
   parity:
     name: Dart <-> .NET golden vectors parity
-    needs: [changes]
+    needs: [freshness, changes]
     # Only an internal head SHA from the trusted base workflow reaches this runner.
     if: >-
       always()
+      && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current == 'true')
       && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
       && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
     runs-on: [self-hosted, Linux, X64, certigo-pr]

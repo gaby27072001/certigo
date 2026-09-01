@@ -614,7 +614,9 @@ class ProjectStateTests(unittest.TestCase):
         self.assertIn("path: .untrusted-source", workflow)
         self.assertIn("path: .trusted-control", workflow)
         self.assertIn("validate-source:", workflow)
-        self.assertIn("needs: validate-source", workflow)
+        self.assertIn("needs: [freshness, validate-source]", workflow)
+        self.assertIn("uses: ./.github/workflows/pr-head-freshness.yml", workflow)
+        self.assertIn("needs.freshness.outputs.current == 'true'", workflow)
         source_job = workflow[
             workflow.index("  validate-source:") : workflow.index(
                 "  validate:\n", workflow.index("  validate-source:")
@@ -846,7 +848,11 @@ class ProjectStateTests(unittest.TestCase):
         security_gate = (
             REPO_ROOT / ".github/workflows/security-gate.yml"
         ).read_text(encoding="utf-8")
-        self.assertIn("needs: [changes, osv, checkov]", security_gate)
+        self.assertIn("needs: [freshness, changes, osv, checkov]", security_gate)
+        self.assertIn(
+            "uses: ./.github/workflows/pr-head-freshness.yml", security_gate
+        )
+        self.assertIn("needs.freshness.outputs.current == 'true'", security_gate)
         self.assertIn("- '.gitignore'", security_gate)
         self.assertIn("- '**/.gitignore'", security_gate)
         self.assertIn("- 'tools/validate_nuget_locks.py'", security_gate)
