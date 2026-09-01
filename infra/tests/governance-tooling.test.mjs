@@ -729,7 +729,7 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
         userType: 'Member',
         accountEnabled: true,
         tenantId: tenant,
-        objectId: '6503a9b1-1e64-4c39-9ec7-c15a1c911c80',
+        objectId: '30000000-0000-0000-0000-000000000003',
         managementAccessVerified: true,
         authenticationMethodCount: 1,
         authenticationMethodsTested: true,
@@ -742,7 +742,7 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
         userType: 'Member',
         accountEnabled: true,
         tenantId: tenant,
-        objectId: '6503a9b1-1e64-4c39-9ec7-c15a1c911c81',
+        objectId: '30000000-0000-0000-0000-000000000004',
         managementAccessVerified: true,
         authenticationMethodCount: 1,
         authenticationMethodsTested: true,
@@ -777,6 +777,14 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
     rollbackEvidenceSha256: 'c'.repeat(64),
   };
   assert.doesNotThrow(() => validate(approvedSolo));
+  const unrelatedEmergencyEvidence = structuredClone(approvedSolo);
+  unrelatedEmergencyEvidence.changeControl.soloModeControls
+    .breakGlassAccounts[0].objectId =
+    '6503a9b1-1e64-4c39-9ec7-c15a1c911c80';
+  assert.throws(
+    () => validate(unrelatedEmergencyEvidence),
+    /must exactly match both emergency principal IDs/,
+  );
   const noManagementEmergencyAccounts = structuredClone(approvedSolo);
   noManagementEmergencyAccounts.changeControl.soloModeControls
     .breakGlassAccounts = [];

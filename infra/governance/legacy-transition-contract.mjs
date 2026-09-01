@@ -405,6 +405,7 @@ export function validateLegacyTransition(
   requireNonEmptyString(operatorOwner, 'transition operator owner');
   let independentAdminExpiresAt = null;
   let soloRiskApprovedAt = null;
+  let qualifiedEmergencyPrincipalIds = null;
   if (transition.changeControl.administrationMode === 'independent-third-party') {
     const independentAdminOwner = transition.changeControl.independentAdminOwner;
     requireNonEmptyString(independentAdminOwner, 'independent admin owner');
@@ -529,6 +530,12 @@ export function validateLegacyTransition(
         'NO-GO: exactly two qualified emergency accounts are required in the subscription management tenant',
       );
     }
+    qualifiedEmergencyPrincipalIds = breakGlassAccounts.map((account, index) =>
+      requireUuid(
+        account.objectId,
+        `solo-mode break-glass account[${index}] object ID`,
+      ),
+    );
     const credentialMode =
       transition.changeControl.soloModeControls.credentialMode;
     const attestationAaguids =
@@ -666,15 +673,27 @@ export function validateLegacyTransition(
   ) {
     throw new Error('exactly two emergency principal IDs are required');
   }
-  safetyPrincipals.push(
-    ...transition.changeControl.emergencyPrincipalIds.map(
-      (principalId, index) =>
-        requireUuid(principalId, `emergency principal IDs[${index}]`),
-    ),
-  );
+  const emergencyPrincipalIds =
+    transition.changeControl.emergencyPrincipalIds.map((principalId, index) =>
+      requireUuid(principalId, `emergency principal IDs[${index}]`),
+    );
+  safetyPrincipals.push(...emergencyPrincipalIds);
   if (new Set(safetyPrincipals).size !== safetyPrincipals.length) {
     throw new Error(
       'legacy, safety admin, and both emergency principals must be distinct',
+    );
+  }
+  if (
+    qualifiedEmergencyPrincipalIds !== null &&
+    (qualifiedEmergencyPrincipalIds.some(
+      (principalId) => !emergencyPrincipalIds.includes(principalId),
+    ) ||
+      emergencyPrincipalIds.some(
+        (principalId) => !qualifiedEmergencyPrincipalIds.includes(principalId),
+      ))
+  ) {
+    throw new Error(
+      'solo-mode qualified break-glass accounts must exactly match both emergency principal IDs',
     );
   }
   const inventoryAt = timestamp(
