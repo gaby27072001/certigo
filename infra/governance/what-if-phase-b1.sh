@@ -9,7 +9,7 @@ mkdir -p "${evidence_dir}"
 chmod 700 "${evidence_dir}"
 exec > "${evidence_dir}/stdout.log" 2> "${evidence_dir}/stderr.log"
 export PHASE_B_WORK_DIR="${evidence_dir}"
-export PHASE_B_STAGE=B1
+export PHASE_B_STAGE=B1a
 
 finalize() {
   status=$?
@@ -20,7 +20,7 @@ import fs from 'node:fs';
 const [output, status] = process.argv.slice(2);
 fs.writeFileSync(output, `${JSON.stringify({
   schemaVersion: 1,
-  phase: 'B1',
+  phase: 'B1a',
   exitCode: Number(status),
   deploymentExecuted: false,
 }, null, 2)}\n`);
@@ -37,7 +37,7 @@ NODE
   )"
   manifest_args=(
     node "${root}/infra/governance/write-what-if-manifest.mjs"
-      --phase B1 \
+      --phase B1a \
       --plan "${evidence_dir}/plan.json" \
       --output "${evidence_dir}/manifest.json" \
       --template "${root}/infra/governance/bootstrap-rbac.bicep" \
@@ -93,5 +93,5 @@ node "${root}/infra/governance/normalize-principal-types.mjs" \
 node "${root}/infra/governance/validate-what-if.mjs" \
   --plan "${evidence_dir}/normalized-plan.json" \
   --subscription "${subscription_id}" \
-  --phase B1 \
+  --phase B1a \
   --phase-a "${evidence_dir}/phase-a.json"

@@ -410,7 +410,8 @@ function roleAssignmentChange(scope, nameSeed, properties) {
 }
 
 function makeCompletePhaseBPlans(proof) {
-  const b1Changes = [];
+  const b1aChanges = [];
+  const b1bChanges = [];
   const b2Changes = [];
   const contributor =
     `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
@@ -418,7 +419,7 @@ function makeCompletePhaseBPlans(proof) {
   for (const environment of ['dev', 'staging', 'prod']) {
     const key = `deploy${environment[0].toUpperCase()}${environment.slice(1)}`;
     const principalId = proof.identities[key].principalId;
-    b1Changes.push(
+    b1bChanges.push(
       roleAssignmentChange(`/subscriptions/${subscription}`, proof.identities[key].name, {
         description:
           `Launches the ${environment} subscription deployment without general ` +
@@ -428,6 +429,8 @@ function makeCompletePhaseBPlans(proof) {
         roleDefinitionId:
           proof.roleDefinitionIds.subscriptionDeploymentLauncher,
       }),
+    );
+    b1aChanges.push(
       roleAssignmentChange(
         `/subscriptions/${subscription}/resourceGroups/rg-certigo-${environment}`,
         proof.identities[key].name,
@@ -437,20 +440,6 @@ function makeCompletePhaseBPlans(proof) {
           principalId,
           principalType: 'ServicePrincipal',
           roleDefinitionId: contributor,
-        },
-      ),
-      roleAssignmentChange(
-        `/subscriptions/${subscription}/resourceGroups/rg-certigo-${environment}`,
-        proof.identities[key].name,
-        {
-          condition: runtimeWriterCondition(),
-          conditionVersion: '2.0',
-          description:
-            'May create only approved runtime roles for service principals in this environment.',
-          principalId,
-          principalType: 'ServicePrincipal',
-          roleDefinitionId:
-            proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
         },
       ),
       roleAssignmentChange(
@@ -465,10 +454,26 @@ function makeCompletePhaseBPlans(proof) {
         },
       ),
     );
+    b1bChanges.push(
+      roleAssignmentChange(
+        `/subscriptions/${subscription}/resourceGroups/rg-certigo-${environment}`,
+        proof.identities[key].name,
+        {
+          condition: runtimeWriterCondition(),
+          conditionVersion: '2.0',
+          description:
+            'May create only approved runtime roles for service principals in this environment.',
+          principalId,
+          principalType: 'ServicePrincipal',
+          roleDefinitionId:
+            proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
+        },
+      ),
+    );
   }
   const contentPrincipal =
     proof.identities.contentInfrastructurePlan.principalId;
-  b1Changes.push(
+  b1bChanges.push(
     roleAssignmentChange(
       `/subscriptions/${subscription}/resourceGroups/rg-certigo-content`,
       proof.identities.contentInfrastructurePlan.name,
@@ -483,6 +488,8 @@ function makeCompletePhaseBPlans(proof) {
           proof.roleDefinitionIds.contentInfrastructurePlanExecutor,
       },
     ),
+  );
+  b1bChanges.push(
     {
       changeType: 'Create',
       resourceId:
@@ -526,7 +533,8 @@ function makeCompletePhaseBPlans(proof) {
     ),
   );
   return {
-    b1: whatIfPlan(b1Changes),
+    b1a: whatIfPlan(b1aChanges),
+    b1b: whatIfPlan(b1bChanges),
     b2: whatIfPlan(b2Changes),
   };
 }
@@ -609,7 +617,7 @@ test('Phase A custom roles contain no wildcard or delete action', () => {
   }
 });
 
-test('Phase B1 uses literal Phase A IDs and creates only internal assignments', () => {
+test('Phase B1a uses literal Phase A IDs and creates only RG assignments', () => {
   const template = compileTemplate('infra/governance/bootstrap-rbac.bicep');
   const source = readFileSync(
     path.join(repositoryRoot, 'infra', 'governance', 'bootstrap-rbac.bicep'),
@@ -624,11 +632,7 @@ test('Phase B1 uses literal Phase A IDs and creates only internal assignments', 
       resourcesOfType(resource.properties.template, 'Microsoft.Authorization/roleAssignments')
         .length > 0,
   );
-  assert.equal(topLevelAssignments.length, 1);
-  assert.equal(
-    topLevelAssignments[0].copy.count,
-    "[length(variables('environments'))]",
-  );
+  assert.equal(topLevelAssignments.length, 0);
   assert.deepEqual(
     assignmentDeployments.map((deployment) => ({
       copy: deployment.copy?.count ?? null,
@@ -638,14 +642,13 @@ test('Phase B1 uses literal Phase A IDs and creates only internal assignments', 
       ).length,
     })),
     [
-      { copy: "[length(variables('environments'))]", nested: 2 },
       { copy: "[length(variables('environments'))]", nested: 1 },
-      { copy: null, nested: 1 },
+      { copy: "[length(variables('environments'))]", nested: 1 },
     ],
   );
   assert.equal(
     resourcesOfType(template, 'Microsoft.Authorization/policyAssignments').length,
-    1,
+    0,
   );
   assert.equal(
     resourcesOfType(template, 'Microsoft.Authorization/roleDefinitions').length,
@@ -661,11 +664,11 @@ test('Phase B1 uses literal Phase A IDs and creates only internal assignments', 
   assert.doesNotMatch(source, /\.properties\.principalId/);
   assert.doesNotMatch(source, /\breference\s*\(/);
   assert.match(source, /principalId: environment\.identity\.principalId/);
-  assert.match(
+  assert.doesNotMatch(
     source,
     /principalId: phaseA\.identities\.contentInfrastructurePlan\.principalId/,
   );
-  assert.equal(template.outputs.assignmentCount.value, 14);
+  assert.equal(template.outputs.assignmentCount.value, 6);
 });
 
 test('Phase B2 uses only literal exact subnet and DNS resources', () => {
@@ -690,7 +693,7 @@ test('Phase B proof validation is mandatory, complete, and subscription-bound', 
   const proof = makePhaseAProof();
   assert.equal(validatePhaseAProof(proof, subscription), proof);
   assert.throws(
-    () => validateWhatIf(whatIfPlan([]), subscription, { phase: 'B1' }),
+    () => validateWhatIf(whatIfPlan([]), subscription, { phase: 'B1a' }),
     /Phase A proof is missing/,
   );
   assert.throws(
@@ -968,23 +971,27 @@ test('Phase A deployment wrappers require exact scope and materialized retries',
   );
 });
 
-test('Phase B1 and B2 accept only their exact assignment contracts', () => {
+test('Phase B1a B1b and B2 accept only their exact assignment contracts', () => {
   const proof = makePhaseAProof();
-  const { b1, b2 } = makeCompletePhaseBPlans(proof);
+  const { b1a, b1b, b2 } = makeCompletePhaseBPlans(proof);
   assert.equal(
-    validateWhatIf(b1, subscription, { phase: 'B1', phaseA: proof }).total,
-    14,
+    validateWhatIf(b1a, subscription, { phase: 'B1a', phaseA: proof }).total,
+    6,
+  );
+  assert.equal(
+    validateWhatIf(b1b, subscription, { phase: 'B1b', phaseA: proof }).total,
+    8,
   );
   assert.equal(
     validateWhatIf(b2, subscription, { phase: 'B2', phaseA: proof }).total,
     2,
   );
   assert.throws(
-    () => validateWhatIf(b2, subscription, { phase: 'B1', phaseA: proof }),
-    /outside the exact Phase B1 contract|Phase B1 plan is incomplete/,
+    () => validateWhatIf(b2, subscription, { phase: 'B1a', phaseA: proof }),
+    /outside the exact Phase B1a contract|Phase B1a plan is incomplete/,
   );
   assert.throws(
-    () => validateWhatIf(b1, subscription, { phase: 'B2', phaseA: proof }),
+    () => validateWhatIf(b1a, subscription, { phase: 'B2', phaseA: proof }),
     /outside the exact Phase B2 contract|Phase B2 plan is incomplete/,
   );
 });
@@ -993,26 +1000,26 @@ test('Phase B validators reject IDs, principals, types, scopes, and conditions',
   const proof = makePhaseAProof();
   const mutations = [
     (plans) => {
-      plans.b1.changes[0].resourceId = plans.b1.changes[0].resourceId.replace(
+      plans.b1a.changes[0].resourceId = plans.b1a.changes[0].resourceId.replace(
         /[0-9a-f-]{36}$/,
         '90000000-0000-0000-0000-000000000001',
       );
-      return ['b1', 'B1'];
+      return ['b1a', 'B1a'];
     },
     (plans) => {
-      plans.b1.changes[0].after.properties.principalId =
+      plans.b1a.changes[0].after.properties.principalId =
         '90000000-0000-0000-0000-000000000001';
-      return ['b1', 'B1'];
+      return ['b1a', 'B1a'];
     },
     (plans) => {
-      plans.b1.changes[0].after.properties.principalType = 'User';
-      return ['b1', 'B1'];
+      plans.b1a.changes[0].after.properties.principalType = 'User';
+      return ['b1a', 'B1a'];
     },
     (plans) => {
-      plans.b1.changes.find(
+      plans.b1b.changes.find(
         ({ after }) => after.properties.conditionVersion === '2.0',
       ).after.properties.condition = 'true';
-      return ['b1', 'B1'];
+      return ['b1b', 'B1b'];
     },
     (plans) => {
       plans.b2.changes[0].resourceId = plans.b2.changes[0].resourceId.replace(
@@ -1036,7 +1043,8 @@ test('Phase B validators reject IDs, principals, types, scopes, and conditions',
 test('Phase B validators accept exact NoChange retries only', () => {
   const proof = makePhaseAProof();
   for (const [key, phase, total] of [
-    ['b1', 'B1', 14],
+    ['b1a', 'B1a', 6],
+    ['b1b', 'B1b', 8],
     ['b2', 'B2', 2],
   ]) {
     const create = makeCompletePhaseBPlans(proof)[key];
@@ -1057,19 +1065,19 @@ test('Phase B validators accept exact NoChange retries only', () => {
 test('Phase B requires a complete Phase A proof and exact policy scope', () => {
   const proof = makePhaseAProof();
   assert.throws(
-    () => validateWhatIf(whatIfPlan([]), subscription, { phase: 'B1' }),
+    () => validateWhatIf(whatIfPlan([]), subscription, { phase: 'B1a' }),
     /Phase A proof is missing/,
   );
-  const { b1 } = makeCompletePhaseBPlans(proof);
-  const policy = b1.changes.find(({ resourceId }) =>
+  const { b1b } = makeCompletePhaseBPlans(proof);
+  const policy = b1b.changes.find(({ resourceId }) =>
     resourceId.includes('/policyAssignments/'),
   );
   policy.resourceId =
     `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci/providers/` +
     'Microsoft.Authorization/policyAssignments/certigo-privileged-ci-rbac';
   assert.throws(
-    () => validateWhatIf(b1, subscription, { phase: 'B1', phaseA: proof }),
-    /outside the exact Phase B1 contract/,
+    () => validateWhatIf(b1b, subscription, { phase: 'B1b', phaseA: proof }),
+    /outside the exact Phase B1b contract/,
   );
 });
 

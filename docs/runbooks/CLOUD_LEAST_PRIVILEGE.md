@@ -139,6 +139,70 @@ Il ne peut ni créer Owner/Contributor/UAA, ni supprimer une attribution.
 
 ## Bootstrap gouvernance en deux phases
 
+### A0 humain et planner B1a borné
+
+Toutes les opérations non conditionnables restent humaines PIM : création des UAMI/FIC,
+`roleDefinitions`, `policyDefinitions`, et `policyAssignments`. Aucune identité workload ne reçoit
+ces actions. `bootstrap-planning-identity.bicep`, exécuté seulement dans A0 humain, précrée
+`id-certigo-governance-phase-b1a-plan`, sa FIC exacte
+`repo:gchambaud_microsoft/Certigo:environment:azure-governance-bootstrap-phase-b`, et le rôle B1a.
+Le template ne crée aucune attribution.
+
+Le rôle B1a contient uniquement `roleAssignments/read`, `roleAssignments/write` et
+`roleDefinitions/read`; ses assignable scopes sont les quatre RG exacts dev/staging/prod/CI.
+Un admin PIM attribue séparément le rôle deployment-launcher existant au scope subscription, puis
+le rôle B1a à chacun des quatre RG. `planner-pim-contract.mjs` génère et valide pour chaque RG la
+condition `2.0` qui borne `PrincipalId`, `RoleDefinitionId` et `PrincipalType`. Le scope est borné
+structurellement par l'attribution RBAC au RG; Azure n'expose pas d'attribut ABAC `Scope`.
+Le launcher conserve pour seul write `Microsoft.Resources/deployments/write`; ses lectures
+additionnelles sont bornées aux deployments, RG, role/policy definitions et assignments, UAMI et
+FIC nécessaires au binding Phase A live. Il n'accorde aucun autre write ni dataAction.
+
+```bash
+# Prévol A0 humain, lecture seule
+GOVERNANCE_PLANNER_EVIDENCE_DIR='<private-output-directory>' \
+  bash infra/governance/what-if-governance-planner.sh
+
+# Après approbation humaine du manifeste A0, sous activation PIM :
+sha256sum --check '<private-output-directory>/manifest.sha256'
+node infra/governance/validate-planner-what-if.mjs evidence \
+  '<private-output-directory>/manifest.json' \
+  '<approved-planner-manifest-sha256>' \
+  "$PWD" \
+  "$AZURE_SUBSCRIPTION_ID" \
+  "$(az account show --query tenantId --output tsv)"
+az bicep build \
+  --file infra/governance/bootstrap-planning-identity.bicep \
+  --stdout > /tmp/governance-planner-template.json
+cmp /tmp/governance-planner-template.json \
+  '<private-output-directory>/compiled-template.json'
+az deployment sub create \
+  --subscription "$AZURE_SUBSCRIPTION_ID" \
+  --name 'certigo-governance-b1a-planner-bootstrap-<ticket>' \
+  --location "${AZURE_LOCATION:-westeurope}" \
+  --template-file '<private-output-directory>/compiled-template.json' \
+  --parameters '@<private-output-directory>/parameters.json'
+
+# Après Phase A, produire le contrat PIM depuis le deployment A0 relu en direct
+# L'outil relit également l'UAMI, toutes ses FIC paginées et le roleDefinition
+# live; il exige une seule FIC et refuse tout drift de principal, sujet,
+# audience, actions ou scopes.
+node infra/governance/planner-pim-contract.mjs \
+  '<private-output-directory>/manifest.json' \
+  '<approved-planner-manifest-sha256>' \
+  'certigo-governance-b1a-planner-bootstrap-<ticket>' \
+  b1a-pim-contract.json
+```
+
+Le générateur réexécute le binding Phase A complet via `prepare-phase-b.sh` à partir des variables
+`PHASE_A_*`; il n'accepte aucun fichier Phase A fourni directement. Il refuse aussi tout accès
+RBAC actif, hérité, éligible ou activé déjà présent sur le principal planner. Le contrat doit être
+généré avant les six attributions PIM décrites, jamais pour légitimer une identité déjà privilégiée.
+
+La migration réutilise les ressources Phase A live et leurs preuves v2; elle ne les recrée pas.
+Avant activation, retirer/downscoper le legacy `microlingo-github-actions` Contributor+UAA
+subscription est une précondition humaine avec preuve avant/après.
+
 Le workflow `azure-content-infra-plan` ne réutilise aucune identité dev, staging, prod ou
 VMSS. Le `what-if` ARM exige les mêmes permissions `write` que le déploiement évalué : le rôle
 subscription launcher seul est donc insuffisant et n'est pas attribué à cette UAMI.
@@ -154,9 +218,13 @@ par le moteur de what-if. Le bootstrap est donc séparé et fail-closed :
   `roleAssignment`, aucun `policyAssignment` et ne donne aucune permission effective. Son output
   `phaseA` versionné contient les deux resource group IDs, les `clientId`, `principalId`,
   `resourceId`, les six role definition IDs, le policy definition ID, le tenant et la subscription.
-- **Phase B1 — `bootstrap-rbac`** : ne crée ni identité, ni rôle, ni policyDefinition. Elle
-  consomme les IDs Phase A comme paramètres littéraux, puis planifie exactement les 13
-  attributions internes et l'unique policyAssignment en `Audit`.
+- **Phase B1a automatisable — `bootstrap-rbac`** : consomme les IDs Phase A comme paramètres
+  littéraux et planifie six attributions RG sans délégation RBAC : Contributor sur
+  dev/staging/prod et réseau partagé sur CI. Elle ne contient ni launcher subscription,
+  rôle accordant `roleAssignments/write`, ni policyAssignment.
+- **Phase B1b humain PIM — `bootstrap-rbac-admin`** : planifie séparément les trois launchers,
+  les trois runtime writers conditionnés, l'exécuteur contenu conditionné et l'unique
+  policyAssignment en `Audit`. Aucun workload ne peut créer ces attributions délégatrices.
 - **Phase B2 — `contentPlanExternalJoinAssignments`** : cible directement `rg-certigo-ci` et
   planifie séparément les deux attributions externes sur le subnet et la zone DNS exacts.
 
@@ -253,20 +321,25 @@ export PHASE_B_EVIDENCE_DIR='<private-output-directory>'
 bash infra/governance/what-if-phase-b.sh
 ```
 
-Le dispatch Phase B exécute uniquement `what-if-phase-b1.sh`. Après approbation et deployment B1,
-un nouveau dispatch `governance-bootstrap-phase-b2-what-if` télécharge les preuves Phase A et B1,
-vérifie le deployment B1 `Succeeded` et la transition live complète, puis exécute
-`what-if-phase-b2.sh`. B2 n'est jamais planifié ou scellé avant B1. Chaque script exige
+Le dispatch Phase B exécute uniquement B1a. B1b est exécuté localement par l'admin PIM avec
+`what-if-phase-b1b.sh`, puis déployé seulement avec `deploy-phase-b1b.sh` et une preuve approuvée.
+Après approbation et deployments B1a+B1b, l'admin PIM fournit localement les preuves immuables
+Phase A, B1a et B1b à `what-if-phase-b2.sh`. Aucun workflow B2 n'existe tant qu'un canal
+d'import de preuve humaine approuvé n'est pas disponible. Le script vérifie les deployments B1a
+et B1b `Succeeded` et la transition live complète. B2 n'est jamais planifié ou scellé avant ces
+deux étapes. Chaque script exige
 `provisioningState=Succeeded`, valide chaque output Phase A, relit chaque ressource par son ID réel,
 compare `clientId`/`principalId`, puis exige exactement zéro ou une FIC conforme par UAMI. Toute
-ressource/output absent ou divergent bloque avant son what-if. Le manifest Phase A approuvé lie le
+ressource/output absent ou divergent bloque avant son what-if. Le manifeste Phase A approuvé lie le
 commit source, les hashes des sources/templates/paramètres, le template ARM compilé et le plan brut.
 Le prévol compare son hash approuvé au fichier téléchargé, le `templateHash` du deployment live,
 toutes les opérations subscription et imbriquées, puis énumère les role/policy assignments des huit
 principals. Seul un replay partiel conforme à B1/B2 est accepté; tout assignment supplémentaire
 bloque. B1 passe l'objet Phase A validé comme
 paramètre littéral : aucun `principalId` d'assignment ne dépend d'un `reference()`. Son manifeste
-indépendant couvre les 13 roleAssignments internes et `certigo-privileged-ci-rbac` en `Audit`.
+indépendant B1a couvre les six roleAssignments RG sans délégation. Le manifeste B1b couvre les
+trois launchers, les quatre attributions délégatrices conditionnées et
+`certigo-privileged-ci-rbac` en `Audit`, sous identité humaine PIM.
 Si ARM omet `principalType` (`null`) dans le payload what-if, B1 ne l'infère qu'après avoir prouvé
 que la déclaration correspondante du template ARM compilé contient le littéral
 `ServicePrincipal` et que le `principalId` littéral correspond exactement à une UAMI Phase A live.
@@ -300,12 +373,12 @@ exact et un état ARM matérialisé (`provisioningState`, `templateHash` ou `tem
 Les valeurs vides ou composées d'espaces sont également refusées. Un même leaf name sous un autre
 RG/subscription, une casse différente ou `properties: {}` est refusé.
 
-Après archivage et approbation humaine distincte des manifestes B1 et B2, l'admin PIM crée pour
+Après archivage et approbation humaine distincte des manifestes B1a, B1b et B2, l'admin PIM crée pour
 chaque phase un JSON d'approbation hors dépôt contenant `schemaVersion: 1`, `approved: true`,
 `phase`, `manifestSha256`, `planSha256`, `sourceCommit` et
 `phaseAEvidenceManifestSha256`. Les outils revalident l'état Phase A live, HEAD, sources, template
-compilé, paramètres, plan et approval avant toute création. L'admin déploie séparément B1 puis B2;
-un GO B1 n'autorise jamais B2 implicitement :
+compilé, paramètres, plan et approval avant toute création. L'admin déploie séparément B1a, B1b
+puis B2; un GO B1a n'autorise jamais B1b ou B2 implicitement :
 
 ```bash
 PHASE_A_EVIDENCE_DIR='<approved-phase-a-artifact>' \
@@ -316,10 +389,24 @@ PHASE_B1_APPROVAL_FILE='<approved-b1.json>' \
 PHASE_B1_DEPLOYMENT_NAME='certigo-governance-bootstrap-rbac-<ticket>' \
   bash infra/governance/deploy-phase-b1.sh
 
-# Conserver exactement ces outputs non secrets pour le dispatch/what-if B2 :
+# B1b est exclusivement humain PIM.
+export PHASE_A_EVIDENCE_DIR='<approved-phase-a-artifact>'
+export PHASE_A_EVIDENCE_MANIFEST_SHA256='<approved-phase-a-manifest-sha256>'
+export PHASE_A_DEPLOYMENT_NAME='<phase-a-deployment>'
+export PHASE_B1B_EVIDENCE_DIR='<private-b1b-evidence>'
+bash infra/governance/what-if-phase-b1b.sh
+
+PHASE_B1B_APPROVAL_FILE='<approved-b1b.json>' \
+PHASE_B1B_DEPLOYMENT_NAME='certigo-governance-bootstrap-rbac-admin-<ticket>' \
+  bash infra/governance/deploy-phase-b1b.sh
+
+# Conserver exactement ces outputs non secrets pour le what-if B2 local :
 export PHASE_B1_EVIDENCE_DIR='<approved-b1-artifact>'
 export PHASE_B1_EVIDENCE_MANIFEST_SHA256='<approved-b1-manifest-sha256>'
 export PHASE_B1_DEPLOYMENT_NAME='certigo-governance-bootstrap-rbac-<ticket>'
+export PHASE_B1B_EVIDENCE_DIR='<approved-b1b-artifact>'
+export PHASE_B1B_EVIDENCE_MANIFEST_SHA256='<approved-b1b-manifest-sha256>'
+export PHASE_B1B_DEPLOYMENT_NAME='certigo-governance-bootstrap-rbac-admin-<ticket>'
 
 PHASE_A_EVIDENCE_DIR='<approved-phase-a-artifact>' \
 PHASE_A_EVIDENCE_MANIFEST_SHA256='<approved-phase-a-manifest-sha256>' \
@@ -328,8 +415,23 @@ PHASE_B1_EVIDENCE_DIR="$PHASE_B1_EVIDENCE_DIR" \
 PHASE_B1_EVIDENCE_MANIFEST_SHA256="$PHASE_B1_EVIDENCE_MANIFEST_SHA256" \
 PHASE_B1_DEPLOYMENT_NAME="$PHASE_B1_DEPLOYMENT_NAME" \
 PHASE_B2_EVIDENCE_DIR='<approved-b2-artifact>' \
+PHASE_B1B_EVIDENCE_DIR="$PHASE_B1B_EVIDENCE_DIR" \
+PHASE_B1B_EVIDENCE_MANIFEST_SHA256="$PHASE_B1B_EVIDENCE_MANIFEST_SHA256" \
+PHASE_B1B_DEPLOYMENT_NAME="$PHASE_B1B_DEPLOYMENT_NAME" \
+  bash infra/governance/what-if-phase-b2.sh
+
 PHASE_B2_APPROVAL_FILE='<approved-b2.json>' \
 PHASE_B2_DEPLOYMENT_NAME='certigo-governance-bootstrap-rbac-external-<ticket>' \
+PHASE_A_EVIDENCE_DIR='<approved-phase-a-artifact>' \
+PHASE_A_EVIDENCE_MANIFEST_SHA256='<approved-phase-a-manifest-sha256>' \
+PHASE_A_DEPLOYMENT_NAME='<phase-a-deployment>' \
+PHASE_B1_EVIDENCE_DIR="$PHASE_B1_EVIDENCE_DIR" \
+PHASE_B1_EVIDENCE_MANIFEST_SHA256="$PHASE_B1_EVIDENCE_MANIFEST_SHA256" \
+PHASE_B1_DEPLOYMENT_NAME="$PHASE_B1_DEPLOYMENT_NAME" \
+PHASE_B1B_EVIDENCE_DIR="$PHASE_B1B_EVIDENCE_DIR" \
+PHASE_B1B_EVIDENCE_MANIFEST_SHA256="$PHASE_B1B_EVIDENCE_MANIFEST_SHA256" \
+PHASE_B1B_DEPLOYMENT_NAME="$PHASE_B1B_DEPLOYMENT_NAME" \
+PHASE_B2_EVIDENCE_DIR='<approved-b2-artifact>' \
   bash infra/governance/deploy-phase-b2.sh
 ```
 
@@ -351,14 +453,7 @@ gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
   -F 'client_payload[phase_a_evidence_run_id]=<phase-a-workflow-run-id>' \
   -F 'client_payload[phase_a_evidence_manifest_sha256]=<approved-manifest-sha256>'
 
-gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
-  -f event_type=governance-bootstrap-phase-b2-what-if \
-  -F 'client_payload[phase_a_deployment_name]=<phase-a-deployment>' \
-  -F 'client_payload[phase_a_evidence_run_id]=<phase-a-run-id>' \
-  -F 'client_payload[phase_a_evidence_manifest_sha256]=<phase-a-manifest-sha256>' \
-  -F 'client_payload[phase_b1_deployment_name]=<phase-b1-deployment>' \
-  -F 'client_payload[phase_b1_evidence_run_id]=<phase-b1-run-id>' \
-  -F 'client_payload[phase_b1_evidence_manifest_sha256]=<phase-b1-manifest-sha256>'
+# B1b et B2 n'ont volontairement aucun workflow workload.
 ```
 
 Après les deux phases :
@@ -382,24 +477,28 @@ Chaque étape est bloquante. Ne jamais anticiper le retrait de l'ancienne identi
 
 1. **Geler l'état de rollback.** Exporter l'inventaire, les IDs des attributions actuelles,
    les federated credentials et les métadonnées des GitHub Environments. Ne rien retirer.
-2. **Prévol admin Phase A.** Activer via PIM l'ensemble minimal permettant RG, UAMI/FIC,
+2. **A0 humain.** Activer via PIM les droits minimaux UAMI/FIC et roleDefinitions. Exécuter le
+   what-if A0, approuver son manifeste, déployer le template A0 exact et archiver ses outputs.
+3. **Prévol admin Phase A.** Activer via PIM l'ensemble minimal permettant RG, UAMI/FIC,
    custom roles et policyDefinition. Exécuter `what-if-phase-a.sh`, archiver et approuver le JSON.
-3. **Provisionnement Phase A.** Déployer `bootstrap-identities.bicep` en incrémentiel; archiver
+4. **Provisionnement Phase A.** Déployer `bootstrap-identities.bicep` en incrémentiel; archiver
    l'output `phaseA`. Vérifier explicitement qu'aucune attribution effective n'existe.
-4. **Access review intermédiaire.** Un second reviewer compare les huit principal/client/resource
+5. **Access review intermédiaire.** Un second reviewer compare les huit principal/client/resource
    IDs, les sept FIC, les six rôles et la policyDefinition à l'output. Il confirme que la Phase A
    n'accorde aucun accès.
-5. **Prévol admin B1.** Exécuter `what-if-phase-b.sh` avec le deployment A approuvé. Refuser tout
+6. **Prévol B1a.** Exécuter `what-if-phase-b.sh` avec le deployment A approuvé. Refuser tout
    `Modify/Delete/Unsupported`, diagnostic, scope générique ou principal/role/condition divergent.
-6. **Provisionnement B1.** Déployer B1 avec `deploy-phase-b1.sh` après approbation hashée.
-7. **Prévol admin B2.** Sur l'état post-B1, exécuter le dispatch B2 avec les preuves A/B1 et le
-   deployment B1; approuver son nouveau manifeste séparément.
-8. **Provisionnement B2.** Déployer B2 avec `deploy-phase-b2.sh`, puis archiver les 16 assignment
-   IDs. Aucun plan B2 antérieur à B1 n'est réutilisable.
-7. **Configuration GitHub.** Créer les `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` et
+7. **Provisionnement B1a.** Déployer B1a avec `deploy-phase-b1.sh` après approbation hashée.
+8. **Prévol/provisionnement B1b humain.** Exécuter puis approuver `what-if-phase-b1b.sh`; déployer
+   `deploy-phase-b1b.sh` sous PIM humain. Aucun workload n'obtient `policyAssignments/write`.
+9. **Prévol admin B2.** Sur l'état post-B1a+B1b, exécuter localement `what-if-phase-b2.sh` avec
+   les deux preuves/deployments; approuver son nouveau manifeste séparément.
+10. **Provisionnement B2.** Déployer B2 avec `deploy-phase-b2.sh`, puis archiver les 16 assignment
+   IDs. Aucun plan B2 antérieur à B1a+B1b n'est réutilisable.
+11. **Configuration GitHub.** Créer les `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` et
    `AZURE_SUBSCRIPTION_ID` au niveau de chaque Environment. Le client ID doit être celui de
    l'UAMI correspondante. Garder la configuration historique disponible pour rollback.
-8. **Préparer l'IaC applicative.** Les RG sont désormais `existing`; leur création et MCSB/
+12. **Préparer l'IaC applicative.** Les RG sont désormais `existing`; leur création et MCSB/
    Defender sortent du chemin applicatif. Reporter le principal de la nouvelle UAMI dans
    `ciDeploymentPrincipalId` pour l'environnement canari seulement.
 9. **Canari dev.** Avec `dev` approuvé : `what-if` sans suppression, déploiement infra,

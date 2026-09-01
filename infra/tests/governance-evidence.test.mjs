@@ -11,6 +11,7 @@ import {
   validateExistingPhaseBAssignments,
   validatePhaseAOperations,
   validatePhaseBTransition,
+  validatePriorDeployment,
   verifyManifestFiles,
   verifyDeploymentApproval,
 } from
@@ -208,7 +209,15 @@ function makeB1Plan(proof) {
     },
   });
   return {
-    changes,
+    changes: changes.filter(
+      (change) =>
+        !change.resourceId.includes('/policyAssignments/') &&
+        !change.after?.properties?.description?.startsWith('Launches the ') &&
+        ![
+          proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
+          proof.roleDefinitionIds.contentInfrastructurePlanExecutor,
+        ].includes(change.after?.properties?.roleDefinitionId),
+    ),
     diagnostics: null,
     error: null,
     potentialChanges: null,
@@ -219,14 +228,6 @@ function makeB1Plan(proof) {
 function compiledB1PrincipalTypes(principalType = 'ServicePrincipal') {
   return {
     resources: [
-      {
-        type: 'Microsoft.Authorization/roleAssignments',
-        properties: {
-          description:
-            "[format('Launches the {0} subscription deployment without general subscription access.', variables('environments')[copyIndex()].name)]",
-          principalType,
-        },
-      },
       {
         type: 'Microsoft.Resources/deployments',
         properties: {
@@ -289,7 +290,7 @@ function makeB1Evidence() {
     encoding: 'utf8',
   }).trim();
   createManifest({
-    phase: 'B1',
+    phase: 'B1a',
     planPath,
     outputPath: manifestPath,
     templatePath: path.join(
@@ -327,7 +328,7 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
   const approval = {
     schemaVersion: 1,
     approved: true,
-    phase: 'B1',
+    phase: 'B1a',
     manifestSha256: sha256File(evidence.manifestPath),
     planSha256: evidence.manifest.plan.sha256,
     sourceCommit: evidence.sourceCommit,
@@ -423,9 +424,9 @@ test('Phase A binding rejects extra and out-of-contract assignments', () => {
       evidence.proof,
     ),
     [
-      `role-assignment:/subscriptions/${subscription}:` +
-        'Launches the dev subscription deployment without general ' +
-        'subscription access.',
+      `role-assignment:/subscriptions/${subscription}/resourcegroups/` +
+        'rg-certigo-dev:Certigo environment deployment; ' +
+        'no role-assignment administration.',
     ],
   );
   extra.after.properties.principalId =
@@ -517,8 +518,72 @@ test('deployment parameters, locations, and B1 transition are exact', () => {
     );
     assert.throws(
       () => validatePhaseBTransition([], subscription, proof, 'B2'),
-      /B1 transition is incomplete/,
+      /B1a transition is incomplete/,
     );
+});
+
+test('live Phase B binding classifies delegator roles as human B1b', () => {
+  const proof = makePhaseAProof();
+  const all = makeB1Plan(proof).changes;
+  const delegators = [];
+  for (const environment of ['dev', 'staging', 'prod']) {
+    const key = `deploy${environment[0].toUpperCase()}${environment.slice(1)}`;
+    const identity = proof.identities[key];
+    const scope =
+      `/subscriptions/${subscription}/resourceGroups/rg-certigo-${environment}`;
+    delegators.push({
+      id:
+        `${scope}/providers/Microsoft.Authorization/roleAssignments/` +
+        armGuid(
+          scope,
+          identity.name,
+          proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
+        ),
+      name: 'runtime-writer',
+      scope,
+      condition: runtimeWriterCondition(),
+      conditionVersion: '2.0',
+      description:
+        'May create only approved runtime roles for service principals in this environment.',
+      principalId: identity.principalId,
+      principalType: 'ServicePrincipal',
+      roleDefinitionId: proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
+    });
+  }
+  const contentScope =
+    `/subscriptions/${subscription}/resourceGroups/rg-certigo-content`;
+  delegators.push({
+    id:
+      `${contentScope}/providers/Microsoft.Authorization/roleAssignments/` +
+      armGuid(
+        contentScope,
+        proof.identities.contentInfrastructurePlan.name,
+        proof.roleDefinitionIds.contentInfrastructurePlanExecutor,
+      ),
+    name: 'content-executor',
+    scope: contentScope,
+    condition: contentPlanCondition(proof),
+    conditionVersion: '2.0',
+    description:
+      'Plans the content stack and may assign only approved content roles to service principals.',
+    principalId: proof.identities.contentInfrastructurePlan.principalId,
+    principalType: 'ServicePrincipal',
+    roleDefinitionId: proof.roleDefinitionIds.contentInfrastructurePlanExecutor,
+  });
+  const b1a = all.map((change) => ({
+    id: change.resourceId,
+    name: change.resourceId.split('/').at(-1),
+    scope: change.resourceId.split('/providers/Microsoft.Authorization/')[0],
+    ...change.after.properties,
+  }));
+  assert.doesNotThrow(() =>
+    validateExistingPhaseBAssignments(
+      [...b1a, ...delegators],
+      [],
+      subscription,
+      proof,
+    ),
+  );
 });
 
 test('omitted principalType requires compiled literal and live Phase A UAMI', () => {
@@ -534,7 +599,7 @@ test('omitted principalType requires compiled literal and live Phase A UAMI', ()
     compiledB1PrincipalTypes(),
     proof,
   );
-  assert.equal(normalized.provenance.normalizedCount, 13);
+  assert.equal(normalized.provenance.normalizedCount, 6);
   assert.ok(
     normalized.provenance.entries.every(
       ({ effectivePrincipalType, provenance }) =>
@@ -544,10 +609,10 @@ test('omitted principalType requires compiled literal and live Phase A UAMI', ()
   );
   assert.equal(
     validateWhatIf(normalized.plan, subscription, {
-      phase: 'B1',
+      phase: 'B1a',
       phaseA: proof,
     }).total,
-    14,
+    6,
   );
 
   for (const compiled of [
@@ -577,10 +642,10 @@ test('omitted principalType requires compiled literal and live Phase A UAMI', ()
     assert.throws(
       () =>
         validateWhatIf(wrongType, subscription, {
-          phase: 'B1',
+          phase: 'B1a',
           phaseA: proof,
         }),
-      /outside the exact Phase B1 contract/,
+      /outside the exact Phase B1a contract/,
     );
   }
 });
@@ -617,7 +682,7 @@ test('deployment approval recomputes normalized principalType evidence', () => {
     provenanceSha256: sha256File(provenancePath),
     effectivePrincipalType: 'ServicePrincipal',
     provenance: 'compiled-template+live-uami',
-    normalizedCount: 13,
+    normalizedCount: 6,
   };
   evidence.manifest.phaseA = {
     evidenceManifestSha256: 'a'.repeat(64),
@@ -643,7 +708,7 @@ test('deployment approval recomputes normalized principalType evidence', () => {
   const approval = {
     schemaVersion: 1,
     approved: true,
-    phase: 'B1',
+    phase: 'B1a',
     manifestSha256: sha256File(evidence.manifestPath),
     planSha256: evidence.manifest.plan.sha256,
     sourceCommit: evidence.sourceCommit,
@@ -664,9 +729,52 @@ test('deployment approval recomputes normalized principalType evidence', () => {
       tenantId: tenant,
     });
   assert.doesNotThrow(verify);
+  const approvedParameters = JSON.parse(
+    fs.readFileSync(evidence.parametersPath, 'utf8'),
+  );
+  assert.doesNotThrow(() =>
+    validatePriorDeployment({
+      manifest: evidence.manifest,
+      plan: rawPlan,
+      deployment: {
+        properties: {
+          provisioningState: 'Succeeded',
+          templateHash: evidence.manifest.template.armTemplateHash,
+          parameters: approvedParameters.parameters,
+        },
+      },
+      approvedParameters,
+      manifestPath: evidence.manifestPath,
+      planPath: evidence.planPath,
+      parametersPath: evidence.parametersPath,
+      compiledTemplatePath: evidence.compiledTemplatePath,
+      sourceRoot: repositoryRoot,
+      expectedManifestSha256: sha256File(evidence.manifestPath),
+      phaseAProof: evidence.proof,
+      expectedPhase: 'B1a',
+    }),
+  );
   fs.appendFileSync(provenancePath, '\n');
   assert.throws(
     verify,
+    /artifact inventory mismatch|principalType provenance mismatch/,
+  );
+  assert.throws(
+    () =>
+      validatePriorDeployment({
+        manifest: evidence.manifest,
+        plan: rawPlan,
+        deployment: {},
+        approvedParameters,
+        manifestPath: evidence.manifestPath,
+        planPath: evidence.planPath,
+        parametersPath: evidence.parametersPath,
+        compiledTemplatePath: evidence.compiledTemplatePath,
+        sourceRoot: repositoryRoot,
+        expectedManifestSha256: sha256File(evidence.manifestPath),
+        phaseAProof: evidence.proof,
+        expectedPhase: 'B1a',
+      }),
     /artifact inventory mismatch|principalType provenance mismatch/,
   );
 });
@@ -716,16 +824,15 @@ test('governance workflows persist evidence and deploy tools require approvals',
   assert.match(phaseBWorkflow, /PHASE_B1_EVIDENCE_DIR/);
   assert.match(phaseBWorkflow, /what-if-phase-b1\.sh/);
   assert.doesNotMatch(phaseBWorkflow, /PHASE_B_EVIDENCE_DIR/);
-  const phaseB2Workflow = fs.readFileSync(
-    path.join(
-      repositoryRoot,
-      '.github/workflows/governance-bootstrap-phase-b2-what-if.yml',
+  assert.equal(
+    fs.existsSync(
+      path.join(
+        repositoryRoot,
+        '.github/workflows/governance-bootstrap-phase-b2-what-if.yml',
+      ),
     ),
-    'utf8',
+    false,
   );
-  assert.match(phaseB2Workflow, /phase_b1_deployment_name/);
-  assert.match(phaseB2Workflow, /phase_b1_evidence_manifest_sha256/);
-  assert.match(phaseB2Workflow, /governance-bootstrap-phase-b2-what-if/);
   const orchestrator = fs.readFileSync(
     path.join(repositoryRoot, 'infra/governance/what-if-phase-b.sh'),
     'utf8',
@@ -771,7 +878,7 @@ test('governance workflows persist evidence and deploy tools require approvals',
   assert.match(phaseADeploy, /deployment-approval/);
   assert.match(phaseADeploy, /--template-file "\$\{work_dir\}\/template\.json"/);
   assert.doesNotMatch(phaseADeploy, /bootstrap-identities\.bicep" \\\n  --parameters/);
-  for (const workflow of [phaseAWorkflow, phaseBWorkflow, phaseB2Workflow]) {
+  for (const workflow of [phaseAWorkflow, phaseBWorkflow]) {
     assert.match(workflow, /fetch-depth: 0/);
   }
   const runbook = fs.readFileSync(

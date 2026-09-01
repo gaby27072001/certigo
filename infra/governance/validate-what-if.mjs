@@ -80,10 +80,17 @@ const roleContracts = {
     roleName: /^Certigo Subscription Deployment Launcher [a-z0-9]{6}$/,
     actions: [
       'Microsoft.Resources/deployments/read',
+      'Microsoft.Resources/deployments/operations/read',
       'Microsoft.Resources/deployments/validate/action',
       'Microsoft.Resources/deployments/whatIf/action',
       'Microsoft.Resources/deployments/write',
       'Microsoft.Resources/subscriptions/resourceGroups/read',
+      'Microsoft.Authorization/policyAssignments/read',
+      'Microsoft.Authorization/policyDefinitions/read',
+      'Microsoft.Authorization/roleAssignments/read',
+      'Microsoft.Authorization/roleDefinitions/read',
+      'Microsoft.ManagedIdentity/userAssignedIdentities/read',
+      'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/read',
     ],
     scopes: (subscriptionId) => [`/subscriptions/${subscriptionId}`],
   },
@@ -894,18 +901,21 @@ export function validatePhaseAResource(resource, subscriptionId) {
 
 export function expectedPhaseBContracts(subscriptionId, phaseA, phase) {
   const proof = validatePhaseAProof(phaseA, subscriptionId);
-  if (phase === 'B1') {
-    return [...requiredPhaseB1Contracts(subscriptionId, proof)].sort();
+  if (phase === 'B1a') {
+    return [...requiredPhaseB1aContracts(subscriptionId, proof)].sort();
+  }
+  if (phase === 'B1b') {
+    return [...requiredPhaseB1bContracts(subscriptionId, proof)].sort();
   }
   if (phase === 'B2') {
     return [...requiredPhaseB2Contracts(subscriptionId, proof)].sort();
   }
-  throw new Error('phase must be B1 or B2');
+  throw new Error('phase must be B1a, B1b, or B2');
 }
 
 export function validatePhaseBResource(resource, subscriptionId, phaseA, phase) {
-  if (!['B1', 'B2'].includes(phase)) {
-    throw new Error('Phase B resource validation requires B1 or B2');
+  if (!['B1a', 'B1b', 'B2'].includes(phase)) {
+    throw new Error('Phase B resource validation requires B1a, B1b, or B2');
   }
   const proof = validatePhaseAProof(phaseA, subscriptionId);
   const contract = phaseBContract(
@@ -952,20 +962,22 @@ function phaseBContract(change, subscriptionId, phaseA, phase) {
       change.after?.properties?.description
     }`;
     const allowed =
-      phase === 'B1'
-        ? requiredPhaseB1Contracts(subscriptionId, phaseA)
-        : requiredPhaseB2Contracts(subscriptionId, phaseA);
+      phase === 'B1a'
+        ? requiredPhaseB1aContracts(subscriptionId, phaseA)
+        : phase === 'B1b'
+          ? requiredPhaseB1bContracts(subscriptionId, phaseA)
+          : requiredPhaseB2Contracts(subscriptionId, phaseA);
     return allowed.has(contract) ? contract : null;
   }
   if (
-    phase === 'B1' &&
+    phase === 'B1b' &&
     parsed.type === 'microsoft.authorization/policyassignments' &&
     validatePolicyAssignment(change, subscriptionId, phaseA)
   ) {
     return 'policy-assignment';
   }
   if (
-    phase === 'B1' &&
+    phase === 'B1a' &&
     validateDeployment(change, phaseB1DeploymentIds(subscriptionId))
   ) {
     return `deployment:${parsed.names[0]}`;
@@ -976,7 +988,7 @@ function phaseBContract(change, subscriptionId, phaseA, phase) {
   const resourceGroupId = (name) =>
     normalizeId(`/subscriptions/${subscriptionId}/resourceGroups/${name}`);
   const exactInputs =
-    phase === 'B1'
+    phase !== 'B2'
       ? new Set(
           ['rg-certigo-ci', 'rg-certigo-content', 'rg-certigo-dev',
             'rg-certigo-staging', 'rg-certigo-prod'].map(resourceGroupId),
@@ -1025,11 +1037,47 @@ function isExternalJoinAssignment(candidate) {
   );
 }
 
-function requiredPhaseB1Contracts(subscriptionId, phaseA) {
+function isSubscriptionLauncherAssignment(candidate) {
+  return candidate.description.startsWith('Launches the ');
+}
+
+function requiredPhaseB1aContracts(subscriptionId, phaseA) {
+  return new Set(
+    expectedRoleAssignments(subscriptionId, phaseA)
+      .filter(
+        (candidate) =>
+          !isExternalJoinAssignment(candidate) &&
+          !isSubscriptionLauncherAssignment(candidate) &&
+          ![
+            phaseA.roleDefinitionIds.runtimeRoleAssignmentWriter,
+            phaseA.roleDefinitionIds.contentInfrastructurePlanExecutor,
+          ].some(
+            (roleDefinitionId) =>
+              normalizeId(roleDefinitionId) ===
+              normalizeId(candidate.roleDefinitionId),
+          ),
+      )
+      .map(assignmentContract),
+  );
+}
+
+function requiredPhaseB1bContracts(subscriptionId, phaseA) {
   return new Set([
     'policy-assignment',
     ...expectedRoleAssignments(subscriptionId, phaseA)
-      .filter((candidate) => !isExternalJoinAssignment(candidate))
+      .filter(isSubscriptionLauncherAssignment)
+      .concat(
+        expectedRoleAssignments(subscriptionId, phaseA).filter((candidate) =>
+          [
+            phaseA.roleDefinitionIds.runtimeRoleAssignmentWriter,
+            phaseA.roleDefinitionIds.contentInfrastructurePlanExecutor,
+          ].some(
+            (roleDefinitionId) =>
+              normalizeId(roleDefinitionId) ===
+              normalizeId(candidate.roleDefinitionId),
+          ),
+        ),
+      )
       .map(assignmentContract),
   ]);
 }
@@ -1050,8 +1098,8 @@ export function validateWhatIf(
   if (!uuidPattern.test(subscriptionId ?? '')) {
     throw new Error('subscription id must be an explicit UUID');
   }
-  if (!['A', 'B1', 'B2'].includes(phase)) {
-    throw new Error('phase must be A, B1, or B2');
+  if (!['A', 'B1a', 'B1b', 'B2'].includes(phase)) {
+    throw new Error('phase must be A, B1a, B1b, or B2');
   }
   const errors = [];
   if (plan.status !== 'Succeeded') {
@@ -1147,9 +1195,11 @@ export function validateWhatIf(
   const required =
     phase === 'A'
       ? requiredPhaseAContracts()
-      : phase === 'B1'
-        ? requiredPhaseB1Contracts(subscriptionId, proof)
-        : requiredPhaseB2Contracts(subscriptionId, proof);
+      : phase === 'B1a'
+        ? requiredPhaseB1aContracts(subscriptionId, proof)
+        : phase === 'B1b'
+          ? requiredPhaseB1bContracts(subscriptionId, proof)
+          : requiredPhaseB2Contracts(subscriptionId, proof);
   const missing = [...required].filter((contract) => !seenContracts.has(contract));
   if (missing.length > 0) {
     errors.push(`Phase ${phase} plan is incomplete: ${missing.join(', ')}`);
@@ -1183,7 +1233,7 @@ function main() {
   ) {
     throw new Error(
       'Usage: node validate-what-if.mjs --plan <path> --subscription <id> ' +
-        '--phase <A|B1|B2> [--phase-a <outputs.json>]',
+        '--phase <A|B1a|B1b|B2> [--phase-a <outputs.json>]',
     );
   }
   const plan = JSON.parse(fs.readFileSync(path.resolve(planPath), 'utf8'));

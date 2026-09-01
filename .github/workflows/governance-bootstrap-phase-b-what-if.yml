@@ -1,4 +1,4 @@
-name: Governance bootstrap Phase B1 what-if
+name: Governance bootstrap Phase B1a what-if
 
 on:
   repository_dispatch:
@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   what-if:
-    name: Admin/PIM Phase B what-if only
+    name: Conditioned Phase B1a what-if only
     if: ${{ github.ref == 'refs/heads/main' }}
     environment: azure-governance-bootstrap-phase-b
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
@@ -75,7 +75,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --name governance-phase-a-evidence \
             --dir "$evidence_dir"
-      - name: Run Phase B1 internal assignment what-if
+      - name: Run Phase B1a RG assignment what-if
         shell: bash
         env:
           AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
