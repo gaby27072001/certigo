@@ -23,7 +23,8 @@ public sealed class RuntimeContentApiContractTests
         var paths = root.GetProperty("paths");
         var manifest = paths.GetProperty("/content/releases/active/manifest")
             .GetProperty("get");
-        manifest.GetProperty("responses").TryGetProperty("304", out _).Should().BeTrue();
+        manifest.GetProperty("responses").EnumerateObject().Select(response => response.Name)
+            .Should().Contain(["200", "304", "401", "423", "503"]);
         manifest.GetProperty("responses").GetProperty("304").GetProperty("headers")
             .EnumerateObject().Select(header => header.Name).Should().Contain(
                 [
@@ -53,7 +54,7 @@ public sealed class RuntimeContentApiContractTests
         feature.GetProperty("enabledValue").GetString().Should().Be("versioned");
         feature.GetProperty("disabledHttpStatus").GetInt32().Should().Be(404);
         file.GetProperty("responses").EnumerateObject().Select(response => response.Name)
-            .Should().Contain(["200", "304", "401", "404", "416", "503"]);
+            .Should().Contain(["200", "304", "401", "404", "416", "423", "503"]);
         var headers = file.GetProperty("responses").GetProperty("200")
             .GetProperty("headers");
         headers.EnumerateObject().Select(header => header.Name).Should().Contain(

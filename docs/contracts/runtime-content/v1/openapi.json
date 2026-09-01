@@ -82,6 +82,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "423": {
+            "$ref": "#/components/responses/AccountDeletionInProgress"
+          },
           "503": {
             "$ref": "#/components/responses/ContentUnavailable"
           }
@@ -198,6 +201,9 @@
           },
           "416": {
             "$ref": "#/components/responses/RangeNotSatisfiable"
+          },
+          "423": {
+            "$ref": "#/components/responses/AccountDeletionInProgress"
           },
           "503": {
             "$ref": "#/components/responses/ContentUnavailable"
@@ -457,6 +463,9 @@
     "responses": {
       "Unauthorized": {
         "description": "Missing or invalid learner JWT"
+      },
+      "AccountDeletionInProgress": {
+        "description": "The authenticated learner is locked by the account deletion workflow"
       },
       "PublicFileNotFound": {
         "description": "Generic anti-enumeration response for disabled mode, an inactive release, or any invalid release, manifest, hash or path binding"
