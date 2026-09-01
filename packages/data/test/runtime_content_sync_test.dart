@@ -67,6 +67,55 @@ class _UnavailableActivationStore extends InMemoryRuntimeContentStore {
   }
 }
 
+class _SecondManifestCallBlockingSource implements PublicContentSource {
+  _SecondManifestCallBlockingSource(this.manifest, this.fixture);
+
+  final PublicContentManifest manifest;
+  final ContentFixture fixture;
+  final Completer<void> secondStarted = Completer<void>();
+  final Completer<void> releaseSecond = Completer<void>();
+  int manifestCalls = 0;
+
+  @override
+  Future<Result<PublicManifestFetch>> fetchActiveManifest({
+    String? ifNoneMatch,
+    RuntimeContentLimits limits = const RuntimeContentLimits(),
+  }) async {
+    manifestCalls++;
+    if (manifestCalls == 2) {
+      secondStarted.complete();
+      await releaseSecond.future;
+    }
+    final String etag = '"${manifest.manifestId}"';
+    return Success<PublicManifestFetch>(
+      ifNoneMatch == etag
+          ? PublicManifestFetch.notModified(
+              etag: etag,
+              releaseId: manifest.releaseId!,
+              publicManifestId: manifest.manifestId,
+            )
+          : PublicManifestFetch.fetched(manifest, etag),
+    );
+  }
+
+  @override
+  Future<Result<PublicContentFileFetch>> fetchFile({
+    required String releaseId,
+    required String publicManifestId,
+    required PublicContentFile file,
+    String? ifNoneMatch,
+  }) async =>
+      Success<PublicContentFileFetch>(
+        PublicContentFileFetch.fetched(
+          bytes: fixture.bytes,
+          etag: '"sha256:${file.hash}"',
+          releaseId: releaseId,
+          publicManifestId: publicManifestId,
+          resourceType: file.resourceType,
+        ),
+      );
+}
+
 void main() {
   const String owner = 'person-1';
   const String pinnedManifest =
@@ -228,6 +277,55 @@ void main() {
     expect(rolledBack!.activeManifestId, releaseN.manifestId);
     expect(rolledBack.activeReleaseId, releaseN.releaseId);
     expect(synchronizer.currentStatus.phase, RuntimeContentPhase.rolledBack);
+    await synchronizer.dispose();
+  });
+
+  test('rollback waits for every sync already queued before it', () async {
+    final ContentFixture first =
+        questionFixture('microsoft.az-900.section-1.cloud.001', prompt: 'N');
+    final PublicContentManifest releaseN = manifest(<ContentFixture>[first]);
+    final InMemoryRuntimeContentStore store = InMemoryRuntimeContentStore();
+    await store.prepare(releaseN);
+    await store.writeStagedFile(releaseN, releaseN.files.single, first.bytes);
+    await store.activate(
+      ownerScope: runtimeContentScopeKey(owner),
+      manifest: releaseN,
+      etag: '"${releaseN.manifestId}"',
+    );
+    final ContentFixture second =
+        questionFixture('microsoft.az-900.section-1.cloud.001', prompt: 'N+1');
+    final PublicContentManifest releaseN1 = manifest(<ContentFixture>[second]);
+    final _SecondManifestCallBlockingSource source =
+        _SecondManifestCallBlockingSource(releaseN1, second);
+    final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
+      source: source,
+      store: store,
+      delay: (_) async {},
+    );
+
+    final Future<RuntimeContentSyncReport> firstSync = synchronizer.sync(ownerId: owner);
+    final Future<RuntimeContentSyncReport> queuedSync = synchronizer.sync(
+      ownerId: owner,
+      pinnedManifestIds: <String>{pinnedManifest},
+    );
+    final Future<RuntimeContentActivation?> rollback = synchronizer.rollback(ownerId: owner);
+    var rollbackCompleted = false;
+    unawaited(
+      rollback.then<void>(
+        (_) => rollbackCompleted = true,
+        onError: (Object _, StackTrace __) => rollbackCompleted = true,
+      ),
+    );
+    await source.secondStarted.future;
+    await Future<void>.delayed(Duration.zero);
+
+    expect(rollbackCompleted, isFalse);
+    source.releaseSecond.complete();
+    await Future.wait<Object?>(<Future<Object?>>[firstSync, queuedSync, rollback]);
+    expect(
+      (await store.readActivation(runtimeContentScopeKey(owner)))!.activeManifestId,
+      releaseN.manifestId,
+    );
     await synchronizer.dispose();
   });
 

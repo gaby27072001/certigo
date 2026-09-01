@@ -153,8 +153,10 @@ class RuntimeContentSynchronizer {
 
   RuntimeContentStatus _current = const RuntimeContentStatus.idle();
   Future<RuntimeContentSyncReport>? _inFlight;
+  Future<void> _operationTail = Future<void>.value();
   String? _inFlightOwnerId;
   Set<String> _inFlightPins = <String>{};
+  bool _disposed = false;
 
   RuntimeContentStatus get currentStatus => _current;
   Stream<RuntimeContentStatus> get statuses => _statuses.stream;
@@ -163,40 +165,38 @@ class RuntimeContentSynchronizer {
     required String ownerId,
     Set<String> pinnedManifestIds = const <String>{},
   }) {
+    if (_disposed) throw StateError('Runtime content synchronizer has been disposed.');
     final Future<RuntimeContentSyncReport>? running = _inFlight;
     if (running != null) {
       if (_inFlightOwnerId == ownerId && pinnedManifestIds.difference(_inFlightPins).isEmpty) {
         return running;
       }
-      return running.then(
-        (_) => sync(ownerId: ownerId, pinnedManifestIds: pinnedManifestIds),
-        onError: (Object _, StackTrace __) =>
-            sync(ownerId: ownerId, pinnedManifestIds: pinnedManifestIds),
-      );
     }
     _inFlightOwnerId = ownerId;
     _inFlightPins = Set<String>.of(pinnedManifestIds);
-    final Future<RuntimeContentSyncReport> operation = _sync(
-      ownerScope: runtimeContentScopeKey(ownerId),
-      pinnedManifestIds: pinnedManifestIds,
-    ).whenComplete(() {
-      _inFlight = null;
-      _inFlightOwnerId = null;
-      _inFlightPins = <String>{};
-    });
+    late final Future<RuntimeContentSyncReport> operation;
+    operation = _enqueueOperation(
+      () => _sync(
+        ownerScope: runtimeContentScopeKey(ownerId),
+        pinnedManifestIds: pinnedManifestIds,
+      ),
+    );
     _inFlight = operation;
+    unawaited(
+      operation.then<void>(
+        (_) => _clearInFlight(operation),
+        onError: (Object _, StackTrace __) => _clearInFlight(operation),
+      ),
+    );
     return operation;
   }
 
-  Future<RuntimeContentActivation?> rollback({required String ownerId}) async {
-    final Future<RuntimeContentSyncReport>? running = _inFlight;
-    if (running != null) {
-      try {
-        await running;
-      } on RuntimeContentSyncException {
-        // A failed sync preserves the last valid activation before rollback.
-      }
-    }
+  Future<RuntimeContentActivation?> rollback({required String ownerId}) {
+    if (_disposed) throw StateError('Runtime content synchronizer has been disposed.');
+    return _enqueueOperation(() => _rollback(ownerId));
+  }
+
+  Future<RuntimeContentActivation?> _rollback(String ownerId) async {
     try {
       final RuntimeContentActivation? activation = await _store.rollback(
         runtimeContentScopeKey(ownerId),
@@ -233,6 +233,22 @@ class RuntimeContentSynchronizer {
       );
       throw RuntimeContentSyncException(error.message);
     }
+  }
+
+  Future<T> _enqueueOperation<T>(Future<T> Function() operation) {
+    final Future<T> current = _operationTail.then<T>((_) => operation());
+    _operationTail = current.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return current;
+  }
+
+  void _clearInFlight(Future<RuntimeContentSyncReport> operation) {
+    if (!identical(_inFlight, operation)) return;
+    _inFlight = null;
+    _inFlightOwnerId = null;
+    _inFlightPins = <String>{};
   }
 
   Future<RuntimeContentSyncReport> _sync({
@@ -566,14 +582,9 @@ class RuntimeContentSynchronizer {
   }
 
   Future<void> dispose() async {
-    final Future<RuntimeContentSyncReport>? running = _inFlight;
-    if (running != null) {
-      try {
-        await running;
-      } on RuntimeContentSyncException {
-        // The status already carries the failure; disposal only waits for completion.
-      }
-    }
+    if (_disposed) return;
+    _disposed = true;
+    await _operationTail;
     await _statuses.close();
   }
 }
