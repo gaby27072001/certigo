@@ -116,7 +116,7 @@ test('missing PR number or head SHA fails safe', () => {
 
   assert.equal(missingNumber.group, 'ci-backend-pull_request_target-4001-1');
   assert.equal(missingNumber.cancelInProgress, false);
-  assert.equal(missingHead.group, 'ci-backend-pull_request_target-4002-1');
+  assert.equal(missingHead.group, 'ci-backend-pr-41');
   assert.equal(missingHead.cancelInProgress, false);
 });
 

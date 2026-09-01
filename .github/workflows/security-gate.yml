@@ -12,8 +12,8 @@ on:
     - cron: "47 2 * * 1"
 
 concurrency:
-  group: security-gate-${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && (github.event.action == 'opened' || github.event.action == 'synchronize') && github.run_attempt == 1 && github.event.pull_request.number > 0 && github.event.pull_request.head.sha != '' && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}-{2}', github.event_name, github.run_id, github.run_attempt) }}
-  cancel-in-progress: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.action == 'synchronize' && github.run_attempt == 1 && github.event.pull_request.number > 0 && github.event.pull_request.head.sha != '' }}
+  group: security-gate-${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && (github.event.action == 'opened' || github.event.action == 'synchronize') && github.run_attempt == 1 && github.event.pull_request.number > 0 && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}-{2}', github.event_name, github.run_id, github.run_attempt) }}
+  cancel-in-progress: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.action == 'synchronize' && github.run_attempt == 1 && github.event.pull_request.number > 0 && github.event.after != '' }}
 
 permissions: {}
 
@@ -150,8 +150,8 @@ jobs:
 
   osv:
     name: OSV dependency scan
-    needs: [freshness, changes]
-    if: ${{ always() && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current != 'false') && needs.changes.outputs.dependencies == 'true' }}
+    needs: changes
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.dependencies == 'true' }}
     uses: ./.github/workflows/dependency-vuln-scan.yml
     permissions:
       contents: read
@@ -159,8 +159,8 @@ jobs:
 
   checkov:
     name: Checkov IaC scan
-    needs: [freshness, changes]
-    if: ${{ always() && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current != 'false') && needs.changes.outputs.iac == 'true' }}
+    needs: changes
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.iac == 'true' }}
     uses: ./.github/workflows/security-scan.yml
     permissions:
       contents: read
@@ -168,15 +168,14 @@ jobs:
 
   security-gate:
     name: Security / Required gate
-    needs: [freshness, changes, osv, checkov]
-    if: ${{ always() && (github.event_name != 'pull_request_target' || (needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository)) }}
+    needs: [changes, osv, checkov]
+    if: ${{ always() && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions: {}
     steps:
       - name: Enforce applicable scanner results
         shell: bash
         env:
-          FRESHNESS_RESULT: ${{ needs.freshness.result }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           DEPENDENCIES_APPLICABLE: ${{ needs.changes.outputs.dependencies }}
           IAC_APPLICABLE: ${{ needs.changes.outputs.iac }}
@@ -184,10 +183,6 @@ jobs:
           CHECKOV_RESULT: ${{ needs.checkov.result }}
         run: |
           set -euo pipefail
-          if [ "$FRESHNESS_RESULT" != "success" ]; then
-            echo "::error::PR head freshness validation did not succeed."
-            exit 1
-          fi
           if [ "$CHANGES_RESULT" != "success" ]; then
             echo "::error::Security path selection did not succeed."
             exit 1

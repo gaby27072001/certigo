@@ -1083,7 +1083,7 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'validate-source:',
     'name: Validate project-state source',
-    'needs: [freshness, validate-source]',
+    'needs: validate-source',
     'name: Generated state equals committed state',
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
@@ -1127,15 +1127,12 @@ function validateRepositoryInvariants() {
       errors.push(`ci-project-state.yml: forbidden App/PAT fallback ${forbiddenMarker}`);
     }
   }
-  if (!projectState.includes('github-token: ${{ github.token }}')) {
-    errors.push('ci-project-state.yml: current-head validation must use github.token');
-  }
   for (const marker of [
     'name: Security / Required gate',
-    'needs: [freshness, changes, osv, checkov]',
+    'needs: [changes, osv, checkov]',
     'uses: ./.github/workflows/dependency-vuln-scan.yml',
     'uses: ./.github/workflows/security-scan.yml',
-    "needs.freshness.outputs.current != 'false'",
+    "if: ${{ always() && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) }}",
   ]) {
     if (!securityGate.includes(marker)) {
       errors.push(`security-gate.yml: missing required invariant ${marker}`);

@@ -65,12 +65,12 @@ aux autres jobs non applicables, sans exécuter une seule instruction du fork.
 
 Chaque workflow PR possède un groupe de concurrence stable `workflow + numéro de PR`.
 Seuls le premier essai de `opened` et les premiers essais de `synchronize` portant
-un SHA de tête non vide rejoignent ce groupe. Un ancien rerun, un événement `reopened`
+un numéro de PR valide rejoignent ce groupe. Un ancien rerun, un événement `reopened`
 ou un contexte PR incomplet reçoit un groupe unique `event + run_id + run_attempt` :
 il ne peut donc ni annuler un run actif, ni évincer le run `pending` de la tête courante
 (GitHub remplace toujours le run en attente d'un même groupe, indépendamment de
-`cancel-in-progress`). Seul `synchronize` peut demander l'annulation du run précédent
-de cette PR. Les événements `push`, `schedule`,
+`cancel-in-progress`). Seul `synchronize`, avec son SHA GitHub `after` non vide, peut
+demander l'annulation du run précédent de cette PR. Les événements `push`, `schedule`,
 `workflow_dispatch`, `repository_dispatch` et `merge_group` utilisent un groupe unique
 par `run_id`; les workflows de gouvernance, déploiement et publication n'annulent jamais
 un run en cours. Le préfixe propre au workflow empêche aussi toute collision avec une
