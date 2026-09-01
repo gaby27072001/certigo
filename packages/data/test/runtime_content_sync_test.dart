@@ -288,7 +288,11 @@ void main() {
     source.promote(manifest(<ContentFixture>[second]), <ContentFixture>[second]);
     await synchronizer.sync(ownerId: owner);
 
-    final RuntimeContentActivation? rolledBack = await synchronizer.rollback(ownerId: owner);
+    final Future<RuntimeContentActivation?> firstRollback = synchronizer.rollback(ownerId: owner);
+    final Future<RuntimeContentActivation?> duplicateRollback =
+        synchronizer.rollback(ownerId: owner);
+    expect(identical(firstRollback, duplicateRollback), isTrue);
+    final RuntimeContentActivation? rolledBack = await firstRollback;
 
     expect(rolledBack!.activeManifestId, releaseN.manifestId);
     expect(rolledBack.activeReleaseId, releaseN.releaseId);
