@@ -193,6 +193,9 @@ class RuntimeContentSynchronizer {
 
   Future<RuntimeContentActivation?> rollback({required String ownerId}) {
     if (_disposed) throw StateError('Runtime content synchronizer has been disposed.');
+    _inFlight = null;
+    _inFlightOwnerId = null;
+    _inFlightPins = <String>{};
     return _enqueueOperation(() => _rollback(ownerId));
   }
 

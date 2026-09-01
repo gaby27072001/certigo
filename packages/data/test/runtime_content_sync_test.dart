@@ -329,6 +329,53 @@ void main() {
     await synchronizer.dispose();
   });
 
+  test('sync requested after rollback runs after the rollback barrier', () async {
+    final ContentFixture first =
+        questionFixture('microsoft.az-900.section-1.cloud.001', prompt: 'N');
+    final PublicContentManifest releaseN = manifest(<ContentFixture>[first]);
+    final InMemoryRuntimeContentStore store = InMemoryRuntimeContentStore();
+    await store.prepare(releaseN);
+    await store.writeStagedFile(releaseN, releaseN.files.single, first.bytes);
+    await store.activate(
+      ownerScope: runtimeContentScopeKey(owner),
+      manifest: releaseN,
+      etag: '"${releaseN.manifestId}"',
+    );
+    final ContentFixture second =
+        questionFixture('microsoft.az-900.section-1.cloud.001', prompt: 'N+1');
+    final PublicContentManifest releaseN1 = manifest(<ContentFixture>[second]);
+    final _SecondManifestCallBlockingSource source =
+        _SecondManifestCallBlockingSource(releaseN1, second);
+    final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
+      source: source,
+      store: store,
+      delay: (_) async {},
+    );
+
+    final Future<RuntimeContentSyncReport> firstSync = synchronizer.sync(ownerId: owner);
+    final Future<RuntimeContentSyncReport> queuedSync = synchronizer.sync(
+      ownerId: owner,
+      pinnedManifestIds: <String>{pinnedManifest},
+    );
+    final Future<RuntimeContentActivation?> rollback = synchronizer.rollback(ownerId: owner);
+    final Future<RuntimeContentSyncReport> syncAfterRollback = synchronizer.sync(
+      ownerId: owner,
+      pinnedManifestIds: <String>{pinnedManifest},
+    );
+    expect(identical(syncAfterRollback, queuedSync), isFalse);
+    await source.secondStarted.future;
+    source.releaseSecond.complete();
+
+    await Future.wait<Object?>(
+      <Future<Object?>>[firstSync, queuedSync, rollback, syncAfterRollback],
+    );
+    expect(
+      (await store.readActivation(runtimeContentScopeKey(owner)))!.activeManifestId,
+      releaseN1.manifestId,
+    );
+    await synchronizer.dispose();
+  });
+
   test('server rollback reactivates the cached N-1 release without downloading', () async {
     final ContentFixture first = questionFixture(
       'microsoft.az-900.section-1.cloud.001',
