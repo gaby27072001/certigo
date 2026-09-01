@@ -1,3 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:certigo/app/active_track_store.dart';
+import 'package:certigo/app/content/runtime_content_dependencies.dart';
+import 'package:certigo/app/offline/prefs_sync_store.dart';
 import 'package:certigo/app/providers.dart';
 import 'package:certigo/features/account_deletion/application/account_deletion_controller.dart';
 import 'package:certigo/features/account_deletion/presentation/account_deletion_screen.dart';
@@ -12,11 +18,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _AuthGateway implements AuthGateway {
   _AuthGateway(this.session);
 
-  final AuthSession session;
+  AuthSession session;
   int reauthenticationCalls = 0;
 
   @override
@@ -80,10 +87,15 @@ class _SessionStore implements SessionStore {
 }
 
 class _DeletionRepository implements AccountDeletionRepository {
-  _DeletionRepository({required this.status, required this.requestResult});
+  _DeletionRepository({
+    required this.status,
+    required this.requestResult,
+    this.request,
+  });
 
   AccountDeletion status;
   Result<AccountDeletion> requestResult;
+  final Future<Result<AccountDeletion>> Function()? request;
   int requestCalls = 0;
   String? proofToken;
 
@@ -94,7 +106,7 @@ class _DeletionRepository implements AccountDeletionRepository {
   Future<Result<AccountDeletion>> requestDeletion({String? reauthenticationToken}) async {
     requestCalls++;
     proofToken = reauthenticationToken;
-    return requestResult;
+    return request?.call() ?? requestResult;
   }
 }
 
@@ -103,10 +115,17 @@ class _Purger implements LocalAccountDataPurger {
 
   int calls = 0;
   bool fail;
+  String? personId;
+  bool? serverConfirmed;
 
   @override
-  Future<void> purge() async {
+  Future<void> purge({
+    required String personId,
+    required bool serverConfirmed,
+  }) async {
     calls++;
+    this.personId = personId;
+    this.serverConfirmed = serverConfirmed;
     if (fail) throw StateError('simulated local cleanup failure');
   }
 }
@@ -149,11 +168,13 @@ void main() {
     required _Purger purger,
     required SyncEngine sync,
     AuthSession? reauthenticatedSession,
+    _AuthGateway? authGateway,
   }) {
     final AuthSession fresh = reauthenticatedSession ?? socialSession();
+    final _AuthGateway gateway = authGateway ?? _AuthGateway(fresh);
     final ProviderContainer container = ProviderContainer(
       overrides: <Override>[
-        authGatewayProvider.overrideWithValue(_AuthGateway(fresh)),
+        authGatewayProvider.overrideWithValue(gateway),
         credentialsGatewayProvider.overrideWithValue(_CredentialsGateway(fresh)),
         sessionStoreProvider.overrideWithValue(store),
         authRequiredProvider.overrideWithValue(true),
@@ -177,6 +198,7 @@ void main() {
   SyncEngine syncEngine() => SyncEngine(
         store: InMemorySyncQueueStore(),
         sender: (SyncAction _) async => SyncDispatch.success,
+        ownerIdProvider: () => 'user-1',
       );
 
   test('confirmed server completion purges local data and ends the session', () async {
@@ -205,6 +227,8 @@ void main() {
     expect(repository.requestCalls, 1);
     expect(repository.proofToken, 'fresh-id-token');
     expect(purger.calls, 1);
+    expect(purger.personId, 'user-1');
+    expect(purger.serverConfirmed, isTrue);
     expect(store.clearCalls, 1);
     expect(container.read(authControllerProvider), isA<AccountDeletionCompleted>());
   });
@@ -243,6 +267,85 @@ void main() {
     expect(purger.calls, 0);
     expect(store.clearCalls, 0);
     expect(container.read(authControllerProvider), isA<Authenticated>());
+  });
+
+  test('local purge is never invoked before server confirmation', () async {
+    final _DeletionRepository repository = _DeletionRepository(
+      status: notRequested,
+      requestResult: const Success<AccountDeletion>(pending),
+    );
+    final _SessionStore store = _SessionStore(socialSession());
+    final _Purger purger = _Purger();
+    final ProviderContainer container = containerFor(
+      repository: repository,
+      store: store,
+      purger: purger,
+      sync: syncEngine(),
+    );
+    container.read(authControllerProvider);
+    await settle();
+    await settle();
+    await settle();
+
+    await container
+        .read(accountDeletionControllerProvider.notifier)
+        .start(expectedUserId: 'user-1');
+
+    expect(purger.calls, 0);
+    expect(purger.serverConfirmed, isNull);
+  });
+
+  test('person-scoped purge preserves another person quarantine and global preferences', () async {
+    const String personAKey = '$kSyncQueueQuarantinePrefsPrefix.person-a';
+    const String personBKey = '$kSyncQueueQuarantinePrefsPrefix.person-b';
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      personAKey: jsonEncode(<String, dynamic>{
+        'schema': 'certigo.sync.queue-quarantine/v1',
+        'ownerId': 'person-a',
+      }),
+      personBKey: jsonEncode(<String, dynamic>{
+        'schema': 'certigo.sync.queue-quarantine/v1',
+        'ownerId': 'person-b',
+      }),
+      'global-setting': 'preserved',
+    });
+    final InMemoryRuntimeContentStore runtimeStore = InMemoryRuntimeContentStore();
+    final RuntimeContentPinRegistry pins = RuntimeContentPinRegistry();
+    final InMemoryActiveTrackStore activeTrack =
+        InMemoryActiveTrackStore.synced('track-b', ownerId: 'person-b');
+    final PersonScopedAccountDataPurger purger = PersonScopedAccountDataPurger(
+      RuntimeContentPersonPurger(store: runtimeStore, pins: pins),
+      activeTrackStore: activeTrack,
+    );
+
+    await expectLater(
+      purger.purge(personId: 'person-a', serverConfirmed: false),
+      throwsStateError,
+    );
+    await purger.purge(personId: 'person-a', serverConfirmed: true);
+
+    final SharedPreferences preferences = await SharedPreferences.getInstance();
+    expect(preferences.containsKey(personAKey), isFalse);
+    expect(preferences.containsKey(personBKey), isTrue);
+    expect(preferences.getString('global-setting'), 'preserved');
+    expect(activeTrack.read()!.ownerId, 'person-b');
+  });
+
+  test('person-scoped purge clears only the confirmed person active track', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final InMemoryActiveTrackStore activeTrack =
+        InMemoryActiveTrackStore.synced('track-a', ownerId: 'person-a');
+    final PersonScopedAccountDataPurger purger = PersonScopedAccountDataPurger(
+      RuntimeContentPersonPurger(
+        store: InMemoryRuntimeContentStore(),
+        pins: RuntimeContentPinRegistry(),
+      ),
+      activeTrackStore: activeTrack,
+    );
+
+    await purger.purge(personId: 'person-a', serverConfirmed: true);
+
+    expect(activeTrack.read(), isNull);
   });
 
   test('network ambiguity never claims that deletion succeeded or failed to record', () async {
@@ -308,6 +411,56 @@ void main() {
         container.read(accountDeletionControllerProvider).message, contains('ne correspond pas'));
     expect(purger.calls, 0);
     expect(store.clearCalls, 0);
+  });
+
+  test('account switch during deletion response never purges the new person', () async {
+    final Completer<Result<AccountDeletion>> response =
+        Completer<Result<AccountDeletion>>();
+    final _DeletionRepository repository = _DeletionRepository(
+      status: notRequested,
+      requestResult: const Success<AccountDeletion>(completed),
+      request: () => response.future,
+    );
+    final _SessionStore store = _SessionStore(socialSession());
+    final _Purger purger = _Purger();
+    final _AuthGateway gateway = _AuthGateway(socialSession());
+    final ProviderContainer container = containerFor(
+      repository: repository,
+      store: store,
+      purger: purger,
+      sync: syncEngine(),
+      authGateway: gateway,
+    );
+    final AuthController auth = container.read(authControllerProvider.notifier);
+    container.read(authControllerProvider);
+    await settle();
+    await settle();
+    await settle();
+
+    final Future<void> deletion = container
+        .read(accountDeletionControllerProvider.notifier)
+        .start(expectedUserId: 'user-1');
+    await settle();
+    await auth.signOut();
+    gateway.session = const AuthSession(
+      accessToken: 'other-access',
+      userId: 'user-2',
+      idToken: 'other-id-token',
+      provider: AuthProvider.microsoft,
+    );
+    await auth.signIn(AuthProvider.microsoft);
+    response.complete(const Success<AccountDeletion>(completed));
+    await deletion;
+
+    expect(purger.calls, 0);
+    expect(container.read(authControllerProvider), isA<Authenticated>());
+    expect((container.read(authControllerProvider) as Authenticated).session.userId, 'user-2');
+    expect(container.read(accountDeletionControllerProvider).stage, AccountDeletionStage.failure);
+
+    await container.read(accountDeletionControllerProvider.notifier).retry();
+
+    expect(repository.requestCalls, 1);
+    expect(purger.calls, 0);
   });
 
   test('server completion never hides a failed local cleanup', () async {

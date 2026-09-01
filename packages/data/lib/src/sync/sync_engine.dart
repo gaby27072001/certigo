@@ -139,6 +139,7 @@ class SyncEngine {
   Future<void> _persistTail = Future<void>.value();
   Future<SyncFlushReport>? _inFlight;
   Future<void>? _disposing;
+  final Set<String> _deletingOwners = <String>{};
 
   /// Health updates for UI badges ("3 leçons en attente de synchronisation").
   Stream<SyncStatus> get status => _status.stream;
@@ -165,6 +166,27 @@ class SyncEngine {
       await running;
     }
     _queue.clear();
+    await _persist();
+    _emit();
+  }
+
+  Future<void> discardOwner(String ownerId) async {
+    _ensureActive();
+    final String? normalizedOwner = _normalizeOwner(ownerId);
+    if (normalizedOwner == null) {
+      throw ArgumentError.value(ownerId, 'ownerId', 'An owner is required for scoped deletion.');
+    }
+    _deletingOwners.add(normalizedOwner);
+    await ensureLoaded();
+    final Future<SyncFlushReport>? running = _inFlight;
+    if (running != null) {
+      await running;
+    }
+    _queue.removeWhere((SyncAction action) => action.ownerId == normalizedOwner);
+    final SyncQueueStore store = _store;
+    if (store is OwnerScopedSyncQueueStore) {
+      store.discardRetainedOwner(normalizedOwner);
+    }
     await _persist();
     _emit();
   }
@@ -216,6 +238,9 @@ class SyncEngine {
     final String? resolvedOwner = _normalizeOwner(ownerId ?? _ownerIdProvider());
     if (resolvedOwner == null) {
       throw StateError('An authenticated owner is required to queue offline work.');
+    }
+    if (_deletingOwners.contains(resolvedOwner)) {
+      throw StateError('Offline work cannot be queued for a deleted owner.');
     }
     final SyncAction? live = _findLiveByKey(idempotencyKey, resolvedOwner);
     if (live != null) return live;

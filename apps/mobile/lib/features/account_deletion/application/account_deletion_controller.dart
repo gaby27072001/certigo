@@ -1,11 +1,17 @@
+import 'dart:convert';
+
 import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../app/active_track_store.dart';
+import '../../../app/content/runtime_content_dependencies.dart';
+import '../../../app/offline/prefs_sync_store.dart';
 import '../../../app/providers.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../auth/application/auth_state.dart';
 
 enum AccountDeletionStage { loading, ready, verifying, deleting, pending, failure }
 
@@ -31,19 +37,71 @@ class AccountDeletionState {
 }
 
 abstract interface class LocalAccountDataPurger {
-  Future<void> purge();
+  Future<void> purge({
+    required String personId,
+    required bool serverConfirmed,
+  });
 }
 
-class SharedPreferencesAccountDataPurger implements LocalAccountDataPurger {
+class PersonScopedAccountDataPurger implements LocalAccountDataPurger {
+  const PersonScopedAccountDataPurger(
+    this._runtimeContent, {
+    ActiveTrackStore? activeTrackStore,
+  }) : _activeTrackStore = activeTrackStore;
+
+  final RuntimeContentPersonPurger _runtimeContent;
+  final ActiveTrackStore? _activeTrackStore;
+
   @override
-  Future<void> purge() async {
+  Future<void> purge({
+    required String personId,
+    required bool serverConfirmed,
+  }) async {
+    if (!serverConfirmed) {
+      throw StateError('Local account data cannot be purged before server confirmation.');
+    }
+    await _runtimeContent.purge(
+      personId: personId,
+      serverConfirmed: serverConfirmed,
+    );
+    final ActiveTrackStore? activeTrackStore = _activeTrackStore;
+    if (activeTrackStore?.read()?.ownerId == personId) {
+      await activeTrackStore!.clear();
+    }
+    await _purgeQuarantinedActions(personId);
+  }
+
+  Future<void> _purgeQuarantinedActions(String personId) async {
     final SharedPreferences preferences = await SharedPreferences.getInstance();
-    await preferences.clear();
+    final List<String> keys = preferences
+        .getKeys()
+        .where((String key) => key.startsWith('$kSyncQueueQuarantinePrefsPrefix.'))
+        .toList(growable: false);
+    for (final String key in keys) {
+      final String? raw = preferences.getString(key);
+      if (raw == null) continue;
+      try {
+        final dynamic decoded = jsonDecode(raw);
+        if (decoded is! Map<String, dynamic> || decoded['ownerId'] != personId) continue;
+        final bool removed = await preferences.remove(key);
+        if (!removed) {
+          throw StateError('Unable to purge a person-scoped queue quarantine entry.');
+        }
+      } on FormatException {
+        debugPrint('[account-deletion] retained unreadable shared queue quarantine $key');
+      }
+    }
   }
 }
 
 final localAccountDataPurgerProvider = Provider<LocalAccountDataPurger>(
-  (Ref ref) => SharedPreferencesAccountDataPurger(),
+  (Ref ref) => PersonScopedAccountDataPurger(
+    RuntimeContentPersonPurger(
+      store: ref.watch(runtimeContentStoreProvider),
+      pins: ref.watch(runtimeContentPinRegistryProvider),
+    ),
+    activeTrackStore: ref.watch(activeTrackStoreProvider),
+  ),
 );
 
 final accountDeletionControllerProvider =
@@ -64,9 +122,11 @@ class AccountDeletionController extends StateNotifier<AccountDeletionState> {
   final AuthController _auth;
   final SyncEngine _sync;
   final LocalAccountDataPurger _localData;
+  String? _deletionOwnerId;
 
   Future<void> load() async {
     state = const AccountDeletionState.loading();
+    _deletionOwnerId ??= _currentPersonId();
     final Result<AccountDeletion> result = await _repository.getStatus();
     await result.when(
       success: _applyServerStatus,
@@ -91,6 +151,7 @@ class AccountDeletionController extends StateNotifier<AccountDeletionState> {
       );
       return;
     }
+    _deletionOwnerId = expectedUserId.trim();
 
     await _request(reauthentication.reauthenticationToken);
   }
@@ -101,6 +162,16 @@ class AccountDeletionController extends StateNotifier<AccountDeletionState> {
   }
 
   Future<void> _request(String? proofToken) async {
+    final String? deletionOwner = _deletionOwnerId;
+    if (deletionOwner == null || _currentPersonId() != deletionOwner) {
+      state = AccountDeletionState(
+        stage: AccountDeletionStage.failure,
+        deletion: state.deletion,
+        message: 'Le compte authentifié a changé. Reprenez la suppression depuis ce compte.',
+        requestRecorded: state.requestRecorded,
+      );
+      return;
+    }
     state = AccountDeletionState(
       stage: AccountDeletionStage.deleting,
       deletion: state.deletion,
@@ -125,9 +196,22 @@ class AccountDeletionController extends StateNotifier<AccountDeletionState> {
   Future<void> _applyServerStatus(AccountDeletion deletion) async {
     if (deletion.isCompleted) {
       try {
-        await _sync.discardAll();
-        await _localData.purge();
-        await _auth.completeAccountDeletion();
+        final String? personId = _deletionOwnerId;
+        if (personId == null || personId.trim().isEmpty) {
+          throw StateError('Authenticated person is unavailable for local deletion.');
+        }
+        if (_currentPersonId() != personId) {
+          throw StateError('Authenticated person changed before local deletion.');
+        }
+        await _sync.discardOwner(personId);
+        await _localData.purge(
+          personId: personId,
+          serverConfirmed: true,
+        );
+        if (_currentPersonId() != personId) {
+          throw StateError('Authenticated person changed during local deletion.');
+        }
+        await _auth.completeAccountDeletion(expectedUserId: personId);
       } on Object catch (error) {
         debugPrint(
           '[account-deletion] local cleanup failed: ${error.runtimeType}',
@@ -171,5 +255,11 @@ class AccountDeletionController extends StateNotifier<AccountDeletionState> {
     return requestRecorded
         ? 'La suppression n’est pas terminée. Réessayez : les étapes déjà effectuées sont conservées.'
         : 'La demande n’a pas pu être enregistrée. Réessayez.';
+  }
+
+  String? _currentPersonId() {
+    final AuthState auth = _auth.state;
+    final String normalized = auth is Authenticated ? (auth.session.userId ?? '').trim() : '';
+    return normalized.isEmpty ? null : normalized;
   }
 }

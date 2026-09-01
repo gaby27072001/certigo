@@ -145,6 +145,8 @@ abstract interface class RuntimeContentStore {
   Future<void> cleanup({required String ownerScope, required Set<String> protectedManifestIds});
 
   Future<CachedPublicContentFile?> readActiveFile(String ownerScope, String fileId);
+
+  Future<void> purgePerson(String ownerScope);
 }
 
 class InMemoryRuntimeContentStore implements RuntimeContentStore {
@@ -152,10 +154,11 @@ class InMemoryRuntimeContentStore implements RuntimeContentStore {
   final Map<String, PublicContentManifest> _manifests = <String, PublicContentManifest>{};
   final Map<String, Map<String, Uint8List>> _staging = <String, Map<String, Uint8List>>{};
   final Map<String, Map<String, Uint8List>> _releases = <String, Map<String, Uint8List>>{};
+  final Set<String> _deletedOwners = <String>{};
 
   @override
   Future<RuntimeContentActivation?> readActivation(String ownerScope) async =>
-      _activations[ownerScope];
+      _deletedOwners.contains(ownerScope) ? null : _activations[ownerScope];
 
   @override
   Future<PublicContentManifest?> readActiveManifest(String ownerScope) async {
@@ -220,6 +223,9 @@ class InMemoryRuntimeContentStore implements RuntimeContentStore {
     required PublicContentManifest manifest,
     required String etag,
   }) async {
+    if (_deletedOwners.contains(ownerScope)) {
+      throw StateError('Runtime content owner was deleted.');
+    }
     if (!await hasCompleteRelease(manifest)) {
       final Map<String, Uint8List> staged = _staging[manifest.manifestId] ?? <String, Uint8List>{};
       if (manifest.files.any((PublicContentFile file) => !staged.containsKey(file.hash))) {
@@ -302,6 +308,12 @@ class InMemoryRuntimeContentStore implements RuntimeContentStore {
     );
   }
 
+  @override
+  Future<void> purgePerson(String ownerScope) async {
+    _activations.remove(ownerScope);
+    _deletedOwners.add(ownerScope);
+  }
+
   static Uint8List? _copy(Uint8List? value) => value == null ? null : Uint8List.fromList(value);
 }
 
@@ -320,6 +332,9 @@ class FileRuntimeContentStore implements RuntimeContentStore {
   final RuntimeContentLimits limits;
   final DateTime Function() _clock;
   int _temporarySequence = 0;
+  final Set<String> _purgingOwners = <String>{};
+  final Set<String> _deletedOwners = <String>{};
+  final Map<String, Future<void>> _ownerMutationTails = <String, Future<void>>{};
 
   Directory get _spaceRoot => Directory(
         '${_root.path}${Platform.pathSeparator}public${Platform.pathSeparator}'
@@ -330,9 +345,18 @@ class FileRuntimeContentStore implements RuntimeContentStore {
 
   Directory get _stagingRoot => Directory('${_spaceRoot.path}${Platform.pathSeparator}staging');
 
+  Directory _personRoot(String ownerScope) => Directory(
+        '${_root.path}${Platform.pathSeparator}person${Platform.pathSeparator}$ownerScope',
+      );
+
+  File _personDeletionMarker(String ownerScope) => File(
+        '${_root.path}${Platform.pathSeparator}person-deletions'
+        '${Platform.pathSeparator}$ownerScope.confirmed',
+      );
+
   Directory _ownerRoot(String ownerScope) => Directory(
-        '${_root.path}${Platform.pathSeparator}person${Platform.pathSeparator}'
-        '$ownerScope${Platform.pathSeparator}spaces${Platform.pathSeparator}$_spaceScope',
+        '${_personRoot(ownerScope).path}${Platform.pathSeparator}'
+        'spaces${Platform.pathSeparator}$_spaceScope',
       );
 
   Directory _activationRoot(String ownerScope) =>
@@ -348,6 +372,8 @@ class FileRuntimeContentStore implements RuntimeContentStore {
 
   @override
   Future<RuntimeContentActivation?> readActivation(String ownerScope) async {
+    _ensureOwnerScope(ownerScope);
+    if (_purgingOwners.contains(ownerScope) || await _isOwnerDeleted(ownerScope)) return null;
     final Directory root = _activationRoot(ownerScope);
     if (!await root.exists()) return null;
     final List<File> files = await root
@@ -468,7 +494,18 @@ class FileRuntimeContentStore implements RuntimeContentStore {
     required String ownerScope,
     required PublicContentManifest manifest,
     required String etag,
+  }) =>
+      _serializeOwnerMutation(
+        ownerScope,
+        () => _activate(ownerScope: ownerScope, manifest: manifest, etag: etag),
+      );
+
+  Future<RuntimeContentActivation> _activate({
+    required String ownerScope,
+    required PublicContentManifest manifest,
+    required String etag,
   }) async {
+    await _ensureOwnerAvailable(ownerScope);
     final Directory stage = _stagingDirectory(manifest.manifestId);
     final Directory release = _releaseDirectory(manifest.manifestId);
     if (!await hasCompleteRelease(manifest)) {
@@ -495,6 +532,7 @@ class FileRuntimeContentStore implements RuntimeContentStore {
     }
 
     final RuntimeContentActivation? current = await readActivation(ownerScope);
+    await _ensureOwnerAvailable(ownerScope);
     final RuntimeContentActivation next = RuntimeContentActivation(
       activeReleaseId: manifest.releaseId,
       activeManifestId: manifest.manifestId,
@@ -513,7 +551,11 @@ class FileRuntimeContentStore implements RuntimeContentStore {
   }
 
   @override
-  Future<RuntimeContentActivation?> rollback(String ownerScope) async {
+  Future<RuntimeContentActivation?> rollback(String ownerScope) =>
+      _serializeOwnerMutation(ownerScope, () => _rollback(ownerScope));
+
+  Future<RuntimeContentActivation?> _rollback(String ownerScope) async {
+    await _ensureOwnerAvailable(ownerScope);
     final RuntimeContentActivation? current = await readActivation(ownerScope);
     final String? previous = current?.previousManifestId;
     if (current == null || previous == null || !await _isCompleteRelease(previous)) {
@@ -590,7 +632,39 @@ class FileRuntimeContentStore implements RuntimeContentStore {
     );
   }
 
+  @override
+  Future<void> purgePerson(String ownerScope) =>
+      _serializeOwnerMutation(ownerScope, () => _purgePerson(ownerScope));
+
+  Future<void> _purgePerson(String ownerScope) async {
+    _ensureOwnerScope(ownerScope);
+    if (!_purgingOwners.add(ownerScope)) {
+      throw StateError('Runtime content person purge is already in progress.');
+    }
+    final Directory person = _personRoot(ownerScope);
+    final Directory tombstone = Directory('${person.path}.deleting');
+    try {
+      final File marker = _personDeletionMarker(ownerScope);
+      if (!await marker.exists()) {
+        await _writeNewFile(marker, utf8.encode('confirmed'));
+      }
+      _deletedOwners.add(ownerScope);
+      if (await tombstone.exists()) {
+        await tombstone.delete(recursive: true);
+      }
+      if (await person.exists()) {
+        await person.rename(tombstone.path);
+      }
+      if (await tombstone.exists()) {
+        await tombstone.delete(recursive: true);
+      }
+    } finally {
+      _purgingOwners.remove(ownerScope);
+    }
+  }
+
   Future<void> _writeActivation(String ownerScope, RuntimeContentActivation activation) async {
+    await _ensureOwnerAvailable(ownerScope);
     final Directory root = _activationRoot(ownerScope);
     await root.create(recursive: true);
     final String generation = activation.generation.toString().padLeft(20, '0');
@@ -640,6 +714,7 @@ class FileRuntimeContentStore implements RuntimeContentStore {
     await for (final FileSystemEntity entity in people.list()) {
       if (entity is! Directory) continue;
       final String ownerScope = entity.path.split(Platform.pathSeparator).last;
+      if (!RegExp(r'^[0-9a-f]{32}$').hasMatch(ownerScope)) continue;
       final RuntimeContentActivation? activation = await readActivation(ownerScope);
       if (activation == null) continue;
       manifestIds.add(activation.activeManifestId);
@@ -698,5 +773,49 @@ class FileRuntimeContentStore implements RuntimeContentStore {
   static String? _manifestIdFromDirectory(String path) {
     final String name = path.split(Platform.pathSeparator).last;
     return RegExp(r'^[0-9a-f]{64}$').hasMatch(name) ? 'sha256:$name' : null;
+  }
+
+  static void _ensureOwnerScope(String ownerScope) {
+    if (!RegExp(r'^[0-9a-f]{32}$').hasMatch(ownerScope)) {
+      throw FormatException('Invalid runtime content owner scope: $ownerScope');
+    }
+  }
+
+  Future<bool> _isOwnerDeleted(String ownerScope) async {
+    if (_deletedOwners.contains(ownerScope)) return true;
+    final bool deleted =
+        await _personDeletionMarker(ownerScope).exists() ||
+        await Directory('${_personRoot(ownerScope).path}.deleting').exists();
+    if (deleted) _deletedOwners.add(ownerScope);
+    return deleted;
+  }
+
+  Future<void> _ensureOwnerAvailable(String ownerScope) async {
+    _ensureOwnerScope(ownerScope);
+    if (_purgingOwners.contains(ownerScope)) {
+      throw StateError('Runtime content person purge is in progress.');
+    }
+    if (await _isOwnerDeleted(ownerScope)) {
+      throw StateError('Runtime content owner was deleted.');
+    }
+  }
+
+  Future<T> _serializeOwnerMutation<T>(
+    String ownerScope,
+    Future<T> Function() operation,
+  ) {
+    _ensureOwnerScope(ownerScope);
+    final Future<void> previous = _ownerMutationTails[ownerScope] ?? Future<void>.value();
+    final Future<T> current = previous.then<T>((_) => operation());
+    final Future<void> tail = current.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    _ownerMutationTails[ownerScope] = tail;
+    return current.whenComplete(() {
+      if (identical(_ownerMutationTails[ownerScope], tail)) {
+        _ownerMutationTails.remove(ownerScope);
+      }
+    });
   }
 }

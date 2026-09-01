@@ -57,23 +57,64 @@ class RuntimeContentSyncException implements Exception {
 }
 
 class RuntimeContentPinRegistry {
-  final Map<String, int> _pins = <String, int>{};
+  final Map<String, Map<String?, int>> _pins = <String, Map<String?, int>>{};
 
   Set<String> get manifestIds => Set<String>.unmodifiable(_pins.keys);
 
-  RuntimeContentPin pin(String? publicManifestId) {
+  RuntimeContentPin pin(String? publicManifestId, {String? ownerId}) {
     if (publicManifestId == null || publicManifestId.isEmpty) {
       return RuntimeContentPin._();
     }
-    _pins.update(publicManifestId, (int count) => count + 1, ifAbsent: () => 1);
+    final String? ownerScope = ownerId == null ? null : runtimeContentScopeKey(ownerId);
+    final Map<String?, int> owners = _pins.putIfAbsent(
+      publicManifestId,
+      () => <String?, int>{},
+    );
+    owners.update(ownerScope, (int count) => count + 1, ifAbsent: () => 1);
     return RuntimeContentPin._(() {
-      final int count = _pins[publicManifestId] ?? 0;
+      final Map<String?, int>? currentOwners = _pins[publicManifestId];
+      final int count = currentOwners?[ownerScope] ?? 0;
       if (count <= 1) {
-        _pins.remove(publicManifestId);
+        currentOwners?.remove(ownerScope);
       } else {
-        _pins[publicManifestId] = count - 1;
+        currentOwners![ownerScope] = count - 1;
       }
+      if (currentOwners?.isEmpty ?? false) _pins.remove(publicManifestId);
     });
+  }
+
+  void releaseOwner(String ownerId) {
+    final String ownerScope = runtimeContentScopeKey(ownerId);
+    _pins.removeWhere((String _, Map<String?, int> owners) {
+      owners.remove(ownerScope);
+      return owners.isEmpty;
+    });
+  }
+}
+
+class RuntimeContentPersonPurger {
+  const RuntimeContentPersonPurger({
+    required RuntimeContentStore store,
+    required RuntimeContentPinRegistry pins,
+  })  : _store = store,
+        _pins = pins;
+
+  final RuntimeContentStore _store;
+  final RuntimeContentPinRegistry _pins;
+
+  Future<void> purge({
+    required String personId,
+    required bool serverConfirmed,
+  }) async {
+    if (!serverConfirmed) {
+      throw StateError('Runtime content can only be purged after server confirmation.');
+    }
+    final String normalized = personId.trim();
+    if (normalized.isEmpty) {
+      throw ArgumentError.value(personId, 'personId', 'A person id is required.');
+    }
+    await _store.purgePerson(runtimeContentScopeKey(normalized));
+    _pins.releaseOwner(normalized);
   }
 }
 

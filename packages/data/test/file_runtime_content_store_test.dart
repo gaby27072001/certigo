@@ -6,6 +6,13 @@ import 'package:test/test.dart';
 
 import 'runtime_content_test_support.dart';
 
+class _FailingPurgeStore extends InMemoryRuntimeContentStore {
+  @override
+  Future<void> purgePerson(String ownerScope) async {
+    throw const FileSystemException('person purge failed');
+  }
+}
+
 void main() {
   late Directory root;
 
@@ -178,5 +185,161 @@ void main() {
     await cached.writeAsBytes(tampered, flush: true);
 
     expect(await store.readActivation(owner), isNull);
+  });
+
+  test('person purge preserves another person and shared release bytes', () async {
+    final FileRuntimeContentStore store = FileRuntimeContentStore(
+      root: root,
+      spaceScope: 'test-space',
+    );
+    final String ownerA = runtimeContentScopeKey('person-a');
+    final String ownerB = runtimeContentScopeKey('person-b');
+    final ContentFixture fixture = questionFixture('microsoft.az-900.section-1.cloud.001');
+    final PublicContentManifest release = manifest(<ContentFixture>[fixture]);
+    await store.prepare(release);
+    await store.writeStagedFile(release, release.files.single, fixture.bytes);
+    await store.activate(ownerScope: ownerA, manifest: release, etag: '"${release.manifestId}"');
+    await store.activate(ownerScope: ownerB, manifest: release, etag: '"${release.manifestId}"');
+
+    await store.purgePerson(ownerA);
+
+    expect(await store.readActivation(ownerA), isNull);
+    expect(await store.readActivation(ownerB), isNotNull);
+    expect((await store.readActiveFile(ownerB, fixture.id))!.bytes, fixture.bytes);
+  });
+
+  test('person purge resumes an interrupted atomic tombstone deletion', () async {
+    final FileRuntimeContentStore store = FileRuntimeContentStore(
+      root: root,
+      spaceScope: 'test-space',
+    );
+    final String owner = runtimeContentScopeKey('person-1');
+    final ContentFixture fixture = questionFixture('microsoft.az-900.section-1.cloud.001');
+    final PublicContentManifest release = manifest(<ContentFixture>[fixture]);
+    await store.prepare(release);
+    await store.writeStagedFile(release, release.files.single, fixture.bytes);
+    await store.activate(ownerScope: owner, manifest: release, etag: '"${release.manifestId}"');
+    final Directory personRoot = Directory(
+      '${root.path}${Platform.pathSeparator}person${Platform.pathSeparator}$owner',
+    );
+    final Directory tombstone = Directory('${personRoot.path}.deleting');
+    await personRoot.rename(tombstone.path);
+    final FileRuntimeContentStore restarted = FileRuntimeContentStore(
+      root: root,
+      spaceScope: 'test-space',
+    );
+    await expectLater(
+      restarted.activate(
+        ownerScope: owner,
+        manifest: release,
+        etag: '"${release.manifestId}"',
+      ),
+      throwsStateError,
+    );
+
+    await restarted.purgePerson(owner);
+
+    expect(await personRoot.exists(), isFalse);
+    expect(await tombstone.exists(), isFalse);
+  });
+
+  test('person purge serializes activation and fences later recreation', () async {
+    final FileRuntimeContentStore store = FileRuntimeContentStore(
+      root: root,
+      spaceScope: 'test-space',
+    );
+    final String owner = runtimeContentScopeKey('person-1');
+    final ContentFixture fixture = questionFixture('microsoft.az-900.section-1.cloud.001');
+    final PublicContentManifest release = manifest(<ContentFixture>[fixture]);
+    await store.prepare(release);
+    await store.writeStagedFile(release, release.files.single, fixture.bytes);
+
+    final Future<RuntimeContentActivation> activating = store.activate(
+      ownerScope: owner,
+      manifest: release,
+      etag: '"${release.manifestId}"',
+    );
+    final Future<void> purging = store.purgePerson(owner);
+    await activating;
+    await purging;
+
+    expect(await store.readActivation(owner), isNull);
+    await expectLater(
+      store.activate(
+        ownerScope: owner,
+        manifest: release,
+        etag: '"${release.manifestId}"',
+      ),
+      throwsStateError,
+    );
+    final FileRuntimeContentStore restarted = FileRuntimeContentStore(
+      root: root,
+      spaceScope: 'test-space',
+    );
+    await expectLater(
+      restarted.activate(
+        ownerScope: owner,
+        manifest: release,
+        etag: '"${release.manifestId}"',
+      ),
+      throwsStateError,
+    );
+  });
+
+  test('confirmed person purge releases only that owner leases', () async {
+    final InMemoryRuntimeContentStore store = InMemoryRuntimeContentStore();
+    final RuntimeContentPinRegistry pins = RuntimeContentPinRegistry();
+    final RuntimeContentPersonPurger purger = RuntimeContentPersonPurger(
+      store: store,
+      pins: pins,
+    );
+    final ContentFixture fixture = questionFixture('microsoft.az-900.section-1.cloud.001');
+    final PublicContentManifest release = manifest(<ContentFixture>[fixture]);
+    await store.prepare(release);
+    await store.writeStagedFile(release, release.files.single, fixture.bytes);
+    await store.activate(
+      ownerScope: runtimeContentScopeKey('person-a'),
+      manifest: release,
+      etag: '"${release.manifestId}"',
+    );
+    await store.activate(
+      ownerScope: runtimeContentScopeKey('person-b'),
+      manifest: release,
+      etag: '"${release.manifestId}"',
+    );
+    pins.pin(release.manifestId, ownerId: 'person-a');
+    final RuntimeContentPin personBPin = pins.pin(release.manifestId, ownerId: 'person-b');
+
+    await purger.purge(personId: 'person-a', serverConfirmed: true);
+
+    expect(await store.readActivation(runtimeContentScopeKey('person-a')), isNull);
+    expect(await store.readActivation(runtimeContentScopeKey('person-b')), isNotNull);
+    expect(pins.manifestIds, <String>{release.manifestId});
+    personBPin.release();
+    expect(pins.manifestIds, isEmpty);
+  });
+
+  test('person purge refuses pre-confirmation and retains leases when storage fails', () async {
+    final RuntimeContentPinRegistry pins = RuntimeContentPinRegistry();
+    final RuntimeContentPin pin = pins.pin(
+      'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      ownerId: 'person-a',
+    );
+    final RuntimeContentPersonPurger purger = RuntimeContentPersonPurger(
+      store: _FailingPurgeStore(),
+      pins: pins,
+    );
+
+    await expectLater(
+      purger.purge(personId: 'person-a', serverConfirmed: false),
+      throwsStateError,
+    );
+    await expectLater(
+      purger.purge(personId: 'person-a', serverConfirmed: true),
+      throwsA(isA<FileSystemException>()),
+    );
+
+    expect(pins.manifestIds, isNotEmpty);
+    pin.release();
   });
 }

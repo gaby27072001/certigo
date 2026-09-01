@@ -37,10 +37,12 @@ class QuizController extends ChangeNotifier {
     required this.trackId,
     required this.lessonId,
     RuntimeContentPinRegistry? contentPins,
+    String? contentOwnerId,
   }) :
         // Keep the optional dependency source-compatible with direct controller tests.
         // ignore: prefer_initializing_formals
-        _contentPins = contentPins {
+        _contentPins = contentPins,
+        _contentOwnerId = contentOwnerId {
     unawaited(loadItems());
   }
 
@@ -49,6 +51,7 @@ class QuizController extends ChangeNotifier {
   final String trackId;
   final String lessonId;
   final RuntimeContentPinRegistry? _contentPins;
+  final String? _contentOwnerId;
 
   List<QuizEntry> _items = <QuizEntry>[];
   bool _loading = true;
@@ -92,7 +95,10 @@ class QuizController extends ChangeNotifier {
     final List<QuizEntry> entries = lesson.when(
       success: (Lesson l) {
         _contentPin?.release();
-        _contentPin = _contentPins?.pin(l.publicManifestId);
+        _contentPin = _contentPins?.pin(
+          l.publicManifestId,
+          ownerId: _contentOwnerId,
+        );
         _publicManifestId = l.publicManifestId;
         final List<QuizEntry> fromApi = l.blocks
             .where((LessonBlock b) => b.check != null)

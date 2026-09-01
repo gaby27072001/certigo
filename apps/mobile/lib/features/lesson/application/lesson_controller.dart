@@ -30,9 +30,11 @@ class LessonController extends StateNotifier<LessonSessionState> {
     required this.args,
     this._feedback = const HapticLessonFeedback(),
     RuntimeContentPinRegistry? contentPins,
+    String? contentOwnerId,
   })  : // Keep the optional dependency source-compatible with direct controller tests.
         // ignore: prefer_initializing_formals
         _contentPins = contentPins,
+        _contentOwnerId = contentOwnerId,
         super(const LessonSessionState()) {
     unawaited(load());
   }
@@ -41,6 +43,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
   final QuizRepository _quiz;
   final LessonFeedback _feedback;
   final RuntimeContentPinRegistry? _contentPins;
+  final String? _contentOwnerId;
   final LessonArgs args;
 
   LessonGrader _grader = const EmbeddedKeyGrader(<String, CheckOutcome>{});
@@ -63,7 +66,10 @@ class LessonController extends StateNotifier<LessonSessionState> {
     final Lesson? lesson = res.when(
       success: (Lesson remote) {
         _contentPin?.release();
-        _contentPin = _contentPins?.pin(remote.publicManifestId);
+        _contentPin = _contentPins?.pin(
+          remote.publicManifestId,
+          ownerId: _contentOwnerId,
+        );
         // Server content is graded server-side; no embedded answer key.
         _grader = const EmbeddedKeyGrader(<String, CheckOutcome>{});
         return remote;
@@ -408,5 +414,6 @@ final lessonControllerProvider = StateNotifierProvider.autoDispose
     args: args,
     feedback: ref.watch(lessonFeedbackProvider),
     contentPins: ref.watch(runtimeContentPinRegistryProvider),
+    contentOwnerId: ref.watch(activeTrackOwnerIdProvider),
   );
 });

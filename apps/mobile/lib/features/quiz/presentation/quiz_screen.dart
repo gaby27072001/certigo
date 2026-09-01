@@ -39,6 +39,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       lessons: ref.read(lessonRepositoryProvider),
       quiz: ref.read(quizRepositoryProvider),
       contentPins: ref.read(runtimeContentPinRegistryProvider),
+      contentOwnerId: ref.read(activeTrackOwnerIdProvider),
       trackId: widget.trackId,
       lessonId: widget.lessonId,
     )..addListener(_onChange);

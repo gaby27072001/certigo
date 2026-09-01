@@ -43,6 +43,7 @@ class RuntimeContentLessonRepository implements LessonRepository {
     if (ownerId == null || ownerId.trim().isEmpty) return remote;
     try {
       final Lesson? cached = await _projectLesson(
+        ownerId: ownerId,
         ownerScope: runtimeContentScopeKey(ownerId),
         trackId: trackId,
         lessonId: lessonId,
@@ -58,6 +59,7 @@ class RuntimeContentLessonRepository implements LessonRepository {
   }
 
   Future<Lesson?> _projectLesson({
+    required String ownerId,
     required String ownerScope,
     required String trackId,
     required String lessonId,
@@ -65,7 +67,10 @@ class RuntimeContentLessonRepository implements LessonRepository {
     for (var attempt = 0; attempt < 2; attempt++) {
       final RuntimeContentActivation? selected = await _store.readActivation(ownerScope);
       if (selected == null) return null;
-      final RuntimeContentPin? pin = _pins?.pin(selected.activeManifestId);
+      final RuntimeContentPin? pin = _pins?.pin(
+        selected.activeManifestId,
+        ownerId: ownerId,
+      );
       try {
         final PublicContentManifest? manifest = await _store.readActiveManifest(ownerScope);
         if (manifest == null || manifest.manifestId != selected.activeManifestId) {

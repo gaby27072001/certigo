@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:certigo/app/content/content_update_banner.dart';
 import 'package:certigo/app/content/runtime_content_providers.dart';
 import 'package:core/core.dart';
@@ -39,6 +41,56 @@ class _StatusController extends RuntimeContentController {
 }
 
 void main() {
+  test('corrupt offline entry is quarantined without blocking runtime sync', () async {
+    final SyncAction healthy = SyncAction(
+      id: 'healthy',
+      kind: 'quizSubmit',
+      endpoint: '/quiz/lesson/submit',
+      payload: const <String, dynamic>{},
+      idempotencyKey: 'healthy',
+      createdAt: DateTime.utc(2026),
+      ownerId: 'person-1',
+    );
+    final List<SyncQueueCorruption> quarantined = <SyncQueueCorruption>[];
+    final SyncEngine engine = SyncEngine(
+      store: JsonSyncQueueStore(
+        read: () async => jsonEncode(<dynamic>[
+          <String, dynamic>{'id': 42},
+          healthy.toJson(),
+        ]),
+        write: (_) async {},
+        quarantine: (SyncQueueCorruption corruption) async {
+          quarantined.add(corruption);
+          return true;
+        },
+      ),
+      sender: (_) async => SyncDispatch.success,
+    );
+    final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
+      source: _NeverSource(),
+      store: InMemoryRuntimeContentStore(),
+      limits: const RuntimeContentLimits(maxAttempts: 1),
+      delay: (_) async {},
+    );
+    final RuntimeContentController controller = RuntimeContentController(
+      synchronizer: synchronizer,
+      pins: RuntimeContentPinRegistry(),
+      syncEngine: engine,
+    );
+    addTearDown(controller.dispose);
+    addTearDown(synchronizer.dispose);
+    addTearDown(engine.dispose);
+
+    await expectLater(
+      controller.syncNow('person-1'),
+      throwsA(isA<RuntimeContentSyncException>()),
+    );
+
+    expect(engine.actions.single.id, 'healthy');
+    expect(quarantined.single.reason, 'entry-type');
+    expect(synchronizer.currentStatus.phase, RuntimeContentPhase.failed);
+  });
+
   testWidgets('runtime content UX stays absent while the feature flag is off', (
     WidgetTester tester,
   ) async {
