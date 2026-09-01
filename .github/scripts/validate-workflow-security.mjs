@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
 import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
+import { validateWorkflowConcurrency } from './workflow-concurrency-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
 
 const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -158,6 +159,8 @@ function validateWorkflow(file) {
   const fileName = path.basename(file);
   const hasTrustedJob = text.includes('certigo-trusted');
   const hasCosmosJob = text.includes('certigo-cosmos-emulator');
+  const hasPrTrigger =
+    /^ {2}pull_request(?:_target)?:\s*$/m.test(text);
 
   if (!lines.some((line) => /^permissions:\s*(?:\{\})?\s*$/.test(line))) {
     errors.push(`${file}: missing explicit top-level permissions`);
@@ -187,6 +190,7 @@ function validateWorkflow(file) {
     errors.push(`${file}: legacy mixed-trust runner label certigo-ci is forbidden`);
   }
   errors.push(...validatePersistentCachePolicy(text, file));
+  errors.push(...validateWorkflowConcurrency(text, file));
   if (hasTrustedJob && /^ {2}workflow_dispatch:/m.test(text)) {
     errors.push(`${file}: certigo-trusted workflows must not use workflow_dispatch`);
   }
@@ -286,6 +290,49 @@ function validateWorkflow(file) {
         );
       }
     }
+    const prHeadCheckoutIndexes = [
+      "ref: ${{ github.event.pull_request.head.sha }}",
+      "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
+    ]
+      .map((marker) => job.text.indexOf(marker))
+      .filter((index) => index >= 0);
+    const prHeadCheckout = prHeadCheckoutIndexes.length > 0
+      ? Math.min(...prHeadCheckoutIndexes)
+      : -1;
+    const assignedHeadRecheck = job.text.indexOf(
+      'name: Recheck current PR head after assignment',
+    );
+    const initialHeadCheck = job.text.indexOf(
+      'name: Enforce initial PR freshness validation',
+    );
+    if (
+      hasPrTrigger
+      && assignedHeadRecheck >= 0
+      && (
+        initialHeadCheck < 0
+        || initialHeadCheck > assignedHeadRecheck
+        || !job.text.includes('needs.freshness.result')
+      )
+    ) {
+      errors.push(
+        `${file}: PR job ${job.id} must fail closed when initial freshness validation fails`,
+      );
+    }
+    if (
+      prHeadCheckout >= 0
+      && (
+        assignedHeadRecheck < 0
+        || assignedHeadRecheck > prHeadCheckout
+        || !job.text.includes(
+          'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0',
+        )
+        || !job.text.includes('pull-requests: read')
+      )
+    ) {
+      errors.push(
+        `${file}: PR-consuming job ${job.id} must recheck the current head after assignment`,
+      );
+    }
     if (
       job.text.includes('certigo-trusted')
       && (
@@ -324,7 +371,6 @@ function validateWorkflow(file) {
     if (isForkPolicy) {
       if (
         text.includes('actions/checkout@') ||
-        text.includes('github.event.pull_request.head.sha') ||
         !text.includes('Fork PR policy / Required gate') ||
         !text.includes('HEAD_REPOSITORY') ||
         !text.includes('HEAD_REPOSITORY" != "$BASE_REPOSITORY')
@@ -489,6 +535,10 @@ function validateRepositoryInvariants() {
   );
   const securityGate = fs.readFileSync(path.join(workflowsDir, 'security-gate.yml'), 'utf8');
   const forkPolicy = fs.readFileSync(path.join(workflowsDir, 'fork-pr-policy.yml'), 'utf8');
+  const prHeadFreshness = fs.readFileSync(
+    path.join(workflowsDir, 'pr-head-freshness.yml'),
+    'utf8',
+  );
   const dependencyScan = fs.readFileSync(
     path.join(workflowsDir, 'dependency-vuln-scan.yml'),
     'utf8',
@@ -907,7 +957,7 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'pull_request_target:',
     prLinuxRunner,
-    "github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository",
+    'github.event.pull_request.head.repo.full_name == github.repository',
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
     'path: .untrusted-source',
@@ -1072,7 +1122,6 @@ function validateRepositoryInvariants() {
     '--validate-active-content',
     'CERTIGO_CONTENT_',
     'actions/create-github-app-token',
-    'token: ${{',
   ]) {
     if (projectState.includes(forbiddenMarker)) {
       errors.push(`ci-project-state.yml: forbidden App/PAT fallback ${forbiddenMarker}`);
@@ -1429,10 +1478,31 @@ function validateRepositoryInvariants() {
     }
   }
   if (
-    forkPolicy.includes('actions/checkout@') ||
-    forkPolicy.includes('github.event.pull_request.head.sha')
+    forkPolicy.includes('actions/checkout@')
   ) {
     errors.push('fork-pr-policy.yml: fork gate must never checkout pull request code');
+  }
+  for (const marker of [
+    'workflow_call:',
+    prLinuxRunner,
+    'pull-requests: read',
+    'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0',
+    'const current = pull.head.sha === eventHeadSha;',
+    "core.setOutput('current', current ? 'true' : 'false');",
+  ]) {
+    if (!prHeadFreshness.includes(marker)) {
+      errors.push(`pr-head-freshness.yml: missing fail-closed freshness invariant ${marker}`);
+    }
+  }
+  for (const forbiddenMarker of [
+    'actions/checkout@',
+    'secrets.',
+    'environment:',
+    'id-token: write',
+  ]) {
+    if (prHeadFreshness.includes(forbiddenMarker)) {
+      errors.push(`pr-head-freshness.yml: forbidden trust surface ${forbiddenMarker}`);
+    }
   }
   if (
     !branchProtection.required_status_checks.contexts.includes(
