@@ -67,6 +67,22 @@ class _UnavailableActivationStore extends InMemoryRuntimeContentStore {
   }
 }
 
+class _RecordingCleanupStore extends InMemoryRuntimeContentStore {
+  final List<Set<String>> protected = <Set<String>>[];
+
+  @override
+  Future<void> cleanup({
+    required String ownerScope,
+    required Set<String> protectedManifestIds,
+  }) async {
+    protected.add(Set<String>.of(protectedManifestIds));
+    await super.cleanup(
+      ownerScope: ownerScope,
+      protectedManifestIds: protectedManifestIds,
+    );
+  }
+}
+
 class _SecondManifestCallBlockingSource implements PublicContentSource {
   _SecondManifestCallBlockingSource(this.manifest, this.fixture);
 
@@ -532,6 +548,30 @@ void main() {
     );
     expect(source.manifestCalls, 2);
     expect(source.fileCalls, 1);
+    await synchronizer.dispose();
+  });
+
+  test('queued sync pins protect cleanup before that sync starts', () async {
+    final ContentFixture fixture = questionFixture('microsoft.az-900.section-1.cloud.001');
+    final PublicContentManifest release = manifest(<ContentFixture>[fixture]);
+    final _BlockingSource source = _BlockingSource(release, fixture);
+    final _RecordingCleanupStore store = _RecordingCleanupStore();
+    final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
+      source: source,
+      store: store,
+      delay: (_) async {},
+    );
+
+    final Future<RuntimeContentSyncReport> first = synchronizer.sync(ownerId: 'person-a');
+    await source.started.future;
+    final Future<RuntimeContentSyncReport> queued = synchronizer.sync(
+      ownerId: 'person-b',
+      pinnedManifestIds: <String>{pinnedManifest},
+    );
+    source.release.complete();
+    await Future.wait<RuntimeContentSyncReport>(<Future<RuntimeContentSyncReport>>[first, queued]);
+
+    expect(store.protected.first, contains(pinnedManifest));
     await synchronizer.dispose();
   });
 }

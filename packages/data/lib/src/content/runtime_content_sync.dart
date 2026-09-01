@@ -156,6 +156,7 @@ class RuntimeContentSynchronizer {
   Future<void> _operationTail = Future<void>.value();
   String? _inFlightOwnerId;
   Set<String> _inFlightPins = <String>{};
+  final Map<String, int> _pendingPins = <String, int>{};
   bool _disposed = false;
 
   RuntimeContentStatus get currentStatus => _current;
@@ -166,26 +167,34 @@ class RuntimeContentSynchronizer {
     Set<String> pinnedManifestIds = const <String>{},
   }) {
     if (_disposed) throw StateError('Runtime content synchronizer has been disposed.');
+    final Set<String> requestedPins = Set<String>.unmodifiable(pinnedManifestIds);
     final Future<RuntimeContentSyncReport>? running = _inFlight;
     if (running != null) {
-      if (_inFlightOwnerId == ownerId && pinnedManifestIds.difference(_inFlightPins).isEmpty) {
+      if (_inFlightOwnerId == ownerId && requestedPins.difference(_inFlightPins).isEmpty) {
         return running;
       }
     }
     _inFlightOwnerId = ownerId;
-    _inFlightPins = Set<String>.of(pinnedManifestIds);
+    _inFlightPins = requestedPins;
+    _retainPendingPins(requestedPins);
     late final Future<RuntimeContentSyncReport> operation;
     operation = _enqueueOperation(
       () => _sync(
         ownerScope: runtimeContentScopeKey(ownerId),
-        pinnedManifestIds: pinnedManifestIds,
+        pinnedManifestIds: requestedPins,
       ),
     );
     _inFlight = operation;
     unawaited(
       operation.then<void>(
-        (_) => _clearInFlight(operation),
-        onError: (Object _, StackTrace __) => _clearInFlight(operation),
+        (_) {
+          _releasePendingPins(requestedPins);
+          _clearInFlight(operation);
+        },
+        onError: (Object _, StackTrace __) {
+          _releasePendingPins(requestedPins);
+          _clearInFlight(operation);
+        },
       ),
     );
     return operation;
@@ -542,8 +551,26 @@ class RuntimeContentSynchronizer {
 
   Set<String> _protectedManifestIds(Set<String> requested) => <String>{
         ...requested,
+        ..._pendingPins.keys,
         ...?_pins?.manifestIds,
       };
+
+  void _retainPendingPins(Set<String> manifestIds) {
+    for (final String manifestId in manifestIds) {
+      _pendingPins.update(manifestId, (int count) => count + 1, ifAbsent: () => 1);
+    }
+  }
+
+  void _releasePendingPins(Set<String> manifestIds) {
+    for (final String manifestId in manifestIds) {
+      final int count = _pendingPins[manifestId] ?? 0;
+      if (count <= 1) {
+        _pendingPins.remove(manifestId);
+      } else {
+        _pendingPins[manifestId] = count - 1;
+      }
+    }
+  }
 
   Future<T> _retry<T>(Future<Result<T>> Function() operation) async {
     Failure? lastFailure;
