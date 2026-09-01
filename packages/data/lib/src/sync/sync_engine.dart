@@ -185,7 +185,7 @@ class SyncEngine {
     _queue.removeWhere((SyncAction action) => action.ownerId == normalizedOwner);
     final SyncQueueStore store = _store;
     if (store is OwnerScopedSyncQueueStore) {
-      store.discardRetainedOwner(normalizedOwner);
+      (store as OwnerScopedSyncQueueStore).discardRetainedOwner(normalizedOwner);
     }
     await _persist();
     _emit();

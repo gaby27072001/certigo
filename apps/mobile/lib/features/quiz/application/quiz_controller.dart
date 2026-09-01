@@ -38,10 +38,11 @@ class QuizController extends ChangeNotifier {
     required this.lessonId,
     RuntimeContentPinRegistry? contentPins,
     String? contentOwnerId,
-  }) :
+  })  :
         // Keep the optional dependency source-compatible with direct controller tests.
         // ignore: prefer_initializing_formals
         _contentPins = contentPins,
+        // ignore: prefer_initializing_formals
         _contentOwnerId = contentOwnerId {
     unawaited(loadItems());
   }

@@ -47,7 +47,9 @@ class PersonScopedAccountDataPurger implements LocalAccountDataPurger {
   const PersonScopedAccountDataPurger(
     this._runtimeContent, {
     ActiveTrackStore? activeTrackStore,
-  }) : _activeTrackStore = activeTrackStore;
+  }) :
+        // ignore: prefer_initializing_formals
+        _activeTrackStore = activeTrackStore;
 
   final RuntimeContentPersonPurger _runtimeContent;
   final ActiveTrackStore? _activeTrackStore;
@@ -258,7 +260,7 @@ class AccountDeletionController extends StateNotifier<AccountDeletionState> {
   }
 
   String? _currentPersonId() {
-    final AuthState auth = _auth.state;
+    final AuthState auth = _auth.currentState;
     final String normalized = auth is Authenticated ? (auth.session.userId ?? '').trim() : '';
     return normalized.isEmpty ? null : normalized;
   }

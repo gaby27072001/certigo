@@ -87,6 +87,8 @@ class AuthController extends Notifier<AuthState> {
   /// Délai de lecture du coffre au démarrage (déjà borné dans le store aussi).
   static const Duration _restoreReadTimeout = Duration(seconds: 6);
 
+  AuthState get currentState => state;
+
   @override
   AuthState build() {
     _gateway = ref.read(authGatewayProvider);

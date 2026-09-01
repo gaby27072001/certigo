@@ -94,8 +94,7 @@ class JsonSyncQueueStore implements SyncQueueStore, OwnerScopedSyncQueueStore {
     required JsonWrite write,
     SyncQueueQuarantineWriter? quarantine,
     SyncQueueCorruptionReporter? onCorruption,
-  })
-      : _read = read,
+  })  : _read = read,
         _write = write,
         _quarantine = quarantine,
         _onCorruption = onCorruption;
@@ -213,7 +212,8 @@ class JsonSyncQueueStore implements SyncQueueStore, OwnerScopedSyncQueueStore {
     int? index,
     String? ownerId,
   }) async {
-    final String fingerprint = sha256.convert(utf8.encode('$reason|${index ?? -1}|$raw')).toString();
+    final String fingerprint =
+        sha256.convert(utf8.encode('$reason|${index ?? -1}|$raw')).toString();
     final SyncQueueCorruption corruption = SyncQueueCorruption(
       fingerprint: fingerprint,
       reason: reason,

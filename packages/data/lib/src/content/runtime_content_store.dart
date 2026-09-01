@@ -783,8 +783,7 @@ class FileRuntimeContentStore implements RuntimeContentStore {
 
   Future<bool> _isOwnerDeleted(String ownerScope) async {
     if (_deletedOwners.contains(ownerScope)) return true;
-    final bool deleted =
-        await _personDeletionMarker(ownerScope).exists() ||
+    final bool deleted = await _personDeletionMarker(ownerScope).exists() ||
         await Directory('${_personRoot(ownerScope).path}.deleting').exists();
     if (deleted) _deletedOwners.add(ownerScope);
     return deleted;

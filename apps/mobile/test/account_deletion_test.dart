@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:certigo/app/active_track_store.dart';
-import 'package:certigo/app/content/runtime_content_dependencies.dart';
 import 'package:certigo/app/offline/prefs_sync_store.dart';
 import 'package:certigo/app/providers.dart';
 import 'package:certigo/features/account_deletion/application/account_deletion_controller.dart';
@@ -414,8 +413,7 @@ void main() {
   });
 
   test('account switch during deletion response never purges the new person', () async {
-    final Completer<Result<AccountDeletion>> response =
-        Completer<Result<AccountDeletion>>();
+    final Completer<Result<AccountDeletion>> response = Completer<Result<AccountDeletion>>();
     final _DeletionRepository repository = _DeletionRepository(
       status: notRequested,
       requestResult: const Success<AccountDeletion>(completed),
@@ -437,9 +435,8 @@ void main() {
     await settle();
     await settle();
 
-    final Future<void> deletion = container
-        .read(accountDeletionControllerProvider.notifier)
-        .start(expectedUserId: 'user-1');
+    final Future<void> deletion =
+        container.read(accountDeletionControllerProvider.notifier).start(expectedUserId: 'user-1');
     await settle();
     await auth.signOut();
     gateway.session = const AuthSession(
