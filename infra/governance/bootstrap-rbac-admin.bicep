@@ -19,6 +19,10 @@ var allowedRuntimeRoleDefinitionIds = [
   '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
   '73c42c96-874c-492b-b04d-ab87d138a893'
 ]
+var managedIdentityOperatorRoleDefinitionId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  'f1a07417-d97a-45cb-824c-7a7467783830'
+)
 
 var environments = [
   {
@@ -43,6 +47,10 @@ resource environmentResourceGroups 'Microsoft.Resources/resourceGroups@2024-03-0
 
 resource contentResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
   name: 'rg-certigo-content'
+}
+
+resource identityResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
+  name: 'rg-certigo-identities'
 }
 
 module runtimeRoleAssignmentWriters 'modules/runtimeRoleAssignmentWriterAssignment.bicep' = [
@@ -76,6 +84,20 @@ module contentInfrastructurePlanExecutorAssignment 'modules/contentPlanExecutorA
   }
 }
 
+module contentReaderAttachAssignments 'modules/managedIdentityOperatorAssignment.bicep' = [
+  for environment in environments: {
+    scope: identityResourceGroup
+    name: 'content-reader-attach-${environment.name}'
+    params: {
+      assignmentNameSeed: environment.identity.name
+      identityName: phaseA.identities.contentReader.name
+      principalId: environment.identity.principalId
+      readerAssignmentDescription: 'Allows ${environment.name} deployment to attach only the immutable content reader identity.'
+      roleDefinitionId: managedIdentityOperatorRoleDefinitionId
+    }
+  }
+]
+
 resource subscriptionLauncherAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
   for environment in environments: {
     name: guid(
@@ -108,4 +130,4 @@ resource privilegedCiAssignmentPolicyAssignment 'Microsoft.Authorization/policyA
   }
 }
 
-output assignmentCount int = 8
+output assignmentCount int = 11

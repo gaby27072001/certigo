@@ -570,6 +570,28 @@ test('live Phase B binding classifies delegator roles as human B1b', () => {
     principalType: 'ServicePrincipal',
     roleDefinitionId: proof.roleDefinitionIds.contentInfrastructurePlanExecutor,
   });
+  const managedIdentityOperatorRoleId =
+    `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
+    'roleDefinitions/f1a07417-d97a-45cb-824c-7a7467783830';
+  for (const environment of ['dev', 'staging', 'prod']) {
+    const key = `deploy${environment[0].toUpperCase()}${environment.slice(1)}`;
+    const identity = proof.identities[key];
+    const scope = proof.identities.contentReader.resourceId;
+    delegators.push({
+      id:
+        `${scope}/providers/Microsoft.Authorization/roleAssignments/` +
+        armGuid(scope, identity.name, managedIdentityOperatorRoleId),
+      name: `reader-attach-${environment}`,
+      scope,
+      condition: null,
+      conditionVersion: null,
+      description:
+        `Allows ${environment} deployment to attach only the immutable content reader identity.`,
+      principalId: identity.principalId,
+      principalType: 'ServicePrincipal',
+      roleDefinitionId: managedIdentityOperatorRoleId,
+    });
+  }
   const b1a = all.map((change) => ({
     id: change.resourceId,
     name: change.resourceId.split('/').at(-1),

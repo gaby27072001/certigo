@@ -23,13 +23,25 @@ az deployment sub what-if \
   --result-format FullResourcePayloads \
   --no-pretty-print \
   --output json > "${evidence_dir}/plan.json"
+node "${root}/infra/governance/normalize-principal-types.mjs" \
+  "${evidence_dir}/plan.json" \
+  "${evidence_dir}/compiled-template.json" \
+  "${evidence_dir}/phase-a.json" \
+  "${evidence_dir}/normalized-plan.json" \
+  "${evidence_dir}/principal-type-provenance.json"
 node "${root}/infra/governance/validate-what-if.mjs" \
-  --plan "${evidence_dir}/plan.json" \
+  --plan "${evidence_dir}/normalized-plan.json" \
   --subscription "${subscription_id}" \
   --phase B1b \
   --phase-a "${evidence_dir}/phase-a.json"
 source_commit="$(git -C "${root}" rev-parse HEAD)"
 tenant_id="$(az account show --query tenantId --output tsv)"
+sources="$(
+  printf '%s,' \
+    "${root}/infra/governance/bootstrap-rbac-admin.bicep"
+  printf '%s' \
+    "${root}/infra/governance/modules/managedIdentityOperatorAssignment.bicep"
+)"
 node "${root}/infra/governance/write-what-if-manifest.mjs" \
   --phase B1b \
   --plan "${evidence_dir}/plan.json" \
@@ -41,7 +53,7 @@ node "${root}/infra/governance/write-what-if-manifest.mjs" \
   --source-commit "${source_commit}" \
   --subscription "${subscription_id}" \
   --tenant "${tenant_id}" \
-  --sources "${root}/infra/governance/bootstrap-rbac-admin.bicep" \
+  --sources "${sources}" \
   --artifact-dir "${evidence_dir}" \
   --phase-a-deployment "${evidence_dir}/phase-a-deployment.json" \
   --phase-a-evidence-manifest "${PHASE_A_EVIDENCE_DIR}/manifest.json" \

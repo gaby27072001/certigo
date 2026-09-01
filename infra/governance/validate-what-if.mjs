@@ -625,6 +625,13 @@ function assignmentResourceId(scope, nameSeed, roleDefinitionId) {
   );
 }
 
+function managedIdentityOperatorRoleDefinitionId(subscriptionId) {
+  return (
+    `/subscriptions/${subscriptionId}/providers/Microsoft.Authorization/` +
+    'roleDefinitions/f1a07417-d97a-45cb-824c-7a7467783830'
+  );
+}
+
 function expectedRoleAssignments(subscriptionId, phaseA) {
   const roleIds = Object.fromEntries(
     Object.entries(phaseA.roleDefinitionIds).map(([key, value]) => [
@@ -635,6 +642,8 @@ function expectedRoleAssignments(subscriptionId, phaseA) {
   const contributorRoleId =
     `/subscriptions/${subscriptionId}/providers/Microsoft.Authorization/` +
     'roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c';
+  const managedIdentityOperatorRoleId =
+    managedIdentityOperatorRoleDefinitionId(subscriptionId);
   const descriptions = [];
 
   for (const environment of ['dev', 'staging', 'prod']) {
@@ -679,6 +688,15 @@ function expectedRoleAssignments(subscriptionId, phaseA) {
       principalId: identity.principalId,
       roleDefinitionId: roleIds.sharedNetworkDeployment,
       scope: `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-ci`,
+    });
+    descriptions.push({
+      nameSeed: identity.name,
+      condition: null,
+      description:
+        `Allows ${environment} deployment to attach only the immutable content reader identity.`,
+      principalId: identity.principalId,
+      roleDefinitionId: managedIdentityOperatorRoleId,
+      scope: phaseA.identities.contentReader.resourceId,
     });
   }
 
@@ -1049,6 +1067,7 @@ function requiredPhaseB1aContracts(subscriptionId, phaseA) {
           !isExternalJoinAssignment(candidate) &&
           !isSubscriptionLauncherAssignment(candidate) &&
           ![
+            managedIdentityOperatorRoleDefinitionId(subscriptionId),
             phaseA.roleDefinitionIds.runtimeRoleAssignmentWriter,
             phaseA.roleDefinitionIds.contentInfrastructurePlanExecutor,
           ].some(
@@ -1069,6 +1088,7 @@ function requiredPhaseB1bContracts(subscriptionId, phaseA) {
       .concat(
         expectedRoleAssignments(subscriptionId, phaseA).filter((candidate) =>
           [
+            managedIdentityOperatorRoleDefinitionId(subscriptionId),
             phaseA.roleDefinitionIds.runtimeRoleAssignmentWriter,
             phaseA.roleDefinitionIds.contentInfrastructurePlanExecutor,
           ].some(
