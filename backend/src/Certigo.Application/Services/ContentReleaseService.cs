@@ -41,15 +41,16 @@ public sealed class ContentReleaseService(
         CancellationToken cancellationToken = default)
     {
         var elapsed = Stopwatch.StartNew();
-        var existing = await store.GetReceiptAsync(releaseId, cancellationToken);
-        if (existing is not null)
-        {
-            telemetry.TrackImport(releaseId, alreadyImported: true, elapsed.Elapsed);
-            return new ContentImportResult(existing, AlreadyImported: true);
-        }
-
         try
         {
+            ContentReleaseContracts.RequireDigestId(releaseId, "releaseId");
+            var existing = await store.GetReceiptAsync(releaseId, cancellationToken);
+            if (existing is not null)
+            {
+                telemetry.TrackImport(releaseId, alreadyImported: true, elapsed.Elapsed);
+                return new ContentImportResult(existing, AlreadyImported: true);
+            }
+
             var verified = await verifier.VerifyReleaseAsync(releaseId, cancellationToken);
             var projection = projector.Project(verified.Graph);
             verifier.VerifyProjectedPublic(projection);

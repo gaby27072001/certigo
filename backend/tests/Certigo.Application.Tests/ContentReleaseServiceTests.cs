@@ -14,6 +14,27 @@ public sealed class ContentReleaseServiceTests
         "sha256:0000000000000000000000000000000000000000000000000000000000000000";
 
     [Fact]
+    public async Task Invalid_release_id_is_rejected_before_receipt_lookup()
+    {
+        var store = new RecordingReleaseStore();
+        var service = new ContentReleaseService(
+            new ContentContractVerifier(
+                new ThrowingReleaseSource(),
+                new AcceptingSchemaValidator(),
+                ContentReleaseLimits.Default),
+            new RuntimeContentProjector(),
+            store,
+            new RecordingTelemetry(),
+            new FixedClock());
+
+        var action = () => service.ImportAsync("not-a-release-id", "admin");
+
+        await action.Should().ThrowAsync<ContentReleaseValidationException>()
+            .WithMessage("releaseId must be a lowercase sha256 content identity.");
+        store.GetReceiptCalls.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Rejected_release_never_mutates_the_store()
     {
         var source = new InvalidReleaseSource();
@@ -212,12 +233,16 @@ public sealed class ContentReleaseServiceTests
     private sealed class RecordingReleaseStore : IContentReleaseStore
     {
         public ContentReleaseReceipt? ExistingReceipt { get; init; }
+        public int GetReceiptCalls { get; private set; }
         public int StageCalls { get; private set; }
 
         public Task<ContentReleaseReceipt?> GetReceiptAsync(
             string releaseId,
             CancellationToken cancellationToken = default)
-            => Task.FromResult(ExistingReceipt);
+        {
+            GetReceiptCalls++;
+            return Task.FromResult(ExistingReceipt);
+        }
 
         public Task<ContentReleaseReceipt> StageAsync(
             ProjectedContentRelease release,

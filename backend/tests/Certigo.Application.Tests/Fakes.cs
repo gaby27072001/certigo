@@ -190,10 +190,16 @@ internal sealed class InMemoryAttemptRepository : IAttemptRepository
 {
     private readonly List<AttemptRecord> _store = new();
 
+    public int GetByClientAttemptIdCount { get; private set; }
+
     public void Seed(AttemptRecord attempt) => _store.Add(attempt);
 
     public Task<AttemptRecord?> GetByClientAttemptIdAsync(string userId, string clientAttemptId, CancellationToken cancellationToken = default)
-        => Task.FromResult(_store.FirstOrDefault(a => a.UserId == userId && a.ClientAttemptId == clientAttemptId));
+    {
+        GetByClientAttemptIdCount++;
+        return Task.FromResult(
+            _store.FirstOrDefault(a => a.UserId == userId && a.ClientAttemptId == clientAttemptId));
+    }
 
     public Task CreateAsync(AttemptRecord attempt, CancellationToken cancellationToken = default)
     {
@@ -363,6 +369,8 @@ internal sealed class InMemoryEconomyOperationRepository : IEconomyOperationRepo
     private readonly object _gate = new();
     private long _version;
 
+    public int GetCount { get; private set; }
+
     public Task<EconomyOperationRecord?> GetAsync(
         string userId,
         string operationId,
@@ -370,6 +378,7 @@ internal sealed class InMemoryEconomyOperationRepository : IEconomyOperationRepo
     {
         lock (_gate)
         {
+            GetCount++;
             return Task.FromResult(_store.GetValueOrDefault(Key(userId, operationId)));
         }
     }

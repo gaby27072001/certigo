@@ -36,6 +36,13 @@ public sealed class QuizService(
 
     public async Task<SubmitQuizResult> SubmitAsync(string lessonId, SubmitQuizRequest request, CancellationToken cancellationToken = default)
     {
+        if (request.PublicManifestId is not null)
+        {
+            ContentReleaseContracts.RequireDigestId(
+                request.PublicManifestId,
+                "publicManifestId");
+        }
+
         var operationId = EconomyOperationRecord.IdFor("quiz", request.ClientAttemptId);
         var existingOperation = await economyOperations.GetAsync(
             userContext.UserId,
