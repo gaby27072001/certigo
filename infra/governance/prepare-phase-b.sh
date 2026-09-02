@@ -6,6 +6,9 @@ case "$(uname -s)" in
   MINGW*|MSYS*) export MSYS2_ARG_CONV_EXCL="/subscriptions" ;;
 esac
 subscription_id="${AZURE_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID explicitly.}"
+tenant_id="${AZURE_TENANT_ID:?Set AZURE_TENANT_ID explicitly.}"
+node "${root}/infra/governance/phase-b-target.mjs" \
+  "${subscription_id}" "${tenant_id}"
 phase_a_deployment="${PHASE_A_DEPLOYMENT_NAME:?Set PHASE_A_DEPLOYMENT_NAME to the approved successful Phase A deployment.}"
 phase_a_evidence_dir="${PHASE_A_EVIDENCE_DIR:?Set PHASE_A_EVIDENCE_DIR to the approved Phase A artifact.}"
 phase_a_evidence_sha="${PHASE_A_EVIDENCE_MANIFEST_SHA256:?Set PHASE_A_EVIDENCE_MANIFEST_SHA256 to the approved manifest hash.}"
@@ -23,7 +26,10 @@ legacy_transition_source="${LEGACY_TRANSITION_FILE:?Set LEGACY_TRANSITION_FILE t
 legacy_transition_sha="${LEGACY_TRANSITION_SHA256:?Set LEGACY_TRANSITION_SHA256 to the approved transition evidence hash.}"
 legacy_transition_file="${work_dir}/legacy-transition.json"
 legacy_assignments_file="${work_dir}/legacy-live-assignments.json"
+legacy_group_ids_file="${work_dir}/legacy-transitive-group-ids.json"
+legacy_access_scopes_file="${work_dir}/legacy-access-scopes.json"
 legacy_schedule_instances_file="${work_dir}/legacy-live-schedule-instances.json"
+legacy_eligibility_instances_file="${work_dir}/legacy-live-eligibility-instances.json"
 
 for evidence_file in \
   "${phase_a_evidence_dir}/manifest.json" \
@@ -138,17 +144,68 @@ cp "${legacy_transition_source}" "${legacy_transition_file}"
 legacy_principal_id="$(
   node -p "require(process.argv[1]).legacyPrincipalId" "${legacy_transition_file}"
 )"
-az role assignment list \
-  --subscription "${subscription_id}" \
-  --assignee-object-id "${legacy_principal_id}" \
-  --include-inherited \
-  --all \
-  --output json > "${legacy_assignments_file}"
+node "${root}/infra/governance/collect-transitive-groups.mjs" \
+  "${legacy_group_ids_file}" "${legacy_principal_id}"
+az account management-group entities list \
+  --output json > "${work_dir}/management-group-entities.json"
+node --input-type=module - \
+  "${root}/infra/governance/planner-pim-contract.mjs" \
+  "${phase_a_file}" "${work_dir}/management-group-entities.json" \
+  "${legacy_access_scopes_file}" <<'NODE'
+import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const [contractPath, phaseAPath, entitiesPath, outputPath] =
+  process.argv.slice(2);
+const { plannerAccessScopes } = await import(pathToFileURL(contractPath));
+const phaseA = JSON.parse(fs.readFileSync(phaseAPath, 'utf8'));
+const entities = JSON.parse(fs.readFileSync(entitiesPath, 'utf8'));
+const subscriptionScope = `/subscriptions/${phaseA.subscriptionId}`;
+const scopes = [
+  ...plannerAccessScopes(entities, phaseA.subscriptionId, phaseA.tenantId),
+  ...['ci', 'dev', 'staging', 'prod'].map(
+    (name) => `${subscriptionScope}/resourceGroups/rg-certigo-${name}`,
+  ),
+];
+fs.writeFileSync(outputPath, JSON.stringify(scopes), { mode: 0o600 });
+NODE
+mapfile -t legacy_principal_ids < <(
+  node --input-type=module - \
+    "${legacy_principal_id}" "${legacy_group_ids_file}" <<'NODE'
+import fs from 'node:fs';
+const [principalId, groupIdsPath] = process.argv.slice(2);
+const groupIds = JSON.parse(fs.readFileSync(groupIdsPath, 'utf8'));
+for (const id of [principalId, ...groupIds]) {
+  process.stdout.write(`${id}\n`);
+}
+NODE
+)
+printf '[]' > "${legacy_assignments_file}"
+for candidate_principal_id in "${legacy_principal_ids[@]}"; do
+  candidate_assignments_file="${work_dir}/legacy-assignments-${candidate_principal_id}.json"
+  merged_assignments_file="${work_dir}/legacy-assignments-merged.json"
+  az role assignment list \
+    --subscription "${subscription_id}" \
+    --assignee-object-id "${candidate_principal_id}" \
+    --include-inherited \
+    --all \
+    --output json > "${candidate_assignments_file}"
+  jq -s 'add' \
+    "${legacy_assignments_file}" "${candidate_assignments_file}" \
+    > "${merged_assignments_file}"
+  mv "${merged_assignments_file}" "${legacy_assignments_file}"
+done
 node "${root}/infra/governance/collect-role-assignment-schedules.mjs" \
-  "${legacy_schedule_instances_file}" "${subscription_id}" "${legacy_principal_id}"
+  "${legacy_schedule_instances_file}" "${subscription_id}" \
+  roleAssignmentScheduleInstances "${legacy_access_scopes_file}" \
+  "${legacy_principal_ids[@]}"
+node "${root}/infra/governance/collect-role-assignment-schedules.mjs" \
+  "${legacy_eligibility_instances_file}" "${subscription_id}" \
+  roleEligibilityScheduleInstances "${legacy_access_scopes_file}" \
+  "${legacy_principal_ids[@]}"
 node "${root}/infra/governance/legacy-transition-contract.mjs" \
   "${legacy_transition_file}" "${phase_a_file}" \
-  "${legacy_assignments_file}" "${legacy_schedule_instances_file}"
+  "${legacy_assignments_file}" "${legacy_schedule_instances_file}" \
+  "${legacy_group_ids_file}" "${legacy_eligibility_instances_file}"
 
 resource_index=0
 while IFS=$'\t' read -r kind resource_id expected_client_id expected_principal_id; do

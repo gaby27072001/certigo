@@ -280,6 +280,9 @@ function makeB1Evidence() {
     parameters: { phaseA: { value: proof } },
   });
   const compiledTemplatePath = path.join(directory, 'compiled-template.json');
+  const legacyTransitionPath = writeJson(directory, 'legacy-transition.json', {
+    schemaVersion: 1,
+  });
   compileTemplate(
     'infra/governance/bootstrap-rbac.bicep',
     compiledTemplatePath,
@@ -306,6 +309,7 @@ function makeB1Evidence() {
     sourceFiles: [
       path.join(repositoryRoot, 'infra/governance/bootstrap-rbac.bicep'),
     ],
+    legacyTransitionPath,
     artifactDirectory: directory,
   });
   return {
@@ -314,6 +318,7 @@ function makeB1Evidence() {
     planPath,
     parametersPath,
     compiledTemplatePath,
+    legacyTransitionPath,
     manifestPath,
     manifest: JSON.parse(fs.readFileSync(manifestPath, 'utf8')),
     sourceCommit,
@@ -366,8 +371,144 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
       sourceRoot: repositoryRoot,
       subscriptionId: subscription,
       tenantId: tenant,
+      legacyTransitionPath: evidence.legacyTransitionPath,
     }),
   );
+  const approvedTransition = fs.readFileSync(
+    evidence.legacyTransitionPath,
+    'utf8',
+  );
+  fs.writeFileSync(
+    evidence.legacyTransitionPath,
+    '{"schemaVersion":1,"substituted":true}\n',
+  );
+  assert.throws(
+    () =>
+      verifyDeploymentApproval({
+        approval,
+        manifest: evidence.manifest,
+        phaseAProof: evidence.proof,
+        manifestPath: evidence.manifestPath,
+        planPath: evidence.planPath,
+        parametersPath: evidence.parametersPath,
+        compiledTemplatePath: evidence.compiledTemplatePath,
+        phaseABindingPath,
+        sourceRoot: repositoryRoot,
+        subscriptionId: subscription,
+        tenantId: tenant,
+        legacyTransitionPath: evidence.legacyTransitionPath,
+      }),
+    /approved legacy transition hash mismatch/,
+  );
+  fs.writeFileSync(evidence.legacyTransitionPath, approvedTransition);
+  assert.throws(
+    () =>
+      verifyDeploymentApproval({
+        approval,
+        manifest: evidence.manifest,
+        phaseAProof: evidence.proof,
+        manifestPath: evidence.manifestPath,
+        planPath: evidence.planPath,
+        parametersPath: evidence.parametersPath,
+        compiledTemplatePath: evidence.compiledTemplatePath,
+        phaseABindingPath,
+        sourceRoot: repositoryRoot,
+        subscriptionId: subscription,
+        tenantId: tenant,
+        legacyTransitionPath: null,
+      }),
+    /fresh legacy transition evidence is required/,
+  );
+  const approvedTransitionHash =
+    evidence.manifest.legacyTransition.sha256;
+  evidence.manifest.legacyTransition.sha256 = 'malformed';
+  fs.writeFileSync(
+    evidence.manifestPath,
+    `${JSON.stringify(evidence.manifest, null, 2)}\n`,
+  );
+  approval.manifestSha256 = sha256File(evidence.manifestPath);
+  assert.throws(
+    () =>
+      verifyDeploymentApproval({
+        approval,
+        manifest: evidence.manifest,
+        phaseAProof: evidence.proof,
+        manifestPath: evidence.manifestPath,
+        planPath: evidence.planPath,
+        parametersPath: evidence.parametersPath,
+        compiledTemplatePath: evidence.compiledTemplatePath,
+        phaseABindingPath,
+        sourceRoot: repositoryRoot,
+        subscriptionId: subscription,
+        tenantId: tenant,
+        legacyTransitionPath: evidence.legacyTransitionPath,
+      }),
+    /manifest legacy transition hash is not a lowercase SHA-256/,
+  );
+  evidence.manifest.legacyTransition.sha256 = approvedTransitionHash;
+  evidence.manifest.legacyTransition.path = '../legacy-transition.json';
+  fs.writeFileSync(
+    evidence.manifestPath,
+    `${JSON.stringify(evidence.manifest, null, 2)}\n`,
+  );
+  approval.manifestSha256 = sha256File(evidence.manifestPath);
+  assert.throws(
+    () =>
+      verifyDeploymentApproval({
+        approval,
+        manifest: evidence.manifest,
+        phaseAProof: evidence.proof,
+        manifestPath: evidence.manifestPath,
+        planPath: evidence.planPath,
+        parametersPath: evidence.parametersPath,
+        compiledTemplatePath: evidence.compiledTemplatePath,
+        phaseABindingPath,
+        sourceRoot: repositoryRoot,
+        subscriptionId: subscription,
+        tenantId: tenant,
+        legacyTransitionPath: evidence.legacyTransitionPath,
+      }),
+    /manifest legacy transition path/,
+  );
+  evidence.manifest.legacyTransition.path = 'legacy-transition.json';
+  evidence.manifest.artifacts = evidence.manifest.artifacts.filter(
+    ({ path: artifactPath }) => artifactPath !== 'legacy-transition.json',
+  );
+  fs.writeFileSync(
+    evidence.manifestPath,
+    `${JSON.stringify(evidence.manifest, null, 2)}\n`,
+  );
+  approval.manifestSha256 = sha256File(evidence.manifestPath);
+  assert.throws(
+    () =>
+      verifyDeploymentApproval({
+        approval,
+        manifest: evidence.manifest,
+        phaseAProof: evidence.proof,
+        manifestPath: evidence.manifestPath,
+        planPath: evidence.planPath,
+        parametersPath: evidence.parametersPath,
+        compiledTemplatePath: evidence.compiledTemplatePath,
+        phaseABindingPath,
+        sourceRoot: repositoryRoot,
+        subscriptionId: subscription,
+        tenantId: tenant,
+        legacyTransitionPath: evidence.legacyTransitionPath,
+      }),
+    /not bound to its inventoried artifact/,
+  );
+  evidence.manifest.artifacts.push({
+    path: 'legacy-transition.json',
+    sha256: approvedTransitionHash,
+  });
+  evidence.manifest.artifacts.sort((left, right) =>
+    left.path.localeCompare(right.path),
+  );
+  fs.writeFileSync(
+    evidence.manifestPath,
+    `${JSON.stringify(evidence.manifest, null, 2)}\n`,
+  );
+  approval.manifestSha256 = sha256File(evidence.manifestPath);
   assert.throws(
     () =>
       verifyDeploymentApproval({
@@ -382,6 +523,7 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
         sourceRoot: repositoryRoot,
         subscriptionId: subscription,
         tenantId: tenant,
+        legacyTransitionPath: evidence.legacyTransitionPath,
       }),
     /approved source commit mismatch/,
   );
@@ -400,6 +542,7 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
         sourceRoot: repositoryRoot,
         subscriptionId: subscription,
         tenantId: tenant,
+        legacyTransitionPath: evidence.legacyTransitionPath,
       }),
     /artifact inventory mismatch|raw plan hash mismatch/,
   );
@@ -698,6 +841,7 @@ test('deployment approval recomputes normalized principalType evidence', () => {
     evidence.compiledTemplatePath,
     evidence.parametersPath,
     bindingPath,
+    evidence.legacyTransitionPath,
     normalizedPlanPath,
     evidence.planPath,
     provenancePath,
@@ -733,6 +877,7 @@ test('deployment approval recomputes normalized principalType evidence', () => {
       sourceRoot: repositoryRoot,
       subscriptionId: subscription,
       tenantId: tenant,
+      legacyTransitionPath: evidence.legacyTransitionPath,
     });
   assert.doesNotThrow(verify);
   const approvedParameters = JSON.parse(

@@ -3,6 +3,9 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 subscription_id="${AZURE_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID explicitly.}"
+tenant_id="${AZURE_TENANT_ID:?Set AZURE_TENANT_ID explicitly.}"
+node "${root}/infra/governance/phase-b-target.mjs" \
+  "${subscription_id}" "${tenant_id}"
 location="${AZURE_LOCATION:-westeurope}"
 evidence_dir="${PHASE_B1_EVIDENCE_DIR:?Set PHASE_B1_EVIDENCE_DIR.}"
 mkdir -p "${evidence_dir}"
@@ -58,6 +61,7 @@ NODE
       --phase-a-deployment "${evidence_dir}/phase-a-deployment.json"
       --phase-a-evidence-manifest "${PHASE_A_EVIDENCE_DIR}/manifest.json"
       --phase-a-binding "${evidence_dir}/phase-a-binding.json"
+      --legacy-transition "${evidence_dir}/legacy-transition.json"
     )
   fi
   "${manifest_args[@]}"

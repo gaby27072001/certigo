@@ -39,8 +39,15 @@ export function createManifest(options) {
     phaseADeploymentPath,
     phaseAEvidenceManifestPath,
     phaseABindingPath,
+    legacyTransitionPath,
     artifactDirectory,
   } = options;
+  if (
+    ['B1a', 'B1b', 'B2'].includes(phase) &&
+    !legacyTransitionPath
+  ) {
+    throw new Error('Phase B manifest requires legacy transition evidence');
+  }
   const planRaw = fs.existsSync(planPath) ? fs.readFileSync(planPath) : null;
   let plan = null;
   try {
@@ -115,6 +122,13 @@ export function createManifest(options) {
       bindingSha256: sha256File(phaseABindingPath),
     };
   }
+  if (legacyTransitionPath) {
+    manifest.legacyTransition = relativeEvidenceFile(
+      artifactDirectory,
+      legacyTransitionPath,
+      'legacy transition evidence',
+    );
+  }
   const normalizedPlanPath = path.join(
     artifactDirectory,
     'normalized-plan.json',
@@ -171,6 +185,12 @@ function main() {
       throw new Error(`Missing required argument ${key}`);
     }
   }
+  if (
+    ['B1a', 'B1b', 'B2'].includes(args['--phase']) &&
+    !args['--legacy-transition']
+  ) {
+    throw new Error('Missing required argument --legacy-transition');
+  }
   createManifest({
     phase: args['--phase'],
     planPath: path.resolve(args['--plan']),
@@ -194,6 +214,9 @@ function main() {
       : null,
     phaseABindingPath: args['--phase-a-binding']
       ? path.resolve(args['--phase-a-binding'])
+      : null,
+    legacyTransitionPath: args['--legacy-transition']
+      ? path.resolve(args['--legacy-transition'])
       : null,
     artifactDirectory: path.resolve(args['--artifact-dir']),
   });

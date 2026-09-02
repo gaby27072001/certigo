@@ -76,6 +76,9 @@ function validateManifestSchema(manifest) {
   if (manifest.normalization !== undefined) {
     topLevelFields.push('normalization');
   }
+  if (['B1a', 'B1b', 'B2'].includes(manifest.phase)) {
+    topLevelFields.push('legacyTransition');
+  }
   requireExactFields(manifest, topLevelFields, 'evidence manifest');
   requireExactFields(manifest.context, ['ref', 'repository', 'runId'], 'manifest context');
   requireExactFields(
@@ -137,6 +140,21 @@ function validateManifestSchema(manifest) {
       'manifest provenance hash',
     );
   }
+  if (['B1a', 'B1b', 'B2'].includes(manifest.phase)) {
+    requireExactFields(
+      manifest.legacyTransition,
+      ['path', 'sha256'],
+      'manifest legacy transition',
+    );
+    requireSha256(
+      manifest.legacyTransition.sha256,
+      'manifest legacy transition hash',
+    );
+    normalizeEvidencePath(
+      manifest.legacyTransition.path,
+      'manifest legacy transition path',
+    );
+  }
   if (manifest.schemaVersion !== 2 || manifest.deploymentExecuted !== false) {
     throw new Error('unsupported evidence schema');
   }
@@ -147,8 +165,26 @@ function validateManifestSchema(manifest) {
   requireSha256(manifest.template.compiledSha256, 'manifest compiled template hash');
   requireSha256(manifest.parameters.sha256, 'manifest parameters hash');
   requireSha256(manifest.plan.sha256, 'manifest plan hash');
+  const artifacts = validateEvidenceEntries(
+    manifest.artifacts,
+    'manifest artifacts',
+  );
+  if (['B1a', 'B1b', 'B2'].includes(manifest.phase)) {
+    const legacyTransitionArtifact = artifacts.find(
+      ({ path: artifactPath }) =>
+        artifactPath === manifest.legacyTransition.path,
+    );
+    if (
+      !legacyTransitionArtifact ||
+      legacyTransitionArtifact.sha256 !== manifest.legacyTransition.sha256
+    ) {
+      throw new Error(
+        'manifest legacy transition is not bound to its inventoried artifact',
+      );
+    }
+  }
   return {
-    artifacts: validateEvidenceEntries(manifest.artifacts, 'manifest artifacts'),
+    artifacts,
     sources: validateEvidenceEntries(manifest.sources, 'manifest sources'),
   };
 }
@@ -519,6 +555,7 @@ export function verifyDeploymentApproval(input) {
     sourceRoot,
     subscriptionId,
     tenantId,
+    legacyTransitionPath,
   } = input;
   requireEqual(approval.schemaVersion, 1, 'unsupported approval schema');
   requireEqual(approval.approved, true, 'evidence is not approved');
@@ -560,6 +597,17 @@ export function verifyDeploymentApproval(input) {
     'deployment subscription mismatch',
   );
   requireEqual(manifest.tenantId, tenantId, 'deployment tenant mismatch');
+  validateManifestSchema(manifest);
+  if (['B1a', 'B1b', 'B2'].includes(manifest.phase)) {
+    if (!legacyTransitionPath) {
+      throw new Error('fresh legacy transition evidence is required');
+    }
+    requireEqual(
+      sha256File(legacyTransitionPath),
+      manifest.legacyTransition.sha256,
+      'approved legacy transition hash mismatch',
+    );
+  }
   verifyManifestFiles(manifest, {
     manifestPath,
     planPath,
@@ -753,6 +801,9 @@ function main() {
       sourceRoot: path.resolve(args['--source-root']),
       subscriptionId: args['--subscription'],
       tenantId: args['--tenant'],
+      legacyTransitionPath: args['--legacy-transition']
+        ? path.resolve(args['--legacy-transition'])
+        : null,
     });
     return;
   }

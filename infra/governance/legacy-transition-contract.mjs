@@ -161,6 +161,8 @@ export function validateLegacyLiveAssignments(
   transition,
   phaseA,
   now = Date.now(),
+  groupIds = [],
+  eligibilityScheduleInstances = [],
 ) {
   if (!Array.isArray(assignments)) {
     throw new Error('live legacy assignment inventory must be an array');
@@ -168,7 +170,36 @@ export function validateLegacyLiveAssignments(
   if (!Array.isArray(scheduleInstances)) {
     throw new Error('live legacy schedule inventory must be an array');
   }
+  if (!Array.isArray(groupIds)) {
+    throw new Error('legacy transitive group inventory must be an array');
+  }
+  if (!Array.isArray(eligibilityScheduleInstances)) {
+    throw new Error('live legacy eligibility inventory must be an array');
+  }
   const proof = validatePhaseAProof(phaseA, transition.subscriptionId);
+  const legacyPrincipalId = requireUuid(
+    transition.legacyPrincipalId,
+    'legacy principal ID',
+  );
+  const normalizedGroupIds = groupIds.map((groupId, index) =>
+    requireUuid(groupId, `legacy transitive group IDs[${index}]`),
+  );
+  if (
+    normalizedGroupIds.includes(legacyPrincipalId) ||
+    new Set(normalizedGroupIds).size !== normalizedGroupIds.length
+  ) {
+    throw new Error('legacy transitive group IDs must be unique and distinct');
+  }
+  if (eligibilityScheduleInstances.length !== 0) {
+    throw new Error(
+      'legacy principal or transitive group retains a PIM eligibility schedule',
+    );
+  }
+  const groupIdSet = new Set(normalizedGroupIds);
+  const inventoriedPrincipalIds = new Set([
+    legacyPrincipalId,
+    ...normalizedGroupIds,
+  ]);
   const subscriptionScope = normalize(`/subscriptions/${proof.subscriptionId}`);
   const broadRoleIds = new Set([
     contributorRoleDefinitionId,
@@ -176,6 +207,16 @@ export function validateLegacyLiveAssignments(
     ownerRoleDefinitionId,
   ]);
   for (const assignment of assignments) {
+    const assignmentPrincipalId = requireUuid(
+      assignment.principalId,
+      'live legacy assignment principal ID',
+    );
+    if (!inventoriedPrincipalIds.has(assignmentPrincipalId)) {
+      throw new Error('live legacy assignment principal is outside the inventory');
+    }
+    if (groupIdSet.has(assignmentPrincipalId)) {
+      throw new Error('legacy transitive group assignment remains live');
+    }
     const roleId = normalize(assignment.roleDefinitionId).split('/').at(-1);
     if (
       normalize(assignment.scope) === subscriptionScope &&
@@ -224,6 +265,13 @@ export function validateLegacyLiveAssignments(
   }
   if (scheduleInstances.length !== transition.temporaryAssignments.length) {
     throw new Error('unexpected legacy assignment schedule remains live');
+  }
+  if (
+    scheduleInstances.some((schedule) =>
+      groupIdSet.has(normalize(schedule?.properties?.principalId)),
+    )
+  ) {
+    throw new Error('legacy transitive group assignment schedule remains live');
   }
   const observedScheduleIds = new Set();
   const scheduledRoleAssignmentIds = new Set();
@@ -900,6 +948,8 @@ function main() {
     phaseAPath,
     liveAssignmentsPath,
     liveScheduleInstancesPath,
+    groupIdsPath,
+    eligibilityScheduleInstancesPath,
   ] = process.argv.slice(2);
   if (!transitionPath || !phaseAPath) {
     throw new Error(
@@ -923,6 +973,18 @@ function main() {
       ),
       transition,
       phaseA,
+      Date.now(),
+      groupIdsPath
+        ? JSON.parse(fs.readFileSync(path.resolve(groupIdsPath), 'utf8'))
+        : [],
+      eligibilityScheduleInstancesPath
+        ? JSON.parse(
+            fs.readFileSync(
+              path.resolve(eligibilityScheduleInstancesPath),
+              'utf8',
+            ),
+          )
+        : [],
     );
   }
 }

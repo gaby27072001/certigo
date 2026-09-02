@@ -12,8 +12,10 @@ import {
 } from '../governance/bicep-parameters.mjs';
 import {
   collectScheduleInstances,
+  collectScheduleInstancesForPrincipals,
   initialScheduleUrls,
 } from '../governance/collect-role-assignment-schedules.mjs';
+import { collectTransitiveGroupIds } from '../governance/collect-transitive-groups.mjs';
 import {
   normalizeEvidencePath,
   validateEvidenceEntries,
@@ -24,6 +26,10 @@ import {
   validateLegacyLiveAssignments,
   validateLegacyTransition,
 } from '../governance/legacy-transition-contract.mjs';
+import {
+  phaseBTarget,
+  validatePhaseBTarget,
+} from '../governance/phase-b-target.mjs';
 import { verifyManifestFiles } from '../governance/validate-evidence.mjs';
 import {
   armGuid,
@@ -363,6 +369,156 @@ test('schedule pagination rejects duplicate conflicts, cycles, and hostile nextL
       /escapes the approved Azure endpoint|unexpected query field|changes the approved query/,
     );
   }
+});
+
+test('legacy access collection covers transitive groups and both PIM schedule types', async () => {
+  const principalId = '30000000-0000-0000-0000-000000000001';
+  const secondPrincipalId = '30000000-0000-0000-0000-000000000002';
+  const groupIds = await collectTransitiveGroupIds({
+    principalId,
+    fetchPage: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.searchParams.has('$skiptoken')) {
+        return {
+          value: [
+            {
+              '@odata.type': '#microsoft.graph.group',
+              id: secondPrincipalId,
+            },
+          ],
+        };
+      }
+      return {
+        value: [
+          {
+            '@odata.type': '#microsoft.graph.group',
+            id: '30000000-0000-0000-0000-000000000003',
+          },
+          {
+            '@odata.type': '#microsoft.graph.administrativeUnit',
+            id: '30000000-0000-0000-0000-000000000004',
+          },
+        ],
+        '@odata.nextLink': `${url}&$skiptoken=page-2`,
+      };
+    },
+  });
+  assert.deepEqual(groupIds, [
+    secondPrincipalId,
+    '30000000-0000-0000-0000-000000000003',
+  ]);
+  await assert.rejects(
+    () =>
+      collectTransitiveGroupIds({
+        principalId,
+        fetchPage: async () => ({
+          value: [],
+          '@odata.nextLink':
+            'https://evil.example/v1.0/servicePrincipals/' +
+            `${principalId}/transitiveMemberOf` +
+            '?$select=id&$top=999&$skiptoken=stolen',
+        }),
+      }),
+    /escapes the approved Graph query/,
+  );
+  await assert.rejects(
+    () =>
+      collectTransitiveGroupIds({
+        principalId,
+        fetchPage: async (url) => ({
+          value: [],
+          '@odata.nextLink': `${url}&$select=id&$skiptoken=page-2`,
+        }),
+      }),
+    /escapes the approved Graph query/,
+  );
+  for (const directoryObject of [
+    { id: secondPrincipalId },
+    {
+      '@odata.type': '#microsoft.graph.group',
+      id: 'not-a-uuid',
+    },
+    {
+      '@odata.type': 'UNKNOWN',
+      id: secondPrincipalId,
+    },
+  ]) {
+    await assert.rejects(
+      () =>
+        collectTransitiveGroupIds({
+          principalId,
+          fetchPage: async () => ({ value: [directoryObject] }),
+        }),
+      /missing or extra fields|must be a UUID/,
+    );
+  }
+  await assert.rejects(
+    () =>
+      collectTransitiveGroupIds({
+        principalId,
+        fetchPage: async () => {
+          throw new Error('Graph visibility is unavailable');
+        },
+      }),
+    /Graph visibility is unavailable/,
+  );
+
+  const seenUrls = [];
+  const schedules = await collectScheduleInstancesForPrincipals({
+    subscriptionId: subscription,
+    principalIds: [principalId, secondPrincipalId],
+    resourceType: 'roleEligibilityScheduleInstances',
+    scopes: [
+      `/subscriptions/${subscription}`,
+      '/providers/Microsoft.Management/managementGroups/root',
+      `/subscriptions/${subscription}/resourceGroups/rg-certigo-ci`,
+      `/subscriptions/${subscription}/resourceGroups/rg-certigo-dev`,
+      `/subscriptions/${subscription}/resourceGroups/rg-certigo-staging`,
+      `/subscriptions/${subscription}/resourceGroups/rg-certigo-prod`,
+    ],
+    fetchPage: async (url) => {
+      seenUrls.push(url);
+      return { value: [] };
+    },
+  });
+  assert.deepEqual(schedules, []);
+  assert.equal(seenUrls.length, 12);
+  assert.ok(
+    seenUrls.every((url) =>
+      url.includes('/roleeligibilityscheduleinstances?'),
+    ),
+  );
+  await assert.rejects(
+    () =>
+      collectScheduleInstances({
+        subscriptionId: subscription,
+        principalId,
+        resourceType: 'roleEligibilityScheduleInstances',
+        fetchPage: async (url) => ({
+          value: [],
+          nextLink: `${url}&api-version=2020-10-01&$skiptoken=page-2`,
+        }),
+      }),
+    /changes the approved query/,
+  );
+});
+
+test('Phase B target rejects stale professional bindings', () => {
+  assert.deepEqual(
+    validatePhaseBTarget(
+      phaseBTarget.subscriptionId.toUpperCase(),
+      phaseBTarget.tenantId.toUpperCase(),
+    ),
+    phaseBTarget,
+  );
+  assert.throws(
+    () =>
+      validatePhaseBTarget(
+        'b8952c8c-8f72-469d-99cd-ac906da4e2fc',
+        '16b3c013-d300-468d-ac64-7eda0820b6d3',
+      ),
+    /stale professional or unapproved Azure bindings/,
+  );
 });
 
 test('build-params wrapper extracts only a strict deployment parameters document', () => {
@@ -785,6 +941,15 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
     () => validate(unrelatedEmergencyEvidence),
     /must exactly match both emergency principal IDs/,
   );
+  const duplicateEmergencyEvidence = structuredClone(approvedSolo);
+  duplicateEmergencyEvidence.changeControl.soloModeControls
+    .breakGlassAccounts[1].objectId =
+    duplicateEmergencyEvidence.changeControl.soloModeControls
+      .breakGlassAccounts[0].objectId;
+  assert.throws(
+    () => validate(duplicateEmergencyEvidence),
+    /must exactly match both emergency principal IDs/,
+  );
   const noManagementEmergencyAccounts = structuredClone(approvedSolo);
   noManagementEmergencyAccounts.changeControl.soloModeControls
     .breakGlassAccounts = [];
@@ -963,6 +1128,49 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
     /Owner, Contributor, or UAA access remains live/,
   );
 
+  const transitiveGroupId = '30000000-0000-0000-0000-000000000099';
+  const groupAssignment = {
+    ...liveAssignments[0],
+    id:
+      `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
+      'roleAssignments/60000000-0000-0000-0000-000000000099',
+    principalId: transitiveGroupId,
+  };
+  assert.throws(
+    () =>
+      validateLegacyLiveAssignments(
+        [...liveAssignments.slice(0, -1), groupAssignment],
+        liveScheduleInstances,
+        transition,
+        proof,
+        Date.parse('2026-09-02T10:00:00Z'),
+        [transitiveGroupId],
+      ),
+    /transitive group assignment remains live/,
+  );
+  assert.throws(
+    () =>
+      validateLegacyLiveAssignments(
+        liveAssignments.slice(0, -1),
+        liveScheduleInstances,
+        transition,
+        proof,
+        Date.parse('2026-09-02T10:00:00Z'),
+        [],
+        [
+          {
+            id:
+              `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
+              'roleEligibilityScheduleInstances/60000000-0000-0000-0000-000000000098',
+            properties: {
+              principalId: transition.legacyPrincipalId,
+            },
+          },
+        ],
+      ),
+    /retains a PIM eligibility schedule/,
+  );
+
   const permanentSchedule = structuredClone(liveScheduleInstances);
   permanentSchedule[0].properties.endDateTime = null;
   assert.throws(
@@ -1023,8 +1231,25 @@ test('runbook fixes planner count, transition ordering, and Phase A repair proof
   assert.match(prepare, /legacy-transition-contract\.mjs/);
   assert.match(prepare, /broad access.*JIT activation|Never reconstruct it locally/s);
   assert.match(prepare, /collect-role-assignment-schedules\.mjs/);
+  assert.match(prepare, /collect-transitive-groups\.mjs/);
+  assert.match(prepare, /roleEligibilityScheduleInstances/);
   assert.match(prepare, /LEGACY_TRANSITION_SHA256/);
   assert.match(phaseBWorkflow, /legacy_transition_json/);
   assert.match(phaseBWorkflow, /legacy_transition_sha256/);
   assert.match(phaseBWorkflow, /LEGACY_TRANSITION_SHA256/);
+  assert.match(phaseBWorkflow, /phase-b-target\.mjs/);
+  for (const script of [
+    'prepare-phase-b.sh',
+    'what-if-phase-b1.sh',
+    'what-if-phase-b1b.sh',
+    'what-if-phase-b2.sh',
+    'deploy-phase-b1.sh',
+    'deploy-phase-b1b.sh',
+    'deploy-phase-b2.sh',
+  ]) {
+    assert.match(
+      fs.readFileSync(path.join(root, 'infra/governance', script), 'utf8'),
+      /phase-b-target\.mjs/,
+    );
+  }
 });

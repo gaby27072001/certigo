@@ -3,6 +3,9 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 subscription_id="${AZURE_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID explicitly.}"
+configured_tenant_id="${AZURE_TENANT_ID:?Set AZURE_TENANT_ID explicitly.}"
+node "${root}/infra/governance/phase-b-target.mjs" \
+  "${subscription_id}" "${configured_tenant_id}"
 evidence_dir="${PHASE_B1B_EVIDENCE_DIR:?Set approved B1b evidence.}"
 approval_file="${PHASE_B1B_APPROVAL_FILE:?Set approved B1b approval.}"
 deployment_name="${PHASE_B1B_DEPLOYMENT_NAME:?Set unique B1b deployment name.}"
@@ -10,6 +13,9 @@ work_dir="$(mktemp -d)"
 trap 'rm -rf -- "${work_dir}"' EXIT
 
 [[ -z "$(git -C "${root}" status --porcelain)" ]]
+tenant_id="$(az account show --query tenantId --output tsv)"
+node "${root}/infra/governance/phase-b-target.mjs" \
+  "${subscription_id}" "${tenant_id}"
 export PHASE_B_WORK_DIR="${work_dir}/fresh-binding"
 export PHASE_B_STAGE=B1b
 bash "${root}/infra/governance/prepare-phase-b.sh"
@@ -30,7 +36,8 @@ node "${root}/infra/governance/validate-evidence.mjs" deployment-approval \
   --phase-a-binding "${PHASE_B_WORK_DIR}/phase-a-binding.json" \
   --source-root "${root}" \
   --subscription "${subscription_id}" \
-  --tenant "$(az account show --query tenantId --output tsv)"
+  --tenant "${tenant_id}" \
+  --legacy-transition "${PHASE_B_WORK_DIR}/legacy-transition.json"
 expected_template_hash="$(
   node -p "require(process.argv[1]).template.compiledSha256" \
     "${evidence_dir}/manifest.json"

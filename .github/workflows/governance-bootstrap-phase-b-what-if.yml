@@ -62,6 +62,8 @@ jobs:
           : "${AZURE_CLIENT_ID:?No GitHub variable is configured by this repository.}"
           : "${AZURE_TENANT_ID:?No GitHub variable is configured by this repository.}"
           : "${AZURE_SUBSCRIPTION_ID:?No GitHub variable is configured by this repository.}"
+          node infra/governance/phase-b-target.mjs \
+            "$AZURE_SUBSCRIPTION_ID" "$AZURE_TENANT_ID"
       - name: Azure login with approved admin planning identity
         uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
         with:
@@ -98,6 +100,7 @@ jobs:
         shell: bash
         env:
           AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
           PHASE_A_DEPLOYMENT_NAME: ${{ github.event.client_payload.phase_a_deployment_name }}
           PHASE_A_EVIDENCE_DIR: ${{ runner.temp }}/approved-phase-a-evidence
           PHASE_A_EVIDENCE_MANIFEST_SHA256: ${{ github.event.client_payload.phase_a_evidence_manifest_sha256 }}

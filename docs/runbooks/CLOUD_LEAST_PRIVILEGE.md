@@ -210,6 +210,10 @@ Le générateur réexécute le binding Phase A complet via `prepare-phase-b.sh` 
 `PHASE_A_*`; il n'accepte aucun fichier Phase A fourni directement. Il refuse aussi tout accès
 RBAC actif, hérité, éligible ou activé déjà présent sur le principal planner. Le contrat doit être
 généré avant les cinq attributions PIM décrites, jamais pour légitimer une identité déjà privilégiée.
+Toutes les entrées Phase B exigent explicitement `AZURE_TENANT_ID=e9174162-1033-40c0-b0c9-f31825914fbe`
+et `AZURE_SUBSCRIPTION_ID=f434ec55-f342-4948-9298-f99af5216204` avant tout appel Azure. Toute autre
+paire, notamment le binding professionnel historique, échoue avant login, inventaire, what-if ou
+déploiement.
 
 La migration réutilise les ressources Phase A live et leurs preuves v2; elle ne les recrée pas.
 Avant toute Phase B, le legacy `microlingo-github-actions` ne doit plus avoir `Contributor` ni
@@ -217,9 +221,15 @@ Avant toute Phase B, le legacy `microlingo-github-actions` ne doit plus avoir `C
 d'un remplacement humain JIT, deux activations et non-lockout testés, rollback prouvé, puis création
 des huit
 attributions legacy temporaires exactes décrites plus bas. `prepare-phase-b.sh` exige le contrat
-`LEGACY_TRANSITION_FILE`, relit les attributions live et bloque si un rôle large subsiste, si une
+`LEGACY_TRANSITION_FILE`, résout exhaustivement les groupes transitifs du principal legacy, relit
+les attributions actives de chaque principal/groupe ainsi que les schedules PIM actifs et éligibles,
+et bloque si un accès de groupe ou une éligibilité subsiste, si un rôle large subsiste, si une
 attribution temporaire manque, si une attribution non approuvée subsiste ou si l'échéance live d'une
-schedule instance diffère du contrat approuvé ou dépasse le soak.
+schedule instance diffère du contrat approuvé ou dépasse le soak. Une visibilité Graph ou ARM
+incomplète est une erreur bloquante, jamais une preuve d'absence. Le manifeste what-if scelle aussi
+le SHA-256 exact du contrat legacy; chaque script de déploiement rematérialise ce contrat depuis la
+source approuvée et refuse toute absence, malformation ou substitution post-approbation avant
+`az deployment ... create`.
 
 Le workflow `azure-content-infra-plan` ne réutilise aucune identité dev, staging, prod ou
 VMSS. Le `what-if` ARM exige les mêmes permissions `write` que le déploiement évalué : le rôle
