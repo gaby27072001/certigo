@@ -154,17 +154,20 @@ export function plannerAccessScopes(entities, subscriptionId, tenantId) {
     throw new Error('management group visibility is incomplete');
   }
   const entityId = (entity) => entity.id ?? entity.properties?.id ?? '';
-  const entityName = (entity) => entity.name ?? entity.properties?.name ?? '';
+  const entityType = (entity) => entity.type ?? entity.properties?.type ?? '';
   const parentId = (entity) =>
     entity.parent?.id ?? entity.properties?.parent?.id ?? '';
-  const subscriptionEntity = entities.find(
+  const subscriptionResourceId = `/subscriptions/${subscriptionId}`;
+  const subscriptionEntities = entities.filter(
     (entity) =>
-      normalize(entityName(entity)) === normalize(subscriptionId) ||
-      normalize(entityId(entity)).endsWith(`/subscriptions/${normalize(subscriptionId)}`),
+      normalize(entityId(entity)) === normalize(subscriptionResourceId) &&
+      normalize(entityType(entity)) ===
+        'microsoft.management/managementgroups/subscriptions',
   );
-  if (!subscriptionEntity) {
+  if (subscriptionEntities.length !== 1) {
     throw new Error('subscription management group ancestry is not visible');
   }
+  const [subscriptionEntity] = subscriptionEntities;
   const scopes = [`/subscriptions/${subscriptionId}`];
   let currentParentId = parentId(subscriptionEntity);
   const seenParents = new Set();
@@ -181,13 +184,16 @@ export function plannerAccessScopes(entities, subscriptionId, tenantId) {
       throw new Error('management group ancestry contains a cycle');
     }
     seenParents.add(normalizedParent);
-    const entity = entities.find(
+    const parentEntities = entities.filter(
       (candidate) =>
-        normalize(entityId(candidate)).replace(/\/+$/, '') === normalizedParent,
+        normalize(entityId(candidate)) === normalizedParent &&
+        normalize(entityType(candidate)) ===
+          'microsoft.management/managementgroups',
     );
-    if (!entity) {
+    if (parentEntities.length !== 1) {
       throw new Error('management group ancestry is incomplete');
     }
+    const [entity] = parentEntities;
     scopes.push(currentParentId.replace(/\/+$/, ''));
     currentParentId = parentId(entity);
   }
