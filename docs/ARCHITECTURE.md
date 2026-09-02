@@ -272,7 +272,7 @@ modules. `params/dev.bicepparam` porte les valeurs d'environnement.
 `deploy-privacy-policy`, `lint-workflows`, `release-android`, `security-scan`,
 `runner-resilience-drill`. Le workflow `promote-backend-staging-prod` est conservé
 temporairement comme garde de compatibilité et échoue explicitement en invitant à utiliser
-le dispatch `promote-backend`. Les workflows iOS GitHub Actions
+le dispatch opérateur `promote-backend`. Les workflows iOS GitHub Actions
 `release-ios` et `sync-ios-certs` sont conservés comme historique ; ils exigent
 l'opt-in manuel `enable_legacy_workflow=true`. La chaîne iOS active passe par Codemagic.
 

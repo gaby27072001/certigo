@@ -40,7 +40,7 @@ jobs:
           fi
           echo "target=$(jq -r '.environment // "staging-prod"' <<< "$CLIENT_PAYLOAD_JSON")" \
             >> "$GITHUB_OUTPUT"
-          echo "::error::This dispatch is disabled; use promote-backend with an explicit environment."
+          echo "::error::This dispatch is disabled; use promote-backend with an explicit operation and environment."
           exit 1
 
   deploy-staging:

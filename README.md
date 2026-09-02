@@ -241,7 +241,7 @@ API principale :
 | `ci-project-state` | chaque PR, `main`, quotidien | état généré identique, référence active `certigo-content` et manifestes public/privé exacts |
 | `ci-infra`   | `infra/**` | compilation Bicep + contrats réseau/contenu immuable |
 | `content-infra-what-if` | push `main` | plan Azure read-only de `main` via Environment `azure-content-infra-plan`, hors dev/staging/prod |
-| `cd-backend` | push / workflow manuel | déploiement backend vers l'environnement cible |
+| `cd-backend` | dispatch opérateur `promote-backend` uniquement | release, promotion ou rollback backend sous Environment |
 | `codeql` | schedule / push | analyse statique de sécurité |
 | `lint-workflows` | `.github/workflows/**` | lint des workflows GitHub Actions |
 | `release-android` | manuel / tag `v*` | **AAB signé** + publication Google Play (gates `analyze`/`test`) |

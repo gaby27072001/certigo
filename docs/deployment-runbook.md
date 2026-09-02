@@ -45,41 +45,70 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | ZIP/manifest/SBOM de release | ✅ Build unique, hashes revérifiés à chaque environnement | `cd-backend.yml` |
 | Rollback applicatif | ✅ Dispatch protégé vers un run `main` antérieur, sans Bicep | §Release récupérable |
 
+### Réactivation contrôlée après l'incident de déploiement
+
+Le workflow `cd-backend` est volontairement dans l'état GitHub
+`disabled_manually`. Un merge ou un push sur `main` ne constitue plus une
+autorisation de déploiement et ne déclenche aucun job de ce workflow.
+
+Conserver cet état jusqu'à ce que toutes les conditions suivantes soient réunies :
+
+1. le correctif fail-closed est fusionné sur `main` et son SHA de merge est relevé ;
+2. les checks obligatoires de ce SHA sont verts, notamment actionlint, la politique
+   de sécurité des workflows et project-state ;
+3. une rerevue indépendante confirme que `cd-backend.yml` n'expose que
+   `repository_dispatch: promote-backend`, que le payload est strict et que tous les
+   jobs Azure dépendent du gate et d'un GitHub Environment ;
+4. les protections et reviewers des Environments `dev`, `staging` et `prod` sont
+   audités sans les modifier depuis le pipeline ;
+5. un opérateur habilité consigne un **GO explicite** puis réactive uniquement
+   `cd-backend` depuis l'interface GitHub Actions.
+
+La réactivation ne doit être effectuée ni par cette PR, ni par un workflow, ni
+avant le GO. Elle ne lance aucun déploiement à elle seule : une seconde action
+opérateur, le dispatch strict décrit ci-dessous, reste obligatoire.
+
 ### Check-list d'exploitation (utilisateur non-admin)
 
-1. Pour `dev`, merger sur `main` afin de déclencher le build unique et le
-   déploiement `cd-backend.yml`. Noter l'identifiant numérique de ce run.
-2. Pour `staging` puis `prod`, envoyer séparément `promote-backend` avec
-   `client_payload.operation=promotion`, `client_payload.environment` et le même
-   `client_payload.source_run_id`.
-3. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `certigo-trusted`.
-4. En cas d'échec Azure login, contrôler la présence de `AZURE_CLIENT_ID`,
+1. Après la réactivation contrôlée, choisir un run `ci-backend` réussi, issu d'un
+   push `main`, dont le commit est celui à livrer.
+2. Pour `dev`, envoyer `promote-backend` avec exactement
+   `operation=release`, `environment=dev` et le `source_run_id` du run CI choisi.
+   Tout champ absent, supplémentaire ou mal typé est rejeté avant l'accès Azure.
+3. Après succès, noter l'identifiant du run `cd-backend` de release. Pour
+   `staging` puis `prod`, envoyer séparément `promote-backend` avec
+   `operation=promotion`, l'environnement cible et cet identifiant de release.
+4. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `certigo-trusted`.
+5. En cas d'échec Azure login, contrôler la présence de `AZURE_CLIENT_ID`,
    `AZURE_TENANT_ID` et `AZURE_SUBSCRIPTION_ID` dans leurs scopes GitHub
    opérationnels actuels. Ne pas les recréer ou les déplacer sans preuve du scope
    effectivement consommé.
-5. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
+6. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
    `AUTH_JWT_SIGNING_KEY` / `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`, sans afficher sa valeur.
-6. En cas d'échec du prévol de suppression de compte, contrôler le jeu complet
+7. En cas d'échec du prévol de suppression de compte, contrôler le jeu complet
    du secret `ENTRA_GRAPH_CLIENT_SECRET` et des variables
    `ENTRA_GRAPH_TENANT_ID`, `ENTRA_GRAPH_CLIENT_ID` et
    `ENTRA_REAUTH_AUDIENCE`. Ne jamais afficher le secret.
-7. Contrôler que la variable non secrète `ALERT_EMAIL` de chaque Environment
+8. Contrôler que la variable non secrète `ALERT_EMAIL` de chaque Environment
    `staging`/`prod` désigne une boîte réellement supervisée ; aucune valeur par
    défaut n'est committée.
-8. Pour un rollback, relever le `sourceRunId` de `previous` dans l'état de
+9. Pour un rollback, relever le `sourceRunId` de `previous` dans l'état de
    déploiement et utiliser `promote-backend` avec `operation=rollback`. Le chemin
    rollback refuse tout autre artefact et ne redéploie pas Bicep.
 
 ### Release récupérable
 
-Le workflow sépare désormais strictement la construction et la promotion :
+Le workflow sépare strictement l'autorisation, la construction et la promotion :
 
-1. un push `main` produit `backend-release` une seule fois ;
-2. le bundle contient `publish.zip`, `release-manifest.json` et le SBOM CycloneDX ;
-3. le manifeste lie le commit, le run source et les SHA-256 du ZIP et du SBOM ;
-4. `dev`, `staging` et `prod` téléchargent et revérifient le même artefact ;
+1. un push `main` exécute uniquement la CI locale et ne déclenche pas `cd-backend` ;
+2. un dispatch `promote-backend` `release:dev` sélectionne un run `ci-backend`
+   réussi de `main`, construit exactement son commit puis retient le bundle sous
+   l'identifiant du run `cd-backend` explicite ;
+3. le bundle contient `publish.zip`, `release-manifest.json` et le SBOM CycloneDX ;
+4. le manifeste lie le commit, le run de release et les SHA-256 du ZIP et du SBOM ;
+5. `dev`, `staging` et `prod` téléchargent et revérifient le même artefact ;
    `prod` exige qu'il soit déjà le `current` sain de staging ;
-5. OneDeploy conserve le ZIP immuable sous `deployments/<commit>.zip` et ne met à
+6. OneDeploy conserve le ZIP immuable sous `deployments/<commit>.zip` et ne met à
    jour `state/backend-release.json` qu'après succès de `health/live` et
    `health/ready`.
 
@@ -269,10 +298,10 @@ au scope souscription, sinon `deploy-infra` échoue.
 
 ### Sujets OIDC
 
-Comme les jobs portent désormais `environment: <env>`, le **sujet** du token OIDC émis par GitHub
+Comme tous les jobs Azure portent `environment: <env>`, le **sujet** du token OIDC émis par GitHub
 devient `repo:<org>/<repo>:environment:<env>`. On crée donc **une federated credential par
-environnement** (dev/staging/prod). Une FC supplémentaire pour `push` sur `main` est optionnelle
-(le push déclenche l'environnement `dev`, déjà couvert par la FC `dev`).
+environnement** (dev/staging/prod). Aucune fédération OIDC de branche pour un simple push `main`
+n'est requise ni autorisée par `cd-backend`.
 
 ### Secret de signature JWT par environnement
 
@@ -537,11 +566,16 @@ par examen soit actif sans expirer les tentatives existantes.
 **Option B — via le pipeline** (une fois T0.1 + T0.3 prêts) :
 
 ```bash
-# dev : merge/push protégé sur main déclenche cd-backend automatiquement.
-# staging, puis répéter avec "prod" après validation.
-SOURCE_RUN_ID="<run push main ayant déployé dev>"
+# Après réactivation contrôlée et GO explicite : release dev depuis un run CI main réussi.
+SOURCE_CI_RUN_ID="<run ci-backend push main réussi du commit à livrer>"
 printf '%s' \
-  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"staging\",\"operation\":\"promotion\",\"source_run_id\":\"$SOURCE_RUN_ID\"}}" |
+  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"dev\",\"operation\":\"release\",\"source_run_id\":\"$SOURCE_CI_RUN_ID\"}}" |
+  gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" --input -
+
+# Après succès dev, utiliser l'identifiant du run cd-backend explicite.
+RELEASE_RUN_ID="<run cd-backend release dev réussi>"
+printf '%s' \
+  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"staging\",\"operation\":\"promotion\",\"source_run_id\":\"$RELEASE_RUN_ID\"}}" |
   gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" --input -
 ```
 

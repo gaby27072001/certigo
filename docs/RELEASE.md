@@ -103,16 +103,20 @@ Le backend suit un modèle **CD par environnement** (pas un tag applicatif) :
 
 | Workflow | Rôle | Déclencheur | Garde |
 | --- | --- | --- | --- |
-| [`cd-backend.yml`](../.github/workflows/cd-backend.yml) | Construit une fois, déploie, promeut ou rollback `dev`/`staging`/`prod` | `push` sur `main` (build + dev), dispatch `promote-backend` | opération, environnement et run source validés depuis un payload strict |
+| [`cd-backend.yml`](../.github/workflows/cd-backend.yml) | Construit une fois, déploie, promeut ou rollback `dev`/`staging`/`prod` | dispatch opérateur `promote-backend` uniquement | type, opération, environnement, run source et Environment validés avant Azure |
 
-- **Build unique** : chaque push `main` publie une seule fois le backend avec le SDK
+- **Push sans déploiement** : un push `main` ne déclenche pas `cd-backend` et ne
+  donne accès à aucun login, secret ou script Azure de ce workflow.
+- **Build unique explicite** : `release:dev` sélectionne un run `ci-backend`
+  réussi issu d'un push `main`, construit exactement son commit avec le SDK
   .NET `8.0.424` et CycloneDX `6.2.0`, normalise les timestamps du ZIP et produit
   `release-manifest.json` (commit, SHA-256 du ZIP/SBOM, run et provenance).
-- **`dev`** : ce même run déploie automatiquement l'artefact retenu. Aucun job de
+- **`dev`** : ce même run opérateur déploie l'artefact retenu. Aucun job de
   déploiement ne relance `dotnet publish`.
 - **`staging` puis `prod`** : deux promotions manuelles référencent le `source_run_id`
-  du run `main` déjà passé en `dev`. Le workflow vérifie via l'API GitHub que ce run
-  est un push `main` réussi de `cd-backend.yml`, puis revérifie manifeste et hashes.
+  du run `cd-backend` explicite déjà passé en `dev`. Le workflow vérifie via l'API
+  GitHub que ce run est un `repository_dispatch` réussi de `cd-backend.yml`, puis
+  revérifie manifeste et hashes.
   `prod` refuse l'artefact s'il n'est pas le `current` déjà sain de staging.
 - **Récupération** : `promote-backend` avec `operation=rollback` redéploie uniquement
   l'artefact `previous` enregistré pour l'environnement, sous sa gate GitHub et sans
@@ -131,24 +135,35 @@ Le backend suit un modèle **CD par environnement** (pas un tag applicatif) :
   valeur vide ou mal formée et l'injecte dans le JSON Bicep temporaire ; aucune
   adresse d'opérateur n'est versionnée.
 
-**Promouvoir le backend** :
+> **Précondition bloquante :** le workflow reste `disabled_manually` jusqu'à
+> fusion du correctif, checks verts, rerevue sécurité indépendante et GO explicite.
+> Suivre la procédure de réactivation de
+> [`deployment-runbook.md`](./deployment-runbook.md) avant tout dispatch.
+
+**Livrer explicitement en `dev`, puis promouvoir le backend** :
 
 ```bash
-SOURCE_RUN_ID="<run push main ayant déployé dev>"
+SOURCE_CI_RUN_ID="<run ci-backend push main réussi du commit à livrer>"
 printf '%s' \
-  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"staging\",\"operation\":\"promotion\",\"source_run_id\":\"$SOURCE_RUN_ID\"}}" |
+  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"dev\",\"operation\":\"release\",\"source_run_id\":\"$SOURCE_CI_RUN_ID\"}}" |
   gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input -
 
-# Après validation staging, promouvoir exactement le même run :
+# Après succès dev, relever l'identifiant du run cd-backend de release.
+RELEASE_RUN_ID="<run cd-backend release dev réussi>"
 printf '%s' \
-  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"prod\",\"operation\":\"promotion\",\"source_run_id\":\"$SOURCE_RUN_ID\"}}" |
+  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"staging\",\"operation\":\"promotion\",\"source_run_id\":\"$RELEASE_RUN_ID\"}}" |
+  gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input -
+
+# Après validation staging, promouvoir exactement le même run de release :
+printf '%s' \
+  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"prod\",\"operation\":\"promotion\",\"source_run_id\":\"$RELEASE_RUN_ID\"}}" |
   gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input -
 ```
 
 **Rollback contrôlé** :
 
 ```bash
-PREVIOUS_RUN_ID="<run push main précédent encore retenu>"
+PREVIOUS_RUN_ID="<run cd-backend de release précédent encore retenu>"
 printf '%s' \
   "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"prod\",\"operation\":\"rollback\",\"source_run_id\":\"$PREVIOUS_RUN_ID\"}}" |
   gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input -
@@ -172,8 +187,10 @@ printf '%s' \
    - [ ] Version décidée (SemVer) et reflétée dans `apps/mobile/pubspec.yaml`.
    - [ ] Notes de version / changelog préparés.
 2. **Backend**
-   - [ ] `dev` déployé (auto au merge) et sain.
-   - [ ] Noter le `source_run_id` du push `main` déployé en `dev`.
+   - [ ] Run `ci-backend` `main` du commit à livrer réussi.
+   - [ ] Workflow réactivé seulement après audit/GO explicite.
+   - [ ] Dispatch `promote-backend` `release:dev`, puis `dev` sain.
+   - [ ] Noter le `source_run_id` du run `cd-backend` de release.
    - [ ] Dispatch `promote-backend` pour `staging` avec ce run, valider les smoke
          tests, puis promouvoir le même run vers `prod`.
 3. **Point de version (tag)**

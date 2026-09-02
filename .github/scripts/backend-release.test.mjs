@@ -80,7 +80,7 @@ function createRelease() {
         GITHUB_RUN_ID: '1234',
         GITHUB_RUN_ATTEMPT: '1',
         GITHUB_REF: 'refs/heads/main',
-        GITHUB_EVENT_NAME: 'push',
+        GITHUB_EVENT_NAME: 'repository_dispatch',
         SOURCE_DATE_EPOCH: '1700000000',
       },
     },
@@ -227,14 +227,14 @@ test('release storage transfer is immutable, private and run-scoped', () => {
   assert.doesNotMatch(script, /generate-sas|account-key|connection-string/);
 });
 
-test('release resolver accepts only a successful main push from cd-backend', () => {
+test('release resolver accepts a successful main push from ci-backend as build source', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'certigo-source-run-'));
   const metadata = path.join(root, 'run.json');
   writeFileSync(
     metadata,
     JSON.stringify({
       repository: { full_name: 'gchambaud_microsoft/Certigo' },
-      path: '.github/workflows/cd-backend.yml',
+      path: '.github/workflows/ci-backend.yml',
       event: 'push',
       head_branch: 'main',
       conclusion: 'success',
@@ -248,6 +248,7 @@ test('release resolver accepts only a successful main push from cd-backend', () 
       ...process.env,
       GITHUB_OUTPUT: '',
       SOURCE_RUN_ID: '1234',
+      SOURCE_RUN_KIND: 'build',
       SOURCE_RUN_METADATA_FILE: metadata,
       GITHUB_REPOSITORY: 'gchambaud_microsoft/Certigo',
     },
@@ -256,8 +257,38 @@ test('release resolver accepts only a successful main push from cd-backend', () 
   assert.match(result.stdout, new RegExp(`commit-sha=${commitSha}`));
 });
 
-test('release resolver rejects non-push workflow provenance', () => {
+test('release resolver rejects non-push build provenance', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'certigo-source-run-'));
+  const metadata = path.join(root, 'run.json');
+  writeFileSync(
+    metadata,
+    JSON.stringify({
+      repository: { full_name: 'gchambaud_microsoft/Certigo' },
+      path: '.github/workflows/ci-backend.yml',
+      event: 'repository_dispatch',
+      head_branch: 'main',
+      conclusion: 'success',
+      head_sha: commitSha,
+    }),
+    'utf8',
+  );
+  const result = spawnSync(process.execPath, [resolverScript], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      GITHUB_OUTPUT: '',
+      SOURCE_RUN_ID: '1234',
+      SOURCE_RUN_KIND: 'build',
+      SOURCE_RUN_METADATA_FILE: metadata,
+      GITHUB_REPOSITORY: 'gchambaud_microsoft/Certigo',
+    },
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /successful main backend CI provenance/);
+});
+
+test('release resolver accepts only a successful explicit cd-backend release source', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'certigo-release-run-'));
   const metadata = path.join(root, 'run.json');
   writeFileSync(
     metadata,
@@ -277,12 +308,43 @@ test('release resolver rejects non-push workflow provenance', () => {
       ...process.env,
       GITHUB_OUTPUT: '',
       SOURCE_RUN_ID: '1234',
+      SOURCE_RUN_KIND: 'release',
+      SOURCE_RUN_METADATA_FILE: metadata,
+      GITHUB_REPOSITORY: 'gchambaud_microsoft/Certigo',
+    },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, new RegExp(`commit-sha=${commitSha}`));
+});
+
+test('release resolver rejects legacy push provenance from cd-backend', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'certigo-release-run-'));
+  const metadata = path.join(root, 'run.json');
+  writeFileSync(
+    metadata,
+    JSON.stringify({
+      repository: { full_name: 'gchambaud_microsoft/Certigo' },
+      path: '.github/workflows/cd-backend.yml',
+      event: 'push',
+      head_branch: 'main',
+      conclusion: 'success',
+      head_sha: commitSha,
+    }),
+    'utf8',
+  );
+  const result = spawnSync(process.execPath, [resolverScript], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      GITHUB_OUTPUT: '',
+      SOURCE_RUN_ID: '1234',
+      SOURCE_RUN_KIND: 'release',
       SOURCE_RUN_METADATA_FILE: metadata,
       GITHUB_REPOSITORY: 'gchambaud_microsoft/Certigo',
     },
   });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /main push provenance/);
+  assert.match(result.stderr, /successful explicit backend release provenance/);
 });
 
 test('deployment state preserves the previously healthy release', () => {

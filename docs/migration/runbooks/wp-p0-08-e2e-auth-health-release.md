@@ -50,10 +50,10 @@ Ce document est le **livrable versionné** du lot. Il n'invente aucun code : il 
 ### (d) Première release E2E taguée (backend + gate mobile `beta`) — ✅ PRÉSENT
 
 - **Tags Git** (local **et** `origin`) : `v1.0.0`, `v1.0.1`, `v1.0.2`, `build-aab-latest`
-- **Pipeline backend** : `.github/workflows/cd-backend.yml` — déploiement OIDC (federated credentials), Bicep `infra/main.bicep` + code .NET 8, RG `rg-certigo-$ENV` (westeurope), retry 5×45 s
+- **Pipeline backend** : `.github/workflows/cd-backend.yml` — dispatch opérateur `promote-backend` strict, déploiement OIDC sous Environment, Bicep `infra/main.bicep` + code .NET 8, RG `rg-certigo-$ENV` (westeurope), retry 5×45 s
 - **Pipeline mobile Android** : `.github/workflows/release-android.yml` — AAB signé → Google Play, **gates bloquants** `flutter analyze` + `flutter test`, **`environment: beta`** (= gate d'approbation *required reviewers*), package `com.certigo.mobileapp`, Flutter 3.27.4
 - **Pipeline mobile iOS** : `.github/workflows/release-ios.yml` — IPA TestFlight, `environment: beta`, runner self-hosted macOS
-- **Promotion** : `.github/workflows/promote-backend-staging-prod.yml` — `workflow_dispatch` staging→prod
+- **Promotion** : `.github/workflows/cd-backend.yml` — `promote-backend` explicite avec run de release immuable ; le workflow legacy échoue fermé
 
 ---
 
@@ -84,9 +84,11 @@ Ce document est le **livrable versionné** du lot. Il n'invente aucun code : il 
 Voir **`docs/E2E_AUTH_PREREQUIS.md`** (tenant Entra External ID, app registration, IdPs, appareils physiques) et **`docs/deployment-runbook.md`** §OIDC/environments (federated credentials GitHub↔Entra, secrets d'environnement).
 
 ### 4.2 Backend — déploiement + validation santé
-1. Merger sur `main` (via PR approuvée) → `cd-backend.yml` se déclenche.
-2. Le pipeline provisionne l'infra (`infra/main.bicep`) puis déploie le code .NET 8 sur la Function App du RG `rg-certigo-<env>`.
-3. **Validation santé** (sonde Cosmos verte) :
+1. Merger sur `main` (via PR approuvée) et attendre la CI ; ce merge ne déclenche aucun déploiement backend.
+2. Après la réactivation contrôlée et le GO décrits dans `docs/deployment-runbook.md`,
+   un opérateur envoie le dispatch strict `promote-backend` pour `release:dev`.
+3. Le pipeline provisionne l'infra (`infra/main.bicep`) puis déploie le code .NET 8 sur la Function App du RG `rg-certigo-<env>`.
+4. **Validation santé** (sonde Cosmos verte) :
    ```bash
    curl -i https://<function-app>.azurewebsites.net/api/health
    # Attendu : HTTP/1.1 200 OK
@@ -94,7 +96,7 @@ Voir **`docs/E2E_AUTH_PREREQUIS.md`** (tenant Entra External ID, app registratio
    #           header: x-correlation-id: <guid>
    ```
    Si `503 { "cosmos":"error" }` → voir `docs/deployment-runbook.md` §Validation (RBAC managed identity / endpoint Cosmos / egress réseau).
-4. **Validation auth** (200 avec token valide, 401 sans) : `docs/deployment-runbook.md` §Validation auth (smoke test 200/401).
+5. **Validation auth** (200 avec token valide, 401 sans) : `docs/deployment-runbook.md` §Validation auth (smoke test 200/401).
 
 ### 4.3 Mobile — release gated `beta`
 1. Déclencher `release-android.yml` (et/ou `release-ios.yml`).

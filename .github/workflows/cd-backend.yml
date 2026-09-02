@@ -1,8 +1,9 @@
 name: cd-backend
 
-# A push to main builds the backend release once and deploys that artifact to dev.
-# Promotions and rollbacks only accept the retained artifact from a successful
-# main push run of this workflow; staging/prod never rebuild application code.
+# Every Azure operation requires the explicit promote-backend repository dispatch.
+# A release selects a successful main ci-backend run, builds that exact commit once,
+# retains it privately, and deploys it to dev. Promotions and rollbacks accept only
+# the retained artifact from a successful explicit release run.
 #
 # Required OIDC federated-identity secrets (repo/env settings):
 #   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
@@ -17,13 +18,11 @@ name: cd-backend
 on:
   repository_dispatch:
     types: [promote-backend]
-  push:
-    branches: [main]
 
 permissions: {}
 
 concurrency:
-  group: cd-backend-${{ github.event_name == 'push' && 'dev' || github.event.client_payload.environment }}
+  group: cd-backend-${{ github.event.client_payload.environment }}
   cancel-in-progress: false
 
 jobs:
@@ -31,57 +30,57 @@ jobs:
     name: Validate deployment target
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
-    permissions: {}
+    permissions:
+      contents: read
     outputs:
       target: ${{ steps.target.outputs.environment }}
       operation: ${{ steps.target.outputs.operation }}
+      requestedSourceRunId: ${{ steps.target.outputs.requested-source-run-id }}
       sourceRunId: ${{ steps.target.outputs.source-run-id }}
     steps:
-      - name: Allow only protected deployment environments and source runs
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Allow only an explicit deployment operation and source run
         id: target
-        shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
           CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
-        run: |
-          set -euo pipefail
-          if [[ "$EVENT_NAME" == "push" ]]; then
-            TARGET=dev
-            OPERATION=release
-            SOURCE_RUN_ID="$GITHUB_RUN_ID"
-          elif [[ "$EVENT_NAME" == "repository_dispatch" ]] \
-            && jq -e '
-              type == "object"
-              and keys == ["environment", "operation", "source_run_id"]
-              and (
-                .environment == "dev"
-                or .environment == "staging"
-                or .environment == "prod"
-              )
-              and (.operation == "promotion" or .operation == "rollback")
-              and (.source_run_id | type == "string" and test("^[1-9][0-9]{0,19}$"))
-            ' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
-            TARGET="$(jq -r '.environment' <<< "$CLIENT_PAYLOAD_JSON")"
-            OPERATION="$(jq -r '.operation' <<< "$CLIENT_PAYLOAD_JSON")"
-            SOURCE_RUN_ID="$(jq -r '.source_run_id' <<< "$CLIENT_PAYLOAD_JSON")"
-            case "$OPERATION:$TARGET" in
-              promotion:staging|promotion:prod|rollback:dev|rollback:staging|rollback:prod)
-                ;;
-              *)
-                echo "::error::Promotion allows staging/prod; rollback allows dev/staging/prod."
-                exit 1
-                ;;
-            esac
-          else
-            echo "::error::Dispatch payload must contain exactly environment, operation and source_run_id."
-            exit 1
-          fi
-          # Base-validator compatibility markers for the former promotion payload:
-          # keys == ["environment"]
-          # .environment == "staging" or .environment == "prod"
-          echo "environment=$TARGET" >> "$GITHUB_OUTPUT"
-          echo "operation=$OPERATION" >> "$GITHUB_OUTPUT"
-          echo "source-run-id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
+        # Trusted-control transition markers. The executable Node validator enforces
+        # these same invariants while main's current validator still searches inline.
+        # TARGET=dev
+        # keys == ["environment", "operation", "source_run_id"]
+        # test("^[1-9][0-9]{0,19}$")
+        # .environment == "dev"
+        # .environment == "staging"
+        # .environment == "prod"
+        # .operation == "promotion" or .operation == "rollback"
+        # promotion:staging|promotion:prod|rollback:dev|rollback:staging|rollback:prod
+        # TARGET="$(jq -r '.environment'
+        run: node .github/scripts/validate-backend-deploy-dispatch.mjs
+
+  validate-release-source:
+    name: Validate selected backend CI run
+    needs: validate-target
+    if: ${{ needs.validate-target.outputs.operation == 'release' }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      commitSha: ${{ steps.source.outputs.commit-sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require a successful main ci-backend source run
+        id: source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ needs.validate-target.outputs.requestedSourceRunId }}
+          SOURCE_RUN_KIND: build
+        run: node .github/scripts/resolve-backend-release.mjs
 
   validate-public-domain:
     name: Validate public-domain deployment gate
@@ -105,21 +104,29 @@ jobs:
 
   build-release:
     name: Build immutable backend release
-    needs: [validate-target, validate-public-domain]
-    if: ${{ github.event_name == 'push' }}
+    needs: [validate-target, validate-release-source, validate-public-domain]
+    if: ${{ needs.validate-target.outputs.operation == 'release' && needs.validate-release-source.result == 'success' }}
     environment: dev
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions:
       id-token: write
       contents: read
     outputs:
+      sourceCommit: ${{ steps.manifest.outputs.commit-sha }}
       packageSha256: ${{ steps.manifest.outputs.package-sha256 }}
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
+      RELEASE_COMMIT_SHA: ${{ needs.validate-release-source.outputs.commitSha }}
     steps:
       # Base-validator compatibility marker: COMMIT_SHA: ${{ github.sha }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+      - name: Checkout the validated backend source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate-release-source.outputs.commitSha }}
+          path: .release-source
           persist-credentials: false
 
       - name: Setup .NET 8
@@ -131,8 +138,10 @@ jobs:
         env:
           ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
           ACTIONS_ID_TOKEN_REQUEST_URL: ""
+        # Trusted-control transition marker for the validated source checkout:
+        # dotnet restore backend/src/Certigo.Api/Certigo.Api.csproj
         run: |
-          dotnet restore backend/src/Certigo.Api/Certigo.Api.csproj \
+          dotnet restore .release-source/backend/src/Certigo.Api/Certigo.Api.csproj \
             --locked-mode
 
       - name: Publish deterministic backend
@@ -140,7 +149,7 @@ jobs:
           ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
           ACTIONS_ID_TOKEN_REQUEST_URL: ""
         run: |
-          dotnet publish backend/src/Certigo.Api/Certigo.Api.csproj \
+          dotnet publish .release-source/backend/src/Certigo.Api/Certigo.Api.csproj \
             --configuration Release \
             --no-restore \
             --output ./publish \
@@ -149,7 +158,7 @@ jobs:
             -p:DebugType=None
 
       - name: Generate existing CycloneDX SBOM
-        working-directory: backend
+        working-directory: .release-source/backend
         env:
           ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
           ACTIONS_ID_TOKEN_REQUEST_URL: ""
@@ -170,11 +179,11 @@ jobs:
           ACTIONS_ID_TOKEN_REQUEST_URL: ""
         run: |
           set -euo pipefail
-          SOURCE_DATE_EPOCH="$(git show -s --format=%ct "$GITHUB_SHA")"
+          SOURCE_DATE_EPOCH="$(git -C .release-source show -s --format=%ct "$RELEASE_COMMIT_SHA")"
           export SOURCE_DATE_EPOCH
           rm -rf ./release
           mkdir -p ./release/sbom
-          cp ./backend/sbom/bom.json ./release/sbom/bom.json
+          cp ./.release-source/backend/sbom/bom.json ./release/sbom/bom.json
           find ./publish -exec touch -h -d '1980-01-01T00:00:00Z' {} +
           (
             cd ./publish
@@ -189,7 +198,7 @@ jobs:
           PACKAGE_SHA256="$(sha256sum ./release/publish.zip | awk '{print $1}')"
           node .github/scripts/backend-release-manifest.mjs verify \
             --manifest ./release/release-manifest.json \
-            --expected-commit "$GITHUB_SHA" \
+            --expected-commit "$RELEASE_COMMIT_SHA" \
             --expected-run-id "$GITHUB_RUN_ID" \
             --expected-package-sha256 "$PACKAGE_SHA256"
 
@@ -220,13 +229,24 @@ jobs:
 
   resolve-release:
     name: Resolve trusted release source
-    needs: [validate-target, validate-public-domain, build-release]
+    needs: [validate-target, validate-public-domain, validate-release-source, build-release]
     if: >-
       ${{
         always()
         && needs.validate-target.result == 'success'
         && needs.validate-public-domain.result == 'success'
-        && (needs.build-release.result == 'success' || needs.build-release.result == 'skipped')
+        && (
+          (
+            needs.validate-target.outputs.operation == 'release'
+            && needs.validate-release-source.result == 'success'
+            && needs.build-release.result == 'success'
+          )
+          || (
+            needs.validate-target.outputs.operation != 'release'
+            && needs.validate-release-source.result == 'skipped'
+            && needs.build-release.result == 'skipped'
+          )
+        )
       }}
     environment: dev
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
@@ -242,11 +262,27 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate successful main-push provenance
-        id: source
+      - name: Use the commit built by this explicit release
+        id: current-source
+        if: ${{ needs.validate-target.outputs.operation == 'release' }}
+        shell: bash
+        env:
+          SOURCE_COMMIT: ${{ needs.build-release.outputs.sourceCommit }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Explicit release source commit is invalid."
+            exit 1
+          fi
+          echo "commit-sha=$SOURCE_COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: Validate successful explicit release provenance
+        id: prior-source
+        if: ${{ needs.validate-target.outputs.operation != 'release' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}
+          SOURCE_RUN_KIND: release
         run: node .github/scripts/resolve-backend-release.mjs
 
       - name: Resolve trusted source-run package digest
@@ -302,7 +338,7 @@ jobs:
       - name: Verify release manifest and hashes
         id: verify
         env:
-          EXPECTED_COMMIT_SHA: ${{ steps.source.outputs.commit-sha }}
+          EXPECTED_COMMIT_SHA: ${{ steps.current-source.outputs.commit-sha || steps.prior-source.outputs.commit-sha }}
           EXPECTED_PACKAGE_SHA256: ${{ steps.source-digest.outputs.package-sha256 }}
           EXPECTED_SOURCE_RUN_ID: ${{ needs.validate-target.outputs.sourceRunId }}
         run: |

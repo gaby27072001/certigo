@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
+import { validateBackendDeployWorkflow } from './backend-deploy-workflow-policy.mjs';
 import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
 import { validateWorkflowConcurrency } from './workflow-concurrency-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
@@ -571,6 +572,10 @@ function validateRepositoryInvariants() {
   const iosRelease = fs.readFileSync(path.join(workflowsDir, 'release-ios.yml'), 'utf8');
   const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');
   const backend = fs.readFileSync(path.join(workflowsDir, 'cd-backend.yml'), 'utf8');
+  const backendDispatch = fs.readFileSync(
+    path.join(root, '.github', 'scripts', 'validate-backend-deploy-dispatch.mjs'),
+    'utf8',
+  );
   const backendCi = fs.readFileSync(path.join(workflowsDir, 'ci-backend.yml'), 'utf8');
   const promoteBackendPath = path.join(
     workflowsDir,
@@ -710,52 +715,26 @@ function validateRepositoryInvariants() {
       'codemagic.yaml: production and dev IPA builds must carry the account deletion flag',
     );
   }
-  const directPromotion = backend.includes('promote-backend');
-  if (
-    directPromotion
-      ? !backend.includes('TARGET=dev')
-        || !backend.includes('.environment == "dev"')
-        || !backend.includes('.environment == "staging"')
-        || !backend.includes('.environment == "prod"')
-      : !backend.includes('dev|staging|prod')
-  ) {
-    errors.push('cd-backend.yml: deployment environments are not strictly allowlisted');
-  }
-  if (!backend.includes('environment: ${{ needs.validate-target.outputs.target }}')) {
-    errors.push('cd-backend.yml: deployment environment is not sourced from validation');
-  }
-  const promotionControl = directPromotion ? backend : promoteBackend;
-  const promotionControlFile = directPromotion
-    ? 'cd-backend.yml'
-    : 'promote-backend-staging-prod.yml';
-  const promotionMarkers = directPromotion
-    ? [
-        'keys == ["environment", "operation", "source_run_id"]',
-        'test("^[1-9][0-9]{0,19}$")',
-        '.operation == "promotion" or .operation == "rollback"',
-        'promotion:staging|promotion:prod|rollback:dev|rollback:staging|rollback:prod',
-        'TARGET="$(jq -r \'.environment\'',
-        'EVENT_NAME: ${{ github.event_name }}',
-        'CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}',
-        'node .github/scripts/resolve-backend-release.mjs',
-        'actions/download-artifact@',
-        'node .github/scripts/backend-release-manifest.mjs verify',
-      ]
-    : [
-        'keys == ["environment"]',
-        '.environment == "staging" or .environment == "prod"',
-        'target=$(jq -r \'.environment // "staging-prod"\'',
-        "needs.validate-dispatch.outputs.target != 'prod'",
-        "needs.validate-dispatch.outputs.target == 'prod'",
-        "needs.validate-dispatch.outputs.target == 'staging-prod'",
-      ];
-  for (const marker of promotionMarkers) {
-    if (!promotionControl.includes(marker)) {
-      errors.push(`${promotionControlFile}: missing controlled promotion invariant ${marker}`);
+  errors.push(...validateBackendDeployWorkflow(backend));
+  for (const marker of [
+    "const expectedEventType = 'promote-backend'",
+    "const expectedKeys = ['environment', 'operation', 'source_run_id']",
+    "'release:dev'",
+    "'promotion:staging'",
+    "'promotion:prod'",
+    "'rollback:dev'",
+    "'rollback:staging'",
+    "'rollback:prod'",
+    'sourceRunPattern.test(payload.source_run_id)',
+    "payload.operation === 'release' ? currentRunId : payload.source_run_id",
+  ]) {
+    if (!backendDispatch.includes(marker)) {
+      errors.push(`validate-backend-deploy-dispatch.mjs: missing strict invariant ${marker}`);
     }
   }
   for (const marker of [
-    'dotnet restore backend/src/Certigo.Api/Certigo.Api.csproj',
+    'dotnet restore .release-source/backend/src/Certigo.Api/Certigo.Api.csproj',
+    'ref: ${{ needs.validate-release-source.outputs.commitSha }}',
     '--locked-mode',
     '--no-restore',
   ]) {

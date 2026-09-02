@@ -141,8 +141,11 @@ function readManifest(manifestFile) {
       fail(`manifest.provenance.${name} must be a positive integer.`);
     }
   }
-  if (manifest.provenance.event !== 'push' || manifest.provenance.ref !== 'refs/heads/main') {
-    fail('Release provenance must come from a push to refs/heads/main.');
+  if (
+    manifest.provenance.event !== 'repository_dispatch'
+    || manifest.provenance.ref !== 'refs/heads/main'
+  ) {
+    fail('Release provenance must come from repository_dispatch on refs/heads/main.');
   }
   return manifest;
 }
@@ -162,7 +165,7 @@ function createManifest(values) {
   const manifestFile = path.resolve(requireValue(values, 'output'));
   const packageFile = path.resolve(requireValue(values, 'package'));
   const sbomFile = path.resolve(requireValue(values, 'sbom'));
-  const commitSha = process.env.GITHUB_SHA ?? '';
+  const commitSha = process.env.RELEASE_COMMIT_SHA ?? process.env.GITHUB_SHA ?? '';
   if (!shaPattern.test(commitSha)) {
     fail('GITHUB_SHA must be a lowercase 40-character Git SHA.');
   }
