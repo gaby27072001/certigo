@@ -16,8 +16,9 @@ Il ne prouve pas que les consoles ont été mises à jour.
 
 Les données réseau sont transportées via HTTPS. Le compte et les données
 associées peuvent être supprimés dans l’app. La page externe à déclarer sur
-Google Play est la valeur validée de `PUBLIC_ACCOUNT_DELETION_URL`. Aucun
-domaine ni chemin ne doit être déduit de ce document.
+Google Play est :
+
+`https://gchambaud_microsoft.github.io/Certigo/account-deletion/`
 
 Avant soumission en production, le responsable de publication doit comparer ces
 faits au binaire exact et aux SDK réellement activés ; aucune réponse de console

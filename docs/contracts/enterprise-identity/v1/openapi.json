@@ -1,0 +1,2192 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Certigo Enterprise Identity",
+    "version": "1.0.0",
+    "description": "Contract-only, dormant enterprise domain, abstract federation, and SCIM 2.0 surface. Runtime supports off only; no provider or live resource is configured."
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Enterprise identity metadata"
+    },
+    {
+      "name": "Enterprise domain administration"
+    },
+    {
+      "name": "Enterprise federation administration"
+    },
+    {
+      "name": "SCIM credential administration"
+    },
+    {
+      "name": "SCIM Users"
+    },
+    {
+      "name": "SCIM Groups"
+    }
+  ],
+  "x-certigo-status": "contract-only",
+  "x-certigo-baseline": "main@6e78c051f",
+  "x-certigo-feature-mode": {
+    "setting": "ENTERPRISE_IDENTITY_V1",
+    "default": "off",
+    "orderedValues": [
+      "off"
+    ],
+    "implementedValues": [
+      "off"
+    ],
+    "offHttpStatus": 404,
+    "evaluationOrder": [
+      "feature gate",
+      "route authentication",
+      "request body read",
+      "request body parse",
+      "DNS or repository access"
+    ],
+    "nonOffStartupBehavior": "fail-closed"
+  },
+  "x-certigo-reuses": {
+    "personAndLinkedIdentity": "../../person-linked-identity/v1",
+    "organizationMembershipAndTeam": "../../organization-membership/v1",
+    "automaticPersonMergeByEmail": false,
+    "linkedIdentityCreationProofs": [
+      "authenticatedFederation",
+      "explicitOwnerOrAdminBinding"
+    ]
+  },
+  "x-certigo-security": {
+    "adminActor": "validated bearer resolved to an existing Person and active owner/admin Membership",
+    "scimActor": "constant-time token hash match resolving exactly one Organization and active generation",
+    "organizationSource": "credential context exact-matched to route and every loaded document",
+    "clientRoleClaimsTrusted": false,
+    "emailTrustedAsIdentity": false,
+    "scimExternalIdTrustedAsIdentity": false,
+    "crossTenantHttpStatus": 404,
+    "unknownOrganizationHttpStatus": 404,
+    "offBeforeAuthenticationAndBodyParsing": true
+  },
+  "x-certigo-idempotency": {
+    "header": "Idempotency-Key",
+    "requiredForMutations": true,
+    "receiptScope": "organizationId",
+    "exactReplay": "reproduce recorded outcome without repeating effects",
+    "payloadMismatchHttpStatus": 409,
+    "receipts": "durable request hashes; no request body or PII"
+  },
+  "x-certigo-federation": {
+    "protocols": [
+      "oidc",
+      "saml"
+    ],
+    "providerNeutral": true,
+    "realProviderConfigured": false,
+    "secretsAccepted": false,
+    "providerAssertionsPersisted": false,
+    "verifiedDomainRequiredForActivation": true,
+    "oidcVerification": [
+      "HTTPS discovery and issuer pinned to the active configuration generation",
+      "signature and algorithm allow-list",
+      "exact iss and aud",
+      "exp, iat, nonce and state",
+      "authorization-code flow with PKCE",
+      "single-use code and subject replay receipt"
+    ],
+    "samlVerification": [
+      "metadata and issuer pinned to the active configuration generation",
+      "signed response or assertion with algorithm allow-list",
+      "exact audience, destination, recipient and InResponseTo",
+      "NotBefore and NotOnOrAfter",
+      "single-use assertion id replay receipt"
+    ],
+    "identitySubjectSource": "validated OIDC sub or SAML persistent/unspecified NameID only; never email or display name"
+  },
+  "x-certigo-scim": {
+    "version": "2.0",
+    "mediaType": "application/scim+json",
+    "userProvisioningCreatesPerson": false,
+    "emailMatching": false,
+    "deprovisioning": "soft organization access revocation; Person and personal learning preserved",
+    "tokenStorage": "hash only",
+    "tokenPlaintextRecovery": false,
+    "rotationOverlapMaximumSeconds": 86400
+  },
+  "x-certigo-audit": {
+    "payloadAllowedClasses": [
+      "pseudonymousHash",
+      "enum"
+    ],
+    "technicalEnvelopeAllowed": [
+      "eventId",
+      "organizationId partition key",
+      "schemaVersion",
+      "occurredAt"
+    ],
+    "forbiddenFields": [
+      "email",
+      "userName",
+      "displayName",
+      "cleartextDomain",
+      "token",
+      "secret",
+      "providerAssertion",
+      "authorizationCode",
+      "claimValue"
+    ]
+  },
+  "paths": {
+    "/v1/enterprise-identity/metadata": {
+      "get": {
+        "tags": [
+          "Enterprise identity metadata"
+        ],
+        "operationId": "getEnterpriseIdentityMetadataV1",
+        "summary": "Describe the future Enterprise Identity V1 feature contract",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Future metadata response; unreachable while the only accepted mode is off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureMetadata"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/SurfaceDisabled"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/enterprise-identity/domains": {
+      "get": {
+        "tags": [
+          "Enterprise domain administration"
+        ],
+        "operationId": "listEnterpriseDomainsV1",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Domains in this Organization partition.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EnterpriseDomain"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Enterprise domain administration"
+        ],
+        "operationId": "beginEnterpriseDomainChallengeV1",
+        "summary": "Reserve a normalized domain hash and return a DNS challenge value once",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BeginDomainChallengeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pending challenge; challenge value is returned once and only its hash is persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainChallengeCreated"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/enterprise-identity/domain-challenges/{challengeId}": {
+      "get": {
+        "tags": [
+          "Enterprise domain administration"
+        ],
+        "operationId": "getEnterpriseDomainChallengeV1",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChallengeId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Challenge state without the challenge value.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainChallenge"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Enterprise domain administration"
+        ],
+        "operationId": "revokeEnterpriseDomainChallengeV1",
+        "summary": "Revoke a pending challenge and release its domain claim by compare-and-set",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChallengeId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Challenge revoked idempotently."
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/enterprise-identity/domain-challenges/{challengeId}/verify": {
+      "post": {
+        "tags": [
+          "Enterprise domain administration"
+        ],
+        "operationId": "verifyEnterpriseDomainChallengeV1",
+        "summary": "Resolve DNS server-side and transition a pending challenge under ETag",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChallengeId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Challenge verified or exact replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnterpriseDomain"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "410": {
+            "description": "Challenge expired; claim release remains CAS and does not transfer ownership."
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/enterprise-identity/domains/{domainId}": {
+      "delete": {
+        "tags": [
+          "Enterprise domain administration"
+        ],
+        "operationId": "revokeEnterpriseDomainV1",
+        "summary": "Revoke a verified domain without transferring it",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/DomainId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Domain revoked and global hash claim released idempotently."
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/enterprise-identity/federation": {
+      "get": {
+        "tags": [
+          "Enterprise federation administration"
+        ],
+        "operationId": "getEnterpriseFederationConfigurationV1",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider-neutral configuration without secrets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederationConfiguration"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Enterprise federation administration"
+        ],
+        "operationId": "putEnterpriseFederationConfigurationV1",
+        "summary": "Create a new provider-neutral configuration generation",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutFederationConfigurationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration generation stored. Active requires a verified domain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederationConfiguration"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Enterprise federation administration"
+        ],
+        "operationId": "disableEnterpriseFederationV1",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Federation disabled idempotently; no Person or personal learning is deleted."
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/enterprise-identity/federation/identity-bindings": {
+      "post": {
+        "tags": [
+          "Enterprise federation administration"
+        ],
+        "operationId": "bindEnterpriseFederatedIdentityV1",
+        "summary": "Bind an explicit external subject to an existing Person as a LinkedIdentity",
+        "description": "Owner/admin ceremony only. Email, SCIM userName, displayName, and externalId are not accepted as proof. A successful authenticated federation may invoke the same domain operation without this admin route.",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplicitIdentityBindingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "LinkedIdentity created or exact replay; raw external subject is not returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityBindingResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/enterprise-identity/scim-tokens": {
+      "post": {
+        "tags": [
+          "SCIM credential administration"
+        ],
+        "operationId": "generateScimTokenV1",
+        "summary": "Generate a SCIM bearer and return plaintext once",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateScimTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Plaintext bearer returned once. Only its cryptographic hash is persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedScimToken"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/enterprise-identity/scim-tokens/{tokenId}/rotate": {
+      "post": {
+        "tags": [
+          "SCIM credential administration"
+        ],
+        "operationId": "rotateScimTokenV1",
+        "summary": "Generate the next token generation with a bounded overlap",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/TokenId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RotateScimTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New plaintext returned once; previous generation remains valid only until overlapEndsAt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedScimToken"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/enterprise-identity/scim-tokens/{tokenId}": {
+      "delete": {
+        "tags": [
+          "SCIM credential administration"
+        ],
+        "operationId": "revokeScimTokenV1",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/TokenId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "All active/overlap generations for this token family revoked."
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/MaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/scim/v2/Users": {
+      "get": {
+        "tags": [
+          "SCIM Users"
+        ],
+        "operationId": "listScimUsersV1",
+        "security": [
+          {
+            "scimBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ScimFilter"
+          },
+          {
+            "$ref": "#/components/parameters/ScimStartIndex"
+          },
+          {
+            "$ref": "#/components/parameters/ScimCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ScimList"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScimMaskedNotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "SCIM Users"
+        ],
+        "operationId": "createScimUserV1",
+        "description": "Creates an organization directory User only. It never creates or merges a Person from email, userName, displayName, or externalId.",
+        "security": [
+          {
+            "scimBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimUserWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ScimUser"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScimMaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ScimConflict"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/scim/v2/Users/{userId}": {
+      "get": {
+        "tags": [
+          "SCIM Users"
+        ],
+        "operationId": "getScimUserV1",
+        "security": [
+          {
+            "scimBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ScimUserId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ScimUser"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScimMaskedNotFound"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "SCIM Users"
+        ],
+        "operationId": "replaceScimUserV1",
+        "security": [
+          {
+            "scimBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ScimUserId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimUserWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ScimUser"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScimMaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ScimConflict"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "SCIM Users"
+        ],
+        "operationId": "patchScimUserV1",
+        "description": "active=false soft-deprovisions organization access before cleanup and preserves Person and personal learning.",
+        "security": [
+          {
+            "scimBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ScimUserId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimPatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ScimUser"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScimMaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ScimConflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "SCIM Users"
+        ],
+        "operationId": "deleteScimUserV1",
+        "description": "Soft-deprovisions the enterprise directory User; Person and personal learning remain.",
+        "security": [
+          {
+            "scimBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ScimUserId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Organization access revoked before asynchronous idempotent cleanup."
+          },
+          "404": {
+            "$ref": "#/components/responses/ScimMaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ScimConflict"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/scim/v2/Groups": {
+      "get": {
+        "tags": [
+          "SCIM Groups"
+        ],
+        "operationId": "listScimGroupsV1",
+        "security": [
+          {
+            "scimBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ScimFilter"
+          },
+          {
+            "$ref": "#/components/parameters/ScimStartIndex"
+          },
+          {
+            "$ref": "#/components/parameters/ScimCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ScimList"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScimMaskedNotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "SCIM Groups"
+        ],
+        "operationId": "createScimGroupV1",
+        "description": "Creates an organization-scoped directory Group. Team edges are projected only for bound active Memberships.",
+        "security": [
+          {
+            "scimBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimGroupWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ScimGroup"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScimMaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ScimConflict"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/scim/v2/Groups/{groupId}": {
+      "get": {
+        "tags": [
+          "SCIM Groups"
+        ],
+        "operationId": "getScimGroupV1",
+        "security": [
+          {
+            "scimBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ScimGroupId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ScimGroup"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScimMaskedNotFound"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "SCIM Groups"
+        ],
+        "operationId": "replaceScimGroupV1",
+        "security": [
+          {
+            "scimBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ScimGroupId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimGroupWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ScimGroup"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScimMaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ScimConflict"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "SCIM Groups"
+        ],
+        "operationId": "patchScimGroupV1",
+        "security": [
+          {
+            "scimBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ScimGroupId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimPatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ScimGroup"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScimMaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ScimConflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "SCIM Groups"
+        ],
+        "operationId": "deleteScimGroupV1",
+        "security": [
+          {
+            "scimBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ScimGroupId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Group and organization-owned projected edges soft-deleted idempotently."
+          },
+          "404": {
+            "$ref": "#/components/responses/ScimMaskedNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ScimConflict"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "adminBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Validated Person bearer; active owner/admin Membership is reloaded server-side."
+      },
+      "scimBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "description": "Opaque token returned once. Only a constant-time comparable hash and generation metadata are persisted."
+      }
+    },
+    "parameters": {
+      "OrganizationId": {
+        "name": "organizationId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "ChallengeId": {
+        "name": "challengeId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "DomainId": {
+        "name": "domainId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "TokenId": {
+        "name": "tokenId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "ScimUserId": {
+        "name": "userId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "ScimGroupId": {
+        "name": "groupId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 200
+        },
+        "description": "Organization-scoped durable receipt key. Exact replay is safe; payload mismatch is 409."
+      },
+      "ScimFilter": {
+        "name": "filter",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 1000
+        }
+      },
+      "ScimStartIndex": {
+        "name": "startIndex",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "ScimCount": {
+        "name": "count",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 100
+        }
+      }
+    },
+    "schemas": {
+      "FeatureMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "feature",
+          "version",
+          "runtimeMode",
+          "implementedModes",
+          "activationRequiresNewAdr"
+        ],
+        "properties": {
+          "feature": {
+            "const": "enterpriseIdentity"
+          },
+          "version": {
+            "const": "1.0.0"
+          },
+          "runtimeMode": {
+            "const": "off"
+          },
+          "implementedModes": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "const": "off"
+              }
+            ],
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "activationRequiresNewAdr": {
+            "const": true
+          }
+        }
+      },
+      "BeginDomainChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "properties": {
+          "domain": {
+            "type": "string",
+            "format": "hostname",
+            "minLength": 3,
+            "maxLength": 253,
+            "description": "Normalized server-side. It is never identity proof and is never written to audit."
+          }
+        }
+      },
+      "DomainChallengeCreated": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/DomainChallenge"
+          },
+          {
+            "type": "object",
+            "required": [
+              "dnsRecord"
+            ],
+            "properties": {
+              "dnsRecord": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "name",
+                  "value"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "TXT"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 32,
+                    "writeOnly": true,
+                    "description": "Returned once; only a SHA-256 hash is persisted."
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "DomainChallenge": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "domainId",
+          "state",
+          "createdAt",
+          "expiresAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "domainId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "verified",
+              "failed",
+              "expired",
+              "revoked"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "dnsRecord": {
+            "type": "object",
+            "additionalProperties": false,
+            "writeOnly": true,
+            "required": [
+              "type",
+              "name",
+              "value"
+            ],
+            "properties": {
+              "type": {
+                "const": "TXT"
+              },
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 32,
+                "writeOnly": true,
+                "description": "Returned once; only a SHA-256 hash is persisted."
+              }
+            }
+          }
+        }
+      },
+      "EnterpriseDomain": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "domain",
+          "state",
+          "verifiedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string",
+            "format": "hostname"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "revoked"
+            ]
+          },
+          "verifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revokedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "PutFederationConfigurationRequest": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/OidcFederationConfigurationWrite"
+          },
+          {
+            "$ref": "#/components/schemas/SamlFederationConfigurationWrite"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "protocol"
+        }
+      },
+      "OidcFederationConfigurationWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "state",
+          "discoveryUri",
+          "issuer",
+          "clientId",
+          "subjectClaim"
+        ],
+        "properties": {
+          "protocol": {
+            "const": "oidc"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "active",
+              "disabled"
+            ]
+          },
+          "discoveryUri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "issuer": {
+            "type": "string",
+            "format": "uri"
+          },
+          "clientId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Public audience identifier, not a secret."
+          },
+          "subjectClaim": {
+            "type": "string",
+            "enum": [
+              "sub"
+            ]
+          }
+        }
+      },
+      "SamlFederationConfigurationWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "state",
+          "metadataUri",
+          "issuerEntityId",
+          "serviceProviderAudience",
+          "subjectNameIdFormat"
+        ],
+        "properties": {
+          "protocol": {
+            "const": "saml"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "active",
+              "disabled"
+            ]
+          },
+          "metadataUri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "issuerEntityId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "serviceProviderAudience": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subjectNameIdFormat": {
+            "type": "string",
+            "enum": [
+              "persistent",
+              "unspecified"
+            ]
+          }
+        }
+      },
+      "FederationConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "generation",
+          "configuration",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/PutFederationConfigurationRequest"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExplicitIdentityBindingRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "federationConfigurationId",
+          "personId",
+          "externalSubject",
+          "proof"
+        ],
+        "properties": {
+          "federationConfigurationId": {
+            "type": "string"
+          },
+          "personId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Existing Person selected explicitly; never derived from email."
+          },
+          "scimUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "externalSubject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "writeOnly": true,
+            "description": "Explicit immutable provider subject; normalized and hashed before persistence outside LinkedIdentity."
+          },
+          "proof": {
+            "const": "explicitAdminBinding"
+          }
+        }
+      },
+      "IdentityBindingResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "bindingId",
+          "linkedIdentityId",
+          "state"
+        ],
+        "properties": {
+          "bindingId": {
+            "type": "string"
+          },
+          "linkedIdentityId": {
+            "type": "string",
+            "pattern": "^linked-identity::v[0-9]+::[0-9a-f]{64}$"
+          },
+          "state": {
+            "const": "active"
+          }
+        }
+      },
+      "GenerateScimTokenRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "Administrative label; never emitted to audit."
+          }
+        }
+      },
+      "RotateScimTokenRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "overlapSeconds"
+        ],
+        "properties": {
+          "overlapSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 86400,
+            "default": 3600
+          }
+        }
+      },
+      "GeneratedScimToken": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tokenId",
+          "generation",
+          "bearerToken",
+          "createdAt"
+        ],
+        "properties": {
+          "tokenId": {
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "bearerToken": {
+            "type": "string",
+            "minLength": 43,
+            "writeOnly": true,
+            "description": "Returned once. No plaintext recovery endpoint exists."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "overlapEndsAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "ScimMeta": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resourceType",
+          "created",
+          "lastModified",
+          "version"
+        ],
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "enum": [
+              "User",
+              "Group"
+            ]
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastModified": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string",
+            "format": "uri-reference"
+          }
+        }
+      },
+      "ScimEmail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "email",
+            "description": "Mutable directory attribute only; never an identity or merge key."
+          },
+          "type": {
+            "type": "string"
+          },
+          "primary": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ScimUserWrite": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "schemas",
+          "userName"
+        ],
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "contains": {
+              "const": "urn:ietf:params:scim:schemas:core:2.0:User"
+            }
+          },
+          "externalId": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "Idempotent directory correlation only; never federation proof."
+          },
+          "userName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "Mutable directory attribute only; never resolves a Person."
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "active": {
+            "type": "boolean",
+            "default": true
+          },
+          "emails": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/ScimEmail"
+            }
+          }
+        }
+      },
+      "ScimUserResource": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ScimUserWrite"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "meta"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "meta": {
+                "$ref": "#/components/schemas/ScimMeta"
+              }
+            }
+          }
+        ]
+      },
+      "ScimMember": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "type": "string",
+            "description": "Organization-local SCIM User id."
+          },
+          "$ref": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "display": {
+            "type": "string",
+            "readOnly": true
+          }
+        }
+      },
+      "ScimGroupWrite": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "schemas",
+          "displayName"
+        ],
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "contains": {
+              "const": "urn:ietf:params:scim:schemas:core:2.0:Group"
+            }
+          },
+          "externalId": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "members": {
+            "type": "array",
+            "maxItems": 10000,
+            "items": {
+              "$ref": "#/components/schemas/ScimMember"
+            }
+          }
+        }
+      },
+      "ScimGroupResource": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ScimGroupWrite"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "meta"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "meta": {
+                "$ref": "#/components/schemas/ScimMeta"
+              }
+            }
+          }
+        ]
+      },
+      "ScimPatchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemas",
+          "Operations"
+        ],
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "const": "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+              }
+            ],
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "Operations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "op"
+              ],
+              "properties": {
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "add",
+                    "remove",
+                    "replace"
+                  ]
+                },
+                "path": {
+                  "type": "string"
+                },
+                "value": {}
+              }
+            }
+          }
+        }
+      },
+      "ScimListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemas",
+          "totalResults",
+          "startIndex",
+          "itemsPerPage",
+          "Resources"
+        ],
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "const": "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+              }
+            ],
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "totalResults": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "startIndex": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "itemsPerPage": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "Resources": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ScimUserResource"
+                },
+                {
+                  "$ref": "#/components/schemas/ScimGroupResource"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ScimError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemas",
+          "status"
+        ],
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "const": "urn:ietf:params:scim:api:messages:2.0:Error"
+              }
+            ],
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "status": {
+            "type": "string",
+            "pattern": "^[1-5][0-9]{2}$"
+          },
+          "scimType": {
+            "type": "string",
+            "enum": [
+              "invalidFilter",
+              "tooMany",
+              "uniqueness",
+              "mutability",
+              "invalidSyntax",
+              "invalidPath",
+              "noTarget",
+              "invalidValue",
+              "sensitive"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "description": "Generic only; never identifies another Organization or credential."
+          }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "forbidden",
+              "not_found",
+              "idempotency_conflict",
+              "replay_detected",
+              "domain_unavailable",
+              "invalid_state"
+            ]
+          }
+        }
+      }
+    },
+    "responses": {
+      "SurfaceDisabled": {
+        "description": "Not found. ENTERPRISE_IDENTITY_V1 is checked before authentication, body read/parsing, DNS, or repository access."
+      },
+      "MaskedNotFound": {
+        "description": "Not found. Also masks feature-off, unknown Organization, absent Membership, invalid credential, and cross-tenant mismatch.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Authenticated active Membership exists but its server-side role is insufficient.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Idempotency payload mismatch, replay, challenge state, takeover reservation, or ETag conflict.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "ScimUser": {
+        "description": "Organization-scoped SCIM User.",
+        "content": {
+          "application/scim+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ScimUserResource"
+            }
+          }
+        }
+      },
+      "ScimGroup": {
+        "description": "Organization-scoped SCIM Group.",
+        "content": {
+          "application/scim+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ScimGroupResource"
+            }
+          }
+        }
+      },
+      "ScimList": {
+        "description": "SCIM ListResponse confined to the token Organization.",
+        "content": {
+          "application/scim+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ScimListResponse"
+            }
+          }
+        }
+      },
+      "ScimMaskedNotFound": {
+        "description": "SCIM 404 masking feature-off, token failure, unknown Organization/resource, and cross-tenant mismatch.",
+        "content": {
+          "application/scim+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ScimError"
+            }
+          }
+        }
+      },
+      "ScimConflict": {
+        "description": "SCIM 409 for uniqueness, idempotency payload mismatch, replay, or ETag conflict.",
+        "content": {
+          "application/scim+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ScimError"
+            }
+          }
+        }
+      }
+    }
+  }
+}

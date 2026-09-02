@@ -1,0 +1,21 @@
+{
+  "results": [
+    {
+      "source": {
+        "path": "/workspace/package-lock.json",
+        "type": "lockfile"
+      },
+      "packages": [
+        {
+          "package": {
+            "name": "example-package",
+            "version": "1.0.0",
+            "ecosystem": "npm"
+          },
+          "vulnerabilities": [],
+          "groups": []
+        }
+      ]
+    }
+  ]
+}

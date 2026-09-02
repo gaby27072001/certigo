@@ -1,8 +1,10 @@
 name: deploy-privacy-policy
 
 # Publie les pages légales publiques (confidentialité + suppression de compte).
-# Les URL et le contact publics sont fournis par une configuration validée ; ce
-# workflow ne suppose aucun domaine personnalisé et ne modifie aucun DNS.
+# URL de secours immediate pour Google Play :
+# https://gchambaud_microsoft.github.io/Certigo/privacy-policy/
+# Ces URLs restent canoniques sur GitHub Pages : aucun domaine personnalise
+# non controle ne doit etre configure comme alias ou destination de redirection.
 on:
   repository_dispatch:
     types: [deploy-privacy-policy]
@@ -11,7 +13,7 @@ permissions: {}
 
 concurrency:
   group: pages-privacy-policy
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:

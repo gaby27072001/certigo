@@ -149,6 +149,26 @@ class Fixture:
                 },
             },
         )
+        for relative in (
+            project_state.CONTENT_PACKAGE_CONTRACT_FILE,
+            Path("contracts/cosmos-containers.json"),
+        ):
+            self.write(
+                relative.as_posix(),
+                (REPO_ROOT / relative).read_text(encoding="utf-8"),
+            )
+        subprocess.run(
+            [
+                sys.executable,
+                str(MODULE_PATH.with_name("generated_contracts.py")),
+                "--root",
+                str(self.root),
+                "--refresh",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         self.write("tools/project_state.py", "# fixture generator source\n")
         self.write("tools/tests/test_generator.py", "def test_placeholder(): pass\n")
         self.git("init")
@@ -183,6 +203,45 @@ class ProjectStateTests(unittest.TestCase):
         self.assertEqual("2026-08-06", first.reference_date)
         self.assertEqual(self.fixture.git("rev-parse", "HEAD"), first.reference_commit)
         self.assertEqual(project_state.render(first), project_state.render(second))
+
+    def test_uncontrolled_domain_references_are_rejected(self) -> None:
+        domain = "certigo" + ".app"
+        self.fixture.write(
+            "docs/unsafe-domain.md",
+            f"https://api.{domain}/api\nsupport@{domain}\n",
+        )
+
+        with self.assertRaisesRegex(
+            project_state.ProjectStateError,
+            r"unsafe-domain\.md:1.*unsafe-domain\.md:2",
+        ):
+            project_state.validate_forbidden_domain_references(self.root)
+
+    def test_namespaces_and_historical_protocol_ids_are_not_domains(self) -> None:
+        self.fixture.write(
+            "docs/safe-identifiers.md",
+            "Certigo.Application\ncertigo.app-certification-catalog/v2\n",
+        )
+
+        project_state.validate_forbidden_domain_references(self.root)
+
+    def test_explicit_third_party_audit_mention_is_the_only_allowlist(self) -> None:
+        domain = "certigo" + ".app"
+        self.fixture.write(
+            project_state.ALLOWED_DOMAIN_AUDIT_PATH.as_posix(),
+            f"Le domaine {domain} est tiers et non controle. Il est explicitement interdit.\n",
+        )
+        project_state.validate_forbidden_domain_references(self.root)
+
+        self.fixture.write(
+            "docs/other.md",
+            f"Le domaine {domain} est tiers et explicitement interdit.\n",
+        )
+        with self.assertRaisesRegex(
+            project_state.ProjectStateError,
+            r"docs/other\.md:1",
+        ):
+            project_state.validate_forbidden_domain_references(self.root)
 
     def test_observable_hash_normalizes_declared_lf_text(self) -> None:
         source = self.root / ".github/workflows/ci-mobile.yml"
@@ -244,6 +303,16 @@ class ProjectStateTests(unittest.TestCase):
             encoding="utf-8",
         )
         with self.assertRaisesRegex(project_state.ProjectStateError, "is stale"):
+            project_state.update(self.root, check=True)
+
+    def test_project_state_check_rejects_stale_generated_contracts(self) -> None:
+        self.assertTrue(project_state.update(self.root, check=False))
+        generated = self.root / "backend/src/Certigo.Infrastructure/Cosmos/CosmosContainers.cs"
+        generated.write_text(
+            generated.read_text(encoding="utf-8") + "// stale\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(project_state.ProjectStateError, "generated contracts are stale"):
             project_state.update(self.root, check=True)
 
     def test_source_change_requires_a_new_exact_reference(self) -> None:
@@ -371,29 +440,19 @@ class ProjectStateTests(unittest.TestCase):
 
     def test_active_content_reference_is_pinned_exactly(self) -> None:
         active = project_state.load_active_content_reference(REPO_ROOT)
-        self.assertEqual(
-            "55a512821dabbea8b65d3403f9c83571b4a33ed8", active.revision
+        reference = json.loads(
+            (REPO_ROOT / project_state.ACTIVE_CONTENT_REFERENCE_FILE).read_text(
+                encoding="utf-8"
+            )
         )
-        self.assertEqual("2026-08-14", active.date)
-        self.assertEqual("2026-08-14T21:42:01Z", active.committed_at)
-        self.assertEqual(146, active.public.file_count)
-        self.assertEqual(
-            "sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff",
-            active.public.manifest_id,
-        )
-        self.assertEqual(
-            "d067b47b9d96593ea58e5dbb22289e6abeef48fcc960ca74f74905c71644ed02",
-            active.public.file_sha256,
-        )
-        self.assertEqual(146, active.private.file_count)
-        self.assertEqual(
-            "sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b",
-            active.private.manifest_id,
-        )
-        self.assertEqual(
-            "06c42204be85737f149c1aff9c21da393c3dbdc6eeeeebe5621fa83777b2c102",
-            active.private.file_sha256,
-        )
+        self.assertEqual(reference["revision"], active.revision)
+        self.assertEqual(reference["date"], active.date)
+        self.assertEqual(reference["committedAt"], active.committed_at)
+        for name, manifest in (("public", active.public), ("private", active.private)):
+            expected = reference["manifests"][name]
+            self.assertEqual(expected["manifestId"], manifest.manifest_id)
+            self.assertEqual(expected["fileCount"], manifest.file_count)
+            self.assertEqual(expected["fileSha256"], manifest.file_sha256)
 
     def test_active_content_revision_and_manifests_are_validated(self) -> None:
         with tempfile.TemporaryDirectory() as active_temp:
@@ -556,6 +615,8 @@ class ProjectStateTests(unittest.TestCase):
         self.assertIn("path: .trusted-control", workflow)
         self.assertIn("validate-source:", workflow)
         self.assertIn("needs: validate-source", workflow)
+        self.assertIn("uses: ./.github/workflows/pr-head-freshness.yml", workflow)
+        self.assertIn("needs.freshness.outputs.current != 'false'", workflow)
         source_job = workflow[
             workflow.index("  validate-source:") : workflow.index(
                 "  validate:\n", workflow.index("  validate-source:")
@@ -733,9 +794,7 @@ class ProjectStateTests(unittest.TestCase):
         expected_markers = {
             "dependency-vuln-scan.yml": [
                 "OSV-Scanner output is missing or malformed.",
-                "--format=json",
-                "--no-ignore",
-                "--all-packages",
+                'node "$TRUSTED_CONTROL_DIR/.github/scripts/run-osv-scan.mjs"',
                 'python -P "$TRUSTED_CONTROL_DIR/tools/validate_dependency_locks.py"',
                 '--root "$UNTRUSTED_SOURCE_DIR"',
                 '--write-expected-sources "$EXPECTED_LOCKS_FILE"',
@@ -749,8 +808,6 @@ class ProjectStateTests(unittest.TestCase):
                 '--pub-cache "$PUB_CACHE"',
                 'FLUTTER_EXECUTABLE="$FLUTTER_INSTALL_DIR/flutter/bin/flutter"',
                 "name: Verify trusted controls remain immutable",
-                '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
-                '--output-file "$output_temp"',
                 'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
                 '"$EXPECTED_LOCKS_FILE"',
                 '"$UNTRUSTED_SOURCE_DIR" 2> "$OSV_ENFORCE_LOG"',
@@ -792,6 +849,13 @@ class ProjectStateTests(unittest.TestCase):
             REPO_ROOT / ".github/workflows/security-gate.yml"
         ).read_text(encoding="utf-8")
         self.assertIn("needs: [changes, osv, checkov]", security_gate)
+        self.assertIn(
+            "uses: ./.github/workflows/pr-head-freshness.yml", security_gate
+        )
+        self.assertIn(
+            "needs.changes.result == 'success'",
+            security_gate,
+        )
         self.assertIn("- '.gitignore'", security_gate)
         self.assertIn("- '**/.gitignore'", security_gate)
         self.assertIn("- 'tools/validate_nuget_locks.py'", security_gate)

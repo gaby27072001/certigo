@@ -1,0 +1,115 @@
+# FEATURE-OFF: this file is intentionally outside .github/workflows.
+# Activation is a separate reviewed change after PR #296, runner provisioning,
+# registration, and rollback evidence are complete.
+name: post-merge-cosmos-account-deletion
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: post-merge-cosmos-account-deletion-main
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  account-deletion:
+    name: Account deletion / Cosmos emulator
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      && github.repository == 'gchambaud_microsoft/Certigo'
+      && github.ref == 'refs/heads/main'
+      && vars.CERTIGO_COSMOS_EMULATOR_ENABLED == 'true'
+    runs-on: [self-hosted, Linux, X64, certigo-cosmos-emulator]
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: refs/heads/main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify merged-main provenance
+        id: provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="$(git branch --show-current)"
+          checked_out="$(git rev-parse HEAD)"
+          remote_main="$(git rev-parse refs/remotes/origin/main)"
+          if [ "$branch" != "main" ] || [ "$checked_out" != "$remote_main" ]; then
+            echo "::error::The emulator gate must run the current merged main checkout."
+            exit 1
+          fi
+          echo "sha=$checked_out" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: "8.0.424"
+
+      - name: Restore locked test dependencies
+        run: >-
+          dotnet restore
+          backend/tests/Certigo.Infrastructure.Tests/Certigo.Infrastructure.Tests.csproj
+          --locked-mode
+
+      - name: Run account-deletion integration against local Cosmos
+        id: cosmos-gate
+        continue-on-error: true
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
+          ACTIONS_ID_TOKEN_REQUEST_URL: ""
+          AZURE_CLIENT_ID: ""
+          AZURE_CLIENT_SECRET: ""
+          AZURE_FEDERATED_TOKEN_FILE: ""
+          AZURE_SUBSCRIPTION_ID: ""
+          AZURE_TENANT_ID: ""
+          ARM_CLIENT_ID: ""
+          ARM_CLIENT_SECRET: ""
+          ARM_SUBSCRIPTION_ID: ""
+          ARM_TENANT_ID: ""
+          COSMOS_EMULATOR_CONNECTION_STRING: ""
+          IDENTITY_ENDPOINT: ""
+          IMDS_ENDPOINT: ""
+          MSI_ENDPOINT: ""
+        run: bash infra/ci-runner/cosmos-emulator/run-account-deletion.sh
+
+      - name: Clean local emulator state
+        if: ${{ always() }}
+        run: bash infra/ci-runner/cosmos-emulator/run-account-deletion.sh --cleanup-only
+
+      - name: Publish result summary
+        if: ${{ always() }}
+        env:
+          CHECKED_OUT_SHA: ${{ steps.provenance.outputs.sha }}
+          GATE_OUTCOME: ${{ steps.cosmos-gate.outcome }}
+          RUNNER_NAME: ${{ runner.name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Cosmos account-deletion validation"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Source | merged \`main\` |"
+            echo "| Commit | \`${CHECKED_OUT_SHA:-unavailable}\` |"
+            echo "| Runner | \`${RUNNER_NAME}\` |"
+            echo "| Emulator | local, digest-pinned |"
+            echo "| Result | **${GATE_OUTCOME}** |"
+            echo
+            echo "No artifact or live Cosmos data was produced."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce emulator result
+        if: ${{ always() }}
+        env:
+          GATE_OUTCOME: ${{ steps.cosmos-gate.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GATE_OUTCOME" = "success"

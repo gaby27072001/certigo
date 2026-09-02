@@ -68,9 +68,15 @@ export function evaluateLifecycle({
     reasons.push('capacity controller feature flag is off');
   }
   const repositoryRunners = runners.runners ?? [];
+  const externalGitHubRunnerIds = new Set(
+    config.inventory.externalGithubRunnerIds ?? [],
+  );
   const certigoRunners = repositoryRunners.filter((runner) => {
     const labels = labelsOf(runner);
-    return labels.has('certigo-pr') || labels.has('certigo-trusted');
+    return (
+      !externalGitHubRunnerIds.has(Number(runner.id)) &&
+      (labels.has('certigo-pr') || labels.has('certigo-trusted'))
+    );
   });
   const dualTrustRunners = certigoRunners.filter((runner) => {
     const labels = labelsOf(runner);
@@ -198,16 +204,16 @@ export function evaluateLifecycle({
     if ((activeRuns.total_count ?? 0) > 0) {
       reasons.push(`active workflow runs: ${activeRuns.total_count}`);
     }
-    const offlineManagedRunners = instanceInventory.managedInstances
+    const inconsistentManagedRunners = instanceInventory.managedInstances
       .filter(
         ({ runner, virtualMachine }) =>
-          runner.status !== 'online' ||
-          !isPoweredCapacity(virtualMachine),
+          (runner.status === 'online') !==
+          isPoweredCapacity(virtualMachine),
       )
       .map(({ runner }) => runner.name);
-    if (offlineManagedRunners.length > 0) {
+    if (inconsistentManagedRunners.length > 0) {
       reasons.push(
-        `managed runners not powered and online: ${offlineManagedRunners.join(', ')}`,
+        `managed runner power/online mismatches: ${inconsistentManagedRunners.join(', ')}`,
       );
     }
 
@@ -273,6 +279,9 @@ export function evaluateLifecycle({
       certigoRunners: certigoRunners.length,
       dualTrustRunners: dualTrustRunners.length,
       externalVirtualMachines: instanceInventory.externalVirtualMachines,
+      externalGitHubRunnerIds: [...externalGitHubRunnerIds].sort(
+        (left, right) => left - right,
+      ),
       forbiddenVirtualMachinesPresent:
         instanceInventory.forbiddenVirtualMachinesPresent,
       managedMachineNames: instanceInventory.managedMachineNames,

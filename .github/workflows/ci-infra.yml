@@ -9,49 +9,101 @@ on:
       - "infra/**"
       - ".github/scripts/write-secure-bicep-parameters.mjs"
       - ".github/scripts/write-secure-bicep-parameters.test.mjs"
+      - ".github/scripts/public-domain-contract.mjs"
+      - ".github/scripts/public-domain-contract.test.mjs"
       - ".github/scripts/deploy-flex-onedeploy.sh"
       - ".github/scripts/deploy-flex-onedeploy.test.mjs"
       - ".github/workflows/cd-backend.yml"
       - ".github/workflows/ci-infra.yml"
+      - ".github/workflows/post-merge-cosmos-account-deletion.yml"
       - ".github/workflows/runner-health.yml"
       - "docs/ACCOUNT_DELETION.md"
       - "docs/deployment-runbook.md"
+      - "docs/PUBLIC_DOMAIN_MIGRATION.md"
       - "docs/E2E_AUTH_PREREQUIS.md"
       - "docs/legal/account-deletion.md"
       - "docs/legal/privacy-policy.md"
       - "tools/build_public_pages.mjs"
       - "tools/tests/build_public_pages.test.mjs"
+      - ".github/workflows-disabled/post-merge-cosmos-account-deletion.yml"
+      - ".github/workflows-disabled/test-account-deletion-cosmos.yml"
+      - "docs/runbooks/COSMOS_EMULATOR_RUNNER.md"
   pull_request_target:
     paths:
       - "infra/**"
       - ".github/scripts/write-secure-bicep-parameters.mjs"
       - ".github/scripts/write-secure-bicep-parameters.test.mjs"
+      - ".github/scripts/public-domain-contract.mjs"
+      - ".github/scripts/public-domain-contract.test.mjs"
       - ".github/scripts/deploy-flex-onedeploy.sh"
       - ".github/scripts/deploy-flex-onedeploy.test.mjs"
       - ".github/workflows/cd-backend.yml"
       - ".github/workflows/ci-infra.yml"
+      - ".github/workflows/post-merge-cosmos-account-deletion.yml"
       - ".github/workflows/runner-health.yml"
       - "docs/ACCOUNT_DELETION.md"
       - "docs/deployment-runbook.md"
+      - "docs/PUBLIC_DOMAIN_MIGRATION.md"
       - "docs/E2E_AUTH_PREREQUIS.md"
       - "docs/legal/account-deletion.md"
       - "docs/legal/privacy-policy.md"
       - "tools/build_public_pages.mjs"
       - "tools/tests/build_public_pages.test.mjs"
+      - ".github/workflows-disabled/post-merge-cosmos-account-deletion.yml"
+      - ".github/workflows-disabled/test-account-deletion-cosmos.yml"
+      - "docs/runbooks/COSMOS_EMULATOR_RUNNER.md"
 
 concurrency:
-  group: ci-infra-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ci-infra-${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && (github.event.action == 'opened' || github.event.action == 'synchronize') && github.run_attempt == 1 && github.event.pull_request.number > 0 && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}-{2}', github.event_name, github.run_id, github.run_attempt) }}
+  cancel-in-progress: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.action == 'synchronize' && github.run_attempt == 1 && github.event.pull_request.number > 0 && github.event.after != '' }}
 
 permissions:
   contents: read
 
 jobs:
+  freshness:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+    uses: ./.github/workflows/pr-head-freshness.yml
+    with:
+      pull-request-number: ${{ github.event.pull_request.number }}
+      event-head-sha: ${{ github.event.pull_request.head.sha }}
+    permissions:
+      pull-requests: read
+
   bicep-build:
     name: Bicep build (lint)
-    if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: freshness
+    if: ${{ always() && (github.event_name != 'pull_request_target' || (needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository)) }}
     runs-on: [self-hosted, Linux, X64, certigo-pr]
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
+      - name: Enforce initial PR freshness validation
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        shell: bash
+        env:
+          FRESHNESS_RESULT: ${{ needs.freshness.result }}
+        run: |
+          if [ "$FRESHNESS_RESULT" != "success" ]; then
+            echo "::error::Initial PR head freshness validation did not succeed."
+            exit 1
+          fi
+      - name: Recheck current PR head after assignment
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const eventHead = context.payload.pull_request.head.sha;
+            if (!eventHead || pull.head.sha !== eventHead) {
+              core.setFailed(`Superseded PR event ${eventHead || '<missing>'}; current head is ${pull.head.sha}.`);
+            }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
@@ -81,14 +133,22 @@ jobs:
         run: bash infra/ci-runner/validate.sh
       - name: Validate runner observability metrics
         run: node --test .github/scripts/runner-observability.test.mjs
+      - name: Validate isolated Cosmos emulator runner
+        run: bash infra/ci-runner/cosmos-emulator/validate.sh
       - name: Validate Cosmos indexing policy
         run: node --test infra/tests/cosmos-indexing-policy.test.mjs
       - name: Validate private networking topology
         run: node --test infra/tests/private-networking.test.mjs
+      - name: Validate immutable content storage topology
+        run: node --test infra/tests/content-storage.test.mjs
       - name: Validate FinOps guardrails
         run: node --test infra/tests/finops-guardrails.test.mjs
       - name: Validate public account-deletion policy
         run: node --test tools/tests/build_public_pages.test.mjs
+      - name: Validate public-domain contract
+        run: node --test .github/scripts/public-domain-contract.test.mjs
+      - name: Validate compiled public-domain ARM gates
+        run: node --test infra/tests/public-domain-contract.test.mjs
       - name: Validate secure deployment parameter writer
         run: node --test .github/scripts/write-secure-bicep-parameters.test.mjs
       - name: Validate private URL-based OneDeploy

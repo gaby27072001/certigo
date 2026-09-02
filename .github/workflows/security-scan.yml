@@ -12,11 +12,27 @@ jobs:
     runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
+      pull-requests: read
     env:
       UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
       TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
       CHECKOV_SCAN_LOG: ${{ github.workspace }}/.scanner-state/checkov-results.log
     steps:
+      - name: Recheck current PR head after assignment
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const eventHead = context.payload.pull_request.head.sha;
+            if (!eventHead || pull.head.sha !== eventHead) {
+              core.setFailed(`Superseded PR event ${eventHead || '<missing>'}; current head is ${pull.head.sha}.`);
+            }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
@@ -33,6 +49,38 @@ jobs:
           python-version: "3.12"
       - name: Install pinned Checkov
         run: python -m pip install --disable-pip-version-check checkov==3.2.495
+      - name: Compile immutable runner image templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          bicep="$RUNNER_TEMP/bicep-0.44.1"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$bicep" \
+            https://github.com/Azure/bicep/releases/download/v0.44.1/bicep-linux-x64
+          echo "e17dc9a9888184886bb0c0051a3230b83b19f342749999f707bc571c3dfd2f45  $bicep" |
+            sha256sum --check --strict
+          chmod 0755 "$bicep"
+          compiled="$RUNNER_TEMP/runner-image-arm"
+          mkdir -p "$compiled"
+          for template in image-build canary canary-main; do
+            "$bicep" build \
+              "$UNTRUSTED_SOURCE_DIR/infra/ci-runner/image/${template}.bicep" \
+              --outfile "$compiled/${template}.json"
+          done
+      - name: Scan compiled runner image ARM
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Exact attested Gallery versions require manual model updates; automatic
+          # OS upgrades would bypass the reviewed provenance and rollback contract.
+          cat > "$RUNNER_TEMP/runner-image-checkov.yaml" <<'YAML'
+          skip-check:
+            - CKV_AZURE_95
+          YAML
+          checkov \
+            --directory "$RUNNER_TEMP/runner-image-arm" \
+            --framework arm \
+            --config-file "$RUNNER_TEMP/runner-image-checkov.yaml"
       - name: Run Checkov on infra/
         run: |
           set -uo pipefail

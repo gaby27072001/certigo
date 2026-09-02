@@ -61,6 +61,7 @@ param cosmosLocation = 'northeurope'
 param entraAuthority = 'https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0'
 // Audience = Application ID URI of the staging backend app registration.
 param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
+param personLinkedIdentityV1 = 'off'
 
 // authJwtSigningKey and authJwtSigningKeyExpiresOn are supplied out-of-band by CD
 // from the staging Environment secret/variable pair. main.bicep rejects an omitted
@@ -68,6 +69,9 @@ param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
 
 // alertEmail is injected by CD from the non-secret ALERT_EMAIL variable on the
 // staging GitHub Environment. Never commit an operator address here.
+// PUBLIC_WEB_ORIGIN, PUBLIC_DOMAIN_VERIFIED and
+// APPLE_CIAM_DOMAIN_RECONFIGURED are also injected from this GitHub Environment.
+// They remain empty/false until a controlled public domain is verified.
 
 // Paid Defender plans off by default; enable when budget is approved.
 param enableDefenderPlans = false

@@ -101,11 +101,22 @@ class DependencyLockValidatorTests(unittest.TestCase):
                 "pubManifests": [
                     "packages/app/pubspec.yaml",
                     "packages/core/pubspec.yaml",
-                ],
-                "allowedEmptyNugetPackages": ["app"],
+                ]
             },
             json.loads(output.read_text(encoding="utf-8")),
         )
+
+    def test_rejects_legacy_empty_version_allowlist(self) -> None:
+        output = self.root / "expected.json"
+        output.write_text(
+            json.dumps({"allowedEmptyNugetPackages": ["ProjectReference"]}),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(
+            validator.DependencyLockError,
+            "allowedEmptyNugetPackages is forbidden",
+        ):
+            validator.validate_repository(self.root, output)
 
     def test_rejects_missing_or_stale_npm_lock(self) -> None:
         subprocess.run(

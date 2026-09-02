@@ -1,0 +1,115 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Certigo Enterprise Learning Metrics",
+    "version": "1.3.0",
+    "description": "Dormant organization-scoped metrics contract. Runtime supports off only."
+  },
+  "servers": [{ "url": "/api" }],
+  "security": [{ "bearerAuth": [] }],
+  "x-certigo-feature-mode": {
+    "setting": "ENTERPRISE_LEARNING_METRICS_V1",
+    "default": "off",
+    "implementedValues": ["off"],
+    "offHttpStatus": 404
+  },
+  "x-certigo-privacy": {
+    "minimumContributorsPerFixedBucket": 5,
+    "arbitraryRangesSupported": false,
+    "smallBucketSuppression": true,
+    "personalOrPortableLearningDataStored": false
+  },
+  "paths": {
+    "/v1/organizations/{organizationId}/learning-metrics/sessions": {
+      "post": {
+        "operationId": "startEnterpriseLearningSessionV1",
+        "description": "Creates one server-issued active lease per membership-cycle subject. Creation contributes no metrics.",
+        "parameters": [{ "$ref": "#/components/parameters/OrganizationId" }],
+        "responses": {
+          "200": { "description": "Opaque server session id and lease token returned once" },
+          "404": { "$ref": "#/components/responses/SurfaceDisabled" },
+          "409": { "description": "An unexpired subject-wide lease already exists" }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/learning-metrics/heartbeats": {
+      "post": {
+        "operationId": "recordEnterpriseLearningHeartbeatV1",
+        "description": "Carries lease proof and sequence only. Metric deltas are derived from server-authoritative facts.",
+        "parameters": [{ "$ref": "#/components/parameters/OrganizationId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Heartbeat" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Created or idempotently replayed" },
+          "404": { "$ref": "#/components/responses/SurfaceDisabled" },
+          "409": { "description": "Lease, sequence, replay hash, or CAS conflict" }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/learning-metrics/daily/{day}": {
+      "get": {
+        "operationId": "getEnterpriseLearningDailySummaryV1",
+        "description": "One fixed UTC day only. Small buckets are suppressed independently before return.",
+        "parameters": [
+          { "$ref": "#/components/parameters/OrganizationId" },
+          { "name": "day", "in": "path", "required": true, "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": {
+          "200": { "description": "Disclosure-safe fixed daily bucket" },
+          "403": { "description": "Learner role cannot read enterprise aggregates" },
+          "404": { "$ref": "#/components/responses/SurfaceDisabled" }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/learning-metrics/active": {
+      "get": {
+        "operationId": "getEnterpriseLearningActiveSummaryV1",
+        "description": "Current fixed five-minute bucket from 128 preaggregated active-subject shards; never scans sessions.",
+        "parameters": [{ "$ref": "#/components/parameters/OrganizationId" }],
+        "responses": {
+          "200": { "description": "Suppressed or disclosure-safe active contributor lower bound" },
+          "403": { "description": "Learner role cannot read enterprise aggregates" },
+          "404": { "$ref": "#/components/responses/SurfaceDisabled" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "parameters": {
+      "OrganizationId": {
+        "name": "organizationId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" }
+      }
+    },
+    "schemas": {
+      "Heartbeat": {
+        "type": "object",
+        "required": ["sessionId", "leaseToken", "operationId", "sequence", "occurredAt"],
+        "properties": {
+          "sessionId": { "type": "string", "minLength": 16, "maxLength": 200 },
+          "leaseToken": { "type": "string", "minLength": 16, "maxLength": 200, "writeOnly": true },
+          "operationId": { "type": "string", "minLength": 16, "maxLength": 200 },
+          "sequence": { "type": "integer", "minimum": 1 },
+          "occurredAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "responses": {
+      "SurfaceDisabled": {
+        "description": "Not found before authentication or service access while feature-off."
+      }
+    }
+  }
+}

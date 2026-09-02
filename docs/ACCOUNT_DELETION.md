@@ -103,18 +103,18 @@ expiration est appliquée au secret Key Vault et contrôlée par Checkov.
 
 ### Gate d’intégration Cosmos
 
-Le workflow trusted `test-account-deletion-cosmos.yml`, chargé uniquement depuis
-`main` par un `repository_dispatch` manuel sans payload, autorise uniquement un
-émulateur Docker local sur runner éphémère. Il génère une clé aléatoire pour le
-run, crée une base unique et supprime le conteneur en `finally`. Il n’utilise
-aucune identité Azure, aucun rôle data-plane et aucune donnée live.
+Le gate historique `test-account-deletion-cosmos.yml` est retiré de
+`.github/workflows/` : il ciblait le pool `certigo-trusted` et ne constitue pas
+une preuve d’isolement suffisante. Son remplacement one-shot reste **feature-off**
+dans `.github/workflows-disabled/post-merge-cosmos-account-deletion.yml`.
 
-Déclenchement opérateur, après présence du workflow sur `main` :
-
-```powershell
-'{"event_type":"test-account-deletion-cosmos","client_payload":{}}' |
-  gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input -
-```
+Il ne peut être déplacé sous `.github/workflows/` que par une PR d’activation
+séparée, variable `CERTIGO_COSMOS_EMULATOR_ENABLED=false`. Le test post-merge
+requiert ensuite une VM jetable sans identité managée, le label exclusif
+`certigo-cosmos-emulator`, un checkout vérifié de `main`, puis un unique
+`workflow_dispatch` avec la variable temporairement à `true`. Les prérequis,
+permissions, bornes et preuves de destruction sont détaillés dans
+`docs/runbooks/COSMOS_EMULATOR_RUNNER.md`.
 
 ### Validation Apple restante après déploiement
 
@@ -123,15 +123,15 @@ Effectuer un test réel avec un compte Apple sacrifiable : créer la connexion v
 l’association Apple n’existe plus ou est révoquée. C’est la seule validation
 Apple encore ouverte pour ce flux.
 
-Les actions humaines non liées à ce câblage restent :
-
-1. Enregistrer
-   `https://gchambaud_microsoft.github.io/Certigo/account-deletion/` dans le champ
-   URL de suppression du compte de Play Console après publication de la page.
+L'URL publique de suppression de compte reste volontairement non configurée.
+Elle ne peut être publiée ou inscrite dans Play Console qu'après satisfaction du
+contrat fail-closed décrit dans
+[`PUBLIC_DOMAIN_MIGRATION.md`](./PUBLIC_DOMAIN_MIGRATION.md). Une URL GitHub
+Pages n'est pas un fallback implicite : sa possession, sa stabilité et sa
+compatibilité stores doivent être prouvées comme pour toute autre origine.
 
 Cette PR ne renseigne aucune valeur de production et ne publie aucune page. Les
-promotions Bicep, le test Apple réel, le dispatch GitHub Pages et les déclarations
-des consoles store restent des actions humaines avant soumission.
+actions humaines post-acquisition sont regroupées dans le guide de migration.
 
 Le contact public approuvé est `gabriel.chambaud@icloud.com`. La politique
 approuvée ne demande aucune pièce d’identité.

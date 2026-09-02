@@ -468,7 +468,7 @@ internal sealed class FakeContentService : IContentService
 
     private static CatalogDto DefaultCatalog() =>
         new(
-            CertificationCatalogSchemas.EmittedAppV2,
+            CertificationCatalogSchemas.AppV2,
             CertificationCatalogSchemas.SourceV1,
             null,
             null,

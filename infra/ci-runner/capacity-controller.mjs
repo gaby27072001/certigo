@@ -62,9 +62,13 @@ function validateCapacityConfig(config) {
     throw new Error('at least two exclusive pools and subnets are required');
   }
   if (
+    !Array.isArray(config.inventory?.externalGithubRunnerIds) ||
     !Array.isArray(config.inventory?.externalVirtualMachines) ||
     !Array.isArray(config.inventory?.forbiddenVirtualMachines) ||
     !Array.isArray(config.inventory?.managedRunnerBindings) ||
+    config.inventory.externalGithubRunnerIds.some(
+      (id) => !Number.isInteger(id) || id <= 0,
+    ) ||
     config.inventory.externalVirtualMachines.some(
       (name) => typeof name !== 'string' || name.length === 0,
     ) ||
@@ -138,6 +142,17 @@ function validateCapacityConfig(config) {
       'scale-in requires a resettable 300-second quiet period and two guards',
     );
   }
+  if (
+    !Array.isArray(config.scaleInOrder) ||
+    config.scaleInOrder.length !== trustClasses.length ||
+    config.scaleInOrder.some(
+      (trustClass, index) => trustClass !== trustClasses[index],
+    )
+  ) {
+    throw new Error(
+      'scaleInOrder must deallocate certigo-pr before certigo-trusted',
+    );
+  }
 }
 
 export function reduceWorkflowJobState(state, event, now) {
@@ -188,7 +203,9 @@ export function createCapacityPlan({
   event,
   inventory,
   leaseHeld = false,
+  leaseGeneration,
   now = Date.now(),
+  persistedStateRevision,
   state = { jobs: {} },
 }) {
   if (config.trigger !== 'workflow_job') {
@@ -203,9 +220,45 @@ export function createCapacityPlan({
       `capacity state version ${state.version} is not supported`,
     );
   }
+  const stateRevision = state.revision ?? 0;
+  if (!Number.isInteger(stateRevision) || stateRevision < 0) {
+    throw new Error('capacity state revision must be a non-negative integer');
+  }
+  const persistedRevisionProvided =
+    persistedStateRevision !== undefined;
+  const persistedRevision = persistedRevisionProvided
+    ? persistedStateRevision
+    : null;
+  if (
+    persistedRevisionProvided &&
+    (!Number.isInteger(persistedRevision) || persistedRevision < 0)
+  ) {
+    throw new Error(
+      'persisted state revision must be a non-negative integer',
+    );
+  }
+  const leaseGenerationValid =
+    Number.isInteger(leaseGeneration) && leaseGeneration > 0;
+  const sameLeaseGeneration =
+    state.leaseGeneration === undefined ||
+    state.leaseGeneration === leaseGeneration;
+  const mutationFenceReady =
+    !config.leaseRequired ||
+    (leaseHeld &&
+      leaseGenerationValid &&
+      sameLeaseGeneration &&
+      persistedRevisionProvided &&
+      persistedRevision === stateRevision);
 
   const nextState = reduceWorkflowJobState(state, event, now);
   nextState.version = config.stateVersion;
+  nextState.revision = stateRevision + 1;
+  if (leaseGenerationValid) {
+    nextState.leaseGeneration = leaseGeneration;
+  }
+  if (!sameLeaseGeneration) {
+    nextState.scaleInSafety = {};
+  }
   const jobs = Object.values(nextState.jobs);
   const stateQueued = jobs.filter((job) => job.status === 'queued').length;
   const stateActive = jobs.filter((job) => job.status === 'in_progress').length;
@@ -335,16 +388,15 @@ export function createCapacityPlan({
   const targetCapacityByTrust = modeCapacity(config, mode);
   const targetCapacity = aggregateCapacity(targetCapacityByTrust);
   const workloadIdle = queued === 0 && active === 0 && busy === 0;
-  const normalCapacityByTrust = modeCapacity(config, 'normal');
   const pendingRearmTarget =
     nextState.scaleInSafety?.rearmTargetCapacityByTrust ?? null;
   const scaleInBaseSafe =
     workloadIdle &&
     exclusiveBoundariesReady &&
-    Object.keys(normalCapacityByTrust).every(
+    Object.keys(currentCapacityByTrust).every(
       (trustClass) =>
-        usableCapacityByTrust[trustClass] >=
-        normalCapacityByTrust[trustClass],
+        usableCapacityByTrust[trustClass] ===
+        currentCapacityByTrust[trustClass],
     );
   const scaleInSafety = advanceScaleInSafety({
     idle: scaleInBaseSafe,
@@ -414,18 +466,11 @@ export function createCapacityPlan({
     nextCapacityByTrust[targetTrustClass] += config.scaleStep;
   } else if (targetCapacity < currentCapacity && scaleInSafe) {
     action = 'scale-in-one';
-    targetTrustClass = Object.keys(targetCapacityByTrust)
-      .filter(
-        (trustClass) =>
-          currentCapacityByTrust[trustClass] >
-          targetCapacityByTrust[trustClass],
-      )
-      .sort(
-        (left, right) =>
-          currentCapacityByTrust[right] -
-          targetCapacityByTrust[right] -
-          (currentCapacityByTrust[left] - targetCapacityByTrust[left]),
-      )[0];
+    targetTrustClass = config.scaleInOrder.find(
+      (trustClass) =>
+        currentCapacityByTrust[trustClass] >
+        targetCapacityByTrust[trustClass],
+    );
     nextCapacity = Math.max(currentCapacity - config.scaleStep, targetCapacity);
     nextCapacityByTrust[targetTrustClass] -= config.scaleStep;
   }
@@ -441,6 +486,24 @@ export function createCapacityPlan({
   }
   if (config.leaseRequired && !leaseHeld) {
     blockers.push('a distributed lease is required before any mutable action');
+  }
+  if (
+    config.leaseRequired &&
+    leaseHeld &&
+    (!leaseGenerationValid || !sameLeaseGeneration)
+  ) {
+    blockers.push(
+      'the distributed lease requires a stable positive fencing generation',
+    );
+  }
+  if (!persistedRevisionProvided) {
+    blockers.push(
+      'the persisted capacity state revision is required before any mutable action',
+    );
+  } else if (persistedRevision !== stateRevision) {
+    blockers.push(
+      'the capacity state revision is stale and must be reloaded before planning',
+    );
   }
   if (targetCapacity < currentCapacity && !scaleInSafe) {
     blockers.push(
@@ -460,7 +523,7 @@ export function createCapacityPlan({
   const canRequestChange =
     config.enabled &&
     exclusiveBoundariesReady &&
-    (!config.leaseRequired || leaseHeld) &&
+    mutationFenceReady &&
     action !== 'hold';
   if (action === 'scale-in-one' && canRequestChange) {
     nextState.scaleInSafety = armScaleInReactivation(
@@ -491,6 +554,12 @@ export function createCapacityPlan({
     scaleInSafe,
     canRequestChange,
     blockers,
+    mutationFence: {
+      leaseGeneration: leaseGenerationValid ? leaseGeneration : null,
+      persistedStateRevision: persistedRevision,
+      requiredStateRevision: stateRevision,
+      ready: mutationFenceReady,
+    },
     safety: {
       guardCount: scaleInSafety.guardCount,
       quietComplete: scaleInSafety.quietComplete,
@@ -519,6 +588,9 @@ export function createCapacityPlan({
         poolBoundaries.distinctIdentityBoundaryCount,
       distinctSubnetCount: poolBoundaries.distinctSubnetCount,
       externalVirtualMachines: instanceInventory.externalVirtualMachines,
+      externalGitHubRunnerIds: instanceInventory.externalGitHubRunners.map(
+        (runner) => Number(runner.id),
+      ),
       forbiddenVirtualMachinesPresent:
         instanceInventory.forbiddenVirtualMachinesPresent,
       managedMachineNames: instanceInventory.managedMachineNames,

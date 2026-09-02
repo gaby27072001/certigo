@@ -1,0 +1,1276 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:c18f421d-f54e-4b63-b623-f2300349a733",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "operating-system",
+      "bom-ref": "pkg:generic/ubuntu@24.04",
+      "name": "Ubuntu",
+      "version": "24.04",
+      "purl": "pkg:generic/ubuntu@24.04"
+    },
+    "properties": [
+      {
+        "name": "certigo:project-dependency-caches-persisted",
+        "value": "false"
+      },
+      {
+        "name": "certigo:dotnet-workloads",
+        "value": "none"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "application",
+      "bom-ref": "pkg:github/actions/runner@2.336.0",
+      "name": "GitHub Actions Runner",
+      "version": "2.336.0",
+      "purl": "pkg:github/actions/runner@2.336.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:generic/azure-cli@2.89.0",
+      "name": "Azure CLI",
+      "version": "2.89.0",
+      "purl": "pkg:generic/azure-cli@2.89.0"
+    },
+    {
+      "type": "framework",
+      "bom-ref": "pkg:generic/flutter@3.44.4",
+      "name": "Flutter",
+      "version": "3.44.4",
+      "purl": "pkg:generic/flutter@3.44.4",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c853cda0312a162854c481fe6a1bc286d84fbb74bfab7037c39750061dc9b466"
+        }
+      ]
+    },
+    {
+      "type": "framework",
+      "bom-ref": "pkg:generic/dart@3.12.2",
+      "name": "Dart",
+      "version": "3.12.2",
+      "purl": "pkg:generic/dart@3.12.2"
+    },
+    {
+      "type": "framework",
+      "bom-ref": "pkg:generic/dart@3.6.0?classifier=formatter",
+      "name": "Dart formatter SDK",
+      "version": "3.6.0",
+      "purl": "pkg:generic/dart@3.6.0?classifier=formatter",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8e14ff436e1eec72618dabc94f421a97251f2068c9cc9ad2d3bb9d232d6155a3"
+        }
+      ]
+    },
+    {
+      "type": "framework",
+      "bom-ref": "pkg:generic/dotnet-sdk@8.0.424",
+      "name": ".NET SDK",
+      "version": "8.0.424",
+      "purl": "pkg:generic/dotnet-sdk@8.0.424",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "6503fd9f464d5e3a4f43a881d2b74afc6a2c46ceda74d027f1565b7239f4b3ec884857c03c0dcd49eb52f384d5ae1fa5aaf135f0a6aabc5518103aceed643c74"
+        }
+      ]
+    },
+    {
+      "type": "framework",
+      "bom-ref": "pkg:generic/python@3.12.3",
+      "name": "Python",
+      "version": "3.12.3",
+      "purl": "pkg:generic/python@3.12.3"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:generic/node@20.20.2",
+      "name": "Node.js",
+      "version": "20.20.2",
+      "purl": "pkg:generic/node@20.20.2",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:npm/npm@10.8.2",
+      "name": "npm",
+      "version": "10.8.2",
+      "purl": "pkg:npm/npm@10.8.2"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:generic/bicep@0.44.1",
+      "name": "Bicep CLI",
+      "version": "0.44.1",
+      "purl": "pkg:generic/bicep@0.44.1",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e17dc9a9888184886bb0c0051a3230b83b19f342749999f707bc571c3dfd2f45"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:github/rhysd/actionlint@1.7.12",
+      "name": "actionlint",
+      "version": "1.7.12",
+      "purl": "pkg:github/rhysd/actionlint@1.7.12",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/aiodns@3.6.1",
+      "name": "aiodns",
+      "version": "3.6.1",
+      "purl": "pkg:pypi/aiodns@3.6.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/aiohappyeyeballs@2.7.1",
+      "name": "aiohappyeyeballs",
+      "version": "2.7.1",
+      "purl": "pkg:pypi/aiohappyeyeballs@2.7.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/aiohttp@3.14.3",
+      "name": "aiohttp",
+      "version": "3.14.3",
+      "purl": "pkg:pypi/aiohttp@3.14.3"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/aiomultiprocess@0.9.1",
+      "name": "aiomultiprocess",
+      "version": "0.9.1",
+      "purl": "pkg:pypi/aiomultiprocess@0.9.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/aiosignal@1.4.0",
+      "name": "aiosignal",
+      "version": "1.4.0",
+      "purl": "pkg:pypi/aiosignal@1.4.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/annotated-types@0.8.0",
+      "name": "annotated-types",
+      "version": "0.8.0",
+      "purl": "pkg:pypi/annotated-types@0.8.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/argcomplete@3.7.2",
+      "name": "argcomplete",
+      "version": "3.7.2",
+      "purl": "pkg:pypi/argcomplete@3.7.2"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/asteval@1.0.6",
+      "name": "asteval",
+      "version": "1.0.6",
+      "purl": "pkg:pypi/asteval@1.0.6"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/attrs@26.1.0",
+      "name": "attrs",
+      "version": "26.1.0",
+      "purl": "pkg:pypi/attrs@26.1.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/bc-detect-secrets@1.5.45",
+      "name": "bc-detect-secrets",
+      "version": "1.5.45",
+      "purl": "pkg:pypi/bc-detect-secrets@1.5.45"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/bc-jsonpath-ng@1.6.1",
+      "name": "bc-jsonpath-ng",
+      "version": "1.6.1",
+      "purl": "pkg:pypi/bc-jsonpath-ng@1.6.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/bc-python-hcl2@0.4.3",
+      "name": "bc-python-hcl2",
+      "version": "0.4.3",
+      "purl": "pkg:pypi/bc-python-hcl2@0.4.3"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/beartype@0.22.9",
+      "name": "beartype",
+      "version": "0.22.9",
+      "purl": "pkg:pypi/beartype@0.22.9"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/beautifulsoup4@4.15.0",
+      "name": "beautifulsoup4",
+      "version": "4.15.0",
+      "purl": "pkg:pypi/beautifulsoup4@4.15.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/boolean-py@5.0",
+      "name": "boolean-py",
+      "version": "5.0",
+      "purl": "pkg:pypi/boolean-py@5.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/boto3@1.35.49",
+      "name": "boto3",
+      "version": "1.35.49",
+      "purl": "pkg:pypi/boto3@1.35.49"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/botocore@1.35.99",
+      "name": "botocore",
+      "version": "1.35.99",
+      "purl": "pkg:pypi/botocore@1.35.99"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/cached-property@2.0.1",
+      "name": "cached-property",
+      "version": "2.0.1",
+      "purl": "pkg:pypi/cached-property@2.0.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/cachetools@5.5.2",
+      "name": "cachetools",
+      "version": "5.5.2",
+      "purl": "pkg:pypi/cachetools@5.5.2"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/certifi@2026.7.22",
+      "name": "certifi",
+      "version": "2026.7.22",
+      "purl": "pkg:pypi/certifi@2026.7.22"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/cffi@2.1.1",
+      "name": "cffi",
+      "version": "2.1.1",
+      "purl": "pkg:pypi/cffi@2.1.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/charset-normalizer@3.5.1",
+      "name": "charset-normalizer",
+      "version": "3.5.1",
+      "purl": "pkg:pypi/charset-normalizer@3.5.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/checkov@3.2.495",
+      "name": "checkov",
+      "version": "3.2.495",
+      "purl": "pkg:pypi/checkov@3.2.495"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/click@8.5.0",
+      "name": "click",
+      "version": "8.5.0",
+      "purl": "pkg:pypi/click@8.5.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/click-option-group@0.5.9",
+      "name": "click-option-group",
+      "version": "0.5.9",
+      "purl": "pkg:pypi/click-option-group@0.5.9"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/cloudsplaining@0.7.0",
+      "name": "cloudsplaining",
+      "version": "0.7.0",
+      "purl": "pkg:pypi/cloudsplaining@0.7.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/colorama@0.4.6",
+      "name": "colorama",
+      "version": "0.4.6",
+      "purl": "pkg:pypi/colorama@0.4.6"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/configargparse@1.7.5",
+      "name": "configargparse",
+      "version": "1.7.5",
+      "purl": "pkg:pypi/configargparse@1.7.5"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/contextlib2@21.6.0",
+      "name": "contextlib2",
+      "version": "21.6.0",
+      "purl": "pkg:pypi/contextlib2@21.6.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/cyclonedx-python-lib@7.6.2",
+      "name": "cyclonedx-python-lib",
+      "version": "7.6.2",
+      "purl": "pkg:pypi/cyclonedx-python-lib@7.6.2"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/decorator@5.3.1",
+      "name": "decorator",
+      "version": "5.3.1",
+      "purl": "pkg:pypi/decorator@5.3.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/defusedxml@0.7.1",
+      "name": "defusedxml",
+      "version": "0.7.1",
+      "purl": "pkg:pypi/defusedxml@0.7.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/docker@7.2.0",
+      "name": "docker",
+      "version": "7.2.0",
+      "purl": "pkg:pypi/docker@7.2.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/dockerfile-parse@2.0.1",
+      "name": "dockerfile-parse",
+      "version": "2.0.1",
+      "purl": "pkg:pypi/dockerfile-parse@2.0.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/dpath@2.1.3",
+      "name": "dpath",
+      "version": "2.1.3",
+      "purl": "pkg:pypi/dpath@2.1.3"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/frozenlist@1.8.0",
+      "name": "frozenlist",
+      "version": "1.8.0",
+      "purl": "pkg:pypi/frozenlist@1.8.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/gitdb@4.0.12",
+      "name": "gitdb",
+      "version": "4.0.12",
+      "purl": "pkg:pypi/gitdb@4.0.12"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/gitpython@3.1.61",
+      "name": "gitpython",
+      "version": "3.1.61",
+      "purl": "pkg:pypi/gitpython@3.1.61"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/idna@3.19",
+      "name": "idna",
+      "version": "3.19",
+      "purl": "pkg:pypi/idna@3.19"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/importlib-metadata@7.2.1",
+      "name": "importlib-metadata",
+      "version": "7.2.1",
+      "purl": "pkg:pypi/importlib-metadata@7.2.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/jinja2@3.1.6",
+      "name": "jinja2",
+      "version": "3.1.6",
+      "purl": "pkg:pypi/jinja2@3.1.6"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/jmespath@1.1.0",
+      "name": "jmespath",
+      "version": "1.1.0",
+      "purl": "pkg:pypi/jmespath@1.1.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/jsonschema@4.26.0",
+      "name": "jsonschema",
+      "version": "4.26.0",
+      "purl": "pkg:pypi/jsonschema@4.26.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/jsonschema-specifications@2025.9.1",
+      "name": "jsonschema-specifications",
+      "version": "2025.9.1",
+      "purl": "pkg:pypi/jsonschema-specifications@2025.9.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/junit-xml@1.9",
+      "name": "junit-xml",
+      "version": "1.9",
+      "purl": "pkg:pypi/junit-xml@1.9"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/lark@1.3.1",
+      "name": "lark",
+      "version": "1.3.1",
+      "purl": "pkg:pypi/lark@1.3.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/license-expression@30.4.4",
+      "name": "license-expression",
+      "version": "30.4.4",
+      "purl": "pkg:pypi/license-expression@30.4.4"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/markdown@3.10.3",
+      "name": "markdown",
+      "version": "3.10.3",
+      "purl": "pkg:pypi/markdown@3.10.3"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/markupsafe@3.0.3",
+      "name": "markupsafe",
+      "version": "3.0.3",
+      "purl": "pkg:pypi/markupsafe@3.0.3"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/multidict@6.7.1",
+      "name": "multidict",
+      "version": "6.7.1",
+      "purl": "pkg:pypi/multidict@6.7.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/networkx@2.6.3",
+      "name": "networkx",
+      "version": "2.6.3",
+      "purl": "pkg:pypi/networkx@2.6.3"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/numpy@2.2.6",
+      "name": "numpy",
+      "version": "2.2.6",
+      "purl": "pkg:pypi/numpy@2.2.6"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/orjson@3.12.0",
+      "name": "orjson",
+      "version": "3.12.0",
+      "purl": "pkg:pypi/orjson@3.12.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/packageurl-python@0.13.4",
+      "name": "packageurl-python",
+      "version": "0.13.4",
+      "purl": "pkg:pypi/packageurl-python@0.13.4"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/packaging@23.2",
+      "name": "packaging",
+      "version": "23.2",
+      "purl": "pkg:pypi/packaging@23.2"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/ply@3.11",
+      "name": "ply",
+      "version": "3.11",
+      "purl": "pkg:pypi/ply@3.11"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/policy-sentry@0.13.2",
+      "name": "policy-sentry",
+      "version": "0.13.2",
+      "purl": "pkg:pypi/policy-sentry@0.13.2"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/prettytable@3.18.0",
+      "name": "prettytable",
+      "version": "3.18.0",
+      "purl": "pkg:pypi/prettytable@3.18.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/propcache@0.5.2",
+      "name": "propcache",
+      "version": "0.5.2",
+      "purl": "pkg:pypi/propcache@0.5.2"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/py-serializable@1.1.2",
+      "name": "py-serializable",
+      "version": "1.1.2",
+      "purl": "pkg:pypi/py-serializable@1.1.2"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/pycares@4.9.0",
+      "name": "pycares",
+      "version": "4.9.0",
+      "purl": "pkg:pypi/pycares@4.9.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/pycep-parser@0.5.1",
+      "name": "pycep-parser",
+      "version": "0.5.1",
+      "purl": "pkg:pypi/pycep-parser@0.5.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/pycparser@3.0",
+      "name": "pycparser",
+      "version": "3.0",
+      "purl": "pkg:pypi/pycparser@3.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/pydantic@2.13.5",
+      "name": "pydantic",
+      "version": "2.13.5",
+      "purl": "pkg:pypi/pydantic@2.13.5"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/pydantic-core@2.46.5",
+      "name": "pydantic-core",
+      "version": "2.46.5",
+      "purl": "pkg:pypi/pydantic-core@2.46.5"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/pyparsing@3.3.2",
+      "name": "pyparsing",
+      "version": "3.3.2",
+      "purl": "pkg:pypi/pyparsing@3.3.2"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/python-dateutil@2.9.0.post0",
+      "name": "python-dateutil",
+      "version": "2.9.0.post0",
+      "purl": "pkg:pypi/python-dateutil@2.9.0.post0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyyaml@6.0.2",
+      "name": "pyyaml",
+      "version": "6.0.2",
+      "purl": "pkg:pypi/pyyaml@6.0.2"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/rdflib@7.6.0",
+      "name": "rdflib",
+      "version": "7.6.0",
+      "purl": "pkg:pypi/rdflib@7.6.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/referencing@0.37.0",
+      "name": "referencing",
+      "version": "0.37.0",
+      "purl": "pkg:pypi/referencing@0.37.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/regex@2026.8.31",
+      "name": "regex",
+      "version": "2026.8.31",
+      "purl": "pkg:pypi/regex@2026.8.31"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/requests@2.34.2",
+      "name": "requests",
+      "version": "2.34.2",
+      "purl": "pkg:pypi/requests@2.34.2"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/rpds-py@2026.6.3",
+      "name": "rpds-py",
+      "version": "2026.6.3",
+      "purl": "pkg:pypi/rpds-py@2026.6.3"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/rustworkx@0.18.1",
+      "name": "rustworkx",
+      "version": "0.18.1",
+      "purl": "pkg:pypi/rustworkx@0.18.1"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/s3transfer@0.10.4",
+      "name": "s3transfer",
+      "version": "0.10.4",
+      "purl": "pkg:pypi/s3transfer@0.10.4"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/schema@0.7.5",
+      "name": "schema",
+      "version": "0.7.5",
+      "purl": "pkg:pypi/schema@0.7.5"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/semantic-version@2.10.0",
+      "name": "semantic-version",
+      "version": "2.10.0",
+      "purl": "pkg:pypi/semantic-version@2.10.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/six@1.17.0",
+      "name": "six",
+      "version": "1.17.0",
+      "purl": "pkg:pypi/six@1.17.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/smmap@5.0.3",
+      "name": "smmap",
+      "version": "5.0.3",
+      "purl": "pkg:pypi/smmap@5.0.3"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/sortedcontainers@2.4.0",
+      "name": "sortedcontainers",
+      "version": "2.4.0",
+      "purl": "pkg:pypi/sortedcontainers@2.4.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/soupsieve@2.9.2",
+      "name": "soupsieve",
+      "version": "2.9.2",
+      "purl": "pkg:pypi/soupsieve@2.9.2"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/spdx-tools@0.8.5",
+      "name": "spdx-tools",
+      "version": "0.8.5",
+      "purl": "pkg:pypi/spdx-tools@0.8.5"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/tabulate@0.9.0",
+      "name": "tabulate",
+      "version": "0.9.0",
+      "purl": "pkg:pypi/tabulate@0.9.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/termcolor@2.3.0",
+      "name": "termcolor",
+      "version": "2.3.0",
+      "purl": "pkg:pypi/termcolor@2.3.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/tqdm@4.70.0",
+      "name": "tqdm",
+      "version": "4.70.0",
+      "purl": "pkg:pypi/tqdm@4.70.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/typing-extensions@4.16.0",
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "purl": "pkg:pypi/typing-extensions@4.16.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/typing-inspection@0.4.4",
+      "name": "typing-inspection",
+      "version": "0.4.4",
+      "purl": "pkg:pypi/typing-inspection@0.4.4"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/unidiff@1.0.0",
+      "name": "unidiff",
+      "version": "1.0.0",
+      "purl": "pkg:pypi/unidiff@1.0.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/uritools@6.1.3",
+      "name": "uritools",
+      "version": "6.1.3",
+      "purl": "pkg:pypi/uritools@6.1.3"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/urllib3@2.7.0",
+      "name": "urllib3",
+      "version": "2.7.0",
+      "purl": "pkg:pypi/urllib3@2.7.0"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/wcwidth@0.8.3",
+      "name": "wcwidth",
+      "version": "0.8.3",
+      "purl": "pkg:pypi/wcwidth@0.8.3"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/xmltodict@1.0.4",
+      "name": "xmltodict",
+      "version": "1.0.4",
+      "purl": "pkg:pypi/xmltodict@1.0.4"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/yarl@1.24.5",
+      "name": "yarl",
+      "version": "1.24.5",
+      "purl": "pkg:pypi/yarl@1.24.5"
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/zipp@4.1.0",
+      "name": "zipp",
+      "version": "4.1.0",
+      "purl": "pkg:pypi/zipp@4.1.0"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:pypi/checkov@3.2.495",
+      "dependsOn": [
+        "pkg:pypi/aiodns@3.6.1",
+        "pkg:pypi/aiohappyeyeballs@2.7.1",
+        "pkg:pypi/aiohttp@3.14.3",
+        "pkg:pypi/aiomultiprocess@0.9.1",
+        "pkg:pypi/aiosignal@1.4.0",
+        "pkg:pypi/annotated-types@0.8.0",
+        "pkg:pypi/argcomplete@3.7.2",
+        "pkg:pypi/asteval@1.0.6",
+        "pkg:pypi/attrs@26.1.0",
+        "pkg:pypi/bc-detect-secrets@1.5.45",
+        "pkg:pypi/bc-jsonpath-ng@1.6.1",
+        "pkg:pypi/bc-python-hcl2@0.4.3",
+        "pkg:pypi/beartype@0.22.9",
+        "pkg:pypi/beautifulsoup4@4.15.0",
+        "pkg:pypi/boolean-py@5.0",
+        "pkg:pypi/boto3@1.35.49",
+        "pkg:pypi/botocore@1.35.99",
+        "pkg:pypi/cached-property@2.0.1",
+        "pkg:pypi/cachetools@5.5.2",
+        "pkg:pypi/certifi@2026.7.22",
+        "pkg:pypi/cffi@2.1.1",
+        "pkg:pypi/charset-normalizer@3.5.1",
+        "pkg:pypi/click@8.5.0",
+        "pkg:pypi/click-option-group@0.5.9",
+        "pkg:pypi/cloudsplaining@0.7.0",
+        "pkg:pypi/colorama@0.4.6",
+        "pkg:pypi/configargparse@1.7.5",
+        "pkg:pypi/contextlib2@21.6.0",
+        "pkg:pypi/cyclonedx-python-lib@7.6.2",
+        "pkg:pypi/decorator@5.3.1",
+        "pkg:pypi/defusedxml@0.7.1",
+        "pkg:pypi/docker@7.2.0",
+        "pkg:pypi/dockerfile-parse@2.0.1",
+        "pkg:pypi/dpath@2.1.3",
+        "pkg:pypi/frozenlist@1.8.0",
+        "pkg:pypi/gitdb@4.0.12",
+        "pkg:pypi/gitpython@3.1.61",
+        "pkg:pypi/idna@3.19",
+        "pkg:pypi/importlib-metadata@7.2.1",
+        "pkg:pypi/jinja2@3.1.6",
+        "pkg:pypi/jmespath@1.1.0",
+        "pkg:pypi/jsonschema@4.26.0",
+        "pkg:pypi/jsonschema-specifications@2025.9.1",
+        "pkg:pypi/junit-xml@1.9",
+        "pkg:pypi/lark@1.3.1",
+        "pkg:pypi/license-expression@30.4.4",
+        "pkg:pypi/markdown@3.10.3",
+        "pkg:pypi/markupsafe@3.0.3",
+        "pkg:pypi/multidict@6.7.1",
+        "pkg:pypi/networkx@2.6.3",
+        "pkg:pypi/numpy@2.2.6",
+        "pkg:pypi/orjson@3.12.0",
+        "pkg:pypi/packageurl-python@0.13.4",
+        "pkg:pypi/packaging@23.2",
+        "pkg:pypi/ply@3.11",
+        "pkg:pypi/policy-sentry@0.13.2",
+        "pkg:pypi/prettytable@3.18.0",
+        "pkg:pypi/propcache@0.5.2",
+        "pkg:pypi/py-serializable@1.1.2",
+        "pkg:pypi/pycares@4.9.0",
+        "pkg:pypi/pycep-parser@0.5.1",
+        "pkg:pypi/pycparser@3.0",
+        "pkg:pypi/pydantic@2.13.5",
+        "pkg:pypi/pydantic-core@2.46.5",
+        "pkg:pypi/pyparsing@3.3.2",
+        "pkg:pypi/python-dateutil@2.9.0.post0",
+        "pkg:pypi/pyyaml@6.0.2",
+        "pkg:pypi/rdflib@7.6.0",
+        "pkg:pypi/referencing@0.37.0",
+        "pkg:pypi/regex@2026.8.31",
+        "pkg:pypi/requests@2.34.2",
+        "pkg:pypi/rpds-py@2026.6.3",
+        "pkg:pypi/rustworkx@0.18.1",
+        "pkg:pypi/s3transfer@0.10.4",
+        "pkg:pypi/schema@0.7.5",
+        "pkg:pypi/semantic-version@2.10.0",
+        "pkg:pypi/six@1.17.0",
+        "pkg:pypi/smmap@5.0.3",
+        "pkg:pypi/sortedcontainers@2.4.0",
+        "pkg:pypi/soupsieve@2.9.2",
+        "pkg:pypi/spdx-tools@0.8.5",
+        "pkg:pypi/tabulate@0.9.0",
+        "pkg:pypi/termcolor@2.3.0",
+        "pkg:pypi/tqdm@4.70.0",
+        "pkg:pypi/typing-extensions@4.16.0",
+        "pkg:pypi/typing-inspection@0.4.4",
+        "pkg:pypi/unidiff@1.0.0",
+        "pkg:pypi/uritools@6.1.3",
+        "pkg:pypi/urllib3@2.7.0",
+        "pkg:pypi/wcwidth@0.8.3",
+        "pkg:pypi/xmltodict@1.0.4",
+        "pkg:pypi/yarl@1.24.5",
+        "pkg:pypi/zipp@4.1.0"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/aiodns@3.6.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/aiohappyeyeballs@2.7.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/aiohttp@3.14.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/aiomultiprocess@0.9.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/aiosignal@1.4.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/annotated-types@0.8.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/argcomplete@3.7.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/asteval@1.0.6",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/attrs@26.1.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/bc-detect-secrets@1.5.45",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/bc-jsonpath-ng@1.6.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/bc-python-hcl2@0.4.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/beartype@0.22.9",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/beautifulsoup4@4.15.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/boolean-py@5.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/boto3@1.35.49",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/botocore@1.35.99",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/cached-property@2.0.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/cachetools@5.5.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/certifi@2026.7.22",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/cffi@2.1.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/charset-normalizer@3.5.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/click@8.5.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/click-option-group@0.5.9",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/cloudsplaining@0.7.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/colorama@0.4.6",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/configargparse@1.7.5",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/contextlib2@21.6.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/cyclonedx-python-lib@7.6.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/decorator@5.3.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/defusedxml@0.7.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/docker@7.2.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/dockerfile-parse@2.0.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/dpath@2.1.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/frozenlist@1.8.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/gitdb@4.0.12",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/gitpython@3.1.61",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/idna@3.19",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/importlib-metadata@7.2.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/jinja2@3.1.6",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/jmespath@1.1.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/jsonschema@4.26.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/jsonschema-specifications@2025.9.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/junit-xml@1.9",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/lark@1.3.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/license-expression@30.4.4",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/markdown@3.10.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/markupsafe@3.0.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/multidict@6.7.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/networkx@2.6.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/numpy@2.2.6",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/orjson@3.12.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/packageurl-python@0.13.4",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/packaging@23.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/ply@3.11",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/policy-sentry@0.13.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/prettytable@3.18.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/propcache@0.5.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/py-serializable@1.1.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/pycares@4.9.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/pycep-parser@0.5.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/pycparser@3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/pydantic@2.13.5",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/pydantic-core@2.46.5",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/pyparsing@3.3.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/python-dateutil@2.9.0.post0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/pyyaml@6.0.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/rdflib@7.6.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/referencing@0.37.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/regex@2026.8.31",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/requests@2.34.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/rpds-py@2026.6.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/rustworkx@0.18.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/s3transfer@0.10.4",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/schema@0.7.5",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/semantic-version@2.10.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/six@1.17.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/smmap@5.0.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/sortedcontainers@2.4.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/soupsieve@2.9.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/spdx-tools@0.8.5",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/tabulate@0.9.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/termcolor@2.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/tqdm@4.70.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/typing-extensions@4.16.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/typing-inspection@0.4.4",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/unidiff@1.0.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/uritools@6.1.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/urllib3@2.7.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/wcwidth@0.8.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/xmltodict@1.0.4",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/yarl@1.24.5",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/zipp@4.1.0",
+      "dependsOn": []
+    }
+  ]
+}

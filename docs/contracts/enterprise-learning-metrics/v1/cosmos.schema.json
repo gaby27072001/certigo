@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:certigo:contract:enterprise-learning-metrics:cosmos:v1",
+  "title": "Certigo Enterprise Learning Metrics Cosmos documents",
+  "version": "1.3.0",
+  "x-certigo-runtime": {
+    "setting": "ENTERPRISE_LEARNING_METRICS_V1",
+    "default": "off",
+    "implementedValues": ["off"]
+  },
+  "x-certigo-cosmos": {
+    "organizationContainer": {
+      "name": "organizations",
+      "partitionKey": "/organizationId",
+      "documents": ["lease", "receiptIntent", "dailyAggregateShard", "activeSubjectShard", "offboardingTombstone"]
+    },
+    "receiptContainer": {
+      "name": "enterpriseMetricReceipts",
+      "partitionKey": "/partitionKey",
+      "partitionShape": "organizationId|yyyyMMdd|000..127",
+      "defaultTtl": -1,
+      "itemTtlSeconds": 2592000,
+      "maximumProjectedItemsPerPartitionAt10kDailyActive": 10000,
+      "maximumProjectedLogicalPartitionBytesAt1KiBPerReceipt": 10240000
+    },
+    "organizationTransaction": "membership CAS + lease CAS + receipt intent + daily shard CAS + active shard CAS",
+    "receiptMaterialization": "CAS-leased outbox worker; tombstone-aware skip; historical replay point-reads intent"
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/lease" },
+    { "$ref": "#/$defs/receiptIntent" },
+    { "$ref": "#/$defs/receipt" },
+    { "$ref": "#/$defs/dailyAggregateShard" },
+    { "$ref": "#/$defs/activeSubjectShard" },
+    { "$ref": "#/$defs/offboardingTombstone" }
+  ],
+  "$defs": {
+    "lease": {
+      "type": "object",
+      "required": [
+        "id", "organizationId", "schemaVersion", "documentType", "metricSubjectId",
+        "metricCohortSubjectId", "sessionId", "leaseTokenHash", "membershipCycle", "startedAt",
+        "lastOccurredAt", "lastHeartbeatAt", "lastSequence", "factWatermark", "ttl"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 3 },
+        "documentType": { "const": "enterpriseLearningSessionLease" },
+        "metricSubjectId": { "type": "string", "pattern": "^enterprise-metric-subject::v3::" },
+        "metricCohortSubjectId": { "type": "string", "pattern": "^enterprise-metric-cohort::v1::" },
+        "leaseTokenHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "membershipCycle": { "type": "integer", "minimum": 1 },
+        "lastSequence": { "type": "integer", "minimum": 0 },
+        "lastRequestHash": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "factWatermark": { "type": "string", "format": "date-time" },
+        "ttl": { "const": 3600 }
+      }
+    },
+    "receiptIntent": {
+      "type": "object",
+      "required": [
+        "id", "organizationId", "schemaVersion", "documentType", "metricSubjectId",
+        "sessionId", "sequence", "requestHash", "receipt", "state", "createdAt", "updatedAt", "ttl"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "documentType": { "const": "enterpriseLearningReceiptIntent" },
+        "state": { "enum": ["pending", "processing", "completed", "skippedRevoked"] },
+        "processingOwner": { "type": ["string", "null"] },
+        "processingLeaseUntil": { "type": ["string", "null"], "format": "date-time" },
+        "ttl": {
+          "type": "integer",
+          "enum": [-1, 3600],
+          "description": "Pending/processing is durable; completed/skipped intents expire after one hour."
+        }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "required": [
+        "id", "partitionKey", "organizationId", "schemaVersion", "documentType",
+        "metricSubjectId", "sessionId", "sequence", "requestHash", "acceptedAt", "ttl"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 3 },
+        "documentType": { "const": "enterpriseLearningMetricReceipt" },
+        "partitionKey": { "type": "string", "pattern": "^.+\\|[0-9]{8}\\|[0-9]{3}$" },
+        "metricSubjectId": { "type": "string", "pattern": "^enterprise-metric-subject::v3::" },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "requestHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "ttl": { "const": 2592000 }
+      }
+    },
+    "dailyAggregateShard": {
+      "type": "object",
+      "required": [
+        "id", "organizationId", "schemaVersion", "documentType", "day", "shard",
+        "contributorBitmap", "learningSeconds", "progressBasisPoints",
+        "completionCount", "readinessBasisPoints", "readinessSampleCount",
+        "heartbeatCount", "updatedAt", "ttl"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 3 },
+        "documentType": { "const": "enterpriseLearningDailyAggregateShard" },
+        "day": { "type": "string", "format": "date" },
+        "shard": { "type": "integer", "minimum": 0, "maximum": 127 },
+        "contributorBitmap": { "type": "string", "contentEncoding": "base64" },
+        "ttl": { "type": "integer", "minimum": 1, "maximum": 34646400 }
+      }
+    },
+    "activeSubjectShard": {
+      "type": "object",
+      "required": [
+        "id", "organizationId", "schemaVersion", "documentType",
+        "bucketStartedAt", "shard", "contributorBitmap", "updatedAt", "ttl"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "documentType": { "const": "enterpriseLearningActiveSubjectShard" },
+        "shard": { "type": "integer", "minimum": 0, "maximum": 127 },
+        "contributorBitmap": { "type": "string", "contentEncoding": "base64" },
+        "ttl": { "const": 600 }
+      }
+    },
+    "offboardingTombstone": {
+      "type": "object",
+      "required": [
+        "id", "organizationId", "schemaVersion", "documentType",
+        "targetMembershipId", "membershipCycle", "metricSubjectId",
+        "receiptPartitionKeys", "revokedAt", "ttl"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 2 },
+        "documentType": { "const": "organizationOffboardingTombstone" },
+        "membershipCycle": { "type": "integer", "minimum": 1 },
+        "metricSubjectId": { "type": "string", "pattern": "^enterprise-metric-subject::v3::" },
+        "receiptPartitionKeys": {
+          "type": "array",
+          "minItems": 30,
+          "maxItems": 30,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^.+\\|[0-9]{8}\\|[0-9]{3}$" }
+        },
+        "purgeCompletedAt": { "type": ["string", "null"], "format": "date-time" },
+        "ttl": { "type": "integer", "minimum": -1 }
+      }
+    }
+  }
+}

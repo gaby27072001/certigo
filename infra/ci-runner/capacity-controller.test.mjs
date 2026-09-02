@@ -47,6 +47,14 @@ function runner(
   };
 }
 
+function leaseFence(state = {}) {
+  return {
+    leaseGeneration: 7,
+    leaseHeld: true,
+    persistedStateRevision: state.revision ?? 0,
+  };
+}
+
 function inventory({
   active = 0,
   busy = false,
@@ -211,10 +219,23 @@ test('an enabled future controller still requires a lease and increments by one'
   assert.equal(withoutLease.nextCapacity, 3);
   assert.equal(withoutLease.canRequestChange, false);
 
+  const withoutPersistedRevision = createCapacityPlan({
+    config: { ...config, enabled: true },
+    inventory: inventory({ queued: 3 }),
+    leaseGeneration: 7,
+    leaseHeld: true,
+  });
+  assert.equal(withoutPersistedRevision.canRequestChange, false);
+  assert.ok(
+    withoutPersistedRevision.blockers.includes(
+      'the persisted capacity state revision is required before any mutable action',
+    ),
+  );
+
   const withLease = createCapacityPlan({
     config: { ...config, enabled: true },
     inventory: inventory({ queued: 3 }),
-    leaseHeld: true,
+    ...leaseFence(),
   });
   assert.equal(withLease.nextCapacity, 3);
   assert.equal(withLease.canRequestChange, true);
@@ -257,7 +278,7 @@ test('a powered runner that is offline remains a usable-capacity deficit', () =>
   const plan = createCapacityPlan({
     config: { ...config, enabled: true },
     inventory: live,
-    leaseHeld: true,
+    ...leaseFence(),
   });
 
   assert.equal(plan.currentCapacityByTrust['certigo-pr'], 1);
@@ -273,7 +294,7 @@ test('scale-in requires a resettable five-minute quiet period, two guards, and r
   const quietStarted = createCapacityPlan({
     config: enabledConfig,
     inventory: inventory({ capacity: 4 }),
-    leaseHeld: true,
+    ...leaseFence(),
     now: start,
   });
   assert.equal(quietStarted.action, 'hold');
@@ -282,7 +303,7 @@ test('scale-in requires a resettable five-minute quiet period, two guards, and r
   const activityReset = createCapacityPlan({
     config: enabledConfig,
     inventory: inventory({ active: 1, capacity: 4 }),
-    leaseHeld: true,
+    ...leaseFence(quietStarted.nextState),
     now: start + 299_000,
     state: quietStarted.nextState,
   });
@@ -293,14 +314,14 @@ test('scale-in requires a resettable five-minute quiet period, two guards, and r
   const quietRestarted = createCapacityPlan({
     config: enabledConfig,
     inventory: inventory({ capacity: 4 }),
-    leaseHeld: true,
+    ...leaseFence(activityReset.nextState),
     now: start + 300_000,
     state: activityReset.nextState,
   });
   const firstGuard = createCapacityPlan({
     config: enabledConfig,
     inventory: inventory({ capacity: 4 }),
-    leaseHeld: true,
+    ...leaseFence(quietRestarted.nextState),
     now: start + 600_000,
     state: quietRestarted.nextState,
   });
@@ -310,12 +331,13 @@ test('scale-in requires a resettable five-minute quiet period, two guards, and r
   const secondGuard = createCapacityPlan({
     config: enabledConfig,
     inventory: inventory({ capacity: 4 }),
-    leaseHeld: true,
+    ...leaseFence(firstGuard.nextState),
     now: start + 601_000,
     state: firstGuard.nextState,
   });
   assert.equal(secondGuard.scaleInSafe, true);
   assert.equal(secondGuard.action, 'scale-in-one');
+  assert.equal(secondGuard.targetTrustClass, 'certigo-pr');
   assert.equal(secondGuard.nextCapacity, 3);
   assert.equal(secondGuard.safety.guardCount, 2);
   assert.deepEqual(
@@ -328,6 +350,73 @@ test('scale-in requires a resettable five-minute quiet period, two guards, and r
   assert.equal(secondGuard.nextState.scaleInSafety.guardCount, 0);
   assert.equal(secondGuard.nextState.scaleInSafety.quietSince, null);
 
+  const staleWatcher = createCapacityPlan({
+    config: enabledConfig,
+    inventory: inventory({ capacity: 4 }),
+    ...leaseFence(firstGuard.nextState),
+    now: start + 602_000,
+    persistedStateRevision: secondGuard.nextState.revision,
+    state: firstGuard.nextState,
+  });
+  assert.equal(staleWatcher.action, 'scale-in-one');
+  assert.equal(staleWatcher.canRequestChange, false);
+  assert.ok(
+    staleWatcher.blockers.includes(
+      'the capacity state revision is stale and must be reloaded before planning',
+    ),
+  );
+
+  const busyFinalGuard = createCapacityPlan({
+    config: enabledConfig,
+    inventory: inventory({ busy: true, capacity: 4 }),
+    ...leaseFence(firstGuard.nextState),
+    now: start + 602_000,
+    state: firstGuard.nextState,
+  });
+  assert.equal(busyFinalGuard.action, 'hold');
+  assert.equal(busyFinalGuard.canRequestChange, false);
+  assert.equal(busyFinalGuard.safety.quietReset, true);
+  assert.equal(busyFinalGuard.nextState.scaleInSafety.quietSince, null);
+
+  const afterPilotScaleIn = inventory({
+    capacity: 4,
+    poweredCapacity: 4,
+  });
+  afterPilotScaleIn.runners.virtualMachines[2].powerState = 'VM deallocated';
+  afterPilotScaleIn.runners.github.runners[2].status = 'offline';
+  const primaryQuietStarted = createCapacityPlan({
+    config: enabledConfig,
+    inventory: afterPilotScaleIn,
+    ...leaseFence(secondGuard.nextState),
+    now: start + 602_000,
+    state: secondGuard.nextState,
+  });
+  assert.equal(primaryQuietStarted.action, 'hold');
+  assert.equal(primaryQuietStarted.safety.rearmRequired, false);
+  const primaryFirstGuard = createCapacityPlan({
+    config: enabledConfig,
+    inventory: afterPilotScaleIn,
+    ...leaseFence(primaryQuietStarted.nextState),
+    now: start + 902_000,
+    state: primaryQuietStarted.nextState,
+  });
+  const primarySecondGuard = createCapacityPlan({
+    config: enabledConfig,
+    inventory: afterPilotScaleIn,
+    ...leaseFence(primaryFirstGuard.nextState),
+    now: start + 903_000,
+    state: primaryFirstGuard.nextState,
+  });
+  assert.equal(primarySecondGuard.action, 'scale-in-one');
+  assert.equal(primarySecondGuard.targetTrustClass, 'certigo-pr');
+  assert.deepEqual(
+    primarySecondGuard.nextState.scaleInSafety.rearmTargetCapacityByTrust,
+    {
+      'certigo-pr': 2,
+      'certigo-trusted': 2,
+    },
+  );
+
   const rearm = createCapacityPlan({
     config: enabledConfig,
     inventory: inventory({
@@ -335,7 +424,7 @@ test('scale-in requires a resettable five-minute quiet period, two guards, and r
       poweredCapacity: 3,
       queued: 1,
     }),
-    leaseHeld: true,
+    ...leaseFence(secondGuard.nextState),
     now: start + 602_000,
     state: secondGuard.nextState,
   });
@@ -349,6 +438,44 @@ test('scale-in requires a resettable five-minute quiet period, two guards, and r
   });
 });
 
+test('the PR pilot is deallocated before the trusted primary', () => {
+  const now = Date.parse('2026-08-20T07:00:00Z');
+  const afterPilotScaleIn = inventory({
+    capacity: 2,
+    poweredCapacity: 2,
+  });
+  afterPilotScaleIn.runners.virtualMachines[0].powerState = 'VM deallocated';
+  afterPilotScaleIn.runners.github.runners[0].status = 'offline';
+
+  const result = createCapacityPlan({
+    config: { ...config, enabled: true },
+    inventory: afterPilotScaleIn,
+    ...leaseFence(),
+    now,
+    persistedStateRevision: 4,
+    state: {
+      jobs: {},
+      leaseGeneration: 7,
+      revision: 4,
+      scaleInSafety: {
+        guardCount: 1,
+        lastGuardAt: new Date(now - 1_000).toISOString(),
+        quietSince: new Date(now - 301_000).toISOString(),
+        rearmRequired: false,
+        rearmTargetCapacityByTrust: {
+          'certigo-pr': 1,
+          'certigo-trusted': 1,
+        },
+      },
+      version: 3,
+    },
+  });
+
+  assert.equal(result.action, 'scale-in-one');
+  assert.equal(result.targetTrustClass, 'certigo-trusted');
+  assert.equal(result.canRequestChange, true);
+});
+
 test('forged quiet-period guard state fails closed', () => {
   const now = Date.parse('2026-08-20T06:10:00Z');
   assert.throws(
@@ -356,7 +483,7 @@ test('forged quiet-period guard state fails closed', () => {
       createCapacityPlan({
         config: { ...config, enabled: true },
         inventory: inventory({ capacity: 4 }),
-        leaseHeld: true,
+        ...leaseFence(),
         now,
         state: {
           jobs: {},
@@ -400,7 +527,7 @@ test('shared runner subnets block every capacity request', () => {
   const plan = createCapacityPlan({
     config: { ...config, enabled: true },
     inventory: live,
-    leaseHeld: true,
+    ...leaseFence(),
   });
 
   assert.equal(plan.action, 'hold');
@@ -421,7 +548,7 @@ test('an unused external VMSS cannot satisfy managed pool separation', () => {
   const plan = createCapacityPlan({
     config: { ...config, enabled: true },
     inventory: live,
-    leaseHeld: true,
+    ...leaseFence(),
   });
 
   assert.equal(plan.action, 'hold');
@@ -441,7 +568,7 @@ test('an unmatched VM without explicit external classification fails closed', ()
   const plan = createCapacityPlan({
     config: { ...config, enabled: true },
     inventory: live,
-    leaseHeld: true,
+    ...leaseFence(),
   });
 
   assert.equal(plan.action, 'hold');
@@ -451,7 +578,7 @@ test('an unmatched VM without explicit external classification fails closed', ()
   ]);
 });
 
-test('real inventory binds f55 and the PR pilot while keeping 22f absent and 415 external', () => {
+test('real inventory binds f55 and the PR pilot while keeping runner 26 and VM 415 external', () => {
   const result = reconcileRunnerInstances(
     [
       { name: 'vmss-certigo-runner-zonal_4153d1dd' },
@@ -474,7 +601,7 @@ test('real inventory binds f55 and the PR pilot while keeping 22f absent and 415
       runner(
         'vmss-certigo-runner-zonal_22f7fb52-Certigo',
         ['certigo-pr'],
-        { status: 'offline' },
+        { id: 26, status: 'offline' },
       ),
       runner(
         'vmss-certigo-runner-zonal_f55d176e-Certigo',
@@ -490,9 +617,11 @@ test('real inventory binds f55 and the PR pilot while keeping 22f absent and 415
     repositoryConfig.inventory,
   );
 
-  assert.deepEqual(result.absentRunners, [
-    'vmss-certigo-runner-zonal_22f7fb52-Certigo',
-  ]);
+  assert.deepEqual(result.absentRunners, []);
+  assert.deepEqual(
+    result.externalGitHubRunners.map(({ id }) => id),
+    [26],
+  );
   assert.deepEqual(result.managedMachineNames, [
     pilotVmName,
     f55VmName,
@@ -607,6 +736,7 @@ test('drift reconciliation reports live VMSS, SKU, CPU scale-in, and labels', ()
     runner(
       'vmss-certigo-runner-zonal_22f7fb52-Certigo',
       ['certigo-pr', 'certigo-trusted'],
+      { id: 26 },
     ),
     {
       ...runner(
@@ -627,7 +757,6 @@ test('drift reconciliation reports live VMSS, SKU, CPU scale-in, and labels', ()
   assert.deepEqual(
     result.findings.map((finding) => finding.code).sort(),
     [
-      'ABSENT_RUNNER_DRIFT',
       'COMPUTE_MODEL_DRIFT',
       'CPU_SCALE_IN_DRIFT',
       'EXTERNAL_INSTANCE_OBSERVED',
@@ -640,9 +769,7 @@ test('drift reconciliation reports live VMSS, SKU, CPU scale-in, and labels', ()
     ],
   );
   assert.equal(result.baseline30Days.costUsd, 242.06);
-  assert.deepEqual(result.observed.absentRunners, [
-    'vmss-certigo-runner-zonal_22f7fb52-Certigo',
-  ]);
+  assert.deepEqual(result.observed.absentRunners, []);
   assert.deepEqual(result.observed.managedMachineNames, [
     'vmss-certigo-runner-zonal_f55d176e',
   ]);

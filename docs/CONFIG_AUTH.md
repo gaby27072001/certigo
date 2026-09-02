@@ -27,8 +27,7 @@ Au démarrage, `bootstrap()` appelle `AppEnv.validate()` :
 | Variable | Rôle | Requis | Exemple valide | Invalide → symptôme |
 |---|---|---|---|---|
 | `CERTIGO_ENV` | Flavor de build | Non (défaut `dev`) | `prod` | valeur inconnue → traité comme `dev` (analytics off) |
-| `API_BASE_URL` | Base de l'API backend | **Oui** (tous flavors) | `https://<host-vérifié>/api` | vide → login e-mail « Pas de connexion » ; URL **dev** en prod → **erreur bloquante** ; `http://` en prod → erreur |
-| `VERIFIED_OWNED_API_HOST` | Host API dont le contrôle a été vérifié | **Oui en prod/staging** | `<nom DNS exact sans schéma>` | vide, placeholder, domaine tiers interdit ou différent de `API_BASE_URL` → **erreur bloquante** |
+| `API_BASE_URL` | Base de l'API backend | **Oui** (tous flavors) | `https://func-certigo-prod-izfhvvxjdxc2k.azurewebsites.net/api` | vide → login e-mail « Pas de connexion » ; URL **dev** en prod → **erreur bloquante** ; `http://` en prod → erreur |
 | `ENTRA_CLIENT_ID` | Client id app reg Entra | **Oui en prod/staging** (sauf `ENTRA_OPTIONAL`) | `00000000-0000-0000-0000-000000000000` | vide en prod → **erreur** (social désactivé) ; renseigné sans autorité → **erreur** (config partielle) |
 | `ENTRA_AUTHORITY` | Autorité CIAM | **Oui en prod/staging** | `https://tenant.ciamlogin.com/<tid>/v2.0` | vide alors que client id présent → **erreur** |
 | `ENTRA_REDIRECT_URI` | URI de redirection OIDC | Défaut `certigo://auth/` | `certigo://auth/` | schéma ≠ `certigo` → **erreur** (callback ne revient jamais) |
@@ -45,12 +44,10 @@ Au démarrage, `bootstrap()` appelle `AppEnv.validate()` :
 1. `API_BASE_URL` vide → erreur (tous flavors).
 2. prod/staging + `API_BASE_URL` == URL dev par défaut → erreur.
 3. prod/staging + `API_BASE_URL` non `https://` → erreur.
-4. prod/staging + URL complexe (port, credentials, query, fragment ou chemin autre que `/api`) → erreur.
-5. prod/staging + host absent, placeholder, non possédé ou différent de `API_BASE_URL` → erreur.
-6. `ENTRA_CLIENT_ID` et `ENTRA_AUTHORITY` : l'un sans l'autre → erreur (config partielle).
-7. Les deux vides : prod/staging (hors `ENTRA_OPTIONAL`) → erreur ; sinon avertissement.
-8. `ENTRA_REDIRECT_URI` de schéma ≠ `certigo` → erreur si Entra (partiellement) configuré ou strict.
-9. Entra configuré + `ENTRA_API_SCOPE` vide → avertissement (401 possible).
+4. `ENTRA_CLIENT_ID` et `ENTRA_AUTHORITY` : l'un sans l'autre → erreur (config partielle).
+5. Les deux vides : prod/staging (hors `ENTRA_OPTIONAL`) → erreur ; sinon avertissement.
+6. `ENTRA_REDIRECT_URI` de schéma ≠ `certigo` → erreur si Entra (partiellement) configuré ou strict.
+7. Entra configuré + `ENTRA_API_SCOPE` vide → avertissement (401 possible).
 
 Le schéma natif `certigo` est déclaré dans `ios/Runner/Info.plist`
 (`CFBundleURLSchemes`) et `android/app/build.gradle`

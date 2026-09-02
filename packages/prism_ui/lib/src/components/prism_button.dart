@@ -112,10 +112,13 @@ class _PrismButtonState extends State<PrismButton> {
     return Semantics(
       button: true,
       enabled: _enabled,
-      label: widget.label,
+      liveRegion: widget.loading,
+      label: widget.loading ? '${widget.label}, chargement' : widget.label,
+      onTap: _enabled ? _handleTap : null,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          excludeFromSemantics: true,
           borderRadius: PrismRadii.buttonAll,
           overlayColor: const WidgetStatePropertyAll<Color>(Colors.transparent),
           onFocusChange: (bool value) {
@@ -127,47 +130,49 @@ class _PrismButtonState extends State<PrismButton> {
                 }
               : null,
           onTap: _enabled ? _handleTap : null,
-          child: AnimatedOpacity(
-            opacity: _enabled ? 1 : 0.5,
-            duration: fast,
-            child: Container(
-              foregroundDecoration: _focused
-                  ? BoxDecoration(
-                      borderRadius: PrismRadii.buttonAll,
-                      border: Border.all(color: p.textPrimary, width: 2),
-                    )
-                  : null,
-              child: SizedBox(
-                height: 54 + lip,
-                child: Stack(
-                  children: <Widget>[
-                    if (depth)
-                      Positioned(
-                        top: lip,
-                        left: 0,
-                        right: 0,
-                        child: Container(height: 54, decoration: _baseDecoration(p)),
-                      ),
-                    AnimatedPositioned(
-                      duration: fast,
-                      curve: PrismMotion.standard,
-                      top: sink,
-                      left: 0,
-                      right: 0,
-                      child: AnimatedScale(
-                        scale: _down ? 0.995 : 1.0,
+          child: ExcludeSemantics(
+            child: AnimatedOpacity(
+              opacity: _enabled ? 1 : 0.5,
+              duration: fast,
+              child: Container(
+                foregroundDecoration: _focused
+                    ? BoxDecoration(
+                        borderRadius: PrismRadii.buttonAll,
+                        border: Border.all(color: p.textPrimary, width: 2),
+                      )
+                    : null,
+                child: SizedBox(
+                  height: 54 + lip,
+                  child: Stack(
+                    children: <Widget>[
+                      if (depth)
+                        Positioned(
+                          top: lip,
+                          left: 0,
+                          right: 0,
+                          child: Container(height: 54, decoration: _baseDecoration(p)),
+                        ),
+                      AnimatedPositioned(
                         duration: fast,
                         curve: PrismMotion.standard,
-                        child: Container(
-                          height: 54,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          decoration: _topDecoration(p),
-                          alignment: Alignment.center,
-                          child: content,
+                        top: sink,
+                        left: 0,
+                        right: 0,
+                        child: AnimatedScale(
+                          scale: _down ? 0.995 : 1.0,
+                          duration: fast,
+                          curve: PrismMotion.standard,
+                          child: Container(
+                            height: 54,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            decoration: _topDecoration(p),
+                            alignment: Alignment.center,
+                            child: content,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

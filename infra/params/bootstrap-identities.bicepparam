@@ -1,0 +1,12 @@
+using '../governance/bootstrap-identities.bicep'
+
+param location = 'westeurope'
+param identityResourceGroupName = 'rg-certigo-identities'
+param ciResourceGroupName = 'rg-certigo-ci'
+param contentResourceGroupName = 'rg-certigo-content'
+param githubRepositoryOwner = 'gchambaud_microsoft'
+param githubRepositoryName = 'Certigo'
+param contentRepositoryOwner = 'gchambaud_microsoft'
+param contentRepositoryName = 'certigo-content'
+param contentInfrastructurePlanIdentityName = 'id-certigo-content-infra-plan'
+param contentInfrastructurePlanEnvironmentName = 'azure-content-infra-plan'

@@ -6,6 +6,7 @@ using Certigo.Api.Http;
 using Certigo.Application.Dtos;
 using Certigo.Application.Services;
 using Certigo.Domain.Content;
+using Certigo.Domain.Identity;
 using Xunit;
 
 namespace Certigo.Api.Tests;
@@ -30,7 +31,7 @@ public sealed class CriticalHttpFunctionsTests
         var service = new FakeContentService
         {
             Catalog = new CatalogDto(
-                CertificationCatalogSchemas.EmittedAppV2,
+                CertificationCatalogSchemas.AppV2,
                 CertificationCatalogSchemas.SourceV1,
                 null,
                 null,
@@ -63,7 +64,7 @@ public sealed class CriticalHttpFunctionsTests
         service.GetCatalogCalls.Should().Be(1);
         var payload = await response.ReadJsonAsync<CatalogDto>();
         payload.Tracks.Should().ContainSingle();
-        payload.Schema.Should().Be(CertificationCatalogSchemas.EmittedAppV2);
+        payload.Schema.Should().Be(CertificationCatalogSchemas.AppV2);
         payload.SourceSchema.Should().Be(CertificationCatalogSchemas.SourceV1);
         payload.Tracks[0].Code.Should().Be("AZ-900");
         payload.Tracks[0].BlueprintDate.Should().Be(new DateOnly(2026, 7, 20));
@@ -146,6 +147,9 @@ public sealed class CriticalHttpFunctionsTests
                         "{\"xpEarned\":10}"),
                 ],
                 AppliedEconomyOperations = ["operation::quiz::legacy"],
+                IdentityMetadata = PersonIdentityMetadata.Shadow(
+                    expected.Profile.Id,
+                    DateTimeOffset.UtcNow),
             },
         };
         var service = new FakeAuthService { RegisterResult = expected };
@@ -165,6 +169,7 @@ public sealed class CriticalHttpFunctionsTests
         var rawPayload = await response.ReadBodyAsStringAsync();
         rawPayload.Should().NotContain("economyReceipts");
         rawPayload.Should().NotContain("appliedEconomyOperations");
+        rawPayload.Should().NotContain("identityMetadata");
         var payload = JsonSerializer.Deserialize<AuthResultDto>(
             rawPayload,
             new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
@@ -216,7 +221,7 @@ public sealed class CriticalHttpFunctionsTests
     private sealed class FakeContentService : IContentService
     {
         public CatalogDto Catalog { get; set; } = new(
-            CertificationCatalogSchemas.EmittedAppV2,
+            CertificationCatalogSchemas.AppV2,
             CertificationCatalogSchemas.SourceV1,
             null,
             null,

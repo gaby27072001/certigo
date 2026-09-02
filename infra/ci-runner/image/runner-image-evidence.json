@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-08-31T14:24:00Z",
+  "measurementResolutionSeconds": 1,
+  "currentRunnerColdAdmission": {
+    "description": "Workflow creation to job start on an already-online trusted VMSS runner",
+    "seconds": 3,
+    "runId": 33387732157,
+    "runner": "vmss-certigo-runner-zonal_f55d176e-Certigo"
+  },
+  "observedSetupSteps": [
+    {
+      "component": "node",
+      "seconds": 1,
+      "runId": 33387732157
+    },
+    {
+      "component": "dotnet-sdk",
+      "seconds": 11,
+      "runId": 33387732157
+    },
+    {
+      "component": "dart-formatter",
+      "seconds": 1,
+      "runId": 33387732157
+    },
+    {
+      "component": "flutter-download-and-precache",
+      "seconds": 88,
+      "runId": 33387732157
+    },
+    {
+      "component": "bicep",
+      "seconds": 1,
+      "runId": 33387732157
+    },
+    {
+      "component": "actionlint",
+      "seconds": 0,
+      "runId": 33393648361
+    },
+    {
+      "component": "checkov",
+      "seconds": 0,
+      "runId": 33401844557
+    }
+  ],
+  "estimatedAvoidedInstallSeconds": {
+    "runnerHealthColdPath": 102,
+    "backendJob": 11,
+    "infraJob": 2,
+    "note": "Zero-second values are below the GitHub Jobs API one-second resolution and are not counted."
+  },
+  "immutableVmBootColdStart": {
+    "status": "not-measured",
+    "reason": "PR1 does not build or deploy an Azure image. measure-cold-start.sh records this during the reviewed PR2 canary."
+  }
+}

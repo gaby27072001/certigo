@@ -1,0 +1,484 @@
+name: Runner image evidence attestation
+
+# Deliberately disabled. A separate reviewed change may move this file under
+# .github/workflows only after the Azure image build and environment approval exist.
+on:
+  workflow_dispatch:
+    inputs:
+      run_output_resource_id:
+        description: Exact Azure VM Image Builder run output resource ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  attest:
+    name: Attest reviewed image evidence
+    runs-on: [self-hosted, Linux, X64, certigo-image-attestation-canary]
+    environment: runner-image-canary-attestation
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Authenticate to Azure with OIDC
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Derive immutable descriptor from Azure
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          RUN_OUTPUT_RESOURCE_ID: ${{ inputs.run_output_resource_id }}
+        run: |
+          set -euo pipefail
+          contract_path="infra/ci-runner/image/image-build-contract.json"
+          manifest_path="infra/ci-runner/image/toolchain-manifest.json"
+          sbom_path="infra/ci-runner/image/toolchain-sbom.cyclonedx.document"
+          evidence_dir="image-build-evidence"
+          mkdir -p "$evidence_dir"
+          build_contract_sha256="$(sha256sum "$contract_path" | awk '{print $1}')"
+          contract_commit="$(jq -er '.contractCommit' "$contract_path")"
+          base_image_version="$(jq -er '.baseImage.version' "$contract_path")"
+          image_version="$(jq -er '.destination.imageVersion' "$contract_path")"
+          manifest_sha256="$(
+            jq -er '.inputs[] | select(.id == "toolchain-manifest") | .sha256' \
+              "$contract_path"
+          )"
+          sbom_sha256="$(
+            jq -er '.inputs[] | select(.id == "toolchain-sbom") | .sha256' \
+              "$contract_path"
+          )"
+          [[ "$(sha256sum "$manifest_path" | awk '{print $1}')" == "$manifest_sha256" ]]
+          [[ "$(sha256sum "$sbom_path" | awk '{print $1}')" == "$sbom_sha256" ]]
+          [[ "$GITHUB_REPOSITORY" == "gchambaud_microsoft/Certigo" ]]
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]
+          jq -e '
+            .policy.reproducibleInputsReady == true and
+            .reproducibility.status == "locked" and
+            (.reproducibility.aptSnapshot | type == "string" and length > 0) and
+            (.reproducibility.aptPackageLockSha256 | test("^[0-9a-f]{64}$")) and
+            (.reproducibility.flutterEngineArtifactLockSha256 |
+              test("^[0-9a-f]{64}$"))
+          ' "$contract_path" >/dev/null
+          [[ -n "$AZURE_SUBSCRIPTION_ID" ]]
+
+          deployment_name="$(jq -er '.destination.deploymentName' "$contract_path")"
+          build_location="$(jq -er '.destination.location' "$contract_path")"
+          identity_name="$(jq -er '.destination.imageBuilderIdentityName' "$contract_path")"
+          staging_group="$(jq -er '.destination.stagingResourceGroupName' "$contract_path")"
+          build_group="rg-certigo-runner-image-build-canary"
+          expected_deployment="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${build_group}/providers/Microsoft.Resources/deployments/${deployment_name}"
+          expected_identity="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${build_group}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${identity_name}"
+          expected_staging="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${staging_group}"
+          expected_template="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/rg-certigo-runner-image-build-canary/providers/Microsoft.VirtualMachineImages/imageTemplates/it-certigo-pr-f8e23b2"
+          expected_run_output="${expected_template}/runOutputs/certigo-pr-f8e23b2-1-0-337"
+          expected_image="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/rg-certigo-runner-image-build-canary/providers/Microsoft.Compute/galleries/galCertigoRunnerCanary/images/certigo-pr-image-canary/versions/1.0.337"
+          [[ "${RUN_OUTPUT_RESOURCE_ID,,}" == "${expected_run_output,,}" ]]
+
+          bicep="$RUNNER_TEMP/bicep-0.44.1"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$bicep" \
+            https://github.com/Azure/bicep/releases/download/v0.44.1/bicep-linux-x64
+          echo "e17dc9a9888184886bb0c0051a3230b83b19f342749999f707bc571c3dfd2f45  $bicep" |
+            sha256sum --check --strict
+          chmod 0755 "$bicep"
+          "$bicep" build infra/ci-runner/image/image-build.bicep \
+            --outfile "$evidence_dir/compiled-image-build-arm.json"
+          jq -S -c . "$evidence_dir/compiled-image-build-arm.json" \
+            > "$evidence_dir/compiled-image-build-arm.canonical.json"
+          compiled_template_sha256="$(
+            sha256sum "$evidence_dir/compiled-image-build-arm.canonical.json" | awk '{print $1}'
+          )"
+
+          az deployment group show \
+            --resource-group "$build_group" \
+            --name "$deployment_name" \
+            --output json > "$evidence_dir/deployment.json"
+          [[ "$(
+            jq -er '.id | ascii_downcase' "$evidence_dir/deployment.json"
+          )" == "${expected_deployment,,}" ]]
+          [[ "$(
+            jq -er '.properties.provisioningState' "$evidence_dir/deployment.json"
+          )" == "Succeeded" ]]
+          deployment_correlation_id="$(
+            jq -er '.properties.correlationId' "$evidence_dir/deployment.json"
+          )"
+          deployment_timestamp="$(
+            jq -er '.properties.timestamp' "$evidence_dir/deployment.json"
+          )"
+          jq -e \
+            --arg identity "${expected_identity,,}" \
+            --arg staging "${expected_staging,,}" \
+            --arg location "$build_location" \
+            '
+              (.properties.parameters | keys | sort) ==
+                (["deploymentEnabled", "imageBuilderIdentityResourceId", "location",
+                  "stagingResourceGroupId", "tags"] | sort) and
+              .properties.parameters.deploymentEnabled.value == true and
+              (.properties.parameters.imageBuilderIdentityResourceId.value |
+                ascii_downcase) == $identity and
+              (.properties.parameters.stagingResourceGroupId.value |
+                ascii_downcase) == $staging and
+              .properties.parameters.location.value == $location and
+              .properties.parameters.tags.value == {
+                product: "Certigo",
+                workload: "github-actions-runner-image",
+                trustBoundary: "untrusted-pr",
+                lifecycle: "canary",
+                managedBy: "bicep"
+              }
+            ' "$evidence_dir/deployment.json" >/dev/null
+          jq -S -c '.properties.parameters' "$evidence_dir/deployment.json" \
+            > "$evidence_dir/deployment-parameters.canonical.json"
+          deployment_parameters_sha256="$(
+            sha256sum "$evidence_dir/deployment-parameters.canonical.json" | awk '{print $1}'
+          )"
+          jq -S -c . "$evidence_dir/deployment.json" \
+            > "$evidence_dir/deployment.canonical.json"
+          deployment_evidence_sha256="$(
+            sha256sum "$evidence_dir/deployment.canonical.json" | awk '{print $1}'
+          )"
+          az deployment group export \
+            --resource-group "$build_group" \
+            --name "$deployment_name" \
+            --output json > "$evidence_dir/deployed-image-build-arm.json"
+          jq -S -c . "$evidence_dir/deployed-image-build-arm.json" \
+            > "$evidence_dir/deployed-image-build-arm.canonical.json"
+          cmp --silent \
+            "$evidence_dir/compiled-image-build-arm.canonical.json" \
+            "$evidence_dir/deployed-image-build-arm.canonical.json"
+          az deployment operation group list \
+            --resource-group "$build_group" \
+            --name "$deployment_name" \
+            --output json > "$evidence_dir/deployment-operations.json"
+          jq -e \
+            --arg template "${expected_template,,}" \
+            --arg correlation "$deployment_correlation_id" \
+            '
+              [.[] | select(
+                (.properties.targetResource.id // "" | ascii_downcase) == $template and
+                .properties.provisioningState == "Succeeded" and
+                .properties.correlationId == $correlation
+              )] | length == 1
+            ' "$evidence_dir/deployment-operations.json" >/dev/null
+
+          az resource show \
+            --ids "$RUN_OUTPUT_RESOURCE_ID" \
+            --api-version 2025-10-01 \
+            --output json > "$evidence_dir/run-output.json"
+          [[ "$(
+            jq -er '.id | ascii_downcase' "$evidence_dir/run-output.json"
+          )" == "${expected_run_output,,}" ]]
+          image_version_id="$(
+            jq -er '.properties.artifactId' "$evidence_dir/run-output.json"
+          )"
+          [[ "${image_version_id,,}" == "${expected_image,,}" ]]
+          az resource show \
+            --ids "$expected_template" \
+            --api-version 2025-10-01 \
+            --output json > "$evidence_dir/image-template.json"
+          az resource show \
+            --ids "$image_version_id" \
+            --api-version 2024-03-03 \
+            --output json > "$evidence_dir/gallery-version.json"
+          [[ "$(
+            jq -er '.properties.provisioningState' "$evidence_dir/run-output.json"
+          )" == "Succeeded" ]]
+          [[ "$(
+            jq -er '.properties.provisioningState' "$evidence_dir/gallery-version.json"
+          )" == "Succeeded" ]]
+          [[ "$(
+            jq -er '.properties.lastRunStatus.runState' "$evidence_dir/image-template.json"
+          )" == "Succeeded" ]]
+          [[ "$(
+            jq -er '.id | ascii_downcase' "$evidence_dir/image-template.json"
+          )" == "${expected_template,,}" ]]
+          [[ "$(
+            jq -er '.id | ascii_downcase' "$evidence_dir/gallery-version.json"
+          )" == "${expected_image,,}" ]]
+          run_started_at="$(
+            jq -er '.properties.lastRunStatus.startTime' "$evidence_dir/image-template.json"
+          )"
+          run_ended_at="$(
+            jq -er '.properties.lastRunStatus.endTime' "$evidence_dir/image-template.json"
+          )"
+          run_output_created_at="$(
+            jq -er '.systemData.createdAt' "$evidence_dir/run-output.json"
+          )"
+          gallery_version_created_at="$(
+            jq -er '.systemData.createdAt' "$evidence_dir/gallery-version.json"
+          )"
+          deployment_epoch="$(date --date="$deployment_timestamp" +%s)"
+          run_started_epoch="$(date --date="$run_started_at" +%s)"
+          run_ended_epoch="$(date --date="$run_ended_at" +%s)"
+          run_output_created_epoch="$(date --date="$run_output_created_at" +%s)"
+          gallery_created_epoch="$(date --date="$gallery_version_created_at" +%s)"
+          (( deployment_epoch <= run_started_epoch ))
+          (( run_started_epoch <= run_output_created_epoch ))
+          (( run_output_created_epoch <= run_ended_epoch ))
+          (( run_started_epoch <= gallery_created_epoch ))
+          (( gallery_created_epoch <= run_ended_epoch ))
+          evidence_hasher="infra/ci-runner/image/validate-canary-evidence.mjs"
+          run_output_sha256="$(
+            node "$evidence_hasher" --hash-azure-evidence \
+              run-output "$evidence_dir/run-output.json"
+          )"
+          image_template_sha256="$(
+            node "$evidence_hasher" --hash-azure-evidence \
+              image-template "$evidence_dir/image-template.json"
+          )"
+          gallery_version_sha256="$(
+            node "$evidence_hasher" --hash-azure-evidence \
+              gallery-version "$evidence_dir/gallery-version.json"
+          )"
+          evidence_captured_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          activity_end="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          az monitor activity-log list \
+            --resource-id "$expected_template" \
+            --start-time "$deployment_timestamp" \
+            --end-time "$activity_end" \
+            --max-events 1000 \
+            --output json > "$evidence_dir/image-template-activity.json"
+          jq -e \
+            --arg correlation "$deployment_correlation_id" \
+            '
+              ([.[] | select(
+                ((.status.value // "") | ascii_downcase) == "succeeded" and
+                ((.operationName.value // "") | ascii_downcase | endswith("/write")) and
+                (.correlationId // "") == $correlation
+              )] | length) >= 1 and
+              ([.[] | select(
+                ((.status.value // "") | ascii_downcase) == "succeeded" and
+                ((.operationName.value // "") | ascii_downcase |
+                  test("/(write|delete)$")) and
+                (.correlationId // "") != $correlation
+              )] | length) == 0
+            ' "$evidence_dir/image-template-activity.json" >/dev/null
+          image_builder_principal_id="$(
+            az identity show --ids "$expected_identity" --query principalId --output tsv
+          )"
+          [[ "$image_builder_principal_id" =~ ^[0-9a-fA-F-]{36}$ ]]
+          az monitor activity-log list \
+            --resource-id "$expected_image" \
+            --start-time "$run_started_at" \
+            --end-time "$activity_end" \
+            --max-events 1000 \
+            --output json > "$evidence_dir/gallery-version-activity.json"
+          jq -e '
+            ([.[] | select(
+              ((.status.value // "") | ascii_downcase) == "succeeded" and
+              ((.operationName.value // "") | ascii_downcase | endswith("/write"))
+            )] | length) == 1 and
+            ([.[] | select(
+              ((.status.value // "") | ascii_downcase) == "succeeded" and
+              ((.operationName.value // "") | ascii_downcase | endswith("/delete"))
+            )] | length) == 0
+          ' "$evidence_dir/gallery-version-activity.json" >/dev/null
+          gallery_write_caller="$(
+            jq -er '
+              .[] | select(
+                ((.status.value // "") | ascii_downcase) == "succeeded" and
+                ((.operationName.value // "") | ascii_downcase | endswith("/write"))
+              ) | .caller
+            ' "$evidence_dir/gallery-version-activity.json"
+          )"
+          gallery_write_correlation_id="$(
+            jq -er '
+              .[] | select(
+                ((.status.value // "") | ascii_downcase) == "succeeded" and
+                ((.operationName.value // "") | ascii_downcase | endswith("/write"))
+              ) | .correlationId
+            ' "$evidence_dir/gallery-version-activity.json"
+          )"
+          gallery_write_timestamp="$(
+            jq -er '
+              .[] | select(
+                ((.status.value // "") | ascii_downcase) == "succeeded" and
+                ((.operationName.value // "") | ascii_downcase | endswith("/write"))
+              ) | .eventTimestamp
+            ' "$evidence_dir/gallery-version-activity.json"
+          )"
+          [[ "${gallery_write_caller,,}" == "${image_builder_principal_id,,}" ]]
+          gallery_write_epoch="$(date --date="$gallery_write_timestamp" +%s)"
+          (( run_started_epoch <= gallery_write_epoch ))
+          (( gallery_write_epoch <= run_ended_epoch ))
+          jq -S -c . "$evidence_dir/image-template-activity.json" \
+            > "$evidence_dir/image-template-activity.canonical.json"
+          jq -S -c . "$evidence_dir/gallery-version-activity.json" \
+            > "$evidence_dir/gallery-version-activity.canonical.json"
+          activity_log_sha256="$(
+            cat \
+              "$evidence_dir/image-template-activity.canonical.json" \
+              "$evidence_dir/gallery-version-activity.canonical.json" |
+              sha256sum | awk '{print $1}'
+          )"
+
+          jq -n \
+            --arg schemaVersion "1" \
+            --arg deploymentId "$expected_deployment" \
+            --arg deploymentCorrelationId "$deployment_correlation_id" \
+            --arg deploymentTimestamp "$deployment_timestamp" \
+            --arg compiledTemplateSha256 "$compiled_template_sha256" \
+            --arg deploymentParametersSha256 "$deployment_parameters_sha256" \
+            --arg deploymentEvidenceSha256 "$deployment_evidence_sha256" \
+            --arg activityLogSha256 "$activity_log_sha256" \
+            --arg runOutputSha256 "$run_output_sha256" \
+            --arg imageTemplateSha256 "$image_template_sha256" \
+            --arg galleryVersionSha256 "$gallery_version_sha256" \
+            --arg evidenceCapturedAt "$evidence_captured_at" \
+            --arg imageTemplateId "$expected_template" \
+            --arg runOutputResourceId "$RUN_OUTPUT_RESOURCE_ID" \
+            --arg galleryImageVersionId "$image_version_id" \
+            --arg imageBuilderPrincipalId "$image_builder_principal_id" \
+            --arg galleryWriteCorrelationId "$gallery_write_correlation_id" \
+            --arg galleryWriteTimestamp "$gallery_write_timestamp" \
+            --arg runStartedAt "$run_started_at" \
+            --arg runEndedAt "$run_ended_at" \
+            --arg runOutputCreatedAt "$run_output_created_at" \
+            --arg galleryVersionCreatedAt "$gallery_version_created_at" \
+            --arg sourceRepository "$GITHUB_REPOSITORY" \
+            --arg sourceRef "$GITHUB_REF" \
+            --arg sourceCommit "$GITHUB_SHA" \
+            '{
+              schemaVersion: ($schemaVersion | tonumber),
+              deploymentId: $deploymentId,
+              deploymentCorrelationId: $deploymentCorrelationId,
+              deploymentTimestamp: $deploymentTimestamp,
+              compiledTemplateSha256: $compiledTemplateSha256,
+              deploymentParametersSha256: $deploymentParametersSha256,
+              deploymentEvidenceSha256: $deploymentEvidenceSha256,
+              activityLogSha256: $activityLogSha256,
+              runOutputSha256: $runOutputSha256,
+              imageTemplateSha256: $imageTemplateSha256,
+              galleryVersionSha256: $galleryVersionSha256,
+              evidenceCapturedAt: $evidenceCapturedAt,
+              imageTemplateId: $imageTemplateId,
+              runOutputResourceId: $runOutputResourceId,
+              galleryImageVersionId: $galleryImageVersionId,
+              imageBuilderPrincipalId: $imageBuilderPrincipalId,
+              galleryWriteCorrelationId: $galleryWriteCorrelationId,
+              galleryWriteTimestamp: $galleryWriteTimestamp,
+              runStartedAt: $runStartedAt,
+              runEndedAt: $runEndedAt,
+              runOutputCreatedAt: $runOutputCreatedAt,
+              galleryVersionCreatedAt: $galleryVersionCreatedAt,
+              sourceRepository: $sourceRepository,
+              sourceRef: $sourceRef,
+              sourceCommit: $sourceCommit
+            }' > "$evidence_dir/provenance.json"
+          (
+            cd "$evidence_dir"
+            sha256sum \
+              compiled-image-build-arm.canonical.json \
+              deployed-image-build-arm.canonical.json \
+              deployment-parameters.canonical.json \
+              deployment.canonical.json \
+              deployment-operations.json \
+              run-output.json \
+              image-template.json \
+              gallery-version.json \
+              image-template-activity.canonical.json \
+              gallery-version-activity.canonical.json \
+              provenance.json > evidence-files.sha256
+          )
+      - name: Persist immutable image build evidence
+        id: build_evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runner-image-build-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: image-build-evidence/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Bind immutable artifact to image descriptor
+        env:
+          EVIDENCE_ARTIFACT_DIGEST: ${{ steps.build_evidence.outputs.artifact-digest }}
+          EVIDENCE_ARTIFACT_ID: ${{ steps.build_evidence.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_URL: ${{ steps.build_evidence.outputs.artifact-url }}
+        run: |
+          set -euo pipefail
+          [[ "$EVIDENCE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$EVIDENCE_ARTIFACT_DIGEST" =~ ^(sha256:)?[0-9a-f]{64}$ ]]
+          expected_artifact_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts/${EVIDENCE_ARTIFACT_ID}"
+          [[ "$EVIDENCE_ARTIFACT_URL" == "$expected_artifact_url" ]]
+          contract_path="infra/ci-runner/image/image-build-contract.json"
+          build_contract_sha256="$(sha256sum "$contract_path" | awk '{print $1}')"
+          contract_commit="$(jq -er '.contractCommit' "$contract_path")"
+          manifest_sha256="$(
+            jq -er '.inputs[] | select(.id == "toolchain-manifest") | .sha256' \
+              "$contract_path"
+          )"
+          sbom_sha256="$(
+            jq -er '.inputs[] | select(.id == "toolchain-sbom") | .sha256' \
+              "$contract_path"
+          )"
+          jq -n \
+            --slurpfile provenance image-build-evidence/provenance.json \
+            --arg contractCommit "$contract_commit" \
+            --arg buildContractSha256 "$build_contract_sha256" \
+            --arg toolchainManifestSha256 "$manifest_sha256" \
+            --arg toolchainSbomSha256 "$sbom_sha256" \
+            --arg artifactId "$EVIDENCE_ARTIFACT_ID" \
+            --arg artifactDigest "$EVIDENCE_ARTIFACT_DIGEST" \
+            --arg artifactUrl "$EVIDENCE_ARTIFACT_URL" \
+            --arg workflowRunId "$GITHUB_RUN_ID" \
+            --arg workflowRunAttempt "$GITHUB_RUN_ATTEMPT" \
+            '{
+              schemaVersion: 2,
+              contractCommit: $contractCommit,
+              galleryImageVersionId: $provenance[0].galleryImageVersionId,
+              runOutputResourceId: $provenance[0].runOutputResourceId,
+              buildContractSha256: $buildContractSha256,
+              toolchainManifestSha256: $toolchainManifestSha256,
+              toolchainSbomSha256: $toolchainSbomSha256,
+              galleryProvisioningState: "Succeeded",
+              runOutputProvisioningState: "Succeeded",
+              immutableBuildEvidence: (
+                $provenance[0] + {
+                  artifactId: $artifactId,
+                  artifactDigest: $artifactDigest,
+                  artifactUrl: $artifactUrl,
+                  workflowRunId: $workflowRunId,
+                  workflowRunAttempt: ($workflowRunAttempt | tonumber)
+                }
+              )
+            }' > image-descriptor.json
+          jq -n \
+            --arg contractCommit "$contract_commit" \
+            --arg builderId "$(jq -er '.runOutputResourceId' image-descriptor.json)" \
+            --arg evidenceDigest "$EVIDENCE_ARTIFACT_DIGEST" \
+            '{
+              buildDefinition: {
+                buildType: "https://azure.microsoft.com/vm-image-builder",
+                externalParameters: {contractCommit: $contractCommit}
+              },
+              runDetails: {
+                builder: {id: $builderId},
+                metadata: {immutableEvidenceArtifactDigest: $evidenceDigest}
+              }
+            }' > provenance.json
+      - name: Attest image build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.0.0
+        with:
+          subject-path: image-descriptor.json
+          predicate-type: 'https://slsa.dev/provenance/v1'
+          predicate-path: provenance.json
+      - name: Attest image SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.0.0
+        with:
+          subject-path: image-descriptor.json
+          predicate-type: 'https://cyclonedx.org/bom'
+          predicate-path: infra/ci-runner/image/toolchain-sbom.cyclonedx.document
+      - name: Persist reviewed image descriptor
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runner-image-descriptor
+          path: |
+            image-descriptor.json
+            provenance.json
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+normal_dir="${1:?systemd normal generator directory is required}"
+unit_dir="${CERTIGO_SYSTEMD_UNIT_DIR:-/etc/systemd/system}"
+shopt -s nullglob
+for unit_path in "${unit_dir}"/actions.runner.*.service; do
+  unit_name="${unit_path##*/}"
+  drop_in="${normal_dir}/${unit_name}.d"
+  install -d -m 0755 "${drop_in}"
+  cat >"${drop_in}/50-certigo-toolchain-guard.conf" <<'EOF'
+[Unit]
+Requires=certigo-toolchain-validate.service
+Requires=certigo-job-temp-mount.service
+After=certigo-toolchain-validate.service
+After=certigo-job-temp-mount.service
+EOF
+done

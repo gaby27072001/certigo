@@ -18,7 +18,7 @@ public sealed class PersonLinkedIdentityContractTests
         new(2026, 8, 20, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Versioned_contracts_are_machine_readable_and_runtime_disabled()
+    public void Versioned_link_contracts_are_machine_readable_and_link_runtime_disabled()
     {
         using var api = LoadContract("openapi.json");
         api.RootElement.GetProperty("info").GetProperty("version").GetString()
@@ -27,12 +27,12 @@ public sealed class PersonLinkedIdentityContractTests
             .Should().Be("contract-only");
         var reconciledMain = api.RootElement.GetProperty("x-certigo-reconciled-main");
         reconciledMain.GetProperty("commit").GetString()
-            .Should().Be("01ac86554445e4e3dd29efa5e95beaa8ed41400e");
+            .Should().Be("034c1dd41e8ce7da0a84f8a6e70d821829a54e61");
         reconciledMain.GetProperty("mergedPullRequests").EnumerateArray()
             .Select(pullRequest => pullRequest.GetInt32())
-            .Should().Equal(289, 296, 297, 301, 302, 303, 305, 308);
+            .Should().Equal(289, 296, 297, 301, 302, 303, 305, 308, 300);
         reconciledMain.GetProperty("productionIdentityRuntimeChanged").GetBoolean()
-            .Should().BeFalse();
+            .Should().BeTrue();
         api.RootElement.GetProperty("x-certigo-feature-mode").GetProperty("default").GetString()
             .Should().Be("off");
 
@@ -109,6 +109,8 @@ public sealed class PersonLinkedIdentityContractTests
         var featureMode = api.RootElement.GetProperty("x-certigo-feature-mode");
         featureMode.GetProperty("offHttpStatus").GetInt32().Should().Be(404);
         featureMode.GetProperty("disabledMutationHttpStatus").GetInt32().Should().Be(503);
+        featureMode.GetProperty("implementedValues").EnumerateArray()
+            .Select(value => value.GetString()).Should().Equal("off", "shadow");
 
         var components = api.RootElement.GetProperty("components");
         components.GetProperty("schemas").GetProperty("CreateIdentityLinkIntentRequest")
@@ -144,9 +146,16 @@ public sealed class PersonLinkedIdentityContractTests
         using var cosmos = LoadContract("cosmos.schema.json");
         cosmos.RootElement.GetProperty("version").GetString().Should().Be("1.0.0");
         cosmos.RootElement.GetProperty("x-certigo-reconciled-main").GetProperty("commit")
-            .GetString().Should().Be("01ac86554445e4e3dd29efa5e95beaa8ed41400e");
+            .GetString().Should().Be("034c1dd41e8ce7da0a84f8a6e70d821829a54e61");
         cosmos.RootElement.GetProperty("x-certigo-reconciled-main")
-            .GetProperty("productionIdentityRuntimeChanged").GetBoolean().Should().BeFalse();
+            .GetProperty("productionIdentityRuntimeChanged").GetBoolean().Should().BeTrue();
+        cosmos.RootElement.GetProperty("x-certigo-runtime")
+            .GetProperty("implementedValues").EnumerateArray()
+            .Select(value => value.GetString()).Should().Equal("off", "shadow");
+        cosmos.RootElement.GetProperty("x-certigo-runtime")
+            .GetProperty("legacyUserIdRemainsAuthoritative").GetBoolean().Should().BeTrue();
+        cosmos.RootElement.GetProperty("x-certigo-runtime")
+            .GetProperty("linkEndpointsImplemented").GetBoolean().Should().BeFalse();
         var storage = cosmos.RootElement.GetProperty("x-certigo-cosmos");
         storage.GetProperty("container").GetString().Should().Be("users");
         storage.GetProperty("partitionKey").GetString().Should().Be("/id");
@@ -204,18 +213,20 @@ public sealed class PersonLinkedIdentityContractTests
     [Fact]
     public void Contracts_match_merged_deletion_onboarding_catalog_and_cosmos_baselines()
     {
-        var containers = LoadRepositoryFile(
-            "backend",
-            "src",
-            "Certigo.Infrastructure",
-            "Cosmos",
-            "CosmosContainers.cs");
-        containers.Should().Contain("new(Users, \"/id\")");
-        containers.Should().Contain("new(Progress, \"/userId\")");
-        containers.Should().Contain("new(Attempts, \"/userId\", DefaultTimeToLive: -1)");
+        using var containerContract = JsonDocument.Parse(
+            LoadRepositoryFile("contracts", "cosmos-containers.json"));
+        var containers = containerContract.RootElement.GetProperty("containers")
+            .EnumerateArray()
+            .ToDictionary(
+                container => container.GetProperty("name").GetString()!,
+                container => container);
+        containers["users"].GetProperty("partitionKeyPath").GetString().Should().Be("/id");
+        containers["progress"].GetProperty("partitionKeyPath").GetString().Should().Be("/userId");
+        containers["attempts"].GetProperty("defaultTimeToLive").GetInt32().Should().Be(-1);
 
         var cosmosBicep = LoadRepositoryFile("infra", "modules", "cosmos.bicep");
-        cosmosBicep.Should().Contain("{ name: 'users', pk: '/id' }");
+        cosmosBicep.Should().Contain(
+            "loadJsonContent('../../contracts/cosmos-containers.json').containers");
         cosmosBicep.Should().Contain("path: '/*'");
         cosmosBicep.Should().Contain("path: '/\"_etag\"/?'");
 
@@ -263,7 +274,25 @@ public sealed class PersonLinkedIdentityContractTests
             "src",
             "Certigo.Api",
             "Program.cs");
-        program.Should().NotContain("PERSON_LINKED_IDENTITY_V1");
+        program.Should().Contain("PERSON_LINKED_IDENTITY_V1");
+        program.Should().Contain("PersonLinkedIdentityOptions.Parse");
+        program.Should().NotContain("IdentityLinkFunctions");
+        program.Should().NotContain("IIdentityLinkService");
+
+        foreach (var environment in new[] { "dev", "staging", "prod" })
+        {
+            LoadRepositoryFile(
+                    "infra",
+                    "params",
+                    $"{environment}.bicepparam")
+                .Should().Contain("param personLinkedIdentityV1 = 'off'");
+        }
+
+        var functionApp = LoadRepositoryFile(
+            "infra",
+            "modules",
+            "functionApp.bicep");
+        functionApp.Should().Contain("PERSON_LINKED_IDENTITY_V1: personLinkedIdentityV1");
     }
 
     [Fact]

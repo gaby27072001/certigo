@@ -53,7 +53,7 @@ public sealed class ContentServiceTests
 
         var catalog = await service.GetCatalogAsync();
 
-        catalog.Schema.Should().Be(CertificationCatalogSchemas.EmittedAppV2);
+        catalog.Schema.Should().Be(CertificationCatalogSchemas.AppV2);
         catalog.SourceSchema.Should().Be(CertificationCatalogSchemas.SourceV1);
         catalog.SourceAsOf.Should().Be(new DateOnly(2026, 8, 17));
         catalog.Providers.Should().HaveCount(3);

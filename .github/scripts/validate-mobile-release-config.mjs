@@ -6,9 +6,8 @@ const placeholderPattern = /(placeholder|example|change-?me|todo|microlingo)/i;
 const guidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const zeroGuid = '00000000-0000-0000-0000-000000000000';
-const hostnamePattern = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/;
-const unownedDomainPattern = /(^|\.)certigo\.app$/i;
-const nonProductionHostPattern = /(^|[.-])(dev|staging)([.-]|$)/i;
+const productionApiHostPattern =
+  /^func-certigo-prod-[a-z0-9]{13}\.azurewebsites\.net$/;
 
 function readArguments(argv) {
   const values = new Map();
@@ -58,23 +57,9 @@ export function validateMobileReleaseConfig(config) {
     if (
       placeholderPattern.test(config.apiBaseUrl)
       || host === 'localhost'
-      || unownedDomainPattern.test(host)
-      || nonProductionHostPattern.test(host)
+      || !productionApiHostPattern.test(host)
     ) {
       errors.push('MOBILE_API_BASE_URL must identify the production Certigo backend.');
-    }
-
-    const verifiedHost = config.verifiedOwnedApiHost.trim().toLowerCase();
-    if (
-      !hostnamePattern.test(verifiedHost)
-      || placeholderPattern.test(verifiedHost)
-      || unownedDomainPattern.test(verifiedHost)
-    ) {
-      errors.push(
-        'MOBILE_VERIFIED_OWNED_API_HOST must be an explicitly verified, non-placeholder hostname.',
-      );
-    } else if (host !== verifiedHost) {
-      errors.push('MOBILE_API_BASE_URL host must match MOBILE_VERIFIED_OWNED_API_HOST exactly.');
     }
   } catch (error) {
     errors.push(error.message);
@@ -128,7 +113,6 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     const args = readArguments(process.argv.slice(2));
     const errors = validateMobileReleaseConfig({
       apiBaseUrl: args.get('api-base-url') ?? '',
-      verifiedOwnedApiHost: args.get('verified-owned-api-host') ?? '',
       entraClientId: args.get('entra-client-id') ?? '',
       entraAuthority: args.get('entra-authority') ?? '',
       entraApiScope: args.get('entra-api-scope') ?? '',

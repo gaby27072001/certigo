@@ -4,7 +4,7 @@
   "title": "Certigo Person and LinkedIdentity Cosmos documents",
   "version": "1.0.0",
   "x-certigo-reconciled-main": {
-    "commit": "01ac86554445e4e3dd29efa5e95beaa8ed41400e",
+    "commit": "034c1dd41e8ce7da0a84f8a6e70d821829a54e61",
     "mergedPullRequests": [
       289,
       296,
@@ -13,9 +13,20 @@
       302,
       303,
       305,
-      308
+      308,
+      300
     ],
-    "productionIdentityRuntimeChanged": false
+    "productionIdentityRuntimeChanged": true
+  },
+  "x-certigo-runtime": {
+    "setting": "PERSON_LINKED_IDENTITY_V1",
+    "default": "off",
+    "implementedValues": [
+      "off",
+      "shadow"
+    ],
+    "legacyUserIdRemainsAuthoritative": true,
+    "linkEndpointsImplemented": false
   },
   "x-certigo-cosmos": {
     "container": "users",

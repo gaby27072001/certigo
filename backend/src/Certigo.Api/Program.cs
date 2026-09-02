@@ -31,11 +31,23 @@ var host = new HostBuilder()
         // downstream exception is mapped to ProblemDetails.
         worker.UseMiddleware<SecurityHeadersMiddleware>();
         worker.UseMiddleware<ExceptionMiddleware>();
+        worker.UseMiddleware<EnterpriseLearningMetricsFeatureMiddleware>();
+        worker.UseMiddleware<OrganizationFeatureMiddleware>();
+        worker.UseMiddleware<EnterpriseIdentityFeatureMiddleware>();
         worker.UseMiddleware<JwtAuthMiddleware>();
     })
     .ConfigureServices((context, services) =>
     {
         var configuration = context.Configuration;
+        var personLinkedIdentityOptions = PersonLinkedIdentityOptions.Parse(
+            configuration["PERSON_LINKED_IDENTITY_V1"]);
+        var organizationFeatureOptions = OrganizationFeatureOptions.Parse(
+            configuration["ORGANIZATION_MEMBERSHIP_V1"]);
+        var enterpriseIdentityFeatureOptions = EnterpriseIdentityFeatureOptions.Parse(
+            configuration["ENTERPRISE_IDENTITY_V1"]);
+        var enterpriseLearningMetricsFeatureOptions =
+            EnterpriseLearningMetricsFeatureOptions.Parse(
+                configuration["ENTERPRISE_LEARNING_METRICS_V1"]);
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
         services.AddHostedService<ColdStartTelemetryService>();
@@ -224,9 +236,54 @@ var host = new HostBuilder()
         services.AddScoped<IAuthService>(sp => sp.GetRequiredService<AuthService>());
         services.AddScoped<IEmailVerificationService>(sp => sp.GetRequiredService<AuthService>());
 
-        services.AddScoped<IUserContext, FunctionUserContext>();
+        services.AddScoped<FunctionUserContext>();
+        services.AddScoped<IUserContext>(sp => sp.GetRequiredService<FunctionUserContext>());
         services.AddSingleton<IClock, SystemClock>();
-        services.AddScoped<IUserRepository, CosmosUserRepository>();
+        services.AddSingleton(personLinkedIdentityOptions);
+        services.AddSingleton(organizationFeatureOptions);
+        services.AddSingleton(enterpriseIdentityFeatureOptions);
+        services.AddSingleton(enterpriseLearningMetricsFeatureOptions);
+        services.AddSingleton<IIdentitySubjectGenerator, CryptographicIdentitySubjectGenerator>();
+        services.AddSingleton<IPersonLinkedIdentityRepository, CosmosPersonLinkedIdentityRepository>();
+        services.AddSingleton<
+            IPersonLinkedIdentityTelemetry,
+            ApplicationInsightsPersonLinkedIdentityTelemetry>();
+        services.AddScoped<ILegacyIdentityObservationSource, FunctionLegacyIdentityObservationSource>();
+        services.AddScoped<IPersonLinkedIdentityShadowRuntime, PersonLinkedIdentityShadowService>();
+        services.AddScoped<CosmosUserRepository>();
+        services.AddScoped<IUserRepository>(sp =>
+            new PersonLinkedIdentityShadowUserRepository(
+                sp.GetRequiredService<CosmosUserRepository>(),
+                sp.GetRequiredService<IPersonLinkedIdentityShadowRuntime>(),
+                sp.GetRequiredService<ILegacyIdentityObservationSource>()));
+        services.AddSingleton<IOrganizationTokenGenerator, CryptographicOrganizationTokenGenerator>();
+        services.AddScoped<IOrganizationRepository, CosmosOrganizationRepository>();
+        services.AddScoped<IOrganizationPersonResolver, OrganizationPersonResolver>();
+        services.AddScoped<IOrganizationMembershipResolver, OrganizationMembershipResolver>();
+        services.AddScoped<IOrganizationAuthorizationHandler, OrganizationAuthorizationHandler>();
+        services.AddScoped<IOrganizationService, OrganizationService>();
+        services.AddScoped<
+            IOrganizationOffboardingRecoveryWorker,
+            OrganizationOffboardingRecoveryWorker>();
+        services.AddScoped<
+            IEnterpriseLearningMetricsRepository,
+            CosmosEnterpriseLearningMetricsRepository>();
+        services.AddScoped<
+            IEnterpriseLearningReceiptOutboxRepository,
+            CosmosEnterpriseLearningMetricsRepository>();
+        services.AddScoped<
+            IEnterpriseLearningMetricReceiptRepository,
+            CosmosEnterpriseLearningMetricReceiptRepository>();
+        services.AddSingleton<
+            IEnterpriseLearningLeaseGenerator,
+            CryptographicEnterpriseLearningLeaseGenerator>();
+        services.AddSingleton<
+            IEnterpriseLearningFactSource,
+            UnavailableEnterpriseLearningFactSource>();
+        services.AddScoped<
+            IEnterpriseLearningReceiptOutboxWorker,
+            EnterpriseLearningReceiptOutboxWorker>();
+        services.AddScoped<IEnterpriseLearningMetricsService, EnterpriseLearningMetricsService>();
         services.AddSingleton<IAccountDeletionRepository, CosmosAccountDeletionRepository>();
         services.AddSingleton<IAccountDeletionAccessGuard, AccountDeletionAccessGuard>();
         services.AddSingleton<IAccountDeletionAudit, AccountDeletionAudit>();

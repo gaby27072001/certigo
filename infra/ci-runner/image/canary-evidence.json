@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "status": "planned",
+  "liveOperationsAuthorized": false,
+  "imageBuild": {
+    "runOutputResourceId": null,
+    "galleryImageVersionId": null,
+    "descriptorSha256": null,
+    "provenanceAttestationUrl": null,
+    "sbomAttestationUrl": null
+  },
+  "whatIf": {
+    "capturedAt": null,
+    "resultSha256": null,
+    "validated": false,
+    "provenance": {
+      "subscriptionId": null,
+      "templateSha256": null,
+      "buildContractSha256": null,
+      "descriptorSha256": null,
+      "direction": null,
+      "targetImageVersionId": null,
+      "previousImageVersionId": null
+    }
+  },
+  "measurements": {
+    "coldBootMilliseconds": [],
+    "warmJobMilliseconds": [],
+    "coldBootP50Milliseconds": null,
+    "coldBootP95Milliseconds": null,
+    "warmJobP50Milliseconds": null,
+    "warmJobP95Milliseconds": null
+  },
+  "rollback": {
+    "previousGalleryImageVersionId": null,
+    "validated": false
+  },
+  "cleanup": {
+    "expiresOn": null,
+    "estimatedMaximumSpendUsd": 15,
+    "completedAt": null
+  }
+}

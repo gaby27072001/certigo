@@ -3,6 +3,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
+import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
+import { validateWorkflowConcurrency } from './workflow-concurrency-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
 
 const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -30,9 +33,12 @@ const usesPattern =
 const runPattern = /^(?<indent>\s*)(?:-\s+)?run:\s*(?<value>.*)$/;
 const prLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-pr]';
 const trustedLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-trusted]';
+const cosmosLinuxRunner =
+  'runs-on: [self-hosted, Linux, X64, certigo-cosmos-emulator]';
 const allowedRunnerLines = new Set([
   prLinuxRunner,
   trustedLinuxRunner,
+  cosmosLinuxRunner,
   'runs-on: [self-hosted, macOS, certigo-trusted]',
 ]);
 const forbiddenRunnerConfiguration = [
@@ -54,6 +60,9 @@ const reusableScannerFiles = new Set([
 const trustedOnlyWorkflowFiles = new Set([
   'cd-backend.yml',
   'deploy-privacy-policy.yml',
+  'governance-bootstrap-phase-a-what-if.yml',
+  'governance-bootstrap-phase-b-what-if.yml',
+  'publish-verified-public-pages.yml',
   'promote-backend-staging-prod.yml',
   'release-android.yml',
   'release-ios.yml',
@@ -69,6 +78,15 @@ const trustedAggregateJobs = new Map([
 const privilegedDispatchTypes = new Map([
   ['cd-backend.yml', 'promote-backend'],
   ['deploy-privacy-policy.yml', 'deploy-privacy-policy'],
+  [
+    'governance-bootstrap-phase-a-what-if.yml',
+    'governance-bootstrap-phase-a-what-if',
+  ],
+  [
+    'governance-bootstrap-phase-b-what-if.yml',
+    'governance-bootstrap-phase-b-what-if',
+  ],
+  ['publish-verified-public-pages.yml', 'publish-verified-public-pages'],
   ['promote-backend-staging-prod.yml', 'promote-backend-staging-prod'],
   ['release-android.yml', 'release-android'],
   ['release-ios.yml', 'release-ios-legacy'],
@@ -140,6 +158,9 @@ function validateWorkflow(file) {
   const errors = [];
   const fileName = path.basename(file);
   const hasTrustedJob = text.includes('certigo-trusted');
+  const hasCosmosJob = text.includes('certigo-cosmos-emulator');
+  const hasPrTrigger =
+    /^ {2}pull_request(?:_target)?:\s*$/m.test(text);
 
   if (!lines.some((line) => /^permissions:\s*(?:\{\})?\s*$/.test(line))) {
     errors.push(`${file}: missing explicit top-level permissions`);
@@ -169,6 +190,7 @@ function validateWorkflow(file) {
     errors.push(`${file}: legacy mixed-trust runner label certigo-ci is forbidden`);
   }
   errors.push(...validatePersistentCachePolicy(text, file));
+  errors.push(...validateWorkflowConcurrency(text, file));
   if (hasTrustedJob && /^ {2}workflow_dispatch:/m.test(text)) {
     errors.push(`${file}: certigo-trusted workflows must not use workflow_dispatch`);
   }
@@ -187,6 +209,30 @@ function validateWorkflow(file) {
     && !/^ {4}branches:\s*/m.test(text)
   ) {
     errors.push(`${file}: certigo-trusted push triggers must be restricted to named branches`);
+  }
+  if (hasCosmosJob) {
+    if (
+      !/^ {2}workflow_dispatch:\s*$/m.test(text)
+      || text.includes('repository_dispatch:')
+      || text.includes('pull_request_target:')
+      || /^ {2}pull_request:\s*$/m.test(text)
+      || /^ {2}push:/m.test(text)
+    ) {
+      errors.push(
+        `${file}: certigo-cosmos-emulator workflows must be manual and must not run for repository events`,
+      );
+    }
+    if (
+      !text.includes("github.event_name == 'workflow_dispatch'")
+      || !text.includes("github.repository == 'gchambaud_microsoft/Certigo'")
+      || !text.includes("github.ref == 'refs/heads/main'")
+      || !text.includes('ref: refs/heads/main')
+      || !text.includes("vars.CERTIGO_COSMOS_EMULATOR_ENABLED == 'true'")
+    ) {
+      errors.push(
+        `${file}: certigo-cosmos-emulator workflows must explicitly gate manual execution and checkout merged main`,
+      );
+    }
   }
   const expectedDispatchType = privilegedDispatchTypes.get(fileName);
   if (
@@ -244,6 +290,49 @@ function validateWorkflow(file) {
         );
       }
     }
+    const prHeadCheckoutIndexes = [
+      "ref: ${{ github.event.pull_request.head.sha }}",
+      "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
+    ]
+      .map((marker) => job.text.indexOf(marker))
+      .filter((index) => index >= 0);
+    const prHeadCheckout = prHeadCheckoutIndexes.length > 0
+      ? Math.min(...prHeadCheckoutIndexes)
+      : -1;
+    const assignedHeadRecheck = job.text.indexOf(
+      'name: Recheck current PR head after assignment',
+    );
+    const initialHeadCheck = job.text.indexOf(
+      'name: Enforce initial PR freshness validation',
+    );
+    if (
+      hasPrTrigger
+      && assignedHeadRecheck >= 0
+      && (
+        initialHeadCheck < 0
+        || initialHeadCheck > assignedHeadRecheck
+        || !job.text.includes('needs.freshness.result')
+      )
+    ) {
+      errors.push(
+        `${file}: PR job ${job.id} must fail closed when initial freshness validation fails`,
+      );
+    }
+    if (
+      prHeadCheckout >= 0
+      && (
+        assignedHeadRecheck < 0
+        || assignedHeadRecheck > prHeadCheckout
+        || !job.text.includes(
+          'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0',
+        )
+        || !job.text.includes('pull-requests: read')
+      )
+    ) {
+      errors.push(
+        `${file}: PR-consuming job ${job.id} must recheck the current head after assignment`,
+      );
+    }
     if (
       job.text.includes('certigo-trusted')
       && (
@@ -254,13 +343,34 @@ function validateWorkflow(file) {
     ) {
       errors.push(`${file}: certigo-trusted job ${job.id} must not checkout or parse PR source`);
     }
+    if (job.text.includes('certigo-cosmos-emulator')) {
+      if (
+        job.text.includes('secrets.')
+        || /^\s+environment:\s*/m.test(job.text)
+        || job.text.includes('azure/login@')
+        || /key\s*vault|keyvault/i.test(job.text)
+        || /^\s+id-token:\s*write\s*$/m.test(job.text)
+      ) {
+        errors.push(
+          `${file}: certigo-cosmos-emulator job ${job.id} must not receive secrets, environments, or cloud identity`,
+        );
+      }
+      if (
+        job.text.includes('github.event.pull_request')
+        || job.text.includes('.untrusted-source')
+        || job.text.includes('.untrusted-restore')
+      ) {
+        errors.push(
+          `${file}: certigo-cosmos-emulator job ${job.id} must consume merged main only`,
+        );
+      }
+    }
   }
   if (text.includes('pull_request_target:')) {
     const isForkPolicy = path.basename(file) === 'fork-pr-policy.yml';
     if (isForkPolicy) {
       if (
         text.includes('actions/checkout@') ||
-        text.includes('github.event.pull_request.head.sha') ||
         !text.includes('Fork PR policy / Required gate') ||
         !text.includes('HEAD_REPOSITORY') ||
         !text.includes('HEAD_REPOSITORY" != "$BASE_REPOSITORY')
@@ -342,14 +452,10 @@ function validateWorkflow(file) {
 function validateRepositoryInvariants() {
   const errors = [];
   const android = fs.readFileSync(path.join(workflowsDir, 'release-android.yml'), 'utf8');
+  const iosRelease = fs.readFileSync(path.join(workflowsDir, 'release-ios.yml'), 'utf8');
   const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');
   const backend = fs.readFileSync(path.join(workflowsDir, 'cd-backend.yml'), 'utf8');
   const backendCi = fs.readFileSync(path.join(workflowsDir, 'ci-backend.yml'), 'utf8');
-  const accountDeletionCosmosWorkflow = fs.readFileSync(
-    path.join(workflowsDir, 'test-account-deletion-cosmos.yml'),
-    'utf8',
-  );
-  const accountDeletionCosmosControls = accountDeletionCosmosWorkflow;
   const promoteBackendPath = path.join(
     workflowsDir,
     'promote-backend-staging-prod.yml',
@@ -364,6 +470,10 @@ function validateRepositoryInvariants() {
   );
   const osvEnforcer = fs.readFileSync(
     path.join(root, '.github', 'scripts', 'enforce-osv-json.mjs'),
+    'utf8',
+  );
+  const osvRunner = fs.readFileSync(
+    path.join(root, '.github', 'scripts', 'run-osv-scan.mjs'),
     'utf8',
   );
   const nugetLockValidator = fs.readFileSync(
@@ -386,6 +496,14 @@ function validateRepositoryInvariants() {
     path.join(root, '.github', 'scripts', 'write-secure-bicep-parameters.mjs'),
     'utf8',
   );
+  const publicDomainContract = fs.readFileSync(
+    path.join(root, '.github', 'scripts', 'public-domain-contract.mjs'),
+    'utf8',
+  );
+  const publicPagesWorkflow = fs.readFileSync(
+    path.join(workflowsDir, 'publish-verified-public-pages.yml'),
+    'utf8',
+  );
   const accountDeletionCosmosGate = fs.readFileSync(
     path.join(root, 'backend', 'run-account-deletion-cosmos-emulator.sh'),
     'utf8',
@@ -406,16 +524,26 @@ function validateRepositoryInvariants() {
     'utf8',
   );
   const lint = fs.readFileSync(path.join(workflowsDir, 'lint-workflows.yml'), 'utf8');
+  const preflight = fs.readFileSync(path.join(workflowsDir, 'ci-preflight.yml'), 'utf8');
+  const pythonLauncher = fs.readFileSync(
+    path.join(root, '.github', 'scripts', 'run-python.sh'),
+    'utf8',
+  );
   const projectState = fs.readFileSync(
     path.join(workflowsDir, 'ci-project-state.yml'),
     'utf8',
   );
   const securityGate = fs.readFileSync(path.join(workflowsDir, 'security-gate.yml'), 'utf8');
   const forkPolicy = fs.readFileSync(path.join(workflowsDir, 'fork-pr-policy.yml'), 'utf8');
+  const prHeadFreshness = fs.readFileSync(
+    path.join(workflowsDir, 'pr-head-freshness.yml'),
+    'utf8',
+  );
   const dependencyScan = fs.readFileSync(
     path.join(workflowsDir, 'dependency-vuln-scan.yml'),
     'utf8',
   );
+  errors.push(...validateOsvWorkflowPolicy(dependencyScan));
   const iacScan = fs.readFileSync(path.join(workflowsDir, 'security-scan.yml'), 'utf8');
   const branchProtection = JSON.parse(
     fs.readFileSync(path.join(root, '.github', 'branch-protection-main.json'), 'utf8'),
@@ -520,33 +648,6 @@ function validateRepositoryInvariants() {
     }
   }
   for (const marker of [
-    'refs/heads/main',
-    'repository_dispatch:',
-    'types: [test-account-deletion-cosmos]',
-    'type == "object" and length == 0',
-    "github.ref == 'refs/heads/main'",
-    'ref: ${{ github.sha }}',
-    'runs-on: [self-hosted, Linux, X64, certigo-trusted]',
-    'ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""',
-    'bash backend/run-account-deletion-cosmos-emulator.sh',
-  ]) {
-    if (!accountDeletionCosmosControls.includes(marker)) {
-      errors.push(
-        `test-account-deletion-cosmos.yml: missing isolated gate invariant ${marker}`,
-      );
-    }
-  }
-  if (
-    accountDeletionCosmosControls.includes('pull_request')
-    || accountDeletionCosmosControls.includes('push:')
-    || accountDeletionCosmosControls.includes('az role assignment')
-    || accountDeletionCosmosControls.includes('az cosmosdb create')
-  ) {
-    errors.push(
-      'test-account-deletion-cosmos.yml: the destructive gate must stay manual and must not provision Azure resources or roles',
-    );
-  }
-  for (const marker of [
     'openssl rand -base64 64',
     'KEY_FILE=/run/secrets/cosmos.key',
     '--publish 127.0.0.1:8081:8081',
@@ -593,6 +694,9 @@ function validateRepositoryInvariants() {
       'ENTRA_GRAPH_CLIENT_SECRET: ${{ secrets.ENTRA_GRAPH_CLIENT_SECRET }}',
       'ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON: ${{ vars.ENTRA_GRAPH_CLIENT_SECRET_EXPIRES_ON }}',
       'ENTRA_REAUTH_AUDIENCE: ${{ vars.ENTRA_REAUTH_AUDIENCE }}',
+      'PUBLIC_WEB_ORIGIN: ${{ vars.PUBLIC_WEB_ORIGIN }}',
+      'PUBLIC_DOMAIN_VERIFIED: ${{ vars.PUBLIC_DOMAIN_VERIFIED }}',
+      'APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}',
       'az bicep build-params',
       'node .github/scripts/write-secure-bicep-parameters.mjs',
       'DEPLOYMENT_OUTPUTS_FILE',
@@ -637,6 +741,9 @@ function validateRepositoryInvariants() {
       'compiled.parameters.entraGraphClientSecret',
       'compiled.parameters.entraGraphClientSecretExpiresOn',
       'compiled.parameters.entraReauthAudience',
+      'compiled.parameters.publicWebOrigin',
+      'compiled.parameters.publicDomainVerified',
+      'compiled.parameters.appleCiamDomainReconfigured',
       'mode: 0o600',
       "flag: 'wx'",
     ]) {
@@ -657,6 +764,82 @@ function validateRepositoryInvariants() {
         errors.push(
           `${environment}.bicepparam: account deletion identity values must come from the GitHub Environment`,
         );
+      }
+      if (
+        /^\s*param\s+(publicWebOrigin|publicDomainVerified|appleCiamDomainReconfigured)\s*=/m
+          .test(content)
+      ) {
+        errors.push(
+          `${environment}.bicepparam: public-domain values must come from the GitHub Environment`,
+        );
+      }
+    }
+  }
+  for (const marker of [
+    "'infrastructure'",
+    'PUBLIC_WEB_ORIGIN must be a canonical HTTPS origin',
+    'PUBLIC_DOMAIN_VERIFIED must be explicitly true',
+    'APPLE_CIAM_DOMAIN_RECONFIGURED must be explicitly true',
+    "host.endsWith('.invalid')",
+    "host.endsWith('.')",
+    "host.endsWith('.test')",
+    "['certigo', 'app'].join('.')",
+  ]) {
+    if (!publicDomainContract.includes(marker)) {
+      errors.push(`public-domain-contract.mjs: missing fail-closed invariant ${marker}`);
+    }
+  }
+  for (const marker of [
+    'environment: github-pages',
+    'PUBLIC_WEB_ORIGIN: ${{ vars.PUBLIC_WEB_ORIGIN }}',
+    'PUBLIC_DOMAIN_VERIFIED: ${{ vars.PUBLIC_DOMAIN_VERIFIED }}',
+    'APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}',
+    'PAGES_ORIGIN: ${{ steps.pages.outputs.origin }}',
+    'PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}',
+    'node .github/scripts/public-domain-contract.mjs legal-pages',
+    'node tools/build_public_pages.mjs --output _site',
+  ]) {
+    if (!publicPagesWorkflow.includes(marker)) {
+      errors.push(`publish-verified-public-pages.yml: missing verified-domain invariant ${marker}`);
+    }
+  }
+  if (
+    publicPagesWorkflow.indexOf('node tools/build_public_pages.mjs --output _site')
+    > publicPagesWorkflow.indexOf('actions/upload-pages-artifact@')
+  ) {
+    errors.push(
+      'publish-verified-public-pages.yml: domain validation must run before the Pages artifact upload',
+    );
+  }
+  for (const marker of [
+    'validate-public-domain:',
+    'Require verified public-domain contract before Azure access',
+    'Require verified public-domain contract before deploy or rollback',
+    'node .github/scripts/public-domain-contract.mjs infrastructure',
+  ]) {
+    if (!backend.includes(marker)) {
+      errors.push(`cd-backend.yml: missing public-domain deploy/rollback gate ${marker}`);
+    }
+  }
+  if (
+    backend.indexOf('validate-public-domain:')
+    > backend.indexOf('resolve-release:')
+  ) {
+    errors.push('cd-backend.yml: public-domain preflight must precede Azure release retrieval');
+  }
+  for (const [file, content] of [
+    ['release-android.yml', android],
+    ['release-ios.yml', iosRelease],
+    ['codemagic.yaml', codemagic],
+  ]) {
+    for (const marker of [
+      'PUBLIC_WEB_ORIGIN',
+      'PUBLIC_DOMAIN_VERIFIED',
+      'APPLE_CIAM_DOMAIN_RECONFIGURED',
+      'public-domain-contract.mjs account-deletion-url',
+    ]) {
+      if (!content.includes(marker)) {
+        errors.push(`${file}: missing public-domain release gate ${marker}`);
       }
     }
   }
@@ -774,7 +957,7 @@ function validateRepositoryInvariants() {
   for (const marker of [
     'pull_request_target:',
     prLinuxRunner,
-    "github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository",
+    'github.event.pull_request.head.repo.full_name == github.repository',
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
     'path: .untrusted-source',
@@ -840,6 +1023,64 @@ function validateRepositoryInvariants() {
     errors.push('lint-workflows.yml: workflow security script tests are not enforced');
   }
   for (const marker of [
+    'pull_request_target:',
+    prLinuxRunner,
+    'github.event.pull_request.head.repo.full_name == github.repository',
+    'uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0',
+    'python-version: "3.12.10"',
+    'architecture: "x64"',
+    'check-latest: false',
+    'name: Verify trusted Python bootstrap',
+    'sys.flags.safe_path',
+    'path: .untrusted-source',
+    'path: .trusted-control',
+    'bash "$TRUSTED_CONTROL_DIR/.github/scripts/run-python.sh"',
+    '"$TRUSTED_CONTROL_DIR/tools/project_state.py"',
+    '--root "$UNTRUSTED_SOURCE_DIR"',
+  ]) {
+    if (!preflight.includes(marker)) {
+      errors.push(`ci-preflight.yml: missing trusted Python launcher invariant ${marker}`);
+    }
+  }
+  const pythonBootstrap = preflight.indexOf('uses: actions/setup-python@');
+  const firstPreflightCheckout = preflight.indexOf('uses: actions/checkout@');
+  if (
+    pythonBootstrap < 0
+    || firstPreflightCheckout < 0
+    || pythonBootstrap > firstPreflightCheckout
+  ) {
+    errors.push('ci-preflight.yml: trusted Python must be bootstrapped before any checkout');
+  }
+  const bootstrapBlock = preflight.slice(pythonBootstrap, firstPreflightCheckout);
+  if (/^\s+cache:/mu.test(bootstrapBlock)) {
+    errors.push('ci-preflight.yml: trusted Python bootstrap must not use a persistent cache');
+  }
+  if (bootstrapBlock.includes('continue-on-error:')) {
+    errors.push('ci-preflight.yml: trusted Python bootstrap must fail closed');
+  }
+  if (
+    bootstrapBlock.includes('.untrusted-source')
+    || bootstrapBlock.includes('UNTRUSTED_SOURCE_DIR')
+  ) {
+    errors.push('ci-preflight.yml: trusted Python bootstrap must not inspect PR source');
+  }
+  if (/(?:^|\s)(?:python|python3|py)\s+-P\s+["']?\$TRUSTED_CONTROL_DIR/mu.test(preflight)) {
+    errors.push('ci-preflight.yml: project-state must use the trusted Python launcher');
+  }
+  for (const marker of [
+    'try_launcher python3',
+    'try_launcher python',
+    'try_launcher py -3',
+    'Python 3.11+ with safe-path mode is required',
+    'UNTRUSTED_SOURCE_DIR',
+    'Refusing Python launcher from untrusted source',
+    'exec "${canonical}" "${launcher_arguments[@]}" -P "${python_arguments[@]}"',
+  ]) {
+    if (!pythonLauncher.includes(marker)) {
+      errors.push(`run-python.sh: missing fail-closed launcher invariant ${marker}`);
+    }
+  }
+  for (const marker of [
     'validate-source:',
     'name: Validate project-state source',
     'needs: validate-source',
@@ -881,7 +1122,6 @@ function validateRepositoryInvariants() {
     '--validate-active-content',
     'CERTIGO_CONTENT_',
     'actions/create-github-app-token',
-    'token: ${{',
   ]) {
     if (projectState.includes(forbiddenMarker)) {
       errors.push(`ci-project-state.yml: forbidden App/PAT fallback ${forbiddenMarker}`);
@@ -977,9 +1217,7 @@ function validateRepositoryInvariants() {
   }
   for (const marker of [
     'OSV-Scanner output is missing or malformed.',
-    '--format=json',
-    '--no-ignore',
-    '--all-packages',
+    'node "$TRUSTED_CONTROL_DIR/.github/scripts/run-osv-scan.mjs"',
     'python -P "$TRUSTED_CONTROL_DIR/tools/validate_dependency_locks.py"',
     '--root "$UNTRUSTED_SOURCE_DIR"',
     '--write-expected-sources "$EXPECTED_LOCKS_FILE"',
@@ -996,8 +1234,6 @@ function validateRepositoryInvariants() {
     'FLUTTER_EXECUTABLE="$FLUTTER_INSTALL_DIR/flutter/bin/flutter"',
     'name: Verify trusted controls remain immutable',
     'git -C "$TRUSTED_CONTROL_DIR" status --porcelain --untracked-files=all',
-    '--config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml"',
-    '--output-file "$output_temp"',
     'node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-osv-json.mjs"',
     '"$EXPECTED_LOCKS_FILE"',
     '"$UNTRUSTED_SOURCE_DIR" 2> "$OSV_ENFORCE_LOG"',
@@ -1011,14 +1247,30 @@ function validateRepositoryInvariants() {
     }
   }
   for (const marker of [
+    "'--format=json'",
+    "'--no-ignore'",
+    '`--config=${path.resolve(configFile)}`',
+    "'--output-file'",
+    '`--lockfile=${canonicalSource}`',
+    'Expected OSV source contract must contain at least one lockfile.',
+    'Expected OSV source contract contains duplicate lockfiles.',
+    'must reference a regular lockfile.',
+    'spawnSync(scanner, args',
+    'assertOsvScannedEveryLockfile',
+    'OSV-Scanner did not confirm scanning lockfiles',
+  ]) {
+    if (!osvRunner.includes(marker)) {
+      errors.push(`run-osv-scan.mjs: missing explicit lockfile invariant ${marker}`);
+    }
+  }
+  for (const marker of [
     'OSV-Scanner JSON must contain a results array.',
     'packageResult.vulnerabilities',
     'packageResult.groups',
     'references unknown vulnerability',
-    'omitted expected tracked lockfiles',
+    'was not present in the validated lockfile contract',
     'pubManifests',
-    'allowedEmptyNugetPackages',
-    'may be empty only for a validated',
+    'package.version',
     'vulnerabilityCount',
   ]) {
     if (!osvEnforcer.includes(marker)) {
@@ -1057,7 +1309,6 @@ function validateRepositoryInvariants() {
     'core.hooksPath=/dev/null',
     'validate_nuget_locks.py',
     'pubManifests',
-    'allowedEmptyNugetPackages',
   ]) {
     if (!dependencyLockValidator.includes(marker)) {
       errors.push(`validate_dependency_locks.py: missing fail-closed invariant ${marker}`);
@@ -1227,10 +1478,31 @@ function validateRepositoryInvariants() {
     }
   }
   if (
-    forkPolicy.includes('actions/checkout@') ||
-    forkPolicy.includes('github.event.pull_request.head.sha')
+    forkPolicy.includes('actions/checkout@')
   ) {
     errors.push('fork-pr-policy.yml: fork gate must never checkout pull request code');
+  }
+  for (const marker of [
+    'workflow_call:',
+    prLinuxRunner,
+    'pull-requests: read',
+    'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0',
+    'const current = pull.head.sha === eventHeadSha;',
+    "core.setOutput('current', current ? 'true' : 'false');",
+  ]) {
+    if (!prHeadFreshness.includes(marker)) {
+      errors.push(`pr-head-freshness.yml: missing fail-closed freshness invariant ${marker}`);
+    }
+  }
+  for (const forbiddenMarker of [
+    'actions/checkout@',
+    'secrets.',
+    'environment:',
+    'id-token: write',
+  ]) {
+    if (prHeadFreshness.includes(forbiddenMarker)) {
+      errors.push(`pr-head-freshness.yml: forbidden trust surface ${forbiddenMarker}`);
+    }
   }
   if (
     !branchProtection.required_status_checks.contexts.includes(
@@ -1263,6 +1535,7 @@ const workflowFiles = fs
   .sort()
   .map((file) => path.join(workflowsDir, file));
 const errors = [
+  ...validateAccountDeletionCosmosLayout(root),
   ...(fs.existsSync(path.join(workflowsDir, 'copilot-auto-merge.yml'))
     ? ['copilot-auto-merge.yml: privileged auto-merge workflow must remain removed']
     : []),
