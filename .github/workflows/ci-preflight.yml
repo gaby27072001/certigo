@@ -169,13 +169,11 @@ jobs:
 
       - name: Run adversarial selector and security-policy tests
         if: ${{ steps.impact.outputs.security_policy == 'true' }}
+        working-directory: .trusted-control
         shell: bash
         run: |
           set -euo pipefail
-          node --test \
-            "$TRUSTED_CONTROL_DIR/.github/scripts/ci-impact.test.mjs" \
-            "$TRUSTED_CONTROL_DIR/.github/scripts/workflow-concurrency-policy.test.mjs" \
-            "$TRUSTED_CONTROL_DIR/.github/scripts/workflow-security-cache-policy.test.mjs"
+          npm --ignore-scripts run test:ci-impact
           node "$TRUSTED_CONTROL_DIR/.github/scripts/validate-workflow-security.mjs" \
             --workspace "$UNTRUSTED_SOURCE_DIR"
 

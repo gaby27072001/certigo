@@ -4,6 +4,8 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -691,6 +693,84 @@ class ProjectStateTests(unittest.TestCase):
             REPO_ROOT / ".github/scripts/enforce-codeql-sarif.mjs"
         ).read_text(encoding="utf-8")
         self.assertIn("GITHUB_STEP_SUMMARY", enforcer)
+
+    def test_trusted_control_references_are_revision_local_and_sealed(self) -> None:
+        preflight = (REPO_ROOT / ".github/workflows/ci-preflight.yml").read_text(
+            encoding="utf-8"
+        )
+        install_start = preflight.index(
+            "      - name: Install trusted validator dependencies"
+        )
+        step_start = preflight.index(
+            "      - name: Run adversarial selector and security-policy tests"
+        )
+        step_end = preflight.index(
+            "      - name: Validate project-state source", step_start
+        )
+        install_step = preflight[install_start:step_start]
+        self.assertIn("working-directory: .trusted-control", install_step)
+        self.assertIn("run: npm ci --ignore-scripts", install_step)
+        self.assertNotIn("UNTRUSTED_SOURCE_DIR", install_step)
+        self.assertNotIn("--prefix", install_step)
+        policy_step = preflight[step_start:step_end]
+        self.assertIn("working-directory: .trusted-control", policy_step)
+        self.assertIn("npm --ignore-scripts run test:ci-impact", policy_step)
+        self.assertNotIn("node --test", policy_step)
+        self.assertNotRegex(
+            policy_step,
+            r"\$(?:\{TRUSTED_CONTROL_DIR\}|TRUSTED_CONTROL_DIR)"
+            r"/[A-Za-z0-9._/-]+\.test\.mjs",
+        )
+
+        package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
+        self.assertNotIn("pretest:ci-impact", package["scripts"])
+        self.assertNotIn("posttest:ci-impact", package["scripts"])
+        manifest = shlex.split(package["scripts"]["test:ci-impact"])
+        self.assertEqual(["node", "--test"], manifest[:2])
+        test_paths = manifest[2:]
+        self.assertTrue(
+            {
+                ".github/scripts/ci-impact.test.mjs",
+                ".github/scripts/workflow-concurrency-policy.test.mjs",
+                ".github/scripts/workflow-security-cache-policy.test.mjs",
+            }.issubset(test_paths)
+        )
+        for test_path in test_paths:
+            self.assertRegex(
+                test_path,
+                r"^\.github/scripts/[A-Za-z0-9._-]+\.test\.mjs$",
+            )
+
+        references = set(test_paths)
+        for workflow_path in (REPO_ROOT / ".github/workflows").glob("*.y*ml"):
+            references.update(
+                re.findall(
+                    r"\$(?:\{TRUSTED_CONTROL_DIR\}|TRUSTED_CONTROL_DIR)"
+                    r"/([A-Za-z0-9._/-]+)",
+                    workflow_path.read_text(encoding="utf-8"),
+                )
+            )
+
+        canonical_root = REPO_ROOT.resolve(strict=True)
+        for relative in sorted(references):
+            with self.subTest(relative=relative):
+                relative_path = Path(relative)
+                self.assertFalse(relative_path.is_absolute())
+                self.assertNotIn("..", relative_path.parts)
+                control_file = REPO_ROOT / relative_path
+                self.assertFalse(control_file.is_symlink())
+                self.assertTrue(control_file.is_file())
+                self.assertTrue(
+                    control_file.resolve(strict=True).is_relative_to(canonical_root)
+                )
+                tracked = subprocess.run(
+                    ["git", "ls-files", "--error-unmatch", "--", relative],
+                    cwd=REPO_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(0, tracked.returncode, tracked.stderr)
 
     def test_trusted_workflows_use_default_branch_dispatch_only(self) -> None:
         workflows = REPO_ROOT / ".github/workflows"
