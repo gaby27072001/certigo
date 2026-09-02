@@ -16,7 +16,7 @@ const accountDeletionIdentityConfiguration = {
   entraReauthAudience: '44444444-4444-4444-4444-444444444444',
 };
 const publicDomainConfiguration = {
-  publicWebOrigin: 'https://github.com',
+  publicWebOrigin: 'https://certigo-app.com',
   publicDomainVerified: 'true',
   appleCiamDomainReconfigured: 'true',
 };
@@ -208,7 +208,7 @@ test('feature-off hardened deployment still requires the verified public domain'
   assert.equal(parameters.entraGraphClientSecret, undefined);
   assert.equal(parameters.entraGraphClientSecretExpiresOn, undefined);
   assert.equal(parameters.entraReauthAudience, undefined);
-  assert.deepEqual(parameters.publicWebOrigin, { value: 'https://github.com' });
+  assert.deepEqual(parameters.publicWebOrigin, { value: 'https://certigo-app.com' });
   assert.deepEqual(parameters.publicDomainVerified, { value: true });
   assert.deepEqual(parameters.appleCiamDomainReconfigured, { value: true });
 });

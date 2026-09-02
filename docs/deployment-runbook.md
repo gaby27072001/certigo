@@ -151,9 +151,9 @@ officielle : [tester un Action Group](https://learn.microsoft.com/azure/azure-mo
 
 La publication GitHub Pages des pages légales (politique de confidentialité
 `/privacy-policy/` et demande de suppression `/account-deletion/`) est
-fail-closed. Le GitHub Environment `github-pages` doit fournir une
-`PUBLIC_WEB_ORIGIN` HTTPS canonique et `PUBLIC_DOMAIN_VERIFIED=true`; sinon le
-builder échoue avant la création de l'artefact. Ne déclencher le dispatch
+fail-closed. Le GitHub Environment `github-pages` doit fournir l'origine exacte,
+les deux preuves d'activation et les identifiants Apple/Android contrôlés ; sinon
+le builder échoue avant la création de l'artefact. Ne déclencher le dispatch
 qu'après avoir suivi [`PUBLIC_DOMAIN_MIGRATION.md`](./PUBLIC_DOMAIN_MIGRATION.md) :
 
 ```bash
@@ -164,11 +164,10 @@ gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" \
 Le dispatch historique `deploy-privacy-policy` reste neutralisé et ne doit pas
 être utilisé comme chemin d'activation.
 
-Le domaine possédé prévu est l'apex `https://certigo-app.com`. Avant de renseigner
-`PUBLIC_WEB_ORIGIN`, suivre le delta DNS Wix, le rollback et les validations
-HTTPS/AASA/assetlinks de
-[`UNIVERSAL_APP_LINKS.md`](./UNIVERSAL_APP_LINKS.md). La possession seule du
-domaine ne suffit pas à passer `PUBLIC_DOMAIN_VERIFIED=true`.
+Le domaine possédé prévu est l'apex `https://certigo-app.com`. Le delta DNS Wix,
+le rollback, les cibles GitHub Pages officielles et les validations
+HTTPS/AASA/assetlinks sont centralisés dans le runbook ci-dessus. La possession
+seule du domaine ne suffit pas à passer `PUBLIC_DOMAIN_VERIFIED=true`.
 
 Staging et production reçoivent en plus
 `APPLE_CIAM_DOMAIN_RECONFIGURED=true` depuis leur GitHub Environment avant toute

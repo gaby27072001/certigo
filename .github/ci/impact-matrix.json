@@ -98,6 +98,7 @@
       ".checkov.yaml",
       ".github/scripts/public-domain-contract.mjs",
       ".github/scripts/public-domain-contract.test.mjs",
+      ".github/scripts/publish-verified-public-pages.test.mjs",
       ".github/scripts/write-secure-bicep-parameters.mjs",
       ".github/scripts/write-secure-bicep-parameters.test.mjs",
       ".github/workflows/cd-backend.yml",
@@ -109,7 +110,10 @@
       ".github/workflows/security-gate.yml",
       "codemagic.yaml",
       "tools/build_public_pages.mjs",
-      "tools/tests/build_public_pages.test.mjs"
+      "tools/tests/build_public_pages.test.mjs",
+      "tools/generate_link_associations.py",
+      "tools/tests/test_generate_link_associations.py",
+      "tools/tests/public_pages_security.test.mjs"
     ],
     "codeql-csharp": [
       "backend/**"

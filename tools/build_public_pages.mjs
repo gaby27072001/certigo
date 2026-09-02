@@ -1,10 +1,42 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import {
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  writeFile,
+} from 'node:fs/promises';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { validatePublicDomainConfiguration } from '../.github/scripts/public-domain-contract.mjs';
+import {
+  canonicalPublicHost,
+  validatePublicDomainConfiguration,
+} from '../.github/scripts/public-domain-contract.mjs';
 
 const supportEmail = 'gabriel.chambaud@icloud.com';
+const associationFileNames = [
+  'apple-app-site-association',
+  'assetlinks.json',
+];
+const expectedAssociationRoutes = [
+  ['/learn/*/*', 'Authenticated lesson route'],
+  ['/assignments/*', 'Authenticated assignment route'],
+  ['/achievements/*', 'Authenticated achievement route'],
+  ['/account-deletion', 'Public account-deletion route'],
+];
+const expectedArtifactPaths = [
+  '.nojekyll',
+  '.well-known/apple-app-site-association',
+  '.well-known/assetlinks.json',
+  'CNAME',
+  'account-deletion/index.html',
+  'privacy-policy/index.html',
+];
+const appIdPattern =
+  /^(?<teamId>[A-Z0-9]{10})\.(?<bundleId>[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)+)$/;
+const bundleIdPattern = /^[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)+$/;
+const fingerprintPattern = /^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$/;
+const maximumAssociationBytes = 32 * 1024;
 
 function htmlEscape(value) {
   return value
@@ -37,29 +69,256 @@ function layout(title, canonicalUrl, content) {
 </html>`;
 }
 
+function isObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function requireObjectKeys(value, expected, label) {
+  if (!isObject(value)) {
+    throw new Error(`${label} must be a JSON object.`);
+  }
+  const actual = Object.keys(value).sort();
+  const wanted = [...expected].sort();
+  if (actual.length !== wanted.length || actual.some((key, index) => key !== wanted[index])) {
+    throw new Error(`${label} contains unexpected public fields.`);
+  }
+}
+
+function parseStableJson(content, fileName) {
+  if (Buffer.byteLength(content, 'utf8') > maximumAssociationBytes) {
+    throw new Error(`${fileName} exceeds the public association size limit.`);
+  }
+
+  let value;
+  try {
+    value = JSON.parse(content);
+  } catch {
+    throw new Error(`${fileName} must contain valid JSON.`);
+  }
+  if (`${JSON.stringify(value, null, 2)}\n` !== content) {
+    throw new Error(`${fileName} must use the deterministic generator format.`);
+  }
+  return value;
+}
+
+function normalizeGeneratedJson(content, fileName) {
+  const normalized = content.replaceAll('\r\n', '\n');
+  if (normalized.includes('\r')) {
+    throw new Error(`${fileName} contains non-canonical line endings.`);
+  }
+  return normalized;
+}
+
+function validateAppleAssociation(content) {
+  const apple = parseStableJson(content, 'apple-app-site-association');
+  requireObjectKeys(apple, ['applinks'], 'apple-app-site-association');
+  requireObjectKeys(apple.applinks, ['details'], 'apple-app-site-association.applinks');
+  if (!Array.isArray(apple.applinks.details) || apple.applinks.details.length !== 1) {
+    throw new Error('apple-app-site-association must contain one application detail.');
+  }
+
+  const detail = apple.applinks.details[0];
+  requireObjectKeys(detail, ['appIDs', 'components'], 'apple-app-site-association detail');
+  if (!Array.isArray(detail.appIDs) || detail.appIDs.length !== 1) {
+    throw new Error('apple-app-site-association must contain one application identifier.');
+  }
+  const match = typeof detail.appIDs[0] === 'string'
+    ? appIdPattern.exec(detail.appIDs[0])
+    : null;
+  if (!match?.groups) {
+    throw new Error('apple-app-site-association contains an invalid application identifier.');
+  }
+  if (
+    !Array.isArray(detail.components)
+    || detail.components.length !== expectedAssociationRoutes.length
+  ) {
+    throw new Error('apple-app-site-association routes do not match the root-domain contract.');
+  }
+  for (const [index, [route, comment]] of expectedAssociationRoutes.entries()) {
+    const component = detail.components[index];
+    requireObjectKeys(component, ['/', 'comment'], `apple-app-site-association component ${index}`);
+    if (component['/'] !== route || component.comment !== comment) {
+      throw new Error('apple-app-site-association routes do not match the root-domain contract.');
+    }
+  }
+  return match.groups.bundleId;
+}
+
+function validateAndroidAssociation(content, expectedBundleId) {
+  const android = parseStableJson(content, 'assetlinks.json');
+  if (!Array.isArray(android) || android.length !== 1) {
+    throw new Error('assetlinks.json must contain one application association.');
+  }
+
+  const statement = android[0];
+  requireObjectKeys(statement, ['relation', 'target'], 'assetlinks.json statement');
+  if (
+    !Array.isArray(statement.relation)
+    || statement.relation.length !== 1
+    || statement.relation[0] !== 'delegate_permission/common.handle_all_urls'
+  ) {
+    throw new Error('assetlinks.json contains an unexpected relation.');
+  }
+
+  requireObjectKeys(
+    statement.target,
+    ['namespace', 'package_name', 'sha256_cert_fingerprints'],
+    'assetlinks.json target',
+  );
+  const {
+    package_name: packageName,
+    sha256_cert_fingerprints: fingerprints,
+  } = statement.target;
+  if (
+    statement.target.namespace !== 'android_app'
+    || typeof packageName !== 'string'
+    || !bundleIdPattern.test(packageName)
+    || packageName !== expectedBundleId
+  ) {
+    throw new Error('assetlinks.json application identifier does not match the Apple association.');
+  }
+  if (
+    !Array.isArray(fingerprints)
+    || fingerprints.length === 0
+    || fingerprints.some((fingerprint) => !fingerprintPattern.test(fingerprint))
+    || new Set(fingerprints).size !== fingerprints.length
+  ) {
+    throw new Error('assetlinks.json requires unique verified SHA-256 fingerprints.');
+  }
+}
+
+async function readAssociationFiles(associationSource) {
+  if (typeof associationSource !== 'string' || associationSource.length === 0) {
+    throw new Error('A generated association source is required before public Pages activation.');
+  }
+
+  let sourceStats;
+  try {
+    sourceStats = await lstat(associationSource);
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      throw new Error('The generated association source does not exist.');
+    }
+    throw error;
+  }
+  if (!sourceStats.isDirectory() || sourceStats.isSymbolicLink()) {
+    throw new Error('The generated association source must be a real directory.');
+  }
+
+  const entries = await readdir(associationSource, { withFileTypes: true });
+  const actualNames = entries.map((entry) => entry.name).sort();
+  if (
+    actualNames.length !== associationFileNames.length
+    || actualNames.some((name, index) => name !== associationFileNames[index])
+  ) {
+    throw new Error('The association source must contain only the two public association files.');
+  }
+  if (entries.some((entry) => !entry.isFile() || entry.isSymbolicLink())) {
+    throw new Error('Public association inputs must be regular files.');
+  }
+
+  const apple = normalizeGeneratedJson(
+    await readFile(join(associationSource, associationFileNames[0]), 'utf8'),
+    associationFileNames[0],
+  );
+  const android = normalizeGeneratedJson(
+    await readFile(join(associationSource, associationFileNames[1]), 'utf8'),
+    associationFileNames[1],
+  );
+  const bundleId = validateAppleAssociation(apple);
+  validateAndroidAssociation(android, bundleId);
+  return { apple, android };
+}
+
+async function ensureEmptyOutput(output) {
+  let outputStats;
+  try {
+    outputStats = await lstat(output);
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return;
+    }
+    throw error;
+  }
+  if (!outputStats.isDirectory() || outputStats.isSymbolicLink()) {
+    throw new Error('The public Pages output must be a real directory.');
+  }
+  if ((await readdir(output)).length > 0) {
+    throw new Error('The public Pages output must be empty to prevent stale or private content.');
+  }
+}
+
+async function listArtifactFiles(directory, root = directory) {
+  const files = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isSymbolicLink()) {
+      throw new Error('The public Pages artifact must not contain symbolic links.');
+    }
+    if (entry.isDirectory()) {
+      files.push(...await listArtifactFiles(path, root));
+    } else if (entry.isFile()) {
+      files.push(relative(root, path).split(sep).join('/'));
+    } else {
+      throw new Error('The public Pages artifact may contain only directories and regular files.');
+    }
+  }
+  return files.sort();
+}
+
+export async function validatePublicArtifact(output) {
+  const outputStats = await lstat(output);
+  if (!outputStats.isDirectory() || outputStats.isSymbolicLink()) {
+    throw new Error('The public Pages artifact must be a real directory.');
+  }
+  const actualPaths = await listArtifactFiles(output);
+  if (
+    actualPaths.length !== expectedArtifactPaths.length
+    || actualPaths.some((path, index) => path !== expectedArtifactPaths[index])
+  ) {
+    throw new Error('The public Pages artifact contains an unexpected path.');
+  }
+  if (await readFile(join(output, 'CNAME'), 'utf8') !== `${canonicalPublicHost}\n`) {
+    throw new Error('The public Pages CNAME does not match the canonical host.');
+  }
+  if (await readFile(join(output, '.nojekyll'), 'utf8') !== '') {
+    throw new Error('The public Pages .nojekyll marker must be empty.');
+  }
+}
+
 export async function buildPublicPages({
   root,
   output,
+  associationSource,
   publicWebOrigin,
   publicDomainVerified,
   appleCiamDomainReconfigured,
 }) {
   const publicDomain = validatePublicDomainConfiguration({
     environment: 'prod',
-    feature: 'legal-pages',
+    feature: 'link-associations',
     publicWebOrigin,
     publicDomainVerified,
     appleCiamDomainReconfigured,
   });
   const privacy = await readFile(resolve(root, 'docs/legal/privacy-policy.md'), 'utf8');
   const deletion = await readFile(resolve(root, 'docs/legal/account-deletion.md'), 'utf8');
+  const associations = await readAssociationFiles(associationSource);
+  await ensureEmptyOutput(output);
   const mailto = `mailto:${supportEmail}?subject=${encodeURIComponent('Suppression de compte Certigo')}`;
 
   const privacyPath = resolve(output, 'privacy-policy/index.html');
   const deletionPath = resolve(output, 'account-deletion/index.html');
+  const applePath = resolve(output, '.well-known/apple-app-site-association');
+  const androidPath = resolve(output, '.well-known/assetlinks.json');
   await mkdir(dirname(privacyPath), { recursive: true });
   await mkdir(dirname(deletionPath), { recursive: true });
+  await mkdir(dirname(applePath), { recursive: true });
 
+  await writeFile(resolve(output, 'CNAME'), `${canonicalPublicHost}\n`, 'utf8');
+  await writeFile(resolve(output, '.nojekyll'), '', 'utf8');
+  await writeFile(applePath, associations.apple, 'utf8');
+  await writeFile(androidPath, associations.android, 'utf8');
   await writeFile(
     privacyPath,
     layout(
@@ -89,15 +348,44 @@ export async function buildPublicPages({
     ),
     'utf8',
   );
+  await validatePublicArtifact(output);
+}
+
+function commandLineOptions(args) {
+  const options = {
+    associationSource: '',
+    output: '_site',
+  };
+  for (let index = 0; index < args.length; index += 2) {
+    const option = args[index];
+    const value = args[index + 1];
+    if (
+      !['--association-source', '--output'].includes(option)
+      || typeof value !== 'string'
+      || value.length === 0
+      || value.startsWith('--')
+    ) {
+      throw new Error(
+        'Usage: build_public_pages.mjs [--output <directory>] '
+        + '--association-source <directory>',
+      );
+    }
+    if (option === '--association-source') {
+      options.associationSource = value;
+    } else {
+      options.output = value;
+    }
+  }
+  return options;
 }
 
 const currentFile = fileURLToPath(import.meta.url);
 if (process.argv[1] && resolve(process.argv[1]) === currentFile) {
-  const outputIndex = process.argv.indexOf('--output');
-  const output = outputIndex >= 0 ? process.argv[outputIndex + 1] : '_site';
+  const { associationSource, output } = commandLineOptions(process.argv.slice(2));
   await buildPublicPages({
     root: process.cwd(),
     output: resolve(output),
+    associationSource: associationSource ? resolve(associationSource) : '',
     publicWebOrigin: process.env.PUBLIC_WEB_ORIGIN,
     publicDomainVerified: process.env.PUBLIC_DOMAIN_VERIFIED,
     appleCiamDomainReconfigured: process.env.APPLE_CIAM_DOMAIN_RECONFIGURED,

@@ -11,6 +11,7 @@ on:
       - ".github/scripts/write-secure-bicep-parameters.test.mjs"
       - ".github/scripts/public-domain-contract.mjs"
       - ".github/scripts/public-domain-contract.test.mjs"
+      - ".github/scripts/publish-verified-public-pages.test.mjs"
       - ".github/scripts/deploy-flex-onedeploy.sh"
       - ".github/scripts/deploy-flex-onedeploy.test.mjs"
       - ".github/workflows/cd-backend.yml"
@@ -25,6 +26,9 @@ on:
       - "docs/legal/privacy-policy.md"
       - "tools/build_public_pages.mjs"
       - "tools/tests/build_public_pages.test.mjs"
+      - "tools/generate_link_associations.py"
+      - "tools/tests/test_generate_link_associations.py"
+      - "tools/tests/public_pages_security.test.mjs"
       - ".github/workflows-disabled/post-merge-cosmos-account-deletion.yml"
       - ".github/workflows-disabled/test-account-deletion-cosmos.yml"
       - "docs/runbooks/COSMOS_EMULATOR_RUNNER.md"
@@ -35,6 +39,7 @@ on:
       - ".github/scripts/write-secure-bicep-parameters.test.mjs"
       - ".github/scripts/public-domain-contract.mjs"
       - ".github/scripts/public-domain-contract.test.mjs"
+      - ".github/scripts/publish-verified-public-pages.test.mjs"
       - ".github/scripts/deploy-flex-onedeploy.sh"
       - ".github/scripts/deploy-flex-onedeploy.test.mjs"
       - ".github/workflows/cd-backend.yml"
@@ -49,6 +54,9 @@ on:
       - "docs/legal/privacy-policy.md"
       - "tools/build_public_pages.mjs"
       - "tools/tests/build_public_pages.test.mjs"
+      - "tools/generate_link_associations.py"
+      - "tools/tests/test_generate_link_associations.py"
+      - "tools/tests/public_pages_security.test.mjs"
       - ".github/workflows-disabled/post-merge-cosmos-account-deletion.yml"
       - ".github/workflows-disabled/test-account-deletion-cosmos.yml"
       - "docs/runbooks/COSMOS_EMULATOR_RUNNER.md"
@@ -111,6 +119,11 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "20.20.2"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12.10"
+          architecture: "x64"
+          check-latest: false
       # CI-09 : le runner-2 n'a PAS l'Azure CLI (`az`). On installe le CLI Bicep
       # standalone dans un répertoire écrivable ($RUNNER_TEMP) et on l'ajoute au PATH,
       # de sorte que le lint fonctionne à l'identique sur les DEUX runners.
@@ -144,9 +157,14 @@ jobs:
       - name: Validate FinOps guardrails
         run: node --test infra/tests/finops-guardrails.test.mjs
       - name: Validate public account-deletion policy
-        run: node --test tools/tests/build_public_pages.test.mjs
+        run: |
+          node --test \
+            tools/tests/build_public_pages.test.mjs \
+            tools/tests/public_pages_security.test.mjs
       - name: Validate public-domain contract
         run: node --test .github/scripts/public-domain-contract.test.mjs
+      - name: Validate verified public Pages workflow
+        run: node --test .github/scripts/publish-verified-public-pages.test.mjs
       - name: Validate compiled public-domain ARM gates
         run: node --test infra/tests/public-domain-contract.test.mjs
       - name: Validate secure deployment parameter writer

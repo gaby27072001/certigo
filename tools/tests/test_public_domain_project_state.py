@@ -56,25 +56,29 @@ class PublicDomainProjectStateTests(unittest.TestCase):
             pages,
         )
         self.assertIn(
-            "node .github/scripts/public-domain-contract.mjs legal-pages",
+            "node .github/scripts/public-domain-contract.mjs link-associations",
             pages,
         )
         self.assertLess(
-            pages.index("node .github/scripts/public-domain-contract.mjs legal-pages"),
-            pages.index("node tools/build_public_pages.mjs --output _site"),
+            pages.index("node .github/scripts/public-domain-contract.mjs link-associations"),
+            pages.index("node tools/build_public_pages.mjs"),
         )
         self.assertLess(
-            pages.index("node tools/build_public_pages.mjs --output _site"),
+            pages.index("node tools/build_public_pages.mjs"),
             pages.index("actions/upload-pages-artifact@"),
         )
         for path in (
             ".github/scripts/public-domain-contract.mjs",
             ".github/scripts/public-domain-contract.test.mjs",
+            ".github/scripts/publish-verified-public-pages.test.mjs",
             ".github/workflows/publish-verified-public-pages.yml",
             ".github/workflows/cd-backend.yml",
             ".github/workflows/release-android.yml",
             ".github/workflows/release-ios.yml",
             "codemagic.yaml",
+            "tools/generate_link_associations.py",
+            "tools/tests/test_generate_link_associations.py",
+            "tools/tests/public_pages_security.test.mjs",
         ):
             self.assertIn(f"- '{path}'", security)
         self.assertIn(

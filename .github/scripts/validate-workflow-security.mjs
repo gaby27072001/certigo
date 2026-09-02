@@ -777,13 +777,12 @@ function validateRepositoryInvariants() {
   }
   for (const marker of [
     "'infrastructure'",
+    "export const canonicalPublicHost = 'certigo-app.com'",
+    'export const canonicalPublicWebOrigin = `https://${canonicalPublicHost}`',
     'PUBLIC_WEB_ORIGIN must be a canonical HTTPS origin',
+    'value !== canonicalPublicWebOrigin',
     'PUBLIC_DOMAIN_VERIFIED must be explicitly true',
     'APPLE_CIAM_DOMAIN_RECONFIGURED must be explicitly true',
-    "host.endsWith('.invalid')",
-    "host.endsWith('.')",
-    "host.endsWith('.test')",
-    "['certigo', 'app'].join('.')",
   ]) {
     if (!publicDomainContract.includes(marker)) {
       errors.push(`public-domain-contract.mjs: missing fail-closed invariant ${marker}`);
@@ -794,21 +793,49 @@ function validateRepositoryInvariants() {
     'PUBLIC_WEB_ORIGIN: ${{ vars.PUBLIC_WEB_ORIGIN }}',
     'PUBLIC_DOMAIN_VERIFIED: ${{ vars.PUBLIC_DOMAIN_VERIFIED }}',
     'APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}',
+    'APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}',
+    'MOBILE_APP_ID: ${{ vars.MOBILE_APP_ID }}',
+    'ANDROID_SHA256_CERT_FINGERPRINTS: ${{ vars.ANDROID_SHA256_CERT_FINGERPRINTS }}',
     'PAGES_ORIGIN: ${{ steps.pages.outputs.origin }}',
     'PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}',
-    'node .github/scripts/public-domain-contract.mjs legal-pages',
-    'node tools/build_public_pages.mjs --output _site',
+    'enablement: false',
+    'node .github/scripts/public-domain-contract.mjs link-associations',
+    'PAGES_ORIGIN" != "https://certigo-app.com"',
+    'python -P tools/generate_link_associations.py',
+    '--apple-team-id "$APPLE_TEAM_ID"',
+    '--bundle-id "$MOBILE_APP_ID"',
+    'generator+=(--android-sha256 "$fingerprint")',
+    '--association-source "$ASSOCIATION_SOURCE"',
   ]) {
     if (!publicPagesWorkflow.includes(marker)) {
       errors.push(`publish-verified-public-pages.yml: missing verified-domain invariant ${marker}`);
     }
   }
   if (
-    publicPagesWorkflow.indexOf('node tools/build_public_pages.mjs --output _site')
-    > publicPagesWorkflow.indexOf('actions/upload-pages-artifact@')
+    publicPagesWorkflow.includes('secrets.')
+    || publicPagesWorkflow.includes('com.certigo.mobileapp')
+    || /(?:[0-9A-F]{2}:){31}[0-9A-F]{2}/.test(publicPagesWorkflow)
   ) {
     errors.push(
-      'publish-verified-public-pages.yml: domain validation must run before the Pages artifact upload',
+      'publish-verified-public-pages.yml: public association identifiers must come only from controlled variables',
+    );
+  }
+  const associationGenerator = publicPagesWorkflow.indexOf(
+    'python -P tools/generate_link_associations.py',
+  );
+  const publicPagesBuilder = publicPagesWorkflow.indexOf(
+    'node tools/build_public_pages.mjs',
+  );
+  const publicPagesUpload = publicPagesWorkflow.indexOf(
+    'actions/upload-pages-artifact@',
+  );
+  if (
+    associationGenerator < 0
+    || publicPagesBuilder < associationGenerator
+    || publicPagesUpload < publicPagesBuilder
+  ) {
+    errors.push(
+      'publish-verified-public-pages.yml: controlled generation and validation must precede upload',
     );
   }
   for (const marker of [

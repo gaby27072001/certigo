@@ -1,8 +1,8 @@
 name: publish-verified-public-pages
 
-# This is the only activation path for legal pages after domain ownership is
-# verified. The legacy dispatch remains fail-closed because its builder receives
-# no public-domain contract.
+# This is the only activation path for the public root artifact after every
+# ownership and application proof is verified. The legacy dispatch remains
+# fail-closed because its builder receives no public-domain contract or associations.
 on:
   repository_dispatch:
     types: [publish-verified-public-pages]
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build verified public legal pages
+    name: Build verified public root artifact
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     environment: github-pages
@@ -36,8 +36,15 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12.10"
+          architecture: "x64"
+          check-latest: false
       - id: pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+        with:
+          enablement: false
       - name: Require a compatible verified Pages origin
         shell: bash
         env:
@@ -49,24 +56,70 @@ jobs:
           APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}
         run: |
           set -euo pipefail
-          node .github/scripts/public-domain-contract.mjs legal-pages
-          if [[ "$PAGES_ORIGIN" != "$PUBLIC_WEB_ORIGIN" || -n "$PAGES_BASE_PATH" ]]; then
+          node .github/scripts/public-domain-contract.mjs link-associations
+          if [[ "$PAGES_ORIGIN" != "https://certigo-app.com" || -n "$PAGES_BASE_PATH" ]]; then
             echo "::error::GitHub Pages must expose the verified origin at its root."
             exit 1
           fi
+      - name: Generate verified link associations
+        id: associations
+        shell: bash
+        env:
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          MOBILE_APP_ID: ${{ vars.MOBILE_APP_ID }}
+          ANDROID_SHA256_CERT_FINGERPRINTS: ${{ vars.ANDROID_SHA256_CERT_FINGERPRINTS }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$APPLE_TEAM_ID" || -z "$MOBILE_APP_ID" || -z "$ANDROID_SHA256_CERT_FINGERPRINTS" ]]; then
+            echo "::error::Verified Apple and Android association identifiers are required."
+            exit 1
+          fi
+
+          association_output="$RUNNER_TEMP/certigo-public-associations"
+          if [[ -e "$association_output" ]]; then
+            echo "::error::Association output must not already exist."
+            exit 1
+          fi
+          generator=(
+            python -P tools/generate_link_associations.py
+            --confirmed-domain certigo-app.com
+            --apple-team-id "$APPLE_TEAM_ID"
+            --bundle-id "$MOBILE_APP_ID"
+            --output-dir "$association_output"
+          )
+          fingerprint_count=0
+          while IFS= read -r fingerprint || [[ -n "$fingerprint" ]]; do
+            if [[ -z "$fingerprint" ]]; then
+              echo "::error::Android fingerprints must be non-empty, one per line."
+              exit 1
+            fi
+            generator+=(--android-sha256 "$fingerprint")
+            fingerprint_count=$((fingerprint_count + 1))
+          done <<< "$ANDROID_SHA256_CERT_FINGERPRINTS"
+          if (( fingerprint_count == 0 )); then
+            echo "::error::At least one verified Android fingerprint is required."
+            exit 1
+          fi
+
+          "${generator[@]}"
+          echo "source=$association_output/certigo-app.com/.well-known" >> "$GITHUB_OUTPUT"
       - name: Build static legal pages
         env:
           PUBLIC_WEB_ORIGIN: ${{ vars.PUBLIC_WEB_ORIGIN }}
           PUBLIC_DOMAIN_VERIFIED: ${{ vars.PUBLIC_DOMAIN_VERIFIED }}
           APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}
-        run: node tools/build_public_pages.mjs --output _site
+          ASSOCIATION_SOURCE: ${{ steps.associations.outputs.source }}
+        run: |
+          node tools/build_public_pages.mjs \
+            --output _site \
+            --association-source "$ASSOCIATION_SOURCE"
       - name: Upload artifact
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
           path: _site
 
   deploy:
-    name: Deploy verified public legal pages
+    name: Deploy verified public root artifact
     needs: build
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Linux, X64, certigo-trusted]

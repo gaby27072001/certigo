@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
-import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+export const canonicalPublicHost = 'certigo-app.com';
+export const canonicalPublicWebOrigin = `https://${canonicalPublicHost}`;
 
 const featuresRequiringApple = new Set([
   'account-deletion-url',
@@ -11,14 +13,6 @@ const featuresRequiringApple = new Set([
   'link-associations',
   'redirects',
 ]);
-
-const placeholderHosts = new Set([
-  'example.com',
-  'example.net',
-  'example.org',
-  'localhost',
-]);
-const unownedLegacyHost = ['certigo', 'app'].join('.');
 
 function explicitBoolean(value, name) {
   if (value === true || value === 'true') {
@@ -59,27 +53,12 @@ function canonicalHttpsOrigin(value) {
     );
   }
 
-  const host = parsed.hostname.toLowerCase();
-  const isPlaceholder = placeholderHosts.has(host)
-    || host.endsWith('.example')
-    || host.endsWith('.invalid')
-    || host.endsWith('.localhost')
-    || host.endsWith('.test');
-  const isUnownedLegacyHost = host === unownedLegacyHost
-    || host.endsWith(`.${unownedLegacyHost}`);
-  if (
-    host !== parsed.hostname
-    || host.endsWith('.')
-    || !host.includes('.')
-    || isIP(host) !== 0
-    || isPlaceholder
-    || isUnownedLegacyHost
-  ) {
+  if (value !== canonicalPublicWebOrigin) {
     throw new Error(
-      'PUBLIC_WEB_ORIGIN must use a non-placeholder, publicly routable domain controlled by Certigo.',
+      `PUBLIC_WEB_ORIGIN must equal the owned canonical origin ${canonicalPublicWebOrigin}.`,
     );
   }
-  return parsed.origin;
+  return canonicalPublicWebOrigin;
 }
 
 export function validatePublicDomainConfiguration({

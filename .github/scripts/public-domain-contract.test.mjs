@@ -79,19 +79,27 @@ test('fails closed when the origin or explicit verification is missing', () => {
 
 test('rejects non-canonical, placeholder, IP and unowned legacy origins', () => {
   for (const publicWebOrigin of [
-    'http://github.com',
-    'https://github.com/',
-    'https://github.com/path',
-    'https://github.com?query=1',
-    'https://github.com:443',
-    'https://github.com.',
+    'http://certigo-app.com',
+    'https://certigo-app.com/',
+    'https://certigo-app.com/Certigo',
+    'https://certigo-app.com?query=1',
+    'https://certigo-app.com#fragment',
+    'https://certigo-app.com:443',
+    'https://certigo-app.com:444',
+    'https://certigo-app.com.',
+    'https://user@certigo-app.com',
+    ' https://certigo-app.com',
     'https://127.0.0.1',
     'https://localhost',
     'https://service.invalid',
     'https://example.com',
+    'https://github.com',
+    'https://gchambaud_microsoft.github.io',
     `https://${['certigo', 'app'].join('.')}`,
     `https://${['certigo', 'app'].join('.')}.`,
     `https://www.${['certigo', 'app'].join('.')}`,
+    'https://www.certigo-app.com',
+    'https://links.certigo-app.com',
   ]) {
     assert.throws(
       () => validatePublicDomainConfiguration({
@@ -102,6 +110,17 @@ test('rejects non-canonical, placeholder, IP and unowned legacy origins', () => 
       publicWebOrigin,
     );
   }
+});
+
+test('association publication requires every activation proof', () => {
+  assert.throws(
+    () => validatePublicDomainConfiguration({
+      ...verifiedConfiguration,
+      feature: 'link-associations',
+      appleCiamDomainReconfigured: 'false',
+    }),
+    /APPLE_CIAM_DOMAIN_RECONFIGURED must be explicitly true/,
+  );
 });
 
 test('rejects ambiguous boolean values instead of coercing them', () => {
