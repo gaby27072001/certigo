@@ -37,6 +37,7 @@ const trustedImpactTestPattern =
   /^\.github\/scripts\/[A-Za-z0-9._-]+\.test\.mjs$/;
 const requiredTrustedImpactTests = new Set([
   '.github/scripts/ci-impact.test.mjs',
+  '.github/scripts/codeql-gate-policy.test.mjs',
   '.github/scripts/workflow-concurrency-policy.test.mjs',
   '.github/scripts/workflow-security-cache-policy.test.mjs',
 ]);
@@ -1097,6 +1098,21 @@ function validateRepositoryInvariants() {
   ]) {
     if (!codeql.includes(marker)) {
       errors.push(`codeql.yml: missing SARIF enforcement invariant ${marker}`);
+    }
+  }
+  for (const marker of [
+    'EVENT_NAME: ${{ github.event_name }}',
+    'FRESHNESS_CURRENT: ${{ needs.freshness.outputs.current }}',
+    'pull_request|pull_request_target)',
+    'push|schedule)',
+    'expected_freshness="success"',
+    'expected_freshness="skipped"',
+    'if [ "$FRESHNESS_RESULT" != "$expected_freshness" ]; then',
+    'case "$HAS_CHANGES" in',
+    'if [ "$ANALYZE_RESULT" != "$expected_analysis" ]; then',
+  ]) {
+    if (!codeql.includes(marker)) {
+      errors.push(`codeql.yml: missing event-aware aggregate gate invariant ${marker}`);
     }
   }
   if (codeql.includes('actions/upload-artifact@')) {
