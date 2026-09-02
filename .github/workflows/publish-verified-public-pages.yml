@@ -56,6 +56,7 @@ jobs:
           APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}
         run: |
           set -euo pipefail
+          node .github/scripts/public-domain-contract.mjs legal-pages
           node .github/scripts/public-domain-contract.mjs link-associations
           if [[ "$PAGES_ORIGIN" != "https://certigo-app.com" || -n "$PAGES_BASE_PATH" ]]; then
             echo "::error::GitHub Pages must expose the verified origin at its root."
@@ -109,10 +110,7 @@ jobs:
           PUBLIC_DOMAIN_VERIFIED: ${{ vars.PUBLIC_DOMAIN_VERIFIED }}
           APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}
           ASSOCIATION_SOURCE: ${{ steps.associations.outputs.source }}
-        run: |
-          node tools/build_public_pages.mjs \
-            --output _site \
-            --association-source "$ASSOCIATION_SOURCE"
+        run: node tools/build_public_pages.mjs --output _site --association-source "$ASSOCIATION_SOURCE"
       - name: Upload artifact
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:

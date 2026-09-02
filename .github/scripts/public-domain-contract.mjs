@@ -53,6 +53,15 @@ function canonicalHttpsOrigin(value) {
     );
   }
 
+  const host = parsed.hostname;
+  if (
+    host.endsWith('.invalid')
+    || host.endsWith('.')
+    || host.endsWith('.test')
+    || host === ['certigo', 'app'].join('.')
+  ) {
+    throw new Error('PUBLIC_WEB_ORIGIN must not use a placeholder or unowned legacy host.');
+  }
   if (value !== canonicalPublicWebOrigin) {
     throw new Error(
       `PUBLIC_WEB_ORIGIN must equal the owned canonical origin ${canonicalPublicWebOrigin}.`,
