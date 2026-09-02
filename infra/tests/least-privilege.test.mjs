@@ -1218,7 +1218,7 @@ test('infra validation bootstraps pinned Node for bare Linux runners', () => {
   assert.match(validation, /GITHUB_PATH/);
 });
 
-test('environment parameters retain historical principals for staged rollback', () => {
+test('environment parameters retain rollback pointers while broad legacy access is bounded', () => {
   for (const environment of ['dev', 'staging', 'prod']) {
     const parameters = readFileSync(
       path.join(repositoryRoot, 'infra', 'params', `${environment}.bicepparam`),
@@ -1238,8 +1238,10 @@ test('environment parameters retain historical principals for staged rollback', 
     ),
     'utf8',
   );
-  assert.match(runbook, /deux déploiements\s+prod réussis/i);
-  assert.match(runbook, /Contributor` puis `User Access Administrator/i);
+  assert.match(runbook, /Ne jamais retirer un accès avant que son remplacement JIT soit créé/i);
+  assert.match(runbook, /Les rôles larges legacy disparaissent avant Phase B/i);
+  assert.match(runbook, /soakEndsAt/);
+  assert.match(runbook, /aucune attribution sans échéance\s+n'est conservée/i);
   assert.match(runbook, /access review/i);
   assert.match(runbook, /rollback/i);
 });

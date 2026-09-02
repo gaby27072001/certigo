@@ -30,10 +30,16 @@ jobs:
           jq -e '
             type == "object" and
             keys == [
+              "legacy_transition_json",
+              "legacy_transition_sha256",
               "phase_a_deployment_name",
               "phase_a_evidence_manifest_sha256",
               "phase_a_evidence_run_id"
             ] and
+            (.legacy_transition_json | type == "string") and
+            (.legacy_transition_json | fromjson | type == "object") and
+            (.legacy_transition_sha256 | type == "string") and
+            (.legacy_transition_sha256 | test("^[0-9a-fA-F]{64}$")) and
             (.phase_a_deployment_name | type == "string") and
             (.phase_a_deployment_name | test("^certigo-governance-bootstrap-identities-[a-zA-Z0-9._-]+$")) and
             (.phase_a_evidence_run_id | type == "number" and . > 0) and
@@ -56,6 +62,8 @@ jobs:
           : "${AZURE_CLIENT_ID:?No GitHub variable is configured by this repository.}"
           : "${AZURE_TENANT_ID:?No GitHub variable is configured by this repository.}"
           : "${AZURE_SUBSCRIPTION_ID:?No GitHub variable is configured by this repository.}"
+          node infra/governance/phase-b-target.mjs \
+            "$AZURE_SUBSCRIPTION_ID" "$AZURE_TENANT_ID"
       - name: Azure login with approved admin planning identity
         uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
         with:
@@ -75,13 +83,29 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --name governance-phase-a-evidence \
             --dir "$evidence_dir"
+      - name: Materialize approved legacy transition evidence
+        shell: bash
+        env:
+          LEGACY_TRANSITION_JSON: ${{ github.event.client_payload.legacy_transition_json }}
+          LEGACY_TRANSITION_SHA256: ${{ github.event.client_payload.legacy_transition_sha256 }}
+        run: |
+          set -euo pipefail
+          transition_file="$RUNNER_TEMP/approved-legacy-transition.json"
+          printf '%s' "$LEGACY_TRANSITION_JSON" > "$transition_file"
+          actual_sha="$(
+           node infra/governance/evidence-files.mjs hash "$transition_file"
+          )"
+          [[ "$actual_sha" == "${LEGACY_TRANSITION_SHA256,,}" ]]
       - name: Run Phase B1a RG assignment what-if
         shell: bash
         env:
           AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
           PHASE_A_DEPLOYMENT_NAME: ${{ github.event.client_payload.phase_a_deployment_name }}
           PHASE_A_EVIDENCE_DIR: ${{ runner.temp }}/approved-phase-a-evidence
           PHASE_A_EVIDENCE_MANIFEST_SHA256: ${{ github.event.client_payload.phase_a_evidence_manifest_sha256 }}
+          LEGACY_TRANSITION_FILE: ${{ runner.temp }}/approved-legacy-transition.json
+          LEGACY_TRANSITION_SHA256: ${{ github.event.client_payload.legacy_transition_sha256 }}
           PHASE_B1_EVIDENCE_DIR: ${{ runner.temp }}/governance-phase-b1-evidence
         run: bash infra/governance/what-if-phase-b1.sh
       - name: Upload immutable Phase B evidence
