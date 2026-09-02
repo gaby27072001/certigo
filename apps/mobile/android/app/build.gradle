@@ -14,10 +14,13 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
-// Native HTTPS link capture stays inert until a newly purchased domain is verified.
-def appLinksHost = project.findProperty("CERTIGO_APP_LINKS_HOST") ?: "links-disabled.invalid"
+// The owned apex is canonical; routing still stays feature-off until association files are live.
+def appLinksHost = project.findProperty("CERTIGO_APP_LINKS_HOST") ?: "certigo-app.com"
 if (!(appLinksHost ==~ /^[A-Za-z0-9.-]+$/)) {
     throw new GradleException("CERTIGO_APP_LINKS_HOST must be a hostname without scheme or path.")
+}
+if (appLinksHost != "certigo-app.com") {
+    throw new GradleException("CERTIGO_APP_LINKS_HOST must use the canonical certigo-app.com host.")
 }
 def appLinksPathPrefix = project.findProperty("CERTIGO_APP_LINKS_PATH_PREFIX") ?: ""
 if (!(appLinksPathPrefix == "" ||

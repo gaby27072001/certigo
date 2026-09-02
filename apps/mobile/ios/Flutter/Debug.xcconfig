@@ -1,4 +1,4 @@
 #include "Generated.xcconfig"
 
-// Inert until DNS, AASA, Apple capability, and runtime routing are approved.
-CERTIGO_APP_LINKS_HOST=links-disabled.invalid
+// Canonical owned host; the entitlement and runtime feature remain disabled.
+CERTIGO_APP_LINKS_HOST=certigo-app.com

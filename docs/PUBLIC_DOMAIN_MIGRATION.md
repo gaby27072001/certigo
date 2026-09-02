@@ -1,8 +1,10 @@
 # Migration vers un domaine public possédé
 
-Le dépôt ne configure aucun domaine public par défaut. Les pages légales et les
-fonctions applicatives liées au web restent désactivées tant que la possession
-du domaine et la reconfiguration des dépendances Apple ne sont pas prouvées.
+Le domaine possédé est `certigo-app.com`, avec l'apex comme origine canonique.
+Sa zone est gérée par Wix, mais le domaine n'est pas encore attribué à un site et
+l'hébergement HTTPS cible n'est pas choisi. Les pages légales et les fonctions
+applicatives liées au web restent donc désactivées tant que DNS, TLS, contenus
+publics et dépendances Apple ne sont pas prouvés.
 
 ## Contrat de configuration
 
@@ -64,7 +66,7 @@ d'association. Lors de sa réconciliation ultérieure, elle doit :
 1. consommer uniquement les quatre URLs ARM non vides ou reproduire exactement
    le même gate avant de générer AASA/assetlinks et les redirects ;
 2. refuser toute association lorsque `publicDomainActivationReady` est faux ;
-3. conserver sa valeur neutralisée tant que le nouveau domaine n'est pas
+3. conserver le feature flag désactivé tant que `certigo-app.com` n'est pas
    entièrement configuré ;
 4. ne jamais déduire la possession d'un domaine depuis sa simple présence dans
    une variable.
@@ -79,10 +81,11 @@ Cette PR est empilée sur #312. Fusionner #312 d'abord, puis rebaser cette PR su
 `main` avant sa fusion. Aucun dispatch Pages, déploiement Bicep ou changement de
 console ne doit être exécuté dans le cadre de ces deux PR.
 
-## Actions humaines après achat du domaine
+## Actions humaines après enregistrement du domaine
 
-1. Configurer le DNS et l'hébergement HTTPS, puis vérifier le certificat et le
-   contrôle effectif de l'origine.
+1. Suivre l'inventaire, le delta DNS Wix et le rollback exacts documentés dans
+   [`UNIVERSAL_APP_LINKS.md`](./UNIVERSAL_APP_LINKS.md), puis vérifier ownership,
+   résolution publique, certificat et service HTTPS de l'apex.
 2. Configurer `PUBLIC_WEB_ORIGIN` dans `github-pages`, `staging`, `prod`, `beta`
    et le groupe Codemagic `certigo_mobile_config`, puis
    passer `PUBLIC_DOMAIN_VERIFIED` à `true` dans chaque Environment après

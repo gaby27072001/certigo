@@ -1,4 +1,4 @@
 #include "Generated.xcconfig"
 
-// Override explicitly at build time only after the universal-link checklist.
-CERTIGO_APP_LINKS_HOST=links-disabled.invalid
+// Canonical owned host; do not link the entitlement before the activation checklist.
+CERTIGO_APP_LINKS_HOST=certigo-app.com

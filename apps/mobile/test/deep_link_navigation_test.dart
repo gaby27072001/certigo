@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 
 void main() {
   const AuthSession session = AuthSession(accessToken: 'token');
-  const String controlledTestHost = 'links.user-owned.example';
+  const String controlledTestHost = certigoCanonicalLinkHost;
 
   late ValueNotifier<AuthState> auth;
   late ValueNotifier<bool> onboardingCompleted;

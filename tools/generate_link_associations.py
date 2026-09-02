@@ -16,6 +16,7 @@ DOMAIN_PATTERN = re.compile(
     r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
 )
 FINGERPRINT_PATTERN = re.compile(r"^(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$")
+CANONICAL_DOMAIN = "certigo-app.com"
 
 
 def validate_team_id(value: str) -> str:
@@ -41,6 +42,8 @@ def validate_confirmed_domain(value: str) -> str:
     normalized = validate_domain(value)
     if normalized.endswith(".invalid"):
         raise ValueError("A confirmed domain must not use the inert .invalid suffix.")
+    if normalized != CANONICAL_DOMAIN:
+        raise ValueError(f"Association files must target the canonical {CANONICAL_DOMAIN} host.")
     return normalized
 
 
@@ -135,7 +138,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--confirmed-domain",
         required=True,
-        help="Purchased and ownership-verified association hostname.",
+        help=f"Ownership-verified association hostname; must be {CANONICAL_DOMAIN}.",
     )
     parser.add_argument("--apple-team-id", required=True, help="Verified 10-character Apple Team ID.")
     parser.add_argument(

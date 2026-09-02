@@ -6,7 +6,7 @@ import { validatePublicDomainConfiguration } from './public-domain-contract.mjs'
 const verifiedConfiguration = {
   environment: 'prod',
   feature: 'infrastructure',
-  publicWebOrigin: 'https://github.com',
+  publicWebOrigin: 'https://certigo-app.com',
   publicDomainVerified: 'true',
   appleCiamDomainReconfigured: 'true',
 };
@@ -36,7 +36,7 @@ test('accepts a canonical verified HTTPS origin for app-facing features', () => 
     {
       appleCiamDomainReconfigured: true,
       publicDomainVerified: true,
-      publicWebOrigin: 'https://github.com',
+      publicWebOrigin: 'https://certigo-app.com',
       ready: true,
     },
   );

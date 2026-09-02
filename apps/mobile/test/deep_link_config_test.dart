@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:certigo/features/auth/application/auth_state.dart';
+import 'package:certigo/features/deep_links/application/deep_link_contract.dart';
 import 'package:core/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -44,11 +45,12 @@ void main() {
     );
   });
 
-  test('les App Links Android restent inertes tant que le host n\'est pas activé', () {
+  test('Android déclare uniquement le host canonique possédé', () {
     final String gradle = resolve('android/app/build.gradle').readAsStringSync();
     final String manifest = resolve('android/app/src/main/AndroidManifest.xml').readAsStringSync();
 
-    expect(gradle, contains('"links-disabled.invalid"'));
+    expect(gradle, contains('"certigo-app.com"'));
+    expect(gradle, contains('appLinksHost != "certigo-app.com"'));
     expect(gradle, contains('appLinksHost: appLinksHost'));
     expect(gradle, contains('appLinksPathPrefix: appLinksPathPrefix'));
     expect(manifest, contains('android:autoVerify="true"'));
@@ -70,18 +72,24 @@ void main() {
     expect(manifest, contains(r'android:pathPrefix="${appLinksPathPrefix}/learn/"'));
   });
 
-  test('iOS déclare les Associated Domains avec un host inerte paramétrable', () {
+  test('iOS prépare le domaine canonique sans activer l\'entitlement', () {
     final String entitlements = resolve('ios/Runner/Runner.entitlements').readAsStringSync();
     final String releaseConfig = resolve('ios/Flutter/Release.xcconfig').readAsStringSync();
     final String project = resolve('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
 
     expect(entitlements, contains(r'applinks:$(CERTIGO_APP_LINKS_HOST)'));
-    expect(releaseConfig, contains('CERTIGO_APP_LINKS_HOST=links-disabled.invalid'));
+    expect(releaseConfig, contains('CERTIGO_APP_LINKS_HOST=certigo-app.com'));
     expect(
       project,
       isNot(contains('CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;')),
       reason: 'L\'entitlement doit rester opt-in tant que les profils Apple ne le supportent pas.',
     );
+  });
+
+  test('le runtime utilise le host canonique mais reste désactivé par défaut', () {
+    expect(certigoConfiguredLinkHost, certigoCanonicalLinkHost);
+    expect(certigoCanonicalLinkHost, 'certigo-app.com');
+    expect(certigoHttpsLinksEnabled, isFalse);
   });
 
   test('ENTRA_REDIRECT_URI utilise le schéma natif', () {

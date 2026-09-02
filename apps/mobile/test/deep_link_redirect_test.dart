@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   const AuthSession session = AuthSession(accessToken: 'token');
-  const String controlledTestHost = 'links.user-owned.example';
+  const String controlledTestHost = certigoCanonicalLinkHost;
 
   DeepLinkRouterCoordinator enabledCoordinator() => DeepLinkRouterCoordinator(
         policy: const DeepLinkPolicy(enabled: true, primaryHost: controlledTestHost),

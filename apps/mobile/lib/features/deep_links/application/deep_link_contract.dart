@@ -7,9 +7,10 @@ const bool certigoHttpsLinksEnabled = bool.fromEnvironment(
   defaultValue: false,
 );
 
+const String certigoCanonicalLinkHost = 'certigo-app.com';
 const String certigoConfiguredLinkHost = String.fromEnvironment(
   'CERTIGO_HTTPS_LINKS_HOST',
-  defaultValue: 'links-disabled.invalid',
+  defaultValue: certigoCanonicalLinkHost,
 );
 final RegExp _identifierPattern = RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$');
 
@@ -229,7 +230,7 @@ bool _isValidIdentifier(String value) => _identifierPattern.hasMatch(value);
 
 bool _isConfirmedLinkHost(String value) {
   final String host = value.toLowerCase();
-  return !host.endsWith('.invalid');
+  return value == host && host == certigoCanonicalLinkHost;
 }
 
 bool _hasExplicitPort(String rawUrl) {

@@ -164,6 +164,12 @@ gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" \
 Le dispatch historique `deploy-privacy-policy` reste neutralisé et ne doit pas
 être utilisé comme chemin d'activation.
 
+Le domaine possédé prévu est l'apex `https://certigo-app.com`. Avant de renseigner
+`PUBLIC_WEB_ORIGIN`, suivre le delta DNS Wix, le rollback et les validations
+HTTPS/AASA/assetlinks de
+[`UNIVERSAL_APP_LINKS.md`](./UNIVERSAL_APP_LINKS.md). La possession seule du
+domaine ne suffit pas à passer `PUBLIC_DOMAIN_VERIFIED=true`.
+
 Staging et production reçoivent en plus
 `APPLE_CIAM_DOMAIN_RECONFIGURED=true` depuis leur GitHub Environment avant toute
 opération de déploiement ou rollback. L'Environment `beta` et le groupe

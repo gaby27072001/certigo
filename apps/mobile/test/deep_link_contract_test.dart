@@ -2,7 +2,7 @@ import 'package:certigo/features/deep_links/application/deep_link_contract.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const String controlledTestHost = 'links.user-owned.example';
+  const String controlledTestHost = certigoCanonicalLinkHost;
   const DeepLinkPolicy enabledPolicy = DeepLinkPolicy(
     enabled: true,
     primaryHost: controlledTestHost,
@@ -127,14 +127,28 @@ void main() {
       );
     });
 
-    test('rejects the inert placeholder even when the feature flag is enabled', () {
+    test('rejects placeholders and non-canonical hosts even when enabled', () {
       const DeepLinkPolicy inertPolicy = DeepLinkPolicy(
         enabled: true,
-        primaryHost: certigoConfiguredLinkHost,
+        primaryHost: 'links-disabled.invalid',
       );
+      const DeepLinkPolicy subdomainPolicy = DeepLinkPolicy(
+        enabled: true,
+        primaryHost: 'links.certigo-app.com',
+      );
+      final String legacyHost = <String>['certigo', 'app'].join('.');
+      final DeepLinkPolicy legacyPolicy = DeepLinkPolicy(enabled: true, primaryHost: legacyHost);
 
       expect(
         inertPolicy.parse('https://links-disabled.invalid/assignments/a').rejection,
+        DeepLinkRejection.unconfiguredHost,
+      );
+      expect(
+        subdomainPolicy.parse('https://links.certigo-app.com/assignments/a').rejection,
+        DeepLinkRejection.unconfiguredHost,
+      );
+      expect(
+        legacyPolicy.parse('https://$legacyHost/assignments/a').rejection,
         DeepLinkRejection.unconfiguredHost,
       );
     });

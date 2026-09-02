@@ -25,7 +25,7 @@ class GenerateLinkAssociationsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             apple_path, android_path = generator.write_associations(
                 output_dir=Path(temporary),
-                confirmed_domain="links.user-owned.example",
+                confirmed_domain="certigo-app.com",
                 apple_team_id="ABCDEFGHIJ",
                 bundle_id="com.certigo.mobileapp",
                 android_fingerprints=[fingerprint()],
@@ -52,6 +52,10 @@ class GenerateLinkAssociationsTests(unittest.TestCase):
             )
             self.assertEqual(apple_path.name, "apple-app-site-association")
             self.assertEqual(android_path.name, "assetlinks.json")
+            self.assertEqual(
+                apple_path.parent,
+                Path(temporary) / "certigo-app.com" / ".well-known",
+            )
 
     def test_verified_path_prefix_is_applied_to_apple_routes(self) -> None:
         apple, _ = generator.association_payloads(
@@ -91,7 +95,7 @@ class GenerateLinkAssociationsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "hostname"):
             generator.write_associations(
                 output_dir=Path("."),
-                confirmed_domain="https://links.user-owned.example",
+                confirmed_domain="https://certigo-app.com",
                 apple_team_id="ABCDEFGHIJ",
                 bundle_id="com.certigo.mobileapp",
                 android_fingerprints=[fingerprint()],
@@ -106,6 +110,19 @@ class GenerateLinkAssociationsTests(unittest.TestCase):
                 bundle_id="com.certigo.mobileapp",
                 android_fingerprints=[fingerprint()],
             )
+
+    def test_rejects_every_non_canonical_domain(self) -> None:
+        legacy_domain = ".".join(("certigo", "app"))
+        for domain in ("www.certigo-app.com", "links.certigo-app.com", legacy_domain):
+            with self.subTest(domain=domain):
+                with self.assertRaisesRegex(ValueError, "canonical"):
+                    generator.write_associations(
+                        output_dir=Path("."),
+                        confirmed_domain=domain,
+                        apple_team_id="ABCDEFGHIJ",
+                        bundle_id="com.certigo.mobileapp",
+                        android_fingerprints=[fingerprint()],
+                    )
 
 
 if __name__ == "__main__":
