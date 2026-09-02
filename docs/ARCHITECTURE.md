@@ -219,8 +219,12 @@ Quand une source canonique est injectée, `ContentService` l'adapte ainsi :
 - un track de même ID fournit les compteurs et passe à `available` ;
 - les statuts `retired` et `replaced` sans contenu publié sont masqués, tandis que
   `active-retiring` reste actif ;
-- l'API annonce explicitement `certigo.app-certification-catalog/v2` et
-  `sourceSchema: certigo.certification-catalog/v1` ; le mobile refuse tout schéma inconnu ;
+- le contrat neutre cible est `urn:certigo:contract:certification-catalog:app:v2` ;
+  l'API émet encore l'identifiant opaque historique
+  `certigo.app-certification-catalog/v2` pendant la fenêtre de compatibilité et
+  le mobile accepte les deux sans tenter aucune résolution réseau ;
+- `sourceSchema: certigo.certification-catalog/v1` reste un namespace logique ;
+  le mobile refuse tout autre schéma ;
 - les segments de route utilisent un encodage URI afin de préserver les identifiants canoniques.
 
 La décision DVA au 18 août 2026 est explicite : `aws:dva-c02` reste l'entrée active et son guide est

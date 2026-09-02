@@ -22,13 +22,14 @@ import 'repositories.dart';
 /// single REST endpoint to a typed model via [ApiClient]. Routes mirror the
 /// backend exactly (userId is always derived from the JWT, never sent).
 
-const String _kAppCatalogSchema = 'certigo.app-certification-catalog/v2';
+const String _kAppCatalogSchema = 'urn:certigo:contract:certification-catalog:app:v2';
+const String _kLegacyAppCatalogSchema = 'certigo.app-certification-catalog/v2';
 const String _kCanonicalCatalogSchema = 'certigo.certification-catalog/v1';
 
 List<TrackSummary> _decodeTrackSummaries(Map<String, dynamic> json) {
   final String? schema = json['schema'] as String?;
   final String? sourceSchema = json['sourceSchema'] as String?;
-  if (schema != _kAppCatalogSchema) {
+  if (schema != _kAppCatalogSchema && schema != _kLegacyAppCatalogSchema) {
     throw FormatException('Unsupported app catalog schema: $schema');
   }
   if (sourceSchema != _kCanonicalCatalogSchema) {

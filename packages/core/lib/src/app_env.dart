@@ -3,7 +3,7 @@
 /// Never hard-code endpoints or client ids. Build flavors pass values:
 /// ```
 /// flutter run --dart-define=CERTIGO_ENV=dev \
-///   --dart-define=API_BASE_URL=https://dev.api.certigo.app \
+///   --dart-define=API_BASE_URL=https://<dev-function-app>.azurewebsites.net/api \
 ///   --dart-define=ENTRA_CLIENT_ID=... --dart-define=ENTRA_AUTHORITY=...
 /// ```
 enum AppFlavor { dev, staging, prod }
@@ -11,6 +11,7 @@ enum AppFlavor { dev, staging, prod }
 class AppEnv {
   const AppEnv._();
 
+  static const String _unownedDomain = 'certigo' '.app';
   static const String _rawEnv = String.fromEnvironment('CERTIGO_ENV', defaultValue: 'dev');
 
   static AppFlavor get flavor => switch (_rawEnv) {
@@ -33,6 +34,16 @@ class AppEnv {
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: devApiBaseUrl,
+  );
+
+  /// Host whose control was verified by the release operator.
+  ///
+  /// Strict builds require an exact match with [apiBaseUrl]. The assertion is
+  /// intentionally separate from the URL so a plausible or placeholder host
+  /// cannot become trusted merely by being configured as the endpoint.
+  static const String verifiedOwnedApiHost = String.fromEnvironment(
+    'VERIFIED_OWNED_API_HOST',
+    defaultValue: '',
   );
 
   /// Dev/staging bearer token sent until Entra External ID is wired. The backend
@@ -149,6 +160,7 @@ class AppEnv {
         entraRedirectUri: entraRedirectUri,
         entraApiScope: entraApiScope,
         entraOptional: entraOptional,
+        verifiedOwnedApiHost: verifiedOwnedApiHost,
       );
 
   /// Cœur de validation : **pur et sans I/O**, ne lit aucune constante globale.
@@ -163,6 +175,7 @@ class AppEnv {
     required String entraRedirectUri,
     required String entraApiScope,
     bool entraOptional = false,
+    String verifiedOwnedApiHost = '',
   }) {
     final bool strictFlavor = flavor == AppFlavor.prod || flavor == AppFlavor.staging;
     final List<AppConfigIssue> issues = <AppConfigIssue>[];
@@ -170,13 +183,23 @@ class AppEnv {
         strictFlavor ? AppConfigSeverity.error : AppConfigSeverity.warning;
 
     // --- API_BASE_URL ---
-    if (apiBaseUrl.trim().isEmpty) {
+    final String normalizedApiBaseUrl = apiBaseUrl.trim();
+    final Uri? apiUri = Uri.tryParse(normalizedApiBaseUrl);
+    if (normalizedApiBaseUrl.isEmpty) {
       issues.add(
         const AppConfigIssue(
           AppConfigSeverity.error,
           'API_BASE_URL',
           'URL de l\'API absente : le login e-mail échouera (« Pas de connexion »). '
               'Injectez --dart-define=API_BASE_URL=https://<host>/api.',
+        ),
+      );
+    } else if (apiUri == null || !apiUri.hasScheme || apiUri.host.isEmpty) {
+      issues.add(
+        const AppConfigIssue(
+          AppConfigSeverity.error,
+          'API_BASE_URL',
+          'API_BASE_URL doit être une URL absolue valide.',
         ),
       );
     } else {
@@ -190,7 +213,7 @@ class AppEnv {
           ),
         );
       }
-      if (strictFlavor && !apiBaseUrl.startsWith('https://')) {
+      if (strictFlavor && apiUri.scheme != 'https') {
         issues.add(
           AppConfigIssue(
             AppConfigSeverity.error,
@@ -198,6 +221,51 @@ class AppEnv {
             'L\'API doit être servie en HTTPS en prod/staging (reçu : $apiBaseUrl).',
           ),
         );
+      }
+      if (strictFlavor &&
+          (apiUri.userInfo.isNotEmpty ||
+              apiUri.hasQuery ||
+              apiUri.hasFragment ||
+              apiUri.hasPort ||
+              (apiUri.path != '/api' && apiUri.path != '/api/'))) {
+        issues.add(
+          const AppConfigIssue(
+            AppConfigSeverity.error,
+            'API_BASE_URL',
+            'API_BASE_URL doit être une URL HTTPS simple terminée par /api, sans '
+                'identifiants, port, query string ni fragment.',
+          ),
+        );
+      }
+
+      if (strictFlavor) {
+        final String verifiedHost = verifiedOwnedApiHost.trim().toLowerCase();
+        final bool validVerifiedHost =
+            RegExp(r'^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$').hasMatch(verifiedHost) &&
+                !RegExp(r'(placeholder|example|change-?me|todo|invalid)', caseSensitive: false)
+                    .hasMatch(verifiedHost) &&
+                verifiedHost != _unownedDomain &&
+                !verifiedHost.endsWith('.$_unownedDomain');
+        if (!validVerifiedHost) {
+          issues.add(
+            const AppConfigIssue(
+              AppConfigSeverity.error,
+              'VERIFIED_OWNED_API_HOST',
+              'Un host API possédé et vérifié doit être fourni explicitement pour '
+                  'les builds prod/staging. Les placeholders et domaines non possédés '
+                  'sont refusés.',
+            ),
+          );
+        } else if (apiUri.host.toLowerCase() != verifiedHost) {
+          issues.add(
+            AppConfigIssue(
+              AppConfigSeverity.error,
+              'VERIFIED_OWNED_API_HOST',
+              'Le host API « ${apiUri.host} » ne correspond pas au host possédé '
+                  'et vérifié « $verifiedHost ».',
+            ),
+          );
+        }
       }
     }
 

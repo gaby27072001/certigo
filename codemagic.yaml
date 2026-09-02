@@ -16,6 +16,7 @@
 #   3. App > Environment variables: create the group "certigo_mobile_config".
 #      NON-secret dart-define values baked into the public binary:
 #        PROD_API_BASE_URL = https://<prod-func-app>.azurewebsites.net/api
+#        VERIFIED_OWNED_API_HOST = <hostname whose control was verified>
 #        ENTRA_CLIENT_ID    = 4d1f1075-7bc5-4764-947b-701435a85f8c
 #        ENTRA_AUTHORITY    = https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0
 #        ENTRA_API_SCOPE    = api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation
@@ -168,9 +169,17 @@ workflows:
           set -euo pipefail
           ACCOUNT_DELETION_ENABLED="${ACCOUNT_DELETION_ENABLED:-false}"
           case "$ACCOUNT_DELETION_ENABLED" in true|false) ;; *) exit 1 ;; esac
+          node ../../.github/scripts/validate-mobile-release-config.mjs \
+            --api-base-url "$PROD_API_BASE_URL" \
+            --verified-owned-api-host "$VERIFIED_OWNED_API_HOST" \
+            --entra-client-id "$ENTRA_CLIENT_ID" \
+            --entra-authority "$ENTRA_AUTHORITY" \
+            --entra-api-scope "$ENTRA_API_SCOPE" \
+            --certigo-env "$CERTIGO_ENV"
           flutter build ipa --release \
             --dart-define=CERTIGO_ENV="$CERTIGO_ENV" \
             --dart-define=API_BASE_URL="$PROD_API_BASE_URL" \
+            --dart-define=VERIFIED_OWNED_API_HOST="$VERIFIED_OWNED_API_HOST" \
             --dart-define=ENTRA_CLIENT_ID="$ENTRA_CLIENT_ID" \
             --dart-define=ENTRA_AUTHORITY="$ENTRA_AUTHORITY" \
             --dart-define=ENTRA_API_SCOPE="$ENTRA_API_SCOPE" \

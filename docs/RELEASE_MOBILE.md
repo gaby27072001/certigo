@@ -161,13 +161,15 @@ noms sont référencés dans le code.
 
 | Valeur | Secret Key Vault | Repli variable GitHub | Format / exemple |
 |---|---|---|---|
-| URL de base API | `mobile-app-api-base-url` | `vars.MOBILE_API_BASE_URL` | `https://api.certigo.app/api` ou `https://func-certigo-prod-<suffixe Bicep>.azurewebsites.net/api` |
+| URL de base API | `mobile-app-api-base-url` | `vars.MOBILE_API_BASE_URL` | `https://<host-backend-prod-vérifié>/api` |
+| Host API possédé vérifié | `mobile-verified-owned-api-host` | `vars.MOBILE_VERIFIED_OWNED_API_HOST` | nom DNS exact de l'URL précédente, sans schéma ni chemin |
 | Entra client ID | `mobile-entra-client-id` | `vars.MOBILE_ENTRA_CLIENT_ID` | GUID App Registration mobile |
 | Entra authority | `mobile-entra-authority` | `vars.MOBILE_ENTRA_AUTHORITY` | `https://<tenant-guid>.ciamlogin.com/<tenant-guid>/v2.0` |
 | Entra API scope | `mobile-entra-api-scope` | `vars.MOBILE_ENTRA_API_SCOPE` | `api://<backend-client-id>/user_impersonation` |
 | Env (flavor) | `mobile-app-env` | `vars.MOBILE_CERTIGO_ENV` | `prod` uniquement |
 
-- **Via Key Vault (recommandé)** : renseigner `API_BASE_URL`, `CERTIGO_ENV`,
+- **Via Key Vault (recommandé)** : renseigner `API_BASE_URL`,
+  `VERIFIED_OWNED_API_HOST`, `CERTIGO_ENV`,
   `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`, `ENTRA_API_SCOPE` dans
   `tools/secrets/mobile-secrets.env` puis lancer `set-keyvault-secrets.ps1`
   (§2.1). Le script crée les secrets `mobile-app-*` / `mobile-entra-*`.
@@ -176,9 +178,10 @@ noms sont référencés dans le code.
   ci-dessus. (Onglet **Variables**, pas **Secrets**.)
 
 > 🔒 **Gate bloquant de build** : pour toute exécution, y compris `dry_run`, les
-> cinq valeurs sont obligatoires et validées strictement. La configuration doit
+> six valeurs sont obligatoires et validées strictement. La configuration doit
 > cibler la production : URL API Certigo HTTPS en `/api`, GUID client non
-> placeholder, authority External ID canonique dont l'hôte GUID correspond au
+> placeholder, host API déclaré séparément comme possédé/vérifié et identique à
+> l'URL, authority External ID canonique dont l'hôte GUID correspond au
 > tenant GUID du chemin, scope `api://...` non placeholder et
 > `MOBILE_CERTIGO_ENV=prod`. La source est le Key Vault désigné par
 > `AZURE_KEYVAULT_NAME`, sinon les variables `MOBILE_*` au scope environnement ou
@@ -190,7 +193,8 @@ noms sont référencés dans le code.
 Codemagic n'a pas accès au Key Vault : créer dans le dashboard Codemagic
 (**Settings → Environment variables**) un **groupe** nommé `certigo_mobile_config`
 contenant `PROD_API_BASE_URL`, `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`,
-`ENTRA_API_SCOPE` (mêmes formats que le tableau ci-dessus). `codemagic.yaml`
+`ENTRA_API_SCOPE`, `VERIFIED_OWNED_API_HOST` (mêmes formats que le tableau
+ci-dessus). `codemagic.yaml`
 référence ce groupe et injecte les `--dart-define` ; `CERTIGO_ENV` est fixé
 inline (`prod` pour `ios-release`, `dev` pour `ios-release-dry`).
 

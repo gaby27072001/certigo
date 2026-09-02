@@ -17,6 +17,7 @@ name: release-android
 # l'app) -> variables GitHub (vars.*), pas secrets.*. Aucune valeur n'est committée.
 #   Secret Key Vault            | Repli variable GitHub       | Rôle / format
 #   mobile-app-api-base-url     | vars.MOBILE_API_BASE_URL    | URL backend, https://<host>/api
+#   mobile-verified-owned-api-host | vars.MOBILE_VERIFIED_OWNED_API_HOST | host dont le contrôle a été vérifié
 #   mobile-entra-client-id      | vars.MOBILE_ENTRA_CLIENT_ID | GUID App Registration mobile
 #   mobile-entra-authority      | vars.MOBILE_ENTRA_AUTHORITY | https://<tenant-guid>.ciamlogin.com/<tenant-guid>/v2.0
 #   mobile-entra-api-scope      | vars.MOBILE_ENTRA_API_SCOPE | api://<backend-client-id>/user_impersonation
@@ -226,13 +227,15 @@ jobs:
           # Repli si Key Vault non configuré. Ce sont des variables (vars.*), pas des
           # secrets : ces valeurs sont embarquées en clair dans le binaire de l'app.
           FB_API_BASE_URL: ${{ vars.MOBILE_API_BASE_URL }}
+          FB_VERIFIED_OWNED_API_HOST: ${{ vars.MOBILE_VERIFIED_OWNED_API_HOST }}
           FB_ENTRA_CLIENT_ID: ${{ vars.MOBILE_ENTRA_CLIENT_ID }}
           FB_ENTRA_AUTHORITY: ${{ vars.MOBILE_ENTRA_AUTHORITY }}
           FB_ENTRA_API_SCOPE: ${{ vars.MOBILE_ENTRA_API_SCOPE }}
           FB_CERTIGO_ENV: ${{ vars.MOBILE_CERTIGO_ENV }}
         run: |
           set -euo pipefail
-          API_BASE_URL="$FB_API_BASE_URL"; ENTRA_CLIENT_ID="$FB_ENTRA_CLIENT_ID"
+          API_BASE_URL="$FB_API_BASE_URL"; VERIFIED_OWNED_API_HOST="$FB_VERIFIED_OWNED_API_HOST"
+          ENTRA_CLIENT_ID="$FB_ENTRA_CLIENT_ID"
           ENTRA_AUTHORITY="$FB_ENTRA_AUTHORITY"; ENTRA_API_SCOPE="$FB_ENTRA_API_SCOPE"
           CERTIGO_ENV="$FB_CERTIGO_ENV"
           CONFIG_SOURCE=github-variables
@@ -243,6 +246,7 @@ jobs:
             az login --identity --output none
             kv(){ az keyvault secret show --vault-name "$KV_NAME" --name "$1" --query value -o tsv 2>/dev/null || true; }
             V="$(kv mobile-app-api-base-url)"; [ -n "$V" ] && API_BASE_URL="$V"
+            V="$(kv mobile-verified-owned-api-host)"; [ -n "$V" ] && VERIFIED_OWNED_API_HOST="$V"
             V="$(kv mobile-entra-client-id)"; [ -n "$V" ] && ENTRA_CLIENT_ID="$V"
             V="$(kv mobile-entra-authority)"; [ -n "$V" ] && ENTRA_AUTHORITY="$V"
             V="$(kv mobile-entra-api-scope)"; [ -n "$V" ] && ENTRA_API_SCOPE="$V"
@@ -253,6 +257,7 @@ jobs:
 
           if ! node .github/scripts/validate-mobile-release-config.mjs \
               --api-base-url "$API_BASE_URL" \
+              --verified-owned-api-host "$VERIFIED_OWNED_API_HOST" \
               --entra-client-id "$ENTRA_CLIENT_ID" \
               --entra-authority "$ENTRA_AUTHORITY" \
               --entra-api-scope "$ENTRA_API_SCOPE" \
@@ -265,6 +270,7 @@ jobs:
 
           {
             echo "APP_API_BASE_URL=$API_BASE_URL"
+            echo "APP_VERIFIED_OWNED_API_HOST=$VERIFIED_OWNED_API_HOST"
             echo "APP_ENTRA_CLIENT_ID=$ENTRA_CLIENT_ID"
             echo "APP_ENTRA_AUTHORITY=$ENTRA_AUTHORITY"
             echo "APP_ENTRA_API_SCOPE=$ENTRA_API_SCOPE"
@@ -294,6 +300,7 @@ jobs:
             --build-number="$BUILD_NUMBER" \
             --dart-define="CERTIGO_ENV=$APP_CERTIGO_ENV" \
             --dart-define="API_BASE_URL=$APP_API_BASE_URL" \
+            --dart-define="VERIFIED_OWNED_API_HOST=$APP_VERIFIED_OWNED_API_HOST" \
             --dart-define="ENTRA_CLIENT_ID=$APP_ENTRA_CLIENT_ID" \
             --dart-define="ENTRA_AUTHORITY=$APP_ENTRA_AUTHORITY" \
             --dart-define="ENTRA_API_SCOPE=$APP_ENTRA_API_SCOPE" \

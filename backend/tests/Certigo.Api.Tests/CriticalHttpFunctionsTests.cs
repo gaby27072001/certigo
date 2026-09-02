@@ -30,7 +30,7 @@ public sealed class CriticalHttpFunctionsTests
         var service = new FakeContentService
         {
             Catalog = new CatalogDto(
-                CertificationCatalogSchemas.AppV2,
+                CertificationCatalogSchemas.EmittedAppV2,
                 CertificationCatalogSchemas.SourceV1,
                 null,
                 null,
@@ -63,7 +63,7 @@ public sealed class CriticalHttpFunctionsTests
         service.GetCatalogCalls.Should().Be(1);
         var payload = await response.ReadJsonAsync<CatalogDto>();
         payload.Tracks.Should().ContainSingle();
-        payload.Schema.Should().Be(CertificationCatalogSchemas.AppV2);
+        payload.Schema.Should().Be(CertificationCatalogSchemas.EmittedAppV2);
         payload.SourceSchema.Should().Be(CertificationCatalogSchemas.SourceV1);
         payload.Tracks[0].Code.Should().Be("AZ-900");
         payload.Tracks[0].BlueprintDate.Should().Be(new DateOnly(2026, 7, 20));
@@ -216,7 +216,7 @@ public sealed class CriticalHttpFunctionsTests
     private sealed class FakeContentService : IContentService
     {
         public CatalogDto Catalog { get; set; } = new(
-            CertificationCatalogSchemas.AppV2,
+            CertificationCatalogSchemas.EmittedAppV2,
             CertificationCatalogSchemas.SourceV1,
             null,
             null,

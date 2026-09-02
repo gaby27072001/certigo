@@ -1,0 +1,45 @@
+name: Validate owned-domain policy
+
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    branches: [main]
+
+concurrency:
+  group: ci-domain-policy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Reject unowned operational domains
+    if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    env:
+      POLICY_WORKSPACE: ${{ github.workspace }}/.untrusted-source
+      TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          path: .untrusted-source
+          persist-credentials: false
+
+      - name: Checkout immutable trusted policy
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}
+          path: .trusted-control
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+
+      - name: Enforce verified owned-domain policy
+        run: |
+          node "$TRUSTED_CONTROL_DIR/.github/scripts/validate-domain-policy.mjs" \
+            --workspace "$POLICY_WORKSPACE"

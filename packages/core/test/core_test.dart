@@ -96,12 +96,14 @@ void main() {
     // Config prod complète et valide : sert de base à muter par cas.
     AppConfigReport validate({
       AppFlavor flavor = AppFlavor.prod,
-      String apiBaseUrl = 'https://api.certigo.app/api',
+      String apiBaseUrl = 'https://func-certigo-prod-bk3j5ja6vw23s.azurewebsites.net/api',
       String entraClientId = 'client-123',
       String entraAuthority = 'https://tenant.ciamlogin.com/tid/v2.0',
       String entraRedirectUri = 'certigo://auth/',
       String entraApiScope = 'api://client-123/user_impersonation',
       bool entraOptional = false,
+      String verifiedOwnedApiHost =
+          'func-certigo-prod-bk3j5ja6vw23s.azurewebsites.net',
     }) =>
         AppEnv.validateConfig(
           flavor: flavor,
@@ -111,6 +113,7 @@ void main() {
           entraRedirectUri: entraRedirectUri,
           entraApiScope: entraApiScope,
           entraOptional: entraOptional,
+          verifiedOwnedApiHost: verifiedOwnedApiHost,
         );
 
     bool hasError(AppConfigReport r, String key) =>
@@ -148,8 +151,30 @@ void main() {
     });
 
     test('prod avec API en HTTP (non https) → erreur bloquante', () {
-      final AppConfigReport r = validate(apiBaseUrl: 'http://api.certigo.app/api');
+      final AppConfigReport r = validate(
+        apiBaseUrl: 'http://func-certigo-prod-bk3j5ja6vw23s.azurewebsites.net/api',
+      );
       expect(hasError(r, 'API_BASE_URL'), isTrue);
+    });
+
+    test('prod sans host possédé vérifié → erreur bloquante', () {
+      final AppConfigReport r = validate(verifiedOwnedApiHost: '');
+      expect(hasError(r, 'VERIFIED_OWNED_API_HOST'), isTrue);
+    });
+
+    test('prod avec un host vérifié différent de l’API → erreur bloquante', () {
+      final AppConfigReport r = validate(
+        verifiedOwnedApiHost: 'func-certigo-prod-other.azurewebsites.net',
+      );
+      expect(hasError(r, 'VERIFIED_OWNED_API_HOST'), isTrue);
+    });
+
+    test('prod refuse explicitement le domaine tiers même déclaré vérifié', () {
+      final AppConfigReport r = validate(
+        apiBaseUrl: 'https://api.${'certigo'}.app/api',
+        verifiedOwnedApiHost: 'api.${'certigo'}.app',
+      );
+      expect(hasError(r, 'VERIFIED_OWNED_API_HOST'), isTrue);
     });
 
     test('API_BASE_URL vide → erreur bloquante quel que soit le flavor', () {

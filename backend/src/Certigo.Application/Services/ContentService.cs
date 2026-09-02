@@ -74,7 +74,7 @@ public sealed class ContentService : IContentService
                 StringComparer.Ordinal)
             .ToArray();
         return new CatalogDto(
-            Schema: CertificationCatalogSchemas.AppV2,
+            Schema: CertificationCatalogSchemas.EmittedAppV2,
             SourceSchema: _certifications.SourceSchema,
             SourceAsOf: _certifications.AsOf,
             Freshness: _certifications.Freshness is null

@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://certigo.app/schema/lesson.schema.json",
+  "$id": "urn:certigo:schema:content:lesson:v1",
   "title": "Certigo Lesson",
   "description": "Content-as-code definition of a single lesson. Authored in YAML, validated against this schema in CI, then published to Cosmos (content container, partitioned by trackId).",
   "type": "object",

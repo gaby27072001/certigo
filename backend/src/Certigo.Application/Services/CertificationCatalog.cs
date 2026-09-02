@@ -8,7 +8,11 @@ namespace Certigo.Application.Services;
 public static class CertificationCatalogSchemas
 {
     public const string SourceV1 = "certigo.certification-catalog/v1";
-    public const string AppV2 = "certigo.app-certification-catalog/v2";
+    public const string AppV2 = "urn:certigo:contract:certification-catalog:app:v2";
+
+    // Kept on the wire until deployed mobile versions accept AppV2.
+    public const string LegacyAppV2 = "certigo.app-certification-catalog/v2";
+    public const string EmittedAppV2 = LegacyAppV2;
 }
 
 public sealed record CertificationCatalogDocument(

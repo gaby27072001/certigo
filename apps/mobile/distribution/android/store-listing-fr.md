@@ -9,10 +9,10 @@
 | Nom de l'application | **Certigo** |
 | applicationId / package | `com.certigo.mobileapp` ⚠️ NON modifiable après le 1er upload |
 | Catégorie | Éducation |
-| Adresse e-mail de contact | TODO (ex : `support@certigo.app`) |
-| Site web | `https://gchambaud_microsoft.github.io/Certigo/` |
-| Politique de confidentialité (URL) | `https://gchambaud_microsoft.github.io/Certigo/privacy-policy/` |
-| Suppression du compte (URL) | `https://gchambaud_microsoft.github.io/Certigo/account-deletion/` |
+| Adresse e-mail de contact | `PUBLIC_SUPPORT_EMAIL` validé avant publication |
+| Site web | `PUBLIC_SITE_URL` validé avant publication |
+| Politique de confidentialité (URL) | `PUBLIC_PRIVACY_POLICY_URL` validé avant publication |
+| Suppression du compte (URL) | `PUBLIC_ACCOUNT_DELETION_URL` validé avant publication |
 
 ## Description courte (≤ 80 caractères)
 Le Duolingo des certifications IT — formez-vous, entraînez-vous, réussissez.
@@ -39,7 +39,8 @@ XP, niveaux, streak quotidien, badges de progression — sans cœurs ni vies. Vo
 ⚠️ Certigo est une plateforme indépendante, non affiliée ni approuvée par Microsoft, Amazon, Cisco, CompTIA ou tout autre organisme de certification. Toutes les leçons et questions sont originales.
 
 ## Conformité (à vérifier dans la console Play)
-- **Politique de confidentialité** : URL publique en place via GitHub Pages (`/privacy-policy/`). Migration ultérieure possible vers `https://certigo.app/privacy-policy/` en conservant le même chemin.
+- **Politique de confidentialité** : reprendre exactement
+  `PUBLIC_PRIVACY_POLICY_URL` après validation HTTPS et contrôle du host.
 - **Section "Sécurité des données"** : déclarer au minimum les informations de
   compte (e-mail pour le mode e-mail, identifiant utilisateur, nom/pseudo),
   l’activité dans l’application (progression, réponses, scores), les relations
@@ -48,8 +49,8 @@ XP, niveaux, streak quotidien, badges de progression — sans cœurs ni vies. Vo
   au diagnostic ; elles ne sont pas vendues.
 - **Suppression des données** : répondre que la suppression du compte et des
   données associées est disponible dans l’application et renseigner
-  `/account-deletion/` dans le champ URL Play Console. La page doit être publiée
-  avant de valider ce formulaire.
+  `PUBLIC_ACCOUNT_DELETION_URL` dans le champ URL Play Console. La page doit être
+  publiée et contrôlée avant de valider ce formulaire.
 - **Classification du contenu** : remplir le questionnaire (IARC). Attendu : Tout public.
 - **Public cible & contenu** : hors « familles/enfants ».
 - **targetSdk** : actuellement 34 (défaut Flutter 3.24). TODO : suivre l'exigence
