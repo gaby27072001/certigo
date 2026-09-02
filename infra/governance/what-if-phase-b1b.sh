@@ -3,14 +3,21 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 subscription_id="${AZURE_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID explicitly.}"
+tenant_id="${AZURE_TENANT_ID:?Set AZURE_TENANT_ID explicitly.}"
+node "${root}/infra/governance/phase-b-target.mjs" \
+  "${subscription_id}" "${tenant_id}"
 evidence_dir="${PHASE_B1B_EVIDENCE_DIR:?Set PHASE_B1B_EVIDENCE_DIR.}"
 mkdir -p "${evidence_dir}"
+node "${root}/infra/governance/evidence-files.mjs" require-directory \
+  "${evidence_dir}"
 chmod 700 "${evidence_dir}"
 export PHASE_B_WORK_DIR="${evidence_dir}"
 export PHASE_B_STAGE=B1b
 
 bash "${root}/infra/governance/prepare-phase-b.sh"
 cp "${evidence_dir}/b1-parameters.json" "${evidence_dir}/parameters.json"
+node "${root}/infra/governance/bicep-parameters.mjs" validate \
+  "${evidence_dir}/parameters.json"
 az bicep build \
   --file "${root}/infra/governance/bootstrap-rbac-admin.bicep" \
   --stdout > "${evidence_dir}/compiled-template.json"
@@ -29,7 +36,9 @@ node "${root}/infra/governance/validate-what-if.mjs" \
   --phase B1b \
   --phase-a "${evidence_dir}/phase-a.json"
 source_commit="$(git -C "${root}" rev-parse HEAD)"
-tenant_id="$(az account show --query tenantId --output tsv)"
+observed_tenant_id="$(az account show --query tenantId --output tsv)"
+node "${root}/infra/governance/phase-b-target.mjs" \
+  "${subscription_id}" "${observed_tenant_id}"
 node "${root}/infra/governance/write-what-if-manifest.mjs" \
   --phase B1b \
   --plan "${evidence_dir}/plan.json" \
@@ -40,11 +49,12 @@ node "${root}/infra/governance/write-what-if-manifest.mjs" \
   --source-root "${root}" \
   --source-commit "${source_commit}" \
   --subscription "${subscription_id}" \
-  --tenant "${tenant_id}" \
+  --tenant "${observed_tenant_id}" \
   --sources "${root}/infra/governance/bootstrap-rbac-admin.bicep" \
   --artifact-dir "${evidence_dir}" \
   --phase-a-deployment "${evidence_dir}/phase-a-deployment.json" \
   --phase-a-evidence-manifest "${PHASE_A_EVIDENCE_DIR}/manifest.json" \
-  --phase-a-binding "${evidence_dir}/phase-a-binding.json"
-sha256sum "${evidence_dir}/manifest.json" > \
-  "${evidence_dir}/manifest.sha256"
+  --phase-a-binding "${evidence_dir}/phase-a-binding.json" \
+  --legacy-transition "${evidence_dir}/legacy-transition.json"
+node "${root}/infra/governance/evidence-files.mjs" seal \
+  "${evidence_dir}/manifest.json" "${evidence_dir}/manifest.sha256"

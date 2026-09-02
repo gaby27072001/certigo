@@ -1,11 +1,16 @@
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export function sha256File(filePath) {
-  return createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
-}
+import {
+  collectArtifactFiles,
+  normalizeEvidencePath,
+  relativeEvidenceFile,
+  sha256File,
+  validateEvidenceEntries,
+} from './evidence-files.mjs';
+
+export { sha256File } from './evidence-files.mjs';
 
 function parseArguments(argv) {
   const result = {};
@@ -13,18 +18,6 @@ function parseArguments(argv) {
     result[argv[index]] = argv[index + 1];
   }
   return result;
-}
-
-function relativeFile(sourceRoot, filePath) {
-  const resolved = path.resolve(filePath);
-  const relative = path.relative(sourceRoot, resolved).replaceAll('\\', '/');
-  if (relative.startsWith('../') || path.isAbsolute(relative)) {
-    throw new Error(`evidence source is outside the repository: ${filePath}`);
-  }
-  return {
-    path: relative,
-    sha256: sha256File(resolved),
-  };
 }
 
 export function createManifest(options) {
@@ -46,8 +39,15 @@ export function createManifest(options) {
     phaseADeploymentPath,
     phaseAEvidenceManifestPath,
     phaseABindingPath,
+    legacyTransitionPath,
     artifactDirectory,
   } = options;
+  if (
+    ['B1a', 'B1b', 'B2'].includes(phase) &&
+    !legacyTransitionPath
+  ) {
+    throw new Error('Phase B manifest requires legacy transition evidence');
+  }
   const planRaw = fs.existsSync(planPath) ? fs.readFileSync(planPath) : null;
   let plan = null;
   try {
@@ -80,9 +80,14 @@ export function createManifest(options) {
       runId: runId ?? null,
       ref: ref ?? null,
     },
-    sources: sourceFiles.map((file) => relativeFile(sourceRoot, file)),
+    sources: validateEvidenceEntries(
+      sourceFiles.map((file) =>
+        relativeEvidenceFile(sourceRoot, file, 'evidence source')
+      ),
+      'manifest sources',
+    ),
     template: {
-      ...relativeFile(sourceRoot, templatePath),
+      ...relativeEvidenceFile(sourceRoot, templatePath, 'evidence template'),
       compiledSha256: fs.existsSync(compiledTemplatePath)
         ? sha256File(compiledTemplatePath)
         : null,
@@ -94,9 +99,7 @@ export function createManifest(options) {
     },
     plan: {
       path: 'plan.json',
-      sha256: planRaw
-        ? createHash('sha256').update(planRaw).digest('hex')
-        : null,
+      sha256: planRaw ? sha256File(planPath) : null,
       status: plan?.status ?? null,
       error: plan?.error ?? null,
       diagnostics: plan?.diagnostics ?? null,
@@ -119,6 +122,13 @@ export function createManifest(options) {
       bindingSha256: sha256File(phaseABindingPath),
     };
   }
+  if (legacyTransitionPath) {
+    manifest.legacyTransition = relativeEvidenceFile(
+      artifactDirectory,
+      legacyTransitionPath,
+      'legacy transition evidence',
+    );
+  }
   const normalizedPlanPath = path.join(
     artifactDirectory,
     'normalized-plan.json',
@@ -140,20 +150,14 @@ export function createManifest(options) {
       normalizedCount: provenance.normalizedCount,
     };
   }
-  manifest.artifacts = fs
-    .readdirSync(artifactDirectory, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => path.join(entry.parentPath, entry.name))
-    .filter(
-      (file) =>
-        path.resolve(file) !== path.resolve(outputPath) &&
-        path.basename(file) !== 'manifest.sha256',
-    )
-    .map((file) => ({
-      path: path.relative(artifactDirectory, file).replaceAll('\\', '/'),
-      sha256: sha256File(file),
-    }))
-    .sort((left, right) => left.path.localeCompare(right.path));
+  const outputRelativePath = normalizeEvidencePath(
+    path.relative(artifactDirectory, outputPath),
+    'manifest output path',
+  );
+  manifest.artifacts = collectArtifactFiles(artifactDirectory, [
+    outputRelativePath,
+    'manifest.sha256',
+  ]);
   fs.writeFileSync(outputPath, `${JSON.stringify(manifest, null, 2)}\n`, {
     mode: 0o600,
   });
@@ -181,6 +185,12 @@ function main() {
       throw new Error(`Missing required argument ${key}`);
     }
   }
+  if (
+    ['B1a', 'B1b', 'B2'].includes(args['--phase']) &&
+    !args['--legacy-transition']
+  ) {
+    throw new Error('Missing required argument --legacy-transition');
+  }
   createManifest({
     phase: args['--phase'],
     planPath: path.resolve(args['--plan']),
@@ -204,6 +214,9 @@ function main() {
       : null,
     phaseABindingPath: args['--phase-a-binding']
       ? path.resolve(args['--phase-a-binding'])
+      : null,
+    legacyTransitionPath: args['--legacy-transition']
+      ? path.resolve(args['--legacy-transition'])
       : null,
     artifactDirectory: path.resolve(args['--artifact-dir']),
   });

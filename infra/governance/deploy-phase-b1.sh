@@ -3,6 +3,9 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 subscription_id="${AZURE_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID explicitly.}"
+configured_tenant_id="${AZURE_TENANT_ID:?Set AZURE_TENANT_ID explicitly.}"
+node "${root}/infra/governance/phase-b-target.mjs" \
+  "${subscription_id}" "${configured_tenant_id}"
 evidence_dir="${PHASE_B1_EVIDENCE_DIR:?Set PHASE_B1_EVIDENCE_DIR to approved B1 evidence.}"
 approval_file="${PHASE_B1_APPROVAL_FILE:?Set PHASE_B1_APPROVAL_FILE to the approval JSON.}"
 deployment_name="${PHASE_B1_DEPLOYMENT_NAME:?Set a unique PHASE_B1_DEPLOYMENT_NAME.}"
@@ -11,6 +14,8 @@ trap 'rm -rf -- "${work_dir}"' EXIT
 
 [[ -z "$(git -C "${root}" status --porcelain)" ]]
 tenant_id="$(az account show --query tenantId --output tsv)"
+node "${root}/infra/governance/phase-b-target.mjs" \
+  "${subscription_id}" "${tenant_id}"
 export PHASE_B_WORK_DIR="${work_dir}/fresh-binding"
 export PHASE_B_STAGE=B1a
 bash "${root}/infra/governance/prepare-phase-b.sh"
@@ -26,13 +31,14 @@ node "${root}/infra/governance/validate-evidence.mjs" deployment-approval \
   --approval "${approval_file}" \
   --manifest "${evidence_dir}/manifest.json" \
   --plan "${evidence_dir}/plan.json" \
-  --parameters "${work_dir}/parameters.json" \
-  --compiled-template "${work_dir}/template.json" \
+  --parameters "${evidence_dir}/parameters.json" \
+  --compiled-template "${evidence_dir}/compiled-template.json" \
   --phase-a-proof "${PHASE_B_WORK_DIR}/phase-a.json" \
   --phase-a-binding "${PHASE_B_WORK_DIR}/phase-a-binding.json" \
   --source-root "${root}" \
   --subscription "${subscription_id}" \
-  --tenant "${tenant_id}"
+  --tenant "${tenant_id}" \
+  --legacy-transition "${PHASE_B_WORK_DIR}/legacy-transition.json"
 
 expected_template_hash="$(
   node -p "require(process.argv[1]).template.compiledSha256" \
@@ -42,9 +48,11 @@ expected_parameters_hash="$(
   node -p "require(process.argv[1]).parameters.sha256" \
     "${evidence_dir}/manifest.json"
 )"
-[[ "$(sha256sum "${work_dir}/template.json" | cut -d' ' -f1)" == \
+[[ "$(node "${root}/infra/governance/evidence-files.mjs" hash \
+  "${work_dir}/template.json")" == \
   "${expected_template_hash}" ]]
-[[ "$(sha256sum "${work_dir}/parameters.json" | cut -d' ' -f1)" == \
+[[ "$(node "${root}/infra/governance/evidence-files.mjs" hash \
+  "${work_dir}/parameters.json")" == \
   "${expected_parameters_hash}" ]]
 az deployment sub create \
   --subscription "${subscription_id}" \

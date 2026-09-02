@@ -355,14 +355,17 @@ test('planner access scopes follow only complete management-group parent IDs', (
     {
       id: `/subscriptions/${subscription}`,
       name: subscription,
+      type: 'Microsoft.Management/managementGroups/subscriptions',
       parent: { id: childId },
       parentNameChain: ['ignored-display-name'],
     },
     {
       id: childId,
+      type: 'Microsoft.Management/managementGroups',
       properties: { parent: { id: rootId } },
     },
     {
+      type: 'Microsoft.Management/managementGroups',
       properties: { id: rootId },
     },
   ];
@@ -389,7 +392,13 @@ test('planner access scopes follow only complete management-group parent IDs', (
   assert.throws(
     () =>
       plannerAccessScopes(
-        [{ id: `/subscriptions/${subscription}`, parent: { id: 'invalid' } }],
+        [
+          {
+            id: `/subscriptions/${subscription}`,
+            type: 'Microsoft.Management/managementGroups/subscriptions',
+            parent: { id: 'invalid' },
+          },
+        ],
         subscription,
         proof().tenantId,
       ),
@@ -400,6 +409,31 @@ test('planner access scopes follow only complete management-group parent IDs', (
   assert.throws(
     () => plannerAccessScopes(truncated, subscription, proof().tenantId),
     /did not reach the tenant root/,
+  );
+  const collidingManagementGroup = {
+    id: '/providers/Microsoft.Management/managementGroups/collision',
+    name: subscription,
+    type: 'Microsoft.Management/managementGroups',
+    parent: { id: rootId },
+  };
+  assert.deepEqual(
+    plannerAccessScopes(
+      [collidingManagementGroup, ...entities],
+      subscription,
+      proof().tenantId,
+    ),
+    [`/subscriptions/${subscription}`, childId, rootId],
+  );
+  const ambiguousSubscription = structuredClone(entities);
+  ambiguousSubscription.push(structuredClone(entities[0]));
+  assert.throws(
+    () =>
+      plannerAccessScopes(
+        ambiguousSubscription,
+        subscription,
+        proof().tenantId,
+      ),
+    /ancestry is not visible/,
   );
 });
 
