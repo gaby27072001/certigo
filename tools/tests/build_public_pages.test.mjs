@@ -11,10 +11,11 @@ import { buildPublicPages } from '../build_public_pages.mjs';
 const execFileAsync = promisify(execFile);
 const canonicalOrigin = 'https://certigo-app.com';
 const testFingerprint = Array.from({ length: 32 }, () => 'AB').join(':');
+const python = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 
 async function generateAssociations(root) {
   const associationOutput = join(root, 'associations');
-  await execFileAsync(process.env.PYTHON || 'python', [
+  await execFileAsync(python, [
     resolve('tools/generate_link_associations.py'),
     '--confirmed-domain',
     'certigo-app.com',
