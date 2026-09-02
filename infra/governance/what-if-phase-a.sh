@@ -6,6 +6,8 @@ subscription_id="${AZURE_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID explicitly.}
 location="${AZURE_LOCATION:-westeurope}"
 evidence_dir="${PHASE_A_EVIDENCE_DIR:-$(mktemp -d)}"
 mkdir -p "${evidence_dir}"
+node "${root}/infra/governance/evidence-files.mjs" require-directory \
+  "${evidence_dir}"
 chmod 700 "${evidence_dir}"
 exec > "${evidence_dir}/stdout.log" 2> "${evidence_dir}/stderr.log"
 
@@ -37,8 +39,8 @@ finalize() {
       --tenant "${tenant_id}" \
       --sources "${sources}" \
       --artifact-dir "${evidence_dir}"
-  sha256sum "${evidence_dir}/manifest.json" > \
-    "${evidence_dir}/manifest.sha256"
+  node "${root}/infra/governance/evidence-files.mjs" seal \
+    "${evidence_dir}/manifest.json" "${evidence_dir}/manifest.sha256"
   exit "${status}"
 }
 trap finalize EXIT
@@ -48,7 +50,10 @@ az bicep build \
   --stdout > "${evidence_dir}/compiled-template.json"
 az bicep build-params \
   --file "${root}/infra/params/bootstrap-identities.bicepparam" \
-  --stdout > "${evidence_dir}/parameters.json"
+  --stdout > "${evidence_dir}/build-params-output.json"
+node "${root}/infra/governance/bicep-parameters.mjs" extract \
+  "${evidence_dir}/build-params-output.json" \
+  "${evidence_dir}/parameters.json"
 set +e
 az deployment sub what-if \
   --subscription "${subscription_id}" \

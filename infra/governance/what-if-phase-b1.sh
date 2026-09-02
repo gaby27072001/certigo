@@ -3,9 +3,14 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 subscription_id="${AZURE_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID explicitly.}"
+tenant_id="${AZURE_TENANT_ID:?Set AZURE_TENANT_ID explicitly.}"
+node "${root}/infra/governance/phase-b-target.mjs" \
+  "${subscription_id}" "${tenant_id}"
 location="${AZURE_LOCATION:-westeurope}"
 evidence_dir="${PHASE_B1_EVIDENCE_DIR:?Set PHASE_B1_EVIDENCE_DIR.}"
 mkdir -p "${evidence_dir}"
+node "${root}/infra/governance/evidence-files.mjs" require-directory \
+  "${evidence_dir}"
 chmod 700 "${evidence_dir}"
 exec > "${evidence_dir}/stdout.log" 2> "${evidence_dir}/stderr.log"
 export PHASE_B_WORK_DIR="${evidence_dir}"
@@ -56,11 +61,12 @@ NODE
       --phase-a-deployment "${evidence_dir}/phase-a-deployment.json"
       --phase-a-evidence-manifest "${PHASE_A_EVIDENCE_DIR}/manifest.json"
       --phase-a-binding "${evidence_dir}/phase-a-binding.json"
+      --legacy-transition "${evidence_dir}/legacy-transition.json"
     )
   fi
   "${manifest_args[@]}"
-  sha256sum "${evidence_dir}/manifest.json" > \
-    "${evidence_dir}/manifest.sha256"
+  node "${root}/infra/governance/evidence-files.mjs" seal \
+    "${evidence_dir}/manifest.json" "${evidence_dir}/manifest.sha256"
   exit "${status}"
 }
 trap finalize EXIT
@@ -70,6 +76,8 @@ az bicep build \
   --stdout > "${evidence_dir}/compiled-template.json"
 bash "${root}/infra/governance/prepare-phase-b.sh"
 cp "${evidence_dir}/b1-parameters.json" "${evidence_dir}/parameters.json"
+node "${root}/infra/governance/bicep-parameters.mjs" validate \
+  "${evidence_dir}/parameters.json"
 set +e
 az deployment sub what-if \
   --subscription "${subscription_id}" \

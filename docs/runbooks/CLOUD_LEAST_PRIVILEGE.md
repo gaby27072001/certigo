@@ -17,6 +17,15 @@ bash infra/governance/what-if-phase-a.sh
 bash infra/ci-runner/lifecycle-preflight.sh deallocate
 ```
 
+La cible **future** exécutable de Phase B est désormais la subscription personnelle
+`f434ec55-f342-4948-9298-f99af5216204` dans le tenant
+`e9174162-1033-40c0-b0c9-f31825914fbe`. Les snapshots `16b3…/b895…` ci-dessous restent un
+historique d'inventaire Non-Production, pas une autorisation d'exécution. Tout manifeste, preuve
+Phase A ou binding portant cette ancienne paire est stale et refusé. Aucun identifiant n'est
+substitué : il faut régénérer Phase A/A0 et toutes les preuves contre la paire personnelle explicite,
+puis confirmer que les RG, identités et scopes attendus y existent. En leur absence, Phase B reste
+**NO-GO**; le tooling ne crée ni compte, ni rôle, ni ressource automatiquement.
+
 `lifecycle-preflight.sh` ne possède volontairement aucun chemin `apply`. Il retourne `2` dès
 qu'une déallocation serait dangereuse et, dans cette PR, pour toute demande puisque le
 feature flag reste `off`.
@@ -41,8 +50,9 @@ Périmètre observé : subscription
 | Secrets Azure | `dev` possède ses `AZURE_*`; staging/prod héritent encore de la configuration dépôt |
 
 Les deux rôles data-plane sont nécessaires au package OneDeploy. Les deux rôles abonnement
-sont historiques et constituent le finding à résorber, mais restent indispensables au rollback
-jusqu'à la fin des preuves.
+sont historiques et constituent le finding à résorber : ils sont remplacés par le JIT humain testé
+et les huit attributions temporaires exactes, puis retirés avant Phase B. Ils ne sont jamais
+conservés pendant les canaris ou le soak.
 
 ### Runners
 
@@ -164,7 +174,9 @@ GOVERNANCE_PLANNER_EVIDENCE_DIR='<private-output-directory>' \
   bash infra/governance/what-if-governance-planner.sh
 
 # Après approbation humaine du manifeste A0, sous activation PIM :
-sha256sum --check '<private-output-directory>/manifest.sha256'
+node infra/governance/evidence-files.mjs verify-seal \
+  '<private-output-directory>/manifest.json' \
+  '<private-output-directory>/manifest.sha256'
 node infra/governance/validate-planner-what-if.mjs evidence \
   '<private-output-directory>/manifest.json' \
   '<approved-planner-manifest-sha256>' \
@@ -197,11 +209,27 @@ node infra/governance/planner-pim-contract.mjs \
 Le générateur réexécute le binding Phase A complet via `prepare-phase-b.sh` à partir des variables
 `PHASE_A_*`; il n'accepte aucun fichier Phase A fourni directement. Il refuse aussi tout accès
 RBAC actif, hérité, éligible ou activé déjà présent sur le principal planner. Le contrat doit être
-généré avant les six attributions PIM décrites, jamais pour légitimer une identité déjà privilégiée.
+généré avant les cinq attributions PIM décrites, jamais pour légitimer une identité déjà privilégiée.
+Toutes les entrées Phase B exigent explicitement `AZURE_TENANT_ID=e9174162-1033-40c0-b0c9-f31825914fbe`
+et `AZURE_SUBSCRIPTION_ID=f434ec55-f342-4948-9298-f99af5216204` avant tout appel Azure. Toute autre
+paire, notamment le binding professionnel historique, échoue avant login, inventaire, what-if ou
+déploiement.
 
 La migration réutilise les ressources Phase A live et leurs preuves v2; elle ne les recrée pas.
-Avant activation, retirer/downscoper le legacy `microlingo-github-actions` Contributor+UAA
-subscription est une précondition humaine avec preuve avant/après.
+Avant toute Phase B, le legacy `microlingo-github-actions` ne doit plus avoir `Contributor` ni
+`User Access Administrator` au scope abonnement. Leur retrait n'arrive toutefois qu'après création
+d'un remplacement humain JIT, deux activations et non-lockout testés, rollback prouvé, puis création
+des huit
+attributions legacy temporaires exactes décrites plus bas. `prepare-phase-b.sh` exige le contrat
+`LEGACY_TRANSITION_FILE`, résout exhaustivement les groupes transitifs du principal legacy, relit
+les attributions actives de chaque principal/groupe ainsi que les schedules PIM actifs et éligibles,
+et bloque si un accès de groupe ou une éligibilité subsiste, si un rôle large subsiste, si une
+attribution temporaire manque, si une attribution non approuvée subsiste ou si l'échéance live d'une
+schedule instance diffère du contrat approuvé ou dépasse le soak. Une visibilité Graph ou ARM
+incomplète est une erreur bloquante, jamais une preuve d'absence. Le manifeste what-if scelle aussi
+le SHA-256 exact du contrat legacy; chaque script de déploiement rematérialise ce contrat depuis la
+source approuvée et refuse toute absence, malformation ou substitution post-approbation avant
+`az deployment ... create`.
 
 Le workflow `azure-content-infra-plan` ne réutilise aucune identité dev, staging, prod ou
 VMSS. Le `what-if` ARM exige les mêmes permissions `write` que le déploiement évalué : le rôle
@@ -308,6 +336,28 @@ chmod 600 phase-a-output.json
 
 Le fichier d'output est un artefact de changement contrôlé, jamais committé.
 
+### Réparation de preuve Phase A
+
+L'artefact original approuvé est obligatoire. Un template recompilé localement, des hashes recalculés
+ou un manifeste reconstruit ne constituent jamais une preuve de substitution. Deux cas imposent un
+arrêt avant Phase B :
+
+- l'artefact original, son manifeste, son plan, ses paramètres ou son template compilé est absent ou
+  contient un symlink ;
+- le `templateHash` du deployment live diffère du `armTemplateHash` scellé.
+
+La seule reprise autorisée est un changement de réparation séparé, lié au template courant :
+
+1. ouvrir un ticket de réparation distinct et exécuter un nouveau `what-if-phase-a.sh` ;
+2. archiver et faire approuver son nouvel artefact et son hash de manifeste ;
+3. déployer exactement ce template compilé sous un nouveau nom de deployment Phase A ;
+4. archiver les opérations et outputs de ce deployment, puis utiliser exclusivement son triplet
+   `PHASE_A_DEPLOYMENT_NAME`, `PHASE_A_EVIDENCE_DIR` et
+   `PHASE_A_EVIDENCE_MANIFEST_SHA256`.
+
+Il est interdit de copier une sortie locale dans l'ancien artefact, de réutiliser l'ancien nom de
+deployment ou de présenter le build local comme équivalent au deployment live.
+
 ### What-if Phase B
 
 La Phase B ne peut démarrer qu'avec le nom du deployment Phase A approuvé :
@@ -317,6 +367,8 @@ export AZURE_SUBSCRIPTION_ID='<subscription-uuid>'
 export PHASE_A_DEPLOYMENT_NAME='certigo-governance-bootstrap-identities-<ticket>'
 export PHASE_A_EVIDENCE_DIR='<downloaded-governance-phase-a-evidence>'
 export PHASE_A_EVIDENCE_MANIFEST_SHA256='<approved-manifest-sha256>'
+export LEGACY_TRANSITION_FILE='<approved-legacy-transition.json>'
+export LEGACY_TRANSITION_SHA256='<approved-legacy-transition-sha256>'
 export PHASE_B_EVIDENCE_DIR='<private-output-directory>'
 bash infra/governance/what-if-phase-b.sh
 ```
@@ -447,11 +499,28 @@ Déclenchements opérateur après revue PIM :
 gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
   -f event_type=governance-bootstrap-phase-a-what-if
 
-gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches \
-  -f event_type=governance-bootstrap-phase-b-what-if \
-  -F 'client_payload[phase_a_deployment_name]=certigo-governance-bootstrap-identities-<ticket>' \
-  -F 'client_payload[phase_a_evidence_run_id]=<phase-a-workflow-run-id>' \
-  -F 'client_payload[phase_a_evidence_manifest_sha256]=<approved-manifest-sha256>'
+jq -c . '<approved-legacy-transition.json>' | tr -d '\n' > transition.payload.json
+transition_sha="$(
+  node infra/governance/evidence-files.mjs hash transition.payload.json
+)"
+jq -n \
+  --rawfile transition transition.payload.json \
+  --arg transitionSha "$transition_sha" \
+  --arg deployment 'certigo-governance-bootstrap-identities-<ticket>' \
+  --arg manifestSha '<approved-manifest-sha256>' \
+  --argjson runId '<phase-a-workflow-run-id>' \
+  '{
+    event_type: "governance-bootstrap-phase-b-what-if",
+    client_payload: {
+      legacy_transition_json: $transition,
+      legacy_transition_sha256: $transitionSha,
+      phase_a_deployment_name: $deployment,
+      phase_a_evidence_run_id: $runId,
+      phase_a_evidence_manifest_sha256: $manifestSha
+    }
+  }' |
+  gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input -
+rm transition.payload.json
 
 # B1b et B2 n'ont volontairement aucun workflow workload.
 ```
@@ -473,56 +542,127 @@ et attributions runtime du stack dédié.
 
 ## Ordre exact de migration
 
-Chaque étape est bloquante. Ne jamais anticiper le retrait de l'ancienne identité.
+Chaque étape est bloquante. Ne jamais retirer un accès avant que son remplacement JIT soit créé,
+activé et testé deux fois avec non-lockout. Chaque mutation d'assignment est sérialisée : une seule
+assignment à la fois, avec un principal emergency distinct et un principal d'administration de
+sécurité maintenus pendant toute la transition. Un second principal contrôlé par le même propriétaire
+ne constitue pas un administrateur humain indépendant : il faut soit un tiers/MSP temporaire réellement
+indépendant, soit une approbation scellée d'une procédure solo à contrôles compensatoires. Sans l'un de
+ces deux contrats, la Phase B reste **NO-GO**. Les rôles larges legacy disparaissent avant Phase B;
+seuls les rôles de rollback exacts et expirables peuvent survivre pendant les canaris.
 
 1. **Geler l'état de rollback.** Exporter l'inventaire, les IDs des attributions actuelles,
    les federated credentials et les métadonnées des GitHub Environments. Ne rien retirer.
-2. **A0 humain.** Activer via PIM les droits minimaux UAMI/FIC et roleDefinitions. Exécuter le
-   what-if A0, approuver son manifeste, déployer le template A0 exact et archiver ses outputs.
-3. **Prévol admin Phase A.** Activer via PIM l'ensemble minimal permettant RG, UAMI/FIC,
-   custom roles et policyDefinition. Exécuter `what-if-phase-a.sh`, archiver et approuver le JSON.
-4. **Provisionnement Phase A.** Déployer `bootstrap-identities.bicep` en incrémentiel; archiver
+2. **Créer le remplacement humain JIT.** Créer les eligibilities PIM minimales et bornées au ticket,
+   sans modifier encore l'accès legacy.
+3. **Tester deux activations et le rollback JIT.** Activer deux fois séparément sous
+   MFA/approbation, prouver à chaque fois les opérations administratives attendues et le non-lockout,
+   puis tester le rollback. Archiver les deux expirations, conserver le tiers/MSP indépendant ou
+   l'approbation scellée du mode solo compensatoire, ainsi qu'un principal emergency distinct, et
+   n'appliquer qu'une mutation d'assignment à la fois.
+4. **A0 humain.** Exécuter le what-if A0, approuver son manifeste, déployer le template exact et
+   archiver ses outputs.
+5. **Prévol admin Phase A.** Exécuter `what-if-phase-a.sh`, archiver et approuver le JSON.
+6. **Provisionnement Phase A.** Déployer `bootstrap-identities.bicep` en incrémentiel; archiver
    l'output `phaseA`. Vérifier explicitement qu'aucune attribution effective n'existe.
-5. **Access review intermédiaire.** Un second reviewer compare les huit principal/client/resource
-   IDs, les sept FIC, les six rôles et la policyDefinition à l'output. Il confirme que la Phase A
-   n'accorde aucun accès.
-6. **Prévol B1a.** Exécuter `what-if-phase-b.sh` avec le deployment A approuvé. Refuser tout
-   `Modify/Delete/Unsupported`, diagnostic, scope générique ou principal/role/condition divergent.
-7. **Provisionnement B1a.** Déployer B1a avec `deploy-phase-b1.sh` après approbation hashée.
-8. **Prévol/provisionnement B1b humain.** Exécuter puis approuver `what-if-phase-b1b.sh`; déployer
+7. **Access review intermédiaire.** Un second reviewer compare les huit principal/client/resource
+   IDs, les sept FIC, les six rôles et la policyDefinition à l'output.
+8. **Créer le rollback legacy borné.** Avant tout retrait large, créer exactement huit attributions
+   temporaires au principal legacy : launcher au scope abonnement; Contributor et runtime writer
+   conditionné sur chacun des RG dev/staging/prod; shared-network deployment sur `rg-certigo-ci`.
+   Toutes portent un `scheduleInstanceId`, une échéance, un owner et une procédure de rollback
+   explicites, au plus tard à la fin du soak approuvé. Les rôles data-plane historiques doivent être
+   migrés vers les nouvelles identités ou retirés avant l'étape suivante.
+9. **Retirer les rôles larges avant Phase B et tout accès non temporaire.** Retirer les deux assignment IDs inventoriés
+   une assignment à la fois : d'abord `User Access Administrator` permanent, puis `Contributor`
+   permanent seulement après vérification de ses huit remplacements exact-scope. Retirer aussi tout
+   ancien rôle data-plane, relire l'état live, prouver les huit remplacements et valider
+   `legacy-transition-contract.mjs`. Si l'activation JIT ou le rollback n'est pas encore prouvé, le
+   retrait est interdit. Toute neuvième attribution ou schedule instance bloque.
+10. **Prévol B1a.** Exécuter `what-if-phase-b.sh` avec le deployment A et le contrat de transition
+   approuvés. Refuser tout rôle large live ou remplacement temporaire manquant.
+11. **Provisionnement B1a.** Déployer B1a avec `deploy-phase-b1.sh` après approbation hashée.
+12. **Prévol/provisionnement B1b humain.** Exécuter puis approuver `what-if-phase-b1b.sh`; déployer
    `deploy-phase-b1b.sh` sous PIM humain. Aucun workload n'obtient `policyAssignments/write`.
-9. **Prévol admin B2.** Sur l'état post-B1a+B1b, exécuter localement `what-if-phase-b2.sh` avec
-   les deux preuves/deployments; approuver son nouveau manifeste séparément.
-10. **Provisionnement B2.** Déployer B2 avec `deploy-phase-b2.sh`, puis archiver les 16 assignment
+13. **Prévol admin B2.** Sur l'état post-B1a+B1b, exécuter `what-if-phase-b2.sh` et approuver son
+   nouveau manifeste séparément.
+14. **Provisionnement B2.** Déployer B2 avec `deploy-phase-b2.sh`, puis archiver les 16 assignment
    IDs. Aucun plan B2 antérieur à B1a+B1b n'est réutilisable.
-11. **Configuration GitHub.** Créer les `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` et
-   `AZURE_SUBSCRIPTION_ID` au niveau de chaque Environment. Le client ID doit être celui de
-   l'UAMI correspondante. Garder la configuration historique disponible pour rollback.
-12. **Préparer l'IaC applicative.** Les RG sont désormais `existing`; leur création et MCSB/
-   Defender sortent du chemin applicatif. Reporter le principal de la nouvelle UAMI dans
+15. **Configuration GitHub.** Créer les variables non secrètes de chaque Environment avec le client
+   ID de l'UAMI correspondante.
+16. **Préparer l'IaC applicative.** Reporter le principal de la nouvelle UAMI dans
    `ciDeploymentPrincipalId` pour l'environnement canari seulement.
-9. **Canari dev.** Avec `dev` approuvé : `what-if` sans suppression, déploiement infra,
-   upload/download du package, OneDeploy, `/health/live`, `/health/ready`, puis second
-   déploiement no-op. Prouver aussi l'échec d'accès à staging/prod et l'impossibilité
-   d'attribuer Contributor/UAA.
-10. **Canari staging.** Refaire les mêmes preuves avec approbation et rollback d'artefact.
-   Aucun accès dev/prod ne doit être hérité.
-11. **Production.** Refaire le cycle après fenêtre de changement et preuve staging du même
-   artefact. Conserver l'ancienne identité et ses rôles pendant au moins deux déploiements
-   prod réussis et la durée de soak approuvée.
-12. **Migration corrective contenu après #290.** Bootstrapper d'abord la gouvernance et les
-    protections de l'Environment, puis exécuter le what-if resource-group. Utiliser les identités
-    public/answer-key et l'identité de plan dédiées; ne jamais réutiliser une identité applicative.
-13. **Retrait data-plane historique.** Un admin PIM retire, environnement par environnement,
-    les anciens Blob Data Contributor/Delegator seulement après preuve du nouveau principal.
-14. **Retrait abonnement historique.** Quand dev, staging, prod et contenu ont leurs preuves,
-    l'admin PIM retire `Contributor` puis `User Access Administrator` du principal
-    `15d2...4706`. Vérifier entre les deux opérations que le nouveau chemin reste vert.
-15. **Fédération historique.** Après le soak final, retirer les credentials `main`,
-    `workflow_dispatch`, puis `dev/staging/prod` de l'ancienne application. Désactiver ou
-    supprimer l'application seulement après access review.
-16. **Policy.** Résoudre toutes les non-conformités et exemptions approuvées, puis promouvoir
-    `Audit` vers `Deny` dans une PR et une fenêtre distinctes.
+17. **Canari dev.** Prouver what-if sans suppression, déploiement, package, health, no-op, isolation
+   staging/prod et impossibilité d'attribuer Contributor/UAA.
+18. **Canari staging.** Refaire les mêmes preuves avec approbation et rollback d'artefact.
+19. **Production.** Refaire le cycle après preuve staging. Les huit attributions temporaires legacy
+   restent bornées par `soakEndsAt`; aucun rôle large ne revient et aucune attribution sans échéance
+   n'est conservée.
+20. **Migration corrective contenu après #290.** Utiliser uniquement les identités dédiées.
+21. **Contrôle data-plane historique.** Confirmer que l'inventaire du principal legacy reste vide de
+   tout rôle data-plane; toute réapparition bloque le soak.
+22. **Fin du soak.** Retirer toutes les attributions legacy temporaires au plus tard à `soakEndsAt`,
+   archiver l'inventaire vide correspondant et ne jamais prolonger implicitement l'échéance.
+23. **Fédération historique.** Retirer les credentials historiques, puis désactiver l'application
+   seulement après access review.
+24. **Policy.** Promouvoir `Audit` vers `Deny` dans une PR et une fenêtre distinctes.
+
+Le fichier de transition est un JSON strict v1 : inventaire scellé, deux assignment IDs larges,
+deux tests d'activation JIT séparés avec `nonLockoutVerified: true`, preuve de rollback, horodatages
+distincts du retrait UAA puis Contributor, et `changeControl.assignmentChangesSerialized: true`.
+`changeControl.administrationMode` vaut `independent-third-party` avec un
+`independentAdminOwner` distinct de `operatorOwner`, une éligibilité UAA bornée par
+`independentAdminExpiresAt`, ou `approved-solo-compensating-controls` avec un objet
+`soloModeControls` complet. Un deuxième principal du même owner ne satisfait jamais le premier mode.
+`safetyAdminPrincipalId` et les deux `emergencyPrincipalIds` restent distincts du principal legacy.
+Les huit attributions
+temporaires portent `scheduleInstanceId`, `createdAt`, `expiresAt`, `owner`,
+`rollbackProcedure`, `soakEndsAt` et les hashes de preuve. Les champs absents ou supplémentaires sont
+refusés. Le SHA-256 approuvé porte sur les octets exacts du JSON, sans newline ajouté;
+`LEGACY_TRANSITION_SHA256` est vérifié avant copie. Le prévol interroge
+ensuite les cinq scopes via `roleAssignmentScheduleInstances`, compare IDs, contrats, fenêtres live,
+statuts, échéances et chaque `originRoleAssignmentId`, et exige exactement huit attributions liées
+aux huit schedule instances sans accès supplémentaire ou permanent. Validation locale du schéma,
+sans mutation :
+
+Pour Certigo en contexte unipersonnel, l'acceptation explicite du risque résiduel du mode solo a été
+enregistrée le 2026-09-01; elle satisfait uniquement le prérequis de décision. Elle ne fournit aucune
+indépendance humaine et ne vaut pas GO opérationnel. `soloModeControls` doit encore prouver, avant
+Phase B, une acceptation datée, scopée à l'abonnement/Phase B et non expirée, la séparation des
+comptes quotidien/admin, et deux comptes emergency-access cloud-only de type `Member`, Global
+Administrator actifs en permanence. Les domaines UPN secondaires `*.onmicrosoft.com` sont admis :
+la gate découvre le domaine issuer du tenant et exige pour chaque compte `accountEnabled: true`,
+`creationType` différent de `Invitation`, `onPremisesSyncEnabled` différent de `true` et un issuer
+identique à celui du tenant. Une présence, un UPN secondaire ou `userType: Member` seuls ne prouvent
+pas la qualification cloud-native. Chaque preuve scelle séparément `tenantId` et `objectId`,
+réconcilie l'issuer/sign-in identifier, confirme l'accès management et refuse de traiter un object ID
+comme tenant ID. Les deux comptes doivent appartenir au tenant management exact de la subscription;
+un Global Administrator d'un tenant CIAM distinct ne prouve jamais le non-lockout RBAC/PIM de la
+subscription. L'observation read-only corrigée confirme un compte CIAM Member actif sur un domaine
+UPN secondaire, mais avec zéro authentication method/default/preferred MFA : il est présent, pas
+qualifié ni testé pour Phase B. Les recherches partielles dans l'ancien tenant management ne
+prouvent pas l'absence de comptes lorsque la visibilité Entra est incomplète : leur état est
+`UNKNOWN/BLOCKED`, jamais « absent ». Cette ancienne dépendance à un Global Administrator
+professionnel est interdite pour la cible exécutable. Deux comptes qualifiés dans le tenant
+personnel explicitement sélectionné restent obligatoires, sans création ou enrôlement automatique. Un
+utilisateur guest interne ou externe, notamment un compte B2B `#EXT#`, ne peut pas
+enregistrer de passkey FIDO2 et n'est jamais une voie admissible pour ces comptes; un échec
+Authenticator/My Security Info sur ce parcours guest ne doit pas conduire à affaiblir la gate. Ces
+comptes recovery restent séparés du compte admin mais sont explicitement
+contrôlés par le même humain : ils ne créent ni indépendance humaine ni second approbateur.
+Deux credentials distincts et testés sont obligatoires : deux FIDO2/CBA, ou deux passkeys
+Authenticator device-bound avec attestations/AAGUID distincts sur deux appareils distincts. Un
+téléphone unique est refusé. WHfB ne compte qu'après preuve d'admissibilité policy et test réel.
+Les méthodes de récupération sont stockées séparément; les exclusions Conditional Access sont
+bloquantes et tout usage déclenche une alerte.
+Un drill de récupération et les tests non-lockout/rollback sont renouvelés au plus tard tous les
+90 jours. Chaque contrôle a une preuve SHA-256 immuable. Tant qu'un seul contrôle ou test manque,
+la Phase B reste **NO-GO**.
+
+```bash
+node infra/governance/legacy-transition-contract.mjs \
+  '<approved-legacy-transition.json>' '<phase-a-output.json>'
+```
 
 ## Preuves minimales avant retrait des rôles abonnement
 
@@ -540,7 +680,8 @@ Pour chaque environnement :
 - test négatif d'une attribution privilégiée ;
 - procédure de rollback exécutée au moins en dev puis staging.
 
-Sans les dix preuves pour prod, les rôles abonnement historiques restent en place.
+Sans les dix preuves pour prod, la migration s'arrête. Elle ne réintroduit jamais les rôles larges
+abonnement; le rollback reste limité aux huit attributions temporaires avec échéance approuvée.
 
 ## PIM et break-glass
 
@@ -684,8 +825,9 @@ Si une opération future échoue :
   puis après B les 15 roleAssignments (scope, principal, role, condition) et la policyAssignment.
   Archiver les exports avant/après, le ticket, les approbations PIM et les deux JSON what-if.
 
-Le rollback ne réintroduit jamais automatiquement Owner, Contributor abonnement ou UAA. Les accès
-historiques restent inchangés jusqu'aux canaris et au soak décrits ci-dessous.
+Le rollback ne réintroduit jamais automatiquement Owner, Contributor abonnement ou UAA. Avant
+Phase B, les accès larges historiques sont déjà retirés; seuls les huit accès exacts, scellés et
+expirables restent disponibles jusqu'au terme approuvé du soak.
 
 ## Rollback OIDC/RBAC
 
@@ -696,7 +838,8 @@ historiques restent inchangés jusqu'aux canaris et au soak décrits ci-dessous.
 3. relancer `what-if`, puis le dernier artefact connu sain ;
 4. conserver les nouvelles UAMI pour investigation; ne rien supprimer.
 
-Ce rollback est immédiat parce que les rôles historiques n'ont pas encore été retirés.
+Ce rollback reste possible uniquement grâce aux attributions temporaires exactes encore valides et
+au remplacement humain JIT testé; il ne dépend d'aucun rôle large abonnement.
 
 ### Après retrait
 
