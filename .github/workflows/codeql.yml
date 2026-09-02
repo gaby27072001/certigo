@@ -218,25 +218,51 @@ jobs:
       - name: Enforce CodeQL result
         shell: bash
         env:
+          EVENT_NAME: ${{ github.event_name }}
           FRESHNESS_RESULT: ${{ needs.freshness.result }}
+          FRESHNESS_CURRENT: ${{ needs.freshness.outputs.current }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           HAS_CHANGES: ${{ needs.changes.outputs.has_changes }}
           ANALYZE_RESULT: ${{ needs.analyze.result }}
         run: |
           set -euo pipefail
-          if [ "$FRESHNESS_RESULT" != "success" ]; then
-            echo "::error::PR head freshness validation did not succeed."
+          case "$EVENT_NAME" in
+            pull_request|pull_request_target)
+              expected_freshness="success"
+              if [ "$FRESHNESS_CURRENT" != "true" ]; then
+                echo "::error::PR head freshness validation did not confirm the current head."
+                exit 1
+              fi
+              ;;
+            push|schedule)
+              expected_freshness="skipped"
+              ;;
+            *)
+              echo "::error::Unsupported CodeQL gate event '$EVENT_NAME'."
+              exit 1
+              ;;
+          esac
+          if [ "$FRESHNESS_RESULT" != "$expected_freshness" ]; then
+            echo "::error::CodeQL freshness result was '$FRESHNESS_RESULT'; expected '$expected_freshness' for '$EVENT_NAME'."
             exit 1
           fi
           if [ "$CHANGES_RESULT" != "success" ]; then
             echo "::error::CodeQL path selection did not succeed."
             exit 1
           fi
-          if [ "$HAS_CHANGES" = "true" ] && [ "$ANALYZE_RESULT" != "success" ]; then
-            echo "::error::At least one applicable CodeQL analysis did not succeed."
-            exit 1
-          fi
-          if [ "$HAS_CHANGES" = "false" ] && [ "$ANALYZE_RESULT" != "skipped" ]; then
-            echo "::error::CodeQL analysis ran despite no applicable language changes."
+          case "$HAS_CHANGES" in
+            true)
+              expected_analysis="success"
+              ;;
+            false)
+              expected_analysis="skipped"
+              ;;
+            *)
+              echo "::error::CodeQL path selection returned invalid has_changes value '$HAS_CHANGES'."
+              exit 1
+              ;;
+          esac
+          if [ "$ANALYZE_RESULT" != "$expected_analysis" ]; then
+            echo "::error::CodeQL analysis result was '$ANALYZE_RESULT'; expected '$expected_analysis' for has_changes='$HAS_CHANGES'."
             exit 1
           fi

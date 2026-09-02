@@ -984,6 +984,21 @@ function validateRepositoryInvariants() {
       errors.push(`codeql.yml: missing SARIF enforcement invariant ${marker}`);
     }
   }
+  for (const marker of [
+    'EVENT_NAME: ${{ github.event_name }}',
+    'FRESHNESS_CURRENT: ${{ needs.freshness.outputs.current }}',
+    'pull_request|pull_request_target)',
+    'push|schedule)',
+    'expected_freshness="success"',
+    'expected_freshness="skipped"',
+    'if [ "$FRESHNESS_RESULT" != "$expected_freshness" ]; then',
+    'case "$HAS_CHANGES" in',
+    'if [ "$ANALYZE_RESULT" != "$expected_analysis" ]; then',
+  ]) {
+    if (!codeql.includes(marker)) {
+      errors.push(`codeql.yml: missing event-aware aggregate gate invariant ${marker}`);
+    }
+  }
   if (codeql.includes('actions/upload-artifact@')) {
     errors.push('codeql.yml: local SARIF enforcement must not depend on artifact storage');
   }
@@ -1041,6 +1056,13 @@ function validateRepositoryInvariants() {
     if (!preflight.includes(marker)) {
       errors.push(`ci-preflight.yml: missing trusted Python launcher invariant ${marker}`);
     }
+  }
+  if (
+    !preflight.includes(
+      '"$TRUSTED_CONTROL_DIR/.github/scripts/codeql-gate-policy.test.mjs"',
+    )
+  ) {
+    errors.push('ci-preflight.yml: CodeQL aggregate gate matrix is not enforced');
   }
   const pythonBootstrap = preflight.indexOf('uses: actions/setup-python@');
   const firstPreflightCheckout = preflight.indexOf('uses: actions/checkout@');
