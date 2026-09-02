@@ -19,21 +19,36 @@ final runtimeContentSynchronizerProvider = Provider<RuntimeContentSynchronizer>(
     store: ref.watch(runtimeContentStoreProvider),
     pins: ref.watch(runtimeContentPinRegistryProvider),
   );
-  ref.onDispose(() => unawaited(synchronizer.dispose()));
   return synchronizer;
 });
 
 class RuntimeContentController extends StateNotifier<RuntimeContentStatus> {
-  RuntimeContentController({
+  factory RuntimeContentController.withSyncEngine({
     required RuntimeContentSynchronizer synchronizer,
     required RuntimeContentPinRegistry pins,
     required SyncEngine syncEngine,
+  }) {
+    return RuntimeContentController(
+      synchronizer: synchronizer,
+      pins: pins,
+      ensureSyncQueueLoaded: syncEngine.ensureLoaded,
+      syncActions: () => syncEngine.actions,
+    );
+  }
+
+  RuntimeContentController({
+    required RuntimeContentSynchronizer synchronizer,
+    required RuntimeContentPinRegistry pins,
+    required Future<void> Function() ensureSyncQueueLoaded,
+    required List<SyncAction> Function() syncActions,
   })  : _synchronizer = synchronizer,
         // Public constructor names stay stable for provider overrides and tests.
         // ignore: prefer_initializing_formals
         _pins = pins,
         // ignore: prefer_initializing_formals
-        _syncEngine = syncEngine,
+        _ensureSyncQueueLoaded = ensureSyncQueueLoaded,
+        // ignore: prefer_initializing_formals
+        _syncActions = syncActions,
         super(synchronizer.currentStatus) {
     _subscription = synchronizer.statuses.listen((RuntimeContentStatus status) {
       state = status;
@@ -42,12 +57,14 @@ class RuntimeContentController extends StateNotifier<RuntimeContentStatus> {
 
   final RuntimeContentSynchronizer _synchronizer;
   final RuntimeContentPinRegistry _pins;
-  final SyncEngine _syncEngine;
+  final Future<void> Function() _ensureSyncQueueLoaded;
+  final List<SyncAction> Function() _syncActions;
   late final StreamSubscription<RuntimeContentStatus> _subscription;
+  Future<void>? _shutdown;
 
   Future<void> syncNow(String ownerId) async {
-    await _syncEngine.ensureLoaded();
-    final Set<String> queuedPins = _syncEngine.actions
+    await _ensureSyncQueueLoaded();
+    final Set<String> queuedPins = _syncActions()
         .where((SyncAction action) => action.isPending)
         .map((SyncAction action) => action.publicManifestId)
         .whereType<String>()
@@ -62,19 +79,32 @@ class RuntimeContentController extends StateNotifier<RuntimeContentStatus> {
     await _synchronizer.rollback(ownerId: ownerId);
   }
 
+  Future<void> shutdown() {
+    final Future<void>? running = _shutdown;
+    if (running != null) return running;
+    final Future<void> cancellation = _subscription.cancel();
+    final Future<void> streamClosure = _synchronizer.dispose();
+    final Future<void> operation = Future.wait<void>(
+      <Future<void>>[cancellation, streamClosure],
+    );
+    _shutdown = operation;
+    return operation;
+  }
+
   @override
   void dispose() {
-    unawaited(_subscription.cancel());
+    unawaited(shutdown());
     super.dispose();
   }
 }
 
 final runtimeContentControllerProvider =
     StateNotifierProvider<RuntimeContentController, RuntimeContentStatus>((Ref ref) {
-  return RuntimeContentController(
+  final SyncEngine syncEngine = ref.watch(syncEngineProvider);
+  return RuntimeContentController.withSyncEngine(
     synchronizer: ref.watch(runtimeContentSynchronizerProvider),
     pins: ref.watch(runtimeContentPinRegistryProvider),
-    syncEngine: ref.watch(syncEngineProvider),
+    syncEngine: syncEngine,
   );
 });
 

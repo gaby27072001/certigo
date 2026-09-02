@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:certigo/app/content/content_update_banner.dart';
@@ -27,17 +28,45 @@ class _NeverSource implements PublicContentSource {
 }
 
 class _StatusController extends RuntimeContentController {
-  _StatusController(RuntimeContentStatus status, RuntimeContentSynchronizer synchronizer)
-      : super(
+  _StatusController(
+    RuntimeContentStatus status,
+    RuntimeContentSynchronizer synchronizer,
+  ) : super(
           synchronizer: synchronizer,
           pins: RuntimeContentPinRegistry(),
-          syncEngine: SyncEngine(
-            store: InMemorySyncQueueStore(),
-            sender: (SyncAction _) async => SyncDispatch.success,
-          ),
+          ensureSyncQueueLoaded: () async {},
+          syncActions: () => const <SyncAction>[],
         ) {
     state = status;
   }
+}
+
+Future<void> _withStatusHarness(
+  WidgetTester tester,
+  RuntimeContentStatus status,
+  Future<void> Function() verify, {
+  Widget Function(Widget child)? wrap,
+}) async {
+  final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
+    source: _NeverSource(),
+    store: InMemoryRuntimeContentStore(),
+  );
+  final _StatusController controller = _StatusController(
+    status,
+    synchronizer,
+  );
+  final Widget content = wrap?.call(const ContentUpdateBanner()) ??
+      const MaterialApp(home: Scaffold(body: ContentUpdateBanner()));
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: <Override>[
+        runtimeContentSyncEnabledProvider.overrideWithValue(true),
+        runtimeContentControllerProvider.overrideWith((Ref ref) => controller),
+      ],
+      child: content,
+    ),
+  );
+  await verify();
 }
 
 void main() {
@@ -72,14 +101,18 @@ void main() {
       limits: const RuntimeContentLimits(maxAttempts: 1),
       delay: (_) async {},
     );
-    final RuntimeContentController controller = RuntimeContentController(
+    final RuntimeContentController controller = RuntimeContentController.withSyncEngine(
       synchronizer: synchronizer,
       pins: RuntimeContentPinRegistry(),
       syncEngine: engine,
     );
-    addTearDown(controller.dispose);
-    addTearDown(synchronizer.dispose);
-    addTearDown(engine.dispose);
+    final Completer<void> statusStreamClosed = Completer<void>();
+    synchronizer.statuses.listen(null, onDone: statusStreamClosed.complete);
+    addTearDown(() async {
+      await controller.shutdown();
+      controller.dispose();
+      await engine.dispose();
+    });
 
     await expectLater(
       controller.syncNow('person-1'),
@@ -89,6 +122,8 @@ void main() {
     expect(engine.actions.single.id, 'healthy');
     expect(quarantined.single.reason, 'entry-type');
     expect(synchronizer.currentStatus.phase, RuntimeContentPhase.failed);
+    await controller.shutdown();
+    await expectLater(statusStreamClosed.future, completes);
   });
 
   testWidgets('runtime content UX stays absent while the feature flag is off', (
@@ -99,80 +134,52 @@ void main() {
         child: MaterialApp(home: Scaffold(body: ContentUpdateBanner())),
       ),
     );
-
     expect(find.byType(ListTile), findsNothing);
   });
 
   testWidgets('failed update keeps content available and exposes an accessible retry', (
     WidgetTester tester,
   ) async {
-    final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
-      source: _NeverSource(),
-      store: InMemoryRuntimeContentStore(),
-    );
-    addTearDown(synchronizer.dispose);
-    final _StatusController controller = _StatusController(
+    await _withStatusHarness(
+      tester,
       const RuntimeContentStatus(
         phase: RuntimeContentPhase.failed,
         message: 'Mise à jour indisponible. Le contenu actuel est conservé.',
         canRollback: true,
       ),
-      synchronizer,
+      () async {
+        expect(
+          find.byWidgetPredicate(
+            (Widget widget) =>
+                widget is Semantics &&
+                widget.properties.liveRegion == true &&
+                widget.properties.label ==
+                    'Mise à jour indisponible. Le contenu actuel est conservé.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.widgetWithText(TextButton, 'Réessayer'), findsOneWidget);
+        expect(find.widgetWithText(TextButton, 'Version précédente'), findsOneWidget);
+      },
     );
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: <Override>[
-          runtimeContentSyncEnabledProvider.overrideWithValue(true),
-          runtimeContentControllerProvider.overrideWith((Ref ref) => controller),
-        ],
-        child: const MaterialApp(home: Scaffold(body: ContentUpdateBanner())),
-      ),
-    );
-
-    expect(
-      find.byWidgetPredicate(
-        (Widget widget) =>
-            widget is Semantics &&
-            widget.properties.liveRegion == true &&
-            widget.properties.label == 'Mise à jour indisponible. Le contenu actuel est conservé.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.widgetWithText(TextButton, 'Réessayer'), findsOneWidget);
-    expect(find.widgetWithText(TextButton, 'Version précédente'), findsOneWidget);
   });
 
   testWidgets('download progress is exposed without a blocking dialog', (
     WidgetTester tester,
   ) async {
-    final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
-      source: _NeverSource(),
-      store: InMemoryRuntimeContentStore(),
-    );
-    addTearDown(synchronizer.dispose);
-    final _StatusController controller = _StatusController(
+    await _withStatusHarness(
+      tester,
       const RuntimeContentStatus(
         phase: RuntimeContentPhase.downloading,
         completedFiles: 2,
         totalFiles: 4,
       ),
-      synchronizer,
+      () async {
+        expect(find.text('Mise à jour du contenu 2/4'), findsOneWidget);
+        expect(find.byType(LinearProgressIndicator), findsOneWidget);
+        expect(find.byType(Dialog), findsNothing);
+      },
     );
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: <Override>[
-          runtimeContentSyncEnabledProvider.overrideWithValue(true),
-          runtimeContentControllerProvider.overrideWith((Ref ref) => controller),
-        ],
-        child: const MaterialApp(home: Scaffold(body: ContentUpdateBanner())),
-      ),
-    );
-
-    expect(find.text('Mise à jour du contenu 2/4'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
-    expect(find.byType(Dialog), findsNothing);
   });
 
   testWidgets('recovery actions remain accessible with large text on a narrow screen', (
@@ -183,39 +190,26 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
-      source: _NeverSource(),
-      store: InMemoryRuntimeContentStore(),
-    );
-    addTearDown(synchronizer.dispose);
-    final _StatusController controller = _StatusController(
+    await _withStatusHarness(
+      tester,
       const RuntimeContentStatus(
         phase: RuntimeContentPhase.failed,
         message: 'Mise à jour indisponible. Le contenu actuel est conservé.',
         canRollback: true,
       ),
-      synchronizer,
-    );
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: <Override>[
-          runtimeContentSyncEnabledProvider.overrideWithValue(true),
-          runtimeContentControllerProvider.overrideWith((Ref ref) => controller),
-        ],
-        child: const MaterialApp(
-          home: MediaQuery(
-            data: MediaQueryData(textScaler: TextScaler.linear(2)),
-            child: Scaffold(body: ContentUpdateBanner()),
-          ),
+      () async {
+        expect(tester.takeException(), isNull);
+        expect(find.bySemanticsLabel('Réessayer'), findsOneWidget);
+        expect(find.bySemanticsLabel('Version précédente'), findsOneWidget);
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      },
+      wrap: (Widget child) => MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+          child: Scaffold(body: child),
         ),
       ),
     );
-
-    expect(tester.takeException(), isNull);
-    expect(find.bySemanticsLabel('Réessayer'), findsOneWidget);
-    expect(find.bySemanticsLabel('Version précédente'), findsOneWidget);
-    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     semantics.dispose();
   });
 }
