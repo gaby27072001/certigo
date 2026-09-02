@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "liveOperationsAuthorized": false,
+  "resourceGroups": {
+    "imageBuild": "rg-certigo-runner-image-build-canary",
+    "runtime": "rg-certigo-runner-image-runtime-canary"
+  },
+  "resources": {
+    "scaleSet": "vmss-certigo-pr-image-canary-z1",
+    "virtualNetwork": "vnet-certigo-pr-image-canary",
+    "subnet": "snet-pr-image-canary",
+    "networkSecurityGroup": "nsg-certigo-pr-image-canary",
+    "natGateway": "nat-certigo-pr-image-canary",
+    "natPublicIp": "pip-certigo-pr-image-canary-nat"
+  },
+  "runner": {
+    "labels": [
+      "certigo-pr-image-canary"
+    ],
+    "bootstrapLines": [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      "source /etc/certigo-runner-bootstrap.env",
+      "[[ \"${RUNNER_LABELS}\" == \"certigo-pr-image-canary\" ]]",
+      "[[ \"${CERTIGO_BLOCK_IMDS:-true}\" == \"true\" ]]",
+      "systemctl enable --now certigo-block-imds.service",
+      "systemctl is-active --quiet certigo-block-imds.service",
+      "/usr/sbin/iptables -C OUTPUT -d 169.254.169.254/32 -j REJECT",
+      "if curl --silent --show-error --connect-timeout 2 --max-time 3 http://169.254.169.254/metadata/instance?api-version=2021-02-01 -H Metadata:true --output /dev/null; then",
+      "  echo \"Azure IMDS is reachable on the untrusted image canary.\" >&2",
+      "  exit 1",
+      "fi",
+      "test ! -e /opt/actions-runner/.runner",
+      "/usr/local/sbin/certigo-validate-toolchain --boot"
+    ],
+    "maximumCapacity": 1,
+    "managedIdentityAllowed": false,
+    "imdsAllowed": false
+  },
+  "reserved": {
+    "githubRunnerIds": [
+      24,
+      26
+    ],
+    "virtualMachineTokens": [
+      "4153d1dd"
+    ],
+    "existingScaleSets": [
+      "vmss-certigo-runner-zonal",
+      "vmss-certigo-pr-pilot-z1"
+    ],
+    "existingLabels": [
+      "certigo-pr",
+      "certigo-trusted",
+      "certigo-pr-pilot"
+    ]
+  },
+  "measurements": {
+    "minimumColdBootSamples": 20,
+    "minimumWarmJobSamples": 20,
+    "requiredPercentiles": [
+      50,
+      95
+    ]
+  },
+  "rollback": {
+    "strategy": "exact-previous-gallery-version",
+    "requiresDistinctPreviousVersion": true,
+    "requiresCleanWhatIf": true,
+    "deploymentMode": "Incremental"
+  },
+  "budget": {
+    "currency": "USD",
+    "linuxVmHourlyUsd": 0.138,
+    "maximumLifetimeHours": 72,
+    "maximumCanarySpendUsd": 15,
+    "cleanupRequired": true,
+    "pricingObservedAt": "2026-08-31"
+  }
+}

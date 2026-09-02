@@ -1,3 +1,5 @@
+# RETIRED: the dedicated feature-off one-shot replacement is
+# post-merge-cosmos-account-deletion.yml in this directory.
 name: test-account-deletion-cosmos
 
 on:

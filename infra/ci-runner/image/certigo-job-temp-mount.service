@@ -1,0 +1,14 @@
+[Unit]
+Description=Bind the Certigo runner workspace to its temporary disk
+DefaultDependencies=no
+After=local-fs.target
+Before=certigo-toolchain-validate.service
+RequiresMountsFor=/mnt
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/certigo-job-temp mount
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

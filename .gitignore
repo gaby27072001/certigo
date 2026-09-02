@@ -112,3 +112,4 @@ tools/seed_output/
 tools/__pycache__/
 __pycache__/
 *.pyc
+infra/ci-runner/image/evidence/

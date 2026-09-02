@@ -58,7 +58,8 @@ conclusion dépend uniquement du statut scanner, des findings et de la validité
 jamais du quota de stockage d'artefacts. Les forks ne sont pas supportés : la gate de confiance
 chargée depuis `main` échoue sans checkout, tandis qu'aucun workflow contrôlé par le fork ne peut
 atteindre le pool Azure persistant.
-OSV utilise `--no-ignore --all-packages` : aucun `.gitignore` fourni par la PR ne peut masquer un
+OSV reçoit explicitement chaque lockfile issu de l'inventaire validé : aucun `.gitignore` fourni
+par la PR ne peut masquer un
 manifeste ou lockfile, et toute modification d'un `.gitignore` déclenche le scan de dépendances.
 Le contrôleur trusted-base calcule d'abord l'inventaire Git attendu et rejette le rapport OSV si
 une seule source verrouillée non vide suivie manque dans `results[].source.path`. Un lock NuGet
@@ -105,9 +106,13 @@ Une PR exécutée via `pull_request_target` sur `certigo-pr` ne peut donc alimen
 ensuite restauré par une opération de signature ou de publication.
 
 La gate `Generated state equals committed state` n'accède à aucun dépôt externe et ne reçoit
-aucun secret. Le générateur du SHA immuable de base valide la référence locale
-`docs/active-content-reference.json` (schéma, SHA de révision complet, contrat de package,
-identifiants et SHA-256 des manifestes), puis vérifie que l'état généré de la PR est commité.
+aucun secret. Son contrôle source rapide exécute d'abord
+`python tools/generated_contracts.py --check`. Les contrats canoniques
+`contracts/content-package-v1.json` et `contracts/cosmos-containers.json` pilotent respectivement
+le contrat de package intégré à `docs/active-content-reference.json` et la topologie partagée par
+Bicep et `CosmosContainers.cs`. Le générateur du SHA immuable valide ensuite la référence locale
+(SHA de révision complet, identifiants et SHA-256 des manifestes), puis vérifie que l'état généré
+de la PR est commité.
 La fraîcheur de `certigo-content/main` relève de la CI et de la protection de ce dépôt, pas d'un
 checkout cross-repository sur un runner PR persistant.
 
@@ -115,6 +120,7 @@ Le bump de contenu actif est donc volontairement manuel et vérifié : après fu
 `certigo-content`, un mainteneur checkout le SHA exact, exécute `npm ci --ignore-scripts` puis
 `npm run package`, reporte la révision, l'horodatage et les deux manifestes dans
 `docs/active-content-reference.json`, puis lance
+`python tools/generated_contracts.py --refresh`,
 `python tools/project_state.py --validate-active-content <checkout-certigo-content>` et
 `python tools/project_state.py --refresh-reference`. La PR du bump doit commiter la référence et
 l'état projet régénéré.

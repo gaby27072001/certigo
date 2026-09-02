@@ -1,0 +1,1167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:certigo:contract:enterprise-identity:cosmos:v1",
+  "title": "Certigo Enterprise Identity Cosmos documents",
+  "version": "1.0.0",
+  "x-certigo-status": "contract-only",
+  "x-certigo-runtime": {
+    "setting": "ENTERPRISE_IDENTITY_V1",
+    "default": "off",
+    "implementedValues": [
+      "off"
+    ],
+    "nonOffStartupBehavior": "fail-closed",
+    "routesReturn404BeforeAuthOrBodyParsing": true
+  },
+  "x-certigo-reuses": {
+    "personAndLinkedIdentity": "../../person-linked-identity/v1/cosmos.schema.json",
+    "organizationMembershipAndTeam": "../../organization-membership/v1/cosmos.schema.json",
+    "duplicatesExistingAggregates": false,
+    "automaticPersonMergeByEmail": false
+  },
+  "x-certigo-cosmos": {
+    "provisionedByThisIncrement": false,
+    "azureOrEntraResourcesCreated": false,
+    "organizationContainer": {
+      "name": "organizations",
+      "partitionKey": "/organizationId",
+      "defaultTtl": -1,
+      "strictTenantPointReads": true,
+      "crossPartitionTenantQueriesAllowed": false,
+      "documents": [
+        "enterpriseDomain",
+        "enterpriseDomainChallenge",
+        "enterpriseFederationConfiguration",
+        "enterpriseScimDirectoryUser",
+        "enterpriseScimDirectoryGroup",
+        "enterpriseFederatedSubjectBinding",
+        "enterpriseScimTokenCredential",
+        "enterpriseIdentityIdempotencyReceipt",
+        "enterpriseIdentityAuditEvent",
+        "enterpriseIdentityOffboardingTombstone"
+      ]
+    },
+    "domainClaimContainer": {
+      "name": "enterpriseDomainClaims",
+      "partitionKey": "/domainHash",
+      "defaultTtl": -1,
+      "purpose": "Conditional-create takeover prevention registry.",
+      "cleartextDomainStored": false,
+      "organizationIdStored": false,
+      "documents": [
+        "enterpriseDomainClaim"
+      ]
+    },
+    "existingContainersChanged": false,
+    "transactionalBoundaries": [
+      "organization actor Membership CAS + tenant document + durable idempotency receipt",
+      "organization domain challenge lifecycle CAS",
+      "organization SCIM mutation + directory projection + receipt",
+      "organization soft deprovision + Membership revoke + offboarding tombstone + receipt",
+      "domain hash claim is conditionally created/released in its own minimal partition with compensating CAS"
+    ]
+  },
+  "x-certigo-identity": {
+    "personCreationFromScim": false,
+    "personMergeByEmail": false,
+    "personMergeByUserName": false,
+    "personMergeByScimExternalId": false,
+    "linkedIdentityProofMethods": [
+      "authenticatedFederation",
+      "explicitAdminBinding"
+    ],
+    "externalSubjectOutsideLinkedIdentity": "sha256 only",
+    "linkedIdentityContractMustBeCompatibleBeforeActivation": true
+  },
+  "x-certigo-scim-token": {
+    "persistedMaterial": "tokenHash only",
+    "plaintextReturnedOnce": true,
+    "plaintextRecovery": false,
+    "generationMonotonic": true,
+    "maximumConcurrentGenerations": 2,
+    "rotationOverlapMaximumSeconds": 86400,
+    "comparison": "constant-time"
+  },
+  "x-certigo-audit": {
+    "payloadAllowedClasses": [
+      "pseudonymousHash",
+      "enum"
+    ],
+    "technicalEnvelopeAllowed": [
+      "id",
+      "organizationId",
+      "schemaVersion",
+      "documentType",
+      "occurredAt"
+    ],
+    "forbiddenFields": [
+      "email",
+      "userName",
+      "displayName",
+      "cleartextDomain",
+      "token",
+      "secret",
+      "providerAssertion",
+      "authorizationCode",
+      "claimValue"
+    ]
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/enterpriseDomain"
+    },
+    {
+      "$ref": "#/$defs/domainChallenge"
+    },
+    {
+      "$ref": "#/$defs/federationConfiguration"
+    },
+    {
+      "$ref": "#/$defs/scimDirectoryUser"
+    },
+    {
+      "$ref": "#/$defs/scimDirectoryGroup"
+    },
+    {
+      "$ref": "#/$defs/federatedSubjectBinding"
+    },
+    {
+      "$ref": "#/$defs/scimTokenCredential"
+    },
+    {
+      "$ref": "#/$defs/idempotencyReceipt"
+    },
+    {
+      "$ref": "#/$defs/auditEvent"
+    },
+    {
+      "$ref": "#/$defs/offboardingTombstone"
+    },
+    {
+      "$ref": "#/$defs/domainClaim"
+    }
+  ],
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "organizationBase": {
+      "type": "object",
+      "required": [
+        "id",
+        "organizationId",
+        "schemaVersion",
+        "documentType"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "organizationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "documentType": {
+          "type": "string"
+        },
+        "_etag": {
+          "type": "string"
+        }
+      }
+    },
+    "enterpriseDomain": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/organizationBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "normalizedDomain",
+            "domainHash",
+            "state",
+            "claimGeneration",
+            "createdAt",
+            "updatedAt"
+          ],
+          "properties": {
+            "id": {
+              "pattern": "^enterprise-domain::v1::[0-9a-f]{64}$"
+            },
+            "documentType": {
+              "const": "enterpriseDomain"
+            },
+            "normalizedDomain": {
+              "type": "string",
+              "format": "hostname",
+              "minLength": 3,
+              "maxLength": 253,
+              "description": "Tenant-confined configuration data; never an identity key or audit field."
+            },
+            "domainHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "verified",
+                "revoked"
+              ]
+            },
+            "claimGeneration": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "verifiedAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "revokedAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "domainChallenge": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/organizationBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "domainId",
+            "domainHash",
+            "challengeValueHash",
+            "state",
+            "attemptCount",
+            "createdBySubjectHash",
+            "createdAt",
+            "expiresAt",
+            "updatedAt",
+            "ttl"
+          ],
+          "properties": {
+            "id": {
+              "pattern": "^enterprise-domain-challenge::v1::[0-9a-f]{64}$"
+            },
+            "documentType": {
+              "const": "enterpriseDomainChallenge"
+            },
+            "domainId": {
+              "type": "string",
+              "pattern": "^enterprise-domain::v1::"
+            },
+            "domainHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "challengeValueHash": {
+              "$ref": "#/$defs/hash",
+              "description": "The plaintext DNS value is returned once and never persisted."
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "verified",
+                "failed",
+                "expired",
+                "revoked"
+              ]
+            },
+            "attemptCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20
+            },
+            "createdBySubjectHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "completedAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "ttl": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2592000
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "oidcConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol",
+        "discoveryUri",
+        "issuer",
+        "clientId",
+        "subjectClaim"
+      ],
+      "properties": {
+        "protocol": {
+          "const": "oidc"
+        },
+        "discoveryUri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "issuer": {
+          "type": "string",
+          "format": "uri"
+        },
+        "clientId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Public audience identifier; not a client secret."
+        },
+        "subjectClaim": {
+          "const": "sub"
+        }
+      }
+    },
+    "samlConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol",
+        "metadataUri",
+        "issuerEntityId",
+        "serviceProviderAudience",
+        "subjectNameIdFormat"
+      ],
+      "properties": {
+        "protocol": {
+          "const": "saml"
+        },
+        "metadataUri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "issuerEntityId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "serviceProviderAudience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subjectNameIdFormat": {
+          "type": "string",
+          "enum": [
+            "persistent",
+            "unspecified"
+          ]
+        }
+      }
+    },
+    "federationConfiguration": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/organizationBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "generation",
+            "state",
+            "configuration",
+            "configurationHash",
+            "verifiedDomainIds",
+            "createdBySubjectHash",
+            "createdAt",
+            "updatedAt"
+          ],
+          "properties": {
+            "id": {
+              "pattern": "^enterprise-federation::v1::"
+            },
+            "documentType": {
+              "const": "enterpriseFederationConfiguration"
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "active",
+                "disabled"
+              ]
+            },
+            "configuration": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/oidcConfiguration"
+                },
+                {
+                  "$ref": "#/$defs/samlConfiguration"
+                }
+              ],
+              "description": "Provider-neutral public metadata only. Secrets, private keys, tokens and assertions are not valid properties."
+            },
+            "configurationHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "verifiedDomainIds": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^enterprise-domain::v1::"
+              }
+            },
+            "createdBySubjectHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "disabledAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "scimEmail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value"
+      ],
+      "properties": {
+        "value": {
+          "type": "string",
+          "format": "email",
+          "description": "Mutable tenant directory attribute; never a Person locator or merge key."
+        },
+        "type": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "primary": {
+          "type": "boolean"
+        }
+      }
+    },
+    "scimDirectoryUser": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/organizationBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "externalIdHash",
+            "userName",
+            "active",
+            "lifecycleState",
+            "version",
+            "createdAt",
+            "updatedAt"
+          ],
+          "properties": {
+            "id": {
+              "pattern": "^enterprise-scim-user::v1::"
+            },
+            "documentType": {
+              "const": "enterpriseScimDirectoryUser"
+            },
+            "externalIdHash": {
+              "$ref": "#/$defs/hash",
+              "description": "Directory correlation only; never authenticated identity proof."
+            },
+            "userName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "description": "Mutable directory attribute; never resolves a Person."
+            },
+            "displayName": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 512
+            },
+            "emails": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "$ref": "#/$defs/scimEmail"
+              }
+            },
+            "active": {
+              "type": "boolean"
+            },
+            "lifecycleState": {
+              "type": "string",
+              "enum": [
+                "staged",
+                "linked",
+                "deprovisioning",
+                "deprovisioned"
+              ]
+            },
+            "federatedSubjectBindingId": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^enterprise-subject-binding::v1::"
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "deprovisionedAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "scimDirectoryGroup": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/organizationBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "externalIdHash",
+            "displayName",
+            "memberScimUserIds",
+            "state",
+            "version",
+            "createdAt",
+            "updatedAt"
+          ],
+          "properties": {
+            "id": {
+              "pattern": "^enterprise-scim-group::v1::"
+            },
+            "documentType": {
+              "const": "enterpriseScimDirectoryGroup"
+            },
+            "externalIdHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "displayName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "memberScimUserIds": {
+              "type": "array",
+              "maxItems": 10000,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^enterprise-scim-user::v1::"
+              }
+            },
+            "projectedTeamId": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "References OrganizationTeam from the existing contract."
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "active",
+                "deprovisioned"
+              ]
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "deprovisionedAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "federatedSubjectBinding": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/organizationBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "federationConfigurationId",
+            "federationGeneration",
+            "externalSubjectHash",
+            "personId",
+            "linkedIdentityId",
+            "proofMethod",
+            "state",
+            "createdAt",
+            "updatedAt"
+          ],
+          "properties": {
+            "id": {
+              "pattern": "^enterprise-subject-binding::v1::[0-9a-f]{64}$"
+            },
+            "documentType": {
+              "const": "enterpriseFederatedSubjectBinding"
+            },
+            "federationConfigurationId": {
+              "type": "string",
+              "pattern": "^enterprise-federation::v1::"
+            },
+            "federationGeneration": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "externalSubjectHash": {
+              "$ref": "#/$defs/hash",
+              "description": "Raw subject exists only in the authoritative LinkedIdentity locator after proof."
+            },
+            "personId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Existing permanent Person; never derived from email or SCIM attributes."
+            },
+            "linkedIdentityId": {
+              "type": "string",
+              "pattern": "^linked-identity::v[0-9]+::[0-9a-f]{64}$"
+            },
+            "scimUserId": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^enterprise-scim-user::v1::"
+            },
+            "proofMethod": {
+              "type": "string",
+              "enum": [
+                "authenticatedFederation",
+                "explicitAdminBinding"
+              ]
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "active",
+                "deprovisioned",
+                "revoked"
+              ]
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "revokedAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "scimTokenCredential": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/organizationBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "tokenFamilyId",
+            "generation",
+            "tokenHash",
+            "state",
+            "createdBySubjectHash",
+            "createdAt",
+            "notBefore",
+            "expiresAt"
+          ],
+          "properties": {
+            "id": {
+              "pattern": "^enterprise-scim-token::v1::[0-9a-f]{64}::[0-9]+$"
+            },
+            "documentType": {
+              "const": "enterpriseScimTokenCredential"
+            },
+            "tokenFamilyId": {
+              "type": "string",
+              "pattern": "^enterprise-scim-token-family::v1::[0-9a-f]{64}$"
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "tokenHash": {
+              "$ref": "#/$defs/hash",
+              "description": "Only persisted token material. Plaintext is non-recoverable."
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "active",
+                "overlap",
+                "revoked",
+                "expired"
+              ]
+            },
+            "createdBySubjectHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "notBefore": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "overlapEndsAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time",
+              "description": "At most 86400 seconds after rotation; only the immediately previous generation may overlap."
+            },
+            "revokedAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "idempotencyReceipt": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/organizationBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "operationKeyHash",
+            "requestHash",
+            "operationType",
+            "outcome",
+            "httpStatus",
+            "createdAt"
+          ],
+          "properties": {
+            "id": {
+              "pattern": "^enterprise-identity-receipt::v1::[0-9a-f]{64}$"
+            },
+            "documentType": {
+              "const": "enterpriseIdentityIdempotencyReceipt"
+            },
+            "operationKeyHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "requestHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "operationType": {
+              "type": "string",
+              "enum": [
+                "domainChallengeBegin",
+                "domainChallengeVerify",
+                "domainChallengeRevoke",
+                "domainRevoke",
+                "federationConfigure",
+                "federationDisable",
+                "identityBind",
+                "scimTokenGenerate",
+                "scimTokenRotate",
+                "scimTokenRevoke",
+                "scimUserCreate",
+                "scimUserReplace",
+                "scimUserPatch",
+                "scimUserDelete",
+                "scimGroupCreate",
+                "scimGroupReplace",
+                "scimGroupPatch",
+                "scimGroupDelete"
+              ]
+            },
+            "outcome": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "rejected"
+              ]
+            },
+            "httpStatus": {
+              "type": "integer",
+              "minimum": 200,
+              "maximum": 499
+            },
+            "resultResourceHash": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/hash"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "auditEvent": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/organizationBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "actorSubjectHash",
+            "targetSubjectHash",
+            "correlationHash",
+            "eventType",
+            "result",
+            "protocol",
+            "occurredAt"
+          ],
+          "properties": {
+            "id": {
+              "pattern": "^enterprise-identity-audit::v1::[0-9a-f]{64}$"
+            },
+            "documentType": {
+              "const": "enterpriseIdentityAuditEvent"
+            },
+            "actorSubjectHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "targetSubjectHash": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/hash"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "correlationHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "eventType": {
+              "type": "string",
+              "enum": [
+                "domainChallengeStarted",
+                "domainVerified",
+                "domainRevoked",
+                "federationConfigured",
+                "federationDisabled",
+                "identityBound",
+                "identityDeprovisioned",
+                "scimTokenGenerated",
+                "scimTokenRotated",
+                "scimTokenRevoked",
+                "scimUserProvisioned",
+                "scimUserDeprovisioned",
+                "scimGroupProvisioned",
+                "scimGroupDeprovisioned",
+                "crossTenantMasked"
+              ]
+            },
+            "result": {
+              "type": "string",
+              "enum": [
+                "succeeded",
+                "rejected",
+                "replayed",
+                "masked"
+              ]
+            },
+            "protocol": {
+              "type": "string",
+              "enum": [
+                "none",
+                "oidc",
+                "saml",
+                "scim"
+              ]
+            },
+            "occurredAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false,
+      "description": "Payload is closed to hashes and enums. No email, display name, userName, token, cleartext domain, provider assertion, authorization code, or claim value is permitted."
+    },
+    "offboardingTombstone": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/organizationBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "directoryUserIdHash",
+            "personSubjectHash",
+            "membershipIdHash",
+            "membershipCycle",
+            "state",
+            "revokedAt",
+            "updatedAt",
+            "ttl"
+          ],
+          "properties": {
+            "id": {
+              "pattern": "^enterprise-identity-offboarding::v1::[0-9a-f]{64}$"
+            },
+            "documentType": {
+              "const": "enterpriseIdentityOffboardingTombstone"
+            },
+            "directoryUserIdHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "personSubjectHash": {
+              "$ref": "#/$defs/hash",
+              "description": "Organization/cycle-scoped pseudonym; not personId."
+            },
+            "membershipIdHash": {
+              "$ref": "#/$defs/hash"
+            },
+            "membershipCycle": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "processing",
+                "completed"
+              ]
+            },
+            "continuationTokenHash": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/hash"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "revokedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "completedAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "ttl": {
+              "const": -1,
+              "description": "Durable until a future retention ADR; Person and personal learning are outside this purge."
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "domainClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "domainHash",
+        "schemaVersion",
+        "documentType",
+        "organizationBindingHash",
+        "challengeIdHash",
+        "generation",
+        "state",
+        "createdAt",
+        "updatedAt",
+        "ttl"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^enterprise-domain-claim::v1::[0-9a-f]{64}$"
+        },
+        "domainHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "documentType": {
+          "const": "enterpriseDomainClaim"
+        },
+        "organizationBindingHash": {
+          "$ref": "#/$defs/hash",
+          "description": "Keyed organization binding; organizationId is deliberately absent."
+        },
+        "challengeIdHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "verified",
+            "released"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "description": "Required by business logic while pending; verified claims do not expire automatically."
+        },
+        "releasedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "ttl": {
+          "type": "integer",
+          "minimum": -1,
+          "description": "Pending/released claims may expire only after lifecycle CAS; verified is -1."
+        }
+      }
+    }
+  }
+}

@@ -21,6 +21,9 @@ param appInsightsName string
 @description('Cosmos DB account endpoint.')
 param cosmosEndpoint string
 
+@description('Cosmos DB database name.')
+param cosmosDatabaseName string
+
 @description('Key Vault name for RBAC secret access.')
 param keyVaultName string
 
@@ -61,6 +64,11 @@ param accountDeletionEnabled bool = false
   'shadow'
 ])
 param personLinkedIdentityV1 string = 'off'
+@description('Organization/Membership V1 mode. This contract increment supports off only.')
+@allowed([
+  'off'
+])
+param organizationMembershipV1 string = 'off'
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
 @description('Azure OpenAI resource endpoint used by the tutor when the feature flag is enabled. Example: https://<resource>.openai.azure.com/.')
@@ -302,7 +310,7 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsConnectionString
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${hostStorageIdentity.properties.clientId};Authorization=AAD'
     COSMOS_ENDPOINT: cosmosEndpoint
-    COSMOS_DATABASE: 'certigo'
+    COSMOS_DATABASE: cosmosDatabaseName
     BLOB_ENDPOINT: storage.properties.primaryEndpoints.blob
     DEPLOYMENT_CONTAINER_NAME: deploymentContainerName
     HEALTH_PROBE_TIMEOUT_SECONDS: '5'
@@ -316,6 +324,9 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     ENTRA_AUDIENCE: entraAudience
     ACCOUNT_DELETION_ENABLED: string(accountDeletionEnabled)
     PERSON_LINKED_IDENTITY_V1: personLinkedIdentityV1
+    ORGANIZATION_MEMBERSHIP_V1: organizationMembershipV1
+    ENTERPRISE_LEARNING_METRICS_V1: 'off'
+    ENTERPRISE_LEARNING_RECOVERY_SCHEDULE: '0 */5 * * * *'
     TUTOR_LLM_ENABLED: string(tutorLlmEnabled)
     TUTOR_LLM_ENDPOINT: tutorLlmEndpoint
     TUTOR_LLM_DEPLOYMENT: tutorLlmDeployment

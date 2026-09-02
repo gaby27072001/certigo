@@ -31,6 +31,9 @@ public sealed class CosmosContext(CosmosClient client, string? databaseName = nu
     public Container Leaderboard => _database.GetContainer(CosmosContainers.Leaderboard);
     public Container Economy => _database.GetContainer(CosmosContainers.Economy);
     public Container Friends => _database.GetContainer(CosmosContainers.Friends);
+    public Container Organizations => _database.GetContainer(CosmosContainers.Organizations);
+    public Container EnterpriseMetricReceipts =>
+        _database.GetContainer(CosmosContainers.EnterpriseMetricReceipts);
 
     internal async Task<AccountWriteLease> AcquireAccountWriteLeaseAsync(
         string userId,

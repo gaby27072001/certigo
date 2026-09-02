@@ -290,6 +290,7 @@ l'opt-in manuel `enable_legacy_workflow=true`. La chaîne iOS active passe par C
 | ADR-06 | Pas de cœurs / vies dans la gamification | éviter la frustration ; motiver la régularité, pas la punition |
 | ADR-011 | Intégrité serveur-autoritatif : `userId` **toujours** issu du JWT (jamais du corps de requête) + idempotence par `clientAttemptId` et ids déterministes sur récompenses/achats | empêcher l'usurpation d'identité côté client et le double-crédit sur rejeu réseau (voir §12.1) |
 | ADR-012 | Intégrité de la gamification : **ETag sur toutes les écritures d'économie**, progression multi-document **atomique** (`TransactionalBatch`), et **plafonds anti-abus `RateWindow` en enforcement** (XP/tentatives sur 1 h, lus du conteneur réel) | rendre les plafonds de cadence effectifs (plus dormants) et confirmer la non-régression du durcissement économie/gamification (voir §12.2) |
+| ADR-018 | VMSS comme socle CI et ACA Jobs en complément éphémère PR-only | conserver la compatibilité et la frontière trusted, tout en pilotant une capacité stateless scale-to-zero sur des validateurs sans secret |
 
 ---
 

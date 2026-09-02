@@ -40,18 +40,22 @@ void main() {
   }
 
   testWidgets('rend le hero (wordmark, titre en deux lignes, CTA)', (WidgetTester tester) async {
+    final SemanticsHandle semantics = tester.ensureSemantics();
     await pumpLanding(tester);
 
     expect(find.text('Certigo'), findsOneWidget);
     expect(find.text('Tes certifs cloud & IT'), findsOneWidget);
     expect(find.text('commencent ici'), findsOneWidget); // 2ᵉ ligne en dégradé
     expect(find.text('Commencer'), findsOneWidget);
+    expect(find.bySemanticsLabel('Commencer'), findsOneWidget);
     expect(find.byKey(const Key('landing-existing-account')), findsOneWidget);
+    semantics.dispose();
   });
 
   testWidgets('taper « Commencer » ouvre la sheet avec Microsoft/Google/Apple + e-mail', (
     WidgetTester tester,
   ) async {
+    final SemanticsHandle semantics = tester.ensureSemantics();
     await pumpLanding(tester);
 
     await tester.tap(find.text('Commencer'));
@@ -65,6 +69,11 @@ void main() {
     expect(find.text('Continuer avec Google'), findsOneWidget);
     expect(find.text('Continuer avec Apple'), findsOneWidget);
     expect(find.text('Continuer avec un e-mail'), findsOneWidget);
+    expect(find.bySemanticsLabel('Continuer avec Microsoft'), findsOneWidget);
+    expect(find.bySemanticsLabel('Continuer avec Google'), findsOneWidget);
+    expect(find.bySemanticsLabel('Continuer avec Apple'), findsOneWidget);
+    expect(find.bySemanticsLabel('Continuer avec un e-mail'), findsOneWidget);
+    semantics.dispose();
   });
 
   testWidgets('même sans Entra configuré, la sheet montre les 4 boutons', (

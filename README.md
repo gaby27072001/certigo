@@ -78,7 +78,9 @@ depuis le dépôt :
 
 ```bash
 # Après avoir commité les sources observables :
+python tools/generated_contracts.py --refresh
 python tools/project_state.py --refresh-reference
+python tools/generated_contracts.py --check
 python tools/project_state.py --check   # contrôle local identique à la gate CI
 python -m unittest discover -s tools/tests -p "test_*.py" -v
 ```
@@ -237,7 +239,8 @@ API principale :
 | `ci-content` | instantané historique `content/**` | schémas + intégrité + somme des poids = 1.0 |
 | `ci-migration-registry` | `docs/migration/**`, validateur Python | statuts, états, dépendances et absence de cycle |
 | `ci-project-state` | chaque PR, `main`, quotidien | état généré identique, référence active `certigo-content` et manifestes public/privé exacts |
-| `ci-infra`   | `infra/**` | `az bicep build` (lint des templates) |
+| `ci-infra`   | `infra/**` | compilation Bicep + contrats réseau/contenu immuable |
+| `content-infra-what-if` | push `main` | plan Azure read-only de `main` via Environment `azure-content-infra-plan`, hors dev/staging/prod |
 | `cd-backend` | push / workflow manuel | déploiement backend vers l'environnement cible |
 | `codeql` | schedule / push | analyse statique de sécurité |
 | `lint-workflows` | `.github/workflows/**` | lint des workflows GitHub Actions |

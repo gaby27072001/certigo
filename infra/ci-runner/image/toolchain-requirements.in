@@ -1,0 +1,4 @@
+checkov==3.2.495
+numpy==2.2.6
+pycares==4.9.0
+PyYAML==6.0.2

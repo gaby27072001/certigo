@@ -1,0 +1,268 @@
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory)]
+  [ValidateNotNullOrEmpty()]
+  [string] $SubscriptionId,
+
+  [Parameter(Mandatory)]
+  [ValidateNotNullOrEmpty()]
+  [string] $VmName,
+
+  [string] $ResourceGroupName = 'RG-CERTIGO-CI',
+  [string] $ScaleSetName = 'vmss-certigo-pr-pilot-z1',
+  [string] $NetworkSecurityGroupName = 'nsg-certigo-pr-pilot',
+  [string] $Location = 'westeurope',
+  [string] $Repository = 'gchambaud_microsoft/Certigo'
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$apiVersion = '2024-11-01'
+$armHeaders = $null
+$registrationToken = $null
+
+function Invoke-NativeText {
+  param(
+    [Parameter(Mandatory)]
+    [string] $FilePath,
+
+    [Parameter(Mandatory)]
+    [string[]] $ArgumentList
+  )
+
+  $output = & $FilePath @ArgumentList
+  if ($LASTEXITCODE -ne 0) {
+    throw "$FilePath failed with exit code $LASTEXITCODE."
+  }
+
+  return ($output -join "`n").Trim()
+}
+
+function Invoke-ManagedRunCommand {
+  param(
+    [Parameter(Mandatory)]
+    [string] $Name,
+
+    [Parameter(Mandatory)]
+    [string] $Script,
+
+    [string] $ProtectedValue
+  )
+
+  $commandUri = (
+    'https://management.azure.com/subscriptions/{0}/resourceGroups/{1}' +
+    '/providers/Microsoft.Compute/virtualMachines/{2}/runCommands/{3}?api-version={4}'
+  ) -f $SubscriptionId, $ResourceGroupName, $VmName, $Name, $apiVersion
+
+  $properties = @{
+    source = @{
+      script = $Script.Replace("`r`n", "`n")
+    }
+    runAsUser = 'root'
+    asyncExecution = $false
+    timeoutInSeconds = 600
+  }
+  if ($PSBoundParameters.ContainsKey('ProtectedValue')) {
+    $properties.protectedParameters = @(
+      @{
+        name = ''
+        value = $ProtectedValue
+      }
+    )
+  }
+
+  $body = @{
+    location = $Location
+    properties = $properties
+  } | ConvertTo-Json -Depth 8 -Compress
+
+  try {
+    $null = Invoke-RestMethod `
+      -Uri $commandUri `
+      -Method Put `
+      -Headers $armHeaders `
+      -ContentType 'application/json' `
+      -Body $body `
+      -TimeoutSec 660
+
+    $deadline = (Get-Date).AddMinutes(12)
+    do {
+      $result = Invoke-RestMethod `
+        -Uri "$commandUri&`$expand=instanceView" `
+        -Method Get `
+        -Headers $armHeaders `
+        -TimeoutSec 30
+      $executionState = $result.properties.instanceView.executionState
+      if ($executionState -in @('Succeeded', 'Failed')) {
+        break
+      }
+      if ((Get-Date) -ge $deadline) {
+        throw "Managed Run Command $Name timed out."
+      }
+      Start-Sleep -Seconds 3
+    } while ($true)
+
+    $instanceView = $result.properties.instanceView
+    if ($executionState -ne 'Succeeded' -or $instanceView.exitCode -ne 0) {
+      throw "Managed Run Command $Name failed: $($instanceView.error)"
+    }
+
+    return $instanceView.output
+  }
+  finally {
+    try {
+      $null = Invoke-RestMethod `
+        -Uri $commandUri `
+        -Method Delete `
+        -Headers $armHeaders `
+        -TimeoutSec 60
+    }
+    catch {
+      Write-Warning "Delete the Managed Run Command resource '$Name' manually."
+    }
+  }
+}
+
+foreach ($command in @('az', 'gh')) {
+  if ($null -eq (Get-Command $command -ErrorAction SilentlyContinue)) {
+    throw "Required command '$command' is not installed."
+  }
+}
+
+$vm = Invoke-NativeText -FilePath 'az' -ArgumentList @(
+  'vm', 'show',
+  '--subscription', $SubscriptionId,
+  '--resource-group', $ResourceGroupName,
+  '--name', $VmName,
+  '--show-details',
+  '--output', 'json'
+) | ConvertFrom-Json
+
+if ($vm.provisioningState -ne 'Succeeded' -or $vm.powerState -ne 'VM running') {
+  throw 'The pilot VM must be provisioned and running before registration.'
+}
+if ($vm.virtualMachineScaleSet.id.Split('/')[-1] -ne $ScaleSetName) {
+  throw "The VM is not a member of the expected scale set '$ScaleSetName'."
+}
+if ($null -ne $vm.identity) {
+  throw 'The PR-only pilot VM must not have a managed identity.'
+}
+
+$nics = Invoke-NativeText -FilePath 'az' -ArgumentList @(
+  'vm', 'nic', 'list',
+  '--subscription', $SubscriptionId,
+  '--resource-group', $ResourceGroupName,
+  '--vm-name', $VmName,
+  '--output', 'json'
+) | ConvertFrom-Json
+foreach ($nic in @($nics)) {
+  foreach ($ipConfiguration in @($nic.ipConfigurations)) {
+    $publicIpProperty = $ipConfiguration.PSObject.Properties['publicIPAddress']
+    if ($null -ne $publicIpProperty -and $null -ne $publicIpProperty.Value) {
+      throw 'The PR-only pilot VM must not have a public IP configuration.'
+    }
+  }
+}
+
+$imdsRule = Invoke-NativeText -FilePath 'az' -ArgumentList @(
+  'network', 'nsg', 'rule', 'show',
+  '--subscription', $SubscriptionId,
+  '--resource-group', $ResourceGroupName,
+  '--nsg-name', $NetworkSecurityGroupName,
+  '--name', 'deny-imds-outbound',
+  '--output', 'json'
+) | ConvertFrom-Json
+if (
+  $imdsRule.access -ne 'Deny' -or
+  $imdsRule.direction -ne 'Outbound' -or
+  $imdsRule.destinationAddressPrefix -ne 'AzurePlatformIMDS'
+) {
+  throw 'The final NSG IMDS deny must be active before registration.'
+}
+
+$armAccessToken = Invoke-NativeText -FilePath 'az' -ArgumentList @(
+  'account', 'get-access-token',
+  '--subscription', $SubscriptionId,
+  '--resource', 'https://management.azure.com/',
+  '--query', 'accessToken',
+  '--output', 'tsv'
+)
+$armHeaders = @{
+  Authorization = "Bearer $armAccessToken"
+}
+$armAccessToken = $null
+
+$preflightScript = Get-Content `
+  -LiteralPath (Join-Path $PSScriptRoot 'pilot-preflight.sh') `
+  -Raw
+$preflightOutput = Invoke-ManagedRunCommand `
+  -Name 'certigo-pr-final-preflight' `
+  -Script $preflightScript
+if ($preflightOutput -notmatch 'pre-registration preflight passed') {
+  throw 'The final pre-registration preflight did not produce its success marker.'
+}
+
+$runnerIdsBefore = @(
+  (
+    Invoke-NativeText -FilePath 'gh' -ArgumentList @(
+      'api', "repos/$Repository/actions/runners?per_page=100"
+    ) | ConvertFrom-Json
+  ).runners.id
+)
+
+try {
+  $registrationToken = Invoke-NativeText -FilePath 'gh' -ArgumentList @(
+    'api', '--method', 'POST',
+    "repos/$Repository/actions/runners/registration-token",
+    '--jq', '.token'
+  )
+  if ([string]::IsNullOrWhiteSpace($registrationToken)) {
+    throw 'GitHub returned an empty repository-scoped registration token.'
+  }
+
+  $registerScript = Get-Content `
+    -LiteralPath (Join-Path $PSScriptRoot 'pilot-register.sh') `
+    -Raw
+  $registrationOutput = Invoke-ManagedRunCommand `
+    -Name 'certigo-pr-secure-register' `
+    -Script $registerScript `
+    -ProtectedValue $registrationToken
+}
+finally {
+  $registrationToken = $null
+  [GC]::Collect()
+}
+
+if ($registrationOutput -notmatch 'registered and started') {
+  throw 'The registration command did not produce its success marker.'
+}
+
+$deadline = (Get-Date).AddMinutes(3)
+do {
+  $runners = (
+    Invoke-NativeText -FilePath 'gh' -ArgumentList @(
+      'api', "repos/$Repository/actions/runners?per_page=100"
+    ) | ConvertFrom-Json
+  ).runners
+  $pilot = @(
+    $runners | Where-Object {
+      $_.id -notin $runnerIdsBefore -and
+      $_.labels.name -contains 'certigo-pr-pilot'
+    }
+  )
+  if ($pilot.Count -eq 1 -and $pilot[0].status -eq 'online') {
+    break
+  }
+  if ((Get-Date) -ge $deadline) {
+    throw 'The newly registered PR-only runner did not become online.'
+  }
+  Start-Sleep -Seconds 2
+} while ($true)
+
+[pscustomobject] @{
+  id = $pilot[0].id
+  name = $pilot[0].name
+  status = $pilot[0].status
+  busy = $pilot[0].busy
+  labels = @($pilot[0].labels.name)
+}

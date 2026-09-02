@@ -28,6 +28,9 @@
     "ENTRA_GRAPH_CLIENT_SECRET_SECRET_URI": "https://<vault>.vault.azure.net/secrets/<name>/<version>",
     "ACCOUNT_DELETION_ENABLED": "false",
     "PERSON_LINKED_IDENTITY_V1": "off",
+    "ORGANIZATION_MEMBERSHIP_V1": "off",
+    "ENTERPRISE_LEARNING_METRICS_V1": "off",
+    "ENTERPRISE_LEARNING_RECOVERY_SCHEDULE": "0 */5 * * * *",
     "APPLICATIONINSIGHTS_CONNECTION_STRING": "<connection-string>"
   }
 }

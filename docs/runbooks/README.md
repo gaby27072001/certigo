@@ -55,6 +55,7 @@ rollbacks. **C'est vous qui exécutez** chaque commande, après relecture.
 | **Tags Azure** | 🟠 Moyen | Contrat FinOps additif pour applications et runners | [`AZURE_TAG_ADOPTION.md`](./AZURE_TAG_ADOPTION.md) | Aucun pour la validation statique; Reader pour l'inventaire live ultérieur | Versionné — aucun déploiement dans la PR |
 | **Cloud least privilege** | 🔴 Haut | Migration OIDC/RBAC, policy, runners et rollback | [`CLOUD_LEAST_PRIVILEGE.md`](./CLOUD_LEAST_PRIVILEGE.md) | Reader pour inventaire; admin PIM pour toute mutation | Plan versionné — aucune mutation dans la PR |
 | **Observabilité** | 🟠 Moyen | Webtests, alertes, cold-start, workbook, signaux runner, coût et confidentialité | [`OBSERVABILITY.md`](./OBSERVABILITY.md) | Reader pour diagnostic ; Contributor pour appliquer après approbation | Préparé — aucun déploiement dans la PR |
+| **Contenu WORM** | 🔴 Haut | Release descriptor + paquets public/privé, OIDC, reader runtime et rollback | [`IMMUTABLE_CONTENT_STORAGE.md`](./IMMUTABLE_CONTENT_STORAGE.md) | Identité de bootstrap Azure + approbation OPS/compliance | Réconcilié avec #304 — aucun déploiement live |
 
 ## Ordre d'exécution conseillé
 

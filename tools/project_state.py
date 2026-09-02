@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import re
 import subprocess
@@ -19,6 +20,7 @@ END_MARKER = "<!-- GENERATED:PROJECT-STATE:END -->"
 DEFAULT_DOCUMENT = Path("docs/ETAT_DU_PROJET.md")
 REFERENCE_FILE = Path("docs/project-state-reference.json")
 ACTIVE_CONTENT_REFERENCE_FILE = Path("docs/active-content-reference.json")
+CONTENT_PACKAGE_CONTRACT_FILE = Path("contracts/content-package-v1.json")
 OBSERVABLE_PATHS = (
     ".github/workflows",
     "codemagic.yaml",
@@ -35,19 +37,17 @@ OBSERVABLE_PATHS = (
     "tools/tests",
 )
 OBSERVABLE_HASH_PREFIX = b"certigo-project-state-observable-v1\0"
-PACKAGE_MANIFEST_SCHEMA = "certigo.content.package-manifest/v1"
-PACKAGE_MANIFEST_ALGORITHM = "sha256"
-PACKAGE_MANIFEST_SERIALIZATION = "json-sorted-keys-compact-utf8-lf"
-PACKAGE_MANIFEST_BODY_FIELDS = (
-    "schema",
-    "channel",
-    "artifact",
-    "algorithm",
-    "serialization",
-    "fileCount",
-    "files",
+_CONTENT_PACKAGE_SOURCE = json.loads(
+    (Path(__file__).resolve().parents[1] / CONTENT_PACKAGE_CONTRACT_FILE).read_text(
+        encoding="utf-8"
+    )
 )
-PACKAGE_MANIFEST_DIGEST_FIELDS = ("manifestId", "rootHash")
+_PACKAGE_CONTRACT = _CONTENT_PACKAGE_SOURCE["packageContract"]
+PACKAGE_MANIFEST_SCHEMA = _PACKAGE_CONTRACT["schema"]
+PACKAGE_MANIFEST_ALGORITHM = _PACKAGE_CONTRACT["algorithm"]
+PACKAGE_MANIFEST_SERIALIZATION = _PACKAGE_CONTRACT["serialization"]
+PACKAGE_MANIFEST_BODY_FIELDS = tuple(_PACKAGE_CONTRACT["canonicalBodyFields"])
+PACKAGE_MANIFEST_DIGEST_FIELDS = tuple(_PACKAGE_CONTRACT["excludedDigestFields"])
 FORBIDDEN_DOMAIN_PATTERN = re.compile(
     rb"(?i)(?<![a-z0-9])(?:[a-z0-9-]+\.)*certigo\.app(?=$|[^a-z0-9-])"
 )
@@ -425,7 +425,7 @@ def load_active_content_reference(root: Path) -> ActiveContentReference:
         },
         str(ACTIVE_CONTENT_REFERENCE_FILE),
     )
-    if value["schema"] != "certigo.active-content-reference/v1":
+    if value["schema"] != _CONTENT_PACKAGE_SOURCE["activeReferenceSchema"]:
         raise ProjectStateError(
             f"{ACTIVE_CONTENT_REFERENCE_FILE}.schema: unsupported reference schema."
         )
@@ -881,6 +881,17 @@ def replace_generated(document: str, generated: str) -> str:
 
 
 def update(root: Path, check: bool, document_path: Path = DEFAULT_DOCUMENT) -> bool:
+    if check:
+        generator_path = Path(__file__).with_name("generated_contracts.py")
+        spec = importlib.util.spec_from_file_location("generated_contracts", generator_path)
+        if spec is None or spec.loader is None:
+            raise ProjectStateError(f"Cannot load generated-contract checker {generator_path}.")
+        generated_contracts = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(generated_contracts)
+        try:
+            generated_contracts.refresh(root, check=True)
+        except generated_contracts.ContractError as exc:
+            raise ProjectStateError(str(exc)) from exc
     path = root / document_path
     current = _read(root, document_path)
     expected = replace_generated(current, render(collect(root)))

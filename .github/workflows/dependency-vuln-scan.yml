@@ -8,10 +8,11 @@ permissions: {}
 
 jobs:
   osv-scan:
-    name: OSV-Scanner (all dependencies, JSON)
+    name: OSV-Scanner (validated lockfiles, JSON)
     runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
+      pull-requests: read
     env:
       UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
       TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
@@ -26,6 +27,21 @@ jobs:
       FLUTTER_INSTALL_DIR: ${{ github.workspace }}/.scanner-state/flutter-sdk
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
+      - name: Recheck current PR head after assignment
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const eventHead = context.payload.pull_request.head.sha;
+            if (!eventHead || pull.head.sha !== eventHead) {
+              core.setFailed(`Superseded PR event ${eventHead || '<missing>'}; current head is ${pull.head.sha}.`);
+            }
       - name: Reset isolated dependency state
         run: |
           /usr/bin/rm -rf -- "$SCANNER_STATE_DIR" "$UNTRUSTED_PUB_DIR"
@@ -118,10 +134,16 @@ jobs:
           output_temp="$RUNNER_TEMP/osv-results.$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT.json"
           rm -f -- "$output_temp" "$OSV_RESULTS_FILE" "$OSV_SCAN_LOG" "$OSV_ENFORCE_LOG"
           set +e
-          "$OSV_BINARY" scan --format=json --recursive --no-ignore --all-packages \
-            --config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml" \
+          node "$TRUSTED_CONTROL_DIR/.github/scripts/run-osv-scan.mjs" \
+            "$OSV_BINARY" \
+            "$EXPECTED_LOCKS_FILE" \
             "$UNTRUSTED_SOURCE_DIR" \
-            --output-file "$output_temp" 2> "$OSV_SCAN_LOG"
+            --format=json \
+            --no-ignore \
+            --forbid-argument=--all-packages \
+            --forbid-argument=--recursive \
+            --config="$TRUSTED_CONTROL_DIR/.github/osv-scanner.toml" \
+            --output-file "$output_temp" > "$OSV_SCAN_LOG" 2>&1
           scan_status=$?
           set -e
           if [ -e "$output_temp" ]; then
@@ -168,21 +190,17 @@ jobs:
               process.stdout.write(String(summary.vulnerabilityCount));
             ' "$evaluation"
           )"
-          source_coverage="$(
+          tracked_lock_count="$(
             node -e '
-              const evaluation = JSON.parse(process.argv[1].split(/\r?\n/, 1)[0]);
-              const contract = JSON.parse(require("fs").readFileSync(process.argv[2], "utf8"));
-              process.stdout.write(
-                `${evaluation.sourceCount} reported`
-                + ` / ${contract.sources.length} expected non-empty locks`,
-              );
-            ' "$evaluation" "$EXPECTED_LOCKS_FILE"
+              const contract = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+              process.stdout.write(String(contract.sources.length));
+            ' "$EXPECTED_LOCKS_FILE"
           )"
           {
             echo "## OSV dependency scan"
             echo
             echo "- Findings: **$finding_count**"
-            echo "- Tracked lockfile coverage: **$source_coverage**"
+            echo "- Explicit lockfiles scanned: **$tracked_lock_count**"
             echo "- Scanner exit code: \`$scan_status\`"
             echo "- Structured validation result and scanner diagnostics are in the job logs."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -206,10 +224,26 @@ jobs:
     runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
       contents: read
+      pull-requests: read
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet-locked
       UNTRUSTED_RESTORE_DIR: ${{ github.workspace }}/.untrusted-restore
     steps:
+      - name: Recheck current PR head after assignment
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const eventHead = context.payload.pull_request.head.sha;
+            if (!eventHead || pull.head.sha !== eventHead) {
+              core.setFailed(`Superseded PR event ${eventHead || '<missing>'}; current head is ${pull.head.sha}.`);
+            }
       - name: Reset isolated .NET tool path
         run: /usr/bin/rm -rf -- "$DOTNET_INSTALL_DIR" "$UNTRUSTED_RESTORE_DIR"
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1

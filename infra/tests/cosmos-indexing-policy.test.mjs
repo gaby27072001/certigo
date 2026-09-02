@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,12 @@ const repositoryRoot = path.resolve(
   '..',
 );
 let cosmosTemplate;
+const cosmosContract = JSON.parse(
+  readFileSync(
+    path.join(repositoryRoot, 'contracts', 'cosmos-containers.json'),
+    'utf8',
+  ),
+);
 
 function compileCosmosTemplate() {
   if (cosmosTemplate) {
@@ -48,7 +55,7 @@ test('Cosmos containers preserve the live default indexing policy', () => {
   assert.ok(compiledResource.includes(indexingPolicy));
 });
 
-test('compiled Cosmos ARM emits TTL only for attempts', () => {
+test('compiled Cosmos ARM preserves container topology and TTL scope', () => {
   const template = compileCosmosTemplate();
   const containerResource = template.resources.find(
     (resource) =>
@@ -57,24 +64,22 @@ test('compiled Cosmos ARM emits TTL only for attempts', () => {
   );
   assert.ok(containerResource);
 
-  const containers = template.variables.containers;
-  assert.deepEqual(containers, [
-    { name: 'users', pk: '/id' },
-    { name: 'content', pk: '/trackId' },
-    { name: 'progress', pk: '/userId' },
-    { name: 'attempts', pk: '/userId' },
-    { name: 'events', pk: '/userId' },
-    { name: 'leaderboard', pk: '/periodLeagueId' },
-    { name: 'economy', pk: '/userId' },
-    { name: 'friends', pk: '/userId' },
-  ]);
+  const embeddedContract = Object.values(template.variables).find(
+    (value) => value?.schema === cosmosContract.schema,
+  );
+  assert.ok(embeddedContract);
+  assert.deepEqual(embeddedContract, cosmosContract);
+  assert.match(
+    template.variables.containers,
+    /^\[variables\('[^']+'\)\.containers\]$/,
+  );
 
   const compiledResource = containerResource.properties.resource;
   assert.equal(typeof compiledResource, 'string');
-  const ttlCondition =
-    "if(equals(variables('containers')[copyIndex()].name, 'attempts'), " +
-    "createObject('defaultTtl', -1), createObject())";
-  assert.ok(compiledResource.endsWith(`${ttlCondition})]`));
+  assert.match(
+    compiledResource,
+    /defaultTimeToLive.*createObject\('defaultTtl'.*defaultTimeToLive/,
+  );
   assert.equal(compiledResource.match(/defaultTtl/g)?.length, 1);
   assert.doesNotMatch(JSON.stringify(template), /"defaultTtl":null/);
 });

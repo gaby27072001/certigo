@@ -11,9 +11,15 @@ MICROSOFT_KEY_FINGERPRINT="BC528686B50D79E339D3721CEB3E94ADBE1229CF"
 RUNNER_USER="runner"
 RUNNER_HOME="/opt/actions-runner"
 RUNNER_NAME="$(hostname)"
-RUNNER_LABELS="certigo-ci"
+RUNNER_LABELS="${CERTIGO_RUNNER_LABELS:-certigo-ci}"
+BLOCK_IMDS="${CERTIGO_BLOCK_IMDS:-false}"
 GITHUB_URL="https://github.com/gchambaud_microsoft/Certigo"
 CACHE_DIR="/var/cache/certigo-runner"
+
+if [[ "${BLOCK_IMDS}" != "true" && "${BLOCK_IMDS}" != "false" ]]; then
+  echo "CERTIGO_BLOCK_IMDS must be true or false." >&2
+  exit 2
+fi
 
 registration_mode=""
 case "$#" in
@@ -64,7 +70,39 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
-  ca-certificates curl git gnupg jq sudo tar unzip zip xz-utils
+  ca-certificates curl git gnupg iptables jq sudo tar unzip zip xz-utils
+
+if [[ "${BLOCK_IMDS}" == "true" ]]; then
+  cat > /usr/local/sbin/certigo-block-imds <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! /usr/sbin/iptables -C OUTPUT -d 169.254.169.254/32 -j REJECT 2>/dev/null; then
+  /usr/sbin/iptables -I OUTPUT 1 -d 169.254.169.254/32 -j REJECT
+fi
+EOF
+  chown root:root /usr/local/sbin/certigo-block-imds
+  chmod 0755 /usr/local/sbin/certigo-block-imds
+
+  cat > /etc/systemd/system/certigo-block-imds.service <<'EOF'
+[Unit]
+Description=Block Azure Instance Metadata Service for the untrusted runner
+DefaultDependencies=no
+After=local-fs.target
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/certigo-block-imds
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now certigo-block-imds.service
+fi
 
 install_azure_cli() {
   install -d -m 0755 /etc/apt/keyrings
@@ -148,7 +186,9 @@ install -d -m 0755 -o "${RUNNER_USER}" -g "${RUNNER_USER}" "${RUNNER_HOME}"
 
 installed_runner_version=""
 if [[ -x "${RUNNER_HOME}/bin/Runner.Listener" ]]; then
-  installed_runner_version="$("${RUNNER_HOME}/bin/Runner.Listener" --version 2>/dev/null || true)"
+  installed_runner_version="$(
+    runuser -u "${RUNNER_USER}" -- "${RUNNER_HOME}/bin/Runner.Listener" --version 2>/dev/null || true
+  )"
 fi
 
 if [[ "${installed_runner_version}" != "${RUNNER_VERSION}" ]]; then
@@ -158,12 +198,15 @@ if [[ "${installed_runner_version}" != "${RUNNER_VERSION}" ]]; then
     --output "${archive}"
   printf '%s  %s\n' "${RUNNER_SHA256}" "${archive}" | sha256sum --check --strict
   if [[ -f "${RUNNER_HOME}/.service" ]]; then
-    "${RUNNER_HOME}/svc.sh" stop
+    (
+      cd "${RUNNER_HOME}"
+      ./svc.sh stop
+    )
   fi
   tar --extract --gzip --file "${archive}" --directory "${RUNNER_HOME}"
   "${RUNNER_HOME}/bin/installdependencies.sh"
-  chown -R "${RUNNER_USER}:${RUNNER_USER}" "${RUNNER_HOME}"
 fi
+chown -R "${RUNNER_USER}:${RUNNER_USER}" "${RUNNER_HOME}"
 
 cat > /etc/certigo-runner-bootstrap.env <<EOF
 RUNNER_VERSION=${RUNNER_VERSION}
@@ -185,10 +228,13 @@ if [[ -f "${RUNNER_HOME}/.runner" ]]; then
     echo "Runner is already registered as ${configured_name}; refusing implicit rename." >&2
     exit 1
   fi
-  if [[ ! -f "${RUNNER_HOME}/.service" ]]; then
-    "${RUNNER_HOME}/svc.sh" install "${RUNNER_USER}"
-  fi
-  "${RUNNER_HOME}/svc.sh" start
+  (
+    cd "${RUNNER_HOME}"
+    if [[ ! -f .service ]]; then
+      ./svc.sh install "${RUNNER_USER}"
+    fi
+    ./svc.sh start
+  )
   echo "Runner ${RUNNER_NAME} is already configured; service start reconciled."
   exit 0
 fi
@@ -226,6 +272,9 @@ runuser -u "${RUNNER_USER}" -- "${RUNNER_HOME}/config.sh" \
   --replace
 unset RUNNER_TOKEN
 trap - EXIT
-"${RUNNER_HOME}/svc.sh" install "${RUNNER_USER}"
-"${RUNNER_HOME}/svc.sh" start
+(
+  cd "${RUNNER_HOME}"
+  ./svc.sh install "${RUNNER_USER}"
+  ./svc.sh start
+)
 echo "Runner ${RUNNER_NAME} registered and started."

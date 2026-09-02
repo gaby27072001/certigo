@@ -213,18 +213,20 @@ public sealed class PersonLinkedIdentityContractTests
     [Fact]
     public void Contracts_match_merged_deletion_onboarding_catalog_and_cosmos_baselines()
     {
-        var containers = LoadRepositoryFile(
-            "backend",
-            "src",
-            "Certigo.Infrastructure",
-            "Cosmos",
-            "CosmosContainers.cs");
-        containers.Should().Contain("new(Users, \"/id\")");
-        containers.Should().Contain("new(Progress, \"/userId\")");
-        containers.Should().Contain("new(Attempts, \"/userId\", DefaultTimeToLive: -1)");
+        using var containerContract = JsonDocument.Parse(
+            LoadRepositoryFile("contracts", "cosmos-containers.json"));
+        var containers = containerContract.RootElement.GetProperty("containers")
+            .EnumerateArray()
+            .ToDictionary(
+                container => container.GetProperty("name").GetString()!,
+                container => container);
+        containers["users"].GetProperty("partitionKeyPath").GetString().Should().Be("/id");
+        containers["progress"].GetProperty("partitionKeyPath").GetString().Should().Be("/userId");
+        containers["attempts"].GetProperty("defaultTimeToLive").GetInt32().Should().Be(-1);
 
         var cosmosBicep = LoadRepositoryFile("infra", "modules", "cosmos.bicep");
-        cosmosBicep.Should().Contain("{ name: 'users', pk: '/id' }");
+        cosmosBicep.Should().Contain(
+            "loadJsonContent('../../contracts/cosmos-containers.json').containers");
         cosmosBicep.Should().Contain("path: '/*'");
         cosmosBicep.Should().Contain("path: '/\"_etag\"/?'");
 

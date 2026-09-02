@@ -1,0 +1,13 @@
+[Unit]
+Description=Validate the immutable Certigo runner toolchain
+DefaultDependencies=no
+After=local-fs.target
+Before=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/certigo-validate-toolchain --boot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

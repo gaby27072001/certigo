@@ -23,6 +23,26 @@ test('accepts a complete clean OSV JSON fixture', () => {
   });
 });
 
+test('accepts a package with a complete package identity', () => {
+  assert.deepEqual(
+    evaluateOsvJson(path.join(fixtureRoot, 'osv-valid-package.json')),
+    {
+      resultCount: 1,
+      sourceCount: 0,
+      packageCount: 1,
+      vulnerabilityCount: 0,
+      vulnerabilityIds: [],
+    },
+  );
+});
+
+test('rejects a package with an empty ecosystem', () => {
+  assert.throws(
+    () => evaluateOsvJson(path.join(fixtureRoot, 'osv-empty-ecosystem.json')),
+    /package\.ecosystem must be a non-empty string/u,
+  );
+});
+
 test('counts grouped vulnerabilities from a complete OSV JSON fixture', () => {
   assert.deepEqual(
     evaluateOsvJson(path.join(fixtureRoot, 'osv-vulnerable.json')),
@@ -81,10 +101,13 @@ test('rejects OSV JSON with invalid nested field types', () => {
       }],
     }),
   );
-  assert.throws(() => evaluateOsvJson(file), /package\.version must be a string/);
+  assert.throws(
+    () => evaluateOsvJson(file),
+    /package\.version must be a non-empty string/u,
+  );
 });
 
-test('requires every expected tracked lockfile in all-packages output', () => {
+test('accepts only result sources from the validated lockfile contract', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-osv-sources-'));
   const lockfile = path.join(directory, 'package-lock.json');
   const file = path.join(directory, 'all-packages.json');
@@ -105,7 +128,6 @@ test('requires every expected tracked lockfile in all-packages output', () => {
       expectedSources: {
         sources: ['package-lock.json'],
         pubManifests: [],
-        allowedEmptyNugetPackages: [],
       },
       sourceRoot: directory,
     }),
@@ -117,20 +139,16 @@ test('requires every expected tracked lockfile in all-packages output', () => {
       vulnerabilityIds: [],
     },
   );
-  assert.throws(
-    () => evaluateOsvJson(file, {
-      expectedSources: {
-        sources: ['package-lock.json', 'missing.lock'],
-        pubManifests: [],
-        allowedEmptyNugetPackages: [],
-      },
-      sourceRoot: directory,
-    }),
-    /omitted expected tracked lockfiles/,
-  );
+  assert.throws(() => evaluateOsvJson(file, {
+    expectedSources: {
+      sources: ['different.lock'],
+      pubManifests: [],
+    },
+    sourceRoot: directory,
+  }), /was not present in the validated lockfile contract/u);
 });
 
-test('allows empty versions only for validated NuGet project references', () => {
+test('rejects empty versions including NuGet project references', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-osv-project-'));
   const file = path.join(directory, 'project-reference.json');
   fs.writeFileSync(
@@ -144,19 +162,48 @@ test('allows empty versions only for validated NuGet project references', () => 
       }],
     }),
   );
-  const options = {
-    expectedSources: {
-      sources: ['packages.lock.json'],
-      pubManifests: [],
-      allowedEmptyNugetPackages: ['certigo.domain'],
-    },
-    sourceRoot: directory,
-  };
-  assert.equal(evaluateOsvJson(file, options).packageCount, 1);
-  options.expectedSources.allowedEmptyNugetPackages = [];
   assert.throws(
-    () => evaluateOsvJson(file, options),
-    /may be empty only for a validated tracked NuGet project reference/,
+    () => evaluateOsvJson(file, {
+      expectedSources: {
+        sources: ['packages.lock.json'],
+        pubManifests: [],
+      },
+      sourceRoot: directory,
+    }),
+    /package\.version must be a non-empty string/u,
+  );
+});
+
+test('accepts no findings when explicit lockfile invocation returns no results', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-osv-empty-'));
+  assert.deepEqual(
+    evaluateOsvJson(path.join(fixtureRoot, 'osv-clean.json'), {
+      expectedSources: {
+        sources: ['package-lock.json'],
+        pubManifests: [],
+      },
+      sourceRoot: directory,
+    }),
+    {
+      resultCount: 0,
+      sourceCount: 0,
+      packageCount: 0,
+      vulnerabilityCount: 0,
+      vulnerabilityIds: [],
+    },
+  );
+});
+
+test('rejects the removed empty-version exception contract', () => {
+  assert.throws(
+    () => evaluateOsvJson(path.join(fixtureRoot, 'osv-clean.json'), {
+      expectedSources: {
+        sources: ['package-lock.json'],
+        pubManifests: [],
+        allowedEmptyNugetPackages: ['ProjectReference'],
+      },
+    }),
+    /allowedEmptyNugetPackages is forbidden/u,
   );
 });
 
@@ -166,7 +213,7 @@ test('CLI exit codes distinguish clean, vulnerable, and invalid reports', () => 
   const expectedSources = path.join(directory, 'expected.json');
   fs.writeFileSync(
     expectedSources,
-    '{"sources":[],"pubManifests":[],"allowedEmptyNugetPackages":[]}',
+    '{"sources":["workspace/package-lock.json"],"pubManifests":[]}',
   );
   const cases = [
     ['osv-clean.json', 0],

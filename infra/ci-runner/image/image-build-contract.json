@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "contractCommit": "e70e62407f939b04b3e9d3b532f4a6ae06994a43",
+  "toolchainOriginCommit": "f8e23b2952e8ca39c59f30081b8950170abb701a",
+  "repository": "gchambaud_microsoft/Certigo",
+  "baseImage": {
+    "publisher": "Canonical",
+    "offer": "ubuntu-24_04-lts",
+    "sku": "server",
+    "version": "24.04.202608070"
+  },
+  "destination": {
+    "deploymentName": "certigo-runner-image-build-f8e23b2-1-0-337",
+    "location": "westeurope",
+    "imageBuilderIdentityName": "id-certigo-runner-image-builder-canary",
+    "stagingResourceGroupName": "rg-certigo-runner-image-staging-canary",
+    "galleryName": "galCertigoRunnerCanary",
+    "imageDefinitionName": "certigo-pr-image-canary",
+    "imageVersion": "1.0.337",
+    "imageTemplateName": "it-certigo-pr-f8e23b2",
+    "runOutputName": "certigo-pr-f8e23b2-1-0-337"
+  },
+  "policy": {
+    "autoRun": false,
+    "excludeFromLatest": true,
+    "reproducibleInputsReady": false,
+    "projectDependencyCachesPersisted": false,
+    "credentialsAllowedInImage": false,
+    "managedIdentityAllowedOnCanary": false
+  },
+  "reproducibility": {
+    "status": "blocked",
+    "aptSnapshot": null,
+    "aptPackageLockSha256": null,
+    "flutterEngineArtifactLockSha256": null,
+    "blockedReasons": [
+      "Ubuntu and Microsoft APT transitive packages are not locked to an immutable snapshot with package hashes.",
+      "Flutter precache engine artifacts are not enumerated with SHA-256 digests."
+    ]
+  },
+  "inputs": [
+    {
+      "id": "bootstrap",
+      "path": "infra/ci-runner/bootstrap.sh",
+      "destination": "bootstrap.sh",
+      "sha256": "16e12b8bf058f77fc1dab47be25016f4961de9d0f80440dd284fc58296dc14d8"
+    },
+    {
+      "id": "toolchain-manifest",
+      "path": "infra/ci-runner/image/toolchain-manifest.json",
+      "destination": "toolchain-manifest.json",
+      "sha256": "0c246a58d042c9a4e561af1c84911ca9f2fb62b023bfa6c1310be0d05a63b7ef"
+    },
+    {
+      "id": "toolchain-sbom",
+      "path": "infra/ci-runner/image/toolchain-sbom.cyclonedx.document",
+      "destination": "toolchain-sbom.cyclonedx.document",
+      "sha256": "50c91591ad53910997eba00003a8840594f3c9c1238821adc56df8d278026838"
+    },
+    {
+      "id": "python-lock",
+      "path": "infra/ci-runner/image/toolchain-requirements.lock",
+      "destination": "toolchain-requirements.lock",
+      "sha256": "fd95e916913fa05320ec5f7ff5e3fb07345afe5802294b4eec6bd1ccece79062"
+    },
+    {
+      "id": "prewarm",
+      "path": "infra/ci-runner/image/prewarm-toolchain.sh",
+      "destination": "prewarm-toolchain.sh",
+      "sha256": "80ce3cf0f856f571da1c446ee3f222f63ffbf87efa5eb2b08d75106e6cc7178a"
+    },
+    {
+      "id": "validator",
+      "path": "infra/ci-runner/image/validate-toolchain.sh",
+      "destination": "validate-toolchain.sh",
+      "sha256": "0824a1f482fa8a38db2b506800dd414e9ba804b673e4e5b0507ee11a6021c952"
+    },
+    {
+      "id": "inventory",
+      "path": "infra/ci-runner/image/inventory-toolchain.sh",
+      "destination": "inventory-toolchain.sh",
+      "sha256": "adba5f0c1f7e1caa6e6543ddf3bc06fa98faa03d6c445058fef8d942f8673a39"
+    },
+    {
+      "id": "seal-state",
+      "path": "infra/ci-runner/image/seal-runner-state.sh",
+      "destination": "seal-runner-state.sh",
+      "sha256": "c32b9fcc8dc68ccf0a65ab0037c2be5a3e85b7ad72056108d2985d034b6c3f33"
+    },
+    {
+      "id": "job-temp",
+      "path": "infra/ci-runner/image/job-temp.sh",
+      "destination": "job-temp.sh",
+      "sha256": "a9c74cf6d85688f1c6daac119365d757378f004c6a360302f122a9faa13f684e"
+    },
+    {
+      "id": "systemd-generator",
+      "path": "infra/ci-runner/image/certigo-toolchain-guard-generator",
+      "destination": "certigo-toolchain-guard-generator",
+      "sha256": "2059ecc1bed0bd325e0d6f2e558423a2a984d352f87c910c20182fa3750a10eb"
+    },
+    {
+      "id": "validation-unit",
+      "path": "infra/ci-runner/image/certigo-toolchain-validate.service",
+      "destination": "certigo-toolchain-validate.service",
+      "sha256": "8bfae3712722c6aa8a34f7b1e778ab3b2d3aaa8bbca9b2dfb5a44166785b64b1"
+    },
+    {
+      "id": "temp-mount-unit",
+      "path": "infra/ci-runner/image/certigo-job-temp-mount.service",
+      "destination": "certigo-job-temp-mount.service",
+      "sha256": "5891ad073639f976c1a2cc071f53ec8f4f72c39c99586546f61ecebe8be0baf5"
+    },
+    {
+      "id": "runner-environment",
+      "path": "infra/ci-runner/image/runner-ephemeral.conf",
+      "destination": "runner-ephemeral.conf",
+      "sha256": "b75d04cee8daf4fb592a79b1a1547aceeb7bf51b7d28634480310e68889b25aa"
+    }
+  ]
+}

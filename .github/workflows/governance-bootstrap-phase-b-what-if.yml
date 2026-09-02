@@ -1,0 +1,94 @@
+name: Governance bootstrap Phase B1a what-if
+
+on:
+  repository_dispatch:
+    types: [governance-bootstrap-phase-b-what-if]
+
+permissions: {}
+
+concurrency:
+  group: governance-bootstrap-phase-b-what-if
+  cancel-in-progress: false
+
+jobs:
+  what-if:
+    name: Conditioned Phase B1a what-if only
+    if: ${{ github.ref == 'refs/heads/main' }}
+    environment: azure-governance-bootstrap-phase-b
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - name: Validate exact payload
+        shell: bash
+        env:
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          jq -e '
+            type == "object" and
+            keys == [
+              "phase_a_deployment_name",
+              "phase_a_evidence_manifest_sha256",
+              "phase_a_evidence_run_id"
+            ] and
+            (.phase_a_deployment_name | type == "string") and
+            (.phase_a_deployment_name | test("^certigo-governance-bootstrap-identities-[a-zA-Z0-9._-]+$")) and
+            (.phase_a_evidence_run_id | type == "number" and . > 0) and
+            (.phase_a_evidence_manifest_sha256 | type == "string") and
+            (.phase_a_evidence_manifest_sha256 | test("^[0-9a-fA-F]{64}$"))
+          ' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: refs/heads/main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fail closed until admin planning variables exist
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          : "${AZURE_CLIENT_ID:?No GitHub variable is configured by this repository.}"
+          : "${AZURE_TENANT_ID:?No GitHub variable is configured by this repository.}"
+          : "${AZURE_SUBSCRIPTION_ID:?No GitHub variable is configured by this repository.}"
+      - name: Azure login with approved admin planning identity
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Download approved Phase A evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PHASE_A_EVIDENCE_RUN_ID: ${{ github.event.client_payload.phase_a_evidence_run_id }}
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/approved-phase-a-evidence"
+          mkdir -p "$evidence_dir"
+          gh run download "$PHASE_A_EVIDENCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name governance-phase-a-evidence \
+            --dir "$evidence_dir"
+      - name: Run Phase B1a RG assignment what-if
+        shell: bash
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          PHASE_A_DEPLOYMENT_NAME: ${{ github.event.client_payload.phase_a_deployment_name }}
+          PHASE_A_EVIDENCE_DIR: ${{ runner.temp }}/approved-phase-a-evidence
+          PHASE_A_EVIDENCE_MANIFEST_SHA256: ${{ github.event.client_payload.phase_a_evidence_manifest_sha256 }}
+          PHASE_B1_EVIDENCE_DIR: ${{ runner.temp }}/governance-phase-b1-evidence
+        run: bash infra/governance/what-if-phase-b1.sh
+      - name: Upload immutable Phase B evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: governance-phase-b1-evidence
+          path: ${{ runner.temp }}/governance-phase-b1-evidence/**
+          if-no-files-found: error
+          retention-days: 90

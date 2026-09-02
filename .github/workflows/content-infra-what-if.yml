@@ -1,0 +1,114 @@
+name: Content infrastructure what-if
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/content/**"
+      - "infra/modules/contentPrivateEndpoints.bicep"
+      - "infra/modules/contentStorage.bicep"
+      - "infra/params/content.bicepparam"
+      - ".github/workflows/content-infra-what-if.yml"
+
+permissions: {}
+
+concurrency:
+  group: content-infra-what-if
+  cancel-in-progress: false
+
+jobs:
+  what-if:
+    name: Dedicated content stack what-if
+    environment: azure-content-infra-plan
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
+
+      - name: Validate planning identity variables
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          : "${AZURE_CLIENT_ID:?Configure AZURE_CLIENT_ID in azure-content-infra-plan}"
+          : "${AZURE_TENANT_ID:?Configure AZURE_TENANT_ID in azure-content-infra-plan}"
+          : "${AZURE_SUBSCRIPTION_ID:?Configure AZURE_SUBSCRIPTION_ID in azure-content-infra-plan}"
+
+      - name: Azure login with OIDC
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run resource-group what-if without deployment
+        shell: bash
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          WHAT_IF_FILE: ${{ runner.temp }}/content-what-if.json
+        run: |
+          set -euo pipefail
+          trap 'rm -f -- "$WHAT_IF_FILE"' EXIT
+          az deployment group what-if \
+            --name certigo-content-plan \
+            --resource-group rg-certigo-content \
+            --template-file infra/content/main.bicep \
+            --parameters infra/params/content.bicepparam \
+            --result-format FullResourcePayloads \
+            --no-pretty-print \
+            --output json > "$WHAT_IF_FILE"
+          node --input-type=module - "$WHAT_IF_FILE" <<'NODE'
+          import fs from 'node:fs';
+          const plan = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const changes = plan.changes ?? [];
+          const contentScope =
+            `/subscriptions/${process.env.AZURE_SUBSCRIPTION_ID}/` +
+            `resourcegroups/rg-certigo-content`;
+          const outsideAllowedScope = changes.filter(({ resourceId = '' }) => {
+            const normalized = resourceId.toLowerCase();
+            return normalized !== contentScope &&
+              !normalized.startsWith(`${contentScope}/`);
+          });
+          if (outsideAllowedScope.length > 0) {
+            throw new Error(
+              `what-if touches resources outside the dedicated content stack: ` +
+              outsideAllowedScope.map((change) => change.resourceId).join(', '),
+            );
+          }
+          const destructive = changes.filter(
+            ({ changeType = '' }) => changeType === 'Delete',
+          );
+          if (destructive.length > 0) {
+            throw new Error(
+              `what-if contains deletions: ` +
+              destructive.map((change) => change.resourceId).join(', '),
+            );
+          }
+          const counts = changes.reduce((result, { changeType = 'Unknown' }) => {
+            result[changeType] = (result[changeType] ?? 0) + 1;
+            return result;
+          }, {});
+          const rows = changes.length === 0
+            ? '| None | No resource change |\n'
+            : changes
+              .map(({ changeType = 'Unknown', resourceId = 'Unknown' }) =>
+                `| ${changeType} | \`${resourceId}\` |`)
+              .join('\n') + '\n';
+          fs.appendFileSync(
+            process.env.GITHUB_STEP_SUMMARY,
+            `## Certigo content infrastructure what-if\n\n` +
+              `Evaluated \`refs/heads/main\`. No deployment was executed. Only ` +
+              `\`rg-certigo-content\` is allowed; deletions fail the job.\n\n` +
+              `### Counts\n\n` +
+              `\`\`\`json\n${JSON.stringify(counts, null, 2)}\n\`\`\`\n\n` +
+              `### Complete diff\n\n| Change | Resource ID |\n|---|---|\n${rows}`,
+          );
+          NODE

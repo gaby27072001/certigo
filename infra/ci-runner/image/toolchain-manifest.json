@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "target": {
+    "os": "ubuntu",
+    "osVersion": "24.04",
+    "architecture": "x86_64",
+    "pythonVersion": "3.12.3"
+  },
+  "policy": {
+    "exactVersionMatch": true,
+    "projectDependencyCachesPersisted": false,
+    "dotnetWorkloads": []
+  },
+  "baseComponents": [
+    {
+      "id": "github-actions-runner",
+      "version": "2.336.0",
+      "source": {
+        "url": "https://github.com/actions/runner/releases/download/v2.336.0/actions-runner-linux-x64-2.336.0.tar.gz",
+        "digest": {
+          "algorithm": "sha256",
+          "value": "04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d"
+        }
+      }
+    },
+    {
+      "id": "azure-cli",
+      "version": "2.89.0",
+      "packageVersion": "2.89.0-1~noble"
+    }
+  ],
+  "tools": [
+    {
+      "id": "node",
+      "version": "20.20.2",
+      "installPath": "/opt/certigo/toolchains/node-20.20.2",
+      "probe": {
+        "command": "node --version",
+        "expected": "v20.20.2"
+      },
+      "source": {
+        "url": "https://nodejs.org/dist/v20.20.2/node-v20.20.2-linux-x64.tar.xz",
+        "digest": {
+          "algorithm": "sha256",
+          "value": "df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d"
+        }
+      }
+    },
+    {
+      "id": "npm",
+      "version": "10.8.2",
+      "installPath": "/opt/certigo/toolchains/node-20.20.2",
+      "probe": {
+        "command": "npm --version",
+        "expected": "10.8.2"
+      },
+      "bundledWith": "node"
+    },
+    {
+      "id": "dotnet-sdk",
+      "version": "8.0.424",
+      "installPath": "/opt/certigo/toolchains/dotnet-8.0.424",
+      "probe": {
+        "command": "dotnet --version",
+        "expected": "8.0.424"
+      },
+      "source": {
+        "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.424/dotnet-sdk-8.0.424-linux-x64.tar.gz",
+        "digest": {
+          "algorithm": "sha512",
+          "value": "6503fd9f464d5e3a4f43a881d2b74afc6a2c46ceda74d027f1565b7239f4b3ec884857c03c0dcd49eb52f384d5ae1fa5aaf135f0a6aabc5518103aceed643c74"
+        }
+      }
+    },
+    {
+      "id": "flutter",
+      "version": "3.44.4",
+      "installPath": "/opt/certigo/toolchains/flutter-3.44.4",
+      "probe": {
+        "command": "flutter --version --machine",
+        "jsonField": "frameworkVersion",
+        "expected": "3.44.4"
+      },
+      "source": {
+        "url": "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.44.4-stable.tar.xz",
+        "digest": {
+          "algorithm": "sha256",
+          "value": "c853cda0312a162854c481fe6a1bc286d84fbb74bfab7037c39750061dc9b466"
+        }
+      }
+    },
+    {
+      "id": "dart",
+      "version": "3.12.2",
+      "installPath": "/opt/certigo/toolchains/flutter-3.44.4",
+      "probe": {
+        "command": "dart --version",
+        "expected": "Dart SDK version: 3.12.2"
+      },
+      "bundledWith": "flutter"
+    },
+    {
+      "id": "dart-formatter",
+      "version": "3.6.0",
+      "installPath": "/opt/certigo/toolchains/dart-3.6.0",
+      "probe": {
+        "command": "dart-format-3.6.0 --version",
+        "expected": "Dart SDK version: 3.6.0"
+      },
+      "source": {
+        "url": "https://storage.googleapis.com/dart-archive/channels/stable/release/3.6.0/sdk/dartsdk-linux-x64-release.zip",
+        "digest": {
+          "algorithm": "sha256",
+          "value": "8e14ff436e1eec72618dabc94f421a97251f2068c9cc9ad2d3bb9d232d6155a3"
+        }
+      }
+    },
+    {
+      "id": "bicep",
+      "version": "0.44.1",
+      "installPath": "/opt/certigo/toolchains/bicep-0.44.1",
+      "probe": {
+        "command": "bicep --version",
+        "contains": "0.44.1"
+      },
+      "source": {
+        "url": "https://github.com/Azure/bicep/releases/download/v0.44.1/bicep-linux-x64",
+        "digest": {
+          "algorithm": "sha256",
+          "value": "e17dc9a9888184886bb0c0051a3230b83b19f342749999f707bc571c3dfd2f45"
+        }
+      }
+    },
+    {
+      "id": "actionlint",
+      "version": "1.7.12",
+      "installPath": "/opt/certigo/toolchains/actionlint-1.7.12",
+      "probe": {
+        "command": "actionlint -version",
+        "contains": "1.7.12"
+      },
+      "source": {
+        "url": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz",
+        "digest": {
+          "algorithm": "sha256",
+          "value": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+        }
+      }
+    },
+    {
+      "id": "checkov",
+      "version": "3.2.495",
+      "installPath": "/opt/certigo/toolchains/python-3.12.3",
+      "probe": {
+        "command": "checkov --version",
+        "expected": "3.2.495"
+      },
+      "pythonLock": "toolchain-requirements.lock"
+    },
+    {
+      "id": "pyyaml",
+      "version": "6.0.2",
+      "installPath": "/opt/certigo/toolchains/python-3.12.3",
+      "probe": {
+        "command": "python3 -c \"import yaml; print(yaml.__version__)\"",
+        "expected": "6.0.2"
+      },
+      "pythonLock": "toolchain-requirements.lock"
+    }
+  ],
+  "contentTools": {
+    "nodeLockfile": "../../../package-lock.json",
+    "nodeLockfileSha256": "9a2081fc70320ab5ae1e0f71ec5b265f5e927c85575ff94a04bb91651f6a9e45",
+    "entryPoints": [
+      "../../../tools/validate_content.mjs",
+      "../../../tools/seed_content.py",
+      "../../../tools/project_state.py",
+      "../../../tools/validate_migration_registry.py"
+    ],
+    "prewarmedProjectDependencies": []
+  },
+  "artifacts": {
+    "cycloneDxSbom": "toolchain-sbom.cyclonedx.document",
+    "pythonLock": "toolchain-requirements.lock",
+    "pythonLockSha256": "fd95e916913fa05320ec5f7ff5e3fb07345afe5802294b4eec6bd1ccece79062",
+    "sbomSha256": "50c91591ad53910997eba00003a8840594f3c9c1238821adc56df8d278026838"
+  }
+}

@@ -80,19 +80,8 @@ resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15
   }
 }
 
-// Locked container topology: name -> partition key.
-var containers = [
-  { name: 'users', pk: '/id' }
-  { name: 'content', pk: '/trackId' }
-  { name: 'progress', pk: '/userId' }
-  // Existing attempts remain durable because their documents omit "ttl"; issued
-  // exam documents opt in with a positive per-item TTL.
-  { name: 'attempts', pk: '/userId' }
-  { name: 'events', pk: '/userId' }
-  { name: 'leaderboard', pk: '/periodLeagueId' }
-  { name: 'economy', pk: '/userId' }
-  { name: 'friends', pk: '/userId' }
-]
+// Canonical topology is shared with backend generation and source checks.
+var containers = loadJsonContent('../../contracts/cosmos-containers.json').containers
 
 resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [
   for c in containers: {
@@ -103,7 +92,7 @@ resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
         {
           id: c.name
           partitionKey: {
-            paths: [ c.pk ]
+            paths: [ c.partitionKeyPath ]
             kind: 'Hash'
             version: 2
           }
@@ -122,7 +111,9 @@ resource containerResources 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
             ]
           }
         },
-        c.name == 'attempts' ? { defaultTtl: -1 } : {}
+        c.defaultTimeToLive == null
+          ? {}
+          : { defaultTtl: c.defaultTimeToLive }
       )
     }
   }

@@ -6,6 +6,7 @@ using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.Logging;
 using Certigo.Api.Http;
 using Certigo.Application.Abstractions;
+using Certigo.Domain.Organizations;
 
 namespace Certigo.Api.Middleware;
 
@@ -86,6 +87,89 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
             logger.LogWarning(ex, "Concurrency conflict in function {FunctionName}.", context.FunctionDefinition.Name);
             await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict",
                 "The request conflicted with a concurrent update; please retry.", correlationId);
+        }
+        catch (OrganizationFeatureDisabledException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.NotFound,
+                "Not found",
+                ex.Message,
+                correlationId);
+        }
+        catch (EnterpriseIdentityFeatureDisabledException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.NotFound,
+                "Not found",
+                ex.Message,
+                correlationId);
+        }
+        catch (EnterpriseLearningMetricsFeatureDisabledException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.NotFound,
+                "Not found",
+                ex.Message,
+                correlationId);
+        }
+        catch (OrganizationNotFoundException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.NotFound, "Not found", ex.Message, correlationId);
+        }
+        catch (OrganizationMembershipNotFoundException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.NotFound, "Not found", ex.Message, correlationId);
+        }
+        catch (OrganizationPersonNotFoundException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.NotFound, "Not found", ex.Message, correlationId);
+        }
+        catch (OrganizationTeamNotFoundException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.NotFound, "Not found", ex.Message, correlationId);
+        }
+        catch (OrganizationAccessDeniedException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Forbidden, "Forbidden", ex.Message, correlationId);
+        }
+        catch (OrganizationValidationException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.BadRequest, "Invalid request", ex.Message, correlationId);
+        }
+        catch (EnterpriseLearningSequenceException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict", ex.Message, correlationId);
+        }
+        catch (OrganizationInvitationTokenException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Unauthorized, "Unauthorized", ex.Message, correlationId);
+        }
+        catch (OrganizationIdempotencyConflictException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict", ex.Message, correlationId);
+        }
+        catch (OrganizationInvitationReplayException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict", ex.Message, correlationId);
+        }
+        catch (OrganizationInvitationExpiredException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Gone, "Invitation expired", ex.Message, correlationId);
+        }
+        catch (OrganizationOwnerOffboardingException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict", ex.Message, correlationId);
+        }
+        catch (OrganizationOffboardingInProgressException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict", ex.Message, correlationId);
+        }
+        catch (EnterpriseLearningLeaseConflictException ex)
+        {
+            await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict", ex.Message, correlationId);
         }
         catch (EmptyCatalogException)
         {

@@ -75,6 +75,11 @@ param appleCiamDomainReconfigured bool = false
   'shadow'
 ])
 param personLinkedIdentityV1 string = 'off'
+@description('Organization/Membership V1 mode. This contract increment supports off only.')
+@allowed([
+  'off'
+])
+param organizationMembershipV1 string = 'off'
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
 @description('Azure OpenAI resource endpoint used by the tutor when enabled. Example: https://<resource>.openai.azure.com/.')
@@ -397,13 +402,15 @@ module monitoring 'modules/appInsights.bicep' = {
   }
 }
 
+var cosmosContract = loadJsonContent('../contracts/cosmos-containers.json')
+
 module data 'modules/cosmos.bicep' = {
   scope: rg
   name: 'cosmos'
   params: {
     accountName: 'cosmos-${appName}-${env}-${suffix}'
     location: cosmosRegion
-    databaseName: 'certigo'
+    databaseName: cosmosContract.databaseName
     disableLocalAuth: hardened
     backupMode: cosmosBackupMode
     continuousBackupTier: cosmosContinuousBackupTier
@@ -569,6 +576,7 @@ module api 'modules/functionApp.bicep' = {
     appInsightsConnectionString: monitoring.outputs.connectionString
     appInsightsName: monitoring.outputs.name
     cosmosEndpoint: data.outputs.endpoint
+    cosmosDatabaseName: cosmosContract.databaseName
     cosmosAccountName: data.outputs.accountName
     keyVaultName: vault.outputs.name
     functionIntegrationSubnetId: privateNetwork.outputs.functionIntegrationSubnetId
@@ -583,6 +591,7 @@ module api 'modules/functionApp.bicep' = {
     entraGraphClientSecretSecretUri: graphClientSecret.?outputs.?secretUri ?? ''
     accountDeletionEnabled: accountDeletionEnabled
     personLinkedIdentityV1: personLinkedIdentityV1
+    organizationMembershipV1: organizationMembershipV1
     tutorLlmEnabled: tutorLlmEnabled
     tutorLlmEndpoint: tutorLlmEndpoint
     tutorLlmDeployment: tutorLlmDeployment
