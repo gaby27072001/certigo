@@ -93,6 +93,29 @@ public sealed class ContentServiceTests
     }
 
     [Fact]
+    public async Task GetCatalogAsync_joins_projected_runtime_track_by_certification_id()
+    {
+        var content = new InMemoryContentRepository();
+        content.AddTrack(MakeTrack(
+                "aws.dva-c02.track.main",
+                "DVA-C02",
+                "Runtime title",
+                "associate",
+                1,
+                1) with
+            { CertificationId = "aws:dva-c02" });
+        var service = new ContentService(content, FixtureRegistry());
+
+        var catalog = await service.GetCatalogAsync();
+
+        var matches = catalog.Tracks.Where(track => track.Code == "DVA-C02").ToArray();
+        matches.Should().ContainSingle();
+        matches[0].Id.Should().Be("aws.dva-c02.track.main");
+        matches[0].ContentStatus.Should().Be("available");
+        matches[0].Provider.Should().Be("aws");
+    }
+
+    [Fact]
     public async Task GetCatalogAsync_overlays_official_blueprints_without_changing_authored_content()
     {
         var content = new InMemoryContentRepository();

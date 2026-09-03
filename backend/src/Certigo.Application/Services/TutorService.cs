@@ -37,11 +37,16 @@ public sealed class TutorService(
 {
     public async Task<TutorExplanationDto> ExplainAsync(TutorExplainRequest request, CancellationToken cancellationToken = default)
     {
-        var track = await content.GetTrackAsync(request.TrackId, cancellationToken)
+        var snapshot = await ResolveSnapshotAsync(request.PublicManifestId, cancellationToken);
+        var track = await content.GetTrackAsync(snapshot, request.TrackId, cancellationToken)
             ?? throw new InvalidOperationException($"Track '{request.TrackId}' was not found.");
-        var lesson = await content.GetLessonAsync(request.TrackId, request.LessonId, cancellationToken)
+        var lesson = await content.GetLessonAsync(snapshot, request.TrackId, request.LessonId, cancellationToken)
             ?? throw new InvalidOperationException($"Lesson '{request.LessonId}' was not found.");
-        var answerKey = await content.GetAnswerKeyAsync(request.TrackId, request.LessonId, cancellationToken)
+        var answerKey = await content.GetAnswerKeyAsync(
+                snapshot,
+                request.TrackId,
+                request.LessonId,
+                cancellationToken)
             ?? throw new InvalidOperationException($"Answer key for lesson '{request.LessonId}' was not found.");
 
         var keyItem = answerKey.Items.FirstOrDefault(i =>
@@ -75,6 +80,25 @@ public sealed class TutorService(
             cancellationToken);
 
         return ToDto(ctx, explanation);
+    }
+
+    private async Task<ContentSnapshot> ResolveSnapshotAsync(
+        string? publicManifestId,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(publicManifestId))
+        {
+            return await content.ResolveSnapshotAsync(publicManifestId, cancellationToken);
+        }
+
+        var snapshot = await content.ResolveActiveSnapshotAsync(cancellationToken);
+        if (!snapshot.IsLegacy)
+        {
+            throw new RequestValidationException(
+                "publicManifestId is required for a versioned tutor request.");
+        }
+
+        return snapshot;
     }
 
     // Attempts an LLM upgrade, but only adopts it if it survives the guardrails

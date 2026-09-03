@@ -1,14 +1,14 @@
 {
   "id": "wp-p2-04",
   "status": "in_progress",
-  "session_id": "5cf299a4-4f53-453a-8d1d-671f70f54913",
+  "session_id": "ec84447b-5c18-4c12-be65-9cdf8f0f8b27",
   "branch": "gchambaud-microsoft-import-content-releases",
   "pr": null,
   "checkpoint": {
-    "step": "implementation-started",
-    "note": "Issue #244 lancée après fusion de wp-p2-03 ; contrat des artefacts content en cours d'intégration dans le backend.",
-    "at": "2026-08-06T10:03:18Z"
+    "step": "backend-iac-mobile-ported-and-validated",
+    "note": "Reprise : 3 PR existantes trouvées sur #244 (#257, #259 obsolètes ; #304 draft du 19/08 alignée sur le contrat canonique certigo-content mais avec un diff brut pollué par ~150 fichiers de gouvernance/CI sans rapport, désynchronisés de main). Code content-release de #304 porté chirurgicalement (merge 3-way fichier par fichier, pas de rebase) sur une branche neuve basée sur main courant. Validé : build backend 0 warning/0 erreur, 831 tests (813 verts, 18 skip gate Cosmos émulateur, 0 échec) ; bicep build OK + 36/36 tests infra ; 84 tests Dart (packages/data) + 435 tests Flutter (apps/mobile) verts. ADR de #304 renumérotée ADR-019 (collision avec ADR-015-organization-membership déjà pris sur main). Reste : validation consolidée finale (melos format/analyze, tools tests, project_state --check), ouverture PR, fermeture #257/#259/#304.",
+    "at": "2026-09-03T18:45:00Z"
   },
-  "updated_at": "2026-08-06T10:03:18Z",
+  "updated_at": "2026-09-03T18:45:00Z",
   "history_ref": "log.jsonl"
 }

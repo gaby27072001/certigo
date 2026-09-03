@@ -394,7 +394,7 @@ work_packages:
     dod: "Import répété sans doublon ; hash invalide rejeté avant mutation ; rollback N-1 testé en staging ; tests HTTP anti-fuite verts ; le backend expose le manifestId public actif."
     rollback: "Réactiver le manifeste précédent ; conserver les artefacts immuables et ne supprimer aucune version pendant le lot."
     status: in_progress
-    notes: "Source : gchambaud_microsoft/Certigo#244. Implémentation active dans la session dédiée 5cf299a4-4f53-453a-8d1d-671f70f54913."
+    notes: "Source : gchambaud_microsoft/Certigo#244. Repris sur session dédiée ec84447b-5c18-4c12-be65-9cdf8f0f8b27 : code content-release porté depuis la PR draft #304 (superseded, alignée sur certigo-content ADR-0005) vers une branche neuve basée sur main, en excluant son diff de gouvernance/CI sans rapport. Backend/IaC/mobile validés verts ; PR à ouvrir."
 
   - id: wp-p2-05
     phase: 2

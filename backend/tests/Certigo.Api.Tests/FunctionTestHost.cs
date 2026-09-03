@@ -34,21 +34,35 @@ internal sealed class TestFunctionContext : FunctionContext
         set => _items = value;
     }
 
-    public static TestFunctionContext Authenticated(string userId = "user-1", string displayName = "Tester")
+    public static TestFunctionContext Authenticated(
+        string userId = "user-1",
+        string displayName = "Tester",
+        string? role = null,
+        string authenticationType = "test")
     {
         var context = new TestFunctionContext();
-        context.Items["User"] = CreatePrincipal(userId, displayName);
+        context.Items["User"] = CreatePrincipal(userId, displayName, role, authenticationType);
         return context;
     }
 
-    private static ClaimsPrincipal CreatePrincipal(string userId, string displayName)
-        => new(new ClaimsIdentity(
-            new[]
-            {
-                new Claim(ClaimTypes.NameIdentifier, userId),
-                new Claim(ClaimTypes.Name, displayName),
-            },
-            authenticationType: "test"));
+    private static ClaimsPrincipal CreatePrincipal(
+        string userId,
+        string displayName,
+        string? role,
+        string authenticationType)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId),
+            new(ClaimTypes.Name, displayName),
+        };
+        if (role is not null)
+        {
+            claims.Add(new Claim("roles", role));
+        }
+
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType));
+    }
 }
 
 internal sealed class TestHttpRequestData : HttpRequestData

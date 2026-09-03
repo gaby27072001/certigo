@@ -50,6 +50,7 @@ class ResultFeedbackWidget extends StatelessWidget {
         lessonId: lessonId,
         itemId: r.itemId,
         selected: answers[r.itemId] ?? const <String>[],
+        publicManifestId: lesson.publicManifestId,
       ),
       correct: r.correct,
     );
@@ -76,12 +77,12 @@ class ResultFeedbackWidget extends StatelessWidget {
           isDemo
               ? 'Démo terminée'
               : pendingSync
-                  ? 'Soumis hors ligne'
-                  : submissionFailed
-                      ? 'Envoi impossible'
-                      : passed
-                          ? 'Concept validé !'
-                          : 'Presque !',
+              ? 'Soumis hors ligne'
+              : submissionFailed
+              ? 'Envoi impossible'
+              : passed
+              ? 'Concept validé !'
+              : 'Presque !',
           textAlign: TextAlign.center,
           style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
         ),
@@ -90,12 +91,12 @@ class ResultFeedbackWidget extends StatelessWidget {
           isDemo
               ? 'Cette session ne sera pas synchronisée et ne rapporte aucune récompense.'
               : pendingSync
-                  ? 'Tes réponses seront synchronisées automatiquement au retour du réseau.'
-                  : submissionFailed
-                      ? 'Aucune progression ni récompense n’a été enregistrée.'
-                      : passed
-                          ? 'Tu maîtrises ce concept. On le consolide avec une révision espacée.'
-                          : 'Tu y es presque — une courte révision et ce sera acquis.',
+              ? 'Tes réponses seront synchronisées automatiquement au retour du réseau.'
+              : submissionFailed
+              ? 'Aucune progression ni récompense n’a été enregistrée.'
+              : passed
+              ? 'Tu maîtrises ce concept. On le consolide avec une révision espacée.'
+              : 'Tu y es presque — une courte révision et ce sera acquis.',
           textAlign: TextAlign.center,
           style: text.bodyMedium?.copyWith(color: p.textSecondary, height: 1.4),
         ),
@@ -152,7 +153,8 @@ class ResultFeedbackWidget extends StatelessWidget {
           CalloutBlock(
             kind: CalloutKind.warning,
             title: 'À renforcer',
-            text: 'On replanifiera ${result.weakConcepts.length} concept(s) en '
+            text:
+                'On replanifiera ${result.weakConcepts.length} concept(s) en '
                 'révision pour bien les ancrer.',
           ),
         ],
@@ -196,16 +198,8 @@ class _ScoreRing extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(
-                '$scorePct%',
-                style: text.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                'score',
-                style: text.labelSmall?.copyWith(color: p.textSecondary),
-              ),
+              Text('$scorePct%', style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Text('score', style: text.labelSmall?.copyWith(color: p.textSecondary)),
             ],
           ),
         ],
@@ -294,11 +288,7 @@ class _ResultRow extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Icon(
-                      Icons.auto_awesome_rounded,
-                      size: 16,
-                      color: p.primary,
-                    ),
+                    Icon(Icons.auto_awesome_rounded, size: 16, color: p.primary),
                     const SizedBox(width: 6),
                     Text(
                       'Demander au tuteur',

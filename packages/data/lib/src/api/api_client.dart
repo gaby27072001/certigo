@@ -28,8 +28,8 @@ class ApiClient {
     String? baseUrl,
     DebugLogger? debugLog,
     CorrelationIdGenerator? correlationIdGenerator,
-  })  : _dio = dio ?? Dio(),
-        _debugLog = debugLog {
+  }) : _dio = dio ?? Dio(),
+       _debugLog = debugLog {
     _dio.options
       ..baseUrl = baseUrl ?? AppEnv.apiBaseUrl
       ..connectTimeout = const Duration(seconds: 12)
@@ -104,6 +104,17 @@ class ApiClient {
     return _guard(() async {
       final Response<dynamic> res = await _dio.get<dynamic>(path, queryParameters: query);
       return parse(_asMap(res.data));
+    });
+  }
+
+  Future<Result<T>> getJsonWithHeaders<T>(
+    String path,
+    T Function(Map<String, dynamic> json, Headers headers) parse, {
+    Map<String, dynamic>? query,
+  }) async {
+    return _guard(() async {
+      final Response<dynamic> res = await _dio.get<dynamic>(path, queryParameters: query);
+      return parse(_asMap(res.data), res.headers);
     });
   }
 

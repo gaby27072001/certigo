@@ -65,6 +65,7 @@ public sealed record CertificationObjective(
 public sealed record CertificationLifecycle(
     DateOnly? ReviewOn = null,
     DateOnly? LastExamOn = null,
+    DateOnly? RecommendThrough = null,
     IReadOnlyList<string>? Replaces = null,
     string? Successor = null,
     string? Note = null);

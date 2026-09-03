@@ -5,6 +5,7 @@ using Certigo.Domain.Content;
 using Certigo.Domain.Gamification;
 using Certigo.Domain.Progress;
 using Certigo.Domain.Tutor;
+using Certigo.Application.Services;
 
 namespace Certigo.Application.Abstractions;
 
@@ -72,6 +73,51 @@ public interface IUserRepository
 
 public interface IContentRepository
 {
+    Task<ContentSnapshot> ResolveActiveSnapshotAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(ContentSnapshot.Legacy);
+
+    Task<ContentSnapshot> ResolveSnapshotAsync(
+        string publicManifestId,
+        CancellationToken cancellationToken = default)
+        => throw new ContentReleaseNotFoundException(
+            $"Public manifest '{publicManifestId}' is not available from the legacy content repository.");
+
+    Task<CertificationCatalogDocument?> GetCertificationCatalogAsync(
+        ContentSnapshot snapshot,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<CertificationCatalogDocument?>(null);
+
+    Task<Track?> GetTrackAsync(
+        ContentSnapshot snapshot,
+        string trackId,
+        CancellationToken cancellationToken = default)
+        => GetTrackAsync(trackId, cancellationToken);
+
+    Task<Lesson?> GetLessonAsync(
+        ContentSnapshot snapshot,
+        string trackId,
+        string lessonId,
+        CancellationToken cancellationToken = default)
+        => GetLessonAsync(trackId, lessonId, cancellationToken);
+
+    Task<LessonAnswerKey?> GetAnswerKeyAsync(
+        ContentSnapshot snapshot,
+        string trackId,
+        string lessonId,
+        CancellationToken cancellationToken = default)
+        => GetAnswerKeyAsync(trackId, lessonId, cancellationToken);
+
+    Task<IReadOnlyList<LessonAnswerKey>> ListAnswerKeysAsync(
+        ContentSnapshot snapshot,
+        string trackId,
+        CancellationToken cancellationToken = default)
+        => ListAnswerKeysAsync(trackId, cancellationToken);
+
+    Task<IReadOnlyList<Track>> ListTracksAsync(
+        ContentSnapshot snapshot,
+        CancellationToken cancellationToken = default)
+        => ListTracksAsync(cancellationToken);
+
     Task<Track?> GetTrackAsync(string trackId, CancellationToken cancellationToken = default);
     Task<Lesson?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default);
     Task<LessonAnswerKey?> GetAnswerKeyAsync(string trackId, string lessonId, CancellationToken cancellationToken = default);
@@ -247,7 +293,9 @@ public sealed record AttemptRecord(
     string LessonId,
     DateTimeOffset StartedAt,
     DateTimeOffset SubmittedAt,
-    SubmitQuizResult Result);
+    SubmitQuizResult Result,
+    string? ReleaseId = null,
+    string? PublicManifestId = null);
 
 // A graded mock-exam attempt. Shares the attempts container with AttemptRecord;
 // the get-only Kind property serialises a "kind":"exam" discriminator so the two
@@ -260,7 +308,9 @@ public sealed record ExamAttemptRecord(
     string ExamId,
     DateTimeOffset StartedAt,
     DateTimeOffset SubmittedAt,
-    MockExamResultDto Result)
+    MockExamResultDto Result,
+    string? ReleaseId = null,
+    string? PublicManifestId = null)
 {
     public string Kind => "exam";
 }
@@ -276,7 +326,9 @@ public sealed record ExamRecord(
     DateTimeOffset CreatedAt,
     int DurationSeconds,
     DateTimeOffset ExpiresAt,
-    int Ttl)
+    int Ttl,
+    string? ReleaseId = null,
+    string? PublicManifestId = null)
 {
     public string Kind => "exam-issued";
 }

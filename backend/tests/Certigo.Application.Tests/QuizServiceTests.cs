@@ -49,6 +49,26 @@ internal sealed class QuizServiceHarness
 public sealed class QuizServiceTests
 {
     [Fact]
+    public async Task SubmitAsync_rejects_invalid_manifest_before_idempotency_reads()
+    {
+        var h = new QuizServiceHarness();
+        var service = h.Build();
+        var request = QuizServiceHarness.Request(
+            "invalid-manifest",
+            QuizServiceHarness.Answer("l1-i1", "a")) with
+        {
+            PublicManifestId = "sha256:not-a-digest",
+        };
+
+        var action = () => service.SubmitAsync("l1", request);
+
+        await action.Should().ThrowAsync<ContentReleaseValidationException>()
+            .WithMessage("publicManifestId must be a lowercase sha256 content identity.");
+        h.EconomyOperations.GetCount.Should().Be(0);
+        h.Attempts.GetByClientAttemptIdCount.Should().Be(0);
+    }
+
+    [Fact]
     public async Task SubmitAsync_rejects_duplicate_item_ids_before_rewards()
     {
         var h = new QuizServiceHarness();

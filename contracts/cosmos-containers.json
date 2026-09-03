@@ -15,6 +15,24 @@
       "defaultTimeToLive": null
     },
     {
+      "symbol": "ContentPublic",
+      "name": "content-public",
+      "partitionKeyPath": "/releaseId",
+      "defaultTimeToLive": null
+    },
+    {
+      "symbol": "ContentPrivate",
+      "name": "content-private",
+      "partitionKeyPath": "/releaseId",
+      "defaultTimeToLive": null
+    },
+    {
+      "symbol": "ContentControl",
+      "name": "content-control",
+      "partitionKeyPath": "/scope",
+      "defaultTimeToLive": null
+    },
+    {
       "symbol": "Progress",
       "name": "progress",
       "partitionKeyPath": "/userId",

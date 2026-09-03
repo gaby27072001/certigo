@@ -49,15 +49,10 @@ class RemoteUserRepository implements UserRepository {
   Future<Result<UserProfile>> setActiveTrack({
     required String trackId,
     required String? expectedTrackId,
-  }) =>
-      _api.postJson(
-        '/me/active-track',
-        <String, dynamic>{
-          'trackId': trackId,
-          'expectedTrackId': expectedTrackId,
-        },
-        UserProfile.fromJson,
-      );
+  }) => _api.postJson('/me/active-track', <String, dynamic>{
+    'trackId': trackId,
+    'expectedTrackId': expectedTrackId,
+  }, UserProfile.fromJson);
 }
 
 class RemoteAccountDeletionRepository implements AccountDeletionRepository {
@@ -70,13 +65,13 @@ class RemoteAccountDeletionRepository implements AccountDeletionRepository {
 
   @override
   Future<Result<AccountDeletion>> requestDeletion({String? reauthenticationToken}) => _api.postJson(
-        '/account/deletion',
-        const <String, dynamic>{},
-        AccountDeletion.fromJson,
-        headers: reauthenticationToken == null
-            ? null
-            : <String, dynamic>{'X-Certigo-Reauthentication': reauthenticationToken},
-      );
+    '/account/deletion',
+    const <String, dynamic>{},
+    AccountDeletion.fromJson,
+    headers: reauthenticationToken == null
+        ? null
+        : <String, dynamic>{'X-Certigo-Reauthentication': reauthenticationToken},
+  );
 }
 
 class RemotePathRepository implements PathRepository {
@@ -117,9 +112,10 @@ class RemoteLessonRepository implements LessonRepository {
 
   @override
   Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) =>
-      _api.getJson(
+      _api.getJsonWithHeaders(
         '/tracks/${Uri.encodeComponent(trackId)}/lessons/${Uri.encodeComponent(lessonId)}',
-        Lesson.fromJson,
+        (Map<String, dynamic> json, headers) =>
+            Lesson.fromJson(json).withPublicManifestId(headers.value('x-content-manifest-id')),
       );
 }
 
@@ -131,8 +127,7 @@ class RemoteQuizRepository implements QuizRepository {
   Future<Result<SubmitQuizResult>> submit({
     required String lessonId,
     required SubmitQuizRequest request,
-  }) =>
-      _api.postJson('/quiz/$lessonId/submit', request.toJson(), SubmitQuizResult.fromJson);
+  }) => _api.postJson('/quiz/$lessonId/submit', request.toJson(), SubmitQuizResult.fromJson);
 }
 
 class RemoteLeaderboardRepository implements LeaderboardRepository {
