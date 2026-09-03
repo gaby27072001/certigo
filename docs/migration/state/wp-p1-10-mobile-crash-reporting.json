@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-10-mobile-crash-reporting",
-  "status": "in_review",
+  "status": "done",
   "session_id": "3dee5e42-1c4d-464a-a9e3-4dff3dbea5e7",
   "branch": "gchambaud-microsoft-wp-p1-10-mobile-crash-reporting",
   "pr": 213,
   "checkpoint": {
-    "step": "ci-fix-applied",
-    "note": "PR #213 couvre la capture locale, mais la DoD reste incomplète : sink production, upload des symboles et crash visible dans le tableau de bord non prouvés.",
-    "at": "2026-07-07T10:52:10+01:00"
+    "step": "merged-pr-reconciled",
+    "note": "PR #213 fusionnée (2026-07-07T09:48:13Z, merge commit 4df79ee3), sans conflit ni revue/commentaire non résolu. Clôture actée sur décision explicite de la session orchestratrice (2026-09-03) malgré un écart DoD résiduel documenté : LoggingCrashReporter par défaut = debugPrint uniquement, aucune intégration de sink production (Crashlytics/Sentry/App Insights), aucun upload de symboles, aucun crash de test vérifié dans un tableau de bord. À rouvrir/suivre séparément si une visibilité crash production est requise avant l'Alpha TestFlight.",
+    "at": "2026-09-03T17:52:00+01:00"
   },
-  "updated_at": "2026-08-05T20:52:00+01:00",
+  "updated_at": "2026-09-03T17:52:00+01:00",
   "history_ref": "log.jsonl"
 }
