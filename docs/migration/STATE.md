@@ -25,7 +25,7 @@
 | `wp-p1-07-content-manifest-immutable` | 1 | S | done | `wp-p1-06-ci-content-pipeline` | [certigo-content#3](https://github.com/gchambaud_microsoft/certigo-content/pull/3) |
 | `wp-p1-08-offline-study-cache` | 1 | M | done | `wp-p1-07-content-manifest-immutable` | [#231](https://github.com/gchambaud_microsoft/Certigo/pull/231) |
 | `wp-p1-09-cortex-parity-gate` | 1 | M | done | `wp-p1-00-decomposition` | [#216](https://github.com/gchambaud_microsoft/Certigo/pull/216) |
-| `wp-p1-10-mobile-crash-reporting` | 1 | S | done | `wp-p1-00-decomposition` | [#213](https://github.com/gchambaud_microsoft/Certigo/pull/213) |
+| `wp-p1-10-mobile-crash-reporting` | 1 | S | done | `wp-p1-00-decomposition` | [#213](https://github.com/gchambaud_microsoft/Certigo/pull/213) (fusionnée — écart DoD résiduel accepté : sink prod + upload symboles restants, voir `work-packages.yaml`) |
 | `wp-p1-11-ci-spof-runners` | 1 | S | todo | `wp-p1-00-decomposition` | — |
 | `wp-p1-12-iac-drift-import` | 1 | M | todo | `wp-p1-00-decomposition` | — |
 | `wp-p1-13-staging-environment` | 1 | S | todo | `wp-p1-12-iac-drift-import` | [#232 (IaC partielle)](https://github.com/gchambaud_microsoft/Certigo/pull/232) |
@@ -38,8 +38,8 @@
 | `wp-p2-05` | 2 | M | todo | `wp-p2-04` | [#243](https://github.com/gchambaud_microsoft/Certigo/issues/243) |
 | `wp-p2-06` | 2 | M | todo | `wp-p2-05` | [#245](https://github.com/gchambaud_microsoft/Certigo/issues/245) |
 | `wp-p2-07` | 2 | M | in_progress | `wp-p1-00-decomposition` | [#249](https://github.com/gchambaud_microsoft/Certigo/issues/249) · [PR #250](https://github.com/gchambaud_microsoft/Certigo/pull/250) · [PR #253](https://github.com/gchambaud_microsoft/Certigo/pull/253) |
-| `wp-p2-08` | 2 | S | in_review | `wp-p2-01` | [#247](https://github.com/gchambaud_microsoft/Certigo/issues/247) · [PR #254](https://github.com/gchambaud_microsoft/Certigo/pull/254) |
-| `wp-p2-09` | 2 | M | in_progress | `wp-p1-00-decomposition` | [#248](https://github.com/gchambaud_microsoft/Certigo/issues/248) · [PR #252](https://github.com/gchambaud_microsoft/Certigo/pull/252) |
+| `wp-p2-08` | 2 | S | done | `wp-p2-01` | [#247](https://github.com/gchambaud_microsoft/Certigo/issues/247) (closed) · [PR #254](https://github.com/gchambaud_microsoft/Certigo/pull/254) |
+| `wp-p2-09` | 2 | M | in_progress | `wp-p1-00-decomposition` | [#248](https://github.com/gchambaud_microsoft/Certigo/issues/248) · [#155](https://github.com/gchambaud_microsoft/Certigo/issues/155) (les deux ouvertes) · [PR #252](https://github.com/gchambaud_microsoft/Certigo/pull/252) (fusionnée — sous-lot icônes/polices, autres sous-lots restants) |
 | `wp-phase-1-contenu-renderer` | 1 | L | planned | `wp-p0-08-e2e-auth-health-release` | — |
 | `wp-phase-2-search-ai-tutor` | 2 | L | planned | `wp-phase-1-contenu-renderer` | — |
 | `wp-phase-3-admin-ops` | 3 | L | planned | `wp-phase-2-search-ai-tutor` | — |
