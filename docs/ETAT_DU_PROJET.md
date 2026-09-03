@@ -472,7 +472,7 @@ déclarée est dans `codemagic.yaml`.
 | Phase | Périmètre | Avancement au 2026-09-03 |
 |---|---|---|
 | **0 — Stabilisation** | Sécurité/fiabilité P0 (F-01, R-01, R-02, gouvernance CIAM, branch protection, E2E release) | ✅ **9/9 lots `done`** (`wp-000` + `wp-p0-01`…`08`) |
-| **1 — Contenu & Renderer** | Dépôt `certigo-content`, schémas v2, renderer, cache offline, observabilité, CI | 🟡 **12/16 lots `done`** — restent `wp-p1-10` (crash reporting mobile, `in_progress` : capture locale livrée, sink prod + upload symboles manquants), `wp-p1-11` (résilience CI, voir nuance ci-dessous), `wp-p1-12` (import drift IaC), `wp-p1-13` (staging, dépend de `wp-p1-12`) |
+| **1 — Contenu & Renderer** | Dépôt `certigo-content`, schémas v2, renderer, cache offline, observabilité, CI | 🟡 **13/16 lots `done`** — `wp-p1-10` (crash reporting mobile) clôturé `done` malgré un écart DoD résiduel accepté sur décision explicite (capture locale livrée, sink prod + upload symboles restants — voir `work-packages.yaml`) ; restent `wp-p1-11` (résilience CI, voir nuance ci-dessous), `wp-p1-12` (import drift IaC), `wp-p1-13` (staging, dépend de `wp-p1-12`) |
 | **2 — Search & AI Tutor** | Réconciliation registre, contenu multi-cloud, releases immuables, anti-drift doc | 🟡 **en cours** — voir détail dans `STATE.md` (`wp-p2-04` à `wp-p2-09`) |
 | **3 à 5 — Admin ops, backend modulaire, scale mondial** | Placeholders non décomposés | ⚪ `planned` |
 
@@ -504,7 +504,11 @@ python tools/check_migration_pr_status.py
 
 Deux dérives de ce type ont été trouvées et corrigées le 2026-09-03 (`wp-p1-10` et `wp-p2-08`
 affichaient un statut périmé de 1 à 2 mois par rapport à l'état réel de leur PR GitHub) — voir
-`docs/migration/log.jsonl` pour le détail des transitions de correction.
+`docs/migration/log.jsonl` pour le détail des transitions de correction. Pour `wp-p1-10`, deux
+sessions indépendantes ont détecté la même dérive et le même écart de DoD le même jour, avec des
+verdicts de clôture différents (`in_progress` vs `done`) ; le conflit de merge qui en a résulté a
+été tranché en faveur de la décision explicite et documentée de la session orchestratrice
+(`done`, écart accepté — voir `docs/migration/state/wp-p1-10-mobile-crash-reporting.json`).
 
 ---
 

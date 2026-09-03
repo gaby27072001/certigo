@@ -259,8 +259,8 @@ work_packages:
     precondition: "Vérifier l'existence d'une remontée de crash côté mobile. Idempotent : si le crash reporting est déjà intégré et actif, le lot est déjà fait."
     dod: "Les exceptions non gérées et erreurs de zone Flutter sont capturées et remontées ; les symboles sont uploadés pour symbolisation ; un crash de test apparaît dans le tableau de bord."
     rollback: "Abandon de la branche ; désactivation de l'intégration (aucune donnée applicative touchée)."
-    status: in_progress
-    notes: "Vague V1 · voie Flutter. PR #213 fusionnée 2026-07-07 (le registre disait à tort `in_review` ~2 mois après le merge — corrigé). Mais la DoD n'est PAS pleinement vérifiée : seule capture locale existe (`LoggingCrashReporter` dans `crash_reporting.dart`), aucun sink production réel (Crashlytics/Sentry/App Insights) ni upload de symboles dSYM/mapping.txt dans `release-android.yml`/`release-ios.yml` (vérifié par grep le 2026-09-03). Statut correct = `in_progress`, pas `done`."
+    status: done
+    notes: "Vague V1 · voie Flutter. PR #213 fusionnée 2026-07-07 (merge commit 4df79ee3). Écart DoD résiduel documenté et accepté sur décision explicite de la session orchestratrice (9af33c67) le 2026-09-03 (voir PR #359) : `LoggingCrashReporter` capture localement (FlutterError.onError/PlatformDispatcher.onError/runZonedGuarded, sink par défaut `debugPrint`) mais aucun sink production réel (Crashlytics/Sentry/App Insights) ni upload de symboles dSYM/mapping.txt n'existe dans `release-android.yml`/`release-ios.yml` (vérifié par grep le 2026-09-03). À rouvrir/suivre séparément si une visibilité crash production est requise avant l'Alpha TestFlight (détail : `state/wp-p1-10-mobile-crash-reporting.json`)."
 
   - id: wp-p1-11-ci-spof-runners
     phase: 1
