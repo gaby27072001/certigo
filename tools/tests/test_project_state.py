@@ -599,10 +599,7 @@ class ProjectStateTests(unittest.TestCase):
         )
         self.assertNotIn("environment:", workflow)
         self.assertIn("runs-on: [self-hosted, Linux, X64, certigo-pr]", workflow)
-        self.assertIn(
-            "runs-on: [self-hosted, Linux, X64, certigo-trusted]",
-            workflow,
-        )
+        self.assertNotIn("certigo-trusted", workflow)
         self.assertIn(
             "ref: ${{ github.event_name == 'pull_request_target' && "
             "github.event.pull_request.head.sha || github.sha }}",
@@ -648,7 +645,15 @@ class ProjectStateTests(unittest.TestCase):
         gate_job = workflow[
             workflow.index("  validate:\n", workflow.index("  validate-source:"))
         :]
+        self.assertIn(
+            "runs-on: [self-hosted, Linux, X64, certigo-pr]", gate_job
+        )
+        self.assertIn("permissions: {}", gate_job)
         self.assertNotIn("actions/checkout@", gate_job)
+        self.assertNotIn("secrets.", gate_job)
+        self.assertNotIn("id-token:", gate_job)
+        self.assertNotIn("environment:", gate_job)
+        self.assertNotIn(".github/scripts/", gate_job)
 
         protection = json.loads(
             (REPO_ROOT / ".github/branch-protection-main.json").read_text(
@@ -788,7 +793,11 @@ class ProjectStateTests(unittest.TestCase):
         persistent_runner_workflows = []
         for workflow_path in workflows.glob("*.yml"):
             workflow = workflow_path.read_text(encoding="utf-8")
-            if "certigo-trusted" in workflow or "certigo-pr" in workflow:
+            if (
+                "certigo-trusted" in workflow
+                or "certigo-pr" in workflow
+                or "certigo-ops-probe" in workflow
+            ):
                 persistent_runner_workflows.append(workflow_path.name)
                 self.assertNotRegex(
                     workflow,
@@ -840,6 +849,15 @@ class ProjectStateTests(unittest.TestCase):
             workflow = (workflows / workflow_name).read_text(encoding="utf-8")
             self.assertNotIn("repository_dispatch:", workflow)
             self.assertNotIn("workflow_dispatch:", workflow)
+
+        runner_health = (workflows / "runner-health.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "runs-on: [self-hosted, Linux, X64, certigo-ops-probe]",
+            runner_health,
+        )
+        self.assertNotIn("certigo-trusted", runner_health)
 
         android = (workflows / "release-android.yml").read_text(encoding="utf-8")
         self.assertNotIn("github.ref_type", android)

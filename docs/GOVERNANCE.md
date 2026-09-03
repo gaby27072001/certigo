@@ -279,8 +279,9 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
 - [ ] Ajouter `Fork PR policy / Required gate` aux contextes requis. Les PR de forks
       restent non supportées et échouent fermement sans checkout ; seules les PR internes
       peuvent exécuter leur SHA de tête uniquement sur `certigo-pr`, sans environnement,
-      secret ou identité cloud. Les gates agrégées sans source PR et toutes les opérations
-      privilégiées utilisent exclusivement `certigo-trusted`.
+      secret ou identité cloud. Les trois gates finales sans checkout ni privilège utilisent
+      aussi `certigo-pr`; les opérations Azure, release et déploiement restent exclusivement
+      sur `certigo-trusted`, et `runner-health` est isolé sur `certigo-ops-probe`.
 - [x] Le secret `AUTOMERGE_TOKEN` a été supprimé et le PAT correspondant révoqué.
       Aucun workflow ne dépend de cet ancien mécanisme.
 - [ ] Protéger l'environnement `beta` avec reviewers obligatoires, interdiction

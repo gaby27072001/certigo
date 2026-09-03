@@ -212,7 +212,7 @@ jobs:
     name: CodeQL / Security gate
     needs: [freshness, changes, analyze]
     if: ${{ always() && (github.event_name != 'pull_request_target' || (needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository)) }}
-    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions: {}
     steps:
       - name: Enforce CodeQL result

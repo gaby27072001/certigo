@@ -34,6 +34,18 @@ test('accepts Flutter setup with explicit cache opt-out on persistent PR runners
   assert.deepEqual(errors, []);
 });
 
+test('accepts disabled cache inputs on the isolated operations probe', () => {
+  const errors = validatePersistentCachePolicy(
+    workflow(
+      '- uses: example/action@0123456789012345678901234567890123456789\n'
+      + '        with: { cache: false }',
+      'certigo-ops-probe',
+    ),
+    'fixture.yml',
+  );
+  assert.deepEqual(errors, []);
+});
+
 test('ignores cache inputs on non-persistent runner jobs', () => {
   const errors = validatePersistentCachePolicy(
     workflow(
@@ -73,6 +85,17 @@ test('rejects enabled Flutter cache on persistent PR runners', () => {
       '- uses: subosito/flutter-action@0123456789012345678901234567890123456789\n'
       + '        with: { cache: true }',
       'certigo-pr',
+    ),
+    'fixture.yml',
+  );
+  assert.equal(errors.length, 1);
+});
+
+test('rejects cache actions on the isolated operations probe', () => {
+  const errors = validatePersistentCachePolicy(
+    workflow(
+      '- uses: actions/cache@0123456789012345678901234567890123456789',
+      'certigo-ops-probe',
     ),
     'fixture.yml',
   );

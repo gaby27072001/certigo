@@ -90,9 +90,8 @@ jobs:
     name: Generated state equals committed state
     needs: validate-source
     if: ${{ always() && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) }}
-    runs-on: [self-hosted, Linux, X64, certigo-trusted]
-    permissions:
-      contents: read
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    permissions: {}
     steps:
       - name: Enforce trusted source validation
         shell: bash

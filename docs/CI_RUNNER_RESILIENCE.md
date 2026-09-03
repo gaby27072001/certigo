@@ -2,16 +2,18 @@
 
 ## Objectif et architecture
 
-Les workflows Linux ciblent deux classes de confiance fixes et jamais un nom de machine :
+Les workflows Linux ciblent trois classes de confiance fixes et jamais un nom de machine :
 
 ```json
 ["self-hosted", "Linux", "X64", "certigo-pr"]
 ["self-hosted", "Linux", "X64", "certigo-trusted"]
+["self-hosted", "Linux", "X64", "certigo-ops-probe"]
 ```
 
-La **cible** impose un pool `certigo-pr` sans identité/secrets et un pool
-`certigo-trusted` pour les gates agrégées sans source PR et les opérations
-release/déploiement. Les labels, frontières d'identité et sous-réseaux doivent être
+La **cible** impose un pool `certigo-pr` sans identité/secrets pour la source PR et les
+gates finales d'agrégation, un pool `certigo-trusted` pour les opérations
+release/déploiement, et un pool `certigo-ops-probe` sans identité pour le checkout
+`main` de `runner-health`. Les labels, frontières d'identité et sous-réseaux sont
 mutuellement exclusifs :
 
 - les PR de fork ne peuvent pas exécuter de code sur les runners persistants ;
@@ -28,10 +30,10 @@ L'inventaire read-only consolidé au 20 août 2026 constate le VMSS legacy
 Cet état ne respecte pas la cible ci-dessus. Le scale-in CPU ignore l'état GitHub `busy`.
 
 La réconciliation classe le runner 26 (`22f7fb52-Certigo`) et la VM `4153d1dd`
-**hors scope**, `f55d176e`/runner 27 et `bbf83c5c`/runner 28 comme paires **gérées**
-running/online. Le pilote zone 1 est PR-only, sans
-identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; f55 zone 2 conserve son identité
-et `snet-runners`, mais ses labels doubles bloquent encore l'activation. L'externe n'est ni comptée,
+**hors scope**, `bbf83c5c`/runner 28 comme paire **gérée** running/online, et
+`f55d176e`/runner 27 comme paire **interdite** tant qu'elle combine contenu et identité.
+Le pilote zone 1 est PR-only, sans identité, sur
+`vnet-certigo-pr-pilot/snet-pr-runners`. L'externe n'est ni comptée,
 ni adoptée, ni ciblée. Toute nouvelle VM sans runner est non classée et bloque le plan.
 Aucune de ces entrées n'est supprimée ou réparée par ce livrable.
 
@@ -102,16 +104,18 @@ Ces opérations modifient Azure ou GitHub et ne peuvent pas être prouvées par 
 
 2. Conserver au moins un pool sain par classe dans deux sous-réseaux distincts; ne pas
    appliquer `runner.bicep` au VMSS flexible live.
-3. Enregistrer le pool PR avec `certigo-pr` seulement et le pool opérations avec
-   `certigo-trusted` seulement; n'accorder les droits minimaux qu'au second.
+3. Enregistrer le pool PR avec `certigo-pr` seulement, le pool privilégié avec
+   `certigo-trusted` seulement et la sonde avec `certigo-ops-probe` seulement ;
+   n'accorder les droits minimaux qu'au pool privilégié.
 4. Vérifier qu'un runner en ligne existe dans chaque classe :
 
    ```bash
    gh api repos/gchambaud_microsoft/Certigo/actions/runners \
-     --jq '[.runners[] | {name,status,labels:[.labels[].name]} | select(.status == "online") | select(any(.labels[]; . == "certigo-pr") or any(.labels[]; . == "certigo-trusted"))]'
+     --jq '[.runners[] | {name,status,labels:[.labels[].name]} | select(.status == "online") | select(any(.labels[]; . == "certigo-pr") or any(.labels[]; . == "certigo-trusted") or any(.labels[]; . == "certigo-ops-probe"))]'
    ```
 
-   Attendu : exactement le runner PR et le runner trusted, chacun avec un seul label de rôle.
+   Attendu : chaque capacité requise possède exactement un label de rôle, sans
+   cohabitation entre PR, trusted et ops-probe.
 
 Conserver comme preuve la sortie des deux inventaires, les noms des runners, leurs
 labels, la date et l'URL du drill décrit ci-dessous.
@@ -127,7 +131,8 @@ dérives, appliquer toujours le bootstrap de façon **idempotente** sur chaque V
    `sudo`, le binaire GitHub runner et Azure CLI) ; les SDK de workload (Node, .NET,
    Flutter/Dart, Java/Android, Bicep) sont épinglés et provisionnés par les workflows ;
 2. vérifier que le service `actions.runner.*` existe et redémarre automatiquement ;
-3. réappliquer exactement un label de rôle, `certigo-pr` ou `certigo-trusted`
+3. réappliquer exactement un label de rôle, `certigo-pr`, `certigo-trusted` ou
+   `certigo-ops-probe`
    (GitHub ajoute `self-hosted`, `Linux` et `X64`) ;
 4. tester la connectivité sortante via la NAT Gateway avant d'approuver une PR.
 
@@ -158,7 +163,7 @@ df -h
 
 Points à vérifier :
 
-- un runner `certigo-pr` et un runner `certigo-trusted` en ligne ;
+- les capacités `certigo-pr`, `certigo-trusted` et `certigo-ops-probe` requises en ligne ;
 - deux VMs `VM running` avant usage ou `VM deallocated` hors session ;
 - NAT Gateway et association du sous-réseau intactes ;
 - espace disque suffisant sur chaque runner (conserver une marge opérationnelle pour
@@ -435,16 +440,18 @@ pool insuffisant et doit être interrompue manuellement.
 ## Résilience exclusivement Azure
 
 Les runners hébergés par GitHub sont durablement indisponibles et aucun chemin de
-break-glass ne doit les cibler. Les deux runners Azure ne sont pas interchangeables : `certigo-pr` absorbe tout code ou
-donnée PR, `certigo-trusted` les opérations et gates sans source PR. Un job reste bloqué
-jusqu'à restauration d'une VM saine de sa propre classe ; aucun fallback de classe n'existe.
+break-glass ne doit les cibler. Les classes Azure ne sont pas interchangeables :
+`certigo-pr` absorbe le code PR et les agrégateurs sans privilège, `certigo-trusted`
+les opérations avec identité et `certigo-ops-probe` la sonde avec checkout `main`.
+Un job reste bloqué jusqu'à restauration d'une capacité saine de sa propre classe ;
+aucun fallback de classe n'existe.
 
 ## Reconstruction, rotation et révocation
 
 - **Reconstruction** : si une VM runner devient irrécupérable, reprovisionner une VM
   Linux dans `RG-CERTIGO-CI`, la raccorder au sous-réseau exclusif de sa classe,
   réappliquer le bootstrap idempotent, puis réenregistrer le runner GitHub avec son
-  unique label de rôle `certigo-pr` ou `certigo-trusted`.
+  unique label de rôle `certigo-pr`, `certigo-trusted` ou `certigo-ops-probe`.
 - **Rotation** : lors de la rotation d'un outil, d'un certificat ou d'un accès
   managé, mettre à jour la documentation opérateur correspondante puis valider la VM
   reconstruite avec la sonde quotidienne et le drill manuel.

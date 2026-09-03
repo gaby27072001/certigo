@@ -22,9 +22,9 @@ jobs:
     timeout-minutes: 45
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
-    # EMU policy keeps this on the redundant self-hosted pool. There is no PR
-    # trigger, so untrusted fork code cannot reach a persistent runner.
-    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    # The checkout and operational probes are isolated from both PR and
+    # identity-bearing trusted capacity, with no fallback across labels.
+    runs-on: [self-hosted, Linux, X64, certigo-ops-probe]
     steps:
       - name: Reject unexpected payload fields
         if: ${{ github.event_name == 'repository_dispatch' }}

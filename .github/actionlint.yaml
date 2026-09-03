@@ -2,5 +2,6 @@ self-hosted-runner:
   labels:
     - certigo-cosmos-emulator
     - certigo-image-attestation-canary
+    - certigo-ops-probe
     - certigo-pr
     - certigo-trusted

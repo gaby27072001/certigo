@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
 import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
 import { validateWorkflowConcurrency } from './workflow-concurrency-policy.mjs';
+import { validateRunnerRouting } from './workflow-runner-routing-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
 
 const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -39,15 +40,19 @@ const requiredTrustedImpactTests = new Set([
   '.github/scripts/ci-impact.test.mjs',
   '.github/scripts/codeql-gate-policy.test.mjs',
   '.github/scripts/workflow-concurrency-policy.test.mjs',
+  '.github/scripts/workflow-runner-routing-policy.test.mjs',
   '.github/scripts/workflow-security-cache-policy.test.mjs',
 ]);
 const prLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-pr]';
 const trustedLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-trusted]';
+const opsProbeLinuxRunner =
+  'runs-on: [self-hosted, Linux, X64, certigo-ops-probe]';
 const cosmosLinuxRunner =
   'runs-on: [self-hosted, Linux, X64, certigo-cosmos-emulator]';
 const allowedRunnerLines = new Set([
   prLinuxRunner,
   trustedLinuxRunner,
+  opsProbeLinuxRunner,
   cosmosLinuxRunner,
   'runs-on: [self-hosted, macOS, certigo-trusted]',
 ]);
@@ -76,14 +81,8 @@ const trustedOnlyWorkflowFiles = new Set([
   'promote-backend-staging-prod.yml',
   'release-android.yml',
   'release-ios.yml',
-  'runner-health.yml',
   'runner-resilience-drill.yml',
   'sync-ios-certs.yml',
-]);
-const trustedAggregateJobs = new Map([
-  ['ci-project-state.yml', new Set(['validate'])],
-  ['codeql.yml', new Set(['security-gate'])],
-  ['security-gate.yml', new Set(['security-gate'])],
 ]);
 const privilegedDispatchTypes = new Map([
   ['cd-backend.yml', 'promote-backend'],
@@ -387,12 +386,6 @@ function validateWorkflow(file) {
     ) {
       errors.push(`${file}: operational job ${job.id} must use certigo-trusted`);
     }
-    if (
-      trustedAggregateJobs.get(fileName)?.has(job.id)
-      && !job.text.includes(trustedLinuxRunner)
-    ) {
-      errors.push(`${file}: aggregate job ${job.id} must use certigo-trusted`);
-    }
     if (job.text.includes(prLinuxRunner)) {
       if (
         job.text.includes('secrets.')
@@ -567,6 +560,7 @@ function validateWorkflow(file) {
 function validateRepositoryInvariants() {
   const errors = [];
   errors.push(...validateTrustedImpactTestManifest());
+  errors.push(...validateRunnerRouting(root));
   const android = fs.readFileSync(path.join(workflowsDir, 'release-android.yml'), 'utf8');
   const iosRelease = fs.readFileSync(path.join(workflowsDir, 'release-ios.yml'), 'utf8');
   const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');

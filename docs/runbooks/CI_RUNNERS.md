@@ -6,13 +6,15 @@
 | **Objectif** | Exploiter la CI de Certigo sur ses **runners self-hosted** : **rallumer** les VMs avant une session de travail, les **déallouer** après (économie), **vérifier** l'état des runners et **dépanner** un runner hors ligne. |
 | **Voie officielle** | **Self-hosted** — VMSS flexible Azure. Les runners GitHub-hosted sont indisponibles par politique d'organisation. |
 | **Périmètre** | Repo `gchambaud_microsoft/Certigo` · RG `RG-CERTIGO-CI` · subscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**). |
-| **Statut** | **Migration bloquée** : aucune déallocation automatisée avant séparation des labels et retrait du scale-in CPU. |
+| **Statut** | **Routage repo isolé ; migration opérateur requise** : aucune déallocation automatisée avant séparation des labels et retrait du scale-in CPU. |
 
 > **Dérive live consolidée au 20 août 2026.** Le pool est désormais
 > `vmss-certigo-runner-zonal` (Flexible, autoscale 2–4). Les deux runners GitHub
 > enregistrés portent simultanément `certigo-pr` et `certigo-trusted`; le scale-in CPU
 > ignore l'état `busy`. Les anciennes commandes visant `vm-certigo-runner` et
 > `vm-certigo-runner-2` ne doivent plus être exécutées.
+> La capacité historique f55/runner 27, qui combine contenu PR et identité, est
+> interdite pour le bootstrap ci-dessous et pour toute nouvelle exécution.
 
 > ⚠️ **Principe « l'agent PRÉPARE, VOUS EXÉCUTEZ »** — aucune commande `gh` / `az` n'est lancée par
 > l'agent. Les commandes ci-dessous sont **à exécuter par vous** après vérification des identifiants
@@ -26,11 +28,13 @@
 
 ## 1. Contexte & verdict — pourquoi self-hosted (et pas GitHub-hosted)
 
-La cible Certigo s'appuie sur des runners **self-hosted** isolés :
-`self-hosted, Linux, X64, certigo-pr` pour toute source PR et
-`self-hosted, Linux, X64, certigo-trusted` pour les opérations/gates sans source PR.
-Ils doivent être portés par des pools/VMSS distincts. Ce n'est pas une préférence : c'est
-une **contrainte dure**, désormais **prouvée empiriquement**.
+La cible Certigo s'appuie sur trois classes **self-hosted** isolées :
+`self-hosted, Linux, X64, certigo-pr` pour toute source PR et les trois gates
+d'agrégation sans privilège, `self-hosted, Linux, X64, certigo-trusted` pour les
+opérations avec identité, environnement ou secret, et
+`self-hosted, Linux, X64, certigo-ops-probe` pour la sonde qui checkout `main`.
+Ces rôles ne partagent ni label ni fallback. Ce n'est pas une préférence : c'est une
+**contrainte dure**, désormais **prouvée empiriquement**.
 
 **Test empirique (verdict sans appel).** Une tentative de bascule vers un runner
 hébergé par GitHub a été testée en conditions réelles :
@@ -62,8 +66,9 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 | **Identités** | f55 : UAMI `id-vm-certigo-runner-2-vmss`; pilote PR : aucune identité |
 | **Repo desservi** | `gchambaud_microsoft/Certigo` |
 
-> 📌 Les labels `certigo-pr` et `certigo-trusted` doivent redevenir mutuellement exclusifs. Un éventuel
-> runner **macOS** dédié à iOS (cf. §9) est **distinct** et **n'est pas** géré par ce runbook.
+> 📌 Les labels `certigo-pr`, `certigo-trusted` et `certigo-ops-probe` sont mutuellement
+> exclusifs. Un éventuel runner **macOS** dédié à iOS (cf. §9) est **distinct** et
+> **n'est pas** géré par ce runbook.
 
 > ℹ️ **Prérequis outillage** (poste opérateur) : `az` (Azure CLI) connecté à la subscription Non-Prod,
 > et `gh` (GitHub CLI) authentifié sur `gchambaud_microsoft/Certigo`.
@@ -86,7 +91,7 @@ ce n'est ni le plafond live actuel de 4, ni un maximum de production définitif.
 
 | Situation | État requis | Décision opérateur |
 |---|---|---|
-| Avant une session CI | un runner exclusif `certigo-pr` et un exclusif `certigo-trusted`, `online` | Tant que les labels sont doubles, corriger la configuration avant toute automation. |
+| Avant une session CI | une capacité exclusive `certigo-pr`, `certigo-trusted` et `certigo-ops-probe` selon les workflows à exécuter | Tant que les labels sont doubles, corriger la configuration avant toute automation. |
 | Pendant une session | zéro scale-in CPU | Ne jamais laisser Azure retirer une instance sur simple faible CPU. |
 | Après la session | 5 min continues à zéro, reset sur toute activité, puis deux gardes | Prévol seulement; changement sous lease, un pool à la fois, avec réarmement sur nouvelle activité. |
 | Panne/maintenance | autre classe préservée | Ne jamais déplacer son label pour contourner la panne. |
@@ -234,6 +239,8 @@ Tous les workflows **exigent** une capacité self-hosted adaptée :
 | [`release-android.yml`](../../.github/workflows/release-android.yml) | Build **AAB lourd**, runner `[self-hosted, Linux, X64, certigo-trusted]`. |
 | [`release-ios.yml`](../../.github/workflows/release-ios.yml) | **iOS = Mac obligatoire**, runner `[self-hosted, macOS, certigo-trusted]`. |
 | [`sync-ios-certs.yml`](../../.github/workflows/sync-ios-certs.yml) | Certificats iOS, runner `[self-hosted, macOS, certigo-trusted]`. |
+| `ci-project-state.yml`, `codeql.yml`, `security-gate.yml` | Gates finales sans checkout, secret, OIDC ni environnement sur `certigo-pr`. |
+| [`runner-health.yml`](../../.github/workflows/runner-health.yml) | Checkout `main` et sondes opérationnelles sur `certigo-ops-probe`, jamais sur `certigo-trusted`. |
 
 > ⚠️ **Runner macOS distinct.** Les jobs iOS exigent un runner **macOS self-hosted** séparé des 2 VMs
 > Linux de ce runbook. S'il existe, il doit **rester disponible** pour les releases iOS. Voir
@@ -241,18 +248,61 @@ Tous les workflows **exigent** une capacité self-hosted adaptée :
 
 ---
 
-## 10. Politique permanente de sélection
+## 10. Bootstrap one-time des trois anciens agrégateurs
 
-Les workflows Linux utilisent exclusivement l'une de ces deux sélections :
+Une PR qui introduit ce routage est elle-même évaluée par les définitions
+`pull_request_target` déjà présentes sur `main`. Ses trois anciens jobs finaux demandent
+donc encore `certigo-trusted`. La procédure suivante les exécute réellement, sans
+modifier les checks requis ni fabriquer de statut :
+
+1. Garder la PR en **draft/HOLD**, figer son SHA de tête et conserver la preuve locale
+   complète (`actionlint`, validateur, tests trusted-control et project-state).
+2. Faire désactiver temporairement par un administrateur tous les workflows capables
+   d'utiliser Azure, OIDC, un environnement, un secret, une release ou un déploiement.
+   Attendre qu'aucun de leurs jobs ne soit `queued` ou `in_progress`.
+3. Préparer une capacité Linux/X64 neuve, jetable et sans identité système ou managée,
+   credential Azure, accès réseau applicatif, workspace persistant ou cache. Elle ne
+   doit être ni f55/runner 27, ni un runner ayant déjà consommé du contenu PR ou un
+   job privilégié.
+4. Appliquer une allowlist de file externe sur le tuple exact
+   `(repo, PR, head SHA, workflow, job)` pour seulement
+   `ci-project-state.yml / Generated state equals committed state`,
+   `codeql.yml / CodeQL / Security gate` et
+   `security-gate.yml / Security / Required gate`. Si un autre job
+   `certigo-trusted` apparaît, ne pas enregistrer la capacité et arrêter la procédure.
+5. Pour chaque job allowlisté, enregistrer une instance **one-job** propre avec le jeu
+   de labels legacy demandé par la définition de base
+   `[self-hosted, Linux, X64, certigo-trusted]`, laisser le script d'agrégation
+   terminer, puis détruire l'instance avant le job suivant. Ne jamais ajouter ce label
+   à un runner existant.
+6. Après le succès réel des trois checks sur le SHA figé, suivre l'approbation et la
+   fusion protégées normales : aucun bypass, changement de ruleset, injection de
+   statut, rerun opportuniste ou déplacement de label n'est permis.
+7. Révoquer tout jeton d'enregistrement restant, détruire le disque de bootstrap et
+   confirmer que `main` contient le nouveau routage avant de réactiver les workflows
+   cloud. Tout nouveau HEAD utilise alors `certigo-pr` pour ces trois gates et
+   `certigo-ops-probe` pour la sonde.
+
+Conserver comme preuve le SHA, les trois URL de jobs, l'allowlist appliquée, l'absence
+d'identité de chaque instance et les horodatages de création/destruction.
+
+---
+
+## 11. Politique permanente de sélection
+
+Les workflows Linux utilisent exclusivement l'une de ces trois sélections :
 
 ```yaml
 runs-on: [self-hosted, Linux, X64, certigo-pr]
 runs-on: [self-hosted, Linux, X64, certigo-trusted]
+runs-on: [self-hosted, Linux, X64, certigo-ops-probe]
 ```
 
-Ces sélections ne sont ni paramétrables ni dotées d'un fallback. `certigo-pr` ne reçoit
-ni environnement, ni secret, ni identité cloud ; `certigo-trusted` ne checkout et
-n'analyse jamais de source PR. Tout workflow contenant un job `certigo-trusted`
+Ces sélections ne sont ni paramétrables ni dotées d'un fallback. `certigo-pr` reçoit
+les validations de source PR et les gates finales qui ne font qu'agréger `needs`, mais
+aucun environnement, secret ou identité cloud. `certigo-ops-probe` est réservé à
+`runner-health.yml`, checkout uniquement `main` et ne porte aucune identité applicative.
+`certigo-trusted` ne checkout et n'analyse jamais de source PR. Tout workflow contenant un job `certigo-trusted`
 interdit `workflow_dispatch` et les déclencheurs par tag : les opérations manuelles
 utilisent un type `repository_dispatch` dédié afin que GitHub charge le YAML depuis
 la branche par défaut. Ces workflows interdisent `actions/cache`, l'action Flutter à tool-cache
@@ -263,7 +313,7 @@ validations PR ne peut donc être restauré sur le pool trusted.
 
 ---
 
-## Références (chemins relatifs)
+## 12. Références (chemins relatifs)
 
 - Preuve du blocage EMU : run [`28782170300`](https://github.com/gchambaud_microsoft/Certigo/actions/runs/28782170300).
 - Workflows CI/CD : [`.github/workflows/`](../../.github/workflows/).
@@ -277,6 +327,6 @@ validations PR ne peut donc être restauré sur le pool trusted.
 
 > **Paramètres confirmés** : RG `RG-CERTIGO-CI` · VMSS
 > `vmss-certigo-runner-zonal` · subscription
-> `b8952c8c-8f72-469d-99cd-ac906da4e2fc` · f55 + bbf gérés ·
+> `b8952c8c-8f72-469d-99cd-ac906da4e2fc` · f55 interdit + bbf géré ·
 > `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit ·
-> label double f55 à corriger.
+> aucune cohabitation contenu + identité autorisée.

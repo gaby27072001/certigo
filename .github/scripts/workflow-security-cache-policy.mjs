@@ -1,6 +1,10 @@
 import { parseDocument } from 'yaml';
 
-const persistentRunnerLabels = new Set(['certigo-pr', 'certigo-trusted']);
+const persistentRunnerLabels = new Set([
+  'certigo-pr',
+  'certigo-trusted',
+  'certigo-ops-probe',
+]);
 
 function persistentRunner(job) {
   const labels = Array.isArray(job?.['runs-on']) ? job['runs-on'] : [job?.['runs-on']];

@@ -83,17 +83,19 @@ pas être inventé. Le pilote doit publier P50, P95 et P99 avec la même défini
 
 ### VMSS : socle durable
 
-Conserver deux classes exclusives :
+Conserver trois classes exclusives :
 
 ```text
 self-hosted, Linux, X64, certigo-pr
 self-hosted, Linux, X64, certigo-trusted
+self-hosted, Linux, X64, certigo-ops-probe
 ```
 
 Le VMSS PR reste la capacité de compatibilité et de rollback. Le VMSS trusted reste
 l'unique capacité Linux autorisée à recevoir environnements, secrets, OIDC, identité
-Azure ou réseau privé. Le lifecycle #309 reste l'autorité pour toute réallocation ou
-désallocation VMSS ; ACA ne le remplace pas.
+Azure ou réseau privé. Le VMSS ops-probe exécute uniquement la sonde avec checkout
+`main`, sans identité applicative. Le lifecycle #309 reste l'autorité pour toute
+réallocation ou désallocation VMSS ; ACA ne le remplace pas.
 
 ### ACA : complément PR explicite
 
@@ -151,13 +153,14 @@ partie du pilote initial.
 
 ### Jobs qui restent VMSS
 
-- tous les jobs `certigo-trusted`, notamment gates agrégées, Pages, déploiements et
-  promotions ;
+- tous les jobs `certigo-trusted`, notamment Pages, déploiements et promotions ;
+- les trois gates finales sans privilège sur le VMSS `certigo-pr` ;
 - `cd-backend`, `release-android`, `release-ios`, `sync-ios-certs` et la chaîne macOS ;
 - tests Docker/services et émulateur Cosmos ;
 - Flutter app, Prism goldens, CodeQL et scans lourds tant que disque, mémoire et durée
   n'ont pas été prouvés ;
-- `runner-health` et `runner-resilience-drill`, qui valident spécifiquement les VMSS ;
+- `runner-health` sur sa capacité dédiée `certigo-ops-probe` et
+  `runner-resilience-drill` sur `certigo-trusted`, qui valident spécifiquement les VMSS ;
 - toute charge future avec secret, environnement, OIDC, identité Azure, réseau privé,
   Docker, privilège, montage hôte ou cache partagé.
 

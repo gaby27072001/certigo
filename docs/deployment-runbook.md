@@ -189,23 +189,21 @@ et la disponibilité du runner self-hosted online avec le label `certigo-trusted
 
 ### Réconciliation des labels runners
 
-Les deux runners existants (`vm-certigo-runner`) portent les labels
-custom mutuellement exclusif **`certigo-pr`** ou **`certigo-trusted`**, en plus
-des labels système
-(`self-hosted`, `Linux`, `X64`).  
+Les capacités runners portent un seul label custom parmi **`certigo-pr`**,
+**`certigo-trusted`** et **`certigo-ops-probe`**, en plus des labels système
+(`self-hosted`, `Linux`, `X64`).
 Le label a été ajouté via l'API GitHub :
 `POST /repos/{owner}/{repo}/actions/runners/{id}/labels`.
 
-Conséquence : les workflows critiques `main` ciblent `certigo-trusted` et les workflows PR
-ciblent `certigo-pr`, ce qui isole la confiance sans éditer les YAML à chaque
-ajustement.
+Conséquence : les workflows Azure/release/déploiement ciblent `certigo-trusted`, les
+workflows PR et leurs agrégateurs sans privilège ciblent `certigo-pr`, et la sonde avec
+checkout `main` cible `certigo-ops-probe`.
 
 ### Sélection immuable des runners
 
-Les workflows Linux ciblent directement les labels
-`[self-hosted, Linux, X64, certigo-trusted]`. Aucune variable de sélection ni aucun fallback
-hébergé n'est accepté : la résilience repose exclusivement sur plusieurs runners Azure
-portant le même jeu de labels.
+Les workflows Linux ciblent directement l'un des trois jeux de labels fixes documentés
+dans `docs/runbooks/CI_RUNNERS.md`. Aucune variable de sélection ni aucun fallback entre
+classes n'est accepté.
 
 ### Politique scans lourds (CodeQL / security-scan)
 
@@ -215,7 +213,7 @@ planifié. Ils n'exposent aucun déclenchement manuel privilégié.
 
 ### Risque / rollback (chemin critique EMU)
 
-- **Risque principal** : runner `certigo-trusted` indisponible pour déploiements/gates.
+- **Risque principal** : capacité indisponible dans la classe exacte demandée par un job.
 - **Rollback repo** : restaurer le dernier YAML validé sans modifier les labels de sécurité.
 - **Rollback opérationnel** : démarrer/maintenir online la VM runner Azure (ou activer un auto-start), puis redéclencher le workflow.
 
