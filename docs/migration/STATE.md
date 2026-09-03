@@ -37,7 +37,7 @@
 | `wp-p2-04` | 2 | M | in_progress | `wp-p2-03` | [#244](https://github.com/gchambaud_microsoft/Certigo/issues/244) |
 | `wp-p2-05` | 2 | M | todo | `wp-p2-04` | [#243](https://github.com/gchambaud_microsoft/Certigo/issues/243) |
 | `wp-p2-06` | 2 | M | todo | `wp-p2-05` | [#245](https://github.com/gchambaud_microsoft/Certigo/issues/245) |
-| `wp-p2-07` | 2 | M | in_progress | `wp-p1-00-decomposition` | [#249](https://github.com/gchambaud_microsoft/Certigo/issues/249) · [PR #250](https://github.com/gchambaud_microsoft/Certigo/pull/250) |
+| `wp-p2-07` | 2 | M | in_progress | `wp-p1-00-decomposition` | [#249](https://github.com/gchambaud_microsoft/Certigo/issues/249) · [PR #250](https://github.com/gchambaud_microsoft/Certigo/pull/250) · [PR #253](https://github.com/gchambaud_microsoft/Certigo/pull/253) |
 | `wp-p2-08` | 2 | S | in_review | `wp-p2-01` | [#247](https://github.com/gchambaud_microsoft/Certigo/issues/247) · [PR #254](https://github.com/gchambaud_microsoft/Certigo/pull/254) |
 | `wp-p2-09` | 2 | M | in_progress | `wp-p1-00-decomposition` | [#248](https://github.com/gchambaud_microsoft/Certigo/issues/248) · [PR #252](https://github.com/gchambaud_microsoft/Certigo/pull/252) |
 | `wp-phase-1-contenu-renderer` | 1 | L | planned | `wp-p0-08-e2e-auth-health-release` | — |
