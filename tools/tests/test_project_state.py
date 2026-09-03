@@ -732,6 +732,7 @@ class ProjectStateTests(unittest.TestCase):
             {
                 ".github/scripts/ci-impact.test.mjs",
                 ".github/scripts/workflow-concurrency-policy.test.mjs",
+                ".github/scripts/workflow-runner-routing-policy.test.mjs",
                 ".github/scripts/workflow-security-cache-policy.test.mjs",
             }.issubset(test_paths)
         )
