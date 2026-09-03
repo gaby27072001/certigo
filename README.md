@@ -71,6 +71,8 @@ Détail complet : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 > [!TIP]
 > 🧭 **Pour voir l'état réel et à jour du projet** (ce qui est *réellement* construit, fonctionnalité
 > par fonctionnalité), consultez le tableau de bord vivant : [`docs/ETAT_DU_PROJET.md`](docs/ETAT_DU_PROJET.md).
+> Ce document est aussi, depuis le 2026-09-03, le **registre canonique unique** des risques de
+> sécurité/fiabilité (§14) et du plan de migration restant (§15).
 
 Les faits techniques observables (versions, workflows, tests, corpus historique, types
 pédagogiques, référence Git analysée et packages actifs de `certigo-content`) y sont générés

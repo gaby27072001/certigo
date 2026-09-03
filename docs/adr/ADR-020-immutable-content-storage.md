@@ -1,4 +1,12 @@
-# ADR-014 — Stockage Azure dédié pour les releases de contenu immuables
+# ADR-020 — Stockage Azure dédié pour les releases de contenu immuables
+
+> Renuméroté depuis `ADR-014` le 2026-09-03 (via `ADR-019` puis `ADR-020` le même jour) : ce
+> numéro était déjà utilisé par
+> [`ADR-014-person-linked-identity.md`](./ADR-014-person-linked-identity.md),
+> référencé ailleurs (ADR-017, contrat `person-linked-identity/v1`). Le numéro `ADR-019` a été
+> abandonné avant merge suite à une collision détectée avec `ADR-019-runtime-content-releases.md`,
+> committé en parallèle sur une autre branche (`wp-p2-04`, import des releases de contenu
+> backend). Aucun changement de contenu au-delà du numéro et de ce titre.
 
 - Statut : proposé
 - Date : 2026-08-19
