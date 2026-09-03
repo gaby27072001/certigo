@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:certigo/app/content/content_update_banner.dart';
 import 'package:certigo/app/content/runtime_content_providers.dart';
+import 'package:certigo/app/capabilities/release_profile_provider.dart';
 import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
@@ -14,8 +15,7 @@ class _NeverSource implements PublicContentSource {
   Future<Result<PublicManifestFetch>> fetchActiveManifest({
     String? ifNoneMatch,
     RuntimeContentLimits limits = const RuntimeContentLimits(),
-  }) async =>
-      const Err<PublicManifestFetch>(NetworkFailure());
+  }) async => const Err<PublicManifestFetch>(NetworkFailure());
 
   @override
   Future<Result<PublicContentFileFetch>> fetchFile({
@@ -23,20 +23,17 @@ class _NeverSource implements PublicContentSource {
     required String publicManifestId,
     required PublicContentFile file,
     String? ifNoneMatch,
-  }) async =>
-      const Err<PublicContentFileFetch>(NetworkFailure());
+  }) async => const Err<PublicContentFileFetch>(NetworkFailure());
 }
 
 class _StatusController extends RuntimeContentController {
-  _StatusController(
-    RuntimeContentStatus status,
-    RuntimeContentSynchronizer synchronizer,
-  ) : super(
-          synchronizer: synchronizer,
-          pins: RuntimeContentPinRegistry(),
-          ensureSyncQueueLoaded: () async {},
-          syncActions: () => const <SyncAction>[],
-        ) {
+  _StatusController(RuntimeContentStatus status, RuntimeContentSynchronizer synchronizer)
+    : super(
+        synchronizer: synchronizer,
+        pins: RuntimeContentPinRegistry(),
+        ensureSyncQueueLoaded: () async {},
+        syncActions: () => const <SyncAction>[],
+      ) {
     state = status;
   }
 }
@@ -51,16 +48,14 @@ Future<void> _withStatusHarness(
     source: _NeverSource(),
     store: InMemoryRuntimeContentStore(),
   );
-  final _StatusController controller = _StatusController(
-    status,
-    synchronizer,
-  );
-  final Widget content = wrap?.call(const ContentUpdateBanner()) ??
+  final _StatusController controller = _StatusController(status, synchronizer);
+  final Widget content =
+      wrap?.call(const ContentUpdateBanner()) ??
       const MaterialApp(home: Scaffold(body: ContentUpdateBanner()));
   await tester.pumpWidget(
     ProviderScope(
       overrides: <Override>[
-        runtimeContentSyncEnabledProvider.overrideWithValue(true),
+        releaseProfileProvider.overrideWithValue(ReleaseProfile.privateAlpha),
         runtimeContentControllerProvider.overrideWith((Ref ref) => controller),
       ],
       child: content,
@@ -114,10 +109,7 @@ void main() {
       await engine.dispose();
     });
 
-    await expectLater(
-      controller.syncNow('person-1'),
-      throwsA(isA<RuntimeContentSyncException>()),
-    );
+    await expectLater(controller.syncNow('person-1'), throwsA(isA<RuntimeContentSyncException>()));
 
     expect(engine.actions.single.id, 'healthy');
     expect(quarantined.single.reason, 'entry-type');
@@ -130,8 +122,9 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
-      const ProviderScope(
-        child: MaterialApp(home: Scaffold(body: ContentUpdateBanner())),
+      ProviderScope(
+        overrides: <Override>[releaseProfileProvider.overrideWithValue(ReleaseProfile.failClosed)],
+        child: const MaterialApp(home: Scaffold(body: ContentUpdateBanner())),
       ),
     );
     expect(find.byType(ListTile), findsNothing);

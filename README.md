@@ -135,8 +135,12 @@ dart pub global activate melos
 melos bootstrap          # résout les dépendances de tous les packages Dart
 melos run analyze        # analyse statique
 melos run test           # tests unitaires + widgets
-cd apps/mobile && flutter run
+cd apps/mobile && flutter run --dart-define=CERTIGO_RELEASE_PROFILE=full
 ```
+
+Le profil est explicite et fail-closed. Pour le contrat Alpha mobile, utiliser
+`CERTIGO_RELEASE_PROFILE=private-alpha`; voir
+[`docs/PRIVATE_ALPHA.md`](docs/PRIVATE_ALPHA.md) pour la matrice de capacités.
 
 ### 2) Backend
 

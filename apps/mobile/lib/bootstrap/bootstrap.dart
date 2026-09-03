@@ -17,6 +17,7 @@ import '../app/offline/prefs_catalog_store.dart';
 import '../app/offline/prefs_lesson_cache_store.dart';
 import '../app/offline/prefs_sync_store.dart';
 import '../app/providers.dart';
+import '../app/capabilities/release_profile_provider.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/notifications/notification_lifecycle_scope.dart';
 import '../features/notifications/notification_service.dart';
@@ -53,9 +54,10 @@ Future<void> bootstrap() async {
     // lancement sur un écran explicite plutôt que de laisser un login échouer
     // silencieusement. En dev, on journalise fort (et `assert` en debug) mais
     // on n'empêche pas le démarrage.
+    final ReleaseProfileResolution release = AppEnv.releaseProfileResolution;
     final AppConfigReport config = AppEnv.validate();
     _reportConfig(config);
-    if (!config.isValid && AppEnv.isStrictFlavor) {
+    if (!config.isValid && (AppEnv.isStrictFlavor || config.hasReleaseProfileError)) {
       runApp(ConfigErrorApp(report: config));
       return;
     }
@@ -63,21 +65,24 @@ Future<void> bootstrap() async {
       config.isValid,
       'Configuration d\'authentification invalide (voir logs [config]) :\n${config.describe()}',
     );
+    final ReleaseProfile profile = release.profile;
 
     await SystemChrome.setPreferredOrientations(<DeviceOrientation>[DeviceOrientation.portraitUp]);
 
-    try {
-      await NotificationService.initialize();
-    } on Object catch (error, stackTrace) {
-      crashReporter.report(
-        CrashReport(
-          error: error,
-          stackTrace: stackTrace,
-          source: CrashSource.zone,
-          context: 'notification bootstrap initialization',
-          library: 'certigo.notifications',
-        ),
-      );
+    if (profile.isEnabled(AppCapability.studyReminders)) {
+      try {
+        await NotificationService.initialize();
+      } on Object catch (error, stackTrace) {
+        crashReporter.report(
+          CrashReport(
+            error: error,
+            stackTrace: stackTrace,
+            source: CrashSource.zone,
+            context: 'notification bootstrap initialization',
+            library: 'certigo.notifications',
+          ),
+        );
+      }
     }
 
     // Wire mascot artwork (built-in faces by default; see app/mascots.dart).
@@ -87,6 +92,8 @@ Future<void> bootstrap() async {
     // offline in a previous session is replayed as soon as the engine flushes.
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final List<Override> overrides = <Override>[
+      releaseProfileProvider.overrideWithValue(profile),
+      capabilityRuntimePolicyProvider.overrideWithValue(AppEnv.capabilityRuntimePolicy),
       authLocalAccountCleanupProvider.overrideWith((Ref ref) {
         return () async {
           await ref.read(syncEngineProvider).waitForIdle();
@@ -98,7 +105,7 @@ Future<void> bootstrap() async {
       lessonStoreProvider.overrideWithValue(prefsLessonCacheStore(prefs)),
       syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
     ];
-    if (kRuntimeContentMobileEnabled) {
+    if (profile.isEnabled(AppCapability.versionedContent)) {
       final Directory support = await getApplicationSupportDirectory();
       final Directory root = Directory(
         '${support.path}${Platform.pathSeparator}certigo${Platform.pathSeparator}'
@@ -111,12 +118,14 @@ Future<void> bootstrap() async {
       );
     }
 
-    runApp(
-      ProviderScope(
-        overrides: overrides,
-        child: const NotificationLifecycleScope(child: OfflineSyncScope(child: CertigoApp())),
-      ),
-    );
+    Widget app = const CertigoApp();
+    if (profile.isEnabled(AppCapability.offlineResilience)) {
+      app = OfflineSyncScope(child: app);
+    }
+    if (profile.isEnabled(AppCapability.studyReminders)) {
+      app = NotificationLifecycleScope(child: app);
+    }
+    runApp(ProviderScope(overrides: overrides, child: app));
   }, crashReporter);
 }
 

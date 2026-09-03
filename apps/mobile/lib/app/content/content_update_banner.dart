@@ -23,30 +23,30 @@ class ContentUpdateBanner extends ConsumerWidget {
 
     final (String message, IconData icon, bool retry) = switch (status.phase) {
       RuntimeContentPhase.checking => (
-          'Vérification du contenu disponible…',
-          Icons.sync_rounded,
-          false,
-        ),
+        'Vérification du contenu disponible…',
+        Icons.sync_rounded,
+        false,
+      ),
       RuntimeContentPhase.downloading => (
-          'Mise à jour du contenu ${status.completedFiles}/${status.totalFiles}',
-          Icons.download_rounded,
-          false,
-        ),
+        'Mise à jour du contenu ${status.completedFiles}/${status.totalFiles}',
+        Icons.download_rounded,
+        false,
+      ),
       RuntimeContentPhase.activating => (
-          'Activation de la mise à jour…',
-          Icons.verified_rounded,
-          false,
-        ),
+        'Activation de la mise à jour…',
+        Icons.verified_rounded,
+        false,
+      ),
       RuntimeContentPhase.rolledBack => (
-          status.message ?? 'La dernière version valide a été restaurée.',
-          Icons.restore_rounded,
-          true,
-        ),
+        status.message ?? 'La dernière version valide a été restaurée.',
+        Icons.restore_rounded,
+        true,
+      ),
       RuntimeContentPhase.failed => (
-          status.message ?? 'Mise à jour indisponible. Le contenu actuel est conservé.',
-          Icons.cloud_off_rounded,
-          true,
-        ),
+        status.message ?? 'Mise à jour indisponible. Le contenu actuel est conservé.',
+        Icons.cloud_off_rounded,
+        true,
+      ),
       _ => ('', Icons.info_outline_rounded, false),
     };
     final double? progress = status.progress;
@@ -75,10 +75,7 @@ class ContentUpdateBanner extends ConsumerWidget {
                               onPressed: () => _rollback(ref),
                               child: const Text('Version précédente'),
                             ),
-                          TextButton(
-                            onPressed: () => _retry(ref),
-                            child: const Text('Réessayer'),
-                          ),
+                          TextButton(onPressed: () => _retry(ref), child: const Text('Réessayer')),
                         ],
                       ),
                     )
@@ -102,9 +99,7 @@ class ContentUpdateBanner extends ConsumerWidget {
     final String? ownerId = auth.session.userId;
     if (ownerId == null || ownerId.isEmpty) return;
     unawaited(
-      _handleExpectedFailure(
-        ref.read(runtimeContentControllerProvider.notifier).syncNow(ownerId),
-      ),
+      _handleExpectedFailure(ref.read(runtimeContentControllerProvider.notifier).syncNow(ownerId)),
     );
   }
 
@@ -114,9 +109,7 @@ class ContentUpdateBanner extends ConsumerWidget {
     final String? ownerId = auth.session.userId;
     if (ownerId == null || ownerId.isEmpty) return;
     unawaited(
-      _handleExpectedFailure(
-        ref.read(runtimeContentControllerProvider.notifier).rollback(ownerId),
-      ),
+      _handleExpectedFailure(ref.read(runtimeContentControllerProvider.notifier).rollback(ownerId)),
     );
   }
 

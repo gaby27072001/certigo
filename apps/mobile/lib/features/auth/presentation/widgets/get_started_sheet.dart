@@ -1,8 +1,12 @@
+import 'package:core/core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import '../../../../app/capabilities/release_profile_provider.dart';
+import '../../../../app/capabilities/release_strings.dart';
+import '../../../../app/route_paths.dart';
 import '../../application/auth_controller.dart';
 import '../../application/auth_state.dart';
 import 'auth_provider_button.dart';
@@ -52,13 +56,20 @@ class _GetStartedSheetState extends ConsumerState<GetStartedSheet> {
     // Duo) : nom → e-mail → mot de passe → écrans post-création. La connexion à
     // un compte existant reste accessible depuis le 1er écran de ce flux.
     Navigator.of(context).pop();
-    context.go('/register/name');
+    final bool registrationEnabled = ref
+        .read(capabilityAvailabilityProvider(AppCapability.publicRegistration))
+        .isEnabled;
+    context.go(registrationEnabled ? '${Routes.registration}/name' : '${Routes.auth}?emailOnly=1');
   }
 
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
+    final ReleaseStrings releaseStrings = ReleaseStrings.of(context);
+    final bool publicRegistrationEnabled = ref
+        .watch(capabilityAvailabilityProvider(AppCapability.publicRegistration))
+        .isEnabled;
 
     // Réarme les boutons dès que le flux retombe sur un état non authentifié
     // (annulation, échec) — le message détaillé reste porté par l'écran e-mail.
@@ -145,7 +156,9 @@ class _GetStartedSheetState extends ConsumerState<GetStartedSheet> {
             ),
             const SizedBox(height: PrismSpacing.xxs),
             Text(
-              'Choisis comment te connecter pour lancer ta progression.',
+              publicRegistrationEnabled
+                  ? 'Choisis comment te connecter pour lancer ta progression.'
+                  : releaseStrings.invitedAccountHint,
               style: text.titleMedium?.copyWith(color: p.textSecondary),
             ),
             const SizedBox(height: PrismSpacing.lg),

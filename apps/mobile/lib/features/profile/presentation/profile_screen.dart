@@ -1,3 +1,4 @@
+import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/capabilities/release_widgets.dart';
 import '../../../app/router.dart';
 import '../application/settings_preferences.dart';
 import 'widgets/account_section.dart';
@@ -149,7 +151,8 @@ class _ProfileContent extends ConsumerWidget {
           onPressed: () => context.go(Routes.achievements),
         ),
         const SizedBox(height: 12),
-        PrismButton.secondary(
+        CapabilitySecondaryButton(
+          capability: AppCapability.socialSharing,
           label: 'Partager le score du jour',
           icon: Icons.share_rounded,
           onPressed: () => context.go(Routes.dailyShare),
@@ -217,8 +220,11 @@ String _subtitleFromParts(String handle, int level) {
 }
 
 String _initials(String name) {
-  final List<String> parts =
-      name.trim().split(RegExp(r'\s+')).where((String s) => s.isNotEmpty).toList();
+  final List<String> parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((String s) => s.isNotEmpty)
+      .toList();
   if (parts.isEmpty) return '?';
   final String a = parts.first.substring(0, 1);
   final String b = parts.length > 1 ? parts[1].substring(0, 1) : '';

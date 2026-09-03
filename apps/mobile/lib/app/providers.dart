@@ -7,6 +7,7 @@ import 'package:data/data.dart';
 
 import 'active_track_store.dart';
 import 'content/runtime_content_dependencies.dart';
+import 'capabilities/release_profile_provider.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/application/auth_state.dart';
 import '../features/lesson/application/lesson_feedback.dart';
@@ -36,35 +37,33 @@ final apiClientProvider = Provider<ApiClient>((Ref ref) {
   );
 });
 
-final userRepositoryProvider = Provider<UserRepository>(
-  (Ref ref) => RemoteUserRepository(ref.watch(apiClientProvider)),
-);
+final userRepositoryProvider = Provider<UserRepository>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.progressionReadinessXp);
+  return RemoteUserRepository(ref.watch(apiClientProvider));
+});
 
-final accountDeletionRepositoryProvider = Provider<AccountDeletionRepository>(
-  (Ref ref) => RemoteAccountDeletionRepository(ref.watch(apiClientProvider)),
-);
+final accountDeletionRepositoryProvider = Provider<AccountDeletionRepository>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.accountDeletion);
+  return RemoteAccountDeletionRepository(ref.watch(apiClientProvider));
+});
 
-final pathRepositoryProvider = Provider<PathRepository>(
-  (Ref ref) => RemotePathRepository(ref.watch(apiClientProvider)),
-);
+final pathRepositoryProvider = Provider<PathRepository>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.learningPath);
+  return RemotePathRepository(ref.watch(apiClientProvider));
+});
 
-final catalogStoreProvider = Provider<CatalogCacheStore>((Ref ref) => InMemoryCatalogCacheStore());
+final catalogStoreProvider = Provider<CatalogCacheStore>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.certificationCatalog);
+  return InMemoryCatalogCacheStore();
+});
 
-final catalogRepositoryProvider = Provider<CatalogRepository>(
-  (Ref ref) => OfflineCatalogRepository(
+final catalogRepositoryProvider = Provider<CatalogRepository>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.certificationCatalog);
+  return OfflineCatalogRepository(
     RemoteCatalogRepository(ref.watch(apiClientProvider)),
     ref.watch(catalogStoreProvider),
-  ),
-);
-
-/// Opt-in feature flag for the offline study cache (wp-p1-08).
-///
-/// Defaults to `false`: online-only is the default behaviour. Compile with
-/// `--dart-define=OFFLINE_STUDY_CACHE=true` to make study sessions downloadable
-/// and readable offline. Rollback is simply not enabling the flag.
-final offlineStudyCacheEnabledProvider = Provider<bool>(
-  (Ref ref) => const bool.fromEnvironment('OFFLINE_STUDY_CACHE', defaultValue: false),
-);
+  );
+});
 
 /// Current content manifest version, used as the single cache-invalidation key
 /// for the offline lesson cache. Bumping it (via
@@ -73,12 +72,19 @@ final contentManifestVersionProvider = Provider<String>(
   (Ref ref) => const String.fromEnvironment('CONTENT_MANIFEST_VERSION', defaultValue: 'v1'),
 );
 
+/// Compatibility adapter for callers that still override the former offline
+/// feature flag. The source of truth is now the typed release capability.
+final offlineStudyCacheEnabledProvider = Provider<bool>(
+  (Ref ref) => ref.watch(capabilityAvailabilityProvider(AppCapability.offlineResilience)).isEnabled,
+);
+
 /// Backing store for the offline lesson cache. Defaults to in-memory so tests
 /// need no platform channels; [bootstrap] overrides it with a
 /// SharedPreferences-backed store so downloaded lessons survive app restarts.
 final lessonStoreProvider = Provider<LessonCacheStore>((Ref ref) => InMemoryLessonCacheStore());
 
 final lessonRepositoryProvider = Provider<LessonRepository>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.lessons);
   LessonRepository repository = RemoteLessonRepository(ref.watch(apiClientProvider));
   if (ref.watch(offlineStudyCacheEnabledProvider)) {
     repository = OfflineLessonRepository(
@@ -111,6 +117,7 @@ final syncStoreProvider = Provider<SyncQueueStore>((Ref ref) => InMemorySyncQueu
 /// long-lived instance per app session, flushed on reconnect/resume/startup by
 /// `OfflineSyncScope`.
 final syncEngineProvider = Provider<SyncEngine>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.offlineResilience);
   final SyncEngine engine = SyncEngine(
     store: ref.watch(syncStoreProvider),
     sender: apiSyncSender(ref.watch(apiClientProvider)),
@@ -127,20 +134,24 @@ final syncEngineProvider = Provider<SyncEngine>((Ref ref) {
 /// transient error (offline, 5xx, 429) is enqueued and replayed later, keyed by
 /// its `clientAttemptId`, so a finished lesson is never lost. Permanent
 /// failures pass straight through to the caller unchanged.
-final quizRepositoryProvider = Provider<QuizRepository>(
-  (Ref ref) => OfflineQuizRepository(
+final quizRepositoryProvider = Provider<QuizRepository>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.quizCorrection);
+  requireEnabledCapability(ref, AppCapability.offlineResilience);
+  return OfflineQuizRepository(
     RemoteQuizRepository(ref.watch(apiClientProvider)),
     ref.watch(syncEngineProvider),
-  ),
-);
+  );
+});
 
-final leaderboardRepositoryProvider = Provider<LeaderboardRepository>(
-  (Ref ref) => RemoteLeaderboardRepository(ref.watch(apiClientProvider)),
-);
+final leaderboardRepositoryProvider = Provider<LeaderboardRepository>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.socialLeague);
+  return RemoteLeaderboardRepository(ref.watch(apiClientProvider));
+});
 
-final tutorRepositoryProvider = Provider<TutorRepository>(
-  (Ref ref) => RemoteTutorRepository(ref.watch(apiClientProvider)),
-);
+final tutorRepositoryProvider = Provider<TutorRepository>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.aiTutor);
+  return RemoteTutorRepository(ref.watch(apiClientProvider));
+});
 
 final recommendationRepositoryProvider = Provider<RecommendationRepository>(
   (Ref ref) => RemoteRecommendationRepository(ref.watch(apiClientProvider)),
@@ -162,13 +173,15 @@ final shopRepositoryProvider = Provider<ShopRepository>(
   (Ref ref) => RemoteShopRepository(ref.watch(apiClientProvider)),
 );
 
-final friendRepositoryProvider = Provider<FriendRepository>(
-  (Ref ref) => RemoteFriendRepository(ref.watch(apiClientProvider)),
-);
+final friendRepositoryProvider = Provider<FriendRepository>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.socialFriends);
+  return RemoteFriendRepository(ref.watch(apiClientProvider));
+});
 
-final shareCardRepositoryProvider = Provider<ShareCardRepository>(
-  (Ref ref) => RemoteShareCardRepository(ref.watch(apiClientProvider)),
-);
+final shareCardRepositoryProvider = Provider<ShareCardRepository>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.socialSharing);
+  return RemoteShareCardRepository(ref.watch(apiClientProvider));
+});
 
 final examRepositoryProvider = Provider<ExamRepository>(
   (Ref ref) => RemoteExamRepository(ref.watch(apiClientProvider)),
@@ -334,10 +347,9 @@ class ActiveTrackController extends AsyncNotifier<String?> {
       }
       state = AsyncData<String?>(normalized);
 
-      final Result<UserProfile> result = await ref.read(userRepositoryProvider).setActiveTrack(
-            trackId: normalized,
-            expectedTrackId: baseTrackId,
-          );
+      final Result<UserProfile> result = await ref
+          .read(userRepositoryProvider)
+          .setActiveTrack(trackId: normalized, expectedTrackId: baseTrackId);
       if (_clearRequested) {
         return const ActiveTrackSaveResult(
           ActiveTrackSaveStatus.rejected,
@@ -347,10 +359,10 @@ class ActiveTrackController extends AsyncNotifier<String?> {
       return switch (result) {
         Success<UserProfile>() => await _acceptSynced(pending),
         Err<UserProfile>(:final Failure failure) => await _handleRemoteFailure(
-            pending,
-            previousRecord,
-            failure,
-          ),
+          pending,
+          previousRecord,
+          failure,
+        ),
       };
     } finally {
       _endMutation();
@@ -375,10 +387,9 @@ class ActiveTrackController extends AsyncNotifier<String?> {
       }
 
       state = AsyncData<String?>(pending.trackId);
-      final Result<UserProfile> result = await ref.read(userRepositoryProvider).setActiveTrack(
-            trackId: pending.trackId,
-            expectedTrackId: pending.pendingBaseTrackId,
-          );
+      final Result<UserProfile> result = await ref
+          .read(userRepositoryProvider)
+          .setActiveTrack(trackId: pending.trackId, expectedTrackId: pending.pendingBaseTrackId);
       if (_clearRequested) return;
       switch (result) {
         case Success<UserProfile>():
@@ -414,9 +425,9 @@ class ActiveTrackController extends AsyncNotifier<String?> {
     final Result<UserProfile> result = await ref.read(userRepositoryProvider).getMe();
     return switch (result) {
       Success<UserProfile>(:final UserProfile value) => (
-          ownerId: _ownerId = value.id.trim(),
-          failure: null,
-        ),
+        ownerId: _ownerId = value.id.trim(),
+        failure: null,
+      ),
       Err<UserProfile>(:final Failure failure) => (ownerId: null, failure: failure),
     };
   }
@@ -464,8 +475,9 @@ class ActiveTrackController extends AsyncNotifier<String?> {
     Failure failure,
   ) async {
     final Result<UserProfile> result = await ref.read(userRepositoryProvider).getMe();
-    if (result case Success<UserProfile>(:final UserProfile value)
-        when value.id == pending.ownerId) {
+    if (result case Success<UserProfile>(
+      :final UserProfile value,
+    ) when value.id == pending.ownerId) {
       final String? remote = _normalizeTrackId(value.activeTrackId);
       final ActiveTrackStore store = ref.read(activeTrackStoreProvider);
       if (remote != null && pending.pendingPredecessors.contains(remote)) {
@@ -487,23 +499,22 @@ class ActiveTrackController extends AsyncNotifier<String?> {
             CacheFailure('La certification en attente n’a pas pu être réconciliée.'),
           );
         }
-        final Result<UserProfile> retry = await ref.read(userRepositoryProvider).setActiveTrack(
-              trackId: rebased.trackId,
-              expectedTrackId: remote,
-            );
+        final Result<UserProfile> retry = await ref
+            .read(userRepositoryProvider)
+            .setActiveTrack(trackId: rebased.trackId, expectedTrackId: remote);
         return switch (retry) {
           Success<UserProfile>() => await _acceptSynced(rebased),
-          Err<UserProfile>(failure: final Failure retryFailure) =>
-            ActiveTrackSaveResult(ActiveTrackSaveStatus.rejected, retryFailure),
+          Err<UserProfile>(failure: final Failure retryFailure) => ActiveTrackSaveResult(
+            ActiveTrackSaveStatus.rejected,
+            retryFailure,
+          ),
         };
       }
       try {
         if (remote == null) {
           await store.clear();
         } else {
-          await store.write(
-            ActiveTrackRecord.synced(trackId: remote, ownerId: pending.ownerId),
-          );
+          await store.write(ActiveTrackRecord.synced(trackId: remote, ownerId: pending.ownerId));
         }
       } on Object catch (error, stackTrace) {
         _report(error, stackTrace, 'while persisting a reconciled certification');
@@ -527,10 +538,7 @@ class ActiveTrackController extends AsyncNotifier<String?> {
     return ActiveTrackSaveResult(ActiveTrackSaveStatus.rejected, readFailure);
   }
 
-  Future<ActiveTrackSaveResult> _restore(
-    ActiveTrackRecord? previous,
-    Failure failure,
-  ) async {
+  Future<ActiveTrackSaveResult> _restore(ActiveTrackRecord? previous, Failure failure) async {
     final String? owner = previous?.ownerId ?? _ownerId;
     final String? currentOwner = _normalizeOwnerId(ref.read(activeTrackOwnerIdProvider));
     if (currentOwner != null && owner != null && currentOwner != owner) {
@@ -562,10 +570,7 @@ class ActiveTrackController extends AsyncNotifier<String?> {
   Future<void> _restoreBase(ActiveTrackRecord pending, Failure failure) async {
     final ActiveTrackRecord? base = pending.pendingBaseTrackId == null
         ? null
-        : ActiveTrackRecord.synced(
-            trackId: pending.pendingBaseTrackId!,
-            ownerId: pending.ownerId,
-          );
+        : ActiveTrackRecord.synced(trackId: pending.pendingBaseTrackId!, ownerId: pending.ownerId);
     await _restore(base, failure);
   }
 

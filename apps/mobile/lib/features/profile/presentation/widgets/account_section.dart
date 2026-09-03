@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import '../../../../app/capabilities/release_profile_provider.dart';
+import '../../../../app/capabilities/release_widgets.dart';
 import '../../../../app/router.dart';
 import '../../application/settings_preferences.dart';
 import 'tappable_row.dart';
@@ -105,6 +107,9 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
     final String? handleOverride = ref.watch(handleOverrideProvider);
     final String displayName = nameOverride ?? widget.me.displayName;
     final String handle = handleOverride ?? widget.me.handle;
+    final CapabilityAvailability accountDeletion = ref.watch(
+      capabilityAvailabilityProvider(AppCapability.accountDeletion),
+    );
 
     return PrismCard(
       child: Column(
@@ -122,14 +127,37 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
             trailing: handle.isEmpty ? null : '@$handle',
             onTap: _editHandle,
           ),
-          if (AppEnv.accountDeletionEnabled) ...<Widget>[
+          if (!accountDeletion.isOff) ...<Widget>[
             Divider(color: p.border, height: 24),
-            TappableRow(
-              icon: Icons.delete_outline_rounded,
-              label: 'Supprimer le compte',
-              trailingColor: p.error,
-              onTap: _deleteAccount,
-            ),
+            if (accountDeletion.isEnabled)
+              TappableRow(
+                icon: Icons.delete_outline_rounded,
+                label: 'Supprimer le compte',
+                trailingColor: p.error,
+                onTap: _deleteAccount,
+              )
+            else
+              CapabilityAction(
+                capability: AppCapability.accountDeletion,
+                semanticLabel: 'Supprimer le compte',
+                onPressed: _deleteAccount,
+                builder: (BuildContext context, CapabilityAvailability availability) => Row(
+                  children: <Widget>[
+                    Icon(Icons.delete_outline_rounded, color: p.textSecondary, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text('Supprimer le compte', style: Theme.of(context).textTheme.bodyLarge),
+                          const SizedBox(height: 4),
+                          CapabilityStatusBadge(availability: availability),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ],
       ),

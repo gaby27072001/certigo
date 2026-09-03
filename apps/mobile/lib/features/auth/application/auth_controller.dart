@@ -10,19 +10,25 @@ import 'auth_state.dart';
 import 'auth_telemetry.dart';
 import 'credentials_gateway.dart';
 import 'session_store.dart';
+import '../../../app/capabilities/release_profile_provider.dart';
 
 /// Passerelle OIDC réelle. Surchargée par un faux dans les tests.
-final authGatewayProvider = Provider<AuthGateway>(
-  (Ref ref) => AppAuthGateway(diagnostics: ref.read(authDiagnosticsProvider.notifier)),
-);
+final authGatewayProvider = Provider<AuthGateway>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.authentication);
+  return AppAuthGateway(diagnostics: ref.read(authDiagnosticsProvider.notifier));
+});
 
 /// Passerelle e-mail/mot de passe réelle (API HTTP). Surchargée dans les tests.
-final credentialsGatewayProvider = Provider<CredentialsGateway>(
-  (Ref ref) => HttpCredentialsGateway(),
-);
+final credentialsGatewayProvider = Provider<CredentialsGateway>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.authentication);
+  return HttpCredentialsGateway();
+});
 
 /// Stockage sécurisé de la session. Surchargé par un faux dans les tests.
-final sessionStoreProvider = Provider<SessionStore>((Ref ref) => SecureSessionStore());
+final sessionStoreProvider = Provider<SessionStore>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.authentication);
+  return SecureSessionStore();
+});
 
 /// Vrai quand Entra External ID est réellement configuré (clientId + autorité).
 ///
@@ -39,9 +45,7 @@ final authRequiredProvider = Provider<bool>((Ref ref) => true);
 
 typedef AuthLocalAccountCleanup = Future<void> Function();
 
-final authLocalAccountCleanupProvider = Provider<AuthLocalAccountCleanup>(
-  (Ref ref) => () async {},
-);
+final authLocalAccountCleanupProvider = Provider<AuthLocalAccountCleanup>((Ref ref) => () async {});
 
 /// Contrôleur d'authentification : source de vérité synchrone de l'état de
 /// session, pilotant le garde de navigation et l'injection du jeton d'API.
@@ -72,6 +76,8 @@ class AuthController extends Notifier<AuthState> {
   late final AuthLocalAccountCleanup _localAccountCleanup;
   late final bool _required;
   late final bool _configured;
+  late final bool _publicRegistrationEnabled;
+  late final CapabilityAvailability _accountDeletionAvailability;
   int _sessionRevision = 0;
   Future<void> _sessionStoreTail = Future<void>.value();
 
@@ -99,6 +105,12 @@ class AuthController extends Notifier<AuthState> {
     _localAccountCleanup = ref.read(authLocalAccountCleanupProvider);
     _required = ref.read(authRequiredProvider);
     _configured = ref.read(authConfiguredProvider);
+    _publicRegistrationEnabled = ref
+        .read(capabilityAvailabilityProvider(AppCapability.publicRegistration))
+        .isEnabled;
+    _accountDeletionAvailability = ref.read(
+      capabilityAvailabilityProvider(AppCapability.accountDeletion),
+    );
     // Différé en micro-tâche : `build` doit retourner sans muter l'état.
     Future<void>.microtask(_restore);
     return const AuthLoading();
@@ -235,11 +247,11 @@ class AuthController extends Notifier<AuthState> {
 
   /// Libellé lisible du fournisseur, inséré dans les messages d'erreur.
   String _providerLabel(AuthProvider provider) => switch (provider) {
-        AuthProvider.microsoft => 'Microsoft',
-        AuthProvider.google => 'Google',
-        AuthProvider.apple => 'Apple',
-        AuthProvider.email => 'e-mail',
-      };
+    AuthProvider.microsoft => 'Microsoft',
+    AuthProvider.google => 'Google',
+    AuthProvider.apple => 'Apple',
+    AuthProvider.email => 'e-mail',
+  };
 
   /// Connexion par e-mail + mot de passe (compte géré par notre backend).
   Future<void> signInWithEmail({required String email, required String password}) async {
@@ -248,8 +260,9 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthLoading();
     final Stopwatch sw = Stopwatch()..start();
     try {
-      final AuthSession session =
-          await _credentials.login(email: email, password: password).timeout(_emailTimeout);
+      final AuthSession session = await _credentials
+          .login(email: email, password: password)
+          .timeout(_emailTimeout);
       if (!_isCurrent(revision)) return;
       if (session.accessToken.isEmpty) {
         _telemetry.authFailure(
@@ -294,6 +307,12 @@ class AuthController extends Notifier<AuthState> {
     required String password,
     String? displayName,
   }) async {
+    if (!_publicRegistrationEnabled) {
+      state = const Unauthenticated(
+        'La création publique de compte est indisponible pour cette version.',
+      );
+      return;
+    }
     final int revision = ++_sessionRevision;
     _telemetry.authStart(AuthMethod.register);
     state = const AuthLoading();
@@ -382,6 +401,11 @@ class AuthController extends Notifier<AuthState> {
     required String expectedUserId,
     String? password,
   }) async {
+    if (!_accountDeletionAvailability.isEnabled) {
+      return const SensitiveReauthenticationResult.failure(
+        'La suppression de compte est indisponible pour cette version.',
+      );
+    }
     final AuthState current = state;
     if (current is! Authenticated) {
       return const SensitiveReauthenticationResult.failure(
@@ -433,6 +457,12 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> completeAccountDeletion({required String expectedUserId}) async {
+    if (!_accountDeletionAvailability.isEnabled) {
+      throw CapabilityUnavailableException(
+        AppCapability.accountDeletion,
+        _accountDeletionAvailability,
+      );
+    }
     final AuthState current = state;
     if (current is! Authenticated || current.session.userId != expectedUserId) {
       throw StateError('Authenticated person does not match the completed deletion.');
@@ -588,8 +618,8 @@ class AuthController extends Notifier<AuthState> {
   }
 
   AuthSession _devSession() => AuthSession(
-        accessToken: AppEnv.devAuthToken,
-        userId: AppEnv.devAuthToken.trim().isEmpty ? 'dev-user' : AppEnv.devAuthToken.trim(),
-        displayName: 'Développeur',
-      );
+    accessToken: AppEnv.devAuthToken,
+    userId: AppEnv.devAuthToken.trim().isEmpty ? 'dev-user' : AppEnv.devAuthToken.trim(),
+    displayName: 'Développeur',
+  );
 }

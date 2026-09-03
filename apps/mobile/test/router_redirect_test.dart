@@ -49,6 +49,17 @@ void main() {
   });
 
   group('resolveAuthRedirect — non authentifié', () {
+    test('la surface générique indisponible reste accessible sans révéler de contenu', () {
+      expect(
+        resolveAuthRedirect(
+          auth: const Unauthenticated(),
+          location: '${AuthShellRoutes.capabilityUnavailable}/social-friends',
+          onboardingCompleted: false,
+        ),
+        isNull,
+      );
+    });
+
     test('sur /landing → reste (écran d\'ouverture par défaut)', () {
       expect(
         resolveAuthRedirect(

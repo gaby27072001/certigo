@@ -10,16 +10,12 @@ import 'package:certigo/features/auth/application/auth_state.dart';
 import 'package:certigo/features/auth/application/auth_telemetry.dart';
 import 'package:certigo/features/auth/application/credentials_gateway.dart';
 import 'package:certigo/features/auth/application/session_store.dart';
+import 'package:certigo/app/capabilities/release_profile_provider.dart';
 
 /// Passerelle OIDC factice : aucune dépendance plateforme, comportement
 /// scriptable par test (succès, échec, jeton rafraîchi…).
 class FakeAuthGateway implements AuthGateway {
-  FakeAuthGateway({
-    this.onSignIn,
-    this.onRefresh,
-    this.onRefreshFuture,
-    this.hangSignIn = false,
-  });
+  FakeAuthGateway({this.onSignIn, this.onRefresh, this.onRefreshFuture, this.hangSignIn = false});
 
   AuthSession Function(AuthProvider provider)? onSignIn;
   AuthSession Function(String refreshToken)? onRefresh;
@@ -179,9 +175,11 @@ void main() {
     AuthLocalAccountCleanup? localAccountCleanup,
     bool configured = true,
     bool required = true,
+    ReleaseProfile releaseProfile = ReleaseProfile.full,
   }) {
     final ProviderContainer container = ProviderContainer(
       overrides: <Override>[
+        releaseProfileProvider.overrideWithValue(releaseProfile),
         authGatewayProvider.overrideWithValue(gateway),
         credentialsGatewayProvider.overrideWithValue(credentials ?? FakeCredentialsGateway()),
         sessionStoreProvider.overrideWithValue(store),
@@ -200,13 +198,12 @@ void main() {
     String accessToken = 'access',
     String? refreshToken = 'refresh',
     DateTime? expiry,
-  }) =>
-      AuthSession(
-        accessToken: accessToken,
-        refreshToken: refreshToken,
-        accessTokenExpiry: expiry,
-        provider: AuthProvider.microsoft,
-      );
+  }) => AuthSession(
+    accessToken: accessToken,
+    refreshToken: refreshToken,
+    accessTokenExpiry: expiry,
+    provider: AuthProvider.microsoft,
+  );
 
   group('restauration au démarrage (auto-connexion)', () {
     test('sans session stockée → Unauthenticated', () async {
@@ -396,10 +393,7 @@ void main() {
 
   test('déconnexion reste authentifiée si le tombstone de session échoue', () async {
     final FakeSessionStore store = FakeSessionStore.failingClear(session());
-    final ProviderContainer container = makeContainer(
-      gateway: FakeAuthGateway(),
-      store: store,
-    );
+    final ProviderContainer container = makeContainer(gateway: FakeAuthGateway(), store: store);
     container.read(authControllerProvider);
     await settle();
 
@@ -446,8 +440,9 @@ void main() {
       container.read(authControllerProvider);
       await settle();
 
-      final String? token =
-          await container.read(authControllerProvider.notifier).currentAccessToken();
+      final String? token = await container
+          .read(authControllerProvider.notifier)
+          .currentAccessToken();
 
       expect(token, 'nouveau');
       expect(gateway.refreshCalls, hasLength(1));
@@ -522,8 +517,9 @@ void main() {
       container.read(authControllerProvider);
       await settle();
 
-      final String? token =
-          await container.read(authControllerProvider.notifier).currentAccessToken();
+      final String? token = await container
+          .read(authControllerProvider.notifier)
+          .currentAccessToken();
       expect(token, AppEnv.devAuthToken);
     });
   });
@@ -588,6 +584,32 @@ void main() {
       expect(store.writeCalls, 1);
     });
 
+    test('Alpha privée refuse l’inscription sans réseau, stockage ni télémétrie', () async {
+      final FakeSessionStore store = FakeSessionStore();
+      final FakeCredentialsGateway credentials = FakeCredentialsGateway(
+        onRegister: (_, __, ___) => const AuthSession(accessToken: 'unexpected'),
+      );
+      final FakeAuthTelemetry telemetry = FakeAuthTelemetry();
+      final ProviderContainer container = makeContainer(
+        gateway: FakeAuthGateway(),
+        store: store,
+        credentials: credentials,
+        telemetry: telemetry,
+        releaseProfile: ReleaseProfile.privateAlpha,
+      );
+      container.read(authControllerProvider);
+      await settle();
+
+      await container
+          .read(authControllerProvider.notifier)
+          .registerWithEmail(email: 'test@example.invalid', password: 'password123');
+
+      expect(credentials.registerCalls, isEmpty);
+      expect(store.writeCalls, 0);
+      expect(telemetry.starts, isEmpty);
+      expect(container.read(authControllerProvider), isA<Unauthenticated>());
+    });
+
     test('inscription non vérifiée → session.emailVerified = false', () async {
       final FakeSessionStore store = FakeSessionStore();
       final FakeCredentialsGateway credentials = FakeCredentialsGateway(
@@ -637,8 +659,9 @@ void main() {
           .read(authControllerProvider.notifier)
           .signInWithEmail(email: 'pending@b.com', password: 'password123');
 
-      final bool ok =
-          await container.read(authControllerProvider.notifier).resendVerificationEmail();
+      final bool ok = await container
+          .read(authControllerProvider.notifier)
+          .resendVerificationEmail();
 
       expect(ok, isTrue);
       expect(credentials.resendCalls, <String>['pending@b.com']);
@@ -680,8 +703,9 @@ void main() {
       expect((state as Authenticated).session.accessToken, 'jeton-2');
       expect(state.session.email, 'pending@b.com'); // reporté malgré l'absence côté API
 
-      final bool ok =
-          await container.read(authControllerProvider.notifier).resendVerificationEmail();
+      final bool ok = await container
+          .read(authControllerProvider.notifier)
+          .resendVerificationEmail();
       expect(ok, isTrue);
       expect(credentials.resendCalls, <String>['pending@b.com']);
     });

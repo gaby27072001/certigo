@@ -1,8 +1,11 @@
+import 'package:core/core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import '../../../app/capabilities/release_profile_provider.dart';
+import '../../../app/capabilities/release_strings.dart';
 import '../application/auth_controller.dart';
 import '../application/auth_diagnostics.dart';
 import '../application/auth_state.dart';
@@ -82,7 +85,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final String email = _emailController.text.trim();
     final String password = _passwordController.text;
     final AuthController notifier = ref.read(authControllerProvider.notifier);
-    if (_mode == _AuthMode.register) {
+    final bool registrationEnabled = ref
+        .read(capabilityAvailabilityProvider(AppCapability.publicRegistration))
+        .isEnabled;
+    if (_mode == _AuthMode.register && registrationEnabled) {
       final String name = _nameController.text.trim();
       notifier.registerWithEmail(
         email: email,
@@ -101,7 +107,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   String? _validateEmail(String? value) {
     final String email = (value ?? '').trim();
     final int at = email.indexOf('@');
-    final bool valid = at > 0 &&
+    final bool valid =
+        at > 0 &&
         at == email.lastIndexOf('@') &&
         email.indexOf('.', at) > at &&
         !email.endsWith('.');
@@ -119,6 +126,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
+    final ReleaseStrings releaseStrings = ReleaseStrings.of(context);
+    final bool publicRegistrationEnabled = ref
+        .watch(capabilityAvailabilityProvider(AppCapability.publicRegistration))
+        .isEnabled;
     final bool socialEnabled = ref.watch(authConfiguredProvider) && !widget.emailOnly;
 
     // Réarme les boutons et **conserve** l'erreur à l'écran quand le flux
@@ -138,7 +149,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
     final AuthState state = ref.watch(authControllerProvider);
     final bool busy = state is AuthLoading || _pending != null || _emailSubmitting;
-    final bool registering = _mode == _AuthMode.register;
+    final bool registering = _mode == _AuthMode.register && publicRegistrationEnabled;
 
     // Message d'erreur affiché : on privilégie le message local (posé par le
     // `ref.listen` ci-dessus sur CETTE instance d'écran) et on retombe sur celui
@@ -299,15 +310,37 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                               ),
                             ),
                             const SizedBox(height: PrismSpacing.sm),
-                            TextButton(
-                              key: const Key('toggle-mode'),
-                              onPressed: busy ? null : _toggleMode,
-                              child: Text(
-                                registering
-                                    ? 'Déjà un compte ? Se connecter'
-                                    : 'Pas encore de compte ? Créer un compte',
+                            if (publicRegistrationEnabled)
+                              TextButton(
+                                key: const Key('toggle-mode'),
+                                onPressed: busy ? null : _toggleMode,
+                                child: Text(
+                                  registering
+                                      ? 'Déjà un compte ? Se connecter'
+                                      : 'Pas encore de compte ? Créer un compte',
+                                ),
+                              )
+                            else
+                              Semantics(
+                                label: releaseStrings.invitedAccountHint,
+                                child: Container(
+                                  key: const Key('private-alpha-access-note'),
+                                  padding: const EdgeInsets.all(PrismSpacing.sm),
+                                  decoration: BoxDecoration(
+                                    color: p.primarySoft,
+                                    borderRadius: BorderRadius.circular(PrismRadii.md),
+                                    border: Border.all(color: p.primary.withOpacity(0.35)),
+                                  ),
+                                  child: Text(
+                                    releaseStrings.invitedAccountHint,
+                                    textAlign: TextAlign.center,
+                                    style: text.bodySmall?.copyWith(
+                                      color: p.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
                             if (socialEnabled) ...<Widget>[
                               const SizedBox(height: PrismSpacing.md),
                               _OrDivider(color: p.textSecondary),

@@ -4,16 +4,19 @@ import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../capabilities/release_profile_provider.dart';
 import '../providers.dart';
 import 'runtime_content_dependencies.dart';
 
 export 'runtime_content_dependencies.dart';
 
-final runtimeContentSourceProvider = Provider<PublicContentSource>(
-  (Ref ref) => ApiPublicContentSource(ref.watch(apiClientProvider)),
-);
+final runtimeContentSourceProvider = Provider<PublicContentSource>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.versionedContent);
+  return ApiPublicContentSource(ref.watch(apiClientProvider));
+});
 
 final runtimeContentSynchronizerProvider = Provider<RuntimeContentSynchronizer>((Ref ref) {
+  requireEnabledCapability(ref, AppCapability.versionedContent);
   final RuntimeContentSynchronizer synchronizer = RuntimeContentSynchronizer(
     source: ref.watch(runtimeContentSourceProvider),
     store: ref.watch(runtimeContentStoreProvider),
@@ -41,15 +44,15 @@ class RuntimeContentController extends StateNotifier<RuntimeContentStatus> {
     required RuntimeContentPinRegistry pins,
     required Future<void> Function() ensureSyncQueueLoaded,
     required List<SyncAction> Function() syncActions,
-  })  : _synchronizer = synchronizer,
-        // Public constructor names stay stable for provider overrides and tests.
-        // ignore: prefer_initializing_formals
-        _pins = pins,
-        // ignore: prefer_initializing_formals
-        _ensureSyncQueueLoaded = ensureSyncQueueLoaded,
-        // ignore: prefer_initializing_formals
-        _syncActions = syncActions,
-        super(synchronizer.currentStatus) {
+  }) : _synchronizer = synchronizer,
+       // Public constructor names stay stable for provider overrides and tests.
+       // ignore: prefer_initializing_formals
+       _pins = pins,
+       // ignore: prefer_initializing_formals
+       _ensureSyncQueueLoaded = ensureSyncQueueLoaded,
+       // ignore: prefer_initializing_formals
+       _syncActions = syncActions,
+       super(synchronizer.currentStatus) {
     _subscription = synchronizer.statuses.listen((RuntimeContentStatus status) {
       state = status;
     });
@@ -84,9 +87,7 @@ class RuntimeContentController extends StateNotifier<RuntimeContentStatus> {
     if (running != null) return running;
     final Future<void> cancellation = _subscription.cancel();
     final Future<void> streamClosure = _synchronizer.dispose();
-    final Future<void> operation = Future.wait<void>(
-      <Future<void>>[cancellation, streamClosure],
-    );
+    final Future<void> operation = Future.wait<void>(<Future<void>>[cancellation, streamClosure]);
     _shutdown = operation;
     return operation;
   }
@@ -100,13 +101,14 @@ class RuntimeContentController extends StateNotifier<RuntimeContentStatus> {
 
 final runtimeContentControllerProvider =
     StateNotifierProvider<RuntimeContentController, RuntimeContentStatus>((Ref ref) {
-  final SyncEngine syncEngine = ref.watch(syncEngineProvider);
-  return RuntimeContentController.withSyncEngine(
-    synchronizer: ref.watch(runtimeContentSynchronizerProvider),
-    pins: ref.watch(runtimeContentPinRegistryProvider),
-    syncEngine: syncEngine,
-  );
-});
+      requireEnabledCapability(ref, AppCapability.versionedContent);
+      final SyncEngine syncEngine = ref.watch(syncEngineProvider);
+      return RuntimeContentController.withSyncEngine(
+        synchronizer: ref.watch(runtimeContentSynchronizerProvider),
+        pins: ref.watch(runtimeContentPinRegistryProvider),
+        syncEngine: syncEngine,
+      );
+    });
 
 String runtimeContentSpaceScope() {
   return runtimeContentSpaceScopeFor(
@@ -115,10 +117,7 @@ String runtimeContentSpaceScope() {
   );
 }
 
-String runtimeContentSpaceScopeFor({
-  required String flavor,
-  required Uri apiBaseUri,
-}) {
+String runtimeContentSpaceScopeFor({required String flavor, required Uri apiBaseUri}) {
   final Uri normalizedUri = apiBaseUri.replace(query: null, fragment: null).normalizePath();
   final String normalized = normalizedUri.toString().replaceFirst(RegExp(r'/$'), '');
   return runtimeContentScopeKey('$flavor|$normalized');

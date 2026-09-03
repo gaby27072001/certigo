@@ -8,3 +8,4 @@ library core;
 export 'src/result.dart';
 export 'src/failures.dart';
 export 'src/app_env.dart';
+export 'src/release_profile.dart';

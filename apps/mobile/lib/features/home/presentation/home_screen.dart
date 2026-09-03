@@ -1,3 +1,4 @@
+import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/capabilities/release_profile_provider.dart';
+import '../../../app/capabilities/release_widgets.dart';
 import '../../../app/router.dart';
 import '../application/home_controller.dart';
 import 'coach_section.dart';
@@ -42,13 +45,13 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _HomeContent extends StatelessWidget {
+class _HomeContent extends ConsumerWidget {
   const _HomeContent({required this.data});
 
   final HomeData data;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
     final UserProfile me = data.profile;
@@ -57,6 +60,9 @@ class _HomeContent extends StatelessWidget {
     final DomainProgress? weak = data.weakestDomain;
     final String firstName = me.displayName.split(' ').first;
     final int previous = (path.readinessScore - path.readinessTrend7d).clamp(0, 100);
+    final CapabilityAvailability sharing = ref.watch(
+      capabilityAvailabilityProvider(AppCapability.socialSharing),
+    );
 
     return ListView(
       padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
@@ -107,6 +113,7 @@ class _HomeContent extends StatelessWidget {
         _DailyShareEntryCard(
           goalMet: me.dailyGoalXp > 0 && me.dailyXpEarned >= me.dailyGoalXp,
           trackCode: path.exam,
+          availability: sharing,
           onTap: () => context.go(Routes.dailyShare),
         ),
         const SizedBox(height: 16),
@@ -279,10 +286,16 @@ class _DailyGoalCard extends StatelessWidget {
 }
 
 class _DailyShareEntryCard extends StatelessWidget {
-  const _DailyShareEntryCard({required this.goalMet, required this.trackCode, required this.onTap});
+  const _DailyShareEntryCard({
+    required this.goalMet,
+    required this.trackCode,
+    required this.availability,
+    required this.onTap,
+  });
 
   final bool goalMet;
   final String trackCode;
+  final CapabilityAvailability availability;
   final VoidCallback onTap;
 
   @override
@@ -291,40 +304,49 @@ class _DailyShareEntryCard extends StatelessWidget {
     final TextTheme t = Theme.of(context).textTheme;
     final Color tone = goalMet ? p.success : p.primary;
 
-    return PrismCard(
-      variant: PrismCardVariant.tonal,
-      accent: tone,
-      onTap: onTap,
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: tone.withOpacity(0.16),
-              borderRadius: PrismRadii.cardMd,
-            ),
-            child: Icon(Icons.share_rounded, color: tone),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('Partage du jour', style: t.titleMedium),
-                const SizedBox(height: 2),
-                Text(
-                  goalMet
-                      ? 'Ton objectif est atteint — partage ta progression ${trackCode.isEmpty ? '' : trackCode}.'
-                      : 'Transforme tes progrès du jour en carte de partage prête a envoyer.',
-                  style: t.bodySmall?.copyWith(color: p.textSecondary, height: 1.35),
+    final Widget content = Row(
+      children: <Widget>[
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(color: tone.withOpacity(0.16), borderRadius: PrismRadii.cardMd),
+          child: Icon(Icons.share_rounded, color: tone),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('Partage du jour', style: t.titleMedium),
+              const SizedBox(height: 2),
+              Text(
+                goalMet
+                    ? 'Ton objectif est atteint — partage ta progression ${trackCode.isEmpty ? '' : trackCode}.'
+                    : 'Transforme tes progrès du jour en carte de partage prête a envoyer.',
+                style: t.bodySmall?.copyWith(color: p.textSecondary, height: 1.35),
+              ),
+              if (availability.isUpcoming) ...<Widget>[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: CapabilityStatusBadge(availability: availability),
                 ),
               ],
-            ),
+            ],
           ),
-          Icon(Icons.chevron_right_rounded, color: p.textSecondary),
-        ],
-      ),
+        ),
+        if (availability.isEnabled) Icon(Icons.chevron_right_rounded, color: p.textSecondary),
+      ],
+    );
+    final Widget card = PrismCard(variant: PrismCardVariant.tonal, accent: tone, child: content);
+    if (availability.isEnabled) {
+      return PrismCard(variant: PrismCardVariant.tonal, accent: tone, onTap: onTap, child: content);
+    }
+    return CapabilityAction(
+      capability: AppCapability.socialSharing,
+      semanticLabel: 'Partage du jour',
+      onPressed: onTap,
+      builder: (_, __) => card,
     );
   }
 }
@@ -396,11 +418,11 @@ class _HomeLoading extends StatelessWidget {
 /// "Explore" shelf on Home — a 2-column grid of secondary destinations
 /// (achievements, seasons, quests, shop, friends, mock exam) presented above
 /// the shell so they never compete with the bottom-nav primary tabs.
-class _ExploreSection extends StatelessWidget {
+class _ExploreSection extends ConsumerWidget {
   const _ExploreSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final PrismColorScheme p = context.prism;
     final List<_ExploreItem> items = <_ExploreItem>[
       _ExploreItem(
@@ -408,26 +430,42 @@ class _ExploreSection extends StatelessWidget {
         label: 'Succès',
         tone: p.xpGold,
         route: Routes.achievements,
+        capability: AppCapability.achievements,
       ),
       _ExploreItem(
         icon: Icons.calendar_month_rounded,
         label: 'Saisons',
         tone: p.primary,
         route: Routes.seasons,
+        capability: AppCapability.seasons,
       ),
-      _ExploreItem(icon: Icons.flag_rounded, label: 'Quêtes', tone: p.ember, route: Routes.quests),
+      _ExploreItem(
+        icon: Icons.flag_rounded,
+        label: 'Quêtes',
+        tone: p.ember,
+        route: Routes.quests,
+        capability: AppCapability.quests,
+      ),
       _ExploreItem(
         icon: Icons.storefront_rounded,
         label: 'Boutique',
         tone: p.success,
         route: Routes.shop,
+        capability: AppCapability.shop,
       ),
-      _ExploreItem(icon: Icons.group_rounded, label: 'Amis', tone: p.info, route: Routes.friends),
+      _ExploreItem(
+        icon: Icons.group_rounded,
+        label: 'Amis',
+        tone: p.info,
+        route: Routes.friends,
+        capability: AppCapability.socialFriends,
+      ),
       _ExploreItem(
         icon: Icons.workspace_premium_rounded,
         label: 'Examen blanc',
         tone: p.warning,
         route: Routes.exam,
+        capability: AppCapability.mockExam,
       ),
     ];
     return LayoutBuilder(
@@ -441,7 +479,10 @@ class _ExploreSection extends StatelessWidget {
             for (final _ExploreItem item in items)
               SizedBox(
                 width: tileWidth,
-                child: _ExploreCard(item: item),
+                child: _ExploreCard(
+                  item: item,
+                  availability: ref.watch(capabilityAvailabilityProvider(item.capability)),
+                ),
               ),
           ],
         );
@@ -456,54 +497,72 @@ class _ExploreItem {
     required this.label,
     required this.tone,
     required this.route,
+    required this.capability,
   });
 
   final IconData icon;
   final String label;
   final Color tone;
   final String route;
+  final AppCapability capability;
 }
 
 class _ExploreCard extends StatelessWidget {
-  const _ExploreCard({required this.item});
+  const _ExploreCard({required this.item, required this.availability});
 
   final _ExploreItem item;
+  final CapabilityAvailability availability;
 
   @override
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     final PrismColorScheme p = context.prism;
-    return GestureDetector(
-      onTap: () => context.go(item.route),
-      child: PrismCard(
-        borderRadius: PrismRadii.cardLg,
-        padding: const EdgeInsets.symmetric(
-          horizontal: PrismSpacing.md,
-          vertical: PrismSpacing.cardInset,
-        ),
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: item.tone.withOpacity(0.16),
-                borderRadius: PrismRadii.cardMd,
-              ),
-              child: Icon(item.icon, color: item.tone, size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                item.label,
-                style: t.titleSmall?.copyWith(color: p.textPrimary),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+    final Widget card = PrismCard(
+      borderRadius: PrismRadii.cardLg,
+      padding: const EdgeInsets.symmetric(
+        horizontal: PrismSpacing.md,
+        vertical: PrismSpacing.cardInset,
       ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: item.tone.withOpacity(0.16),
+              borderRadius: PrismRadii.cardMd,
+            ),
+            child: Icon(item.icon, color: item.tone, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  item.label,
+                  style: t.titleSmall?.copyWith(color: p.textPrimary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (availability.isUpcoming) ...<Widget>[
+                  const SizedBox(height: 4),
+                  CapabilityStatusBadge(availability: availability),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (availability.isEnabled) {
+      return GestureDetector(onTap: () => context.go(item.route), child: card);
+    }
+    return CapabilityAction(
+      capability: item.capability,
+      semanticLabel: item.label,
+      onPressed: () => context.go(item.route),
+      builder: (_, __) => card,
     );
   }
 }

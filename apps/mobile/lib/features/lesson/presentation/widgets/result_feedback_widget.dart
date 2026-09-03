@@ -1,12 +1,16 @@
+import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import '../../../../app/capabilities/release_profile_provider.dart';
+import '../../../../app/capabilities/release_widgets.dart';
 import '../../../tutor/presentation/tutor_sheet.dart';
 
 /// End-of-lesson result: a score emblem, the rewards earned, a per-check recap
 /// and a path back into the product (continue or review weak concepts).
-class ResultFeedbackWidget extends StatelessWidget {
+class ResultFeedbackWidget extends ConsumerWidget {
   const ResultFeedbackWidget({
     super.key,
     required this.result,
@@ -57,12 +61,15 @@ class ResultFeedbackWidget extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
     final QuizRewards rewards = result.rewards;
     final bool passed = result.scorePct >= 60;
     final Color tone = passed ? p.success : p.warning;
+    final CapabilityAvailability tutor = ref.watch(
+      capabilityAvailabilityProvider(AppCapability.aiTutor),
+    );
 
     return ListView(
       padding: PrismSpacing.screen,
@@ -77,12 +84,12 @@ class ResultFeedbackWidget extends StatelessWidget {
           isDemo
               ? 'Démo terminée'
               : pendingSync
-                  ? 'Soumis hors ligne'
-                  : submissionFailed
-                      ? 'Envoi impossible'
-                      : passed
-                          ? 'Concept validé !'
-                          : 'Presque !',
+              ? 'Soumis hors ligne'
+              : submissionFailed
+              ? 'Envoi impossible'
+              : passed
+              ? 'Concept validé !'
+              : 'Presque !',
           textAlign: TextAlign.center,
           style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
         ),
@@ -91,12 +98,12 @@ class ResultFeedbackWidget extends StatelessWidget {
           isDemo
               ? 'Cette session ne sera pas synchronisée et ne rapporte aucune récompense.'
               : pendingSync
-                  ? 'Tes réponses seront synchronisées automatiquement au retour du réseau.'
-                  : submissionFailed
-                      ? 'Aucune progression ni récompense n’a été enregistrée.'
-                      : passed
-                          ? 'Tu maîtrises ce concept. On le consolide avec une révision espacée.'
-                          : 'Tu y es presque — une courte révision et ce sera acquis.',
+              ? 'Tes réponses seront synchronisées automatiquement au retour du réseau.'
+              : submissionFailed
+              ? 'Aucune progression ni récompense n’a été enregistrée.'
+              : passed
+              ? 'Tu maîtrises ce concept. On le consolide avec une révision espacée.'
+              : 'Tu y es presque — une courte révision et ce sera acquis.',
           textAlign: TextAlign.center,
           style: text.bodyMedium?.copyWith(color: p.textSecondary, height: 1.4),
         ),
@@ -139,6 +146,7 @@ class ResultFeedbackWidget extends StatelessWidget {
                   stem: _stemFor(r.itemId),
                   tone: r.correct ? p.success : p.error,
                   onExplain: isDemo ? null : () => _explain(context, r),
+                  tutorAvailability: tutor,
                 ),
                 if (!identical(r, result.results.last)) const SizedBox(height: 12),
               ],
@@ -153,7 +161,8 @@ class ResultFeedbackWidget extends StatelessWidget {
           CalloutBlock(
             kind: CalloutKind.warning,
             title: 'À renforcer',
-            text: 'On replanifiera ${result.weakConcepts.length} concept(s) en '
+            text:
+                'On replanifiera ${result.weakConcepts.length} concept(s) en '
                 'révision pour bien les ancrer.',
           ),
         ],
@@ -197,16 +206,8 @@ class _ScoreRing extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(
-                '$scorePct%',
-                style: text.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                'score',
-                style: text.labelSmall?.copyWith(color: p.textSecondary),
-              ),
+              Text('$scorePct%', style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Text('score', style: text.labelSmall?.copyWith(color: p.textSecondary)),
             ],
           ),
         ],
@@ -257,12 +258,14 @@ class _ResultRow extends StatelessWidget {
     required this.stem,
     required this.tone,
     required this.onExplain,
+    required this.tutorAvailability,
   });
 
   final bool correct;
   final String stem;
   final Color tone;
   final VoidCallback? onExplain;
+  final CapabilityAvailability tutorAvailability;
 
   @override
   Widget build(BuildContext context) {
@@ -283,37 +286,63 @@ class _ResultRow extends StatelessWidget {
             Expanded(child: Text(stem, style: text.bodyMedium?.copyWith(height: 1.35))),
           ],
         ),
-        if (onExplain != null) ...<Widget>[
+        if (onExplain != null && !tutorAvailability.isOff) ...<Widget>[
           const SizedBox(height: 6),
           Padding(
             padding: const EdgeInsets.only(left: PrismSpacing.debt30),
-            child: GestureDetector(
-              onTap: onExplain,
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: PrismSpacing.xxs),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Icon(
-                      Icons.auto_awesome_rounded,
-                      size: 16,
-                      color: p.primary,
+            child: tutorAvailability.isEnabled
+                ? GestureDetector(
+                    onTap: onExplain,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: PrismSpacing.xxs),
+                      child: _TutorActionContent(color: p.primary, style: text.labelMedium),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Demander au tuteur',
-                      style: text.labelMedium?.copyWith(
-                        color: p.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  )
+                : CapabilityAction(
+                    capability: AppCapability.aiTutor,
+                    semanticLabel: 'Demander au tuteur',
+                    onPressed: onExplain!,
+                    builder: (_, CapabilityAvailability availability) => Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: <Widget>[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: PrismSpacing.xxs),
+                          child: _TutorActionContent(
+                            color: p.textSecondary,
+                            style: text.labelMedium,
+                          ),
+                        ),
+                        CapabilityStatusBadge(availability: availability),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            ),
+                  ),
           ),
         ],
+      ],
+    );
+  }
+}
+
+class _TutorActionContent extends StatelessWidget {
+  const _TutorActionContent({required this.color, required this.style});
+
+  final Color color;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Icon(Icons.auto_awesome_rounded, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(
+          'Demander au tuteur',
+          style: style?.copyWith(color: color, fontWeight: FontWeight.w700),
+        ),
       ],
     );
   }

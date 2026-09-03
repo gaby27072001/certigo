@@ -1,5 +1,7 @@
+import 'package:certigo/app/capabilities/release_profile_provider.dart';
 import 'package:certigo/app/content/runtime_content_providers.dart';
 import 'package:certigo/app/providers.dart';
+import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,33 +10,58 @@ void main() {
   late ApiClient api;
 
   setUp(() {
-    api = ApiClient(
-      baseUrl: 'https://example.test',
-      tokenProvider: () async => null,
-    );
+    api = ApiClient(baseUrl: 'https://example.test', tokenProvider: () async => null);
   });
 
-  test('runtime content stays off and preserves the online repository by default', () {
+  for (final ReleaseProfile profile in <ReleaseProfile>[
+    ReleaseProfile.privateAlpha,
+    ReleaseProfile.full,
+  ]) {
+    test('${profile.id.configValue} keeps offline and versioned lesson content active', () {
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          releaseProfileProvider.overrideWithValue(profile),
+          apiClientProvider.overrideWithValue(api),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(profile.isEnabled(AppCapability.offlineResilience), isTrue);
+      expect(profile.isEnabled(AppCapability.versionedContent), isTrue);
+      expect(container.read(lessonRepositoryProvider), isA<RuntimeContentLessonRepository>());
+    });
+  }
+
+  test('fail-closed profile stops lesson service construction before API access', () {
     final ProviderContainer container = ProviderContainer(
-      overrides: <Override>[apiClientProvider.overrideWithValue(api)],
+      overrides: <Override>[releaseProfileProvider.overrideWithValue(ReleaseProfile.failClosed)],
     );
     addTearDown(container.dispose);
 
-    expect(container.read(runtimeContentSyncEnabledProvider), isFalse);
-    expect(container.read(lessonRepositoryProvider), isA<RemoteLessonRepository>());
+    expect(
+      () => container.read(lessonRepositoryProvider),
+      throwsA(
+        isA<CapabilityUnavailableException>().having(
+          (CapabilityUnavailableException error) => error.capability,
+          'capability',
+          AppCapability.lessons,
+        ),
+      ),
+    );
   });
 
-  test('flag off preserves the legacy offline lesson cache decorator', () {
+  test('legacy cache and runtime-content provider overrides remain effective', () {
     final ProviderContainer container = ProviderContainer(
       overrides: <Override>[
+        releaseProfileProvider.overrideWithValue(ReleaseProfile.full),
         apiClientProvider.overrideWithValue(api),
-        offlineStudyCacheEnabledProvider.overrideWithValue(true),
+        offlineStudyCacheEnabledProvider.overrideWithValue(false),
+        runtimeContentSyncEnabledProvider.overrideWithValue(false),
       ],
     );
     addTearDown(container.dispose);
 
-    expect(container.read(runtimeContentSyncEnabledProvider), isFalse);
-    expect(container.read(lessonRepositoryProvider), isA<OfflineLessonRepository>());
+    expect(container.read(lessonRepositoryProvider), isA<RemoteLessonRepository>());
   });
 
   test('runtime cache namespace includes the normalized API base path', () {

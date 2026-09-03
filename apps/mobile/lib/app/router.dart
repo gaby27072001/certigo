@@ -1,8 +1,8 @@
+import 'package:core/core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
-import 'package:core/core.dart';
 
 import '../features/home/presentation/home_screen.dart';
 import '../features/path/presentation/path_screen.dart';
@@ -38,36 +38,12 @@ import '../features/onboarding/presentation/welcome_screen.dart';
 import 'app_shell.dart';
 import 'auth_redirect.dart';
 import 'providers.dart';
+import 'capabilities/feature_unavailable_screen.dart';
+import 'capabilities/release_navigation.dart';
+import 'capabilities/release_profile_provider.dart';
+import 'route_paths.dart';
 
-/// Centralized, named route table. Using constants avoids stringly-typed
-/// navigation scattered across the codebase.
-abstract class Routes {
-  static const String home = '/home';
-  static const String path = '/path';
-  static const String library = '/library';
-  static const String leaderboard = '/leaderboard';
-  static const String profile = '/profile';
-
-  /// Auth flows (outside the shell, on the root navigator).
-  static const String splash = '/splash'; // session restore in progress
-  static const String landing = '/landing'; // Luma-style opening hero (pre-auth)
-  static const String auth = '/auth'; // sign-in (Microsoft / Google / Apple / e-mail)
-
-  /// Full-screen (outside the shell) flows.
-  static const String lesson = '/lesson'; // /lesson/:trackId/:lessonId
-  static const String quiz = '/quiz'; // /quiz/:trackId/:lessonId
-
-  /// "Explore" destinations presented above the shell (no bottom nav).
-  static const String achievements = '/achievements';
-  static const String seasons = '/seasons';
-  static const String quests = '/quests';
-  static const String shop = '/shop';
-  static const String friends = '/friends';
-  static const String exam = '/exam';
-  static const String dailyShare = '/share-daily';
-  static const String accountDeletion = '/account/delete';
-  static const String accountDeleted = '/account/deleted';
-}
+export 'route_paths.dart';
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
@@ -82,31 +58,34 @@ CustomTransitionPage<void> _stepPage({
     child: child,
     transitionDuration: PrismMotion.base,
     reverseTransitionDuration: PrismMotion.fast,
-    transitionsBuilder: (
-      BuildContext context,
-      Animation<double> animation,
-      Animation<double> secondaryAnimation,
-      Widget child,
-    ) {
-      final CurvedAnimation curved = CurvedAnimation(
-        parent: animation,
-        curve: PrismMotion.decelerate,
-        reverseCurve: PrismMotion.standard,
-      );
-      return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
-          child: child,
-        ),
-      );
-    },
+    transitionsBuilder:
+        (
+          BuildContext context,
+          Animation<double> animation,
+          Animation<double> secondaryAnimation,
+          Widget child,
+        ) {
+          final CurvedAnimation curved = CurvedAnimation(
+            parent: animation,
+            curve: PrismMotion.decelerate,
+            reverseCurve: PrismMotion.standard,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
+              child: child,
+            ),
+          );
+        },
   );
 }
 
 /// The app router. Exposed as a provider so auth/session/onboarding guards can
 /// react to state changes without rebuilding the app shell manually.
 final routerProvider = Provider<GoRouter>((Ref ref) {
+  final releaseProfile = ref.watch(releaseProfileProvider);
+  final CapabilityRuntimePolicy runtimePolicy = ref.watch(capabilityRuntimePolicyProvider);
   // Garde de synchronisation : les constantes du garde d'auth (fichier feuille
   // testable) doivent rester alignées sur le table de routes et l'onboarding.
   // En debug, tout écart casse tôt plutôt que de laisser passer une régression.
@@ -117,6 +96,10 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   assert(
     Routes.accountDeleted == AuthShellRoutes.accountDeleted,
     'Routes.accountDeleted désynchronisé',
+  );
+  assert(
+    Routes.capabilityUnavailable == AuthShellRoutes.capabilityUnavailable,
+    'Routes.capabilityUnavailable désynchronisé',
   );
   assert(
     OnboardingRoutes.splash == AuthShellRoutes.onboardingSplash,
@@ -144,8 +127,13 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
     initialLocation: Routes.splash,
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
-      if (!AppEnv.accountDeletionEnabled && state.matchedLocation == Routes.accountDeletion) {
-        return Routes.profile;
+      final String? releaseRedirect = resolveReleaseRedirect(
+        profile: releaseProfile,
+        location: state.matchedLocation,
+        runtimePolicy: runtimePolicy,
+      );
+      if (releaseRedirect != null) {
+        return releaseRedirect;
       }
       final AuthState auth = ref.read(authControllerProvider);
       return resolveAuthRedirect(
@@ -189,6 +177,12 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         path: Routes.accountDeleted,
         parentNavigatorKey: _rootKey,
         builder: (_, __) => const AccountDeletionCompletedScreen(),
+      ),
+      GoRoute(
+        path: '${Routes.capabilityUnavailable}/:capabilityId',
+        parentNavigatorKey: _rootKey,
+        builder: (_, GoRouterState state) =>
+            FeatureUnavailableScreen(capability: unavailableCapabilityForLocation(state.uri.path)),
       ),
 
       // Real account creation: name → email → password → confirmation.

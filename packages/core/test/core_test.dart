@@ -89,6 +89,14 @@ void main() {
       expect(AppEnv.apiBaseUrl, isNotEmpty);
       expect(AppEnv.entraRedirectUri, 'certigo://auth/');
       expect(AppEnv.entraScopes, contains('openid'));
+      expect(AppEnv.accountDeletionEnabled, isFalse);
+      expect(
+        AppEnv.capabilityRuntimePolicy.availabilityOf(
+          ReleaseProfile.full,
+          AppCapability.accountDeletion,
+        ),
+        CapabilityAvailability.off,
+      );
     });
   });
 
@@ -102,16 +110,17 @@ void main() {
       String entraRedirectUri = 'certigo://auth/',
       String entraApiScope = 'api://client-123/user_impersonation',
       bool entraOptional = false,
-    }) =>
-        AppEnv.validateConfig(
-          flavor: flavor,
-          apiBaseUrl: apiBaseUrl,
-          entraClientId: entraClientId,
-          entraAuthority: entraAuthority,
-          entraRedirectUri: entraRedirectUri,
-          entraApiScope: entraApiScope,
-          entraOptional: entraOptional,
-        );
+      String releaseProfileName = 'full',
+    }) => AppEnv.validateConfig(
+      flavor: flavor,
+      apiBaseUrl: apiBaseUrl,
+      entraClientId: entraClientId,
+      entraAuthority: entraAuthority,
+      entraRedirectUri: entraRedirectUri,
+      entraApiScope: entraApiScope,
+      entraOptional: entraOptional,
+      releaseProfileName: releaseProfileName,
+    );
 
     bool hasError(AppConfigReport r, String key) =>
         r.errors.any((AppConfigIssue i) => i.key == key);
@@ -187,9 +196,17 @@ void main() {
       expect(r.hasWarnings, isTrue);
     });
 
-    test('validate() réel (dev par défaut) est valide', () {
-      // Sans --dart-define, flavor=dev : la config par défaut ne doit pas bloquer.
-      expect(AppEnv.validate().isValid, isTrue);
+    test('profil absent bloque même le flavor dev', () {
+      final AppConfigReport report = AppEnv.validate();
+      expect(report.isValid, isFalse);
+      expect(report.hasReleaseProfileError, isTrue);
+      expect(AppEnv.releaseProfileResolution.profile, same(ReleaseProfile.failClosed));
+    });
+
+    test('profil inconnu est une erreur bloquante', () {
+      final AppConfigReport report = validate(releaseProfileName: 'preview');
+      expect(report.isValid, isFalse);
+      expect(hasError(report, 'CERTIGO_RELEASE_PROFILE'), isTrue);
     });
   });
 }

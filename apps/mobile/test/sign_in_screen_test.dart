@@ -10,6 +10,8 @@ import 'package:certigo/features/auth/application/auth_gateway.dart';
 import 'package:certigo/features/auth/application/auth_state.dart';
 import 'package:certigo/features/auth/presentation/sign_in_screen.dart';
 import 'package:certigo/features/auth/presentation/widgets/auth_provider_button.dart';
+import 'package:certigo/app/capabilities/release_profile_provider.dart';
+import 'package:core/core.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import 'auth_controller_test.dart' show FakeAuthGateway, FakeCredentialsGateway, FakeSessionStore;
@@ -27,6 +29,7 @@ void main() {
     required FakeSessionStore store,
     FakeCredentialsGateway? credentials,
     bool configured = true,
+    ReleaseProfile releaseProfile = ReleaseProfile.full,
   }) async {
     // L'écran de connexion refondu (façon Luma) est plus haut que la fenêtre de
     // test par défaut (800x600) : on élargit la surface pour que le bouton de
@@ -38,6 +41,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
+          releaseProfileProvider.overrideWithValue(releaseProfile),
           authGatewayProvider.overrideWithValue(gateway),
           credentialsGatewayProvider.overrideWithValue(credentials ?? FakeCredentialsGateway()),
           sessionStoreProvider.overrideWithValue(store),
@@ -141,6 +145,22 @@ void main() {
 
     expect(find.byKey(const Key('name-field')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Créer un compte'), findsOneWidget);
+  });
+
+  testWidgets('Alpha privée masque l’inscription publique et explique le compte invité', (
+    tester,
+  ) async {
+    await pumpSignIn(
+      tester,
+      gateway: FakeAuthGateway(),
+      store: FakeSessionStore(),
+      releaseProfile: ReleaseProfile.privateAlpha,
+    );
+
+    expect(find.byKey(const Key('toggle-mode')), findsNothing);
+    expect(find.byKey(const Key('name-field')), findsNothing);
+    expect(find.byKey(const Key('private-alpha-access-note')), findsOneWidget);
+    expect(find.textContaining('Public sign-up is closed'), findsOneWidget);
   });
 
   testWidgets('le tap sur un fournisseur déclenche sa connexion', (tester) async {

@@ -1,3 +1,5 @@
+import 'release_profile.dart';
+
 /// Compile-time environment configuration, injected via `--dart-define`.
 ///
 /// Never hard-code endpoints or client ids. Build flavors pass values:
@@ -12,12 +14,16 @@ class AppEnv {
   const AppEnv._();
 
   static const String _rawEnv = String.fromEnvironment('CERTIGO_ENV', defaultValue: 'dev');
+  static const String releaseProfileName = String.fromEnvironment(
+    'CERTIGO_RELEASE_PROFILE',
+    defaultValue: '',
+  );
 
   static AppFlavor get flavor => switch (_rawEnv) {
-        'prod' => AppFlavor.prod,
-        'staging' => AppFlavor.staging,
-        _ => AppFlavor.dev,
-      };
+    'prod' => AppFlavor.prod,
+    'staging' => AppFlavor.staging,
+    _ => AppFlavor.dev,
+  };
 
   /// URL du backend dev, servie **uniquement** en repli local (voir [apiBaseUrl]).
   /// Exposée comme constante nommée pour que [validate] puisse détecter — et
@@ -113,10 +119,16 @@ class AppEnv {
   /// prévisualiser/tester l'UI en dev (`--dart-define=FORCE_AUTH_UI=true`).
   static const bool forceAuthUi = bool.fromEnvironment('FORCE_AUTH_UI', defaultValue: false);
 
-  /// Keeps account deletion hidden until the destructive Cosmos gate passes.
+  /// Keeps account deletion unavailable until the destructive Cosmos gate has
+  /// passed. This operational kill switch remains independent from product
+  /// release profiles so a `full` build cannot bypass the safety contract.
   static const bool accountDeletionEnabled = bool.fromEnvironment(
     'ACCOUNT_DELETION_ENABLED',
     defaultValue: false,
+  );
+
+  static const CapabilityRuntimePolicy capabilityRuntimePolicy = CapabilityRuntimePolicy(
+    accountDeletionEnabled: accountDeletionEnabled,
   );
 
   /// Assouplit [validate] : quand `true`, l'absence **totale** de configuration
@@ -135,6 +147,9 @@ class AppEnv {
   /// avertissement). Le garde-fou de démarrage bloque le lancement si invalide.
   static bool get isStrictFlavor => flavor == AppFlavor.prod || flavor == AppFlavor.staging;
 
+  static ReleaseProfileResolution get releaseProfileResolution =>
+      ReleaseProfile.resolve(releaseProfileName);
+
   /// Valide la configuration compile-time (`--dart-define`) réelle.
   ///
   /// Délègue à [validateConfig] avec les constantes ci-dessus. Le garde-fou de
@@ -142,14 +157,15 @@ class AppEnv {
   /// [AppConfigReport.isValid] est faux, plutôt que de démarrer silencieusement
   /// sur une config dev/incohérente.
   static AppConfigReport validate() => validateConfig(
-        flavor: flavor,
-        apiBaseUrl: apiBaseUrl,
-        entraClientId: entraClientId,
-        entraAuthority: entraAuthority,
-        entraRedirectUri: entraRedirectUri,
-        entraApiScope: entraApiScope,
-        entraOptional: entraOptional,
-      );
+    flavor: flavor,
+    apiBaseUrl: apiBaseUrl,
+    entraClientId: entraClientId,
+    entraAuthority: entraAuthority,
+    entraRedirectUri: entraRedirectUri,
+    entraApiScope: entraApiScope,
+    entraOptional: entraOptional,
+    releaseProfileName: releaseProfileName,
+  );
 
   /// Cœur de validation : **pur et sans I/O**, ne lit aucune constante globale.
   /// Isolé ainsi pour être testable unitairement avec des valeurs arbitraires
@@ -163,11 +179,20 @@ class AppEnv {
     required String entraRedirectUri,
     required String entraApiScope,
     bool entraOptional = false,
+    String releaseProfileName = 'full',
   }) {
     final bool strictFlavor = flavor == AppFlavor.prod || flavor == AppFlavor.staging;
     final List<AppConfigIssue> issues = <AppConfigIssue>[];
-    final AppConfigSeverity strict =
-        strictFlavor ? AppConfigSeverity.error : AppConfigSeverity.warning;
+    final AppConfigSeverity strict = strictFlavor
+        ? AppConfigSeverity.error
+        : AppConfigSeverity.warning;
+
+    final ReleaseProfileResolution release = ReleaseProfile.resolve(releaseProfileName);
+    if (!release.isValid) {
+      issues.add(
+        AppConfigIssue(AppConfigSeverity.error, 'CERTIGO_RELEASE_PROFILE', release.issue!.message),
+      );
+    }
 
     // --- API_BASE_URL ---
     if (apiBaseUrl.trim().isEmpty) {
@@ -217,8 +242,9 @@ class AppEnv {
       );
     } else if (!hasClientId) {
       // Entra totalement absent : bloquant en prod (sauf opt-in e-mail seul).
-      final AppConfigSeverity sev =
-          (strictFlavor && !entraOptional) ? AppConfigSeverity.error : AppConfigSeverity.warning;
+      final AppConfigSeverity sev = (strictFlavor && !entraOptional)
+          ? AppConfigSeverity.error
+          : AppConfigSeverity.warning;
       issues.add(
         AppConfigIssue(
           sev,
@@ -235,8 +261,9 @@ class AppEnv {
     if (redirect == null || redirect.scheme != redirectScheme) {
       // Schéma incohérent → le callback OIDC ne revient jamais dans l'app.
       // Bloquant dès qu'Entra est (au moins partiellement) configuré ou strict.
-      final AppConfigSeverity sev =
-          (hasClientId || hasAuthority || strictFlavor) ? strict : AppConfigSeverity.warning;
+      final AppConfigSeverity sev = (hasClientId || hasAuthority || strictFlavor)
+          ? strict
+          : AppConfigSeverity.warning;
       issues.add(
         AppConfigIssue(
           sev,
@@ -302,6 +329,9 @@ class AppConfigReport {
   bool get isValid => errors.isEmpty;
 
   bool get hasWarnings => warnings.isNotEmpty;
+
+  bool get hasReleaseProfileError =>
+      errors.any((AppConfigIssue issue) => issue.key == 'CERTIGO_RELEASE_PROFILE');
 
   /// Résumé multi-lignes pour les logs et l'écran de config invalide.
   String describe() => issues.map((AppConfigIssue i) => '• $i').join('\n');

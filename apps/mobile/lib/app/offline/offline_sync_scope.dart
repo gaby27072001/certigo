@@ -85,9 +85,7 @@ class _OfflineSyncScopeState extends ConsumerState<OfflineSyncScope> with Widget
     if (ref.read(runtimeContentSyncEnabledProvider)) {
       final String? ownerId = auth.session.userId;
       if (ownerId != null && ownerId.isNotEmpty) {
-        operations.add(
-          ref.read(runtimeContentControllerProvider.notifier).syncNow(ownerId),
-        );
+        operations.add(ref.read(runtimeContentControllerProvider.notifier).syncNow(ownerId));
       }
     }
     await Future.wait<void>(operations);
