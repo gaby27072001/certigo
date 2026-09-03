@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-10-mobile-crash-reporting",
-  "status": "in_review",
+  "status": "in_progress",
   "session_id": "3dee5e42-1c4d-464a-a9e3-4dff3dbea5e7",
   "branch": "gchambaud-microsoft-wp-p1-10-mobile-crash-reporting",
   "pr": 213,
   "checkpoint": {
-    "step": "ci-fix-applied",
-    "note": "PR #213 couvre la capture locale, mais la DoD reste incomplète : sink production, upload des symboles et crash visible dans le tableau de bord non prouvés.",
-    "at": "2026-07-07T10:52:10+01:00"
+    "step": "merged-partial-dod",
+    "note": "PR #213 fusionnée 2026-07-07 (le registre disait à tort `in_review`, ~2 mois de dérive, corrigé le 2026-09-03). DoD partielle seulement : `LoggingCrashReporter` capture localement (FlutterError.onError/PlatformDispatcher.onError/runZonedGuarded) mais aucun sink production réel n'est branché, et aucun upload de symboles (dSYM/mapping.txt) n'existe dans release-android.yml/release-ios.yml. Reste à faire avant DoD verte : sink production + upload symboles + preuve tableau de bord.",
+    "at": "2026-09-03T00:00:00Z"
   },
-  "updated_at": "2026-08-05T20:52:00+01:00",
+  "updated_at": "2026-09-03T00:00:00Z",
   "history_ref": "log.jsonl"
 }

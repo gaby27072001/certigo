@@ -1,4 +1,9 @@
-# ADR-014 — Stockage Azure dédié pour les releases de contenu immuables
+# ADR-019 — Stockage Azure dédié pour les releases de contenu immuables
+
+> Renuméroté depuis `ADR-014` le 2026-09-03 : ce numéro était déjà utilisé par
+> [`ADR-014-person-linked-identity.md`](./ADR-014-person-linked-identity.md),
+> référencé ailleurs (ADR-017, contrat `person-linked-identity/v1`). Aucun
+> changement de contenu au-delà du numéro et de ce titre.
 
 - Statut : proposé
 - Date : 2026-08-19

@@ -2,9 +2,11 @@
 
 > **Lot** : `wp-p0-08-e2e-auth-health-release` (Phase 0, dernier lot — intégration/release E2E)
 > **Type** : **lot de CONFIRMATION** (idempotent — déjà remédié sur `main`)
-> **Statut registre** : `in_review` (réserves/actions live listées §5 — **pas `done`**)
+> **Statut registre** : `done` — mis à jour le 2026-09-03 (vérifié `gh pr view 209` : PR **mergée** le 2026-07-06 ; les deux dépendances `wp-p0-01-jwt-key-vault` et `wp-p0-07-github-branch-protection-release` sont également `done`). Ce document restait rédigé au présent comme si la PR était encore en draft — corrigé lors de la consolidation documentaire du 2026-09-03. Voir aussi le registre canonique : `docs/ETAT_DU_PROJET.md`.
 > **DoD (autorité)** : `docs/migration/work-packages.yaml` → `wp-p0-08-e2e-auth-health-release`
-> **Base** : `main` · **PR** : DRAFT, **NON mergée** (décision de merge = Gabriel via orchestrateur)
+> **Base** : `main` · **PR** : [#209](https://github.com/gchambaud_microsoft/Certigo/pull/209), **fusionnée** 2026-07-06
+>
+> *(Déplacé depuis `docs/migration/runbooks/` vers `docs/migration/verifications/` pour cohérence avec `wp-p0-05-ciam-governance.md`, qui suit le même format de livrable de confirmation.)*
 
 Ce document est le **livrable versionné** du lot. Il n'invente aucun code : il **audite finding-par-finding** l'état réel de `main`, **chiffre la DoD**, et fournit un **runbook de release E2E** qui **référence** (sans dupliquer) les runbooks opérationnels déjà présents (`docs/deployment-runbook.md`, `docs/RELEASE_MOBILE.md`, `docs/E2E_AUTH_PREREQUIS.md`).
 
@@ -114,17 +116,17 @@ Un client peut fixer `x-correlation-id: <guid>` sur sa requête ; le backend l'h
 
 ---
 
-## 5. Réserves / actions live (→ le lot reste `in_review`, PAS `done`)
+## 5. Réserves / actions live — état au moment de la rédaction (2026-07-06), résolues depuis
 
-Conformément à la règle de blocage (préférence de Gabriel) : les points suivants exigent une **action humaine/live** ou dépendent d'autres lots non finalisés. **Aucun n'est bloquant pour la PR de confirmation**, mais tous doivent être **traités hors de cette PR draft**.
+> Section conservée pour l'historique de l'audit finding-par-finding. Toutes les réserves listées ci-dessous ont été levées : les deux dépendances sont `done` et la PR #209 a été mergée le 2026-07-06.
 
-1. **Dépendances non mergées** — `depends_on: [wp-p0-01-jwt-key-vault, wp-p0-07-github-branch-protection-release]` sont encore `todo` sur `main` (leurs PR draft ne sont pas mergées). Ce lot **confirme** l'état E2E ; sa clôture (`done`) devrait suivre celle de ses dépendances via l'orchestrateur.
+1. ~~**Dépendances non mergées**~~ — ✅ résolu : `wp-p0-01-jwt-key-vault` et `wp-p0-07-github-branch-protection-release` sont `done` sur `main` (vérifié 2026-09-03).
 2. **Tags release** — `v1.0.0…v1.0.2` existent déjà → **aucun tag live à pousser ici**. Le §4.4 est documentaire.
 3. **Correlation id côté mobile** — le backend est le **point de propagation autoritaire** (honore l'entrant, sinon génère, renvoie). Le client mobile **n'émet pas** de `x-correlation-id` propre. Nuance mineure, **pas un défaut de DoD** (la DoD porte sur `/health` + propagation backend). Amélioration éventuelle : faire émettre un guid par requête côté `api_client.dart` (hors périmètre de ce lot).
 4. **Gate mobile `beta`** — `environment: beta` avec *required reviewers* est une **configuration GitHub Environments** (Settings → Environments → `beta` → Required reviewers). C'est une **action admin GitHub**, à valider/maintenir hors PR :
    - Vérifier : `Settings → Environments → beta → Deployment protection rules → Required reviewers` non vide.
    - Rollback : retirer le reviewer requis rétablit une publication non gated (déconseillé).
-5. **Merge** — cette PR est **DRAFT et ne doit jamais être mergée** par l'agent (ni admin, ni auto). La décision appartient à **Gabriel via l'orchestrateur**.
+5. ~~**Merge**~~ — ✅ résolu : la PR #209 a été mergée le 2026-07-06.
 
 ---
 
@@ -136,7 +138,7 @@ Aucun changement de code/IaC n'est introduit par ce lot. Rollback = **`git rever
 
 ## 7. Traçabilité registre
 
-- `docs/migration/state/wp-p0-08-e2e-auth-health-release.json` — statut `in_review`, `session_id`, `branch`, `pr`, `checkpoint`.
-- `docs/migration/log.jsonl` — transitions `todo → in_progress → in_review` (append-only).
+- `docs/migration/state/wp-p0-08-e2e-auth-health-release.json` — statut `done`, `session_id`, `branch`, `pr`, `checkpoint`.
+- `docs/migration/log.jsonl` — transitions `todo → in_progress → in_review → done` (append-only).
 - `docs/migration/STATE.md` — ligne du lot mise à jour (statut + lien PR).
-- `docs/migration/work-packages.yaml` — `status: in_review`.
+- `docs/migration/work-packages.yaml` — `status: done`.

@@ -1,5 +1,12 @@
 # Actions manuelles P0 — Runbook opérateur consolidé (Certigo)
 
+> **⚠️ ARCHIVÉ le 2026-09-03.** Ce document est **entièrement obsolète** : les deux PR qu'il
+> gate (#205, #201) sont **fusionnées depuis le 2026-07-06** (Phase 0 est `done` à 100 % —
+> voir `docs/migration/STATE.md`). Aucune commande ci-dessous n'est unique : toutes proviennent
+> déjà de `docs/runbooks/` (R-04, R-05, R-06, O-05) ou de `docs/GOVERNANCE.md` (§4, branch
+> protection). Conservé pour l'historique uniquement — voir le registre canonique
+> [`docs/ETAT_DU_PROJET.md`](../ETAT_DU_PROJET.md) pour l'état actuel.
+
 > **Statut de ce document** : GUIDE OPÉRATEUR consolidé, additif, **non exécutable par une session agent** (les 5 actions exigent des credentials live Entra / Azure / GitHub). Destiné à **Gabriel** (admin Azure / Entra External ID CIAM / GitHub), à exécuter **à la main**.
 >
 > **Source de vérité** : ce document **réconcilie sans les remplacer** les runbooks déjà versionnés. Il ne contient **aucune commande inventée** ; chaque commande est tirée des runbooks cités. En cas de doute, **le runbook source fait foi**.

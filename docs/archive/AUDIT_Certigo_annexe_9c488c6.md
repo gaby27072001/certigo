@@ -1,5 +1,13 @@
 # Audit technique exhaustif — Certigo
 
+> **⚠️ ARCHIVÉ le 2026-09-03.** Explicitement remplacé par `docs/archive/AUDIT_Certigo_2026-07-04.md`
+> (lui-même désormais archivé) dès le 2026-07-04. Le seul finding encore valide et non tracé
+> ailleurs à cette date — **D10, l'exclusion de Dart/Flutter de la couverture CodeQL/SAST** — a
+> été migré dans [`docs/ETAT_DU_PROJET.md`](../ETAT_DU_PROJET.md) §14 (revérifié encore vrai le
+> 2026-09-03). Tous les autres findings D1-D18 sont soit corrigés (voir §M « Remédiation
+> appliquée » plus bas dans ce même fichier), soit couverts par l'audit successeur. Ne pas s'y
+> fier pour un statut actuel.
+
 > Audit indépendant, factuel et sans complaisance, réalisé au niveau d'exigence d'une
 > grande entreprise technologique. Chaque conclusion est reliée à un élément observable
 > dans le dépôt (`fichier:ligne`). Les niveaux de certitude sont explicites :

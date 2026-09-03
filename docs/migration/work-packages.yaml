@@ -259,8 +259,8 @@ work_packages:
     precondition: "Vérifier l'existence d'une remontée de crash côté mobile. Idempotent : si le crash reporting est déjà intégré et actif, le lot est déjà fait."
     dod: "Les exceptions non gérées et erreurs de zone Flutter sont capturées et remontées ; les symboles sont uploadés pour symbolisation ; un crash de test apparaît dans le tableau de bord."
     rollback: "Abandon de la branche ; désactivation de l'intégration (aucune donnée applicative touchée)."
-    status: in_review
-    notes: "Vague V1 · voie Flutter."
+    status: in_progress
+    notes: "Vague V1 · voie Flutter. PR #213 fusionnée 2026-07-07 (le registre disait à tort `in_review` ~2 mois après le merge — corrigé). Mais la DoD n'est PAS pleinement vérifiée : seule capture locale existe (`LoggingCrashReporter` dans `crash_reporting.dart`), aucun sink production réel (Crashlytics/Sentry/App Insights) ni upload de symboles dSYM/mapping.txt dans `release-android.yml`/`release-ios.yml` (vérifié par grep le 2026-09-03). Statut correct = `in_progress`, pas `done`."
 
   - id: wp-p1-11-ci-spof-runners
     phase: 1
@@ -465,8 +465,8 @@ work_packages:
       - "Séparer les faits générés des affirmations narratives et exiger une preuve pour tout statut opérationnel."
     dod: "Les métriques techniques de ETAT_DU_PROJET.md sont générées ; une modification de version ou corpus sans régénération échoue en CI ; aucun compteur majeur n'est maintenu manuellement ; date et commit de référence sont exacts."
     rollback: "Revert de la génération et conservation du document précédent ; aucun impact runtime."
-    status: in_review
-    notes: "Source : gchambaud_microsoft/Certigo#247. Générateur stdlib, tests unitaires et gate generated==committed implémentés ; validations vertes, référence exacte sur le commit source 33b34a64ae2f6de2de73679328cee49881207794 et PR #254 ouverte."
+    status: done
+    notes: "Source : gchambaud_microsoft/Certigo#247 (closed 2026-08-07). Générateur stdlib, tests unitaires et gate generated==committed implémentés ; validations vertes, référence exacte sur le commit source 33b34a64ae2f6de2de73679328cee49881207794. PR #254 fusionnée 2026-08-07 (vérifié `gh pr view 254` le 2026-09-03 ; registre corrigé, était resté `in_review`/« ouverte » ~1 mois — voir aussi PR #360 qui tentait la même correction sans être mergée)."
 
   - id: wp-p2-09
     phase: 2
@@ -484,7 +484,7 @@ work_packages:
     dod: "Une PR ne mélange pas plusieurs migrations majeures sans lien ; Flutter est identique dans les environnements supportés ; tests CI, staging et appareils réels verts ; PR Dependabot obsolètes fusionnées, remplacées ou fermées avec justification."
     rollback: "Pins et lockfiles antérieurs conservés par lot ; rollback indépendant pour chaque groupe fonctionnel."
     status: in_progress
-    notes: "Source : gchambaud_microsoft/Certigo#248. PR #252 ouverte et en correction. Ce lot est indépendant de la chaîne de contenu."
+    notes: "Source : gchambaud_microsoft/Certigo#248 (ouverte) + #155 (ouverte, migration font_awesome_flutter/google_fonts). PR #252 fusionnée 2026-08-06 : sous-lot explicitement scopé (vendoring icônes/polices Prism) livré ; le corps de la PR déclare lui-même « belongs to #248/#155 » et liste les lots restants (validation réelle Android/iOS, disposition des PR Dependabot obsolètes) — #248/#155 restent donc ouvertes à raison, `in_progress` est le statut correct (vérifié `gh pr view 252` + `gh issue view 155` le 2026-09-03)."
 
   # --- Phases 1–5 — placeholders (à décomposer au lancement) ---------------
   # Chaîne séquentielle. Chaque placeholder sera éclaté en lots XS–M au démarrage
