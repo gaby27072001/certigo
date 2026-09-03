@@ -20,10 +20,10 @@ class AppEnv {
   );
 
   static AppFlavor get flavor => switch (_rawEnv) {
-    'prod' => AppFlavor.prod,
-    'staging' => AppFlavor.staging,
-    _ => AppFlavor.dev,
-  };
+        'prod' => AppFlavor.prod,
+        'staging' => AppFlavor.staging,
+        _ => AppFlavor.dev,
+      };
 
   /// URL du backend dev, servie **uniquement** en repli local (voir [apiBaseUrl]).
   /// Exposée comme constante nommée pour que [validate] puisse détecter — et
@@ -157,15 +157,15 @@ class AppEnv {
   /// [AppConfigReport.isValid] est faux, plutôt que de démarrer silencieusement
   /// sur une config dev/incohérente.
   static AppConfigReport validate() => validateConfig(
-    flavor: flavor,
-    apiBaseUrl: apiBaseUrl,
-    entraClientId: entraClientId,
-    entraAuthority: entraAuthority,
-    entraRedirectUri: entraRedirectUri,
-    entraApiScope: entraApiScope,
-    entraOptional: entraOptional,
-    releaseProfileName: releaseProfileName,
-  );
+        flavor: flavor,
+        apiBaseUrl: apiBaseUrl,
+        entraClientId: entraClientId,
+        entraAuthority: entraAuthority,
+        entraRedirectUri: entraRedirectUri,
+        entraApiScope: entraApiScope,
+        entraOptional: entraOptional,
+        releaseProfileName: releaseProfileName,
+      );
 
   /// Cœur de validation : **pur et sans I/O**, ne lit aucune constante globale.
   /// Isolé ainsi pour être testable unitairement avec des valeurs arbitraires
@@ -183,9 +183,8 @@ class AppEnv {
   }) {
     final bool strictFlavor = flavor == AppFlavor.prod || flavor == AppFlavor.staging;
     final List<AppConfigIssue> issues = <AppConfigIssue>[];
-    final AppConfigSeverity strict = strictFlavor
-        ? AppConfigSeverity.error
-        : AppConfigSeverity.warning;
+    final AppConfigSeverity strict =
+        strictFlavor ? AppConfigSeverity.error : AppConfigSeverity.warning;
 
     final ReleaseProfileResolution release = ReleaseProfile.resolve(releaseProfileName);
     if (!release.isValid) {
@@ -242,9 +241,8 @@ class AppEnv {
       );
     } else if (!hasClientId) {
       // Entra totalement absent : bloquant en prod (sauf opt-in e-mail seul).
-      final AppConfigSeverity sev = (strictFlavor && !entraOptional)
-          ? AppConfigSeverity.error
-          : AppConfigSeverity.warning;
+      final AppConfigSeverity sev =
+          (strictFlavor && !entraOptional) ? AppConfigSeverity.error : AppConfigSeverity.warning;
       issues.add(
         AppConfigIssue(
           sev,
@@ -261,9 +259,8 @@ class AppEnv {
     if (redirect == null || redirect.scheme != redirectScheme) {
       // Schéma incohérent → le callback OIDC ne revient jamais dans l'app.
       // Bloquant dès qu'Entra est (au moins partiellement) configuré ou strict.
-      final AppConfigSeverity sev = (hasClientId || hasAuthority || strictFlavor)
-          ? strict
-          : AppConfigSeverity.warning;
+      final AppConfigSeverity sev =
+          (hasClientId || hasAuthority || strictFlavor) ? strict : AppConfigSeverity.warning;
       issues.add(
         AppConfigIssue(
           sev,

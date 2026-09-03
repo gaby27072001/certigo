@@ -44,15 +44,15 @@ class RuntimeContentController extends StateNotifier<RuntimeContentStatus> {
     required RuntimeContentPinRegistry pins,
     required Future<void> Function() ensureSyncQueueLoaded,
     required List<SyncAction> Function() syncActions,
-  }) : _synchronizer = synchronizer,
-       // Public constructor names stay stable for provider overrides and tests.
-       // ignore: prefer_initializing_formals
-       _pins = pins,
-       // ignore: prefer_initializing_formals
-       _ensureSyncQueueLoaded = ensureSyncQueueLoaded,
-       // ignore: prefer_initializing_formals
-       _syncActions = syncActions,
-       super(synchronizer.currentStatus) {
+  })  : _synchronizer = synchronizer,
+        // Public constructor names stay stable for provider overrides and tests.
+        // ignore: prefer_initializing_formals
+        _pins = pins,
+        // ignore: prefer_initializing_formals
+        _ensureSyncQueueLoaded = ensureSyncQueueLoaded,
+        // ignore: prefer_initializing_formals
+        _syncActions = syncActions,
+        super(synchronizer.currentStatus) {
     _subscription = synchronizer.statuses.listen((RuntimeContentStatus status) {
       state = status;
     });
@@ -101,14 +101,14 @@ class RuntimeContentController extends StateNotifier<RuntimeContentStatus> {
 
 final runtimeContentControllerProvider =
     StateNotifierProvider<RuntimeContentController, RuntimeContentStatus>((Ref ref) {
-      requireEnabledCapability(ref, AppCapability.versionedContent);
-      final SyncEngine syncEngine = ref.watch(syncEngineProvider);
-      return RuntimeContentController.withSyncEngine(
-        synchronizer: ref.watch(runtimeContentSynchronizerProvider),
-        pins: ref.watch(runtimeContentPinRegistryProvider),
-        syncEngine: syncEngine,
-      );
-    });
+  requireEnabledCapability(ref, AppCapability.versionedContent);
+  final SyncEngine syncEngine = ref.watch(syncEngineProvider);
+  return RuntimeContentController.withSyncEngine(
+    synchronizer: ref.watch(runtimeContentSynchronizerProvider),
+    pins: ref.watch(runtimeContentPinRegistryProvider),
+    syncEngine: syncEngine,
+  );
+});
 
 String runtimeContentSpaceScope() {
   return runtimeContentSpaceScopeFor(

@@ -220,11 +220,8 @@ String _subtitleFromParts(String handle, int level) {
 }
 
 String _initials(String name) {
-  final List<String> parts = name
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((String s) => s.isNotEmpty)
-      .toList();
+  final List<String> parts =
+      name.trim().split(RegExp(r'\s+')).where((String s) => s.isNotEmpty).toList();
   if (parts.isEmpty) return '?';
   final String a = parts.first.substring(0, 1);
   final String b = parts.length > 1 ? parts[1].substring(0, 1) : '';

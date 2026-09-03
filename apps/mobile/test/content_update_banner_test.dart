@@ -15,7 +15,8 @@ class _NeverSource implements PublicContentSource {
   Future<Result<PublicManifestFetch>> fetchActiveManifest({
     String? ifNoneMatch,
     RuntimeContentLimits limits = const RuntimeContentLimits(),
-  }) async => const Err<PublicManifestFetch>(NetworkFailure());
+  }) async =>
+      const Err<PublicManifestFetch>(NetworkFailure());
 
   @override
   Future<Result<PublicContentFileFetch>> fetchFile({
@@ -23,17 +24,18 @@ class _NeverSource implements PublicContentSource {
     required String publicManifestId,
     required PublicContentFile file,
     String? ifNoneMatch,
-  }) async => const Err<PublicContentFileFetch>(NetworkFailure());
+  }) async =>
+      const Err<PublicContentFileFetch>(NetworkFailure());
 }
 
 class _StatusController extends RuntimeContentController {
   _StatusController(RuntimeContentStatus status, RuntimeContentSynchronizer synchronizer)
-    : super(
-        synchronizer: synchronizer,
-        pins: RuntimeContentPinRegistry(),
-        ensureSyncQueueLoaded: () async {},
-        syncActions: () => const <SyncAction>[],
-      ) {
+      : super(
+          synchronizer: synchronizer,
+          pins: RuntimeContentPinRegistry(),
+          ensureSyncQueueLoaded: () async {},
+          syncActions: () => const <SyncAction>[],
+        ) {
     state = status;
   }
 }
@@ -49,8 +51,7 @@ Future<void> _withStatusHarness(
     store: InMemoryRuntimeContentStore(),
   );
   final _StatusController controller = _StatusController(status, synchronizer);
-  final Widget content =
-      wrap?.call(const ContentUpdateBanner()) ??
+  final Widget content = wrap?.call(const ContentUpdateBanner()) ??
       const MaterialApp(home: Scaffold(body: ContentUpdateBanner()));
   await tester.pumpWidget(
     ProviderScope(

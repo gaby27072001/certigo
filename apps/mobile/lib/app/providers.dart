@@ -359,10 +359,10 @@ class ActiveTrackController extends AsyncNotifier<String?> {
       return switch (result) {
         Success<UserProfile>() => await _acceptSynced(pending),
         Err<UserProfile>(:final Failure failure) => await _handleRemoteFailure(
-          pending,
-          previousRecord,
-          failure,
-        ),
+            pending,
+            previousRecord,
+            failure,
+          ),
       };
     } finally {
       _endMutation();
@@ -425,9 +425,9 @@ class ActiveTrackController extends AsyncNotifier<String?> {
     final Result<UserProfile> result = await ref.read(userRepositoryProvider).getMe();
     return switch (result) {
       Success<UserProfile>(:final UserProfile value) => (
-        ownerId: _ownerId = value.id.trim(),
-        failure: null,
-      ),
+          ownerId: _ownerId = value.id.trim(),
+          failure: null,
+        ),
       Err<UserProfile>(:final Failure failure) => (ownerId: null, failure: failure),
     };
   }
@@ -475,9 +475,10 @@ class ActiveTrackController extends AsyncNotifier<String?> {
     Failure failure,
   ) async {
     final Result<UserProfile> result = await ref.read(userRepositoryProvider).getMe();
-    if (result case Success<UserProfile>(
-      :final UserProfile value,
-    ) when value.id == pending.ownerId) {
+    if (result
+        case Success<UserProfile>(
+          :final UserProfile value,
+        ) when value.id == pending.ownerId) {
       final String? remote = _normalizeTrackId(value.activeTrackId);
       final ActiveTrackStore store = ref.read(activeTrackStoreProvider);
       if (remote != null && pending.pendingPredecessors.contains(remote)) {
@@ -505,9 +506,9 @@ class ActiveTrackController extends AsyncNotifier<String?> {
         return switch (retry) {
           Success<UserProfile>() => await _acceptSynced(rebased),
           Err<UserProfile>(failure: final Failure retryFailure) => ActiveTrackSaveResult(
-            ActiveTrackSaveStatus.rejected,
-            retryFailure,
-          ),
+              ActiveTrackSaveStatus.rejected,
+              retryFailure,
+            ),
         };
       }
       try {

@@ -53,9 +53,8 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final PrismColorScheme p = context.prism;
     final ReleaseStrings strings = ReleaseStrings.of(context);
-    final bool accountDeletionEnabled = ref
-        .watch(capabilityAvailabilityProvider(AppCapability.accountDeletion))
-        .isEnabled;
+    final bool accountDeletionEnabled =
+        ref.watch(capabilityAvailabilityProvider(AppCapability.accountDeletion)).isEnabled;
     Widget body = Column(
       children: <Widget>[
         const EmailVerificationBanner(),
@@ -150,9 +149,9 @@ class _NavItem extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: selected ? color.primary : color.textSecondary,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            ),
+                  color: selected ? color.primary : color.textSecondary,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
           ),
           if (availability.isUpcoming) ...<Widget>[
             const SizedBox(height: 2),

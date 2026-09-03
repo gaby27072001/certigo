@@ -18,7 +18,7 @@ class ReleaseStrings {
       _french ? 'Accès réservé aux testeurs invités' : 'Access is limited to invited testers';
   String get invitedAccountHint => _french
       ? 'Connecte-toi avec le compte test qui t’a été attribué. '
-            'L’inscription publique est fermée.'
+          'L’inscription publique est fermée.'
       : 'Sign in with the test account assigned to you. Public sign-up is closed.';
   String get backToSignIn => _french ? 'Se connecter' : 'Sign in';
   String get backToApp => _french ? 'Retour à Certigo' : 'Back to Certigo';
@@ -44,7 +44,7 @@ class ReleaseStrings {
     if (availability == CapabilityAvailability.upcoming) {
       return _french
           ? 'Cette fonction est prévue pour une prochaine mise à jour. '
-                'Aucune action n’est requise.'
+              'Aucune action n’est requise.'
           : 'This feature is planned for a future update. No action is required.';
     }
     return _french

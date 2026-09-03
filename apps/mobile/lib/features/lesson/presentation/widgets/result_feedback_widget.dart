@@ -84,12 +84,12 @@ class ResultFeedbackWidget extends ConsumerWidget {
           isDemo
               ? 'Démo terminée'
               : pendingSync
-              ? 'Soumis hors ligne'
-              : submissionFailed
-              ? 'Envoi impossible'
-              : passed
-              ? 'Concept validé !'
-              : 'Presque !',
+                  ? 'Soumis hors ligne'
+                  : submissionFailed
+                      ? 'Envoi impossible'
+                      : passed
+                          ? 'Concept validé !'
+                          : 'Presque !',
           textAlign: TextAlign.center,
           style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
         ),
@@ -98,12 +98,12 @@ class ResultFeedbackWidget extends ConsumerWidget {
           isDemo
               ? 'Cette session ne sera pas synchronisée et ne rapporte aucune récompense.'
               : pendingSync
-              ? 'Tes réponses seront synchronisées automatiquement au retour du réseau.'
-              : submissionFailed
-              ? 'Aucune progression ni récompense n’a été enregistrée.'
-              : passed
-              ? 'Tu maîtrises ce concept. On le consolide avec une révision espacée.'
-              : 'Tu y es presque — une courte révision et ce sera acquis.',
+                  ? 'Tes réponses seront synchronisées automatiquement au retour du réseau.'
+                  : submissionFailed
+                      ? 'Aucune progression ni récompense n’a été enregistrée.'
+                      : passed
+                          ? 'Tu maîtrises ce concept. On le consolide avec une révision espacée.'
+                          : 'Tu y es presque — une courte révision et ce sera acquis.',
           textAlign: TextAlign.center,
           style: text.bodyMedium?.copyWith(color: p.textSecondary, height: 1.4),
         ),
@@ -161,8 +161,7 @@ class ResultFeedbackWidget extends ConsumerWidget {
           CalloutBlock(
             kind: CalloutKind.warning,
             title: 'À renforcer',
-            text:
-                'On replanifiera ${result.weakConcepts.length} concept(s) en '
+            text: 'On replanifiera ${result.weakConcepts.length} concept(s) en '
                 'révision pour bien les ancrer.',
           ),
         ],

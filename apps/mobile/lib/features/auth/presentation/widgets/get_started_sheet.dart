@@ -56,9 +56,8 @@ class _GetStartedSheetState extends ConsumerState<GetStartedSheet> {
     // Duo) : nom → e-mail → mot de passe → écrans post-création. La connexion à
     // un compte existant reste accessible depuis le 1er écran de ce flux.
     Navigator.of(context).pop();
-    final bool registrationEnabled = ref
-        .read(capabilityAvailabilityProvider(AppCapability.publicRegistration))
-        .isEnabled;
+    final bool registrationEnabled =
+        ref.read(capabilityAvailabilityProvider(AppCapability.publicRegistration)).isEnabled;
     context.go(registrationEnabled ? '${Routes.registration}/name' : '${Routes.auth}?emailOnly=1');
   }
 
@@ -67,9 +66,8 @@ class _GetStartedSheetState extends ConsumerState<GetStartedSheet> {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
     final ReleaseStrings releaseStrings = ReleaseStrings.of(context);
-    final bool publicRegistrationEnabled = ref
-        .watch(capabilityAvailabilityProvider(AppCapability.publicRegistration))
-        .isEnabled;
+    final bool publicRegistrationEnabled =
+        ref.watch(capabilityAvailabilityProvider(AppCapability.publicRegistration)).isEnabled;
 
     // Réarme les boutons dès que le flux retombe sur un état non authentifié
     // (annulation, échec) — le message détaillé reste porté par l'écran e-mail.

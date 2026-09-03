@@ -85,9 +85,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final String email = _emailController.text.trim();
     final String password = _passwordController.text;
     final AuthController notifier = ref.read(authControllerProvider.notifier);
-    final bool registrationEnabled = ref
-        .read(capabilityAvailabilityProvider(AppCapability.publicRegistration))
-        .isEnabled;
+    final bool registrationEnabled =
+        ref.read(capabilityAvailabilityProvider(AppCapability.publicRegistration)).isEnabled;
     if (_mode == _AuthMode.register && registrationEnabled) {
       final String name = _nameController.text.trim();
       notifier.registerWithEmail(
@@ -107,8 +106,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   String? _validateEmail(String? value) {
     final String email = (value ?? '').trim();
     final int at = email.indexOf('@');
-    final bool valid =
-        at > 0 &&
+    final bool valid = at > 0 &&
         at == email.lastIndexOf('@') &&
         email.indexOf('.', at) > at &&
         !email.endsWith('.');
@@ -127,9 +125,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
     final ReleaseStrings releaseStrings = ReleaseStrings.of(context);
-    final bool publicRegistrationEnabled = ref
-        .watch(capabilityAvailabilityProvider(AppCapability.publicRegistration))
-        .isEnabled;
+    final bool publicRegistrationEnabled =
+        ref.watch(capabilityAvailabilityProvider(AppCapability.publicRegistration)).isEnabled;
     final bool socialEnabled = ref.watch(authConfiguredProvider) && !widget.emailOnly;
 
     // Réarme les boutons et **conserve** l'erreur à l'écran quand le flux

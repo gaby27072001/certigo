@@ -6,8 +6,8 @@ import 'package:prism_ui/prism_ui.dart';
 import 'release_profile_provider.dart';
 import 'release_strings.dart';
 
-typedef CapabilityChildBuilder =
-    Widget Function(BuildContext context, CapabilityAvailability availability);
+typedef CapabilityChildBuilder = Widget Function(
+    BuildContext context, CapabilityAvailability availability);
 
 /// Stable interaction boundary for a capability-backed navigation entry.
 ///
@@ -72,9 +72,8 @@ class CapabilityStatusBadge extends StatelessWidget {
     if (availability.isEnabled) return const SizedBox.shrink();
     final PrismColorScheme p = context.prism;
     final ReleaseStrings strings = ReleaseStrings.of(context);
-    final String label = availability == CapabilityAvailability.upcoming
-        ? strings.soon
-        : strings.unavailable;
+    final String label =
+        availability == CapabilityAvailability.upcoming ? strings.soon : strings.unavailable;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.xs, vertical: 3),
       decoration: BoxDecoration(
@@ -152,9 +151,9 @@ class CapabilitySecondaryButton extends ConsumerWidget {
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: p.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
+                              color: p.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
                     ),
                   ],

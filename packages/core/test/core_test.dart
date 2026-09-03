@@ -111,16 +111,17 @@ void main() {
       String entraApiScope = 'api://client-123/user_impersonation',
       bool entraOptional = false,
       String releaseProfileName = 'full',
-    }) => AppEnv.validateConfig(
-      flavor: flavor,
-      apiBaseUrl: apiBaseUrl,
-      entraClientId: entraClientId,
-      entraAuthority: entraAuthority,
-      entraRedirectUri: entraRedirectUri,
-      entraApiScope: entraApiScope,
-      entraOptional: entraOptional,
-      releaseProfileName: releaseProfileName,
-    );
+    }) =>
+        AppEnv.validateConfig(
+          flavor: flavor,
+          apiBaseUrl: apiBaseUrl,
+          entraClientId: entraClientId,
+          entraAuthority: entraAuthority,
+          entraRedirectUri: entraRedirectUri,
+          entraApiScope: entraApiScope,
+          entraOptional: entraOptional,
+          releaseProfileName: releaseProfileName,
+        );
 
     bool hasError(AppConfigReport r, String key) =>
         r.errors.any((AppConfigIssue i) => i.key == key);

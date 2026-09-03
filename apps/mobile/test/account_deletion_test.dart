@@ -57,7 +57,8 @@ class _CredentialsGateway implements CredentialsGateway {
     required String email,
     required String password,
     String? displayName,
-  }) async => session;
+  }) async =>
+      session;
 
   @override
   Future<void> resendVerification(String email) async {}
@@ -148,12 +149,12 @@ void main() {
   );
 
   AuthSession socialSession() => const AuthSession(
-    accessToken: 'access',
-    userId: 'user-1',
-    idToken: 'fresh-id-token',
-    refreshToken: 'refresh',
-    provider: AuthProvider.microsoft,
-  );
+        accessToken: 'access',
+        userId: 'user-1',
+        idToken: 'fresh-id-token',
+        refreshToken: 'refresh',
+        provider: AuthProvider.microsoft,
+      );
 
   Future<void> settle() => Future<void>.delayed(Duration.zero);
 
@@ -179,22 +180,22 @@ void main() {
         syncEngineProvider.overrideWithValue(sync),
       ],
     );
-    final ProviderSubscription<AccountDeletionState> subscription = container
-        .listen<AccountDeletionState>(
-          accountDeletionControllerProvider,
-          (_, __) {},
-          fireImmediately: true,
-        );
+    final ProviderSubscription<AccountDeletionState> subscription =
+        container.listen<AccountDeletionState>(
+      accountDeletionControllerProvider,
+      (_, __) {},
+      fireImmediately: true,
+    );
     addTearDown(subscription.close);
     addTearDown(container.dispose);
     return container;
   }
 
   SyncEngine syncEngine() => SyncEngine(
-    store: InMemorySyncQueueStore(),
-    sender: (SyncAction _) async => SyncDispatch.success,
-    ownerIdProvider: () => 'user-1',
-  );
+        store: InMemorySyncQueueStore(),
+        sender: (SyncAction _) async => SyncDispatch.success,
+        ownerIdProvider: () => 'user-1',
+      );
 
   test('confirmed server completion purges local data and ends the session', () async {
     final _DeletionRepository repository = _DeletionRepository(
@@ -434,9 +435,8 @@ void main() {
     await settle();
     await settle();
 
-    final Future<void> deletion = container
-        .read(accountDeletionControllerProvider.notifier)
-        .start(expectedUserId: 'user-1');
+    final Future<void> deletion =
+        container.read(accountDeletionControllerProvider.notifier).start(expectedUserId: 'user-1');
     await settle();
     await auth.signOut();
     gateway.session = const AuthSession(
