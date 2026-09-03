@@ -8,9 +8,10 @@
 | **Objet de ce runbook** | Documenter la **procédure de restauration** PITR (gate audit : « preuve d'un restore Cosmos »). |
 | **Cible** | Compte `cosmos-certigo-<env>-<suffixe>`, base `certigo`, RG `rg-certigo-<env>` (staging/prod). |
 
-> **Pourquoi ce runbook ?** Le PITR est désormais **actif en IaC** sur staging/prod, mais l'audit
-> (`AUDIT_Certigo.md`, section G) exige une **preuve de restauration** pour valider la stratégie de
-> reprise après corruption ou suppression accidentelle de données. La restauration Cosmos PITR
+> **Pourquoi ce runbook ?** Le PITR est désormais **actif en IaC** sur staging/prod, mais le
+> registre de risques (`docs/ETAT_DU_PROJET.md` §14, finding R-02) exige une **preuve de
+> restauration** pour valider la stratégie de reprise après corruption ou suppression accidentelle
+> de données. La restauration Cosmos PITR
 > (`az cosmosdb restore`) nécessite des **credentials Azure** que **seul l'opérateur humain possède**.
 > L'agent Copilot **n'a lancé aucune commande Azure** : il a **préparé** les commandes `az` exactes,
 > la procédure pas-à-pas, les vérifications et le nettoyage. **C'est vous qui exécutez** chaque commande.

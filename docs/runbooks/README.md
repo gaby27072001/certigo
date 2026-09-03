@@ -1,6 +1,8 @@
 # Runbooks — Gouvernance CIAM, Opérations Cloud & Protection des données (Certigo)
 
-> **Origine** : findings de l'audit de sécurité `AUDIT_Certigo.md` (PR #176).
+> **Origine** : findings de l'audit de sécurité initial (PR #176), désormais suivis dans le
+> registre canonique [`docs/ETAT_DU_PROJET.md`](../ETAT_DU_PROJET.md) §14 « Registre des risques
+> & findings ».
 > Ce dossier regroupe les procédures opérationnelles pour les findings **gouvernance CIAM**,
 > **opérations cloud** et **protection des données** : `R-02`, `R-04`, `R-05`, `R-06`, `O-01`, `O-02`, `O-05`.
 
@@ -48,7 +50,7 @@ rollbacks. **C'est vous qui exécutez** chaque commande, après relecture.
 | **R-04** | 🔴 Haut | Compte break-glass CIAM (Global Admin cloud-only) | [`R-04_compte-break-glass-ciam.md`](./R-04_compte-break-glass-ciam.md) | Global Admin du tenant CIAM `af721be8` | À exécuter |
 | **R-05** | 🔴 Haut | Rotation du secret IdP « Microsoft account » + alerte J-30 | [`R-05_rotation-secret-idp-msa.md`](./R-05_rotation-secret-idp-msa.md) | Owner de l'app `df42c145` + admin External ID (user flows) | À exécuter |
 | **O-05** | 🟠 Moyen | Nettoyage sûr du tenant CIAM (résidus QuickStart) | [`O-05_nettoyage-tenant-ciam.md`](./O-05_nettoyage-tenant-ciam.md) | Application Administrator (apps) + Owner sub `906c6a44` (billing) | À exécuter |
-| **O-01** | 🔴 Haut | Décision : Tutor IA en production (note ADR) | [`O-01_decision-tutor-ia-prod.md`](./O-01_decision-tutor-ia-prod.md) | Décision produit/technique (aucune commande destructive) | À arbitrer |
+| **O-01** | 🔴 Haut | Décision : Tutor IA en production (note ADR) | [`O-01_decision-tutor-ia-prod.md`](./O-01_decision-tutor-ia-prod.md) | Décision produit/technique (aucune commande destructive) | ✅ Décidé le 2026-07-06 — Option B (repli déterministe), voir `docs/adr/ADR-O-01-ai-tutor-prod.md` |
 | **O-02** | 🔴 Haut | Plan de test de charge Azure OpenAI + bump capacity | [`O-02_plan-test-charge-openai.md`](./O-02_plan-test-charge-openai.md) | Cognitive Services OpenAI User (test) + Contributor (bump) | À exécuter |
 | **R-02** | 🟠 Moyen | Restauration Point-In-Time (PITR) du compte Cosmos DB | [`R-02_cosmos-pitr-restauration.md`](./R-02_cosmos-pitr-restauration.md) | Cosmos DB Operator/Contributor + `CosmosRestoreOperator` (sub staging/prod) | Remédiation IaC ✅ (PR #178) — restore-test à planifier |
 | **Azure IaC** | 🔴 Haut | Prévol, diagnostics read-only, ordre de déploiement et risques | [`AZURE_IAC_OPERATIONS.md`](./AZURE_IAC_OPERATIONS.md) | Reader pour diagnostic; rôles custom cibles ou admin PIM pour bootstrap | Versionné — exécution live soumise à autorisation |
