@@ -4,7 +4,6 @@ import { pathToFileURL } from 'node:url';
 
 import {
   isPoweredCapacity,
-  labelsOf,
   reconcileRunnerInstances,
   summarizePoolBoundaries,
   trustClassOfRunner,
@@ -23,9 +22,9 @@ function scaleInRules(autoscale) {
 }
 
 function aggregateCapacity(capacityByTrust) {
-  return (
-    capacityByTrust['certigo-pr'] +
-    capacityByTrust['certigo-trusted']
+  return Object.values(capacityByTrust).reduce(
+    (total, capacity) => total + capacity,
+    0,
   );
 }
 
@@ -68,42 +67,54 @@ export function evaluateLifecycle({
     reasons.push('capacity controller feature flag is off');
   }
   const repositoryRunners = runners.runners ?? [];
+  const runnerClasses = config.classOrder;
+  const enabledRunnerClasses = runnerClasses.filter(
+    (runnerClass) => config.classEnabled[runnerClass],
+  );
   const externalGitHubRunnerIds = new Set(
     config.inventory.externalGithubRunnerIds ?? [],
   );
-  const certigoRunners = repositoryRunners.filter((runner) => {
-    const labels = labelsOf(runner);
-    return (
+  const certigoRunners = repositoryRunners.filter(
+    (runner) =>
       !externalGitHubRunnerIds.has(Number(runner.id)) &&
-      (labels.has('certigo-pr') || labels.has('certigo-trusted'))
-    );
-  });
-  const dualTrustRunners = certigoRunners.filter((runner) => {
-    const labels = labelsOf(runner);
-    return labels.has('certigo-pr') && labels.has('certigo-trusted');
-  });
-  const prRunners = certigoRunners.filter((runner) => {
-    const labels = labelsOf(runner);
-    return labels.has('certigo-pr') && !labels.has('certigo-trusted');
-  });
-  const trustedRunners = certigoRunners.filter((runner) => {
-    const labels = labelsOf(runner);
-    return labels.has('certigo-trusted') && !labels.has('certigo-pr');
-  });
+      trustClassOfRunner(runner, runnerClasses) !== null,
+  );
+  const dualTrustRunners = certigoRunners.filter(
+    (runner) => trustClassOfRunner(runner, runnerClasses) === 'dual',
+  );
+  const runnersByClass = Object.fromEntries(
+    runnerClasses.map((runnerClass) => [
+      runnerClass,
+      certigoRunners.filter(
+        (runner) =>
+          trustClassOfRunner(runner, runnerClasses) === runnerClass,
+      ),
+    ]),
+  );
+  const prRunners = runnersByClass['certigo-pr'] ?? [];
+  const trustedRunners = runnersByClass['certigo-trusted'] ?? [];
 
   if (dualTrustRunners.length > 0) {
     reasons.push(
       `dual trust labels: ${dualTrustRunners.map((runner) => runner.name).join(', ')}`,
     );
   }
-  if (prRunners.length === 0 || trustedRunners.length === 0) {
-    reasons.push('at least one exclusive certigo-pr and certigo-trusted runner is required');
+  const missingEnabledClasses = enabledRunnerClasses.filter(
+    (runnerClass) => runnersByClass[runnerClass].length === 0,
+  );
+  if (missingEnabledClasses.length > 0) {
+    reasons.push(
+      `at least one exclusive runner is required for enabled classes: ${missingEnabledClasses.join(', ')}`,
+    );
   }
 
   const instanceInventory = reconcileRunnerInstances(
     virtualMachines,
     certigoRunners,
-    config.inventory,
+    {
+      ...config.inventory,
+      runnerClasses,
+    },
   );
   if (instanceInventory.absentRunners.length > 0) {
     reasons.push(
@@ -139,6 +150,7 @@ export function evaluateLifecycle({
   const poolBoundaries = summarizePoolBoundaries(
     vmScaleSets,
     instanceInventory.managedInstances,
+    runnerClasses,
   );
   if (
     poolBoundaries.managedPoolCount < config.minimumExclusivePools ||
@@ -146,6 +158,7 @@ export function evaluateLifecycle({
     poolBoundaries.missingManagedScaleSets.length > 0 ||
     poolBoundaries.distinctIdentityBoundaryCount <
       config.minimumExclusivePools ||
+    poolBoundaries.poolsWithoutIdentityEvidence.length > 0 ||
     poolBoundaries.sharedIdentityIds.length > 0
   ) {
     reasons.push('runner pool identities are not exclusive');
@@ -160,8 +173,10 @@ export function evaluateLifecycle({
   }
   if (
     poolBoundaries.poolsWithMixedTrustLabels.length > 0 ||
-    poolBoundaries.trustClassPoolCounts['certigo-pr'] === 0 ||
-    poolBoundaries.trustClassPoolCounts['certigo-trusted'] === 0
+    enabledRunnerClasses.some(
+      (runnerClass) =>
+        poolBoundaries.trustClassPoolCounts[runnerClass] === 0,
+    )
   ) {
     reasons.push('runner labels are not isolated by managed pool');
   }
@@ -174,15 +189,13 @@ export function evaluateLifecycle({
       runner.status === 'online' &&
       isPoweredCapacity(virtualMachine),
   ).length;
-  const usableCapacityByTrust = {
-    'certigo-pr': 0,
-    'certigo-trusted': 0,
-  };
+  const usableCapacityByTrust = Object.fromEntries(
+    runnerClasses.map((runnerClass) => [runnerClass, 0]),
+  );
   for (const { runner, virtualMachine } of instanceInventory.managedInstances) {
-    const trustClass = trustClassOfRunner(runner);
+    const trustClass = trustClassOfRunner(runner, runnerClasses);
     if (
-      (trustClass === 'certigo-pr' ||
-        trustClass === 'certigo-trusted') &&
+      runnerClasses.includes(trustClass) &&
       runner.status === 'online' &&
       isPoweredCapacity(virtualMachine)
     ) {
@@ -291,12 +304,20 @@ export function evaluateLifecycle({
       unclassifiedVirtualMachines:
         instanceInventory.unclassifiedVirtualMachines,
       prRunners: prRunners.length,
+      runnersByClass: Object.fromEntries(
+        Object.entries(runnersByClass).map(([runnerClass, classRunners]) => [
+          runnerClass,
+          classRunners.length,
+        ]),
+      ),
       queuedRuns: queuedRuns.total_count ?? 0,
       unboundRunnerVirtualMachinePairs:
         instanceInventory.unboundRunnerVirtualMachinePairs,
       distinctIdentityBoundaryCount:
         poolBoundaries.distinctIdentityBoundaryCount,
       distinctSubnetCount: poolBoundaries.distinctSubnetCount,
+      poolsWithoutIdentityEvidence:
+        poolBoundaries.poolsWithoutIdentityEvidence,
       trustedRunners: trustedRunners.length,
       usableManagedCapacity,
       usableCapacityByTrust,

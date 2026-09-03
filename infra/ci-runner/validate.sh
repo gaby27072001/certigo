@@ -17,6 +17,7 @@ validate="${root}/infra/ci-runner/validate.sh"
 runner_bicep="${root}/infra/ci-runner/runner.bicep"
 pilot_bicep="${root}/infra/ci-runner/pilot.bicep"
 image_dir="${root}/infra/ci-runner/image"
+bicep_bin="${BICEP_BIN:-bicep}"
 
 for script in \
   "${bootstrap}" \
@@ -166,6 +167,10 @@ bash "${image_dir}/validate-toolchain.sh" --contract
 node --test \
   "${image_dir}/toolchain-contract.test.mjs" \
   "${image_dir}/runner-image-canary.test.mjs"
+BICEP_CLI="${bicep_bin}" node --test \
+  "${root}/infra/ci-runner/backend/backend-runner.test.mjs"
+node --check \
+  "${root}/infra/ci-runner/backend/validate-physical-attestation.mjs"
 node "${image_dir}/validate-canary-evidence.mjs" --plan
 canary_transition_ps="${canary_transition}"
 canary_cleanup_ps="${canary_cleanup}"

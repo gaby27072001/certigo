@@ -286,6 +286,15 @@ postérieure. Le baseline 30 jours est
 242,06 USD pour 413 jobs, 18,84 runner-heures, 3,78 % CPU moyen, avec une file P95 de
 5 108 s et P99 de 12 628 s.
 
+### Pools backend isolés (conception désactivée)
+
+Le dossier [`backend/`](./backend/README.md) décrit deux futurs pools
+physiquement séparés, aux labels uniques `certigo-backend-builder` et
+`certigo-backend-deployer`. Leur IaC, leurs images verrouillées, leur cycle
+one-job et leur contrat artifact-before-OIDC restent **UNKNOWN / NO-GO** :
+capacité zéro, contrôleur désactivé, aucun déploiement et aucune intégration
+workflow. Les classes PR et trusted existantes restent inchangées.
+
 > À noter : le compte **Azure OpenAI** (`certigo-openai`), autre ressource en drift citée
 > par le finding G, est lui **réintégré en IaC** dans ce livrable via
 > `infra/modules/openai.bicep` (câblé dans `infra/main.bicep`, module `tutor`).

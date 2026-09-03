@@ -1,0 +1,70 @@
+{
+  "schema": "certigo.backend-deployment-bundle/v1",
+  "status": "integration-required-activation-blocked",
+  "builder": {
+    "requiredRunnerLabel": "certigo-backend-builder",
+    "sourceRef": "refs/heads/main",
+    "sourceEvent": "push",
+    "azureIdentityAllowed": false,
+    "allowedOutputs": [
+      "package",
+      "sbom",
+      "manifest",
+      "provenance"
+    ]
+  },
+  "bundle": {
+    "digestAlgorithm": "sha256",
+    "sbomFormat": "CycloneDX JSON",
+    "provenancePredicateType": "https://slsa.dev/provenance/v1",
+    "requiredSubjects": [
+      "manifest"
+    ],
+    "manifestBindsPackageAndSbomDigests": true,
+    "githubArtifactAttestationRequired": true,
+    "githubArtifactAttestationSubject": "manifest"
+  },
+  "attestationVerifier": {
+    "tool": "gh attestation verify",
+    "toolVersion": "2.96.0",
+    "executable": "/usr/local/bin/gh",
+    "rootOwned": true,
+    "requiredIdentityConstraints": [
+      "repository",
+      "signer-workflow",
+      "signer-digest",
+      "source-ref",
+      "source-digest",
+      "predicate-type"
+    ],
+    "sourceRef": "refs/heads/main",
+    "predicateType": "https://slsa.dev/provenance/v1",
+    "booleanAssertionAccepted": false
+  },
+  "deployer": {
+    "requiredRunnerLabel": "certigo-backend-deployer",
+    "sourceCheckoutAllowed": false,
+    "packageExecutionBeforeDeploymentAllowed": false,
+    "compilerAllowed": false,
+    "projectCacheAllowed": false,
+    "hostManagedIdentityAllowed": false,
+    "githubOidcAllowed": true,
+    "protectedEnvironmentRequired": true
+  },
+  "verificationOrder": [
+    "download-bundle-without-source-checkout",
+    "reject-unsafe-archive-entries",
+    "verify-canonical-manifest-attestation-cryptographically",
+    "verify-manifest-package-and-sbom-digests",
+    "verify-cyclonedx-sbom",
+    "verify-signed-slsa-provenance-identity-constraints",
+    "mark-artifact-verified",
+    "request-github-oidc",
+    "deploy-package-without-executing-it"
+  ],
+  "activation": {
+    "workflowIntegrationReviewed": false,
+    "environmentProtectionReviewed": false,
+    "attestationVerificationTested": false
+  }
+}

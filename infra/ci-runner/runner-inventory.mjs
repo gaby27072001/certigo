@@ -1,26 +1,32 @@
+export const RUNNER_CLASSES = Object.freeze([
+  'certigo-pr',
+  'certigo-backend-builder',
+  'certigo-backend-deployer',
+  'certigo-trusted',
+]);
+
 export function labelsOf(runner) {
   return new Set((runner.labels ?? []).map((label) => label.name ?? label));
 }
 
-export function isCertigoRunner(runner) {
+export function isCertigoRunner(runner, runnerClasses = RUNNER_CLASSES) {
   const labels = labelsOf(runner);
-  return labels.has('certigo-pr') || labels.has('certigo-trusted');
+  return runnerClasses.some((runnerClass) => labels.has(runnerClass));
 }
 
-export function trustClassOfRunner(runner) {
+export function runnerClassOf(runner, runnerClasses = RUNNER_CLASSES) {
   const labels = labelsOf(runner);
-  const hasPr = labels.has('certigo-pr');
-  const hasTrusted = labels.has('certigo-trusted');
-  if (hasPr && hasTrusted) {
+  const matchingClasses = runnerClasses.filter((runnerClass) =>
+    labels.has(runnerClass)
+  );
+  if (matchingClasses.length > 1) {
     return 'dual';
   }
-  if (hasPr) {
-    return 'certigo-pr';
-  }
-  if (hasTrusted) {
-    return 'certigo-trusted';
-  }
-  return null;
+  return matchingClasses[0] ?? null;
+}
+
+export function trustClassOfRunner(runner, runnerClasses = RUNNER_CLASSES) {
+  return runnerClassOf(runner, runnerClasses);
 }
 
 export function machineNameForRunner(runnerName) {
@@ -37,12 +43,44 @@ export function scaleSetNameOf(virtualMachine) {
 }
 
 export function identitiesOf(scaleSet) {
+  if (!Object.hasOwn(scaleSet ?? {}, 'identity')) {
+    return [];
+  }
   return [
     ...Object.keys(scaleSet.identity?.userAssignedIdentities ?? {}),
     ...(scaleSet.identity?.principalId
       ? [scaleSet.identity.principalId]
       : []),
   ].map((identity) => String(identity).toLowerCase());
+}
+
+function identityEvidenceOf(scaleSet) {
+  if (!Object.hasOwn(scaleSet ?? {}, 'identity')) {
+    return { known: false, identities: [] };
+  }
+  const identity = scaleSet.identity;
+  if (identity === null) {
+    return { known: true, identities: [] };
+  }
+  if (typeof identity !== 'object' || Array.isArray(identity)) {
+    return { known: false, identities: [] };
+  }
+
+  const identities = identitiesOf(scaleSet);
+  const identityType = String(identity.type ?? '').toLowerCase();
+  if (identityType === 'none') {
+    return {
+      known: identities.length === 0,
+      identities,
+    };
+  }
+  if (identities.length > 0) {
+    return { known: true, identities };
+  }
+  return {
+    known: Object.keys(identity).length === 0,
+    identities,
+  };
 }
 
 export function subnetIdsOf(scaleSet) {
@@ -82,7 +120,11 @@ function duplicateValues(collections) {
     .sort();
 }
 
-export function summarizePoolBoundaries(scaleSets, managedInstances = null) {
+export function summarizePoolBoundaries(
+  scaleSets,
+  managedInstances = null,
+  runnerClasses = RUNNER_CLASSES,
+) {
   const scaleSetByName = new Map(
     (scaleSets ?? []).map((scaleSet) => [
       String(scaleSet.name).toLowerCase(),
@@ -101,7 +143,7 @@ export function summarizePoolBoundaries(scaleSets, managedInstances = null) {
       }
       managedPoolNames.add(poolName);
       const trustClasses = trustClassesByPool.get(poolName) ?? new Set();
-      const trustClass = trustClassOfRunner(runner);
+      const trustClass = runnerClassOf(runner, runnerClasses);
       if (trustClass) {
         trustClasses.add(trustClass);
       }
@@ -115,17 +157,25 @@ export function summarizePoolBoundaries(scaleSets, managedInstances = null) {
       : [...managedPoolNames]
           .map((name) => scaleSetByName.get(name))
           .filter(Boolean);
-  const identityCollections = boundaryScaleSets.map((scaleSet) => [
+  const identityEvidence = boundaryScaleSets.map((scaleSet) => [
     scaleSet.name,
-    identitiesOf(scaleSet),
+    identityEvidenceOf(scaleSet),
+  ]);
+  const identityCollections = identityEvidence.map(([name, evidence]) => [
+    name,
+    evidence.identities,
   ]);
   const subnetCollections = boundaryScaleSets.map((scaleSet) => [
     scaleSet.name,
     subnetIdsOf(scaleSet),
   ]);
-  const identityProfiles = identityCollections.map(([, identities]) =>
-    [...new Set(identities)].sort().join('|') || 'none',
-  );
+  const identityProfiles = identityEvidence
+    .filter(([, evidence]) => evidence.known)
+    .map(
+      ([name, evidence]) =>
+        [...new Set(evidence.identities)].sort().join('|') ||
+        `none:${String(name).toLowerCase()}`,
+    );
   const distinctSubnetIds = new Set(
     subnetCollections.flatMap(([, subnetIds]) => subnetIds),
   );
@@ -146,18 +196,22 @@ export function summarizePoolBoundaries(scaleSets, managedInstances = null) {
       )
       .map(([name]) => name)
       .sort(),
-    trustClassPoolCounts: {
-      'certigo-pr': [...trustClassesByPool.values()].filter((trustClasses) =>
-        trustClasses.has('certigo-pr'),
-      ).length,
-      'certigo-trusted': [...trustClassesByPool.values()].filter(
-        (trustClasses) => trustClasses.has('certigo-trusted'),
-      ).length,
-    },
+    trustClassPoolCounts: Object.fromEntries(
+      runnerClasses.map((runnerClass) => [
+        runnerClass,
+        [...trustClassesByPool.values()].filter((trustClasses) =>
+          trustClasses.has(runnerClass)
+        ).length,
+      ]),
+    ),
     distinctIdentityBoundaryCount: new Set(identityProfiles).size,
     distinctSubnetCount: distinctSubnetIds.size,
     poolsWithoutSubnet: subnetCollections
       .filter(([, subnetIds]) => subnetIds.length === 0)
+      .map(([name]) => name)
+      .sort(),
+    poolsWithoutIdentityEvidence: identityEvidence
+      .filter(([, evidence]) => !evidence.known)
       .map(([name]) => name)
       .sort(),
     sharedIdentityIds: duplicateValues(identityCollections),
@@ -181,6 +235,7 @@ export function reconcileRunnerInstances(
     externalVirtualMachines = [],
     forbiddenVirtualMachines = [],
     managedRunnerBindings = [],
+    runnerClasses = RUNNER_CLASSES,
   } = {},
 ) {
   const azureByName = new Map(
@@ -192,7 +247,9 @@ export function reconcileRunnerInstances(
   const externalRunnerIds = new Set(
     externalGithubRunnerIds.map((id) => Number(id)),
   );
-  const allCertigoRunners = (runners ?? []).filter(isCertigoRunner);
+  const allCertigoRunners = (runners ?? []).filter((runner) =>
+    isCertigoRunner(runner, runnerClasses)
+  );
   const externalGitHubRunners = allCertigoRunners.filter((runner) =>
     externalRunnerIds.has(Number(runner.id)),
   );

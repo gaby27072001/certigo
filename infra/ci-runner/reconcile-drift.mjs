@@ -4,9 +4,9 @@ import { pathToFileURL } from 'node:url';
 
 import {
   isPoweredCapacity,
-  labelsOf,
   reconcileRunnerInstances,
   summarizePoolBoundaries,
+  trustClassOfRunner,
 } from './runner-inventory.mjs';
 
 function scaleInRules(autoscaleSettings) {
@@ -20,14 +20,18 @@ function scaleInRules(autoscaleSettings) {
 }
 
 function aggregateCapacity(capacityByTrust) {
-  return (
-    capacityByTrust['certigo-pr'] +
-    capacityByTrust['certigo-trusted']
+  return Object.values(capacityByTrust).reduce(
+    (total, capacity) => total + capacity,
+    0,
   );
 }
 
 export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
   const findings = [];
+  const runnerClasses = config.classOrder;
+  const enabledRunnerClasses = runnerClasses.filter(
+    (runnerClass) => config.classEnabled[runnerClass],
+  );
   const expectedVmSize =
     runnerTemplate.match(/param vmSize string = '([^']+)'/)?.[1] ?? null;
   const liveVmScaleSets = inventory.runners?.vmScaleSets ?? [];
@@ -48,11 +52,15 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
   const instanceInventory = reconcileRunnerInstances(
     inventory.runners?.virtualMachines ?? [],
     inventory.runners?.github?.runners ?? [],
-    config.inventory,
+    {
+      ...config.inventory,
+      runnerClasses,
+    },
   );
   const poolBoundaries = summarizePoolBoundaries(
     liveVmScaleSets,
     instanceInventory.managedInstances,
+    runnerClasses,
   );
 
   if (
@@ -145,12 +153,13 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
     poolBoundaries.missingManagedScaleSets.length > 0 ||
     poolBoundaries.distinctIdentityBoundaryCount <
       config.minimumExclusivePools ||
+    poolBoundaries.poolsWithoutIdentityEvidence.length > 0 ||
     poolBoundaries.sharedIdentityIds.length > 0
   ) {
     findings.push({
       severity: 'blocking',
       code: 'POOL_IDENTITY_DRIFT',
-      detail: `Expected ${config.minimumExclusivePools} managed pools with exclusive identity boundaries; observed ${poolBoundaries.managedPoolCount} managed pools and ${poolBoundaries.distinctIdentityBoundaryCount} boundaries.`,
+      detail: `Expected ${config.minimumExclusivePools} managed pools with exclusive identity boundaries; observed ${poolBoundaries.managedPoolCount} managed pools, ${poolBoundaries.distinctIdentityBoundaryCount} boundaries, and ${poolBoundaries.poolsWithoutIdentityEvidence.length} pools without identity evidence.`,
     });
   }
   if (
@@ -166,8 +175,10 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
   }
   if (
     poolBoundaries.poolsWithMixedTrustLabels.length > 0 ||
-    poolBoundaries.trustClassPoolCounts['certigo-pr'] === 0 ||
-    poolBoundaries.trustClassPoolCounts['certigo-trusted'] === 0
+    enabledRunnerClasses.some(
+      (runnerClass) =>
+        poolBoundaries.trustClassPoolCounts[runnerClass] === 0,
+    )
   ) {
     findings.push({
       severity: 'blocking',
@@ -177,10 +188,10 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
   }
 
   const dualTrustRunners = instanceInventory.managedInstances
-    .filter(({ runner }) => {
-      const labels = labelsOf(runner);
-      return labels.has('certigo-pr') && labels.has('certigo-trusted');
-    })
+    .filter(
+      ({ runner }) =>
+        trustClassOfRunner(runner, runnerClasses) === 'dual',
+    )
     .map(({ runner }) => runner.name);
   if (dualTrustRunners.length > 0) {
     findings.push({
@@ -199,7 +210,16 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
       minimumExclusivePools: config.minimumExclusivePools,
       minimumExclusiveSubnets: config.minimumExclusiveSubnets,
       pilotTarget: config.pilotTarget,
-      pilotTargetCapacity: aggregateCapacity(config.pilotTarget),
+      pilotTargetCapacity: aggregateCapacity(
+        Object.fromEntries(
+          enabledRunnerClasses.map((runnerClass) => [
+            runnerClass,
+            config.pilotTarget[runnerClass],
+          ]),
+        ),
+      ),
+      runnerClasses,
+      classEnabled: config.classEnabled,
       quietPeriodSeconds: config.quietPeriodSeconds,
       requiredPostQuietGuards: config.requiredPostQuietGuards,
       trigger: config.trigger,
@@ -230,6 +250,8 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
         poolBoundaries.poolsWithMixedTrustLabels,
       physicalManagedCapacity: instanceInventory.managedInstances.length,
       poweredManagedCapacity: poweredManagedInstances.length,
+      poolsWithoutIdentityEvidence:
+        poolBoundaries.poolsWithoutIdentityEvidence,
       sharedIdentityIds: poolBoundaries.sharedIdentityIds,
       sharedSubnetIds: poolBoundaries.sharedSubnetIds,
       unboundRunnerVirtualMachinePairs:

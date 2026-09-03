@@ -1,0 +1,99 @@
+{
+  "schema": "certigo.backend-runner-image-build/v1",
+  "status": "locked-activation-blocked",
+  "policy": {
+    "reproducibleInputsReady": true,
+    "packageManagerMutationAllowed": false,
+    "flutterInstalled": false,
+    "imageTemplateAutoRunEnabled": false,
+    "imageBuildExecutionAuthorized": false
+  },
+  "baseImage": {
+    "publisher": "Canonical",
+    "offer": "ubuntu-24_04-lts",
+    "sku": "server",
+    "version": "24.04.202608070"
+  },
+  "directArtifacts": {
+    "actionsRunner": {
+      "version": "2.336.0",
+      "uri": "https://github.com/actions/runner/releases/download/v2.336.0/actions-runner-linux-x64-2.336.0.tar.gz",
+      "sha256": "04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d"
+    },
+    "node": {
+      "version": "20.20.2",
+      "uri": "https://nodejs.org/dist/v20.20.2/node-v20.20.2-linux-x64.tar.xz",
+      "sha256": "df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d",
+      "roles": [
+        "builder"
+      ]
+    },
+    "dotnetSdk": {
+      "version": "8.0.424",
+      "uri": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.424/dotnet-sdk-8.0.424-linux-x64.tar.gz",
+      "sha512": "6503fd9f464d5e3a4f43a881d2b74afc6a2c46ceda74d027f1565b7239f4b3ec884857c03c0dcd49eb52f384d5ae1fa5aaf135f0a6aabc5518103aceed643c74",
+      "roles": [
+        "builder"
+      ]
+    },
+    "githubCli": {
+      "version": "2.96.0",
+      "uri": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_linux_amd64.tar.gz",
+      "sha256": "83d5c2ccad5498f58bf6368acb1ab32588cf43ab3a4b1c301bf36328b1c8bd60",
+      "roles": [
+        "deployer"
+      ]
+    }
+  },
+  "repositoryLocks": {
+    "backendNugetLockFiles": 8,
+    "restoreLockedModeRequired": true,
+    "globalJsonRequired": false,
+    "reason": "The image carries exactly one .NET 8 SDK and locked NuGet restore is enforced by the backend projects."
+  },
+  "scripts": {
+    "jobHook": {
+      "path": "image/backend-job-hook.sh",
+      "sha256": "d8ae0a43faf39c9b2f499b19713a30509e952f475910b3c8e8264ca65a3a378c"
+    },
+    "cleanup": {
+      "path": "image/cleanup-backend-runner.sh",
+      "sha256": "f9f32a9b78be3b96853cba0415690497e6cdcaa8e749056e450114939c3c3a34"
+    },
+    "customize": {
+      "path": "image/customize-backend-image.sh",
+      "sha256": "86ae456803af796d741f83899a49c0578e747c9266746cf59b569abde13d6115"
+    },
+    "register": {
+      "path": "image/register-ephemeral-runner.sh",
+      "sha256": "3fa6dbe3f72cffe29d6b9bdd45017e16b6a43c7fa8172708503b598d148b1799"
+    },
+    "validate": {
+      "path": "image/validate-backend-image.sh",
+      "sha256": "6e956bfc5ee487245e14e4dfe9765a1d37ad20c6ba16f84ebe93c318e6c0cf3d"
+    },
+    "artifactVerifier": {
+      "path": "verify-deployment-bundle.mjs",
+      "sha256": "5d453282915524dc3cc918973c35836bfbc833eabd155929bc78da3ec9c3bfad"
+    }
+  },
+  "destination": {
+    "galleryName": "galcertigocirunners",
+    "imageVersion": "2026.09.02",
+    "builder": {
+      "imageDefinitionName": "certigo-backend-builder-ubuntu-2404",
+      "imageTemplateName": "aib-certigo-backend-builder-20260902",
+      "runOutputName": "certigo-backend-builder-20260902"
+    },
+    "deployer": {
+      "imageDefinitionName": "certigo-backend-deployer-ubuntu-2404",
+      "imageTemplateName": "aib-certigo-backend-deployer-20260902",
+      "runOutputName": "certigo-backend-deployer-20260902"
+    }
+  },
+  "activation": {
+    "designReviewed": false,
+    "securityReviewApproved": false,
+    "offlineTemplateValidationPassed": false
+  }
+}

@@ -12,8 +12,28 @@
   "leaseRequired": true,
   "scaleInOrder": [
     "certigo-pr",
+    "certigo-backend-builder",
+    "certigo-backend-deployer",
     "certigo-trusted"
   ],
+  "classOrder": [
+    "certigo-pr",
+    "certigo-backend-builder",
+    "certigo-backend-deployer",
+    "certigo-trusted"
+  ],
+  "classEnabled": {
+    "certigo-pr": true,
+    "certigo-backend-builder": false,
+    "certigo-backend-deployer": false,
+    "certigo-trusted": true
+  },
+  "classLifecycle": {
+    "certigo-pr": "managed-reusable",
+    "certigo-backend-builder": "ephemeral-delete",
+    "certigo-backend-deployer": "ephemeral-delete",
+    "certigo-trusted": "managed-reusable"
+  },
   "inventory": {
     "externalGithubRunnerIds": [
       26
@@ -42,19 +62,27 @@
   },
   "pilotTarget": {
     "certigo-pr": 6,
+    "certigo-backend-builder": 1,
+    "certigo-backend-deployer": 1,
     "certigo-trusted": 2
   },
   "modes": {
     "idle": {
       "certigo-pr": 0,
+      "certigo-backend-builder": 0,
+      "certigo-backend-deployer": 0,
       "certigo-trusted": 0
     },
     "normal": {
       "certigo-pr": 1,
+      "certigo-backend-builder": 0,
+      "certigo-backend-deployer": 0,
       "certigo-trusted": 1
     },
     "boost": {
       "certigo-pr": 6,
+      "certigo-backend-builder": 0,
+      "certigo-backend-deployer": 0,
       "certigo-trusted": 2
     }
   },

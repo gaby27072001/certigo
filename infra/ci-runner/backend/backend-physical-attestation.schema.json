@@ -1,0 +1,468 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://certigo.example/schemas/backend-runner-physical-attestation-v1.json",
+  "title": "Certigo backend runner physical attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "observedAtUtc",
+    "repositoryCommitSha",
+    "collector",
+    "immutableBindings",
+    "controls",
+    "performance",
+    "evidence",
+    "approval"
+  ],
+  "properties": {
+    "schema": {
+      "const": "certigo.backend-runner-physical-attestation/v1"
+    },
+    "status": {
+      "enum": [
+        "approved",
+        "no-go"
+      ]
+    },
+    "observedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "repositoryCommitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "collector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "collectedAtUtc"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "collectedAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "immutableBindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "builderImageVersionResourceId",
+        "deployerImageVersionResourceId",
+        "builderVmssResourceId",
+        "deployerVmssResourceId"
+      ],
+      "properties": {
+        "builderImageVersionResourceId": {
+          "$ref": "#/$defs/imageVersionResourceId"
+        },
+        "deployerImageVersionResourceId": {
+          "$ref": "#/$defs/imageVersionResourceId"
+        },
+        "builderVmssResourceId": {
+          "$ref": "#/$defs/vmssResourceId"
+        },
+        "deployerVmssResourceId": {
+          "$ref": "#/$defs/vmssResourceId"
+        }
+      }
+    },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distinctHosts",
+        "distinctDisks",
+        "distinctServiceUsers",
+        "distinctNetworks",
+        "networkPeeringAbsent",
+        "runtimeManagedIdentityAbsent",
+        "imdsBlockedByOs",
+        "imdsBlockedByNsg",
+        "exclusiveLabels",
+        "ephemeralOneJob",
+        "deleteOrReimageAfterJob",
+        "workspaceCleaned",
+        "processesCleaned",
+        "projectCachesCleaned",
+        "dockerStateAbsent",
+        "builderAzureIdentityAbsent",
+        "deployerSourceCheckoutAbsent",
+        "deployerBuildToolsAbsent",
+        "artifactVerifiedBeforeOidc",
+        "packageNotExecutedBeforeDeploy"
+      ],
+      "properties": {
+        "distinctHosts": { "type": "boolean" },
+        "distinctDisks": { "type": "boolean" },
+        "distinctServiceUsers": { "type": "boolean" },
+        "distinctNetworks": { "type": "boolean" },
+        "networkPeeringAbsent": { "type": "boolean" },
+        "runtimeManagedIdentityAbsent": { "type": "boolean" },
+        "imdsBlockedByOs": { "type": "boolean" },
+        "imdsBlockedByNsg": { "type": "boolean" },
+        "exclusiveLabels": { "type": "boolean" },
+        "ephemeralOneJob": { "type": "boolean" },
+        "deleteOrReimageAfterJob": { "type": "boolean" },
+        "workspaceCleaned": { "type": "boolean" },
+        "processesCleaned": { "type": "boolean" },
+        "projectCachesCleaned": { "type": "boolean" },
+        "dockerStateAbsent": { "type": "boolean" },
+        "builderAzureIdentityAbsent": { "type": "boolean" },
+        "deployerSourceCheckoutAbsent": { "type": "boolean" },
+        "deployerBuildToolsAbsent": { "type": "boolean" },
+        "artifactVerifiedBeforeOidc": { "type": "boolean" },
+        "packageNotExecutedBeforeDeploy": { "type": "boolean" }
+      }
+    },
+    "performance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "percentileMethod",
+        "builder",
+        "deployer"
+      ],
+      "properties": {
+        "percentileMethod": {
+          "const": "nearest-rank"
+        },
+        "builder": {
+          "$ref": "#/$defs/builderPerformance"
+        },
+        "deployer": {
+          "$ref": "#/$defs/deployerPerformance"
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "path",
+          "mediaType",
+          "sha256"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "azure-resource-inventory",
+              "runner-lifecycle",
+              "network-imds-probes",
+              "artifact-oidc-ordering",
+              "performance-raw"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*\\.\\.)"
+          },
+          "mediaType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approved",
+        "reviewedCommitSha",
+        "reviewer",
+        "independentFromImplementer",
+        "reviewedAtUtc"
+      ],
+      "properties": {
+        "approved": { "type": "boolean" },
+        "reviewedCommitSha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "reviewer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independentFromImplementer": { "type": "boolean" },
+        "reviewedAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "approved" }
+        }
+      },
+      "then": {
+        "properties": {
+          "controls": {
+            "properties": {
+              "distinctHosts": { "const": true },
+              "distinctDisks": { "const": true },
+              "distinctServiceUsers": { "const": true },
+              "distinctNetworks": { "const": true },
+              "networkPeeringAbsent": { "const": true },
+              "runtimeManagedIdentityAbsent": { "const": true },
+              "imdsBlockedByOs": { "const": true },
+              "imdsBlockedByNsg": { "const": true },
+              "exclusiveLabels": { "const": true },
+              "ephemeralOneJob": { "const": true },
+              "deleteOrReimageAfterJob": { "const": true },
+              "workspaceCleaned": { "const": true },
+              "processesCleaned": { "const": true },
+              "projectCachesCleaned": { "const": true },
+              "dockerStateAbsent": { "const": true },
+              "builderAzureIdentityAbsent": { "const": true },
+              "deployerSourceCheckoutAbsent": { "const": true },
+              "deployerBuildToolsAbsent": { "const": true },
+              "artifactVerifiedBeforeOidc": { "const": true },
+              "packageNotExecutedBeforeDeploy": { "const": true }
+            }
+          },
+          "performance": {
+            "properties": {
+              "builder": {
+                "properties": {
+                  "accepted": { "const": true }
+                }
+              },
+              "deployer": {
+                "properties": {
+                  "accepted": { "const": true }
+                }
+              }
+            }
+          },
+          "approval": {
+            "properties": {
+              "approved": { "const": true },
+              "independentFromImplementer": { "const": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "no-go" }
+        }
+      },
+      "then": {
+        "properties": {
+          "approval": {
+            "properties": {
+              "approved": { "const": false }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "imageVersionResourceId": {
+      "type": "string",
+      "pattern": "^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\\.Compute/galleries/[^/]+/images/[^/]+/versions/[^/]+$"
+    },
+    "vmssResourceId": {
+      "type": "string",
+      "pattern": "^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\\.Compute/virtualMachineScaleSets/[^/]+$"
+    },
+    "nonNegativeNumber": {
+      "type": "number",
+      "minimum": 0
+    },
+    "positiveNumber": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "percentiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "p50",
+        "p95"
+      ],
+      "properties": {
+        "p50": { "$ref": "#/$defs/positiveNumber" },
+        "p95": { "$ref": "#/$defs/positiveNumber" }
+      }
+    },
+    "phaseStatistics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provisioningToOnlineSeconds",
+        "queueToStartSeconds",
+        "cleanupToDeleteSeconds",
+        "replacementReadySeconds"
+      ],
+      "properties": {
+        "provisioningToOnlineSeconds": { "$ref": "#/$defs/percentiles" },
+        "queueToStartSeconds": { "$ref": "#/$defs/percentiles" },
+        "cleanupToDeleteSeconds": { "$ref": "#/$defs/percentiles" },
+        "replacementReadySeconds": { "$ref": "#/$defs/percentiles" }
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cold",
+        "warm"
+      ],
+      "properties": {
+        "cold": { "$ref": "#/$defs/phaseStatistics" },
+        "warm": { "$ref": "#/$defs/phaseStatistics" }
+      }
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runnerLabel",
+        "controllerGeneration",
+        "leaseGeneration",
+        "stateRevision",
+        "imageVersionResourceId",
+        "vmssResourceId",
+        "vmResourceId",
+        "provisioningToOnlineSeconds",
+        "queueToStartSeconds",
+        "cleanupToDeleteSeconds",
+        "replacementReadySeconds"
+      ],
+      "properties": {
+        "runnerLabel": {
+          "enum": [
+            "certigo-backend-builder",
+            "certigo-backend-deployer"
+          ]
+        },
+        "controllerGeneration": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "leaseGeneration": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "stateRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "imageVersionResourceId": {
+          "$ref": "#/$defs/imageVersionResourceId"
+        },
+        "vmssResourceId": {
+          "$ref": "#/$defs/vmssResourceId"
+        },
+        "vmResourceId": {
+          "$ref": "#/$defs/vmResourceId"
+        },
+        "provisioningToOnlineSeconds": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "queueToStartSeconds": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "cleanupToDeleteSeconds": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "replacementReadySeconds": {
+          "$ref": "#/$defs/positiveNumber"
+        }
+      }
+    },
+    "builderSamples": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "items": {
+        "allOf": [
+          { "$ref": "#/$defs/sample" },
+          {
+            "properties": {
+              "runnerLabel": { "const": "certigo-backend-builder" }
+            }
+          }
+        ]
+      }
+    },
+    "deployerSamples": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "items": {
+        "allOf": [
+          { "$ref": "#/$defs/sample" },
+          {
+            "properties": {
+              "runnerLabel": { "const": "certigo-backend-deployer" }
+            }
+          }
+        ]
+      }
+    },
+    "builderPerformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cold",
+        "warm",
+        "statistics",
+        "accepted"
+      ],
+      "properties": {
+        "cold": { "$ref": "#/$defs/builderSamples" },
+        "warm": { "$ref": "#/$defs/builderSamples" },
+        "statistics": { "$ref": "#/$defs/statistics" },
+        "accepted": { "type": "boolean" }
+      }
+    },
+    "deployerPerformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cold",
+        "warm",
+        "statistics",
+        "accepted"
+      ],
+      "properties": {
+        "cold": { "$ref": "#/$defs/deployerSamples" },
+        "warm": { "$ref": "#/$defs/deployerSamples" },
+        "statistics": { "$ref": "#/$defs/statistics" },
+        "accepted": { "type": "boolean" }
+      }
+    },
+    "vmResourceId": {
+      "type": "string",
+      "pattern": "^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\\.Compute/virtualMachines/[^/]+$"
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "schema": "certigo.isolated-runner-module-interface/v1",
+  "status": "reusable-code-contract",
+  "designInputs": [
+    {
+      "fileName": "content-runner-contract-pr32-20260902T1514Z.json",
+      "sha256": "efc5a6ad4cc8f61b170e65ecaef976a33c1b82af976bab1e8bbb46c63f0ed196",
+      "scope": "session-local-design-compatibility-input-only",
+      "copied": false,
+      "physicalAttestation": false,
+      "approval": false
+    }
+  ],
+  "imageModule": {
+    "path": "locked-runner-image.bicep",
+    "singleLabelProfileRequired": true,
+    "immutableFileDigestsRequired": true,
+    "autoRunState": "Disabled",
+    "activationReadyDefault": false
+  },
+  "runtimeModule": {
+    "path": "isolated-ephemeral-pool.bicep",
+    "singlePoolProfileRequired": true,
+    "idleCapacity": 0,
+    "maximumCapacity": 1,
+    "hostManagedIdentity": "none",
+    "vmExtensionOperationsAllowed": false,
+    "imdsOsAndNsgBlockRequired": true,
+    "networkPeeringAllowed": false,
+    "exactAttestedImageVersionRequired": true,
+    "activationReadyDefault": false
+  },
+  "ephemeralRuntime": {
+    "environmentSchema": "certigo.ephemeral-runner/v1",
+    "singleImmutableLabelRequired": true,
+    "registrationToComputeBindingRequired": true,
+    "runnerEphemeralFlagRequired": true,
+    "oneJobGuardRequired": true,
+    "rootOwnedRunnerInstallationRequired": true,
+    "persistentRegistrationAndRetirementStampsRequired": true,
+    "cleanupAndRetirementRequired": true
+  },
+  "controller": {
+    "classOrderIsConfigurationDriven": true,
+    "classEnabledRequired": true,
+    "generationRequired": true,
+    "leaseRequired": true,
+    "compareAndSwapRequired": true,
+    "disabledClassCapacityMustBeZero": true,
+    "ephemeralClassLifecycleRequired": true,
+    "ephemeralScaleOutAction": "create-fresh",
+    "ephemeralScaleInAction": "delete-retired"
+  },
+  "futureProfiles": {
+    "legacyTrustedBootstrap": {
+      "status": "interface-only-disabled-no-go",
+      "contractPath": "legacy-trusted-bootstrap-contract.json",
+      "contractSha256": "7e34473196bf00d7f7c03314efccce57054ec963b498d94e3611d69a5e0f2c15",
+      "imageModuleCompatible": true,
+      "runtimeModuleCompatible": true,
+      "exactLabel": "certigo-trusted",
+      "aliasesAllowed": false,
+      "dualLabelsAllowed": false,
+      "fallbackForBackendPoolsAllowed": false,
+      "oneJobEphemeralRequired": true,
+      "hostManagedIdentity": "none",
+      "idleCapacity": 0,
+      "maximumCapacity": 1,
+      "networkPeeringAllowed": false,
+      "queueAllowlistRequired": true,
+      "dedicatedQueueAdmissionControllerRequired": true,
+      "sharedFourClassCapacityControllerAllowed": false,
+      "deploymentBindingAllowed": false
+    }
+  },
+  "isolation": {
+    "crossRepositoryColocationAllowed": false,
+    "sharedHostAllowed": false,
+    "sharedDiskAllowed": false,
+    "sharedServiceUserAllowed": false,
+    "sharedProjectCacheAllowed": false,
+    "sharedDockerStateAllowed": false
+  }
+}

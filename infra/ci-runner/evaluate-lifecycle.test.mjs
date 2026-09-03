@@ -201,6 +201,8 @@ test('idle exclusive pools require five minutes, two guards, then arm reactivati
     secondGuard.nextState.scaleInSafety.rearmTargetCapacityByTrust,
     {
       'certigo-pr': 1,
+      'certigo-backend-builder': 0,
+      'certigo-backend-deployer': 0,
       'certigo-trusted': 1,
     },
   );

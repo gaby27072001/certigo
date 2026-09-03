@@ -1,0 +1,171 @@
+{
+  "schema": "certigo.backend-runner-isolation/v1",
+  "status": "design-only-activation-blocked",
+  "designInput": {
+    "fileName": "backend-runner-capacity-contract-final-20260902T1445Z.json",
+    "sha256": "179931e8129ea4d70494a02215288d91525af454907846d205eadedebbda4085",
+    "capturedAtUtc": "2026-09-02T14:45:00Z",
+    "scope": "conversation-session-local-design-input-only",
+    "signed": false,
+    "immutable": false,
+    "physicalAttestation": false,
+    "approval": false,
+    "terminalEvidenceCopied": false
+  },
+  "mutationAuthorization": {
+    "deploymentEnabled": false,
+    "runnerMutationAuthorized": false,
+    "workflowMutationAuthorized": false,
+    "azureMutationAuthorized": false
+  },
+  "activation": {
+    "status": "blocked",
+    "designReviewed": false,
+    "securityReviewApproved": false,
+    "artifactFlowIntegrated": false,
+    "githubEnvironmentApproved": false,
+    "coldWarmAttestationApproved": false
+  },
+  "routing": {
+    "authoritativeLabels": [
+      "certigo-backend-builder",
+      "certigo-backend-deployer"
+    ],
+    "fallbackAllowed": false,
+    "dualLabelAllowed": false,
+    "defaultLabelsAllowed": false,
+    "trustedFallbackAllowed": false,
+    "oldRunnerIdsDenied": [
+      24,
+      25,
+      26,
+      27
+    ]
+  },
+  "controller": {
+    "capacityEnabled": false,
+    "generationRequired": true,
+    "leaseRequired": true,
+    "compareAndSwapRequired": true,
+    "builderLifecycle": "ephemeral-delete",
+    "deployerLifecycle": "ephemeral-delete",
+    "scaleOutAction": "create-fresh",
+    "scaleInAction": "delete-retired",
+    "restartOrDeallocateAllowed": false
+  },
+  "pools": {
+    "builder": {
+      "label": "certigo-backend-builder",
+      "runtimeResourceGroup": "rg-certigo-backend-builder-runtime",
+      "virtualMachineScaleSet": "vmss-certigo-backend-builder",
+      "virtualNetwork": "vnet-certigo-backend-builder",
+      "subnet": "snet-certigo-backend-builder",
+      "networkSecurityGroup": "nsg-certigo-backend-builder",
+      "natGateway": "nat-certigo-backend-builder",
+      "natPublicIp": "pip-certigo-backend-builder",
+      "addressSpace": "10.45.0.0/16",
+      "subnetPrefix": "10.45.1.0/24",
+      "zone": "1",
+      "imageDefinitionName": "certigo-backend-builder-ubuntu-2404",
+      "attestedImageVersionResourceId": "",
+      "idleCapacity": 0,
+      "maximumCapacity": 1,
+      "managedIdentity": "none",
+      "imdsOsBlockRequired": true,
+      "imdsNsgBlockRequired": true,
+      "sourceCheckoutAllowed": true,
+      "projectBuildAllowed": true,
+      "azureCredentialsAllowed": false,
+      "azureOidcAllowed": false,
+      "projectCachePersistenceAllowed": false,
+      "dockerAllowed": false
+    },
+    "deployer": {
+      "label": "certigo-backend-deployer",
+      "runtimeResourceGroup": "rg-certigo-backend-deployer-runtime",
+      "virtualMachineScaleSet": "vmss-certigo-backend-deployer",
+      "virtualNetwork": "vnet-certigo-backend-deployer",
+      "subnet": "snet-certigo-backend-deployer",
+      "networkSecurityGroup": "nsg-certigo-backend-deployer",
+      "natGateway": "nat-certigo-backend-deployer",
+      "natPublicIp": "pip-certigo-backend-deployer",
+      "addressSpace": "10.46.0.0/16",
+      "subnetPrefix": "10.46.1.0/24",
+      "zone": "2",
+      "imageDefinitionName": "certigo-backend-deployer-ubuntu-2404",
+      "attestedImageVersionResourceId": "",
+      "idleCapacity": 0,
+      "maximumCapacity": 1,
+      "managedIdentity": "none",
+      "imdsOsBlockRequired": true,
+      "imdsNsgBlockRequired": true,
+      "sourceCheckoutAllowed": false,
+      "projectBuildAllowed": false,
+      "azureCredentialsAllowed": false,
+      "azureOidcAllowed": true,
+      "projectCachePersistenceAllowed": false,
+      "dockerAllowed": false
+    }
+  },
+  "physicalIsolation": {
+    "sharedHostAllowed": false,
+    "sharedDiskAllowed": false,
+    "sharedServiceUserAllowed": false,
+    "sharedProjectCacheAllowed": false,
+    "sharedDockerStateAllowed": false,
+    "networkPeeringAllowed": false,
+    "applicationRoutesAllowed": false,
+    "distinctRuntimeResourceGroupsRequired": true,
+    "distinctZonesRequired": true
+  },
+  "lifecycle": {
+    "registrationMode": "ephemeral-one-job",
+    "runnerEphemeralFlagRequired": true,
+    "oneJobGuardRequired": true,
+    "runtimeImageValidationStampRequired": true,
+    "registrationConsumptionStampRequired": true,
+    "runnerInstallationRootOwned": true,
+    "retireAfterJobRequired": true,
+    "persistentRetirementStampRequired": true,
+    "deleteOrReimageAfterJobRequired": true,
+    "cleanupRequired": [
+      "workspace",
+      "processes",
+      "project-caches",
+      "runner-credentials",
+      "docker-state"
+    ]
+  },
+  "attestation": {
+    "activationDecision": "unknown-no-go",
+    "requiredEvidenceSchema": "certigo.backend-runner-physical-attestation/v1",
+    "validator": {
+      "path": "validate-physical-attestation.mjs",
+      "requiresApprovedStatus": true,
+      "requiresDistinctAllowlistedEd25519CollectorAndReviewerKeys": true,
+      "authenticatesExactAttestationBytes": true,
+      "recomputesNearestRankPercentiles": true,
+      "verifiesEvidenceDigests": true,
+      "verifiesAzureInventorySemantics": true,
+      "requiresFreshVmPerSample": true
+    },
+    "requiredImmutableBindings": [
+      "repository-commit-sha",
+      "builder-image-version-resource-id",
+      "deployer-image-version-resource-id",
+      "builder-vmss-resource-id",
+      "deployer-vmss-resource-id"
+    ],
+    "independentApprovalRequired": true,
+    "sampleCountPerPath": 20,
+    "paths": [
+      "cold",
+      "warm"
+    ],
+    "requiredStatistics": [
+      "p50",
+      "p95"
+    ],
+    "status": "pending-live-activation-review"
+  }
+}

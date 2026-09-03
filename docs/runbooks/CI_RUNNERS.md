@@ -100,6 +100,54 @@ Prévisualiser drift et état `idle`/`normal`/`boost`, sans mutation :
 bash infra/ci-runner/capacity-plan.sh
 ```
 
+### Conception backend non active
+
+Le contrôleur reconnaît aussi `certigo-backend-builder` et
+`certigo-backend-deployer`, mais ces deux classes sont désactivées et à capacité
+zéro dans tous les modes. Elles n'ont aucun fallback vers `certigo-trusted`.
+Leur futur lifecycle est création fraîche puis suppression de l'instance
+retirée, jamais redémarrage ou déallocation/réutilisation.
+
+Le contrat complet, les validations hors ligne, le what-if futur non exécuté
+et les critères d'attestation (20 cold + 20 warm par pool, P50/P95) sont dans
+[`infra/ci-runner/backend/README.md`](../../infra/ci-runner/backend/README.md).
+Tant qu'une preuve immutable distincte, liée au commit/images/VMSS et approuvée
+indépendamment n'existe pas, ces labels ne doivent être utilisés par aucun
+workflow et le verdict reste **UNKNOWN / NO-GO**.
+
+### Bootstrap legacy `certigo-trusted` non actif
+
+Le contrat d'interface
+[`legacy-trusted-bootstrap-contract.json`](../../infra/ci-runner/modules/legacy-trusted-bootstrap-contract.json)
+décrit, sans l'instancier, un pool one-time distinct : capacité zéro,
+`deploymentEnabled=false`, `activationReady=false`, aucune identité hôte,
+extension VM, route applicative, secret de job, OIDC, opération Azure ou liaison
+au backend deployer. Le profil runtime complet est compatible avec le module
+générique `isolated-ephemeral-pool.bicep`, mais un contrôleur d'admission dédié
+est obligatoire ; le contrôleur quatre classes existant ne peut pas le piloter.
+
+L'admission future est limitée au tuple repository/PR/SHA exact
+`gchambaud_microsoft/Certigo` / `#356` /
+`447a18de80bedba494f8a94c2a8f05e2af29f7f9` et aux trois couples
+`ci-project-state.yml/validate`, `codeql.yml/security-gate` et
+`security-gate.yml/security-gate`. `#354` reste un contexte de file documenté,
+pas une autorisation. Toute divergence doit refuser l'enregistrement et
+détruire l'instance fraîche. Après l'unique job `--ephemeral`, l'instance puis
+toute capacité restante doivent être détruites.
+
+Le label legacy impose une exclusivité temporelle : aucun autre runner
+`Linux/X64/certigo-trusted` ne peut être en ligne, aucun job trusted hors
+allowlist ne peut être en file, et tout autre workflow trusted doit être
+désactivé ou prouvé inerte. Sous lease d'admission, la file exacte est relue
+immédiatement avant l'enregistrement ; toute dérive détruit l'instance sans
+l'enregistrer.
+
+Ce contrat n'est ni une attestation ni une approbation. Les preuves immutables
+de queue, image, IDs Azure, absence d'identité/IMDS, hôte/disque frais,
+enregistrement unique et destruction, avec approbation indépendante, sont
+absentes. État : **UNKNOWN / NO-GO**. Aucune commande Azure, what-if, API runner,
+rerun ou mutation GitHub ne fait partie de ce livrable.
+
 ---
 
 ## 4. Rallumer la CI (avant une session de travail)

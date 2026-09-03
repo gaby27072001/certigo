@@ -7,7 +7,11 @@ import {
   reduceWorkflowJobState,
 } from './capacity-controller.mjs';
 import { reconcileRunnerDrift } from './reconcile-drift.mjs';
-import { reconcileRunnerInstances } from './runner-inventory.mjs';
+import {
+  reconcileRunnerInstances,
+  RUNNER_CLASSES,
+  summarizePoolBoundaries,
+} from './runner-inventory.mjs';
 
 const repositoryConfig = JSON.parse(
   readFileSync(
@@ -189,6 +193,196 @@ test('workflow_job events maintain queue state without writing it', () => {
   assert.deepEqual(completed.jobs, {});
 });
 
+test('repository policy declares four classes while backend capacity remains disabled', () => {
+  assert.deepEqual(repositoryConfig.classOrder, RUNNER_CLASSES);
+  for (const runnerClass of [
+    'certigo-backend-builder',
+    'certigo-backend-deployer',
+  ]) {
+    assert.equal(repositoryConfig.classEnabled[runnerClass], false);
+    assert.equal(repositoryConfig.pilotTarget[runnerClass], 1);
+    assert.equal(repositoryConfig.classLifecycle[runnerClass], 'ephemeral-delete');
+    for (const mode of ['idle', 'normal', 'boost']) {
+      assert.equal(repositoryConfig.modes[mode][runnerClass], 0);
+    }
+  }
+});
+
+test('disabled backend demand is recognized but can never request capacity', () => {
+  const state = {
+    jobs: {
+      '351': {
+        labels: ['self-hosted', 'certigo-backend-builder'],
+        queuedAt: '2026-09-02T14:45:00Z',
+        status: 'queued',
+      },
+    },
+  };
+  const plan = createCapacityPlan({
+    config: { ...config, enabled: true },
+    inventory: inventory(),
+    now: Date.parse('2026-09-02T14:46:00Z'),
+    state,
+    ...leaseFence(state),
+  });
+
+  assert.equal(plan.workload.queuedByTrust['certigo-backend-builder'], 1);
+  assert.equal(plan.targetCapacityByTrust['certigo-backend-builder'], 0);
+  assert.equal(plan.action, 'hold');
+  assert.equal(plan.targetInstanceAction, 'none');
+  assert.equal(plan.canRequestChange, false);
+  assert.ok(
+    plan.blockers.some((blocker) =>
+      blocker.includes('queued or active work targets disabled runner classes')
+    ),
+  );
+});
+
+test('controller class inputs are generic without weakening single-label isolation', () => {
+  const genericClasses = ['certigo-synthetic-low', 'certigo-synthetic-high'];
+  const genericConfig = {
+    ...config,
+    classOrder: genericClasses,
+    classEnabled: {
+      'certigo-synthetic-low': true,
+      'certigo-synthetic-high': true,
+    },
+    classLifecycle: {
+      'certigo-synthetic-low': 'managed-reusable',
+      'certigo-synthetic-high': 'managed-reusable',
+    },
+    pilotTarget: {
+      'certigo-synthetic-low': 1,
+      'certigo-synthetic-high': 1,
+    },
+    scaleInOrder: genericClasses,
+    modes: {
+      idle: {
+        'certigo-synthetic-low': 0,
+        'certigo-synthetic-high': 0,
+      },
+      normal: {
+        'certigo-synthetic-low': 1,
+        'certigo-synthetic-high': 1,
+      },
+      boost: {
+        'certigo-synthetic-low': 1,
+        'certigo-synthetic-high': 1,
+      },
+    },
+  };
+  const live = inventory();
+  live.runners.github.runners[0].labels = [
+    { name: 'certigo-synthetic-low' },
+  ];
+  live.runners.github.runners[1].labels = [
+    { name: 'certigo-synthetic-high' },
+  ];
+
+  const plan = createCapacityPlan({
+    config: genericConfig,
+    inventory: live,
+  });
+  assert.deepEqual(plan.runnerClasses, genericClasses);
+  assert.equal(plan.trust.dualTrustRunners.length, 0);
+  assert.equal(plan.targetCapacity, 0);
+});
+
+test('identity-free pools remain distinct boundaries when their hosts are distinct', () => {
+  const managedInstances = [
+    {
+      runner: runner('vm-low-Certigo', ['certigo-pr']),
+      virtualMachine: {
+        name: 'vm-low',
+        virtualMachineScaleSet: { id: '/vmss/pool-low' },
+      },
+    },
+    {
+      runner: runner('vm-high-Certigo', ['certigo-trusted']),
+      virtualMachine: {
+        name: 'vm-high',
+        virtualMachineScaleSet: { id: '/vmss/pool-high' },
+      },
+    },
+  ];
+  const boundaries = summarizePoolBoundaries(
+    [
+      {
+        name: 'pool-low',
+        identity: null,
+        virtualMachineProfile: {
+          networkProfile: {
+            networkInterfaceConfigurations: [
+              {
+                properties: {
+                  ipConfigurations: [
+                    {
+                      properties: {
+                        subnet: { id: '/networks/low/subnets/runners' },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      },
+      {
+        name: 'pool-high',
+        identity: null,
+        virtualMachineProfile: {
+          networkProfile: {
+            networkInterfaceConfigurations: [
+              {
+                properties: {
+                  ipConfigurations: [
+                    {
+                      properties: {
+                        subnet: { id: '/networks/high/subnets/runners' },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      },
+    ],
+    managedInstances,
+  );
+
+  assert.equal(boundaries.distinctIdentityBoundaryCount, 2);
+  assert.deepEqual(boundaries.poolsWithoutIdentityEvidence, []);
+  assert.deepEqual(boundaries.sharedIdentityIds, []);
+});
+
+test('missing identity evidence blocks every capacity request', () => {
+  const live = inventory({ queued: 3 });
+  for (const scaleSet of live.runners.vmScaleSets) {
+    delete scaleSet.identity;
+  }
+
+  const plan = createCapacityPlan({
+    config: { ...config, enabled: true },
+    inventory: live,
+    ...leaseFence(),
+  });
+
+  assert.equal(plan.action, 'hold');
+  assert.equal(plan.canRequestChange, false);
+  assert.deepEqual(plan.trust.poolsWithoutIdentityEvidence, [
+    'pool-0',
+    'pool-1',
+  ]);
+  assert.ok(
+    plan.blockers.includes(
+      'exclusive certigo-pr/certigo-trusted labels, identities, and subnets are not reconciled',
+    ),
+  );
+});
+
 test('backlog selects the future six PR plus two trusted pilot target while feature stays off', () => {
   const plan = createCapacityPlan({
     config,
@@ -199,6 +393,8 @@ test('backlog selects the future six PR plus two trusted pilot target while feat
   assert.equal(plan.targetCapacity, 8);
   assert.deepEqual(plan.targetCapacityByTrust, {
     'certigo-pr': 6,
+    'certigo-backend-builder': 0,
+    'certigo-backend-deployer': 0,
     'certigo-trusted': 2,
   });
   assert.equal(plan.targetTrustClass, 'certigo-pr');
@@ -268,6 +464,8 @@ test('a queued trusted job selects trusted capacity before the larger PR deficit
   assert.equal(plan.targetTrustClass, 'certigo-trusted');
   assert.deepEqual(plan.workload.queuedByTrust, {
     'certigo-pr': 0,
+    'certigo-backend-builder': 0,
+    'certigo-backend-deployer': 0,
     'certigo-trusted': 2,
   });
 });
@@ -344,6 +542,8 @@ test('scale-in requires a resettable five-minute quiet period, two guards, and r
     secondGuard.nextState.scaleInSafety.rearmTargetCapacityByTrust,
     {
       'certigo-pr': 2,
+      'certigo-backend-builder': 0,
+      'certigo-backend-deployer': 0,
       'certigo-trusted': 2,
     },
   );
@@ -413,6 +613,8 @@ test('scale-in requires a resettable five-minute quiet period, two guards, and r
     primarySecondGuard.nextState.scaleInSafety.rearmTargetCapacityByTrust,
     {
       'certigo-pr': 2,
+      'certigo-backend-builder': 0,
+      'certigo-backend-deployer': 0,
       'certigo-trusted': 2,
     },
   );
@@ -434,6 +636,8 @@ test('scale-in requires a resettable five-minute quiet period, two guards, and r
   assert.equal(rearm.safety.rearmRequired, true);
   assert.deepEqual(rearm.safety.rearmTargetCapacityByTrust, {
     'certigo-pr': 2,
+    'certigo-backend-builder': 0,
+    'certigo-backend-deployer': 0,
     'certigo-trusted': 2,
   });
 });
@@ -787,8 +991,8 @@ test('configuration refuses a boost mode that differs from the pilot target', ()
           modes: {
             ...config.modes,
             boost: {
+              ...config.modes.boost,
               'certigo-pr': 5,
-              'certigo-trusted': 2,
             },
           },
         },

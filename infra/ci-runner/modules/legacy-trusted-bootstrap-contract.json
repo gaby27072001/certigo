@@ -1,0 +1,162 @@
+{
+  "schema": "certigo.legacy-trusted-bootstrap/v1",
+  "status": "interface-only-disabled-no-go",
+  "provenance": {
+    "repository": "gchambaud_microsoft/Certigo",
+    "requirementPullRequest": 356,
+    "requirementHeadSha": "447a18de80bedba494f8a94c2a8f05e2af29f7f9",
+    "queuedContextPullRequest": 354,
+    "signed": false,
+    "physicalAttestation": false,
+    "approval": false
+  },
+  "moduleBinding": {
+    "imageModule": "locked-runner-image.bicep",
+    "runtimeModule": "isolated-ephemeral-pool.bicep",
+    "backendWrapperReuseAllowed": false,
+    "deploymentEnabled": false,
+    "activationReady": false,
+    "reproducibleInputsReady": false,
+    "attestedGalleryImageVersionResourceId": "",
+    "imageProfile": {
+      "galleryName": "galcertigocirunners",
+      "imageDefinitionName": "certigo-trusted-bootstrap-ubuntu-2404",
+      "imageTemplateName": "aib-certigo-trusted-bootstrap-disabled",
+      "imageVersion": "2026.09.03",
+      "autoRunState": "Disabled",
+      "runnerLabel": "certigo-trusted",
+      "roleName": "legacy-trusted-bootstrap",
+      "baseImage": {
+        "publisher": "Canonical",
+        "offer": "ubuntu-24_04-lts",
+        "sku": "server",
+        "version": "24.04.202608070"
+      },
+      "identifier": {
+        "publisher": "Certigo",
+        "offer": "github-actions",
+        "sku": "legacy-trusted-bootstrap"
+      },
+      "buildTimeoutInMinutes": 60,
+      "inputRoot": "/var/tmp/certigo-trusted-bootstrap-inputs",
+      "runOutputName": "certigo-trusted-bootstrap-disabled",
+      "osDiskSizeGB": 64,
+      "vmSize": "Standard_D2ads_v6"
+    },
+    "fileInputs": [],
+    "materializedInputs": [],
+    "customizationCommands": [],
+    "validationCommands": [],
+    "runtimeResourceGroup": "rg-certigo-trusted-bootstrap-runtime",
+    "runtimeProfile": {
+      "roleName": "legacy-trusted-bootstrap",
+      "runnerLabel": "certigo-trusted",
+      "imageDefinitionName": "certigo-trusted-bootstrap-ubuntu-2404",
+      "idleCapacity": 0,
+      "maximumCapacity": 1,
+      "managedIdentity": "none",
+      "networkPeeringAllowed": false,
+      "applicationRoutesAllowed": false,
+      "registrationMode": "ephemeral-one-job",
+      "runnerEphemeralFlagRequired": true,
+      "oneJobGuardRequired": true,
+      "retireAfterJobRequired": true,
+      "deleteOrReimageAfterJobRequired": true,
+      "imdsOsBlockRequired": true,
+      "imdsNsgBlockRequired": true,
+      "natPublicIp": "pip-certigo-trusted-bootstrap",
+      "zone": "3",
+      "natGateway": "nat-certigo-trusted-bootstrap",
+      "networkSecurityGroup": "nsg-certigo-trusted-bootstrap",
+      "virtualNetwork": "vnet-certigo-trusted-bootstrap",
+      "addressSpace": "10.94.0.0/24",
+      "subnet": "snet-certigo-trusted-bootstrap",
+      "subnetPrefix": "10.94.0.0/26",
+      "virtualMachineScaleSet": "vmss-certigo-trusted-bootstrap",
+      "computerNamePrefix": "ctgbst"
+    }
+  },
+  "queueAdmission": {
+    "controller": "dedicated-fail-closed-bootstrap-admission",
+    "sharedFourClassCapacityControllerAllowed": false,
+    "repository": "gchambaud_microsoft/Certigo",
+    "event": "pull_request_target",
+    "pullRequestNumber": 356,
+    "headSha": "447a18de80bedba494f8a94c2a8f05e2af29f7f9",
+    "allowedWorkflowJobs": [
+      {
+        "workflowPath": ".github/workflows/ci-project-state.yml",
+        "jobId": "validate",
+        "requiredCheckName": "Generated state equals committed state"
+      },
+      {
+        "workflowPath": ".github/workflows/codeql.yml",
+        "jobId": "security-gate",
+        "requiredCheckName": "CodeQL / Security gate"
+      },
+      {
+        "workflowPath": ".github/workflows/security-gate.yml",
+        "jobId": "security-gate",
+        "requiredCheckName": "Security / Required gate"
+      }
+    ],
+    "allowAnyOtherRepository": false,
+    "allowAnyOtherPullRequest": false,
+    "allowAnyOtherHeadSha": false,
+    "allowAnyOtherWorkflowOrJob": false,
+    "queuedContextPullRequest354Admitted": false,
+    "exactQueuedTupleSetRequired": true,
+    "allNonAllowlistedTrustedJobsAbsentRequired": true,
+    "noOtherMatchingRunnerOnlineRequired": true,
+    "atomicAdmissionLeaseRequired": true,
+    "queueSnapshotRecheckedImmediatelyBeforeRegistration": true,
+    "destroyWithoutRegistrationOnQueueDrift": true
+  },
+  "security": {
+    "aliasesAllowed": false,
+    "dualLabelsAllowed": false,
+    "defaultLabelsAllowed": false,
+    "backendBuilderRoleAllowed": false,
+    "backendDeployerRoleAllowed": false,
+    "backendDeploymentBindingAllowed": false,
+    "hostManagedIdentityAllowed": false,
+    "imdsReachabilityAllowed": false,
+    "jobSecretsAllowed": false,
+    "persistentSecretsAllowed": false,
+    "oidcAllowed": false,
+    "azureCredentialsAllowed": false,
+    "azureOperationsAllowed": false,
+    "environmentAllowed": false,
+    "releaseOrDeploymentAllowed": false,
+    "sourceBuildAllowed": false,
+    "cloudWorkflowDisablementEvidenceRequired": true,
+    "nonAllowlistedTrustedWorkflowDisablementOrInertnessEvidenceRequired": true,
+    "shortLivedRegistrationTokenViaStdinOnly": true,
+    "registrationTokenPersistenceAllowed": false,
+    "historicalRunnerIdsDenied": [
+      24,
+      25,
+      26,
+      27
+    ]
+  },
+  "lifecycle": {
+    "freshInstancePerJobRequired": true,
+    "runnerEphemeralFlagRequired": true,
+    "oneJobGuardRequired": true,
+    "persistentRetirementStampRequired": true,
+    "destroyImmediatelyAfterJobRequired": true,
+    "restartOrReuseAllowed": false,
+    "remainingCapacityDestroyedAfterBootstrapRequired": true
+  },
+  "evidence": {
+    "immutableQueueAdmissionEvidenceRequired": true,
+    "exactImageVmssVmNetworkResourceIdsRequired": true,
+    "identityAndImdsEvidenceRequired": true,
+    "freshHostAndDiskEvidenceRequired": true,
+    "singleJobRegistrationAndDeletionEvidenceRequired": true,
+    "independentApprovalRequired": true,
+    "currentlyAvailable": false,
+    "activationDecision": "UNKNOWN/NO-GO"
+  }
+}
