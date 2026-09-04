@@ -161,7 +161,7 @@ test('publishers are isolated and the runtime reader is read-only on every conta
   );
 });
 
-test('custom publisher role grants metadata reads without data-plane access', () => {
+test('custom publisher role grants create-and-verify blob access without delete', () => {
   const template = compileTemplate(
     'infra/governance/bootstrap-identities.bicep',
   );
@@ -181,7 +181,14 @@ test('custom publisher role grants metadata reads without data-plane access', ()
     'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/read',
     'Microsoft.Storage/storageAccounts/blobServices/containers/read',
   ]);
-  assert.deepEqual(permissions.dataActions, []);
+  // tools/publish_blob_artifact.sh uploads with `--auth-mode login` and then
+  // downloads each blob back to compare SHA-256, so the publisher needs exactly
+  // these two data actions. `blobs/delete` stays absent, and version-level
+  // immutability plus `--overwrite false` keep the upload create-only.
+  assert.deepEqual(permissions.dataActions.sort(), [
+    'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read',
+    'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write',
+  ]);
   assert.deepEqual(permissions.notActions, []);
   assert.deepEqual(permissions.notDataActions, []);
   assert.ok(

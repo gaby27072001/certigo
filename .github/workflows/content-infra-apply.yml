@@ -1,0 +1,212 @@
+name: Content infrastructure apply
+
+# Applies infra/content/main.bicep to rg-certigo-content.
+#
+# Deliberately NOT workflow_dispatch: validate-workflow-security.mjs forbids
+# workflow_dispatch on certigo-trusted workflows, so this uses a dedicated
+# repository_dispatch type that only a maintainer can send, and only against
+# refs/heads/main.
+#
+# The dispatch payload must pin the exact template being applied:
+#   gh api repos/gchambaud_microsoft/Certigo/dispatches \
+#     -f event_type=content-infra-apply \
+#     -F client_payload[confirm]=apply-content-infrastructure \
+#     -F client_payload[expected_template_sha256]="$(sha256sum infra/content/main.bicep | cut -d' ' -f1)"
+#
+# The job always runs what-if first, enforces the same guardrails as
+# content-infra-what-if.yml (nothing outside rg-certigo-content, no deletions),
+# and only then applies. It never locks a WORM immutability policy: locking is
+# irreversible and stays a separate, explicitly approved operator action.
+
+on:
+  repository_dispatch:
+    types: [content-infra-apply]
+
+permissions: {}
+
+concurrency:
+  group: content-infra-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Dedicated content stack apply
+    if: ${{ github.ref == 'refs/heads/main' }}
+    environment: azure-content-infra-plan
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Validate exact payload
+        shell: bash
+        env:
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          jq -e '
+            type == "object" and
+            keys == ["confirm", "expected_template_sha256"] and
+            (.confirm == "apply-content-infrastructure") and
+            (.expected_template_sha256 | type == "string") and
+            (.expected_template_sha256 | test("^[0-9a-f]{64}$"))
+          ' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
+
+      - name: Pin the approved template revision
+        shell: bash
+        env:
+          EXPECTED_TEMPLATE_SHA256: ${{ github.event.client_payload.expected_template_sha256 }}
+        run: |
+          set -euo pipefail
+          echo "${EXPECTED_TEMPLATE_SHA256}  infra/content/main.bicep" \
+            | sha256sum --check --strict
+
+      - name: Validate deployment identity variables
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          : "${AZURE_CLIENT_ID:?Configure AZURE_CLIENT_ID in azure-content-infra-plan}"
+          : "${AZURE_TENANT_ID:?Configure AZURE_TENANT_ID in azure-content-infra-plan}"
+          : "${AZURE_SUBSCRIPTION_ID:?Configure AZURE_SUBSCRIPTION_ID in azure-content-infra-plan}"
+
+      - name: Azure login with OIDC
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Refuse any tenant or subscription other than the approved pair
+        shell: bash
+        env:
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          ACTUAL_TENANT="$(az account show --query tenantId --output tsv)"
+          ACTUAL_SUBSCRIPTION="$(az account show --query id --output tsv)"
+          test "${ACTUAL_TENANT}" = "${AZURE_TENANT_ID}"
+          test "${ACTUAL_SUBSCRIPTION}" = "${AZURE_SUBSCRIPTION_ID}"
+
+      - name: Run what-if and enforce guardrails before applying
+        shell: bash
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          WHAT_IF_FILE: ${{ runner.temp }}/content-apply-what-if.json
+        run: |
+          set -euo pipefail
+          trap 'rm -f -- "$WHAT_IF_FILE"' EXIT
+          az deployment group what-if \
+            --name certigo-content \
+            --resource-group rg-certigo-content \
+            --template-file infra/content/main.bicep \
+            --parameters infra/params/content.bicepparam \
+            --result-format FullResourcePayloads \
+            --no-pretty-print \
+            --output json > "$WHAT_IF_FILE"
+          node --input-type=module - "$WHAT_IF_FILE" <<'NODE'
+          import fs from 'node:fs';
+          const plan = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const changes = plan.changes ?? [];
+          const contentScope =
+            `/subscriptions/${process.env.AZURE_SUBSCRIPTION_ID}/` +
+            `resourcegroups/rg-certigo-content`;
+          const outsideAllowedScope = changes.filter(({ resourceId = '' }) => {
+            const normalized = resourceId.toLowerCase();
+            return normalized !== contentScope &&
+              !normalized.startsWith(`${contentScope}/`);
+          });
+          if (outsideAllowedScope.length > 0) {
+            throw new Error(
+              `what-if touches resources outside the dedicated content stack: ` +
+              outsideAllowedScope.map((change) => change.resourceId).join(', '),
+            );
+          }
+          const destructive = changes.filter(
+            ({ changeType = '' }) => changeType === 'Delete',
+          );
+          if (destructive.length > 0) {
+            throw new Error(
+              `what-if contains deletions: ` +
+              destructive.map((change) => change.resourceId).join(', '),
+            );
+          }
+          const locked = changes.filter((change) => {
+            const after = change.after ?? {};
+            return after?.properties?.state === 'Locked';
+          });
+          if (locked.length > 0) {
+            throw new Error(
+              `what-if would lock an immutability policy, which is irreversible: ` +
+              locked.map((change) => change.resourceId).join(', '),
+            );
+          }
+          const counts = changes.reduce((result, { changeType = 'Unknown' }) => {
+            result[changeType] = (result[changeType] ?? 0) + 1;
+            return result;
+          }, {});
+          const rows = changes.length === 0
+            ? '| None | No resource change |\n'
+            : changes
+              .map(({ changeType = 'Unknown', resourceId = 'Unknown' }) =>
+                `| ${changeType} | \`${resourceId}\` |`)
+              .join('\n') + '\n';
+          fs.appendFileSync(
+            process.env.GITHUB_STEP_SUMMARY,
+            `## Certigo content infrastructure apply — reviewed plan\n\n` +
+              `Evaluated \`refs/heads/main\`. Only \`rg-certigo-content\` is ` +
+              `allowed; deletions and WORM locks fail the job.\n\n` +
+              `### Counts\n\n` +
+              `\`\`\`json\n${JSON.stringify(counts, null, 2)}\n\`\`\`\n\n` +
+              `### Complete diff\n\n| Change | Resource ID |\n|---|---|\n${rows}`,
+          );
+          NODE
+
+      - name: Apply the reviewed deployment
+        shell: bash
+        env:
+          DEPLOYMENT_OUTPUTS_FILE: ${{ runner.temp }}/content-outputs.json
+        run: |
+          set -euo pipefail
+          trap 'rm -f -- "$DEPLOYMENT_OUTPUTS_FILE"' EXIT
+          az deployment group create \
+            --name certigo-content \
+            --resource-group rg-certigo-content \
+            --template-file infra/content/main.bicep \
+            --parameters infra/params/content.bicepparam \
+            --query 'properties.outputs' \
+            --output json > "$DEPLOYMENT_OUTPUTS_FILE"
+          node --input-type=module - "$DEPLOYMENT_OUTPUTS_FILE" <<'NODE'
+          import fs from 'node:fs';
+          const outputs = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const publish = [
+            'azureStorageAccount',
+            'azureBlobEndpoint',
+            'azureDescriptorContainer',
+            'azurePublicContainer',
+            'azurePrivateContainer',
+            'azureDescriptorStorageTarget',
+            'azurePublicStorageTarget',
+            'azurePrivateStorageTarget',
+            'azureContentReaderClientId',
+            'azureContentReaderResourceId',
+          ];
+          const rows = publish
+            .map((key) => `| \`${key}\` | \`${outputs[key]?.value ?? 'missing'}\` |`)
+            .join('\n');
+          fs.appendFileSync(
+            process.env.GITHUB_STEP_SUMMARY,
+            `\n## Deployment outputs\n\n| Output | Value |\n|---|---|\n${rows}\n\n` +
+              `Immutability policies are created **Unlocked**. Locking is a ` +
+              `separate, irreversible operator action and is not performed here.\n`,
+          );
+          NODE

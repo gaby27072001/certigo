@@ -207,7 +207,14 @@ resource contentPublisherRole 'Microsoft.Authorization/roleDefinitions@2022-04-0
           'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/read'
         ]
         notActions: []
-        dataActions: []
+        // Create-and-verify only. `blobs/write` cannot overwrite because the
+        // publisher always uploads with `--overwrite false` onto containers that
+        // have version-level immutability enabled. `blobs/delete` is deliberately
+        // absent so a publisher can never remove or truncate a published release.
+        dataActions: [
+          'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read'
+          'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write'
+        ]
         notDataActions: []
       }
     ]

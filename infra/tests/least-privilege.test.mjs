@@ -600,6 +600,19 @@ test('Phase A custom roles contain no wildcard or delete action', () => {
   const template = compileTemplate(
     'infra/governance/bootstrap-identities.bicep',
   );
+  // Only the immutable content publisher may hold data-plane actions, and only
+  // the two needed to create a blob and read it back for hash verification.
+  // Everything else must stay control-plane only.
+  const contentPublisherRoleName = 'c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de';
+  const allowedDataActions = new Map([
+    [
+      contentPublisherRoleName,
+      [
+        'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read',
+        'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write',
+      ],
+    ],
+  ]);
   for (const role of resourcesOfType(
     template,
     'Microsoft.Authorization/roleDefinitions',
@@ -612,7 +625,7 @@ test('Phase A custom roles contain no wildcard or delete action', () => {
     assert.ok(permissions.every((permission) => !/delete/i.test(permission)));
     assert.deepEqual(
       role.properties.permissions.flatMap((value) => value.dataActions ?? []),
-      [],
+      allowedDataActions.get(role.name) ?? [],
     );
   }
 });

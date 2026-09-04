@@ -76,10 +76,16 @@ des settings ci-dessus, des conteneurs Cosmos
 #290 plutôt que créer un reader et un compte de contenu locaux.
 
 Le dépôt `certigo-content` reste propriétaire de la publication. Son workflow
-actuel ne publie que les paquets public et privé sous l'ancien préfixe. Une
-évolution séparée doit publier `release.json` avec l'identité
-`azure-content-release`, après vérification des deux paquets, et adopter les
-préfixes `manifests/<manifestId>/`.
+publie désormais le paquet public sous
+`content-public-releases/manifests/<publicManifestId>/`, le paquet privé sous
+`content-private-releases/manifests/<privateManifestId>/`, puis `release.json`
+en dernier sous `content-release-descriptors/releases/<releaseId>/`, chacun avec
+son Environment et son identité OIDC dédiés.
+
+> Mise à jour 2026-09-04 : ce paragraphe décrivait l'ancien préfixe
+> `releases/sha256/<rootHash>` et présentait la publication de `release.json`
+> comme un travail restant. Vérifié sur `certigo-content@07ab6b04` : les trois
+> chemins et l'ordre descripteur-en-dernier sont déjà implémentés.
 
 ## WORM et rollback
 

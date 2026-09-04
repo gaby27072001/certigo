@@ -38,14 +38,14 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-09-04** |
-| Commit de référence analysé | `c5d092e50809fc6aaa09295717d1fbb7b540180e` |
+| Commit de référence analysé | `3b56905752fb1afab70b2f6e2bcbcd25ede151df` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
 | Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `55a512821dabbea8b65d3403f9c83571b4a33ed8` du **2026-08-14** |
 | Package public actif | **146 fichiers** — `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
 | Package privé actif (`answerKey`) | **146 fichiers** — `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
-| Workflows GitHub Actions | **28** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content-drift.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `codeql.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
+| Workflows GitHub Actions | **29** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content-drift.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `codeql.yml`, `content-infra-apply.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
 | Tests découverts | **197 fichiers** — .NET : 4 projets / 93 fichiers ; Flutter/Dart : 6 racines / 96 fichiers ; Python : 1 racine / 8 fichier |
 | Corpus **historique** local | **91 pistes**, **146 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
@@ -88,6 +88,25 @@ paquet amont déclare désormais `certigo.content.package-manifest/v3` tandis qu
 contrôle de schéma. Reporter ces valeurs sans faire évoluer le contrat consommateur remplacerait
 une référence périmée par une référence fausse ; la montée v1 → v3 est un changement de contrat
 distinct.
+
+**État mesuré du stockage immuable au 2026-09-04.** Le stack `infra/content/main.bicep` est
+désormais **déployé** dans `rg-certigo-content` (déploiement nommé
+`certigo-content-bootstrap-20260904`, `Succeeded`). Relu depuis Azure : compte
+`stcertigocntz3wqbdww` en `publicNetworkAccess: Disabled`, `allowSharedKeyAccess: false`,
+versioning actif et soft-delete blob/conteneur à 30 jours ; les trois conteneurs
+`content-release-descriptors`, `content-public-releases` et `content-private-releases` existent
+avec `immutableStorageWithVersioning` et `publicAccess: None` ; les policies WORM sont
+**`Unlocked`** à 90/30/90 jours, sans append protégé ; le Private Endpoint Blob est `Approved`
+dans `rg-certigo-ci/vnet-certigo-ci/snet-runners` avec l'enregistrement A
+`stcertigocntz3wqbdww → 10.42.1.5` ; six attributions de rôle au scope conteneur ; lifecycle de
+tiering sans action de suppression.
+
+Ce déploiement ne publie **aucun contenu** : les trois conteneurs sont **vides** et
+`ci-content-drift.yml` échoue donc légitimement tant qu'aucun descripteur n'existe. La
+publication reste bloquée en amont, et l'identité `id-certigo-content-reader` possède désormais
+ses trois attributions `Storage Blob Data Reader` mais **pas encore de credential fédéré**, donc
+la gate ne peut pas encore s'authentifier. Aucune policy n'a été verrouillée : le verrouillage
+WORM est irréversible et reste une action opérateur distincte.
 
 Le commit et la date de référence sont capturés au premier commit. La correspondance des sources
 est ensuite vérifiée par SHA-256 sur les noms de chemins UTF-8 triés et les octets exacts, avec

@@ -138,6 +138,12 @@ const roleContracts = {
       'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/read',
       'Microsoft.Storage/storageAccounts/blobServices/containers/read',
     ],
+    // Create-and-verify only: no blobs/delete, so a publisher can never remove
+    // or truncate a published release.
+    dataActions: [
+      'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read',
+      'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write',
+    ],
     scopes: (subscriptionId) => [
       `/subscriptions/${subscriptionId}/resourceGroups/rg-certigo-content`,
     ],
