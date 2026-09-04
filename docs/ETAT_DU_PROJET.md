@@ -38,15 +38,15 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-09-04** |
-| Commit de référence analysé | `6423bc58e7658e774dbdf7f6f53e1e476fc199d2` |
+| Commit de référence analysé | `c5d092e50809fc6aaa09295717d1fbb7b540180e` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
 | Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `55a512821dabbea8b65d3403f9c83571b4a33ed8` du **2026-08-14** |
 | Package public actif | **146 fichiers** — `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
 | Package privé actif (`answerKey`) | **146 fichiers** — `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
-| Workflows GitHub Actions | **27** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `codeql.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **195 fichiers** — .NET : 4 projets / 93 fichiers ; Flutter/Dart : 6 racines / 96 fichiers ; Python : 1 racine / 6 fichier |
+| Workflows GitHub Actions | **28** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content-drift.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `codeql.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
+| Tests découverts | **197 fichiers** — .NET : 4 projets / 93 fichiers ; Flutter/Dart : 6 racines / 96 fichiers ; Python : 1 racine / 8 fichier |
 | Corpus **historique** local | **91 pistes**, **146 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
@@ -64,11 +64,30 @@ python -m unittest discover -s tools/tests -p "test_*.py" -v
 Sources canoniques : pins des workflows GitHub/Codemagic, `package.json`, arborescences de
 workflows/tests/corpus, `lesson.schema.json`, `ContentModels.cs`,
 `docs/active-content-reference.json` et `docs/project-state-reference.json`. La gate
-`ci-project-state.yml` teste le générateur, impose **generated == committed**, reconstruit les
-packages du `main` courant de `certigo-content`, puis vérifie la révision, la date et les deux
-manifestes. Elle tourne sur chaque PR et quotidiennement : toute dérive amont rend l'état obsolète
-et échoue explicitement. Les sections restantes expliquent le contexte ; « opérationnel » exige une
-preuve automatisée ou une référence explicite, sinon l'affirmation est **non vérifiée / manuelle**.
+`ci-project-state.yml` teste le générateur, impose **generated == committed** et valide la
+*structure* de la référence de contenu committée. Elle ne reconstruit **pas** les packages du
+`main` courant de `certigo-content` et ne compare **pas** la révision amont : elle est
+délibérément sans secret et n'atteint aucun dépôt externe (`docs/GOVERNANCE.md`), et
+`.github/scripts/validate-workflow-security.mjs` interdit explicitement `--validate-active-content`,
+`secrets.` et tout checkout cross-repository dans ce fichier. Une dérive amont **ne la fait donc
+pas échouer** — c'est précisément ainsi que le pin a pu prendre 20 jours de retard sans qu'aucun
+signal ne se déclenche. La détection de dérive est portée par le workflow séparé
+`ci-content-drift.yml` (jamais sur PR, `certigo-trusted`), qui compare le pin à la *release
+publiée* et non à une branche Git. Les sections restantes expliquent le contexte ;
+« opérationnel » exige une preuve automatisée ou une référence explicite, sinon l'affirmation est
+**non vérifiée / manuelle**.
+
+**État mesuré du pin au 2026-09-04.** `docs/active-content-reference.json` épingle toujours
+`55a5128` du 2026-08-14, alors que `certigo-content@main` est à `07ab6b0` du 2026-08-31
+(`07ab6b0453a49c7ac5800837851ae83edf159768`, committé `2026-08-31T16:37:50Z`). Reconstruire ce
+`main` (`npm ci --ignore-scripts` puis `npm run package`) produit `publicManifestId`
+`sha256:dd95aafc…7ced79` (1 735 fichiers) et `privateManifestId` `sha256:65b1914f…10f793`
+(812 fichiers), à comparer aux 146 fichiers épinglés. Le pin **n'a pas été rafraîchi ici** : le
+paquet amont déclare désormais `certigo.content.package-manifest/v3` tandis que
+`contracts/content-package-v1.json` épingle `v1`, et `--validate-active-content` échoue sur le
+contrôle de schéma. Reporter ces valeurs sans faire évoluer le contrat consommateur remplacerait
+une référence périmée par une référence fausse ; la montée v1 → v3 est un changement de contrat
+distinct.
 
 Le commit et la date de référence sont capturés au premier commit. La correspondance des sources
 est ensuite vérifiée par SHA-256 sur les noms de chemins UTF-8 triés et les octets exacts, avec
@@ -456,18 +475,23 @@ déclarée est dans `codemagic.yaml`.
 | **R-02** | 🟠 | Cosmos prod en backup `Periodic`, pas de PITR | ✅ **Résolu en IaC** — `cosmosBackupMode = 'Continuous'` en staging/prod (`infra/params/{staging,prod}.bicepparam`, `infra/modules/cosmos.bicep:59`) ; ⏳ **preuve de restauration live encore à faire** (`docs/runbooks/R-02_cosmos-pitr-restauration.md` : « restore-test à planifier ») |
 | **O-01** | 🔴 (décision) | Tutor IA désactivé en prod, décision requise | ✅ **Décidé** le 2026-07-06 — Option B (repli déterministe), voir `docs/adr/ADR-O-01-ai-tutor-prod.md` |
 | **O-03** | — | Tenant CIAM personnel non audité | ✅ **Résolu** (déjà clos dans l'audit d'origine, §D-bis) |
+| **R-04** | 🔴 | CIAM : un seul Global Admin (MSA gmail fédéré), pas de break-glass | ✅ **Résolu** — vérifié live sur Azure/Entra le 2026-09-04 : un compte break-glass natif existe et le tenant compte **2 Global Administrators**. Runbook `docs/runbooks/R-04_compte-break-glass-ciam.md` exécuté |
+| **R-06** | 🔴 | Ressource de facturation CIAM (`ciamDirectories`) sans resource lock | ✅ **Résolu** — vérifié live sur Azure le 2026-09-04 : **deux verrous `CanNotDelete`**, l'un sur le resource group `rg-certigo-identity`, l'autre sur la ressource `ciamDirectories`. Runbook `docs/runbooks/R-06_resource-lock-ciam-facturation.md` exécuté |
 | **D11** *(migré depuis l'annexe)* | 🟠 | Checkov IaC en `--soft-fail` ; aucun scan CVE pub/npm/pip | ✅ **Résolu** — plus de `--soft-fail` dans `.github/workflows/security-scan.yml` ; `dependency-vuln-scan.yml` couvre désormais pub/npm/pip |
+
+### Findings devenus obsolètes
+
+| ID | Sévérité | Constat original | Statut vérifié 2026-09-04 |
+|---|---|---|---|
+| **O-04** | 🟡 | Pas d'environnement staging réellement déployé (`staging.bicepparam` existe, non appliqué) | ⚪ **Obsolète** — vérifié live sur Azure le 2026-09-04 : `rg-certigo-staging` est déployé (Function App en marche, Cosmos avec PITR continu 7 jours, Key Vault, Storage, VNet et 5 private endpoints). Le constat ne décrit plus la réalité ; le lot `wp-p1-13` reste néanmoins ouvert dans le registre de migration, non modifié par cette PR |
 
 ### Findings encore ouverts — action live hors repo (runbook prêt, exécution humaine requise)
 
-| ID | Sévérité | Constat | Runbook | Statut au 2026-09-03 |
+| ID | Sévérité | Constat | Runbook | Statut au 2026-09-04 |
 |---|---|---|---|---|
-| **O-02** | 🔴 | Azure OpenAI dev jamais load-testé, capacity=1 (~1K TPM) | `docs/runbooks/O-02_plan-test-charge-openai.md` | À exécuter |
+| **O-02** | 🔴 | Azure OpenAI dev jamais load-testé, capacity=1 (~1K TPM) | `docs/runbooks/O-02_plan-test-charge-openai.md` | **Toujours ouvert**, mais le constat est corrigé : le déploiement `gpt-5.4-mini` **existe** et est en état `Succeeded` avec `capacity=1` (vérifié live le 2026-09-04). Il n'y a pas d'échec `DeploymentModelNotSupported`. Ce qui manque reste le test de charge |
 | **O-05** | 🟠 | Résidus QuickStart dans le tenant CIAM (3 apps + 2 user flows + 1 subscription vide) | `docs/runbooks/O-05_nettoyage-tenant-ciam.md` | À exécuter |
-| **R-04** | 🔴 | CIAM : un seul Global Admin (MSA gmail fédéré), pas de break-glass | `docs/runbooks/R-04_compte-break-glass-ciam.md` | À exécuter |
-| **R-05** | 🔴 | Secret IdP « Microsoft account » prod expire 2027-07-01, sans rotation/alerte outillée | `docs/runbooks/R-05_rotation-secret-idp-msa.md` | À exécuter |
-| **R-06** | 🔴 | Ressource de facturation CIAM (`ciamDirectories`) sans resource lock | `docs/runbooks/R-06_resource-lock-ciam-facturation.md` | À exécuter |
-| **O-04** | 🟡 | Pas d'environnement staging réellement déployé (`staging.bicepparam` existe, non appliqué) | `docs/migration/ACTIONS-MANUELLES-P1.md` §4 (`wp-p1-13`) | `todo` (dépend de `wp-p1-12`, également `todo`) |
+| **R-05** | 🔴 | Secrets d'application sans rotation ni alerte outillée — **3 secrets, pas 1** : le secret IdP « Microsoft account » prod (expire 2027-07-01) **et** les deux secrets de l'app registration `Certigo Account Deletion Graph` (prod et staging, expirent 2027-08-19) | `docs/runbooks/R-05_rotation-secret-idp-msa.md` | À exécuter — périmètre élargi le 2026-09-04 ; le runbook ne couvre à ce jour que le secret IdP et doit être étendu aux deux secrets Graph |
 
 ### Findings encore ouverts — actionnables depuis le repo
 
@@ -476,11 +500,13 @@ déclarée est dans `codemagic.yaml`.
 | **R-03** | 🟡 | Sur-privilège Storage (`Storage Blob Data Owner` en plus de `Contributor` pour l'identité hôte Function App) | `infra/modules/functionApp.bicep:168-176` (assignation `Owner` toujours présente à côté de `Contributor`, lignes 158-166) — revérifié le 2026-09-03, **toujours présent** | Auditer si `Owner` est réellement nécessaire ; rétrograder vers `Contributor` seul si possible |
 | **D10** *(migré depuis l'annexe, toujours vrai)* | 🟠 | Dart/Flutter exclu de CodeQL — plus grande base de code (jetons OIDC, secure storage) sans SAST | `.github/workflows/codeql.yml:5` (« Dart/Flutter is not supported by CodeQL ») — revérifié le 2026-09-03, **toujours vrai** ; `flutter analyze` est un linter, pas un SAST | Compléter par un scanner sécurité Dart (ex. `dart_code_metrics` sécurité, Semgrep règles Dart) ou documenter explicitement la limite comme risque accepté |
 
-> **Méthode de revérification.** Pour toute ligne « action live hors repo », le statut ne peut
-> **pas** être confirmé depuis ce dépôt (nécessite des credentials Azure/Entra que l'agent n'a
-> pas). Avant de considérer une ligne comme close, relire le runbook cité : il porte sa propre
-> case « Statut » mise à jour par l'opérateur qui l'exécute (voir aussi l'index
-> `docs/runbooks/README.md`).
+> **Méthode de revérification.** Les lignes datées du **2026-09-03** ont été revérifiées depuis ce
+> dépôt (code, IaC, workflows). Les lignes datées du **2026-09-04** — R-04, R-05, R-06, O-02, O-04 —
+> ont été revérifiées **live contre Azure/Entra**, ce que ce dépôt seul ne permet pas : elles
+> nécessitent des credentials Azure/Entra. Une session qui ne dispose pas de ces credentials ne doit
+> **pas** les re-confirmer de mémoire ni les recopier comme si elle les avait mesurées. Avant de
+> considérer une ligne comme close, relire le runbook cité : il porte sa propre case « Statut » mise
+> à jour par l'opérateur qui l'exécute (voir aussi l'index `docs/runbooks/README.md`).
 
 ---
 
@@ -502,11 +528,20 @@ déclarée est dans `codemagic.yaml`.
 **Point d'attention actif (`wp-p1-11-ci-spof-runners`, encore `todo`) :** le lot `wp-p2-07`
 (Phase 2, PR [#250](https://github.com/gchambaud_microsoft/Certigo/pull/250) et
 [#253](https://github.com/gchambaud_microsoft/Certigo/pull/253), fusionnées) a livré le
-**failover** sur un pool Azure ≥2 instances, mais la DoD précise de `wp-p1-11` — séparation
-stricte des identités `certigo-pr` / `certigo-trusted` — **n'est pas atteinte en live** :
-`docs/runbooks/CI_RUNNERS.md` constate (au 20 août 2026) que les deux runners portent
-**simultanément** les deux labels et que la migration est **« bloquée »**. Ne pas clore
-`wp-p1-11` sans revérifier cet état live.
+**failover** sur un pool Azure ≥2 instances. La **séparation stricte des identités**
+`certigo-pr` / `certigo-trusted` — qui était la partie « bloquée » de la DoD — **est désormais
+atteinte en live** : relevé des runners enregistrés le 2026-09-04, `certigo-prIVJAN8` porte
+`self-hosted,Linux,X64,certigo-pr,certigo-pr-pilot` et les deux instances
+`vmss-certigo-runner-zonal_*` portent `self-hosted,Linux,X64,azure,vmss,zonal,certigo,certigo-trusted`.
+**Aucun recouvrement** entre les deux jeux de labels. Le constat de
+`docs/runbooks/CI_RUNNERS.md` (au 20 août 2026) selon lequel « les deux runners portent
+simultanément les deux labels » est donc **périmé** et ce runbook reste à mettre à jour.
+
+Attention à ne pas surinterpréter : **séparation ≠ redondance**. La séparation des labels est
+vérifiée ; la redondance effective du pool `certigo-trusted` dépend de l'état d'alimentation des
+instances VMSS (l'instance zone-1 a été rapportée *deallocated*), qui n'est **pas** observable
+depuis ce dépôt et n'est pas affirmée ici. `wp-p1-11` reste `todo` : son statut n'a pas été
+modifié par cette PR, seule cette note narrative l'a été.
 
 **Prochaine action prioritaire recommandée :** `wp-p1-12-iac-drift-import` (réconcilier Azure
 OpenAI dev et le réseau `rg-certigo-ci` dans le Bicep) — débloque `wp-p1-13-staging-environment`,

@@ -114,7 +114,14 @@ Bicep et `CosmosContainers.cs`. Le générateur du SHA immuable valide ensuite l
 (SHA de révision complet, identifiants et SHA-256 des manifestes), puis vérifie que l'état généré
 de la PR est commité.
 La fraîcheur de `certigo-content/main` relève de la CI et de la protection de ce dépôt, pas d'un
-checkout cross-repository sur un runner PR persistant.
+checkout cross-repository sur un runner PR persistant. Le workflow séparé `ci-content-drift.yml`
+surveille néanmoins le pin sans affaiblir cette règle : il ne tourne **jamais** sur PR (seulement
+`push` sur `main` et planification), reste sur `certigo-trusted`, ne checkout pas `certigo-content`
+et compare le pin à la *release publiée* dans le stockage immuable. Il échoue explicitement tant
+que cette source n'existe pas, plutôt que de se désactiver silencieusement. Sa moitié sans
+credential — `tools/check_active_content_age.py` — vérifie dès aujourd'hui que le bump manuel a
+bien été rejoué récemment ; elle ne prouve pas l'absence de dérive amont, seulement que la
+procédure n'a pas été oubliée.
 
 Le bump de contenu actif est donc volontairement manuel et vérifié : après fusion protégée dans
 `certigo-content`, un mainteneur checkout le SHA exact, exécute `npm ci --ignore-scripts` puis

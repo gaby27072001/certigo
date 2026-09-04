@@ -3,8 +3,10 @@
 Ce document décrit l'architecture de référence du monorepo : frontend Flutter, backend
 .NET 8 Azure Functions, moteur pédagogique Cortex, contenu *as-code* et flux de données.
 
-> Rappel produit : Certigo enseigne des **concepts techniques réels** et prépare aux
-> certifications Microsoft (AZ-900, AZ-104, AI-900, DP-900). Ce **n'est pas** une app de langues.
+> Rappel produit : Certigo enseigne des **concepts techniques réels** et prépare à des
+> certifications cloud multi-fournisseurs. Le catalogue canonique (`content/public/catalog/certifications.json`
+> dans `certigo-content`) contient **32 certifications** réparties sur **3 fournisseurs** :
+> 14 Google Cloud, 12 AWS, 6 Microsoft. Ce **n'est pas** une app de langues.
 
 ---
 
@@ -107,17 +109,41 @@ gitignorés).
 | `Certigo.Application` | Services d'orchestration, DTO (`Dtos.cs`), abstractions/ports (`CoreAbstractions.cs`). |
 | `Certigo.Infrastructure` | Adapters Cosmos (`CosmosContext`, repositories, sérialiseur System.Text.Json), validation token Entra. |
 | `Certigo.Api` | HTTP triggers (`*Functions.cs`), `JwtAuthMiddleware`, `ExceptionMiddleware`, `FunctionUserContext`. |
-| `Certigo.Domain.Tests` | xUnit — couvre FSRS, readiness, XP. |
+
+Quatre projets de tests xUnit, un par couche : `Certigo.Domain.Tests` (FSRS, readiness, XP),
+`Certigo.Application.Tests`, `Certigo.Infrastructure.Tests` et `Certigo.Api.Tests`.
 
 ### 4.2 Endpoints
 
-| Méthode | Route | Fonction |
-|---|---|---|
-| `GET`  | `/me` | `UserFunctions` |
-| `GET`  | `/me/paths/{trackId}` | `PathFunctions` |
-| `GET`  | `/tracks/{trackId}/lessons/{lessonId}` | `LessonFunctions` |
-| `POST` | `/quiz/{lessonId}/submit` | `QuizFunctions` |
-| `GET`  | `/me/league` | `LeaderboardFunctions` |
+**24 fichiers `*Functions.cs`** sous `backend/src/Certigo.Api`. Vingt-trois exposent des routes
+HTTP ; `EnterpriseLearningRecoveryFunctions` est un `TimerTrigger` sans route.
+
+| Fonction | Routes |
+|---|---|
+| `UserFunctions` | `me`, `me/active-track` |
+| `PathFunctions` | `me/paths/{trackId}` |
+| `LessonFunctions` | `tracks/{trackId}/lessons/{lessonId}` |
+| `QuizFunctions` | `quiz/{lessonId}/submit` |
+| `ExamFunctions` | `exam/generate`, `exam/submit` |
+| `CatalogFunctions` | `catalog/tracks` |
+| `RecommendationFunctions` | `me/recommendations/{trackId}` |
+| `TutorFunctions` | `tutor/explain` |
+| `AuthFunctions` | `auth/register`, `auth/login`, `auth/refresh`, `auth/verify-email`, `auth/resend-verification` |
+| `AccountDeletionFunctions` | `account/deletion` |
+| `LeaderboardFunctions` | `me/league`, `me/league/resolution` |
+| `FriendFunctions` | `friends`, `friends/{friendId}`, `friends/leaderboard` |
+| `AchievementFunctions` | `achievements` |
+| `QuestFunctions` | `quests`, `quests/claim` |
+| `SeasonFunctions` | `season`, `season/claim` |
+| `StreakFunctions` | `streak`, `streak/repair` |
+| `ShopFunctions` | `shop`, `shop/purchase` |
+| `ShareCardFunctions` | `share/daily` |
+| `NotificationFunctions` | `me/notifications/plan`, `me/notifications/settings` |
+| `HealthFunctions` | `health`, `health/live`, `health/ready` |
+| `OrganizationFunctions` | `v1/organizations…`, invitations, teams, memberships |
+| `EnterpriseIdentityFunctions` | `v1/enterprise-identity/metadata`, domaines, fédération, jetons SCIM, `v1/organizations/{organizationId}/scim/v2/…` |
+| `EnterpriseLearningMetricsFunctions` | `v1/organizations/{organizationId}/learning-metrics/…` |
+| `EnterpriseLearningRecoveryFunctions` | *(TimerTrigger, pas de route)* |
 
 **Règles transverses** : `userId` est extrait du JWT (`FunctionUserContext`), jamais du corps.
 Avec `PERSON_LINKED_IDENTITY_V1=shadow`, ce même `userId` reste autoritaire et devient
@@ -128,15 +154,18 @@ client n'embarquent pas la réponse correcte (notation serveur).
 
 ### 4.3 Configuration consommée
 
-`COSMOS_ENDPOINT`, `COSMOS_DATABASE`, `KeyVault__Uri`, les paramètres d'authentification
-et `PERSON_LINKED_IDENTITY_V1` (`off` par défaut, `shadow` seul autre état accepté).
+`COSMOS_ENDPOINT`, `COSMOS_DATABASE`, `KeyVault__Uri` et les paramètres d'authentification.
+Drapeaux de fonctionnalité consommés par le backend (liste non exhaustive, vérifiée dans
+`backend/src`) : `PERSON_LINKED_IDENTITY_V1` (`off` par défaut, `shadow` seul autre état accepté),
+`ORGANIZATION_MEMBERSHIP_V1`, `ENTERPRISE_LEARNING_METRICS_V1` et `TUTOR_LLM_ENABLED`.
 En local : `local.settings.json` (gabarit `.example` fourni, fichier réel gitignoré).
 
 ---
 
 ## 5. Données — Cosmos DB
 
-Base `certigo`, mode **serverless**. Huit containers, partitionnés pour la localité des accès :
+Base `certigo`, mode **serverless**. **Dix containers** — la topologie canonique est
+`contracts/cosmos-containers.json`, partagée par Bicep et `CosmosContainers.cs` :
 
 | Container | Partition key | Contenu |
 |---|---|---|
@@ -148,6 +177,8 @@ Base `certigo`, mode **serverless**. Huit containers, partitionnés pour la loca
 | `leaderboard` | `/periodLeagueId` | classements hebdomadaires |
 | `economy` | `/userId` | gemmes, achats boutique (id déterministe `purchase::{clientPurchaseId}`) |
 | `friends` | `/userId` | graphe social (deux arêtes dirigées par amitié) |
+| `organizations` | `/organizationId` | organisations, équipes, adhésions et invitations entreprise |
+| `enterpriseMetricReceipts` | `/partitionKey` | reçus d'idempotence des métriques d'apprentissage entreprise |
 
 La partition par `/userId` garde toutes les lectures d'un utilisateur dans une seule
 partition logique (progression, tentatives, événements) — requêtes mono-partition, coût maîtrisé.
@@ -251,30 +282,43 @@ La décision DVA au 18 août 2026 est explicite : `aws:dva-c02` reste l'entrée 
 ## 9. Infrastructure (Bicep)
 
 `infra/main.bicep` est *subscription-scoped* : il crée le resource group puis compose les
-modules. `params/dev.bicepparam` porte les valeurs d'environnement.
+modules. `params/dev.bicepparam` porte les valeurs d'environnement. **`infra/modules` contient
+21 modules** ; les principaux :
 
 | Module | Crée |
 |---|---|
-| `cosmos.bicep` | compte Cosmos serverless + **8 containers** (PK verrouillées) |
+| `cosmos.bicep` | compte Cosmos serverless + **10 containers** (PK verrouillées) |
 | `storage.bicep` | StorageV2 + container `lesson-assets` |
 | `appInsights.bicep` | Application Insights *workspace-based* |
 | `keyvault.bicep` | Key Vault (modèle RBAC) |
 | `privateNetwork.bicep` | VNet `/24`, subnet FC1 `/26`, subnet private endpoint, 5 zones DNS/liens et endpoints privés Storage/KV/Cosmos |
 | `functionApp.bicep` | plan FC1 Linux, `dotnet-isolated` 8.0, intégration VNet privée sans route-all, identité système Cosmos et identité utilisateur préprovisionnée pour stockage/KV/App Insights |
+| `openai.bicep` | déploiement Azure OpenAI du tuteur |
+| `communicationEmail.bicep` | Azure Communication Services (e-mails transactionnels) |
+| `defender.bicep`, `policy.bicep`, `diagnostics.bicep` | posture de sécurité, Azure Policy et journalisation |
+| `contentStorage.bicep`, `contentIdentity.bicep`, `contentReaderIdentity.bicep`, `contentPrivateEndpoints.bicep` | chaîne de contenu immuable (ADR-020) |
+| `keyvaultGraphClientSecret.bicep`, `keyvaultPreviousJwtSecret.bicep`, `keyVaultSecretsAccess.bicep` | secrets Key Vault et accès |
+| `ciVnetPeering.bicep`, `sharedPrivateDns.bicep`, `privateDnsAppLinks.bicep` | réseau CI, DNS privé partagé et liens |
 
 ---
 
 ## 10. CI/CD
 
-17 workflows au total (15 actifs, 2 legacy iOS manuels et inertes par défaut) ciblés par chemin ou par événement (voir `.github/workflows/`) :
-`ci-mobile`, `ci-backend`, `ci-content`, `ci-cortex-parity`, `ci-infra`,
-`ci-migration-registry`, `cd-backend`, `codeql`, `dependency-vuln-scan`,
-`deploy-privacy-policy`, `lint-workflows`, `release-android`, `security-scan`,
-`runner-resilience-drill`. Le workflow `promote-backend-staging-prod` est conservé
+**28 workflows** sous `.github/workflows/` (dont 2 workflows iOS legacy, manuels et inertes par
+défaut), ciblés par chemin ou par événement. Sept contextes sont requis sur `main` : `Build & test`,
+`Flutter app + UI packages`, `Generated state equals committed state`, `Validate workflow YAML`,
+`CodeQL / Security gate`, `Security / Required gate` et `Fork PR policy / Required gate`.
+
+Le workflow `promote-backend-staging-prod` est conservé
 temporairement comme garde de compatibilité et échoue explicitement en invitant à utiliser
 le dispatch `promote-backend`. Les workflows iOS GitHub Actions
 `release-ios` et `sync-ios-certs` sont conservés comme historique ; ils exigent
 l'opt-in manuel `enable_legacy_workflow=true`. La chaîne iOS active passe par Codemagic.
+
+`ci-content-drift.yml` détecte la dérive entre `docs/active-content-reference.json` et la release
+de contenu publiée. Il ne tourne **jamais** sur PR et reste sur `certigo-trusted` : le compte de
+stockage de contenu est privé (private endpoint lié à `vnet-certigo-ci`), donc sur `certigo-pr` il
+échouerait sur le DNS et non sur l'autorisation.
 
 ---
 

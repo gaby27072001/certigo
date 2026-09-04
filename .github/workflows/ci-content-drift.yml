@@ -1,0 +1,161 @@
+name: Detect content drift
+
+# The `Generated state equals committed state` gate is deliberately secret-free and reaches no
+# external repository (docs/GOVERNANCE.md), so it cannot notice that docs/active-content-reference.json
+# has stopped tracking certigo-content. This workflow closes that loop without weakening that gate:
+# it never runs for pull requests, so no PR-class runner ever sees a credential.
+#
+# It compares the pin against what was actually *published* to immutable storage rather than against
+# a Git branch, because published manifest identities are what reaches users. certigo-content writes
+# releases/<releaseId>/release.json LAST, after both manifest trees, so a partial publish never
+# becomes the active release — which is why the descriptor is the source of truth here.
+#
+# Scope, stated precisely: this asks "has the pin drifted from the most recently PUBLISHED release?",
+# not "does the pin match what users are SERVED?". The container is append-only by design — releaseId
+# is content-addressed, nothing is ever deleted — and the active-release pointer lives in the Cosmos
+# content-control container. ADR-020 is explicit that a rollback moves only that pointer and never
+# moves or rewrites a blob, so after a rollback the newest descriptor is no longer the serving one.
+# Blob is the only source that exists today; the naming here must not overstate what it proves.
+#
+# The blob endpoint is private-endpoint only and its DNS zone is linked to vnet-certigo-ci, so this
+# must stay on certigo-trusted: on certigo-pr it would fail on DNS, not on authorisation.
+#
+# TODAY this workflow proves only the credential-free half (the pin was refreshed recently) and then
+# fails with the prerequisites, because the content storage account does not exist yet. It must not
+# be added to the required status checks on main until the storage exists AND a release has been
+# published; otherwise it would deadlock every merge. The 05:41 UTC schedule deliberately avoids the
+# nightly 00:46-00:49 UTC deallocation window of the runner resource group.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "41 5 * * *"
+
+concurrency:
+  group: ci-content-drift-${{ github.event_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  detect-content-drift:
+    name: Pinned content reference tracks published content
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PYTHONSAFEPATH: "1"
+      DESCRIPTOR_PATH: ${{ github.workspace }}/.content-release/release.json
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      # Runs with no credential at all, so this half keeps working even while the published
+      # source below is unavailable. It cannot observe upstream; it only proves that somebody
+      # re-ran the documented bump recently.
+      - name: Assert the pinned content reference was refreshed recently
+        run: python -P tools/check_active_content_age.py
+
+      - name: Resolve the published release descriptor location
+        shell: bash
+        env:
+          RELEASE_STORAGE_TARGET: ${{ vars.AZURE_RELEASE_STORAGE_TARGET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RELEASE_STORAGE_TARGET:-}" ]; then
+            echo "::error::The immutable content storage is not deployed yet, so there is no \
+          published release to compare against and this gate cannot yet prove that \
+          docs/active-content-reference.json still tracks the content that reaches users. \
+          This is expected today and is owned by the content-chain infrastructure workstream, \
+          which deploys infra/content/main.bicep. Prerequisites, in order: (1) that deployment \
+          creates the content storage account and the content-release-descriptors container \
+          (rg-certigo-content is currently empty); (2) the irreversible WORM lock that \
+          tools/publish_blob_artifact.sh requires before it will upload must be decided; \
+          (3) certigo-content must actually publish a release; (4) this workflow's identity needs \
+          Storage Blob Data Reader on that container, within the ABAC condition of \
+          infra/governance/modules/contentPlanExecutorAssignment.bicep; (5) set the repository \
+          variable AZURE_RELEASE_STORAGE_TARGET to <storageAccount>/content-release-descriptors. \
+          Until then this workflow fails on purpose and must NOT be added to the required status \
+          checks on main: a drift check that skipped itself is the exact bug it exists to prevent, \
+          and a required check with no data source would deadlock every merge."
+            exit 1
+          fi
+          if ! [[ "${RELEASE_STORAGE_TARGET}" =~ ^[a-z0-9]{3,24}/content-release-descriptors$ ]]; then
+            echo "::error::AZURE_RELEASE_STORAGE_TARGET must be <storageAccount>/content-release-descriptors."
+            exit 1
+          fi
+
+      - name: Azure login (OIDC)
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Download the newest published release descriptor
+        shell: bash
+        env:
+          RELEASE_STORAGE_TARGET: ${{ vars.AZURE_RELEASE_STORAGE_TARGET }}
+        run: |
+          set -euo pipefail
+          account="${RELEASE_STORAGE_TARGET%%/*}"
+          container="${RELEASE_STORAGE_TARGET##*/}"
+          mkdir -p "$(dirname "${DESCRIPTOR_PATH}")"
+          # The container is append-only: releaseId is content-addressed, uploads use
+          # --overwrite false and the containers are immutable, so a blob's content can never
+          # change and lastModified is a stable creation time. Sorting by it is therefore sound.
+          # Do not sort by releaseId: it is a content hash with no temporal order.
+          list_stderr="$(mktemp)"
+          trap 'rm -f "${list_stderr}"' EXIT
+          if ! newest="$(az storage blob list \
+            --account-name "${account}" \
+            --container-name "${container}" \
+            --auth-mode login \
+            --prefix releases/ \
+            --query "sort_by([?ends_with(name, 'release.json')], &properties.lastModified)[-1].name" \
+            --output tsv 2>"${list_stderr}")"; then
+            echo "::error::Cannot list ${RELEASE_STORAGE_TARGET}, so nothing is known about \
+          drift. This is NOT the same as 'no release published' - the listing itself failed. Three \
+          causes are possible and this gate deliberately does not guess between them, but they are \
+          listed in descending order of likelihood: the private endpoint is unreachable, which is \
+          what a misconfigured runs-on produces - the account is publicNetworkAccess Disabled, so \
+          off the certigo-trusted pool the host name does not resolve and this appears as a DNS or \
+          connectivity failure rather than a 403; or this workflow's identity cannot read the \
+          container, which from inside the VNet is a genuine RBAC 403 \
+          (id-certigo-content-reader holds Storage Blob Data Reader at container scope, but a \
+          Certigo workflow also needs a federated credential to assume that identity); or the \
+          container does not exist. Azure CLI reported: $(tr '\n' ' ' <"${list_stderr}")"
+            exit 1
+          fi
+          if [ -z "${newest}" ] || [ "${newest}" = "None" ]; then
+            echo "::error::Container ${RELEASE_STORAGE_TARGET} is readable and holds no release \
+          descriptor, so the pinned reference cannot be verified. The listing succeeded, which \
+          proves the container exists and this identity can read it - the gap is content, not \
+          infrastructure or access. Two remaining causes are indistinguishable from here and both \
+          are expected at times: publication has not yet run, or a publication is still in flight. \
+          certigo-content uploads the manifest trees first and writes releases/<releaseId>/release.json \
+          LAST, and that upload is slow (four az CLI calls per file, thousands of files), so there \
+          is a multi-hour window in which some blobs exist but no descriptor does. Descriptor-last \
+          ordering is deliberate: it means this gate sees no release rather than a half-published \
+          one. Check whether publish-content-azure is running before treating this as drift."
+            exit 1
+          fi
+          az storage blob download \
+            --account-name "${account}" \
+            --container-name "${container}" \
+            --auth-mode login \
+            --name "${newest}" \
+            --file "${DESCRIPTOR_PATH}" \
+            --no-progress \
+            --output none
+
+      - name: Compare the newest published release with the pinned reference
+        run: python -P tools/check_published_content_release.py --release-descriptor "$DESCRIPTOR_PATH"
