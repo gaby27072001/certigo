@@ -11,7 +11,7 @@ const validator = fs.readFileSync(
   'utf8',
 );
 const workflow = fs.readFileSync(
-  path.join(root, '.github', 'workflows', 'ci-aca-pilot.yml'),
+  path.join(root, '.github', 'workflows-disabled', 'ci-aca-pilot.yml'),
   'utf8',
 );
 

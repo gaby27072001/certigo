@@ -7,9 +7,13 @@ constitue pas une autorisation de déploiement.
 
 - Les quatre checks requis existants restent sur
   `[self-hosted, Linux, X64, certigo-pr]`.
-- Le workflow additif `.github/workflows/ci-aca-pilot.yml` est manuel, non
-  requis et bloqué tant que la variable dépôt `CERTIGO_ACA_PILOT_ENABLED`
-  n'existe pas avec la valeur exacte `true`.
+- La source du canari reste dans
+  `.github/workflows-disabled/ci-aca-pilot.yml` : GitHub Actions ne l'enregistre
+  pas et elle ne peut pas être dispatchée. Une PR d'activation séparée devra la
+  déplacer sous `.github/workflows/`, après fermeture de tous les NO-GO.
+- Même après ce déplacement, le workflow reste manuel, non requis et bloqué tant
+  que la variable dépôt `CERTIGO_ACA_PILOT_ENABLED` n'existe pas avec la valeur
+  exacte `true`.
 - Le job ACA n'existe que si `pilotEnabled=true`; le template vaut `false` par
   défaut.
 - Aucun runner VMSS, déploiement, release ou environnement de production ne
@@ -29,7 +33,7 @@ job trusted ou de production.
 | Surface | Contrat |
 |---|---|
 | Workloads | `ci-content`, `ci-migration-registry`, `lint-workflows`, `ci-project-state` |
-| Déclenchement | `workflow_dispatch` depuis `main`, PR interne ouverte vers `main` |
+| Déclenchement futur | Après PR d'activation : `workflow_dispatch` depuis `main`, PR interne ouverte vers `main` |
 | Label | `self-hosted, Linux, X64, certigo-pr-aca` exclusivement |
 | Capacité | min 0, max 2, poll 30 s, un replica et une complétion, retry 0 |
 | Durée | 30 minutes maximum |
@@ -164,10 +168,15 @@ supprime son fichier de paramètres temporaire.
 4. Vérifier dans GitHub qu'aucun runner persistant ne porte
    `certigo-pr-aca`.
 5. Créer la variable dépôt `CERTIGO_ACA_PILOT_ENABLED=false`.
-6. Passer la variable à `true` pour une fenêtre surveillée uniquement.
-7. Dispatcher `ACA runner pilot (disabled by default)` sur une PR interne, un
+6. Dans une PR d'activation séparée, déplacer uniquement
+   `.github/workflows-disabled/ci-aca-pilot.yml` vers
+   `.github/workflows/ci-aca-pilot.yml`. Le validator de `main` doit déjà
+   reconnaître `certigo-pr-aca`; actionlint et la policy sécurité doivent passer.
+7. Après merge de cette PR d'activation, vérifier que le workflow n'est pas un
+   check requis, puis passer la variable à `true` pour une fenêtre surveillée.
+8. Dispatcher `ACA runner pilot (disabled by default)` sur une PR interne, un
    workload à la fois, dans l'ordre ADR-018.
-8. Après chaque exécution, remettre la variable à `false` pendant la revue des
+9. Après chaque exécution, remettre la variable à `false` pendant la revue des
    logs, du runner éphémère et du coût.
 
 La variable ne doit être activée que lorsque les VMSS sont sains. Le pilote

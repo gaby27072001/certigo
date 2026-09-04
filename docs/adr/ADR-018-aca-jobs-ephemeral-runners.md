@@ -6,7 +6,7 @@
 | **Statut** | **Pilote limité implémenté, désactivé et non provisionné** |
 | **Date** | 2026-08-20 |
 | **Décision** | Conserver les VMSS comme cible principale. Évaluer ACA Jobs uniquement comme capacité éphémère complémentaire pour quelques jobs PR Linux, stateless, sans secret, identité Azure, Docker ni accès privé. |
-| **Périmètre** | IaC et canari manuel désactivés par défaut. Aucun changement Azure live, aucun routage de check requis ou de production. |
+| **Périmètre** | IaC désactivée et source du canari conservée sous `.github/workflows-disabled/`. Aucun changement Azure live, aucun routage de check requis ou de production. |
 | **Provenance** | Évaluation ACA locale `8d09f7d`, recalée sur `origin/main` après le lifecycle VMSS fusionné par #309 (`8495b91`). |
 
 ## Décision courte

@@ -1,5 +1,7 @@
 name: ACA runner pilot (disabled by default)
 
+# Deliberately disabled. A separate reviewed activation change may move this file
+# under .github/workflows only after every NO-GO prerequisite is closed.
 on:
   workflow_dispatch:
     inputs:

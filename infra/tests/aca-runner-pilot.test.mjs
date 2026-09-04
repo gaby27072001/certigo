@@ -33,7 +33,12 @@ const preflight = fs.readFileSync(
   'utf8',
 );
 const workflow = fs.readFileSync(
-  path.join(repositoryRoot, '.github', 'workflows', 'ci-aca-pilot.yml'),
+  path.join(
+    repositoryRoot,
+    '.github',
+    'workflows-disabled',
+    'ci-aca-pilot.yml',
+  ),
   'utf8',
 );
 
@@ -539,6 +544,12 @@ test('what-if validator rejects identity, secret, and scope expansion', () => {
 });
 
 test('pilot workflow preserves VMSS fallback and gates one internal PR validation', () => {
+  assert.equal(
+    fs.existsSync(
+      path.join(repositoryRoot, '.github', 'workflows', 'ci-aca-pilot.yml'),
+    ),
+    false,
+  );
   assert.match(workflow, /^ {2}workflow_dispatch:\s*$/m);
   assert.match(workflow, /vars\.CERTIGO_ACA_PILOT_ENABLED == 'true'/);
   assert.match(workflow, /runs-on: \[self-hosted, Linux, X64, certigo-pr-aca]/);
