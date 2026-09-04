@@ -323,7 +323,7 @@ Garanties ajoutées à l'issue de l'audit technique (voir `AUDIT_CERTIGO.md`) :
 | **Sécurité auth** | `DevTokenValidator` **verrouillé hors développement** (`AuthValidatorSelection`, garde de production explicite ; `AUTH_MODE=dev` rejeté en prod sauf override non-prod). |
 | **Parité Cortex** | Planification en **jours fractionnaires** alignée client/serveur, garantie par des **golden tests partagés**. |
 | **Frontière HTTP** | JSON malformé → **400** ; conflit de concurrence → **409** ; **correlation id** (`x-correlation-id`) propagé/journalisé/retourné ; endpoint **`GET /health`** (sonde Cosmos, anonyme). |
-| **Anti-triche** | Détecteurs de cadence **activés** : `QuizService` alimente l'évaluateur d'intégrité avec une **fenêtre de débit réelle** (XP + tentatives sur 1 h, depuis le conteneur `attempts`) → `XpRateExceeded`/`AttemptRateExceeded` ne sont plus dormants (mode détection). |
+| **Anti-triche** | Détecteurs de cadence **activés** : `QuizService`/`ExamService` alimentent l'évaluateur d'intégrité avec une **fenêtre de débit réelle** (XP + tentatives sur 1 h, depuis le conteneur `attempts`). Signaux durs (horloge falsifiée, vitesse) **sanctionnent** (`Reject` → 0 récompense) ; `XpRateExceeded`/`AttemptRateExceeded` restent **détection pure par construction** (contribution de risque plafonnée sous le seuil de `Reject`, seule ou combinée). |
 | **Contenu** | Le validateur vérifie l'**intégrité des réponses** (chaque `correct` référence une option réelle), l'**unicité** des ids d'items, et la cohérence `ordering`/`mcq`. |
 | **Cloud** | Key Vault purge protection est activée dans tous les environnements. Le hardening **par environnement** (`var hardened = env != 'dev'`) conserve Cosmos RBAC-only, soft delete Key Vault 90 j, Storage GRS + versioning + soft delete et CORS verrouillé pour staging/prod. |
 | **CI/CD** | SDK Dart épinglé, lockfile applicatif suivi, **SBOM** (CycloneDX) backend, **gate d'approbation** (`environment: beta`) sur les releases mobiles. |
@@ -444,8 +444,12 @@ conteneur réel** (`attempts`), pas un stub dormant :
   = **600 XP** (`:121`) et **40 tentatives** (`:122`) par heure.
 - Application dans `Evaluate` : dépassement XP → `flags.Add(IntegrityFlag.XpRateExceeded)`
   (`AttemptIntegrity.cs:236`, gardé par le `if` L234) ; dépassement tentatives →
-  `IntegrityFlag.AttemptRateExceeded` (`AttemptIntegrity.cs:244`, gardé L242). Ces flags alimentent
-  le score de risque et peuvent **rejeter** l'attribution des récompenses.
+  `IntegrityFlag.AttemptRateExceeded` (`AttemptIntegrity.cs:244`, gardé L242). Ces flags
+  alimentent le score de risque commun ; leur contribution individuelle est plafonnée
+  (`AttemptIntegrityEvaluator.CadenceContributionCeiling`, 0.54) si bien que la cadence —
+  seule ou les deux signaux de cadence combinés entre eux — ne peut jamais franchir le
+  seuil de `Reject`. Seule une combinaison avec un signal dur (horloge falsifiée, vitesse)
+  peut faire basculer la tentative en `Reject`.
 
 **4. `userId` exclusivement issu du JWT.** Confirmé §12.1 pour l'identité. Les fenêtres de cadence
 elles-mêmes emploient `userContext.UserId` (`QuizService.cs:370`, `ExamService.cs:428`) : aucun DTO

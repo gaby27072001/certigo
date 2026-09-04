@@ -162,6 +162,52 @@ public sealed class AttemptIntegrityEvaluatorTests
         verdict.Flags.Should().BeEmpty();
     }
 
+    // --- Régression : la cadence ne sanctionne JAMAIS seule, même massive ----
+    // Avant le plafond `CadenceContributionCeiling`, un excès XP ou tentatives d'environ
+    // 30 % (projeté ≥ 1.3x le plafond) suffisait SEUL à atteindre RejectThreshold (0.8) —
+    // un apprenant honnête enchaînant quelques leçons puis un examen réussi dans la même
+    // heure pouvait perdre toutes ses récompenses sans avoir triché. Ces trois tests
+    // épinglent la garantie : la cadence, seule ou combinée à elle-même, reste Flag.
+
+    [Fact]
+    public void Massive_solo_xp_rate_overage_stays_flagged_not_rejected()
+    {
+        var verdict = AttemptIntegrityEvaluator.Evaluate(
+            Timing(60_000, new[] { 5000, 5000, 5000 }, xp: 100),
+            new RateWindow(TimeSpan.FromHours(1), XpInWindow: 1000, AttemptsInWindow: 0));
+
+        verdict.Decision.Should().Be(IntegrityDecision.Flag);
+        verdict.RiskScore.Should().BeApproximately(0.54, 1e-9);
+        verdict.Flags.Should().Equal(IntegrityFlag.XpRateExceeded);
+    }
+
+    [Fact]
+    public void Massive_solo_attempt_rate_overage_stays_flagged_not_rejected()
+    {
+        var verdict = AttemptIntegrityEvaluator.Evaluate(
+            Timing(60_000, new[] { 5000, 5000, 5000 }, xp: 5),
+            new RateWindow(TimeSpan.FromHours(1), XpInWindow: 0, AttemptsInWindow: 100));
+
+        verdict.Decision.Should().Be(IntegrityDecision.Flag);
+        verdict.RiskScore.Should().BeApproximately(0.54, 1e-9);
+        verdict.Flags.Should().Equal(IntegrityFlag.AttemptRateExceeded);
+    }
+
+    [Fact]
+    public void Massive_combined_cadence_overage_still_stays_flagged_not_rejected()
+    {
+        // Les DEUX signaux de cadence à leur plafond (0.54 chacun) combinés via l'OR
+        // probabiliste donnent ~0.7884 (< 0.8) : même un dépassement massif et simultané
+        // des deux plafonds ne peut jamais, à lui seul, produire un Reject.
+        var verdict = AttemptIntegrityEvaluator.Evaluate(
+            Timing(60_000, new[] { 5000, 5000, 5000 }, xp: 100),
+            new RateWindow(TimeSpan.FromHours(1), XpInWindow: 1000, AttemptsInWindow: 100));
+
+        verdict.Decision.Should().Be(IntegrityDecision.Flag);
+        verdict.RiskScore.Should().BeApproximately(0.7884, 1e-3);
+        verdict.Flags.Should().Equal(IntegrityFlag.XpRateExceeded, IntegrityFlag.AttemptRateExceeded);
+    }
+
     // --- Combinaison probabiliste (OR) et ordre déterministe -----------------
 
     [Fact]
