@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
 using Certigo.Domain.Content;
@@ -27,6 +28,8 @@ public sealed class OfflineContentService(
     IContentReleaseService releases,
     IContentPayloadSerializer serializer) : IOfflineContentService
 {
+    private const int ManifestReadConcurrency = 8;
+
     public async Task<OfflineContentManifest> GetActiveManifestAsync(
         CancellationToken cancellationToken = default)
     {
@@ -51,26 +54,36 @@ public sealed class OfflineContentService(
             .OrderBy(item => item.TrackId, StringComparer.Ordinal)
             .ThenBy(item => item.LessonId, StringComparer.Ordinal);
 
-        foreach (var (trackId, lessonId) in lessons)
+        foreach (var batch in lessons.Chunk(ManifestReadConcurrency))
         {
-            var lesson = await content.GetLessonAsync(
-                snapshot,
-                trackId,
-                lessonId,
-                cancellationToken)
-                ?? throw new ContentReleaseStateException(
-                    $"Public lesson '{trackId}/{lessonId}' is missing from manifest '{publicManifestId}'.");
-            descriptors.Add(Describe(
-                lessonId,
-                LessonPath(trackId, lessonId),
-                "lesson",
-                lesson,
-                trackId));
+            var batchDescriptors = await Task.WhenAll(batch.Select(async item =>
+            {
+                var lesson = await content.GetLessonAsync(
+                    snapshot,
+                    item.TrackId,
+                    item.LessonId,
+                    cancellationToken)
+                    ?? throw new ContentReleaseStateException(
+                        $"Public lesson '{item.TrackId}/{item.LessonId}' is missing "
+                        + $"from manifest '{publicManifestId}'.");
+                return Describe(
+                    item.LessonId,
+                    LessonPath(item.TrackId, item.LessonId),
+                    "lesson",
+                    lesson,
+                    item.TrackId);
+            }));
+            descriptors.AddRange(batchDescriptors);
         }
 
         return new OfflineContentManifest(
             ContentReleaseContracts.OfflineManifestV1,
             publicManifestId,
+            ComputeManifestVersion(
+                ContentReleaseContracts.OfflineManifestV1,
+                publicManifestId,
+                active.Manifest.Schema,
+                descriptors),
             active.Manifest.Schema,
             descriptors.Count,
             descriptors);
@@ -137,6 +150,27 @@ public sealed class OfflineContentService(
 
     private static string Hash(ReadOnlySpan<byte> content)
         => Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+
+    private static string ComputeManifestVersion(
+        string schema,
+        string publicManifestId,
+        string sourceSchema,
+        IEnumerable<OfflineContentResourceDescriptor> descriptors)
+    {
+        var resources = descriptors
+            .OrderBy(descriptor => descriptor.Path, StringComparer.Ordinal)
+            .Select(descriptor => string.Join(
+                '\0',
+                descriptor.Id,
+                descriptor.Path,
+                descriptor.ResourceType,
+                descriptor.Hash,
+                descriptor.Size.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                descriptor.TrackId ?? string.Empty));
+        var canonical = string.Join('\n', new[] { schema, publicManifestId, sourceSchema }
+            .Concat(resources));
+        return $"sha256:{Hash(Encoding.UTF8.GetBytes(canonical))}";
+    }
 
     private static string LessonPath(string trackId, string lessonId)
         => $"tracks/{Uri.EscapeDataString(trackId)}/lessons/{Uri.EscapeDataString(lessonId)}.json";

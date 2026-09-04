@@ -27,6 +27,7 @@ public sealed class OfflineContentServiceTests
         first.Should().BeEquivalentTo(second, options => options.WithStrictOrdering());
         first.Schema.Should().Be(ContentReleaseContracts.OfflineManifestV1);
         first.ManifestId.Should().Be(CurrentManifestId);
+        first.Version.Should().MatchRegex("^sha256:[0-9a-f]{64}$");
         first.SourceSchema.Should().Be(ContentReleaseContracts.PackageManifestV3);
         first.FileCount.Should().Be(3);
         first.Files.Select(resource => resource.ResourceType)
@@ -64,7 +65,13 @@ public sealed class OfflineContentServiceTests
         var serializedManifest = JsonSerializer.Serialize(first, TestSerializer.Options);
         using var manifestDocument = JsonDocument.Parse(serializedManifest);
         manifestDocument.RootElement.EnumerateObject().Select(property => property.Name)
-            .Should().Equal("schema", "manifestId", "sourceSchema", "fileCount", "files");
+            .Should().Equal(
+                "schema",
+                "manifestId",
+                "version",
+                "sourceSchema",
+                "fileCount",
+                "files");
         var allowedFileFields = new HashSet<string>(
             ["id", "path", "resourceType", "hash", "size", "trackId"],
             StringComparer.Ordinal);
@@ -73,6 +80,9 @@ public sealed class OfflineContentServiceTests
             file.EnumerateObject().Should().OnlyContain(property =>
                 allowedFileFields.Contains(property.Name));
         }
+        manifestDocument.RootElement.GetProperty("files")[0]
+            .TryGetProperty("trackId", out _)
+            .Should().BeFalse();
 
         var manifestJson = serializedManifest.ToLowerInvariant();
         manifestJson.Should().NotContain("releaseid");

@@ -12,6 +12,10 @@ const String contentReleaseCachePointer = 'pointer';
 
 typedef ContentReleaseCacheRead = Future<String?> Function(String key);
 typedef ContentReleaseCacheWrite = Future<void> Function(String key, String value);
+typedef ContentReleaseFileWrite = ({
+  OfflineContentFileDescriptor descriptor,
+  Uint8List bytes,
+});
 
 abstract interface class ContentReleaseCacheStore {
   Future<void> stageManifest(OfflineContentManifest manifest);
@@ -22,6 +26,11 @@ abstract interface class ContentReleaseCacheStore {
     required OfflineContentManifest manifest,
     required OfflineContentFileDescriptor descriptor,
     required Uint8List bytes,
+  });
+
+  Future<void> stageFiles({
+    required OfflineContentManifest manifest,
+    required List<ContentReleaseFileWrite> files,
   });
 
   Future<void> activate(OfflineContentManifest manifest);
@@ -96,7 +105,7 @@ class JsonContentReleaseCacheStore implements ContentReleaseCacheStore {
     final _LoadedCache loaded = await _load();
     final _CacheState state = loaded.state;
     final Map<String, dynamic> manifestJson = manifest.toJson();
-    final _StoredGeneration? existing = state.generations[manifest.manifestId];
+    final _StoredGeneration? existing = state.generations[manifest.version];
     bool replace = false;
     if (existing != null && jsonEncode(existing.manifest) != jsonEncode(manifestJson)) {
       try {
@@ -108,7 +117,7 @@ class JsonContentReleaseCacheStore implements ContentReleaseCacheStore {
       }
       if (!replace) {
         throw ContentReleaseIntegrityException(
-          'Manifest ${manifest.manifestId} changed despite its immutable identity.',
+          'Manifest version ${manifest.version} changed despite its immutable identity.',
         );
       }
     }
@@ -116,7 +125,7 @@ class JsonContentReleaseCacheStore implements ContentReleaseCacheStore {
         ? _StoredGeneration(manifest: manifestJson, files: <String, _StoredFile>{})
         : existing;
     if (existing == null || replace) {
-      state.generations[manifest.manifestId] = target;
+      state.generations[manifest.version] = target;
     }
     bool changed = existing == null || replace || loaded.failure != null;
     for (final OfflineContentFileDescriptor descriptor in manifest.files) {
@@ -140,9 +149,9 @@ class JsonContentReleaseCacheStore implements ContentReleaseCacheStore {
     changed = changed || target.files.length != before;
 
     final Set<String?> retained = <String?>{
-      state.activeManifestId,
-      state.previousManifestId,
-      manifest.manifestId,
+      state.activeVersion,
+      state.previousVersion,
+      manifest.version,
     };
     final int generationCount = state.generations.length;
     state.generations.removeWhere((String id, _StoredGeneration _) => !retained.contains(id));
@@ -154,9 +163,9 @@ class JsonContentReleaseCacheStore implements ContentReleaseCacheStore {
   @override
   Future<List<OfflineContentFileDescriptor>> missingFiles(OfflineContentManifest manifest) async {
     final _LoadedCache loaded = await _load();
-    final _StoredGeneration? generation = loaded.state.generations[manifest.manifestId];
+    final _StoredGeneration? generation = loaded.state.generations[manifest.version];
     if (generation == null) {
-      throw ContentReleaseCacheException('Manifest ${manifest.manifestId} is not staged.');
+      throw ContentReleaseCacheException('Manifest version ${manifest.version} is not staged.');
     }
     _ensureSameManifest(manifest, generation);
     return manifest.files
@@ -172,54 +181,116 @@ class JsonContentReleaseCacheStore implements ContentReleaseCacheStore {
     required OfflineContentManifest manifest,
     required OfflineContentFileDescriptor descriptor,
     required Uint8List bytes,
-  }) async {
-    final OfflineContentFileDescriptor declared = manifest.files.singleWhere(
-      (OfflineContentFileDescriptor file) => file.path == descriptor.path,
-      orElse: () => throw ContentReleaseCacheException(
-        'File ${descriptor.path} is not declared by ${manifest.manifestId}.',
-      ),
-    );
-    if (!_sameDescriptor(declared, descriptor)) {
-      throw ContentReleaseIntegrityException(
-        'File ${descriptor.path} metadata differs from the staged manifest.',
+  }) =>
+      stageFiles(
+        manifest: manifest,
+        files: <ContentReleaseFileWrite>[
+          (descriptor: descriptor, bytes: bytes),
+        ],
       );
-    }
-    _validateContent(descriptor, bytes);
 
-    final _LoadedCache loaded = await _load();
-    final _StoredGeneration? generation = loaded.state.generations[manifest.manifestId];
-    if (generation == null) {
-      throw ContentReleaseCacheException('Manifest ${manifest.manifestId} is not staged.');
+  @override
+  Future<void> stageFiles({
+    required OfflineContentManifest manifest,
+    required List<ContentReleaseFileWrite> files,
+  }) async {
+    if (files.isEmpty) return;
+    final Map<String, OfflineContentFileDescriptor> declaredByPath =
+        <String, OfflineContentFileDescriptor>{
+      for (final OfflineContentFileDescriptor descriptor in manifest.files)
+        descriptor.path: descriptor,
+    };
+    final List<ContentReleaseFileWrite> validFiles = <ContentReleaseFileWrite>[];
+    ContentReleaseCacheException? firstFailure;
+    for (final ContentReleaseFileWrite file in files) {
+      try {
+        final OfflineContentFileDescriptor? declared = declaredByPath[file.descriptor.path];
+        if (declared == null) {
+          throw ContentReleaseCacheException(
+            'File ${file.descriptor.path} is not declared by ${manifest.manifestId}.',
+          );
+        }
+        if (!_sameDescriptor(declared, file.descriptor)) {
+          throw ContentReleaseIntegrityException(
+            'File ${file.descriptor.path} metadata differs from the staged manifest.',
+          );
+        }
+        _validateContent(file.descriptor, file.bytes);
+        validFiles.add(file);
+      } on ContentReleaseCacheException catch (error) {
+        firstFailure ??= error;
+      }
     }
-    _ensureSameManifest(manifest, generation);
-    generation.files[descriptor.path] = _StoredFile(
-      id: descriptor.id,
-      resourceType: descriptor.resourceType,
-      hash: descriptor.hash,
-      size: descriptor.size,
-      trackId: descriptor.trackId,
-      bytes: base64Encode(bytes),
-    );
-    await _commit(loaded, loaded.state);
+
+    if (validFiles.isNotEmpty) {
+      final _LoadedCache loaded = await _load();
+      final _StoredGeneration? generation = loaded.state.generations[manifest.version];
+      if (generation == null) {
+        throw ContentReleaseCacheException('Manifest version ${manifest.version} is not staged.');
+      }
+      _ensureSameManifest(manifest, generation);
+      for (final ContentReleaseFileWrite file in validFiles) {
+        final OfflineContentFileDescriptor descriptor = file.descriptor;
+        generation.files[descriptor.path] = _StoredFile(
+          id: descriptor.id,
+          resourceType: descriptor.resourceType,
+          hash: descriptor.hash,
+          size: descriptor.size,
+          trackId: descriptor.trackId,
+          bytes: base64Encode(file.bytes),
+        );
+      }
+      await _commit(loaded, loaded.state);
+    }
+    if (firstFailure != null) throw firstFailure;
   }
 
   @override
   Future<void> activate(OfflineContentManifest manifest) async {
     final _LoadedCache loaded = await _load();
     final _CacheState state = loaded.state;
-    final _StoredGeneration? generation = state.generations[manifest.manifestId];
+    final _StoredGeneration? generation = state.generations[manifest.version];
     if (generation == null) {
-      throw ContentReleaseCacheException('Manifest ${manifest.manifestId} is not staged.');
+      throw ContentReleaseCacheException('Manifest version ${manifest.version} is not staged.');
     }
     _ensureSameManifest(manifest, generation);
     _validatedFiles(manifest, generation);
 
-    if (state.activeManifestId == manifest.manifestId) return;
-    state.previousManifestId = state.activeManifestId;
-    state.activeManifestId = manifest.manifestId;
-    final Set<String?> retained = <String?>{state.activeManifestId, state.previousManifestId};
+    if (state.activeVersion == manifest.version) return;
+    state.previousVersion = _validatedRollbackVersion(
+      state,
+      excluding: manifest.version,
+    );
+    state.activeVersion = manifest.version;
+    final Set<String?> retained = <String?>{state.activeVersion, state.previousVersion};
     state.generations.removeWhere((String id, _StoredGeneration _) => !retained.contains(id));
     await _commit(loaded, state);
+  }
+
+  String? _validatedRollbackVersion(_CacheState state, {required String excluding}) {
+    for (final String? id in <String?>{
+      state.activeVersion,
+      state.previousVersion,
+    }) {
+      if (id == null || id == excluding) continue;
+      final _StoredGeneration? generation = state.generations[id];
+      if (generation == null) continue;
+      try {
+        final OfflineContentManifest manifest = OfflineContentManifest.fromJson(
+          generation.manifest,
+        );
+        if (manifest.version != id) continue;
+        _validatedFiles(manifest, generation);
+        return id;
+      } on ContentReleaseCacheException {
+        continue;
+      } on FormatException {
+        continue;
+      } on TypeError {
+        continue;
+      }
+    }
+    return null;
   }
 
   @override
@@ -233,8 +304,8 @@ class JsonContentReleaseCacheStore implements ContentReleaseCacheStore {
     }
 
     final List<({String? id, bool previous})> candidates = <({String? id, bool previous})>[
-      (id: loaded.state.activeManifestId, previous: false),
-      (id: loaded.state.previousManifestId, previous: true),
+      (id: loaded.state.activeVersion, previous: false),
+      (id: loaded.state.previousVersion, previous: true),
     ];
 
     for (final ({String? id, bool previous}) candidate in candidates) {
@@ -249,9 +320,9 @@ class JsonContentReleaseCacheStore implements ContentReleaseCacheStore {
         final OfflineContentManifest manifest = OfflineContentManifest.fromJson(
           generation.manifest,
         );
-        if (manifest.manifestId != id) {
+        if (manifest.version != id) {
           throw const ContentReleaseIntegrityException(
-            'Cached manifest pointer does not match its immutable identity.',
+            'Cached manifest pointer does not match its immutable version.',
           );
         }
         return ContentReleaseCacheSelection(
@@ -330,8 +401,8 @@ class JsonContentReleaseCacheStore implements ContentReleaseCacheStore {
         slot: null,
         state: _CacheState(
           revision: 0,
-          activeManifestId: null,
-          previousManifestId: null,
+          activeVersion: null,
+          previousVersion: null,
           generations: <String, _StoredGeneration>{},
         ),
         failure: const CacheFailure('Les deux slots du journal offline sont corrompus.'),
@@ -341,8 +412,8 @@ class JsonContentReleaseCacheStore implements ContentReleaseCacheStore {
       slot: null,
       state: _CacheState(
         revision: 0,
-        activeManifestId: null,
-        previousManifestId: null,
+        activeVersion: null,
+        previousVersion: null,
         generations: <String, _StoredGeneration>{},
       ),
       failure: null,
@@ -457,7 +528,7 @@ class JsonContentReleaseCacheStore implements ContentReleaseCacheStore {
   void _ensureSameManifest(OfflineContentManifest manifest, _StoredGeneration generation) {
     if (jsonEncode(manifest.toJson()) != jsonEncode(generation.manifest)) {
       throw ContentReleaseIntegrityException(
-        'Staged manifest ${manifest.manifestId} changed unexpectedly.',
+        'Staged manifest version ${manifest.version} changed unexpectedly.',
       );
     }
   }
@@ -482,8 +553,8 @@ class _LoadedCache {
 class _CacheState {
   _CacheState({
     required this.revision,
-    required this.activeManifestId,
-    required this.previousManifestId,
+    required this.activeVersion,
+    required this.previousVersion,
     required this.generations,
   });
 
@@ -507,22 +578,22 @@ class _CacheState {
     }
     return _CacheState(
       revision: revision,
-      activeManifestId: json['activeManifestId'] as String?,
-      previousManifestId: json['previousManifestId'] as String?,
+      activeVersion: json['activeVersion'] as String?,
+      previousVersion: json['previousVersion'] as String?,
       generations: generations,
     );
   }
 
   int revision;
-  String? activeManifestId;
-  String? previousManifestId;
+  String? activeVersion;
+  String? previousVersion;
   final Map<String, _StoredGeneration> generations;
 
   Map<String, dynamic> toJson(String schema) => <String, dynamic>{
         'schema': schema,
         'revision': revision,
-        if (activeManifestId != null) 'activeManifestId': activeManifestId,
-        if (previousManifestId != null) 'previousManifestId': previousManifestId,
+        if (activeVersion != null) 'activeVersion': activeVersion,
+        if (previousVersion != null) 'previousVersion': previousVersion,
         'generations': generations.map(
           (String id, _StoredGeneration generation) =>
               MapEntry<String, dynamic>(id, generation.toJson()),

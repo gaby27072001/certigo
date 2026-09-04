@@ -6,7 +6,7 @@ import 'package:core/core.dart';
 import '../models/content_release.dart';
 import '../models/lesson.dart';
 import '../models/track_summary.dart';
-import '../repositories/remote_repositories.dart';
+import '../repositories/catalog_payload_decoder.dart';
 import '../repositories/repositories.dart';
 import 'content_release_cache_store.dart';
 
@@ -75,6 +75,7 @@ class ContentReleaseCoordinator {
   final LegacyLessonCacheRead? _readLegacyLessons;
   final ContentReleaseNow _now;
   final Duration refreshInterval;
+  static const int _downloadConcurrency = 6;
 
   Future<Result<ContentReleaseResolution>>? _inFlight;
   ContentReleaseResolution? _lastResolution;
@@ -129,22 +130,57 @@ class ContentReleaseCoordinator {
       await _store.stageManifest(manifest);
       await _migrateLegacyLessons(manifest);
       final List<OfflineContentFileDescriptor> missing = await _store.missingFiles(manifest);
-      for (final OfflineContentFileDescriptor descriptor in missing) {
-        final Result<ContentFileResponse> fileResult = await _remote.getFile(
-          manifestId: manifest.manifestId,
-          descriptor: descriptor,
+      for (int offset = 0; offset < missing.length; offset += _downloadConcurrency) {
+        final List<OfflineContentFileDescriptor> batch =
+            missing.skip(offset).take(_downloadConcurrency).toList(growable: false);
+        final List<
+            ({
+              OfflineContentFileDescriptor descriptor,
+              Result<ContentFileResponse> result,
+            })> responses = await Future.wait(
+          batch.map((OfflineContentFileDescriptor descriptor) async {
+            return (
+              descriptor: descriptor,
+              result: await _remote.getFile(
+                manifestId: manifest.manifestId,
+                descriptor: descriptor,
+              ),
+            );
+          }),
         );
-        if (fileResult case Err<ContentFileResponse>(:final Failure failure)) {
-          return _fallback(failure, attemptedManifestId: manifest.manifestId);
+        final List<ContentReleaseFileWrite> verified = <ContentReleaseFileWrite>[];
+        Failure? batchFailure;
+        ContentReleaseIntegrityException? batchIntegrityFailure;
+        for (final ({
+          OfflineContentFileDescriptor descriptor,
+          Result<ContentFileResponse> result,
+        }) response in responses) {
+          if (response.result case Err<ContentFileResponse>(:final Failure failure)) {
+            batchFailure ??= failure;
+            continue;
+          }
+          final ContentFileResponse payload =
+              (response.result as Success<ContentFileResponse>).value;
+          try {
+            _validateResponseMetadata(manifest, response.descriptor, payload);
+          } on ContentReleaseIntegrityException catch (error) {
+            batchIntegrityFailure ??= error;
+            continue;
+          }
+          verified.add((descriptor: response.descriptor, bytes: payload.bytes));
         }
-        final ContentFileResponse response = (fileResult as Success<ContentFileResponse>).value;
-        _validateResponseMetadata(manifest, descriptor, response);
-        await _store.stageFile(manifest: manifest, descriptor: descriptor, bytes: response.bytes);
+        await _store.stageFiles(manifest: manifest, files: verified);
+        if (batchIntegrityFailure != null) {
+          throw batchIntegrityFailure;
+        }
+        if (batchFailure != null) {
+          return _fallback(batchFailure, attemptedManifestId: manifest.manifestId);
+        }
       }
       await _store.activate(manifest);
       final ContentReleaseCacheSelection selected = await _store.readBest();
       final CachedContentRelease? release = selected.release;
-      if (release == null || release.manifest.manifestId != manifest.manifestId) {
+      if (release == null || release.manifest.version != manifest.version) {
         throw const ContentReleaseCacheException(
           'The synchronized manifest was not activated atomically.',
         );
@@ -234,8 +270,7 @@ class ContentReleaseCoordinator {
         final OfflineContentFileDescriptor? descriptor = _findLesson(manifest, trackId, id);
         if (descriptor == null) continue;
 
-        lesson.remove('publicManifestId');
-        final Uint8List bytes = Uint8List.fromList(utf8.encode(jsonEncode(lesson)));
+        final Uint8List bytes = _encodeBackendLesson(Lesson.fromJson(lesson));
         try {
           await _store.stageFile(manifest: manifest, descriptor: descriptor, bytes: bytes);
           migrated++;
@@ -282,6 +317,97 @@ class ContentReleaseCoordinator {
       }
     }
     return null;
+  }
+
+  Uint8List _encodeBackendLesson(Lesson lesson) {
+    final Map<String, Object?> wire = <String, Object?>{
+      'id': lesson.id,
+      'trackId': lesson.trackId,
+      'unitId': lesson.unitId,
+      'domainId': lesson.domainId,
+      'title': lesson.title,
+      'estMinutes': lesson.estMinutes,
+      'blocks': lesson.blocks.map((LessonBlock block) {
+        final QuizItem? check = block.check;
+        return <String, Object?>{
+          'type': blockTypeToWire(block.type),
+          'conceptId': block.conceptId,
+          'title': block.title,
+          'body': block.body,
+          'code': block.code,
+          'language': block.language,
+          'check': check == null
+              ? null
+              : <String, Object?>{
+                  'id': check.id,
+                  'conceptId': check.conceptId,
+                  'type': itemTypeToWire(check.type),
+                  'stem': check.stem,
+                  'options': check.options
+                      .map(
+                        (QuizOption option) => <String, Object?>{
+                          'id': option.id,
+                          'label': option.label,
+                        },
+                      )
+                      .toList(growable: false),
+                },
+        };
+      }).toList(growable: false),
+    };
+    return Uint8List.fromList(utf8.encode(_encodeSystemTextJson(wire)));
+  }
+
+  String _encodeSystemTextJson(Object? value) {
+    if (value == null) return 'null';
+    if (value is bool || value is num) return jsonEncode(value);
+    if (value is String) return _encodeSystemTextJsonString(value);
+    if (value is List) {
+      return '[${value.map(_encodeSystemTextJson).join(',')}]';
+    }
+    if (value is Map<String, Object?>) {
+      return '{${value.entries.map((MapEntry<String, Object?> entry) {
+        return '${_encodeSystemTextJsonString(entry.key)}:${_encodeSystemTextJson(entry.value)}';
+      }).join(',')}}';
+    }
+    throw FormatException('Unsupported legacy lesson JSON value: ${value.runtimeType}.');
+  }
+
+  String _encodeSystemTextJsonString(String value) {
+    final StringBuffer encoded = StringBuffer('"');
+    for (final int codeUnit in value.codeUnits) {
+      switch (codeUnit) {
+        case 0x08:
+          encoded.write(r'\b');
+        case 0x09:
+          encoded.write(r'\t');
+        case 0x0A:
+          encoded.write(r'\n');
+        case 0x0C:
+          encoded.write(r'\f');
+        case 0x0D:
+          encoded.write(r'\r');
+        case 0x5C:
+          encoded.write(r'\\');
+        default:
+          if (codeUnit < 0x20 ||
+              codeUnit > 0x7E ||
+              codeUnit == 0x22 ||
+              codeUnit == 0x26 ||
+              codeUnit == 0x27 ||
+              codeUnit == 0x2B ||
+              codeUnit == 0x3C ||
+              codeUnit == 0x3E ||
+              codeUnit == 0x60) {
+            encoded
+              ..write(r'\u')
+              ..write(codeUnit.toRadixString(16).toUpperCase().padLeft(4, '0'));
+          } else {
+            encoded.writeCharCode(codeUnit);
+          }
+      }
+    }
+    return encoded.toString() + '"';
   }
 
   void _validateResponseMetadata(

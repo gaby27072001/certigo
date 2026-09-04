@@ -148,11 +148,13 @@ public sealed record OfflineContentResourceDescriptor(
     string ResourceType,
     string Hash,
     long Size,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? TrackId = null);
 
 public sealed record OfflineContentManifest(
     string Schema,
     string ManifestId,
+    string Version,
     string SourceSchema,
     int FileCount,
     IReadOnlyList<OfflineContentResourceDescriptor> Files);

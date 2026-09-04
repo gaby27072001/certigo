@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart';
 
 const String offlineContentManifestV1 = 'certigo.mobile-offline-manifest/v1';
 const String packageManifestV3 = 'certigo.content.package-manifest/v3';
@@ -91,14 +94,32 @@ class OfflineContentManifest {
   OfflineContentManifest({
     required this.schema,
     required this.manifestId,
+    required this.version,
     required this.sourceSchema,
     required this.files,
   }) {
     _validate();
   }
 
+  factory OfflineContentManifest.create({
+    required String schema,
+    required String manifestId,
+    required String sourceSchema,
+    required List<OfflineContentFileDescriptor> files,
+  }) =>
+      OfflineContentManifest(
+        schema: schema,
+        manifestId: manifestId,
+        version: _computeVersion(schema, manifestId, sourceSchema, files),
+        sourceSchema: sourceSchema,
+        files: files,
+      );
+
   factory OfflineContentManifest.fromJson(Map<String, dynamic> json) {
-    _requireOnlyKeys(json, <String>{'schema', 'manifestId', 'sourceSchema', 'fileCount', 'files'});
+    _requireOnlyKeys(
+      json,
+      <String>{'schema', 'manifestId', 'version', 'sourceSchema', 'fileCount', 'files'},
+    );
     final List<dynamic> rawFiles = json['files'] as List<dynamic>? ??
         (throw const FormatException('Offline content manifest files are required.'));
     final int fileCount = _requiredInt(json, 'fileCount');
@@ -108,6 +129,7 @@ class OfflineContentManifest {
     return OfflineContentManifest(
       schema: _requiredString(json, 'schema'),
       manifestId: _requiredString(json, 'manifestId'),
+      version: _requiredString(json, 'version'),
       sourceSchema: _requiredString(json, 'sourceSchema'),
       files: rawFiles
           .map(
@@ -121,6 +143,7 @@ class OfflineContentManifest {
 
   final String schema;
   final String manifestId;
+  final String version;
   final String sourceSchema;
   final List<OfflineContentFileDescriptor> files;
 
@@ -130,6 +153,7 @@ class OfflineContentManifest {
   Map<String, dynamic> toJson() => <String, dynamic>{
         'schema': schema,
         'manifestId': manifestId,
+        'version': version,
         'sourceSchema': sourceSchema,
         'fileCount': files.length,
         'files': files.map((OfflineContentFileDescriptor file) => file.toJson()).toList(),
@@ -141,6 +165,9 @@ class OfflineContentManifest {
     }
     if (!isContentDigestId(manifestId)) {
       throw const FormatException('Offline content manifestId is invalid.');
+    }
+    if (!isContentDigestId(version)) {
+      throw const FormatException('Offline content manifest version is invalid.');
     }
     if (sourceSchema != packageManifestV3) {
       throw FormatException('Unsupported source package manifest schema: $sourceSchema');
@@ -160,6 +187,40 @@ class OfflineContentManifest {
         throw FormatException('Duplicate offline content identity: ${file.id}');
       }
     }
+    if (version != _computeVersion(schema, manifestId, sourceSchema, files)) {
+      throw const FormatException(
+        'Offline content manifest version does not match its immutable descriptors.',
+      );
+    }
+  }
+
+  static String _computeVersion(
+    String schema,
+    String manifestId,
+    String sourceSchema,
+    List<OfflineContentFileDescriptor> files,
+  ) {
+    final List<OfflineContentFileDescriptor> sorted = List<OfflineContentFileDescriptor>.from(files)
+      ..sort(
+        (OfflineContentFileDescriptor left, OfflineContentFileDescriptor right) =>
+            left.path.compareTo(right.path),
+      );
+    final String canonical = <String>[
+      schema,
+      manifestId,
+      sourceSchema,
+      ...sorted.map(
+        (OfflineContentFileDescriptor file) => <Object>[
+          file.id,
+          file.path,
+          file.resourceType,
+          file.hash,
+          file.size,
+          file.trackId ?? '',
+        ].join('\u0000'),
+      ),
+    ].join('\n');
+    return 'sha256:${sha256.convert(utf8.encode(canonical))}';
   }
 }
 

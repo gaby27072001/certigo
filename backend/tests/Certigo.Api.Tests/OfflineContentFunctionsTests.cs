@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using Certigo.Api.Functions;
+using Certigo.Api.Http;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Services;
 using FluentAssertions;
@@ -14,6 +15,8 @@ public sealed class OfflineContentFunctionsTests
         "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string PayloadHash =
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    private const string ManifestVersion =
+        "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
     [Fact]
     public async Task Every_offline_endpoint_requires_a_learner_identity()
@@ -54,7 +57,9 @@ public sealed class OfflineContentFunctionsTests
         var context = TestFunctionContext.Authenticated();
 
         var response = await function.GetLesson(
-            Request(context, $"content/releases/{ManifestId}/offline/tracks/t/lessons/l"),
+            Request(
+                context,
+                $"content/releases/{ManifestId}/offline/tracks/t/lessons/l?sha256={PayloadHash}"),
             ManifestId,
             "t",
             "l",
@@ -68,7 +73,30 @@ public sealed class OfflineContentFunctionsTests
         response.Headers.GetValues("X-Content-SHA256").Should().Equal(PayloadHash);
         response.Headers.GetValues("Content-Length").Should().Equal(bytes.Length.ToString());
         response.Headers.GetValues("ETag").Should().Equal($"\"sha256:{PayloadHash}\"");
-        response.Headers.GetValues("Cache-Control").Should().Equal("private, immutable");
+        response.Headers.GetValues("Cache-Control")
+            .Should().Equal("max-age=31536000, private, immutable");
+    }
+
+    [Fact]
+    public async Task Pinned_payload_requires_the_descriptor_hash_in_the_request_uri()
+    {
+        var function = new OfflineContentFunctions(new FakeOfflineContentService());
+        var context = TestFunctionContext.Authenticated();
+
+        var missing = () => function.GetCatalog(
+            Request(context, $"content/releases/{ManifestId}/offline/catalog"),
+            ManifestId,
+            context);
+        var changed = () => function.GetCatalog(
+            Request(
+                context,
+                $"content/releases/{ManifestId}/offline/catalog?sha256="
+                + "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"),
+            ManifestId,
+            context);
+
+        await missing.Should().ThrowAsync<BadRequestException>();
+        await changed.Should().ThrowAsync<ContentReleaseStateException>();
     }
 
     [Fact]
@@ -79,7 +107,9 @@ public sealed class OfflineContentFunctionsTests
         var context = TestFunctionContext.Authenticated();
 
         var response = await function.GetLesson(
-            Request(context, $"content/releases/{ManifestId}/offline/tracks/t/lessons/missing"),
+            Request(
+                context,
+                $"content/releases/{ManifestId}/offline/tracks/t/lessons/missing?sha256={PayloadHash}"),
             ManifestId,
             "t",
             "missing",
@@ -107,6 +137,7 @@ public sealed class OfflineContentFunctionsTests
             return Task.FromResult(new OfflineContentManifest(
                 ContentReleaseContracts.OfflineManifestV1,
                 ManifestId,
+                ManifestVersion,
                 ContentReleaseContracts.PackageManifestV3,
                 0,
                 []));

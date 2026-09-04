@@ -39,6 +39,7 @@ class _LessonAdapter implements HttpClientAdapter {
 
 class _OfflineContentAdapter implements HttpClientAdapter {
   bool requestedIdentityEncoding = false;
+  bool requestedContentHash = false;
 
   @override
   Future<ResponseBody> fetch(
@@ -47,22 +48,22 @@ class _OfflineContentAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     if (options.path.endsWith('/active/offline-manifest')) {
+      final OfflineContentFileDescriptor descriptor = OfflineContentFileDescriptor(
+        id: 'catalog',
+        path: 'catalog/tracks.json',
+        resourceType: catalogContentResourceType,
+        hash: '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+        size: 2,
+      );
       return ResponseBody.fromString(
-        jsonEncode(<String, dynamic>{
-          'schema': offlineContentManifestV1,
-          'manifestId': _manifestId,
-          'sourceSchema': packageManifestV3,
-          'fileCount': 1,
-          'files': <Map<String, dynamic>>[
-            <String, dynamic>{
-              'id': 'catalog',
-              'path': 'catalog/tracks.json',
-              'resourceType': catalogContentResourceType,
-              'hash': '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
-              'size': 2,
-            },
-          ],
-        }),
+        jsonEncode(
+          OfflineContentManifest.create(
+            schema: offlineContentManifestV1,
+            manifestId: _manifestId,
+            sourceSchema: packageManifestV3,
+            files: <OfflineContentFileDescriptor>[descriptor],
+          ).toJson(),
+        ),
         200,
         headers: <String, List<String>>{
           Headers.contentTypeHeader: <String>[Headers.jsonContentType],
@@ -70,6 +71,8 @@ class _OfflineContentAdapter implements HttpClientAdapter {
       );
     }
     requestedIdentityEncoding = options.headers['Accept-Encoding'] == 'identity';
+    requestedContentHash = options.queryParameters['sha256'] ==
+        '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a';
     return ResponseBody.fromString(
       '{}',
       200,
@@ -146,6 +149,7 @@ void main() {
     expect(file.hash, manifest.catalog.hash);
     expect(file.size, manifest.catalog.size);
     expect(adapter.requestedIdentityEncoding, isTrue);
+    expect(adapter.requestedContentHash, isTrue);
   });
 }
 

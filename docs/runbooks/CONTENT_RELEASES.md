@@ -121,12 +121,12 @@ une build mobile qu'après avoir validé en staging une release publique complè
 1. Appeler `GET /api/content/releases/active/offline-manifest` avec un JWT
    learner. Vérifier `schema=certigo.mobile-offline-manifest/v1`,
    `sourceSchema=certigo.content.package-manifest/v3`, `fileCount` et
-   `manifestId`.
+   `manifestId`, puis recalculer `version` depuis les descripteurs canoniques.
 2. Vérifier que les seuls `resourceType` sont `catalog` et `lesson`, qu'il existe
    exactement un catalogue et qu'aucune clé privée listée dans l'ADR-021
    n'apparaît.
-3. Télécharger un catalogue et une leçon via leurs routes épinglées. Comparer les
-   octets aux `hash`/`size` du manifeste et aux headers
+3. Télécharger un catalogue et une leçon via leurs routes épinglées en passant
+   `?sha256=<hash-du-descripteur>`. Comparer les octets aux `hash`/`size` du manifeste et aux headers
    `X-Content-Manifest-Id`, `X-Content-SHA256`, `Content-Length`.
 4. Lancer une synchronisation complète, couper le réseau après un fichier, puis
    redémarrer. L'ancien manifeste doit rester actif et la reprise ne doit

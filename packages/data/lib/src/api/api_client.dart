@@ -121,10 +121,14 @@ class ApiClient {
     });
   }
 
-  Future<Result<ContentFileResponse>> getBytesWithHeaders(String path) async {
+  Future<Result<ContentFileResponse>> getBytesWithHeaders(
+    String path, {
+    Map<String, dynamic>? query,
+  }) async {
     return _guard(() async {
       final Response<dynamic> response = await _dio.get<dynamic>(
         path,
+        queryParameters: query,
         options: Options(
           responseType: ResponseType.bytes,
           headers: <String, String>{'Accept-Encoding': 'identity'},

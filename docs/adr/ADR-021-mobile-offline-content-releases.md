@@ -26,7 +26,10 @@ résoudre toute release déjà activée sans exposer le manifeste privé.
    snapshot runtime immuable identifié par `publicManifestId`. Il décrit
    uniquement le catalogue applicatif et les payloads `Lesson` déjà compris par
    le mobile. Chaque entrée contient son identité, son chemin, son type, sa taille
-   exacte et le SHA-256 des octets effectivement servis.
+   exacte et le SHA-256 des octets effectivement servis. Le champ `version` est
+   lui-même le SHA-256 canonique du schéma, du `publicManifestId`, du schéma
+   source et de tous ces descripteurs : une évolution des octets projetés crée
+   donc une nouvelle génération locale, même pour la même release source.
 2. Les endpoints de payload exigent un JWT learner et un `publicManifestId`
    explicite. Cette identité est résolue par le repository versionné : un import
    seulement stagé ou une identité inconnue échoue, même si le backend sert encore
@@ -35,6 +38,8 @@ résoudre toute release déjà activée sans exposer le manifeste privé.
    élément N-1 seulement si type, identité, taille et hash correspondent, puis ne
    télécharge que les éléments manquants ou modifiés. Il vérifie en plus les
    headers `X-Content-Manifest-Id`, `X-Content-SHA256` et `Content-Length`.
+   Chaque URI de payload inclut en outre le SHA-256 attendu ; le backend le
+   compare avant de servir une réponse déclarée `immutable`.
 4. Le stockage mobile utilise deux slots A/B. Chaque mutation écrit le document
    complet dans le slot inactif avant de basculer le pointeur. Une génération
    partielle reste en staging et est reprise au prochain démarrage ; seule une

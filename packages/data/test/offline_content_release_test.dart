@@ -8,6 +8,7 @@ import 'package:test/test.dart';
 
 const String _manifestA = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const String _manifestB = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+const String _manifestC = 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
 
 class _MemoryStorage {
   final Map<String, String> values = <String, String>{};
@@ -114,15 +115,16 @@ void main() {
       );
     });
 
-    test('rejects changed descriptors under an immutable manifest identity', () async {
-      final JsonContentReleaseCacheStore store = _MemoryStorage().store();
+    test('rejects a forged immutable manifest version', () {
       final _ReleaseFixture original = _fixture(_manifestA, catalogTitle: 'Original');
-      final _ReleaseFixture changed = _fixture(_manifestA, catalogTitle: 'Changed');
-      await store.stageManifest(original.manifest);
+      final Map<String, dynamic> changed = _fixture(_manifestA, catalogTitle: 'Changed')
+          .manifest
+          .toJson()
+        ..['version'] = original.manifest.version;
 
-      await expectLater(
-        store.stageManifest(changed.manifest),
-        throwsA(isA<ContentReleaseIntegrityException>()),
+      expect(
+        () => OfflineContentManifest.fromJson(changed),
+        throwsA(isA<FormatException>()),
       );
     });
 
@@ -142,7 +144,7 @@ void main() {
         state['generations'] as Map<dynamic, dynamic>,
       );
       final Map<String, dynamic> active = Map<String, dynamic>.from(
-        generations[_manifestB] as Map<dynamic, dynamic>,
+        generations[second.manifest.version] as Map<dynamic, dynamic>,
       );
       final Map<String, dynamic> files = Map<String, dynamic>.from(
         active['files'] as Map<dynamic, dynamic>,
@@ -154,7 +156,7 @@ void main() {
       catalog['bytes'] = base64Encode(utf8.encode('{"tampered":true}'));
       files[catalogPath] = catalog;
       active['files'] = files;
-      generations[_manifestB] = active;
+      generations[second.manifest.version] = active;
       state['generations'] = generations;
       storage.values[activeSlot] = jsonEncode(state);
 
@@ -182,6 +184,25 @@ void main() {
       expect(selected.release!.manifest.manifestId, _manifestA);
       expect(selected.failure, isNull);
       expect(() => jsonDecode(storage.values[inactiveSlot]!), returnsNormally);
+    });
+
+    test('keeps the validated rollback when the active generation is corrupt', () async {
+      final _MemoryStorage storage = _MemoryStorage();
+      final JsonContentReleaseCacheStore store = storage.store();
+      final _ReleaseFixture first = _fixture(_manifestA, catalogTitle: 'First');
+      final _ReleaseFixture second = _fixture(_manifestB, catalogTitle: 'Second');
+      final _ReleaseFixture third = _fixture(_manifestC, catalogTitle: 'Third');
+      await _activate(store, first);
+      await _activate(store, second);
+      _corruptCatalog(storage, second);
+
+      await _activate(store, third);
+      _corruptCatalog(storage, third);
+      final ContentReleaseCacheSelection selected = await store.readBest();
+
+      expect(selected.release!.manifest.manifestId, _manifestA);
+      expect(selected.release!.restoredPrevious, isTrue);
+      expect(selected.failure, isA<CacheFailure>());
     });
 
     test('rejects private answer fields even when hash and size match', () async {
@@ -214,6 +235,34 @@ void main() {
       );
 
       await expectLater(write, throwsA(isA<ContentReleaseIntegrityException>()));
+    });
+
+    test('persists valid batch peers before reporting corrupt bytes', () async {
+      final _ReleaseFixture fixture = _fixture(_manifestA);
+      final JsonContentReleaseCacheStore store = _MemoryStorage().store();
+      await store.stageManifest(fixture.manifest);
+
+      await expectLater(
+        store.stageFiles(
+          manifest: fixture.manifest,
+          files: <ContentReleaseFileWrite>[
+            (
+              descriptor: fixture.manifest.catalog,
+              bytes: fixture.files[fixture.manifest.catalog.path]!.bytes,
+            ),
+            (
+              descriptor: fixture.lesson,
+              bytes: _jsonBytes(_lesson('Tampered').toJson()),
+            ),
+          ],
+        ),
+        throwsA(isA<ContentReleaseIntegrityException>()),
+      );
+
+      expect(
+        await store.missingFiles(fixture.manifest),
+        <OfflineContentFileDescriptor>[fixture.lesson],
+      );
     });
 
     test('recovers the committed slot when an interrupted write never flips the pointer', () async {
@@ -373,10 +422,21 @@ void main() {
 
     test('migrates a pinned legacy lesson and downloads only the missing catalog', () async {
       final JsonContentReleaseCacheStore store = _MemoryStorage().store();
-      final _ReleaseFixture fixture = _fixture(_manifestA);
-      final Map<String, dynamic> legacyLesson = Map<String, dynamic>.from(
-        jsonDecode(utf8.decode(fixture.files[fixture.lesson.path]!.bytes)) as Map<dynamic, dynamic>,
-      )..['publicManifestId'] = _manifestA;
+      final Uint8List backendBytes = Uint8List.fromList(
+        utf8.encode(
+          r'{"id":"lesson-1","trackId":"az-900","unitId":"unit-1","domainId":"domain-1",'
+          r'"title":"Le\u00E7on","estMinutes":5,"blocks":[{"type":"check",'
+          r'"conceptId":"concept-1","title":null,"body":null,"code":null,"language":null,'
+          r'"check":{"id":"question-1","conceptId":"concept-1","type":"mcq",'
+          r'"stem":"Question \u003C1\u003E","options":[{"id":"a","label":"R\u00E9ponse"}]}}]}',
+        ),
+      );
+      final _ReleaseFixture fixture = _fixture(_manifestA, lessonBytes: backendBytes);
+      final Map<String, dynamic> legacyLesson = Lesson.fromJson(
+        Map<String, dynamic>.from(
+          jsonDecode(utf8.decode(backendBytes)) as Map<dynamic, dynamic>,
+        ),
+      ).withPublicManifestId(_manifestA).toJson();
       final String legacy = jsonEncode(<String, dynamic>{
         'manifestVersion': 'v1',
         'lessons': <String, dynamic>{'az-900/lesson-1': legacyLesson},
@@ -472,7 +532,7 @@ void main() {
         state['generations'] as Map<dynamic, dynamic>,
       );
       final Map<String, dynamic> active = Map<String, dynamic>.from(
-        generations[_manifestB] as Map<dynamic, dynamic>,
+        generations[second.manifest.version] as Map<dynamic, dynamic>,
       );
       final Map<String, dynamic> files = Map<String, dynamic>.from(
         active['files'] as Map<dynamic, dynamic>,
@@ -482,7 +542,7 @@ void main() {
       )..['bytes'] = base64Encode(utf8.encode('{"tampered":true}'));
       files[second.manifest.catalog.path] = catalog;
       active['files'] = files;
-      generations[_manifestB] = active;
+      generations[second.manifest.version] = active;
       state['generations'] = generations;
       storage.values[activeSlot] = jsonEncode(state);
       final List<ContentReleaseEvent> events = <ContentReleaseEvent>[];
@@ -541,6 +601,31 @@ class _ReleaseFixture {
   final Map<String, ContentFileResponse> files;
 }
 
+void _corruptCatalog(_MemoryStorage storage, _ReleaseFixture fixture) {
+  final String activeSlot = storage.values[contentReleaseCachePointer]!;
+  final Map<String, dynamic> state = Map<String, dynamic>.from(
+    jsonDecode(storage.values[activeSlot]!) as Map<dynamic, dynamic>,
+  );
+  final Map<String, dynamic> generations = Map<String, dynamic>.from(
+    state['generations'] as Map<dynamic, dynamic>,
+  );
+  final Map<String, dynamic> active = Map<String, dynamic>.from(
+    generations[fixture.manifest.version] as Map<dynamic, dynamic>,
+  );
+  final Map<String, dynamic> files = Map<String, dynamic>.from(
+    active['files'] as Map<dynamic, dynamic>,
+  );
+  final String path = fixture.manifest.catalog.path;
+  final Map<String, dynamic> catalog = Map<String, dynamic>.from(
+    files[path] as Map<dynamic, dynamic>,
+  )..['bytes'] = base64Encode(utf8.encode('{"tampered":true}'));
+  files[path] = catalog;
+  active['files'] = files;
+  generations[fixture.manifest.version] = active;
+  state['generations'] = generations;
+  storage.values[activeSlot] = jsonEncode(state);
+}
+
 _ReleaseFixture _fixture(
   String manifestId, {
   String catalogTitle = 'Azure Fundamentals',
@@ -565,7 +650,7 @@ _ReleaseFixture _fixture(
     trackId: 'az-900',
     bytes: lesson,
   );
-  final OfflineContentManifest manifest = OfflineContentManifest(
+  final OfflineContentManifest manifest = OfflineContentManifest.create(
     schema: offlineContentManifestV1,
     manifestId: manifestId,
     sourceSchema: packageManifestV3,

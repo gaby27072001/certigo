@@ -17,27 +17,12 @@ import '../models/exam.dart';
 import '../models/share_card.dart';
 import '../models/account_deletion.dart';
 import '../models/content_release.dart';
+import 'catalog_payload_decoder.dart';
 import 'repositories.dart';
 
 /// HTTP-backed implementations of the repository contracts. Each method maps a
 /// single REST endpoint to a typed model via [ApiClient]. Routes mirror the
 /// backend exactly (userId is always derived from the JWT, never sent).
-
-const String _kAppCatalogSchema = 'certigo.app-certification-catalog/v2';
-const String _kCanonicalCatalogSchema = 'certigo.certification-catalog/v1';
-
-List<TrackSummary> decodeTrackSummaries(Map<String, dynamic> json) {
-  final String? schema = json['schema'] as String?;
-  final String? sourceSchema = json['sourceSchema'] as String?;
-  if (schema != _kAppCatalogSchema) {
-    throw FormatException('Unsupported app catalog schema: $schema');
-  }
-  if (sourceSchema != _kCanonicalCatalogSchema) {
-    throw FormatException('Unsupported source catalog schema: $sourceSchema');
-  }
-  final List<dynamic> tracks = json['tracks'] as List<dynamic>? ?? <dynamic>[];
-  return tracks.map((dynamic e) => TrackSummary.fromJson(e as Map<String, dynamic>)).toList();
-}
 
 class RemoteUserRepository implements UserRepository {
   const RemoteUserRepository(this._api);
@@ -139,13 +124,18 @@ class RemoteContentReleaseRepository implements ContentReleaseRepository {
     required OfflineContentFileDescriptor descriptor,
   }) {
     final String encodedManifest = Uri.encodeComponent(manifestId);
+    final Map<String, dynamic> query = <String, dynamic>{'sha256': descriptor.hash};
     if (descriptor.isCatalog) {
-      return _api.getBytesWithHeaders('/content/releases/$encodedManifest/offline/catalog');
+      return _api.getBytesWithHeaders(
+        '/content/releases/$encodedManifest/offline/catalog',
+        query: query,
+      );
     }
     final String trackId = Uri.encodeComponent(descriptor.trackId!);
     final String lessonId = Uri.encodeComponent(descriptor.id);
     return _api.getBytesWithHeaders(
       '/content/releases/$encodedManifest/offline/tracks/$trackId/lessons/$lessonId',
+      query: query,
     );
   }
 }

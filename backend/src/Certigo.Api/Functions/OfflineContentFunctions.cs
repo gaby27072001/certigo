@@ -23,7 +23,7 @@ public sealed class OfflineContentFunctions(IOfflineContentService content)
         var response = await request.JsonAsync(
             manifest,
             cancellationToken: context.CancellationToken);
-        AddManifestHeaders(response, manifest.ManifestId, manifest.ManifestId);
+        AddManifestHeaders(response, manifest.ManifestId, manifest.Version);
         response.Headers.Add("Cache-Control", "private, no-cache");
         return response;
     }
@@ -42,6 +42,7 @@ public sealed class OfflineContentFunctions(IOfflineContentService content)
         var payload = await content.GetCatalogAsync(
             manifestId,
             context.CancellationToken);
+        EnsureExpectedHash(request, payload);
         return await PayloadResponseAsync(request, payload, context.CancellationToken);
     }
 
@@ -63,6 +64,10 @@ public sealed class OfflineContentFunctions(IOfflineContentService content)
             trackId,
             lessonId,
             context.CancellationToken);
+        if (payload is not null)
+        {
+            EnsureExpectedHash(request, payload);
+        }
         return payload is null
             ? await request.NotFound("Lesson not found.", context.CancellationToken)
             : await PayloadResponseAsync(request, payload, context.CancellationToken);
@@ -80,8 +85,25 @@ public sealed class OfflineContentFunctions(IOfflineContentService content)
         response.Headers.Add("X-Content-SHA256", payload.Sha256);
         response.Headers.Add("Content-Length", payload.Content.Length.ToString(
             System.Globalization.CultureInfo.InvariantCulture));
-        response.Headers.Add("Cache-Control", "private, immutable");
+        response.Headers.Add("Cache-Control", "private, max-age=31536000, immutable");
         return response;
+    }
+
+    private static void EnsureExpectedHash(
+        HttpRequestData request,
+        OfflineContentPayload payload)
+    {
+        var expected = request.Query["sha256"];
+        if (string.IsNullOrWhiteSpace(expected))
+        {
+            throw new BadRequestException("The sha256 query parameter is required.");
+        }
+
+        if (!string.Equals(expected, payload.Sha256, StringComparison.Ordinal))
+        {
+            throw new ContentReleaseStateException(
+                "The requested offline payload hash does not match the pinned release.");
+        }
     }
 
     private static void AddManifestHeaders(
