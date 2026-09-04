@@ -106,7 +106,7 @@ Une preuve de juillet/août ne peut pas remplacer une exécution actuelle.
 |---|---|---|
 | G0 — Scope et CI | Diff candidat sans nouvelle feature ; `ci-mobile` vert | SHA candidat + URL du run |
 | G1 — Crash distant | Exceptions Flutter/moteur/zone envoyées vers un sink distant ; symboles dSYM uploadés ; crash de test lisible | URL/ID du dashboard, horodatage UTC, stack symboliquée |
-| G2 — Intégrations live | App Codemagic existante connectée au repo ; intégration `AppStoreConnect`, clé ASC, groupe `certigo_mobile_config`, app ASC et `Internal Testers` valides | Contrôle opérateur daté, sans valeur secrète |
+| G2 — Intégrations live | App Codemagic existante connectée au repo ; intégration `AppStoreConnect`, clé ASC, groupe `certigo_mobile_config`, contrat de domaine public, app ASC et `Internal Testers` valides | Contrôle opérateur daté, sans valeur secrète |
 | G3 — Dry-run | `ios-release-dry` réussit depuis le SHA candidat, produit une IPA signée et n'uploade rien | URL/ID du build Codemagic + SHA |
 | G4 — Build TestFlight | `ios-release` produit un nouveau build traité et affecté à `Internal Testers` | URL/ID Codemagic + version/build ASC |
 | G5 — Auth/E2E appareil | Build G4 installé sur iPhone physique ; auth réelle puis catalogue → leçon → quiz → progression → Tuteur déterministe ; crash distant vérifié | Appareil/iOS, testeur, date UTC, résultats et IDs de corrélation non sensibles |
@@ -426,9 +426,10 @@ approbation et sa restriction à `main`.
    par `codemagic.yaml`.
 4. **Groupe de variables `certigo_mobile_config`** : dashboard → **App >
    Environment variables** → ouvrir le groupe existant
-   **`certigo_mobile_config`** et vérifier ces **4 variables NON secrètes**
-   (injectées en `--dart-define`) **+ 1 variable SÉCURISÉE** (signature, jamais
-   un `--dart-define`) :
+   **`certigo_mobile_config`** et vérifier ces **8 variables NON secrètes**
+   **+ 1 variable SÉCURISÉE**. Certaines valeurs sont injectées en
+   `--dart-define`; les variables de domaine public alimentent la gate
+   fail-closed avant le build :
 
    | Variable | Valeur | Secure ? | Utilisée par |
    |---|---|---|---|
@@ -436,6 +437,10 @@ approbation et sa restriction à `main`.
    | `ENTRA_CLIENT_ID` | `4d1f1075-7bc5-4764-947b-701435a85f8c` | non | `ios-release` + `ios-release-dry` |
    | `ENTRA_AUTHORITY` | `https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0` | non | idem |
    | `ENTRA_API_SCOPE` | `api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation` | non | idem |
+   | `ACCOUNT_DELETION_ENABLED` | `false` tant que la gate destructive Cosmos n'est pas close | non | `ios-release` + `ios-release-dry` |
+   | `PUBLIC_WEB_ORIGIN` | origine HTTPS canonique d'un domaine Certigo possédé et vérifié | non | gate `ios-release` |
+   | `PUBLIC_DOMAIN_VERIFIED` | `true` uniquement après vérification humaine du domaine public | non | gate `ios-release` |
+   | `APPLE_CIAM_DOMAIN_RECONFIGURED` | `true` uniquement après reconfiguration Apple/CIAM vérifiée | non | gate `ios-release` |
    | `CERTIFICATE_PRIVATE_KEY` | clé privée **RSA 2048 PEM non chiffrée** (`openssl genrsa 2048`), sans passphrase. Sert à créer le certificat de distribution iOS au 1er build. | **OUI (Secure)** | les 3 workflows iOS |
 
    > Sans les 4 premières : boutons sociaux masqués et/ou login e-mail cassé. Mêmes
@@ -446,6 +451,13 @@ approbation et sa restriction à `main`.
    > « Cannot save Signing Certificates without certificate private key ». La clé
    > n'a **pas** de passphrase → aucun `--certificate-key-password` requis. Cochez
    > **Secure** pour cette variable (elle est masquée dans les logs).
+   >
+   > Les trois variables `PUBLIC_*`/`APPLE_CIAM_*` ne sont pas présentes dans le
+   > scope GitHub `beta` observé le 2026-09-04, et ce scope ne prouve de toute
+   > façon pas le contenu du dashboard Codemagic. Elles restent donc une **gate
+   > humaine live**, pas un setup à recréer. Ne pas inventer de domaine ni passer
+   > les booléens à `true` pour débloquer un build : en leur absence, conserver G2
+   > ouverte et laisser `ios-release` échouer fermé.
 
 ### 4.1 Inventaire Apple à vérifier live
 
@@ -670,6 +682,9 @@ fixe et revenir à `flutter.ndkVersion` (vérifier avec `flutter doctor -v`).
 - [ ] App Codemagic existante et repo vérifiés.
 - [ ] Intégration `AppStoreConnect` et clé ASC vérifiées live.
 - [ ] Groupe `certigo_mobile_config` existant et complet, sans exposer ses valeurs.
+- [ ] Contrat de domaine public vérifié live (`PUBLIC_WEB_ORIGIN`,
+      `PUBLIC_DOMAIN_VERIFIED`, `APPLE_CIAM_DOMAIN_RECONFIGURED`) ; aucune valeur
+      déduite du scope GitHub `beta`.
 - [ ] App ASC `com.certigo.mobileapp` et groupe `Internal Testers` vérifiés live.
 - [ ] `ios-release-dry` vert sur le SHA candidat, IPA signée, aucun upload.
 - [ ] Nouveau build `ios-release` traité dans TestFlight et affecté au groupe interne.

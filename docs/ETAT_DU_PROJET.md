@@ -120,10 +120,12 @@ publication publique et nouvelles features sont hors scope.
 | Crash mobile | Capture locale fusionnée par [#213](https://github.com/gchambaud_microsoft/Certigo/pull/213) | Sink par défaut `debugPrint`, sans upload de symboles | 🔴 **bloquant** avant Alpha |
 
 Le Go Alpha exige, sur un même SHA candidat : **sink crash distant + symboles et
-crash test visible**, **intégrations Codemagic/ASC encore valides**, **dry-run IPA
-signé**, **nouveau build TestFlight interne**, puis **auth réelle et boucle E2E sur
-iPhone physique**. Les preuves historiques ne ferment aucune de ces gates. Cette
-décision documentaire ne déclenche aucun tag, release, upload ou recréation de store.
+crash test visible**, **intégrations Codemagic/ASC encore valides**, **contrat de
+domaine public vérifié humainement dans Codemagic** (non déductible du scope GitHub
+`beta`), **dry-run IPA signé**, **nouveau build TestFlight interne**, puis **auth
+réelle et boucle E2E sur iPhone physique**. Les preuves historiques ne ferment
+aucune de ces gates. Cette décision documentaire ne déclenche aucun tag, release,
+upload ou recréation de store.
 
 ---
 
