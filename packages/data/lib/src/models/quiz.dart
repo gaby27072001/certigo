@@ -24,11 +24,11 @@ class QuizAnswer {
   final int latencyMs;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-    'itemId': itemId,
-    'itemType': itemTypeToWire(type),
-    'selected': selected,
-    'latencyMs': latencyMs,
-  };
+        'itemId': itemId,
+        'itemType': itemTypeToWire(type),
+        'selected': selected,
+        'latencyMs': latencyMs,
+      };
 }
 
 /// Request body for `POST /quiz/{lessonId}/submit`.
@@ -51,12 +51,12 @@ class SubmitQuizRequest {
   final String? publicManifestId;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-    'clientAttemptId': clientAttemptId,
-    'trackId': trackId,
-    'startedAt': startedAt.toUtc().toIso8601String(),
-    'answers': answers.map((a) => a.toJson()).toList(),
-    if (publicManifestId != null) 'publicManifestId': publicManifestId,
-  };
+        'clientAttemptId': clientAttemptId,
+        'trackId': trackId,
+        'startedAt': startedAt.toUtc().toIso8601String(),
+        'answers': answers.map((a) => a.toJson()).toList(),
+        if (publicManifestId != null) 'publicManifestId': publicManifestId,
+      };
 }
 
 /// Server-graded result of a quiz submission.
@@ -80,19 +80,20 @@ class SubmitQuizResult {
   final DateTime? nextReviewDueAt;
 
   factory SubmitQuizResult.fromJson(Map<String, dynamic> json) => SubmitQuizResult(
-    attemptId: json['attemptId'] as String,
-    scorePct: (json['scorePct'] as num?)?.toInt() ?? 0,
-    results: (json['results'] as List<dynamic>? ?? <dynamic>[])
-        .map((e) => ItemResult.fromJson(e as Map<String, dynamic>))
-        .toList(),
-    rewards: QuizRewards.fromJson(json['rewards'] as Map<String, dynamic>? ?? <String, dynamic>{}),
-    weakConcepts: (json['weakConcepts'] as List<dynamic>? ?? <dynamic>[])
-        .map((e) => e as String)
-        .toList(),
-    nextReviewDueAt: json['nextReviewDueAt'] == null
-        ? null
-        : DateTime.parse(json['nextReviewDueAt'] as String),
-  );
+        attemptId: json['attemptId'] as String,
+        scorePct: (json['scorePct'] as num?)?.toInt() ?? 0,
+        results: (json['results'] as List<dynamic>? ?? <dynamic>[])
+            .map((e) => ItemResult.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        rewards:
+            QuizRewards.fromJson(json['rewards'] as Map<String, dynamic>? ?? <String, dynamic>{}),
+        weakConcepts: (json['weakConcepts'] as List<dynamic>? ?? <dynamic>[])
+            .map((e) => e as String)
+            .toList(),
+        nextReviewDueAt: json['nextReviewDueAt'] == null
+            ? null
+            : DateTime.parse(json['nextReviewDueAt'] as String),
+      );
 }
 
 /// Per-item grading + the explanatory feedback that powers real learning.
@@ -118,15 +119,15 @@ class ItemResult {
   final double masteryDelta;
 
   factory ItemResult.fromJson(Map<String, dynamic> json) => ItemResult(
-    itemId: json['itemId'] as String,
-    conceptId: json['conceptId'] as String? ?? '',
-    correct: json['correct'] as bool? ?? false,
-    correctAnswer: (json['correctAnswer'] as List<dynamic>? ?? <dynamic>[])
-        .map((e) => e as String)
-        .toList(),
-    explanation: json['explanation'] as String? ?? '',
-    masteryDelta: (json['masteryDelta'] as num?)?.toDouble() ?? 0,
-  );
+        itemId: json['itemId'] as String,
+        conceptId: json['conceptId'] as String? ?? '',
+        correct: json['correct'] as bool? ?? false,
+        correctAnswer: (json['correctAnswer'] as List<dynamic>? ?? <dynamic>[])
+            .map((e) => e as String)
+            .toList(),
+        explanation: json['explanation'] as String? ?? '',
+        masteryDelta: (json['masteryDelta'] as num?)?.toDouble() ?? 0,
+      );
 }
 
 class QuizRewards {
@@ -149,13 +150,13 @@ class QuizRewards {
   final List<String> achievementsUnlocked;
 
   factory QuizRewards.fromJson(Map<String, dynamic> json) => QuizRewards(
-    xpEarned: (json['xpEarned'] as num?)?.toInt() ?? 0,
-    newXp: (json['newXp'] as num?)?.toInt() ?? 0,
-    levelUp: json['levelUp'] as bool? ?? false,
-    streakExtended: json['streakExtended'] as bool? ?? false,
-    gemsEarned: (json['gemsEarned'] as num?)?.toInt() ?? 0,
-    achievementsUnlocked: (json['achievementsUnlocked'] as List<dynamic>? ?? <dynamic>[])
-        .map((e) => e as String)
-        .toList(),
-  );
+        xpEarned: (json['xpEarned'] as num?)?.toInt() ?? 0,
+        newXp: (json['newXp'] as num?)?.toInt() ?? 0,
+        levelUp: json['levelUp'] as bool? ?? false,
+        streakExtended: json['streakExtended'] as bool? ?? false,
+        gemsEarned: (json['gemsEarned'] as num?)?.toInt() ?? 0,
+        achievementsUnlocked: (json['achievementsUnlocked'] as List<dynamic>? ?? <dynamic>[])
+            .map((e) => e as String)
+            .toList(),
+      );
 }

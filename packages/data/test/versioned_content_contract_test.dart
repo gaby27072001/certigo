@@ -15,22 +15,23 @@ class _LessonAdapter implements HttpClientAdapter {
     RequestOptions options,
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
-  ) async => ResponseBody.fromString(
-    jsonEncode(<String, dynamic>{
-      'id': 'lesson-1',
-      'trackId': 'track-1',
-      'unitId': 'unit-1',
-      'domainId': 'domain-1',
-      'title': 'Lesson',
-      'estMinutes': 5,
-      'blocks': <dynamic>[],
-    }),
-    200,
-    headers: <String, List<String>>{
-      Headers.contentTypeHeader: <String>[Headers.jsonContentType],
-      'x-content-manifest-id': <String>[_manifestId],
-    },
-  );
+  ) async =>
+      ResponseBody.fromString(
+        jsonEncode(<String, dynamic>{
+          'id': 'lesson-1',
+          'trackId': 'track-1',
+          'unitId': 'unit-1',
+          'domainId': 'domain-1',
+          'title': 'Lesson',
+          'estMinutes': 5,
+          'blocks': <dynamic>[],
+        }),
+        200,
+        headers: <String, List<String>>{
+          Headers.contentTypeHeader: <String>[Headers.jsonContentType],
+          'x-content-manifest-id': <String>[_manifestId],
+        },
+      );
 
   @override
   void close({bool force = false}) {}
