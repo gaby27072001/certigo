@@ -11,12 +11,14 @@ namespace Certigo.Api.Tests;
 
 public sealed class OrganizationFunctionsTests
 {
-    [Fact]
-    public async Task Disabled_surface_returns_before_authentication_or_service_access()
+    [Theory]
+    [InlineData("off")]
+    [InlineData("shadow")]
+    public async Task Disabled_surface_returns_before_authentication_or_service_access(string mode)
     {
         var service = new FakeOrganizationService();
         var function = new OrganizationFunctions(
-            OrganizationFeatureOptions.Parse(null),
+            OrganizationFeatureOptions.Parse(mode),
             service);
         var context = new TestFunctionContext();
         var request = new TestHttpRequestData(
@@ -31,13 +33,15 @@ public sealed class OrganizationFunctionsTests
         service.CallCount.Should().Be(0);
     }
 
-    [Fact]
-    public async Task Disabled_surface_is_hidden_before_jwt_authentication()
+    [Theory]
+    [InlineData("off")]
+    [InlineData("shadow")]
+    public async Task Disabled_surface_is_hidden_before_jwt_authentication(string mode)
     {
         var validator = FakeTokenValidator.Failing();
         var exception = new ExceptionMiddleware(NullLogger<ExceptionMiddleware>.Instance);
         var feature = new OrganizationFeatureMiddleware(
-            OrganizationFeatureOptions.Parse(null));
+            OrganizationFeatureOptions.Parse(mode));
         var jwt = new JwtAuthMiddleware(validator);
         var invocation = FunctionTestHarness.CreateHttp(
             method: "POST",

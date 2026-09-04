@@ -257,7 +257,10 @@ var host = new HostBuilder()
                 sp.GetRequiredService<IPersonLinkedIdentityShadowRuntime>(),
                 sp.GetRequiredService<ILegacyIdentityObservationSource>()));
         services.AddSingleton<IOrganizationTokenGenerator, CryptographicOrganizationTokenGenerator>();
+        services.AddSingleton<IOrganizationTelemetry, ApplicationInsightsOrganizationTelemetry>();
         services.AddScoped<IOrganizationRepository, CosmosOrganizationRepository>();
+        services.AddScoped<IOrganizationShadowObservationReader>(
+            sp => (IOrganizationShadowObservationReader)sp.GetRequiredService<IOrganizationRepository>());
         services.AddScoped<IOrganizationPersonResolver, OrganizationPersonResolver>();
         services.AddScoped<IOrganizationMembershipResolver, OrganizationMembershipResolver>();
         services.AddScoped<IOrganizationAuthorizationHandler, OrganizationAuthorizationHandler>();

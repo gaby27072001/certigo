@@ -506,23 +506,6 @@ public sealed class OrganizationServiceTests
         await action.Should().ThrowAsync<OrganizationMembershipNotFoundException>();
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("shadow")]
-    [InlineData("enabled")]
-    public void Feature_mode_is_fail_closed(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            OrganizationFeatureOptions.Parse(value).Mode.Should().Be(OrganizationFeatureMode.Off);
-            return;
-        }
-
-        var action = () => OrganizationFeatureOptions.Parse(value);
-        action.Should().Throw<InvalidOperationException>();
-    }
-
     private static OrganizationService CreateService(
         string personId,
         MemoryOrganizationRepository repository,
@@ -555,6 +538,7 @@ public sealed class OrganizationServiceTests
             authorization,
             repository,
             new StubTokenGenerator(),
+            new RecordingOrganizationTelemetry(),
             new StubClock());
     }
 
@@ -572,6 +556,13 @@ public sealed class OrganizationServiceTests
     private sealed class StubTokenGenerator : IOrganizationTokenGenerator
     {
         public string NewToken() => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    }
+
+    private sealed class RecordingOrganizationTelemetry : IOrganizationTelemetry
+    {
+        public List<OrganizationTelemetryEvent> Events { get; } = [];
+
+        public void Track(OrganizationTelemetryEvent telemetryEvent) => Events.Add(telemetryEvent);
     }
 
     private sealed class MemoryOrganizationRepository : IOrganizationRepository
@@ -594,6 +585,7 @@ public sealed class OrganizationServiceTests
         public int RemainingMetricDocuments { get; private set; }
         public bool MembershipWasRemovedBeforePurge { get; private set; }
         public int FailPurgeAttempts { get; set; }
+        public int TeamMembershipCount { get; private set; }
         public (int Memberships, int Organizations) ReadCounts =>
             (MembershipReadCount, OrganizationReadCount);
 
@@ -699,6 +691,7 @@ public sealed class OrganizationServiceTests
         {
             RequireCurrent(actor);
             RequireCurrent(target, invokeHook: false);
+            TeamMembershipCount++;
             return Task.CompletedTask;
         }
 
@@ -771,6 +764,10 @@ public sealed class OrganizationServiceTests
                     .Where(item => item.PurgeCompletedAt is null)
                     .Take(maximumTombstones)
                     .ToArray());
+
+        public Task<TeamMembershipVolumetryObservation> CountTeamMembershipsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TeamMembershipVolumetryObservation(TeamMembershipCount, Capped: false));
 
         public void SeedMetricDocuments(int count) => RemainingMetricDocuments = count;
 

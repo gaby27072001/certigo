@@ -64,9 +64,10 @@ param accountDeletionEnabled bool = false
   'shadow'
 ])
 param personLinkedIdentityV1 string = 'off'
-@description('Organization/Membership V1 mode. This contract increment supports off only.')
+@description('Organization/Membership V1 mode. "off" (default) leaves the V1 HTTP surface at 404 in every environment. "shadow" additionally runs a strictly read-only background observation (incomplete-offboarding count, team membership volumetry) with non-PII telemetry; it adds no reachable route and never creates, updates, or deletes Organization/Membership data. A future read/write mode requires its own ADR.')
 @allowed([
   'off'
+  'shadow'
 ])
 param organizationMembershipV1 string = 'off'
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
@@ -325,6 +326,7 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     ACCOUNT_DELETION_ENABLED: string(accountDeletionEnabled)
     PERSON_LINKED_IDENTITY_V1: personLinkedIdentityV1
     ORGANIZATION_MEMBERSHIP_V1: organizationMembershipV1
+    ORGANIZATION_SHADOW_OBSERVATION_SCHEDULE: '0 */5 * * * *'
     ENTERPRISE_LEARNING_METRICS_V1: 'off'
     ENTERPRISE_LEARNING_RECOVERY_SCHEDULE: '0 */5 * * * *'
     TUTOR_LLM_ENABLED: string(tutorLlmEnabled)

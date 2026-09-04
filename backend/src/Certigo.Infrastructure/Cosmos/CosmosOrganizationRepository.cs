@@ -8,10 +8,12 @@ namespace Certigo.Infrastructure.Cosmos;
 public sealed class CosmosOrganizationRepository(
     CosmosContext context,
     IEnterpriseLearningMetricReceiptRepository metricReceipts,
-    IEnterpriseLearningReceiptOutboxRepository metricOutbox) : IOrganizationRepository
+    IEnterpriseLearningReceiptOutboxRepository metricOutbox,
+    IOrganizationTelemetry telemetry) : IOrganizationRepository
 {
     private const int PurgePageSize = 50;
     private const int CompletedTombstoneTtlSeconds = 2_592_000;
+    private const int TeamMembershipVolumetryObservationCap = 10_000;
 
     public async Task<OrganizationCreateResult> CreateOrganizationAsync(
         Organization organization,
@@ -27,6 +29,10 @@ public sealed class CosmosOrganizationRepository(
             .ExecuteAsync(cancellationToken);
         if (response.IsSuccessStatusCode)
         {
+            Track(
+                OrganizationTelemetryOperation.CreateOrganization,
+                OrganizationTelemetryOutcome.Created,
+                response.RequestCharge);
             return new OrganizationCreateResult(
                 OrganizationCreateStatus.Created,
                 response.GetOperationResultAtIndex<Organization>(0).Resource);
@@ -38,6 +44,10 @@ public sealed class CosmosOrganizationRepository(
                 cancellationToken)
                 ?? throw new ConcurrencyConflictException(
                     "The organization was created concurrently but could not be reloaded.");
+            Track(
+                OrganizationTelemetryOperation.CreateOrganization,
+                OrganizationTelemetryOutcome.Replayed,
+                response.RequestCharge);
             return new OrganizationCreateResult(OrganizationCreateStatus.Replayed, existing);
         }
         throw CreateBatchException("Could not create the organization.", response);
@@ -90,6 +100,10 @@ public sealed class CosmosOrganizationRepository(
             .ExecuteAsync(cancellationToken);
         if (response.IsSuccessStatusCode)
         {
+            Track(
+                OrganizationTelemetryOperation.CreateInvitation,
+                OrganizationTelemetryOutcome.Created,
+                response.RequestCharge);
             return new OrganizationInvitationCreateResult(
                 OrganizationCreateStatus.Created,
                 response.GetOperationResultAtIndex<OrganizationInvitation>(2).Resource);
@@ -121,6 +135,10 @@ public sealed class CosmosOrganizationRepository(
                 invitation.Id,
                 cancellationToken)
                 ?? throw new OrganizationInvitationReplayException();
+            Track(
+                OrganizationTelemetryOperation.CreateInvitation,
+                OrganizationTelemetryOutcome.Replayed,
+                response.RequestCharge);
             return new OrganizationInvitationCreateResult(
                 OrganizationCreateStatus.Replayed,
                 existing);
@@ -165,6 +183,10 @@ public sealed class CosmosOrganizationRepository(
             .ExecuteAsync(cancellationToken);
         if (response.IsSuccessStatusCode)
         {
+            Track(
+                OrganizationTelemetryOperation.AcceptInvitation,
+                OrganizationTelemetryOutcome.Completed,
+                response.RequestCharge);
             return response.GetOperationResultAtIndex<OrganizationMembership>(2).Resource;
         }
         if (response.StatusCode == HttpStatusCode.NotFound
@@ -199,6 +221,10 @@ public sealed class CosmosOrganizationRepository(
             .ExecuteAsync(cancellationToken);
         if (response.IsSuccessStatusCode)
         {
+            Track(
+                OrganizationTelemetryOperation.CreateTeam,
+                OrganizationTelemetryOutcome.Created,
+                response.RequestCharge);
             return new OrganizationTeamCreateResult(
                 OrganizationCreateStatus.Created,
                 response.GetOperationResultAtIndex<OrganizationTeam>(1).Resource);
@@ -217,6 +243,10 @@ public sealed class CosmosOrganizationRepository(
                 cancellationToken)
                 ?? throw new ConcurrencyConflictException(
                     "The team was created concurrently but could not be reloaded.");
+            Track(
+                OrganizationTelemetryOperation.CreateTeam,
+                OrganizationTelemetryOutcome.Replayed,
+                response.RequestCharge);
             return new OrganizationTeamCreateResult(OrganizationCreateStatus.Replayed, existing);
         }
         throw CreateBatchException("Could not create the organization team.", response);
@@ -261,6 +291,11 @@ public sealed class CosmosOrganizationRepository(
             .ExecuteAsync(cancellationToken);
         if (response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.Conflict)
         {
+            Track(
+                OrganizationTelemetryOperation.AddTeamMember,
+                OrganizationTelemetryOutcome.Completed,
+                response.RequestCharge,
+                count: 1);
             return;
         }
         if (response.StatusCode is HttpStatusCode.NotFound
@@ -315,6 +350,10 @@ public sealed class CosmosOrganizationRepository(
             }
             throw CreateBatchException("Could not offboard the organization member.", response);
         }
+        Track(
+            OrganizationTelemetryOperation.Offboard,
+            OrganizationTelemetryOutcome.Completed,
+            response.RequestCharge);
 
         await PurgeOffboardingAsync(
             target.OrganizationId,
@@ -448,9 +487,61 @@ public sealed class CosmosOrganizationRepository(
                     {
                         MaxItemCount = maximumTombstones,
                     });
-            return iterator.HasMoreResults
-                ? (await iterator.ReadNextAsync(cancellationToken)).ToArray()
-                : [];
+            if (!iterator.HasMoreResults)
+            {
+                Track(
+                    OrganizationTelemetryOperation.ObserveIncompleteOffboardings,
+                    OrganizationTelemetryOutcome.Observed,
+                    count: 0);
+                return [];
+            }
+            var page = await iterator.ReadNextAsync(cancellationToken);
+            var results = page.ToArray();
+            Track(
+                OrganizationTelemetryOperation.ObserveIncompleteOffboardings,
+                OrganizationTelemetryOutcome.Observed,
+                page.RequestCharge,
+                results.LongLength);
+            return results;
+    }
+
+    /// <summary>
+    /// Read-only, RU-bounded observation used only by the strictly-observational shadow runtime
+    /// job. Never creates, replaces, or deletes anything. Reports a lower bound capped at
+    /// <see cref="TeamMembershipVolumetryObservationCap"/> via a bounded `TOP` query — the same
+    /// shape as <see cref="ListIncompleteOffboardingsAsync"/> — rather than an unbounded
+    /// full-container COUNT aggregate, so its Cosmos RU cost cannot grow without limit as the
+    /// container grows after a future `read`/`write` activation.
+    /// </summary>
+    public async Task<TeamMembershipVolumetryObservation> CountTeamMembershipsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var query = new QueryDefinition(
+                "SELECT TOP @maximum VALUE c.id FROM c WHERE c.documentType = @type")
+            .WithParameter("@maximum", TeamMembershipVolumetryObservationCap)
+            .WithParameter("@type", OrganizationTeamMembership.Type);
+        using var iterator = context.Organizations.GetItemQueryIterator<string>(
+            query,
+            requestOptions: new QueryRequestOptions
+            {
+                MaxItemCount = TeamMembershipVolumetryObservationCap,
+            });
+        long total = 0;
+        double totalRequestCharge = 0;
+        while (iterator.HasMoreResults)
+        {
+            var page = await iterator.ReadNextAsync(cancellationToken);
+            total += page.Count;
+            totalRequestCharge += page.RequestCharge;
+        }
+        var capped = total >= TeamMembershipVolumetryObservationCap;
+        Track(
+            OrganizationTelemetryOperation.ObserveTeamMembershipVolumetry,
+            OrganizationTelemetryOutcome.Observed,
+            totalRequestCharge,
+            total,
+            capped);
+        return new TeamMembershipVolumetryObservation(total, capped);
     }
 
     private async Task<IReadOnlyList<OrganizationTeamMembership>> ListTeamMembershipsAsync(
@@ -558,4 +649,18 @@ public sealed class CosmosOrganizationRepository(
             0,
             response.ActivityId,
             response.RequestCharge);
+
+    private void Track(
+        OrganizationTelemetryOperation operation,
+        OrganizationTelemetryOutcome outcome,
+        double? requestCharge = null,
+        long? count = null,
+        bool? capped = null) =>
+        telemetry.Track(new OrganizationTelemetryEvent(
+            operation,
+            outcome,
+            DateTimeOffset.UtcNow,
+            requestCharge,
+            count,
+            capped));
 }

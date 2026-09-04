@@ -12,7 +12,7 @@ public sealed class OrganizationFeatureMiddleware(OrganizationFeatureOptions opt
         var request = await context.GetHttpRequestDataAsync();
         if (request is not null
             && IsOrganizationPath(request.Url.AbsolutePath)
-            && options.Mode == OrganizationFeatureMode.Off)
+            && !options.HttpSurfaceEnabled)
         {
             throw new OrganizationFeatureDisabledException();
         }
