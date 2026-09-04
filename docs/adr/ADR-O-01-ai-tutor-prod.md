@@ -128,6 +128,28 @@ déjà conditionné par le flag).
 
 ---
 
+## Addendum — clarification de l'état `dev` (2026-09, revue Phase B)
+
+Cette décision (Option B, prod) **ne change pas**. Cette revue a corrigé une divergence trouvée en
+`dev` : `infra/params/dev.bicepparam` portait un commentaire affirmant à tort que le tutor LLM était
+« Enabled in dev » et que le rôle RBAC était « now granted », alors que `tutorLlmEnabled = false` y
+est en réalité déployé depuis #181 (échec réel de déploiement `DeploymentModelNotSupported` sur
+`gpt-5.4-mini`, qui a forcé la désactivation pour débloquer un correctif de sécurité sans rapport). Le
+module d'adoption IaC (`infra/modules/openai.bicep`, RBAC `Cognitive Services OpenAI User` inclus,
+ajouté par #178) est gated par ce flag et n'a **plus été redéployé depuis** #181 : le grant RBAC et la
+compatibilité du déploiement de modèle (kind `AIServices`) restent **non revérifiés**.
+
+Un agent CLI/IA sans accès réel à l'abonnement/tenant Azure Certigo ne peut ni attribuer ce RBAC ni
+exécuter un appel réel de validation — ces actions exigent un humain disposant de cet accès. Le
+commentaire de `infra/params/dev.bicepparam` a été corrigé pour refléter cet état, et un test gated
+`CERTIGO_TUTOR_LLM_LIVE_TESTS` (skip par défaut, zéro impact CI) a été ajouté
+(`backend/tests/Certigo.Api.Tests/TutorLlmLiveEndToEndTests.cs`, lancé via
+`backend/run-tutor-llm-live-gate.ps1`) pour que cette validation humaine — register/login → JWT →
+`POST /api/tutor/explain` → 200 + `source:"ai"` — soit reproductible dès que l'accès est disponible.
+Procédure complète : `docs/deployment-runbook.md` §T0.5 "Chemin 3".
+
+---
+
 ## Rollback
 
 Le repli déterministe **est** le rollback naturel : si l'Option A est un jour activée puis pose problème
@@ -142,5 +164,6 @@ Le repli déterministe **est** le rollback naturel : si l'Option A est un jour a
 - Note de décision détaillée : [`docs/runbooks/O-01_decision-tutor-ia-prod.md`](../runbooks/O-01_decision-tutor-ia-prod.md)
 - Code : `backend/src/Certigo.Api/Program.cs` (garde du flag), `backend/src/Certigo.Infrastructure/Ai/NullTutorCompletion.cs`, `backend/src/Certigo.Infrastructure/Ai/AzureOpenAiTutorCompletion.cs`
 - IaC : `infra/main.bicep`, `infra/modules/functionApp.bicep`, `infra/modules/openai.bicep`, `infra/params/prod.bicepparam`, `infra/params/dev.bicepparam`
+- Validation dev gated (Phase B) : `backend/tests/Certigo.Api.Tests/TutorLlmLiveEndToEndTests.cs`, `backend/tests/Certigo.Api.Tests/TutorLlmLiveEndToEndSupport.cs`, `backend/run-tutor-llm-live-gate.ps1`, `docs/deployment-runbook.md` §T0.5 "Chemin 3"
 - Registre de migration : `docs/migration/work-packages.yaml` (`wp-p0-04-ai-tutor-decision`), Phase 2 `wp-phase-2-search-ai-tutor`
 - Findings liés : O-02 (load-test Tutor), drift §G (OpenAI dev hors IaC)
