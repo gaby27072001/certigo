@@ -54,7 +54,9 @@ Ce document est le **livrable versionné** du lot. Il n'invente aucun code : il 
 - **Tags Git** (local **et** `origin`) : `v1.0.0`, `v1.0.1`, `v1.0.2`, `build-aab-latest`
 - **Pipeline backend** : `.github/workflows/cd-backend.yml` — déploiement OIDC (federated credentials), Bicep `infra/main.bicep` + code .NET 8, RG `rg-certigo-$ENV` (westeurope), retry 5×45 s
 - **Pipeline mobile Android** : `.github/workflows/release-android.yml` — AAB signé → Google Play, **gates bloquants** `flutter analyze` + `flutter test`, **`environment: beta`** (= gate d'approbation *required reviewers*), package `com.certigo.mobileapp`, Flutter 3.27.4
-- **Pipeline mobile iOS** : `.github/workflows/release-ios.yml` — IPA TestFlight, `environment: beta`, runner self-hosted macOS
+- **Pipeline mobile iOS** : `codemagic.yaml` — IPA signée puis TestFlight via
+  l'intégration `AppStoreConnect`; `.github/workflows/release-ios.yml` est legacy,
+  inerte par défaut et ne constitue pas la chaîne active
 - **Promotion** : `.github/workflows/promote-backend-staging-prod.yml` — `workflow_dispatch` staging→prod
 
 ---
@@ -99,10 +101,14 @@ Voir **`docs/E2E_AUTH_PREREQUIS.md`** (tenant Entra External ID, app registratio
 4. **Validation auth** (200 avec token valide, 401 sans) : `docs/deployment-runbook.md` §Validation auth (smoke test 200/401).
 
 ### 4.3 Mobile — release gated `beta`
-1. Déclencher `release-android.yml` (et/ou `release-ios.yml`).
-2. **Gates bloquants** exécutés automatiquement : `flutter analyze` + `flutter test` — un échec **stoppe** la release.
-3. **Gate `environment: beta`** : la job de publication attend l'**approbation d'un *required reviewer*** (configuration GitHub Environments — **action humaine**, cf. §5.4).
-4. Après approbation : AAB signé → Google Play (piste `beta`) ; IPA → TestFlight.
+1. Android : déclencher `release-android.yml`; iOS : utiliser le workflow
+   Codemagic documenté dans `docs/RELEASE_MOBILE.md`.
+2. **Gates bloquants** exécutés automatiquement : `flutter analyze` + `flutter
+   test` — un échec **stoppe** la release.
+3. Android conserve la gate GitHub `environment: beta`. iOS suit les gates
+   Codemagic/ASC, dry-run, crash distant et E2E appareil du runbook canonique.
+4. Pour le scope Alpha gelé le 2026-09-04, seul iOS/TestFlight interne est
+   autorisé ; Android et les promotions externes/publiques restent hors scope.
 
 ### 4.4 Tag de release
 Les tags `v1.0.0…v1.0.2` + `build-aab-latest` **existent déjà** (local + origin). **Aucun tag à pousser dans le cadre de ce lot** — pour une future version :

@@ -57,6 +57,12 @@ git push origin v1.2.3
 (Android / Google Play). iOS : voir [`RELEASE_MOBILE.md`](./RELEASE_MOBILE.md)
 (TestFlight via Codemagic ; `release-ios.yml` conservé à titre historique).
 
+> [!IMPORTANT]
+> Le scope de release actif est l'**Alpha iOS interne** gelée le 2026-09-04.
+> Les instructions Android ci-dessous restent un runbook futur et ne font pas
+> partie de cette Alpha. Les gates et la vérité historique/live canoniques sont
+> dans `RELEASE_MOBILE.md`; ne créer aucun tag ou store pour les vérifier.
+
 | Élément | Valeur |
 | --- | --- |
 | Déclencheurs | `repository_dispatch` type `release-android`, chargé uniquement depuis la branche par défaut |
@@ -162,7 +168,8 @@ printf '%s' \
 ## 5. Checklist de release E2E
 
 > Sert de base au lot **wp-p0-08** (release E2E taggée). À dérouler pour une release
-> coordonnée backend + mobile.
+> coordonnée backend + mobile **après l'Alpha iOS**. Pour l'Alpha, appliquer
+> exclusivement les gates de `RELEASE_MOBILE.md` §1.3 et §8.
 
 1. **Pré-vol**
    - [ ] `main` à jour, PR de release mergée (revue + checks verts).

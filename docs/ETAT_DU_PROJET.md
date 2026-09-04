@@ -104,6 +104,27 @@ dépend ni de l'objet Git capturé ni de son ascendance et reste donc valide apr
 **Légende narrative :** 🟢 implémenté avec référence indiquée · 🟡 partiel / en cours · 🔴 absent.
 Un statut sans référence vérifiable reste **non vérifié / manuel**.
 
+### Décision de release — Alpha iOS (gelée le 2026-09-04)
+
+La vérité opérationnelle détaillée et la checklist sont dans
+[`RELEASE_MOBILE.md`](./RELEASE_MOBILE.md). L'Alpha est **iOS/TestFlight interne
+uniquement**, limitée à la boucle coeur existante et au Tuteur IA déterministe
+(`TUTOR_LLM_ENABLED=false` / `NullTutorCompletion`). Android, TestFlight externe,
+publication publique et nouvelles features sont hors scope.
+
+| Surface | Historique prouvé | Vérifié le 2026-09-04 | Statut Alpha |
+|---|---|---|---|
+| App Store Connect / TestFlight | Capture opérateur du 2026-08-17 : app `com.certigo.mobileapp`, `Internal Testers`, build `1.0.1 (8)` traité, au moins une installation, cinq sessions | Bundle et publication `Internal Testers` toujours déclarés dans le dépôt | 🟡 historique seulement ; accès live et nouveau build à revérifier |
+| Codemagic | Runs réels documentés par les PR [#161](https://github.com/gchambaud_microsoft/Certigo/pull/161) et [#163](https://github.com/gchambaud_microsoft/Certigo/pull/163), puis build TestFlight traité | `AppStoreConnect` + `certigo_mobile_config` toujours référencés dans `codemagic.yaml` | 🟡 intégrations à revérifier live, puis dry-run |
+| Google Play | Le 2026-08-17, app en brouillon + liste de test interne créée/sélectionnée | Pipeline/package présents | ⚪ hors scope ; aucun AAB/release interne final prouvé |
+| Crash mobile | Capture locale fusionnée par [#213](https://github.com/gchambaud_microsoft/Certigo/pull/213) | Sink par défaut `debugPrint`, sans upload de symboles | 🔴 **bloquant** avant Alpha |
+
+Le Go Alpha exige, sur un même SHA candidat : **sink crash distant + symboles et
+crash test visible**, **intégrations Codemagic/ASC encore valides**, **dry-run IPA
+signé**, **nouveau build TestFlight interne**, puis **auth réelle et boucle E2E sur
+iPhone physique**. Les preuves historiques ne ferment aucune de ces gates. Cette
+décision documentaire ne déclenche aucun tag, release, upload ou recréation de store.
+
 ---
 
 ## 2 · Carte du monorepo
