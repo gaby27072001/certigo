@@ -16,10 +16,12 @@ namespace Certigo.Domain.Integrity;
 // Mode SANCTION : le verdict est appliqué par les services. `Reject` (signaux
 // durs : horloge falsifiée, vitesse bot — risk ≥ 0.8) SUPPRIME les récompenses
 // (0 XP/gems, pas de ligue, pas d'upsert profil) ET émet `attempt.flagged`.
-// `Flag` (cadence 0.4–0.8) reste en détection : récompenses créditées +
-// `attempt.flagged`. `Allow` passe sans event. La fenêtre de cadence 1h
-// (débit XP / nb tentatives) est alimentée par une `RateWindow` réelle lue du
-// conteneur `attempts`.
+// `Flag` (cadence) reste TOUJOURS en détection pure : la cadence, seule ou
+// combinée à elle-même, ne peut jamais franchir le seuil de `Reject` (voir
+// `AttemptIntegrityEvaluator.CadenceContributionCeiling`) — récompenses
+// créditées + `attempt.flagged`. `Allow` passe sans event. La fenêtre de
+// cadence 1h (débit XP / nb tentatives) est alimentée par une `RateWindow`
+// réelle lue du conteneur `attempts`.
 
 /// <summary>
 /// Décision du serveur sur une tentative notée. <see cref="Allow"/> laisse passer,
@@ -105,11 +107,14 @@ public sealed record IntegrityPolicy(
     /// suspecter un bot.
     ///
     /// Calibration sanction (conservée, ne pas durcir sans test dédié) :
-    /// la cadence (MaxXpPerWindow 600, MaxAttemptsPerWindow 40/1h) plafonne à
-    /// FlagThreshold 0.4 → un débit excessif seul donne au plus un `Flag`
-    /// (récompenses conservées), jamais un `Reject` solo. Le `Reject` (≥ 0.8) est
-    /// réservé aux signaux durs : soumission avant départ (risk 1) ou vitesse
-    /// surhumaine cumulée. Marge 0.4 entre Flag et Reject = aucun faux positif punitif.
+    /// la cadence (MaxXpPerWindow 600, MaxAttemptsPerWindow 40/1h) ne peut JAMAIS
+    /// sanctionner — ni seule, ni les deux signaux de cadence combinés entre eux —
+    /// grâce au plafond <see cref="AttemptIntegrityEvaluator.CadenceContributionCeiling"/>
+    /// (0.54, strictement sous FlagThreshold+RejectThreshold combinés : voir sa doc).
+    /// Un débit excessif reste donc TOUJOURS un `Flag` (détection pure, récompenses
+    /// conservées). Le `Reject` (≥ 0.8) est réservé aux signaux durs : soumission avant
+    /// départ (risk 1) ou vitesse surhumaine cumulée — seule une combinaison d'un signal
+    /// dur AVEC de la cadence peut faire franchir le seuil de `Reject`.
     /// </summary>
     public static IntegrityPolicy Default { get; } = new(
         HumanFloorMs: 350,
@@ -146,6 +151,28 @@ public sealed record IntegrityVerdict(
 /// </summary>
 public static class AttemptIntegrityEvaluator
 {
+    /// <summary>
+    /// Plafond de la contribution de risque d'UN SEUL détecteur de cadence
+    /// (<see cref="IntegrityFlag.XpRateExceeded"/> ou <see cref="IntegrityFlag.AttemptRateExceeded"/>).
+    /// La cadence est un signal STATISTIQUE (un apprenant assidu peut légitimement
+    /// enchaîner leçons et examens dans la même heure) — contrairement aux signaux durs
+    /// (horloge falsifiée, vitesse surhumaine), elle ne doit JAMAIS, à elle seule,
+    /// sanctionner une tentative.
+    ///
+    /// 0.54 garantit deux propriétés à la fois : (1) un détecteur de cadence seul
+    /// (contribution ≤ 0.54, combinée à un risque de base nul ⇒ risque final ≤ 0.54)
+    /// reste strictement sous <see cref="IntegrityPolicy.RejectThreshold"/> (0.8) quel
+    /// que soit l'ampleur du dépassement ; (2) même les DEUX signaux de cadence combinés
+    /// entre eux via la combinaison OR probabiliste (<c>Combine(0.54, 0.54) ≈ 0.7884</c>)
+    /// restent sous 0.8. Seule une combinaison avec un signal dur peut donc faire
+    /// franchir le seuil de `Reject`. Sans ce plafond, un dépassement de cadence solo
+    /// d'environ 30 % (XP projeté ≥ 1.3× MaxXpPerWindow, ou tentatives ≥ 1.3×
+    /// MaxAttemptsPerWindow) atteignait déjà `Reject` seul — un apprenant honnête
+    /// enchaînant quelques leçons puis un examen réussi dans la même heure pouvait
+    /// perdre toutes ses récompenses sans avoir triché.
+    /// </summary>
+    private const double CadenceContributionCeiling = 0.54;
+
     /// <summary>
     /// Rend un <see cref="IntegrityVerdict"/> pour une tentative. <paramref name="window"/>
     /// est optionnel (active les plafonds de cadence). <paramref name="policy"/> est
@@ -227,7 +254,9 @@ public static class AttemptIntegrityEvaluator
 
         // 5 & 6. Plafonds de cadence sur fenêtre récente — gardes anti-farming d'XP et
         //        anti-spam de soumissions. Évalués seulement si l'appelant fournit la
-        //        fenêtre agrégée (Redis en production).
+        //        fenêtre agrégée (Redis en production). Contribution plafonnée à
+        //        CadenceContributionCeiling : la cadence, seule ou combinée à
+        //        elle-même, ne peut jamais faire franchir RejectThreshold (voir sa doc).
         if (window is not null)
         {
             var projectedXp = window.XpInWindow + timing.XpEarned;
@@ -235,7 +264,7 @@ public static class AttemptIntegrityEvaluator
             {
                 flags.Add(IntegrityFlag.XpRateExceeded);
                 var excess = (double)(projectedXp - policy.MaxXpPerWindow) / policy.MaxXpPerWindow;
-                risk = Combine(risk, Math.Min(0.5 + excess, 1d));
+                risk = Combine(risk, Math.Min(0.5 + excess, CadenceContributionCeiling));
             }
 
             var projectedAttempts = window.AttemptsInWindow + 1;
@@ -243,7 +272,7 @@ public static class AttemptIntegrityEvaluator
             {
                 flags.Add(IntegrityFlag.AttemptRateExceeded);
                 var excess = (double)(projectedAttempts - policy.MaxAttemptsPerWindow) / policy.MaxAttemptsPerWindow;
-                risk = Combine(risk, Math.Min(0.5 + excess, 1d));
+                risk = Combine(risk, Math.Min(0.5 + excess, CadenceContributionCeiling));
             }
         }
 

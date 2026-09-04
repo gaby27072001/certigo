@@ -1,14 +1,14 @@
 {
   "id": "wp-p2-08",
-  "status": "in_review",
+  "status": "done",
   "session_id": "c730679b-0f9a-4fd9-a315-577a3f913e71",
   "branch": "gchambaud-microsoft-generate-project-state",
   "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/254",
   "checkpoint": {
-    "step": "pr-opened",
-    "note": "PR non-draft #254 ouverte vers main après revue indépendante ; py_compile, 10 tests unitaires, registre et contrôle generated == committed verts. Référence exacte sur le commit source 33b34a64ae2f6de2de73679328cee49881207794.",
-    "at": "2026-08-06T13:41:00+01:00"
+    "step": "merged",
+    "note": "PR #254 fusionnée 2026-08-07, issue #247 fermée le même jour (vérifié `gh pr view 254` + `gh issue view 247` le 2026-09-03). tools/project_state.py, le bloc GENERATED:PROJECT-STATE dans docs/ETAT_DU_PROJET.md et la gate ci-project-state.yml existent et sont opérationnels sur main. Registre corrigé après dérive : restait `in_review` (« PR ouverte ») ~1 mois après le merge réel ; une PR #360 tentait déjà la même correction sans être mergée.",
+    "at": "2026-09-03T00:00:00Z"
   },
-  "updated_at": "2026-08-06T13:41:00+01:00",
+  "updated_at": "2026-09-03T00:00:00Z",
   "history_ref": "log.jsonl"
 }

@@ -1,5 +1,12 @@
 # Audit Certigo — Refonte complète
 
+> **⚠️ ARCHIVÉ le 2026-09-03.** Les findings encore ouverts et leur statut vérifié vivent
+> désormais dans [`docs/ETAT_DU_PROJET.md`](../ETAT_DU_PROJET.md) §14 « Registre des risques &
+> findings ». Ce fichier est conservé pour le détail exhaustif de l'audit cloud d'origine
+> (tenant CIAM, RG Azure, RBAC — §D, §D-bis) qui n'a pas été reproduit intégralement dans le
+> registre canonique. Ne pas s'y fier pour un statut de finding actuel — seul §14 de
+> `ETAT_DU_PROJET.md` est tenu à jour.
+
 > **Date de l'audit** : 2026-07-04
 > **Auditeur** : Copilot (audit factuel, preuves cloud + repo réelles)
 > **Commit de référence repo** : `ccc0fa36` (branche `main`, 2026-07-01 — "docs: guide interactif activation auth Android #150")

@@ -10,10 +10,19 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 </div>
 
 > [!NOTE]
-> **Ce document combine des faits générés et une lecture narrative.** Trois documents complémentaires :
+> **Ce document combine des faits générés et une lecture narrative — c'est aussi, depuis le
+> 2026-09-03, le registre canonique unique de l'audit (risques/findings) et du plan (lots de
+> migration restants) de Certigo.** Quatre documents complémentaires :
 > - **`README.md`** → la **vision** et le pitch produit.
 > - **`docs/ARCHITECTURE.md`** → le **design de référence / la cible** technique.
-> - **`docs/ETAT_DU_PROJET.md`** (ce fichier) → faits observables générés, puis contexte narratif.
+> - **`docs/ETAT_DU_PROJET.md`** (ce fichier) → faits observables générés, risques/findings
+>   (§14), plan de migration (§15), puis contexte narratif.
+> - **`docs/migration/STATE.md`** → détail machine-vérifié (gardé par
+>   `ci-migration-registry.yml`) de chaque lot de migration ; §15 en donne le résumé et y renvoie
+>   plutôt que de le dupliquer.
+>
+> Les anciens `AUDIT_Certigo.md` et `AUDIT_Certigo_annexe_9c488c6.md` sont **archivés** sous
+> [`docs/archive/`](./archive/) : leur contenu encore pertinent a été migré au §14.
 >
 > Le bloc suivant est la seule source documentaire des compteurs techniques majeurs. Sa référence
 > (`docs/project-state-reference.json`) conserve le commit/date capturés et le SHA-256 déterministe
@@ -80,7 +89,7 @@ dépend ni de l'objet Git capturé ni de son ascendance et reste donc valide apr
 | **Tuteur IA** | 🟡 | Domain `Tutor/` + mobile `features/tutor` | Explications ancrées sur le contenu — **branché côté serveur ET mobile** (`tutor_sheet`). LLM réel **Azure OpenAI / Microsoft Foundry** (`AzureOpenAiTutorCompletion`, déploiement `gpt-5.4-mini`, surface API **v1**, auth **Entra ID** clé désactivée) derrière `ITutorCompletion`, **code prêt, compilé, couvert par `TutorCompletionTests`** — mais **désactivé partout** (`TUTOR_LLM_ENABLED=false` en prod **et en `dev`**, repli déterministe `NullTutorCompletion` toujours actif). Décision prod actée : ADR-O-01 (Option B). En `dev`, le flag a été repassé à `false` par #181 après un échec réel de déploiement (`DeploymentModelNotSupported` sur `gpt-5.4-mini`) ; le module IaC d'adoption (`infra/modules/openai.bicep`, RBAC _Cognitive Services OpenAI User_ inclus) n'a **plus été redéployé depuis** — RBAC et compatibilité du modèle sont **non revérifiés**. Test gated `CERTIGO_TUTOR_LLM_LIVE_TESTS` (`backend/run-tutor-llm-live-gate.ps1`) prêt pour la validation humaine une fois l'accès Azure réel disponible. Voir H19 et `docs/deployment-runbook.md` §T0.5 "Chemin 3". |
 | **Recommandation + coach** | 🟢 | Domain `Recommendation/` + `home/coach_section` | Moteur « next best » + coach IA sur l'accueil. |
 | **Notifications** | 🟢 | Domain `Notifications/` | Planification **serveur‑autoritaire**, estimation de la meilleure heure d'envoi. |
-| **Anti‑triche / intégrité** | 🟢 (shadow) | Domain `Integrity/` | Évaluateur déterministe des tentatives — **mode détection** (signale, ne sanctionne pas encore). |
+| **Anti‑triche / intégrité** | 🟢 | Domain `Integrity/` | Évaluateur déterministe — **signaux durs** (horloge falsifiée, vitesse) **sanctionnent** (`Reject` → 0 récompense) ; **cadence** (débit XP/tentatives) reste **détection pure par construction** (ne peut jamais, seule ou combinée, sanctionner). |
 | **Offline‑first** | 🟢 | `packages/data` (sync) + `app/offline` | File de synchro idempotente, backoff, rejouable — **câblée dans l'app**. *(Seule la leçon en cours est disponible hors‑ligne pour l'instant ; la synchronisation complète du catalogue est planifiée — P3.)* |
 | **Authentification** | 🟢 | API `Middleware/` + mobile `features/auth` | **Microsoft / Google / Apple** fédérés derrière **Entra External ID**, JWT validé serveur. |
 | **Person / LinkedIdentity** | 🟡 (shadow) | Domain `Identity/` + Application/Infrastructure | Runtime additif `off|shadow`, `off` dans tous les environnements. `shadow` conserve `personId == userId` et le resolver legacy autoritaire ; aucun endpoint/UI de liaison. |
@@ -89,7 +98,7 @@ dépend ni de l'objet Git capturé ni de son ascendance et reste donc valide apr
 | **Design system (Prism)** | 🟢 | `packages/prism_ui` | Composants + tokens + thèmes ; tests/goldens dans `ci-mobile.yml`. |
 | **App mobile (Flutter)** | 🟢 | `apps/mobile` | Les moteurs de gamification sont branchés en écran + tests widget (`ci-mobile.yml`). Validation E2E appareil : **non vérifiée / manuelle**. |
 | **Cortex (algos partagés)** | 🟢 | `packages/cortex` | SRS, scoring, fil pédagogique — partagé client/serveur. |
-| **Infrastructure (Bicep)** | 🟢 | `infra/` | Modules Functions, Cosmos, Key Vault, App Insights, Defender, Policy, Diagnostics et Storage ; réseau privé complet prêt (VNet/subnets FC1, private endpoints et DNS Storage/KV/Cosmos), non déployé par la PR ; état live référencé par `AUDIT_Certigo.md`. |
+| **Infrastructure (Bicep)** | 🟢 | `infra/` | Modules Functions, Cosmos, Key Vault, App Insights, Defender, Policy, Diagnostics et Storage ; réseau privé complet prêt (VNet/subnets FC1, private endpoints et DNS Storage/KV/Cosmos), non déployé par la PR ; état live référencé au §10/§14 ci-dessous. |
 | **CI / qualité** | 🟢 | `.github/workflows` | Inventaire généré ci-dessus ; gates référencées dans les workflows versionnés. |
 
 **Légende narrative :** 🟢 implémenté avec référence indiquée · 🟡 partiel / en cours · 🔴 absent.
@@ -170,7 +179,7 @@ flowchart LR
 | **Tuteur IA** | 🟢 | 🟢 | `POST /tutor/explain` — branché dans l'app via `tutor_sheet`. |
 | **Recommandation + coach** | 🟢 | 🟢 | `GET /me/recommendations/{trackId}` + coach IA sur l'accueil. |
 | **Notifications intelligentes** | 🟢 | 🟡 | `GET /me/notifications/plan` + réglages ; meilleure heure d'envoi estimée. |
-| **Anti‑triche / intégrité** | 🟢 | — | Évaluateur déterministe (mode détection, événement `attempt.flagged`). **Fenêtre de cadence** (XP/tentatives sur 1 h, conteneur `attempts`) câblée pour **quiz et examens** → détecteurs de débit actifs. |
+| **Anti‑triche / intégrité** | 🟢 | — | Évaluateur déterministe : **signaux durs sanctionnent** (`Reject` → 0 récompense, câblé quiz + examens) ; **cadence** (XP/tentatives sur 1 h, conteneur `attempts`) reste **détection pure par construction** (`attempt.flagged`), plafonnée sous le seuil de rejet, seule ou combinée. |
 | **Offline‑first** | 🟢 | 🟢 | Synchro idempotente rejouable, backoff. |
 | **Authentification** | 🟢 | 🟢 | Microsoft / Google / Apple via Entra External ID (Android + iOS natifs câblés). |
 | **Person / LinkedIdentity** | 🟡 (`off|shadow`) | — | Overlay Person et miroirs locaux/Entra idempotents, collisions fail-closed, télémétrie sans PII et tombstones de suppression ; aucune résolution autoritaire ni liaison utilisateur. |
@@ -273,7 +282,7 @@ les décisions serveur‑autoritaires.
 | **Validation JWT** | `Api/Middleware/JwtAuthMiddleware` | Vérifie le porteur `Bearer` sur chaque requête, sauf endpoints explicitement anonymes. |
 | **Config native Android** | `apps/mobile/android` | Schéma de redirection `certigo://auth` + permission `INTERNET` (#46). |
 | **Config native iOS** | `apps/mobile/ios` | URL Scheme `certigo` déclaré dans `Info.plist` pour le callback OIDC `certigo://auth`. |
-| **Anti‑triche** | `Domain/Integrity/AttemptIntegrity` | Évaluateur **déterministe & pur** → verdict `Allow / Flag / Reject` + score de risque [0..1] + drapeaux nommés (vitesse surhumaine, soumission avant départ, débit XP excessif…). **Mode détection** d'abord (signale, ne touche pas aux récompenses). **Fenêtre de cadence** (XP + nombre de tentatives sur 1 h, lue du conteneur `attempts`, sans Redis) alimentée côté **`QuizService` et `ExamService`** → détecteurs `XpRateExceeded`/`AttemptRateExceeded` actifs. |
+| **Anti‑triche** | `Domain/Integrity/AttemptIntegrity` | Évaluateur **déterministe & pur** → verdict `Allow / Flag / Reject` + score de risque [0..1] + drapeaux nommés (vitesse surhumaine, soumission avant départ, débit XP excessif…). **Mode SANCTION pour les signaux durs** (horloge falsifiée, vitesse surhumaine) : `Reject` supprime les récompenses (0 XP/gems, pas de ligue, pas d'upsert profil), câblé côté **`QuizService` et `ExamService`**. **La cadence** (XP + nombre de tentatives sur 1 h, lue du conteneur `attempts`, sans Redis) reste **détection pure par construction** : le score de risque d'un signal de cadence — seul ou combiné à l'autre signal de cadence — est plafonné strictement sous le seuil de `Reject` ; seule une combinaison avec un signal dur peut sanctionner. |
 | **Baseline sécurité CI** | `.github/workflows` | **CodeQL** + **security‑scan** + Bicep `Defender` / `Policy` / `Diagnostics`. |
 
 ---
@@ -318,7 +327,9 @@ La présence des modules et paramètres est observable dans `infra/` et contrôl
 `ci-infra.yml`. L'état des environnements Azure est une observation externe, datée et référencée
 dans l'audit ci-dessous ; il n'est pas déduit du seul code.
 
-> ℹ️ État d'infra vérifié le **2026-07-04** — voir [`AUDIT_Certigo.md`](../AUDIT_Certigo.md) (source de vérité de l'état d'infra).
+> ℹ️ État d'infra vérifié le **2026-07-04** — détail cloud complet (RG, RBAC, tenant CIAM) dans
+> [`docs/archive/AUDIT_Certigo_2026-07-04.md`](./archive/AUDIT_Certigo_2026-07-04.md) (archivé,
+> synthèse des risques encore ouverts au §14 ci-dessous).
 
 ---
 
@@ -396,11 +407,108 @@ déclarée est dans `codemagic.yaml`.
 - 🪪 **Person / LinkedIdentity — prochain lot** : observer le mode `shadow`, traiter toute collision,
   puis livrer séparément le resolver autoritaire `resolve`. Les endpoints/UI `link` restent hors
   périmètre jusqu'à validation des cohortes et de la suppression multi-identités.
-- 🔍 **Faire passer l'anti‑triche** du mode détection au mode application des sanctions (lot suivant) — la **fenêtre de cadence** (débit XP/tentatives sur 1 h) est désormais câblée pour **quiz et examens** ; reste la calibration puis la bascule en mode sanction.
+- ✅ **Anti‑triche en mode sanction** pour les signaux durs (horloge falsifiée, vitesse) — `Reject` supprime les récompenses, câblé pour quiz et examens (§8). La **cadence** (débit XP/tentatives sur 1 h) reste **volontairement** en détection pure : sa contribution au score de risque est plafonnée sous le seuil de `Reject`, seule ou combinée aux deux signaux de cadence entre eux, pour ne jamais punir un apprenant assidu. Bascule future de la cadence en sanction : **différée**, nécessite au préalable un feature flag de configuration (kill switch), une alerte sur le volume de `Reject`, et une revue de télémétrie réelle avant tout changement de seuil.
 - ✅ **Tests d'intégration Cosmos exécutés sur émulateur réel** (le projet `Certigo.Infrastructure.Tests` est gated `CERTIGO_COSMOS_TESTS=1`). Les **6 cas ont tourné** (0 ignoré) contre l'émulateur Docker `mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview` (ARM64, HTTPS) : **5/6 verts**. Le 6e — `Attempt_recent_activity_aggregates_count_and_xp_within_window` (`CosmosAttemptRepository.GetRecentActivityAsync`, agrégat `COUNT(1)`/`SUM` projeté en objet `VALUE { … }`) — échoue **uniquement** sur l'émulateur _vnext-preview_ (back‑end PostgreSQL) avec `RewrittenAggregateProjections was not an array for a value aggregate query`. **Ce n'est pas un bug de production** : la requête est valide contre Cosmos réel et l'émulateur classic ; on **ne réécrit pas** la requête pour contourner une limite de l'émulateur preview. L'émulateur **classic amd64** est **inutilisable sur cet hôte ARM64** (`exec format error` sans QEMU ; `segfault signal 11` même avec QEMU x86_64 binfmt installé), d'où la cible 6/6 hors de portée localement — à confirmer en CI/Cosmos réel.
   - _Relancer la suite_ : `docker run -d --name cosmos-emulator -p 8081:8081 -p 1234:1234 -e PROTOCOL=https mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview` (attendre `PostgreSQL=OK, Gateway=OK, Explorer=OK` dans `docker logs`), puis exporter `CERTIGO_COSMOS_TESTS=1`, `COSMOS_EMULATOR_ENDPOINT=https://localhost:8081`, `COSMOS_EMULATOR_KEY=<clé publique émulateur>` et lancer `dotnet test backend\tests\Certigo.Infrastructure.Tests`.
 - ✅ **Couverture HTTP/middleware Functions complétée** : tests ajoutés pour les **15 Functions** jusque‑là non couvertes (User, Tutor, Streak, Shop, ShareCard, Season, Recommendation, Quest, Path, Notification, Lesson, Leaderboard, Friend, Exam, Achievement) via le harness maison (`FunctionTestHost` + faux services dans `Fakes.Functions.cs`) — happy‑path authentifié (200 + service appelé 1×) et garde non‑authentifié. **Suite globale `dotnet test backend\Certigo.sln` : 496 verts, 0 échec** (6 cas Cosmos `Skipped` proprement quand le gate est off).
 - 🤖 **Tuteur IA — décision prod actée, dev verrouillé documenté** : le provider Azure OpenAI / Foundry (`gpt-5.4-mini`, surface **v1**, auth **Entra ID**) est **câblé, compilé et couvert par tests unitaires** (`AzureOpenAiTutorCompletionTests`). Décision prod : ADR-O-01 (Option B, repli déterministe, `TUTOR_LLM_ENABLED=false`) — **aucun changement**. État **dev** clarifié (le commentaire précédent de `infra/params/dev.bicepparam` affirmait à tort que le rôle RBAC était accordé et le flag actif) : le flag est **`false`** depuis #181 (échec réel de déploiement `DeploymentModelNotSupported` sur `gpt-5.4-mini`) et le module IaC d'adoption (`infra/modules/openai.bicep`, RBAC _Cognitive Services OpenAI User_) **n'a plus été redéployé depuis** — RBAC et compatibilité du modèle sont donc **non revérifiés dans la forme IaC actuelle**. Un **appel réel de validation** (register/login → JWT → `POST /api/tutor/explain` → 200 + `source:"ai"`) reste nécessaire avant toute bascule ; il ne peut être exécuté que par un humain disposant d'un accès Azure réel (agent sans accès à la souscription/tenant Certigo). Outillage prêt pour cette validation : test gated `CERTIGO_TUTOR_LLM_LIVE_TESTS=1` (`backend/tests/Certigo.Api.Tests/TutorLlmLiveEndToEndTests.cs`, skip par défaut) lancé via `backend/run-tutor-llm-live-gate.ps1` ; procédure complète dans `docs/deployment-runbook.md` §T0.5 "Chemin 3".
+
+---
+
+## 14 · Registre des risques & findings
+
+> Registre canonique unique des risques de sécurité/fiabilité identifiés par audit. Remplace
+> `AUDIT_Certigo.md` (2026-07-04) et `AUDIT_Certigo_annexe_9c488c6.md` (2026-06-23), archivés
+> sous [`docs/archive/`](./archive/). Chaque ligne cite sa preuve ; **statut vérifié** = revérifié
+> sur le code/l'infra actuels lors de la consolidation du 2026-09-03 (pas une recopie de l'audit
+> d'origine). Sévérité : 🔴 Haute · 🟠 Moyenne · 🟡 Faible.
+
+### Findings résolus (preuve dans le repo)
+
+| ID | Sévérité | Constat original | Statut vérifié 2026-09-03 |
+|---|---|---|---|
+| **F-01** | 🟠 | Secret de signature JWT en clair dans les app settings (dev + prod) | ✅ **Résolu** — Key Vault reference câblée (`infra/modules/functionApp.bicep:89,321`, `infra/modules/keyvault.bicep:46`) |
+| **F-02** | 🟡 | Config Entra dev factice (tenant placeholder) | ✅ **Résolu** — confirmé par `docs/migration/verifications/wp-p0-05-ciam-governance.md` |
+| **R-01** | 🟠 | Écriture profil (XP/gems/streak) sans concurrence optimiste — lost update possible | ✅ **Résolu** — `OptimisticConcurrency.cs` (retry borné sur `ConcurrencyConflictException`) + ETag câblés (`wp-p0-02-etag-concurrency` = `done`) |
+| **R-02** | 🟠 | Cosmos prod en backup `Periodic`, pas de PITR | ✅ **Résolu en IaC** — `cosmosBackupMode = 'Continuous'` en staging/prod (`infra/params/{staging,prod}.bicepparam`, `infra/modules/cosmos.bicep:59`) ; ⏳ **preuve de restauration live encore à faire** (`docs/runbooks/R-02_cosmos-pitr-restauration.md` : « restore-test à planifier ») |
+| **O-01** | 🔴 (décision) | Tutor IA désactivé en prod, décision requise | ✅ **Décidé** le 2026-07-06 — Option B (repli déterministe), voir `docs/adr/ADR-O-01-ai-tutor-prod.md` |
+| **O-03** | — | Tenant CIAM personnel non audité | ✅ **Résolu** (déjà clos dans l'audit d'origine, §D-bis) |
+| **D11** *(migré depuis l'annexe)* | 🟠 | Checkov IaC en `--soft-fail` ; aucun scan CVE pub/npm/pip | ✅ **Résolu** — plus de `--soft-fail` dans `.github/workflows/security-scan.yml` ; `dependency-vuln-scan.yml` couvre désormais pub/npm/pip |
+
+### Findings encore ouverts — action live hors repo (runbook prêt, exécution humaine requise)
+
+| ID | Sévérité | Constat | Runbook | Statut au 2026-09-03 |
+|---|---|---|---|---|
+| **O-02** | 🔴 | Azure OpenAI dev jamais load-testé, capacity=1 (~1K TPM) | `docs/runbooks/O-02_plan-test-charge-openai.md` | À exécuter |
+| **O-05** | 🟠 | Résidus QuickStart dans le tenant CIAM (3 apps + 2 user flows + 1 subscription vide) | `docs/runbooks/O-05_nettoyage-tenant-ciam.md` | À exécuter |
+| **R-04** | 🔴 | CIAM : un seul Global Admin (MSA gmail fédéré), pas de break-glass | `docs/runbooks/R-04_compte-break-glass-ciam.md` | À exécuter |
+| **R-05** | 🔴 | Secret IdP « Microsoft account » prod expire 2027-07-01, sans rotation/alerte outillée | `docs/runbooks/R-05_rotation-secret-idp-msa.md` | À exécuter |
+| **R-06** | 🔴 | Ressource de facturation CIAM (`ciamDirectories`) sans resource lock | `docs/runbooks/R-06_resource-lock-ciam-facturation.md` | À exécuter |
+| **O-04** | 🟡 | Pas d'environnement staging réellement déployé (`staging.bicepparam` existe, non appliqué) | `docs/migration/ACTIONS-MANUELLES-P1.md` §4 (`wp-p1-13`) | `todo` (dépend de `wp-p1-12`, également `todo`) |
+
+### Findings encore ouverts — actionnables depuis le repo
+
+| ID | Sévérité | Constat | Preuve | Action recommandée |
+|---|---|---|---|---|
+| **R-03** | 🟡 | Sur-privilège Storage (`Storage Blob Data Owner` en plus de `Contributor` pour l'identité hôte Function App) | `infra/modules/functionApp.bicep:168-176` (assignation `Owner` toujours présente à côté de `Contributor`, lignes 158-166) — revérifié le 2026-09-03, **toujours présent** | Auditer si `Owner` est réellement nécessaire ; rétrograder vers `Contributor` seul si possible |
+| **D10** *(migré depuis l'annexe, toujours vrai)* | 🟠 | Dart/Flutter exclu de CodeQL — plus grande base de code (jetons OIDC, secure storage) sans SAST | `.github/workflows/codeql.yml:5` (« Dart/Flutter is not supported by CodeQL ») — revérifié le 2026-09-03, **toujours vrai** ; `flutter analyze` est un linter, pas un SAST | Compléter par un scanner sécurité Dart (ex. `dart_code_metrics` sécurité, Semgrep règles Dart) ou documenter explicitement la limite comme risque accepté |
+
+> **Méthode de revérification.** Pour toute ligne « action live hors repo », le statut ne peut
+> **pas** être confirmé depuis ce dépôt (nécessite des credentials Azure/Entra que l'agent n'a
+> pas). Avant de considérer une ligne comme close, relire le runbook cité : il porte sa propre
+> case « Statut » mise à jour par l'opérateur qui l'exécute (voir aussi l'index
+> `docs/runbooks/README.md`).
+
+---
+
+## 15 · Plan — lots de migration
+
+> Résumé par phase, ancré sur `docs/migration/work-packages.yaml` (source de vérité) et
+> `docs/migration/STATE.md` (miroir humain détaillé, gardé cohérent avec le manifeste par
+> `python tools/validate_migration_registry.py` + la gate `ci-migration-registry.yml`). **Ce
+> tableau ne duplique pas `STATE.md`** — il en donne la synthèse ; pour le détail lot par lot
+> (dépendances, PR, statut), voir [`docs/migration/STATE.md`](./migration/STATE.md).
+
+| Phase | Périmètre | Avancement au 2026-09-03 |
+|---|---|---|
+| **0 — Stabilisation** | Sécurité/fiabilité P0 (F-01, R-01, R-02, gouvernance CIAM, branch protection, E2E release) | ✅ **9/9 lots `done`** (`wp-000` + `wp-p0-01`…`08`) |
+| **1 — Contenu & Renderer** | Dépôt `certigo-content`, schémas v2, renderer, cache offline, observabilité, CI | 🟡 **13/16 lots `done`** — `wp-p1-10` (crash reporting mobile) clôturé `done` malgré un écart DoD résiduel accepté sur décision explicite (capture locale livrée, sink prod + upload symboles restants — voir `work-packages.yaml`) ; restent `wp-p1-11` (résilience CI, voir nuance ci-dessous), `wp-p1-12` (import drift IaC), `wp-p1-13` (staging, dépend de `wp-p1-12`) |
+| **2 — Search & AI Tutor** | Réconciliation registre, contenu multi-cloud, releases immuables, anti-drift doc | 🟡 **en cours** — voir détail dans `STATE.md` (`wp-p2-04` à `wp-p2-09`) |
+| **3 à 5 — Admin ops, backend modulaire, scale mondial** | Placeholders non décomposés | ⚪ `planned` |
+
+**Point d'attention actif (`wp-p1-11-ci-spof-runners`, encore `todo`) :** le lot `wp-p2-07`
+(Phase 2, PR [#250](https://github.com/gchambaud_microsoft/Certigo/pull/250) et
+[#253](https://github.com/gchambaud_microsoft/Certigo/pull/253), fusionnées) a livré le
+**failover** sur un pool Azure ≥2 instances, mais la DoD précise de `wp-p1-11` — séparation
+stricte des identités `certigo-pr` / `certigo-trusted` — **n'est pas atteinte en live** :
+`docs/runbooks/CI_RUNNERS.md` constate (au 20 août 2026) que les deux runners portent
+**simultanément** les deux labels et que la migration est **« bloquée »**. Ne pas clore
+`wp-p1-11` sans revérifier cet état live.
+
+**Prochaine action prioritaire recommandée :** `wp-p1-12-iac-drift-import` (réconcilier Azure
+OpenAI dev et le réseau `rg-certigo-ci` dans le Bicep) — débloque `wp-p1-13-staging-environment`,
+lui-même prérequis à un environnement pré-prod aligné sur le durcissement prod.
+
+**Comment vérifier qu'une ligne de `STATE.md` n'a pas dérivé** (le mécanisme
+`GENERATED:PROJECT-STATE` en tête de document ne couvre que des faits statiques du dépôt, pas des
+états PR/issue GitHub externes — ces derniers ont besoin d'une vérification explicite,
+documentée ici plutôt que d'un hash) :
+
+```bash
+# Pour un lot non-done/non-planned, retrouver son PR/issue dans work-packages.yaml puis :
+gh pr view <numéro> --repo gchambaud_microsoft/Certigo --json number,title,state,mergedAt,url
+gh issue view <numéro> --repo gchambaud_microsoft/Certigo --json number,title,state,closedAt
+# Ou, pour un balayage semi-automatique de tous les lots non clos :
+python tools/check_migration_pr_status.py
+```
+
+Deux dérives de ce type ont été trouvées et corrigées le 2026-09-03 (`wp-p1-10` et `wp-p2-08`
+affichaient un statut périmé de 1 à 2 mois par rapport à l'état réel de leur PR GitHub) — voir
+`docs/migration/log.jsonl` pour le détail des transitions de correction. Pour `wp-p1-10`, deux
+sessions indépendantes ont détecté la même dérive et le même écart de DoD le même jour, avec des
+verdicts de clôture différents (`in_progress` vs `done`) ; le conflit de merge qui en a résulté a
+été tranché en faveur de la décision explicite et documentée de la session orchestratrice
+(`done`, écart accepté — voir `docs/migration/state/wp-p1-10-mobile-crash-reporting.json`).
 
 ---
 
