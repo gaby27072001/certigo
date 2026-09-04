@@ -57,6 +57,9 @@ Trois modèles complémentaires sont versionnés :
 - `pilot.bicep` crée un VMSS Flexible PR-only dans un VNet dédié non appairé, avec son
   propre NAT/NSG. Il n'accorde aucune identité, IP publique, route privée applicative ou
   label trusted.
+- `aca/main.bicep` décrit le pilote ACA Jobs éphémère d'ADR-018. Il est
+  désactivé par défaut et son prévol strict est documenté dans
+  [`ACA_JOBS_PILOT.md`](../../docs/runbooks/ACA_JOBS_PILOT.md).
 
 `runner.bicep` sert à créer une nouvelle instance ou à reconstruire une instance
 préalablement supprimée. **Ne pas l'appliquer au nom d'une VM vivante** : les propriétés
@@ -264,8 +267,9 @@ explicitement à une PR2 séparée.
 ## Capacité et cycle de vie
 
 Le VMSS live est `Standard_D2ads_v6`, autoscale min 2 / défaut 2 / max 4. Son scale-in CPU
-est dangereux car il ignore GitHub `busy`, et les runners portent simultanément
-`certigo-pr` et `certigo-trusted`. Toute automation mutable est donc bloquée.
+est dangereux car il ignore GitHub `busy`. Les labels de confiance ont été réconciliés le
+4 septembre 2026 (`f55` trusted-only, `bbf` PR-only), mais toute automation mutable reste
+bloquée par le scale-in CPU et le feature flag.
 
 Le script `lifecycle-preflight.sh` inventorie sans mutation et refuse une déallocation en
 présence d'un label double, d'un job actif/en file, d'un scale-in CPU ou d'un écart entre VM

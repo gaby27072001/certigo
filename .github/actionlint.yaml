@@ -3,4 +3,5 @@ self-hosted-runner:
     - certigo-cosmos-emulator
     - certigo-image-attestation-canary
     - certigo-pr
+    - certigo-pr-aca
     - certigo-trusted

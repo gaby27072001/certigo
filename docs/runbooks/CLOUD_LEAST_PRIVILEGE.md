@@ -30,7 +30,7 @@ puis confirmer que les RG, identités et scopes attendus y existent. En leur abs
 qu'une déallocation serait dangereuse et, dans cette PR, pour toute demande puisque le
 feature flag reste `off`.
 
-## Inventaire read-only consolidé au 20 août 2026
+## Inventaire read-only consolidé au 20 août et revérifié le 4 septembre 2026
 
 Périmètre observé : subscription
 `b8952c8c-8f72-469d-99cd-ac906da4e2fc`, groupes `rg-certigo-dev`,
@@ -65,9 +65,9 @@ L'état live ne correspond plus aux anciennes VM autonomes documentées :
 | Autoscale | activé, minimum `2`, défaut `2`, maximum `4` |
 | Scale-out | CPU moyenne > 70 % pendant 10 min |
 | Scale-in | CPU moyenne < 20 % pendant 45 min — **non conscient des jobs GitHub** |
-| Inventaire GitHub | runner `27` `f55d176e-Certigo` online/labels doubles; runner `28` `certigo-prIVJAN8` online, PR-only; runner `26` `22f7fb52-Certigo` offline/stale et hors scope |
-| Cloisonnement | le pilote est sans identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; `f55d176e` conserve UAMI + `snet-runners` mais ses labels doubles restent **bloquants** |
-| Capacité réellement réconciliée | **2 instances gérées/online** : `f55d176e` et `bbf83c5c`; `4153d1dd` reste externe |
+| Inventaire GitHub | runner `27` `f55d176e-Certigo` offline/non-busy, `certigo-trusted` uniquement; runner `28` `certigo-prIVJAN8` offline/non-busy, `certigo-pr` + `certigo-pr-pilot`; runner `26` `22f7fb52-Certigo` offline/stale et hors scope |
+| Cloisonnement | le pilote est sans identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; `f55d176e` conserve UAMI + `snet-runners`; les labels de confiance sont exclusifs |
+| Capacité réellement réconciliée | **2 instances gérées/deallocated** : `f55d176e` et `bbf83c5c`; `4153d1dd` reste externe |
 
 Le premier snapshot avait vu trois VM, avant le scale-in CPU. L'état consolidé prouve qu'un
 simple comptage « VM Azure / runners GitHub » est faux. La réconciliation explicite classe

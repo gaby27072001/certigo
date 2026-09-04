@@ -6,13 +6,20 @@
 | **Objectif** | Exploiter la CI de Certigo sur ses **runners self-hosted** : **rallumer** les VMs avant une session de travail, les **déallouer** après (économie), **vérifier** l'état des runners et **dépanner** un runner hors ligne. |
 | **Voie officielle** | **Self-hosted** — VMSS flexible Azure. Les runners GitHub-hosted sont indisponibles par politique d'organisation. |
 | **Périmètre** | Repo `gchambaud_microsoft/Certigo` · RG `RG-CERTIGO-CI` · subscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**). |
-| **Statut** | **Migration bloquée** : aucune déallocation automatisée avant séparation des labels et retrait du scale-in CPU. |
+| **Statut** | **Labels réconciliés** ; aucune déallocation automatisée avant retrait du scale-in CPU et activation approuvée du lifecycle. |
 
-> **Dérive live consolidée au 20 août 2026.** Le pool est désormais
-> `vmss-certigo-runner-zonal` (Flexible, autoscale 2–4). Les deux runners GitHub
-> enregistrés portent simultanément `certigo-pr` et `certigo-trusted`; le scale-in CPU
-> ignore l'état `busy`. Les anciennes commandes visant `vm-certigo-runner` et
+> **État live revérifié le 4 septembre 2026.** Le pool est
+> `vmss-certigo-runner-zonal` (Flexible, autoscale 2–4). Le runner 27 porte uniquement
+> `certigo-trusted`; le runner 28 porte `certigo-pr` + `certigo-pr-pilot`. Les deux
+> runners étaient offline/non-busy et leurs VM déallouées. Le scale-in CPU ignore toujours
+> l'état `busy`. Les anciennes commandes visant `vm-certigo-runner` et
 > `vm-certigo-runner-2` ne doivent plus être exécutées.
+>
+> Une nouvelle panne simultanée a été observée à `03:15Z` le même jour : runners
+> 27 et 28 offline, PR #366 et autres runs en file. La restauration des VM est
+> traitée séparément; ce runbook ne la duplique pas. Le pilote ACA décrit dans
+> [`ACA_JOBS_PILOT.md`](./ACA_JOBS_PILOT.md) fournit une capacité indépendante
+> limitée, pas un remplacement du pool trusted.
 
 > ⚠️ **Principe « l'agent PRÉPARE, VOUS EXÉCUTEZ »** — aucune commande `gh` / `az` n'est lancée par
 > l'agent. Les commandes ci-dessous sont **à exécuter par vous** après vérification des identifiants
@@ -54,16 +61,17 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 | Élément | Valeur |
 |---|---|
 | **VMSS live** | legacy `vmss-certigo-runner-zonal` zone 2 + pilote PR `vmss-certigo-pr-pilot-z1` zone 1 |
-| **Capacité Azure live** | `f55d176e` et `bbf83c5c` gérées/running; `4153d1dd` externe/deallocated; `22f7fb52` et `4596a9d5` absentes/interdites |
+| **Capacité Azure live** | `f55d176e` et `bbf83c5c` gérées/deallocated; `4153d1dd` externe/deallocated; `22f7fb52` et `4596a9d5` absentes/interdites |
 | **Resource group** | `RG-CERTIGO-CI` |
 | **Subscription** | `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**) |
-| **Runners GitHub live** | ID 27 `f55d176e-Certigo` online/labels doubles; ID 28 `certigo-prIVJAN8` online/non-busy, labels `certigo-pr` + `certigo-pr-pilot` |
+| **Runners GitHub live** | ID 27 `f55d176e-Certigo` offline/non-busy, label `certigo-trusted`; ID 28 `certigo-prIVJAN8` offline/non-busy, labels `certigo-pr` + `certigo-pr-pilot` |
 | **Classification contrôleur** | f55 + bbf bindings exacts gérés · `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit |
 | **Identités** | f55 : UAMI `id-vm-certigo-runner-2-vmss`; pilote PR : aucune identité |
 | **Repo desservi** | `gchambaud_microsoft/Certigo` |
 
-> 📌 Les labels `certigo-pr` et `certigo-trusted` doivent redevenir mutuellement exclusifs. Un éventuel
-> runner **macOS** dédié à iOS (cf. §9) est **distinct** et **n'est pas** géré par ce runbook.
+> 📌 Les labels `certigo-pr` et `certigo-trusted` sont mutuellement exclusifs depuis la
+> vérification du 4 septembre 2026. Un éventuel runner **macOS** dédié à iOS (cf. §9)
+> est **distinct** et **n'est pas** géré par ce runbook.
 
 > ℹ️ **Prérequis outillage** (poste opérateur) : `az` (Azure CLI) connecté à la subscription Non-Prod,
 > et `gh` (GitHub CLI) authentifié sur `gchambaud_microsoft/Certigo`.
@@ -80,13 +88,13 @@ Baseline 30 jours : **242,06 USD**, 413 jobs, 18,84 runner-heures, CPU moyen 3,7
 file P95 5 108 s et P99 12 628 s. Le CPU faible combiné à une file longue justifie un
 contrôleur `workflow_job` queue-driven, pas un seuil CPU. Son feature flag reste désactivé.
 Le plan réconcilie les bindings Azure/GitHub exacts et exige simultanément power Azure
-**et** runner GitHub online. Le label trusted doit encore être séparé, puis la redondance
-prouvée avant toute activation. La cible du pilote ultérieur est **6 PR + 2 trusted**;
+**et** runner GitHub online. La redondance et le lifecycle fail-closed doivent encore être
+prouvés avant toute activation. La cible du pilote ultérieur est **6 PR + 2 trusted**;
 ce n'est ni le plafond live actuel de 4, ni un maximum de production définitif.
 
 | Situation | État requis | Décision opérateur |
 |---|---|---|
-| Avant une session CI | un runner exclusif `certigo-pr` et un exclusif `certigo-trusted`, `online` | Tant que les labels sont doubles, corriger la configuration avant toute automation. |
+| Avant une session CI | un runner exclusif `certigo-pr` et un exclusif `certigo-trusted`, `online` | Les labels sont réconciliés ; vérifier qu'ils le restent avant toute automation. |
 | Pendant une session | zéro scale-in CPU | Ne jamais laisser Azure retirer une instance sur simple faible CPU. |
 | Après la session | 5 min continues à zéro, reset sur toute activité, puis deux gardes | Prévol seulement; changement sous lease, un pool à la fois, avec réarmement sur nouvelle activité. |
 | Panne/maintenance | autre classe préservée | Ne jamais déplacer son label pour contourner la panne. |
@@ -145,8 +153,8 @@ bash infra/ci-runner/lifecycle-preflight.sh deallocate
 > - **`az vm stop`** (ou un `shutdown` depuis l'OS) : éteint l'OS mais **laisse la VM allouée** →
 >   **le compute reste facturé**. ❌ **à éviter.**
 
-Un résultat bloqué est le comportement attendu tant que les labels doubles, la file ou le
-scale-in CPU existent.
+Un résultat bloqué est le comportement attendu tant que la file, le scale-in CPU ou une
+autre garde lifecycle subsistent.
 
 ---
 
@@ -279,4 +287,4 @@ validations PR ne peut donc être restauré sur le pool trusted.
 > `vmss-certigo-runner-zonal` · subscription
 > `b8952c8c-8f72-469d-99cd-ac906da4e2fc` · f55 + bbf gérés ·
 > `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit ·
-> label double f55 à corriger.
+> labels de confiance exclusifs vérifiés le 4 septembre 2026.

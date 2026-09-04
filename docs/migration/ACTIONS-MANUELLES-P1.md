@@ -27,11 +27,11 @@
 > - **Lot 2** (`wp-p1-11-ci-spof-runners`) — ⚠️ **encore ouvert, mais partiellement recoupé
 >   par `wp-p2-07`** (PR [#250](https://github.com/gchambaud_microsoft/Certigo/pull/250) et
 >   [#253](https://github.com/gchambaud_microsoft/Certigo/pull/253), fusionnées) qui a livré le
->   **failover** sur un pool Azure ≥2 instances. La DoD précise de **ce** lot (séparation
->   d'identité stricte `certigo-pr` / `certigo-trusted`) reste **non atteinte en live** :
->   `docs/runbooks/CI_RUNNERS.md` (au 20 août 2026) constate que les deux runners portent
->   **simultanément** les deux labels et que la migration est **« bloquée »**. Ne pas
->   considérer ce lot comme fait sans revérifier `CI_RUNNERS.md`.
+>   **failover** sur un pool Azure ≥2 instances. La séparation stricte des labels
+>   `certigo-pr` / `certigo-trusted` a été revérifiée le 4 septembre 2026. La DoD du lot
+>   reste ouverte tant que le scale-in CPU non conscient de GitHub et les preuves lifecycle
+>   fail-closed ne sont pas résolus. Ne pas considérer ce lot comme fait sans revérifier
+>   `CI_RUNNERS.md`.
 > - **Lots 3 et 4** (`wp-p1-12-iac-drift-import`, `wp-p1-13-staging-environment`) — toujours
 >   ouverts (`todo` dans le registre), inchangés depuis la dernière vérification.
 

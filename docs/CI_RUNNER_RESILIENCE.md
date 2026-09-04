@@ -23,19 +23,28 @@ mutuellement exclusifs :
 
 ## Capacité et stratégie de cycle de vie
 
-L'inventaire read-only consolidé au 20 août 2026 constate le VMSS legacy
+L'inventaire read-only revérifié le 4 septembre 2026 constate le VMSS legacy
 `vmss-certigo-runner-zonal` et le pilote `vmss-certigo-pr-pilot-z1`.
-Cet état ne respecte pas la cible ci-dessus. Le scale-in CPU ignore l'état GitHub `busy`.
+Les labels de confiance respectent désormais la cible ci-dessus. Le scale-in CPU ignore
+toujours l'état GitHub `busy`.
 
 La réconciliation classe le runner 26 (`22f7fb52-Certigo`) et la VM `4153d1dd`
 **hors scope**, `f55d176e`/runner 27 et `bbf83c5c`/runner 28 comme paires **gérées**
-running/online. Le pilote zone 1 est PR-only, sans
+comme paires gérées. Le pilote zone 1 est PR-only, sans
 identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; f55 zone 2 conserve son identité
-et `snet-runners`, mais ses labels doubles bloquent encore l'activation. L'externe n'est ni comptée,
-ni adoptée, ni ciblée. Toute nouvelle VM sans runner est non classée et bloque le plan.
-Aucune de ces entrées n'est supprimée ou réparée par ce livrable.
+et `snet-runners`. Le runner 27 porte uniquement `certigo-trusted`; le runner 28 porte
+`certigo-pr` + `certigo-pr-pilot`. Les deux étaient offline/non-busy et leurs VM déallouées
+lors de la vérification. L'externe n'est ni comptée, ni adoptée, ni ciblée. Toute nouvelle
+VM sans runner est non classée et bloque le plan. Aucune de ces entrées n'est supprimée ou
+réparée par ce livrable.
 
-Toute automation mutable est donc bloquée. Le prévol
+À `03:15Z` le 4 septembre, les deux runners étaient de nouveau offline en même
+temps après leur restauration précédente. La PR #366 et d'autres runs sont restés
+en file. Le pilote ACA d'ADR-018 est donc conçu comme une capacité indépendante
+des VMSS pour quatre jobs stateless seulement; il ne remplace pas le rétablissement
+des VM ni la capacité trusted.
+
+Toute automation mutable reste bloquée par le scale-in CPU et le feature flag. Le prévol
 `infra/ci-runner/lifecycle-preflight.sh` est read-only et doit refuser cet état. La
 séparation en pools, le lease anti-concurrence, l'ordre start/deallocate et le rollback
 sont dans [`CLOUD_LEAST_PRIVILEGE.md`](./runbooks/CLOUD_LEAST_PRIVILEGE.md).

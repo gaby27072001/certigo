@@ -481,9 +481,10 @@ déclarée est dans `codemagic.yaml`.
 [#253](https://github.com/gchambaud_microsoft/Certigo/pull/253), fusionnées) a livré le
 **failover** sur un pool Azure ≥2 instances, mais la DoD précise de `wp-p1-11` — séparation
 stricte des identités `certigo-pr` / `certigo-trusted` — **n'est pas atteinte en live** :
-`docs/runbooks/CI_RUNNERS.md` constate (au 20 août 2026) que les deux runners portent
-**simultanément** les deux labels et que la migration est **« bloquée »**. Ne pas clore
-`wp-p1-11` sans revérifier cet état live.
+`docs/runbooks/CI_RUNNERS.md` consigne la vérification du 4 septembre 2026 : les labels
+`certigo-pr` et `certigo-trusted` sont désormais exclusifs. Le lot reste ouvert à cause du
+scale-in CPU non conscient de GitHub et des preuves lifecycle fail-closed encore requises.
+Ne pas clore `wp-p1-11` sans revérifier cet état live.
 
 **Prochaine action prioritaire recommandée :** `wp-p1-12-iac-drift-import` (réconcilier Azure
 OpenAI dev et le réseau `rg-certigo-ci` dans le Bicep) — débloque `wp-p1-13-staging-environment`,

@@ -3,10 +3,10 @@
 | Champ | Valeur |
 |---|---|
 | **ADR** | 018 |
-| **Statut** | **Accepté pour un pilote limité, sans provisionnement** |
+| **Statut** | **Pilote limité implémenté, désactivé et non provisionné** |
 | **Date** | 2026-08-20 |
 | **Décision** | Conserver les VMSS comme cible principale. Évaluer ACA Jobs uniquement comme capacité éphémère complémentaire pour quelques jobs PR Linux, stateless, sans secret, identité Azure, Docker ni accès privé. |
-| **Périmètre** | Décision documentaire. Aucun changement Azure, GitHub Actions ou IaC. |
+| **Périmètre** | IaC et canari manuel désactivés par défaut. Aucun changement Azure live, aucun routage de check requis ou de production. |
 | **Provenance** | Évaluation ACA locale `8d09f7d`, recalée sur `origin/main` après le lifecycle VMSS fusionné par #309 (`8495b91`). |
 
 ## Décision courte
@@ -20,8 +20,9 @@ Certigo adopte une **architecture hybride**, pas un remplacement global :
   `certigo-pr-aca`, au plus deux exécutions concurrentes et un runner JIT éphémère par job ;
 - la capacité ACA ne partage aucune identité, aucun secret, environnement, cache, volume,
   réseau applicatif ou label avec les VMSS ;
-- le pilote n'est activé qu'après correction complète des labels VMSS et preuve que le
-  lifecycle versionné par #309 reste fail-closed. Son contrôleur demeure désactivé jusque-là.
+- les labels VMSS ont été réconciliés et vérifiés en lecture le 4 septembre 2026. Le pilote
+  n'est activé qu'après preuve que le lifecycle versionné par #309 reste fail-closed. Son
+  contrôleur demeure désactivé jusque-là.
 
 ACA réduit le blast radius d'une PR et peut réduire la file et le coût variable. Il ne
 répond pas aux contraintes de compatibilité et de confiance des jobs opérationnels.
@@ -41,10 +42,15 @@ répond pas aux contraintes de compatibilité et de confiance des jobs opératio
   quiet period réinitialisable, deux gardes, une garde finale, un lease générationnel,
   un compare-and-swap d'état, un ordre pilote-avant-trusted et le réarmement exact des
   slots. Le contrôleur reste `enabled=false` tant que les frontières ne sont pas saines.
-- Le live documenté comporte deux bindings gérés et versionnés :
-  `f55d176e`/runner 27 sur le VMSS legacy et `bbf83c5c`/runner 28 sur le VMSS PR isolé.
-  Le premier conserve encore des labels doubles ; aucune automation mutable n'est donc
-  autorisée.
+- Le live vérifié le 4 septembre 2026 comporte deux bindings gérés et versionnés :
+  `f55d176e`/runner 27 sur le VMSS legacy, avec le seul label de confiance
+  `certigo-trusted`, et `bbf83c5c`/runner 28 sur le VMSS PR isolé, avec
+  `certigo-pr` + `certigo-pr-pilot`. Les deux VM étaient déallouées et les deux runners
+  offline/non-busy pendant l'inventaire. Le feature flag du lifecycle reste désactivé.
+- À `03:15Z` le même jour, les runners 27 et 28 étaient de nouveau simultanément
+  offline et la PR #366 avait dix checks en file. Une restauration des VM relève d'un
+  chantier opérateur séparé. Cette récidive rend obligatoire une capacité pilote qui ne
+  dépend ni du compute, ni du réseau, ni du lifecycle des VMSS.
 
 ### Baseline 30 jours
 
@@ -244,6 +250,7 @@ Publier par job et agrégé :
 - `docs/CI_RUNNER_RESILIENCE.md`
 - `docs/runbooks/CI_RUNNERS.md`
 - `docs/runbooks/CLOUD_LEAST_PRIVILEGE.md`
+- `docs/runbooks/ACA_JOBS_PILOT.md`
 - `infra/ci-runner/README.md`
 - `infra/ci-runner/capacity-controller.config.json`
 - ADR source locale : commit `8d09f7d`

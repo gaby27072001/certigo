@@ -9,6 +9,8 @@ import { validateWorkflowConcurrency } from './workflow-concurrency-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
 
 const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const invokedDirectly = process.argv[1]
+  && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 function workspaceRoot(argv) {
   if (argv.length === 0) {
@@ -24,7 +26,7 @@ function workspaceRoot(argv) {
   return workspace;
 }
 
-const root = workspaceRoot(process.argv.slice(2));
+const root = invokedDirectly ? workspaceRoot(process.argv.slice(2)) : controlRoot;
 const workflowsDir = path.join(root, '.github', 'workflows');
 const shaPattern = /^[0-9a-f]{40}$/;
 const versionPattern = /^v[0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z.-]+)?$/;
@@ -36,17 +38,20 @@ const trustedControlReferencePattern =
 const trustedImpactTestPattern =
   /^\.github\/scripts\/[A-Za-z0-9._-]+\.test\.mjs$/;
 const requiredTrustedImpactTests = new Set([
+  '.github/scripts/aca-pilot-policy.test.mjs',
   '.github/scripts/ci-impact.test.mjs',
   '.github/scripts/codeql-gate-policy.test.mjs',
   '.github/scripts/workflow-concurrency-policy.test.mjs',
   '.github/scripts/workflow-security-cache-policy.test.mjs',
 ]);
 const prLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-pr]';
+const acaPrLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-pr-aca]';
 const trustedLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-trusted]';
 const cosmosLinuxRunner =
   'runs-on: [self-hosted, Linux, X64, certigo-cosmos-emulator]';
 const allowedRunnerLines = new Set([
   prLinuxRunner,
+  acaPrLinuxRunner,
   trustedLinuxRunner,
   cosmosLinuxRunner,
   'runs-on: [self-hosted, macOS, certigo-trusted]',
@@ -104,6 +109,39 @@ const privilegedDispatchTypes = new Map([
   ['runner-resilience-drill.yml', 'runner-resilience-drill'],
   ['sync-ios-certs.yml', 'sync-ios-certs-legacy'],
 ]);
+
+export function validateAcaPilotWorkflow(text, file) {
+  if (!text.includes('certigo-pr-aca')) {
+    return [];
+  }
+
+  const errors = [];
+  if (
+    path.basename(file) !== 'ci-aca-pilot.yml'
+    || !/^ {2}workflow_dispatch:\s*$/m.test(text)
+    || text.includes('pull_request_target:')
+    || /^ {2}pull_request:\s*$/m.test(text)
+    || /^ {2}push:/m.test(text)
+    || text.includes('repository_dispatch:')
+  ) {
+    errors.push(
+      `${file}: certigo-pr-aca is restricted to the manual pilot workflow`,
+    );
+  }
+  for (const gate of [
+    "github.repository == 'gchambaud_microsoft/Certigo'",
+    "github.ref == 'refs/heads/main'",
+    "vars.CERTIGO_ACA_PILOT_ENABLED == 'true'",
+    "pull.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`",
+    "pull.base.ref !== 'main'",
+    "pull.state !== 'open'",
+  ]) {
+    if (!text.includes(gate)) {
+      errors.push(`${file}: ACA pilot is missing fail-closed gate ${gate}`);
+    }
+  }
+  return errors;
+}
 
 function sealedControlFileError(repositoryRoot, relativePath, source) {
   const normalized = path.posix.normalize(relativePath);
@@ -349,6 +387,7 @@ function validateWorkflow(file) {
       );
     }
   }
+  errors.push(...validateAcaPilotWorkflow(text, file));
   const expectedDispatchType = privilegedDispatchTypes.get(fileName);
   if (
     expectedDispatchType
@@ -393,15 +432,19 @@ function validateWorkflow(file) {
     ) {
       errors.push(`${file}: aggregate job ${job.id} must use certigo-trusted`);
     }
-    if (job.text.includes(prLinuxRunner)) {
+    if (
+      job.text.includes(prLinuxRunner)
+      || job.text.includes(acaPrLinuxRunner)
+    ) {
       if (
         job.text.includes('secrets.')
         || /^\s+environment:\s*/m.test(job.text)
         || job.text.includes('azure/login@')
         || /key\s*vault|keyvault/i.test(job.text)
+        || /^\s+id-token:\s*write\s*$/m.test(job.text)
       ) {
         errors.push(
-          `${file}: certigo-pr job ${job.id} must not receive secrets, environments, or cloud identity`,
+          `${file}: untrusted PR job ${job.id} must not receive secrets, environments, or cloud identity`,
         );
       }
     }
@@ -1714,23 +1757,25 @@ function validateRepositoryInvariants() {
   return errors;
 }
 
-const workflowFiles = fs
-  .readdirSync(workflowsDir)
-  .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'))
-  .sort()
-  .map((file) => path.join(workflowsDir, file));
-const errors = [
-  ...validateAccountDeletionCosmosLayout(root),
-  ...(fs.existsSync(path.join(workflowsDir, 'copilot-auto-merge.yml'))
-    ? ['copilot-auto-merge.yml: privileged auto-merge workflow must remain removed']
-    : []),
-  ...workflowFiles.flatMap(validateWorkflow),
-  ...validateRepositoryInvariants(),
-];
+if (invokedDirectly) {
+  const workflowFiles = fs
+    .readdirSync(workflowsDir)
+    .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'))
+    .sort()
+    .map((file) => path.join(workflowsDir, file));
+  const errors = [
+    ...validateAccountDeletionCosmosLayout(root),
+    ...(fs.existsSync(path.join(workflowsDir, 'copilot-auto-merge.yml'))
+      ? ['copilot-auto-merge.yml: privileged auto-merge workflow must remain removed']
+      : []),
+    ...workflowFiles.flatMap(validateWorkflow),
+    ...validateRepositoryInvariants(),
+  ];
 
-if (errors.length > 0) {
-  console.error(errors.join('\n'));
-  process.exitCode = 1;
-} else {
-  console.log('Workflow security policy passed.');
+  if (errors.length > 0) {
+    console.error(errors.join('\n'));
+    process.exitCode = 1;
+  } else {
+    console.log('Workflow security policy passed.');
+  }
 }

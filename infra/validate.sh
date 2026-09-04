@@ -91,6 +91,10 @@ BICEP_CLI="${bicep_bin}" node --test \
 BICEP_CLI="${bicep_bin}" node --test \
   "${root}/infra/tests/governance-planner.test.mjs"
 node --test "${root}/infra/tests/governance-tooling.test.mjs"
+node --test "${root}/infra/tests/aca-runner-pilot.test.mjs"
+node --check "${root}/infra/ci-runner/aca/image/prepare-jit.mjs"
+node --check "${root}/infra/ci-runner/aca/validate-what-if.mjs"
+bash -n "${root}/infra/ci-runner/aca/image/run-ephemeral.sh"
 
 for environment in dev staging prod; do
   params="${root}/infra/params/${environment}.bicepparam"
