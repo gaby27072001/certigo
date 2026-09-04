@@ -4,7 +4,7 @@
 > validation E2E réelle (vrai tenant Entra External ID + appareils). Le code et les
 > tests automatisables sont déjà en place (cf. `apps/mobile/test/auth_controller_test.dart`,
 > 18/18 vert). **Rien n'est provisionné ici** : tout ce qui suit est à fournir par
-> l'utilisateur. Le plan associé : `plan.md` (Phases 0–4). Référence : `docs/ETAT_DU_PROJET.md` §13.
+> l'utilisateur. Référence : `docs/ETAT_DU_PROJET.md` §13.
 
 ---
 
