@@ -412,7 +412,7 @@ work_packages:
     dod: "Téléchargement différentiel et activation atomique ; dernier cache valide utilisable hors ligne ; tests unitaires et intégration verts ; aucun corrigé dans le paquet ou le cache mobile."
     rollback: "Feature flag vers l'ancien repository de contenu/cache ; données du nouveau cache isolées par version."
     status: todo
-    notes: "Source : gchambaud_microsoft/Certigo#243. La précondition est une formulation locale, absente de l'issue."
+    notes: "Source : gchambaud_microsoft/Certigo#243. Implémentation anticipée dans la session b3584c64-471a-447f-8a33-15116e225d84, branche gchambaud-microsoft-offline-release-manifest empilée sur wp-p2-04 / PR #363 ; le statut reste todo tant que cette dépendance est in_review, conformément au validateur du registre. La précondition est une formulation locale, absente de l'issue."
 
   - id: wp-p2-06
     phase: 2

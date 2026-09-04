@@ -49,12 +49,53 @@ final pathRepositoryProvider = Provider<PathRepository>(
 
 final catalogStoreProvider = Provider<CatalogCacheStore>((Ref ref) => InMemoryCatalogCacheStore());
 
-final catalogRepositoryProvider = Provider<CatalogRepository>(
+final legacyCatalogRepositoryProvider = Provider<CatalogRepository>(
   (Ref ref) => OfflineCatalogRepository(
     RemoteCatalogRepository(ref.watch(apiClientProvider)),
     ref.watch(catalogStoreProvider),
   ),
 );
+
+/// Manifest-driven offline cache from wp-p2-05. Disabled by default until an
+/// immutable public release has been promoted; disabling it is the documented
+/// rollback to the wp-p1-08 repositories.
+final releaseOfflineCacheEnabledProvider = Provider<bool>(
+  (Ref ref) => const bool.fromEnvironment('RELEASE_OFFLINE_CACHE', defaultValue: false),
+);
+
+final contentReleaseRepositoryProvider = Provider<ContentReleaseRepository>(
+  (Ref ref) => RemoteContentReleaseRepository(ref.watch(apiClientProvider)),
+);
+
+final contentReleaseStoreProvider = Provider<ContentReleaseCacheStore>((Ref ref) {
+  final Map<String, String> values = <String, String>{};
+  return JsonContentReleaseCacheStore(
+    read: (String key) async => values[key],
+    write: (String key, String value) async => values[key] = value,
+  );
+});
+
+final legacyLessonCacheReadProvider = Provider<LegacyLessonCacheRead?>((Ref ref) => null);
+
+final contentReleaseCoordinatorProvider = Provider<ContentReleaseCoordinator>(
+  (Ref ref) => ContentReleaseCoordinator(
+    remote: ref.watch(contentReleaseRepositoryProvider),
+    store: ref.watch(contentReleaseStoreProvider),
+    readLegacyLessons: ref.watch(legacyLessonCacheReadProvider),
+    events: (ContentReleaseEvent event) {
+      debugPrint('[content-release] ${event.toJson()}');
+    },
+  ),
+);
+
+final catalogRepositoryProvider = Provider<CatalogRepository>((Ref ref) {
+  final CatalogRepository legacy = ref.watch(legacyCatalogRepositoryProvider);
+  if (!ref.watch(releaseOfflineCacheEnabledProvider)) return legacy;
+  return ReleaseAwareCatalogRepository(
+    coordinator: ref.watch(contentReleaseCoordinatorProvider),
+    legacy: legacy,
+  );
+});
 
 /// Opt-in feature flag for the offline study cache (wp-p1-08).
 ///
@@ -77,13 +118,22 @@ final contentManifestVersionProvider = Provider<String>(
 /// SharedPreferences-backed store so downloaded lessons survive app restarts.
 final lessonStoreProvider = Provider<LessonCacheStore>((Ref ref) => InMemoryLessonCacheStore());
 
-final lessonRepositoryProvider = Provider<LessonRepository>((Ref ref) {
+final legacyLessonRepositoryProvider = Provider<LessonRepository>((Ref ref) {
   final LessonRepository remote = RemoteLessonRepository(ref.watch(apiClientProvider));
   if (!ref.watch(offlineStudyCacheEnabledProvider)) return remote;
   return OfflineLessonRepository(
     remote,
     ref.watch(lessonStoreProvider),
     ref.watch(contentManifestVersionProvider),
+  );
+});
+
+final lessonRepositoryProvider = Provider<LessonRepository>((Ref ref) {
+  final LessonRepository legacy = ref.watch(legacyLessonRepositoryProvider);
+  if (!ref.watch(releaseOfflineCacheEnabledProvider)) return legacy;
+  return ReleaseAwareLessonRepository(
+    coordinator: ref.watch(contentReleaseCoordinatorProvider),
+    legacy: legacy,
   );
 });
 

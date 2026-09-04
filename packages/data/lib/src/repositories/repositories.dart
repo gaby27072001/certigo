@@ -15,6 +15,7 @@ import '../models/friend.dart';
 import '../models/exam.dart';
 import '../models/share_card.dart';
 import '../models/account_deletion.dart';
+import '../models/content_release.dart';
 
 /// Repository contracts consumed by the app's feature controllers.
 ///
@@ -51,6 +52,15 @@ abstract interface class LessonRepository {
   Future<Result<Lesson>> getLesson({
     required String trackId,
     required String lessonId,
+  });
+}
+
+abstract interface class ContentReleaseRepository {
+  Future<Result<OfflineContentManifest>> getActiveManifest();
+
+  Future<Result<ContentFileResponse>> getFile({
+    required String manifestId,
+    required OfflineContentFileDescriptor descriptor,
   });
 }
 

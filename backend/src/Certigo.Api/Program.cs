@@ -13,6 +13,7 @@ using Microsoft.Extensions.Hosting;
 using Certigo.Api;
 using Certigo.Api.Auth;
 using Certigo.Api.Functions;
+using Certigo.Api.Http;
 using Certigo.Api.Middleware;
 using Certigo.Api.Observability;
 using Certigo.Application.Abstractions;
@@ -135,6 +136,8 @@ var host = new HostBuilder()
         services.AddScoped<ContentContractVerifier>();
         services.AddScoped<IContentReleaseStore, CosmosContentReleaseStore>();
         services.AddScoped<IContentReleaseService, ContentReleaseService>();
+        services.AddSingleton<IContentPayloadSerializer, WebContentPayloadSerializer>();
+        services.AddScoped<IOfflineContentService, OfflineContentService>();
         services.AddSingleton<IContentReleaseTelemetry, ApplicationInsightsContentReleaseTelemetry>();
         services.AddSingleton(new ContentAdminAuthorization(
             configuration[ConfigurationKeys.ContentAdminRole] ?? "Content.Release.Admin",

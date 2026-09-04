@@ -9,6 +9,7 @@ import '../app/active_track_store.dart';
 import '../app/mascots.dart';
 import '../app/offline/offline_sync_scope.dart';
 import '../app/offline/prefs_catalog_store.dart';
+import '../app/offline/prefs_content_release_cache_store.dart';
 import '../app/offline/prefs_lesson_cache_store.dart';
 import '../app/offline/prefs_sync_store.dart';
 import '../app/providers.dart';
@@ -93,6 +94,10 @@ Future<void> bootstrap() async {
           }),
           activeTrackStoreProvider.overrideWithValue(SharedPreferencesActiveTrackStore(prefs)),
           catalogStoreProvider.overrideWithValue(prefsCatalogCacheStore(prefs)),
+          contentReleaseStoreProvider.overrideWithValue(prefsContentReleaseCacheStore(prefs)),
+          legacyLessonCacheReadProvider.overrideWithValue(
+            () async => prefs.getString(kLessonCachePrefsKey),
+          ),
           lessonStoreProvider.overrideWithValue(prefsLessonCacheStore(prefs)),
           syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
         ],

@@ -20,6 +20,7 @@ export 'src/models/friend.dart';
 export 'src/models/exam.dart';
 export 'src/models/share_card.dart';
 export 'src/models/account_deletion.dart';
+export 'src/models/content_release.dart';
 
 export 'src/api/api_client.dart';
 export 'src/api/correlation_interceptor.dart';
@@ -38,3 +39,5 @@ export 'src/sync/offline_catalog_repository.dart';
 export 'src/sync/lesson_cache_store.dart';
 export 'src/sync/offline_lesson_repository.dart';
 export 'src/sync/api_sync_sender.dart';
+export 'src/sync/content_release_cache_store.dart';
+export 'src/sync/offline_content_release.dart';

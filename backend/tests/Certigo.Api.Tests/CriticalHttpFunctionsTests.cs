@@ -3,6 +3,7 @@ using System.Text.Json;
 using FluentAssertions;
 using Certigo.Api.Functions;
 using Certigo.Api.Http;
+using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
 using Certigo.Application.Services;
 using Certigo.Domain.Content;
@@ -237,6 +238,11 @@ public sealed class CriticalHttpFunctionsTests
             GetCatalogCalls++;
             return Task.FromResult(Catalog);
         }
+
+        public Task<CatalogDto> GetCatalogAsync(
+            ContentSnapshot snapshot,
+            CancellationToken cancellationToken = default)
+            => GetCatalogAsync(cancellationToken);
     }
 
     private sealed class FakeQuizService : IQuizService

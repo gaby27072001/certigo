@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:core/core.dart';
 
 import 'correlation_interceptor.dart';
+import '../models/content_release.dart';
 
 /// Supplies a fresh access token for outbound requests. Implemented by the auth
 /// feature (Entra External ID) and injected so `data` stays auth-agnostic.
@@ -118,6 +121,25 @@ class ApiClient {
     });
   }
 
+  Future<Result<ContentFileResponse>> getBytesWithHeaders(String path) async {
+    return _guard(() async {
+      final Response<dynamic> response = await _dio.get<dynamic>(
+        path,
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: <String, String>{'Accept-Encoding': 'identity'},
+        ),
+      );
+      final Uint8List bytes = _asBytes(response.data);
+      return ContentFileResponse(
+        bytes: bytes,
+        manifestId: response.headers.value('x-content-manifest-id'),
+        hash: response.headers.value('x-content-sha256'),
+        size: int.tryParse(response.headers.value('content-length') ?? ''),
+      );
+    });
+  }
+
   Future<Result<T>> postJson<T>(
     String path,
     Map<String, dynamic> body,
@@ -157,6 +179,12 @@ class ApiClient {
   Map<String, dynamic> _asMap(dynamic data) {
     if (data is Map<String, dynamic>) return data;
     throw const FormatException('Expected a JSON object');
+  }
+
+  Uint8List _asBytes(Object? data) {
+    if (data is Uint8List) return data;
+    if (data is List<int>) return Uint8List.fromList(data);
+    throw const FormatException('Expected a binary response');
   }
 
   /// Milliseconds elapsed since the `onRequest` marker, or -1 if unavailable.

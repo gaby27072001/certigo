@@ -30,6 +30,10 @@ public interface IContentService
     // Lightweight multi-cloud certification metadata and content availability,
     // without lesson bodies.
     Task<CatalogDto> GetCatalogAsync(CancellationToken cancellationToken = default);
+
+    Task<CatalogDto> GetCatalogAsync(
+        ContentSnapshot snapshot,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record ContentLessonResult(Lesson Lesson, string? PublicManifestId);
@@ -74,6 +78,13 @@ public sealed class ContentService : IContentService
     public async Task<CatalogDto> GetCatalogAsync(CancellationToken cancellationToken = default)
     {
         var snapshot = await _content.ResolveActiveSnapshotAsync(cancellationToken);
+        return await GetCatalogAsync(snapshot, cancellationToken);
+    }
+
+    public async Task<CatalogDto> GetCatalogAsync(
+        ContentSnapshot snapshot,
+        CancellationToken cancellationToken = default)
+    {
         var tracks = await _content.ListTracksAsync(snapshot, cancellationToken);
         var importedCatalog = await _content.GetCertificationCatalogAsync(snapshot, cancellationToken);
         var certifications = importedCatalog is null

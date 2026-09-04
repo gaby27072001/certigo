@@ -1,3 +1,4 @@
+using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
 using Certigo.Application.Services;
 using Certigo.Domain.Content;
@@ -472,6 +473,11 @@ internal sealed class FakeContentService : IContentService
         CatalogCallCount++;
         return Task.FromResult(CatalogResult);
     }
+
+    public Task<CatalogDto> GetCatalogAsync(
+        ContentSnapshot snapshot,
+        CancellationToken cancellationToken = default)
+        => GetCatalogAsync(cancellationToken);
 
     private static Lesson DefaultLesson() =>
         new("lesson-1", "track-1", "unit-1", "domain-1", "Title", 5, new List<LessonBlock>());

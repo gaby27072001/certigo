@@ -113,6 +113,44 @@ artefacts. L'ETag doit être relu immédiatement avant l'opération : toute
 promotion ou rollback concurrent rend le CAS obsolète et retourne 412, sans
 écraser le pointeur. Un second rollback sans nouvelle promotion retourne 409.
 
+## Déploiement du cache offline mobile
+
+Le cache `wp-p2-05` reste derrière `RELEASE_OFFLINE_CACHE`. Ne l'activer pour
+une build mobile qu'après avoir validé en staging une release publique complète.
+
+1. Appeler `GET /api/content/releases/active/offline-manifest` avec un JWT
+   learner. Vérifier `schema=certigo.mobile-offline-manifest/v1`,
+   `sourceSchema=certigo.content.package-manifest/v3`, `fileCount` et
+   `manifestId`.
+2. Vérifier que les seuls `resourceType` sont `catalog` et `lesson`, qu'il existe
+   exactement un catalogue et qu'aucune clé privée listée dans l'ADR-021
+   n'apparaît.
+3. Télécharger un catalogue et une leçon via leurs routes épinglées. Comparer les
+   octets aux `hash`/`size` du manifeste et aux headers
+   `X-Content-Manifest-Id`, `X-Content-SHA256`, `Content-Length`.
+4. Lancer une synchronisation complète, couper le réseau après un fichier, puis
+   redémarrer. L'ancien manifeste doit rester actif et la reprise ne doit
+   retélécharger que les entrées manquantes.
+5. Promouvoir une seconde release. Vérifier que l'activation locale intervient
+   en une seule bascule A/B et que les fichiers au hash inchangé sont réutilisés.
+6. Créer une soumission offline depuis la première release, synchroniser la
+   seconde, puis rejouer la soumission. Son `clientAttemptId` et son
+   `publicManifestId` doivent rester inchangés.
+7. Exécuter le rollback backend N-1. La génération précédente doit redevenir
+   active localement sans mélange de fichiers entre manifestes.
+8. Corrompre une copie locale en staging. Le client doit journaliser
+   `content.release.offline.cache_corrupt` ou
+   `content.release.offline.fallback`; il ne doit servir que N-1 revérifié, sinon
+   retourner une erreur locale.
+
+Pour le rollback applicatif mobile, republier une build avec
+`RELEASE_OFFLINE_CACHE=false`. Le cache release reste isolé sous
+`certigo.content.release.cache.v1.*`; les caches historiques ne sont ni écrasés
+ni supprimés. Ne traiter un 404 du manifeste offline comme compatibilité qu'avec
+un backend antérieur à cette capability. Les timeouts, 5xx, erreurs de parsing et
+échecs d'intégrité restent des incidents visibles, même lorsqu'un cache valide
+permet de continuer hors ligne.
+
 ## Rollback applicatif
 
 Si le nouveau repository présente un défaut indépendant du contenu:

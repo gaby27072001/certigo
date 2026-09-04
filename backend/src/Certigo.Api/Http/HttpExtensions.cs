@@ -49,6 +49,21 @@ public static class HttpExtensions
         return response;
     }
 
+    public static byte[] SerializeJsonBytes<T>(T value)
+        => JsonSerializer.SerializeToUtf8Bytes(value, JsonOptions);
+
+    public static async Task<HttpResponseData> JsonBytesAsync(
+        this HttpRequestData request,
+        ReadOnlyMemory<byte> content,
+        HttpStatusCode statusCode = HttpStatusCode.OK,
+        CancellationToken cancellationToken = default)
+    {
+        var response = request.CreateResponse(statusCode);
+        response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        await response.Body.WriteAsync(content, cancellationToken);
+        return response;
+    }
+
     public static async Task<JsonResponseWriter> JsonAsync<T>(
         this HttpResponseData response,
         T value,

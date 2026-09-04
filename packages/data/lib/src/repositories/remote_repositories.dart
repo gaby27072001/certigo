@@ -16,6 +16,7 @@ import '../models/friend.dart';
 import '../models/exam.dart';
 import '../models/share_card.dart';
 import '../models/account_deletion.dart';
+import '../models/content_release.dart';
 import 'repositories.dart';
 
 /// HTTP-backed implementations of the repository contracts. Each method maps a
@@ -25,7 +26,7 @@ import 'repositories.dart';
 const String _kAppCatalogSchema = 'certigo.app-certification-catalog/v2';
 const String _kCanonicalCatalogSchema = 'certigo.certification-catalog/v1';
 
-List<TrackSummary> _decodeTrackSummaries(Map<String, dynamic> json) {
+List<TrackSummary> decodeTrackSummaries(Map<String, dynamic> json) {
   final String? schema = json['schema'] as String?;
   final String? sourceSchema = json['sourceSchema'] as String?;
   if (schema != _kAppCatalogSchema) {
@@ -95,7 +96,7 @@ class RemoteCatalogRepository implements CatalogRepository {
   Future<Result<List<TrackSummary>>> getCatalog() async {
     final Result<List<TrackSummary>> result = await _api.getJson(
       '/catalog/tracks',
-      _decodeTrackSummaries,
+      decodeTrackSummaries,
     );
     return result.when(
       success: (tracks) => tracks.isEmpty
@@ -121,6 +122,32 @@ class RemoteLessonRepository implements LessonRepository {
         (Map<String, dynamic> json, headers) =>
             Lesson.fromJson(json).withPublicManifestId(headers.value('x-content-manifest-id')),
       );
+}
+
+class RemoteContentReleaseRepository implements ContentReleaseRepository {
+  const RemoteContentReleaseRepository(this._api);
+
+  final ApiClient _api;
+
+  @override
+  Future<Result<OfflineContentManifest>> getActiveManifest() =>
+      _api.getJson('/content/releases/active/offline-manifest', OfflineContentManifest.fromJson);
+
+  @override
+  Future<Result<ContentFileResponse>> getFile({
+    required String manifestId,
+    required OfflineContentFileDescriptor descriptor,
+  }) {
+    final String encodedManifest = Uri.encodeComponent(manifestId);
+    if (descriptor.isCatalog) {
+      return _api.getBytesWithHeaders('/content/releases/$encodedManifest/offline/catalog');
+    }
+    final String trackId = Uri.encodeComponent(descriptor.trackId!);
+    final String lessonId = Uri.encodeComponent(descriptor.id);
+    return _api.getBytesWithHeaders(
+      '/content/releases/$encodedManifest/offline/tracks/$trackId/lessons/$lessonId',
+    );
+  }
 }
 
 class RemoteQuizRepository implements QuizRepository {

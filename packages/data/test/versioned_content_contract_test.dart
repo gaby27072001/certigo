@@ -37,6 +37,57 @@ class _LessonAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+class _OfflineContentAdapter implements HttpClientAdapter {
+  bool requestedIdentityEncoding = false;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    if (options.path.endsWith('/active/offline-manifest')) {
+      return ResponseBody.fromString(
+        jsonEncode(<String, dynamic>{
+          'schema': offlineContentManifestV1,
+          'manifestId': _manifestId,
+          'sourceSchema': packageManifestV3,
+          'fileCount': 1,
+          'files': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 'catalog',
+              'path': 'catalog/tracks.json',
+              'resourceType': catalogContentResourceType,
+              'hash': '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+              'size': 2,
+            },
+          ],
+        }),
+        200,
+        headers: <String, List<String>>{
+          Headers.contentTypeHeader: <String>[Headers.jsonContentType],
+        },
+      );
+    }
+    requestedIdentityEncoding = options.headers['Accept-Encoding'] == 'identity';
+    return ResponseBody.fromString(
+      '{}',
+      200,
+      headers: <String, List<String>>{
+        Headers.contentTypeHeader: <String>[Headers.jsonContentType],
+        Headers.contentLengthHeader: <String>['2'],
+        'x-content-manifest-id': <String>[_manifestId],
+        'x-content-sha256': <String>[
+          '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+        ],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 void main() {
   test('remote lesson preserves the server content snapshot header', () async {
     final Dio dio = Dio()..httpClientAdapter = _LessonAdapter();
@@ -73,6 +124,28 @@ void main() {
     expect(quiz.toJson()['publicManifestId'], _manifestId);
     expect(tutor.toJson()['publicManifestId'], _manifestId);
     expect(exam.toJson()['publicManifestId'], _manifestId);
+  });
+
+  test('offline release repository preserves manifest integrity metadata', () async {
+    final _OfflineContentAdapter adapter = _OfflineContentAdapter();
+    final Dio dio = Dio()..httpClientAdapter = adapter;
+    final RemoteContentReleaseRepository repository = RemoteContentReleaseRepository(
+      ApiClient(dio: dio, baseUrl: 'https://example.test', tokenProvider: () async => null),
+    );
+
+    final OfflineContentManifest manifest = (await repository.getActiveManifest()).valueOrNull!;
+    final ContentFileResponse file = (await repository.getFile(
+      manifestId: manifest.manifestId,
+      descriptor: manifest.catalog,
+    ))
+        .valueOrNull!;
+
+    expect(manifest.manifestId, _manifestId);
+    expect(file.bytes, <int>[123, 125]);
+    expect(file.manifestId, _manifestId);
+    expect(file.hash, manifest.catalog.hash);
+    expect(file.size, manifest.catalog.size);
+    expect(adapter.requestedIdentityEncoding, isTrue);
   });
 }
 

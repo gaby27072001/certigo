@@ -11,6 +11,7 @@ public static class ContentReleaseContracts
     public const string PackageManifestV1 = "certigo.content.package-manifest/v1";
     public const string PackageManifestV2 = "certigo.content.package-manifest/v2";
     public const string PackageManifestV3 = "certigo.content.package-manifest/v3";
+    public const string OfflineManifestV1 = "certigo.mobile-offline-manifest/v1";
     public const string RuntimeScope = "runtime-content";
     public const string LegacySource = "legacy";
     public const string VersionedSource = "versioned";
@@ -140,6 +141,31 @@ public sealed record ContentImportResult(
 public sealed record ActivePublicManifestResult(
     ContentPackageManifest Manifest,
     string ETag);
+
+public sealed record OfflineContentResourceDescriptor(
+    string Id,
+    string Path,
+    string ResourceType,
+    string Hash,
+    long Size,
+    string? TrackId = null);
+
+public sealed record OfflineContentManifest(
+    string Schema,
+    string ManifestId,
+    string SourceSchema,
+    int FileCount,
+    IReadOnlyList<OfflineContentResourceDescriptor> Files);
+
+public sealed record OfflineContentPayload(
+    string PublicManifestId,
+    string Sha256,
+    ReadOnlyMemory<byte> Content);
+
+public interface IContentPayloadSerializer
+{
+    byte[] Serialize<T>(T value);
+}
 
 public sealed record ContentReleaseLimits(
     int MaxFiles,
