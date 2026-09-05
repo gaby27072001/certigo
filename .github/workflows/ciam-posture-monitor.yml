@@ -42,7 +42,7 @@ jobs:
           CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
         run: |
           set -euo pipefail
-          if ! jq -e 'type == "object" and length == 0' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+          if ! jq -e 'type == "null" or (type == "object" and length == 0)' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
             echo "::error::ciam-posture does not accept client_payload fields."
             exit 1
           fi
