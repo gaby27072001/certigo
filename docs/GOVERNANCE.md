@@ -108,7 +108,9 @@ ensuite restauré par une opération de signature ou de publication.
 La gate `Generated state equals committed state` n'accède à aucun dépôt externe et ne reçoit
 aucun secret. Son contrôle source rapide exécute d'abord
 `python tools/generated_contracts.py --check`. Les contrats canoniques
-`contracts/content-package-v1.json` et `contracts/cosmos-containers.json` pilotent respectivement
+`contracts/content-package-v2.json` (avec repli sur `contracts/content-package-v1.json` tant que
+la migration en cours n'est pas terminée) et `contracts/cosmos-containers.json` pilotent
+respectivement
 le contrat de package intégré à `docs/active-content-reference.json` et la topologie partagée par
 Bicep et `CosmosContainers.cs`. Le générateur du SHA immuable valide ensuite la référence locale
 (SHA de révision complet, identifiants et SHA-256 des manifestes), puis vérifie que l'état généré
@@ -131,6 +133,44 @@ Le bump de contenu actif est donc volontairement manuel et vérifié : après fu
 `python tools/project_state.py --validate-active-content <checkout-certigo-content>` et
 `python tools/project_state.py --refresh-reference`. La PR du bump doit commiter la référence et
 l'état projet régénéré.
+
+### Faire évoluer le contrat de package : expand / migrate / contract
+
+**Symptôme.** Une PR qui modifie `contracts/content-package-*.json` ou
+`docs/active-content-reference.json` échoue sur `Validate project-state source` et
+`Generated state equals committed state` avec l'un de ces messages :
+
+```
+docs/active-content-reference.json.packageContract: contract does not match certigo.content.package-manifest/v1.
+contracts/content-package-v1.json: unexpected fields.
+contracts/content-package-v1.json: cannot load canonical JSON: [Errno 2] No such file or directory
+generated contracts are stale: docs/active-content-reference.json.
+```
+
+**Ce n'est pas une donnée malformée, et un rebase n'y change rien.** `ci-project-state.yml`
+exécute délibérément le validateur *de la branche de base* contre les *données de la PR*
+(`working-directory: .trusted-control`, `--root "$PROJECT_WORKSPACE"` pointant sur
+`.untrusted-source`). C'est une propriété de sécurité voulue : une PR ne peut pas réécrire le
+validateur qui la juge. La conséquence est que le validateur et les données qu'il valide sont
+versionnés ensemble, donc **toute évolution du contrat est jugée par le validateur d'avant
+l'évolution**. Le message ci-dessus attribue les données du candidat au schéma de la base : il
+signifie « le juge est périmé », pas « tes données sont invalides ».
+
+**Conséquence pratique : un basculement atomique est impossible.** Il faut trois PR :
+
+1. **expand** — code seul. Le validateur apprend à accepter l'ancienne *et* la nouvelle forme.
+   Ne toucher ni `docs/active-content-reference.json` ni le fichier de contrat existant, afin
+   que la base (qui ne connaît que l'ancienne forme) voie des données inchangées.
+2. **migrate** — données seules. Basculer la référence sur la nouvelle forme. `main` porte
+   désormais le code bi-compatible et l'accepte.
+3. **contract** — retirer l'ancienne forme. L'état final redevient strict et mono-schéma.
+
+La bi-compatibilité de l'étape 1 est un **échafaudage transitoire, pas la cible** : un validateur
+qui accepte à la fois la forme courante et la forme supersédée ne peut pas détecter une
+régression de l'une vers l'autre. L'étape 3 n'est pas optionnelle.
+
+Chaque forme reste validée **séparément et strictement** : les règles d'entrées et de chemins sont
+déclarées par schéma dans `manifestShapes`, jamais fusionnées en une union permissive.
 
 ### Conclusion DoD
 

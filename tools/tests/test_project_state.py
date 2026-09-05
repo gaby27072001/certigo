@@ -566,6 +566,272 @@ class ProjectStateTests(unittest.TestCase):
         expected = f"sha256:{hashlib.sha256(canonical).hexdigest()}"
         self.assertEqual(expected, project_state._canonical_manifest_id(manifest))
 
+    def _validate_entry(
+        self, schema: str, channel: str, entry: dict[str, object]
+    ) -> None:
+        """Validate one manifest entry against a specific declared schema."""
+        artifact = "public" if channel == "public" else "private"
+        manifest: dict[str, object] = {
+            "schema": schema,
+            "channel": channel,
+            "artifact": artifact,
+            "algorithm": project_state.PACKAGE_MANIFEST_ALGORITHM,
+            "serialization": project_state.PACKAGE_MANIFEST_SERIALIZATION,
+            "fileCount": 1,
+            "files": [entry],
+            "manifestId": "",
+            "rootHash": "",
+        }
+        manifest["manifestId"] = project_state._canonical_manifest_id(manifest)
+        manifest["rootHash"] = str(manifest["manifestId"]).removeprefix("sha256:")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            relative = f"dist/{artifact}/manifest.json"
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            raw = (json.dumps(manifest, indent=2) + "\n").encode("utf-8")
+            path.write_bytes(raw)
+            reference = project_state.ActiveManifestReference(
+                relative,
+                channel,
+                artifact,
+                str(manifest["manifestId"]),
+                1,
+                hashlib.sha256(raw).hexdigest(),
+            )
+            project_state._validate_manifest(root, reference)
+
+    def test_both_contract_schemas_are_accepted_during_the_migration(self) -> None:
+        self.assertEqual(
+            {
+                "certigo.content.package-manifest/v1",
+                "certigo.content.package-manifest/v3",
+            },
+            set(project_state.PACKAGE_MANIFEST_SCHEMAS),
+        )
+
+    def test_v3_accepts_every_declared_public_prefix(self) -> None:
+        for path, resource_type in (
+            ("catalog/certifications.json", "certificationCatalog"),
+            ("coverage/aws/aif-c01.json", "coverageMatrix"),
+            ("questions/lesson.json", "question"),
+            ("questions/aws/aif-c01/aws.aif-c01.domain-1.001.json", "question"),
+            ("runtime/concepts/aws/aif-c01/aws.concept.json", "concept"),
+            ("runtime/domains/aws/aif-c01/aws.domain-1.json", "domain"),
+            ("runtime/tracks/aws/aif-c01/aws.track.json", "track"),
+        ):
+            with self.subTest(path=path):
+                self._validate_entry(
+                    "certigo.content.package-manifest/v3",
+                    "public",
+                    {
+                        "id": "item",
+                        "path": path,
+                        "hash": "6" * 64,
+                        "size": 1,
+                        "resourceType": resource_type,
+                    },
+                )
+
+    def test_v3_accepts_declared_optional_entry_fields(self) -> None:
+        self._validate_entry(
+            "certigo.content.package-manifest/v3",
+            "public",
+            {
+                "id": "aws.aif-c01.domain-1.001",
+                "path": "questions/aws/aif-c01/aws.aif-c01.domain-1.001.json",
+                "hash": "6" * 64,
+                "size": 1,
+                "resourceType": "question",
+                "blueprintVersion": "2026-08-17",
+                "certification": "aws:aif-c01",
+                "objective": "domain-1",
+                "provider": "aws",
+            },
+        )
+
+    def test_v3_rejects_malformed_entries(self) -> None:
+        base: dict[str, object] = {
+            "id": "certification-catalog",
+            "path": "catalog/certifications.json",
+            "hash": "6" * 64,
+            "size": 1,
+            "resourceType": "certificationCatalog",
+        }
+        cases: tuple[tuple[str, dict[str, object], str], ...] = (
+            # The answer key must never be reachable through the public channel.
+            (
+                "answer key leaked into the public channel",
+                {"path": "solutions/lesson.json", "resourceType": "solution"},
+                "unexpected path for public",
+            ),
+            (
+                "path traversal",
+                {"path": "questions/../../secret/leak.json"},
+                "unexpected path for public",
+            ),
+            (
+                "undeclared prefix",
+                {"path": "secrets/leak.json"},
+                "unexpected path for public",
+            ),
+            (
+                "undeclared nesting depth",
+                {"path": "runtime/concepts/shallow.json", "resourceType": "concept"},
+                "unexpected path for public",
+            ),
+            (
+                "non-json artifact",
+                {"path": "catalog/certifications.yaml"},
+                "unexpected path for public",
+            ),
+            (
+                "resourceType foreign to its prefix",
+                {"resourceType": "question"},
+                "expected one of",
+            ),
+            (
+                "unknown entry field",
+                {"surprise": "x"},
+                "expected required fields",
+            ),
+            (
+                "empty declared optional field",
+                {"provider": ""},
+                "expected a non-empty string",
+            ),
+        )
+        for label, override, message in cases:
+            with self.subTest(case=label):
+                entry = dict(base)
+                entry.update(override)
+                with self.assertRaisesRegex(project_state.ProjectStateError, message):
+                    self._validate_entry(
+                        "certigo.content.package-manifest/v3", "public", entry
+                    )
+
+    def test_v3_rejects_an_entry_missing_a_required_field(self) -> None:
+        shape = project_state.PACKAGE_MANIFEST_SHAPES[
+            "certigo.content.package-manifest/v3"
+        ]
+        for field in sorted(shape.required_fields):
+            with self.subTest(missing=field):
+                entry: dict[str, object] = {
+                    "id": "certification-catalog",
+                    "path": "catalog/certifications.json",
+                    "hash": "6" * 64,
+                    "size": 1,
+                    "resourceType": "certificationCatalog",
+                }
+                del entry[field]
+                with self.assertRaisesRegex(
+                    project_state.ProjectStateError, "expected required fields"
+                ):
+                    self._validate_entry(
+                        "certigo.content.package-manifest/v3", "public", entry
+                    )
+
+    def test_v1_stays_exactly_as_strict_as_before_the_migration(self) -> None:
+        """Accepting v3 must not loosen v1 into a union of both shapes."""
+        cases: tuple[tuple[str, dict[str, object], str], ...] = (
+            (
+                "v3-only resourceType key rejected under v1",
+                {
+                    "id": "lesson",
+                    "path": "questions/lesson.json",
+                    "hash": "6" * 64,
+                    "size": 1,
+                    "resourceType": "question",
+                },
+                "expected required fields",
+            ),
+            (
+                "v3-only optional field rejected under v1",
+                {
+                    "id": "lesson",
+                    "path": "questions/lesson.json",
+                    "hash": "6" * 64,
+                    "size": 1,
+                    "provider": "aws",
+                },
+                "expected required fields",
+            ),
+            (
+                "v3 nested path rejected under v1",
+                {
+                    "id": "lesson",
+                    "path": "questions/aws/aif-c01/lesson.json",
+                    "hash": "6" * 64,
+                    "size": 1,
+                },
+                "unexpected path for public",
+            ),
+            (
+                "v3-only prefix rejected under v1",
+                {
+                    "id": "catalog",
+                    "path": "catalog/certifications.json",
+                    "hash": "6" * 64,
+                    "size": 1,
+                },
+                "unexpected path for public",
+            ),
+        )
+        for label, entry, message in cases:
+            with self.subTest(case=label):
+                with self.assertRaisesRegex(project_state.ProjectStateError, message):
+                    self._validate_entry(
+                        "certigo.content.package-manifest/v1", "public", entry
+                    )
+
+    def test_answer_key_channel_stays_solutions_only_in_every_shape(self) -> None:
+        for schema, shape in project_state.PACKAGE_MANIFEST_SHAPES.items():
+            with self.subTest(schema=schema):
+                self.assertEqual(
+                    ["solutions"],
+                    [rule.prefix for rule in shape.channels["answerKey"]],
+                )
+                self.assertEqual(["public", "answerKey"], list(shape.channels))
+
+    def test_unknown_manifest_schema_is_rejected(self) -> None:
+        with self.assertRaisesRegex(
+            project_state.ProjectStateError, "unexpected package manifest schema"
+        ):
+            self._validate_entry(
+                "certigo.content.package-manifest/v2",
+                "public",
+                {
+                    "id": "lesson",
+                    "path": "questions/lesson.json",
+                    "hash": "6" * 64,
+                    "size": 1,
+                },
+            )
+
+    def test_artifact_path_contract_rejects_unusable_segment_counts(self) -> None:
+        """A count below 2 would render `{-1}`, which Python treats as a literal.
+
+        Left unguarded that yields a pattern silently matching nothing, in a tool
+        whose whole purpose is to fail loudly.
+        """
+        for counts in ([1], [], [2, 0]):
+            with self.subTest(segmentCounts=counts):
+                with self.assertRaisesRegex(ValueError, "segmentCounts"):
+                    project_state._compile_channel_rules(
+                        {
+                            "public": [
+                                {
+                                    "prefix": "catalog",
+                                    "segmentCounts": counts,
+                                    "resourceTypes": ["certificationCatalog"],
+                                }
+                            ]
+                        },
+                        "[A-Za-z0-9._-]+",
+                        ".json",
+                        "certigo.content.package-manifest/v3",
+                    )
+
     def test_manifest_reference_rejects_paths_outside_active_content(self) -> None:
         reference_path = self.root / project_state.ACTIVE_CONTENT_REFERENCE_FILE
         reference = json.loads(reference_path.read_text(encoding="utf-8"))

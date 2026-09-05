@@ -20,7 +20,7 @@ class GeneratedContractsTests(unittest.TestCase):
     def copy_contract_inputs(self, root: Path) -> None:
         source_root = MODULE_PATH.parents[1]
         for relative in (
-            generated_contracts.CONTENT_PACKAGE_CONTRACT,
+            generated_contracts.content_package_contract_path(source_root),
             generated_contracts.COSMOS_CONTRACT,
             generated_contracts.ACTIVE_CONTENT_REFERENCE,
         ):
@@ -201,7 +201,7 @@ class GeneratedContractsTests(unittest.TestCase):
     def test_package_contract_maps_one_to_one_to_active_reference(self) -> None:
         root = MODULE_PATH.parents[1]
         source = json.loads(
-            (root / generated_contracts.CONTENT_PACKAGE_CONTRACT).read_text(
+            (root / generated_contracts.content_package_contract_path(root)).read_text(
                 encoding="utf-8"
             )
         )

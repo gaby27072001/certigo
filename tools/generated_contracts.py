@@ -10,7 +10,25 @@ import sys
 from pathlib import Path
 
 
-CONTENT_PACKAGE_CONTRACT = Path("contracts/content-package-v1.json")
+CONTENT_PACKAGE_CONTRACTS = (
+    Path("contracts/content-package-v2.json"),
+    Path("contracts/content-package-v1.json"),
+)
+CONTENT_PACKAGE_ENVELOPES = {
+    "certigo.source-contract/content-package/v1": {
+        "schema",
+        "activeReferenceSchema",
+        "packageContract",
+    },
+    "certigo.source-contract/content-package/v2": {
+        "schema",
+        "activeReferenceSchema",
+        "packageContract",
+        "segmentPattern",
+        "fileSuffix",
+        "manifestShapes",
+    },
+}
 COSMOS_CONTRACT = Path("contracts/cosmos-containers.json")
 ACTIVE_CONTENT_REFERENCE = Path("docs/active-content-reference.json")
 COSMOS_CSHARP = Path(
@@ -63,16 +81,33 @@ def _load_json(root: Path, relative: Path) -> dict[str, object]:
     return value
 
 
+def content_package_contract_path(root: Path) -> Path:
+    """Return the active content-package contract relative to ``root``.
+
+    The newest envelope wins so a migration can introduce it without disturbing
+    the superseded file, which the previous release's validator still reads.
+    """
+    for relative in CONTENT_PACKAGE_CONTRACTS:
+        if (root / relative).is_file():
+            return relative
+    raise ContractError(
+        "No content-package contract found; expected one of "
+        f"{[path.as_posix() for path in CONTENT_PACKAGE_CONTRACTS]}."
+    )
+
+
 def _package_contract(root: Path) -> tuple[str, dict[str, object]]:
-    value = _load_json(root, CONTENT_PACKAGE_CONTRACT)
-    if set(value) != {"schema", "activeReferenceSchema", "packageContract"}:
-        raise ContractError(f"{CONTENT_PACKAGE_CONTRACT}: unexpected fields.")
-    if value["schema"] != "certigo.source-contract/content-package/v1":
-        raise ContractError(f"{CONTENT_PACKAGE_CONTRACT}: unsupported schema.")
+    relative = content_package_contract_path(root)
+    value = _load_json(root, relative)
+    expected_fields = CONTENT_PACKAGE_ENVELOPES.get(value.get("schema"))
+    if expected_fields is None:
+        raise ContractError(f"{relative}: unsupported schema.")
+    if set(value) != expected_fields:
+        raise ContractError(f"{relative}: unexpected fields.")
     active_schema = value["activeReferenceSchema"]
     package_contract = value["packageContract"]
     if not isinstance(active_schema, str) or not isinstance(package_contract, dict):
-        raise ContractError(f"{CONTENT_PACKAGE_CONTRACT}: invalid contract values.")
+        raise ContractError(f"{relative}: invalid contract values.")
     return active_schema, package_contract
 
 

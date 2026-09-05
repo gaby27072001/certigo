@@ -13,6 +13,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import NamedTuple
 
 
 START_MARKER = "<!-- GENERATED:PROJECT-STATE:START -->"
@@ -20,7 +21,29 @@ END_MARKER = "<!-- GENERATED:PROJECT-STATE:END -->"
 DEFAULT_DOCUMENT = Path("docs/ETAT_DU_PROJET.md")
 REFERENCE_FILE = Path("docs/project-state-reference.json")
 ACTIVE_CONTENT_REFERENCE_FILE = Path("docs/active-content-reference.json")
-CONTENT_PACKAGE_CONTRACT_FILE = Path("contracts/content-package-v1.json")
+CONTENT_PACKAGE_CONTRACT_FILES = (
+    Path("contracts/content-package-v2.json"),
+    Path("contracts/content-package-v1.json"),
+)
+
+
+def _content_package_contract_path(root: Path) -> Path:
+    """Resolve the canonical content-package contract inside ``root``.
+
+    The newest envelope wins so a migration can add it without disturbing the
+    superseded file, which the previous release's validator still reads.
+    """
+    for relative in CONTENT_PACKAGE_CONTRACT_FILES:
+        if (root / relative).is_file():
+            return relative
+    raise ValueError(
+        "No content-package contract found; expected one of "
+        f"{[path.as_posix() for path in CONTENT_PACKAGE_CONTRACT_FILES]}."
+    )
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+CONTENT_PACKAGE_CONTRACT_FILE = _content_package_contract_path(_REPO_ROOT)
 OBSERVABLE_PATHS = (
     ".github/workflows",
     "codemagic.yaml",
@@ -38,9 +61,7 @@ OBSERVABLE_PATHS = (
 )
 OBSERVABLE_HASH_PREFIX = b"certigo-project-state-observable-v1\0"
 _CONTENT_PACKAGE_SOURCE = json.loads(
-    (Path(__file__).resolve().parents[1] / CONTENT_PACKAGE_CONTRACT_FILE).read_text(
-        encoding="utf-8"
-    )
+    (_REPO_ROOT / CONTENT_PACKAGE_CONTRACT_FILE).read_text(encoding="utf-8")
 )
 _PACKAGE_CONTRACT = _CONTENT_PACKAGE_SOURCE["packageContract"]
 PACKAGE_MANIFEST_SCHEMA = _PACKAGE_CONTRACT["schema"]
@@ -48,6 +69,111 @@ PACKAGE_MANIFEST_ALGORITHM = _PACKAGE_CONTRACT["algorithm"]
 PACKAGE_MANIFEST_SERIALIZATION = _PACKAGE_CONTRACT["serialization"]
 PACKAGE_MANIFEST_BODY_FIELDS = tuple(_PACKAGE_CONTRACT["canonicalBodyFields"])
 PACKAGE_MANIFEST_DIGEST_FIELDS = tuple(_PACKAGE_CONTRACT["excludedDigestFields"])
+
+
+class _ArtifactPathRule(NamedTuple):
+    prefix: str
+    pattern: re.Pattern[str]
+    resource_types: frozenset[str]
+
+
+class _ManifestShape(NamedTuple):
+    """One accepted package-manifest schema and the entry/path rules it implies."""
+
+    schema: str
+    required_fields: frozenset[str]
+    optional_fields: frozenset[str]
+    channels: dict[str, tuple[_ArtifactPathRule, ...]]
+
+
+_LEGACY_MANIFEST_SHAPES = [
+    {
+        "schema": "certigo.content.package-manifest/v1",
+        "requiredEntryFields": ["hash", "id", "path", "size"],
+        "optionalEntryFields": [],
+        "channels": {
+            "public": [
+                {"prefix": "questions", "segmentCounts": [2], "resourceTypes": []}
+            ],
+            "answerKey": [
+                {"prefix": "solutions", "segmentCounts": [2], "resourceTypes": []}
+            ],
+        },
+    }
+]
+
+
+def _compile_channel_rules(
+    channels: dict[str, object], segment: str, suffix: str, schema: str
+) -> dict[str, tuple[_ArtifactPathRule, ...]]:
+    """Turn a declared per-channel path enumeration into anchored matchers.
+
+    Each rule pins one artifact prefix to an explicit set of segment counts and
+    an explicit set of resourceType values, so an unknown prefix, an unexpected
+    nesting depth, or a resourceType that does not belong to its prefix all stay
+    hard errors instead of being absorbed by a wildcard.
+    """
+    compiled: dict[str, tuple[_ArtifactPathRule, ...]] = {}
+    for channel, rules in channels.items():
+        channel_rules: list[_ArtifactPathRule] = []
+        for rule in rules:
+            prefix = rule["prefix"]
+            counts = sorted(rule["segmentCounts"])
+            # A count below 2 would render as a `{-1}` quantifier, which Python
+            # treats as a literal rather than an error, yielding a pattern that
+            # silently matches nothing. Refuse it at load time instead.
+            if not counts or counts[0] < 2:
+                raise ValueError(
+                    f"{CONTENT_PACKAGE_CONTRACT_FILE}: {schema} {channel}/{prefix} "
+                    "segmentCounts must be a non-empty list of integers >= 2."
+                )
+            # `.`/`..` segments are refused outright so a manifest can never
+            # describe a path that escapes its artifact root.
+            alternatives = "|".join(
+                f"{re.escape(prefix)}/(?:(?!\\.{{1,2}}/){segment}/){{{count - 2}}}"
+                f"{segment}{re.escape(suffix)}"
+                for count in counts
+            )
+            channel_rules.append(
+                _ArtifactPathRule(
+                    prefix,
+                    re.compile(alternatives),
+                    frozenset(rule["resourceTypes"]),
+                )
+            )
+        compiled[channel] = tuple(channel_rules)
+    return compiled
+
+
+def _compile_manifest_shapes(source: dict[str, object]) -> dict[str, _ManifestShape]:
+    segment = source.get("segmentPattern", "[A-Za-z0-9._-]+")
+    suffix = source.get("fileSuffix", ".json")
+    shapes: dict[str, _ManifestShape] = {}
+    for shape in source.get("manifestShapes", _LEGACY_MANIFEST_SHAPES):
+        schema = shape["schema"]
+        required = frozenset(shape["requiredEntryFields"])
+        optional = frozenset(shape["optionalEntryFields"])
+        if required & optional:
+            raise ValueError(
+                f"{CONTENT_PACKAGE_CONTRACT_FILE}: {schema} declares "
+                f"{sorted(required & optional)} as both required and optional."
+            )
+        shapes[schema] = _ManifestShape(
+            schema,
+            required,
+            optional,
+            _compile_channel_rules(shape["channels"], segment, suffix, schema),
+        )
+    return shapes
+
+
+PACKAGE_MANIFEST_SHAPES = _compile_manifest_shapes(_CONTENT_PACKAGE_SOURCE)
+PACKAGE_MANIFEST_SCHEMAS = frozenset(PACKAGE_MANIFEST_SHAPES)
+if PACKAGE_MANIFEST_SCHEMA not in PACKAGE_MANIFEST_SHAPES:
+    raise ValueError(
+        f"{CONTENT_PACKAGE_CONTRACT_FILE}: the active packageContract schema "
+        f"{PACKAGE_MANIFEST_SCHEMA} has no declared manifest shape."
+    )
 FORBIDDEN_DOMAIN_PATTERN = re.compile(
     rb"(?i)(?<![a-z0-9])(?:[a-z0-9-]+\.)*certigo\.app(?=$|[^a-z0-9-])"
 )
@@ -482,10 +608,16 @@ def load_active_content_reference(root: Path) -> ActiveContentReference:
         "canonicalBodyFields": list(PACKAGE_MANIFEST_BODY_FIELDS),
         "excludedDigestFields": list(PACKAGE_MANIFEST_DIGEST_FIELDS),
     }
-    if contract != expected_contract:
+    # Every accepted schema shares one digest contract, so only `schema` may
+    # differ. A reference pinned to a superseded-but-accepted schema is allowed
+    # during a migration; anything else is still rejected outright.
+    accepted_contracts = [
+        {**expected_contract, "schema": schema} for schema in sorted(PACKAGE_MANIFEST_SCHEMAS)
+    ]
+    if contract not in accepted_contracts:
         raise ProjectStateError(
             f"{ACTIVE_CONTENT_REFERENCE_FILE}.packageContract: contract does not match "
-            "certigo.content.package-manifest/v1."
+            f"any accepted package manifest schema {sorted(PACKAGE_MANIFEST_SCHEMAS)}."
         )
 
     manifests = value["manifests"]
@@ -544,8 +676,9 @@ def _validate_manifest(
         raise ProjectStateError(f"{source}: expected a JSON object.")
     expected_fields = set(PACKAGE_MANIFEST_BODY_FIELDS + PACKAGE_MANIFEST_DIGEST_FIELDS)
     _exact_keys(manifest, expected_fields, source)
-    if manifest["schema"] != PACKAGE_MANIFEST_SCHEMA:
+    if manifest["schema"] not in PACKAGE_MANIFEST_SHAPES:
         raise ProjectStateError(f"{source}.schema: unexpected package manifest schema.")
+    shape = PACKAGE_MANIFEST_SHAPES[manifest["schema"]]
     if manifest["algorithm"] != PACKAGE_MANIFEST_ALGORITHM:
         raise ProjectStateError(f"{source}.algorithm: expected sha256.")
     if manifest["serialization"] != PACKAGE_MANIFEST_SERIALIZATION:
@@ -570,27 +703,56 @@ def _validate_manifest(
         raise ProjectStateError(
             f"{source}.fileCount: expected {reference.file_count} and len(files) equality."
         )
-    expected_path = (
-        r"questions/[^/]+\.json"
-        if reference.channel == "public"
-        else r"solutions/[^/]+\.json"
-    )
+    channel_rules = shape.channels.get(reference.channel)
+    if not channel_rules:
+        raise ProjectStateError(
+            f"{source}.channel: {shape.schema} declares no artifact paths for "
+            f"{reference.channel!r}."
+        )
     manifest_paths: list[str] = []
     for index, file_entry in enumerate(files):
         entry_source = f"{source}.files[{index}]"
         if not isinstance(file_entry, dict):
             raise ProjectStateError(f"{entry_source}: expected an object.")
-        _exact_keys(file_entry, {"id", "path", "hash", "size"}, entry_source)
+        present = set(file_entry)
+        if (present - shape.optional_fields) != shape.required_fields:
+            raise ProjectStateError(
+                f"{entry_source}: expected required fields "
+                f"{sorted(shape.required_fields)} plus optional "
+                f"{sorted(shape.optional_fields)}, found {sorted(present)}."
+            )
         item_id = file_entry["id"]
         item_path = file_entry["path"]
         item_hash = file_entry["hash"]
         item_size = file_entry["size"]
         if not isinstance(item_id, str) or not item_id or "/" in item_id:
             raise ProjectStateError(f"{entry_source}.id: expected a non-empty item id.")
-        if not isinstance(item_path, str) or not re.fullmatch(expected_path, item_path):
+        if not isinstance(item_path, str):
             raise ProjectStateError(
                 f"{entry_source}.path: unexpected path for {reference.channel}."
             )
+        matched = next(
+            (rule for rule in channel_rules if rule.pattern.fullmatch(item_path)),
+            None,
+        )
+        if matched is None:
+            raise ProjectStateError(
+                f"{entry_source}.path: unexpected path for {reference.channel}."
+            )
+        if matched.resource_types:
+            resource_type = file_entry["resourceType"]
+            if resource_type not in matched.resource_types:
+                raise ProjectStateError(
+                    f"{entry_source}.resourceType: expected one of "
+                    f"{sorted(matched.resource_types)} under {matched.prefix}/, "
+                    f"found {resource_type!r}."
+                )
+        for optional in sorted(shape.optional_fields & present):
+            value = file_entry[optional]
+            if not isinstance(value, str) or not value:
+                raise ProjectStateError(
+                    f"{entry_source}.{optional}: expected a non-empty string."
+                )
         if not isinstance(item_hash, str) or not re.fullmatch(
             r"[0-9a-f]{64}", item_hash
         ):

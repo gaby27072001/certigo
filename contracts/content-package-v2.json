@@ -1,0 +1,127 @@
+{
+  "schema": "certigo.source-contract/content-package/v2",
+  "activeReferenceSchema": "certigo.active-content-reference/v1",
+  "packageContract": {
+    "schema": "certigo.content.package-manifest/v1",
+    "algorithm": "sha256",
+    "serialization": "json-sorted-keys-compact-utf8-lf",
+    "canonicalBodyFields": [
+      "schema",
+      "channel",
+      "artifact",
+      "algorithm",
+      "serialization",
+      "fileCount",
+      "files"
+    ],
+    "excludedDigestFields": [
+      "manifestId",
+      "rootHash"
+    ]
+  },
+  "segmentPattern": "[A-Za-z0-9._-]+",
+  "fileSuffix": ".json",
+  "manifestShapes": [
+    {
+      "schema": "certigo.content.package-manifest/v1",
+      "requiredEntryFields": [
+        "hash",
+        "id",
+        "path",
+        "size"
+      ],
+      "optionalEntryFields": [],
+      "channels": {
+        "public": [
+          {
+            "prefix": "questions",
+            "segmentCounts": [
+              2
+            ],
+            "resourceTypes": []
+          }
+        ],
+        "answerKey": [
+          {
+            "prefix": "solutions",
+            "segmentCounts": [
+              2
+            ],
+            "resourceTypes": []
+          }
+        ]
+      }
+    },
+    {
+      "schema": "certigo.content.package-manifest/v3",
+      "requiredEntryFields": [
+        "hash",
+        "id",
+        "path",
+        "resourceType",
+        "size"
+      ],
+      "optionalEntryFields": [
+        "blueprintVersion",
+        "certification",
+        "objective",
+        "provider"
+      ],
+      "channels": {
+        "public": [
+          {
+            "prefix": "catalog",
+            "segmentCounts": [
+              2
+            ],
+            "resourceTypes": [
+              "certificationCatalog"
+            ]
+          },
+          {
+            "prefix": "coverage",
+            "segmentCounts": [
+              3
+            ],
+            "resourceTypes": [
+              "coverageMatrix"
+            ]
+          },
+          {
+            "prefix": "questions",
+            "segmentCounts": [
+              2,
+              4
+            ],
+            "resourceTypes": [
+              "question"
+            ]
+          },
+          {
+            "prefix": "runtime",
+            "segmentCounts": [
+              5
+            ],
+            "resourceTypes": [
+              "concept",
+              "domain",
+              "track"
+            ]
+          }
+        ],
+        "answerKey": [
+          {
+            "prefix": "solutions",
+            "segmentCounts": [
+              2,
+              4
+            ],
+            "resourceTypes": [
+              "solution"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
