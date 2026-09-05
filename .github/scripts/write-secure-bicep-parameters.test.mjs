@@ -20,6 +20,15 @@ const publicDomainConfiguration = {
   publicDomainVerified: 'true',
   appleCiamDomainReconfigured: 'true',
 };
+const contentConfiguration = {
+  contentBlobEndpoint: 'https://stcertigocontent.blob.core.windows.net/',
+  contentReaderClientId: '55555555-5555-5555-5555-555555555555',
+  contentReaderResourceId:
+    '/subscriptions/66666666-6666-6666-6666-666666666666/resourceGroups/rg-certigo-content/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader',
+  contentDescriptorContainerName: 'content-release-descriptors',
+  contentPublicContainerName: 'content-public-releases',
+  contentPrivateContainerName: 'content-private-releases',
+};
 
 function outputPath() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-bicep-params-'));
@@ -107,6 +116,7 @@ test('injects active and previous rotation pairs into a private parameter docume
     jwtPreviousSigningKeyExpiresOn: expiration,
     ...accountDeletionIdentityConfiguration,
   });
+
   const parameters = JSON.parse(fs.readFileSync(outputFile, 'utf8')).parameters;
 
   assert.deepEqual(result, { hasActiveKey: true, hasPreviousKey: true });
@@ -132,6 +142,38 @@ test('injects active and previous rotation pairs into a private parameter docume
   assert.deepEqual(
     parameters.authJwtPreviousSigningKeyExpiresOn,
     { value: expiration },
+  );
+});
+
+test('injects the complete PR 290 content outputs and rejects partial wiring', () => {
+  const { outputFile } = write({
+    ...contentConfiguration,
+    contentRepositoryMode: 'versioned',
+  });
+  const parameters = JSON.parse(fs.readFileSync(outputFile, 'utf8')).parameters;
+  for (const [name, value] of Object.entries(contentConfiguration)) {
+    assert.deepEqual(parameters[name], { value });
+  }
+  assert.deepEqual(parameters.contentRepositoryMode, { value: 'versioned' });
+
+  assert.throws(
+    () => write({ contentBlobEndpoint: contentConfiguration.contentBlobEndpoint }),
+    /All immutable content outputs from PR #290 must be configured together/,
+  );
+  assert.throws(
+    () => write({
+      ...contentConfiguration,
+      contentReaderResourceId: '/subscriptions/not-an-identity',
+    }),
+    /must identify a user-assigned managed identity/,
+  );
+  assert.throws(
+    () => write({ contentRepositoryMode: 'versioned' }),
+    /requires the complete PR #290 outputs/,
+  );
+  assert.throws(
+    () => write({ ...contentConfiguration, contentRepositoryMode: 'invalid' }),
+    /must be legacy or versioned/,
   );
 });
 

@@ -87,6 +87,8 @@ class AuthController extends Notifier<AuthState> {
   /// Délai de lecture du coffre au démarrage (déjà borné dans le store aussi).
   static const Duration _restoreReadTimeout = Duration(seconds: 6);
 
+  AuthState get currentState => state;
+
   @override
   AuthState build() {
     _gateway = ref.read(authGatewayProvider);
@@ -430,16 +432,26 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<void> completeAccountDeletion() async {
+  Future<void> completeAccountDeletion({required String expectedUserId}) async {
     final AuthState current = state;
-    if (current is Authenticated) {
-      try {
-        await _gateway.signOut(current.session);
-      } catch (error, stackTrace) {
-        _logAuthError('completeAccountDeletion', error, stackTrace);
-      }
+    if (current is! Authenticated || current.session.userId != expectedUserId) {
+      throw StateError('Authenticated person does not match the completed deletion.');
     }
-    await _store.clear();
+    final int revision = ++_sessionRevision;
+    try {
+      await _gateway.signOut(current.session);
+    } catch (error, stackTrace) {
+      _logAuthError('completeAccountDeletion', error, stackTrace);
+    }
+    final AuthState afterSignOut = state;
+    if (!_isCurrent(revision) ||
+        afterSignOut is! Authenticated ||
+        afterSignOut.session.userId != expectedUserId) {
+      throw StateError('Authenticated person changed during account deletion.');
+    }
+    if (!await _clearPersistedSession(revision)) {
+      throw StateError('Authenticated session changed during account deletion.');
+    }
     state = const AccountDeletionCompleted();
   }
 

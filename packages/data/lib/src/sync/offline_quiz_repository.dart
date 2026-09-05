@@ -47,6 +47,7 @@ class OfflineQuizRepository implements QuizRepository {
         payload: request.toJson(),
         idempotencyKey: request.clientAttemptId,
         ownerId: ownerId,
+        publicManifestId: request.publicManifestId,
       );
     }
 

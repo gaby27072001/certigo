@@ -193,9 +193,12 @@ backend.
    `rg-certigo-content`: un StorageV2 `Standard_GRS`, OAuth-only, réseau public
    désactivé, trois containers, rétentions WORM `Unlocked` 90/30/90 et un seul
    Private Endpoint Blob dans le subnet CI.
-4. Copier les six outputs #290 dans l'Environment GitHub staging. Laisser
-   `CONTENT_REPOSITORY_MODE` absent: la Function attache uniquement l'UAMI reader
-   externe et reste en `legacy`.
+4. Renseigner les paramètres de contenu dans `infra/params/staging.bicepparam`
+   (`contentBlobEndpoint`, `contentReaderClientId`, `contentReaderResourceId`),
+   puis redéployer l'infrastructure. Ce ne sont **pas** des variables GitHub
+   Environment : en définir n'a aucun effet et ne produit aucune erreur.
+   Laisser `contentRepositoryMode = 'legacy'` : la Function attache uniquement
+   l'UAMI reader externe et reste en `legacy`.
 5. Redéployer la même révision backend en staging afin de matérialiser l'endpoint
    et l'UAMI reader externes, tout en conservant `CONTENT_REPOSITORY_MODE=legacy`.
    Vérifier les app settings effectifs avant tout import.
@@ -207,9 +210,10 @@ backend.
    staging envoient `publicManifestId` pour quiz et tuteur. Drainer les actions
    offline créées avant cette version, ou les invalider explicitement avec une
    information utilisateur; une requête sans pin doit rester rejetée fail-closed.
-9. Définir `CONTENT_REPOSITORY_MODE=versioned` dans staging seulement, déployer
-   la même révision backend et vérifier manifeste/ETag, catalog, lesson, quiz,
-   exam, tutor et absence de données privées.
+9. Passer `param contentRepositoryMode = 'versioned'` dans
+   `infra/params/staging.bicepparam` (staging seulement), redéployer
+   l'infrastructure puis la même révision backend, et vérifier manifeste/ETag,
+   catalog, lesson, quiz, exam, tutor et absence de données privées.
 10. Publier et promouvoir la seconde release, puis prouver le rollback N-1 avec
    `If-Match`; un second rollback doit retourner 409 et aucun artefact ne doit
    être supprimé ou réécrit.

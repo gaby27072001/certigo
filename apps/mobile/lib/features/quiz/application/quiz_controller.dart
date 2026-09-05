@@ -36,7 +36,14 @@ class QuizController extends ChangeNotifier {
     required this._quiz,
     required this.trackId,
     required this.lessonId,
-  }) {
+    RuntimeContentPinRegistry? contentPins,
+    String? contentOwnerId,
+  })  :
+        // Keep the optional dependency source-compatible with direct controller tests.
+        // ignore: prefer_initializing_formals
+        _contentPins = contentPins,
+        // ignore: prefer_initializing_formals
+        _contentOwnerId = contentOwnerId {
     unawaited(loadItems());
   }
 
@@ -44,6 +51,8 @@ class QuizController extends ChangeNotifier {
   final QuizRepository _quiz;
   final String trackId;
   final String lessonId;
+  final RuntimeContentPinRegistry? _contentPins;
+  final String? _contentOwnerId;
 
   List<QuizEntry> _items = <QuizEntry>[];
   bool _loading = true;
@@ -60,6 +69,7 @@ class QuizController extends ChangeNotifier {
   final Map<String, List<String>> _answersByItem = <String, List<String>>{};
   final Map<String, int> _latencyByItem = <String, int>{};
   String? _publicManifestId;
+  RuntimeContentPin? _contentPin;
 
   List<QuizEntry> get items => _items;
   bool get loading => _loading;
@@ -82,6 +92,11 @@ class QuizController extends ChangeNotifier {
 
     final List<QuizEntry> entries = lesson.when(
       success: (Lesson l) {
+        _contentPin?.release();
+        _contentPin = _contentPins?.pin(
+          l.publicManifestId,
+          ownerId: _contentOwnerId,
+        );
         _publicManifestId = l.publicManifestId;
         final List<QuizEntry> fromApi = l.blocks
             .where((LessonBlock b) => b.check != null)
@@ -95,7 +110,11 @@ class QuizController extends ChangeNotifier {
     _items = entries;
     _loadFailed = lesson.isFailure;
     _isDemo = false;
-    if (lesson.isFailure) _publicManifestId = null;
+    if (lesson.isFailure) {
+      _publicManifestId = null;
+      _contentPin?.release();
+      _contentPin = null;
+    }
     _loading = false;
     _shownAt = DateTime.now();
     notifyListeners();
@@ -113,6 +132,8 @@ class QuizController extends ChangeNotifier {
     _answersByItem.clear();
     _latencyByItem.clear();
     _publicManifestId = null;
+    _contentPin?.release();
+    _contentPin = null;
     _shownAt = DateTime.now();
     notifyListeners();
   }
@@ -238,6 +259,7 @@ class QuizController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _contentPin?.release();
     super.dispose();
   }
 

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/content/runtime_content_providers.dart';
 import '../../../app/router.dart';
 import '../application/quiz_controller.dart';
 import '../application/quiz_entry.dart';
@@ -37,6 +38,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     _controller = QuizController(
       lessons: ref.read(lessonRepositoryProvider),
       quiz: ref.read(quizRepositoryProvider),
+      contentPins: ref.read(runtimeContentPinRegistryProvider),
+      contentOwnerId: ref.read(activeTrackOwnerIdProvider),
       trackId: widget.trackId,
       lessonId: widget.lessonId,
     )..addListener(_onChange);

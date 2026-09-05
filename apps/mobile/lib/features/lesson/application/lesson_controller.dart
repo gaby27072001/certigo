@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/content/runtime_content_providers.dart';
 import 'answer_grading.dart';
 import 'check_outcome.dart';
 import 'lesson_args.dart';
@@ -28,13 +29,22 @@ class LessonController extends StateNotifier<LessonSessionState> {
     required this._quiz,
     required this.args,
     this._feedback = const HapticLessonFeedback(),
-  }) : super(const LessonSessionState()) {
+    RuntimeContentPinRegistry? contentPins,
+    String? contentOwnerId,
+  })  : // Keep the optional dependency source-compatible with direct controller tests.
+        // ignore: prefer_initializing_formals
+        _contentPins = contentPins,
+        // ignore: prefer_initializing_formals
+        _contentOwnerId = contentOwnerId,
+        super(const LessonSessionState()) {
     unawaited(load());
   }
 
   final LessonRepository _lessons;
   final QuizRepository _quiz;
   final LessonFeedback _feedback;
+  final RuntimeContentPinRegistry? _contentPins;
+  final String? _contentOwnerId;
   final LessonArgs args;
 
   LessonGrader _grader = const EmbeddedKeyGrader(<String, CheckOutcome>{});
@@ -42,6 +52,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
   final DateTime _startedAt = DateTime.now().toUtc();
   DateTime _stepShownAt = DateTime.now();
   bool _disposed = false;
+  RuntimeContentPin? _contentPin;
 
   /// Fetches server or genuinely cached content. A failure stays visible until
   /// retry or an explicit [startDemo] action.
@@ -55,11 +66,20 @@ class LessonController extends StateNotifier<LessonSessionState> {
 
     final Lesson? lesson = res.when(
       success: (Lesson remote) {
+        _contentPin?.release();
+        _contentPin = _contentPins?.pin(
+          remote.publicManifestId,
+          ownerId: _contentOwnerId,
+        );
         // Server content is graded server-side; no embedded answer key.
         _grader = const EmbeddedKeyGrader(<String, CheckOutcome>{});
         return remote;
       },
-      failure: (Failure _) => null,
+      failure: (Failure _) {
+        _contentPin?.release();
+        _contentPin = null;
+        return null;
+      },
     );
 
     if (lesson == null) {
@@ -101,6 +121,8 @@ class LessonController extends StateNotifier<LessonSessionState> {
   void startDemo() {
     if (state.status != LessonStatus.error) return;
     final Lesson lesson = sampleLesson('certigo-demo');
+    _contentPin?.release();
+    _contentPin = null;
     _grader = EmbeddedKeyGrader(sampleAnswerKey());
     state = state.copyWith(
       status: LessonStatus.ready,
@@ -376,6 +398,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
   @override
   void dispose() {
     _disposed = true;
+    _contentPin?.release();
     super.dispose();
   }
 }
@@ -389,5 +412,7 @@ final lessonControllerProvider = StateNotifierProvider.autoDispose
     quiz: ref.watch(quizRepositoryProvider),
     args: args,
     feedback: ref.watch(lessonFeedbackProvider),
+    contentPins: ref.watch(runtimeContentPinRegistryProvider),
+    contentOwnerId: ref.watch(activeTrackOwnerIdProvider),
   );
 });

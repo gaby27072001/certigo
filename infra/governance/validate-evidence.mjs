@@ -482,9 +482,13 @@ export function validateExistingPhaseBAssignments(
   const contracts = new Set();
   for (const assignment of roleAssignments) {
     const roleDefinitionId = String(assignment.roleDefinitionId).toLowerCase();
+    const managedIdentityOperatorRoleId =
+      `/subscriptions/${subscriptionId}/providers/Microsoft.Authorization/` +
+      'roleDefinitions/f1a07417-d97a-45cb-824c-7a7467783830';
     const isDelegator = [
       proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
       proof.roleDefinitionIds.contentInfrastructurePlanExecutor,
+      managedIdentityOperatorRoleId,
     ].some(
       (expected) => String(expected).toLowerCase() === roleDefinitionId,
     );
@@ -618,7 +622,7 @@ export function verifyDeploymentApproval(input) {
   });
   const rawPlan = readJson(planPath);
   let effectivePlan = rawPlan;
-  if (manifest.phase === 'B1a' && manifest.normalization) {
+  if (['B1a', 'B1b'].includes(manifest.phase) && manifest.normalization) {
     const normalized = normalizePrincipalTypes(
       rawPlan,
       readJson(compiledTemplatePath),
@@ -686,7 +690,7 @@ export function validatePriorDeployment(input) {
   });
   requireEqual(manifest.phase, expectedPhase, 'prior deployment phase mismatch');
   let effectivePlan = plan;
-  if (expectedPhase === 'B1a' && manifest.normalization) {
+  if (['B1a', 'B1b'].includes(expectedPhase) && manifest.normalization) {
     const normalized = normalizePrincipalTypes(
       plan,
       readJson(compiledTemplatePath),

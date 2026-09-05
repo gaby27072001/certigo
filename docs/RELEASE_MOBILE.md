@@ -678,6 +678,12 @@ fixe et revenir à `flutter.ndkVersion` (vérifier avec `flutter doctor -v`).
 - [x] Scope gelé : iOS interne, boucle coeur existante, Tuteur déterministe,
       aucune nouvelle feature.
 - [ ] SHA candidat identifié et `ci-mobile` vert.
+- [ ] Toute modification du cache ou du contrat de contenu runtime a passé
+      `flutter test integration_test -d <device>` sur un appareil ou émulateur
+      **Android**, puis sur un simulateur ou appareil **iOS**. Un device web ou
+      desktop ne remplace pas cette preuve. Si l'un des deux environnements
+      physiques manque, conserver la PR en draft et enregistrer ce blocker ;
+      ne pas installer un émulateur lourd uniquement pour contourner ce gate.
 - [ ] Sink de crash distant actif, dSYM uploadés et crash de test symboliqué.
 - [ ] App Codemagic existante et repo vérifiés.
 - [ ] Intégration `AppStoreConnect` et clé ASC vérifiées live.

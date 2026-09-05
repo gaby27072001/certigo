@@ -11,6 +11,10 @@ const guidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const alertEmailPattern =
   /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/;
+const blobEndpointPattern = /^https:\/\/[a-z0-9]{3,24}\.blob\.core\.windows\.net\/$/;
+const containerNamePattern = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/;
+const readerResourceIdPattern =
+  /^\/subscriptions\/[0-9a-f-]{36}\/resourceGroups\/[^/]+\/providers\/Microsoft\.ManagedIdentity\/userAssignedIdentities\/[^/]+$/i;
 const refreshOverlapMilliseconds = (90 * 24 * 60 + 2) * 60 * 1000;
 
 function requirePair(value, expiresOn, valueName, expiresOnName) {
@@ -113,6 +117,68 @@ function validateAccountDeletionIdentityConfiguration({
   };
 }
 
+function validateContentConfiguration({
+  blobEndpoint,
+  readerClientId,
+  readerResourceId,
+  descriptorContainer,
+  publicContainer,
+  privateContainer,
+}) {
+  const values = [
+    blobEndpoint,
+    readerClientId,
+    readerResourceId,
+    descriptorContainer,
+    publicContainer,
+    privateContainer,
+  ].map((value) => (typeof value === 'string' ? value : ''));
+  if (values.every((value) => value.length === 0)) {
+    return null;
+  }
+  if (values.some((value) => value.length === 0 || value !== value.trim())) {
+    throw new Error('All immutable content outputs from PR #290 must be configured together without surrounding whitespace.');
+  }
+  if (!blobEndpointPattern.test(values[0])) {
+    throw new Error('AZURE_BLOB_ENDPOINT must be a canonical Azure Blob endpoint ending in /.');
+  }
+  validateGuid(values[1], 'AZURE_CONTENT_READER_CLIENT_ID');
+  if (!readerResourceIdPattern.test(values[2])) {
+    throw new Error('AZURE_CONTENT_READER_RESOURCE_ID must identify a user-assigned managed identity.');
+  }
+  for (const [name, value] of [
+    ['AZURE_DESCRIPTOR_CONTAINER', values[3]],
+    ['AZURE_PUBLIC_CONTAINER', values[4]],
+    ['AZURE_PRIVATE_CONTAINER', values[5]],
+  ]) {
+    if (!containerNamePattern.test(value)) {
+      throw new Error(`${name} must be a canonical Azure Blob container name.`);
+    }
+  }
+  return {
+    contentBlobEndpoint: values[0],
+    contentReaderClientId: values[1],
+    contentReaderResourceId: values[2],
+    contentDescriptorContainerName: values[3],
+    contentPublicContainerName: values[4],
+    contentPrivateContainerName: values[5],
+  };
+}
+
+function validateContentRepositoryMode(value, contentConfiguration) {
+  const mode = typeof value === 'string' ? value : '';
+  if (mode.length === 0) {
+    return null;
+  }
+  if (!['legacy', 'versioned'].includes(mode)) {
+    throw new Error('CONTENT_REPOSITORY_MODE must be legacy or versioned.');
+  }
+  if (mode === 'versioned' && contentConfiguration === null) {
+    throw new Error('CONTENT_REPOSITORY_MODE=versioned requires the complete PR #290 outputs.');
+  }
+  return mode;
+}
+
 export function writeSecureParameters({
   environment,
   alertEmail,
@@ -128,6 +194,13 @@ export function writeSecureParameters({
   publicWebOrigin,
   publicDomainVerified,
   appleCiamDomainReconfigured,
+  contentBlobEndpoint,
+  contentReaderClientId,
+  contentReaderResourceId,
+  contentDescriptorContainerName,
+  contentPublicContainerName,
+  contentPrivateContainerName,
+  contentRepositoryMode,
   inputFile,
   outputFile,
   now = new Date(),
@@ -168,6 +241,18 @@ export function writeSecureParameters({
     appleCiamDomainReconfigured,
     activationRequested: environment !== 'dev',
   });
+  const contentConfiguration = validateContentConfiguration({
+    blobEndpoint: contentBlobEndpoint,
+    readerClientId: contentReaderClientId,
+    readerResourceId: contentReaderResourceId,
+    descriptorContainer: contentDescriptorContainerName,
+    publicContainer: contentPublicContainerName,
+    privateContainer: contentPrivateContainerName,
+  });
+  const validatedContentRepositoryMode = validateContentRepositoryMode(
+    contentRepositoryMode,
+    contentConfiguration,
+  );
 
   const hasActiveKey = requirePair(
     jwtSigningKey,
@@ -250,6 +335,16 @@ export function writeSecureParameters({
       value: accountDeletionIdentityConfiguration.entraReauthAudience,
     };
   }
+  if (contentConfiguration !== null) {
+    for (const [name, value] of Object.entries(contentConfiguration)) {
+      compiled.parameters[name] = { value };
+    }
+    if (validatedContentRepositoryMode !== null) {
+      compiled.parameters.contentRepositoryMode = {
+        value: validatedContentRepositoryMode,
+      };
+    }
+  }
 
   fs.writeFileSync(
     outputFile,
@@ -278,6 +373,13 @@ function main() {
       publicWebOrigin: process.env.PUBLIC_WEB_ORIGIN,
       publicDomainVerified: process.env.PUBLIC_DOMAIN_VERIFIED,
       appleCiamDomainReconfigured: process.env.APPLE_CIAM_DOMAIN_RECONFIGURED,
+      contentBlobEndpoint: process.env.AZURE_BLOB_ENDPOINT,
+      contentReaderClientId: process.env.AZURE_CONTENT_READER_CLIENT_ID,
+      contentReaderResourceId: process.env.AZURE_CONTENT_READER_RESOURCE_ID,
+      contentDescriptorContainerName: process.env.AZURE_DESCRIPTOR_CONTAINER,
+      contentPublicContainerName: process.env.AZURE_PUBLIC_CONTAINER,
+      contentPrivateContainerName: process.env.AZURE_PRIVATE_CONTAINER,
+      contentRepositoryMode: process.env.CONTENT_REPOSITORY_MODE,
       inputFile: process.env.BASE_PARAMETERS_FILE,
       outputFile: process.env.AUTH_PARAMETERS_FILE,
     });

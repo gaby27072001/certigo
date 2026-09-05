@@ -4,6 +4,7 @@ import 'package:prism_ui/prism_ui.dart';
 
 import '../features/auth/presentation/widgets/email_verification_banner.dart';
 import 'account_deletion_resume_scope.dart';
+import 'content/content_update_banner.dart';
 
 /// App shell hosting the four primary tabs behind a floating glass nav bar.
 ///
@@ -43,6 +44,7 @@ class AppShell extends StatelessWidget {
         child: Column(
           children: <Widget>[
             const EmailVerificationBanner(),
+            const ContentUpdateBanner(),
             Expanded(child: shell),
           ],
         ),

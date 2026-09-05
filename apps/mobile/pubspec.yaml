@@ -37,6 +37,7 @@ dependencies:
   # Offline-first persistence & connectivity (iOS + Android)
   shared_preferences: ^2.3.0
   connectivity_plus: ^6.0.0
+  path_provider: ^2.1.5
 
   # UX engagement additions
   confetti: ^0.7.0

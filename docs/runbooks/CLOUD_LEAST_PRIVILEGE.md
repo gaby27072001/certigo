@@ -259,8 +259,9 @@ par le moteur de what-if. Le bootstrap est donc séparé et fail-closed :
   dev/staging/prod et réseau partagé sur CI. Elle ne contient ni launcher subscription,
   rôle accordant `roleAssignments/write`, ni policyAssignment.
 - **Phase B1b humain PIM — `bootstrap-rbac-admin`** : planifie séparément les trois launchers,
-  les trois runtime writers conditionnés, l'exécuteur contenu conditionné et l'unique
-  policyAssignment en `Audit`. Aucun workload ne peut créer ces attributions délégatrices.
+  les trois runtime writers conditionnés, l'exécuteur contenu conditionné, trois
+  `Managed Identity Operator` limités à l'unique UAMI reader et l'unique policyAssignment
+  en `Audit`. Aucun workload ne peut créer ces attributions délégatrices.
 - **Phase B2 — `contentPlanExternalJoinAssignments`** : cible directement `rg-certigo-ci` et
   planifie séparément les deux attributions externes sur le subnet et la zone DNS exacts.
 
@@ -398,9 +399,10 @@ principals. Seul un replay partiel conforme à B1/B2 est accepté; tout assignme
 bloque. B1 passe l'objet Phase A validé comme
 paramètre littéral : aucun `principalId` d'assignment ne dépend d'un `reference()`. Son manifeste
 indépendant B1a couvre les six roleAssignments RG sans délégation. Le manifeste B1b couvre les
-trois launchers, les quatre attributions délégatrices conditionnées et
+trois launchers, les quatre attributions délégatrices conditionnées, les trois droits
+d'attachement limités à l'UAMI reader et
 `certigo-privileged-ci-rbac` en `Audit`, sous identité humaine PIM.
-Si ARM omet `principalType` (`null`) dans le payload what-if, B1 ne l'infère qu'après avoir prouvé
+Si ARM omet `principalType` (`null`) dans le payload what-if, B1a/B1b ne l'infèrent qu'après avoir prouvé
 que la déclaration correspondante du template ARM compilé contient le littéral
 `ServicePrincipal` et que le `principalId` littéral correspond exactement à une UAMI Phase A live.
 Le plan normalisé et la provenance `compiled-template+live-uami` sont hashés dans le manifeste;

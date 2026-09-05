@@ -12,6 +12,7 @@ import {
   validatePhaseAProof,
   validateWhatIf,
 } from '../governance/validate-what-if.mjs';
+import { normalizePrincipalTypes } from '../governance/normalize-principal-types.mjs';
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -416,6 +417,9 @@ function makeCompletePhaseBPlans(proof) {
   const contributor =
     `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
     'roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c';
+  const managedIdentityOperator =
+    `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
+    'roleDefinitions/f1a07417-d97a-45cb-824c-7a7467783830';
   for (const environment of ['dev', 'staging', 'prod']) {
     const key = `deploy${environment[0].toUpperCase()}${environment.slice(1)}`;
     const principalId = proof.identities[key].principalId;
@@ -467,6 +471,17 @@ function makeCompletePhaseBPlans(proof) {
           principalType: 'ServicePrincipal',
           roleDefinitionId:
             proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
+        },
+      ),
+      roleAssignmentChange(
+        proof.identities.contentReader.resourceId,
+        proof.identities[key].name,
+        {
+          description:
+            `Allows ${environment} deployment to attach only the immutable content reader identity.`,
+          principalId,
+          principalType: 'ServicePrincipal',
+          roleDefinitionId: managedIdentityOperator,
         },
       ),
     );
@@ -993,7 +1008,7 @@ test('Phase B1a B1b and B2 accept only their exact assignment contracts', () => 
   );
   assert.equal(
     validateWhatIf(b1b, subscription, { phase: 'B1b', phaseA: proof }).total,
-    8,
+    11,
   );
   assert.equal(
     validateWhatIf(b2, subscription, { phase: 'B2', phaseA: proof }).total,
@@ -1006,6 +1021,52 @@ test('Phase B1a B1b and B2 accept only their exact assignment contracts', () => 
   assert.throws(
     () => validateWhatIf(b1a, subscription, { phase: 'B2', phaseA: proof }),
     /outside the exact Phase B2 contract|Phase B2 plan is incomplete/,
+  );
+});
+
+test('human B1b normalizes only proven Phase A service principals', () => {
+  const proof = makePhaseAProof();
+  const raw = structuredClone(makeCompletePhaseBPlans(proof).b1b);
+  for (const change of raw.changes) {
+    if (change.resourceId.includes('/Microsoft.Authorization/roleAssignments/')) {
+      change.after.type = 'Microsoft.Authorization/roleAssignments';
+      change.after.properties.principalType = null;
+    }
+  }
+  const compiled = compileTemplate('infra/governance/bootstrap-rbac-admin.bicep');
+  const normalized = normalizePrincipalTypes(raw, compiled, proof);
+  assert.equal(normalized.provenance.normalizedCount, 10);
+  assert.equal(
+    validateWhatIf(normalized.plan, subscription, {
+      phase: 'B1b',
+      phaseA: proof,
+    }).total,
+    11,
+  );
+
+  const nonUami = structuredClone(raw);
+  nonUami.changes.find(
+    ({ after }) => after?.type === 'Microsoft.Authorization/roleAssignments',
+  ).after.properties.principalId =
+    '90000000-0000-0000-0000-000000000001';
+  assert.throws(
+    () => normalizePrincipalTypes(nonUami, compiled, proof),
+    /does not match a Phase A UAMI/,
+  );
+
+  const tampered = structuredClone(compiled);
+  const readerAssignment = resourcesOfType(
+    tampered,
+    'Microsoft.Authorization/roleAssignments',
+  ).find(
+    ({ properties }) =>
+      properties.description ===
+      "[parameters('readerAssignmentDescription')]",
+  );
+  readerAssignment.properties.principalType = "[parameters('principalType')]";
+  assert.throws(
+    () => normalizePrincipalTypes(raw, tampered, proof),
+    /not literal ServicePrincipal/,
   );
 });
 
@@ -1057,7 +1118,7 @@ test('Phase B validators accept exact NoChange retries only', () => {
   const proof = makePhaseAProof();
   for (const [key, phase, total] of [
     ['b1a', 'B1a', 6],
-    ['b1b', 'B1b', 8],
+    ['b1b', 'B1b', 11],
     ['b2', 'B2', 2],
   ]) {
     const create = makeCompletePhaseBPlans(proof)[key];

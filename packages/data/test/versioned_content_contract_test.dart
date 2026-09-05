@@ -71,6 +71,7 @@ void main() {
     const MockExamRequest exam = MockExamRequest(trackId: 'track-1', publicManifestId: _manifestId);
 
     expect(quiz.toJson()['publicManifestId'], _manifestId);
+    expect(quiz.toJson(), isNot(contains('releaseId')));
     expect(tutor.toJson()['publicManifestId'], _manifestId);
     expect(exam.toJson()['publicManifestId'], _manifestId);
   });

@@ -1,11 +1,16 @@
+import 'dart:io';
+
 import 'package:core/core.dart';
+import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app/app.dart';
 import '../app/active_track_store.dart';
+import '../app/content/runtime_content_providers.dart';
 import '../app/mascots.dart';
 import '../app/offline/offline_sync_scope.dart';
 import '../app/offline/prefs_catalog_store.dart';
@@ -81,21 +86,34 @@ Future<void> bootstrap() async {
     // Restore the offline action queue from disk so a submission made while
     // offline in a previous session is replayed as soon as the engine flushes.
     final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final List<Override> overrides = <Override>[
+      authLocalAccountCleanupProvider.overrideWith((Ref ref) {
+        return () async {
+          await ref.read(syncEngineProvider).waitForIdle();
+          await ref.read(activeTrackProvider.notifier).clear();
+        };
+      }),
+      activeTrackStoreProvider.overrideWithValue(SharedPreferencesActiveTrackStore(prefs)),
+      catalogStoreProvider.overrideWithValue(prefsCatalogCacheStore(prefs)),
+      lessonStoreProvider.overrideWithValue(prefsLessonCacheStore(prefs)),
+      syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
+    ];
+    if (kRuntimeContentMobileEnabled) {
+      final Directory support = await getApplicationSupportDirectory();
+      final Directory root = Directory(
+        '${support.path}${Platform.pathSeparator}certigo${Platform.pathSeparator}'
+        'runtime-content${Platform.pathSeparator}v1',
+      );
+      overrides.add(
+        runtimeContentStoreProvider.overrideWithValue(
+          FileRuntimeContentStore(root: root, spaceScope: runtimeContentSpaceScope()),
+        ),
+      );
+    }
 
     runApp(
       ProviderScope(
-        overrides: <Override>[
-          authLocalAccountCleanupProvider.overrideWith((Ref ref) {
-            return () async {
-              await ref.read(syncEngineProvider).waitForIdle();
-              await ref.read(activeTrackProvider.notifier).clear();
-            };
-          }),
-          activeTrackStoreProvider.overrideWithValue(SharedPreferencesActiveTrackStore(prefs)),
-          catalogStoreProvider.overrideWithValue(prefsCatalogCacheStore(prefs)),
-          lessonStoreProvider.overrideWithValue(prefsLessonCacheStore(prefs)),
-          syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
-        ],
+        overrides: overrides,
         child: const NotificationLifecycleScope(child: OfflineSyncScope(child: CertigoApp())),
       ),
     );
