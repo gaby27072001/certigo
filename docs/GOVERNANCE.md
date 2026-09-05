@@ -170,6 +170,91 @@ régression de l'une vers l'autre. L'étape 3 n'est pas optionnelle.
 Chaque forme reste validée **séparément et strictement** : les règles d'entrées et de chemins sont
 déclarées par schéma dans `manifestShapes`, jamais fusionnées en une union permissive.
 
+### Snapshot d'état projet périmé : la branche, ou `main` ?
+
+**Symptôme.** Une PR échoue sur `Validate project-state source` et `Generated state equals
+committed state` avec :
+
+```
+project-state: Observable sources differ from the captured source snapshot
+sha256:<attendu> (current sha256:<obtenu>). Commit the source changes, then run
+`python tools/project_state.py --refresh-reference`.
+```
+
+> ⚠️ **Ces deux checks portent le même nom que ceux de la section précédente, mais la cause est
+> différente.** C'est la source de confusion la plus fréquente sur cette gate : `expand / migrate /
+> contract` concerne le *validateur de base jugeant les données de la PR* ; la présente section
+> concerne le *contenu de la branche elle-même*. Le message d'erreur les distingue —
+> « Observable sources differ » désigne toujours le second cas.
+>
+> 🔎 **Limitation connue de l'outillage.** L'information discriminante n'existe **que dans le texte
+> du log**. Le *nom* du check est identique dans les deux cas, et c'est lui qui s'affiche partout où
+> l'on regarde par défaut : page de PR, résumé de run, notifications, messages entre équipes. Un
+> lecteur qui se fie au résumé ne peut pas distinguer les deux causes — il ne lui manque pas
+> seulement du détail, il reçoit une information **activement trompeuse**, puisqu'un nom identique
+> suggère une cause identique.
+>
+> *Piste pour qui reprendra cet outillage* (hors périmètre ici) : faire émettre aux deux causes des
+> noms de check distincts, ou à défaut une première ligne discriminante en tête de log. Tant que le
+> nom du check sert de proxy pour la panne, il ne peut pas distinguer ce qu'il représente.
+
+**Ce n'est presque jamais « `main` a bougé », et un rebase seul ne corrige rien.** `OBSERVABLE_PATHS`
+(`tools/project_state.py`) hache le **contenu** d'une liste de chemins. Dès que la branche modifie
+l'un d'eux, l'empreinte change et le snapshot committé devient faux — **indépendamment de toute
+avance de `main`**. Modifier un fichier existant suffit : il n'est pas nécessaire d'en ajouter ou
+d'en supprimer un.
+
+Chemins observables (source de vérité : `tools/project_state.py`) :
+
+```
+.github/workflows                                     docs/active-content-reference.json
+codemagic.yaml                                        tools/project_state.py
+README.md                                             tools/tests
+package.json                                          backend/tests
+content                                               apps/mobile/test
+backend/src/Certigo.Domain/Content/ContentModels.cs   apps/mobile/integration_test
+                                                      packages/*/test/**
+```
+
+> 📌 `backend/tests`, `apps/mobile/test` et `packages/*/test/**` en font partie : **toute PR qui
+> ajoute un test déclenche ce cas**, tout comme une PR qui ne modifie que `README.md` ou
+> `package.json`. C'est le fonctionnement voulu, pas un défaut.
+
+**Diagnostic — une seule commande, sans rebase**, sur une branche à jour avec `main` :
+
+```bash
+python tools/project_state.py --check
+```
+
+| Résultat | Cause | Correction |
+|---|---|---|
+| **Échoue en local** | Le contenu **de la branche** — un chemin observable a été modifié. | `--refresh-reference`. **Aucun rebase nécessaire.** |
+| **Passe en local, échoue en CI** | `main` a réellement avancé sur un chemin observable. | Rebase, **puis** `--refresh-reference`. |
+
+**Correction.** Committer d'abord les sources observables (l'outil refuse de tourner sur un arbre
+sale), puis :
+
+```bash
+python tools/project_state.py --refresh-reference   # met à jour la référence ET le document
+python tools/project_state.py --check               # doit répondre « Project state is current. »
+```
+
+Committer `docs/project-state-reference.json` et `docs/ETAT_DU_PROJET.md` **séparément** des sources
+observables : ni l'un ni l'autre n'est observable, donc ce commit ne réinvalide pas l'empreinte —
+c'est ce qui évite l'auto-référence. Après un rebase, régénérer **après** le rebase, jamais avant,
+pour que le snapshot reflète l'arbre final.
+
+> ✅ **Vérifiez cette affirmation vous-même, en une commande.** Le présent fichier
+> (`docs/GOVERNANCE.md`) n'est pas un chemin observable. Modifiez-le, puis lancez :
+>
+> ```bash
+> python tools/project_state.py --check   # attendu : « Project state is current. »
+> ```
+>
+> S'il passe alors que le fichier est modifié, c'est la preuve directe que `docs/` est hors
+> périmètre observable. La même manipulation sur un fichier de `backend/tests` échouera. Ne croyez
+> pas la liste ci-dessus sur parole : dix secondes suffisent à la tester.
+
 ### Conclusion DoD
 
 Le **cœur de la DoD est SATISFAIT** : `main` exige une PR avec **≥ 1 revue**, des checks stricts et

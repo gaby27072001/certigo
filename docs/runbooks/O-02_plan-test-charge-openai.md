@@ -14,13 +14,69 @@
 
 ---
 
+## ⛔ Blocage identifié le 2026-09-04 — à lever AVANT d'exécuter ce protocole
+
+Le test **n'a pas pu être exécuté**. La cause est unique, précise, et **ce n'est pas le routage
+réseau** : c'est la **résolution DNS privée**.
+
+| Élément | État mesuré le 2026-09-04 | Verdict |
+|---|---|---|
+| `certigo-openai` `publicNetworkAccess` | `Disabled` | Attendu. **À NE PAS modifier.** |
+| Private endpoint `pep-certigo-openai-account` | `vnet-certigo-dev/snet-private-endpoints` → `10.60.0.75` | OK |
+| Peering `vnet-certigo-ci` ↔ `vnet-certigo-dev` | **`Connected`** (bidirectionnel) | ✅ Le routage IP fonctionne **déjà**. |
+| Zone DNS `privatelink.openai.azure.com` | Liée **uniquement** à `vnet-certigo-dev` | ❌ **BLOCAGE** |
+| Zones `blob`/`documents`/`queue`/`table`/`vaultcore` | Liées aux **4** VNets | Le lien manquant est une **omission**, pas un choix d'architecture. |
+
+Un runner `vmss-certigo-runner-zonal` (dans `vnet-certigo-ci`) **peut router** vers `10.60.0.75`,
+mais **ne peut pas résoudre** `certigo-openai.openai.azure.com` en privé : la zone DNS privée n'est
+pas liée à son VNet. Il obtiendrait l'adresse publique, qui est fermée.
+
+> 🔎 **Second constat — incohérence de nom d'hôte, à corriger en même temps.**
+> Le compte annonce `properties.endpoint = https://certigo-openai.cognitiveservices.azure.com/`,
+> alors que la **seule** zone privée déployée est `privatelink.openai.azure.com`. Aucune zone
+> `privatelink.cognitiveservices.azure.com` n'existe dans la subscription. Un client qui utilise
+> l'endpoint annoncé par le compte **échouera à résoudre en privé, même depuis `vnet-certigo-dev`**.
+> Tant que ce point n'est pas traité, utiliser explicitement l'hôte
+> `https://certigo-openai.openai.azure.com/` dans le benchmark (étape 1 ci-dessous).
+
+**Ce qui a été écarté délibérément** : activer `publicNetworkAccess` rendrait le test trivial mais
+dégraderait la posture réseau de façon permanente pour un besoin de mesure ponctuel. **Exclu.**
+
+**Correctif attendu** : ajouter un `virtualNetworkLinks` de `privatelink.openai.azure.com` vers
+`vnet-certigo-ci`, **en Bicep** (le dossier `infra/` est géré en IaC ; une modification manuelle
+créerait une dérive). Ce changement **n'ouvre aucun accès public** : il autorise seulement un VNet
+déjà appairé et déjà de confiance à résoudre un nom privé. Le bloc Bicep exact et les commandes de
+vérification sont dans
+[`ACTIONS_MANUELLES_EN_ATTENTE.md`](./ACTIONS_MANUELLES_EN_ATTENTE.md#2-test-de-charge-azure-openai-o-02).
+
+Vérification rapide de l'état actuel :
+
+```bash
+az network private-dns link vnet list \
+  --subscription b8952c8c-8f72-469d-99cd-ac906da4e2fc \
+  -g rg-certigo-dev -z privatelink.openai.azure.com \
+  --query "[].{link:name, vnet:virtualNetwork.id, state:virtualNetworkLinkState}" -o table
+# Aujourd'hui : vnet-certigo-dev uniquement. Attendu après correctif : + vnet-certigo-ci.
+```
+
+Puis, depuis un runner CI :
+
+```bash
+getent hosts certigo-openai.openai.azure.com   # Attendu : 10.60.0.75
+```
+
+> ℹ️ **Le test doit s'exécuter depuis un runner `certigo-trusted` situé dans le VNet.** Un poste
+> opérateur hors VNet ne peut pas atteindre l'endpoint privé, quelle que soit la configuration DNS.
+
+---
+
 ## Prérequis d'accès
 
 | Prérequis | Détail |
 |---|---|
 | **Rôle test** | `Cognitive Services OpenAI User` sur `certigo-openai` (déjà attribué à l'identité dev `55014fa6`) |
 | **Rôle bump/metrics** | `Contributor` (ou `Cognitive Services Contributor`) sur `rg-certigo-dev` |
-| **Subscription** | `f434ec55-…` (ou la sub hébergeant `rg-certigo-dev`) |
+| **Subscription** | `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (`MCAPS-Hybrid-REQ-150432-2026-gchambaud`) — vérifié le 2026-09-04 comme hébergeant `rg-certigo-dev` |
 | **Quota régional** | Quota TPM `gpt-5.4-mini` en **swedencentral** (à vérifier, cf étape 4) |
 | **Outil** | Python 3.10+ pour `azure-openai-benchmark` (ou Azure Load Testing / k6) |
 
@@ -37,12 +93,13 @@
 
 ```bash
 az login
-az account set --subscription f434ec55-f342-4948-9298-f99af5216204
+az account set --subscription b8952c8c-8f72-469d-99cd-ac906da4e2fc
 
 az cognitiveservices account deployment list \
   -n certigo-openai -g rg-certigo-dev \
   --query "[].{name:name, model:properties.model.name, sku:sku.name, capacity:sku.capacity}" -o table
-# → noter le <NOM_DEPLOIEMENT> exact (probablement 'gpt-5.4-mini') et capacity actuelle (=1).
+# Vérifié le 2026-09-04 : name=gpt-5.4-mini, model=gpt-5.4-mini (2026-03-17),
+# sku=GlobalStandard, capacity=1.
 ```
 
 Récupérer aussi l'endpoint :
@@ -65,6 +122,9 @@ pip install azure-openai-benchmark    # ou : git clone https://github.com/Azure/
 
 # Auth par identité (disableLocalAuth=true → PAS de clé) :
 az login   # jeton AAD utilisé par le bench si configuré ; sinon exporter un token OpenAI AAD.
+
+# ⚠️ Utiliser l'hôte *.openai.azure.com : c'est le SEUL résoluble en privé (cf. blocage ci-dessus).
+# NE PAS utiliser properties.endpoint (*.cognitiveservices.azure.com), qui n'a pas de zone privée.
 export AZURE_OPENAI_ENDPOINT="https://certigo-openai.openai.azure.com/"
 ```
 

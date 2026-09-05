@@ -149,12 +149,46 @@ connexion interactive réussie.
 
 ## Exclusions Conditional Access / MFA
 
+> ⚠️ **Section mise à jour le 2026-09-04** — l'état des security defaults, auparavant inconnu, a été
+> **mesuré**. Les conclusions ci-dessous remplacent les recommandations conditionnelles précédentes.
+
 | Recommandation | Détail |
 |---|---|
-| **Exclure des futures policies CA** | Le tenant a actuellement **0 policy Conditional Access** (audité). Dès qu'une policy sera créée, **exclure le compte break-glass** pour éviter tout lock-out par une règle mal configurée. |
-| **MFA distinct et résilient** | Idéalement une **clé FIDO2** dédiée (stockée avec le secret), **différente** du MFA du compte gmail — pour ne pas partager un facteur avec le compte à risque. |
-| **Security defaults** | L'état des *security defaults* n'a pas pu être confirmé lors de l'audit (endpoint `Forbidden` avec le compte délégué). Une fois connecté avec un GA **natif**, vérifiez : `az rest --url "https://graph.microsoft.com/v1.0/policies/identitySecurityDefaultsEnforcementPolicy"`. Si activés **et** qu'aucun CA n'existe, le compte break-glass devra satisfaire le MFA des security defaults → enregistrer sa méthode MFA à l'avance. |
-| **Surveillance** | Créer une alerte sur toute connexion du compte break-glass (usage = exceptionnel). |
+| **Security defaults** | ✅ **ACTIVÉS — confirmé le 2026-09-04.** `GET /policies/identitySecurityDefaultsEnforcementPolicy` renvoie `"isEnabled": true`. L'audit de juillet n'avait pas pu le lire (`Forbidden` avec un jeton délégué, qui ne porte pas `Policy.Read.All`) ; la lecture a été obtenue via un **jeton applicatif** dédié. |
+| **MFA des administrateurs** | ✅ **Déjà imposé** par les security defaults, qui exigent le MFA pour le rôle Global Administrator. Le finding `CIAM-2` est donc **couvert** — voir l'encadré ci-dessous. |
+| **Ne PAS créer de policy Conditional Access** | ❌ Security defaults et Conditional Access sont **mutuellement exclusifs** : créer une policy CA obligerait à **désactiver** les security defaults, ce qui ferait perdre le blocage de l'authentification héritée, le blocage du device code flow et l'inscription MFA généralisée. Ce serait une **régression nette**. |
+| **🔴 MFA du compte break-glass — ÉCART ACTIF** | Le compte n'a **que** `passwordAuthenticationMethod` enregistré (vérifié le 2026-09-04). Or les security defaults **n'acceptent aucune exclusion**. Voir l'encadré ci-dessous. |
+| **Surveillance** | ✅ **Automatisée** : `.github/workflows/ciam-posture-monitor.yml` vérifie chaque jour que les security defaults restent activés et que le compte break-glass conserve une méthode forte. |
+
+### 🔴 Écart actif — le compte break-glass n'a aucun second facteur
+
+La note conditionnelle de la version précédente de ce runbook (« *si les security defaults sont
+activés et qu'aucun CA n'existe, le compte break-glass devra satisfaire le MFA → enregistrer sa
+méthode MFA à l'avance* ») s'est **vérifiée**. Les trois conditions sont réunies :
+
+1. Security defaults **activés** (`isEnabled: true`) ;
+2. **0 policy Conditional Access** dans le tenant — donc **aucune exclusion possible**, les security
+   defaults n'en supportant pas ;
+3. Compte break-glass avec **une seule** méthode : `#microsoft.graph.passwordAuthenticationMethod`.
+
+**Conséquence** : le compte de secours devra **inscrire un MFA dans l'urgence**, au moment même où
+il est censé débloquer la situation. Cela annule une grande partie de sa valeur.
+
+**Remédiation** : enregistrer une **clé FIDO2 dédiée** (déjà activée dans la policy de méthodes du
+tenant), rangée avec le mot de passe dans le coffre. Procédure détaillée, pas à pas, dans
+[`ACTIONS_MANUELLES_EN_ATTENTE.md`](./ACTIONS_MANUELLES_EN_ATTENTE.md#1-enregistrer-une-méthode-mfa-forte-sur-breakglasscertigoapponmicrosoftcom).
+Cette action est **délibérément laissée à l'humain** : établir un credential sur un compte d'urgence
+exige une décision explicite et la possession physique du facteur.
+
+### Si Conditional Access devenait un jour la bonne réponse
+
+CA **est** disponible dans un tenant externe, mais avec des limites : les affectations se réduisent à
+« inclure tous les utilisateurs, exclure des utilisateurs/groupes » — **on ne peut pas cibler un
+rôle d'annuaire**. CA ne deviendrait préférable que si l'on avait besoin de granularité impossible
+avec les security defaults, par exemple des exclusions par emplacement nommé, ou justement une
+**exclusion du compte break-glass**. Dans ce cas il faudrait, **dans cet ordre** : créer la policy CA
+en mode *report-only* avec l'exclusion break-glass, vérifier son évaluation, l'activer, **puis
+seulement** désactiver les security defaults.
 
 ---
 
