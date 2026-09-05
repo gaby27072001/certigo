@@ -144,6 +144,11 @@ bash infra/ci-runner/capacity-plan.sh
 
 ## 4. Rallumer la CI (avant une session de travail)
 
+> 📌 **Depuis la reprise automatique (§11), ce rallumage manuel n'est plus la voie normale.**
+> Les trois instances sont démarrées chaque jour à **01:30 UTC**. Cette section reste le mode
+> dégradé : reprise en échec, reprise désactivée, ou besoin de rallumer en cours de journée.
+> Rappel : une VM sous tension n'est **pas** un runner `online` — toujours confirmer au §6.
+
 Le dépôt ne fournit pas de chemin mutable tant que les findings live restent ouverts.
 
 ```bash
@@ -321,6 +326,131 @@ partagé et toute entrée `cache`/`pub-cache` autre que le booléen littéral `f
 installent à la place un SDK Flutter neuf après vérification d'un SHA-256 figé, utilisent un
 `PUB_CACHE` propre au run, puis suppriment SDK et cache. Aucun état inscriptible par les
 validations PR ne peut donc être restauré sur le pool trusted.
+
+---
+
+## 11. Reprise automatique côté Azure (01:30 UTC)
+
+Un Logic App `logic-certigo-ci-runner-recovery` dans `rg-certigo-ci` démarre les trois
+instances **chaque jour à 01:30 UTC**, puis vérifie que chacune atteint
+`PowerState/running`. Il est décrit en Bicep : ne pas le modifier dans le portail.
+
+- Composition : [`infra/ci-runner/auto-recovery.bicep`](../../infra/ci-runner/auto-recovery.bicep)
+- Workflow + alerte : [`infra/ci-runner/modules/runnerAutoRecovery.bicep`](../../infra/ci-runner/modules/runnerAutoRecovery.bicep)
+- Paramètres : [`infra/params/ci-runner-auto-recovery.bicepparam`](../../infra/params/ci-runner-auto-recovery.bicepparam)
+
+> ⚠️ **Ce mécanisme prouve le power state Azure, rien de plus.** Il ne dit **pas** qu'un
+> runner est `online` côté GitHub — c'est précisément la panne du 1er septembre. Après une
+> reprise, confirmer toujours avec le §6 (`gh api ... /actions/runners`). Et rallumer les VMs
+> ne protège **pas** une opération longue : une publication de contenu de ~4 h démarrée trop
+> tard sera tranchée à 00:46 UTC quoi qu'il soit rallumé ensuite.
+
+### Vérifier que la reprise a bien tourné
+
+```bash
+export SUB=b8952c8c-8f72-469d-99cd-ac906da4e2fc
+WF="/subscriptions/$SUB/resourceGroups/rg-certigo-ci/providers/Microsoft.Logic/workflows/logic-certigo-ci-runner-recovery"
+
+# Historique : le run du matin doit être "Succeeded".
+az rest --method get --subscription "$SUB" \
+  --uri "https://management.azure.com${WF}/runs?api-version=2016-06-01" \
+  --query "value[].{run:name,status:properties.status,start:properties.startTime}" -o table
+
+# Détail action par action d'un run donné.
+az rest --method get --subscription "$SUB" \
+  --uri "https://management.azure.com${WF}/runs/<RUN_ID>/actions?api-version=2016-06-01" \
+  --query "value[].{action:name,status:properties.status}" -o table
+```
+
+Un run sain se termine `Succeeded` avec `Fail_the_run_when_a_runner_is_not_running` en
+`Skipped`. Si cette action est `Succeeded`, la reprise a **échoué volontairement** : au moins
+une VM n'était pas `running`.
+
+### Déclencher la reprise à la main
+
+```bash
+az rest --method post --subscription "$SUB" \
+  --uri "https://management.azure.com${WF}/triggers/Daily_after_the_governance_teardown_window/run?api-version=2016-06-01"
+```
+
+> 📌 **Un premier run en échec juste après un déploiement neuf est normal.** Le déclencheur
+> `Recurrence` se déclenche immédiatement à la création, avant propagation de l'assignation
+> de rôle : ce run échoue en `ActionFailed`. Rejouer manuellement une minute plus tard.
+
+### Comment on est prévenu d'un échec
+
+Alerte `alert-certigo-ci-runner-recovery-failed` (sévérité 1) sur `RunsFailed > 0`, routée
+vers l'action group `ag-certigo-ci-recovery`. Le destinataire e-mail vient de la variable
+non secrète `ALERT_EMAIL` au déploiement; sans elle l'alerte existe mais n'envoie rien.
+
+```bash
+az monitor metrics alert show -g rg-certigo-ci -n alert-certigo-ci-runner-recovery-failed \
+  --subscription "$SUB" --query "{enabled:enabled,severity:severity}" -o json
+```
+
+**Angle mort connu :** si le Logic App ne tourne **pas du tout**, `RunsFailed` reste vide et
+l'alerte ne part pas. Le filet est `runner-health.yml`, qui s'exécute **sur un runner
+trusted** : son échec à trouver un runner est la preuve que la reprise n'a pas eu lieu.
+
+### Rollback
+
+```bash
+# 1. Désactiver sans rien supprimer (réversible immédiatement).
+az resource update --ids "$WF" --subscription "$SUB" --set properties.state=Disabled
+az resource update --ids "$WF" --subscription "$SUB" --set properties.state=Enabled   # ré-activer
+
+# 2. Suppression complète (workflow + alerte + action group + RBAC + rôle).
+az logic workflow delete -g rg-certigo-ci -n logic-certigo-ci-runner-recovery --subscription "$SUB" --yes
+az monitor metrics alert delete -g rg-certigo-ci -n alert-certigo-ci-runner-recovery-failed --subscription "$SUB"
+az monitor action-group delete -g rg-certigo-ci -n ag-certigo-ci-recovery --subscription "$SUB"
+az role assignment delete --assignee <principalId> \
+  --scope "/subscriptions/$SUB/resourceGroups/rg-certigo-ci" --subscription "$SUB"
+az role definition delete --name "Certigo CI Runner Recovery <suffixe>" --subscription "$SUB"
+```
+
+Le retrait rétablit l'état antérieur : rallumage manuel du §4. Rien d'autre n'en dépend.
+
+### Prérequis de redéploiement
+
+`Microsoft.Logic` doit être enregistré sur la subscription (il ne l'était pas avant ce
+livrable) :
+
+```bash
+az provider register --namespace Microsoft.Logic --subscription "$SUB" --wait
+```
+
+---
+
+## 12. Verrou `CanNotDelete` sur `rg-certigo-ci`
+
+Le resource group porte un verrou `certigo-ci-cannot-delete`, décrit dans
+[`infra/ci-runner/modules/resourceGroupDeletionLock.bicep`](../../infra/ci-runner/modules/resourceGroupDeletionLock.bicep).
+
+**Pourquoi.** Plusieurs templates ciblent ce RG. Un déploiement en mode `Complete` depuis
+l'un d'eux supprimerait ce que les autres ont créé — dont la zone
+`privatelink.blob.core.windows.net`, qui porte les enregistrements A de **dev, staging, prod
+et content**. Le verrou transforme cette destruction silencieuse en échec immédiat.
+
+> ⚠️ **Toujours déployer en `--mode Incremental` (défaut) sur ce RG. Jamais `Complete`.**
+> Lancer systématiquement `az deployment group what-if` d'abord et lire la section des
+> suppressions.
+
+**Effet de bord attendu, pas un bug.** Les verrous sont hérités. Supprimer le private
+endpoint de contenu (`pe-stcertigocntz3wqbdww-blob`, dans `rg-certigo-content`) tente de
+supprimer son enregistrement A dans la zone verrouillée et **échoue** avec
+`ScopeLocked`. C'est voulu.
+
+```bash
+# Lever temporairement (opération délibérée).
+az lock delete --name certigo-ci-cannot-delete -g rg-certigo-ci --subscription "$SUB"
+
+# Remettre — préférer un redéploiement Bicep pour que l'IaC reste la source de vérité.
+az deployment sub create --location westeurope \
+  --parameters infra/params/ci-runner-auto-recovery.bicepparam --subscription "$SUB"
+
+# Vérifier.
+az lock list -g rg-certigo-ci --subscription "$SUB" -o table
+```
 
 ---
 

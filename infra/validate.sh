@@ -90,6 +90,8 @@ BICEP_CLI="${bicep_bin}" node --test \
   "${root}/infra/tests/governance-evidence.test.mjs"
 BICEP_CLI="${bicep_bin}" node --test \
   "${root}/infra/tests/governance-planner.test.mjs"
+BICEP_CLI="${bicep_bin}" node --test \
+  "${root}/infra/tests/ci-runner-auto-recovery.test.mjs"
 node --test "${root}/infra/tests/governance-tooling.test.mjs"
 
 for environment in dev staging prod; do

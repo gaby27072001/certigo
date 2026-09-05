@@ -220,8 +220,7 @@ exactement qui prouve quoi.
 
 | Mécanisme | Ce qu'il prouve | Ce qu'il ne prouve pas |
 |---|---|---|
-| Reprise Azure (quotidienne, sans surveillance) | que les VMs sont **sous tension** | **rien** sur l'état des runners GitHub |
-| `runner-health.yml` (quotidien) | qu'**au moins un** runner trusted est online — puisqu'il s'y exécute — et que ce runner figure dans l'inventaire versionné | le compte exact de runners online; l'absence de chevauchement de labels |
+| Reprise Azure (quotidienne, sans surveillance) | que les VMs sont **sous tension** | **rien** sur l'état des runners GitHub || `runner-health.yml` (quotidien) | qu'**au moins un** runner trusted est online — puisqu'il s'y exécute — et que ce runner figure dans l'inventaire versionné | le compte exact de runners online; l'absence de chevauchement de labels |
 | Prévol opérateur (`lifecycle-preflight.sh`, à la demande) | **≥ 2 runners trusted online**, zéro chevauchement de label, complétude de l'inventaire | rien **sans surveillance** : il faut qu'un humain le lance |
 
 **Ce que rien ne prouve la nuit :** qu'un agent soit mort alors que sa VM tourne.
@@ -279,22 +278,116 @@ depuis un workflow.
 > opérateur, où l'inventaire runners est déjà lu légitimement — et pourquoi tout
 > l'outillage embarqué dans les workflows a été conçu **sans droit d'administration**.
 
-### Limite assumée : la reprise n'est pas encore automatique
+### Reprise automatique côté Azure — implémentée
 
-Aucun de ces garde-fous ne **rallume** les VMs. C'est une limite structurelle et non un
-oubli : un workflow GitHub Actions ne peut pas s'auto-réparer ici, puisque les runners dont
-il aurait besoin pour s'exécuter sont exactement ceux qui sont désalloués, et qu'aucun
+Aucun des garde-fous ci-dessus ne **rallume** les VMs. C'est une limite structurelle et non
+un oubli : un workflow GitHub Actions ne peut pas s'auto-réparer ici, puisque les runners
+dont il aurait besoin pour s'exécuter sont exactement ceux qui sont désalloués, et qu'aucun
 runner GitHub-hosted n'est disponible par politique EMU.
 
-Une reprise automatique doit donc être déclenchée **depuis Azure**, hors des runners :
-planificateur type Automation Account ou Logic App qui, chaque matin après la fenêtre de
-00:46–00:49 UTC, démarre les trois instances **puis vérifie l'état `online` des runners
-côté API GitHub** — la vérification du seul power state Azure aurait manqué cette panne.
-Cela crée de l'infrastructure Azure nouvelle et sort du périmètre de ce livrable :
-**décision opérateur requise** avant implémentation.
+La reprise est donc déclenchée **depuis Azure**, hors des runners. Elle est décrite en
+Bicep dans [`infra/ci-runner/auto-recovery.bicep`](../infra/ci-runner/auto-recovery.bicep)
+et son module [`modules/runnerAutoRecovery.bicep`](../infra/ci-runner/modules/runnerAutoRecovery.bicep).
 
-En attendant, la procédure reste manuelle et documentée dans
+| Propriété | Valeur |
+|---|---|
+| Déclencheur | Logic App (Consumption) `logic-certigo-ci-runner-recovery`, récurrence quotidienne |
+| Heure | **01:30 UTC** |
+| Action | démarre les 3 instances, attend 30 s, relit `instanceView`, exige `PowerState/running` pour **chacune** |
+| Identité | managée **assignée par le système** — aucun secret, aucun credential |
+| Rôle | rôle personnalisé `Certigo CI Runner Recovery`, 3 actions, assignable au seul `rg-certigo-ci` |
+| Échec | run `Failed` → métrique `RunsFailed` → alerte `alert-certigo-ci-runner-recovery-failed` (sévérité 1) |
+
+**Pourquoi 01:30 UTC.** La fenêtre de teardown se termine à 00:49 UTC. 01:30 laisse ~41
+minutes de marge : la reprise ne court pas contre la déallocation, et une déallocation en
+retard ne peut pas annuler un démarrage déjà effectué. Le contrat est verrouillé par un
+test (`infra/tests/ci-runner-auto-recovery.test.mjs`) qui refuse toute heure antérieure à
+01:00 UTC.
+
+**Privilège accordé — exactement trois actions, et rien d'autre :**
+
+| Action | Pourquoi elle est nécessaire |
+|---|---|
+| `Microsoft.Compute/virtualMachines/read` | résoudre l'instance avant de l'adresser |
+| `Microsoft.Compute/virtualMachines/start/action` | la **seule** mutation autorisée; idempotente sur une VM déjà allumée |
+| `Microsoft.Compute/virtualMachines/instanceView/read` | lire le power state pour **vérifier** la reprise; `GET .../instanceView` n'est pas couvert par le `read` ci-dessus |
+
+Le rôle intégré **« Virtual Machine Contributor » a été écarté comme trop large** : via
+`Microsoft.Compute/virtualMachines/*` il accorderait aussi `delete`, `deallocate/action`,
+`reimage/action` et `runCommand/action`. Il permettrait donc à l'identité de reprise de
+détruire précisément ce qu'elle est censée restaurer. Sur `runCommand`, voir « Options
+écartées » ci-dessus : la décision est déjà prise et n'est pas rouverte ici.
+
+> ⚠️ **La reprise n'est pas l'immunité.** Rallumer les VMs chaque matin ne rend **pas** sûres
+> les opérations privilégiées longues. Une publication de contenu complète dure environ
+> **quatre heures** (~10 200 invocations `az` pour ~2 550 fichiers). Démarrée trop tard dans
+> la journée, elle est **tranchée à 00:46 UTC** quoi qu'il soit rallumé ensuite. La reprise
+> raccourcit l'indisponibilité du matin; elle n'allonge pas la fenêtre utile de la nuit.
+
+> ⚠️ **« VM running » n'est pas « runner online ».** Ce mécanisme prouve **uniquement** le
+> power state Azure. La panne du 1er septembre s'est présentée comme une VM sous tension
+> dont l'enregistrement runner avait été collecté par GitHub : l'agent démarrait, était
+> rejeté, et s'arrêtait de lui-même. Un contrôle de power state **n'aurait pas vu** cette
+> panne et ne la verrait pas davantage aujourd'hui. C'est un choix délibéré : vérifier
+> l'état `online` exigerait un credential GitHub (PAT ou clé de GitHub App) **dans Azure**,
+> ce que ce livrable refuse d'introduire. La preuve côté GitHub reste dans
+> `runner-health.yml` et le prévol opérateur.
+
+**Ce que la reprise ferme réellement.** L'enregistrement runner avait été supprimé parce que
+la VM était restée éteinte **plus de quatorze jours**. Un démarrage quotidien supprime cette
+précondition : c'est le seul des trois mécanismes du tableau « Écart résiduel assumé » qui
+soit un **contrôle** et non un rapport.
+
+**Comment on sait qu'elle a échoué.** Deux signaux complémentaires, et il faut les deux :
+
+1. **Elle a tourné et a échoué** → alerte `alert-certigo-ci-runner-recovery-failed`
+   (`RunsFailed > 0`, sévérité 1, action group `ag-certigo-ci-recovery`).
+2. **Elle n'a pas tourné du tout** → l'alerte métrique ne se déclenche pas, par construction.
+   Le filet est alors `runner-health.yml` : cette sonde quotidienne **s'exécute sur un runner
+   trusted**, donc son échec à trouver un runner est en soi la preuve que la reprise n'a pas
+   eu lieu. Aucun des deux ne couvre l'autre; ensemble ils couvrent les deux cas.
+
+> 📌 **Le premier run après un déploiement neuf échoue, et c'est normal.** Le déclencheur
+> `Recurrence` d'un Logic App se déclenche **immédiatement à la création**, avant que
+> l'assignation de rôle ne se soit propagée. Ce run initial échoue en `ActionFailed` et lève
+> l'alerte. Rejouer le déclencheur manuellement une minute plus tard doit réussir; c'est la
+> vérification de bon fonctionnement (voir [`runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md) §11).
+
+Le mode dégradé manuel reste valable et documenté dans
 [`docs/runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md) §4.
+
+### Verrou de suppression sur `rg-certigo-ci`
+
+Plusieurs templates distincts ciblent ce resource group : `network.bicep`, `runner.bicep`,
+`pilot.bicep`, le module `sharedPrivateDns.bicep` déployé par `infra/main.bicep`, et
+désormais `auto-recovery.bicep`. **Un déploiement en mode `Complete` lancé depuis n'importe
+lequel supprimerait tout ce que les autres ont créé.**
+
+Le rayon d'impact a été mesuré, pas supposé. La zone privée
+`privatelink.blob.core.windows.net` réside dans `rg-certigo-ci` et porte **quatre**
+enregistrements A : `dev` (10.60.0.69), `staging` (10.80.2.5), `prod` (10.100.2.7) et
+`content` (10.42.1.5). Détruire la zone casse la résolution privée de **dev, staging et prod
+simultanément** — pas seulement la chaîne de contenu.
+
+Deux précisions factuelles, vérifiées dans Azure :
+
+- Le private endpoint blob `pe-stcertigocntz3wqbdww-blob` réside dans **`rg-certigo-content`**,
+  pas ici; il ne fait que **joindre** un sous-réseau de `vnet-certigo-ci`. Un déploiement
+  `Complete` ciblant `rg-certigo-ci` ne pouvait donc pas le supprimer.
+- L'enregistrement `stcertigocntz3wqbdww` est **géré par Azure** via le `dnsZoneGroup` de ce
+  private endpoint. C'est bien la **zone** qui est exposée, pas l'enregistrement isolément.
+
+La règle « jamais de mode `Complete` ici » ne vivait que dans un runbook. Un runbook
+*signale*, il n'*empêche* pas. Elle est donc désormais un **contrôle** :
+[`modules/resourceGroupDeletionLock.bicep`](../infra/ci-runner/modules/resourceGroupDeletionLock.bicep)
+pose un verrou `CanNotDelete` au scope du resource group. Il protège aussi les instances
+`be505fa1` et `f55d176e`, dont les enregistrements runner ont été restaurés à la main.
+
+> ⚠️ **Effet de bord assumé et validé.** Les verrous sont hérités par les ressources enfants.
+> Supprimer le private endpoint de contenu entraînerait la suppression de son enregistrement A
+> dans la zone verrouillée et **échouera** tant que le verrou est en place. C'est la propriété
+> recherchée : une suppression délibérée doit passer par une levée délibérée. Procédure de
+> levée et de remise en place : [`runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md) §11.
 
 La release Android reste volontairement sur `certigo-trusted`. Elle peut
 utiliser l'identité managée Azure du runner pour lire Key Vault.
