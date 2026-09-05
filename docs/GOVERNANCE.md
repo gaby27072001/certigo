@@ -273,6 +273,34 @@ observables : ni l'un ni l'autre n'est observable, donc ce commit ne réinvalide
 c'est ce qui évite l'auto-référence. Après un rebase, régénérer **après** le rebase, jamais avant,
 pour que le snapshot reflète l'arbre final.
 
+> 🕳️ **Piège après un rebase : `--check` peut passer alors que le champ `commit` est périmé.**
+>
+> Un rebase réécrit les commits : l'ancien SHA capturé devient **orphelin**, irrésolvable dans
+> l'historique de la branche. Or `--check` ne compare **que** `observableSha256`, qui est stable au
+> rebase par conception (il hache le *contenu*, pas l'historique — cf. le champ `semantics` de la
+> référence). **La gate ne signalera donc jamais ce décalage.**
+>
+> Le champ n'est pas seulement muet, il est **faux** : quiconque fait `git show <commit>` obtient une
+> erreur, sans pouvoir distinguer « la référence est périmée » de « mon clone est incomplet ».
+>
+> ```bash
+> # Après tout rebase, vérifier que le commit capturé appartient encore à l'historique :
+> CAPTURED=$(jq -r .commit docs/project-state-reference.json)
+> git merge-base --is-ancestor "$CAPTURED" HEAD \
+>   && echo "commit capturé présent dans l'historique" \
+>   || echo "ORPHELIN -> relancer --refresh-reference"
+> ```
+>
+> ⚠️ **N'utilisez pas `git cat-file -e` pour ce test.** Il répond « existe » pour un commit orphelin,
+> parce que le reflog local le maintient vivant plusieurs semaines : le test **passe sur la machine
+> de l'auteur** et échoue sur un clone frais, où l'objet n'a jamais été transféré. C'est un faux
+> positif qui ne se manifeste que chez les autres. Seul `merge-base --is-ancestor` teste
+> l'appartenance à l'historique plutôt que la simple présence de l'objet.
+>
+> `--refresh-reference` le repointe. Le faire **systématiquement après un rebase**, même si
+> `--check` est déjà vert : « la CI ne le vérifie pas » est une raison de le corriger à la main, pas
+> de l'ignorer — un champ que rien ne contrôle est précisément un champ qui pourrit.
+
 > ✅ **Vérifiez cette affirmation vous-même, en une commande.** Le présent fichier
 > (`docs/GOVERNANCE.md`) n'est pas un chemin observable. Modifiez-le, puis lancez :
 >

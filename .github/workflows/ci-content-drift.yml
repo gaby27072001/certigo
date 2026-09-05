@@ -42,6 +42,17 @@ permissions:
 jobs:
   detect-content-drift:
     name: Pinned content reference tracks published content
+    # This job MUST NOT carry a job-level `if:`, MUST NOT be split into a job that another job
+    # `needs:`, and this workflow MUST NOT gain a `paths:` filter.
+    #
+    # Once this check is promoted to required, a SKIPPED required check counts as SATISFIED in
+    # branch protection — so a job that did not run would report as a pass. The single-job shape is
+    # deliberate and load-bearing: it cannot be skipped, therefore it can only ever be green because
+    # it RAN, never because it was absent. That is why the "nothing to compare" case is handled by a
+    # step-level `if:` on the comparison instead of by skipping a job.
+    #
+    # The author's original note in this file says it directly: a drift check that skipped itself is
+    # the exact bug it exists to prevent.
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions:
       contents: read
@@ -49,6 +60,21 @@ jobs:
     env:
       PYTHONSAFEPATH: "1"
       DESCRIPTOR_PATH: ${{ github.workspace }}/.content-release/release.json
+      # Bounds the window in which "no descriptor" is an acceptable green.
+      #
+      # Before the first publication, an empty container is the expected state and failing on it
+      # is noise -- eight consecutive red runs on main taught every reader to skip this check,
+      # which is how a correct diagnosis sat unread in these logs for a day.
+      #
+      # After the first publication, the SAME observation means a published release has vanished
+      # from an append-only container, which is an incident. The two are indistinguishable from
+      # here, so the expectation is declared rather than inferred, and the gate compares what we
+      # SAY we expect against what the container REPORTS. A single source is always silently
+      # consistent with itself.
+      #
+      # FLIP THIS TO "true" in the same PR that records the first successful publication.
+      # It is deliberately a one-line diff at a reviewable moment, not something to remember.
+      EXPECT_PUBLISHED_RELEASE: "false"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -96,7 +122,12 @@ jobs:
       - name: Azure login (OIDC)
         uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          # id-certigo-content-reader, not the general-purpose deployment identity. It holds
+          # Storage Blob Data Reader at container scope on content-release-descriptors and
+          # nothing else, so this gate cannot read or write anything beyond what it compares.
+          # Granting the blob role to the shared secrets.AZURE_CLIENT_ID instead would have been
+          # one fewer moving part and a much wider data-plane blast radius.
+          client-id: ${{ vars.AZURE_CONTENT_READER_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
@@ -136,18 +167,38 @@ jobs:
             exit 1
           fi
           if [ -z "${newest}" ] || [ "${newest}" = "None" ]; then
-            echo "::error::Container ${RELEASE_STORAGE_TARGET} is readable and holds no release \
-          descriptor, so the pinned reference cannot be verified. The listing succeeded, which \
-          proves the container exists and this identity can read it - the gap is content, not \
-          infrastructure or access. Two remaining causes are indistinguishable from here and both \
-          are expected at times: publication has not yet run, or a publication is still in flight. \
-          certigo-content uploads the manifest trees first and writes releases/<releaseId>/release.json \
-          LAST, and that upload is slow (four az CLI calls per file, thousands of files), so there \
-          is a multi-hour window in which some blobs exist but no descriptor does. Descriptor-last \
-          ordering is deliberate: it means this gate sees no release rather than a half-published \
-          one. Check whether publish-content-azure is running before treating this as drift."
-            exit 1
+            if [ "${EXPECT_PUBLISHED_RELEASE}" = "true" ]; then
+              echo "::error::Container ${RELEASE_STORAGE_TARGET} is readable and holds NO release \
+          descriptor, but EXPECT_PUBLISHED_RELEASE is true - a release has been published before. \
+          The container is append-only and content-addressed, so a descriptor that existed and no \
+          longer does means it was deleted or the container was replaced. Treat this as an \
+          incident, not as 'publication has not run yet'. Verify against the immutability policy \
+          and the storage account's change feed before republishing."
+              exit 1
+            fi
+            echo "::notice::Container ${RELEASE_STORAGE_TARGET} is readable and holds no release \
+          descriptor. The listing SUCCEEDED, which proves the container exists and this identity \
+          can read it - the gap is content, not infrastructure or access. This is the expected \
+          state before the first publication (EXPECT_PUBLISHED_RELEASE=false), so this gate passes \
+          without having compared anything. certigo-content writes releases/<releaseId>/release.json \
+          LAST, after the manifest trees, so there is a multi-hour window in which some blobs exist \
+          but no descriptor does; descriptor-last ordering is deliberate so this gate sees no \
+          release rather than a half-published one."
+            {
+              echo "## Content drift: not compared"
+              echo
+              echo "The container was **readable** and held **no release descriptor**."
+              echo "Access and infrastructure are therefore working; only the content is absent."
+              echo
+              echo "This passes because \`EXPECT_PUBLISHED_RELEASE=false\` - the expected state"
+              echo "before the first publication. Flip that flag to \`true\` in the PR recording"
+              echo "the first successful publication, after which this same observation becomes"
+              echo "an error rather than a notice."
+            } >> "${GITHUB_STEP_SUMMARY}"
+            echo "DRIFT_COMPARABLE=false" >> "${GITHUB_ENV}"
+            exit 0
           fi
+          echo "DRIFT_COMPARABLE=true" >> "${GITHUB_ENV}"
           az storage blob download \
             --account-name "${account}" \
             --container-name "${container}" \
@@ -158,4 +209,9 @@ jobs:
             --output none
 
       - name: Compare the newest published release with the pinned reference
+        # Guarded rather than skipped as a job: the author's own note records that "a drift check
+        # that skipped itself is the exact bug it exists to prevent", and a skipped JOB counts as
+        # satisfied once this gate is promoted to required. Keeping one job means the check can
+        # only ever be green because it ran, never because it was absent.
+        if: ${{ env.DRIFT_COMPARABLE == 'true' }}
         run: python -P tools/check_published_content_release.py --release-descriptor "$DESCRIPTOR_PATH"

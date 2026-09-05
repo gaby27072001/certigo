@@ -11,7 +11,7 @@
 | # | Action | Finding | Criticité | Pourquoi ce n'est pas automatisable |
 |---|---|---|---|---|
 | 1 | Enregistrer une méthode MFA forte sur le compte break-glass | R-04 (nouveau constat) | 🔴 Haut | Acte d'établissement de credential sur un compte d'urgence : exige une décision humaine explicite et la possession physique du facteur. |
-| 2 | Lier la zone DNS privée `privatelink.openai.azure.com` au VNet CI, puis lancer le test de charge | O-02 | 🔴 Haut | Changement d'infrastructure géré en Bicep + exécution obligatoire depuis un runner **dans** le VNet (donc après merge sur `main`). |
+| 2 | **Déployer** le correctif DNS privé (code déjà fusionné), puis lancer le test de charge | O-02 | 🔴 Haut | Le code Bicep est fusionné (#380) ; il reste un **déploiement Azure** à décider et exécuter, puis une exécution obligatoire depuis un runner **dans** le VNet. |
 
 Aucune autre action manuelle n'est en attente. Les points 1 et 2 ci-dessous sont détaillés.
 
@@ -275,38 +275,73 @@ Deux blocages **indépendants**, qui doivent tous deux être levés :
    `main` : il faut donc que le workflow soit **mergé** avant de pouvoir être lancé. La machine de
    l'agent est hors VNet et ne peut en aucun cas atteindre l'endpoint privé.
 
-### Étape 1 — lever le blocage DNS (en Bicep, via PR)
+### Étape 1 — lever le blocage DNS — ✅ **CODE FUSIONNÉ, DÉPLOIEMENT RESTANT**
 
-Ajouter un lien de zone privée vers `vnet-certigo-ci`, sur le modèle **déjà utilisé** par les cinq
-autres zones (`privatelink.blob.core.windows.net/vnet-certigo-ci-link`, etc.) :
+> **Mise à jour du 2026-09-05.** Le correctif Bicep est **écrit, revu et fusionné** dans `main`
+> (PR #380, commit `b5b80dfc`). Il n'y a **plus de code à écrire**. Ce qui reste est un
+> **déploiement**, décrit à l'étape 1b.
 
-```bicep
-resource openAiZoneCiLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  parent: openAiPrivateDnsZone          // privatelink.openai.azure.com (rg-certigo-dev)
-  name: 'vnet-certigo-ci-link'
-  location: 'global'
-  properties: {
-    registrationEnabled: false          // résolution seule, aucun enregistrement automatique
-    virtualNetwork: { id: ciVnetId }    // vnet-certigo-ci
-  }
-}
-```
+Le correctif livré est **plus large** que le simple lien manquant décrit à l'origine. Un compte
+`kind: AIServices` répond sur **trois** suffixes publics, et chacun exige sa propre zone privée —
+or **deux des trois n'existaient pas du tout**. `infra/modules/openAiPrivateDns.bicep` crée donc :
 
-> 🔐 **Ce changement ne dégrade pas la posture.** Il n'ouvre aucun accès public : il autorise
-> uniquement un VNet **déjà appairé et déjà de confiance** à résoudre un nom privé. C'est la
-> manière correcte et la moins privilégiée d'atteindre un endpoint privé.
+| Ressource | Rôle |
+|---|---|
+| zone `privatelink.cognitiveservices.azure.com` | **manquante** — suffixe annoncé par `properties.endpoint` du compte |
+| zone `privatelink.services.ai.azure.com` | **manquante** — suffixe utilisé par `tutorLlmEndpoint` dans `dev.bicepparam` |
+| liens VNet dev + CI sur les trois zones | résolution depuis l'app **et** depuis le runner de confiance |
+| entrées du **DNS zone group** du private endpoint | écrit les enregistrements A dans les nouvelles zones |
 
-Vérification après déploiement :
+> ⚠️ **Pourquoi les trois catégories sont dans un seul module.** Une zone DNS privée liée à un VNet
+> fait **autorité** sur son espace de noms : une zone liée mais **vide** répond `NXDOMAIN` au lieu de
+> laisser la requête retomber sur le DNS public. Créer les zones et leurs liens **sans** les entrées
+> du zone group (qui écrivent les enregistrements A) ferait donc passer la résolution de
+> « résout en public puis refusé » à « ne résout plus du tout » — strictement pire, avec un symptôme
+> sans rapport apparent avec le changement. Ne jamais scinder ces trois éléments.
+
+### Étape 1b — déployer (action manuelle restante)
+
+Le code est sur `main` mais **rien n'est déployé** : `rg-certigo-dev` ne contient toujours qu'une
+seule zone privée. Le paramètre `adoptOpenAiPrivateDns` vaut `true` en dev uniquement.
 
 ```bash
-az network private-dns link vnet list \
-  --subscription b8952c8c-8f72-469d-99cd-ac906da4e2fc \
-  -g rg-certigo-dev -z privatelink.openai.azure.com \
-  --query "[].{link:name, vnet:virtualNetwork.id, state:virtualNetworkLinkState}" -o table
-# Attendu : un lien vers vnet-certigo-ci en état Completed, EN PLUS de vnet-certigo-dev.
+az account set --subscription b8952c8c-8f72-469d-99cd-ac906da4e2fc
+
+# 1. Rejouer le plan et le relire (attendu : 7 Create, 0 Delete, 0 Modify)
+az deployment sub what-if \
+  --location westeurope \
+  --template-file infra/main.bicep \
+  --parameters infra/params/dev.bicepparam
+
+# 2. Appliquer
+az deployment sub create \
+  --location westeurope \
+  --template-file infra/main.bicep \
+  --parameters infra/params/dev.bicepparam
 ```
 
-Puis, **depuis un runner CI** :
+> 🔐 **Ne jamais passer `publicNetworkAccess` à `Enabled`.** Le compte doit rester privé. Ce
+> déploiement n'ouvre aucun accès public : il ajoute uniquement de la **résolution de noms** pour des
+> VNets déjà appairés et déjà de confiance (`registrationEnabled: false` partout).
+
+**Vérification après déploiement** — les trois zones doivent exister et porter un lien CI :
+
+```bash
+az network private-dns zone list \
+  --subscription b8952c8c-8f72-469d-99cd-ac906da4e2fc -g rg-certigo-dev \
+  --query "[].name" -o tsv
+# Attendu : les 3 zones. Aujourd'hui : seulement privatelink.openai.azure.com.
+
+for z in privatelink.openai.azure.com privatelink.cognitiveservices.azure.com privatelink.services.ai.azure.com; do
+  echo "== $z"
+  az network private-dns link vnet list \
+    --subscription b8952c8c-8f72-469d-99cd-ac906da4e2fc -g rg-certigo-dev -z "$z" \
+    --query "[].{link:name, state:virtualNetworkLinkState}" -o tsv
+done
+# Attendu : un lien vnet-certigo-ci en Completed sur CHACUNE des trois.
+```
+
+Puis, **depuis un runner `certigo-trusted`** (jamais depuis un poste hors VNet) :
 
 ```bash
 getent hosts certigo-openai.openai.azure.com
