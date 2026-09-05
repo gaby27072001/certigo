@@ -108,9 +108,7 @@ ensuite restauré par une opération de signature ou de publication.
 La gate `Generated state equals committed state` n'accède à aucun dépôt externe et ne reçoit
 aucun secret. Son contrôle source rapide exécute d'abord
 `python tools/generated_contracts.py --check`. Les contrats canoniques
-`contracts/content-package-v2.json` (avec repli sur `contracts/content-package-v1.json` tant que
-la migration en cours n'est pas terminée) et `contracts/cosmos-containers.json` pilotent
-respectivement
+`contracts/content-package-v2.json` et `contracts/cosmos-containers.json` pilotent respectivement
 le contrat de package intégré à `docs/active-content-reference.json` et la topologie partagée par
 Bicep et `CosmosContainers.cs`. Le générateur du SHA immuable valide ensuite la référence locale
 (SHA de révision complet, identifiants et SHA-256 des manifestes), puis vérifie que l'état généré

@@ -465,10 +465,24 @@ class ProjectStateTests(unittest.TestCase):
             active_fixture.git("config", "user.name", "Active Content Tests")
 
             manifest_references: dict[str, dict[str, object]] = {}
+            # Entries are built for whichever schema is currently active, so the
+            # fixture keeps exercising the real shape after a contract bump.
+            active_shape = project_state.PACKAGE_MANIFEST_SHAPES[
+                project_state.PACKAGE_MANIFEST_SCHEMA
+            ]
             for name, channel, artifact in (
                 ("public", "public", "public"),
                 ("private", "answerKey", "private"),
             ):
+                rule = active_shape.channels[channel][0]
+                entry: dict[str, object] = {
+                    "id": "lesson",
+                    "path": f"{rule.prefix}/lesson.json",
+                    "hash": "6" * 64,
+                    "size": 123,
+                }
+                if "resourceType" in active_shape.required_fields:
+                    entry["resourceType"] = sorted(rule.resource_types)[0]
                 manifest: dict[str, object] = {
                     "schema": project_state.PACKAGE_MANIFEST_SCHEMA,
                     "channel": channel,
@@ -476,18 +490,7 @@ class ProjectStateTests(unittest.TestCase):
                     "algorithm": project_state.PACKAGE_MANIFEST_ALGORITHM,
                     "serialization": project_state.PACKAGE_MANIFEST_SERIALIZATION,
                     "fileCount": 1,
-                    "files": [
-                        {
-                            "id": "lesson",
-                            "path": (
-                                "questions/lesson.json"
-                                if channel == "public"
-                                else "solutions/lesson.json"
-                            ),
-                            "hash": "6" * 64,
-                            "size": 123,
-                        }
-                    ],
+                    "files": [entry],
                     "manifestId": "",
                     "rootHash": "",
                 }

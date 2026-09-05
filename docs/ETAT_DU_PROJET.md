@@ -38,13 +38,13 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-09-05** |
-| Commit de référence analysé | `a206f393f4d5a7b9ca607970711eae7e0864e7c5` |
+| Commit de référence analysé | `022a3117d7763706144bc9c0feae15157e63311f` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
-| Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `55a512821dabbea8b65d3403f9c83571b4a33ed8` du **2026-08-14** |
-| Package public actif | **146 fichiers** — `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
-| Package privé actif (`answerKey`) | **146 fichiers** — `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
+| Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `78bfa72c62371cd206d1f2c2cfa8e0a38fa22540` du **2026-09-05** |
+| Package public actif | **1735 fichiers** — `sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f` |
+| Package privé actif (`answerKey`) | **812 fichiers** — `sha256:65b1914f4cbeb87d7be9cd939a7cd3d03deb344b408b6ef6de91e0346410f793` |
 | Workflows GitHub Actions | **29** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content-drift.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `codeql.yml`, `content-infra-apply.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
 | Tests découverts | **197 fichiers** — .NET : 4 projets / 93 fichiers ; Flutter/Dart : 6 racines / 96 fichiers ; Python : 1 racine / 8 fichier |
 | Corpus **historique** local | **91 pistes**, **146 leçons** sous `content/` — instantané de compatibilité, non actif |
@@ -77,17 +77,29 @@ publiée* et non à une branche Git. Les sections restantes expliquent le contex
 « opérationnel » exige une preuve automatisée ou une référence explicite, sinon l'affirmation est
 **non vérifiée / manuelle**.
 
-**État mesuré du pin au 2026-09-04.** `docs/active-content-reference.json` épingle toujours
-`55a5128` du 2026-08-14, alors que `certigo-content@main` est à `07ab6b0` du 2026-08-31
-(`07ab6b0453a49c7ac5800837851ae83edf159768`, committé `2026-08-31T16:37:50Z`). Reconstruire ce
-`main` (`npm ci --ignore-scripts` puis `npm run package`) produit `publicManifestId`
-`sha256:dd95aafc…7ced79` (1 735 fichiers) et `privateManifestId` `sha256:65b1914f…10f793`
-(812 fichiers), à comparer aux 146 fichiers épinglés. Le pin **n'a pas été rafraîchi ici** : le
-paquet amont déclare désormais `certigo.content.package-manifest/v3` tandis que
-`contracts/content-package-v1.json` épingle `v1`, et `--validate-active-content` échoue sur le
-contrôle de schéma. Reporter ces valeurs sans faire évoluer le contrat consommateur remplacerait
-une référence périmée par une référence fausse ; la montée v1 → v3 est un changement de contrat
-distinct.
+**État du pin au 2026-09-05.** Le pin est **à jour** : `docs/active-content-reference.json`
+épingle `78bfa72c62371cd206d1f2c2cfa8e0a38fa22540`, committé `2026-09-05T08:54:33Z`, soit la tête
+de `certigo-content@main`. Reconstruire ce `main` (`npm ci` puis `npm run package`) produit
+`publicManifestId` `sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f`
+(1 735 fichiers) et `privateManifestId`
+`sha256:65b1914f4cbeb87d7be9cd939a7cd3d03deb344b408b6ef6de91e0346410f793` (812 fichiers) — les
+valeurs effectivement épinglées. `python tools/project_state.py --validate-active-content
+<clone packagé>` répond `Active content reference is current.` et sort en 0.
+
+Ce pin avait pris du retard depuis le 2026-08-14 (`55a5128`, 146 fichiers) et n'a pu être
+rafraîchi qu'après la montée du contrat consommateur : le paquet amont déclare
+`certigo.content.package-manifest/v3` alors que le dépôt épinglait `v1`, et
+`--validate-active-content` échouait au contrôle de schéma avant même de comparer les empreintes.
+Reporter les valeurs sans faire évoluer le contrat aurait remplacé une référence périmée par une
+référence fausse ; la montée v1 → v3 a donc été traitée comme un changement de contrat distinct,
+réalisé en trois étapes (expand / migrate / contract) pour la raison structurelle documentée dans
+`docs/GOVERNANCE.md`.
+
+**Attention à ne pas surinterpréter.** Le pin est courant et le contrat est en v3, mais la chaîne
+n'est **pas** opérationnelle de bout en bout : le stockage immuable existe et ses conteneurs sont
+**vides**, aucune release n'a encore été publiée, et `ci-content-drift.yml` échoue donc
+légitimement faute de descripteur à comparer. Ce qui est acquis ici, c'est que le dépôt est de
+nouveau **capable de détecter** une dérive amont, pas qu'il en consomme le contenu.
 
 **État mesuré du stockage immuable au 2026-09-04.** Le stack `infra/content/main.bicep` est
 désormais **déployé** dans `rg-certigo-content` (déploiement nommé
@@ -268,19 +280,31 @@ Les PR éditoriales, la validation des schémas et la publication du manifeste s
 présenté ni utilisé comme source éditoriale active.
 
 Référence active vérifiée : `certigo-content@main`
-`470acdbf100e7f7faf9911015662bee6118b8bf5`, commit du
-`2026-08-06T09:57:19Z`.
+`78bfa72c62371cd206d1f2c2cfa8e0a38fa22540`, commit du
+`2026-09-05T08:54:33Z`.
 
 | Canal / artefact actif | Nombre de fichiers | Manifest ID |
 |---|---:|---|
-| `public/public` | **146** | `sha256:335fb7c1538739cf2a1f2ac9629ed3d355dca851215fed61d60a28c166807dff` |
-| `answerKey/private` | **146** | `sha256:6e0ce2ef6ac799e3298e7e78ce23ad181a94961c979bef305e384898196f023b` |
+| `public/public` | **1 735** | `sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f` |
+| `answerKey/private` | **812** | `sha256:65b1914f4cbeb87d7be9cd939a7cd3d03deb344b408b6ef6de91e0346410f793` |
 
-Le contrat `certigo.content.package-manifest/v1` utilise `sha256` et la sérialisation
+Le contrat `certigo.content.package-manifest/v3` utilise `sha256` et la sérialisation
 `json-sorted-keys-compact-utf8-lf`. Le corps canonique contient uniquement `schema`, `channel`,
 `artifact`, `algorithm`, `serialization`, `fileCount` et `files` ; `manifestId` et `rootHash` sont
-exclus du calcul. Les **91 pistes / 146 leçons** sous `content/` restent des métriques
-**historiques** et ne décrivent pas la source active.
+exclus du calcul — **le contrat d'empreinte est inchangé depuis `v1`**. Ce qui change en `v3` :
+chaque entrée porte un `resourceType` obligatoire, plus les optionnels déclarés
+`blueprintVersion`, `certification`, `objective` et `provider` ; l'espace de noms public couvre
+`catalog/`, `coverage/`, `questions/` et `runtime/`, tandis que le canal `answerKey` reste
+strictement limité à `solutions/`. `contracts/content-package-v2.json` énumère explicitement ces
+préfixes, leurs profondeurs admises et les `resourceType` autorisés sous chacun.
+
+L'adressage par contenu est vérifiable plutôt qu'affirmé : la correction de métadonnées MLA-C01
+amont (`#39`) a déplacé le `publicManifestId` et le `releaseId` en laissant le `privateManifestId`
+et les deux comptes de fichiers **identiques**. Un changement sémantique déplace l'empreinte, et
+son rayon d'impact reste borné et observable — ici confiné au canal effectivement modifié.
+
+Les **91 pistes / 146 leçons** sous `content/` restent des métriques **historiques** et ne
+décrivent pas la source active.
 
 ---
 

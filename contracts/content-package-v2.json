@@ -2,7 +2,7 @@
   "schema": "certigo.source-contract/content-package/v2",
   "activeReferenceSchema": "certigo.active-content-reference/v1",
   "packageContract": {
-    "schema": "certigo.content.package-manifest/v1",
+    "schema": "certigo.content.package-manifest/v3",
     "algorithm": "sha256",
     "serialization": "json-sorted-keys-compact-utf8-lf",
     "canonicalBodyFields": [
