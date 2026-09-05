@@ -604,13 +604,14 @@ class ProjectStateTests(unittest.TestCase):
             )
             project_state._validate_manifest(root, reference)
 
-    def test_both_contract_schemas_are_accepted_during_the_migration(self) -> None:
+    def test_only_v3_is_accepted_after_the_migration(self) -> None:
         self.assertEqual(
-            {
-                "certigo.content.package-manifest/v1",
-                "certigo.content.package-manifest/v3",
-            },
+            {"certigo.content.package-manifest/v3"},
             set(project_state.PACKAGE_MANIFEST_SCHEMAS),
+        )
+        self.assertEqual(
+            "certigo.content.package-manifest/v3",
+            project_state.PACKAGE_MANIFEST_SCHEMA,
         )
 
     def test_v3_accepts_every_declared_public_prefix(self) -> None:
@@ -734,58 +735,30 @@ class ProjectStateTests(unittest.TestCase):
                         "certigo.content.package-manifest/v3", "public", entry
                     )
 
-    def test_v1_stays_exactly_as_strict_as_before_the_migration(self) -> None:
-        """Accepting v3 must not loosen v1 into a union of both shapes."""
-        cases: tuple[tuple[str, dict[str, object], str], ...] = (
-            (
-                "v3-only resourceType key rejected under v1",
-                {
-                    "id": "lesson",
-                    "path": "questions/lesson.json",
-                    "hash": "6" * 64,
-                    "size": 1,
-                    "resourceType": "question",
-                },
-                "expected required fields",
-            ),
-            (
-                "v3-only optional field rejected under v1",
-                {
-                    "id": "lesson",
-                    "path": "questions/lesson.json",
-                    "hash": "6" * 64,
-                    "size": 1,
-                    "provider": "aws",
-                },
-                "expected required fields",
-            ),
-            (
-                "v3 nested path rejected under v1",
-                {
-                    "id": "lesson",
-                    "path": "questions/aws/aif-c01/lesson.json",
-                    "hash": "6" * 64,
-                    "size": 1,
-                },
-                "unexpected path for public",
-            ),
-            (
-                "v3-only prefix rejected under v1",
-                {
-                    "id": "catalog",
-                    "path": "catalog/certifications.json",
-                    "hash": "6" * 64,
-                    "size": 1,
-                },
-                "unexpected path for public",
-            ),
+    def test_a_regression_to_the_superseded_schema_is_rejected(self) -> None:
+        """The migration scaffolding is gone, so v1 must now fail loudly.
+
+        A validator that still accepted the superseded shape could not detect a
+        regression from v3 back to v1, which is the whole point of pinning one
+        schema rather than a set.
+        """
+        self.assertNotIn(
+            "certigo.content.package-manifest/v1",
+            project_state.PACKAGE_MANIFEST_SHAPES,
         )
-        for label, entry, message in cases:
-            with self.subTest(case=label):
-                with self.assertRaisesRegex(project_state.ProjectStateError, message):
-                    self._validate_entry(
-                        "certigo.content.package-manifest/v1", "public", entry
-                    )
+        with self.assertRaisesRegex(
+            project_state.ProjectStateError, "unexpected package manifest schema"
+        ):
+            self._validate_entry(
+                "certigo.content.package-manifest/v1",
+                "public",
+                {
+                    "id": "lesson",
+                    "path": "questions/lesson.json",
+                    "hash": "6" * 64,
+                    "size": 1,
+                },
+            )
 
     def test_answer_key_channel_stays_solutions_only_in_every_shape(self) -> None:
         for schema, shape in project_state.PACKAGE_MANIFEST_SHAPES.items():

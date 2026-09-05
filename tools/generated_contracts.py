@@ -10,16 +10,8 @@ import sys
 from pathlib import Path
 
 
-CONTENT_PACKAGE_CONTRACTS = (
-    Path("contracts/content-package-v2.json"),
-    Path("contracts/content-package-v1.json"),
-)
+CONTENT_PACKAGE_CONTRACTS = (Path("contracts/content-package-v2.json"),)
 CONTENT_PACKAGE_ENVELOPES = {
-    "certigo.source-contract/content-package/v1": {
-        "schema",
-        "activeReferenceSchema",
-        "packageContract",
-    },
     "certigo.source-contract/content-package/v2": {
         "schema",
         "activeReferenceSchema",

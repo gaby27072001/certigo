@@ -134,6 +134,22 @@ l'état projet régénéré.
 
 ### Faire évoluer le contrat de package : expand / migrate / contract
 
+> **D'abord, une seule question : changez-vous la *forme* du contrat, ou seulement les *données*
+> qu'il décrit ?**
+>
+> | Votre changement | Procédure |
+> |---|---|
+> | **Données seules** — rafraîchir le pin : révision, horodatage, `manifestId`, `fileCount`, `fileSha256` | **Une seule PR**, la procédure de bump ci-dessus. Rien de spécial. |
+> | **Forme du contrat** — schéma du manifeste, champs d'entrée, préfixes ou profondeurs de chemins, enveloppe du fichier de contrat | **Trois PR**, la séquence ci-dessous. Un basculement atomique est impossible. |
+>
+> Le rafraîchissement périodique du pin appartient à la **première** ligne. Ne payez pas le coût
+> de trois PR pour un bump de contenu ordinaire.
+
+**Règle générale qui explique les deux cas.** La contrainte de la gate se traverse dans les deux
+sens **à condition de ne jamais changer le code et les données dans la même PR**. Le validateur de
+la base juge les données du candidat : si les données ne bougent pas, le code peut bouger ; si le
+code ne bouge pas, les données peuvent bouger — pourvu que le code déjà sur `main` les accepte.
+
 **Symptôme.** Une PR qui modifie `contracts/content-package-*.json` ou
 `docs/active-content-reference.json` échoue sur `Validate project-state source` et
 `Generated state equals committed state` avec l'un de ces messages :
@@ -161,7 +177,9 @@ signifie « le juge est périmé », pas « tes données sont invalides ».
    que la base (qui ne connaît que l'ancienne forme) voie des données inchangées.
 2. **migrate** — données seules. Basculer la référence sur la nouvelle forme. `main` porte
    désormais le code bi-compatible et l'accepte.
-3. **contract** — retirer l'ancienne forme. L'état final redevient strict et mono-schéma.
+3. **contract** — code seul à nouveau : retirer l'ancienne forme. La base porte déjà la nouvelle
+   et voit des données inchangées, d'où le passage. L'état final redevient strict et
+   mono-schéma.
 
 La bi-compatibilité de l'étape 1 est un **échafaudage transitoire, pas la cible** : un validateur
 qui accepte à la fois la forme courante et la forme supersédée ne peut pas détecter une
@@ -169,6 +187,17 @@ régression de l'une vers l'autre. L'étape 3 n'est pas optionnelle.
 
 Chaque forme reste validée **séparément et strictement** : les règles d'entrées et de chemins sont
 déclarées par schéma dans `manifestShapes`, jamais fusionnées en une union permissive.
+
+> **Migration v1 → v3 : terminée le 2026-09-05** (PR #379 *expand*, #382 *migrate*, puis
+> l'étape *contract*). `contracts/content-package-v2.json` ne déclare plus qu'une seule forme,
+> `certigo.content.package-manifest/v3`, et un manifeste v1 est désormais **rejeté**. Les
+> messages d'erreur cités plus haut mentionnent des fichiers qui n'existent plus : ils sont
+> conservés tels quels parce que c'est le texte que l'on rencontre encore sur une branche
+> antérieure à la migration, et qu'il doit rester trouvable par recherche.
+>
+> Cette procédure resservira : l'essentiel du corpus amont porte `provenance.checkedOn`
+> 2026-08-17 et arrive à échéance en bloc à la mi-septembre 2026. **Ce rafraîchissement-là est un
+> changement de données seules : une PR, pas trois.**
 
 ### Snapshot d'état projet périmé : la branche, ou `main` ?
 

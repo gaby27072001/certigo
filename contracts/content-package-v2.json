@@ -23,36 +23,6 @@
   "fileSuffix": ".json",
   "manifestShapes": [
     {
-      "schema": "certigo.content.package-manifest/v1",
-      "requiredEntryFields": [
-        "hash",
-        "id",
-        "path",
-        "size"
-      ],
-      "optionalEntryFields": [],
-      "channels": {
-        "public": [
-          {
-            "prefix": "questions",
-            "segmentCounts": [
-              2
-            ],
-            "resourceTypes": []
-          }
-        ],
-        "answerKey": [
-          {
-            "prefix": "solutions",
-            "segmentCounts": [
-              2
-            ],
-            "resourceTypes": []
-          }
-        ]
-      }
-    },
-    {
       "schema": "certigo.content.package-manifest/v3",
       "requiredEntryFields": [
         "hash",

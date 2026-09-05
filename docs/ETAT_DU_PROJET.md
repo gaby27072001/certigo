@@ -38,7 +38,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-09-05** |
-| Commit de référence analysé | `7ae814968c8341087fc85ec950439e8116819ae0` |
+| Commit de référence analysé | `f9e88ae2a75af11427d137fe0981410391a2cd5c` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
@@ -77,6 +77,38 @@ publiée* et non à une branche Git. Les sections restantes expliquent le contex
 « opérationnel » exige une preuve automatisée ou une référence explicite, sinon l'affirmation est
 **non vérifiée / manuelle**.
 
+#### Convention : un fait volatil s'écrit une fois, daté et borné
+
+Ce document est dense en faits **volatils** — décomptes, états de déploiement, « pas encore
+fait ». Deux règles s'appliquent à chacun d'eux, et elles ne sont pas interchangeables.
+
+1. **Dater et borner.** Un relevé se consigne avec son horodatage, sa source citable (run ID,
+   commit, commande) et, s'il y a lieu, **la mention d'une opération en cours susceptible de
+   l'invalider**. Un relevé daté et borné reste vrai indéfiniment ; un relevé nu se périme en
+   silence. L'horodatage seul ne suffit pas : c'est la mention « une écriture était en vol » qui
+   dit au lecteur que la valeur était déjà en train d'être invalidée quand elle a été écrite.
+2. **N'écrire le fait qu'une seule fois.** Toute autre mention doit être un **renvoi** vers cet
+   endroit unique, jamais une reformulation. C'est la règle structurante : dater rend une
+   affirmation honnête à l'instant où on l'écrit, mais **seul le point unique garde le document
+   honnête dans la durée**. Un fait répété à trois endroits sera mis à jour à un seul : les deux
+   autres deviennent faux **silencieusement** — pas de diff, pas de gate, pas de test rouge, juste
+   deux paragraphes qui se contredisent.
+
+Le second point supprime la *possibilité* du défaut, pas seulement son instance courante. Une
+affirmation gagne en crédibilité par simple répétition entre gens prudents, et rien dans le
+processus ne distingue la répétition de la vérification.
+
+Corollaire pratique : **renvoyer par titre, jamais par numéro de section**. Une numérotation est
+elle-même un fait volatil — insérer une section renumérote tout ce qui suit, et le renvoi devient
+faux en silence, exactement comme le fait qu'il était censé protéger.
+
+> Ce n'est pas théorique. Voir la correction consignée plus bas sous « État des conteneurs mesuré
+> au 2026-09-05 à 10:15Z » : la même affirmation non vérifiée a traversé quatre passes
+> successives — dont deux dont l'objet explicite était d'éviter ce type d'erreur, la dernière
+> étant la correction elle-même, qui a d'abord réintroduit le défaut trois paragraphes plus haut
+> avant d'être reprise. Quatre passes attentives, chacune consciente du problème, et il a quand
+> même récidivé. La discipline individuelle ne suffit pas ; la structure, si.
+
 **État du pin au 2026-09-05.** Le pin est **à jour** : `docs/active-content-reference.json`
 épingle `78bfa72c62371cd206d1f2c2cfa8e0a38fa22540`, committé `2026-09-05T08:54:33Z`, soit la tête
 de `certigo-content@main`. Reconstruire ce `main` (`npm ci` puis `npm run package`) produit
@@ -95,11 +127,12 @@ référence fausse ; la montée v1 → v3 a donc été traitée comme un changem
 réalisé en trois étapes (expand / migrate / contract) pour la raison structurelle documentée dans
 `docs/GOVERNANCE.md`.
 
-**Attention à ne pas surinterpréter.** Le pin est courant et le contrat est en v3, mais la chaîne
-n'est **pas** opérationnelle de bout en bout : le stockage immuable existe et ses conteneurs sont
-**vides**, aucune release n'a encore été publiée, et `ci-content-drift.yml` échoue donc
-légitimement faute de descripteur à comparer. Ce qui est acquis ici, c'est que le dépôt est de
-nouveau **capable de détecter** une dérive amont, pas qu'il en consomme le contenu.
+**Attention à ne pas surinterpréter.** Le pin est courant et le contrat est en v3, mais cela ne
+dit **rien** de la disponibilité du contenu côté consommateur : ce qui est acquis ici, c'est que
+le dépôt est de nouveau **capable de détecter** une dérive amont, pas qu'il en consomme le
+contenu. `ci-content-drift.yml` ne peut comparer que s'il existe un descripteur de release
+publié ; l'état de publication est daté et borné plus bas, sous « État des conteneurs mesuré au
+2026-09-05 à 10:15Z », et doit être relu là-bas plutôt que déduit d'ici.
 
 **État mesuré du stockage immuable au 2026-09-04.** Le stack `infra/content/main.bicep` est
 désormais **déployé** dans `rg-certigo-content` (déploiement nommé
@@ -113,12 +146,71 @@ dans `rg-certigo-ci/vnet-certigo-ci/snet-runners` avec l'enregistrement A
 `stcertigocntz3wqbdww → 10.42.1.5` ; six attributions de rôle au scope conteneur ; lifecycle de
 tiering sans action de suppression.
 
-Ce déploiement ne publie **aucun contenu** : les trois conteneurs sont **vides** et
-`ci-content-drift.yml` échoue donc légitimement tant qu'aucun descripteur n'existe. La
-publication reste bloquée en amont, et l'identité `id-certigo-content-reader` possède désormais
-ses trois attributions `Storage Blob Data Reader` mais **pas encore de credential fédéré**, donc
-la gate ne peut pas encore s'authentifier. Aucune policy n'a été verrouillée : le verrouillage
-WORM est irréversible et reste une action opérateur distincte.
+Ce déploiement ne publie **aucune release** : le conteneur `content-release-descriptors` est
+mesuré **vide** et `ci-content-drift.yml` échoue donc légitimement tant qu'aucun descripteur
+n'existe. La publication reste bloquée en amont, et l'identité `id-certigo-content-reader` possède
+désormais ses trois attributions `Storage Blob Data Reader` mais **pas encore de credential
+fédéré**, donc la gate ne peut pas encore s'authentifier. Aucune policy n'a été verrouillée : le
+verrouillage WORM est irréversible et reste une action opérateur distincte.
+
+**État des conteneurs mesuré au 2026-09-05 à 10:15Z**, par le workflow d'inspection en lecture
+seule (run `33960148573`). Chaque appel `az` a retourné un code de sortie `0` explicite : ce sont
+donc des **mesures**, pas des absences de réponse.
+
+> ⚠️ **Ce relevé décrit l'état *avant* la quatrième tentative de publication, dont le chemin
+> d'écriture a démarré à 10:30:10Z — soit quinze minutes *après* la mesure.** Une publication
+> était donc **en vol au moment de la rédaction**. Si elle a abouti, les chiffres ci-dessous sont
+> **périmés** et les conteneurs contiennent désormais l'ordre de 1 735 blobs publics, 812 privés
+> et 1 descripteur. Vérifier la date d'un relevé d'inspection plus récent avant de s'appuyer sur
+> ce tableau.
+
+| Conteneur | Blobs à 10:15Z | Contenu |
+|---|---:|---|
+| `content-public-releases` | **1** | `manifests/sha256:0a7f0448…/catalog/certifications.json` |
+| `content-private-releases` | **1** | `manifests/sha256:65b1914f…/manifest.json` |
+| `content-release-descriptors` | **0** | — |
+
+À cet instant, ces deux blobs étaient **orphelins** : écrits par la troisième tentative
+(run `33958713216`, sortie `68` sur chacun d'eux), immuables donc **non supprimables**, et
+inatteignables par tout consommateur puisqu'aucun descripteur ne les référençait. Leur
+`immutabilityPolicy.policyMode` est `unlocked`. `publish-release` avait été **sauté aux trois
+tentatives**, donc aucune publication partielle n'était jamais devenue la release active.
+
+Le conteneur de descripteurs mesuré à **0** est la première confirmation *mesurée* que l'ordre
+« descripteur en dernier » a tenu sur ces trois tentatives ; il n'était jusque-là qu'**inféré** du
+fait que le job avait été sauté. Le script étant en création seule, ces deux orphelins doivent
+être **ignorés** et non réécrits par la tentative suivante — propriété affirmée depuis l'origine
+et jamais encore observée.
+
+> **Correction.** Une version antérieure de ce document affirmait que les trois conteneurs étaient
+> **vides**. C'était faux, et la chaîne de propagation est plus instructive que le correctif :
+> #377 l'a affirmé à partir d'appels `az` qui échouaient et dont l'échec se rendait en `0` ; la
+> valeur a ensuite été relayée comme fait établi ; puis reprise ici par #382, dans un paragraphe
+> dont l'intention était précisément d'éviter de surestimer l'état de la chaîne. Enfin — et c'est
+> la partie la plus révélatrice — **la correction elle-même a d'abord réintroduit le défaut** :
+> sa première rédaction affirmait à nouveau, au présent et sans borne, « aucune release n'est
+> publiée », à propos d'un conteneur en cours d'écriture. Quatre passes successives, toutes de
+> bonne foi, deux d'entre elles ayant explicitement pour objet d'éviter cette erreur.
+>
+> La leçon n'est donc pas qu'une étape a été négligente : c'est qu'**une affirmation gagne en
+> crédibilité par simple répétition entre gens prudents**, et que rien dans le processus ne
+> distinguait la répétition de la vérification. Un échec qui se rend en valeur plausible — `0` est
+> une réponse parfaitement crédible à « combien de blobs ? » — ne déclenche aucune alarme,
+> contrairement à une exception.
+>
+> Le défaut de fond n'était pas la fausseté mais **l'absence des conditions de validité** :
+> « les conteneurs sont vides » était probablement vrai à l'instant où la phrase a été écrite. Ce
+> qui l'a rendue toxique, c'est d'avoir été consignée sans son horodatage ni son périmètre, donc
+> de continuer à être lue comme un état courant longtemps après avoir cessé de l'être. Et si les
+> lignes concernées ont divergé, c'est que **le même fait volatil était énoncé à deux endroits** :
+> l'une des deux devait fatalement rotir la première. D'où la convention énoncée plus haut,
+> « un fait volatil s'écrit une fois, daté et borné » : ce relevé est désormais l'unique point
+> d'énonciation, tout le reste y renvoie.
+>
+> La rétractation portait par ailleurs sur une lecture **data-plane**. Les faits **control-plane**
+> issus des logs de run n'étaient pas en cause et restent valides : sur-corriger en déclarant tout
+> inconnu aurait été l'erreur symétrique. Les chiffres ci-dessus proviennent des runs cités, non
+> d'une mesure effectuée depuis ce dépôt.
 
 Le commit et la date de référence sont capturés au premier commit. La correspondance des sources
 est ensuite vérifiée par SHA-256 sur les noms de chemins UTF-8 triés et les octets exacts, avec

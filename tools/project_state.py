@@ -21,17 +21,14 @@ END_MARKER = "<!-- GENERATED:PROJECT-STATE:END -->"
 DEFAULT_DOCUMENT = Path("docs/ETAT_DU_PROJET.md")
 REFERENCE_FILE = Path("docs/project-state-reference.json")
 ACTIVE_CONTENT_REFERENCE_FILE = Path("docs/active-content-reference.json")
-CONTENT_PACKAGE_CONTRACT_FILES = (
-    Path("contracts/content-package-v2.json"),
-    Path("contracts/content-package-v1.json"),
-)
+CONTENT_PACKAGE_CONTRACT_FILES = (Path("contracts/content-package-v2.json"),)
 
 
 def _content_package_contract_path(root: Path) -> Path:
     """Resolve the canonical content-package contract inside ``root``.
 
-    The newest envelope wins so a migration can add it without disturbing the
-    superseded file, which the previous release's validator still reads.
+    Kept as a tuple lookup so the next contract migration can reintroduce a
+    superseded entry for one release without reshaping the callers.
     """
     for relative in CONTENT_PACKAGE_CONTRACT_FILES:
         if (root / relative).is_file():
@@ -86,23 +83,6 @@ class _ManifestShape(NamedTuple):
     channels: dict[str, tuple[_ArtifactPathRule, ...]]
 
 
-_LEGACY_MANIFEST_SHAPES = [
-    {
-        "schema": "certigo.content.package-manifest/v1",
-        "requiredEntryFields": ["hash", "id", "path", "size"],
-        "optionalEntryFields": [],
-        "channels": {
-            "public": [
-                {"prefix": "questions", "segmentCounts": [2], "resourceTypes": []}
-            ],
-            "answerKey": [
-                {"prefix": "solutions", "segmentCounts": [2], "resourceTypes": []}
-            ],
-        },
-    }
-]
-
-
 def _compile_channel_rules(
     channels: dict[str, object], segment: str, suffix: str, schema: str
 ) -> dict[str, tuple[_ArtifactPathRule, ...]]:
@@ -146,10 +126,10 @@ def _compile_channel_rules(
 
 
 def _compile_manifest_shapes(source: dict[str, object]) -> dict[str, _ManifestShape]:
-    segment = source.get("segmentPattern", "[A-Za-z0-9._-]+")
-    suffix = source.get("fileSuffix", ".json")
+    segment = source["segmentPattern"]
+    suffix = source["fileSuffix"]
     shapes: dict[str, _ManifestShape] = {}
-    for shape in source.get("manifestShapes", _LEGACY_MANIFEST_SHAPES):
+    for shape in source["manifestShapes"]:
         schema = shape["schema"]
         required = frozenset(shape["requiredEntryFields"])
         optional = frozenset(shape["optionalEntryFields"])
