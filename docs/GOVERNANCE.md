@@ -401,6 +401,39 @@ Le push direct sur `main` est bloqué par la combinaison :
 > Pour un blocage total y compris pour les administrateurs, activer `enforce_admins = true`
 > (voir §4, réserve admin).
 
+### Fusionner une PR appartenant à une pile (*stack*)
+
+Lorsqu'une PR est empilée sur une autre (base = branche d'une PR ouverte), **tous les
+chemins de fusion documentés refusent**, sans indiquer qu'il en existe un autre :
+
+| Chemin | Résultat |
+| --- | --- |
+| `gh pr merge <n>` | refus — *« part of a stack »* |
+| `PUT /repos/{owner}/{repo}/pulls/{n}/merge` | refus — même message |
+| Changer la base d'une PR enfant | refus — *« Cannot change the base branch because the pull request is part of a stack »* |
+
+Le seul chemin fonctionnel est l'API asynchrone :
+
+```bash
+gh api --method PUT "repos/{owner}/{repo}/pulls/{n}/merge-async" \
+  -f merge_method=squash -f merge_action=default
+# -> {"status":"pending","uuid":"..."}
+```
+
+Deux pièges :
+
+1. **Le suivi documenté ne fonctionne pas.** `GET /pulls/merge-async/{uuid}` renvoie `404`.
+   Interroger l'état de la PR elle-même (`gh pr view <n> --json state,mergedAt`).
+2. **La fusion porte sur la pile jusqu'à la PR ciblée incluse.** Fusionner la PR du bas
+   ne fusionne donc qu'elle. Les enfants restent ouverts et sont **rebasés
+   automatiquement** sur la nouvelle base.
+
+> **Vérifié le 2026-09-05** sur la PR #363 (bas de pile) : #363 fusionnée seule, #372
+> (enfant) restée ouverte et re-basée automatiquement sur `main`.
+> **Ce qui invaliderait ce constat** : GitHub rendant `merge-async` inutile en levant le
+> refus sur `gh pr merge` / `PUT …/merge` pour les piles, ou corrigeant le `404` du suivi
+> par `uuid`. Revérifier si l'un des deux chemins refusés cesse de refuser.
+
 ---
 
 ## 3. Propriété du code — `CODEOWNERS`
