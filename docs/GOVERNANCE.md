@@ -323,6 +323,47 @@ pour que le snapshot reflète l'arbre final.
 > `--refresh-reference` le repointe. Le faire **systématiquement après un rebase**, même si
 > `--check` est déjà vert : « la CI ne le vérifie pas » est une raison de le corriger à la main, pas
 > de l'ignorer — un champ que rien ne contrôle est précisément un champ qui pourrit.
+>
+> 🔬 **Ce test vaut pour une branche, jamais pour `main`.** Mesuré le 2026-09-05 sur les douze
+> derniers commits de `main` : le commit capturé y est **orphelin dans 12 cas sur 12**, sans
+> exception. Ce n'est pas une anomalie, c'est mécanique — le dépôt fusionne en *squash*, donc le
+> commit de branche que `--refresh-reference` a capturé cesse d'exister à l'instant de la fusion,
+> remplacé par le commit de squash. Le champ `commit` de `docs/project-state-reference.json` n'a
+> donc, sur `main`, **jamais** désigné un commit atteignable et ne le peut pas.
+>
+> Conséquences pratiques, à ne pas confondre :
+>
+> - **Rien n'est cassé.** `observableSha256` est le contrôle réel et il est stable au squash *par
+>   conception* — le champ `semantics` de la référence le dit explicitement. La gate reste juste.
+> - **Le champ `commit` est de la provenance, pas une garantie.** Sur `main` il indique « la
+>   branche qui a produit ce relevé », dans une forme qui ne survit pas au squash.
+> - **N'appliquez donc pas la commande ci-dessus à `main`** en concluant à un défaut : elle y
+>   échouera toujours. Elle sert à vérifier *votre branche avant de pousser*, où un orphelin est
+>   réellement de votre fait et réellement corrigeable.
+>
+> Le contrôle est correct ; c'est son domaine d'application qui devait être borné. Un contrôle
+> dont on ignore le domaine produit un faux positif permanent, et un faux positif permanent finit
+> par être ignoré — y compris le jour où il dit vrai.
+>
+> 🎯 **Corollaire : quand `--amend` est-il sûr ?** `--refresh-reference` capture *le dernier commit
+> touchant un chemin observable*. Amender **ce commit-là** réécrit le SHA qu'on vient de capturer :
+> c'est un **point fixe inatteignable par amendement**, chaque tentative de faire coïncider le
+> relevé avec l'historique déplaçant l'historique.
+>
+> > **Amender est sûr si et seulement si le commit amendé n'est pas celui que la référence a
+> > capturé.**
+>
+> Exemple : si la capture porte sur un commit *workflow* et que l'on amende un commit *docs*, la
+> capture survit (`is-ancestor` reste vrai). Amender le commit workflow l'orpheline à tous les
+> coups. Cette formulation remplace la consigne plus grossière « toujours commiter l'état projet
+> séparément » : elle dit **où passe la frontière**, donc un lecteur peut déterminer de quel côté
+> il se trouve, au lieu de suivre une interdiction qui paraît arbitraire et qu'il abandonnera à la
+> première gêne.
+>
+> À noter sur la provenance de cette règle : le test `merge-base --is-ancestor` documenté ci-dessus
+> **a pris son propre auteur en défaut**, quelques heures après avoir été écrit. C'est la seule
+> preuve réelle qu'un contrôle fonctionne — toute autre confirmation revient à ce que l'auteur se
+> donne raison à lui-même.
 
 > ✅ **Vérifiez cette affirmation vous-même, en une commande.** Le présent fichier
 > (`docs/GOVERNANCE.md`) n'est pas un chemin observable. Modifiez-le, puis lancez :

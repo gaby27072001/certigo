@@ -79,6 +79,14 @@ publiée* et non à une branche Git. Les sections restantes expliquent le contex
 
 #### Convention : un fait volatil s'écrit une fois, daté et borné
 
+**À quoi sert cette convention.** Elle ne *préserve* pas la vérité du document : rien ne peut le
+faire, puisque le monde bouge et que le document ne bouge pas avec lui. Ce qu'elle fait, c'est
+**convertir une fausseté silencieuse en contradiction visible**. Une affirmation datée et bornée
+se périme *bruyamment* — le lecteur peut confronter la condition énoncée à la réalité et voir
+qu'elle ne tient plus. Une affirmation nue se périme sans bruit et continue d'être lue comme
+vraie. C'est un mécanisme de **détection de pourriture**, pas de conservation — le seul type qui
+puisse fonctionner, l'alternative exigeant que le document se mette à jour tout seul.
+
 Ce document est dense en faits **volatils** — décomptes, états de déploiement, « pas encore
 fait ». Deux règles s'appliquent à chacun d'eux, et elles ne sont pas interchangeables.
 
@@ -130,8 +138,40 @@ les textes rédigés pour énoncer cette convention** :
 > **Aucun n'a été détecté par une gate** — tous par une relecture délibérée. C'est ce qui
 > justifie une checklist plutôt qu'un simple principe.
 
+##### Un critère annoncé à l'avance est un instrument, pas une vérité
+
+Annoncer un critère de falsification **avant** la mesure protège contre la rationalisation du
+résultat. Il ne protège **pas** contre le fait que le critère soit lui-même faux — et il rend
+cette erreur *plus difficile à voir*, parce que le critère arrive adoubé par son antériorité :
+c'est alors la mesure qui a l'air d'être le défaut.
+
+> **Quand une mesure contredit une attente annoncée à l'avance, re-dériver l'attente depuis les
+> principes premiers avant de conclure que la mesure est fausse. Les deux sont des affirmations ;
+> une seule a été vérifiée.**
+
+Exemple vécu, le 2026-09-05 : un critère annoncé posait qu'un décompte supérieur à `812` blobs
+privés signalerait un manifeste non déterministe — un défaut sérieux. La mesure a rendu **813**.
+Le critère était faux, pas la mesure : `manifest.json` est publié **à côté** des fichiers qu'il
+énumère et ne se référence pas lui-même, donc le nombre de blobs d'un préfixe vaut toujours
+`fileCount + 1`. Une lecture stricte du critère aurait signalé comme défectueux un artefact
+parfaitement correct.
+
+La protection et la vulnérabilité sont **la même propriété** : l'annonce préalable fonctionne
+précisément en retirant le droit d'ajuster le critère après coup, et c'est ce même verrou qui
+empêche de le corriger lorsqu'il est réellement faux. Le remède n'est donc pas de tenir les
+critères plus mollement — cela détruirait la technique — mais de **re-dériver indépendamment et
+comparer deux dérivations**.
+
+Le mécanisme sous-jacent dépasse l'annonce préalable : **une valeur chiffrée emprunte une autorité
+que la croyance qu'elle remplace ne revendiquait pas.** Second exemple vécu le même jour — une
+intuition explicitement présentée comme telle a été remplacée par un « taux de base mesuré »
+(4 sur 4 contre 0 sur 4) dont les cas avaient en réalité été *sélectionnés pour* la propriété
+mesurée. Substituer une statistique confondue à une supposition assumée est **pire que de garder
+la supposition**, puisque celle-ci s'annonçait comme telle et invitait à la vérification. Vérifier
+d'abord d'où vient l'échantillon, avant de citer ce qu'on en tire.
+
 > Ce n'est pas théorique. Voir la correction consignée plus bas sous « État des conteneurs mesuré
-> au 2026-09-05 à 10:15Z » : la même affirmation non vérifiée a traversé quatre passes
+> au 2026-09-05 après publication » : la même affirmation non vérifiée a traversé quatre passes
 > successives — dont deux dont l'objet explicite était d'éviter ce type d'erreur, la dernière
 > étant la correction elle-même, qui a d'abord réintroduit le défaut trois paragraphes plus haut
 > avant d'être reprise. Quatre passes attentives, chacune consciente du problème, et il a quand
@@ -164,7 +204,7 @@ Deux obstacles **indépendants**, à ne pas confondre :
 
 1. **Aucune release publiée** — `ci-content-drift.yml` n'aurait de toute façon rien à comparer.
    L'état de publication est daté et borné plus bas, sous « État des conteneurs mesuré au
-   2026-09-05 à 10:15Z », et doit être relu là-bas plutôt que déduit d'ici.
+   2026-09-05 après publication », et doit être relu là-bas plutôt que déduit d'ici.
 2. **La gate n'avait jamais réussi une seule fois depuis sa création** — elle échouait dans une
    branche *impossible de lister le conteneur* et **n'atteignait jamais** le contrôle du
    descripteur, parce qu'elle s'authentifiait sous une identité ne portant aucun rôle data-plane
@@ -207,43 +247,80 @@ désormais ses trois attributions `Storage Blob Data Reader` mais **pas encore d
 fédéré**, donc la gate ne peut pas encore s'authentifier. Aucune policy n'a été verrouillée : le
 verrouillage WORM est irréversible et reste une action opérateur distincte.
 
-**État des conteneurs mesuré au 2026-09-05 à 10:15Z**, par le workflow d'inspection en lecture
-seule (run `33960148573`). Chaque appel `az` a retourné un code de sortie `0` explicite : ce sont
-donc des **mesures**, pas des absences de réponse.
+**État des conteneurs mesuré au 2026-09-05 après publication**, par le workflow d'inspection en
+lecture seule. Chaque appel `az` a retourné un code de sortie `0` explicite : ce sont donc des
+**mesures**, pas des absences de réponse.
 
-> ⚠️ **Ces chiffres sont périmés.** Ils décrivent l'état *avant* la quatrième tentative de
-> publication, dont le chemin d'écriture a démarré à 10:30:10Z — soit quinze minutes *après* la
-> mesure.
+| Conteneur | Blobs | `fileCount` du manifeste |
+|---|---:|---:|
+| `content-public-releases` | **1 736** | 1 735 |
+| `content-private-releases` | **813** | 812 |
+| `content-release-descriptors` | **1** | — |
+
+> 📌 **Les deux colonnes diffèrent de 1, et les deux sont correctes.** `manifest.json` est publié
+> **à côté** des fichiers qu'il énumère et **ne se référence pas lui-même** : le nombre de blobs
+> d'un préfixe `manifests/<manifestId>/` vaut donc toujours `fileCount + 1`. Un lecteur qui
+> compare 1 736 blobs à un `fileCount` de 1 735 lira une dérive là où il n'y en a pas.
 >
-> **La condition d'invalidation est l'écriture, pas la réussite.** Le stockage étant immuable et
-> en création seule, **tout blob écrit avant la fin d'un run le rend caduc — que ce run aboutisse
-> ou échoue**. Un run qui échoue à mi-parcours laisse derrière lui exactement autant de blobs
-> non supprimables qu'un run qui réussit jusqu'à ce point.
+> Deux dérivations indépendantes l'établissent : le comptage direct des fichiers de `dist/private`
+> (813), et la forme du manifeste lui-même — ses entrées `files[]` portent exactement les préfixes
+> `{solutions: 812}` sans entrée pour `manifest.json`, tandis que le blob orphelin relevé plus tôt
+> était précisément `manifests/sha256:65b1914f…/manifest.json`.
 >
-> C'est précisément ce qui s'est produit : le run `33960774991` a **échoué** — `publish-public` et
-> `publish-answer-key` en `failure`, `publish-release` sauté — mais les deux jobs d'écriture
-> avaient tourné respectivement **49 min 29 s** (10:30:10Z → 11:19:39Z) et **22 min 16 s**
-> (10:30:10Z → 10:52:26Z) avant de mourir. Ils ont donc écrit un nombre **non encore mesuré** de
-> blobs, définitivement présents. Le tableau ci-dessous ne vaut plus que comme **archive de
-> l'état à 10:15Z** ; un relevé d'inspection mesuré est attendu pour établir les compteurs réels.
+> **Ce qui périmerait ces chiffres :** toute publication ultérieure, qu'elle aboutisse ou échoue.
+> Le stockage est immuable et en création seule, donc les décomptes ne peuvent que **croître** et
+> tout blob écrit avant la fin d'un run y reste. Un `releaseId` différent de celui cité ci-dessous
+> indique qu'une publication a eu lieu depuis et que ce relevé doit être refait.
 
-| Conteneur | Blobs à 10:15Z | Contenu |
-|---|---:|---|
-| `content-public-releases` | **1** | `manifests/sha256:0a7f0448…/catalog/certifications.json` |
-| `content-private-releases` | **1** | `manifests/sha256:65b1914f…/manifest.json` |
-| `content-release-descriptors` | **0** | — |
+Identité auto-vérifiante du publieur, recomputée à la main : `1 202 + 534 = 1 736`,
+`540 + 273 = 813`, `0 + 1 = 1`. La sortie `69` (rupture d'identité) n'a jamais été levée.
+`releaseId` `sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035`, relu
+depuis le blob distant et **identique octet pour octet** au descripteur construit localement
+(`contentMd5` et taille de 410 octets concordants). **0 retry** sur ~9 750 appels : l'échec de la
+tentative 4 n'était donc pas transitoire.
 
-À cet instant, ces deux blobs étaient **orphelins** : écrits par la troisième tentative
-(run `33958713216`, sortie `68` sur chacun d'eux), immuables donc **non supprimables**, et
-inatteignables par tout consommateur puisqu'aucun descripteur ne les référençait. Leur
-`immutabilityPolicy.policyMode` est `unlocked`. `publish-release` avait été **sauté aux trois
-tentatives**, donc aucune publication partielle n'était jamais devenue la release active.
+**La publication fonctionne — et ce que ce succès ne prouve pas.** Le run `33965259786`
+(12:09:47Z → 13:11:01Z) a terminé ses quatre jobs en succès, `publish-release` compris pour la
+première fois : `publish-public` s'est achevé à 13:10:33Z et `publish-release` a démarré à
+13:10:37Z, première observation *sous succès* de l'ordre « descripteur en dernier ». Mais ce run
+s'est déroulé sous **deux protections simultanées** contre le mécanisme de contention décrit
+ci-dessous — le gel des fusions et l'isolation `AZURE_CONFIG_DIR` — et **aucune des deux n'a été
+isolée**. Aucune gate de dérive n'a tourné pendant l'écriture : l'agresseur n'a jamais attaqué.
+Une victime qui survit à une attaque qui n'a pas eu lieu n'apprend rien sur son armure.
+**L'isolation reste donc non testée en conditions réelles**, et cette expérience n'est plus
+disponible : les deux côtés sont désormais corrigés.
 
-Le conteneur de descripteurs mesuré à **0** est la première confirmation *mesurée* que l'ordre
-« descripteur en dernier » a tenu sur ces trois tentatives ; il n'était jusque-là qu'**inféré** du
-fait que le job avait été sauté. Le script étant en création seule, ces deux orphelins doivent
-être **ignorés** et non réécrits par la tentative suivante — propriété affirmée depuis l'origine
-et jamais encore observée.
+**Contention inter-dépôts, diagnostiquée le 2026-09-05.** Les tentatives 3 et 4 ont été tuées par
+des fusions sur `main` de ce dépôt. Les deux dépôts enregistrent leurs runners sur les **mêmes
+machines physiques sous le même utilisateur système**, donc partagent `~/.azure` ;
+`ci-content-drift.yml` se déclenche sur push et exécute `azure/login` avec
+`AZURE_LOGIN_PRE_CLEANUP`, qui purge et réécrit ce profil partagé. Le job de publication en vol
+perd son jeton et meurt. Chaîne mesurée, constante sur toute la journée :
+
+| Intervalle | Valeur | n |
+|---|---|---:|
+| commit de fusion → démarrage de la gate | **3 s, variance nulle** | 10 |
+| démarrage de la gate → mort de la victime | **18 s** | 2 |
+
+> ⚠️ **Le danger est l'étape `azure/login`, pas le résultat de la gate.** Elle réécrit le profil
+> partagé **avant** que la gate ait une conclusion, donc une gate **verte** est exactement aussi
+> destructrice qu'une rouge et rien dans la liste des checks ne peut en avertir. Le déclenchement
+> planifié quotidien s'exécute sans surveillance et présente le même risque.
+
+**Première comparaison réelle de la gate de dérive**, run `33969562794` du 2026-09-05 à 13:40:07Z.
+L'étape *« Compare the newest published release with the pinned reference »* était `skipped` à
+**tous** les runs depuis la création de la gate ; elle s'est exécutée pour la première fois ici et
+rapporte **aucune dérive** (`0a7f0448…` épinglé = `0a7f0448…` publié). Le contrôle est net : même
+workflow, mêmes étapes, seule la présence d'un descripteur ayant changé. Cela prouve en outre que
+l'identité lectrice **voit** effectivement le descripteur, ce que la seule existence du blob
+n'établissait pas.
+
+> La borne `EXPECT_PUBLISHED_RELEASE` décide si « conteneur lisible, aucun descripteur » est un
+> état attendu ou un incident. Sa valeur fait foi dans `.github/workflows/ci-content-drift.yml` et
+> **n'est pas recopiée ici** : la redire à cet endroit créerait un second point d'énonciation, que
+> la convention ci-dessus interdit précisément parce que l'un des deux finirait par mentir.
+> Maintenant qu'une release est publiée, l'absence de descripteur ne peut plus signifier « la
+> publication n'a pas encore tourné ».
 
 > **Correction.** Une version antérieure de ce document affirmait que les trois conteneurs étaient
 > **vides**. C'était faux, et la chaîne de propagation est plus instructive que le correctif :
