@@ -115,6 +115,15 @@ jobs:
     outputs:
       packageSha256: ${{ steps.manifest.outputs.package-sha256 }}
     env:
+      # Isolates this job Azure CLI profile. DO NOT REMOVE - not redundant, and not about
+      # whether this workflow passes. THE HAZARD IS THE azure/login STEP, NOT THE OUTCOME:
+      # a green run rewrites the shared profile exactly as a red one does, before there is
+      # any status to read. Certigo and certigo-content runners are separate registrations
+      # on the SAME machines as the same OS user, so they share one ~/.azure; without this,
+      # this job wipes the credentials out from under an in-flight certigo-content publish,
+      # which then dies with "Could not retrieve credential from local cache". The aggressor
+      # never sees it - only the victim, in another repository. Measured 2026-09-05.
+      AZURE_CONFIG_DIR: /tmp/azure-cdbackend-build-release-${{ github.run_id }}-${{ github.run_attempt }}
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     steps:
       # Base-validator compatibility marker: COMMIT_SHA: ${{ github.sha }}
@@ -230,6 +239,16 @@ jobs:
       }}
     environment: dev
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    env:
+      # Isolates this job Azure CLI profile. DO NOT REMOVE - not redundant, and not about
+      # whether this workflow passes. THE HAZARD IS THE azure/login STEP, NOT THE OUTCOME:
+      # a green run rewrites the shared profile exactly as a red one does, before there is
+      # any status to read. Certigo and certigo-content runners are separate registrations
+      # on the SAME machines as the same OS user, so they share one ~/.azure; without this,
+      # this job wipes the credentials out from under an in-flight certigo-content publish,
+      # which then dies with "Could not retrieve credential from local cache". The aggressor
+      # never sees it - only the victim, in another repository. Measured 2026-09-05.
+      AZURE_CONFIG_DIR: /tmp/azure-cdbackend-resolve-release-${{ github.run_id }}-${{ github.run_attempt }}
     permissions:
       actions: read
       id-token: write
@@ -321,6 +340,15 @@ jobs:
       id-token: write
       contents: read
     env:
+      # Isolates this job Azure CLI profile. DO NOT REMOVE - not redundant, and not about
+      # whether this workflow passes. THE HAZARD IS THE azure/login STEP, NOT THE OUTCOME:
+      # a green run rewrites the shared profile exactly as a red one does, before there is
+      # any status to read. Certigo and certigo-content runners are separate registrations
+      # on the SAME machines as the same OS user, so they share one ~/.azure; without this,
+      # this job wipes the credentials out from under an in-flight certigo-content publish,
+      # which then dies with "Could not retrieve credential from local cache". The aggressor
+      # never sees it - only the victim, in another repository. Measured 2026-09-05.
+      AZURE_CONFIG_DIR: /tmp/azure-cdbackend-deploy-infra-${{ github.run_id }}-${{ github.run_attempt }}
       TARGET_ENV: ${{ needs.validate-target.outputs.target }}
     outputs:
       functionAppName: ${{ steps.target.outputs.functionAppName }}
@@ -672,6 +700,15 @@ jobs:
       id-token: write
       contents: read
     env:
+      # Isolates this job Azure CLI profile. DO NOT REMOVE - not redundant, and not about
+      # whether this workflow passes. THE HAZARD IS THE azure/login STEP, NOT THE OUTCOME:
+      # a green run rewrites the shared profile exactly as a red one does, before there is
+      # any status to read. Certigo and certigo-content runners are separate registrations
+      # on the SAME machines as the same OS user, so they share one ~/.azure; without this,
+      # this job wipes the credentials out from under an in-flight certigo-content publish,
+      # which then dies with "Could not retrieve credential from local cache". The aggressor
+      # never sees it - only the victim, in another repository. Measured 2026-09-05.
+      AZURE_CONFIG_DIR: /tmp/azure-cdbackend-deploy-backend-${{ github.run_id }}-${{ github.run_attempt }}
       TARGET_ENV: ${{ needs.validate-target.outputs.target }}
       FUNCTION_APP_NAME: ${{ needs.deploy-infra.outputs.functionAppName }}
       STORAGE_ACCOUNT: ${{ needs.deploy-infra.outputs.storageAccount }}

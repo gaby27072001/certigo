@@ -60,6 +60,30 @@ jobs:
     env:
       PYTHONSAFEPATH: "1"
       DESCRIPTOR_PATH: ${{ github.workspace }}/.content-release/release.json
+      # Isolates this job's Azure CLI profile. DO NOT REMOVE — it is not redundant, and it is not
+      # about this workflow succeeding or failing.
+      #
+      # THE HAZARD IS THE `azure/login` STEP ITSELF, NOT THE OUTCOME. A green run rewrites the
+      # shared profile exactly as a red one does, and the damage is done before there is any status
+      # to read. Do not reason "this gate passes now, so it is safe" — that inference is backwards.
+      #
+      # Why it is shared: the Certigo and certigo-content runners are separate registrations on the
+      # SAME physical machines, running as the same OS user, so they share one `~/.azure`.
+      # `azure/login` clears and rewrites that directory. Without this variable, a push to main
+      # starts this gate, which wipes the profile out from under any certigo-content publish job in
+      # flight on the same VM; that job then dies ~18s later with "Could not retrieve credential
+      # from local cache", naming a foreign service principal it never chose.
+      #
+      # Measured, not theorised: publish-answer-key died 10:52:26Z and publish-public died
+      # 11:19:39Z on 2026-09-05, each seconds after a merge to main started this workflow.
+      #
+      # THE AGGRESSOR NEVER SEES IT. Only the job that is NOT logging in observes a failure, and it
+      # observes it in a different repository. No check status, run conclusion or PR page in this
+      # repo can surface it, and testing this workflow in isolation will never reproduce it.
+      #
+      # The 05:41 cron makes this unattended and daily. Per-run path so two runs of this same
+      # workflow cannot collide with each other either.
+      AZURE_CONFIG_DIR: /tmp/azure-drift-${{ github.run_id }}-${{ github.run_attempt }}
       # Bounds the window in which "no descriptor" is an acceptable green.
       #
       # Before the first publication, an empty container is the expected state and failing on it
@@ -72,9 +96,24 @@ jobs:
       # SAY we expect against what the container REPORTS. A single source is always silently
       # consistent with itself.
       #
-      # FLIP THIS TO "true" in the same PR that records the first successful publication.
-      # It is deliberately a one-line diff at a reviewable moment, not something to remember.
-      EXPECT_PUBLISHED_RELEASE: "false"
+      # FLIPPED TO "true" on 2026-09-05, the day of the first successful publication.
+      #
+      # The condition for flipping was deliberately NOT "a release was published" -- that is a fact
+      # about the storage, verified by the publisher and inspector identities. It was "THE GATE can
+      # see a published release", which is a fact about the reader identity's view and had never
+      # been true: id-certigo-content-reader was federated at ~11:00Z and every run until now took
+      # the empty-container path. Confirmed RBAC and a successful read are different claims.
+      #
+      # Evidence, from this workflow itself rather than relayed: run 33969562794 took the comparison
+      # branch (DRIFT_COMPARABLE=true, the Compare step ran rather than being guarded off) and
+      # reported "Pinned content reference matches the newest published release
+      # sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035" -- the gate's first
+      # ever execution of its comparison path.
+      #
+      # From here, "readable container, no descriptor" is an ERROR, not a notice: the container is
+      # append-only and content-addressed, so a descriptor that existed and no longer does means it
+      # was deleted or the container replaced. Do not flip this back to silence a red square.
+      EXPECT_PUBLISHED_RELEASE: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -34,6 +34,16 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' }}
     environment: azure-content-infra-plan
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    env:
+      # Isolates this job Azure CLI profile. DO NOT REMOVE - not redundant, and not about
+      # whether this workflow passes. THE HAZARD IS THE azure/login STEP, NOT THE OUTCOME:
+      # a green run rewrites the shared profile exactly as a red one does, before there is
+      # any status to read. Certigo and certigo-content runners are separate registrations
+      # on the SAME machines as the same OS user, so they share one ~/.azure; without this,
+      # this job wipes the credentials out from under an in-flight certigo-content publish,
+      # which then dies with "Could not retrieve credential from local cache". The aggressor
+      # never sees it - only the victim, in another repository. Measured 2026-09-05.
+      AZURE_CONFIG_DIR: /tmp/azure-contentapply-apply-${{ github.run_id }}-${{ github.run_attempt }}
     permissions:
       contents: read
       id-token: write

@@ -40,6 +40,29 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | `Generated state equals committed state` | [`.github/workflows/ci-project-state.yml`](../.github/workflows/ci-project-state.yml) | `Generated state equals committed state` |
 | `Validate workflow YAML` | [`.github/workflows/lint-workflows.yml`](../.github/workflows/lint-workflows.yml) | `Validate workflow YAML` |
 | `CodeQL / Security gate` | [`.github/workflows/codeql.yml`](../.github/workflows/codeql.yml) | `CodeQL / Security gate` |
+
+> ℹ️ **Portée de `Validate workflow YAML` : large sur les PR, nulle sans PR.**
+>
+> Cette gate lint **tous** les workflows à chaque PR vers `main` — pas seulement ceux modifiés : son
+> déclencheur n'a aucun filtre `paths` et le script passe `.github/workflows/*.yml` en bloc à
+> `actionlint`. Un fichier que personne n'édite, y compris un workflow **désactivé**, est donc revérifié
+> à chaque PR.
+>
+> En revanche, **un simple push de branche sans PR ouverte n'est pas linté du tout.** C'est inhérent à
+> une gate déclenchée par PR, pas un défaut : rien ne s'exécute tant qu'aucune PR n'existe. Un workflow
+> invalide poussé sur une branche ne se manifeste que par des runs en échec nommés d'après le *chemin
+> du fichier* (`.github/workflows/<nom>.yml`, `jobs=0`) — la signature d'un fichier que GitHub n'a pas
+> pu parser. Constaté le 2026-09-05 : six workflows cassés poussés sur une branche, cinq runs de ce
+> type, et aucune gate franchie puisqu'aucune PR n'existait encore.
+>
+> **Pré-contrôle local**, avec la version que la CI épingle déjà :
+>
+> ```bash
+> actionlint .github/workflows/*.yml   # v1.7.12, cf. lint-workflows.yml
+> ```
+>
+> `actionlint` connaît les règles de **disponibilité des contextes** — il rejette par exemple
+> `runner.*` dans un `env:` de job — ce qu'aucun parseur YAML ne peut voir.
 | `Security / Required gate` | [`.github/workflows/security-gate.yml`](../.github/workflows/security-gate.yml) | `Security / Required gate` |
 | `Fork PR policy / Required gate` | [`.github/workflows/fork-pr-policy.yml`](../.github/workflows/fork-pr-policy.yml) | `Fork PR policy / Required gate` |
 
