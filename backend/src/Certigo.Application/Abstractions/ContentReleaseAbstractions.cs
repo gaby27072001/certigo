@@ -84,7 +84,9 @@ public sealed record ContentPackageManifest(
     int FileCount,
     IReadOnlyList<ContentPackageFile> Files,
     string ManifestId,
-    string RootHash);
+    string RootHash,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? ReleaseId = null);
 
 public sealed record ContentBlobVersion(
     string Path,
@@ -139,7 +141,18 @@ public sealed record ContentImportResult(
 
 public sealed record ActivePublicManifestResult(
     ContentPackageManifest Manifest,
+    string ReleaseId,
     string ETag);
+
+public sealed record PublicContentFileResult(
+    string ReleaseId,
+    string PublicManifestId,
+    string Path,
+    string Hash,
+    string ContentType,
+    ReadOnlyMemory<byte> Content);
+
+public sealed record PublicContentDeliveryOptions(bool Enabled);
 
 public sealed record ContentReleaseLimits(
     int MaxFiles,

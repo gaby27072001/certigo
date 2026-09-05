@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Certigo.Application.Abstractions;
@@ -91,6 +92,38 @@ public sealed class ContentReleaseServiceTests
         result.Receipt.Should().Be(receipt);
         store.StageCalls.Should().Be(0);
         telemetry.Imports.Should().ContainSingle(value => value);
+    }
+
+    [Theory]
+    [InlineData("questions/question%25.json")]
+    [InlineData("questions/question\u001f.json")]
+    public async Task Import_rejects_paths_that_public_delivery_cannot_address(string path)
+    {
+        var source = new UnsafePathReleaseSource(path);
+        var verifier = new ContentContractVerifier(
+            source,
+            new AcceptingSchemaValidator(),
+            ContentReleaseLimits.Default);
+
+        var action = () => verifier.VerifyReleaseAsync(source.ReleaseId);
+
+        await action.Should().ThrowAsync<ContentReleaseValidationException>()
+            .WithMessage("*unsafe or non-canonical*");
+    }
+
+    [Fact]
+    public async Task Import_rejects_paths_longer_than_the_public_delivery_limit()
+    {
+        var source = new UnsafePathReleaseSource($"questions/{new string('a', 1010)}.json");
+        var verifier = new ContentContractVerifier(
+            source,
+            new AcceptingSchemaValidator(),
+            ContentReleaseLimits.Default);
+
+        var action = () => verifier.VerifyReleaseAsync(source.ReleaseId);
+
+        await action.Should().ThrowAsync<ContentReleaseValidationException>()
+            .WithMessage("*unsafe or non-canonical*");
     }
 
     [Fact]
@@ -194,6 +227,90 @@ public sealed class ContentReleaseServiceTests
             string manifestId,
             CancellationToken cancellationToken = default)
             => throw new InvalidOperationException();
+    }
+
+    private sealed class UnsafePathReleaseSource : IContentReleaseSource
+    {
+            private readonly byte[] _releaseBytes;
+            private readonly byte[] _manifestBytes;
+
+            public UnsafePathReleaseSource(string path)
+            {
+                var fileHash = new string('a', 64);
+                var pathJson = JsonSerializer.Serialize(path);
+                var canonicalManifest =
+                    $$"""{"algorithm":"sha256","artifact":"public","channel":"public","fileCount":1,"files":[{"hash":"{{fileHash}}","id":"question-1","path":{{pathJson}},"resourceType":"question","size":1}],"schema":"certigo.content.package-manifest/v3","serialization":"json-sorted-keys-compact-utf8-lf"}""";
+                var manifestDigest = Sha256(canonicalManifest);
+                var publicManifestId = $"sha256:{manifestDigest}";
+                var privateManifestId = $"sha256:{new string('b', 64)}";
+                var canonicalRelease =
+                    $$"""{"algorithm":"sha256","canonicalization":"json-sorted-keys-compact-utf8","privateManifestId":"{{privateManifestId}}","publicManifestId":"{{publicManifestId}}","schema":"certigo.content.release/v1"}""";
+                ReleaseId = $"sha256:{Sha256(canonicalRelease)}";
+                _releaseBytes = Encoding.UTF8.GetBytes($$"""
+                    {
+                      "schema": "certigo.content.release/v1",
+                      "algorithm": "sha256",
+                      "canonicalization": "json-sorted-keys-compact-utf8",
+                      "publicManifestId": "{{publicManifestId}}",
+                      "privateManifestId": "{{privateManifestId}}",
+                      "releaseId": "{{ReleaseId}}"
+                    }
+                    """);
+                _manifestBytes = Encoding.UTF8.GetBytes($$"""
+                    {
+                      "schema": "certigo.content.package-manifest/v3",
+                      "channel": "public",
+                      "artifact": "public",
+                      "algorithm": "sha256",
+                      "serialization": "json-sorted-keys-compact-utf8-lf",
+                      "fileCount": 1,
+                      "files": [{
+                        "id": "question-1",
+                        "path": {{pathJson}},
+                        "resourceType": "question",
+                        "hash": "{{fileHash}}",
+                        "size": 1
+                      }],
+                      "manifestId": "{{publicManifestId}}",
+                      "rootHash": "{{manifestDigest}}"
+                    }
+                    """);
+            }
+
+            public string ReleaseId { get; }
+
+            public Task<ContentBlobObject> ReadReleaseAsync(
+                string releaseId,
+                CancellationToken cancellationToken = default)
+                => Task.FromResult(Blob("release.json", _releaseBytes));
+
+            public Task<ContentBlobObject> ReadManifestAsync(
+                ContentArtifact artifact,
+                string manifestId,
+                CancellationToken cancellationToken = default)
+                => artifact == ContentArtifact.Public
+                    ? Task.FromResult(Blob("manifest.json", _manifestBytes))
+                    : throw new InvalidOperationException("Private manifest must not be read.");
+
+            public Task<ContentBlobObject> ReadFileAsync(
+                ContentArtifact artifact,
+                string manifestId,
+                string path,
+                CancellationToken cancellationToken = default)
+                => throw new InvalidOperationException("Unsafe manifest files must not be read.");
+
+            public Task<IReadOnlyList<string>> ListFilesAsync(
+                ContentArtifact artifact,
+                string manifestId,
+                CancellationToken cancellationToken = default)
+                => throw new InvalidOperationException("Unsafe manifests must not be listed.");
+
+            private static ContentBlobObject Blob(string path, byte[] bytes)
+                => new(path, "version-1", "\"etag\"", true, bytes);
+
+            private static string Sha256(string value)
+                => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)))
+                    .ToLowerInvariant();
     }
 
     private sealed class ThrowingReleaseSource : IContentReleaseSource

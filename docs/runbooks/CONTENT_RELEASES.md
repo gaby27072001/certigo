@@ -101,12 +101,24 @@ si un pointeur existe.
 
 1. Appeler `GET /api/content/releases/active/manifest` avec un JWT learner.
 2. Vérifier l'ETag = `publicManifestId` et le 304 avec `If-None-Match`.
-3. Vérifier que `GET /tracks/{trackId}/lessons/{lessonId}` retourne le même
+3. Vérifier que la réponse expose `releaseId` et que
+   `GET /api/content/releases/<releaseId>/manifests/<publicManifestId>/files/<sha256>/<path>`
+   retourne uniquement le fichier public déclaré, avec `ETag`,
+   `X-Content-SHA256`, `Content-Length`, `Content-Type`,
+   `X-Content-Release-Id`, `X-Content-Manifest-Id`,
+   `Cache-Control: private, max-age=31536000, immutable` et
+   `Accept-Ranges: none`.
+4. Vérifier un 304 avec `If-None-Match` (fort, faible, wildcard et liste), un
+   416 non cacheable avec `Range`, et le même 404 pour release, manifeste, hash
+   ou path incorrect, traversal inclus.
+5. Vérifier que `GET /tracks/{trackId}/lessons/{lessonId}` retourne le même
    identifiant dans `X-Content-Manifest-Id`; le client doit le conserver dans
    son cache et l'envoyer aux requêtes quiz/tuteur.
-4. Vérifier l'absence de `releaseId`, `privateManifestId`, `correct`,
+6. Vérifier l'absence de `privateManifestId`, `correct`,
    `correctOptionIds`, `explanation`, `rationale`, `answerKey` et `solution`.
-5. Basculer **staging seulement** vers `CONTENT_REPOSITORY_MODE=versioned`.
+7. Vérifier qu'en mode `legacy`, la nouvelle route fichier retourne 404 sans
+   lecture Blob; le manifeste actif conserve son comportement existant.
+8. Basculer **staging seulement** vers `CONTENT_REPOSITORY_MODE=versioned`.
    Ce réglage n'est **pas** une variable GitHub Environment : aucun workflow ne
    lit `CONTENT_REPOSITORY_MODE`. Le seul producteur du paramètre applicatif est
    `infra/modules/functionApp.bicep` à partir du paramètre Bicep
@@ -116,11 +128,11 @@ si un pointeur existe.
    Définir une variable GitHub Environment du même nom n'a aucun effet et ne
    produit aucune erreur : l'API continue de servir le mode `legacy` alors que
    le déploiement paraît réussi. Le paramètre reste `legacy` dans dev et prod.
-6. Exécuter catalog, lesson, path, quiz, exam et tutor.
-7. Soumettre une tentative avec le `publicManifestId`, promouvoir une autre
+9. Exécuter catalog, lesson, path, quiz, exam et tutor.
+10. Soumettre une tentative avec le `publicManifestId`, promouvoir une autre
    release, puis vérifier que le replay et la notation relisent l'ancienne
    release.
-8. Contrôler les événements App Insights
+11. Contrôler les événements App Insights
    `content.release.import|rejected|promoted|rolled_back`, sans payload.
 
 ## Rollback N-1

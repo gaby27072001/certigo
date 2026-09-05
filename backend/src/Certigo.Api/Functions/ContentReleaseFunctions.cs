@@ -99,22 +99,30 @@ public sealed class ContentReleaseFunctions(
         context.GetUser();
         var result = await releases.GetActivePublicManifestAsync(context.CancellationToken)
             ?? throw new ContentUnavailableException("No active public content manifest exists.");
-        var etag = QuoteETag(result.ETag);
-        if (request.Headers.TryGetValues("If-None-Match", out var values)
-            && values.Any(value => string.Equals(value, etag, StringComparison.Ordinal)))
+        var etag = ContentHttpCaching.QuoteETag(result.ETag);
+        if (ContentHttpCaching.MatchesIfNoneMatch(request, etag))
         {
             var notModified = request.CreateResponse(HttpStatusCode.NotModified);
             notModified.Headers.Add("ETag", etag);
-            notModified.Headers.Add("Access-Control-Expose-Headers", "ETag");
+            notModified.Headers.Add("X-Content-Release-Id", result.ReleaseId);
+            notModified.Headers.Add("X-Content-Manifest-Id", result.Manifest.ManifestId);
+            notModified.Headers.Add("Cache-Control", "private, no-cache");
+            notModified.Headers.Add(
+                "Access-Control-Expose-Headers",
+                "ETag, X-Content-Release-Id, X-Content-Manifest-Id");
             return notModified;
         }
 
         var response = await request.JsonAsync(
-            result.Manifest,
+            result.Manifest with { ReleaseId = result.ReleaseId },
             cancellationToken: context.CancellationToken);
         response.Headers.Add("ETag", etag);
-        response.Headers.Add("Access-Control-Expose-Headers", "ETag");
+        response.Headers.Add("X-Content-Release-Id", result.ReleaseId);
+        response.Headers.Add("X-Content-Manifest-Id", result.Manifest.ManifestId);
         response.Headers.Add("Cache-Control", "private, no-cache");
+        response.Headers.Add(
+            "Access-Control-Expose-Headers",
+            "ETag, X-Content-Release-Id, X-Content-Manifest-Id");
         return response;
     }
 
@@ -129,6 +137,4 @@ public sealed class ContentReleaseFunctions(
             : value.Trim();
     }
 
-    private static string QuoteETag(string value)
-        => value.StartsWith('"') ? value : $"\"{value}\"";
 }

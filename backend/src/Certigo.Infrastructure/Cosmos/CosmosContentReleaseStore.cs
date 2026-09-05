@@ -348,7 +348,10 @@ public sealed class CosmosContentReleaseStore(
         return document is null
             ? throw new ContentReleaseStateException(
                 $"Active public manifest '{pointer.ActivePublicManifestId}' is missing.")
-            : new ActivePublicManifestResult(document.Payload, pointer.ActivePublicManifestId);
+            : new ActivePublicManifestResult(
+                document.Payload,
+                pointer.ActiveReleaseId,
+                pointer.ActivePublicManifestId);
     }
 
     private static CosmosVersionedContentDocument<T> PublicDocument<T>(

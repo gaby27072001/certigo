@@ -1516,8 +1516,11 @@ public sealed partial class ContentContractVerifier(
     private static void EnsureSafeRelativePath(string path)
     {
         if (string.IsNullOrWhiteSpace(path)
+            || path.Length > 1024
             || path.StartsWith("/", StringComparison.Ordinal)
             || path.Contains('\\', StringComparison.Ordinal)
+            || path.Contains('%', StringComparison.Ordinal)
+            || path.Any(char.IsControl)
             || path.Split('/').Any(segment => segment is "" or "." or ".."))
         {
             throw Invalid($"Package path '{path}' is unsafe or non-canonical.");
