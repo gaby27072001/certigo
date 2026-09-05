@@ -153,6 +153,19 @@ function validateCapacityConfig(config) {
       'scaleInOrder must deallocate certigo-pr before certigo-trusted',
     );
   }
+  for (const trustClass of trustClasses) {
+    const minimumOnline = config.minimumOnlineByTrust?.[trustClass];
+    if (!Number.isInteger(minimumOnline) || minimumOnline < 1) {
+      throw new Error(
+        `minimumOnlineByTrust.${trustClass} must be a positive integer`,
+      );
+    }
+    if (minimumOnline > config.pilotTarget[trustClass]) {
+      throw new Error(
+        `minimumOnlineByTrust.${trustClass} must stay within the pilot target`,
+      );
+    }
+  }
 }
 
 export function reduceWorkflowJobState(state, event, now) {
@@ -343,6 +356,18 @@ export function createCapacityPlan({
     vmScaleSets,
     instanceInventory.managedInstances,
   );
+  // A trust class reduced to a single online runner is a single point of
+  // failure for every required check it carries. MCAPS governance deallocates
+  // this resource group nightly, so that state recurs by construction and is
+  // asserted here instead of being inferred from Azure power state alone.
+  const redundancyShortfalls = ['certigo-pr', 'certigo-trusted']
+    .map((trustClass) => ({
+      trustClass,
+      online: usableCapacityByTrust[trustClass] ?? 0,
+      required: config.minimumOnlineByTrust[trustClass],
+    }))
+    .filter((entry) => entry.online < entry.required);
+  const redundancyReady = redundancyShortfalls.length === 0;
   const identitiesReady =
     poolBoundaries.distinctIdentityBoundaryCount >=
       config.minimumExclusivePools &&
@@ -484,6 +509,15 @@ export function createCapacityPlan({
       'exclusive certigo-pr/certigo-trusted labels, identities, and subnets are not reconciled',
     );
   }
+  // Reported, deliberately NOT folded into canRequestChange: scaling out is how a
+  // shortfall gets fixed, so gating changes on it would deadlock recovery. It is also
+  // deliberately absent from the deallocate preflight, where a planned end-of-session
+  // shutdown legitimately takes every class to zero.
+  for (const shortfall of redundancyShortfalls) {
+    blockers.push(
+      `${shortfall.trustClass} has ${shortfall.online} online runner(s) but requires ${shortfall.required} for redundancy`,
+    );
+  }
   if (config.leaseRequired && !leaseHeld) {
     blockers.push('a distributed lease is required before any mutable action');
   }
@@ -582,6 +616,9 @@ export function createCapacityPlan({
       dualTrustRunners: dualTrust.map((runner) => runner.name),
       exclusivePrRunners: exclusivePr.map((runner) => runner.name),
       exclusiveTrustedRunners: exclusiveTrusted.map((runner) => runner.name),
+      redundancyReady,
+      redundancyShortfalls,
+      minimumOnlineByTrust: config.minimumOnlineByTrust,
       absentRunners: instanceInventory.absentRunners,
       bindingMismatches: instanceInventory.bindingMismatches,
       distinctIdentityBoundaryCount:

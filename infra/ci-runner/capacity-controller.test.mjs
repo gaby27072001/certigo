@@ -797,3 +797,173 @@ test('configuration refuses a boost mode that differs from the pilot target', ()
     /boost mode must equal the approved pilot target/,
   );
 });
+
+const be505VmName = 'vmss-certigo-runner-zonal_be505fa1';
+const be505VmId =
+  '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
+  'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
+  `virtualMachines/${be505VmName}`;
+
+// Mirrors the live topology: one certigo-pr pilot instance and two
+// certigo-trusted instances of vmss-certigo-runner-zonal across zones 1 and 2.
+function zonalInventory({ zone1Powered = true, zone1Online = true } = {}) {
+  const scaleSet = (name, index) => ({
+    name,
+    identity: { userAssignedIdentities: { [`/identities/${name}`]: {} } },
+    virtualMachineProfile: {
+      networkProfile: {
+        networkInterfaceConfigurations: [
+          {
+            properties: {
+              ipConfigurations: [
+                {
+                  properties: {
+                    subnet: { id: `/networks/net-${index}/subnets/default` },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  });
+  return {
+    runners: {
+      activeRuns: { total_count: 0 },
+      queuedRuns: { total_count: 0 },
+      github: {
+        runners: [
+          runner('vmss-certigo-runner-zonal_f55d176e-Certigo', [
+            'certigo-trusted',
+          ], { id: 27 }),
+          runner('vmss-certigo-runner-zonal_be505fa1-Certigo', [
+            'certigo-trusted',
+          ], { id: 29, status: zone1Online ? 'online' : 'offline' }),
+          runner('certigo-prIVJAN8', ['certigo-pr'], { id: 28 }),
+        ],
+      },
+      virtualMachines: [
+        {
+          id: f55VmId,
+          name: f55VmName,
+          powerState: 'VM running',
+          virtualMachineScaleSet: { id: '/vmss/vmss-certigo-runner-zonal' },
+          zones: ['2'],
+        },
+        {
+          id: be505VmId,
+          name: be505VmName,
+          powerState: zone1Powered ? 'VM running' : 'VM deallocated',
+          virtualMachineScaleSet: { id: '/vmss/vmss-certigo-runner-zonal' },
+          zones: ['1'],
+        },
+        {
+          id: pilotVmId,
+          name: pilotVmName,
+          powerState: 'VM running',
+          virtualMachineScaleSet: { id: '/vmss/vmss-certigo-pr-pilot-z1' },
+          zones: ['1'],
+        },
+      ],
+      vmScaleSets: [
+        scaleSet('vmss-certigo-runner-zonal', 0),
+        scaleSet('vmss-certigo-pr-pilot-z1', 1),
+      ],
+    },
+  };
+}
+
+test('the versioned inventory binds both trusted zones so neither can go missing', () => {
+  const result = reconcileRunnerInstances(
+    zonalInventory().runners.virtualMachines,
+    zonalInventory().runners.github.runners,
+    repositoryConfig.inventory,
+  );
+
+  assert.deepEqual(result.unclassifiedVirtualMachines, []);
+  assert.deepEqual(result.managedMachineNames, [
+    pilotVmName,
+    be505VmName,
+    f55VmName,
+  ]);
+  assert.deepEqual(result.bindingMismatches, []);
+  assert.deepEqual(result.absentRunners, []);
+});
+
+test('two online trusted runners satisfy the redundancy floor', () => {
+  const plan = createCapacityPlan({
+    config: repositoryConfig,
+    inventory: zonalInventory(),
+  });
+
+  assert.equal(plan.usableCapacityByTrust['certigo-trusted'], 2);
+  assert.equal(plan.trust.redundancyReady, true);
+  assert.deepEqual(plan.trust.redundancyShortfalls, []);
+  assert.ok(
+    !plan.blockers.some((blocker) => blocker.includes('redundancy')),
+  );
+});
+
+test('a deallocated trusted zone is reported as a redundancy shortfall', () => {
+  const plan = createCapacityPlan({
+    config: repositoryConfig,
+    inventory: zonalInventory({ zone1Powered: false, zone1Online: false }),
+  });
+
+  assert.equal(plan.usableCapacityByTrust['certigo-trusted'], 1);
+  assert.equal(plan.trust.redundancyReady, false);
+  assert.deepEqual(plan.trust.redundancyShortfalls, [
+    { trustClass: 'certigo-trusted', online: 1, required: 2 },
+  ]);
+  assert.ok(
+    plan.blockers.includes(
+      'certigo-trusted has 1 online runner(s) but requires 2 for redundancy',
+    ),
+  );
+});
+
+test('a running VM whose GitHub runner is offline still counts as a shortfall', () => {
+  // The zone-1 outage presented exactly this way: Azure reported "VM running"
+  // while GitHub had garbage-collected the runner registration.
+  const plan = createCapacityPlan({
+    config: repositoryConfig,
+    inventory: zonalInventory({ zone1Powered: true, zone1Online: false }),
+  });
+
+  assert.equal(plan.currentCapacityByTrust['certigo-trusted'], 2);
+  assert.equal(plan.usableCapacityByTrust['certigo-trusted'], 1);
+  assert.equal(plan.trust.redundancyReady, false);
+});
+
+test('configuration refuses a redundancy floor below one or above the pilot target', () => {
+  assert.throws(
+    () =>
+      createCapacityPlan({
+        config: {
+          ...config,
+          minimumOnlineByTrust: {
+            'certigo-pr': 1,
+            'certigo-trusted': 0,
+          },
+        },
+        inventory: inventory(),
+      }),
+    /minimumOnlineByTrust\.certigo-trusted must be a positive integer/,
+  );
+
+  assert.throws(
+    () =>
+      createCapacityPlan({
+        config: {
+          ...config,
+          minimumOnlineByTrust: {
+            'certigo-pr': 1,
+            'certigo-trusted': 3,
+          },
+        },
+        inventory: inventory(),
+      }),
+    /minimumOnlineByTrust\.certigo-trusted must stay within the pilot target/,
+  );
+});

@@ -60,19 +60,27 @@ L'état live ne correspond plus aux anciennes VM autonomes documentées :
 
 | Élément | État observé |
 |---|---|
-| Compute géré | `f55d176e` dans `vmss-certigo-runner-zonal` zone 2; pilote `bbf83c5c` dans `vmss-certigo-pr-pilot-z1` zone 1 |
-| Inventaire Azure courant | `f55d176e` et `bbf83c5c` running; `4153d1dd` externe/deallocated; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
+| Compute géré | `f55d176e` (zone 2) **et `be505fa1` (zone 1)** dans `vmss-certigo-runner-zonal`; pilote `bbf83c5c` dans `vmss-certigo-pr-pilot-z1` zone 1 |
+| Inventaire Azure courant | `f55d176e`, `be505fa1` et `bbf83c5c` running; `4153d1dd` externe/deallocated; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
 | Autoscale | activé, minimum `2`, défaut `2`, maximum `4` |
 | Scale-out | CPU moyenne > 70 % pendant 10 min |
 | Scale-in | CPU moyenne < 20 % pendant 45 min — **non conscient des jobs GitHub** |
-| Inventaire GitHub | runner `27` `f55d176e-Certigo` online/labels doubles; runner `28` `certigo-prIVJAN8` online, PR-only; runner `26` `22f7fb52-Certigo` offline/stale et hors scope |
-| Cloisonnement | le pilote est sans identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; `f55d176e` conserve UAMI + `snet-runners` mais ses labels doubles restent **bloquants** |
-| Capacité réellement réconciliée | **2 instances gérées/online** : `f55d176e` et `bbf83c5c`; `4153d1dd` reste externe |
+| Inventaire GitHub | runner `27` `f55d176e-Certigo` online **trusted**; runner `29` `be505fa1-Certigo` online **trusted**; runner `28` `certigo-prIVJAN8` online, PR-only; runner `26` `22f7fb52-Certigo` offline/stale et hors scope |
+| Cloisonnement | le pilote est sans identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; `f55d176e` et `be505fa1` conservent UAMI + `snet-runners`. **Les labels sont désormais strictement disjoints** — plus aucun label double bloquant |
+| Capacité réellement réconciliée | **3 instances gérées/online** : `f55d176e`, `be505fa1` et `bbf83c5c`; `4153d1dd` reste externe |
+| Plancher de redondance | `minimumOnlineByTrust` = `certigo-pr: 1`, `certigo-trusted: 2` |
+
+> ⚠️ **`be505fa1` était absente de cet inventaire jusqu'au 4 septembre 2026.** C'est
+> exactement ce trou qui a permis à l'instance zone 1 de rester éteinte assez longtemps pour
+> que GitHub supprime son enregistrement runner. Un inventaire qui peut omettre un membre
+> est un inventaire faux : toute instance du VMSS doit y figurer. La cause racine complète
+> est dans [`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md).
 
 Le premier snapshot avait vu trois VM, avant le scale-in CPU. L'état consolidé prouve qu'un
 simple comptage « VM Azure / runners GitHub » est faux. La réconciliation explicite classe
 le runner 26 (`22f7fb52-Certigo`) et la VM `4153d1dd` comme **externes**, et les bindings
-exacts `f55d176e`/runner `27` et `bbf83c5c`/runner `28` comme **gérés**. Externe ne
+exacts `f55d176e`/runner `27`, `be505fa1`/runner `29` et `bbf83c5c`/runner `28` comme
+**gérés**. Externe ne
 signifie ni orphelin ni adoptable : ces ressources sont
 exclue de `currentCapacity`, de toute sélection de cible et de toute opération future par
 une classification exacte dans `inventory.externalVirtualMachines`. Toute autre VM sans
@@ -768,9 +776,9 @@ impose une nouvelle quiet period complète. Seule une future PR d'activation pou
 la persistance, l'acquittement du réarmement et le chemin mutable. Tant que `enabled=false`,
 `lifecycle-preflight.sh` bloque aussi bien `start` que `deallocate` et n'arme aucune action.
 
-La passation opérationnelle externe v3 possède temporairement uniquement les IDs exacts
-`f55d176e` et `bbf83c5c`; le runner 26 et la VM 415 restent hors scope. Elle maintient les
-deux pendant l'activité, applique une quiet period coordonnée de 5 minutes resettable,
+La passation opérationnelle externe v3 possède les IDs exacts
+`f55d176e`, `be505fa1` et `bbf83c5c`; le runner 26 et la VM 415 restent hors scope. Elle
+maintient ces instances pendant l'activité, applique une quiet period coordonnée de 5 minutes resettable,
 contrôle 2 + garde finale sous la même génération de lease, désalloue le pilote puis le
 primaire et réarme les capacités exactes supprimées si une activité apparaît. Ce processus
 hors dépôt n'active pas le contrôleur versionné : `enabled=false` reste le contrat de cette PR.

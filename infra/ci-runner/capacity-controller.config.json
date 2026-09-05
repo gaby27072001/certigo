@@ -10,6 +10,10 @@
   "quietPeriodSeconds": 300,
   "requiredPostQuietGuards": 2,
   "leaseRequired": true,
+  "minimumOnlineByTrust": {
+    "certigo-pr": 1,
+    "certigo-trusted": 2
+  },
   "scaleInOrder": [
     "certigo-pr",
     "certigo-trusted"
@@ -31,6 +35,12 @@
         "runnerName": "vmss-certigo-runner-zonal_f55d176e-Certigo",
         "virtualMachineId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/virtualMachines/vmss-certigo-runner-zonal_f55d176e",
         "virtualMachineName": "vmss-certigo-runner-zonal_f55d176e"
+      },
+      {
+        "githubRunnerId": 29,
+        "runnerName": "vmss-certigo-runner-zonal_be505fa1-Certigo",
+        "virtualMachineId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/virtualMachines/vmss-certigo-runner-zonal_be505fa1",
+        "virtualMachineName": "vmss-certigo-runner-zonal_be505fa1"
       },
       {
         "githubRunnerId": 28,

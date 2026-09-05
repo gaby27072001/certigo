@@ -1214,7 +1214,41 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
     'vmss-certigo-runner-zonal_22f7fb52',
     'vmss-certigo-pr-pilot-z1_4596a9d5',
   ]);
-  assert.equal(config.inventory.managedRunnerBindings.length, 2);
+  // Pin the exact managed set, not just its size. A bare length check is what let the
+  // zone-1 trusted instance stay absent from the inventory until GitHub garbage-collected
+  // its runner registration.
+  assert.deepEqual(
+    config.inventory.managedRunnerBindings.map(
+      ({ githubRunnerId, runnerName, virtualMachineName }) => ({
+        githubRunnerId,
+        runnerName,
+        virtualMachineName,
+      }),
+    ),
+    [
+      {
+        githubRunnerId: 27,
+        runnerName: 'vmss-certigo-runner-zonal_f55d176e-Certigo',
+        virtualMachineName: 'vmss-certigo-runner-zonal_f55d176e',
+      },
+      {
+        githubRunnerId: 29,
+        runnerName: 'vmss-certigo-runner-zonal_be505fa1-Certigo',
+        virtualMachineName: 'vmss-certigo-runner-zonal_be505fa1',
+      },
+      {
+        githubRunnerId: 28,
+        runnerName: 'certigo-prIVJAN8',
+        virtualMachineName: 'vmss-certigo-pr-pilot-z1_bbf83c5c',
+      },
+    ],
+  );
+  // Both trusted zones must stay bound: the redundancy floor is meaningless if the
+  // inventory it is counted against can silently omit a member.
+  assert.deepEqual(config.minimumOnlineByTrust, {
+    'certigo-pr': 1,
+    'certigo-trusted': 2,
+  });
 });
 
 test('infra validation bootstraps pinned Node for bare Linux runners', () => {
