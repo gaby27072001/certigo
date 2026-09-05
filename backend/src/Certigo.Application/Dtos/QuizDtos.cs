@@ -6,7 +6,8 @@ public sealed record SubmitQuizRequest(
     string ClientAttemptId,
     string TrackId,
     DateTimeOffset StartedAt,
-    List<AnswerDto> Answers);
+    List<AnswerDto> Answers,
+    string? PublicManifestId = null);
 
 public sealed record AnswerDto(
     string ItemId,

@@ -56,9 +56,9 @@ La réconciliation de #304 doit supprimer, dans une même modification :
 #304 reçoit à la place l'endpoint, les trois noms de conteneur, le resource ID
 et le client ID de l'UAMI externe. Il attache cette UAMI à la Function App sans
 recréer son RBAC. Les paramètres déployés restent `legacy` dans dev, staging et
-prod, et `CONTENT_ALLOW_MUTABLE_BLOBS=false`. La valeur `true` éventuellement
-utilisée avec un émulateur local n'est pas un default Azure et ne doit entrer
-dans aucun fichier de paramètres ou Environment de déploiement.
+prod, et `CONTENT_ALLOW_MUTABLE_BLOBS=false`. Une dérogation locale éventuelle
+doit être explicite et non committée; aucun exemple, fichier de paramètres ou
+Environment de déploiement ne l'active par défaut.
 
 ## Matrice d'environnements et activation
 

@@ -27,7 +27,8 @@ public sealed class PathService(
 {
     public async Task<PathDto> GetPathAsync(string trackId, CancellationToken cancellationToken = default)
     {
-        var track = await content.GetTrackAsync(trackId, cancellationToken);
+        var snapshot = await content.ResolveActiveSnapshotAsync(cancellationToken);
+        var track = await content.GetTrackAsync(snapshot, trackId, cancellationToken);
         if (track is null)
             throw new TrackNotFoundException(trackId);
 
@@ -37,7 +38,8 @@ public sealed class PathService(
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
         var lessonIds = track.Units.SelectMany(u => u.Lessons).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var lessons = await Task.WhenAll(lessonIds.Select(id => content.GetLessonAsync(trackId, id, cancellationToken)));
+        var lessons = await Task.WhenAll(
+            lessonIds.Select(id => content.GetLessonAsync(snapshot, trackId, id, cancellationToken)));
         var lessonById = lessons
             .Where(l => l is not null)
             .Select(l => l!)
@@ -192,7 +194,8 @@ public sealed class RecommendationService(
     public async Task<NextBestDto> GetNextBestAsync(string trackId, CancellationToken cancellationToken = default)
     {
         var now = clock.UtcNow;
-        var track = await content.GetTrackAsync(trackId, cancellationToken);
+        var snapshot = await content.ResolveActiveSnapshotAsync(cancellationToken);
+        var track = await content.GetTrackAsync(snapshot, trackId, cancellationToken);
         if (track is null)
         {
             return new NextBestDto(trackId, now, Array.Empty<RecommendationItemDto>());
@@ -207,7 +210,8 @@ public sealed class RecommendationService(
         var statByConcept = LearnerModelMap.ToMap(learnerRecord);
 
         var lessonIds = track.Units.SelectMany(u => u.Lessons).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var loaded = await Task.WhenAll(lessonIds.Select(id => content.GetLessonAsync(trackId, id, cancellationToken)));
+        var loaded = await Task.WhenAll(
+            lessonIds.Select(id => content.GetLessonAsync(snapshot, trackId, id, cancellationToken)));
         var lessonById = loaded
             .Where(l => l is not null)
             .Select(l => l!)

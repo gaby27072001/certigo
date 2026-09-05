@@ -88,6 +88,69 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
             await WriteProblemAsync(context, HttpStatusCode.Conflict, "Conflict",
                 "The request conflicted with a concurrent update; please retry.", correlationId);
         }
+        catch (ContentAccessForbiddenException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.Forbidden,
+                "Forbidden",
+                ex.Message,
+                correlationId);
+        }
+        catch (ContentReleasePreconditionRequiredException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                (HttpStatusCode)428,
+                "Precondition required",
+                ex.Message,
+                correlationId);
+        }
+        catch (ContentReleasePreconditionException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.PreconditionFailed,
+                "Precondition failed",
+                ex.Message,
+                correlationId);
+        }
+        catch (ContentReleaseValidationException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.UnprocessableEntity,
+                "Invalid content release",
+                ex.Message,
+                correlationId);
+        }
+        catch (ContentReleaseNotFoundException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.NotFound,
+                "Content release not found",
+                ex.Message,
+                correlationId);
+        }
+        catch (ContentReleaseStateException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.Conflict,
+                "Content release conflict",
+                ex.Message,
+                correlationId);
+        }
+        catch (ContentUnavailableException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.ServiceUnavailable,
+                "Content unavailable",
+                ex.Message,
+                correlationId);
+        }
         catch (OrganizationFeatureDisabledException ex)
         {
             await WriteProblemAsync(

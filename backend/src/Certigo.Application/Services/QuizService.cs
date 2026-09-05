@@ -36,6 +36,13 @@ public sealed class QuizService(
 
     public async Task<SubmitQuizResult> SubmitAsync(string lessonId, SubmitQuizRequest request, CancellationToken cancellationToken = default)
     {
+        if (request.PublicManifestId is not null)
+        {
+            ContentReleaseContracts.RequireDigestId(
+                request.PublicManifestId,
+                "publicManifestId");
+        }
+
         var operationId = EconomyOperationRecord.IdFor("quiz", request.ClientAttemptId);
         var existingOperation = await economyOperations.GetAsync(
             userContext.UserId,
@@ -56,7 +63,12 @@ public sealed class QuizService(
 
         SubmissionValidation.EnsureDistinctItemIds(request.Answers);
 
-        var answerKey = await content.GetAnswerKeyAsync(request.TrackId, lessonId, cancellationToken)
+        var snapshot = await ResolveSnapshotAsync(request.PublicManifestId, cancellationToken);
+        var answerKey = await content.GetAnswerKeyAsync(
+                snapshot,
+                request.TrackId,
+                lessonId,
+                cancellationToken)
             ?? throw new InvalidOperationException($"Answer key for lesson '{lessonId}' was not found.");
         var itemById = answerKey.Items.ToDictionary(i => i.ItemId, StringComparer.OrdinalIgnoreCase);
         var now = clock.UtcNow;
@@ -217,7 +229,9 @@ public sealed class QuizService(
                 lessonId,
                 request.StartedAt,
                 now,
-                rejectedResult);
+                rejectedResult,
+                snapshot.ReleaseId,
+                snapshot.PublicManifestId);
             var signal = new AttemptIntegritySignal(
                 "quiz",
                 lessonId,
@@ -250,7 +264,9 @@ public sealed class QuizService(
             lessonId,
             request.StartedAt,
             now,
-            result);
+            result,
+            snapshot.ReleaseId,
+            snapshot.PublicManifestId);
         var learnerModel = await BuildLearnerModelAsync(request, itemById, now, cancellationToken);
         var integritySignal = integrity.IsClean
             ? null
@@ -275,6 +291,25 @@ public sealed class QuizService(
             now,
             cancellationToken);
         return await ResumeEconomyOperationAsync(durableOperation, cancellationToken);
+    }
+
+    private async Task<ContentSnapshot> ResolveSnapshotAsync(
+        string? publicManifestId,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(publicManifestId))
+        {
+            return await content.ResolveSnapshotAsync(publicManifestId, cancellationToken);
+        }
+
+        var snapshot = await content.ResolveActiveSnapshotAsync(cancellationToken);
+        if (!snapshot.IsLegacy)
+        {
+            throw new RequestValidationException(
+                "publicManifestId is required for a versioned quiz submission.");
+        }
+
+        return snapshot;
     }
 
     // Reads the learner model, observes each gradable answer (tracking the wrong

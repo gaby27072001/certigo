@@ -51,13 +51,12 @@ class RemoteUserRepository implements UserRepository {
     required String? expectedTrackId,
   }) =>
       _api.postJson(
-        '/me/active-track',
-        <String, dynamic>{
-          'trackId': trackId,
-          'expectedTrackId': expectedTrackId,
-        },
-        UserProfile.fromJson,
-      );
+          '/me/active-track',
+          <String, dynamic>{
+            'trackId': trackId,
+            'expectedTrackId': expectedTrackId,
+          },
+          UserProfile.fromJson);
 }
 
 class RemoteAccountDeletionRepository implements AccountDeletionRepository {
@@ -117,9 +116,10 @@ class RemoteLessonRepository implements LessonRepository {
 
   @override
   Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) =>
-      _api.getJson(
+      _api.getJsonWithHeaders(
         '/tracks/${Uri.encodeComponent(trackId)}/lessons/${Uri.encodeComponent(lessonId)}',
-        Lesson.fromJson,
+        (Map<String, dynamic> json, headers) =>
+            Lesson.fromJson(json).withPublicManifestId(headers.value('x-content-manifest-id')),
       );
 }
 

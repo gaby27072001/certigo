@@ -52,4 +52,25 @@ public sealed class LessonFunctionsTests
         await Assert.ThrowsAsync<UnauthorizedAccessException>(act);
         service.LessonCallCount.Should().Be(0);
     }
+
+    [Fact]
+    public async Task GetLesson_ReturnsTheExactPublicManifestIdentity()
+    {
+        const string manifestId =
+            "sha256:e5663734ac88ac916cff3b6e1206dc03bacf7f6d530e8b115e3f198a1e6304ee";
+        var service = new FakeContentService { PublicManifestId = manifestId };
+        var function = new LessonFunctions(service);
+        var context = TestFunctionContext.Authenticated();
+        var request = new TestHttpRequestData(
+            context,
+            "GET",
+            "https://localhost/api/tracks/track-1/lessons/lesson-1");
+
+        var response = await function.GetLesson(request, "track-1", "lesson-1", context);
+
+        response.Headers.GetValues("X-Content-Manifest-Id").Should().Equal(manifestId);
+        response.Headers.GetValues("Access-Control-Expose-Headers")
+            .Should().Equal("ETag, X-Content-Manifest-Id");
+        response.Headers.GetValues("ETag").Should().Equal($"\"{manifestId}\"");
+    }
 }

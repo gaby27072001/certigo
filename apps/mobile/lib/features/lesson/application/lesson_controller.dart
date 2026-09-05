@@ -74,10 +74,9 @@ class LessonController extends StateNotifier<LessonSessionState> {
         .where((LessonBlock block) => block.type == BlockType.check)
         .map((LessonBlock block) => block.check)
         .toList();
-    if (checks.isEmpty ||
-        checks.any(
-          (QuizItem? check) => check == null || !isAnswerableCheck(check),
-        )) {
+    if (lesson.blocks.isEmpty ||
+        checks.isEmpty ||
+        checks.any((QuizItem? check) => check == null || !isAnswerableCheck(check))) {
       state = state.copyWith(
         status: LessonStatus.error,
         errorMessage: 'Le contenu est indisponible. Réessaie ou lance la démo.',
@@ -207,11 +206,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
     }
     final int next = state.index + 1;
     if (next >= state.steps.length) return;
-    state = state.copyWith(
-      status: LessonStatus.ready,
-      index: next,
-      selection: const <String>[],
-    );
+    state = state.copyWith(status: LessonStatus.ready, index: next, selection: const <String>[]);
     _stepShownAt = DateTime.now();
   }
 
@@ -254,6 +249,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
           trackId: args.trackId,
           startedAt: _startedAt,
           answers: answers,
+          publicManifestId: lesson.publicManifestId,
         ),
       );
     } on Object catch (error, stackTrace) {
@@ -386,11 +382,8 @@ class LessonController extends StateNotifier<LessonSessionState> {
 
 /// Family provider keyed by [LessonArgs]; auto-disposed so leaving a lesson
 /// resets its session.
-final lessonControllerProvider =
-    StateNotifierProvider.autoDispose.family<LessonController, LessonSessionState, LessonArgs>((
-  Ref ref,
-  LessonArgs args,
-) {
+final lessonControllerProvider = StateNotifierProvider.autoDispose
+    .family<LessonController, LessonSessionState, LessonArgs>((Ref ref, LessonArgs args) {
   return LessonController(
     lessons: ref.watch(lessonRepositoryProvider),
     quiz: ref.watch(quizRepositoryProvider),

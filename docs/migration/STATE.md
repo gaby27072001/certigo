@@ -34,7 +34,7 @@
 | `wp-p2-01` | 2 | S | done | `wp-p1-00-decomposition` | [#251](https://github.com/gchambaud_microsoft/Certigo/pull/251) |
 | `wp-p2-02` | 2 | M | done | `wp-p1-00-decomposition` | [certigo-content#7](https://github.com/gchambaud_microsoft/certigo-content/pull/7) |
 | `wp-p2-03` | 2 | M | done | `wp-p2-02` | [certigo-content#8](https://github.com/gchambaud_microsoft/certigo-content/pull/8) |
-| `wp-p2-04` | 2 | M | in_progress | `wp-p2-03` | [#244](https://github.com/gchambaud_microsoft/Certigo/issues/244) |
+| `wp-p2-04` | 2 | M | in_review | `wp-p2-03` | [#244](https://github.com/gchambaud_microsoft/Certigo/issues/244) · [PR #363](https://github.com/gchambaud_microsoft/Certigo/pull/363) |
 | `wp-p2-05` | 2 | M | todo | `wp-p2-04` | [#243](https://github.com/gchambaud_microsoft/Certigo/issues/243) |
 | `wp-p2-06` | 2 | M | todo | `wp-p2-05` | [#245](https://github.com/gchambaud_microsoft/Certigo/issues/245) |
 | `wp-p2-07` | 2 | M | in_progress | `wp-p1-00-decomposition` | [#249](https://github.com/gchambaud_microsoft/Certigo/issues/249) · [PR #250](https://github.com/gchambaud_microsoft/Certigo/pull/250) · [PR #253](https://github.com/gchambaud_microsoft/Certigo/pull/253) |
