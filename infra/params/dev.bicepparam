@@ -100,3 +100,13 @@ param tutorLlmEnabled = false
 param tutorLlmEndpoint = 'https://certigo-openai.services.ai.azure.com/api/projects/certigo-dev/openai/v1/'
 param tutorLlmDeployment = 'gpt-5.4-mini'
 param tutorLlmApiSurface = 'v1'
+
+// Private DNS adoption for the AI Services account. Dev is the only environment
+// with such an account, so this stays false everywhere else by default.
+//
+// Note the endpoint configured above resolves under *.services.ai.azure.com, a
+// suffix that had NO private DNS zone at all. That is a live latent bug in this
+// committed parameter file, not a hypothetical: with the account private, the
+// Function App could not resolve its own configured endpoint even from inside
+// vnet-certigo-dev. adoptOpenAiPrivateDns creates the missing zones.
+param adoptOpenAiPrivateDns = true
