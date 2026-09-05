@@ -87,6 +87,15 @@ fait ». Deux règles s'appliquent à chacun d'eux, et elles ne sont pas interch
    l'invalider**. Un relevé daté et borné reste vrai indéfiniment ; un relevé nu se périme en
    silence. L'horodatage seul ne suffit pas : c'est la mention « une écriture était en vol » qui
    dit au lecteur que la valeur était déjà en train d'être invalidée quand elle a été écrite.
+
+   **Et la condition d'invalidation doit être la bonne.** C'est le piège le plus discret de toute
+   cette convention : il est naturel d'écrire « *si* l'opération aboutit, ces chiffres sont
+   périmés », alors que l'événement invalidant est presque toujours **l'effet partiel, pas le
+   succès**. Une écriture interrompue laisse ses effets derrière elle ; un run échoué à
+   mi-parcours invalide un compteur exactement autant qu'un run réussi. Formuler la condition en
+   « si ça marche » exclut par construction le cas le plus probable — l'échec — et rend la mise en
+   garde inopérante précisément quand elle servirait. Demander « **qu'est-ce qui rendrait ceci
+   faux ?** » plutôt que « est-ce que ça va réussir ? ».
 2. **N'écrire le fait qu'une seule fois.** Toute autre mention doit être un **renvoi** vers cet
    endroit unique, jamais une reformulation. C'est la règle structurante : dater rend une
    affirmation honnête à l'instant où on l'écrit, mais **seul le point unique garde le document
@@ -101,6 +110,25 @@ processus ne distingue la répétition de la vérification.
 Corollaire pratique : **renvoyer par titre, jamais par numéro de section**. Une numérotation est
 elle-même un fait volatil — insérer une section renumérote tout ce qui suit, et le renvoi devient
 faux en silence, exactement comme le fait qu'il était censé protéger.
+
+##### Checklist — trois questions avant de consigner un fait volatil
+
+Un principe dit au lecteur ce à quoi il doit faire attention ; une checklist survit au lecteur
+fatigué. Les trois questions ci-dessous auraient chacune intercepté un défaut réel commis **dans
+les textes rédigés pour énoncer cette convention** :
+
+- [ ] **Est-ce daté ?** Horodatage + source citable (run ID, commit, commande).
+- [ ] **La condition d'invalidation est-elle la vraie, ou une version plus étroite qui en a
+      l'air ?** Se demander « qu'est-ce qui rendrait ceci faux ? », jamais « est-ce que ça va
+      réussir ? ». Les effets partiels comptent : un run échoué invalide autant qu'un run réussi.
+- [ ] **Chaque renvoi résout-il, et par titre plutôt que par numéro ?** Vérifier le titre cité,
+      littéralement, pas de mémoire.
+
+> Ces trois défauts ont été commis puis rattrapés au cours de la même journée : une affirmation
+> au présent sans borne, deux renvois vers des sections inexistantes, et une condition
+> d'invalidation formulée en « si ça réussit » alors que l'écriture partielle suffisait.
+> **Aucun n'a été détecté par une gate** — tous par une relecture délibérée. C'est ce qui
+> justifie une checklist plutôt qu'un simple principe.
 
 > Ce n'est pas théorique. Voir la correction consignée plus bas sous « État des conteneurs mesuré
 > au 2026-09-05 à 10:15Z » : la même affirmation non vérifiée a traversé quatre passes
@@ -129,10 +157,36 @@ réalisé en trois étapes (expand / migrate / contract) pour la raison structur
 
 **Attention à ne pas surinterpréter.** Le pin est courant et le contrat est en v3, mais cela ne
 dit **rien** de la disponibilité du contenu côté consommateur : ce qui est acquis ici, c'est que
-le dépôt est de nouveau **capable de détecter** une dérive amont, pas qu'il en consomme le
-contenu. `ci-content-drift.yml` ne peut comparer que s'il existe un descripteur de release
-publié ; l'état de publication est daté et borné plus bas, sous « État des conteneurs mesuré au
-2026-09-05 à 10:15Z », et doit être relu là-bas plutôt que déduit d'ici.
+le dépôt est **capable en principe** de détecter une dérive amont, pas qu'il la détecte
+aujourd'hui ni qu'il consomme le contenu.
+
+Deux obstacles **indépendants**, à ne pas confondre :
+
+1. **Aucune release publiée** — `ci-content-drift.yml` n'aurait de toute façon rien à comparer.
+   L'état de publication est daté et borné plus bas, sous « État des conteneurs mesuré au
+   2026-09-05 à 10:15Z », et doit être relu là-bas plutôt que déduit d'ici.
+2. **La gate n'avait jamais réussi une seule fois depuis sa création** — elle échouait dans une
+   branche *impossible de lister le conteneur* et **n'atteignait jamais** le contrôle du
+   descripteur, parce qu'elle s'authentifiait sous une identité ne portant aucun rôle data-plane
+   sur ce conteneur. Elle était donc aveugle **indépendamment** de toute publication. **Corrigé
+   par #385**, qui la repointe sur `id-certigo-content-reader`
+   (`vars.AZURE_CONTENT_READER_CLIENT_ID`) plutôt que sur l'identité de déploiement partagée.
+
+Le second point est le plus important et il a été identifié tardivement : corriger la publication
+seule n'aurait pas rendu la gate signifiante, et le repointage seul ne suffit pas davantage — les
+deux obstacles sont distincts.
+
+**Depuis #385 la gate lit réellement le conteneur.** Premier passage au vert le 2026-09-05 à
+11:31:37Z (run `33963551889`, workflow *Detect content drift*), rapportant « conteneur lisible,
+aucun descripteur de release ». Ce vert est **borné et voulu** : il n'est valide que tant que
+`EXPECT_PUBLISHED_RELEASE=false`, c'est-à-dire tant que l'absence de descripteur est l'état
+attendu. Il atteste que l'accès et l'infrastructure fonctionnent, **pas** que du contenu est
+publié — l'obstacle 1 subsiste entièrement.
+
+> Distinction à retenir, parce que les deux se ressemblent dans la liste des checks : **une gate
+> qui échoue pour la raison prévue fonctionne ; une gate qui échoue avant d'atteindre son
+> contrôle, non.** Les rouges antérieurs à #385 relevaient du second cas et masquaient
+> complètement le premier.
 
 **État mesuré du stockage immuable au 2026-09-04.** Le stack `infra/content/main.bicep` est
 désormais **déployé** dans `rg-certigo-content` (déploiement nommé
@@ -157,12 +211,21 @@ verrouillage WORM est irréversible et reste une action opérateur distincte.
 seule (run `33960148573`). Chaque appel `az` a retourné un code de sortie `0` explicite : ce sont
 donc des **mesures**, pas des absences de réponse.
 
-> ⚠️ **Ce relevé décrit l'état *avant* la quatrième tentative de publication, dont le chemin
-> d'écriture a démarré à 10:30:10Z — soit quinze minutes *après* la mesure.** Une publication
-> était donc **en vol au moment de la rédaction**. Si elle a abouti, les chiffres ci-dessous sont
-> **périmés** et les conteneurs contiennent désormais l'ordre de 1 735 blobs publics, 812 privés
-> et 1 descripteur. Vérifier la date d'un relevé d'inspection plus récent avant de s'appuyer sur
-> ce tableau.
+> ⚠️ **Ces chiffres sont périmés.** Ils décrivent l'état *avant* la quatrième tentative de
+> publication, dont le chemin d'écriture a démarré à 10:30:10Z — soit quinze minutes *après* la
+> mesure.
+>
+> **La condition d'invalidation est l'écriture, pas la réussite.** Le stockage étant immuable et
+> en création seule, **tout blob écrit avant la fin d'un run le rend caduc — que ce run aboutisse
+> ou échoue**. Un run qui échoue à mi-parcours laisse derrière lui exactement autant de blobs
+> non supprimables qu'un run qui réussit jusqu'à ce point.
+>
+> C'est précisément ce qui s'est produit : le run `33960774991` a **échoué** — `publish-public` et
+> `publish-answer-key` en `failure`, `publish-release` sauté — mais les deux jobs d'écriture
+> avaient tourné respectivement **49 min 29 s** (10:30:10Z → 11:19:39Z) et **22 min 16 s**
+> (10:30:10Z → 10:52:26Z) avant de mourir. Ils ont donc écrit un nombre **non encore mesuré** de
+> blobs, définitivement présents. Le tableau ci-dessous ne vaut plus que comme **archive de
+> l'état à 10:15Z** ; un relevé d'inspection mesuré est attendu pour établir les compteurs réels.
 
 | Conteneur | Blobs à 10:15Z | Contenu |
 |---|---:|---|

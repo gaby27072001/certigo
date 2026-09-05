@@ -160,7 +160,12 @@ Key entry points are `apps\mobile\lib\main.dart`,
 
 - `README.md` - product overview, prerequisites, and quick-start commands.
 - `docs\ARCHITECTURE.md` - full system architecture.
-- `docs\ETAT_DU_PROJET.md` - current implementation status.
+- `docs\ETAT_DU_PROJET.md` - current implementation status. Before recording any **volatile**
+  fact there (counts, deployment state, "not yet done"), follow the convention
+  "un fait volatil s'écrit une fois, daté et borné" in its "Régénération et politique de preuve"
+  section: date it with a citable source, name the **real** invalidation condition rather than a
+  narrower one, write it in exactly one place, and cross-reference by title rather than section
+  number.
 - `docs\adr` - architectural decision records.
 - `docs\runbooks` and `docs\deployment-runbook.md` - operational procedures.
 - `SECURITY.md` - vulnerability reporting and security expectations.
