@@ -64,15 +64,26 @@ public sealed record ContentReleaseDescriptor(
     string PrivateManifestId,
     string ReleaseId);
 
+// The published package manifest is canonicalised as sorted-key compact JSON with
+// absent optional keys OMITTED, and `ManifestId`/`RootHash` are the SHA-256 of that
+// exact form. Clients re-derive the digest from the bytes we return, so emitting
+// `"provider": null` instead of omitting the key makes every manifest fail
+// verification. These attributes keep our serialization identical to the canonical
+// form the digest was computed over.
 public sealed record ContentPackageFile(
     string Id,
     string Path,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? ResourceType,
     string Hash,
     long Size,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? Provider = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? Certification = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? BlueprintVersion = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? Objective = null);
 
 public sealed record ContentPackageManifest(

@@ -8,10 +8,7 @@ void main() {
   late ApiClient api;
 
   setUp(() {
-    api = ApiClient(
-      baseUrl: 'https://example.test',
-      tokenProvider: () async => null,
-    );
+    api = ApiClient(baseUrl: 'https://example.test', tokenProvider: () async => null);
   });
 
   test('runtime content stays off and preserves the online repository by default', () {
@@ -35,6 +32,35 @@ void main() {
 
     expect(container.read(runtimeContentSyncEnabledProvider), isFalse);
     expect(container.read(lessonRepositoryProvider), isA<OfflineLessonRepository>());
+  });
+
+  // The flag is compile-time, so `flutter test` can only ever observe the default.
+  // These two overrides cover the other half: they prove that turning it on changes
+  // the composition, which is what a `--dart-define` in a build workflow relies on.
+  // Without them, adding the define could silently do nothing.
+  test('flag on swaps in the runtime content repository', () {
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        apiClientProvider.overrideWithValue(api),
+        runtimeContentSyncEnabledProvider.overrideWithValue(true),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    expect(container.read(lessonRepositoryProvider), isA<RuntimeContentLessonRepository>());
+  });
+
+  test('flag on keeps the legacy offline cache underneath', () {
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        apiClientProvider.overrideWithValue(api),
+        offlineStudyCacheEnabledProvider.overrideWithValue(true),
+        runtimeContentSyncEnabledProvider.overrideWithValue(true),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    expect(container.read(lessonRepositoryProvider), isA<RuntimeContentLessonRepository>());
   });
 
   test('runtime cache namespace includes the normalized API base path', () {

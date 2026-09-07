@@ -222,6 +222,9 @@ workflows:
         FLUTTER_APP_PATH: apps/mobile
         CERTIGO_ENV: dev
         API_BASE_URL: "https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net/api"
+        # Runtime content sync (offline cache + integrity layer) is exercised on the
+        # dev artifact only. Production stays on the compile-time default (false).
+        RUNTIME_CONTENT_MOBILE: "true"
     cache: *cache
     triggering:
       events:
@@ -241,6 +244,8 @@ workflows:
           set -euo pipefail
           ACCOUNT_DELETION_ENABLED="${ACCOUNT_DELETION_ENABLED:-false}"
           case "$ACCOUNT_DELETION_ENABLED" in true|false) ;; *) exit 1 ;; esac
+          RUNTIME_CONTENT_MOBILE="${RUNTIME_CONTENT_MOBILE:-false}"
+          case "$RUNTIME_CONTENT_MOBILE" in true|false) ;; *) exit 1 ;; esac
           flutter build ipa --release \
             --dart-define=CERTIGO_ENV="$CERTIGO_ENV" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
@@ -248,6 +253,7 @@ workflows:
             --dart-define=ENTRA_AUTHORITY="$ENTRA_AUTHORITY" \
             --dart-define=ENTRA_API_SCOPE="$ENTRA_API_SCOPE" \
             --dart-define=ACCOUNT_DELETION_ENABLED="$ACCOUNT_DELETION_ENABLED" \
+            --dart-define=RUNTIME_CONTENT_MOBILE="$RUNTIME_CONTENT_MOBILE" \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist="$HOME/export_options.plist"
