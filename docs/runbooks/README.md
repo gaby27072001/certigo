@@ -58,9 +58,9 @@ subscription) ou la **possession physique** d'un facteur d'authentification.
 
 | Finding | Criticité | Titre | Fichier | Prérequis d'accès | Statut |
 |---|---|---|---|---|---|
-| **— (transverse)** | 🔴 Haut | **Actions manuelles en attente (point d'entrée unique)** | [`ACTIONS_MANUELLES_EN_ATTENTE.md`](./ACTIONS_MANUELLES_EN_ATTENTE.md) | Variables selon l'action | **2 actions** en attente au 2026-09-04 |
+| **— (transverse)** | 🔴 Haut | **Actions manuelles en attente (point d'entrée unique)** | [`ACTIONS_MANUELLES_EN_ATTENTE.md`](./ACTIONS_MANUELLES_EN_ATTENTE.md) | Variables selon l'action | **1 action** en attente au 2026-09-07 |
 | **R-06** | 🔴 Haut | Resource lock `CanNotDelete` sur la facturation CIAM | [`R-06_resource-lock-ciam-facturation.md`](./R-06_resource-lock-ciam-facturation.md) | Owner **ou** User Access Administrator sur sub `f434ec55` | À exécuter |
-| **R-04** | 🔴 Haut | Compte break-glass CIAM (Global Admin cloud-only) | [`R-04_compte-break-glass-ciam.md`](./R-04_compte-break-glass-ciam.md) | Global Admin du tenant CIAM `af721be8` | Compte créé ✅ — 🔴 **MFA à enregistrer** (aucune méthode forte, cf. actions manuelles) |
+| **R-04** | 🔴 Haut | Compte break-glass CIAM (Global Admin cloud-only) | [`R-04_compte-break-glass-ciam.md`](./R-04_compte-break-glass-ciam.md) | Global Admin du tenant CIAM `af721be8` | Compte créé ✅ — MFA enregistré ✅ (Authenticator, 2026-09-07, vérifié par le monitor) |
 | **R-05** | 🔴 Haut | Rotation du secret IdP « Microsoft account » + alerte d'expiration | [`R-05_rotation-secret-idp-msa.md`](./R-05_rotation-secret-idp-msa.md) | Owner de l'app `df42c145` + admin External ID (user flows) | ✅ **Alerte automatisée** (2026-09-04, seuil 90 j, sans secret) — rotation à faire avant 2027-07-01 |
 | **O-05** | 🟠 Moyen | Nettoyage sûr du tenant CIAM (résidus QuickStart) | [`O-05_nettoyage-tenant-ciam.md`](./O-05_nettoyage-tenant-ciam.md) | Application Administrator (apps) + Owner sub `906c6a44` (billing) | À exécuter |
 | **O-01** | 🔴 Haut | Décision : Tutor IA en production (note ADR) | [`O-01_decision-tutor-ia-prod.md`](./O-01_decision-tutor-ia-prod.md) | Décision produit/technique (aucune commande destructive) | ✅ Décidé le 2026-07-06 — Option B (repli déterministe), voir `docs/adr/ADR-O-01-ai-tutor-prod.md` |

@@ -4,20 +4,34 @@
 > agent, avec la raison exacte du blocage. Tout ce qui pouvait être automatisé l'a été et n'apparaît
 > donc pas ici. **L'objectif est que ce fichier tende vers zéro entrée.**
 >
-> **Dernière revue** : 2026-09-04 — session « Actions résiduelles ».
+> **Dernière revue** : 2026-09-07 — action 1 close et vérifiée ; sa procédure TAP s'est révélée
+> non praticable dans ce tenant et a été neutralisée sur place.
 
 ## Résumé
 
 | # | Action | Finding | Criticité | Pourquoi ce n'est pas automatisable |
 |---|---|---|---|---|
-| 1 | Enregistrer une méthode MFA forte sur le compte break-glass | R-04 (nouveau constat) | 🔴 Haut | Acte d'établissement de credential sur un compte d'urgence : exige une décision humaine explicite et la possession physique du facteur. |
+| 1 | ~~Enregistrer une méthode MFA forte sur le compte break-glass~~ — ✅ **fait le 2026-09-07** | R-04 | — | Close. Voir « Écart clos le 2026-09-07 » dans [`R-04_compte-break-glass-ciam.md`](./R-04_compte-break-glass-ciam.md), qui porte le constat et la procédure réellement applicable. |
 | 2 | **Déployer** le correctif DNS privé (code déjà fusionné), puis lancer le test de charge | O-02 | 🔴 Haut | Le code Bicep est fusionné (#380) ; il reste un **déploiement Azure** à décider et exécuter, puis une exécution obligatoire depuis un runner **dans** le VNet. |
 
-Aucune autre action manuelle n'est en attente. Les points 1 et 2 ci-dessous sont détaillés.
+Une seule action reste en attente : le point 2. Le point 1 est conservé, barré, comme trace du
+raisonnement et pour empêcher que sa procédure TAP ne soit réintroduite.
 
 ---
 
 ## 1. Enregistrer une méthode MFA forte sur `breakglass@certigoapp.onmicrosoft.com`
+
+> ✅ **ACTION CLOSE le 2026-09-07** — Microsoft Authenticator est enregistré sur le compte.
+>
+> ⚠️ **La procédure ci-dessous a partiellement échoué à l'usage. Ne la rejouez pas telle quelle.**
+> Le bootstrap par Temporary Access Pass n'est **pas praticable dans ce tenant** (voir l'encadré
+> à l'étape correspondante), et la clé FIDO2 n'a pas été la voie retenue. Le constat mesuré, la
+> voie qui fonctionne et la méthode de vérification vivent désormais en **un seul endroit** :
+> section « Écart clos le 2026-09-07 » de
+> [`R-04_compte-break-glass-ciam.md`](./R-04_compte-break-glass-ciam.md).
+>
+> Ce qui suit est **conservé comme trace du raisonnement d'origine** — notamment la comparaison
+> FIDO2 / OATH, qui reste valable si l'on veut renforcer la méthode plus tard.
 
 ### Constat (vérifié le 2026-09-04)
 
@@ -141,7 +155,18 @@ vérifiable sans tenter l'enregistrement, et l'agent ne doit pas le faire.
 sécurité » est absente ou refusée, basculez sur l'**Option B (Software OATH)** et signalez-le — cela
 constituerait un constat supplémentaire à documenter.
 
-### Réduire la friction : bootstrap par Temporary Access Pass (TAP)
+### ~~Réduire la friction : bootstrap par Temporary Access Pass (TAP)~~ — ❌ non praticable
+
+> ⚠️ **Mesuré le 2026-09-07 : cette voie n'existe pas dans ce tenant.** La policy de méthodes
+> affiche bien « Droit d'accès temporaire : Oui, tous les utilisateurs », mais le menu **Ajouter une
+> méthode d'authentification** de la fiche utilisateur ne propose que **E-mail / Numéro de téléphone
+> / Code QR**. Une capacité **déclarée** par la policy n'est pas une capacité **exposée** par la
+> surface d'administration d'un tenant externe (CIAM).
+>
+> Le bootstrap est de toute façon **inutile** : les security defaults déclenchent eux-mêmes l'écran
+> d'inscription à la première connexion du compte. Voir R-04, section « Écart clos le 2026-09-07 ».
+>
+> Bloc conservé ci-dessous pour que personne ne le réintroduise en relisant la policy.
 
 Problème d'amorçage : pour enregistrer une méthode, il faut souvent déjà en avoir une. `TemporaryAccessPass`
 est **activé** dans ce tenant, ce qui offre une porte de sortie propre. Depuis le compte GA gmail :

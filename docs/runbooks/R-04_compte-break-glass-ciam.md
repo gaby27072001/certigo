@@ -157,28 +157,66 @@ connexion interactive réussie.
 | **Security defaults** | ✅ **ACTIVÉS — confirmé le 2026-09-04.** `GET /policies/identitySecurityDefaultsEnforcementPolicy` renvoie `"isEnabled": true`. L'audit de juillet n'avait pas pu le lire (`Forbidden` avec un jeton délégué, qui ne porte pas `Policy.Read.All`) ; la lecture a été obtenue via un **jeton applicatif** dédié. |
 | **MFA des administrateurs** | ✅ **Déjà imposé** par les security defaults, qui exigent le MFA pour le rôle Global Administrator. Le finding `CIAM-2` est donc **couvert** — voir l'encadré ci-dessous. |
 | **Ne PAS créer de policy Conditional Access** | ❌ Security defaults et Conditional Access sont **mutuellement exclusifs** : créer une policy CA obligerait à **désactiver** les security defaults, ce qui ferait perdre le blocage de l'authentification héritée, le blocage du device code flow et l'inscription MFA généralisée. Ce serait une **régression nette**. |
-| **🔴 MFA du compte break-glass — ÉCART ACTIF** | Le compte n'a **que** `passwordAuthenticationMethod` enregistré (vérifié le 2026-09-04). Or les security defaults **n'acceptent aucune exclusion**. Voir l'encadré ci-dessous. |
+| **✅ MFA du compte break-glass — écart clos le 2026-09-07** | Microsoft Authenticator enregistré sur le compte. L'écart, ouvert depuis le 2026-09-04, est refermé. Voir l'encadré ci-dessous : la procédure qui a fonctionné n'est **pas** celle que ce runbook prescrivait. |
 | **Surveillance** | ✅ **Automatisée** : `.github/workflows/ciam-posture-monitor.yml` vérifie chaque jour que les security defaults restent activés et que le compte break-glass conserve une méthode forte. |
 
-### 🔴 Écart actif — le compte break-glass n'a aucun second facteur
+### ✅ Écart clos le 2026-09-07 — et la procédure prescrite ne marchait pas
 
 La note conditionnelle de la version précédente de ce runbook (« *si les security defaults sont
 activés et qu'aucun CA n'existe, le compte break-glass devra satisfaire le MFA → enregistrer sa
-méthode MFA à l'avance* ») s'est **vérifiée**. Les trois conditions sont réunies :
+méthode MFA à l'avance* ») s'est **vérifiée**. Les trois conditions étaient réunies au 2026-09-04 :
 
 1. Security defaults **activés** (`isEnabled: true`) ;
 2. **0 policy Conditional Access** dans le tenant — donc **aucune exclusion possible**, les security
    defaults n'en supportant pas ;
 3. Compte break-glass avec **une seule** méthode : `#microsoft.graph.passwordAuthenticationMethod`.
 
-**Conséquence** : le compte de secours devra **inscrire un MFA dans l'urgence**, au moment même où
-il est censé débloquer la situation. Cela annule une grande partie de sa valeur.
+**Conséquence** : le compte de secours aurait dû **inscrire un MFA dans l'urgence**, au moment même
+où il est censé débloquer la situation.
 
-**Remédiation** : enregistrer une **clé FIDO2 dédiée** (déjà activée dans la policy de méthodes du
-tenant), rangée avec le mot de passe dans le coffre. Procédure détaillée, pas à pas, dans
-[`ACTIONS_MANUELLES_EN_ATTENTE.md`](./ACTIONS_MANUELLES_EN_ATTENTE.md#1-enregistrer-une-méthode-mfa-forte-sur-breakglasscertigoapponmicrosoftcom).
-Cette action est **délibérément laissée à l'humain** : établir un credential sur un compte d'urgence
-exige une décision explicite et la possession physique du facteur.
+**Remédiation appliquée le 2026-09-07** : **Microsoft Authenticator** enregistré sur le compte.
+
+> ⚠️ **Le bootstrap par Temporary Access Pass décrit ailleurs dans cette documentation n'est pas
+> praticable dans ce tenant.** La policy de méthodes affiche « Droit d'accès temporaire : Oui, tous
+> les utilisateurs », mais le menu **Ajouter une méthode d'authentification** de la fiche
+> utilisateur ne propose que **E-mail / Numéro de téléphone / Code QR** — le TAP en est absent
+> (constaté le 2026-09-07). Une capacité **déclarée** dans la policy n'est pas une capacité
+> **exposée** par la surface d'administration : ce tenant est un tenant externe (CIAM), dont
+> l'interface d'administration est réduite. Ne pas remettre la procédure TAP en se fiant à la policy.
+
+**Voie qui a fonctionné, et qui ne dépend d'aucune surface d'administration** :
+
+1. Se connecter à `https://login.microsoftonline.com` avec `breakglass@certigoapp.onmicrosoft.com`
+   et le mot de passe du coffre, dans une fenêtre **distincte** de la session administrateur.
+2. Les security defaults déclenchent d'eux-mêmes l'écran **« Informations supplémentaires
+   requises »**, qui conduit à l'inscription de la méthode. C'est l'exigence MFA elle-même qui
+   ouvre la porte — aucun facteur préexistant, aucun TAP, aucun écran d'administration.
+3. Si l'interruption n'apparaît pas, aller directement sur
+   `https://mysignins.microsoft.com/security-info` → **Ajouter une méthode**.
+
+**Vérification — ne pas se fier à l'absence d'erreur.** `GET /users/<id>/authentication/methods`
+renvoie `403` avec un jeton `az` délégué (portée `UserAuthenticationMethod.Read.All` absente), et ce
+`403` se lit à tort comme « aucune méthode ». Le contrôle qui tranche est
+`.github/workflows/ciam-posture-monitor.yml`, déclenchable à la demande :
+
+```bash
+gh api -X POST repos/gchambaud_microsoft/Certigo/dispatches -f event_type=ciam-posture
+```
+
+Comparer alors **deux** runs, avant et après : celui du 2026-09-07 12:47 UTC portait
+`BREAK_GLASS_NO_STRONG_METHOD` et sortait en `exit 1` ; celui de 16:00 UTC, après remédiation,
+ne rapportait aucun finding. Un vert seul ne prouve rien — il faut avoir lu le journal du rouge
+précédent pour établir que l'échec venait du **constat** et non d'une panne de l'instrument.
+
+> **Ce fait redevient faux si** la méthode forte est retirée du compte, ou si les security defaults
+> sont désactivés. Le monitor ci-dessus vérifie les deux quotidiennement. En revanche il **n'a pas
+> d'étape de fermeture** : il sait ouvrir l'issue de suivi, jamais la refermer quand la posture
+> redevient saine (`if: steps.audit.outcome == 'failure'`). Après toute remédiation future, refermer
+> l'issue à la main en citant les deux runs — sinon la prochaine alerte réelle se fondra dans un
+> ticket déjà ouvert et cessé d'être lu.
+
+L'action reste **délibérément laissée à l'humain** : établir un credential sur un compte d'urgence
+exige une décision explicite et la possession du facteur.
 
 ### Si Conditional Access devenait un jour la bonne réponse
 
