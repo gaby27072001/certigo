@@ -163,8 +163,13 @@ function validateContentConfiguration({
       details.push(`Set but padded with whitespace: ${untrimmed.join(', ')}.`);
     }
     details.push(
-      'Either configure all six for this environment or clear all six; clearing all six is the'
-      + ' safe default and leaves the deployment on legacy content.',
+      'Either configure all six for this environment, or leave all six ABSENT. Absent is not the'
+      + ' same as blank: GitHub rejects an empty Actions variable value (422 Variable value cannot'
+      + ' be empty), so a value cannot be neutralised by blanking it at environment scope. When a'
+      + ' value is inherited from repository scope, the only way to reach the absent state is to'
+      + ' DELETE it at repository scope, which removes it from every environment and every workflow'
+      + ' that reads it. Completing all six is therefore usually the reachable outcome, not'
+      + ' clearing them.',
       'Note that repository-scope Actions variables are visible to EVERY environment, so a value'
       + ' defined at repository scope counts as configured here even if this environment never set'
       + ' it. Check repository scope as well as this environment before concluding a value is unset.',

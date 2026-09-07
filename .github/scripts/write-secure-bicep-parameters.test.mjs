@@ -175,7 +175,16 @@ test('injects the complete PR 290 content outputs and rejects partial wiring', (
         /Missing: AZURE_BLOB_ENDPOINT, AZURE_CONTENT_READER_RESOURCE_ID, AZURE_DESCRIPTOR_CONTAINER, AZURE_PUBLIC_CONTAINER, AZURE_PRIVATE_CONTAINER\./,
       );
       assert.match(error.message, /repository scope counts as configured here/);
-      assert.match(error.message, /clearing all six is the safe default/);
+      // Measured 2026-09-07: GitHub answers 422 "Variable value cannot be empty" to both creating
+      // and updating an Actions variable with an empty value (control chain on a neutral
+      // environment: absent 404 -> create non-empty succeeds -> PATCH to empty 422 -> value
+      // unchanged). So "clear all six" is not reachable by blanking; it requires DELETING the
+      // value at the scope that defines it. The message must not offer clearing as the easy
+      // default, because an operator who follows that advice at repository scope also removes the
+      // value from every other environment and workflow that reads it.
+      assert.match(error.message, /Absent is not the same as blank/);
+      assert.match(error.message, /422 Variable value cannot be empty/);
+      assert.doesNotMatch(error.message, /safe default/);
       return true;
     },
   );

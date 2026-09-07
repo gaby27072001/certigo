@@ -199,17 +199,34 @@ posées, les manquantes, et le fait que le scope dépôt est visible partout.
 | `staging`/`prod` doivent servir le contenu versionné | **compléter les six** variables sur l'Environment concerné |
 | `staging`/`prod` doivent rester en contenu legacy | **vider les six**, c'est-à-dire neutraliser l'héritage du scope dépôt |
 
-**Question ouverte, délibérément non tranchée ici** : `staging` et `prod` sont-ils censés partager
-le magasin de contenu de `dev` ? Aucune déclaration d'intention n'a été trouvée. Il n'existe pas de
-stack contenu par environnement dans `infra/params`, ce qui *suggère* un magasin unique — mais
-c'est une inférence de structure, pas une décision écrite. Trancher avant d'agir.
+**Question ouverte, mais plus petite qu'elle ne l'était** : elle ne porte plus que sur `prod`.
+
+**Mesuré le 2026-09-07, après la fusion de `272552aa` (#392)** — une version antérieure de cette
+section affirmait qu'« aucune déclaration d'intention n'a été trouvée ». **C'est faux depuis ce
+commit**, et l'inférence de structure qui l'accompagnait est désormais remplacée par une mesure :
+
+| Fichier de `infra/params` | Nombre de `param content*` | Valeurs |
+| --- | --- | --- |
+| `dev.bicepparam` | 3 | `stcertigocntz3wqbdww` + `id-certigo-content-reader` |
+| `staging.bicepparam` | 3 | **chaînes strictement identiques à `dev`** |
+| `prod.bicepparam` | **0** | non câblé |
+
+La comparaison est faite par égalité de chaînes et non à l'œil, et `prod` à zéro dans le même appel
+sert de contrôle négatif : il prouve que la lecture sait voir une absence, les trois fichiers
+passant par le même code.
+
+**`staging` partage donc déjà le magasin de `dev`** — même compte de stockage, même identité de
+lecture, écrit dans le dépôt. La question qui reste ouverte est **`prod`**, qui ne déclare aucun
+paramètre de contenu à ce jour. Trancher avant d'agir sur `prod` ; ne pas rouvrir le cas `staging`.
 
 #### Mesuré le 2026-09-07 : « vider les six » n'est pas disponible en l'état
 
 La ligne « vider les six » du tableau ci-dessus décrit une issue qui n'est pas
-atteignable aujourd'hui, et « clearing all six is the safe default » dans le
-message d'erreur de `write-secure-bicep-parameters.mjs` est donc un conseil
-qu'on ne peut pas suivre pour `staging` et `prod`. La raison est mécanique.
+atteignable aujourd'hui. Le message d'erreur de
+`write-secure-bicep-parameters.mjs` disait « clearing all six is the safe
+default » — un conseil qu'on ne peut pas suivre pour `staging` et `prod` ; il a
+été corrigé dans la même PR que cette section pour décrire l'état *absent*
+plutôt que *vide*. La raison est mécanique.
 
 **GitHub refuse une valeur de variable vide.** Vérifié par une chaîne de
 contrôles sur l'Environment neutre `copilot`, sans toucher `staging` ni `prod`,
@@ -261,3 +278,135 @@ d'abord poser la valeur en variable d'environnement sur `dev`, sinon `dev` passe
 **Condition d'invalidation de cette section** : elle cesse d'être vraie dès que le compte des six
 variables visibles depuis `staging` ou `prod` n'est plus 1. Recompter au scope dépôt **et** au scope
 environnement, les deux, avant de conclure.
+
+## Le contenu a deux sources, pas une : `bicepparam` et variables GitHub
+
+**Mesuré le 2026-09-07.** Une lecture répandue — et que ce document entretenait — est que les six
+variables GitHub sont *la* source du contenu. Elles n'en sont que **la surcharge**. Il y a deux
+chemins, et ils se rejoignent dans le même fichier de paramètres :
+
+```
+infra/params/<env>.bicepparam  --az bicep build-params-->  valeurs de BASE
+variables GitHub (les six)     --write-secure-bicep-parameters.mjs-->  SURCHARGE
+```
+
+Les six variables correspondent une à une à six paramètres de `main.bicep`, dont trois ont un
+défaut non vide :
+
+| Variable GitHub | Paramètre `main.bicep` | Défaut |
+| --- | --- | --- |
+| `AZURE_BLOB_ENDPOINT` | `contentBlobEndpoint` | `''` |
+| `AZURE_CONTENT_READER_CLIENT_ID` | `contentReaderClientId` | `''` |
+| `AZURE_CONTENT_READER_RESOURCE_ID` | `contentReaderResourceId` | `''` |
+| `AZURE_DESCRIPTOR_CONTAINER` | `contentDescriptorContainerName` | `'content-release-descriptors'` |
+| `AZURE_PUBLIC_CONTAINER` | `contentPublicContainerName` | `'content-public-releases'` |
+| `AZURE_PRIVATE_CONTAINER` | `contentPrivateContainerName` | `'content-private-releases'` |
+
+`staging.bicepparam` pose les **trois premières** et laisse les trois noms de conteneurs à leurs
+défauts.
+
+**Ce que cela change, et ce que cela ne change pas.** La règle tout-ou-rien porte sur les
+**variables**, pas sur les paramètres compilés : `staging` lèvera donc le jour J *quoi que
+contienne son `bicepparam`*. En revanche, compléter les six sur `staging` **réécrirait par-dessus
+des valeurs déjà committées et identiques** — la même valeur existerait alors à deux endroits qui
+peuvent diverger sans que rien ne le signale.
+
+**Si l'on préfère `bicepparam` comme source unique**, la séquence est contrainte et son ordre est
+la partie importante :
+
+1. donner un `environment:` à `ci-content-drift.yml`, qui n'en déclare aucun aujourd'hui ;
+2. poser `AZURE_CONTENT_READER_CLIENT_ID` au scope **Environment** de `dev` ;
+3. **seulement ensuite** supprimer la variable au scope dépôt.
+
+Inverser 2 et 3 fait passer `dev` par 1-sur-6, et `cd-backend` le déploie automatiquement à chaque
+push sur `main` : la casse serait immédiate et automatique.
+
+**Condition d'invalidation** : cette section cesse d'être vraie si `main.bicep` cesse de déclarer
+ces six paramètres, ou si `staging.bicepparam` cesse de déclarer les trois valeurs de contenu.
+Recompter les `param content*` dans les trois fichiers de `infra/params` avant de conclure.
+
+## `validate-public-domain` est une gate bloquante, pas une simple validation de forme
+
+**Mesuré le 2026-09-07.** Poser `PUBLIC_WEB_ORIGIN` ne fait pas qu'échouer l'écriture d'un fichier
+de paramètres : le contrat est un **job** de `cd-backend.yml` dont dépend toute la chaîne de
+déploiement.
+
+```
+validate-target
+  └── validate-public-domain
+        ├── build-release
+        └── resolve-release   <-- porte la garde explicite
+              └── deploy-infra
+                    └── deploy-backend
+```
+
+**Attention au mécanisme exact.** C'est **`resolve-release`** qui exige
+`needs.validate-public-domain.result == 'success'`. `deploy-backend` ne nomme pas la gate : il en
+hérite **transitivement** via `resolve-release` puis `deploy-infra`. Quelqu'un qui chercherait la
+protection dans la garde de `deploy-backend` ne l'y trouverait pas, et pourrait la retirer de
+`resolve-release` en croyant qu'elle est redondante. Elle est portante : `resolve-release` s'exécute
+sous `always()`, donc sans ce test explicite un échec de la gate ne l'arrêterait pas.
+
+**Le job n'a aucun `if:`** — il s'exécute toujours. Pour `dev` il **réussit** (et non « saute »)
+grâce au court-circuit `dev` du contrat : mesuré sur le run `34146273853`, où
+`Validate public-domain deployment gate` est `completed/success` alors qu'aucune des trois
+variables n'est posée.
+
+**Conséquence de séquencement pour `staging` et `prod`.** Le job appelle le contrat avec la
+fonctionnalité `infrastructure`, qui fait partie des fonctionnalités exigeant Apple. Poser
+`PUBLIC_WEB_ORIGIN` et `PUBLIC_DOMAIN_VERIFIED` sans `APPLE_CIAM_DOMAIN_RECONFIGURED=true` ne
+débloque donc rien : la gate refusera. **La reconfiguration Apple/Entra n'est pas une étape
+ultérieure, c'est un prérequis du tout premier déploiement `staging`.**
+
+**Condition d'invalidation** : cette section cesse d'être vraie si `resolve-release` cesse
+d'exiger `validate-public-domain`, ou si `infrastructure` sort de l'ensemble des fonctionnalités
+exigeant Apple dans `public-domain-contract.mjs`.
+
+## L'origine sera absente du code : c'est voulu, pas un oubli
+
+**Mesuré le 2026-09-07.** Une propriété voulue de ce contrat ressemble de très près à une
+configuration manquante, et quelqu'un la « corrigera » un jour s'il ne la trouve pas nommée.
+
+La règle « jamais dans un `*.bicepparam` » est réelle, mais elle est **plus étroite que sa
+formulation courante** : elle ne vise que les environnements de release. Mesuré :
+
+| Fichier | Déclare les trois `param` ? | Statut |
+| --- | --- | --- |
+| `infra/params/dev.bicepparam:67-69` | **oui**, figés inertes (`''`, `false`, `false`) | autorisé |
+| `infra/params/staging.bicepparam` | non | **interdit** |
+| `infra/params/prod.bicepparam` | non | **interdit** |
+
+L'interdiction est appliquée **deux fois, indépendamment** — `infra/validate.sh:139`, dans une
+boucle `for environment in staging prod`, et `.github/scripts/validate-workflow-security.mjs:887`,
+sur `['staging', 'prod']`. `dev` est hors des deux boucles : sa déclaration inerte est délibérée et
+garantit qu'aucun `bicepparam` ne peut activer le domaine sur `dev`.
+
+Pour `staging` et `prod`, les trois valeurs ne peuvent donc venir que des GitHub Environments.
+Conséquence directe, et c'est le piège :
+
+- l'origine canonique **n'apparaîtra dans aucun fichier de configuration** de ces environnements ;
+- elle est donc **invisible en revue de code** : aucune PR ne montrera jamais sa valeur ;
+- un `grep` du domaine dans le dépôt trouvera **une phrase de prose, et rien de fonctionnel**.
+
+Vérification à date, avec contrôles : sur `main`, `certigo-app.com` n'apparaît **que dans des
+phrases de ce document** — aucun fichier de configuration, de workflow ou d'infrastructure ne le
+référence. Contrôle positif (`PUBLIC_WEB_ORIGIN`, 18 fichiers) : la recherche voit du présent.
+Contrôle négatif (chaîne inexistante, 0 fichier) : elle voit de l'absent.
+
+> Cette phrase énonce **où** le domaine apparaît, pas **combien de fois**. Un décompte daté serait
+> auto-invalidant : ce paragraphe est lui-même une occurrence, et le publier changerait le nombre
+> qu'il annonce. La règle du fait volatil s'applique aussi aux faits qui portent sur le document
+> qui les énonce.
+
+**Un résultat qui ressemble à une réponse est plus trompeur qu'un vide.** Ne concluez pas d'une
+occurrence trouvée dans le dépôt que le domaine est configuré, ni d'une absence qu'il ne l'est pas.
+La seule lecture qui fasse foi est l'état des variables des Environments concernés, au scope
+Environment **et** au scope dépôt. Et la seule preuve qu'une activation a pris effet est la sortie
+de déploiement : `publicDomainActivationReady`, `privacyPolicyUrl` et `accountDeletionUrl` de
+`main.bicep`, qui valent `''` tant que l'activation n'est pas effective — ils varient donc avec ce
+qu'ils mesurent, contrairement au dépôt.
+
+**Condition d'invalidation** : cette section cesse d'être vraie si `staging` ou `prod` entre dans
+la liste des environnements autorisés à déclarer ces `param`, ou si `dev` entre dans la boucle
+`staging prod` de `infra/validate.sh:139` ou dans `['staging','prod']` de
+`validate-workflow-security.mjs:887`.
