@@ -152,10 +152,6 @@ resource hostStorageIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2
   tags: tags
 }
 
-var storageBlobDataOwner = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
-)
 var storageBlobDataContributor = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
@@ -183,16 +179,6 @@ resource deploymentBlobAccess 'Microsoft.Authorization/roleAssignments@2022-04-0
   properties: {
     principalId: hostStorageIdentity.properties.principalId
     roleDefinitionId: storageBlobDataContributor
-    principalType: 'ServicePrincipal'
-  }
-}
-
-resource hostBlobAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: storage
-  name: guid(storage.id, hostStorageIdentity.id, storageBlobDataOwner)
-  properties: {
-    principalId: hostStorageIdentity.properties.principalId
-    roleDefinitionId: storageBlobDataOwner
     principalType: 'ServicePrincipal'
   }
 }
@@ -306,7 +292,6 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
   }
   dependsOn: [
     deploymentBlobAccess
-    hostBlobAccess
     hostQueueAccess
     hostTableAccess
     appInsightsPublisherAccess

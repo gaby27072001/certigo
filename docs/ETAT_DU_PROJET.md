@@ -748,6 +748,7 @@ déclarée est dans `codemagic.yaml`.
 | **F-02** | 🟡 | Config Entra dev factice (tenant placeholder) | ✅ **Résolu** — confirmé par `docs/migration/verifications/wp-p0-05-ciam-governance.md` |
 | **R-01** | 🟠 | Écriture profil (XP/gems/streak) sans concurrence optimiste — lost update possible | ✅ **Résolu** — `OptimisticConcurrency.cs` (retry borné sur `ConcurrencyConflictException`) + ETag câblés (`wp-p0-02-etag-concurrency` = `done`) |
 | **R-02** | 🟠 | Cosmos prod en backup `Periodic`, pas de PITR | ✅ **Résolu en IaC** — `cosmosBackupMode = 'Continuous'` en staging/prod (`infra/params/{staging,prod}.bicepparam`, `infra/modules/cosmos.bicep:59`) ; ⏳ **preuve de restauration live encore à faire** (`docs/runbooks/R-02_cosmos-pitr-restauration.md` : « restore-test à planifier ») |
+| **R-03** | 🟡 | Sur-privilège Storage (`Storage Blob Data Owner` en plus de `Contributor` pour l'identité hôte Function App) | ✅ **Résolu en IaC** (PR #368) — assignation `Owner` retirée de `infra/modules/functionApp.bicep` (Contributor seul reste, `deploymentBlobAccess`) ; garde-fou anti-régression ajouté dans `infra/validate.sh` ; ⏳ **retrait de l'attribution live encore à faire** (`docs/runbooks/R-03_least-privilege-storage-owner.md` : principalIds et id d'attribution résolus le 2026-09-03, à exécuter après merge + redéploiement) |
 | **O-01** | 🔴 (décision) | Tutor IA désactivé en prod, décision requise | ✅ **Décidé** le 2026-07-06 — Option B (repli déterministe), voir `docs/adr/ADR-O-01-ai-tutor-prod.md` |
 | **O-03** | — | Tenant CIAM personnel non audité | ✅ **Résolu** (déjà clos dans l'audit d'origine, §D-bis) |
 | **R-04** | 🔴 | CIAM : un seul Global Admin (MSA gmail fédéré), pas de break-glass | ✅ **Résolu** — vérifié live sur Azure/Entra le 2026-09-04 : un compte break-glass natif existe et le tenant compte **2 Global Administrators**. Runbook `docs/runbooks/R-04_compte-break-glass-ciam.md` exécuté |
@@ -772,7 +773,6 @@ déclarée est dans `codemagic.yaml`.
 
 | ID | Sévérité | Constat | Preuve | Action recommandée |
 |---|---|---|---|---|
-| **R-03** | 🟡 | Sur-privilège Storage (`Storage Blob Data Owner` en plus de `Contributor` pour l'identité hôte Function App) | `infra/modules/functionApp.bicep:168-176` (assignation `Owner` toujours présente à côté de `Contributor`, lignes 158-166) — revérifié le 2026-09-03, **toujours présent** | Auditer si `Owner` est réellement nécessaire ; rétrograder vers `Contributor` seul si possible |
 | **D10** *(migré depuis l'annexe, toujours vrai)* | 🟠 | Dart/Flutter exclu de CodeQL — plus grande base de code (jetons OIDC, secure storage) sans SAST | `.github/workflows/codeql.yml:5` (« Dart/Flutter is not supported by CodeQL ») — revérifié le 2026-09-03, **toujours vrai** ; `flutter analyze` est un linter, pas un SAST | Compléter par un scanner sécurité Dart (ex. `dart_code_metrics` sécurité, Semgrep règles Dart) ou documenter explicitement la limite comme risque accepté |
 
 > **Méthode de revérification.** Les lignes datées du **2026-09-03** ont été revérifiées depuis ce

@@ -4,7 +4,7 @@
 > registre canonique [`docs/ETAT_DU_PROJET.md`](../ETAT_DU_PROJET.md) §14 « Registre des risques
 > & findings ».
 > Ce dossier regroupe les procédures opérationnelles pour les findings **gouvernance CIAM**,
-> **opérations cloud** et **protection des données** : `R-02`, `R-04`, `R-05`, `R-06`, `O-01`, `O-02`, `O-05`.
+> **opérations cloud** et **protection des données** : `R-02`, `R-03`, `R-04`, `R-05`, `R-06`, `O-01`, `O-02`, `O-05`.
 
 ## ⚠️ Principe : « l'agent PRÉPARE, VOUS EXÉCUTEZ » — désormais nuancé
 
@@ -63,6 +63,7 @@ subscription) ou la **possession physique** d'un facteur d'authentification.
 | **R-04** | 🔴 Haut | Compte break-glass CIAM (Global Admin cloud-only) | [`R-04_compte-break-glass-ciam.md`](./R-04_compte-break-glass-ciam.md) | Global Admin du tenant CIAM `af721be8` | Compte créé ✅ — MFA enregistré ✅ (Authenticator, 2026-09-07, vérifié par le monitor) |
 | **R-05** | 🔴 Haut | Rotation du secret IdP « Microsoft account » + alerte d'expiration | [`R-05_rotation-secret-idp-msa.md`](./R-05_rotation-secret-idp-msa.md) | Owner de l'app `df42c145` + admin External ID (user flows) | ✅ **Alerte automatisée** (2026-09-04, seuil 90 j, sans secret) — rotation à faire avant 2027-07-01 |
 | **O-05** | 🟠 Moyen | Nettoyage sûr du tenant CIAM (résidus QuickStart) | [`O-05_nettoyage-tenant-ciam.md`](./O-05_nettoyage-tenant-ciam.md) | Application Administrator (apps) + Owner sub `906c6a44` (billing) | À exécuter |
+| **R-03** | 🟡 Faible | Retrait de l'attribution Storage Blob Data Owner (identités Function App) | [`R-03_least-privilege-storage-owner.md`](./R-03_least-privilege-storage-owner.md) | Owner **ou** User Access Administrator sur la subscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc` | IaC corrigé (PR #368) — retrait live à exécuter après merge |
 | **O-01** | 🔴 Haut | Décision : Tutor IA en production (note ADR) | [`O-01_decision-tutor-ia-prod.md`](./O-01_decision-tutor-ia-prod.md) | Décision produit/technique (aucune commande destructive) | ✅ Décidé le 2026-07-06 — Option B (repli déterministe), voir `docs/adr/ADR-O-01-ai-tutor-prod.md` |
 | **O-02** | 🔴 Haut | Plan de test de charge Azure OpenAI + bump capacity | [`O-02_plan-test-charge-openai.md`](./O-02_plan-test-charge-openai.md) | Cognitive Services OpenAI User (test) + Contributor (bump) | ⛔ **Bloqué** — zone DNS privée non liée au VNet CI (diagnostic + correctif Bicep fournis) |
 | **R-02** | 🟠 Moyen | Restauration Point-In-Time (PITR) du compte Cosmos DB | [`R-02_cosmos-pitr-restauration.md`](./R-02_cosmos-pitr-restauration.md) | Cosmos DB Operator/Contributor + `CosmosRestoreOperator` (sub staging/prod) | ✅ **Preuve obtenue le 2026-09-04** — restore staging réel (708 s, 8 containers, compte temporaire supprimé) |
