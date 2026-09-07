@@ -54,7 +54,9 @@ avec ce contrat : elle reste neutralisée. Le workflow
 dispatch historique reste bloqué par le builder sans configuration. Le workflow
 compare aussi l'origine et le `base_path` retournés par GitHub Pages : toute URL
 de projet ou tout alias qui ne sert pas l'origine vérifiée à la racine échoue
-avant la création de l'artefact.
+avant la création de l'artefact. Ce chemin est toutefois **inexploitable sur ce
+dépôt** pour une raison de type de compte : voir « Où héberger les pages
+légales : GitHub Pages est exclu sur ce dépôt ».
 
 ## Interface attendue par la PR #298
 
@@ -79,14 +81,83 @@ Cette PR est empilée sur #312. Fusionner #312 d'abord, puis rebaser cette PR su
 `main` avant sa fusion. Aucun dispatch Pages, déploiement Bicep ou changement de
 console ne doit être exécuté dans le cadre de ces deux PR.
 
+## Où héberger les pages légales : GitHub Pages est exclu sur ce dépôt
+
+**Mesuré le 2026-09-07.** Le paragraphe ci-dessus décrit GitHub Pages comme
+« chemin d'activation futur ». Cette possibilité n'existe pas pour ce dépôt, et
+la cause n'est pas une configuration manquante mais le type de compte
+propriétaire.
+
+Trois mesures, chacune reproductible :
+
+| Mesure | Commande | Résultat |
+|---|---|---|
+| Le dépôt est privé et son propriétaire est un compte EMU | `gh api repos/gchambaud_microsoft/Certigo --jq '{private, owner_type: .owner.type}'` puis `gh api users/gchambaud_microsoft --jq .plan.name` | `private: true`, `owner_type: User`, `plan: emu_user` |
+| GitHub Pages n'est pas activé | `gh api repos/gchambaud_microsoft/Certigo --jq .has_pages` | `false` |
+| L'Environment `github-pages` n'existe pas | `gh api repos/gchambaud_microsoft/Certigo/environments/github-pages/variables` | `Not Found` |
+
+La deuxième mesure exige un contrôle : `has_pages` vaut aussi `false` sur
+`github/docs` et `microsoft/vscode`, donc ce champ ne discrimine rien tant qu'on
+n'a pas exhibé un dépôt où il vaut `true`. `pages-themes/cayman`,
+`github/opensource.guide` et `jekyll/minima` renvoient `true`. Le champ varie
+donc bien, et le `false` de Certigo est une mesure et non un artefact. Ne pas
+utiliser `GET /repos/{o}/{r}/pages` à cette fin : cet endpoint renvoie `404`
+même sur un dépôt qui a des Pages, il ne distingue pas l'absence du défaut de
+portée du jeton.
+
+**Conséquence.** Sur une entreprise Enterprise Managed Users, les sites GitHub
+Pages ne peuvent être publiés que *privés* et ne sont accessibles qu'aux membres
+de l'entreprise. Or une politique de confidentialité et une page de suppression
+de compte doivent rester lisibles anonymement, y compris par la revue Apple et
+Google et par un utilisateur qui a désinstallé l'application. Un site Pages
+restreint à l'entreprise ne satisfait donc pas l'exigence, même une fois le
+domaine personnalisé posé.
+
+`publish-verified-public-pages.yml` reste néanmoins correct et fail-closed : son
+étape « Require a compatible verified Pages origin » compare
+`steps.pages.outputs.origin` à `PUBLIC_WEB_ORIGIN` et exige un `base_path` vide.
+Sans site Pages servant l'origine vérifiée à la racine, ce workflow échoue avant
+de produire un artefact. Il n'y a donc rien à neutraliser ; il faut seulement
+cesser de le décrire comme le chemin prévu.
+
+**L'hébergement des pages légales est donc un choix à trancher hors dépôt**, et
+il n'est pas tranché ici. Le DNS de `certigo-app.com` est délégué à Wix
+(`ns12.wixdns.net`, `ns13.wixdns.net`) et l'origine HTTPS répond déjà — un `404`
+à la racine prouve que le DNS résout, que le certificat est valide et que la
+connexion aboutit, puisqu'un échec TLS ne produirait pas de code HTTP. Quel que
+soit l'hébergeur retenu, il doit servir exactement les chemins que l'ARM
+compose, sans redirection ni préfixe :
+
+- `${PUBLIC_WEB_ORIGIN}/privacy-policy/`
+- `${PUBLIC_WEB_ORIGIN}/account-deletion/`
+
+et, pour l'étape 4 seulement, `/.well-known/apple-app-site-association` et
+`/.well-known/assetlinks.json`, servis en clair, sans redirection et avec le
+type de contenu attendu par Apple et Google. Vérifier que l'hébergeur retenu
+sait servir `/.well-known/` **avant** de s'engager sur l'étape 4 : c'est la
+contrainte qui élimine le plus d'hébergeurs de sites vitrine.
+
+**Condition d'invalidation de cette section** : elle cesse d'être vraie si le
+dépôt change de propriétaire pour un compte non-EMU, ou si l'entreprise cesse
+d'utiliser les Enterprise Managed Users. Le seul fait d'activer Pages ou de
+poser un domaine personnalisé ne l'invalide pas, puisque la restriction porte
+sur la visibilité du site et non sur son existence. Recontrôler
+`gh api users/<owner> --jq .plan.name` avant de conclure.
+
 ## Actions humaines après achat du domaine
 
 1. Configurer le DNS et l'hébergement HTTPS, puis vérifier le certificat et le
    contrôle effectif de l'origine.
-2. Configurer `PUBLIC_WEB_ORIGIN` dans `github-pages`, `staging`, `prod`, `beta`
-   et le groupe Codemagic `certigo_mobile_config`, puis
+2. Configurer `PUBLIC_WEB_ORIGIN` dans `staging`, `prod`, `beta` et le groupe
+   Codemagic `certigo_mobile_config`, puis
    passer `PUBLIC_DOMAIN_VERIFIED` à `true` dans chaque Environment après
-   validation indépendante.
+   validation indépendante. Poser ces variables **au scope Environment et jamais
+   au scope dépôt** : une variable de dépôt est visible par tous les
+   Environments et activerait `staging` et `prod` sans décision explicite.
+   L'Environment `github-pages` est sans objet ici, voir « Où héberger les pages
+   légales : GitHub Pages est exclu sur ce dépôt ». Traiter d'abord les six
+   variables de contenu, voir « Avant l'étape 6 : `staging` et `prod` sont à
+   1-sur-6 sur le contenu » : sans cela cette étape échoue au job IaC.
 3. Reconfigurer les domaines et return URLs dans Apple Developer et Microsoft
    Entra External ID, tester le parcours réel, puis passer
    `APPLE_CIAM_DOMAIN_RECONFIGURED` à `true` dans `staging`, `prod`, `beta` et
@@ -132,6 +203,53 @@ posées, les manquantes, et le fait que le scope dépôt est visible partout.
 le magasin de contenu de `dev` ? Aucune déclaration d'intention n'a été trouvée. Il n'existe pas de
 stack contenu par environnement dans `infra/params`, ce qui *suggère* un magasin unique — mais
 c'est une inférence de structure, pas une décision écrite. Trancher avant d'agir.
+
+#### Mesuré le 2026-09-07 : « vider les six » n'est pas disponible en l'état
+
+La ligne « vider les six » du tableau ci-dessus décrit une issue qui n'est pas
+atteignable aujourd'hui, et « clearing all six is the safe default » dans le
+message d'erreur de `write-secure-bicep-parameters.mjs` est donc un conseil
+qu'on ne peut pas suivre pour `staging` et `prod`. La raison est mécanique.
+
+**GitHub refuse une valeur de variable vide.** Vérifié par une chaîne de
+contrôles sur l'Environment neutre `copilot`, sans toucher `staging` ni `prod`,
+la sonde ayant été supprimée ensuite :
+
+| Étape | Résultat |
+|---|---|
+| la sonde n'existe pas avant | `404` |
+| création avec une valeur **non vide** | succès, relue correctement |
+| `PATCH` vers une valeur **vide** | **`422 Variable value cannot be empty.`** |
+| relecture après l'échec | valeur inchangée |
+
+Le contrôle positif est indispensable ici : sans la création réussie, un `422`
+ne prouverait pas que c'est *le vide* qui est refusé plutôt que la requête, le
+jeton ou l'Environment.
+
+**Conséquence.** On ne peut pas masquer une variable de scope dépôt par une
+variable d'Environment vide. Amener `staging` ou `prod` à 0-sur-6 exigerait donc
+de **supprimer** `AZURE_CONTENT_READER_CLIENT_ID` du scope dépôt, ce qui casse
+deux choses à la fois :
+
+1. `ci-content-drift.yml` la lit en `vars.AZURE_CONTENT_READER_CLIENT_ID` comme
+   client-id OIDC et **ne déclare aucun `environment:`** — vérifié, le mot-clé
+   est absent du fichier — donc elle ne peut lire que le scope dépôt. La
+   supprimer supprime le seul garde-fou de dérive de contenu qui fonctionne,
+   sans solution de rechange par variable d'Environment ;
+2. `dev` tombe de 6-sur-6 à 5-sur-6 et échoue à chaque push sur `main`, puisque
+   `dev` a cinq valeurs au scope Environment et tire la sixième du scope dépôt.
+
+**Il ne reste donc qu'une issue réellement disponible pour `staging` et `prod` :
+compléter les six.** Choisir malgré tout le contenu legacy imposerait d'abord un
+changement de `ci-content-drift.yml` pour qu'il déclare un `environment:`, puis
+une copie de la variable au scope Environment de `dev`, et seulement ensuite la
+suppression au scope dépôt — dans cet ordre, sinon `dev` casse entre-temps.
+
+**Condition d'invalidation de ce sous-point** : il cesse d'être vrai si GitHub
+accepte un jour une valeur de variable vide, ou si `ci-content-drift.yml` déclare
+un `environment:`. Le simple fait de compléter les six sur un Environment ne
+l'invalide pas. Rejouer les quatre étapes du tableau sur un Environment neutre
+avant de conclure.
 
 **Ne supprimez pas `AZURE_CONTENT_READER_CLIENT_ID` du scope dépôt sans précaution.**
 `ci-content-drift.yml` la consomme comme client-id OIDC et ne déclare aucun `environment:`, donc
