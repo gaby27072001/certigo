@@ -17,7 +17,7 @@ public sealed class ContentReleaseFunctions(
         [HttpTrigger(
             AuthorizationLevel.Anonymous,
             "post",
-            Route = "admin/content/releases/{releaseId}/import")]
+            Route = "content/admin/releases/{releaseId}/import")]
         HttpRequestData request,
         string releaseId,
         FunctionContext context)
@@ -35,7 +35,7 @@ public sealed class ContentReleaseFunctions(
         [HttpTrigger(
             AuthorizationLevel.Anonymous,
             "get",
-            Route = "admin/content/releases/pointer")]
+            Route = "content/admin/releases/pointer")]
         HttpRequestData request,
         FunctionContext context)
     {
@@ -52,7 +52,7 @@ public sealed class ContentReleaseFunctions(
         [HttpTrigger(
             AuthorizationLevel.Anonymous,
             "post",
-            Route = "admin/content/releases/{releaseId}/promote")]
+            Route = "content/admin/releases/{releaseId}/promote")]
         HttpRequestData request,
         string releaseId,
         FunctionContext context)
@@ -73,7 +73,7 @@ public sealed class ContentReleaseFunctions(
         [HttpTrigger(
             AuthorizationLevel.Anonymous,
             "post",
-            Route = "admin/content/releases/rollback")]
+            Route = "content/admin/releases/rollback")]
         HttpRequestData request,
         FunctionContext context)
     {

@@ -22,7 +22,7 @@ public sealed class ContentReleaseFunctionsTests
     {
         var function = CreateFunction(new FakeContentReleaseService());
         var context = TestFunctionContext.Authenticated();
-        var request = Request(context, "POST", $"/api/admin/content/releases/{ReleaseId}/import");
+        var request = Request(context, "POST", $"/api/content/admin/releases/{ReleaseId}/import");
 
         var action = () => function.Import(request, ReleaseId, context);
 
@@ -35,7 +35,7 @@ public sealed class ContentReleaseFunctionsTests
         var service = new FakeContentReleaseService();
         var function = CreateFunction(service);
         var context = TestFunctionContext.Authenticated(role: "Content.Release.Admin");
-        var request = Request(context, "POST", $"/api/admin/content/releases/{ReleaseId}/import");
+        var request = Request(context, "POST", $"/api/content/admin/releases/{ReleaseId}/import");
 
         var response = await function.Import(request, ReleaseId, context);
 
@@ -49,7 +49,7 @@ public sealed class ContentReleaseFunctionsTests
     {
         var function = CreateFunction(new FakeContentReleaseService());
         var context = TestFunctionContext.Authenticated(role: "Content.Release.Admin");
-        var request = Request(context, "POST", $"/api/admin/content/releases/{ReleaseId}/promote");
+        var request = Request(context, "POST", $"/api/content/admin/releases/{ReleaseId}/promote");
 
         var action = () => function.Promote(request, ReleaseId, context);
 
@@ -61,7 +61,7 @@ public sealed class ContentReleaseFunctionsTests
     {
         var function = CreateFunction(new FakeContentReleaseService());
         var context = TestFunctionContext.Authenticated(role: "Content.Release.Admin");
-        var request = Request(context, "POST", "/api/admin/content/releases/rollback");
+        var request = Request(context, "POST", "/api/content/admin/releases/rollback");
 
         var action = () => function.Rollback(request, context);
 

@@ -68,7 +68,7 @@ TOKEN="<entra-admin-token>"
 curl --fail-with-body \
   -X POST \
   -H "Authorization: Bearer $TOKEN" \
-  "$API/admin/content/releases/$RELEASE_ID/import"
+  "$API/content/admin/releases/$RELEASE_ID/import"
 ```
 
 Un premier import retourne 201; un replay exact retourne 200. Toute erreur de
@@ -81,7 +81,7 @@ complet. Ne pas promouvoir une release sans receipt.
 curl --fail-with-body \
   -D pointer.headers \
   -H "Authorization: Bearer $TOKEN" \
-  "$API/admin/content/releases/pointer" \
+  "$API/content/admin/releases/pointer" \
   -o pointer.json
 
 ETAG="$(awk 'BEGIN{IGNORECASE=1} /^etag:/ {gsub(/\r/,""); print $2}' pointer.headers)"
@@ -91,7 +91,7 @@ curl --fail-with-body \
   -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "If-Match: ${ETAG:-*}" \
-  "$API/admin/content/releases/$RELEASE_ID/promote"
+  "$API/content/admin/releases/$RELEASE_ID/promote"
 ```
 
 Une ETag obsolète retourne 412. Relire le pointeur; ne pas réessayer avec `*`
@@ -141,7 +141,7 @@ si un pointeur existe.
 curl --fail-with-body \
   -D rollback-pointer.headers \
   -H "Authorization: ******" \
-  "$API/admin/content/releases/pointer" \
+  "$API/content/admin/releases/pointer" \
   -o rollback-pointer.json
 
 ROLLBACK_ETAG="$(
@@ -153,7 +153,7 @@ curl --fail-with-body \
   -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "If-Match: $ROLLBACK_ETAG" \
-  "$API/admin/content/releases/rollback"
+  "$API/content/admin/releases/rollback"
 ```
 
 Le rollback active `previous`, vide les champs previous et conserve tous les
