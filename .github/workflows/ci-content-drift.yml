@@ -20,10 +20,15 @@ name: Detect content drift
 # The blob endpoint is private-endpoint only and its DNS zone is linked to vnet-certigo-ci, so this
 # must stay on certigo-trusted: on certigo-pr it would fail on DNS, not on authorisation.
 #
-# TODAY this workflow proves only the credential-free half (the pin was refreshed recently) and then
-# fails with the prerequisites, because the content storage account does not exist yet. It must not
-# be added to the required status checks on main until the storage exists AND a release has been
-# published; otherwise it would deadlock every merge. The 05:41 UTC schedule deliberately avoids the
+# STATUS 2026-09-07: the prerequisites listed in the error below are now SATISFIED and this
+# workflow compares for real. The content storage account stcertigocntz3wqbdww exists (created
+# 2026-09-04), a release has been published, and AZURE_RELEASE_STORAGE_TARGET is set. Established
+# not from the run conclusion - a green run and an executed comparison are different facts wearing
+# the same name - but from the step list of scheduled run 34112906910, where "Compare the newest
+# published release with the pinned reference" reports `success` rather than `skipped`. That step's
+# conclusion is the discriminator to re-check; the previous text here asserted the storage did not
+# exist and survived in the file for three days after it did. This gate could now be promoted to a
+# required status check; that has not been done. The 05:41 UTC schedule deliberately avoids the
 # nightly 00:46-00:49 UTC deallocation window of the runner resource group.
 
 on:
@@ -142,7 +147,7 @@ jobs:
           This is expected today and is owned by the content-chain infrastructure workstream, \
           which deploys infra/content/main.bicep. Prerequisites, in order: (1) that deployment \
           creates the content storage account and the content-release-descriptors container \
-          (rg-certigo-content is currently empty); (2) the irreversible WORM lock that \
+          (rg-certigo-content was empty until 2026-09-04); (2) the irreversible WORM lock that \
           tools/publish_blob_artifact.sh requires before it will upload must be decided; \
           (3) certigo-content must actually publish a release; (4) this workflow's identity needs \
           Storage Blob Data Reader on that container, within the ABAC condition of \

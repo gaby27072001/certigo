@@ -1,5 +1,81 @@
 name: Content infrastructure what-if
 
+# PARKED 2026-09-07. The job below is gated off deliberately. It is not deleted, and the push
+# trigger is left in place, so the workflow stays visible and un-parking is a one-line change under
+# review rather than a reconstruction.
+#
+# The gate is an opt-in variable comparison, NOT `if: false`. That is not a stylistic preference:
+# actionlint rejects a literal constant with "constant expression \"false\" in condition. remove the
+# if: section [if-cond]", which fails the required "Validate workflow YAML" check. Measured
+# 2026-09-07 on run 34129015963. `vars.<NAME> == 'true'` is the same opt-in shape this repository
+# already uses - and that validate-workflow-security.mjs actively REQUIRES - for
+# CERTIGO_COSMOS_EMULATOR_ENABLED. Do not "simplify" it back to `if: false`; CI will reject it.
+#
+# WHY IT IS PARKED: this gate has never once succeeded. It failed on all five runs since
+# 2026-08-20, dying about three seconds in at "Validate planning identity variables", and painted a
+# red check on every push to main touching infra/content/**. A check that is always red teaches
+# readers to skip it, which is the alarm-fatigue failure mode recorded elsewhere in this repository.
+# Note the scope precisely: the three sibling workflows (content-infra-apply,
+# governance-bootstrap-phase-a-what-if, governance-bootstrap-phase-b-what-if) are equally broken but
+# are `repository_dispatch`-only, so they never fire unsolicited. This is the only one that did.
+#
+# WHAT IS ACTUALLY BROKEN — THREE INDEPENDENT LEVELS. Fixing any one alone MOVES the error, it does
+# not clear it. Measured 2026-09-07 except where marked.
+#
+#   Level 1 - configuration, specified but never performed.
+#     vars.AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID are unset on the
+#     `azure-content-infra-plan` Environment. This is NOT a vars-versus-secrets namespace mistake.
+#     docs/runbooks/CLOUD_LEAST_PRIVILEGE.md ("Apres les deux phases", item 1) specifies these exact
+#     non-secret variables on this exact Environment, deliberately NOT the shared CI principal. The
+#     guard's message is therefore accurate and already points at the right place; the manual
+#     post-bootstrap step was simply never carried out.
+#
+#   Level 2 - RBAC, unapplied governance.
+#     id-certigo-content-infra-plan (clientId d849ecb0-7a82-4736-b6c7-4ee0b9690e8b, principalId
+#     d0f76908-f7c1-4fcc-aecf-07326e1f940d) holds ZERO role assignments. Measured with a positive
+#     control: the same query against the content-reader principal returns its three container-scope
+#     grants, so the empty result is a real zero and not a blind query. Its federated credential
+#     subject already matches this workflow's environment exactly, and both custom role DEFINITIONS
+#     exist (created 2026-08-30 - Phase A is applied); only the ASSIGNMENTS are missing. They come
+#     from infra/governance/bootstrap-rbac-admin.bicep via modules/contentPlanExecutorAssignment.bicep
+#     - Phase B, which CLOUD_LEAST_PRIVILEGE.md records as NO-GO absent an independent third party.
+#     Setting Level 1 without Level 2 makes `azure/login` fail with a subscription-not-found message
+#     STRICTLY LESS informative than today's accurate guard. That is a moved error, not a fix.
+#
+#   Level 3 - REASONED, NOT MEASURED. Stated so the next person can falsify it cheaply.
+#     Even the complete canonical grant set looks insufficient. infra/content/main.bicep declares
+#     four `existing` user-assigned identities scoped to rg-certigo-identities and reads
+#     `.properties.principalId` on each, so ARM must be able to GET them. The canonical set is
+#     exactly three assignments (infra/governance/validate-what-if.mjs, and the
+#     "Plan contenu post-#290" row of CLOUD_LEAST_PRIVILEGE.md): executor on rg-certigo-content plus
+#     two external joins on rg-certigo-ci. None covers rg-certigo-identities. PREDICTION: the what-if
+#     still fails with AuthorizationFailed on a Microsoft.ManagedIdentity read. NOT VERIFIED - the
+#     identity is OIDC-federated with no client secret and cannot be impersonated locally. If the
+#     prediction holds, the least-privilege model is missing a grant its own design requires, and
+#     infra/tests/least-privilege.test.mjs would stay green while the running system diverged from it.
+#
+#   Separately measured, so it is not mistaken for a fourth level: the Bicep template and this
+#   workflow's own scope guards are sound. An owner-run `az deployment group what-if` against
+#   rg-certigo-content returned 19 changes with zero resources outside the allowed scope and zero
+#   deletions. RBAC is the blocker, not the template.
+#
+# WHAT WOULD UN-PARK IT: replace the condition below with `if: true`-equivalent normal execution
+# (that is, delete the `if:` line), once Level 1 is configured AND Level 2's assignments exist via
+# the governance workflow rather than out-of-band AND Level 3 is falsified or the missing grant is
+# added to the model. A green run obtained any other way is not evidence that this works.
+#
+# There is also a no-code-change escape hatch: setting the Actions variable named in the condition
+# to the string `true`. Prefer the code change - it goes through review, and it is self-documenting.
+# UNVERIFIED: whether a job-level `if` resolves variables defined at ENVIRONMENT scope, or only at
+# repository/organisation scope. GitHub evaluates the job condition before the environment is bound,
+# so set it at REPOSITORY scope if you use the escape hatch. Not measured here, because measuring it
+# requires actually running this workflow.
+#
+# DO NOT ADD THIS WORKFLOW TO THE REQUIRED STATUS CHECKS ON main WHILE IT IS PARKED. A skipped
+# required check counts as SATISFIED by branch protection, so promoting a parked job would report a
+# pass while proving nothing - the same trap ci-content-drift.yml documents on its own job, arriving
+# here from the opposite direction. Verified 2026-09-07: it is not among the seven required contexts.
+
 on:
   push:
     branches: [main]
@@ -19,6 +95,19 @@ concurrency:
 jobs:
   what-if:
     name: Dedicated content stack what-if
+    # PARKED - see the header comment for the three levels and the un-parking conditions.
+    # The variable below is intentionally never set, so this evaluates to false and the job skips.
+    # Delete this `if:` line to un-park. Do NOT replace it with `if: false` - actionlint rejects a
+    # constant condition and the required "Validate workflow YAML" check fails.
+    # Do NOT "fix" this workflow by moving the `vars.` references below into the repository secret
+    # namespace. That would route content-stack planning through the shared CI principal, which
+    # holds subscription-scope Contributor AND User Access Administrator, and would dismantle the
+    # privilege separation this workflow exists to enforce - while every least-privilege test
+    # stayed green.
+    # The forbidden token is deliberately not spelled out anywhere in this file, comments included:
+    # infra/tests/content-storage.test.mjs asserts the whole file never matches /\bsecrets\./, and
+    # an earlier draft of this very comment failed that assertion. Keep the paraphrase.
+    if: ${{ vars.CERTIGO_CONTENT_INFRA_WHAT_IF_ENABLED == 'true' }}
     environment: azure-content-infra-plan
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     env:

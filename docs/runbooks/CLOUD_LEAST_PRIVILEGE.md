@@ -544,6 +544,63 @@ Après les deux phases :
    `azure-content-infra-plan` à la branche `main` et exiger un reviewer. Cette configuration
    GitHub est une opération séparée, non réalisée par la PR.
 
+### État constaté le 2026-09-07 : `content-infra-what-if` est cassé sur trois niveaux
+
+Le point 1 ci-dessus **n'a jamais été exécuté**, et ce n'est que le premier de trois blocages
+indépendants. Corriger un seul niveau **déplace** l'erreur au lieu de la lever. Le workflow
+`.github/workflows/content-infra-what-if.yml` est en conséquence **parké** (job désactivé par une
+condition d'opt-in `vars.CERTIGO_CONTENT_INFRA_WHAT_IF_ENABLED == 'true'`, variable jamais
+définie — et non `if: false`, qu'actionlint rejette comme expression constante) : son
+en-tête porte le détail, les conditions de réactivation, et l'avertissement de ne pas le promouvoir
+en check requis tant qu'il est parké — un check requis *skipped* compte comme *satisfait*.
+
+| Niveau | Nature | Constat | Statut de la mesure |
+| --- | --- | --- | --- |
+| 1 | Configuration | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` absentes de l'Environment `azure-content-infra-plan` | **mesuré** |
+| 2 | RBAC | `id-certigo-content-infra-plan` (`d849ecb0-…`, principal `d0f76908-…`) porte **zéro** attribution de rôle | **mesuré**, avec témoin positif |
+| 3 | Modèle de moindre privilège | Le jeu canonique de trois attributions ne couvre pas `rg-certigo-identities` | **raisonné, non mesuré** |
+
+**Niveau 1 — `vars.` est correct par conception.** Ce n'est pas une confusion `vars.`/`secrets.` :
+le point 1 ci-dessus prescrit ces variables non secrètes sur cet Environment précis, délibérément
+et non le principal CI partagé. Le message du garde-fou (`Configure AZURE_CLIENT_ID in
+azure-content-infra-plan`) est donc **exact** et désigne déjà le bon endroit.
+
+**Niveau 2 — la Phase A est appliquée, les attributions manquent.** Les deux définitions de rôles
+personnalisés existent (créées le 2026-08-30) ; seules les *attributions* manquent. Le credential
+fédéré correspond déjà exactement à l'environnement du workflow, donc aucune mutation Entra n'est
+requise. Le zéro est réel : la même requête contre le principal content-reader renvoie ses trois
+attributions au scope conteneur. Ces attributions proviennent de
+`infra/governance/bootstrap-rbac-admin.bicep` via `modules/contentPlanExecutorAssignment.bicep`,
+c'est-à-dire la **Phase B**, que ce runbook classe **NO-GO** en l'absence d'un tiers indépendant.
+Poser le niveau 1 sans le niveau 2 ferait échouer `azure/login` avec un message
+*subscription not found* **strictement moins informatif** que le garde-fou actuel.
+
+**Niveau 3 — prédiction, à falsifier.** `infra/content/main.bicep` déclare quatre identités
+`existing` au scope `rg-certigo-identities` et lit `.properties.principalId` sur chacune ; ARM doit
+donc pouvoir les lire. Or le jeu canonique (`infra/governance/validate-what-if.mjs`, et la ligne
+« Plan contenu post-#290 » du tableau de ce document) comporte exactement trois attributions :
+exécuteur sur `rg-certigo-content`, deux joins externes sur `rg-certigo-ci`. Aucune ne couvre
+`rg-certigo-identities`. **Prédiction : même la Phase B complète laisserait le what-if en
+`AuthorizationFailed` sur une lecture `Microsoft.ManagedIdentity`.** Non vérifié : l'identité est
+fédérée OIDC sans secret client et ne peut pas être empruntée localement. Si la prédiction se
+confirme, le modèle de moindre privilège omet une attribution que sa propre conception exige, et
+`infra/tests/least-privilege.test.mjs` resterait vert pendant que le système réel diverge.
+
+**Ce qui n'est pas en cause.** Le template et les garde-fous de périmètre du workflow sont sains :
+un `az deployment group what-if` exécuté en Owner sur `rg-certigo-content` renvoie 19 changements,
+zéro ressource hors périmètre autorisé et zéro suppression. Le blocage est le RBAC, pas le Bicep.
+
+**Portée.** Les trois workflows voisins (`content-infra-apply`,
+`governance-bootstrap-phase-a-what-if`, `governance-bootstrap-phase-b-what-if`) sont cassés de la
+même façon mais déclenchés uniquement par `repository_dispatch` : ils ne produisent aucun rouge
+spontané. Les deux workflows de gouvernance sont bloqués plus profondément encore — aucune identité
+de planification de gouvernance n'existe parmi les douze UAMI de la souscription, et l'Environment
+`azure-governance-bootstrap-phase-b` n'existe pas.
+
+**Condition d'invalidation de cette section** : elle cesse d'être vraie dès qu'une attribution de
+rôle est créée sur `d0f76908-f7c1-4fcc-aecf-07326e1f940d`, ou que les trois variables sont posées
+sur `azure-content-infra-plan`. Vérifier alors les trois niveaux, pas seulement celui qui a bougé.
+
 Après ce bootstrap, `infra/content/main.bicep` s'exécute au scope resource group. Le workflow
 utilise exclusivement `az deployment group what-if --resource-group rg-certigo-content` et
 refuse toute ressource hors de ce RG. Son plan durable ne crée plus le RG ni le roleDefinition

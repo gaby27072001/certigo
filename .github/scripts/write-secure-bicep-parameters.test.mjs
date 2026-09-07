@@ -160,6 +160,35 @@ test('injects the complete PR 290 content outputs and rejects partial wiring', (
     () => write({ contentBlobEndpoint: contentConfiguration.contentBlobEndpoint }),
     /All immutable content outputs from PR #290 must be configured together/,
   );
+
+  // The measured real-world case, 2026-09-07: exactly ONE of the six is set, and it is set at
+  // REPOSITORY scope, so every environment inherits it and reads a partial set even though none of
+  // them configured content. The message must name which value is present, which are absent, and
+  // that repository scope is visible everywhere - otherwise the reader searches the environment,
+  // finds all six unset there, and has no path to the cause.
+  assert.throws(
+    () => write({ contentReaderClientId: contentConfiguration.contentReaderClientId }),
+    (error) => {
+      assert.match(error.message, /Configured \(1 of 6\): AZURE_CONTENT_READER_CLIENT_ID\./);
+      assert.match(
+        error.message,
+        /Missing: AZURE_BLOB_ENDPOINT, AZURE_CONTENT_READER_RESOURCE_ID, AZURE_DESCRIPTOR_CONTAINER, AZURE_PUBLIC_CONTAINER, AZURE_PRIVATE_CONTAINER\./,
+      );
+      assert.match(error.message, /repository scope counts as configured here/);
+      assert.match(error.message, /clearing all six is the safe default/);
+      return true;
+    },
+  );
+
+  // A padded value is "set" but still rejected. It must be reported as padded rather than missing,
+  // because the two have opposite fixes and the untrimmed case is invisible in a variables list.
+  assert.throws(
+    () => write({
+      ...contentConfiguration,
+      contentBlobEndpoint: ` ${contentConfiguration.contentBlobEndpoint} `,
+    }),
+    /Set but padded with whitespace: AZURE_BLOB_ENDPOINT\./,
+  );
   assert.throws(
     () => write({
       ...contentConfiguration,

@@ -137,7 +137,41 @@ function validateContentConfiguration({
     return null;
   }
   if (values.some((value) => value.length === 0 || value !== value.trim())) {
-    throw new Error('All immutable content outputs from PR #290 must be configured together without surrounding whitespace.');
+    // The names are listed in the same order as `values` above. Naming which side of the
+    // all-or-nothing rule each value fell on is not cosmetic: the usual cause is a single value
+    // defined at REPOSITORY scope, which every environment inherits, so an environment that never
+    // configured content still reads a partial set. Without that hint the reader has no path from
+    // this message back to the cause.
+    const names = [
+      'AZURE_BLOB_ENDPOINT',
+      'AZURE_CONTENT_READER_CLIENT_ID',
+      'AZURE_CONTENT_READER_RESOURCE_ID',
+      'AZURE_DESCRIPTOR_CONTAINER',
+      'AZURE_PUBLIC_CONTAINER',
+      'AZURE_PRIVATE_CONTAINER',
+    ];
+    const configured = names.filter((_, index) => values[index].length > 0);
+    const missing = names.filter((_, index) => values[index].length === 0);
+    const untrimmed = names.filter(
+      (_, index) => values[index].length > 0 && values[index] !== values[index].trim(),
+    );
+    const details = [
+      `Configured (${configured.length} of 6): ${configured.join(', ') || 'none'}.`,
+      `Missing: ${missing.join(', ') || 'none'}.`,
+    ];
+    if (untrimmed.length > 0) {
+      details.push(`Set but padded with whitespace: ${untrimmed.join(', ')}.`);
+    }
+    details.push(
+      'Either configure all six for this environment or clear all six; clearing all six is the'
+      + ' safe default and leaves the deployment on legacy content.',
+      'Note that repository-scope Actions variables are visible to EVERY environment, so a value'
+      + ' defined at repository scope counts as configured here even if this environment never set'
+      + ' it. Check repository scope as well as this environment before concluding a value is unset.',
+    );
+    throw new Error(
+      `All immutable content outputs from PR #290 must be configured together without surrounding whitespace. ${details.join(' ')}`,
+    );
   }
   if (!blobEndpointPattern.test(values[0])) {
     throw new Error('AZURE_BLOB_ENDPOINT must be a canonical Azure Blob endpoint ending in /.');

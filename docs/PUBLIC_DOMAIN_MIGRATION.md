@@ -98,3 +98,48 @@ console ne doit être exécuté dans le cadre de ces deux PR.
    consoles stores.
 6. Promouvoir d'abord en staging, exécuter les tests réels, puis promouvoir en
    production après approbation humaine.
+
+### Avant l'étape 6 : `staging` et `prod` sont à 1-sur-6 sur le contenu
+
+**Mesuré le 2026-09-07. Ce point ne se manifeste qu'à partir du moment où l'étape 2 est faite** —
+il est aujourd'hui invisible, et c'est précisément ce qui le rend piégeux.
+
+`write-secure-bicep-parameters.mjs` applique une règle **tout-ou-rien** sur six variables de contenu :
+les six vides, le déploiement continue en mode legacy (branche sûre) ; les six posées, elles sont
+injectées ; **entre une et cinq, il lève**. Or exactement une des six est posée aujourd'hui —
+`AZURE_CONTENT_READER_CLIENT_ID`, au **scope dépôt**, donc héritée par *tous* les environnements,
+y compris ceux qui n'ont jamais demandé de contenu versionné.
+
+Pourquoi vous ne l'avez jamais vu : `validatePublicDomainConfiguration` s'exécute **avant** le
+contrôle de contenu et échoue d'abord, inconditionnellement, pour tout environnement non-`dev`.
+Le contrôle de contenu n'est donc jamais atteint. **L'étape 2 lève ce masque.** Le jour où
+`PUBLIC_DOMAIN_VERIFIED` passe à `true`, l'erreur de contenu devient atteignable et se déclenchera
+dans un contexte où personne ne l'attend.
+
+Ce n'est pas une urgence, et ce n'est pas destructeur : le script s'exécute **avant** tout appel
+Azure (`cd-backend.yml`, `write-secure-bicep-parameters.mjs` puis `az deployment sub create`), donc
+l'échec est propre, bruyant et sans état partiel. Le message nomme désormais lui-même les valeurs
+posées, les manquantes, et le fait que le scope dépôt est visible partout.
+
+**Deux issues, et le choix dépend d'une question non tranchée.**
+
+| Si | Alors le jour J |
+| --- | --- |
+| `staging`/`prod` doivent servir le contenu versionné | **compléter les six** variables sur l'Environment concerné |
+| `staging`/`prod` doivent rester en contenu legacy | **vider les six**, c'est-à-dire neutraliser l'héritage du scope dépôt |
+
+**Question ouverte, délibérément non tranchée ici** : `staging` et `prod` sont-ils censés partager
+le magasin de contenu de `dev` ? Aucune déclaration d'intention n'a été trouvée. Il n'existe pas de
+stack contenu par environnement dans `infra/params`, ce qui *suggère* un magasin unique — mais
+c'est une inférence de structure, pas une décision écrite. Trancher avant d'agir.
+
+**Ne supprimez pas `AZURE_CONTENT_READER_CLIENT_ID` du scope dépôt sans précaution.**
+`ci-content-drift.yml` la consomme comme client-id OIDC et ne déclare aucun `environment:`, donc
+elle ne peut lire que le scope dépôt. C'est le seul garde-fou de dérive de contenu qui fonctionne
+aujourd'hui. De plus `dev` tire sa sixième valeur de ce même scope dépôt : toute suppression doit
+d'abord poser la valeur en variable d'environnement sur `dev`, sinon `dev` passe par 1-sur-6 et
+`cd-backend` le déploie automatiquement à chaque push sur `main`.
+
+**Condition d'invalidation de cette section** : elle cesse d'être vraie dès que le compte des six
+variables visibles depuis `staging` ou `prod` n'est plus 1. Recompter au scope dépôt **et** au scope
+environnement, les deux, avant de conclure.
