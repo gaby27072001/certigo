@@ -99,16 +99,10 @@ Future<void> bootstrap() async {
       syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
     ];
     if (kRuntimeContentMobileEnabled) {
-      final Directory support = await getApplicationSupportDirectory();
-      final Directory root = Directory(
-        '${support.path}${Platform.pathSeparator}certigo${Platform.pathSeparator}'
-        'runtime-content${Platform.pathSeparator}v1',
-      );
-      overrides.add(
-        runtimeContentStoreProvider.overrideWithValue(
-          FileRuntimeContentStore(root: root, spaceScope: runtimeContentSpaceScope()),
-        ),
-      );
+      final FileRuntimeContentStore? store = await resolveFileRuntimeContentStore();
+      if (store != null) {
+        overrides.add(runtimeContentStoreProvider.overrideWithValue(store));
+      }
     }
 
     runApp(
@@ -118,6 +112,30 @@ Future<void> bootstrap() async {
       ),
     );
   }, crashReporter);
+}
+
+/// Résout le cache disque du contenu runtime, ou `null` si la plateforme ne
+/// peut pas le fournir.
+///
+/// Invariant : le démarrage ne doit jamais échouer à cause du cache. Le store
+/// disque dépend de `path_provider`, qui n'a pas d'implémentation sur toutes
+/// les plateformes (le web lève `MissingPluginException`) et peut échouer si le
+/// dossier support est indisponible. Sans ce repli, activer
+/// `RUNTIME_CONTENT_MOBILE` tue l'application avant `runApp` : l'écran reste
+/// vide. En renvoyant `null`, on conserve le store en mémoire par défaut et le
+/// contenu continue d'être servi par le réseau.
+Future<FileRuntimeContentStore?> resolveFileRuntimeContentStore() async {
+  try {
+    final Directory support = await getApplicationSupportDirectory();
+    final Directory root = Directory(
+      '${support.path}${Platform.pathSeparator}certigo${Platform.pathSeparator}'
+      'runtime-content${Platform.pathSeparator}v1',
+    );
+    return FileRuntimeContentStore(root: root, spaceScope: runtimeContentSpaceScope());
+  } on Object catch (error) {
+    debugPrint('[runtime-content] cache disque indisponible, repli en mémoire : $error');
+    return null;
+  }
 }
 
 /// Journalise chaque problème de configuration (erreurs + avertissements) avec
