@@ -110,3 +110,31 @@ param tutorLlmApiSurface = 'v1'
 // Function App could not resolve its own configured endpoint even from inside
 // vnet-certigo-dev. adoptOpenAiPrivateDns creates the missing zones.
 param adoptOpenAiPrivateDns = true
+
+// Immutable content supply chain — producer outputs from the content stack.
+//
+// These three are all-or-nothing by construction: main.bicep fail()s unless all
+// three are set or all three are empty ("contentBlobEndpoint,
+// contentReaderClientId and contentReaderResourceId must be configured together
+// from PR #290 outputs"). Each value below was verified against Azure on
+// 2026-09-07, not copied from a brief:
+//   - stcertigocntz3wqbdww exists in rg-certigo-content with
+//     publicNetworkAccess=Disabled, allowSharedKey=false, and an Approved
+//     private endpoint in vnet-certigo-ci/snet-runners. Its private address is
+//     deliberately NOT quoted here: private-networking.test.mjs asserts that no
+//     environment parameter file mentions the CI runner VNet address range, and
+//     that assertion is a raw-text grep which cannot distinguish a declaration
+//     from prose describing one;
+//   - the reader clientId matches `az identity show -n id-certigo-content-reader`;
+//   - that identity holds Storage Blob Data Reader on exactly three containers,
+//     whose names match the main.bicep defaults, so the three *ContainerName
+//     params are deliberately NOT overridden here.
+//
+// contentRepositoryMode is deliberately absent: 'legacy' is already the
+// main.bicep default, and infra/tests/content-storage.test.mjs asserts that no
+// committed environment file declares that parameter at all (the assertion is a
+// raw-text grep, so even quoting the declaration here would trip it). The
+// versioned flip is therefore a deploy-time parameter, never a committed one.
+param contentBlobEndpoint = 'https://stcertigocntz3wqbdww.blob.core.windows.net/'
+param contentReaderClientId = 'cabec54e-0536-4c0b-9ddb-f8b951725bcb'
+param contentReaderResourceId = '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader'

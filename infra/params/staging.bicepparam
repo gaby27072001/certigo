@@ -81,6 +81,17 @@ param manageDefenderPlans = false
 param cosmosBackupMode = 'Continuous'
 param cosmosContinuousBackupTier = 'Continuous7Days'
 
+// ============================================================================
+// Immutable content stack (rg-certigo-content). These three values are the
+// outputs of the content infrastructure and are all-or-nothing: main.bicep
+// fail()s if only some are set. contentRepositoryMode is deliberately NOT set
+// here — it defaults to 'legacy' in main.bicep, and infra/tests asserts that no
+// committed environment pins it.
+// ============================================================================
+param contentBlobEndpoint = 'https://stcertigocntz3wqbdww.blob.core.windows.net/'
+param contentReaderClientId = 'cabec54e-0536-4c0b-9ddb-f8b951725bcb'
+param contentReaderResourceId = '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader'
+
 // Subscription security controls are owned by the PIM-approved governance stack.
 param deployMcsbPolicyAssignment = false
 param mcsbEnforcementMode = 'DoNotEnforce'
