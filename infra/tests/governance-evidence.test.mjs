@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   validateDeploymentParameters,
+  validateExpectedDeploymentPhase,
   validateExistingPhaseBAssignments,
   validatePhaseAOperations,
   validatePhaseBTransition,
@@ -329,6 +330,7 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
   const evidence = makeB1Evidence();
   const phaseABindingPath = writeJson(evidence.directory, 'phase-a-binding.json', {
     schemaVersion: 1,
+    phase: 'B1a',
   });
   const approval = {
     schemaVersion: 1,
@@ -371,6 +373,7 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
       sourceRoot: repositoryRoot,
       subscriptionId: subscription,
       tenantId: tenant,
+      expectedPhase: 'B1a',
       legacyTransitionPath: evidence.legacyTransitionPath,
     }),
   );
@@ -396,6 +399,7 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
         sourceRoot: repositoryRoot,
         subscriptionId: subscription,
         tenantId: tenant,
+        expectedPhase: 'B1a',
         legacyTransitionPath: evidence.legacyTransitionPath,
       }),
     /approved legacy transition hash mismatch/,
@@ -415,6 +419,7 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
         sourceRoot: repositoryRoot,
         subscriptionId: subscription,
         tenantId: tenant,
+        expectedPhase: 'B1a',
         legacyTransitionPath: null,
       }),
     /fresh legacy transition evidence is required/,
@@ -441,6 +446,7 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
         sourceRoot: repositoryRoot,
         subscriptionId: subscription,
         tenantId: tenant,
+        expectedPhase: 'B1a',
         legacyTransitionPath: evidence.legacyTransitionPath,
       }),
     /manifest legacy transition hash is not a lowercase SHA-256/,
@@ -466,6 +472,7 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
         sourceRoot: repositoryRoot,
         subscriptionId: subscription,
         tenantId: tenant,
+        expectedPhase: 'B1a',
         legacyTransitionPath: evidence.legacyTransitionPath,
       }),
     /manifest legacy transition path/,
@@ -493,6 +500,7 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
         sourceRoot: repositoryRoot,
         subscriptionId: subscription,
         tenantId: tenant,
+        expectedPhase: 'B1a',
         legacyTransitionPath: evidence.legacyTransitionPath,
       }),
     /not bound to its inventoried artifact/,
@@ -523,6 +531,7 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
         sourceRoot: repositoryRoot,
         subscriptionId: subscription,
         tenantId: tenant,
+        expectedPhase: 'B1a',
         legacyTransitionPath: evidence.legacyTransitionPath,
       }),
     /approved source commit mismatch/,
@@ -542,6 +551,7 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
         sourceRoot: repositoryRoot,
         subscriptionId: subscription,
         tenantId: tenant,
+        expectedPhase: 'B1a',
         legacyTransitionPath: evidence.legacyTransitionPath,
       }),
     /artifact inventory mismatch|raw plan hash mismatch/,
@@ -550,6 +560,54 @@ test('deployment approval rejects missing, tampered, and wrong-commit evidence',
     () => fs.readFileSync(path.join(evidence.directory, 'missing.json')),
     /ENOENT/,
   );
+});
+
+test('Phase B deployment approval is bound to an external expected phase', () => {
+  for (const expectedPhase of ['B1a', 'B1b', 'B2']) {
+    const manifest = { phase: expectedPhase };
+    const approval = { phase: expectedPhase };
+    const binding = { phase: expectedPhase };
+    assert.doesNotThrow(() =>
+      validateExpectedDeploymentPhase(
+        manifest,
+        approval,
+        binding,
+        expectedPhase,
+      ),
+    );
+    for (const [candidateManifest, candidateApproval, candidateBinding, pattern] of [
+      [{}, approval, binding, /manifest phase mismatch/],
+      [{ phase: 'A' }, approval, binding, /manifest phase mismatch/],
+      [manifest, {}, binding, /approval phase mismatch/],
+      [manifest, { phase: 'A' }, binding, /approval phase mismatch/],
+      [manifest, approval, null, /fresh Phase B deployment binding is required/],
+      [manifest, approval, {}, /fresh deployment binding phase mismatch/],
+      [manifest, approval, { phase: 'A' }, /fresh deployment binding phase mismatch/],
+    ]) {
+      assert.throws(
+        () =>
+          validateExpectedDeploymentPhase(
+            candidateManifest,
+            candidateApproval,
+            candidateBinding,
+            expectedPhase,
+          ),
+        pattern,
+      );
+    }
+  }
+  for (const expectedPhase of [undefined, null, {}, 'B1', 'UNKNOWN']) {
+    assert.throws(
+      () =>
+        validateExpectedDeploymentPhase(
+          { phase: 'B1a' },
+          { phase: 'B1a' },
+          { phase: 'B1a' },
+          expectedPhase,
+        ),
+      /expected deployment phase is missing or invalid/,
+    );
+  }
 });
 
 test('Phase A binding rejects extra and out-of-contract assignments', () => {
@@ -843,6 +901,7 @@ test('deployment approval recomputes normalized principalType evidence', () => {
   );
   const bindingPath = writeJson(evidence.directory, 'phase-a-binding.json', {
     schemaVersion: 1,
+    phase: 'B1a',
   });
   evidence.manifest.plan.sha256 = sha256File(evidence.planPath);
   evidence.manifest.normalization = {
@@ -899,6 +958,7 @@ test('deployment approval recomputes normalized principalType evidence', () => {
       sourceRoot: repositoryRoot,
       subscriptionId: subscription,
       tenantId: tenant,
+      expectedPhase: 'B1a',
       legacyTransitionPath: evidence.legacyTransitionPath,
     });
   assert.doesNotThrow(verify);
@@ -1025,17 +1085,23 @@ test('governance workflows persist evidence and deploy tools require approvals',
     );
     assert.match(source, /--artifact-dir/);
   }
-  for (const script of ['deploy-phase-b1.sh', 'deploy-phase-b2.sh']) {
+  const expectedDeployPhases = new Map([
+    ['deploy-phase-b1.sh', 'B1a'],
+    ['deploy-phase-b1b.sh', 'B1b'],
+    ['deploy-phase-b2.sh', 'B2'],
+  ]);
+  for (const [script, expectedPhase] of expectedDeployPhases) {
     const source = fs.readFileSync(
       path.join(repositoryRoot, 'infra/governance', script),
       'utf8',
     );
     assert.match(source, /validate-evidence\.mjs" deployment-approval/);
+    assert.match(source, new RegExp(`--phase ${expectedPhase}`));
     assert.ok(
       source.indexOf('deployment-approval') < source.lastIndexOf('az deployment '),
     );
     assert.match(source, /APPROVAL_FILE/);
-    assert.match(source, /fresh-compiled-template\.json/);
+    assert.match(source, /fresh-(?:compiled-)?template\.json/);
     assert.match(
       source,
       /--parameters "\$\{evidence_dir\}\/parameters\.json"/,
