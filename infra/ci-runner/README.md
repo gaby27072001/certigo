@@ -92,6 +92,34 @@ l'identité prévue par `runner.bicep`, tandis que le pilote PR échoue fermé.
 
 ### Séquence de provisionnement et d'enregistrement
 
+> **Avant tout redéploiement complet : vérifier la dérive du bootstrap.**
+>
+> `pilot.bicep` livre le bootstrap via `customData`. Un déploiement du modèle
+> complet le réécrit donc **sur les instances existantes**, pas seulement sur la
+> nouvelle. Si le bootstrap du dépôt a changé depuis le dernier déploiement, la
+> procédure ci-dessous — pourtant correcte — reconstruit les runners en service.
+>
+> `customData` est **write-only** : `az vmss show` rend `False`, ce qui n'est pas
+> une absence mais une impossibilité de lecture. La dérive se révèle par le
+> `what-if`, en comparant le `bootstrapSha256` déployé à celui du dépôt :
+>
+> ```bash
+> az deployment group what-if \
+>   --subscription <SUBSCRIPTION_ID> \
+>   --resource-group RG-CERTIGO-CI \
+>   --template-file infra/ci-runner/pilot.bicep \
+>   --parameters imageVersion="$IMAGE_VERSION" \
+>                adminSshPublicKey="$(cat <BREAK_GLASS_PUBLIC_KEY>)" \
+>                blockImdsAtNsg=true \
+>   | grep -A2 bootstrapSha256
+> ```
+>
+> Si les deux empreintes diffèrent, **ne pas déployer le modèle complet** :
+> traiter la dérive séparément, ou opérer de façon ciblée (`az vmss scale`,
+> mise à jour d'une seule ressource). Une dérive était présente au moment de
+> l'ajout de la deuxième instance PR ; c'est pourquoi ce scale-out n'a pas
+> emprunté la voie documentée ci-dessous.
+
 Toujours utiliser un nom de VMSS neuf et le mode incrémentiel. Le premier déploiement
 laisse temporairement la règle NSG IMDS absente pour que l'agent Azure et cloud-init
 terminent ; il ne contient aucun jeton et le bootstrap installe immédiatement le bloc OS.
@@ -150,6 +178,11 @@ reste en mémoire dans le processus PowerShell, passe à ARM comme `protectedPar
 sans nom (argument positionnel `$1` côté Linux), puis la ressource Run Command est
 supprimée. Ne jamais ajouter le token à une ligne de commande, un fichier, `customData`,
 une variable d'environnement ou un journal.
+
+Le verrou `CanNotDelete` posé sur `rg-certigo-ci` bloque cette suppression comme il bloque
+le scale-in : sa portée est toute opération `delete` du groupe, pas seulement les VM. Le
+script le signale et poursuit ; les ressources Run Command résiduelles s'accumulent alors
+silencieusement et doivent être supprimées dans une levée de verrou explicite.
 
 ```powershell
 .\infra\ci-runner\register-pilot.ps1 `

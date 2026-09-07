@@ -144,24 +144,40 @@ if ($vm.provisioningState -ne 'Succeeded' -or $vm.powerState -ne 'VM running') {
 if ($vm.virtualMachineScaleSet.id.Split('/')[-1] -ne $ScaleSetName) {
   throw "The VM is not a member of the expected scale set '$ScaleSetName'."
 }
-if ($null -ne $vm.identity) {
+# Sous Set-StrictMode, `$vm.identity` leve quand az omet la propriete, c'est-a-dire
+# precisement dans le cas conforme. Le test doit rester faux sans identite et vrai avec.
+$identityProperty = $vm.PSObject.Properties['identity']
+if ($null -ne $identityProperty -and $null -ne $identityProperty.Value) {
   throw 'The PR-only pilot VM must not have a managed identity.'
 }
 
-$nics = Invoke-NativeText -FilePath 'az' -ArgumentList @(
+$nicReferences = Invoke-NativeText -FilePath 'az' -ArgumentList @(
   'vm', 'nic', 'list',
   '--subscription', $SubscriptionId,
   '--resource-group', $ResourceGroupName,
   '--vm-name', $VmName,
   '--output', 'json'
 ) | ConvertFrom-Json
-foreach ($nic in @($nics)) {
+# `az vm nic list` ne rend que des references (id/primary) : sans resolution, la boucle
+# ci-dessous n'inspectait jamais aucune ipConfiguration et passait toujours au vert.
+$inspectedIpConfigurations = 0
+foreach ($nicReference in @($nicReferences)) {
+  $nic = Invoke-NativeText -FilePath 'az' -ArgumentList @(
+    'network', 'nic', 'show',
+    '--subscription', $SubscriptionId,
+    '--ids', $nicReference.id,
+    '--output', 'json'
+  ) | ConvertFrom-Json
   foreach ($ipConfiguration in @($nic.ipConfigurations)) {
+    $inspectedIpConfigurations++
     $publicIpProperty = $ipConfiguration.PSObject.Properties['publicIPAddress']
     if ($null -ne $publicIpProperty -and $null -ne $publicIpProperty.Value) {
       throw 'The PR-only pilot VM must not have a public IP configuration.'
     }
   }
+}
+if ($inspectedIpConfigurations -lt 1) {
+  throw 'No IP configuration could be inspected; the public IP assertion would be vacuous.'
 }
 
 $imdsRule = Invoke-NativeText -FilePath 'az' -ArgumentList @(

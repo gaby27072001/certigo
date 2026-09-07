@@ -78,6 +78,10 @@ param tags object = {
 var bootstrapSource = loadTextContent('bootstrap.sh')
 var bootstrapContent = '#!/usr/bin/env bash\nexport CERTIGO_RUNNER_LABELS=\'${runnerLabels}\'\nexport CERTIGO_BLOCK_IMDS=\'true\'\n${bootstrapSource}'
 // The repository validator keeps this value synchronized with bootstrap.sh.
+// Il peut en revanche differer de la valeur *deployee* : un deploiement du modele
+// complet reecrit alors `customData` sur les instances en service, pas seulement sur
+// une nouvelle. `customData` etant write-only, la comparaison passe obligatoirement par
+// un what-if. Voir « Avant tout redeploiement complet » dans README.md.
 var bootstrapSha256 = '6e798d4eeddc032eb948336cf17aef3539a91b8a33097b3cb877c4f3019c844c'
 var runnerVersion = '2.336.0'
 var pinnedImageVersion = toLower(imageVersion) == 'latest' ? 'mutable-latest-is-not-allowed' : imageVersion
@@ -220,7 +224,13 @@ resource runnerScaleSet 'Microsoft.Compute/virtualMachineScaleSets@2024-11-01' =
   sku: {
     name: vmSize
     tier: 'Standard'
-    capacity: 1
+    // Toute instance supplémentaire doit être créée avec blockImdsAtNsg=false, puis
+    // durcie à nouveau à true : l'agent Azure interroge IMDS pendant le provisionnement
+    // de l'OS et échoue en OSProvisioningInternalError si deny-imds-outbound est déjà
+    // actif. Mesuré : ~30 min d'échec avec la règle, `Succeeded` en 1,1 min sans elle.
+    // La défense en profondeur reste assurée par certigo-block-imds.service au niveau
+    // de l'OS (voir infra/ci-runner/pilot-preflight.sh).
+    capacity: 2
   }
   properties: {
     orchestrationMode: 'Flexible'

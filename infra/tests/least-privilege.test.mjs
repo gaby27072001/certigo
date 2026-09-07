@@ -1302,6 +1302,11 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
         runnerName: 'certigo-prIVJAN8',
         virtualMachineName: 'vmss-certigo-pr-pilot-z1_bbf83c5c',
       },
+      {
+        githubRunnerId: 30,
+        runnerName: 'certigo-prQA5OWT',
+        virtualMachineName: 'vmss-certigo-pr-pilot-z1_a14700a3',
+      },
     ],
   );
   // Both trusted zones must stay bound: the redundancy floor is meaningless if the
@@ -1310,6 +1315,61 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
     'certigo-pr': 1,
     'certigo-trusted': 2,
   });
+});
+
+test('every managed runner is restarted after the nightly teardown', () => {
+  const config = JSON.parse(
+    readFileSync(
+      path.join(
+        repositoryRoot,
+        'infra',
+        'ci-runner',
+        'capacity-controller.config.json',
+      ),
+      'utf8',
+    ),
+  );
+  const bicepparam = readFileSync(
+    path.join(
+      repositoryRoot,
+      'infra',
+      'params',
+      'ci-runner-auto-recovery.bicepparam',
+    ),
+    'utf8',
+  );
+
+  const block = /param virtualMachineNames = \[([^\]]*)\]/.exec(bicepparam);
+  assert.ok(block, 'the recovery parameters must declare virtualMachineNames');
+  const recovered = [...block[1].matchAll(/'([^']+)'/g)].map(([, name]) => name);
+  // A parser that silently yields nothing would make every membership assertion below
+  // vacuously true, which is the failure mode this whole test exists to prevent.
+  assert.ok(recovered.length > 0, 'the parsed recovery list must not be empty');
+
+  const managed = config.inventory.managedRunnerBindings.map(
+    ({ virtualMachineName }) => virtualMachineName,
+  );
+
+  // The subscription-wide teardown deallocates every instance; one absent from this
+  // list simply stays off, and a runner that never comes back online is invisible
+  // until a job queues behind the survivors. Capacity is only real if it restarts.
+  assert.deepEqual(
+    managed.filter((name) => !recovered.includes(name)),
+    [],
+    'each managed runner instance must appear in the recovery parameters',
+  );
+  assert.deepEqual(
+    recovered.filter((name) => !managed.includes(name)),
+    [],
+    'the recovery job must not restart an instance the inventory does not manage',
+  );
+  assert.deepEqual(
+    recovered.filter((name) =>
+      config.inventory.forbiddenVirtualMachines.includes(name),
+    ),
+    [],
+    'a forbidden instance must never be restarted',
+  );
 });
 
 test('infra validation bootstraps pinned Node for bare Linux runners', () => {

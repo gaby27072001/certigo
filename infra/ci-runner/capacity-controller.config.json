@@ -47,6 +47,12 @@
         "runnerName": "certigo-prIVJAN8",
         "virtualMachineId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/virtualMachines/vmss-certigo-pr-pilot-z1_bbf83c5c",
         "virtualMachineName": "vmss-certigo-pr-pilot-z1_bbf83c5c"
+      },
+      {
+        "githubRunnerId": 30,
+        "runnerName": "certigo-prQA5OWT",
+        "virtualMachineId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/virtualMachines/vmss-certigo-pr-pilot-z1_a14700a3",
+        "virtualMachineName": "vmss-certigo-pr-pilot-z1_a14700a3"
       }
     ]
   },
