@@ -209,11 +209,13 @@ ne rapportait aucun finding. Un vert seul ne prouve rien — il faut avoir lu le
 précédent pour établir que l'échec venait du **constat** et non d'une panne de l'instrument.
 
 > **Ce fait redevient faux si** la méthode forte est retirée du compte, ou si les security defaults
-> sont désactivés. Le monitor ci-dessus vérifie les deux quotidiennement. En revanche il **n'a pas
-> d'étape de fermeture** : il sait ouvrir l'issue de suivi, jamais la refermer quand la posture
-> redevient saine (`if: steps.audit.outcome == 'failure'`). Après toute remédiation future, refermer
-> l'issue à la main en citant les deux runs — sinon la prochaine alerte réelle se fondra dans un
-> ticket déjà ouvert et cessé d'être lu.
+> sont désactivés. Le monitor ci-dessus vérifie les deux quotidiennement, et sait désormais
+> **refermer** l'issue de suivi quand la posture redevient saine — ce qui n'était pas le cas le
+> 2026-09-07 : l'issue #388 a dû être fermée à la main. La fermeture est conditionnée à
+> `steps.audit.outputs.failed == 'false'`, c'est-à-dire à un **verdict de santé explicitement
+> écrit** par l'audit, et non à `outcome == 'success'` : un plantage du script laisse la sortie
+> vide, et une sortie vide n'est délibérément pas « false ». Un moniteur qui annonce « c'est
+> réglé » parce qu'il n'a pas su regarder serait exactement le défaut inverse.
 
 L'action reste **délibérément laissée à l'humain** : établir un credential sur un compte d'urgence
 exige une décision explicite et la possession du facteur.

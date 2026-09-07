@@ -7,6 +7,11 @@
 #
 # The CIAM identity authenticates with a GitHub OIDC federated credential, so this
 # monitor holds no stored secret that could itself expire unnoticed.
+#
+# The job has both edges: it opens a tracking issue when the posture breaks and closes
+# it when the posture is proven healthy again. Without the falling edge its state
+# converged on "broken" and stayed there, so a later real alert would have landed in a
+# ticket already open and no longer read. See docs/runbooks/R-05, "Le front descendant".
 name: CIAM posture monitor
 
 on:
@@ -115,6 +120,54 @@ jobs:
                 body,
               });
             }
+
+      - name: Close the tracking issue when the audit proves the posture healthy
+        # Deliberately gated on `outputs.failed == 'false'`, never on
+        # `outcome == 'success'` alone. The audit script writes `failed` only once it
+        # has reached its conclusion, so `false` is a *positive assertion of health*;
+        # a crash leaves the output unset and must never read as an all-clear. Both
+        # signals are required, and if they ever disagree nothing is closed. An issue
+        # left open wrongly is recoverable; a monitor announcing "resolved" because it
+        # could not look is the same silent failure this step exists to end.
+        if: ${{ steps.audit.outcome == 'success' && steps.audit.outputs.failed == 'false' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const title = 'CIAM posture monitor: action required';
+            // Same lookup as the open path on purpose: an asymmetric match would let an
+            // issue be refreshed forever while never becoming closable.
+            const existing = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open in:title "${title}"`,
+            });
+            const match = existing.data.items.find((issue) => issue.title === title);
+            if (!match) {
+              core.info('Posture healthy and no open tracking issue — nothing to close.');
+              return;
+            }
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: match.number,
+              body: [
+                'Posture healthy again: the audit ran to completion and reported no',
+                'error-severity finding. Closing automatically.',
+                '',
+                `Run: ${run}`,
+                '',
+                'Before treating this as a resolution, read the journal of the previous',
+                'failing run. A green obtained by repairing the monitor itself would look',
+                'exactly like this one — only the pair of runs distinguishes them.',
+              ].join('\n'),
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: match.number,
+              state: 'closed',
+              state_reason: 'completed',
+            });
 
       - name: Fail when the audit reported an error
         if: ${{ steps.audit.outcome == 'failure' }}

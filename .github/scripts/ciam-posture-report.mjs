@@ -3,6 +3,8 @@
 // tenant, and security defaults accept no exclusions, so the break-glass account must
 // keep a usable strong authentication method registered at all times.
 
+import { pathToFileURL } from 'node:url';
+
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 const TOKEN_HOST = 'https://login.microsoftonline.com';
 
@@ -251,6 +253,17 @@ async function acquireGraphToken({ tenantId, clientId }) {
   return (await tokenResponse.json()).access_token;
 }
 
+// The workflow closes its tracking issue on `failed == 'false'` rather than on step
+// success, so this payload is the contract that makes the falling edge possible: it
+// is written only once the audit has reached a verdict. A crash leaves GITHUB_OUTPUT
+// untouched, and an unset output is deliberately not `false`.
+export function renderStepOutput({ findings, failed }) {
+  const body = findings
+    .map((finding) => `- **${finding.severity}** \`${finding.code}\` — ${finding.message}`)
+    .join('\n');
+  return `failed=${failed}\nfindings<<CERTIGO_EOF\n${body}\nCERTIGO_EOF\n`;
+}
+
 async function main() {
   const tenantId = process.env.AZURE_TENANT_ID;
   const clientId = process.env.AZURE_CLIENT_ID;
@@ -310,20 +323,23 @@ async function main() {
   }
   if (process.env.GITHUB_OUTPUT) {
     const { appendFileSync } = await import('node:fs');
-    const body = result.findings
-      .map((finding) => `- **${finding.severity}** \`${finding.code}\` — ${finding.message}`)
-      .join('\n');
-    appendFileSync(
-      process.env.GITHUB_OUTPUT,
-      `failed=${result.failed}\nfindings<<CERTIGO_EOF\n${body}\nCERTIGO_EOF\n`,
-    );
+    appendFileSync(process.env.GITHUB_OUTPUT, renderStepOutput(result));
   }
   if (result.failed) {
     process.exitCode = 1;
   }
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1].replace(/\\/gu, '/')}`) {
+// `pathToFileURL` is the documented inverse of `import.meta.url` for a filesystem
+// path. Building the URL by hand worked on the Linux runner but not on Windows,
+// where an absolute path carries a drive letter and needs a third slash
+// (`file:///C:/...`, not `file://C:/...`). The hand-built form silently skipped
+// `main()` there, so the script exited 0 having measured nothing — the same shape of
+// silent success this monitor exists to catch.
+const invokedDirectly =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (invokedDirectly) {
   main().catch((error) => {
     console.error(`::error::${error.message}`);
     process.exitCode = 1;

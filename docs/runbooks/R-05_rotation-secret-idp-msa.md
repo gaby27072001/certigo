@@ -133,7 +133,7 @@ az ad app credential list --id df42c145 \
 | Logique | [`.github/scripts/ciam-posture-report.mjs`](../../.github/scripts/ciam-posture-report.mjs) (couverte par `ciam-posture-report.test.mjs`) |
 | Fréquence | Quotidienne (`cron: "23 6 * * *"`), plus `repository_dispatch: [ciam-posture]` |
 | **Seuil d'alerte** | **90 jours** avant expiration (plus large que le J-30 initial : laisse le temps de planifier la rotation) |
-| Effet | Écrit un résumé, **ouvre (ou commente) une issue GitHub**, puis **fait échouer le job** |
+| Effet | Écrit un résumé, **ouvre (ou commente) une issue GitHub**, puis **fait échouer le job** — et **referme l'issue** quand la posture redevient saine (voir « Le front descendant » ci-dessous) |
 | Runner | `certigo-trusted` (aucun déclencheur PR ⇒ inatteignable par du code de fork) |
 
 Le workflow couvre **tous** les secrets et certificats de **toutes** les app registrations du tenant
@@ -232,8 +232,36 @@ une liste partielle, refuse une réponse sans collection `value`, et s'arrête a
 pour ne pas boucler indéfiniment sur un lien auto-référentiel.
 
 Ces quatre chemins sont **couverts par des tests** dans
-`.github/scripts/ciam-posture-report.test.mjs` (18 tests), dont un qui vérifie explicitement qu'une
+`.github/scripts/ciam-posture-report.test.mjs` (23 tests), dont un qui vérifie explicitement qu'une
 liste vide **échoue** au lieu de passer pour « aucun secret expirant ».
+
+### Le front descendant — comment le moniteur sait dire « c'est réglé »
+
+Jusqu'au 2026-09-07, ce moniteur savait **ouvrir** son issue de suivi et jamais la refermer. Son
+état convergeait donc vers « cassé » et y restait, quelle que soit la réalité du tenant : un
+instrument dont la sortie finit par ne plus dépendre de son entrée. La conséquence pratique est
+qu'une alerte réelle suivante se serait fondue dans un ticket déjà ouvert et cessé d'être lu.
+
+La fermeture automatique introduit le **risque inverse**, plus grave : annoncer « résolu » parce que
+l'audit n'a pas su regarder. La condition de fermeture est donc choisie pour l'exclure :
+
+| Situation | `steps.audit.outcome` | `steps.audit.outputs.failed` | Effet |
+|---|---|---|---|
+| Audit conclu, finding de sévérité `error` | `failure` | `true` | Ouvre / commente, échoue |
+| Audit conclu, aucun finding `error` | `success` | `false` | **Ferme** l'issue |
+| Audit **planté** (config, token, Graph) | `failure` | *(non écrite)* | Ouvre / commente, échoue |
+
+Le script n'écrit `failed` **qu'après avoir atteint son verdict**. Un `false` est donc une
+**affirmation positive de santé**, alors que `outcome == 'success'` ne serait que l'absence d'erreur
+constatée — et un refactor qui avalerait une exception transformerait ce silence en feu vert. Les
+deux signaux sont exigés conjointement ; s'ils divergeaient un jour, rien n'est fermé. Une issue
+laissée ouverte à tort se rattrape, un moniteur qui se tait à tort ne se rattrape pas.
+
+Trois tests verrouillent ce raisonnement : un audit sain publie bien `failed=false` (sans quoi la
+porte ne s'ouvrirait jamais), un audit planté ne publie **rien** (vérifié en le faisant échouer pour
+de bon, sortie `GITHUB_OUTPUT` restée vide), et le texte du workflow est comparé au marqueur exact
+de la condition — avec un contrôle positif sur la condition d'ouverture, pour qu'une absence de
+correspondance signifie une porte absente et non un fichier illisible.
 
 ### Dispositif complémentaire — owner de l'app avec e-mail
 
