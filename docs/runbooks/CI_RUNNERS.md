@@ -173,12 +173,21 @@ Attendre `status: online` **avant** d'approuver un run de PR (sinon les jobs res
 
 ## 5. Éteindre la CI (après usage — pour le coût)
 
-Le prévol ci-dessous vérifie les labels, jobs actifs/en file, autoscale, frontières
-d'identité/sous-réseau et réconciliation Azure/GitHub. Il n'effectue aucune déallocation.
-Dans le présent livrable, `enabled=false` bloque tous les prévols. Après une future activation
-séparée, le premier passage démarrera seulement la quiet period; un snapshot d'état externe
-devra prouver les 5 minutes continues puis deux gardes distinctes. L'état v3 conserve la
-capacité exacte supprimée par classe jusqu'à son réarmement réel.
+Le prévol ci-dessous vérifie, sur les deux dépôts, les labels, jobs actifs/en file, autoscale,
+frontières d'identité/sous-réseau et réconciliation Azure/GitHub. Il n'effectue aucune
+déallocation. Un run système Dependabot n'est exclu que si son acteur est `dependabot[bot]`,
+son événement `dynamic` et tous ses jobs sans runner portent le seul label `dependabot`; une
+fiche job absente ou une cible self-hosted bloque.
+
+Dans le présent livrable, `enabled=false` et les dérives de migration bloquent toute nouvelle
+mutation. Une exception de lecture existe pour l'état final déjà sûr : si f55 et bbf sont
+explicitement `deallocated`, les trois registrations exactes sont non-busy et la file valide
+est vide, le prévol retourne `terminalSafe=true`, `safeToRequestChange=false` et
+`requestedChange=none`. Il ne redémarre rien et n'invente pas de quiet period après coup.
+Les dérives restent visibles dans `reasons` afin de bloquer un prochain start/deallocate.
+Après une future activation séparée, une vraie déallocation exigera toujours 5 minutes
+continues puis deux gardes distinctes. L'état v3 conserve la capacité exacte supprimée par
+classe jusqu'à son réarmement réel.
 
 ```bash
 bash infra/ci-runner/lifecycle-preflight.sh deallocate
@@ -191,8 +200,9 @@ bash infra/ci-runner/lifecycle-preflight.sh deallocate
 >   **le compute reste facturé**. ❌ **à éviter.**
 
 Un résultat bloqué reste le comportement attendu tant que la file, le scale-in CPU ou un
-déficit de redondance `certigo-trusted` existent. Le chevauchement de labels, lui, n'est
-plus une cause de blocage : il est résolu.
+déficit de redondance `certigo-trusted` existent, sauf constat terminal-safe déjà désalloué
+décrit ci-dessus. Le chevauchement de labels, lui, n'est plus une cause de blocage : il est
+résolu.
 
 ---
 

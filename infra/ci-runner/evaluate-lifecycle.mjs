@@ -22,6 +22,156 @@ function scaleInRules(autoscale) {
   );
 }
 
+export function isIgnorableSystemDependabotRun(run) {
+  const jobs = run?.jobs;
+  return (
+    run?.actor?.login === 'dependabot[bot]' &&
+    run?.event === 'dynamic' &&
+    Array.isArray(jobs) &&
+    jobs.length > 0 &&
+    jobs.every((job) => {
+      const labels = job.labels ?? [];
+      return (
+        !job.runner_name &&
+        labels.length === 1 &&
+        labels[0] === 'dependabot'
+      );
+    })
+  );
+}
+
+function summarizeWorkflowRuns(collection) {
+  if (!Array.isArray(collection?.workflow_runs)) {
+    return {
+      blockingCount: collection?.total_count ?? 0,
+      ignoredRunIds: [],
+    };
+  }
+
+  const ignored = collection.workflow_runs.filter(
+    isIgnorableSystemDependabotRun,
+  );
+  return {
+    blockingCount: collection.workflow_runs.length - ignored.length,
+    ignoredRunIds: ignored.map((run) => run.id).sort(),
+  };
+}
+
+function isExplicitlyDeallocated(virtualMachine) {
+  return String(virtualMachine.powerState ?? '')
+    .toLowerCase()
+    .includes('deallocated');
+}
+
+function observedRunnerInventory(runners, bindings = []) {
+  if (bindings.length === 0) {
+    return {
+      bindingMismatches: [],
+      missingBindings: [],
+      runners: [],
+    };
+  }
+
+  const observed = [];
+  const bindingMismatches = [];
+  const missingBindings = [];
+  for (const binding of bindings) {
+    const candidates = runners.filter(
+      (runner) =>
+        Number(runner.id) === binding.githubRunnerId &&
+        String(runner.repository ?? '').toLowerCase() ===
+          String(binding.repository).toLowerCase(),
+    );
+    if (candidates.length !== 1) {
+      missingBindings.push(
+        `${binding.repository}#${binding.githubRunnerId} (${binding.runnerName})`,
+      );
+      continue;
+    }
+    const candidate = candidates[0];
+    if (candidate.name !== binding.runnerName) {
+      bindingMismatches.push(
+        `${binding.repository}#${binding.githubRunnerId}: ${candidate.name} != ${binding.runnerName}`,
+      );
+      continue;
+    }
+    observed.push(candidate);
+  }
+
+  return {
+    bindingMismatches: bindingMismatches.sort(),
+    missingBindings: missingBindings.sort(),
+    runners: observed,
+  };
+}
+
+function validateObservedRunnerBindings(config) {
+  const managedBindings = config.inventory?.managedRunnerBindings ?? [];
+  const observedBindings = config.inventory?.observedRunnerBindings ?? [];
+  const repositories = config.repositories ?? [];
+  if (
+    !Array.isArray(repositories) ||
+    repositories.length === 0 ||
+    repositories.some(
+      (repository) =>
+        typeof repository !== 'string' || repository.length === 0,
+    )
+  ) {
+    throw new Error('lifecycle repositories must be a non-empty array');
+  }
+  if (managedBindings.length === 0 && observedBindings.length === 0) {
+    return;
+  }
+  if (!Array.isArray(observedBindings) || observedBindings.length === 0) {
+    throw new Error(
+      'managed lifecycle capacity requires observed runner bindings',
+    );
+  }
+
+  const repositoryNames = new Set(
+    repositories.map((repository) => repository.toLowerCase()),
+  );
+  const managedMachineNames = new Set(
+    managedBindings.map((binding) =>
+      String(binding.virtualMachineName).toLowerCase(),
+    ),
+  );
+  const observedKeys = new Set();
+  const observedRunnerNames = new Set();
+  const observedMachineNames = new Set();
+  for (const binding of observedBindings) {
+    const repository = String(binding.repository ?? '').toLowerCase();
+    const runnerName = String(binding.runnerName ?? '').toLowerCase();
+    const machineName = String(
+      binding.virtualMachineName ?? '',
+    ).toLowerCase();
+    const key = `${repository}#${binding.githubRunnerId}`;
+    if (
+      !repositoryNames.has(repository) ||
+      !Number.isInteger(binding.githubRunnerId) ||
+      binding.githubRunnerId <= 0 ||
+      !runnerName ||
+      !managedMachineNames.has(machineName) ||
+      observedKeys.has(key) ||
+      observedRunnerNames.has(`${repository}#${runnerName}`)
+    ) {
+      throw new Error('observed runner bindings are invalid');
+    }
+    observedKeys.add(key);
+    observedRunnerNames.add(`${repository}#${runnerName}`);
+    observedMachineNames.add(machineName);
+  }
+  if (
+    [...managedMachineNames].some(
+      (machineName) => !observedMachineNames.has(machineName),
+    )
+  ) {
+    throw new Error(
+      'every managed machine requires an observed runner binding',
+    );
+  }
+}
+
 function aggregateCapacity(capacityByTrust) {
   return (
     capacityByTrust['certigo-pr'] +
@@ -51,6 +201,7 @@ export function evaluateLifecycle({
   now = Date.now(),
   state = {},
 }) {
+  validateObservedRunnerBindings(config);
   if (!['start', 'deallocate'].includes(operation)) {
     throw new Error(`Unsupported lifecycle operation: ${operation}`);
   }
@@ -68,15 +219,9 @@ export function evaluateLifecycle({
     reasons.push('capacity controller feature flag is off');
   }
   const repositoryRunners = runners.runners ?? [];
-  const externalGitHubRunnerIds = new Set(
-    config.inventory.externalGithubRunnerIds ?? [],
-  );
   const certigoRunners = repositoryRunners.filter((runner) => {
     const labels = labelsOf(runner);
-    return (
-      !externalGitHubRunnerIds.has(Number(runner.id)) &&
-      (labels.has('certigo-pr') || labels.has('certigo-trusted'))
-    );
+    return labels.has('certigo-pr') || labels.has('certigo-trusted');
   });
   const dualTrustRunners = certigoRunners.filter((runner) => {
     const labels = labelsOf(runner);
@@ -90,6 +235,20 @@ export function evaluateLifecycle({
     const labels = labelsOf(runner);
     return labels.has('certigo-trusted') && !labels.has('certigo-pr');
   });
+  const observedRunners = observedRunnerInventory(
+    repositoryRunners,
+    config.inventory?.observedRunnerBindings,
+  );
+  if (observedRunners.missingBindings.length > 0) {
+    reasons.push(
+      `missing observed runner bindings: ${observedRunners.missingBindings.join(', ')}`,
+    );
+  }
+  if (observedRunners.bindingMismatches.length > 0) {
+    reasons.push(
+      `observed runner binding mismatches: ${observedRunners.bindingMismatches.join(', ')}`,
+    );
+  }
 
   if (dualTrustRunners.length > 0) {
     reasons.push(
@@ -189,62 +348,113 @@ export function evaluateLifecycle({
       usableCapacityByTrust[trustClass] += 1;
     }
   }
+  const queuedRunSummary = summarizeWorkflowRuns(queuedRuns);
+  const activeRunSummary = summarizeWorkflowRuns(activeRuns);
+  const lifecycleRunners =
+    observedRunners.runners.length > 0
+      ? observedRunners.runners
+      : certigoRunners;
+  const busyLifecycleRunners = lifecycleRunners.filter(
+    (runner) => runner.busy === true,
+  );
+  const unknownBusyLifecycleRunners = lifecycleRunners.filter(
+    (runner) => runner.busy !== true && runner.busy !== false,
+  );
+  const expectedManagedMachineCount = new Set(
+    (config.inventory?.managedRunnerBindings ?? []).map((binding) =>
+      String(binding.virtualMachineName).toLowerCase(),
+    ),
+  ).size;
+  const managedInventoryIsExact =
+    expectedManagedMachineCount > 0 &&
+    instanceInventory.managedInstances.length ===
+      expectedManagedMachineCount &&
+    instanceInventory.bindingMismatches.length === 0 &&
+    instanceInventory.missingManagedRunnerVirtualMachines.length === 0 &&
+    instanceInventory.forbiddenVirtualMachinesPresent.length === 0 &&
+    instanceInventory.unclassifiedVirtualMachines.length === 0 &&
+    instanceInventory.unboundRunnerVirtualMachinePairs.length === 0;
+  const terminalAlreadyDeallocated =
+    operation === 'deallocate' &&
+    managedInventoryIsExact &&
+    instanceInventory.managedInstances.every(({ virtualMachine }) =>
+      isExplicitlyDeallocated(virtualMachine),
+    ) &&
+    observedRunners.missingBindings.length === 0 &&
+    observedRunners.bindingMismatches.length === 0 &&
+    busyLifecycleRunners.length === 0 &&
+    unknownBusyLifecycleRunners.length === 0 &&
+    queuedRunSummary.blockingCount === 0 &&
+    activeRunSummary.blockingCount === 0;
   let scaleInSafety = null;
   let nextState = { ...state, version: config.stateVersion };
   if (operation === 'deallocate') {
-    const busyRunners = certigoRunners.filter((runner) => runner.busy);
-    if (busyRunners.length > 0) {
+    if (busyLifecycleRunners.length > 0) {
       reasons.push(
-        `busy runners: ${busyRunners.map((runner) => runner.name).join(', ')}`,
+        `busy runners: ${busyLifecycleRunners.map((runner) => runner.name).join(', ')}`,
       );
     }
-    if ((queuedRuns.total_count ?? 0) > 0) {
-      reasons.push(`queued workflow runs: ${queuedRuns.total_count}`);
-    }
-    if ((activeRuns.total_count ?? 0) > 0) {
-      reasons.push(`active workflow runs: ${activeRuns.total_count}`);
-    }
-    const inconsistentManagedRunners = instanceInventory.managedInstances
-      .filter(
-        ({ runner, virtualMachine }) =>
-          (runner.status === 'online') !==
-          isPoweredCapacity(virtualMachine),
-      )
-      .map(({ runner }) => runner.name);
-    if (inconsistentManagedRunners.length > 0) {
+    if (unknownBusyLifecycleRunners.length > 0) {
       reasons.push(
-        `managed runner power/online mismatches: ${inconsistentManagedRunners.join(', ')}`,
+        `runner busy state is not explicit: ${unknownBusyLifecycleRunners.map((runner) => runner.name).join(', ')}`,
       );
     }
+    if (queuedRunSummary.blockingCount > 0) {
+      reasons.push(
+        `queued workflow runs: ${queuedRunSummary.blockingCount}`,
+      );
+    }
+    if (activeRunSummary.blockingCount > 0) {
+      reasons.push(
+        `active workflow runs: ${activeRunSummary.blockingCount}`,
+      );
+    }
+    if (!terminalAlreadyDeallocated) {
+      const offlineManagedRunners = instanceInventory.managedInstances
+        .filter(
+          ({ runner, virtualMachine }) =>
+            runner.status !== 'online' ||
+            !isPoweredCapacity(virtualMachine),
+        )
+        .map(({ runner }) => runner.name);
+      if (offlineManagedRunners.length > 0) {
+        reasons.push(
+          `managed runners not powered and online: ${offlineManagedRunners.join(', ')}`,
+        );
+      }
 
-    const quietEligible =
-      reasons.length === 0 &&
-      busyRunners.length === 0 &&
-      (queuedRuns.total_count ?? 0) === 0 &&
-      (activeRuns.total_count ?? 0) === 0;
-    scaleInSafety = advanceScaleInSafety({
-      idle: quietEligible,
-      now,
-      quietPeriodSeconds: config.quietPeriodSeconds,
-      rearmSatisfied: capacitySatisfies(
-        usableCapacityByTrust,
-        state.scaleInSafety?.rearmTargetCapacityByTrust,
-      ),
-      requiredGuards: config.requiredPostQuietGuards,
-      state: state.scaleInSafety,
-    });
-    nextState.scaleInSafety = scaleInSafety.nextState;
-    if (scaleInSafety.rearmRequired) {
-      reasons.push('post-scale-in activity requires managed capacity rearm');
-    }
-    if (!scaleInSafety.ready) {
-      reasons.push(
-        'resettable five-minute quiet period and two post-quiet guards are incomplete',
-      );
+      const quietEligible =
+        reasons.length === 0 &&
+        busyLifecycleRunners.length === 0 &&
+        queuedRunSummary.blockingCount === 0 &&
+        activeRunSummary.blockingCount === 0;
+      scaleInSafety = advanceScaleInSafety({
+        idle: quietEligible,
+        now,
+        quietPeriodSeconds: config.quietPeriodSeconds,
+        rearmSatisfied: capacitySatisfies(
+          usableCapacityByTrust,
+          state.scaleInSafety?.rearmTargetCapacityByTrust,
+        ),
+        requiredGuards: config.requiredPostQuietGuards,
+        state: state.scaleInSafety,
+      });
+      nextState.scaleInSafety = scaleInSafety.nextState;
+      if (scaleInSafety.rearmRequired) {
+        reasons.push('post-scale-in activity requires managed capacity rearm');
+      }
+      if (!scaleInSafety.ready) {
+        reasons.push(
+          'resettable five-minute quiet period and two post-quiet guards are incomplete',
+        );
+      }
+    } else {
+      nextState.scaleInSafety = state.scaleInSafety ?? null;
     }
   }
 
-  const safeToRequestChange = reasons.length === 0;
+  const safeToRequestChange =
+    !terminalAlreadyDeallocated && reasons.length === 0;
   if (operation === 'deallocate' && safeToRequestChange) {
     nextState.scaleInSafety = armScaleInReactivation(
       nextState.scaleInSafety,
@@ -255,7 +465,10 @@ export function evaluateLifecycle({
   return {
     operation,
     preflightOnly: true,
+    requestedChange: safeToRequestChange ? operation : 'none',
     safeToRequestChange,
+    terminalAlreadyDeallocated,
+    terminalSafe: terminalAlreadyDeallocated,
     reasons,
     safety:
       scaleInSafety === null
@@ -272,26 +485,30 @@ export function evaluateLifecycle({
             quietPeriodSeconds: config.quietPeriodSeconds,
           },
     observed: {
-      activeRuns: activeRuns.total_count ?? 0,
+      activeRuns: activeRunSummary.blockingCount,
       absentRunners: instanceInventory.absentRunners,
       bindingMismatches: instanceInventory.bindingMismatches,
       azureVirtualMachines: (virtualMachines ?? []).length,
       certigoRunners: certigoRunners.length,
       dualTrustRunners: dualTrustRunners.length,
       externalVirtualMachines: instanceInventory.externalVirtualMachines,
-      externalGitHubRunnerIds: [...externalGitHubRunnerIds].sort(
-        (left, right) => left - right,
-      ),
       forbiddenVirtualMachinesPresent:
         instanceInventory.forbiddenVirtualMachinesPresent,
+      ignoredSystemDependabotRunIds: [
+        ...queuedRunSummary.ignoredRunIds,
+        ...activeRunSummary.ignoredRunIds,
+      ].sort(),
       managedMachineNames: instanceInventory.managedMachineNames,
       managedPoolNames: poolBoundaries.managedPoolNames,
       missingManagedRunnerVirtualMachines:
         instanceInventory.missingManagedRunnerVirtualMachines,
+      observedRunnerBindingMismatches:
+        observedRunners.bindingMismatches,
+      missingObservedRunnerBindings: observedRunners.missingBindings,
       unclassifiedVirtualMachines:
         instanceInventory.unclassifiedVirtualMachines,
       prRunners: prRunners.length,
-      queuedRuns: queuedRuns.total_count ?? 0,
+      queuedRuns: queuedRunSummary.blockingCount,
       unboundRunnerVirtualMachinePairs:
         instanceInventory.unboundRunnerVirtualMachinePairs,
       distinctIdentityBoundaryCount:
@@ -354,7 +571,7 @@ if (isMain) {
   });
 
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  if (!result.safeToRequestChange) {
+  if (!result.safeToRequestChange && !result.terminalSafe) {
     process.exitCode = 2;
   }
 }

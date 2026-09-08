@@ -300,9 +300,15 @@ Le VMSS live est `Standard_D2ads_v6`, autoscale min 2 / défaut 2 / max 4. Son s
 est dangereux car il ignore GitHub `busy`, et les runners portent simultanément
 `certigo-pr` et `certigo-trusted`. Toute automation mutable est donc bloquée.
 
-Le script `lifecycle-preflight.sh` inventorie sans mutation et refuse une déallocation en
-présence d'un label double, d'un job actif/en file, d'un scale-in CPU ou d'un écart entre VM
-et runners. La cible sérialisée et son rollback sont dans
+Le script `lifecycle-preflight.sh` inventorie sans mutation les dépôts Certigo et
+certigo-content et refuse une déallocation en présence d'un label double, d'un job actif/en
+file, d'un scale-in CPU ou d'un écart entre VM et runners. Un run système Dependabot n'est
+ignoré qu'après inspection de ses jobs, s'ils n'ont aucun runner et portent exclusivement le
+label `dependabot`; toute information manquante ou cible self-hosted reste bloquante. Si toutes
+les VM gérées exactes sont déjà explicitement `deallocated`, les trois registrations observées
+sont non-busy et la file valide est vide, le résultat est terminal-safe et ne demande aucun
+changement Azure, sans redémarrage artificiel ni quiet period rétroactive. Les autres dérives
+restent rapportées et bloquent toute future mutation. La cible sérialisée et son rollback sont dans
 [`docs/runbooks/CLOUD_LEAST_PRIVILEGE.md`](../../docs/runbooks/CLOUD_LEAST_PRIVILEGE.md).
 
 Le planificateur `capacity-plan.sh` ajoute une réconciliation de drift et un modèle
