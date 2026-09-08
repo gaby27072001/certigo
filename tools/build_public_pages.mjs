@@ -57,8 +57,66 @@ export async function buildPublicPages({
 
   const privacyPath = resolve(output, 'privacy-policy/index.html');
   const deletionPath = resolve(output, 'account-deletion/index.html');
+  const indexPath = resolve(output, 'index.html');
+  const configPath = resolve(output, 'staticwebapp.config.json');
   await mkdir(dirname(privacyPath), { recursive: true });
   await mkdir(dirname(deletionPath), { recursive: true });
+  await mkdir(dirname(indexPath), { recursive: true });
+
+  // Azure Static Web Apps sert /.well-known/ tel quel, mais attribue
+  // application/octet-stream a un fichier sans extension, et Apple exige
+  // application/json sur l'apple-app-site-association. Mesure du 2026-09-08 :
+  //   headers.content-type sur la route      -> ignore (octet-stream persiste)
+  //   mimeTypes avec la cle "."              -> ignore
+  //   rewrite vers un jumeau .json           -> 200, application/json, 0 redirection
+  // Un en-tete temoin pose sur la meme route etait bien renvoye : la regle
+  // s'appliquait, c'est content-type seul qui resistait. Sans ce controle, on
+  // aurait conclu que les routes ne fonctionnent pas.
+  //
+  // rewrite et non redirect : Apple ne suit aucune redirection. La distinction
+  // est invisible dans un navigateur et fatale pour un lien profond, qui echoue
+  // alors en silence en ouvrant le navigateur au lieu de l'application.
+  await writeFile(
+    configPath,
+    `${JSON.stringify(
+      {
+        mimeTypes: { '.json': 'application/json' },
+        routes: [
+          {
+            route: '/.well-known/apple-app-site-association',
+            rewrite: '/.well-known/apple-app-site-association.json',
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+
+  // Azure Static Web Apps refuse de publier un dossier sans fichier par defaut
+  // a la racine, et son client rend un code de sortie 0 en le refusant : le
+  // 2026-09-07, un deploiement « reussi » sans cette page a laisse les deux
+  // URLs en 404. GitHub Pages, lui, n'exigeait rien de tel. Cette page est
+  // aussi le « Site web » declare dans la fiche Google Play.
+  await writeFile(
+    indexPath,
+    layout(
+      'Certigo — informations légales',
+      `${publicDomain.publicWebOrigin}/`,
+      `<h1>Certigo — informations légales</h1>
+<p>Certigo est une application d’entraînement aux certifications IT. Cette page
+rassemble les documents publics de l’application.</p>
+<ul>
+  <li><a href="/privacy-policy/">Politique de confidentialité</a></li>
+  <li><a href="/account-deletion/">Demander la suppression d’un compte</a></li>
+</ul>
+<p>Contact : <a href="mailto:${htmlEscape(supportEmail)}">${htmlEscape(supportEmail)}</a></p>
+<p><small>Certigo est une plateforme indépendante, non affiliée aux organismes de
+certification dont elle prépare les examens.</small></p>`,
+    ),
+    'utf8',
+  );
 
   await writeFile(
     privacyPath,

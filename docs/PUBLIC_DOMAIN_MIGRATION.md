@@ -120,9 +120,10 @@ Sans site Pages servant l'origine vérifiée à la racine, ce workflow échoue a
 de produire un artefact. Il n'y a donc rien à neutraliser ; il faut seulement
 cesser de le décrire comme le chemin prévu.
 
-**L'hébergement des pages légales est donc un choix à trancher hors dépôt**, et
-il n'est pas tranché ici. Le DNS de `certigo-app.com` est délégué à Wix
-(`ns12.wixdns.net`, `ns13.wixdns.net`) et l'origine HTTPS répond déjà — un `404`
+**L'hébergement des pages légales est tranché : Azure Static Web Apps**, décision
+du 2026-09-07, détaillée dans la section « Hébergement retenu » ci-dessous. Le
+DNS de `certigo-app.com` est délégué à Wix (`ns12.wixdns.net`, `ns13.wixdns.net`)
+et l'origine HTTPS répond déjà — un `404`
 à la racine prouve que le DNS résout, que le certificat est valide et que la
 connexion aboutit, puisqu'un échec TLS ne produirait pas de code HTTP. Quel que
 soit l'hébergeur retenu, il doit servir exactement les chemins que l'ARM
@@ -133,9 +134,9 @@ compose, sans redirection ni préfixe :
 
 et, pour l'étape 4 seulement, `/.well-known/apple-app-site-association` et
 `/.well-known/assetlinks.json`, servis en clair, sans redirection et avec le
-type de contenu attendu par Apple et Google. Vérifier que l'hébergeur retenu
-sait servir `/.well-known/` **avant** de s'engager sur l'étape 4 : c'est la
-contrainte qui élimine le plus d'hébergeurs de sites vitrine.
+type de contenu attendu par Apple et Google. **Mesuré le 2026-09-08 sur l'hôte
+Azure retenu** : servi en clair, sans redirection, le type MIME de l'AASA
+demandant une réécriture — voir « `/.well-known/` est servi en clair » ci-dessous.
 
 **Condition d'invalidation de cette section** : elle cesse d'être vraie si le
 dépôt change de propriétaire pour un compte non-EMU, ou si l'entreprise cesse
@@ -143,6 +144,119 @@ d'utiliser les Enterprise Managed Users. Le seul fait d'activer Pages ou de
 poser un domaine personnalisé ne l'invalide pas, puisque la restriction porte
 sur la visibilité du site et non sur son existence. Recontrôler
 `gh api users/<owner> --jq .plan.name` avant de conclure.
+
+### Hébergement retenu : Azure Static Web Apps (décision du 2026-09-07)
+
+Les pages légales publiques sont servies par le Static Web App
+`swa-certigo-legal` (groupe `rg-certigo-web`, westeurope, SKU **Free**,
+souscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc`, locataire
+`16b3c013-d300-468d-ac64-7eda0820b6d3`). Le déploiement est automatique :
+`.github/workflows/deploy-legal-pages-azure.yml` reconstruit les pages depuis
+`docs/legal/*.md` et les publie à chaque modification sur `main`.
+
+**Ce qui a emporté la décision** n'est ni le prix ni le `/.well-known/`, mais le
+fait que `docs/legal/*.md` reste la source unique et que la page publiée en
+découle. Tout hébergeur exigeant un copier-coller manuel laissait la page
+publiée diverger silencieusement du dépôt le jour où quelqu'un oublierait de
+recopier une correction.
+
+**Alternatives écartées, avec leur coût mesuré le 2026-09-07 :**
+
+| Option | Verdict | Coût mesuré |
+| --- | --- | --- |
+| GitHub Pages | **Fermé**, pas cher | Site publiable en privé uniquement (EMU), voir la section ci-dessus |
+| Déplacer le dépôt vers un compte personnel | Écarté | 30 workflows, 68 fichiers nommant le dépôt, 9 secrets, 7 variables, 9 Environments, 4 runners à refaire — et une fenêtre où rien ne se déploie. **Non vérifié** : que l'EMU autorise seulement le transfert |
+| Wix | Écarté | Rattacher un domaine à un site Wix exige un abonnement Premium, ~17 $/mois |
+| Hostinger | Écarté | ~3-4 €/mois, et la recopie manuelle subsistait |
+| Azure Static Web Apps | **Retenu** | Gratuit, sert `/.well-known/`, pages générées depuis le dépôt |
+
+**Origine canonique : `https://www.certigo-app.com`, et non la racine.** Ce
+n'est pas un report : Wix ne supporte ni `ALIAS` ni `ANAME`, et Azure Static Web
+Apps ne publie aucune IP stable qu'un `A` pourrait viser. La racine est donc
+**fermée par le DNS du registrar**, de la même façon que Pages l'est par le type
+de compte. Un rattachement de la racine avait été créé puis supprimé : resté en
+`Validating` sans pouvoir aboutir, il aurait ressemblé à un chemin configuré.
+
+**Conséquence pour l'étape 4** : l'`apple-app-site-association` doit être servi
+depuis `www.certigo-app.com`, donc c'est **ce** domaine qui va dans
+l'entitlement Apple. Configurer la racine par habitude produit des liens
+profonds qui échouent **en silence** — un lien profond qui échoue n'affiche
+aucune erreur, il ouvre le navigateur.
+
+**Pourquoi le workflow n'utilise pas l'action officielle Azure.**
+`Azure/static-web-apps-deploy` est une action Docker, et le runner
+`certigo-trusted` n'a pas de Docker : mesuré le 2026-09-07 sur
+`vmss-certigo-runner-zonal_be505fa1`, `DOCKER=ABSENT`, `DAEMON=KO`, pour
+`NODE=v20.20.2` et `npx` présents. Le workflow passe donc par
+`@azure/static-web-apps-cli`, qui n'est que du Node.
+
+**Pourquoi le workflow vérifie les pages après les avoir publiées.** Le
+2026-09-07, une exécution locale de ce même CLI a rendu le **code de sortie 0
+sans rien publier** : les deux URLs répondaient `404` immédiatement après. Un
+déploiement qui ne prouve pas ce qu'il sert ne prouve rien, et l'étape finale
+inclut un contrôle négatif — un chemin absent doit échouer — sans lequel un site
+répondant `200` à tout ferait passer les vérifications pour une preuve.
+
+**Cause de ce faux vert, corrigée** : Azure Static Web Apps refuse de publier un
+dossier sans fichier par défaut à la racine, et son client **rend malgré tout 0**
+en le refusant. GitHub Pages n'exigeait rien de tel, donc
+`build_public_pages.mjs` ne produisait pas d'`index.html` racine ; il en génère
+un désormais, qui sert aussi de « Site web » déclaré dans la fiche Google Play.
+
+#### Mesuré le 2026-09-08 : `/.well-known/` est servi en clair, mais le type MIME de l'AASA demande une réécriture
+
+C'était « la contrainte qui élimine le plus d'hébergeurs de sites vitrine », et
+elle n'avait jamais été mesurée. Résultat, contre l'hôte réel :
+
+| Question | Mesure |
+| --- | --- |
+| `/.well-known/` est-il servi ? | **Oui**, `200` direct |
+| Y a-t-il une redirection ? | **Non**, `num_redirects=0` |
+| Y a-t-il un préfixe de chemin ? | **Non**, le chemin est servi tel quel |
+| `assetlinks.json` a-t-il le bon type ? | **Oui**, `application/json` |
+| `apple-app-site-association` a-t-il le bon type ? | **Non par défaut** : `application/octet-stream` |
+
+Apple exige `application/json` sur ce fichier, qui n'a pas d'extension. Trois
+approches ont été essayées :
+
+| Approche | Résultat |
+| --- | --- |
+| `headers.content-type` sur la route | **Ignoré**, `octet-stream` persiste |
+| `mimeTypes` avec la clé `"."` | **Ignoré** |
+| `rewrite` vers un jumeau `.json` | **`200`, `application/json`, 0 redirection** |
+
+**Le contrôle qui rend ce verdict utilisable** : un en-tête témoin
+`x-certigo-route-temoin` posé sur la *même* route était bien renvoyé. La règle
+s'appliquait donc, et c'est `content-type` seul qui résistait. Sans ce contrôle,
+on aurait conclu que les routes de `staticwebapp.config.json` ne fonctionnent
+pas, et cherché la solution ailleurs.
+
+`rewrite` et non `redirect` : **Apple ne suit aucune redirection.** La
+distinction est invisible dans un navigateur — les deux affichent le fichier —
+et fatale pour un lien profond, qui échoue alors en silence en ouvrant le
+navigateur au lieu de l'application.
+
+La configuration est générée par `tools/build_public_pages.mjs`, donc la route
+existe déjà. Le fichier `apple-app-site-association.json` visé par la réécriture
+n'est pas encore produit : la route rend `404` sans redirection en attendant, ce
+qui est le comportement honnête. **La génération et la validation de ce fichier
+existent déjà** sur la branche `gchambaud-microsoft-host-certigo-public-pages`
+(PR #352, fermée parce qu'elle verrouillait l'origine sur l'apex) ; ne pas les
+réécrire.
+
+**Ce qui n'a pas été touché, et pourquoi.** `deploy-privacy-policy.yml` et
+`publish-verified-public-pages.yml` visent tous deux GitHub Pages et sont donc
+sans objet, mais ils restent en place : `validate-workflow-security.mjs` exige
+huit marqueurs textuels dans le second et nomme le premier deux fois, et
+`tools/tests/test_project_state.py` le nomme aussi. Les retirer ou les déplacer
+casserait un fichier de trust-root et un test — c'est un changement de contrat,
+pas de l'hygiène.
+
+**Condition d'invalidation de cette section** : elle cesse d'être vraie si
+`swa-certigo-legal` est supprimé, si le domaine `certigo-app.com` quitte Wix
+pour un registrar supportant `ALIAS`/`ANAME` (ce qui rouvrirait la racine), ou
+si le SKU Free cesse de couvrir les besoins. Un simple changement d'hôte par
+défaut Azure ne l'invalide pas.
 
 ## Actions humaines après achat du domaine
 

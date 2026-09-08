@@ -48,7 +48,7 @@ Les données actives sont conservées tant que le compte existe. L’utilisateur
 peut lancer la suppression depuis **Profil > Mon compte > Supprimer le compte**,
 ou utiliser la page publique :
 
-https://gchambaud_microsoft.github.io/Certigo/account-deletion/
+https://www.certigo-app.com/account-deletion/
 
 Le flux supprime les données actives associées au compte et les identifiants
 gérés par Certigo immédiatement après la vérification et l’exécution de la
