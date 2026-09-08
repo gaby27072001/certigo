@@ -1,8 +1,12 @@
+import 'package:core/core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../features/auth/presentation/widgets/email_verification_banner.dart';
+import '../features/manager/application/manager_providers.dart';
+import '../features/manager/presentation/manager_workspace_switcher.dart';
 import 'account_deletion_resume_scope.dart';
 import 'content/content_update_banner.dart';
 
@@ -11,7 +15,7 @@ import 'content/content_update_banner.dart';
 /// Uses [StatefulNavigationShell] so each tab keeps its own navigation stack
 /// and scroll position. The bottom bar is a [GlassSurface] to extend the Prism
 /// material language to chrome, not just content.
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.shell});
 
   final StatefulNavigationShell shell;
@@ -34,8 +38,11 @@ class AppShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final PrismColorScheme p = context.prism;
+    final organization = ref.watch(managerOrganizationContextProvider);
+    final bool showEnterprise =
+        AppEnv.managerPortalEnabled && ref.watch(managerPolicyProvider).canOpenPortal(organization);
     return Scaffold(
       extendBody: true,
       // The verification banner sits above the tab content and self-hides unless
@@ -45,6 +52,22 @@ class AppShell extends StatelessWidget {
           children: <Widget>[
             const EmailVerificationBanner(),
             const ContentUpdateBanner(),
+            if (showEnterprise)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  PrismSpacing.gutter,
+                  PrismSpacing.sm,
+                  PrismSpacing.gutter,
+                  0,
+                ),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: ManagerWorkspaceSwitcher(
+                    enterpriseSelected: false,
+                    organizationId: organization!.organizationId,
+                  ),
+                ),
+              ),
             Expanded(child: shell),
           ],
         ),
