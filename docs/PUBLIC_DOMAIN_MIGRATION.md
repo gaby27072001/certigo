@@ -134,9 +134,9 @@ compose, sans redirection ni préfixe :
 
 et, pour l'étape 4 seulement, `/.well-known/apple-app-site-association` et
 `/.well-known/assetlinks.json`, servis en clair, sans redirection et avec le
-type de contenu attendu par Apple et Google. Vérifier que l'hébergeur retenu
-sait servir `/.well-known/` **avant** de s'engager sur l'étape 4 : c'est la
-contrainte qui élimine le plus d'hébergeurs de sites vitrine.
+type de contenu attendu par Apple et Google. **Mesuré le 2026-09-08 sur l'hôte
+Azure retenu** : servi en clair, sans redirection, le type MIME de l'AASA
+demandant une réécriture — voir « `/.well-known/` est servi en clair » ci-dessous.
 
 **Condition d'invalidation de cette section** : elle cesse d'être vraie si le
 dépôt change de propriétaire pour un compte non-EMU, ou si l'entreprise cesse
@@ -196,6 +196,53 @@ sans rien publier** : les deux URLs répondaient `404` immédiatement après. Un
 déploiement qui ne prouve pas ce qu'il sert ne prouve rien, et l'étape finale
 inclut un contrôle négatif — un chemin absent doit échouer — sans lequel un site
 répondant `200` à tout ferait passer les vérifications pour une preuve.
+
+**Cause de ce faux vert, corrigée** : Azure Static Web Apps refuse de publier un
+dossier sans fichier par défaut à la racine, et son client **rend malgré tout 0**
+en le refusant. GitHub Pages n'exigeait rien de tel, donc
+`build_public_pages.mjs` ne produisait pas d'`index.html` racine ; il en génère
+un désormais, qui sert aussi de « Site web » déclaré dans la fiche Google Play.
+
+#### Mesuré le 2026-09-08 : `/.well-known/` est servi en clair, mais le type MIME de l'AASA demande une réécriture
+
+C'était « la contrainte qui élimine le plus d'hébergeurs de sites vitrine », et
+elle n'avait jamais été mesurée. Résultat, contre l'hôte réel :
+
+| Question | Mesure |
+| --- | --- |
+| `/.well-known/` est-il servi ? | **Oui**, `200` direct |
+| Y a-t-il une redirection ? | **Non**, `num_redirects=0` |
+| Y a-t-il un préfixe de chemin ? | **Non**, le chemin est servi tel quel |
+| `assetlinks.json` a-t-il le bon type ? | **Oui**, `application/json` |
+| `apple-app-site-association` a-t-il le bon type ? | **Non par défaut** : `application/octet-stream` |
+
+Apple exige `application/json` sur ce fichier, qui n'a pas d'extension. Trois
+approches ont été essayées :
+
+| Approche | Résultat |
+| --- | --- |
+| `headers.content-type` sur la route | **Ignoré**, `octet-stream` persiste |
+| `mimeTypes` avec la clé `"."` | **Ignoré** |
+| `rewrite` vers un jumeau `.json` | **`200`, `application/json`, 0 redirection** |
+
+**Le contrôle qui rend ce verdict utilisable** : un en-tête témoin
+`x-certigo-route-temoin` posé sur la *même* route était bien renvoyé. La règle
+s'appliquait donc, et c'est `content-type` seul qui résistait. Sans ce contrôle,
+on aurait conclu que les routes de `staticwebapp.config.json` ne fonctionnent
+pas, et cherché la solution ailleurs.
+
+`rewrite` et non `redirect` : **Apple ne suit aucune redirection.** La
+distinction est invisible dans un navigateur — les deux affichent le fichier —
+et fatale pour un lien profond, qui échoue alors en silence en ouvrant le
+navigateur au lieu de l'application.
+
+La configuration est générée par `tools/build_public_pages.mjs`, donc la route
+existe déjà. Le fichier `apple-app-site-association.json` visé par la réécriture
+n'est pas encore produit : la route rend `404` sans redirection en attendant, ce
+qui est le comportement honnête. **La génération et la validation de ce fichier
+existent déjà** sur la branche `gchambaud-microsoft-host-certigo-public-pages`
+(PR #352, fermée parce qu'elle verrouillait l'origine sur l'apex) ; ne pas les
+réécrire.
 
 **Ce qui n'a pas été touché, et pourquoi.** `deploy-privacy-policy.yml` et
 `publish-verified-public-pages.yml` visent tous deux GitHub Pages et sont donc

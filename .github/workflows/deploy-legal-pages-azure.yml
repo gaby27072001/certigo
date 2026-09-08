@@ -87,6 +87,10 @@ jobs:
           node tools/build_public_pages.mjs --output _site
           test -f _site/privacy-policy/index.html
           test -f _site/account-deletion/index.html
+          # Azure refuse de publier un dossier sans fichier par defaut a la
+          # racine, et son client rend 0 en le refusant.
+          test -f _site/index.html
+          test -f _site/staticwebapp.config.json
 
       - name: Publish to Azure Static Web Apps
         shell: bash
@@ -160,3 +164,17 @@ jobs:
             exit 1
           fi
           echo "OK - an absent path returns ${absent_status}, so the checks above discriminate."
+
+          # /.well-known/ doit rester servi tel quel, sans redirection : Apple
+          # n'en suit aucune, et un lien profond qui echoue n'affiche pas
+          # d'erreur, il ouvre le navigateur. Une regle attrape-tout ajoutee un
+          # jour dans staticwebapp.config.json casserait cette propriete en
+          # silence ; cette etape la ferait echouer bruyamment.
+          well_known_redirects="$(curl --silent --output /dev/null \
+            --write-out '%{num_redirects}' --location --max-time 30 \
+            "${SWA_DEFAULT_HOST}/.well-known/apple-app-site-association")"
+          if [[ "$well_known_redirects" != "0" ]]; then
+            echo "::error::/.well-known/ is redirected (${well_known_redirects} hop(s)); Apple follows none."
+            exit 1
+          fi
+          echo "OK - /.well-known/ is served without redirection."
