@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 /// Écran de configuration invalide, affiché **à la place** de l'application
 /// quand un build strict (prod/staging) démarre avec une configuration
-/// d'authentification erronée (voir [AppEnv.validate]).
+/// runtime erronée (voir [AppEnv.validate]).
 ///
 /// Objectif : **échouer fort et visiblement** plutôt que de laisser l'app
 /// démarrer sur une config dev/incohérente (API dev en prod, Entra partiel,
@@ -51,7 +51,7 @@ class ConfigErrorApp extends StatelessWidget {
                     Text(
                       'L\'application ne peut pas démarrer en environnement '
                       '« ${AppEnv.flavor.name} » : la configuration '
-                      'd\'authentification est incomplète ou incohérente. '
+                      'runtime est incomplète ou incohérente. '
                       'Corrigez les points ci-dessous (--dart-define / CI) puis '
                       'reconstruisez l\'application.',
                       textAlign: TextAlign.center,
@@ -73,7 +73,7 @@ class ConfigErrorApp extends StatelessWidget {
                     ],
                     const SizedBox(height: 24),
                     Text(
-                      'Référence : docs/CONFIG_AUTH.md',
+                      'Références : docs/CONFIG_AUTH.md et docs/RELEASE_MOBILE.md',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),

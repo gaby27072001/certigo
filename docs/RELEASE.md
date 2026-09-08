@@ -188,9 +188,16 @@ printf '%s' \
    - [ ] `gh release create vX.Y.Z --generate-notes` (optionnel mais recommandé).
 4. **Mobile**
    - [ ] Dispatch `release-android` avec le SemVer du tag → valider la *gate* `beta`.
+   - [ ] Sentry : projet protégé contre IP/PII et dépassement de quota, variables
+         Codemagic présentes, `SENTRY_AUTH_TOKEN` marqué Secure.
    - [ ] iOS : lancer/valider la release TestFlight (Codemagic — cf. `RELEASE_MOBILE.md`).
+   - [ ] Avant l'Alpha interne : exécuter `ios-crash-smoke`, vérifier après
+         relance les événements Dart et natif symboliqués, puis expirer cette
+         build destructive (cf. `runbooks/MOBILE_CRASH_REPORTING.md`).
 5. **Post-release**
    - [ ] Vérifier santé backend (`/api/health`) et publication mobile.
+   - [ ] Vérifier la release/dist Sentry et l'absence de PII, IP brute ou token
+         dans les événements de la build publiée.
    - [ ] Consigner la version et l'horodatage (registre / changelog).
 
 ---

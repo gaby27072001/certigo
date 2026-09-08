@@ -257,9 +257,12 @@ noms sont référencés dans le code.
 Codemagic n'a pas accès au Key Vault : créer dans le dashboard Codemagic
 (**Settings → Environment variables**) un **groupe** nommé `certigo_mobile_config`
 contenant `PROD_API_BASE_URL`, `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`,
-`ENTRA_API_SCOPE` (mêmes formats que le tableau ci-dessus). `codemagic.yaml`
-référence ce groupe et injecte les `--dart-define` ; `CERTIGO_ENV` est fixé
-inline (`prod` pour `ios-release`, `dev` pour `ios-release-dry`).
+`ENTRA_API_SCOPE`, `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`,
+`SENTRY_AUTH_TOKEN` et `CERTIFICATE_PRIVATE_KEY`. `codemagic.yaml` référence ce
+groupe et injecte uniquement les valeurs publiques utiles à l'app en
+`--dart-define` ; `CERTIGO_ENV` est fixé inline (`prod` pour `ios-release`,
+`dev` pour `ios-release-dry`, `staging` pour `ios-crash-smoke`). Le token Sentry
+et la clé privée de signature ne sont jamais injectés dans le binaire.
 
 ---
 
@@ -426,10 +429,12 @@ approbation et sa restriction à `main`.
    par `codemagic.yaml`.
 4. **Groupe de variables `certigo_mobile_config`** : dashboard → **App >
    Environment variables** → ouvrir le groupe existant
-   **`certigo_mobile_config`** et vérifier ces **8 variables NON secrètes**
-   **+ 1 variable SÉCURISÉE**. Certaines valeurs sont injectées en
+   **`certigo_mobile_config`** (ou le créer s'il n'existe pas) et vérifier ces
+   **11 variables NON secrètes + 2 variables SÉCURISÉES**. Certaines valeurs
+   sont injectées en
    `--dart-define`; les variables de domaine public alimentent la gate
-   fail-closed avant le build :
+   fail-closed avant le build. Seuls les champs marqués Secure contiennent un
+   secret ; le DSN Sentry est public mais reste configurable et non commité :
 
    | Variable | Valeur | Secure ? | Utilisée par |
    |---|---|---|---|
@@ -437,11 +442,15 @@ approbation et sa restriction à `main`.
    | `ENTRA_CLIENT_ID` | `4d1f1075-7bc5-4764-947b-701435a85f8c` | non | `ios-release` + `ios-release-dry` |
    | `ENTRA_AUTHORITY` | `https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0` | non | idem |
    | `ENTRA_API_SCOPE` | `api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation` | non | idem |
+   | `SENTRY_DSN` | DSN HTTPS public du projet Flutter Sentry | non | binaire des 3 workflows IPA |
+   | `SENTRY_ORG` | slug d'organisation Sentry | non | upload dSYM Codemagic |
+   | `SENTRY_PROJECT` | slug du projet Sentry | non | upload dSYM Codemagic |
+   | `SENTRY_AUTH_TOKEN` | token dédié, moindre privilège, pour upload de debug files/releases | **OUI (Secure)** | Codemagic uniquement, jamais `--dart-define` |
    | `ACCOUNT_DELETION_ENABLED` | `false` tant que la gate destructive Cosmos n'est pas close | non | `ios-release` + `ios-release-dry` |
    | `PUBLIC_WEB_ORIGIN` | origine HTTPS canonique d'un domaine Certigo possédé et vérifié | non | gate `ios-release` |
    | `PUBLIC_DOMAIN_VERIFIED` | `true` uniquement après vérification humaine du domaine public | non | gate `ios-release` |
    | `APPLE_CIAM_DOMAIN_RECONFIGURED` | `true` uniquement après reconfiguration Apple/CIAM vérifiée | non | gate `ios-release` |
-   | `CERTIFICATE_PRIVATE_KEY` | clé privée **RSA 2048 PEM non chiffrée** (`openssl genrsa 2048`), sans passphrase. Sert à créer le certificat de distribution iOS au 1er build. | **OUI (Secure)** | les 3 workflows iOS |
+   | `CERTIFICATE_PRIVATE_KEY` | clé privée **RSA 2048 PEM non chiffrée** (`openssl genrsa 2048`), sans passphrase. Sert à créer le certificat de distribution iOS au 1er build. | **OUI (Secure)** | les 4 workflows iOS |
 
    > Sans les 4 premières : boutons sociaux masqués et/ou login e-mail cassé. Mêmes
    > valeurs que côté Android (Key Vault `mobile-*` / `vars.MOBILE_*`). Le
@@ -451,6 +460,10 @@ approbation et sa restriction à `main`.
    > « Cannot save Signing Certificates without certificate private key ». La clé
    > n'a **pas** de passphrase → aucun `--certificate-key-password` requis. Cochez
    > **Secure** pour cette variable (elle est masquée dans les logs).
+   > Sans l'une des quatre variables Sentry, sans dSYM ou si l'upload est refusé,
+   > les workflows IPA échouent avant publication. Le setup confidentialité,
+   > quotas et smoke test est détaillé dans
+   > [`runbooks/MOBILE_CRASH_REPORTING.md`](./runbooks/MOBILE_CRASH_REPORTING.md).
    >
    > Les trois variables `PUBLIC_*`/`APPLE_CIAM_*` ne sont pas présentes dans le
    > scope GitHub `beta` observé le 2026-09-04, et ce scope ne prouve de toute
@@ -515,16 +528,36 @@ gh secret set ASC_KEY_P8_BASE64               < authkey.b64
 1. Se connecter sur <https://codemagic.io> → sélectionner le repo Certigo.
 2. Cliquer **Start new build** → choisir le workflow **`ios-release`**.
    - Pour un dry run (IPA sans upload) : choisir **`ios-release-dry`**.
+   - Pour la validation destructive du crash reporting : choisir
+     **`ios-crash-smoke`** (TestFlight interne uniquement).
    - Hors Alpha seulement : pour distribuer aux testeurs externes, modifier
      `beta_groups` dans `codemagic.yaml` avant de lancer.
 3. Ou pousser un **tag git `v*`** (ex: `git tag -a v1.2.3 -m "Release v1.2.3" && git push --tags`) ;
    cela déclenche automatiquement `ios-release`.
 4. Le workflow : `analyze`/`test` → signature automatique via App Store Connect
-   API → `flutter build ipa` → upload TestFlight.
+   API → gate Sentry → `flutter build ipa` → vérification/upload bloquant des
+   dSYM → upload TestFlight.
 5. Dans **App Store Connect → TestFlight**, la build apparaît après traitement
    Apple (quelques minutes).
 
-### 4.4 TestFlight interne puis externe
+### 4.4 Crash reporting et symbolication iOS
+
+Les builds IPA imposent `CRASH_REPORTING_REQUIRED=true`. La release Sentry est
+stable (`com.certigo.mobileapp@<version>+<build>`), la distribution est le numéro
+de build Codemagic et l'environnement suit `CERTIGO_ENV`. Le pipeline archive
+les dSYM et exécute un upload Sentry direct avec `--wait`; aucun symbole n'est
+uploadé par la CI de pull request.
+
+Avant l'Alpha, exécuter l'action manuelle de setup et les deux crashs volontaires
+Dart/natif du runbook
+[`runbooks/MOBILE_CRASH_REPORTING.md`](./runbooks/MOBILE_CRASH_REPORTING.md).
+Après le crash natif, relancer impérativement la build afin que Sentry Cocoa
+rejoue l'enveloppe persistée, puis vérifier les frames symboliquées.
+
+Xcode Organizer reste un complément TestFlight opt-in dépendant du partage des
+diagnostics Apple ; Sentry est le système principal et bloquant.
+
+### 4.5 TestFlight interne puis externe
 
 État historique : `Internal Testers` existait et le build `1.0.1 (8)` avait été
 traité et installé au moins une fois. Pour l'Alpha, réutiliser ce groupe avec un
@@ -536,7 +569,7 @@ traité et installé au moins une fois. Pour l'Alpha, réutiliser ce groupe avec
 - **Externe — post-Alpha uniquement** (≤ 10 000) : créer un **groupe externe**,
   soumettre la **première** build à la **revue bêta Apple**, puis distribuer.
 
-### 4.5 Détails de signature
+### 4.6 Détails de signature
 
 - **Signature Codemagic** : `fetch-signing-files` récupère le certificat et le
   profil via l'intégration `AppStoreConnect`, puis les importe dans un
@@ -545,7 +578,7 @@ traité et installé au moins une fois. Pour l'Alpha, réutiliser ce groupe avec
 - **Authentification upload** : clé **API App Store Connect** (`.p8`) → pas
   d'Apple ID ni de 2FA en CI.
 
-### 4.6 ~~fastlane match~~ — Remplacé par Codemagic automatic signing
+### 4.7 ~~fastlane match~~ — Remplacé par Codemagic automatic signing
 
 > ⛔ **fastlane match n'est plus utilisé.** Codemagic gère les certificats et
 > profils iOS nativement via l'**App Store Connect API** (signature automatique).

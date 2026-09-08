@@ -19,21 +19,26 @@
 #        ENTRA_CLIENT_ID    = 4d1f1075-7bc5-4764-947b-701435a85f8c
 #        ENTRA_AUTHORITY    = https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0
 #        ENTRA_API_SCOPE    = api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation
+#        SENTRY_DSN         = https://<public-key>@<ingest-host>/<project-id>
+#        SENTRY_ORG         = <organization-slug>
+#        SENTRY_PROJECT     = <project-slug>
 #        ACCOUNT_DELETION_ENABLED = false until the destructive Cosmos gate passes
 #        PUBLIC_WEB_ORIGIN, PUBLIC_DOMAIN_VERIFIED and
 #        APPLE_CIAM_DOMAIN_RECONFIGURED = fail-closed public-domain contract
 #      Missing values keep social buttons hidden and/or break email login. Same
 #      values as Android (Key Vault mobile-* / GitHub vars.MOBILE_*).
-#      Plus one SECURE variable (masked, NOT a dart-define - used only to create
-#      the iOS distribution certificate on the first build):
+#      Plus two SECURE variables (masked, never committed):
 #        CERTIFICATE_PRIVATE_KEY = unencrypted RSA 2048 private key in PEM form
 #          (openssl genrsa 2048). No passphrase. Required by fetch-signing-files
 #          --create; without it the build fails "Cannot save Signing Certificates
 #          without certificate private key".
+#        SENTRY_AUTH_TOKEN = least-privilege Sentry organization token used only
+#          by Codemagic to upload dSYMs. It is never passed as a dart-define.
 #
 # WORKFLOWS:
 #   ios-release         : tag v* -> signed IPA + upload to TestFlight (prod config)
 #   ios-release-dry     : push main -> signed IPA, NO upload (dev config, validation)
+#   ios-crash-smoke     : manual -> destructive internal TestFlight crash test
 #   ios-refresh-signing : manual only -> refresh signing profiles via ASC API
 #
 # Build status is reported to GitHub automatically by the Codemagic GitHub App
@@ -53,6 +58,7 @@ definitions:
 
   artifacts: &artifacts
     - apps/mobile/build/ios/ipa/*.ipa
+    - apps/mobile/build/ios/symbols/*.zip
     - /tmp/xcodebuild_logs/*.log
     - apps/mobile/build/ios/logs/*.log
 
@@ -133,6 +139,85 @@ definitions:
         echo "Resolved version: $BUILD_NAME (+$BUILD_NUMBER)"
         echo "BUILD_NAME=$BUILD_NAME"     >> "$CM_ENV"
         echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$CM_ENV"
+    - &step_sentry_config_gate
+      name: Verify required crash reporting configuration
+      script: |
+        set -euo pipefail
+        if [ "${CRASH_REPORTING_REQUIRED:-}" != "true" ]; then
+          echo "Crash reporting must be required for every signed iOS build." >&2
+          exit 1
+        fi
+
+        missing=0
+        for name in SENTRY_DSN SENTRY_ORG SENTRY_PROJECT; do
+          if [ -z "$(printenv "$name" 2>/dev/null || true)" ]; then
+            echo "Missing required Codemagic variable: $name" >&2
+            missing=1
+          fi
+        done
+        if [ "$missing" -ne 0 ]; then
+          exit 1
+        fi
+
+        if [[ ! "$SENTRY_DSN" =~ ^https://[^:@/?#]+@[^/?#]+/.+ ]] ||
+           [[ "$SENTRY_DSN" == *"?"* ]] ||
+           [[ "$SENTRY_DSN" == *"#"* ]]; then
+          echo "SENTRY_DSN must be an HTTPS DSN containing only its public key and project id." >&2
+          exit 1
+        fi
+        if [[ ! "$SENTRY_ORG" =~ ^[A-Za-z0-9_-]+$ ]] ||
+           [[ ! "$SENTRY_PROJECT" =~ ^[A-Za-z0-9_-]+$ ]]; then
+          echo "SENTRY_ORG and SENTRY_PROJECT must be valid Sentry slugs." >&2
+          exit 1
+        fi
+
+        SENTRY_RELEASE="${BUNDLE_ID}@${BUILD_NAME}+${BUILD_NUMBER}"
+        SENTRY_DIST="$BUILD_NUMBER"
+        export SENTRY_RELEASE SENTRY_DIST
+        echo "SENTRY_RELEASE=$SENTRY_RELEASE" >> "$CM_ENV"
+        echo "SENTRY_DIST=$SENTRY_DIST"       >> "$CM_ENV"
+        echo "Crash reporting configuration accepted for release $SENTRY_RELEASE."
+    - &step_upload_sentry_symbols
+      name: Upload and archive iOS dSYMs (blocking)
+      script: |
+        set -euo pipefail
+        if [ -z "${SENTRY_AUTH_TOKEN:-}" ]; then
+          echo "Missing required secure Codemagic variable: SENTRY_AUTH_TOKEN" >&2
+          exit 1
+        fi
+        DSYM_ROOT="build/ios/archive/Runner.xcarchive/dSYMs"
+        if [ ! -d "$DSYM_ROOT" ]; then
+          echo "Expected dSYM directory is missing: $DSYM_ROOT" >&2
+          exit 1
+        fi
+        DSYM_COUNT="$(find "$DSYM_ROOT" -type d -name '*.dSYM' -prune -print | wc -l | tr -d ' ')"
+        if [ "$DSYM_COUNT" -eq 0 ]; then
+          echo "No .dSYM bundle was produced; refusing to publish an unsymbolicated build." >&2
+          exit 1
+        fi
+
+        # The plugin discovers Flutter/iOS debug files and downloads a checksum-
+        # verified sentry-cli. Its current release can log some CLI failures
+        # without propagating a non-zero exit, so the direct upload below is the
+        # authoritative fail-closed gate.
+        dart run sentry_dart_plugin
+        SENTRY_CLI=".dart_tool/pub/bin/sentry_dart_plugin/sentry-cli"
+        if [ ! -x "$SENTRY_CLI" ]; then
+          echo "sentry-cli was not installed at the expected verified path." >&2
+          exit 1
+        fi
+        "$SENTRY_CLI" debug-files upload \
+          --org "$SENTRY_ORG" \
+          --project "$SENTRY_PROJECT" \
+          --wait \
+          "$DSYM_ROOT"
+
+        mkdir -p build/ios/symbols
+        ditto -c -k --sequesterRsrc --keepParent \
+          "$DSYM_ROOT" \
+          "build/ios/symbols/Certigo-${BUILD_NAME}-${BUILD_NUMBER}-dSYMs.zip"
+        echo "Uploaded and archived $DSYM_COUNT dSYM bundle(s)."
+      working_directory: apps/mobile
 
 workflows:
 
@@ -156,6 +241,9 @@ workflows:
         BUNDLE_ID: com.certigo.mobileapp
         FLUTTER_APP_PATH: apps/mobile
         CERTIGO_ENV: prod
+        CRASH_REPORTING_ENABLED: "true"
+        CRASH_REPORTING_REQUIRED: "true"
+        CRASH_SMOKE_TEST_ENABLED: "false"
     cache: *cache
     triggering:
       events:
@@ -171,6 +259,7 @@ workflows:
       - *step_test
       - *step_setup_signing
       - *step_resolve_version
+      - *step_sentry_config_gate
       - name: Build signed IPA (production)
         script: |
           set -euo pipefail
@@ -183,10 +272,17 @@ workflows:
             --dart-define=ENTRA_AUTHORITY="$ENTRA_AUTHORITY" \
             --dart-define=ENTRA_API_SCOPE="$ENTRA_API_SCOPE" \
             --dart-define=ACCOUNT_DELETION_ENABLED="$ACCOUNT_DELETION_ENABLED" \
+            --dart-define=CRASH_REPORTING_ENABLED="$CRASH_REPORTING_ENABLED" \
+            --dart-define=CRASH_REPORTING_REQUIRED="$CRASH_REPORTING_REQUIRED" \
+            --dart-define=CRASH_SMOKE_TEST_ENABLED="$CRASH_SMOKE_TEST_ENABLED" \
+            --dart-define=SENTRY_DSN="$SENTRY_DSN" \
+            --dart-define=SENTRY_RELEASE="$SENTRY_RELEASE" \
+            --dart-define=SENTRY_DIST="$SENTRY_DIST" \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist="$HOME/export_options.plist"
         working_directory: apps/mobile
+      - *step_upload_sentry_symbols
     artifacts: *artifacts
     publishing:
       app_store_connect:
@@ -222,6 +318,9 @@ workflows:
         FLUTTER_APP_PATH: apps/mobile
         CERTIGO_ENV: dev
         API_BASE_URL: "https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net/api"
+        CRASH_REPORTING_ENABLED: "true"
+        CRASH_REPORTING_REQUIRED: "true"
+        CRASH_SMOKE_TEST_ENABLED: "false"
         # Runtime content sync (offline cache + integrity layer) is exercised on the
         # dev artifact only. Production stays on the compile-time default (false).
         RUNTIME_CONTENT_MOBILE: "true"
@@ -239,6 +338,7 @@ workflows:
       - *step_test
       - *step_setup_signing
       - *step_resolve_version
+      - *step_sentry_config_gate
       - name: Build signed IPA (dev, no upload)
         script: |
           set -euo pipefail
@@ -253,12 +353,85 @@ workflows:
             --dart-define=ENTRA_AUTHORITY="$ENTRA_AUTHORITY" \
             --dart-define=ENTRA_API_SCOPE="$ENTRA_API_SCOPE" \
             --dart-define=ACCOUNT_DELETION_ENABLED="$ACCOUNT_DELETION_ENABLED" \
+            --dart-define=CRASH_REPORTING_ENABLED="$CRASH_REPORTING_ENABLED" \
+            --dart-define=CRASH_REPORTING_REQUIRED="$CRASH_REPORTING_REQUIRED" \
+            --dart-define=CRASH_SMOKE_TEST_ENABLED="$CRASH_SMOKE_TEST_ENABLED" \
+            --dart-define=SENTRY_DSN="$SENTRY_DSN" \
+            --dart-define=SENTRY_RELEASE="$SENTRY_RELEASE" \
+            --dart-define=SENTRY_DIST="$SENTRY_DIST" \
             --dart-define=RUNTIME_CONTENT_MOBILE="$RUNTIME_CONTENT_MOBILE" \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist="$HOME/export_options.plist"
         working_directory: apps/mobile
+      - *step_upload_sentry_symbols
     artifacts: *artifacts
+
+  # ===========================================================================
+  # ios-crash-smoke : manual-only destructive TestFlight build. It exposes
+  # explicit buttons for one Dart error and one native iOS fatal crash.
+  # ===========================================================================
+  ios-crash-smoke:
+    name: iOS - Internal crash reporting smoke
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    integrations:
+      app_store_connect: AppStoreConnect
+    environment:
+      flutter: 3.44.4
+      xcode: latest
+      cocoapods: default
+      groups:
+        - certigo_mobile_config
+      vars:
+        BUNDLE_ID: com.certigo.mobileapp
+        FLUTTER_APP_PATH: apps/mobile
+        CERTIGO_ENV: staging
+        CRASH_REPORTING_ENABLED: "true"
+        CRASH_REPORTING_REQUIRED: "true"
+        CRASH_SMOKE_TEST_ENABLED: "true"
+    cache: *cache
+    scripts:
+      - *step_pub_get
+      - *step_analyze
+      - *step_test
+      - *step_setup_signing
+      - *step_resolve_version
+      - *step_sentry_config_gate
+      - name: Build destructive internal crash-test IPA
+        script: |
+          set -euo pipefail
+          flutter build ipa --release \
+            --dart-define=CERTIGO_ENV="$CERTIGO_ENV" \
+            --dart-define=API_BASE_URL="$PROD_API_BASE_URL" \
+            --dart-define=ENTRA_CLIENT_ID="$ENTRA_CLIENT_ID" \
+            --dart-define=ENTRA_AUTHORITY="$ENTRA_AUTHORITY" \
+            --dart-define=ENTRA_API_SCOPE="$ENTRA_API_SCOPE" \
+            --dart-define=ACCOUNT_DELETION_ENABLED=false \
+            --dart-define=CRASH_REPORTING_ENABLED="$CRASH_REPORTING_ENABLED" \
+            --dart-define=CRASH_REPORTING_REQUIRED="$CRASH_REPORTING_REQUIRED" \
+            --dart-define=CRASH_SMOKE_TEST_ENABLED="$CRASH_SMOKE_TEST_ENABLED" \
+            --dart-define=SENTRY_DSN="$SENTRY_DSN" \
+            --dart-define=SENTRY_RELEASE="$SENTRY_RELEASE" \
+            --dart-define=SENTRY_DIST="$SENTRY_DIST" \
+            --build-name="$BUILD_NAME" \
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist="$HOME/export_options.plist"
+        working_directory: apps/mobile
+      - *step_upload_sentry_symbols
+    artifacts: *artifacts
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
+      email:
+        recipients:
+          - gabriel.chambaud@gmail.com
+        notify:
+          success: true
+          failure: true
 
   # ===========================================================================
   # ios-refresh-signing : manual-only maintenance. Refreshes signing profiles

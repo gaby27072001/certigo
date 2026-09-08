@@ -89,6 +89,10 @@ void main() {
       expect(AppEnv.apiBaseUrl, isNotEmpty);
       expect(AppEnv.entraRedirectUri, 'certigo://auth/');
       expect(AppEnv.entraScopes, contains('openid'));
+      expect(AppEnv.crashReportingEnabled, isFalse);
+      expect(AppEnv.crashReportingRequired, isFalse);
+      expect(AppEnv.crashSmokeTestEnabled, isFalse);
+      expect(AppEnv.sentryDsn, isEmpty);
     });
   });
 
@@ -102,6 +106,12 @@ void main() {
       String entraRedirectUri = 'certigo://auth/',
       String entraApiScope = 'api://client-123/user_impersonation',
       bool entraOptional = false,
+      String crashReportingMode = 'auto',
+      String crashReportingRequiredMode = 'false',
+      String crashSmokeTestMode = 'false',
+      String sentryDsn = 'https://public-key@o1.ingest.sentry.io/123',
+      String sentryRelease = 'com.certigo.mobileapp@1.2.3+45',
+      String sentryDist = '45',
     }) =>
         AppEnv.validateConfig(
           flavor: flavor,
@@ -111,6 +121,12 @@ void main() {
           entraRedirectUri: entraRedirectUri,
           entraApiScope: entraApiScope,
           entraOptional: entraOptional,
+          crashReportingMode: crashReportingMode,
+          crashReportingRequiredMode: crashReportingRequiredMode,
+          crashSmokeTestMode: crashSmokeTestMode,
+          sentryDsn: sentryDsn,
+          sentryRelease: sentryRelease,
+          sentryDist: sentryDist,
         );
 
     bool hasError(AppConfigReport r, String key) =>
@@ -190,6 +206,76 @@ void main() {
     test('validate() réel (dev par défaut) est valide', () {
       // Sans --dart-define, flavor=dev : la config par défaut ne doit pas bloquer.
       expect(AppEnv.validate().isValid, isTrue);
+    });
+
+    test('prod active le crash reporting distant en mode auto', () {
+      expect(AppEnv.resolveCrashReportingEnabled(flavor: AppFlavor.prod, mode: 'auto'), isTrue);
+    });
+
+    test('mode de crash reporting invalide → erreur bloquante', () {
+      final AppConfigReport r = validate(crashReportingMode: 'sometimes');
+      expect(hasError(r, 'CRASH_REPORTING_ENABLED'), isTrue);
+    });
+
+    test('crash reporting requis mais désactivé → erreur bloquante', () {
+      final AppConfigReport r = validate(
+        crashReportingMode: 'false',
+        crashReportingRequiredMode: 'true',
+      );
+      expect(hasError(r, 'CRASH_REPORTING_ENABLED'), isTrue);
+    });
+
+    test('DSN absent, non HTTPS ou contenant un secret → erreur', () {
+      expect(hasError(validate(sentryDsn: ''), 'SENTRY_DSN'), isTrue);
+      expect(
+        hasError(validate(sentryDsn: 'http://public@o1.ingest.sentry.io/123'), 'SENTRY_DSN'),
+        isTrue,
+      );
+      final AppConfigReport r = validate(
+        sentryDsn: 'https://public:secret@o1.ingest.sentry.io/123?token=secret',
+      );
+      expect(hasError(r, 'SENTRY_DSN'), isTrue);
+    });
+
+    test('release et dist doivent être stables et cohérents', () {
+      expect(hasError(validate(sentryRelease: '1.2.3+45'), 'SENTRY_RELEASE'), isTrue);
+      expect(hasError(validate(sentryDist: '46'), 'SENTRY_DIST'), isTrue);
+      expect(hasError(validate(sentryDist: 'unknown'), 'SENTRY_DIST'), isTrue);
+    });
+
+    test('smoke test sans Sentry actif → erreur bloquante', () {
+      final AppConfigReport r = validate(
+        flavor: AppFlavor.dev,
+        crashReportingMode: 'false',
+        crashSmokeTestMode: 'true',
+      );
+      expect(hasError(r, 'CRASH_SMOKE_TEST_ENABLED'), isTrue);
+    });
+
+    test('smoke requis sans configuration Sentry complète → erreurs bloquantes', () {
+      final AppConfigReport r = validate(
+        flavor: AppFlavor.staging,
+        crashReportingMode: 'true',
+        crashReportingRequiredMode: 'true',
+        crashSmokeTestMode: 'true',
+        sentryDsn: '',
+        sentryRelease: '',
+        sentryDist: '',
+      );
+
+      expect(r.isValid, isFalse);
+      expect(hasError(r, 'SENTRY_DSN'), isTrue);
+      expect(hasError(r, 'SENTRY_RELEASE'), isTrue);
+      expect(hasError(r, 'SENTRY_DIST'), isTrue);
+    });
+
+    test('modes booléens invalides → erreurs visibles', () {
+      final AppConfigReport r = validate(
+        crashReportingRequiredMode: 'yes',
+        crashSmokeTestMode: 'sometimes',
+      );
+      expect(hasError(r, 'CRASH_REPORTING_REQUIRED'), isTrue);
+      expect(hasError(r, 'CRASH_SMOKE_TEST_ENABLED'), isTrue);
     });
   });
 }

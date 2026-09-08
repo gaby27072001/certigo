@@ -55,6 +55,24 @@ void main() {
     expect(cortexParity, contains('sdk: "3.12.2"'));
     expect(androidRelease, contains('FLUTTER_VERSION: "3.44.4"'));
     expect(iosRelease, contains('FLUTTER_VERSION: "3.44.4"'));
-    expect('flutter: 3.44.4'.allMatches(codemagic), hasLength(2));
+    expect('flutter: 3.44.4'.allMatches(codemagic), hasLength(3));
+  });
+
+  test('PR CI cannot access Sentry symbol upload credentials or commands', () {
+    final String githubWorkflows = Directory('../../.github/workflows')
+        .listSync()
+        .whereType<File>()
+        .map((File file) => file.readAsStringSync())
+        .join('\n');
+    final String codemagic = File('../../codemagic.yaml').readAsStringSync();
+
+    expect(githubWorkflows, isNot(contains('SENTRY_AUTH_TOKEN')));
+    expect(githubWorkflows, isNot(contains('sentry_dart_plugin')));
+    expect(githubWorkflows, isNot(contains('debug-files upload')));
+    expect(githubWorkflows, isNot(contains('upload_debug_symbols')));
+
+    expect(RegExp(r'\$\{SENTRY_AUTH_TOKEN:-\}').allMatches(codemagic), hasLength(1));
+    expect(codemagic, contains('name: Upload and archive iOS dSYMs (blocking)'));
+    expect(codemagic, isNot(contains('--auth-token')));
   });
 }
