@@ -78,3 +78,45 @@ test('rejects enabled Flutter cache on persistent PR runners', () => {
   );
   assert.equal(errors.length, 1);
 });
+
+test('the job parser refuses to report an empty result instead of passing silently', async () => {
+  // Asserted on the source, following the marker convention used elsewhere for
+  // validate-workflow-security.mjs, because that module runs its checks at import
+  // time and cannot be imported from a test.
+  //
+  // The failure this guards is silent: a CRLF workflow makes the '\njobs:\n' probe
+  // miss, jobBlocks returns nothing, and every job-level rule below it is skipped
+  // while the validator still exits 0. Measured on a CRLF copy of runner-health.yml:
+  // exit 0 "Workflow security policy passed." before this guard, exit 1 naming the
+  // unreadable file after it. .gitattributes normalises line endings today, so the
+  // guard closes the class - CRLF, a byte order mark, an indented `jobs:` - rather
+  // than relying on that one defence staying in place.
+  const { readFileSync } = await import('node:fs');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+
+  const source = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), 'validate-workflow-security.mjs'),
+    'utf8',
+  );
+
+  // Positive control: prove this read can see a construct that has always been
+  // there, so a missing match below means an absent guard, not an unreadable file.
+  assert.ok(
+    source.includes('function jobBlocks(text) {'),
+    'expected to still see jobBlocks; otherwise the assertions below prove nothing',
+  );
+
+  assert.ok(
+    /if \(matches\.length === 0\) \{\s*throw new Error\(/.test(source),
+    'jobBlocks must raise when it finds no jobs rather than return an empty list',
+  );
+  assert.ok(
+    source.includes('the job parser found no jobs'),
+    'the raised error must say the parser cannot read the file',
+  );
+  assert.ok(
+    /catch \(error\) \{\s*errors\.push\(`\$\{file\}: \$\{error\.message\}`\);/.test(source),
+    'the raised error must surface as a validation error, not as a crash',
+  );
+});

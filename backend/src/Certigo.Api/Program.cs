@@ -25,6 +25,7 @@ using Certigo.Infrastructure.ContentContracts;
 using Certigo.Infrastructure.Cosmos;
 using Certigo.Infrastructure.Email;
 using Certigo.Infrastructure.Identity;
+using Certigo.Infrastructure.Learning;
 using Certigo.Infrastructure.Observability;
 
 var host = new HostBuilder()
@@ -37,6 +38,7 @@ var host = new HostBuilder()
         worker.UseMiddleware<SecurityHeadersMiddleware>();
         worker.UseMiddleware<ExceptionMiddleware>();
         worker.UseMiddleware<EnterpriseLearningMetricsFeatureMiddleware>();
+        worker.UseMiddleware<VivaLearningFeatureMiddleware>();
         worker.UseMiddleware<OrganizationFeatureMiddleware>();
         worker.UseMiddleware<EnterpriseIdentityFeatureMiddleware>();
         worker.UseMiddleware<JwtAuthMiddleware>();
@@ -48,6 +50,9 @@ var host = new HostBuilder()
             configuration["PERSON_LINKED_IDENTITY_V1"]);
         var organizationFeatureOptions = OrganizationFeatureOptions.Parse(
             configuration["ORGANIZATION_MEMBERSHIP_V1"]);
+        var vivaLearningOptions = VivaLearningFeatureOptions.Parse(
+            configuration["VIVA_LEARNING_V1"],
+            configuration["PUBLIC_WEB_ORIGIN"]);
         var enterpriseIdentityFeatureOptions = EnterpriseIdentityFeatureOptions.Parse(
             configuration["ENTERPRISE_IDENTITY_V1"]);
         var enterpriseLearningMetricsFeatureOptions =
@@ -328,6 +333,7 @@ var host = new HostBuilder()
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(personLinkedIdentityOptions);
         services.AddSingleton(organizationFeatureOptions);
+        services.AddSingleton(vivaLearningOptions);
         services.AddSingleton(enterpriseIdentityFeatureOptions);
         services.AddSingleton(enterpriseLearningMetricsFeatureOptions);
         services.AddSingleton<IIdentitySubjectGenerator, CryptographicIdentitySubjectGenerator>();
@@ -349,6 +355,8 @@ var host = new HostBuilder()
         services.AddScoped<IOrganizationMembershipResolver, OrganizationMembershipResolver>();
         services.AddScoped<IOrganizationAuthorizationHandler, OrganizationAuthorizationHandler>();
         services.AddScoped<IOrganizationService, OrganizationService>();
+        services.AddSingleton<IVivaLearningFixtureCatalog, EmbeddedVivaLearningFixtureCatalog>();
+        services.AddScoped<IVivaLearningService, VivaLearningService>();
         services.AddScoped<
             IOrganizationOffboardingRecoveryWorker,
             OrganizationOffboardingRecoveryWorker>();

@@ -1,0 +1,17 @@
+[
+  {
+    "id": "22222222-2222-2222-2222-222222222222",
+    "trackId": "az-900",
+    "lessonId": "az900-l-cloud-benefits",
+    "title": "Benefices du cloud",
+    "description": "Fixture-only learning content.",
+    "languageTag": "fr-fr",
+    "estimatedMinutes": 5,
+    "format": "Course",
+    "level": "Beginner",
+    "sourceName": "Certigo",
+    "isActive": true,
+    "isPremium": true,
+    "isSearchable": true
+  }
+]
