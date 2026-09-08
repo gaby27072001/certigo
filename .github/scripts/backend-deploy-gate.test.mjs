@@ -243,10 +243,11 @@ function runDispatch(overrides = {}, response = {}) {
     };
     await import(${JSON.stringify(pathToFileURL(dispatchPath).href)});
   `;
+  const { GITHUB_OUTPUT: _runnerOutput, ...inheritedEnv } = process.env;
   return spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
     encoding: 'utf8',
     env: {
-      ...process.env,
+      ...inheritedEnv,
       ...deploymentEnvironment(overrides),
     },
   });
@@ -313,7 +314,7 @@ test('raw CRLF supporting controls cannot satisfy sealed Git blob hashes', () =>
     createHash('sha256').update(crlfDispatchBytes).digest('hex'),
     supportingControlHashes.get('.github/scripts/validate-backend-deploy-dispatch.mjs'),
   );
-  const controls = new Map(supportingControlHashes.keys().map((relativePath) => [
+  const controls = new Map([...supportingControlHashes.keys()].map((relativePath) => [
     relativePath,
     relativePath.endsWith('validate-backend-deploy-dispatch.mjs')
       ? crlfDispatchBytes
