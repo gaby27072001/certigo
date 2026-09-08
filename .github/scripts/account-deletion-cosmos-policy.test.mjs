@@ -8,7 +8,7 @@ import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-p
 import { fingerprintWorkflow } from './workflow-semantic-fingerprint.mjs';
 
 const repositoryRoot = path.resolve('.');
-const manifestGoldenDigest = '15368377aaeedd23ad4c25b6201f0c88cdc11e9c4a2cdc6dfba0d1cca5830b67';
+const manifestGoldenDigest = 'bd6c7c63d2c47d85ece0feb4c151c476dd23238f73d276464e2867d638b6376f';
 const baselineWorkflowNames = fs.readdirSync(
   path.join(repositoryRoot, '.github', 'workflows'),
 ).filter((name) => /\.ya?ml$/.test(name));
