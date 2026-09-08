@@ -895,6 +895,49 @@ là où la soustraction de deux horodatages donne **56** — les deux valeurs ju
 sous « Un vert peut décrire une base qui n'existe plus ». Une note bien datée reste vraie **à sa
 date** ; la recycler sans la redater la transforme en mesure fausse.
 
+### Le transport ampute la portée avant le chiffre
+
+> Ajouté le **2026-09-08**, quelques heures après le reste du §7. **Invalidé** le jour où un nombre
+> relayé sans objet ni date est refusé à la lecture plutôt que corrigé après coup.
+
+**Le cas.** Une session mesure `200 / application/json / 0 redirection` sur un chemin de production.
+**La mesure est exacte** : elle porte sur un fichier témoin déposé pour valider une règle de
+réécriture, puis retiré, disparition vérifiée — et son contrôle négatif figure **dans le même
+message**. Relayée, elle devient « le fichier est servi » et circule huit heures, jusqu'à ce qu'une
+remesure rende `404`. **Aucun instrument n'a échoué et personne n'a menti.**
+
+**Pourquoi ce n'est pas de la distraction.** Les autres cas de ce §7 sont des défauts d'instrument ;
+celui-ci est un défaut de **transport**.
+
+> **Un nombre est portable, une portée ne l'est pas.** `200` tient en trois caractères et se cite ;
+> « sur un fichier témoin déposé pour valider la règle de réécriture, puis retiré » est une phrase
+> qu'un résumé écrase. **Le transport sélectionne ce qui est court**, et un coordinateur par lequel
+> tout passe est précisément l'endroit où tout se résume. La règle qui suit doit donc être
+> **opposable, pas recommandée** : elle doit tenir sans la vigilance de celui qui relaie.
+
+1. **Un nombre relayé ne s'écrit jamais seul.** Forme minimale : *`<valeur>`, mesurée sur `<objet>`,
+   le `<date>`*. Un nombre privé de l'un des trois champs est **irrecevable** — pas « à vérifier ».
+2. **Si la portée ne tient pas dans la phrase qui porte le nombre, le nombre ne se transmet pas** :
+   on transmet le lien vers la mesure.
+3. **Un nombre qui va décider se remesure avant d'être opposé** — pas en cas de doute, *avant de
+   décider*. C'est la règle qui aurait tout arrêté ; appliquée, elle a coûté trente secondes. Le
+   chiffre avait circulé huit heures **parce qu'il n'était pas contesté**, ce qui n'est pas une
+   propriété de la mesure.
+
+### La parade de dernier recours : deux mesures qui se contredisent
+
+Aucune parade de ce §7 n'aurait attrapé le cas ci-dessus. **Ce qui l'a fait tomber, c'est un `404`
+opposé à un `200`.** Le 2026-09-08, trois fois, le seul détecteur disponible a été l'incohérence
+entre deux mesures — jamais un contrôle prévu pour ça : ce `404` contre `200` ; un `exit 0` contre
+un témoin à `False` ; un comptage à 6 contre un outil rendant 5.
+
+> **Quand deux sorties ne peuvent pas être vraies ensemble, ne choisissez pas la rassurante :
+> cherchez laquelle ment.**
+
+Elle ne se planifie pas — on ne décide pas de rencontrer une contradiction. Mais elle s'applique dès
+qu'on la connaît, et elle est gratuite : elle ne demande qu'un second regard sur deux résultats
+qu'on possède déjà.
+
 ### Citer sans envoyer le lecteur au mauvais endroit
 
 **Citez par titre de section et courte phrase entre guillemets, jamais par numéro de ligne.** Une
