@@ -972,6 +972,7 @@ class ProjectStateTests(unittest.TestCase):
         test_paths = manifest[2:]
         self.assertTrue(
             {
+                ".github/scripts/backend-deploy-gate.test.mjs",
                 ".github/scripts/ci-impact.test.mjs",
                 ".github/scripts/workflow-concurrency-policy.test.mjs",
                 ".github/scripts/workflow-security-cache-policy.test.mjs",

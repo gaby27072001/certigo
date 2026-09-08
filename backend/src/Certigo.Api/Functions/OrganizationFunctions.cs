@@ -152,7 +152,7 @@ public sealed class OrganizationFunctions(
 
     private void EnsureAvailable()
     {
-        if (options.Mode == OrganizationFeatureMode.Off)
+        if (!options.HttpSurfaceEnabled)
         {
             throw new OrganizationFeatureDisabledException();
         }
