@@ -39,6 +39,24 @@ R-06 **en premier** car le lock protège tout le reste. Le durcissement #5 **en 
 
 ---
 
+## 🟢 État d'avancement live — constats du 2026-07-06 (réconciliation)
+
+> Bloc **additif** ajouté après exécution / inventaire live par Gabriel sur le tenant CIAM `af721be8-5901-422a-b299-b9c57847b968`.
+> Il **annote** l'état réel constaté ; il **ne remplace ni ne modifie** les procédures ci-dessous, qui restent la référence de rejeu (idempotence). **En cas de doute, le runbook source fait foi.**
+
+| # | Action | État constaté (2026-07-06) | Reste-t-il quelque chose à faire ? |
+|---|--------|----------------------------|-----------------------------------|
+| 1 | **R-06** | ✅ **FAIT** — 2 locks `CanNotDelete` posés : `lock-ciam-nodelete` (directory `certigoapp.onmicrosoft.com`) **et** `lock-rg-certigo-identity-nodelete` (RG). Confirmés par `az lock list`. | Non. |
+| 2 | **R-04** | ✅ **DÉJÀ EN PLACE** — `breakglass@certigoapp.onmicrosoft.com` (`6503a9b1-…`, créé 2026-07-05) existe : `accountEnabled=true`, `userType=Member` (cloud-only), **Global Admin** confirmé. MDP long **scellé hors-ligne** (Gabriel). | Non (0 policy CA → exclusion CA sans objet aujourd'hui). |
+| 3 | **O-05** | ✅ **NO-OP INTÉGRAL** — les 3 apps QuickStart (`35bb7bbc`/`49957408`/`5f371968`) **n'existent plus**, les 2 user flows QuickStart **n'existent plus** (seul `susi_certigo` `7fdf12ed` subsiste), et la subscription `906c6a44-…` est déjà **`Disabled`**. | Non. |
+| 4 | **R-05 (4.a alerte)** | ✅ **ALERTE NATIVE DÉJÀ BRANCHÉE** — Gabriel (`12e9b1cc-…`, boîte réelle `gabriel.chambaud@gmail.com`) est **déjà owner** de l'app `df42c145` → reçoit les notifications d'expiration Entra. Secret expire **2027-07-01** (~360 j). | Dispositif 2 (workflow cron J-30) : filet complémentaire, **à confier à l'agent Author** (hors périmètre live). |
+| 4 | **R-05 (4.b rotation)** | ⏳ **NON URGENT** — rotation à planifier **avant 2027-07-01** (≈ juin 2027, J-30). | Rien aujourd'hui. |
+| 5 | **Durcissement `main`** | ⏸️ **REPORTÉ** (choix de Gabriel) — car `enforce_admins=true` bloquerait l'admin-merge des PR P0 encore ouvertes. | À faire **après** le merge des PR P0 par l'orchestrateur (feu vert requis). |
+
+> **Bilan : 4/5 actions du BLOC A satisfaites** aujourd'hui (R-06 exécuté ; R-04, O-05, R-05-alerte déjà en place). Le **#5** est volontairement reporté ; la **rotation R-05 (4.b)** est planifiée pour ~juin 2027.
+
+---
+
 ## BLOC A — CIAM (lot wp-p0-05, PR #205) — 4 actions à exécuter AVANT de merger #205
 
 ### Identifiants communs au BLOC A
@@ -131,6 +149,8 @@ Idempotent : ré-exécuter `az lock create` sur un lock existant ne casse rien.
 **Durée estimée.** ~2 min.
 **Ordre / dépendances.** **Action n°1, aucune dépendance.** À faire **avant** R-04/O-05/R-05.
 
+> 🟢 **Constat live 2026-07-06 — ✅ FAIT.** `<NOM_CIAM>` = `certigoapp.onmicrosoft.com`. Option renforcée retenue : `lock-ciam-nodelete` **et** `lock-rg-certigo-identity-nodelete` posés. `az lock list --resource-group rg-certigo-identity` renvoie bien les 2 (Level=`CanNotDelete`). **Rien à refaire** (`az lock create` reste idempotent).
+
 ---
 
 ### 2. R-04 — Compte break-glass cloud-only (Global Admin)
@@ -222,6 +242,11 @@ az rest --method DELETE \
 **Ordre / dépendances.** **Action n°2**, après R-06. Indépendante d'O-05/R-05, mais R-04 **avant** O-05 (garder un admin de secours avant de faire le ménage).
 
 > **Note (best practice vs brief).** Microsoft recommande **2 comptes** break-glass. Le brief P0 n'en demande **qu'un** ; R-04 documente le second comme amélioration ultérieure (non bloquante P0).
+
+> 🟢 **Constat live 2026-07-06 — ✅ DÉJÀ EN PLACE.** Le compte `breakglass@certigoapp.onmicrosoft.com` (`id 6503a9b1-1e64-4c39-9ec7-c15a1c911c80`, créé 2026-07-05) existe : `accountEnabled=true`, `userType=Member` (**cloud-only**), et figure parmi les **Global Admins** (2 GA au total : ce break-glass + le compte invité de Gabriel). **MDP long scellé hors-ligne** (confirmé par Gabriel → aucun reset nécessaire).
+> - ⚠️ Ré-exécuter le POST `/users` (étape 2) renverra **`ObjectConflict`** (« userPrincipalName already exists ») : **normal**, ne PAS le rejouer.
+> - Exclusion CA : **sans objet aujourd'hui** (0 policy Conditional Access dans le tenant) → à appliquer **dès qu'une policy sera créée**.
+> - **Observation gouvernance (hors P0)** : l'autre GA est un **compte invité `#EXT#`** (MSA gmail) — c'est précisément le SPOF que R-04 mitige ; envisager à terme un 2ᵉ break-glass cloud-only.
 
 ---
 
@@ -321,6 +346,13 @@ az account subscription show --id "906c6a44-…" --query "{name:displayName, sta
 **Durée estimée.** ~20 min (dont inventaire).
 **Ordre / dépendances.** **Action n°3**, après R-04. L'étape 0 (inventaire) est **non négociable**.
 
+> 🟢 **Constat live 2026-07-06 — ✅ NO-OP INTÉGRAL (rien à supprimer).** L'inventaire (étape 0) montre que le ménage est **déjà fait** :
+> - **Apps** : seules **4** apps subsistent — `12910b8e` Certigo API, `df42c145` Certigo MSA Login, `4d1f1075` Certigo Mobile, `77216304` b2c-extensions-app (**toutes PROD / infra**). Les 3 QuickStart `35bb7bbc`/`49957408`/`5f371968` **n'existent plus**.
+> - **User flows** : un seul reste — `susi_certigo` (`7fdf12ed-…`). Les 2 QuickStart **n'existent plus**.
+> - **Subscription** : `906c6a44-1c75-410b-8578-6462713ab843` (« Azure subscription 1 », tenant `e9174162-…`) est déjà **`Disabled`** → objectif atteint.
+>
+> **Aucune commande de suppression à exécuter.** Ne PAS rejouer les `az ad app delete` / `az rest DELETE` / `az account subscription cancel` (sans objet).
+
 ---
 
 ### 4. R-05 — Rotation outillée + alerte J-30 du secret MSA
@@ -410,6 +442,10 @@ az ad app credential list --id df42c145-… \
 **Durée estimée.** ~15 min pour l'**alerte (4.a)** aujourd'hui ; ~15 min pour la **rotation (4.b)** à l'échéance 2027-07.
 **Ordre / dépendances.** **Action n°4**, après O-05. Aujourd'hui : **exécuter 4.a (alerte)**. 4.b : **planifier avant 2027-07-01**.
 
+> 🟢 **Constat live 2026-07-06 — ✅ ALERTE NATIVE (Dispositif 1) DÉJÀ BRANCHÉE.** L'owner de l'app `df42c145` est **déjà** Gabriel (`12e9b1cc-…`, boîte réelle `gabriel.chambaud@gmail.com`) → les notifications d'expiration Entra arrivent sur une boîte surveillée. **Étape 4.a / Dispositif 1 = NO-OP** (ne PAS ré-ajouter l'owner : `az ad app owner add` serait sans objet). Secret `certigo-ciam-oidc-2026-07` (keyId `a1c4706f-…`) expire **2027-07-01T14:17Z** (~360 j → **rotation non urgente**).
+> - **Reste conseillé (Dispositif 2)** : le workflow cron GitHub Actions J-30 (filet complémentaire — la fiabilité des alertes natives Entra est variable) est **hors périmètre live** → **à confier à l'agent Author** pour déploiement côté dépôt ops/infra (**PAS** ce dépôt applicatif).
+> - **4.b rotation** : rien aujourd'hui ; replanifier ~**juin 2027** (J-30), procédure `--append` ci-dessous.
+
 > **Après R-06 + R-04 + O-05 + R-05(4.a) exécutés & vérifiés**, l'orchestrateur peut basculer `wp-p0-05` de `in_review` → `done` et proposer le merge de **#205**.
 
 ---
@@ -467,6 +503,8 @@ Rejouer un `PUT` avec un JSON remettant les 3 champs à `false` (`enforce_admins
 
 **Durée estimée.** ~5 min.
 **Ordre / dépendances.** **Action n°5, EN DERNIER**, **après** les merges P0 souhaités (dont #205). Dépend de : CODEOWNERS présent sur `main` (#201).
+
+> 🟠 **Constat 2026-07-06 — ⏸️ REPORTÉ (choix de Gabriel).** Non exécuté aujourd'hui : `enforce_admins=true` retirerait à l'admin la capacité de bypasser les checks, ce qui **bloquerait le merge admin des PR P0 encore ouvertes** (dont **#208** — ce runbook — et #205). À rejouer **après** que l'orchestrateur ait mergé les PR P0 voulues. **Attend le feu vert de l'orchestrateur.**
 
 ---
 
