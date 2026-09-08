@@ -1,9 +1,9 @@
 // Azure AI Services account hosting the LLM tutor (audit finding G: IaC drift).
-// The live resource 'certigo-openai' (dev, swedencentral) was created out-of-band;
-// this module brings it under IaC. It is an adoption module: on the first apply,
-// review the what-if carefully so the existing account is UPDATED, not recreated.
-// All divergent properties are exposed as parameters so the template can be aligned
-// to the live resource without editing this file.
+// The live resource 'certigo-openai' (dev, swedencentral) was created out-of-band.
+// The account, model deployment and RBAC are managed; the Foundry project and private
+// endpoint are existing boundaries until their ownership is proven independently.
+// Private DNS is not claimed here: the live zone covers *.openai.azure.com, while the
+// configured Foundry endpoint resolves through *.privatelink.services.ai.azure.com.
 
 @description('Cognitive Services account name. Must match the live resource to adopt it (e.g. certigo-openai).')
 param accountName string
@@ -20,8 +20,8 @@ param deploymentName string
 @description('Deployment model name.')
 param modelName string = 'gpt-5.4-mini'
 
-@description('Deployment model version. Leave empty to let the platform pick the default version (recommended when the live version is unknown; confirm via what-if before apply).')
-param modelVersion string = ''
+@description('Deployment model version observed in the live account.')
+param modelVersion string = '2026-03-17'
 
 @description('Model format. OpenAI for GPT models.')
 param modelFormat string = 'OpenAI'
@@ -34,6 +34,15 @@ param deploymentCapacity int = 1
 
 @description('Managed identity principal id of the Function App, granted the Cognitive Services OpenAI User role for keyless access.')
 param functionAppPrincipalId string
+
+@description('Existing Foundry project consumed by the v1 tutor endpoint.')
+param projectName string = 'certigo-dev'
+
+@description('Existing private endpoint that keeps the account off the public network.')
+param privateEndpointName string = 'pep-certigo-openai-account'
+
+@description('Existing OpenAI User role assignment name for the Function App identity.')
+param openAiUserRoleAssignmentName string = 'f2f408f8-6106-4435-980c-a4d178e67fd2'
 
 @description('Resource tags.')
 param tags object = {}
@@ -54,12 +63,11 @@ resource account 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: accountName
-    publicNetworkAccess: 'Enabled'
+    disableLocalAuth: true
+    publicNetworkAccess: 'Disabled'
   }
 }
 
-// Model deployment. 'version' is omitted when modelVersion is empty so ARM keeps
-// the current/default version instead of forcing a downgrade on an existing deployment.
 resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   parent: account
   name: deploymentName
@@ -68,14 +76,23 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01
     capacity: deploymentCapacity
   }
   properties: {
-    model: union(
-      {
-        format: modelFormat
-        name: modelName
-      },
-      empty(modelVersion) ? {} : { version: modelVersion }
-    )
+    model: {
+      format: modelFormat
+      name: modelName
+      version: modelVersion
+    }
+    raiPolicyName: 'Microsoft.DefaultV2'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
   }
+}
+
+resource project 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' existing = {
+  parent: account
+  name: projectName
+}
+
+resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' existing = {
+  name: privateEndpointName
 }
 
 // Cognitive Services OpenAI User: keyless (managed-identity) inference access for
@@ -87,7 +104,7 @@ var openAiUserRoleId = subscriptionResourceId(
 
 resource openAiUserAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: account
-  name: guid(account.id, functionAppPrincipalId, openAiUserRoleId)
+  name: openAiUserRoleAssignmentName
   properties: {
     principalId: functionAppPrincipalId
     roleDefinitionId: openAiUserRoleId
@@ -97,3 +114,5 @@ resource openAiUserAssignment 'Microsoft.Authorization/roleAssignments@2022-04-0
 
 output endpoint string = account.properties.endpoint
 output accountName string = account.name
+output projectId string = project.id
+output privateEndpointId string = privateEndpoint.id

@@ -15,6 +15,10 @@ const repositoryConfig = JSON.parse(
     'utf8',
   ),
 );
+const capacityTemplate = readFileSync(
+  new URL('./capacity.bicep', import.meta.url),
+  'utf8',
+);
 const config = {
   ...repositoryConfig,
   inventory: {
@@ -133,6 +137,70 @@ function inventory({
       })),
     },
   };
+}
+
+function reconciledCapacityInventory() {
+  const live = inventory();
+  const legacyId =
+    '/subscriptions/example/resourceGroups/RG-CERTIGO-CI/providers/' +
+    'Microsoft.Compute/virtualMachineScaleSets/vmss-certigo-runner-zonal';
+  live.runners.vmScaleSets = live.runners.vmScaleSets.map(
+    (scaleSet, index) => ({
+      ...scaleSet,
+      id:
+        index === 0
+          ? legacyId
+          : '/subscriptions/example/resourceGroups/RG-CERTIGO-CI/providers/' +
+            'Microsoft.Compute/virtualMachineScaleSets/vmss-certigo-pr-pilot-z1',
+      name:
+        index === 0
+          ? 'vmss-certigo-runner-zonal'
+          : 'vmss-certigo-pr-pilot-z1',
+      orchestrationMode: 'Flexible',
+      sku: { name: 'Standard_D2ads_v6' },
+    }),
+  );
+  live.runners.autoscaleSettings = [
+    {
+      enabled: true,
+      name: 'autoscale-vmss-certigo-runner-zonal',
+      predictiveAutoscalePolicy: { scaleMode: 'Disabled' },
+      targetResourceUri: legacyId,
+      profiles: [
+        {
+          name: 'default',
+          capacity: {
+            minimum: '2',
+            default: '2',
+            maximum: '4',
+          },
+          rules: [
+            {
+              metricTrigger: {
+                metricName: 'Percentage CPU',
+                metricNamespace: '',
+                metricResourceUri: legacyId,
+                operator: 'GreaterThan',
+                statistic: 'Average',
+                threshold: 70,
+                timeAggregation: 'Average',
+                timeGrain: 'PT1M',
+                timeWindow: 'PT10M',
+                dividePerInstance: false,
+              },
+              scaleAction: {
+                cooldown: 'PT10M',
+                direction: 'Increase',
+                type: 'ChangeCount',
+                value: '1',
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ];
+  return live;
 }
 
 test('workflow_job events maintain queue state without writing it', () => {
@@ -788,6 +856,40 @@ test('drift reconciliation reports live VMSS, SKU, CPU scale-in, and labels', ()
   assert.deepEqual(result.observed.externalVirtualMachines, [
     'vmss-certigo-runner-zonal_4153d1dd',
   ]);
+});
+
+test('drift reconciliation validates every VMSS SKU and the full autoscale contract', () => {
+  const live = reconciledCapacityInventory();
+  const reconciled = reconcileRunnerDrift(live, capacityTemplate, config);
+  assert.equal(
+    reconciled.findings.some(
+      (finding) => finding.code === 'AUTOSCALE_CONTRACT_DRIFT',
+    ),
+    false,
+  );
+
+  live.runners.vmScaleSets[1].sku.name = 'Standard_D4s_v5';
+  live.runners.autoscaleSettings[0] = {
+    ...live.runners.autoscaleSettings[0],
+    enabled: false,
+    targetResourceUri: '/subscriptions/example/resourceGroups/rg/providers/wrong',
+    profiles: [
+      {
+        name: 'default',
+        capacity: {
+          minimum: '0',
+          default: '0',
+          maximum: '99',
+        },
+        rules: [],
+      },
+    ],
+  };
+
+  const drifted = reconcileRunnerDrift(live, capacityTemplate, config);
+  const codes = drifted.findings.map((finding) => finding.code);
+  assert.ok(codes.includes('VM_SIZE_DRIFT'));
+  assert.ok(codes.includes('AUTOSCALE_CONTRACT_DRIFT'));
 });
 
 test('configuration refuses a boost mode that differs from the pilot target', () => {

@@ -286,10 +286,10 @@ Pour ajouter les intégrations réelles, démarrer l'émulateur puis définir
 > défaut d'Azure (septembre 2025), une VM sans IP publique explicite n'a **aucune
 > connectivité sortante** — le runner ne peut alors ni joindre GitHub ni restaurer
 > les paquets NuGet/pub.dev, et tous les jobs échouent. La connectivité est assurée
-> par une **NAT Gateway** (`nat-certigo`) associée au sous-réseau `snet-runners`,
+> par une **NAT Gateway** (`nat-vm-certigo-runner-2`) associée au sous-réseau `snet-runners`,
 > avec une IP publique Standard dédiée. Si l'egress retombe, vérifier :
 > ```bash
-> az network nat gateway show -g rg-certigo-ci -n nat-certigo
+> az network nat gateway show -g rg-certigo-ci -n nat-vm-certigo-runner-2
 > az network vnet subnet show -g rg-certigo-ci --vnet-name vnet-certigo-ci \
 >   -n snet-runners --query natGateway.id
 > ```

@@ -1,27 +1,25 @@
 # Runners CI — Infrastructure-as-Code
 
-Ce dossier réconcilie en Bicep les **VM GitHub Actions auto-hébergées** de Certigo et
-leur **chemin d'egress (sortie Internet)**. Tout y est nommé en français pour rester aligné
-avec le reste des livrables ; les noms de ressources Azure reprennent ceux du portail.
+Ce dossier réconcilie en Bicep la **capacité GitHub Actions auto-hébergée** de Certigo
+et son **chemin d'egress (sortie Internet)**. Les instances VM restent hors ownership
+IaC tant que leur classification n'est pas prouvée.
 
 ## Pourquoi
 
 Les runners hébergés par GitHub sont **désactivés par la politique d'entreprise EMU**.
-L'inventaire live consolidé au 20 août 2026 montre désormais un VMSS flexible
-`vmss-certigo-runner-zonal` et non les deux VM autonomes historiques. Le dossier reste une
-référence de reconstruction; il ne doit pas être appliqué à ce VMSS sans migration approuvée.
+L'inventaire live consolidé au 4 septembre 2026 montre deux VMSS Flexible :
+`vmss-certigo-runner-zonal` et `vmss-certigo-pr-pilot-z1`.
 Le runbook de redondance, de moindre privilège et de preuve opérationnelle est dans
 [`docs/CI_RUNNER_RESILIENCE.md`](../../docs/CI_RUNNER_RESILIENCE.md).
 
-Le live comporte une NAT Gateway, un Load Balancer et un autoscale CPU. La réconciliation
-classe le runner historique 26 (`22f7fb52-Certigo`) et la VM `4153d1dd` hors scope, les
-bindings exacts f55/runner 27 et bbf/runner 28 comme gérés (running/online).
-Ces entrées externes ne sont ni comptées ni ciblées; toute autre VM non réconciliée bloque le plan.
-`network.bicep`
-décrit l'ancienne réconciliation et son déploiement est suspendu; seul son `what-if`
-read-only est autorisé.
+`f55d176e`/runner 27 (`certigo-trusted`) et `bbf83c5c`/runner 28
+(`certigo-pr,certigo-pr-pilot`) sont running/online et ont été redémarrés le
+3 septembre. `be505fa1` est restée `deallocated`, sans runner GitHub ni
+classification : elle bloque toute automation et n'est ajoutée à aucune allow-list.
+Les exclusions historiques du runner 26 et de `4153d1dd` restent des garde-fous,
+pas une affirmation de présence live.
 
-## Modèle historique versionné (pas l'état live)
+## Egress legacy réconcilié
 
 ```
 vm-certigo-runner (carte réseau, pas d'IP publique)
@@ -30,7 +28,9 @@ vm-certigo-runner (carte réseau, pas d'IP publique)
 sous-réseau snet-runners (10.42.1.0/24)
         │   défaut sortant désactivé (defaultOutboundAccess = false)
         ▼
-Passerelle NAT nat-certigo  ──►  IP publique pip-certigo-nat (20.86.156.64)
+Passerelle NAT nat-vm-certigo-runner-2
+        └──────────────────────► IP publique pip-vm-certigo-runner-2-nat
+                                 (20.4.178.183)
                                          │
                                          ▼
                                       Internet
@@ -38,22 +38,23 @@ Passerelle NAT nat-certigo  ──►  IP publique pip-certigo-nat (20.86.156.64
 
 | Ressource | Type | Rôle |
 | --- | --- | --- |
-| `pip-certigo-nat` | IP publique (Standard, statique, régionale) | Adresse d'egress **stable** présentée à Internet (à mettre en liste d'autorisation) |
-| `nat-certigo` | Passerelle NAT (Standard) | SNAT sortant déterministe ; **survit à la désallocation** de la VM |
-| `vnet-certigo-ci` | Réseau virtuel (`10.42.0.0/16`) | Héberge le sous-réseau runner |
+| `pip-vm-certigo-runner-2-nat` | IP publique (Standard, statique, zones 1/2) | Adresse d'egress **stable** présentée à Internet |
+| `nat-vm-certigo-runner-2` | Passerelle NAT (Standard) | SNAT sortant déterministe ; **survit à la désallocation** des VM |
+| `vnet-certigo-ci` | VNet `existing` (`10.42.0.0/16` live) | Parent référencé sans réécrire ses trois peerings |
 | `snet-runners` | Sous-réseau (`10.42.1.0/24`) | La carte réseau du runner s'y rattache ; associé à la Passerelle NAT + NSG |
 | `vnet-certigo-ci-snet-runners-nsg-westeurope` | Groupe de sécurité réseau (NSG) | Vide (règles Azure par défaut) ; conservé pour matcher l'état réel |
 
-Le schéma et les noms ci-dessous décrivent `network.bicep`. Ils ne correspondent plus au
-VMSS/NAT/LB live et ne constituent pas une autorisation de déploiement.
+## Périmètre IaC
 
-## Périmètre IaC historique
+Quatre modèles complémentaires sont versionnés :
 
-Trois modèles complémentaires sont versionnés :
-
-- `network.bicep` réconcilie l'egress partagé sans toucher aux VM existantes ;
+- `network.bicep` référence l'IP, la NAT, le NSG et le VNet en `existing`,
+  applique leurs tags par des extensions `Microsoft.Resources/tags` isolées et
+  ne gère que le sous-réseau enfant ;
+- `capacity.bicep` référence les deux VMSS en `existing` et gère uniquement
+  l'autoscale legacy, avec scale-out CPU mais **aucun scale-in CPU** ;
 - `runner.bicep` reconstruit une VM, sa NIC privée, son disque et son identité managée.
-  Il référence le sous-réseau existant et exécute `bootstrap.sh` au premier démarrage.
+  C'est un modèle historique de reconstruction, pas le modèle du compute live ;
 - `pilot.bicep` crée un VMSS Flexible PR-only dans un VNet dédié non appairé, avec son
   propre NAT/NSG. Il n'accorde aucune identité, IP publique, route privée applicative ou
   label trusted.
@@ -296,9 +297,11 @@ explicitement à une PR2 séparée.
 
 ## Capacité et cycle de vie
 
-Le VMSS live est `Standard_D2ads_v6`, autoscale min 2 / défaut 2 / max 4. Son scale-in CPU
-est dangereux car il ignore GitHub `busy`, et les runners portent simultanément
-`certigo-pr` et `certigo-trusted`. Toute automation mutable est donc bloquée.
+Les deux VMSS live sont `Standard_D2ads_v6`. L'autoscale legacy est min 2 /
+défaut 2 / max 4. Son scale-out CPU (`> 70 %` pendant 10 minutes) est conservé
+dans `capacity.bicep`; son scale-in CPU (`< 20 %` pendant 45 minutes) est retiré
+du contrat car il ignore GitHub `busy`. Tant que ce changement n'est pas appliqué
+et que `be505fa1` reste non classifiée, toute automation mutable est bloquée.
 
 Le script `lifecycle-preflight.sh` inventorie sans mutation les dépôts Certigo et
 certigo-content et refuse une déallocation en présence d'un label double, d'un job actif/en
@@ -311,12 +314,14 @@ changement Azure, sans redémarrage artificiel ni quiet period rétroactive. Les
 restent rapportées et bloquent toute future mutation. La cible sérialisée et son rollback sont dans
 [`docs/runbooks/CLOUD_LEAST_PRIVILEGE.md`](../../docs/runbooks/CLOUD_LEAST_PRIVILEGE.md).
 
-Le planificateur `capacity-plan.sh` ajoute une réconciliation de drift et un modèle
+Le planificateur `capacity-plan.sh` compare désormais le live à `capacity.bicep`,
+puis ajoute une réconciliation de drift et un modèle
 queue-driven `workflow_job` avec trois modes par classe (`idle=0+0`, `normal=1+1`,
 `boost=6 PR + 2 trusted`). Cette cible est celle d'un pilote ultérieur, pas un plafond
 de production final. Le feature flag est **off**; aucun code de mutation n'est présent.
 L'état v3 exige power Azure + runner online, conserve le slot exact à réarmer, garde le runner
-26 et la VM 415 hors scope et refuse les VMs 22f/459. Labels, frontières d'identité et
+26 et la VM 415 hors scope et refuse les VMs 22f/459. La VM `be505fa1` n'est
+volontairement dans aucune liste : son apparition reste bloquante. Labels, frontières d'identité et
 sous-réseaux exclusifs sont des prérequis. Le scale-in exige une quiet period resettable de
 5 minutes, deux gardes, un lease à génération stable et un compare-and-swap de révision.
 La garde finale relit `busy` et les jobs; le pilote PR est désalloué avant le primaire trusted.
@@ -387,12 +392,21 @@ autorisée, durée — pas une correction ponctuelle.
 > par le finding G, est lui **réintégré en IaC** dans ce livrable via
 > `infra/modules/openai.bicep` (câblé dans `infra/main.bicep`, module `tutor`).
 
+> À noter : le compte **Azure OpenAI** (`certigo-openai`) est géré en dev
+> indépendamment du feature flag runtime. Le compte et son modèle sont déclarés ;
+> le projet Foundry et le private endpoint sont seulement référencés `existing`
+> jusqu'à preuve d'ownership complète. L'endpoint Foundry
+> `*.services.ai.azure.com` annonce `10.60.0.76` sur le private endpoint, mais
+> seule la zone `privatelink.openai.azure.com` existe et aucun zone group n'est
+> attaché. Le module ne revendique donc aucune zone DNS et l'activation runtime
+> reste bloquée jusqu'à adoption séparée de `privatelink.services.ai.azure.com`,
+> de son enregistrement, de son lien VNet et de son zone group.
+
 ## Nettoyage
 
-Les quatre anciens candidats documentés ne sont plus présents dans l'inventaire live. Les
-disques, NIC, IP, NAT, NSG et backends LB actuels ont des attachements prouvés. Aucune
-suppression n'est planifiée. Une ressource sans preuve d'usage reste `non classée` tant que
-les références ARM, RBAC, logs, propriétaires et rollback ne sont pas établis.
+Les disques, NIC, IP, NAT, NSG et backends LB actuels ont des attachements
+prouvés. Aucune suppression n'est planifiée. `be505fa1` reste non classifiée tant
+que ses références ARM, RBAC, journaux, propriétaire et rollback ne sont pas établis.
 
 ## Commande read-only
 
@@ -401,10 +415,19 @@ plus présumé bénin :
 
 ```bash
 az deployment group what-if -g rg-certigo-ci \
-  --template-file infra/ci-runner/network.bicep
+  --template-file infra/ci-runner/network.bicep \
+  --validation-level Provider
+az deployment group what-if -g rg-certigo-ci \
+  --template-file infra/ci-runner/capacity.bicep \
+  --validation-level Provider
 ```
 
-### Anciennes différences résiduelles
+Attendu avant application : aucune création d'infrastructure ni suppression,
+aucune écriture du VNet parent, de l'IP, de la NAT, du NSG ou des VMSS. Les
+seuls changements admis sont les extensions de tags FinOps sur IP/NAT/NSG, les
+tags de l'autoscale et la suppression de la règle de scale-in CPU.
+
+### Valeurs injectées par Azure
 
 Avant la migration VMSS, le what-if affichait trois « suppressions » de propriétés.
 Ce sont des **valeurs par défaut injectées par Azure** que l'API renvoie en lecture mais
@@ -414,13 +437,13 @@ conclure sur le live actuel. Ne pas exécuter `az deployment group create`.
 
 | Ressource | Propriété signalée | Pourquoi on ne la fige pas |
 | --- | --- | --- |
-| `nat-certigo` | `sku.tier` (= `Regional`) | Le type `NatGatewaySku` n'accepte que `name` ; `tier` n'existe pas dans le schéma. |
-| `nat-certigo` | `properties.scope` (= `Public`) | Non réglable via modèle ; `Public` est déjà la valeur par défaut d'une Passerelle NAT. |
-| `pip-certigo-nat` | `properties.ipTags` (`FirstPartyUsage` / `/Unprivileged`) | Étiquette **première-partie réservée** à Azure ; un déploiement qui tenterait de la poser serait **rejeté**. |
+| `nat-vm-certigo-runner-2` | `sku.tier` (= `Regional`) | Le type `NatGatewaySku` n'accepte que `name` ; `tier` n'existe pas dans le schéma. |
+| `nat-vm-certigo-runner-2` | `properties.scope` (= `Public`) | Non réglable via modèle ; `Public` est déjà la valeur par défaut d'une Passerelle NAT. |
+| `pip-vm-certigo-runner-2-nat` | `properties.ipTags` (`FirstPartyUsage` / `/Unprivileged`) | Étiquette **première-partie réservée** à Azure ; un déploiement qui tenterait de la poser serait **rejeté**. |
 
-Les fausses différences réglables (`ddosSettings` héritée du VNet sur l'IP publique,
-`privateEndpointVNetPolicies` sur le réseau virtuel) ont déjà été **explicitées** dans le
-modèle : le réseau virtuel et le NSG ressortent donc en **« aucun changement »**.
+L'IP, la NAT, le NSG et le VNet parent ne sont plus émis en écriture par le
+modèle. Le plan ne porte donc ni leurs propriétés provider-owned, ni les règles
+NSG, ni les trois peerings.
 
 La compilation des deux modèles, le contrat de tags, la syntaxe Bash et les tests du probe
 sont vérifiés par `infra/validate.sh` et la gate `ci-infra`.

@@ -35,7 +35,7 @@
 > (repo, noms de VM, resource group, subscription).
 >
 > Exécuter d'abord `bash infra/ci-runner/lifecycle-preflight.sh deallocate`. Ce script est
-> strictement read-only et bloque l'état actuel. La migration et le rollback sont définis dans
+> strictement read-only et doit bloquer l'état actuel. La migration et le rollback sont définis dans
 > [`CLOUD_LEAST_PRIVILEGE.md`](./CLOUD_LEAST_PRIVILEGE.md).
 
 ---
@@ -110,9 +110,10 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 
 ## 3. Capacité et stratégie d'exploitation
 
-Chaque runner traite **un job GitHub Actions à la fois**. L'autoscale CPU actuel peut ajouter
-ou retirer une VM sans connaître GitHub. Tout scale-in reste interdit jusqu'au remplacement
-par le contrôleur sérialisé décrit dans le runbook moindre privilège.
+Chaque runner traite **un job GitHub Actions à la fois**. L'autoscale CPU live peut encore
+ajouter ou retirer une VM sans connaître GitHub. `capacity.bicep` conserve seulement le
+scale-out `> 70 % / 10 min` et retire le scale-in `< 20 % / 45 min`; tant que ce
+what-if n'est pas approuvé puis appliqué séparément, tout scale-in reste interdit.
 
 Baseline 30 jours : **242,06 USD**, 413 jobs, 18,84 runner-heures, CPU moyen 3,78 %,
 file P95 5 108 s et P99 12 628 s. Le CPU faible combiné à une file longue justifie un

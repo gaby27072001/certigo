@@ -55,7 +55,9 @@ function allResources(template) {
 }
 
 function resourcesOfType(template, type) {
-  return allResources(template).filter((resource) => resource.type === type);
+  return allResources(template).filter(
+    (resource) => resource.type.toLowerCase() === type.toLowerCase(),
+  );
 }
 
 function makePhaseAProof() {
@@ -1318,6 +1320,179 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
     'certigo-pr': 2,
     'certigo-trusted': 2,
   });
+});
+
+test('CI drift IaC manages only bounded network and autoscale surfaces', () => {
+  const network = compileTemplate('infra/ci-runner/network.bicep');
+  const networkSource = readFileSync(
+    path.join(repositoryRoot, 'infra', 'ci-runner', 'network.bicep'),
+    'utf8',
+  );
+  const [subnet] = resourcesOfType(
+    network,
+    'Microsoft.Network/virtualNetworks/subnets',
+  );
+  assert.match(
+    networkSource,
+    /resource vnet 'Microsoft\.Network\/virtualNetworks@[^']+' existing/,
+  );
+  assert.match(
+    networkSource,
+    /resource publicIp 'Microsoft\.Network\/publicIPAddresses@[^']+' existing/,
+  );
+  assert.match(
+    networkSource,
+    /resource natGateway 'Microsoft\.Network\/natGateways@[^']+' existing/,
+  );
+  assert.match(
+    networkSource,
+    /resource nsg 'Microsoft\.Network\/networkSecurityGroups@[^']+' existing/,
+  );
+  assert.equal(
+    resourcesOfType(network, 'Microsoft.Network/virtualNetworks').length,
+    0,
+  );
+  assert.ok(subnet);
+  assert.equal(
+    resourcesOfType(network, 'Microsoft.Network/publicIPAddresses').length,
+    0,
+  );
+  assert.equal(
+    resourcesOfType(network, 'Microsoft.Network/natGateways').length,
+    0,
+  );
+  assert.equal(
+    resourcesOfType(network, 'Microsoft.Network/networkSecurityGroups').length,
+    0,
+  );
+  assert.equal(
+    resourcesOfType(network, 'Microsoft.Resources/tags').length,
+    3,
+  );
+
+  const capacity = compileTemplate('infra/ci-runner/capacity.bicep');
+  const capacitySource = readFileSync(
+    path.join(repositoryRoot, 'infra', 'ci-runner', 'capacity.bicep'),
+    'utf8',
+  );
+  const scaleSets = resourcesOfType(
+    capacity,
+    'Microsoft.Compute/virtualMachineScaleSets',
+  );
+  const [autoscale] = resourcesOfType(
+    capacity,
+    'Microsoft.Insights/autoscaleSettings',
+  );
+  assert.equal(scaleSets.length, 0);
+  assert.equal(
+    (
+      capacitySource.match(
+        /resource \w+ 'Microsoft\.Compute\/virtualMachineScaleSets@[^']+' existing/g,
+      ) ?? []
+    ).length,
+    2,
+  );
+  assert.equal(
+    resourcesOfType(capacity, 'Microsoft.Compute/virtualMachines').length,
+    0,
+  );
+  const rules = autoscale.properties.profiles[0].rules;
+  assert.equal(rules.length, 1);
+  assert.equal(autoscale.properties.enabled, true);
+  assert.equal(
+    autoscale.properties.profiles[0].capacity.minimum,
+    "[string(parameters('legacyMinimumCapacity'))]",
+  );
+  assert.equal(
+    autoscale.properties.profiles[0].capacity.default,
+    "[string(parameters('legacyMinimumCapacity'))]",
+  );
+  assert.equal(
+    autoscale.properties.profiles[0].capacity.maximum,
+    "[string(parameters('legacyMaximumCapacity'))]",
+  );
+  assert.equal(rules[0].metricTrigger.metricName, 'Percentage CPU');
+  assert.equal(rules[0].metricTrigger.operator, 'GreaterThan');
+  assert.equal(rules[0].metricTrigger.threshold, 70);
+  assert.equal(rules[0].metricTrigger.timeWindow, 'PT10M');
+  assert.equal(rules[0].scaleAction.direction, 'Increase');
+  assert.equal(rules[0].scaleAction.value, '1');
+
+  const plan = readFileSync(
+    path.join(repositoryRoot, 'infra', 'ci-runner', 'capacity-plan.sh'),
+    'utf8',
+  );
+  assert.match(plan, /--capacity-template/);
+  assert.match(plan, /capacity\.bicep/);
+  assert.doesNotMatch(plan, /--runner-template/);
+});
+
+test('OpenAI IaC remains private, keyless, and independent from runtime activation', () => {
+  const openAi = compileTemplate('infra/modules/openai.bicep');
+  const openAiSource = readFileSync(
+    path.join(repositoryRoot, 'infra', 'modules', 'openai.bicep'),
+    'utf8',
+  );
+  const [account] = resourcesOfType(
+    openAi,
+    'Microsoft.CognitiveServices/accounts',
+  );
+  const [deployment] = resourcesOfType(
+    openAi,
+    'Microsoft.CognitiveServices/accounts/deployments',
+  );
+  const [roleAssignment] = resourcesOfType(
+    openAi,
+    'Microsoft.Authorization/roleAssignments',
+  );
+  assert.equal(account.properties.publicNetworkAccess, 'Disabled');
+  assert.equal(account.properties.disableLocalAuth, true);
+  assert.equal(
+    deployment.properties.model.version,
+    "[parameters('modelVersion')]",
+  );
+  assert.equal(
+    openAi.parameters.openAiUserRoleAssignmentName.defaultValue,
+    'f2f408f8-6106-4435-980c-a4d178e67fd2',
+  );
+  assert.equal(
+    roleAssignment.name,
+    "[parameters('openAiUserRoleAssignmentName')]",
+  );
+  assert.match(
+    openAiSource,
+    /resource project 'Microsoft\.CognitiveServices\/accounts\/projects@[^']+' existing/,
+  );
+  assert.match(
+    openAiSource,
+    /resource privateEndpoint 'Microsoft\.Network\/privateEndpoints@[^']+' existing/,
+  );
+  assert.doesNotMatch(openAiSource, /Microsoft\.Network\/privateDnsZones/);
+  assert.equal(
+    resourcesOfType(
+      openAi,
+      'Microsoft.CognitiveServices/accounts/projects',
+    ).length,
+    0,
+  );
+  assert.equal(
+    resourcesOfType(openAi, 'Microsoft.Network/privateEndpoints').length,
+    0,
+  );
+  assert.equal(
+    resourcesOfType(openAi, 'Microsoft.Network/privateDnsZones').length,
+    0,
+  );
+
+  const main = readFileSync(
+    path.join(repositoryRoot, 'infra', 'main.bicep'),
+    'utf8',
+  );
+  assert.match(
+    main,
+    /module tutor .* = if \(env == 'dev' && !empty\(tutorLlmDeployment\)\)/,
+  );
+  assert.doesNotMatch(main, /module tutor .* = if \(tutorLlmEnabled\)/);
 });
 
 test('every managed runner is restarted after the nightly teardown', () => {

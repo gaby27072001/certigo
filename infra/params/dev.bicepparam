@@ -73,29 +73,13 @@ param appleCiamDomainReconfigured = false
 // Its expiration is fixed and reviewable: deployments do not extend it implicitly.
 param authJwtSigningKeyExpiresOn = '2027-08-31T00:00:00Z'
 
-// AI tutor (Azure OpenAI / Microsoft Foundry). DISABLED in dev — this comment
-// previously claimed the opposite ("Enabled in dev" / "role is now granted"),
-// which was stale and incorrect; corrected here (Phase B tutor-prod review).
-//
-// Real history: #99 set tutorLlmEnabled=true. #178 added the IaC adoption
-// module (infra/modules/openai.bicep, kind=AIServices, grants "Cognitive
-// Services OpenAI User" — roleId 5e0bd9bd-7b93-4f28-af87-19fc36ad61bd — to the
-// Function App managed identity). #181 then reset this flag to false because
-// the dev deployment failed with `DeploymentModelNotSupported` for the
-// gpt-5.4-mini model, to unblock an unrelated security fix. The `tutor` module
-// is gated on this flag (`if (tutorLlmEnabled)`, main.bicep), so it has NOT
-// been deployed since #181 — the RBAC grant AND the model-deployment
-// compatibility of the current AIServices-kind module are both UNVERIFIED.
-//
-// Do not flip this to `true` without first: (1) a human with real Azure
-// access running `az deployment sub create --what-if` for this file to
-// confirm the model deployment no longer fails, (2) confirming the role
-// assignment lands, (3) running the new gated live test described in
-// docs/deployment-runbook.md §T0.5 "Chemin 3" (backend/run-tutor-llm-live-gate.ps1,
-// CERTIGO_TUTOR_LLM_LIVE_TESTS=1) against the deployed dev endpoint to prove a
-// real (non-fallback) LLM response. See docs/adr/ADR-O-01-ai-tutor-prod.md.
-// TUTOR_LLM_API_KEY stays empty so the managed identity (Entra) would be used
-// for auth once/if this is safely re-enabled.
+// AI tutor infrastructure is managed independently from runtime activation.
+// The live read-only audit confirms the private/keyless AIServices account,
+// gpt-5.4-mini deployment and existing OpenAI User role assignment. Runtime
+// remains disabled because the Foundry private DNS path is incomplete.
+// Do not flip this flag until that DNS adoption has its own approved Provider
+// what-if and backend/run-tutor-llm-live-gate.ps1 proves a real LLM response.
+// See docs/deployment-runbook.md §T0.5 "Chemin 3".
 param tutorLlmEnabled = false
 param tutorLlmEndpoint = 'https://certigo-openai.services.ai.azure.com/api/projects/certigo-dev/openai/v1/'
 param tutorLlmDeployment = 'gpt-5.4-mini'

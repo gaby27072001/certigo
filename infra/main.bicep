@@ -677,13 +677,10 @@ module api 'modules/functionApp.bicep' = {
   ]
 }
 
-// Azure AI Services account for the LLM tutor. Brought under IaC to remove the
-// drift documented in audit finding G (the 'certigo-openai' account was created
-// out-of-band). Gated on tutorLlmEnabled (dev only today). accountName/location
-// target the existing dev resource: on the first apply, review the what-if so the
-// account is adopted/updated, not recreated. Deployed after 'api' because it needs
-// the Function App managed-identity principal id for the OpenAI User role grant.
-module tutor 'modules/openai.bicep' = if (tutorLlmEnabled) {
+// The dev Azure AI Services account is infrastructure, independent from the runtime
+// feature flag. The module is present whenever the configured dev deployment exists;
+// tutorLlmEnabled still controls only Function App behavior.
+module tutor 'modules/openai.bicep' = if (env == 'dev' && !empty(tutorLlmDeployment)) {
   scope: rg
   name: 'openai'
   params: {

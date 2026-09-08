@@ -35,8 +35,8 @@ WORM et son rollback sont décrits dans
 
 ## Diagnostics Azure read-only
 
-L'hôte de cette remédiation ne possède ni Azure CLI ni session Azure authentifiée. Un opérateur
-autorisé doit exécuter exactement les commandes suivantes :
+L'inventaire du 4 septembre 2026 a été capturé avec Azure CLI en lecture seule.
+Pour toute nouvelle preuve, un opérateur autorisé exécute les commandes suivantes :
 
 ```bash
 az login
@@ -116,6 +116,20 @@ private endpoint `Approved`, cinq zones DNS partagées dans `rg-certigo-ci` avec
 applicatif, deux peerings `Connected`, subnet FC1 délégué à `Microsoft.App/environments`, route-all
 désactivé, authentification locale Storage/Cosmos désactivée hors dev et readiness `healthy`.
 
+### Staging live à réconcilier, pas à recréer
+
+`rg-certigo-staging` existe et est peuplé. Le déploiement subscription
+`certigo-staging` a terminé `Succeeded` le 2026-08-16 à 13:45:34 UTC, en mode
+`Incremental` (correlation ID `22b74f66-9ba9-4030-8b1d-bdd6978b2b00`).
+Storage, Cosmos, Key Vault, Function App, VNet, private endpoints et alertes sont
+présents; `/api/health/live`, `/api/health/ready` et `/api/health` répondent 200.
+Le RG et les ressources principales portent `managedBy=bicep`.
+
+La procédure staging est donc un **what-if de réconciliation** sur l'existant.
+Ne jamais lancer `az group create`, `az group delete` ou planifier la stack comme
+une création initiale. Toute création/suppression annoncée par le what-if est
+bloquante jusqu'à explication ressource par ressource.
+
 ### Migration initiale des zones privées par environnement
 
 Avant la première application de chaque environnement, planifier une fenêtre de
@@ -132,6 +146,18 @@ au jeu partagé. Vérifier les dix liens et la résolution privée avant de pass
 ## Prévol sans mutation
 
 ```bash
+# 0. Vérifier identité, scope et permissions effectives.
+az account show --query "{subscription:id,tenantId:tenantId,user:user.name}" -o json
+az role assignment list --assignee "$(az ad signed-in-user show --query id -o tsv)" \
+  --scope "/subscriptions/<SUBSCRIPTION_ID>" --include-inherited \
+  --query "[].{role:roleDefinitionName,scope:scope}" -o table
+
+# 1. Syntaxe : toutes les compilations doivent réussir avant un what-if.
+bicep build infra/main.bicep --stdout >/dev/null
+bicep build infra/ci-runner/network.bicep --stdout >/dev/null
+bicep build infra/ci-runner/capacity.bicep --stdout >/dev/null
+bicep build infra/modules/openai.bicep --stdout >/dev/null
+
 PARAMETERS_DIRECTORY="$(mktemp -d)"
 chmod 700 "$PARAMETERS_DIRECTORY"
 BASE_PARAMETERS_FILE="$PARAMETERS_DIRECTORY/base.json"
@@ -150,12 +176,57 @@ az deployment sub what-if \
   --name "certigo-${ENV}-preflight" \
   --location westeurope \
   --template-file infra/main.bicep \
-  --parameters "@$AUTH_PARAMETERS_FILE"
+  --parameters "@$AUTH_PARAMETERS_FILE" \
+  --validation-level Provider
+
+# 2. Surfaces CI bornées : aucun VMSS/VM/VNet parent ne doit être modifié.
+az deployment group what-if -g rg-certigo-ci \
+  --template-file infra/ci-runner/network.bicep \
+  --validation-level Provider
+az deployment group what-if -g rg-certigo-ci \
+  --template-file infra/ci-runner/capacity.bicep \
+  --validation-level Provider
+
+# 3. Adoption OpenAI dev, indépendamment du feature flag runtime.
+FUNC_PRINCIPAL_ID="$(az functionapp identity show -g rg-certigo-dev \
+  -n "$(az functionapp list -g rg-certigo-dev --query '[0].name' -o tsv)" \
+  --query principalId -o tsv)"
+az deployment group what-if -g rg-certigo-dev \
+  --template-file infra/modules/openai.bicep \
+  --parameters accountName=certigo-openai location=swedencentral \
+               deploymentName=gpt-5.4-mini \
+               functionAppPrincipalId="$FUNC_PRINCIPAL_ID" \
+  --validation-level Provider
+
+# 4. Garde DNS OpenAI strictement read-only.
+az network private-endpoint show -g rg-certigo-dev \
+  -n pep-certigo-openai-account \
+  --query "{dns:customDnsConfigs,zoneGroups:privateDnsZoneGroups}" -o json
+az network private-dns zone list -g rg-certigo-dev \
+  --query "[].name" -o tsv
 ```
+
+Le niveau `Provider` est obligatoire. En cas de refus RBAC, `ProviderNoRbac` peut
+servir uniquement au diagnostic; il ne constitue pas une autorisation de déployer.
+Conserver la sortie complète et la joindre au ticket de changement.
 
 Refuser l'application si le what-if annonce une suppression, un remplacement du compte Cosmos,
 une Function App créée avant le déploiement `privateNetwork`, une private endpoint sans zone group,
-ou une baisse inattendue de Defender.
+une baisse inattendue de Defender, une création de NAT/IP déjà live, un PUT de
+l'IP, de la NAT, du NSG, du VNet `vnet-certigo-ci`, ou une modification d'un
+VMSS/VM. Pour
+`capacity.bicep`, la suppression de la seule règle `Decrease` CPU et l'ajout des
+tags FinOps à l'autoscale sont intentionnels. Pour `network.bicep`, seules les
+extensions de tags FinOps sur PIP/NAT/NSG sont intentionnelles. Le compte OpenAI doit rester
+`AIServices`, privé, `disableLocalAuth=true`, avec le modèle existant; son projet
+et son private endpoint restent `existing`. Le what-if OpenAI n'autorise pas
+l'activation runtime : le hostname `*.services.ai.azure.com` doit disposer de
+la zone `privatelink.services.ai.azure.com`, de l'enregistrement A annoncé par
+le private endpoint, d'un lien au VNet applicatif et d'un zone group approuvé.
+Au 4 septembre 2026, seule `privatelink.openai.azure.com` existe, avec une
+adresse différente, et le private endpoint n'a aucun zone group. Ne pas
+réutiliser cette zone classique ni créer les ressources manquantes sans un
+changement séparé et son propre what-if `Provider`.
 La date d'expiration JWT est une entrée absolue auditée : ne pas utiliser `utcNow()`, ne pas la
 repousser sans changer la clé, et appliquer la procédure de chevauchement décrite dans
 `docs/deployment-runbook.md` avant toute rotation.
@@ -167,8 +238,9 @@ repousser sans changer la clé, et appliquer la procédure de chevauchement déc
    route-all désactivé. Le CD publie ensuite via
    `.github/scripts/deploy-flex-onedeploy.sh` et bloque tant que `/health/live` puis
    `/health/ready` ne sont pas verts.
-2. **Staging** : fournir la clé JWT sécurisée et son expiration absolue, appliquer l'IaC, attendre
-   la propagation RBAC, publier, tester alertes et restauration PITR vers un nouveau compte.
+2. **Staging** : l'environnement est déjà déployé et healthy. Fournir la clé JWT
+   sécurisée et son expiration absolue uniquement pour un changement approuvé,
+   relire le what-if contre le RG peuplé, puis appliquer en mode incrémentiel.
 3. **Production** : fenêtre de changement approuvée, preuve du what-if, sauvegarde/PITR vérifiée,
    appliquer l'IaC puis publier ; ne jamais inverser cet ordre.
 4. **Runner CI** : le cycle start/stop reste une opération séparée et autorisée ; aucun script de
@@ -205,6 +277,9 @@ repousser sans changer la clé, et appliquer la procédure de chevauchement déc
   `deployments/<commit-sha>.zip` ne peut être réutilisé que si son SHA-256 est identique. Le script
   ne le supprime pas après OneDeploy : la policy lifecycle bornée à 30 jours cible exclusivement
   `app-package/deployments/`.
+- Le finding R-03 (rôles Storage Blob Data Owner/Contributor) appartient à une
+  PR distincte. Le préflight le signale mais ce chantier ne modifie ni ne retire
+  aucune attribution Storage.
 - OneDeploy est invoqué par PUT ARM direct. Ne jamais revenir à une corrélation par « dernier
   déploiement » : seul l'en-tête `Azure-AsyncOperation` ou `Location` renvoyé par le PUT exact peut
   être interrogé. L'absence d'en-tête, une URL hors `management.azure.com`, un statut inconnu ou un

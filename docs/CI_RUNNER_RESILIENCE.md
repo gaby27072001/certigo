@@ -549,8 +549,12 @@ checksum attendu et la commande de vérification avant mise en service.
 
 Le code fournit désormais :
 
-- `infra/ci-runner/network.bicep` pour l'egress partagé ;
-- `infra/ci-runner/runner.bicep` pour reconstruire une VM/NIC/disque/identité ;
+- `infra/ci-runner/network.bicep` pour l'egress legacy, avec IP, NAT, NSG et
+  VNet `existing`, tags isolés et seul sous-réseau enfant mutable ;
+- `infra/ci-runner/capacity.bicep` pour référencer les deux VMSS `existing` et
+  retirer uniquement le scale-in CPU de l'autoscale legacy ;
+- `infra/ci-runner/runner.bicep` comme modèle historique de reconstruction
+  d'une nouvelle VM/NIC/disque/identité, jamais comme représentation du VMSS live ;
 - `infra/ci-runner/bootstrap.sh` pour installer et enregistrer le runner de manière
   idempotente, avec version et SHA-256 épinglés ;
 - `.github/workflows/runner-health.yml` pour le probe quotidien ;
@@ -764,39 +768,18 @@ Le second résultat doit être vide avant suppression d'une VM compromise.
 
 ## Drill de perte d'un runner
 
-Le workflow `Runner resilience drill`, déclenché par un type
-`repository_dispatch` dédié, ne checkout aucun code et ne lit aucun secret. GitHub
-le charge depuis `main`. Il s'exécute sur `certigo-trusted` pour
-prouver que l'arrêt contrôlé du runner `certigo-pr` n'affecte pas les opérations trusted :
+Le drill mutable est **suspendu**. Ne pas reprendre les anciennes commandes
+`vm-certigo-runner` / `vm-certigo-runner-2` : elles ne représentent plus le live.
+Avant un nouveau drill, les trois conditions suivantes sont obligatoires :
 
-1. Relever les deux runners en ligne.
-2. Arrêter uniquement `vm-certigo-runner` (`certigo-pr`) et noter son nom exact.
-3. Déclencher le workflow :
+1. le what-if puis l'application approuvée de `capacity.bicep` ont retiré le scale-in CPU ;
+2. `be505fa1` possède une classification et une décision de lifecycle documentées ;
+3. `lifecycle-preflight.sh` est vert tout en gardant le contrôleur `enabled=false`.
 
-   ```bash
-   gh api --method POST repos/gchambaud_microsoft/Certigo/dispatches --input - <<JSON
-   {
-     "event_type": "runner-resilience-drill",
-     "client_payload": {
-       "expected_offline_runner": "<RUNNER_ARRETE>"
-     }
-   }
-   JSON
-   ```
-
-4. Vérifier que le job termine sur `vm-certigo-runner-2` (`certigo-trusted`) :
-
-   ```bash
-   gh run list --workflow runner-resilience-drill.yml --limit 1
-   gh run watch <RUN_ID>
-   ```
-
-5. Réactiver le runner PR et confirmer que les deux instances sont `online`.
-
-Le drill échoue si le runner exécutant porte le nom déclaré indisponible ou si le job
-n'est pas exécuté sur un runner self-hosted. L'attente en file n'est pas limitée par
-`timeout-minutes` ; l'absence de démarrage reste donc une preuve opérationnelle d'un
-pool insuffisant et doit être interrompue manuellement.
+Le ticket de drill doit ensuite nommer l'ID ARM exact de l'instance PR, prouver
+`busy=false` et zéro job en file, définir la fenêtre et le rollback, puis recevoir
+une approbation opérateur. Le workflow `Runner resilience drill` reste la preuve
+GitHub, mais ce document n'autorise aucun arrêt ou redémarrage Azure.
 
 ## Résilience exclusivement Azure
 

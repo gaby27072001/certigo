@@ -19,7 +19,7 @@
 > révèle que la cible existe déjà et est conforme, le lot est **déjà fait** — ne rien
 > réappliquer.
 
-> **Statut vérifié le 2026-09-03** (consolidation documentaire) :
+> **Statut vérifié le 2026-09-04** (inventaire Azure/GitHub read-only) :
 > - **Lot 1** (`wp-p1-04-certigo-content-repo`) — ✅ **FAIT**. Le dépôt
 >   [`gchambaud_microsoft/certigo-content`](https://github.com/gchambaud_microsoft/certigo-content)
 >   existe, avec arborescence `content/public`/`content/answerKey`, gouvernance et pipeline CI
@@ -27,13 +27,13 @@
 > - **Lot 2** (`wp-p1-11-ci-spof-runners`) — ⚠️ **encore ouvert, mais partiellement recoupé
 >   par `wp-p2-07`** (PR [#250](https://github.com/gchambaud_microsoft/Certigo/pull/250) et
 >   [#253](https://github.com/gchambaud_microsoft/Certigo/pull/253), fusionnées) qui a livré le
->   **failover** sur un pool Azure ≥2 instances. La DoD précise de **ce** lot (séparation
->   d'identité stricte `certigo-pr` / `certigo-trusted`) reste **non atteinte en live** :
->   `docs/runbooks/CI_RUNNERS.md` (au 20 août 2026) constate que les deux runners portent
->   **simultanément** les deux labels et que la migration est **« bloquée »**. Ne pas
->   considérer ce lot comme fait sans revérifier `CI_RUNNERS.md`.
-> - **Lots 3 et 4** (`wp-p1-12-iac-drift-import`, `wp-p1-13-staging-environment`) — toujours
->   ouverts (`todo` dans le registre), inchangés depuis la dernière vérification.
+>   **failover**. Les labels live sont désormais exclusifs, mais le contrôleur reste
+>   désactivé, le scale-in CPU est encore présent et une VM deallocated est non classifiée.
+> - **Lot 3** (`wp-p1-12-iac-drift-import`) — correction IaC minimale en revue :
+>   réseau borné, deux VMSS `existing`, autoscale sans scale-in CPU, OpenAI privé/keyless.
+> - **Lot 4** (`wp-p1-13-staging-environment`) — staging existe déjà et est healthy.
+>   Le déploiement Bicep subscription `certigo-staging` a réussi le 2026-08-16.
+>   Ne jamais recréer ou supprimer ce RG pour rejouer ce runbook.
 
 ---
 
@@ -43,8 +43,8 @@
 | --- | --- | --- | --- | --- | --- |
 | 1 | **Créer le dépôt `certigo-content`** (arborescence + gouvernance + séparation public/answerKey) | `wp-p1-04-certigo-content-repo` | GitHub (org) | ~45 min | p1-05, p1-06 → p1-07 → p1-08 |
 | 2 | **Résilience CI** : supprimer le SPOF runner (pool Azure ≥2 instances) | `wp-p1-11-ci-spof-runners` | Azure + GitHub Actions | ~2–4 h | Stabilité CI de toute la Phase 1+ |
-| 3 | **Import du drift IaC** : Azure OpenAI + réseau CI en Bicep (what-if → apply) | `wp-p1-12-iac-drift-import` | Azure (abonnement live) | ~2–3 h | p1-13 |
-| 4 | **Environnement de staging** : pré-prod isolée, provisionnée par IaC (O-04) | `wp-p1-13-staging-environment` | Azure (abonnement live) | ~1–2 h | Recette pré-prod P1+ |
+| 3 | **Réconcilier le drift IaC** : OpenAI + réseau/capacité CI (syntaxe + permissions + what-if) | `wp-p1-12-iac-drift-import` | Azure (lecture seule avant changement approuvé) | ~2–3 h | p1-13 |
+| 4 | **Maintenir staging** : pré-prod live, isolée et déjà provisionnée par IaC | `wp-p1-13-staging-environment` | Azure (réconciliation) | ~1 h | Recette pré-prod P1+ |
 
 > **Ordre imposé — `wp-p1-04` est la clé de voûte, à faire EN PREMIER.** Le dépôt
 > `certigo-content` conditionne toute la chaîne contenu de la Phase 1 : p1-05 (migration du
@@ -272,68 +272,79 @@ IaC ; un **`what-if` Bicep ne montre aucun drift non intentionnel** ; la **proc�
 détection de drift** est documentée et exécutable. Import **descriptif uniquement** — aucune
 modification appliquée aux ressources live sans revue du what-if.
 
-**Finding G (audit).** Deux dérives principales, **déjà scaffoldées en code sur `main`** ;
-il reste à **jouer les déploiements d'adoption côté live** (voie ops, non faisable par l'agent) :
-1. **Compte Azure OpenAI `certigo-openai`** (région **swedencentral**, dev) créé hors-bande →
-   module d'**adoption** `infra/modules/openai.bicep` (câblé dans `infra/main.bicep`, module
-   `tutor`, encore gated dev-only).
-2. **Chemin d'egress réseau du runner CI** (5 ressources : `pip-certigo-nat`, `nat-certigo`,
-   `vnet-certigo-ci`, `snet-runners`, NSG) dans `rg-certigo-ci` → figé par
-   `infra/ci-runner/network.bicep`. Les **VMs runners restent hors IaC** (report Phase 2,
-   choix assumé — voir `infra/ci-runner/README.md`).
+**Constat live du 4 septembre.**
+
+1. **Azure OpenAI `certigo-openai`** (`AIServices`, `swedencentral`, S0) est
+   privé (`publicNetworkAccess=Disabled`), keyless (`disableLocalAuth=true`),
+   avec projet `certigo-dev`, private endpoint approuvé et déploiement
+   `gpt-5.4-mini` version `2026-03-17`, `GlobalStandard`, capacité 1. Le module
+   gère le compte/modèle/RBAC indépendamment du feature flag runtime; projet et
+   private endpoint restent `existing`. La zone live
+   `privatelink.openai.azure.com` ne couvre pas le hostname Foundry
+   `*.services.ai.azure.com`; aucune zone DNS n'est donc revendiquée par ce lot
+   et l'activation runtime reste bloquée.
+2. **Réseau CI** : les noms live sont `pip-vm-certigo-runner-2-nat` et
+   `nat-vm-certigo-runner-2`. Le VNet a trois peerings; `network.bicep` le
+   référence donc `existing` et gère seulement le sous-réseau enfant.
+3. **Capacité CI** : les deux VMSS Flexible sont `existing`. `capacity.bicep`
+   conserve min/default/max 2/2/4 et le scale-out CPU, mais retire le scale-in
+   CPU qui ignore GitHub `busy`. Il ne déclare aucune instance VM.
+4. **Frontière bloquante** : `be505fa1`, deallocated et sans runner, reste
+   volontairement non classifiée. Ne pas l'ajouter à une liste pour obtenir un
+   plan vert. Le contrôleur reste `enabled=false`.
 
 **Pré-requis.**
 - `az login` ; `az account set --subscription <SUBSCRIPTION_ID>`.
-- Droits **Contributor** (a minima) sur `rg-certigo-ci` et le RG hôte de `certigo-openai`.
-- Précondition idempotente : si un `what-if` sur les deux périmètres ne montre **aucun** drift,
+- Droits permettant la validation `Provider` sur `rg-certigo-ci` et `rg-certigo-dev`.
+- Précondition idempotente : si les what-if montrent uniquement les changements
+  intentionnels documentés,
   le lot est **fait**.
 
-**Étapes (what-if AVANT tout apply — c'est un import d'adoption, jamais un recreate).**
+**Étapes (aucun apply implicite).**
 
 ```bash
-# 1. Réseau CI : valider sans rien changer (n'affiche que des diffs bénignes documentées).
+# 1. Compiler tous les contrats ciblés.
+bicep build infra/ci-runner/network.bicep --stdout >/dev/null
+bicep build infra/ci-runner/capacity.bicep --stdout >/dev/null
+bicep build infra/modules/openai.bicep --stdout >/dev/null
+
+# 2. Vérifier les permissions effectives, puis le réseau et la capacité.
+az account show --query "{subscription:id,tenantId:tenantId,user:user.name}" -o json
 az deployment group what-if -g rg-certigo-ci \
-  --template-file infra/ci-runner/network.bicep
-# -> attendu : aucun changement sur le chemin d'egress (IP/NAT/subnet identiques).
-#    Seules subsistent les 3 diffs "bénignes" listées dans infra/ci-runner/README.md.
+  --template-file infra/ci-runner/network.bicep \
+  --validation-level Provider
+az deployment group what-if -g rg-certigo-ci \
+  --template-file infra/ci-runner/capacity.bicep \
+  --validation-level Provider
 
-# 2. Déployer le réseau CI en INCRÉMENTIEL (ne touche que les 5 ressources d'egress).
-#    ⚠️ NE JAMAIS déployer en mode "Complete" : cela supprimerait la VM runner et son disque.
-az deployment group create -g rg-certigo-ci \
-  --template-file infra/ci-runner/network.bicep
-
-# 3. Azure OpenAI : adopter le compte existant. Confirmer d'abord les valeurs live
-#    (nom, région, déploiement, version de modèle) puis passer le what-if global.
-az cognitiveservices account show -n certigo-openai -g <OPENAI_RG> \
-  --query "{name:name,location:location,sku:sku.name}" -o json
-az deployment sub what-if \
-  --location westeurope \
-  --template-file infra/main.bicep \
-  --parameters infra/params/dev.bicepparam
-# -> attendu : le compte certigo-openai ressort en UPDATE (adopté), PAS en Create/Delete.
-#    Aligner les paramètres du module openai sur le live tant que le what-if montre du drift.
+# 3. OpenAI : le principal est lu, jamais fourni par un payload utilisateur.
+FUNC="$(az functionapp list -g rg-certigo-dev --query '[0].name' -o tsv)"
+PRINCIPAL="$(az functionapp identity show -g rg-certigo-dev -n "$FUNC" \
+  --query principalId -o tsv)"
+az deployment group what-if -g rg-certigo-dev \
+  --template-file infra/modules/openai.bicep \
+  --parameters accountName=certigo-openai location=swedencentral \
+               deploymentName=gpt-5.4-mini functionAppPrincipalId="$PRINCIPAL" \
+  --validation-level Provider
 ```
 
-**Procédure de détection de drift (à documenter/planifier — livrable du DoD).** Exécuter
-périodiquement (ou en CI `ci-infra`) un `what-if` sur chaque périmètre ; toute diff non
-listée comme « bénigne » est un drift à traiter.
+Le fallback `ProviderNoRbac` sert uniquement à diagnostiquer un manque de droits;
+il ne permet pas d'appliquer. Une suppression, une création d'une ressource déjà
+live, un changement de VMSS/VM/VNet parent, ou l'ouverture réseau d'OpenAI bloque.
+Les changements intentionnels sont bornés : tags FinOps réseau/autoscale, retrait
+de la seule règle CPU `Decrease`, gestion privée/keyless du compte OpenAI.
 
 **Placeholders.** `<SUBSCRIPTION_ID>`, `<OPENAI_RG>` (RG hôte du compte `certigo-openai`).
 
-**Vérification.**
+**Vérification.** Conserver les sorties Provider complètes dans le ticket et
+générer `preflight-report.md`. `bash infra/ci-runner/capacity-plan.sh` doit rester
+read-only et signaler `be505fa1` tant qu'elle n'est pas classifiée. La gate
+`ci-infra` doit rester verte.
 
-```bash
-az deployment group what-if -g rg-certigo-ci --template-file infra/ci-runner/network.bicep \
-  | Select-String -Pattern "Modify|Delete|Create"
-# -> attendu : aucune ligne, hormis les diffs bénignes connues (sku.tier, scope, ipTags).
-```
-
-Côté CI : le pipeline `ci-infra` compile déjà les modèles (`az bicep build`) — le job doit
-rester **vert** sur `main`.
-
-**Rollback.** Abandon de la branche ; l'import étant **descriptif** (incrémentiel, jamais
-Complete), **aucune** ressource live n'est modifiée en cas d'abandon. Ne **jamais** lancer un
-déploiement Complete sur `rg-certigo-ci`.
+**Rollback.** Avant apply : abandon de la branche, aucune ressource live modifiée.
+Après une application approuvée : restaurer la version précédente de la seule
+surface concernée en mode incrémentiel et refaire un what-if. Ne jamais utiliser
+`Complete`, supprimer une VM/VMSS ou réintroduire le scale-in CPU comme rollback.
 
 **Durée estimée.** ~2–3 h (revue what-if + apply prudents). **Ordre / dépendances.** À jouer
 **avant le lot 4** : le staging s'appuie sur une IaC réconciliée et sans drift.
@@ -346,34 +357,27 @@ déploiement Complete sur `rg-certigo-ci`.
 dédiés) et **isolé de la prod** ; un déploiement staging **réussit** et **`/health` est vert**.
 Répond à la reco **O-04** (environnement de recette réel).
 
-**État actuel.** Le fichier de paramètres **`infra/params/staging.bicepparam` existe déjà** sur
-`main` : durcissement calqué sur la prod (Cosmos RBAC-only, Key Vault purge protection, storage
-géo-redondant), `env='staging'`, `location='westeurope'`, Cosmos épinglé `northeurope`. Le RG
-cible est **`rg-certigo-staging`** (patron `rg-${appName}-${env}` de `infra/main.bicep`).
-**Seuls 2 blocages** subsistent : les **valeurs Entra External ID** (CIAM) de staging.
+**État actuel.** `rg-certigo-staging` existe, est peuplé et porte
+`managedBy=bicep`. Le déploiement subscription `certigo-staging` a réussi le
+2026-08-16 en mode Incremental. Storage, Cosmos Continuous7Days, Key Vault,
+Function App, VNet, private endpoints approuvés et alertes sont présents.
+`/api/health/live`, `/api/health/ready` et `/api/health` répondent 200.
 
 **Pré-requis.**
 - `az login` ; `az account set --subscription <SUBSCRIPTION_ID>`.
-- Droits de créer un RG + déployer au **scope abonnement** (`az deployment sub create`).
-- App registration backend **dédiée staging** (préférable) pour obtenir `<TENANT_GUID>` et
-  `<API_CLIENT_ID>` — **NE PAS inventer de GUID** (à défaut, réutiliser temporairement les
-  valeurs prod en connaissance de cause, cf. commentaires du `staging.bicepparam`).
-- Précondition idempotente : si un staging isolé provisionné par IaC existe **déjà**, lot fait.
+- Droits de validation `Provider` au scope abonnement/RG.
+- Paramètres sécurisés JWT et alerte fournis hors dépôt.
+- Précondition idempotente déjà satisfaite : staging existe et provient de Bicep.
 
 **Étapes.**
 
 ```bash
-# 1. Renseigner les 2 paramètres Entra dans infra/params/staging.bicepparam
-#    (SEULS blocages avant déploiement — sinon tout login est rejeté 401 aud/issuer) :
-#      param entraAuthority = 'https://certigo.ciamlogin.com/<TENANT_GUID>/v2.0'
-#      param entraAudience  = 'api://<API_CLIENT_ID>'
-#    Utiliser le sous-domaine GUID de tenant (<TENANT_GUID>.ciamlogin.com), pas un vanity domain.
-
-# 2. Déployer le staging au scope abonnement (crée le RG rg-certigo-staging + la stack).
-az deployment sub create \
+# Valider le déploiement existant; toute Create/Delete inattendue est bloquante.
+az deployment sub what-if \
   --location westeurope \
   --template-file infra/main.bicep \
-  --parameters infra/params/staging.bicepparam
+  --parameters @<SECURE_STAGING_PARAMETERS_JSON> \
+  --validation-level Provider
 ```
 
 **Placeholders.** `<SUBSCRIPTION_ID>`, `<TENANT_GUID>`, `<API_CLIENT_ID>`.
@@ -392,8 +396,10 @@ curl -fsS https://<STAGING_FUNCTION_HOST>/api/health
 Vérifier l'**isolation** : les ressources staging portent le suffixe `staging` et vivent dans
 `rg-certigo-staging` — **aucune** ne partage d'état avec `rg-certigo-prod`.
 
-**Rollback.** Abandon de la branche ; **supprimer l'environnement** de staging le cas échéant
-(`az group delete -n rg-certigo-staging`) — la **prod reste inchangée** (RG distinct).
+**Rollback.** Abandonner la modification IaC avant apply. Après un changement
+approuvé, revenir au template/paramètres précédents en mode Incremental. **Ne
+jamais supprimer `rg-certigo-staging` comme rollback générique** : il contient un
+environnement actif.
 
 **Durée estimée.** ~1–2 h (après obtention des valeurs Entra). **Ordre / dépendances.**
 **Après le lot 3** (`wp-p1-12`) : le staging suppose une IaC réconciliée et sans drift.
@@ -416,22 +422,23 @@ Vérifier l'**isolation** : les ressources staging portent le suffixe `staging` 
 - [ ] Simulation d'indisponibilité d'un runner : la CI **ne bloque pas**
 
 **Lot 3 — `wp-p1-12-iac-drift-import`**
-- [ ] `what-if` réseau CI : aucune diff hors « bénignes » documentées
-- [ ] Déploiement réseau CI en **incrémentiel** (jamais Complete)
-- [ ] `certigo-openai` ressort en **UPDATE** (adopté), pas Create/Delete, au what-if
+- [ ] Syntaxe, permissions et trois what-if Provider archivés
+- [ ] Aucun Create/Delete, aucun PUT VM/VMSS/VNet parent
+- [ ] Scale-in CPU absent du contrat; contrôleur toujours désactivé
+- [ ] `certigo-openai` reste privé/keyless et n'est ni recréé ni supprimé
+- [ ] `be505fa1` reste bloquante jusqu'à classification indépendante
 - [ ] Procédure de détection de drift documentée + `ci-infra` vert sur `main`
 
 **Lot 4 — `wp-p1-13-staging-environment`**
-- [ ] Valeurs Entra staging (`<TENANT_GUID>`, `<API_CLIENT_ID>`) renseignées (pas de GUID inventé)
-- [ ] `az deployment sub create` staging **réussi** (`rg-certigo-staging` = Succeeded)
-- [ ] `/health` du backend staging **vert**
-- [ ] Isolation confirmée (aucun partage d'état avec la prod)
+- [x] Déploiement subscription `certigo-staging` **Succeeded** le 2026-08-16
+- [x] `/health/live`, `/health/ready` et `/health` **verts**
+- [x] RG et ressources principales tagués `managedBy=bicep`
+- [x] Isolation RG/réseau confirmée; aucun partage d'état avec la prod
 
 ---
 
-> **Note d'orchestration.** Ce runbook est **docs-only**. Après exécution réelle d'un lot par
-> Gabriel, mettre à jour l'état dans le registre : `docs/migration/state/<id>.json`
-> (`todo → in_progress → done`) et **append** une ligne dans
-> [`log.jsonl`](./log.jsonl) (append-only, UNION, 0 suppression). La PR qui porte ce document
-> reste en **draft** et ne doit être ni fusionnée ni sortie du draft par l'agent : elle sert de
-> support de revue au guide opérateur. Ordre de jeu recommandé : **1 (keystone) → 2 → 3 → 4**.
+> **Note d'orchestration.** Après une preuve live, mettre à jour
+> `docs/migration/state/<id>.json` et **append** une ligne dans
+> [`log.jsonl`](./log.jsonl) (append-only, UNION, 0 suppression). Une PR IaC ne
+> doit jamais appliquer ni merger automatiquement un changement live. Ordre de
+> décision recommandé : **1 (keystone) → 2 → revue 3 → maintien 4**.

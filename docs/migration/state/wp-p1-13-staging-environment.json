@@ -7,12 +7,12 @@
     "number": 232,
     "url": "https://github.com/gchambaud_microsoft/Certigo/pull/232"
   },
-  "head": "4d65d61559e6cac4534433a21c88d137cb9cafc8",
+  "head": "91cb0d4f56666bd381796bfb0c4fea5828334734",
   "checkpoint": {
-    "step": "live-dod-not-satisfied",
-    "note": "PR #232 fournit une configuration IaC partielle, mais staging n'est pas déployé, /health n'est pas vérifié et la dépendance wp-p1-12 reste todo.",
-    "at": "2026-08-05T20:52:00+01:00"
+    "step": "live-dod-observed-domain-contract-pending",
+    "note": "Le déploiement subscription Bicep certigo-staging a réussi le 2026-08-16 en mode Incremental. RG peuplé, ressources isolées et /health/live, /health/ready, /health verts le 2026-09-04. Le prochain what-if racine exige PUBLIC_WEB_ORIGIN, PUBLIC_DOMAIN_VERIFIED et APPLE_CIAM_DOMAIN_RECONFIGURED, absents de l'environnement GitHub staging ; aucune valeur n'est devinée. Statut todo conservé jusqu'à wp-p1-12 done.",
+    "at": "2026-09-04T07:48:23Z"
   },
-  "updated_at": "2026-08-05T20:52:00+01:00",
+  "updated_at": "2026-09-04T07:48:23Z",
   "history_ref": "log.jsonl"
 }

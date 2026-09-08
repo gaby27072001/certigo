@@ -30,7 +30,7 @@ puis confirmer que les RG, identités et scopes attendus y existent. En leur abs
 qu'une déallocation serait dangereuse et, dans cette PR, pour toute demande puisque le
 feature flag reste `off`.
 
-## Inventaire read-only consolidé au 20 août 2026
+## Inventaire read-only consolidé au 4 septembre 2026
 
 Périmètre observé : subscription
 `b8952c8c-8f72-469d-99cd-ac906da4e2fc`, groupes `rg-certigo-dev`,
@@ -120,8 +120,8 @@ réinventoriées avant toute décision :
 - l'UAMI `id-vm-certigo-runner-2-vmss` est liée au VMSS et possède uniquement
   `Key Vault Secrets User` sur `kv-certigo-ci-081423`.
 
-`4153d1dd` est explicitement externe et gelée. Ne pas la démarrer, déallouer, supprimer,
-réenregistrer, relabelliser ou adopter depuis cette PR.
+`be505fa1` est non classifiée et gelée. Ne pas la démarrer, déallouer,
+supprimer, réenregistrer, relabelliser ou adopter depuis cette PR.
 
 `kv-certigo-ci-pub814` et tout autre artefact sans chaîne d'usage complète restent
 **non classés**, jamais « orphelins par intuition ». Une suppression n'est envisageable que si
@@ -789,7 +789,8 @@ Les éléments versionnés restent tous read-only :
 - `capacity-controller.config.json` fixe `enabled=false`, le trigger `workflow_job`, la
   quiet period de 300 s, les deux gardes et la cible de pilote ultérieur
   `6 certigo-pr + 2 certigo-trusted`; son état v3 lie les IDs exacts f55/pilote, garde le
-  runner 26 et la VM `4153d1dd` hors scope et interdit les VMs `22f7fb52`/`4596a9d5`,
+  runner 26 et la VM `4153d1dd` hors scope et interdit les VMs `22f7fb52`/`4596a9d5`.
+  `be505fa1` reste volontairement absente de ces listes afin de demeurer bloquante,
   sans règle générique qui masquerait une
   nouvelle VM non réconciliée ;
 - `capacity-controller.mjs` réduit un snapshot d'événements et produit uniquement le
@@ -847,8 +848,8 @@ hors dépôt n'active pas le contrôleur versionné : `enabled=false` reste le c
 1. conserver `enabled=false` et suspendre tout scale-in CPU ;
 2. archiver les inventaires Azure, VMSS, GitHub, disques/NIC et l'erreur
    `ResourceNotFound` de `22f7fb52` ;
-3. ne supprimer ni le runner stale `22f7fb52-Certigo`, ni la VM intacte `4153d1dd` pendant
-   l'analyse de cause et la décision d'adoption/reconstruction ;
+3. ne supprimer ni le runner historique `22f7fb52-Certigo`, ni la VM
+   `be505fa1` pendant l'analyse de cause et la décision d'adoption/reconstruction ;
 4. faire approuver le modèle cible : deux pools/VMSS, frontières d'identité distinctes,
    sous-réseaux distincts, un label exclusif par pool et au moins deux zones ;
 5. reconstruire ou adopter une seconde instance via une fenêtre opérateur, puis
