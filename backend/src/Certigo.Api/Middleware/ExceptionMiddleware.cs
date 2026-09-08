@@ -160,6 +160,15 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
                 ex.Message,
                 correlationId);
         }
+        catch (VivaLearningFeatureDisabledException ex)
+        {
+            await WriteProblemAsync(
+                context,
+                HttpStatusCode.NotFound,
+                "Not found",
+                ex.Message,
+                correlationId);
+        }
         catch (EnterpriseIdentityFeatureDisabledException ex)
         {
             await WriteProblemAsync(
