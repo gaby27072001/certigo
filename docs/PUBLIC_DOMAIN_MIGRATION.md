@@ -524,3 +524,136 @@ qu'ils mesurent, contrairement au dépôt.
 la liste des environnements autorisés à déclarer ces `param`, ou si `dev` entre dans la boucle
 `staging prod` de `infra/validate.sh:139` ou dans `['staging','prod']` de
 `validate-workflow-security.mjs:887`.
+
+## La garde de release attestait une capacité absente du binaire
+
+**Mesuré le 2026-09-08.** Les workflows de release appelaient le contrat avec la fonctionnalité
+`account-deletion-url`, qui exige `APPLE_CIAM_DOMAIN_RECONFIGURED=true`, alors qu'ils compilent
+`ACCOUNT_DELETION_ENABLED=false` par défaut. **La garde attestait une capacité que le binaire
+livré ne contient pas.**
+
+Ce n'est pas une prudence sans conséquence. Une garde plus stricte que son objet ne mesure pas ce
+qu'on croit : elle bloquait la première bêta iOS au nom d'une fonctionnalité désactivée, et rien
+n'aurait signalé le cas inverse — un binaire qui embarque la suppression de compte sans que la
+reconfiguration Apple ait été faite.
+
+**La correction lie la fonctionnalité au drapeau réellement compilé** (`codemagic.yaml`, ancre
+`step_public_domain_gate`) : `account-deletion-url` quand `ACCOUNT_DELETION_ENABLED` vaut `true`,
+`legal-pages` sinon. Mesuré dans les quatre directions, en exécutant la garde :
+
+| `ACCOUNT_DELETION_ENABLED` | `APPLE_CIAM_DOMAIN_RECONFIGURED` | Résultat |
+| --- | --- | --- |
+| `false` | `false` | passe — `legal-pages` |
+| **`true`** | **`false`** | **échoue** — l'exigence Apple se rallume |
+| `true` | `true` | passe — `account-deletion-url` |
+| toute autre valeur | — | échoue |
+
+La deuxième ligne est la raison d'être du lien : activer la suppression de compte **rallume
+automatiquement** l'exigence Apple, sans dépendre de la mémoire de quelqu'un.
+
+### Ce que le drapeau atteste aujourd'hui : rien, et ce n'est pas définitif
+
+**Mesuré le 2026-09-08** sur le locataire CIAM `af721be8-5901-422a-b299-b9c57847b968`, six
+inscriptions d'application sur six : aucune URL de la chaîne d'authentification ne contient de
+domaine Certigo. Uniquement le schéma applicatif `certigo://auth/`, des hôtes appartenant à
+Microsoft (`*.ciamlogin.com`, `*.onmicrosoft.com`) et une URN `api://<guid>`. Le seul domaine du
+locataire est `certigoapp.onmicrosoft.com`.
+
+`APPLE_CIAM_DOMAIN_RECONFIGURED` est rattaché à l'étape 3 de « Actions humaines après achat du
+domaine » — « les domaines et return URLs Apple et External ID ». **Cette étape n'a donc aucun
+objet mesurable.** L'étape 4, elle, en a un depuis que l'hébergement est tranché : l'entitlement
+Apple porte `www.certigo-app.com`, voir « Hébergement retenu : Azure Static Web Apps ».
+
+**Ne pas en conclure que le drapeau restera vide.** Le jour où l'étape 4 est faite, il acquiert un
+objet — et le lien ci-dessus fait que l'exigence se rallume seule à ce moment-là.
+
+Un angle n'est pas couvert : `GET /identity/identityProviders` rend `403` faute de
+`IdentityProvider.Read.All`, donc la fédération « Sign in with Apple » n'a pas été énumérée. Les
+URL de fédération mesurées sur les autres applications pointent toutes vers `*.ciamlogin.com`,
+mais c'est une inférence de motif, pas une lecture.
+
+### Périmètre : ne pas généraliser cette correction à `cd-backend.yml`
+
+`cd-backend.yml` appelle le contrat avec `infrastructure`, et **ce n'est pas la même anomalie**.
+Un déploiement d'infrastructure ne produit pas de binaire : il produit `accountDeletionUrl` et
+`appleAppSiteAssociationUrl`. La garde y a son objet. Voir « `validate-public-domain` est une gate
+bloquante, pas une simple validation de forme ».
+
+**La raison de la borne, pas seulement la borne** : quelqu'un qui lit « la garde était trop
+stricte, on l'a alignée » voudra appliquer le même geste aux quatre sites d'appel. Sur
+`cd-backend.yml`, ce serait un affaiblissement réel. La correction ne vaut que là où un **binaire**
+est produit.
+
+### Les deux lignes de normalisation sont dupliquées délibérément
+
+La garde reprend mot pour mot les deux lignes que porte déjà l'étape de build :
+
+```bash
+ACCOUNT_DELETION_ENABLED="${ACCOUNT_DELETION_ENABLED:-false}"
+case "$ACCOUNT_DELETION_ENABLED" in true|false) ;; *) exit 1 ;; esac
+```
+
+**Ce n'est pas une duplication à factoriser.** Elle rend la garde correcte **sans dépendre de la
+propagation des variables entre étapes Codemagic** — un fait que nous n'avons pas mesuré et qui
+peut changer sans préavis. La normalisation étant idempotente, le résultat est identique que les
+étapes partagent leur shell ou non. `codemagic.yaml` suggère d'ailleurs qu'elles ne le partagent
+pas : `step_resolve_version` écrit `BUILD_NAME` et `BUILD_NUMBER` dans `$CM_ENV`, ce qui serait
+inutile autrement.
+
+`${VAR:-false}` traite la valeur vide **comme** l'absence : une variable définie mais vide donne
+`false`, comme une variable absente. Avec `-` au lieu de `:-`, une valeur vide aurait produit une
+chaîne vide, refusée par le `case` — un échec bruyant, jamais une divergence silencieuse.
+
+### Le littéral `public-domain-contract.mjs account-deletion-url` est exigé tel quel
+
+`validateRepositoryInvariants` dans `validate-workflow-security.mjs` vérifie par
+`content.includes()` que `codemagic.yaml`, `release-android.yml` et `release-ios.yml` contiennent
+la sous-chaîne littérale `public-domain-contract.mjs account-deletion-url`.
+
+**Remplacer le nom de la fonctionnalité par une variable shell fait échouer la CI**, avec un
+message qui annonce une garde « manquante » alors qu'elle est présente, seulement écrite
+autrement. C'est pourquoi les deux invocations sont écrites en clair, une par branche : le littéral
+est là **parce que le chemin `account-deletion-url` existe réellement**. Supprimer cette branche
+déclencherait l'invariant — il fait son travail.
+
+### Android et l'iOS historique portent la même anomalie, sans remède
+
+`release-android.yml` appelle lui aussi le contrat avec `account-deletion-url` tout en compilant
+`ACCOUNT_DELETION_ENABLED` à `false` par défaut. `release-ios.yml`, déprécié, l'appelle sans
+jamais compiler le drapeau. **Ces deux-là ne peuvent pas être corrigés.**
+
+`validateNoncanonicalWorkflows` dans `backend-deploy-workflow-policy.mjs` rejette tout fichier de
+`.github/workflows/` **autre que `cd-backend.yml`** qui diffère de sa révision de base **et** porte
+une capacité privilégiée au sens de `privilegedWorkflow`. `release-android.yml` en porte trois :
+`permissions:`, `environment:` et `secrets.*`. Mesuré le 2026-09-08 : l'ajout d'**une seule ligne
+de commentaire** suffit à le faire rejeter.
+
+> **Le message ment sur son déclencheur.** Il dit `changed or new privileged capability is
+> forbidden outside cd-backend.yml`, mais la condition réelle est *le fichier diffère d'un octet*
+> **et** *le fichier est privilégié*. Aucune capacité n'a besoin de changer. Quelqu'un qui ajoute
+> un commentaire vérifiera ses permissions, ses secrets et son environnement, n'y trouvera rien de
+> modifié, et conclura à un bug de l'outil.
+
+Le message qui l'accompagne aggrave la confusion : il propose de régénérer le manifeste sémantique
+avec `generate-workflow-semantic-manifest.mjs --write`. **Ce remède adresse la première erreur et
+jamais la seconde** — vérifié en régénérant réellement le manifeste, le refus reste mot pour mot.
+
+**Ne pas tenter de « réparer » Android.** Ce n'est pas un oubli, c'est fermé, et l'essai coûte un
+aller-retour CI complet pour un message trompeur. L'anomalie y disparaîtra d'elle-même le jour où
+la suppression de compte sera réellement activée : l'attestation redeviendra vraie.
+
+### Ce qui rend la correction iOS possible tient à l'emplacement d'un fichier
+
+`validateNoncanonicalWorkflows` ne parcourt que `.github/workflows/`. **`codemagic.yaml` vit à la
+racine du dépôt, il n'est donc jamais examiné par cette règle.** C'est la seule raison pour
+laquelle la chaîne iOS est corrigeable et la chaîne Android ne l'est pas.
+
+**Ce n'est pas une propriété d'architecture, c'est une contingence** : l'emplacement a été choisi
+parce que Codemagic lit son manifeste à la racine, pour une raison sans rapport avec la
+gouvernance. Déplacer `codemagic.yaml` sous `.github/`, ou migrer la chaîne iOS vers GitHub
+Actions, **fermerait la dernière porte** — et le scellé qui l'impose ne peut plus être retiré.
+
+**Condition d'invalidation** : cette section cesse d'être vraie si une return URL du locataire
+CIAM contient un domaine Certigo — contrôle : réénumérer les inscriptions d'application du
+locataire ; si `account-deletion-url` sort de `featuresRequiringApple` dans
+`public-domain-contract.mjs` ; ou si `codemagic.yaml` cesse d'être à la racine du dépôt.

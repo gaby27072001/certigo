@@ -67,7 +67,18 @@ definitions:
       name: Verify public-domain contract
       script: |
         set -euo pipefail
-        TARGET_ENV=prod node .github/scripts/public-domain-contract.mjs account-deletion-url
+        # La garde doit attester exactement ce que le binaire embarque : la
+        # reconfiguration Apple n'est exigee que si la suppression de compte est
+        # reellement compilee dans l'IPA. Les deux lignes de normalisation sont
+        # dupliquees depuis l'etape de build a dessein - voir docs/PUBLIC_DOMAIN_MIGRATION.md,
+        # « Les deux lignes de normalisation sont dupliquees deliberement ».
+        ACCOUNT_DELETION_ENABLED="${ACCOUNT_DELETION_ENABLED:-false}"
+        case "$ACCOUNT_DELETION_ENABLED" in true|false) ;; *) exit 1 ;; esac
+        if [ "$ACCOUNT_DELETION_ENABLED" = "true" ]; then
+          TARGET_ENV=prod node .github/scripts/public-domain-contract.mjs account-deletion-url
+        else
+          TARGET_ENV=prod node .github/scripts/public-domain-contract.mjs legal-pages
+        fi
     - &step_pub_get
       name: Flutter pub get
       script: flutter pub get --enforce-lockfile
