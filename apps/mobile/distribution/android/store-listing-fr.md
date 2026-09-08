@@ -10,9 +10,16 @@
 | applicationId / package | `com.certigo.mobileapp` ⚠️ NON modifiable après le 1er upload |
 | Catégorie | Éducation |
 | Adresse e-mail de contact | `gabriel.chambaud@icloud.com` |
-| Site web | `https://gchambaud_microsoft.github.io/Certigo/` |
-| Politique de confidentialité (URL) | `https://gchambaud_microsoft.github.io/Certigo/privacy-policy/` |
-| Suppression du compte (URL) | `https://gchambaud_microsoft.github.io/Certigo/account-deletion/` |
+| Site web | `https://www.certigo-app.com/` |
+| Politique de confidentialité (URL) | `https://www.certigo-app.com/privacy-policy/` |
+| Suppression du compte (URL) | `https://www.certigo-app.com/account-deletion/` |
+
+> **Origine publique.** `docs/PUBLIC_DOMAIN_MIGRATION.md` fait autorité sur ces
+> trois URLs. Elles sont écrites en clair ici, et non sous forme de variable,
+> parce que ce document est recopié à la main dans la console Play : un
+> `${PUBLIC_WEB_ORIGIN}` recopié tel quel y produirait une URL cassée publiée.
+> Le sous-domaine `www` n'est pas décoratif — le registrar du domaine ne
+> supporte ni `ALIAS` ni `ANAME`, donc la racine ne peut pas servir ces pages.
 
 ## Description courte (≤ 80 caractères)
 Le Duolingo des certifications IT — formez-vous, entraînez-vous, réussissez.
@@ -39,9 +46,10 @@ XP, niveaux, streak quotidien, badges de progression — sans cœurs ni vies. Vo
 ⚠️ Certigo est une plateforme indépendante, non affiliée ni approuvée par Microsoft, Amazon, Cisco, CompTIA ou tout autre organisme de certification. Toutes les leçons et questions sont originales.
 
 ## Conformité (à vérifier dans la console Play)
-- **Politique de confidentialité** : URL publique canonique sur GitHub Pages
-  (`https://gchambaud_microsoft.github.io/Certigo/privacy-policy/`). Ne pas la
-  remplacer par un domaine personnalisé non contrôlé.
+- **Politique de confidentialité** : URL publique canonique servie par Azure
+  Static Web Apps (`https://www.certigo-app.com/privacy-policy/`). Ne pas la
+  remplacer par un domaine non contrôlé, et ne pas retirer le `www` : la racine
+  ne peut pas servir ces pages, voir `docs/PUBLIC_DOMAIN_MIGRATION.md`.
 - **Section "Sécurité des données"** : déclarer au minimum les informations de
   compte (e-mail pour le mode e-mail, identifiant utilisateur, nom/pseudo),
   l’activité dans l’application (progression, réponses, scores), les relations

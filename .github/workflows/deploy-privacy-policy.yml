@@ -1,10 +1,24 @@
 name: deploy-privacy-policy
 
 # Publie les pages légales publiques (confidentialité + suppression de compte).
-# URL de secours immediate pour Google Play :
-# https://gchambaud_microsoft.github.io/Certigo/privacy-policy/
-# Ces URLs restent canoniques sur GitHub Pages : aucun domaine personnalise
-# non controle ne doit etre configure comme alias ou destination de redirection.
+#
+# ATTENTION - cible historique, plus canonique. Ce workflow vise GitHub Pages,
+# dont docs/PUBLIC_DOMAIN_MIGRATION.md a mesure le 2026-09-07 qu'il est ferme
+# sur ce depot : le proprietaire est un compte Enterprise Managed Users, donc un
+# site Pages ne peut etre publie que prive, et des pages legales doivent rester
+# lisibles anonymement par la revue Apple/Google et par un utilisateur ayant
+# desinstalle l'application.
+#
+# Les URLs canoniques sont desormais servies par Azure Static Web Apps :
+#   https://www.certigo-app.com/privacy-policy/
+#   https://www.certigo-app.com/account-deletion/
+# Le sous-domaine www est obligatoire : le registrar ne supporte ni ALIAS ni
+# ANAME, donc la racine ne peut pas pointer vers Azure Static Web Apps.
+#
+# Ce fichier est conserve tel quel parce que validate-workflow-security.mjs et
+# tools/tests/test_project_state.py le nomment ; le retirer casserait un fichier
+# de trust-root et un test. Il reste dormant : seul un repository_dispatch
+# explicite le declenche, et il n'en a recu aucun depuis le 2026-06-30.
 on:
   repository_dispatch:
     types: [deploy-privacy-policy]

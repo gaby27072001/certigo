@@ -113,3 +113,6 @@ tools/__pycache__/
 __pycache__/
 *.pyc
 infra/ci-runner/image/evidence/
+# Pages legales generees par tools/build_public_pages.mjs. La source est
+# docs/legal/*.md ; committer le HTML genere le ferait diverger en silence.
+_site/
