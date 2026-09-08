@@ -222,6 +222,75 @@ déclarées par schéma dans `manifestShapes`, jamais fusionnées en une union p
 > 2026-08-17 et arrive à échéance en bloc à la mi-septembre 2026. **Ce rafraîchissement-là est un
 > changement de données seules : une PR, pas trois.**
 
+### Workflow privilégié : ni ajout, ni modification — la règle est scellée
+
+> **Avant de concevoir quoi que ce soit : un workflow qui parle à Azure ne peut plus être ajouté
+> ni modifié dans ce dépôt, et cette contrainte ne peut être levée par aucune PR.** Mesuré le
+> 2026-09-08 sur `main` = `9c438660`. **Invalidé si** `backend-deploy-workflow-policy.mjs`
+> disparaît de `backendDeployTrustedFiles`, si `Validate workflow YAML` cesse d'être un contexte
+> requis, ou si `enforce_admins` repasse à `false`.
+
+**Symptôme.** Une PR qui ajoute un workflow, ou qui modifie d'une seule ligne l'un des cinq
+workflows utilisant `azure/login@`, échoue sur `Validate workflow YAML` avec :
+
+```
+.github/workflows/<nom>.yml: changed or new privileged capability is forbidden outside cd-backend.yml
+```
+
+Un commentaire suffit à le déclencher : la comparaison porte sur les **octets** du fichier, pas
+sur les capacités qu'il ajoute. Les cinq workflows concernés — `ci-content-drift.yml`,
+`content-infra-apply.yml`, `content-infra-what-if.yml`,
+`governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml` — sont
+donc figés à l'octet.
+
+**Ce qui déclenche.** `privilegedWorkflow` dans
+`.github/scripts/backend-deploy-workflow-policy.mjs` signale un workflow dès qu'il porte une
+permission `write` ou `write-all`, un `id-token: write`, un `environment:`, un `secrets:` de job,
+ou l'un de dix-sept marqueurs textuels (`azure/login@`, `secrets.`, `az deployment`,
+`management.azure.com`, …). L'unique exemption est le nom de fichier `cd-backend.yml`, en dur.
+
+**La règle ne peut pas être amendée.** `validateBackendDeployWorkspace` exige que trois fichiers
+soient **byte-identiques entre la PR et sa révision de base** :
+
+```
+.github/scripts/backend-deploy-workflow-policy.mjs
+.github/scripts/backend-deploy-gate.test.mjs
+.github/scripts/validate-backend-deploy-dispatch.mjs
+```
+
+Toute modification, fût-elle d'un commentaire, produit :
+
+```
+candidate trusted control: <chemin> must match the immutable base revision
+```
+
+Ajouter une liste d'exemptions, exempter un workflow nommément, ou remplacer la comparaison
+d'octets par une comparaison de capacités exigent tous d'éditer ces fichiers. **Aucune PR ne le
+peut.** Et il n'existe pas de contournement : `Validate workflow YAML` est un contexte requis sur
+`main`, `enforce_admins` vaut `true`, `allow_force_pushes` vaut `false`.
+
+**Comment le scellé a pu être posé.** `validate-workflow-security.mjs` importe la politique et
+l'appelle sans condition. Lorsque la PR #357 l'a introduite, la révision de base ne contenait pas
+le module : le validateur de la base n'a donc jamais appliqué la règle à la PR qui l'apportait.
+
+> **Une PR n'est jamais soumise à la règle qu'elle introduit.** C'est la même propriété que celle
+> décrite plus haut pour le contrat de package — le validateur de la base juge les données du
+> candidat — mais elle a ici un effet à sens unique : #357 a pu poser un scellé qu'elle-même ne
+> pourrait plus poser aujourd'hui, et que personne ne peut retirer.
+
+**Le scellé n'est pas le défaut.** Son intention est déclarée par son propre test
+(`backend-deploy-gate.test.mjs`, `workspace rejects a symlink trust root and privileged shadow
+workflows`), qui construit le cas visé en copiant `cd-backend.yml` vers `cd-backend-shadow.yml` :
+empêcher qu'un workflow fantôme contourne les scellés du pipeline de déploiement. Sceller la garde
+contre son propre désarmement est cohérent avec ce but. **C'est la règle scellée qui est plus large
+que son intention — et le scellé est précisément ce qui interdit de la resserrer.**
+
+**Ce qui reste possible.** Un workflow qui n'utilise que le jeton GitHub automatique ne déclenche
+aucun des marqueurs : ni `github.token`, ni `permissions: contents: read` n'y figurent. Mesuré le
+2026-09-08 en écrivant deux workflows neufs dans le même répertoire et la même seconde — celui qui
+ne lit que l'API GitHub n'est pas signalé, celui qui porte `azure/login@` l'est. La surveillance
+qui ne demande que des données GitHub (vivacité des runners, états de jobs) est donc constructible ;
+celle qui exige une lecture Azure ne l'est pas.
 ### Snapshot d'état projet périmé : la branche, ou `main` ?
 
 **Symptôme.** Une PR échoue sur `Validate project-state source` et `Generated state equals
