@@ -252,13 +252,27 @@ function shellExpressions(lines) {
   return findings;
 }
 
+// Refuses to report an empty result. Every rule below that inspects a job is
+// silent when this returns nothing, so a parser that loses its grip reads as a
+// clean workflow rather than as an unreadable one. Measured: a CRLF file makes
+// the '\njobs:\n' probe miss and the validator exits 0 with the job rules never
+// applied. Raising here closes the class - CRLF, a BOM, an indented `jobs:`, an
+// unexpected encoding - instead of the one cause. No workflow in this
+// repository has zero jobs, and GitHub rejects one that does.
 function jobBlocks(text) {
   const jobsStart = text.indexOf('\njobs:\n');
-  if (jobsStart < 0) {
-    return [];
+  const jobsText = jobsStart < 0 ? '' : text.slice(jobsStart + 1);
+  const matches = jobsText
+    ? [...jobsText.matchAll(/^ {2}(?<id>[A-Za-z0-9_-]+):\s*$/gm)]
+    : [];
+  if (matches.length === 0) {
+    throw new Error(
+      'the job parser found no jobs, so every job-level rule below would be '
+      + 'skipped silently; the file is unreadable to this parser rather than '
+      + 'free of jobs (CRLF line endings, a byte order mark, or an indented '
+      + '`jobs:` each produce this)',
+    );
   }
-  const jobsText = text.slice(jobsStart + 1);
-  const matches = [...jobsText.matchAll(/^  (?<id>[A-Za-z0-9_-]+):\s*$/gm)];
   return matches.map((match, index) => ({
     id: match.groups.id,
     text: jobsText.slice(
@@ -381,7 +395,14 @@ function validateWorkflow(file) {
   ) {
     errors.push(`${file}: repository_dispatch must use one explicit event type`);
   }
-  for (const job of jobBlocks(text)) {
+  let jobs;
+  try {
+    jobs = jobBlocks(text);
+  } catch (error) {
+    errors.push(`${file}: ${error.message}`);
+    jobs = [];
+  }
+  for (const job of jobs) {
     if (
       trustedOnlyWorkflowFiles.has(fileName)
       && job.text.includes('runs-on:')
