@@ -785,3 +785,134 @@ NuGet/csproj, npm et pub), Checkov et CodeQL, sans activation de fonctionnalité
 
 Ces réserves ne doivent pas être appliquées implicitement avec le JSON complet. Les traiter
 séparément, avec revue admin et lecture préalable de l'état live.
+
+---
+
+## 7. Discipline de mesure — un instrument muet doit échouer, pas rendre zéro
+
+> **Note opérationnelle.** Faits relevés le **2026-09-08**, journée où une dizaine de sessions ont
+> travaillé en parallèle sur ce dépôt et sur `certigo-content`. **Invalidée** le jour où les parades
+> ci-dessous deviennent structurelles — c'est-à-dire où un instrument de ce dépôt ne peut plus rendre
+> un verdict sans avoir déclaré ce qu'il a lu. Tant qu'écrire un instrument muet reste possible, la
+> note vaut, quel que soit l'âge des incidents.
+
+Cette section prolonge le §1, qui dit déjà **comment lire un verdict** — voir « Un vert peut décrire
+une base qui n'existe plus » et « Deux corollaires pour lire les sorties ». Elle ajoute la question
+d'avant : **le verdict a-t-il seulement été produit par une lecture ?**
+
+Ce jour-là, **dix instruments ont rendu un résultat sans avoir rien mesuré.** Chacun a été attrapé
+par un contrôle différent, improvisé sur le moment, et les traces se trouvaient dans des commentaires
+de PR et des messages appelés à disparaître. Ce qui suit ne conserve pas les incidents pour eux-mêmes :
+il conserve **ce qui les a attrapés**.
+
+### Les dix instruments vides
+
+| # | Instrument | Ce qu'il rendait | Pourquoi c'était vide |
+| --- | --- | --- | --- |
+| 1 | `Object.keys()` appliqué à un **tableau** | « identifiant absent » | Rend les **indices** (`["0","1"]`), jamais les identifiants : « absent » sans qu'aucun élément ait été examiné. |
+| 2 | SHA tronqué à **8 caractères** envoyé à l'API GitHub | **liste vide** | Une liste vide est indiscernable d'une absence réelle. |
+| 3 | `require('yaml')` indisponible | `exit 127` | **Quatre** configurations différentes rendaient le même code : le discriminant attendu n'était jamais atteint. |
+| 4 | `git show … \| Set-Content -NoNewline` | **quatre verdicts identiques** | Le pipeline concatène les lignes **sans séparateur** ; les verdicts mesuraient l'écriture du fichier, pas son contenu. |
+| 5 | `npm ci` non lancé | trois `ERR_MODULE_NOT_FOUND` | Ressemblent à des échecs de test ; ce sont des dépendances absentes. |
+| 6 | Enveloppe `{corpus, nbCorpus, nbQuestions}` non déballée | « 0 problème » | **3** clés comparées à **33** identifiants : aucune régression n'était *représentable*, donc aucune n'a été trouvée. |
+| 7 | Localisateur par **chaîne exacte** après réécriture complète | « introduit » | La transformation mesurée détruisait la clé de comparaison : réponse vraie **par construction**. |
+| 8 | `\b` adjacent à une lettre accentée, en JS | jamais de correspondance | `é` n'est pas un caractère de mot : le motif existe, tourne, et ne participe jamais. |
+| 9 | `.Replace()` sur une constante qui avait changé sous l'auteur | **rouge** | Une mutation qui échoue et un vrai défaut rendent le même rouge. |
+| 10 | Motif **sur-échappé** (`\\d` au lieu de `\d`) | — | Le seul attrapé **avant exécution**. |
+
+Trois de ces mécanismes tiennent en une commande, et ont été rejoués le 2026-09-08 :
+
+```bash
+node -e "console.log(Object.keys([{id:'q1'}]))"                # ["0"]  — n°1
+node -e "console.log(/\bla totalité\b/.test('la totalité'))"   # false  — n°8, y compris avec /u
+node -e "console.log(new RegExp('\\\\d+').test('42'))"         # false  — n°10
+```
+
+**Le n°2 n'a pas été reproduit.** Rejoué le 2026-09-08 sur quatre points d'entrée REST
+(`commits?sha=`, `commits/{sha}/pulls`, `compare/…`, `search/commits`), un SHA de 8 caractères est
+**résolu normalement** ; en GraphQL, `GitObjectID!` le **rejette bruyamment**. L'incident reste
+consigné tel qu'observé, sans mécanisme nommé : écrire ici une cause non reproduite serait commettre,
+dans une note sur la mesure, exactement la faute qu'elle décrit.
+
+### Les parades, par coût croissant
+
+**a. L'autotest de quelques chaînes, avant la première exécution.** Le n°10 n'a **jamais** produit de
+résultat faux : quatre chaînes de contrôle l'ont arrêté avant qu'il ne serve. Les neuf autres en ont
+produit un, qu'il a fallu reconnaître, puis défaire.
+
+**b. Le plancher de lecture — la seule parade structurelle.**
+
+```js
+if (corpus < 30 || questions < 700) throw new Error('lecture insuffisante');
+```
+
+**Un instrument qui n'a rien lu échoue, au lieu de rendre zéro.** C'est la seule des quatre parades
+qui couvre les dix cas, et la seule qui protège **sans qu'on y pense** : elle ne demande pas au
+lecteur de se méfier au bon moment.
+
+**c. Le contrôle qui rend une présence.** Avant de conclure à une absence, montrer que l'instrument
+sait rendre autre chose. **Une absence n'informe que si l'instrument peut varier.** Le §1 pratique
+déjà ce geste, sous « Snapshot d'état projet périmé : la branche, ou `main` ? » : « Ne croyez pas la
+liste ci-dessus sur parole : dix secondes suffisent à la tester. »
+
+> **Onzième cas, attrapé pendant la rédaction de cette section, le 2026-09-08.** Le script qui
+> vérifiait la présence des citations ci-dessus a rendu deux « ABSENT » et un `True` pour un nom de
+> fonction inexistant. Un témoin négatif — chercher `zzzNeverExistsZzz` — a rendu `True` lui aussi :
+> l'instrument ne lisait rien. Les deux « ABSENT » étaient des retours à la ligne (le n°4), et le
+> `True` un `-Quiet` mal composé. **Deux minutes de témoin ont évité de publier, dans une note sur la
+> mesure, une citation fausse et un symbole inventé.**
+
+**d. L'assertion sur l'ACTION, pas sur son résultat.** Pour le n°9, la ligne qui manquait est
+`substitution effective : True`. **Le résultat ne distingue pas « j'ai mesuré » de « je n'ai rien
+mesuré » ; l'action, si.**
+
+### Le signal partagé : l'uniformité
+
+Aux n°3, 4 et 9, **des entrées différentes rendaient exactement la même sortie.**
+
+> **Quand des entrées variées donnent le même résultat, le discriminant n'a pas été atteint : on
+> mesure l'instrument, pas l'objet.**
+
+C'est le seul symptôme commun à plusieurs de ces incidents, et il se teste **sans comprendre la
+panne** : faire varier l'entrée, regarder si la sortie bouge.
+
+### Trois règles d'inférence, chacune payée deux fois
+
+**1. Le volume dit combien, il ne dit pas si.** Deux fois, une session a mesuré une composition exacte
+— « 64 % de cette famille est de la négation neutre », « 19,6 % de ces appariements sont temporels » —
+et en a tiré un **verdict de validité**. Les deux fois, une permutation a montré que la partie réputée
+contaminante **portait le signal**. Le pourcentage était juste ; « donc c'est un défaut » ne suivait
+pas.
+
+**2. Un état décrit un passé.** Un contrôle vert mesure la base contre laquelle il a tourné, pas la
+fusion qu'il prédit. **Cette règle est déjà instruite**, avec son relevé daté, sous « Un vert peut
+décrire une base qui n'existe plus » : le vert périmé y est établi comme **le régime ordinaire, pas
+l'exception**. Elle n'est pas répétée ici.
+
+**3. Une mémoire correctement datée n'est pas une mesure courante.** Un compteur relu dans une note
+puis recyclé comme frais a donné **« 28 PR ouvertes »** là où il y en avait **9**, et **« 90 minutes »**
+là où la soustraction de deux horodatages donne **56** — les deux valeurs justes figurant, mesurées,
+sous « Un vert peut décrire une base qui n'existe plus ». Une note bien datée reste vraie **à sa
+date** ; la recycler sans la redater la transforme en mesure fausse.
+
+### Citer sans envoyer le lecteur au mauvais endroit
+
+**Citez par titre de section et courte phrase entre guillemets, jamais par numéro de ligne.** Une
+citation qui glisse ne devient pas invalide, elle devient **trompeuse** : elle désigne une ligne
+réelle qui dit autre chose, et le lecteur en conclut que l'auteur s'est trompé sur le fond.
+
+**Vérifiez que tout symbole cité existe.** Une session a écrit `validatePrivilegedWorkflows` ; la
+fonction de `.github/scripts/backend-deploy-workflow-policy.mjs` s'appelle
+**`validateNoncanonicalWorkflows`**. Un nom inventé mais plausible envoie chercher une modification
+qui n'a jamais eu lieu — un coût qu'aucune relecture ne rattrape, puisque rien ne paraît faux.
+
+### Ce qui a réellement corrigé
+
+Une session a tiré ce bilan de sa propre journée :
+
+> **« trois fois attrapé par un contrôle, zéro fois par la prudence ».**
+
+**La prudence ralentit sans corriger.** Ce qui a fonctionné, chez tous les acteurs sans exception,
+c'est **remesurer une chose qu'on croyait déjà savoir**. Le §1 le dit déjà d'un contrôle qui a pris
+son propre auteur en défaut : « C'est la seule preuve réelle qu'un contrôle fonctionne — toute autre
+confirmation revient à ce que l'auteur se donne raison à lui-même. »
