@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
+import { validateBackendDeployWorkspace } from './backend-deploy-workflow-policy.mjs';
 import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
 import { validateWorkflowConcurrency } from './workflow-concurrency-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
@@ -36,6 +37,7 @@ const trustedControlReferencePattern =
 const trustedImpactTestPattern =
   /^\.github\/scripts\/[A-Za-z0-9._-]+\.test\.mjs$/;
 const requiredTrustedImpactTests = new Set([
+  '.github/scripts/backend-deploy-gate.test.mjs',
   '.github/scripts/ci-impact.test.mjs',
   '.github/scripts/codeql-gate-policy.test.mjs',
   '.github/scripts/workflow-concurrency-policy.test.mjs',
@@ -590,6 +592,7 @@ function validateWorkflow(file) {
 function validateRepositoryInvariants() {
   const errors = [];
   errors.push(...validateTrustedImpactTestManifest());
+  errors.push(...validateBackendDeployWorkspace(root, controlRoot));
   const android = fs.readFileSync(path.join(workflowsDir, 'release-android.yml'), 'utf8');
   const iosRelease = fs.readFileSync(path.join(workflowsDir, 'release-ios.yml'), 'utf8');
   const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');

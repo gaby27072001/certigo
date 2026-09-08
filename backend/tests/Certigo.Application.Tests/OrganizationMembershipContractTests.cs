@@ -7,18 +7,18 @@ namespace Certigo.Application.Tests;
 public sealed class OrganizationMembershipContractTests
 {
     [Fact]
-    public void Versioned_contract_is_off_only_and_preserves_person_ownership()
+    public void Versioned_contract_supports_off_and_shadow_and_preserves_person_ownership()
     {
         using var openApi = Load("openapi.json");
         var root = openApi.RootElement;
 
-        root.GetProperty("info").GetProperty("version").GetString().Should().Be("1.1.0");
+        root.GetProperty("info").GetProperty("version").GetString().Should().Be("1.2.0");
         root.GetProperty("x-certigo-feature-mode")
             .GetProperty("implementedValues")
             .EnumerateArray()
             .Select(value => value.GetString())
             .Should()
-            .Equal("off");
+            .Equal("off", "shadow");
         root.GetProperty("x-certigo-person-contract")
             .GetProperty("automaticEmailMerge")
             .GetBoolean()

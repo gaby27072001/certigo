@@ -73,6 +73,7 @@ subscription) ou la **possession physique** d'un facteur d'authentification.
 | **Observabilité** | 🟠 Moyen | Webtests, alertes, cold-start, workbook, signaux runner, coût et confidentialité | [`OBSERVABILITY.md`](./OBSERVABILITY.md) | Reader pour diagnostic ; Contributor pour appliquer après approbation | Préparé — aucun déploiement dans la PR |
 | **Viva Learning** | Bloque | Connecteur organization-scoped, fixture-only et feature-off | [`VIVA_LEARNING_CONNECTOR_NO_GO.md`](./VIVA_LEARNING_CONNECTOR_NO_GO.md) | Aucun acces live | **NO-GO** |
 | **Contenu WORM** | 🔴 Haut | Release descriptor + paquets public/privé, OIDC, reader runtime et rollback | [`IMMUTABLE_CONTENT_STORAGE.md`](./IMMUTABLE_CONTENT_STORAGE.md) | Identité de bootstrap Azure + approbation OPS/compliance | Réconcilié avec #304 — aucun déploiement live |
+| **Conformité B2B** | 🔴 Bloquant | Qualification employee monitoring, transparence, droits, rétention, résidence et Go/No-Go pilote | [`B2B_COMPLIANCE_PILOT.md`](./B2B_COMPLIANCE_PILOT.md) | Product, conseil juridique, Privacy/DPO, Security et client pilote | **NO-GO — feature off** |
 
 ## Ordre d'exécution conseillé
 

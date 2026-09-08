@@ -75,9 +75,10 @@ param appleCiamDomainReconfigured bool = false
   'shadow'
 ])
 param personLinkedIdentityV1 string = 'off'
-@description('Organization/Membership V1 mode. This contract increment supports off only.')
+@description('Organization/Membership V1 mode. "off" (default) leaves the V1 HTTP surface at 404 in every environment. "shadow" additionally runs a strictly read-only background observation (incomplete-offboarding count, team membership volumetry) with non-PII telemetry; it adds no reachable route and never creates, updates, or deletes Organization/Membership data. A future read/write mode requires its own ADR.')
 @allowed([
   'off'
+  'shadow'
 ])
 param organizationMembershipV1 string = 'off'
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')

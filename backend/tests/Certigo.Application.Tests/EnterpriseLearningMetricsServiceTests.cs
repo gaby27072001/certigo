@@ -285,6 +285,9 @@ public sealed class EnterpriseLearningMetricsServiceTests
                 int maximumTombstones,
                 CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<OrganizationOffboardingTombstone>>([]);
+        public Task<TeamMembershipVolumetryObservation> CountTeamMembershipsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TeamMembershipVolumetryObservation(0, Capped: false));
         public Task<OrganizationCreateResult> CreateOrganizationAsync(
             Organization organization,
             OrganizationMembership ownerMembership,

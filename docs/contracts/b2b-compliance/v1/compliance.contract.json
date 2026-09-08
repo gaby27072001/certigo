@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:certigo:contract:b2b-compliance:v1",
+  "contractVersion": "1.0.0",
+  "status": "pre-pilot-not-legal-advice",
+  "runtime": {
+    "setting": "ENTERPRISE_LEARNING_METRICS_V1",
+    "default": "off",
+    "implementedValues": [
+      "off"
+    ],
+    "activationRequiresNewAdr": true
+  },
+  "productDecisions": {
+    "allowedPurposes": [
+      "aggregate-learning-adoption",
+      "aggregate-learning-progress",
+      "aggregate-completion",
+      "aggregate-readiness"
+    ],
+    "prohibitedPurposes": [
+      "individual-employee-evaluation",
+      "presence-monitoring",
+      "disciplinary-action",
+      "compensation-decision",
+      "individual-ranking",
+      "job-performance-inference"
+    ],
+    "managerVisibility": "aggregate-only",
+    "arbitraryDateRanges": false,
+    "minimumCohortSize": 5,
+    "smallCohortBehavior": "suppress-entire-fixed-bucket",
+    "individualManagerExport": false,
+    "enterpriseExport": "thresholded-aggregate-only",
+    "personalLearningOwnership": "person",
+    "enterpriseDataOwnership": "organization",
+    "acknowledgementIsConsent": false,
+    "auditContainsPii": false,
+    "auditContainsStablePseudonym": false
+  },
+  "dataClasses": [
+    {
+      "id": "session-lease",
+      "scope": "organization-cycle-pseudonymous",
+      "ttlSeconds": 3600,
+      "managerVisible": false,
+      "exportableToEnterprise": false,
+      "offboardingAction": "purge"
+    },
+    {
+      "id": "active-aggregate",
+      "scope": "organization-aggregate",
+      "ttlSeconds": 600,
+      "managerVisible": true,
+      "exportableToEnterprise": true,
+      "offboardingAction": "not-attributable"
+    },
+    {
+      "id": "replay-receipt",
+      "scope": "organization-cycle-pseudonymous",
+      "ttlSeconds": 2592000,
+      "managerVisible": false,
+      "exportableToEnterprise": false,
+      "offboardingAction": "purge"
+    },
+    {
+      "id": "daily-aggregate",
+      "scope": "organization-aggregate",
+      "retentionDays": 400,
+      "maximumTtlSeconds": 34646400,
+      "managerVisible": true,
+      "exportableToEnterprise": true,
+      "offboardingAction": "not-attributable"
+    },
+    {
+      "id": "completed-receipt-intent",
+      "scope": "organization-cycle-pseudonymous",
+      "ttlSeconds": 3600,
+      "managerVisible": false,
+      "exportableToEnterprise": false,
+      "offboardingAction": "purge"
+    },
+    {
+      "id": "pending-receipt-intent",
+      "scope": "organization-cycle-pseudonymous",
+      "ttlSeconds": -1,
+      "managerVisible": false,
+      "exportableToEnterprise": false,
+      "offboardingAction": "drain-or-skip-then-purge"
+    },
+    {
+      "id": "offboarding-tombstone",
+      "scope": "organization-cycle-pseudonymous",
+      "ttlSeconds": -1,
+      "managerVisible": false,
+      "exportableToEnterprise": false,
+      "offboardingAction": "retain-until-purge-complete"
+    },
+    {
+      "id": "personal-learning-record",
+      "scope": "person",
+      "retention": "separate-personal-policy",
+      "managerVisible": false,
+      "exportableToEnterprise": false,
+      "offboardingAction": "preserve"
+    }
+  ],
+  "legalQuestions": [
+    "controller-processor-roles-by-processing-purpose",
+    "lawful-basis-by-jurisdiction",
+    "whether-consent-is-required-or-valid-in-employment-context",
+    "employee-and-worker-representative-consultation",
+    "notice-content-and-delivery",
+    "data-subject-rights-and-response-time",
+    "dpia-requirement",
+    "international-transfers-and-data-residency",
+    "subprocessor-and-support-access",
+    "retention-necessity-and-contractual-commitment"
+  ],
+  "pilotRequirements": [
+    "legal-opinion-approved-per-jurisdiction",
+    "purposes-and-recipients-signed-off",
+    "dpia-or-documented-dpia-decision-approved",
+    "dpa-processing-register-and-subprocessors-approved",
+    "employee-notice-version-approved",
+    "residency-backup-log-and-support-regions-verified",
+    "dsar-privacy-export-deletion-and-offboarding-drills-passed",
+    "small-cohort-and-anti-differencing-tests-passed",
+    "role-change-and-aggregate-export-tests-passed",
+    "pii-free-audit-review-approved",
+    "new-activation-adr-approved"
+  ]
+}

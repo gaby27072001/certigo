@@ -1,10 +1,11 @@
 # Contrat Organization / Membership V1
 
-**Version :** `1.1.0`
+**Version :** `1.2.0`
 
-**Statut :** contrat et implémentation dormante (`off` uniquement)
+**Statut :** runtime `off|shadow` — `shadow` observe en lecture seule, sans endpoint utilisateur
 
-**ADR :** [ADR-015](../../../adr/ADR-015-organization-membership.md)
+**ADR :** [ADR-015](../../../adr/ADR-015-organization-membership.md) (contrat, domaine, runtime
+`off`), [ADR-021](../../../adr/ADR-021-organization-membership-shadow.md) (activation `shadow`)
 
 - `openapi.json` décrit la surface HTTP versionnée sous `/v1`.
 - `cosmos.schema.json` décrit les documents additifs du conteneur `organizations`.
@@ -26,7 +27,9 @@
 - feature-off, absence de Person/Membership et mismatch cross-tenant sont masqués en `404` ;
 - offboarding révoque atomiquement l'accès, puis purge les artefacts par pages idempotentes ;
 - rejoin bloqué pendant purge, puis Membership et sujet métrique passent au cycle suivant ;
-- `ORGANIZATION_MEMBERSHIP_V1=off` dans tous les environnements ; toute autre valeur est refusée.
+- `ORGANIZATION_MEMBERSHIP_V1=off` (défaut) ou `shadow` dans un environnement, sans qu'aucune autre
+  valeur ne soit acceptée ; `shadow` n'ouvre aucune route et n'ajoute qu'une observation read-only
+  en tâche de fond (voir ADR-021).
 
 ## Matrice d'autorisation
 
