@@ -50,6 +50,7 @@ class ResultFeedbackWidget extends StatelessWidget {
         lessonId: lessonId,
         itemId: r.itemId,
         selected: answers[r.itemId] ?? const <String>[],
+        publicManifestId: lesson.publicManifestId,
       ),
       correct: r.correct,
     );
@@ -196,16 +197,8 @@ class _ScoreRing extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(
-                '$scorePct%',
-                style: text.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                'score',
-                style: text.labelSmall?.copyWith(color: p.textSecondary),
-              ),
+              Text('$scorePct%', style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Text('score', style: text.labelSmall?.copyWith(color: p.textSecondary)),
             ],
           ),
         ],
@@ -294,11 +287,7 @@ class _ResultRow extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Icon(
-                      Icons.auto_awesome_rounded,
-                      size: 16,
-                      color: p.primary,
-                    ),
+                    Icon(Icons.auto_awesome_rounded, size: 16, color: p.primary),
                     const SizedBox(width: 6),
                     Text(
                       'Demander au tuteur',

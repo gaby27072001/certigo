@@ -30,6 +30,7 @@ legacy_group_ids_file="${work_dir}/legacy-transitive-group-ids.json"
 legacy_access_scopes_file="${work_dir}/legacy-access-scopes.json"
 legacy_schedule_instances_file="${work_dir}/legacy-live-schedule-instances.json"
 legacy_eligibility_instances_file="${work_dir}/legacy-live-eligibility-instances.json"
+independent_admin_schedule_instances_file="${work_dir}/independent-admin-live-schedule-instances.json"
 
 for evidence_file in \
   "${phase_a_evidence_dir}/manifest.json" \
@@ -202,10 +203,30 @@ node "${root}/infra/governance/collect-role-assignment-schedules.mjs" \
   "${legacy_eligibility_instances_file}" "${subscription_id}" \
   roleEligibilityScheduleInstances "${legacy_access_scopes_file}" \
   "${legacy_principal_ids[@]}"
+administration_mode="$(
+  node -p "require(process.argv[1]).changeControl.administrationMode" \
+    "${legacy_transition_file}"
+)"
+if [[ "${administration_mode}" == "independent-third-party" ]]; then
+  independent_admin_principal_id="$(
+    node -p "require(process.argv[1]).changeControl.independentAdminPrincipalId" \
+      "${legacy_transition_file}"
+  )"
+  node "${root}/infra/governance/collect-role-assignment-schedules.mjs" \
+    "${independent_admin_schedule_instances_file}" "${subscription_id}" \
+    roleAssignmentScheduleInstances "${legacy_access_scopes_file}" \
+    "${independent_admin_principal_id}"
+elif [[ "${administration_mode}" == "approved-solo-compensating-controls" ]]; then
+  printf '[]' > "${independent_admin_schedule_instances_file}"
+else
+  echo "Legacy transition administration mode is missing or invalid." >&2
+  exit 1
+fi
 node "${root}/infra/governance/legacy-transition-contract.mjs" \
   "${legacy_transition_file}" "${phase_a_file}" \
   "${legacy_assignments_file}" "${legacy_schedule_instances_file}" \
-  "${legacy_group_ids_file}" "${legacy_eligibility_instances_file}"
+  "${legacy_group_ids_file}" "${legacy_eligibility_instances_file}" \
+  "${independent_admin_schedule_instances_file}"
 
 resource_index=0
 while IFS=$'\t' read -r kind resource_id expected_client_id expected_principal_id; do
@@ -421,5 +442,5 @@ node "${root}/infra/governance/validate-evidence.mjs" phase-a-binding \
   --policy-assignments "${phase_a_policy_assignments_file}" \
   --source-root "${root}" \
   --expected-manifest-sha256 "${phase_a_evidence_sha}" \
-  --stage "${PHASE_B_STAGE:?Set PHASE_B_STAGE to B1 or B2.}" \
+  --stage "${PHASE_B_STAGE:?Set PHASE_B_STAGE to B1a, B1b, or B2.}" \
   --output "${phase_a_binding_file}"

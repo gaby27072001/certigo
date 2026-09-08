@@ -6,6 +6,9 @@ param location string = 'westeurope'
 @description('Existing resource group that contains the trusted CI runner VNet and shared private DNS zones.')
 param ciVnetResourceGroupName string = 'rg-certigo-ci'
 
+@description('Existing resource group that owns the content publisher and reader user-assigned identities.')
+param contentIdentityResourceGroupName string = 'rg-certigo-identities'
+
 @description('Existing trusted CI runner virtual network.')
 param ciVnetName string = 'vnet-certigo-ci'
 
@@ -93,18 +96,22 @@ resource contentPublisherRole 'Microsoft.Authorization/roleDefinitions@2022-04-0
 }
 
 resource descriptorPublisherIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  scope: resourceGroup(contentIdentityResourceGroupName)
   name: descriptorPublisherIdentityName
 }
 
 resource publicPublisherIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  scope: resourceGroup(contentIdentityResourceGroupName)
   name: publicPublisherIdentityName
 }
 
 resource privatePublisherIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  scope: resourceGroup(contentIdentityResourceGroupName)
   name: privatePublisherIdentityName
 }
 
 resource contentReaderIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  scope: resourceGroup(contentIdentityResourceGroupName)
   name: readerIdentityName
 }
 

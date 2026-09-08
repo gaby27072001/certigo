@@ -39,12 +39,13 @@ const applicationTagParameterNames = {
   costCenter: 'tagCostCenter',
 };
 const taggableResourceTypes = new Set([
-  'Microsoft.Compute/virtualMachines',
-  'Microsoft.Network/natGateways',
-  'Microsoft.Network/networkInterfaces',
-  'Microsoft.Network/networkSecurityGroups',
-  'Microsoft.Network/publicIPAddresses',
-  'Microsoft.Network/virtualNetworks',
+  'microsoft.compute/virtualmachines',
+  'microsoft.network/natgateways',
+  'microsoft.network/networkinterfaces',
+  'microsoft.network/networksecuritygroups',
+  'microsoft.network/publicipaddresses',
+  'microsoft.network/virtualnetworks',
+  'microsoft.insights/autoscalesettings',
 ]);
 const templates = new Map();
 
@@ -91,12 +92,22 @@ function assertRunnerRequiredTags(template) {
 
   const taggableResources = resources(template).filter(
     (resource) =>
-      resource.existing !== true && taggableResourceTypes.has(resource.type),
+      resource.existing !== true &&
+      taggableResourceTypes.has(resource.type.toLowerCase()),
   );
-  assert.ok(taggableResources.length > 0);
+  const tagExtensions = resources(template).filter(
+    (resource) => resource.type.toLowerCase() === 'microsoft.resources/tags',
+  );
+  assert.ok(taggableResources.length + tagExtensions.length > 0);
   assert.ok(
     taggableResources.every(
       (resource) => resource.tags === "[variables('effectiveTags')]",
+    ),
+  );
+  assert.ok(
+    tagExtensions.every(
+      (resource) =>
+        resource.properties.tags === "[variables('effectiveTags')]",
     ),
   );
 }
@@ -118,16 +129,40 @@ test('runner network applies parameterized non-personal tags additively', () => 
   const template = compileTemplate('infra/ci-runner/network.bicep');
   assertRunnerRequiredTags(template);
 
-  const publicIp = resources(template).find(
-    (resource) => resource.type === 'Microsoft.Network/publicIPAddresses',
+  const source = readFileSync(
+    path.join(repositoryRoot, 'infra', 'ci-runner', 'network.bicep'),
+    'utf8',
   );
-  const natGateway = resources(template).find(
-    (resource) => resource.type === 'Microsoft.Network/natGateways',
+  assert.equal(
+    resources(template).filter(
+      (resource) =>
+        resource.type.toLowerCase() ===
+        'microsoft.network/publicipaddresses',
+    ).length,
+    0,
   );
-  assert.equal(publicIp.name, "[parameters('publicIpName')]");
-  assert.equal(natGateway.name, "[parameters('natGatewayName')]");
-  assert.deepEqual(publicIp.sku, { name: 'Standard', tier: 'Regional' });
-  assert.deepEqual(natGateway.sku, { name: 'Standard' });
+  assert.equal(
+    resources(template).filter(
+      (resource) =>
+        resource.type.toLowerCase() === 'microsoft.network/natgateways',
+    ).length,
+    0,
+  );
+  assert.match(
+    source,
+    /resource publicIp 'Microsoft\.Network\/publicIPAddresses@[^']+' existing/,
+  );
+  assert.match(
+    source,
+    /resource natGateway 'Microsoft\.Network\/natGateways@[^']+' existing/,
+  );
+  assert.equal(
+    resources(template).filter(
+      (resource) =>
+        resource.type.toLowerCase() === 'microsoft.resources/tags',
+    ).length,
+    3,
+  );
 });
 
 test('runner compute preserves provenance tags under the mandatory contract', () => {
@@ -146,6 +181,35 @@ test('runner compute preserves provenance tags under the mandatory contract', ()
   assert.equal(vm.name, "[parameters('runnerName')]");
   assert.equal(vm.properties.hardwareProfile.vmSize, "[parameters('vmSize')]");
   assert.equal(vm.properties.storageProfile.osDisk.deleteOption, 'Delete');
+});
+
+test('runner capacity tags only the autoscale resource and leaves VMSS existing', () => {
+  const template = compileTemplate('infra/ci-runner/capacity.bicep');
+  assertRunnerRequiredTags(template);
+
+  const source = readFileSync(
+    path.join(repositoryRoot, 'infra', 'ci-runner', 'capacity.bicep'),
+    'utf8',
+  );
+  const scaleSets = resources(template).filter(
+    (resource) =>
+      resource.type.toLowerCase() ===
+      'microsoft.compute/virtualmachinescalesets',
+  );
+  const [autoscale] = resources(template).filter(
+    (resource) =>
+      resource.type.toLowerCase() === 'microsoft.insights/autoscalesettings',
+  );
+  assert.equal(scaleSets.length, 0);
+  assert.equal(
+    (
+      source.match(
+        /resource \w+ 'Microsoft\.Compute\/virtualMachineScaleSets@[^']+' existing/g,
+      ) ?? []
+    ).length,
+    2,
+  );
+  assert.equal(autoscale.tags, "[variables('effectiveTags')]");
 });
 
 test('application composition applies the canonical contract additively by scope', () => {
@@ -223,10 +287,14 @@ test('only directly declared taggable runner resources receive the contract', ()
   for (const relativePath of [
     'infra/ci-runner/network.bicep',
     'infra/ci-runner/runner.bicep',
+    'infra/ci-runner/capacity.bicep',
   ]) {
     const template = compileTemplate(relativePath);
     for (const resource of resources(template)) {
-      if (resource.existing === true || !taggableResourceTypes.has(resource.type)) {
+      if (
+        resource.existing === true ||
+        !taggableResourceTypes.has(resource.type.toLowerCase())
+      ) {
         assert.equal(resource.tags, undefined);
       }
     }

@@ -75,13 +75,36 @@ param appleCiamDomainReconfigured bool = false
   'shadow'
 ])
 param personLinkedIdentityV1 string = 'off'
-@description('Organization/Membership V1 mode. This contract increment supports off only.')
+@description('Organization/Membership V1 mode. "off" (default) leaves the V1 HTTP surface at 404 in every environment. "shadow" additionally runs a strictly read-only background observation (incomplete-offboarding count, team membership volumetry) with non-PII telemetry; it adds no reachable route and never creates, updates, or deletes Organization/Membership data. A future read/write mode requires its own ADR.')
 @allowed([
   'off'
+  'shadow'
 ])
 param organizationMembershipV1 string = 'off'
 @description('Feature flag for the optional Azure OpenAI tutor completion. False keeps the deterministic grounded tutor only.')
 param tutorLlmEnabled bool = false
+
+@description('Content repository mode. Deploy legacy first; switch only after a verified staging promotion.')
+@allowed([ 'legacy', 'versioned' ])
+param contentRepositoryMode string = 'legacy'
+
+@description('Blob endpoint output azureBlobEndpoint from the immutable content stack (PR #290).')
+param contentBlobEndpoint string = ''
+
+@description('Reader client-id output azureContentReaderClientId from the immutable content stack (PR #290).')
+param contentReaderClientId string = ''
+
+@description('Reader resource-id output azureContentReaderResourceId from the immutable content stack (PR #290).')
+param contentReaderResourceId string = ''
+
+@description('Descriptor container output azureDescriptorContainer from the immutable content stack (PR #290).')
+param contentDescriptorContainerName string = 'content-release-descriptors'
+
+@description('Public container output azurePublicContainer from the immutable content stack (PR #290).')
+param contentPublicContainerName string = 'content-public-releases'
+
+@description('Private container output azurePrivateContainer from the immutable content stack (PR #290).')
+param contentPrivateContainerName string = 'content-private-releases'
 @description('Azure OpenAI resource endpoint used by the tutor when enabled. Example: https://<resource>.openai.azure.com/.')
 param tutorLlmEndpoint string = ''
 @description('Azure OpenAI deployment name used by the tutor when enabled.')
@@ -97,6 +120,10 @@ param tutorLlmApiVersion string = '2024-10-21'
 @description('Optional explicit Azure OpenAI API key for the tutor. Leave empty to use the Function App managed identity instead.')
 @secure()
 param tutorLlmApiKey string = ''
+@description('Adopt the private DNS zones for the AI Services account. Dev only: it is the sole environment with an AI Services account and its out-of-band private endpoint. Independent of tutorLlmEnabled, because the DNS gap exists whether or not the runtime feature is on.')
+param adoptOpenAiPrivateDns bool = false
+@description('Existing private endpoint fronting the AI Services account, adopted read-only when adoptOpenAiPrivateDns is true.')
+param openAiPrivateEndpointName string = 'pep-certigo-openai-account'
 @description('Signing key for email/password JWTs. Dev may derive a stable non-production value. Staging/prod must receive a non-empty secret through a secure deployment parameter.')
 @secure()
 param authJwtSigningKey string = ''
@@ -248,6 +275,15 @@ var rgName = 'rg-${appName}-${env}'
 // Dev token bypass is allowed ONLY in the dev environment; staging/prod enforce
 // Entra token validation ("prod" signals to the backend that Entra is required).
 var authMode = env == 'dev' ? 'dev' : 'prod'
+var contentContractConfigured = !empty(contentBlobEndpoint) && !empty(contentReaderClientId) && !empty(contentReaderResourceId)
+var contentContractAbsent = empty(contentBlobEndpoint) && empty(contentReaderClientId) && empty(contentReaderResourceId)
+var contentContractValid = contentContractConfigured || contentContractAbsent
+  ? true
+  : fail('contentBlobEndpoint, contentReaderClientId and contentReaderResourceId must be configured together from PR #290 outputs.')
+var contentModeReady = contentRepositoryMode == 'legacy' || contentContractConfigured
+  ? true
+  : fail('contentRepositoryMode=versioned requires the complete PR #290 storage and reader outputs.')
+var effectiveContentBlobEndpoint = contentContractValid && contentModeReady ? contentBlobEndpoint : ''
 // Production-grade hardening is on for every non-dev environment: Cosmos RBAC-only
 // auth, Key Vault purge protection + 90-day soft delete, geo-redundant + versioned
 // storage, and a locked-down CORS origin set.
@@ -532,6 +568,26 @@ module ciVnetPeering 'modules/ciVnetPeering.bicep' = {
   }
 }
 
+// Private DNS for the AI Services account. The peering above already routes CI
+// traffic to the private endpoint; without these zones the runner can reach the
+// address but cannot learn it. Deployed at the app resource group scope because the
+// out-of-band OpenAI zone and private endpoint both live there.
+module openAiPrivateDns 'modules/openAiPrivateDns.bicep' = if (adoptOpenAiPrivateDns) {
+  scope: rg
+  name: 'openAiPrivateDns'
+  params: {
+    appVnetId: privateNetwork.outputs.vnetId
+    appVnetName: privateNetwork.outputs.vnetName
+    ciVnetId: resourceId(subscription().subscriptionId, ciVnetResourceGroupName, 'Microsoft.Network/virtualNetworks', ciVnetName)
+    ciVnetName: ciVnetName
+    privateEndpointName: openAiPrivateEndpointName
+    tags: effectiveTags
+  }
+  dependsOn: [
+    ciVnetPeering
+  ]
+}
+
 module previousJwtSecret 'modules/keyvaultPreviousJwtSecret.bicep' = if (usePreviousJwtSigningKey) {
   scope: rg
   name: 'keyvaultPreviousJwtSecret'
@@ -572,6 +628,12 @@ module api 'modules/functionApp.bicep' = {
     functionAppName: 'func-${appName}-${env}-${suffix}'
     location: location
     storageAccountName: storage.outputs.accountName
+    contentBlobEndpoint: effectiveContentBlobEndpoint
+    contentReaderClientId: contentReaderClientId
+    contentReaderResourceId: contentReaderResourceId
+    contentDescriptorContainerName: contentDescriptorContainerName
+    contentPublicContainerName: contentPublicContainerName
+    contentPrivateContainerName: contentPrivateContainerName
     deploymentContainerName: storage.outputs.deploymentContainerName
     appInsightsConnectionString: monitoring.outputs.connectionString
     appInsightsName: monitoring.outputs.name
@@ -581,6 +643,7 @@ module api 'modules/functionApp.bicep' = {
     keyVaultName: vault.outputs.name
     functionIntegrationSubnetId: privateNetwork.outputs.functionIntegrationSubnetId
     authMode: authMode
+    contentRepositoryMode: contentRepositoryMode
     authJwtSigningKeySecretUri: vault.outputs.jwtSecretUri
     authJwtPreviousSigningKeySecretUri: previousJwtSecret.?outputs.?jwtSecretUri ?? ''
     entraAuthority: entraAuthority
@@ -614,13 +677,10 @@ module api 'modules/functionApp.bicep' = {
   ]
 }
 
-// Azure AI Services account for the LLM tutor. Brought under IaC to remove the
-// drift documented in audit finding G (the 'certigo-openai' account was created
-// out-of-band). Gated on tutorLlmEnabled (dev only today). accountName/location
-// target the existing dev resource: on the first apply, review the what-if so the
-// account is adopted/updated, not recreated. Deployed after 'api' because it needs
-// the Function App managed-identity principal id for the OpenAI User role grant.
-module tutor 'modules/openai.bicep' = if (tutorLlmEnabled) {
+// The dev Azure AI Services account is infrastructure, independent from the runtime
+// feature flag. The module is present whenever the configured dev deployment exists;
+// tutorLlmEnabled still controls only Function App behavior.
+module tutor 'modules/openai.bicep' = if (env == 'dev' && !empty(tutorLlmDeployment)) {
   scope: rg
   name: 'openai'
   params: {

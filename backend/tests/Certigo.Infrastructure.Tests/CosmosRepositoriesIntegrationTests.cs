@@ -3,6 +3,7 @@ using FluentAssertions;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
 using Certigo.Domain.Identity;
+using Certigo.Domain.Organizations;
 using Certigo.Infrastructure.Cosmos;
 using Xunit;
 
@@ -504,6 +505,50 @@ public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fix
 
         Func<Task> duplicate = () => repository.CreateAsync(exam);
         await duplicate.Should().ThrowAsync<DuplicateRecordException>();
+    }
+
+    [CosmosEmulatorFact]
+    public async Task Team_membership_volumetry_observation_counts_seeded_memberships_uncapped()
+    {
+        var context = await fixture.GetContextAsync();
+        var receipts = new CosmosEnterpriseLearningMetricReceiptRepository(context);
+        var metrics = new CosmosEnterpriseLearningMetricsRepository(context, receipts);
+        var telemetry = new RecordingOrganizationTelemetry();
+        var repository = new CosmosOrganizationRepository(context, receipts, metrics, telemetry);
+        var organizationId = $"org-{Guid.NewGuid():N}";
+        var teamId = $"team-{Guid.NewGuid():N}";
+        var seeded = Enumerable.Range(0, 3)
+            .Select(index => OrganizationTeamMembership.Create(
+                organizationId,
+                teamId,
+                $"person-{index}-{Guid.NewGuid():N}",
+                DateTimeOffset.UtcNow))
+            .ToArray();
+        foreach (var membership in seeded)
+        {
+            await context.Organizations.CreateItemAsync(
+                membership,
+                new Microsoft.Azure.Cosmos.PartitionKey(organizationId));
+        }
+
+        var observation = await repository.CountTeamMembershipsAsync();
+
+        // The container is shared across the whole test class, so other concurrently-seeded
+        // organizations may also contribute team memberships; this only asserts a floor.
+        observation.TeamMembershipCountLowerBound.Should().BeGreaterOrEqualTo(3);
+        observation.Capped.Should().BeFalse("far fewer than the 10,000-document observation cap were seeded");
+        telemetry.Events.Should().Contain(item =>
+            item.Operation == OrganizationTelemetryOperation.ObserveTeamMembershipVolumetry
+            && item.Outcome == OrganizationTelemetryOutcome.Observed
+            && item.RequestChargeRequestUnits > 0
+            && item.Capped == false);
+    }
+
+    private sealed class RecordingOrganizationTelemetry : IOrganizationTelemetry
+    {
+        public List<OrganizationTelemetryEvent> Events { get; } = [];
+
+        public void Track(OrganizationTelemetryEvent telemetryEvent) => Events.Add(telemetryEvent);
     }
 
     private static UserProfileDto NewProfile() => new(

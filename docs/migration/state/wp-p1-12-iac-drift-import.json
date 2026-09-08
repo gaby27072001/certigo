@@ -1,14 +1,14 @@
 {
   "id": "wp-p1-12-iac-drift-import",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
-  "pr": null,
+  "status": "in_review",
+  "session_id": "8b58b4cf-6003-404e-9584-fc15b44cb82e",
+  "branch": "gchambaud-microsoft-reconciliation-iac-wp-p1-12",
+  "pr": 371,
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "pr-opened-provider-preflight-complete",
+    "note": "PR #371 ouverte après inventaire live, revue indépendante et what-if Provider bornés sans création/suppression. Le what-if racine staging reste bloqué sans les trois variables de domaine public exigées depuis #364 ; l'activation OpenAI reste bloquée séparément car le DNS privé Foundry privatelink.services.ai.azure.com n'est pas établi. Aucune valeur n'est devinée et aucune mutation Azure n'a été exécutée.",
+    "at": "2026-09-04T11:17:39Z"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "updated_at": "2026-09-04T11:17:39Z",
   "history_ref": "log.jsonl"
 }

@@ -19,6 +19,7 @@ public sealed class OrganizationService(
     IOrganizationAuthorizationHandler authorization,
     IOrganizationRepository organizations,
     IOrganizationTokenGenerator tokenGenerator,
+    IOrganizationTelemetry telemetry,
     IClock clock) : IOrganizationService
 {
     public async Task<OrganizationDto> CreateAsync(
@@ -46,8 +47,14 @@ public sealed class OrganizationService(
                 organization.CreationRequestHash,
                 StringComparison.Ordinal))
         {
+            Track(OrganizationTelemetryOperation.CreateOrganization, OrganizationTelemetryOutcome.Conflict);
             throw new OrganizationIdempotencyConflictException();
         }
+        Track(
+            OrganizationTelemetryOperation.CreateOrganization,
+            result.Status == OrganizationCreateStatus.Created
+                ? OrganizationTelemetryOutcome.Created
+                : OrganizationTelemetryOutcome.Replayed);
         return ToDto(result.Organization);
     }
 
@@ -99,13 +106,16 @@ public sealed class OrganizationService(
                 candidate.CreationRequestHash,
                 StringComparison.Ordinal))
         {
+            Track(OrganizationTelemetryOperation.CreateInvitation, OrganizationTelemetryOutcome.Conflict);
             throw new OrganizationIdempotencyConflictException();
         }
         if (result.Status == OrganizationCreateStatus.Replayed)
         {
             // Invitation secrets are returned only at creation and cannot be recovered.
+            Track(OrganizationTelemetryOperation.CreateInvitation, OrganizationTelemetryOutcome.Replayed);
             throw new OrganizationInvitationReplayException();
         }
+        Track(OrganizationTelemetryOperation.CreateInvitation, OrganizationTelemetryOutcome.Created);
         return new OrganizationInvitationDto(
             result.Invitation.Id,
             organizationId,
@@ -166,6 +176,7 @@ public sealed class OrganizationService(
             accepted,
             membership,
             cancellationToken);
+        Track(OrganizationTelemetryOperation.AcceptInvitation, OrganizationTelemetryOutcome.Completed);
         return ToDto(stored);
     }
 
@@ -195,8 +206,14 @@ public sealed class OrganizationService(
                 candidate.CreationRequestHash,
                 StringComparison.Ordinal))
         {
+            Track(OrganizationTelemetryOperation.CreateTeam, OrganizationTelemetryOutcome.Conflict);
             throw new OrganizationIdempotencyConflictException();
         }
+        Track(
+            OrganizationTelemetryOperation.CreateTeam,
+            result.Status == OrganizationCreateStatus.Created
+                ? OrganizationTelemetryOutcome.Created
+                : OrganizationTelemetryOutcome.Replayed);
         return ToDto(result.Team);
     }
 
@@ -226,6 +243,10 @@ public sealed class OrganizationService(
                 personId,
                 clock.UtcNow),
             cancellationToken);
+        Track(
+            OrganizationTelemetryOperation.AddTeamMember,
+            OrganizationTelemetryOutcome.Completed,
+            count: 1);
     }
 
     public async Task<OrganizationOffboardingDto> OffboardAsync(
@@ -268,6 +289,7 @@ public sealed class OrganizationService(
                     tombstone.Id,
                     cancellationToken);
             }
+            Track(OrganizationTelemetryOperation.Offboard, OrganizationTelemetryOutcome.Completed);
             return new OrganizationOffboardingDto(
                 organizationId,
                 personId,
@@ -290,11 +312,18 @@ public sealed class OrganizationService(
             target,
             clock.UtcNow,
             cancellationToken);
+        Track(OrganizationTelemetryOperation.Offboard, OrganizationTelemetryOutcome.Completed);
         return new OrganizationOffboardingDto(
             organizationId,
             personId,
             clock.UtcNow);
     }
+
+    private void Track(
+        OrganizationTelemetryOperation operation,
+        OrganizationTelemetryOutcome outcome,
+        long? count = null) =>
+        telemetry.Track(new OrganizationTelemetryEvent(operation, outcome, clock.UtcNow, Count: count));
 
     private static OrganizationDto ToDto(Organization organization) =>
         new(

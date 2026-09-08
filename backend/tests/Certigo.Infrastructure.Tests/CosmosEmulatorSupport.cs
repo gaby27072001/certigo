@@ -49,7 +49,7 @@ public sealed class CosmosEmulatorFixture : IAsyncLifetime
     public Task InitializeAsync() => Task.CompletedTask;
 
     /// <summary>
-    /// Lazily creates the ephemeral database + the eight production containers on
+    /// Lazily creates the ephemeral database + the production containers on
     /// first use and returns a <see cref="CosmosContext"/> bound to them. Only ever
     /// reached from an executing (non-skipped) test body.
     /// </summary>

@@ -49,7 +49,7 @@
       "id": "toolchain-manifest",
       "path": "infra/ci-runner/image/toolchain-manifest.json",
       "destination": "toolchain-manifest.json",
-      "sha256": "0c246a58d042c9a4e561af1c84911ca9f2fb62b023bfa6c1310be0d05a63b7ef"
+      "sha256": "bdae8e2d435734875efa5f2decd2a1932d46ba7385271cce765bcbfb42404525"
     },
     {
       "id": "toolchain-sbom",

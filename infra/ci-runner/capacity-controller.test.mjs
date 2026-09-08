@@ -15,6 +15,10 @@ const repositoryConfig = JSON.parse(
     'utf8',
   ),
 );
+const capacityTemplate = readFileSync(
+  new URL('./capacity.bicep', import.meta.url),
+  'utf8',
+);
 const config = {
   ...repositoryConfig,
   inventory: {
@@ -32,6 +36,14 @@ const pilotVmId =
   '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
   'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
   `virtualMachines/${pilotVmName}`;
+// The second PR runner bought in #402. The fixture carries it because the
+// redundancy floor is now two per trust class: a fixture stuck on the
+// pre-scale-out fleet would make a satisfied floor look like a shortfall.
+const pilot2VmName = 'vmss-certigo-pr-pilot-z1_a14700a3';
+const pilot2VmId =
+  '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
+  'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
+  `virtualMachines/${pilot2VmName}`;
 
 function runner(
   name,
@@ -125,6 +137,70 @@ function inventory({
       })),
     },
   };
+}
+
+function reconciledCapacityInventory() {
+  const live = inventory();
+  const legacyId =
+    '/subscriptions/example/resourceGroups/RG-CERTIGO-CI/providers/' +
+    'Microsoft.Compute/virtualMachineScaleSets/vmss-certigo-runner-zonal';
+  live.runners.vmScaleSets = live.runners.vmScaleSets.map(
+    (scaleSet, index) => ({
+      ...scaleSet,
+      id:
+        index === 0
+          ? legacyId
+          : '/subscriptions/example/resourceGroups/RG-CERTIGO-CI/providers/' +
+            'Microsoft.Compute/virtualMachineScaleSets/vmss-certigo-pr-pilot-z1',
+      name:
+        index === 0
+          ? 'vmss-certigo-runner-zonal'
+          : 'vmss-certigo-pr-pilot-z1',
+      orchestrationMode: 'Flexible',
+      sku: { name: 'Standard_D2ads_v6' },
+    }),
+  );
+  live.runners.autoscaleSettings = [
+    {
+      enabled: true,
+      name: 'autoscale-vmss-certigo-runner-zonal',
+      predictiveAutoscalePolicy: { scaleMode: 'Disabled' },
+      targetResourceUri: legacyId,
+      profiles: [
+        {
+          name: 'default',
+          capacity: {
+            minimum: '2',
+            default: '2',
+            maximum: '4',
+          },
+          rules: [
+            {
+              metricTrigger: {
+                metricName: 'Percentage CPU',
+                metricNamespace: '',
+                metricResourceUri: legacyId,
+                operator: 'GreaterThan',
+                statistic: 'Average',
+                threshold: 70,
+                timeAggregation: 'Average',
+                timeGrain: 'PT1M',
+                timeWindow: 'PT10M',
+                dividePerInstance: false,
+              },
+              scaleAction: {
+                cooldown: 'PT10M',
+                direction: 'Increase',
+                type: 'ChangeCount',
+                value: '1',
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ];
+  return live;
 }
 
 test('workflow_job events maintain queue state without writing it', () => {
@@ -764,6 +840,10 @@ test('drift reconciliation reports live VMSS, SKU, CPU scale-in, and labels', ()
       'POOL_SUBNET_DRIFT',
       'POOL_TRUST_BOUNDARY_DRIFT',
       'REDUNDANCY_DRIFT',
+      // The only managed runner here carries both trust labels, so it counts
+      // for neither class and both floors are unmet.
+      'TRUST_CLASS_REDUNDANCY_DRIFT',
+      'TRUST_CLASS_REDUNDANCY_DRIFT',
       'TRUST_LABEL_DRIFT',
       'VM_SIZE_DRIFT',
     ],
@@ -776,6 +856,40 @@ test('drift reconciliation reports live VMSS, SKU, CPU scale-in, and labels', ()
   assert.deepEqual(result.observed.externalVirtualMachines, [
     'vmss-certigo-runner-zonal_4153d1dd',
   ]);
+});
+
+test('drift reconciliation validates every VMSS SKU and the full autoscale contract', () => {
+  const live = reconciledCapacityInventory();
+  const reconciled = reconcileRunnerDrift(live, capacityTemplate, config);
+  assert.equal(
+    reconciled.findings.some(
+      (finding) => finding.code === 'AUTOSCALE_CONTRACT_DRIFT',
+    ),
+    false,
+  );
+
+  live.runners.vmScaleSets[1].sku.name = 'Standard_D4s_v5';
+  live.runners.autoscaleSettings[0] = {
+    ...live.runners.autoscaleSettings[0],
+    enabled: false,
+    targetResourceUri: '/subscriptions/example/resourceGroups/rg/providers/wrong',
+    profiles: [
+      {
+        name: 'default',
+        capacity: {
+          minimum: '0',
+          default: '0',
+          maximum: '99',
+        },
+        rules: [],
+      },
+    ],
+  };
+
+  const drifted = reconcileRunnerDrift(live, capacityTemplate, config);
+  const codes = drifted.findings.map((finding) => finding.code);
+  assert.ok(codes.includes('VM_SIZE_DRIFT'));
+  assert.ok(codes.includes('AUTOSCALE_CONTRACT_DRIFT'));
 });
 
 test('configuration refuses a boost mode that differs from the pilot target', () => {
@@ -795,5 +909,184 @@ test('configuration refuses a boost mode that differs from the pilot target', ()
         inventory: inventory(),
       }),
     /boost mode must equal the approved pilot target/,
+  );
+});
+
+const be505VmName = 'vmss-certigo-runner-zonal_be505fa1';
+const be505VmId =
+  '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
+  'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
+  `virtualMachines/${be505VmName}`;
+
+// Mirrors the live topology: one certigo-pr pilot instance and two
+// certigo-trusted instances of vmss-certigo-runner-zonal across zones 1 and 2.
+function zonalInventory({ zone1Powered = true, zone1Online = true } = {}) {
+  const scaleSet = (name, index) => ({
+    name,
+    identity: { userAssignedIdentities: { [`/identities/${name}`]: {} } },
+    virtualMachineProfile: {
+      networkProfile: {
+        networkInterfaceConfigurations: [
+          {
+            properties: {
+              ipConfigurations: [
+                {
+                  properties: {
+                    subnet: { id: `/networks/net-${index}/subnets/default` },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  });
+  return {
+    runners: {
+      activeRuns: { total_count: 0 },
+      queuedRuns: { total_count: 0 },
+      github: {
+        runners: [
+          runner('vmss-certigo-runner-zonal_f55d176e-Certigo', [
+            'certigo-trusted',
+          ], { id: 27 }),
+          runner('vmss-certigo-runner-zonal_be505fa1-Certigo', [
+            'certigo-trusted',
+          ], { id: 29, status: zone1Online ? 'online' : 'offline' }),
+          runner('certigo-prIVJAN8', ['certigo-pr'], { id: 28 }),
+          runner('certigo-prQA5OWT', ['certigo-pr'], { id: 30 }),
+        ],
+      },
+      virtualMachines: [
+        {
+          id: f55VmId,
+          name: f55VmName,
+          powerState: 'VM running',
+          virtualMachineScaleSet: { id: '/vmss/vmss-certigo-runner-zonal' },
+          zones: ['2'],
+        },
+        {
+          id: be505VmId,
+          name: be505VmName,
+          powerState: zone1Powered ? 'VM running' : 'VM deallocated',
+          virtualMachineScaleSet: { id: '/vmss/vmss-certigo-runner-zonal' },
+          zones: ['1'],
+        },
+        {
+          id: pilotVmId,
+          name: pilotVmName,
+          powerState: 'VM running',
+          virtualMachineScaleSet: { id: '/vmss/vmss-certigo-pr-pilot-z1' },
+          zones: ['1'],
+        },
+        {
+          id: pilot2VmId,
+          name: pilot2VmName,
+          powerState: 'VM running',
+          virtualMachineScaleSet: { id: '/vmss/vmss-certigo-pr-pilot-z1' },
+          zones: ['1'],
+        },
+      ],
+      vmScaleSets: [
+        scaleSet('vmss-certigo-runner-zonal', 0),
+        scaleSet('vmss-certigo-pr-pilot-z1', 1),
+      ],
+    },
+  };
+}
+
+test('the versioned inventory binds both trusted zones so neither can go missing', () => {
+  const result = reconcileRunnerInstances(
+    zonalInventory().runners.virtualMachines,
+    zonalInventory().runners.github.runners,
+    repositoryConfig.inventory,
+  );
+
+  assert.deepEqual(result.unclassifiedVirtualMachines, []);
+  assert.deepEqual(result.managedMachineNames, [
+    pilot2VmName,
+    pilotVmName,
+    be505VmName,
+    f55VmName,
+  ]);
+  assert.deepEqual(result.bindingMismatches, []);
+  assert.deepEqual(result.absentRunners, []);
+});
+
+test('two online trusted runners satisfy the redundancy floor', () => {
+  const plan = createCapacityPlan({
+    config: repositoryConfig,
+    inventory: zonalInventory(),
+  });
+
+  assert.equal(plan.usableCapacityByTrust['certigo-trusted'], 2);
+  assert.equal(plan.trust.redundancyReady, true);
+  assert.deepEqual(plan.trust.redundancyShortfalls, []);
+  assert.ok(
+    !plan.blockers.some((blocker) => blocker.includes('redundancy')),
+  );
+});
+
+test('a deallocated trusted zone is reported as a redundancy shortfall', () => {
+  const plan = createCapacityPlan({
+    config: repositoryConfig,
+    inventory: zonalInventory({ zone1Powered: false, zone1Online: false }),
+  });
+
+  assert.equal(plan.usableCapacityByTrust['certigo-trusted'], 1);
+  assert.equal(plan.trust.redundancyReady, false);
+  assert.deepEqual(plan.trust.redundancyShortfalls, [
+    { trustClass: 'certigo-trusted', online: 1, required: 2 },
+  ]);
+  assert.ok(
+    plan.blockers.includes(
+      'certigo-trusted has 1 online runner(s) but requires 2 for redundancy',
+    ),
+  );
+});
+
+test('a running VM whose GitHub runner is offline still counts as a shortfall', () => {
+  // The zone-1 outage presented exactly this way: Azure reported "VM running"
+  // while GitHub had garbage-collected the runner registration.
+  const plan = createCapacityPlan({
+    config: repositoryConfig,
+    inventory: zonalInventory({ zone1Powered: true, zone1Online: false }),
+  });
+
+  assert.equal(plan.currentCapacityByTrust['certigo-trusted'], 2);
+  assert.equal(plan.usableCapacityByTrust['certigo-trusted'], 1);
+  assert.equal(plan.trust.redundancyReady, false);
+});
+
+test('configuration refuses a redundancy floor below one or above the pilot target', () => {
+  assert.throws(
+    () =>
+      createCapacityPlan({
+        config: {
+          ...config,
+          minimumOnlineByTrust: {
+            'certigo-pr': 1,
+            'certigo-trusted': 0,
+          },
+        },
+        inventory: inventory(),
+      }),
+    /minimumOnlineByTrust\.certigo-trusted must be a positive integer/,
+  );
+
+  assert.throws(
+    () =>
+      createCapacityPlan({
+        config: {
+          ...config,
+          minimumOnlineByTrust: {
+            'certigo-pr': 1,
+            'certigo-trusted': 3,
+          },
+        },
+        inventory: inventory(),
+      }),
+    /minimumOnlineByTrust\.certigo-trusted must stay within the pilot target/,
   );
 });

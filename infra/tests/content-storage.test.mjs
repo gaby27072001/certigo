@@ -161,7 +161,7 @@ test('publishers are isolated and the runtime reader is read-only on every conta
   );
 });
 
-test('custom publisher role grants metadata reads without data-plane access', () => {
+test('custom publisher role grants create-and-verify blob access without delete', () => {
   const template = compileTemplate(
     'infra/governance/bootstrap-identities.bicep',
   );
@@ -181,7 +181,14 @@ test('custom publisher role grants metadata reads without data-plane access', ()
     'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies/read',
     'Microsoft.Storage/storageAccounts/blobServices/containers/read',
   ]);
-  assert.deepEqual(permissions.dataActions, []);
+  // tools/publish_blob_artifact.sh uploads with `--auth-mode login` and then
+  // downloads each blob back to compare SHA-256, so the publisher needs exactly
+  // these two data actions. `blobs/delete` stays absent, and version-level
+  // immutability plus `--overwrite false` keep the upload create-only.
+  assert.deepEqual(permissions.dataActions.sort(), [
+    'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read',
+    'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write',
+  ]);
   assert.deepEqual(permissions.notActions, []);
   assert.deepEqual(permissions.notDataActions, []);
   assert.ok(
@@ -428,4 +435,143 @@ test('what-if workflow evaluates current main and cannot deploy', () => {
   assert.match(workflow, /!normalized\.startsWith\(`\$\{contentScope\}\//);
   assert.match(workflow, /Delete/);
   assert.match(workflow, /Resource ID/);
+});
+
+test('runtime consumes the official external storage outputs without provisioning a duplicate', () => {
+  const main = compileTemplate('infra/main.bicep');
+  assert.equal(main.resources.contentStorage, undefined);
+  assert.equal(main.parameters.contentBlobEndpoint.defaultValue, '');
+  assert.equal(main.parameters.contentReaderClientId.defaultValue, '');
+  assert.equal(main.parameters.contentReaderResourceId.defaultValue, '');
+  assert.equal(
+    main.parameters.contentDescriptorContainerName.defaultValue,
+    'content-release-descriptors',
+  );
+  assert.equal(
+    main.parameters.contentPublicContainerName.defaultValue,
+    'content-public-releases',
+  );
+  assert.equal(
+    main.parameters.contentPrivateContainerName.defaultValue,
+    'content-private-releases',
+  );
+
+  const apiParameters = main.resources.api.properties.parameters;
+  assert.equal(
+    apiParameters.contentBlobEndpoint.value,
+    "[variables('effectiveContentBlobEndpoint')]",
+  );
+  assert.equal(
+    apiParameters.contentReaderClientId.value,
+    "[parameters('contentReaderClientId')]",
+  );
+  assert.equal(
+    apiParameters.contentReaderResourceId.value,
+    "[parameters('contentReaderResourceId')]",
+  );
+});
+
+test('application Function attaches only the external reader UAMI and creates no content RBAC', () => {
+  const template = compileTemplate('infra/modules/functionApp.bicep');
+  const identities = resourcesOfType(
+    template,
+    'Microsoft.ManagedIdentity/userAssignedIdentities',
+  );
+  assert.equal(identities.length, 1);
+  assert.doesNotMatch(identities[0].name, /content-reader/);
+
+  const assignments = resourcesOfType(
+    template,
+    'Microsoft.Authorization/roleAssignments',
+  );
+  assert.ok(
+    assignments.every(
+      (assignment) =>
+        !String(assignment.scope).includes(
+          'Microsoft.Storage/storageAccounts/blobServices/containers',
+        ),
+    ),
+  );
+
+  const [app] = resourcesOfType(template, 'Microsoft.Web/sites');
+  assert.match(
+    JSON.stringify(app.identity.userAssignedIdentities),
+    /contentReaderIdentityAssignment/,
+  );
+  assert.match(
+    JSON.stringify(template.variables.contentReaderIdentityAssignment),
+    /contentReaderResourceId/,
+  );
+
+  const [settings] = resourcesOfType(template, 'Microsoft.Web/sites/config');
+  const contentSettings = template.variables.contentRuntimeSettings;
+  assert.match(
+    contentSettings,
+    /if\(empty\(parameters\('contentBlobEndpoint'\)\), createObject\(\),/,
+  );
+  assert.match(contentSettings, /'CONTENT_BLOB_ENDPOINT', parameters\('contentBlobEndpoint'\)/);
+  assert.match(contentSettings, /'CONTENT_STORAGE_CLIENT_ID', parameters\('contentReaderClientId'\)/);
+  assert.match(settings.properties, /variables\('contentRuntimeSettings'\)/);
+  assert.match(
+    settings.properties,
+    /'CONTENT_REPOSITORY_MODE', parameters\('contentRepositoryMode'\)/,
+  );
+  assert.match(settings.properties, /'CONTENT_ALLOW_MUTABLE_BLOBS', 'false'/);
+  assert.match(settings.properties, /'CONTENT_ADMIN_ROLE', 'Content\.Release\.Admin'/);
+  const program = readFileSync(
+    path.join(
+      repositoryRoot,
+      'backend',
+      'src',
+      'Certigo.Api',
+      'Program.cs',
+    ),
+    'utf8',
+  );
+  assert.match(program, /string\.IsNullOrWhiteSpace\(endpoint\)/);
+  assert.doesNotMatch(
+    program,
+    /ContentBlobEndpoint\]\s*\?\?\s*configuration\["BLOB_ENDPOINT"\]/,
+  );
+});
+
+test('release descriptor path remains compatible with the official release.json contract', () => {
+  const source = path.join(
+    repositoryRoot,
+    'backend',
+    'src',
+    'Certigo.Infrastructure',
+    'Blob',
+    'BlobContentReleaseSource.cs',
+  );
+  const contents = readFileSync(source, 'utf8');
+  assert.match(contents, /releases\/\{releaseId\}\/release\.json/);
+});
+
+test('all committed environments stay legacy and immutable', () => {
+  const main = compileTemplate('infra/main.bicep');
+  assert.equal(main.parameters.contentRepositoryMode.defaultValue, 'legacy');
+  for (const environment of ['dev', 'staging', 'prod']) {
+    const parameters = readFileSync(
+      path.join(repositoryRoot, 'infra', 'params', `${environment}.bicepparam`),
+      'utf8',
+    );
+    assert.doesNotMatch(parameters, /param contentRepositoryMode\s*=/);
+    assert.doesNotMatch(parameters, /CONTENT_ALLOW_MUTABLE_BLOBS/);
+  }
+
+  const localSettings = JSON.parse(
+    readFileSync(
+      path.join(
+        repositoryRoot,
+        'backend',
+        'src',
+        'Certigo.Api',
+        'local.settings.json.example',
+      ),
+      'utf8',
+    ),
+  );
+  assert.equal(localSettings.Values.CONTENT_REPOSITORY_MODE, 'legacy');
+  assert.equal(localSettings.Values.CONTENT_ALLOW_MUTABLE_BLOBS, 'false');
 });

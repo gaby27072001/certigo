@@ -44,6 +44,7 @@ class SyncAction {
     required this.idempotencyKey,
     required this.createdAt,
     this.ownerId,
+    this.publicManifestId,
     this.status = SyncActionStatus.pending,
     this.attempts = 0,
     this.nextAttemptAt,
@@ -74,6 +75,10 @@ class SyncAction {
   /// Authenticated account that created this action. Null only for legacy v1
   /// records, which the engine quarantines instead of replaying under a new user.
   final String? ownerId;
+
+  /// Public content revision used to create the action. Null only for legacy
+  /// actions created before runtime manifest pinning.
+  final String? publicManifestId;
 
   final SyncActionStatus status;
 
@@ -118,6 +123,7 @@ class SyncAction {
       idempotencyKey: idempotencyKey,
       createdAt: createdAt,
       ownerId: ownerId,
+      publicManifestId: publicManifestId,
       status: status ?? this.status,
       attempts: attempts ?? this.attempts,
       nextAttemptAt: clearNextAttemptAt ? null : (nextAttemptAt ?? this.nextAttemptAt),
@@ -134,6 +140,7 @@ class SyncAction {
         'idempotencyKey': idempotencyKey,
         'createdAt': createdAt.toUtc().toIso8601String(),
         if (ownerId != null) 'ownerId': ownerId,
+        if (publicManifestId != null) 'publicManifestId': publicManifestId,
         'status': _statusToWire(status),
         'attempts': attempts,
         if (nextAttemptAt != null) 'nextAttemptAt': nextAttemptAt!.toUtc().toIso8601String(),
@@ -149,6 +156,7 @@ class SyncAction {
         idempotencyKey: json['idempotencyKey'] as String,
         createdAt: DateTime.parse(json['createdAt'] as String),
         ownerId: json['ownerId'] as String?,
+        publicManifestId: json['publicManifestId'] as String?,
         status: _statusFromWire(json['status'] as String?),
         attempts: (json['attempts'] as num?)?.toInt() ?? 0,
         nextAttemptAt:

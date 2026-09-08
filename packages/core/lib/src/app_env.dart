@@ -11,7 +11,10 @@ enum AppFlavor { dev, staging, prod }
 class AppEnv {
   const AppEnv._();
 
-  static const String _rawEnv = String.fromEnvironment('CERTIGO_ENV', defaultValue: 'dev');
+  static const String _rawEnv = String.fromEnvironment(
+    'CERTIGO_ENV',
+    defaultValue: 'dev',
+  );
 
   static AppFlavor get flavor => switch (_rawEnv) {
         'prod' => AppFlavor.prod,
@@ -39,11 +42,20 @@ class AppEnv {
   /// dev token validator resolves any non-empty value to a stable userId, so the
   /// app works end-to-end against a dev API. Production must inject a real Entra
   /// access token (see [tokenProvider]) and never relies on this.
-  static const String devAuthToken = String.fromEnvironment('DEV_AUTH_TOKEN', defaultValue: 'dev');
+  static const String devAuthToken = String.fromEnvironment(
+    'DEV_AUTH_TOKEN',
+    defaultValue: 'dev',
+  );
 
   /// Microsoft Entra External ID — public client configuration.
-  static const String entraClientId = String.fromEnvironment('ENTRA_CLIENT_ID', defaultValue: '');
-  static const String entraAuthority = String.fromEnvironment('ENTRA_AUTHORITY', defaultValue: '');
+  static const String entraClientId = String.fromEnvironment(
+    'ENTRA_CLIENT_ID',
+    defaultValue: '',
+  );
+  static const String entraAuthority = String.fromEnvironment(
+    'ENTRA_AUTHORITY',
+    defaultValue: '',
+  );
 
   /// URI de redirection OIDC de l'app.
   ///
@@ -80,7 +92,10 @@ class AppEnv {
   /// Scope d'API protégée (ex. `api://<api-client-id>/.default`). Quand il est
   /// renseigné, Entra émet un access_token dont l'`aud` correspond à
   /// `ENTRA_AUDIENCE` côté backend, ce qui permet de l'envoyer en Bearer.
-  static const String entraApiScope = String.fromEnvironment('ENTRA_API_SCOPE', defaultValue: '');
+  static const String entraApiScope = String.fromEnvironment(
+    'ENTRA_API_SCOPE',
+    defaultValue: '',
+  );
 
   /// Indices de domaine (`domain_hint`) pour pré-orienter Entra vers le bon
   /// fournisseur fédéré. Configurables car le nom exact du fournisseur Google /
@@ -111,11 +126,21 @@ class AppEnv {
 
   /// Force l'affichage de l'écran de connexion même sans Entra configuré, pour
   /// prévisualiser/tester l'UI en dev (`--dart-define=FORCE_AUTH_UI=true`).
-  static const bool forceAuthUi = bool.fromEnvironment('FORCE_AUTH_UI', defaultValue: false);
+  static const bool forceAuthUi = bool.fromEnvironment(
+    'FORCE_AUTH_UI',
+    defaultValue: false,
+  );
 
   /// Keeps account deletion hidden until the destructive Cosmos gate passes.
   static const bool accountDeletionEnabled = bool.fromEnvironment(
     'ACCOUNT_DELETION_ENABLED',
+    defaultValue: false,
+  );
+
+  /// Keeps the B2B manager portal completely absent from navigation and routing
+  /// until its server contracts are ready. Local previews use provider overrides.
+  static const bool managerPortalEnabled = bool.fromEnvironment(
+    'MANAGER_PORTAL_ENABLED',
     defaultValue: false,
   );
 
@@ -125,7 +150,37 @@ class AppEnv {
   /// **e-mail/mot de passe uniquement** assumé (`--dart-define=ENTRA_OPTIONAL=true`).
   /// Par défaut `false` : un build prod/staging DOIT fournir Entra pour offrir
   /// les 4 méthodes de connexion.
-  static const bool entraOptional = bool.fromEnvironment('ENTRA_OPTIONAL', defaultValue: false);
+  static const bool entraOptional = bool.fromEnvironment(
+    'ENTRA_OPTIONAL',
+    defaultValue: false,
+  );
+
+  /// Remote crash delivery is opt-in so existing Android and local build paths
+  /// keep the local sink. Every official Codemagic IPA passes `true`.
+  static const String crashReportingMode = String.fromEnvironment(
+    'CRASH_REPORTING_ENABLED',
+    defaultValue: 'false',
+  );
+  static const String crashReportingRequiredMode = String.fromEnvironment(
+    'CRASH_REPORTING_REQUIRED',
+    defaultValue: 'false',
+  );
+  static const String crashSmokeTestMode = String.fromEnvironment(
+    'CRASH_SMOKE_TEST_ENABLED',
+    defaultValue: 'false',
+  );
+  static const String sentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+  static const String sentryRelease = String.fromEnvironment('SENTRY_RELEASE', defaultValue: '');
+  static const String sentryDist = String.fromEnvironment('SENTRY_DIST', defaultValue: '');
+
+  static bool get crashReportingEnabled =>
+      resolveCrashReportingEnabled(flavor: flavor, mode: crashReportingMode);
+
+  static bool get crashReportingRequired => resolveBooleanMode(crashReportingRequiredMode) ?? false;
+
+  static bool get crashSmokeTestEnabled => resolveBooleanMode(crashSmokeTestMode) ?? false;
+
+  static String get sentryEnvironment => flavor.name;
 
   static bool get isProd => flavor == AppFlavor.prod;
   static bool get analyticsEnabled => isProd || flavor == AppFlavor.staging;
@@ -149,6 +204,12 @@ class AppEnv {
         entraRedirectUri: entraRedirectUri,
         entraApiScope: entraApiScope,
         entraOptional: entraOptional,
+        crashReportingMode: crashReportingMode,
+        crashReportingRequiredMode: crashReportingRequiredMode,
+        crashSmokeTestMode: crashSmokeTestMode,
+        sentryDsn: sentryDsn,
+        sentryRelease: sentryRelease,
+        sentryDist: sentryDist,
       );
 
   /// Cœur de validation : **pur et sans I/O**, ne lit aucune constante globale.
@@ -163,6 +224,12 @@ class AppEnv {
     required String entraRedirectUri,
     required String entraApiScope,
     bool entraOptional = false,
+    String crashReportingMode = 'false',
+    String crashReportingRequiredMode = 'false',
+    String crashSmokeTestMode = 'false',
+    String sentryDsn = '',
+    String sentryRelease = '',
+    String sentryDist = '',
   }) {
     final bool strictFlavor = flavor == AppFlavor.prod || flavor == AppFlavor.staging;
     final List<AppConfigIssue> issues = <AppConfigIssue>[];
@@ -261,8 +328,146 @@ class AppEnv {
       );
     }
 
+    // --- Sentry crash reporting ---
+    final String normalizedCrashMode = crashReportingMode.trim().toLowerCase();
+    final bool validCrashMode = normalizedCrashMode == 'auto' ||
+        normalizedCrashMode == 'true' ||
+        normalizedCrashMode == 'false';
+    if (!validCrashMode) {
+      issues.add(
+        const AppConfigIssue(
+          AppConfigSeverity.error,
+          'CRASH_REPORTING_ENABLED',
+          'Valeur invalide : utilisez auto, true ou false.',
+        ),
+      );
+    }
+
+    final bool? crashRequired = resolveBooleanMode(crashReportingRequiredMode);
+    if (crashRequired == null) {
+      issues.add(
+        const AppConfigIssue(
+          AppConfigSeverity.error,
+          'CRASH_REPORTING_REQUIRED',
+          'Valeur invalide : utilisez true ou false.',
+        ),
+      );
+    }
+
+    final bool? smokeTestEnabled = resolveBooleanMode(crashSmokeTestMode);
+    if (smokeTestEnabled == null) {
+      issues.add(
+        const AppConfigIssue(
+          AppConfigSeverity.error,
+          'CRASH_SMOKE_TEST_ENABLED',
+          'Valeur invalide : utilisez true ou false.',
+        ),
+      );
+    }
+
+    final bool remoteCrashEnabled =
+        validCrashMode && resolveCrashReportingEnabled(flavor: flavor, mode: normalizedCrashMode);
+    if (!remoteCrashEnabled && crashRequired == true) {
+      issues.add(
+        const AppConfigIssue(
+          AppConfigSeverity.error,
+          'CRASH_REPORTING_ENABLED',
+          'Le crash reporting est requis pour ce build mais il est désactivé.',
+        ),
+      );
+    } else if (!remoteCrashEnabled && strictFlavor && validCrashMode) {
+      issues.add(
+        const AppConfigIssue(
+          AppConfigSeverity.warning,
+          'CRASH_REPORTING_ENABLED',
+          'Crash reporting distant désactivé pour un build prod/staging. '
+              'Réservez false au rollback opérateur.',
+        ),
+      );
+    }
+
+    if (smokeTestEnabled == true && !remoteCrashEnabled) {
+      issues.add(
+        const AppConfigIssue(
+          AppConfigSeverity.error,
+          'CRASH_SMOKE_TEST_ENABLED',
+          'Le test de crash interne exige un crash reporting distant actif.',
+        ),
+      );
+    }
+
+    if (remoteCrashEnabled) {
+      final Uri? dsn = Uri.tryParse(sentryDsn.trim());
+      final bool hasPublicKey =
+          dsn != null && dsn.userInfo.isNotEmpty && !dsn.userInfo.contains(':');
+      final bool hasProjectId =
+          dsn != null && dsn.pathSegments.isNotEmpty && dsn.pathSegments.last.isNotEmpty;
+      if (dsn == null ||
+          dsn.scheme != 'https' ||
+          dsn.host.isEmpty ||
+          !hasPublicKey ||
+          !hasProjectId ||
+          dsn.hasQuery ||
+          dsn.hasFragment) {
+        issues.add(
+          const AppConfigIssue(
+            AppConfigSeverity.error,
+            'SENTRY_DSN',
+            'DSN Sentry absent ou invalide. Injectez une URL HTTPS contenant uniquement '
+                'la clé publique DSN, sans mot de passe, query string ni fragment.',
+          ),
+        );
+      }
+
+      final RegExp releasePattern = RegExp(
+        r'^com\.certigo\.mobileapp@[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?\+([1-9][0-9]*)$',
+      );
+      final Match? releaseMatch = releasePattern.firstMatch(sentryRelease.trim());
+      if (releaseMatch == null) {
+        issues.add(
+          const AppConfigIssue(
+            AppConfigSeverity.error,
+            'SENTRY_RELEASE',
+            'Release invalide : utilisez com.certigo.mobileapp@<version>+<build>.',
+          ),
+        );
+      }
+
+      if (!RegExp(r'^[1-9][0-9]*$').hasMatch(sentryDist.trim())) {
+        issues.add(
+          const AppConfigIssue(
+            AppConfigSeverity.error,
+            'SENTRY_DIST',
+            'Distribution invalide : utilisez le numéro de build iOS positif.',
+          ),
+        );
+      } else if (releaseMatch != null && releaseMatch.group(1) != sentryDist.trim()) {
+        issues.add(
+          const AppConfigIssue(
+            AppConfigSeverity.error,
+            'SENTRY_DIST',
+            'SENTRY_DIST doit correspondre au numéro après « + » dans SENTRY_RELEASE.',
+          ),
+        );
+      }
+    }
+
     return AppConfigReport(issues);
   }
+
+  static bool resolveCrashReportingEnabled({required AppFlavor flavor, required String mode}) =>
+      switch (mode.trim().toLowerCase()) {
+        'true' => true,
+        'false' => false,
+        'auto' => flavor == AppFlavor.prod || flavor == AppFlavor.staging,
+        _ => false,
+      };
+
+  static bool? resolveBooleanMode(String mode) => switch (mode.trim().toLowerCase()) {
+        'true' => true,
+        'false' => false,
+        _ => null,
+      };
 }
 
 /// Gravité d'un problème de configuration détecté par [AppEnv.validate].

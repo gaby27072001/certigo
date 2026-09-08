@@ -6,20 +6,36 @@
 | **Objectif** | Exploiter la CI de Certigo sur ses **runners self-hosted** : **rallumer** les VMs avant une session de travail, les **déallouer** après (économie), **vérifier** l'état des runners et **dépanner** un runner hors ligne. |
 | **Voie officielle** | **Self-hosted** — VMSS flexible Azure. Les runners GitHub-hosted sont indisponibles par politique d'organisation. |
 | **Périmètre** | Repo `gchambaud_microsoft/Certigo` · RG `RG-CERTIGO-CI` · subscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**). |
-| **Statut** | **Migration bloquée** : aucune déallocation automatisée avant séparation des labels et retrait du scale-in CPU. |
+| **Statut** | **Labels séparés (vérifié le 4 septembre 2026)**. Le point ouvert n'est plus la séparation mais la **reprise automatique** après la déallocation nocturne imposée par la gouvernance MCAPS. |
 
-> **Dérive live consolidée au 20 août 2026.** Le pool est désormais
-> `vmss-certigo-runner-zonal` (Flexible, autoscale 2–4). Les deux runners GitHub
-> enregistrés portent simultanément `certigo-pr` et `certigo-trusted`; le scale-in CPU
-> ignore l'état `busy`. Les anciennes commandes visant `vm-certigo-runner` et
-> `vm-certigo-runner-2` ne doivent plus être exécutées.
+> **Dérive live consolidée au 4 septembre 2026.** Le pool trusted est
+> `vmss-certigo-runner-zonal` (Flexible, capacité 2, autoscale 2–4) et le pool PR est
+> `vmss-certigo-pr-pilot-z1` (capacité 1). **Les labels sont désormais strictement
+> disjoints** : aucun runner ne porte simultanément `certigo-pr` et `certigo-trusted`.
+> L'affirmation précédente (« les deux runners portent les deux labels », 20 août 2026)
+> est **caduque** et a été corrigée. Le scale-in CPU ignore toujours l'état `busy`.
+> Les anciennes commandes visant `vm-certigo-runner` et `vm-certigo-runner-2` ne doivent
+> plus être exécutées : `vm-certigo-runner-2` n'est plus qu'un *hostname* interne porté
+> par l'instance VMSS `vmss-certigo-runner-zonal_be505fa1`.
+
+> 🔁 **Contrainte structurante — déallocation nocturne non négociable.**
+> `MCAPSGovernance-AutomationApp` (appId `a1a9c5b6-7a4f-4288-89ab-6805873f65d1`, tenant
+> `975f013f-7f24-47e8-a7d3-abc4752bf346`) **désalloue toutes les VM du resource group
+> chaque nuit vers 00:46–00:49 UTC**. Ce principal détient `Owner` au niveau du
+> management group `896a9463-4bb5-462e-b7b5-2e525d3e1a03`, c'est-à-dire **au-dessus de la
+> subscription** : le projet ne peut ni le révoquer, ni s'en exempter. Aucune assignation
+> de policy au scope du RG, aucun `Microsoft.DevTestLab/schedules`, aucun tag d'exemption
+> n'existe pour le contourner. **La CI est donc indisponible chaque matin jusqu'à ce que
+> quelqu'un rallume les VMs**, et les 7 checks requis de `main` le sont avec elle.
+> Toute conception doit supposer cette déallocation permanente et viser la **reprise**,
+> jamais la prévention. Détail et preuves : [`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md).
 
 > ⚠️ **Principe « l'agent PRÉPARE, VOUS EXÉCUTEZ »** — aucune commande `gh` / `az` n'est lancée par
 > l'agent. Les commandes ci-dessous sont **à exécuter par vous** après vérification des identifiants
 > (repo, noms de VM, resource group, subscription).
 >
 > Exécuter d'abord `bash infra/ci-runner/lifecycle-preflight.sh deallocate`. Ce script est
-> strictement read-only et bloque l'état actuel. La migration et le rollback sont définis dans
+> strictement read-only et doit bloquer l'état actuel. La migration et le rollback sont définis dans
 > [`CLOUD_LEAST_PRIVILEGE.md`](./CLOUD_LEAST_PRIVILEGE.md).
 
 ---
@@ -53,17 +69,39 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 
 | Élément | Valeur |
 |---|---|
-| **VMSS live** | legacy `vmss-certigo-runner-zonal` zone 2 + pilote PR `vmss-certigo-pr-pilot-z1` zone 1 |
-| **Capacité Azure live** | `f55d176e` et `bbf83c5c` gérées/running; `4153d1dd` externe/deallocated; `22f7fb52` et `4596a9d5` absentes/interdites |
+| **VMSS live** | trusted `vmss-certigo-runner-zonal` (capacité 2, zones 1 et 2) + pilote PR `vmss-certigo-pr-pilot-z1` (capacité 1, zone 1) |
+| **Capacité Azure live** | `f55d176e` (zone 2) et `be505fa1` (zone 1) trusted, `bbf83c5c` (zone 1) PR — les trois `VM running`; `4153d1dd` externe; `22f7fb52` et `4596a9d5` absentes/interdites |
 | **Resource group** | `RG-CERTIGO-CI` |
 | **Subscription** | `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**) |
-| **Runners GitHub live** | ID 27 `f55d176e-Certigo` online/labels doubles; ID 28 `certigo-prIVJAN8` online/non-busy, labels `certigo-pr` + `certigo-pr-pilot` |
-| **Classification contrôleur** | f55 + bbf bindings exacts gérés · `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit |
-| **Identités** | f55 : UAMI `id-vm-certigo-runner-2-vmss`; pilote PR : aucune identité |
-| **Repo desservi** | `gchambaud_microsoft/Certigo` |
+| **Runners GitHub live** | ID 27 `…_f55d176e-Certigo` **trusted**; ID 29 `…_be505fa1-Certigo` **trusted**; ID 28 `certigo-prIVJAN8` **pr** — tous `online`, labels disjoints |
+| **Classification contrôleur** | f55 + be5 + bbf liés explicitement dans `capacity-controller.config.json` · `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit |
+| **Identités** | f55/be5 : UAMI du VMSS zonal; pilote PR : aucune identité |
+| **Repo desservi** | `gchambaud_microsoft/Certigo` (les mêmes VMs hébergent aussi un agent pour `gchambaud_microsoft/certigo-content`) |
 
-> 📌 Les labels `certigo-pr` et `certigo-trusted` doivent redevenir mutuellement exclusifs. Un éventuel
-> runner **macOS** dédié à iOS (cf. §9) est **distinct** et **n'est pas** géré par ce runbook.
+> ✅ Les labels `certigo-pr` et `certigo-trusted` **sont** mutuellement exclusifs depuis le
+> 4 septembre 2026. Un éventuel runner **macOS** dédié à iOS (cf. §9) est **distinct** et
+> **n'est pas** géré par ce runbook.
+
+> 🔗 **Les instances trusted servent aussi `certigo-content` sous le label `certigo-ci`.**
+> `f55d176e` et `be505fa1` portent chacune un **second** agent, enregistré dans
+> `gchambaud_microsoft/certigo-content` avec les labels `certigo-ci,azure,vmss,zonal,certigo`
+> (ID 25 et ID 26). C'est **intentionnel et porteur** : ces instances sont les seules à
+> joindre le stockage de contenu immuable via son private endpoint. **Ne pas supprimer ces
+> agents, ne pas renommer leurs labels, ne pas les « normaliser »** — la publication de
+> contenu s'exécute dessus. Noter la tension assumée : `certigo-ci` est *interdit* dans un
+> `runs-on:` des workflows **de ce dépôt** (validateur `validate-workflow-security.mjs`)
+> alors qu'il est *requis* par ceux de `certigo-content`. Cette question est documentée
+> dans [`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md) et **reste à trancher**.
+
+> ⏱️ **Marge avant la fenêtre nocturne.** Une publication de contenu complète dure de
+> l'ordre de **quatre heures**. Elle doit donc démarrer avec plusieurs heures de marge
+> avant la déallocation de 00:46–00:49 UTC, faute de quoi elle est interrompue en vol.
+
+> ⚠️ **Toute instance du VMSS doit figurer dans `infra/ci-runner/capacity-controller.config.json`.**
+> C'est la cause racine de l'incident du 1er septembre 2026 : `be505fa1` n'apparaissait dans
+> aucun artefact versionné, donc la liste de rallumage de l'opérateur l'ignorait
+> silencieusement. Restée éteinte plus de 14 jours, son enregistrement runner a été
+> supprimé par GitHub et `az vm start` ne suffisait plus à la rétablir.
 
 > ℹ️ **Prérequis outillage** (poste opérateur) : `az` (Azure CLI) connecté à la subscription Non-Prod,
 > et `gh` (GitHub CLI) authentifié sur `gchambaud_microsoft/Certigo`.
@@ -72,24 +110,27 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 
 ## 3. Capacité et stratégie d'exploitation
 
-Chaque runner traite **un job GitHub Actions à la fois**. L'autoscale CPU actuel peut ajouter
-ou retirer une VM sans connaître GitHub. Tout scale-in reste interdit jusqu'au remplacement
-par le contrôleur sérialisé décrit dans le runbook moindre privilège.
+Chaque runner traite **un job GitHub Actions à la fois**. L'autoscale CPU live peut encore
+ajouter ou retirer une VM sans connaître GitHub. `capacity.bicep` conserve seulement le
+scale-out `> 70 % / 10 min` et retire le scale-in `< 20 % / 45 min`; tant que ce
+what-if n'est pas approuvé puis appliqué séparément, tout scale-in reste interdit.
 
 Baseline 30 jours : **242,06 USD**, 413 jobs, 18,84 runner-heures, CPU moyen 3,78 %,
 file P95 5 108 s et P99 12 628 s. Le CPU faible combiné à une file longue justifie un
 contrôleur `workflow_job` queue-driven, pas un seuil CPU. Son feature flag reste désactivé.
 Le plan réconcilie les bindings Azure/GitHub exacts et exige simultanément power Azure
-**et** runner GitHub online. Le label trusted doit encore être séparé, puis la redondance
-prouvée avant toute activation. La cible du pilote ultérieur est **6 PR + 2 trusted**;
+**et** runner GitHub online. La séparation des labels est **acquise**; le contrôleur
+impose désormais aussi un plancher de redondance (`minimumOnlineByTrust`) de
+**2 runners `certigo-trusted` online**. La cible du pilote ultérieur est **6 PR + 2 trusted**;
 ce n'est ni le plafond live actuel de 4, ni un maximum de production définitif.
 
 | Situation | État requis | Décision opérateur |
 |---|---|---|
-| Avant une session CI | un runner exclusif `certigo-pr` et un exclusif `certigo-trusted`, `online` | Tant que les labels sont doubles, corriger la configuration avant toute automation. |
+| Avant une session CI | un runner exclusif `certigo-pr` et **deux** exclusifs `certigo-trusted`, `online` | Vérifier côté GitHub, pas seulement le power state Azure. |
 | Pendant une session | zéro scale-in CPU | Ne jamais laisser Azure retirer une instance sur simple faible CPU. |
 | Après la session | 5 min continues à zéro, reset sur toute activité, puis deux gardes | Prévol seulement; changement sous lease, un pool à la fois, avec réarmement sur nouvelle activité. |
 | Panne/maintenance | autre classe préservée | Ne jamais déplacer son label pour contourner la panne. |
+| Chaque matin | les 3 VMs sont désallouées par la gouvernance MCAPS | Rallumer **les trois** instances, puis confirmer 3 runners `online` côté GitHub. |
 
 Le détail de reconstruction, de santé et de révocation est dans
 [`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md).
@@ -103,6 +144,11 @@ bash infra/ci-runner/capacity-plan.sh
 ---
 
 ## 4. Rallumer la CI (avant une session de travail)
+
+> 📌 **Depuis la reprise automatique (§11), ce rallumage manuel n'est plus la voie normale.**
+> Les trois instances sont démarrées chaque jour à **01:30 UTC**. Cette section reste le mode
+> dégradé : reprise en échec, reprise désactivée, ou besoin de rallumer en cours de journée.
+> Rappel : une VM sous tension n'est **pas** un runner `online` — toujours confirmer au §6.
 
 Le dépôt ne fournit pas de chemin mutable tant que les findings live restent ouverts.
 
@@ -128,12 +174,21 @@ Attendre `status: online` **avant** d'approuver un run de PR (sinon les jobs res
 
 ## 5. Éteindre la CI (après usage — pour le coût)
 
-Le prévol ci-dessous vérifie les labels, jobs actifs/en file, autoscale, frontières
-d'identité/sous-réseau et réconciliation Azure/GitHub. Il n'effectue aucune déallocation.
-Dans le présent livrable, `enabled=false` bloque tous les prévols. Après une future activation
-séparée, le premier passage démarrera seulement la quiet period; un snapshot d'état externe
-devra prouver les 5 minutes continues puis deux gardes distinctes. L'état v3 conserve la
-capacité exacte supprimée par classe jusqu'à son réarmement réel.
+Le prévol ci-dessous vérifie, sur les deux dépôts, les labels, jobs actifs/en file, autoscale,
+frontières d'identité/sous-réseau et réconciliation Azure/GitHub. Il n'effectue aucune
+déallocation. Un run système Dependabot n'est exclu que si son acteur est `dependabot[bot]`,
+son événement `dynamic` et tous ses jobs sans runner portent le seul label `dependabot`; une
+fiche job absente ou une cible self-hosted bloque.
+
+Dans le présent livrable, `enabled=false` et les dérives de migration bloquent toute nouvelle
+mutation. Une exception de lecture existe pour l'état final déjà sûr : si f55 et bbf sont
+explicitement `deallocated`, les trois registrations exactes sont non-busy et la file valide
+est vide, le prévol retourne `terminalSafe=true`, `safeToRequestChange=false` et
+`requestedChange=none`. Il ne redémarre rien et n'invente pas de quiet period après coup.
+Les dérives restent visibles dans `reasons` afin de bloquer un prochain start/deallocate.
+Après une future activation séparée, une vraie déallocation exigera toujours 5 minutes
+continues puis deux gardes distinctes. L'état v3 conserve la capacité exacte supprimée par
+classe jusqu'à son réarmement réel.
 
 ```bash
 bash infra/ci-runner/lifecycle-preflight.sh deallocate
@@ -145,8 +200,10 @@ bash infra/ci-runner/lifecycle-preflight.sh deallocate
 > - **`az vm stop`** (ou un `shutdown` depuis l'OS) : éteint l'OS mais **laisse la VM allouée** →
 >   **le compute reste facturé**. ❌ **à éviter.**
 
-Un résultat bloqué est le comportement attendu tant que les labels doubles, la file ou le
-scale-in CPU existent.
+Un résultat bloqué reste le comportement attendu tant que la file, le scale-in CPU ou un
+déficit de redondance `certigo-trusted` existent, sauf constat terminal-safe déjà désalloué
+décrit ci-dessus. Le chevauchement de labels, lui, n'est plus une cause de blocage : il est
+résolu.
 
 ---
 
@@ -176,16 +233,31 @@ gh api repos/gchambaud_microsoft/Certigo/actions/runners \
 
 ## 7. Dépannage — un runner reste `offline`
 
+> 🔴 **Cas prouvé le 4 septembre 2026 — « VM running » n'est pas « runner online ».**
+> Une VM peut être `VM running` sans qu'aucun runner n'apparaisse côté GitHub, **même pas
+> en `offline`**. Le journal de l'agent affiche alors :
+> `Failed to create a session. The runner registration has been deleted from the server,
+> please re-configure.` GitHub supprime l'enregistrement d'un runner resté trop longtemps
+> déconnecté (~14 jours). L'agent démarre, se connecte, est rejeté, puis s'arrête de
+> lui-même (`no retry needed`). **Dans ce cas `az vm start`, `systemctl start` et
+> `systemctl enable` ne peuvent rien** : seul un réenregistrement rétablit le runner.
+> Un contrôle de santé qui ne regarde que le power state Azure **manque** cette panne.
+
 Si, après un `az vm start` et ~1–2 minutes d'attente, un runner reste `offline` côté GitHub :
 
 1. **Confirmer l'état Azure de la VM** (§6). Si elle n'est pas `VM running`, la (re)démarrer :
    ```bash
-   az vm restart --resource-group RG-CERTIGO-CI --name <vm-concernée>
+   az vm start --subscription b8952c8c-8f72-469d-99cd-ac906da4e2fc \
+     --resource-group RG-CERTIGO-CI --name <vm-concernée>
    ```
+   Les instances du VMSS Flexible s'adressent bien avec les commandes `az vm` ordinaires.
 2. **Vérifier le service de l'agent sur la VM** (connexion SSH / Bastion selon l'accès en vigueur). Le
-   runner tourne en service systemd nommé `actions.runner.*`. Le compte break-glass peut
-   administrer le service ; le compte de service `runner` ne peut exécuter sans mot de
-   passe que le wrapper root-owned, sans argument, de redémarrage :
+   runner tourne en service systemd nommé `actions.runner.*`. Sur les instances du VMSS zonal,
+   les répertoires d'installation sont `/home/azureuser/actions-runner-2` (repo `Certigo`) et
+   `/home/azureuser/actions-runner-content` (repo `certigo-content`), sous l'utilisateur
+   `azureuser`. Le compte break-glass peut administrer le service ; le compte de service
+   `runner` ne peut exécuter sans mot de passe que le wrapper root-owned, sans argument, de
+   redémarrage :
    ```bash
    systemctl list-units 'actions.runner.*'
    sudo systemctl status  'actions.runner.*'
@@ -198,11 +270,16 @@ Si, après un `az vm start` et ~1–2 minutes d'attente, un runner reste `offlin
    `apt-get update` et à `apt-get install -y unzip zip jq xz-utils` (les seuls paquets
    requis par les jobs actuels, avec `DEBIAN_FRONTEND` autorisé). Il ne peut ni installer
    de paquet arbitraire, ni reconfigurer un service, ni enregistrer un runner.
-3. **Consulter les logs de l'agent** sur la VM (répertoire `_diag/` de l'installation du runner) pour
-   identifier un échec de connexion.
-4. **En dernier recours — reconfigurer le runner** (token expiré, runner supprimé côté GitHub, etc.) en
-   suivant la procédure **officielle GitHub** pour les self-hosted runners :
+3. **Consulter les logs de l'agent** : `journalctl -u 'actions.runner.*' -n 100`, ou le
+   répertoire `_diag/` de l'installation. Chercher explicitement le message
+   `registration has been deleted from the server`.
+4. **Si l'enregistrement a été supprimé — réenregistrer** en suivant la procédure
+   **officielle GitHub** pour les self-hosted runners :
    <https://docs.github.com/actions/hosting-your-own-runners/managing-self-hosted-runners>.
+   Réappliquer **exactement** le jeu de labels d'origine de la classe concernée. Pour le
+   pool trusted zonal : `certigo-trusted,azure,vmss,zonal,certigo`. **Ne jamais** ajouter
+   `certigo-pr` ni `certigo-pr-pilot` à un runner trusted — le chevauchement de labels
+   effondre la frontière de confiance et le validateur du dépôt le bloque.
 
 > 🔐 **Aucun secret en clair.** Ne copiez **jamais** de token d'enregistrement (`--token …`), de PAT ou
 > de secret dans ce runbook, un ticket, un chat ou un commit. Les tokens d'enregistrement de runner sont
@@ -263,6 +340,131 @@ validations PR ne peut donc être restauré sur le pool trusted.
 
 ---
 
+## 11. Reprise automatique côté Azure (01:30 UTC)
+
+Un Logic App `logic-certigo-ci-runner-recovery` dans `rg-certigo-ci` démarre les trois
+instances **chaque jour à 01:30 UTC**, puis vérifie que chacune atteint
+`PowerState/running`. Il est décrit en Bicep : ne pas le modifier dans le portail.
+
+- Composition : [`infra/ci-runner/auto-recovery.bicep`](../../infra/ci-runner/auto-recovery.bicep)
+- Workflow + alerte : [`infra/ci-runner/modules/runnerAutoRecovery.bicep`](../../infra/ci-runner/modules/runnerAutoRecovery.bicep)
+- Paramètres : [`infra/params/ci-runner-auto-recovery.bicepparam`](../../infra/params/ci-runner-auto-recovery.bicepparam)
+
+> ⚠️ **Ce mécanisme prouve le power state Azure, rien de plus.** Il ne dit **pas** qu'un
+> runner est `online` côté GitHub — c'est précisément la panne du 1er septembre. Après une
+> reprise, confirmer toujours avec le §6 (`gh api ... /actions/runners`). Et rallumer les VMs
+> ne protège **pas** une opération longue : une publication de contenu de ~4 h démarrée trop
+> tard sera tranchée à 00:46 UTC quoi qu'il soit rallumé ensuite.
+
+### Vérifier que la reprise a bien tourné
+
+```bash
+export SUB=b8952c8c-8f72-469d-99cd-ac906da4e2fc
+WF="/subscriptions/$SUB/resourceGroups/rg-certigo-ci/providers/Microsoft.Logic/workflows/logic-certigo-ci-runner-recovery"
+
+# Historique : le run du matin doit être "Succeeded".
+az rest --method get --subscription "$SUB" \
+  --uri "https://management.azure.com${WF}/runs?api-version=2016-06-01" \
+  --query "value[].{run:name,status:properties.status,start:properties.startTime}" -o table
+
+# Détail action par action d'un run donné.
+az rest --method get --subscription "$SUB" \
+  --uri "https://management.azure.com${WF}/runs/<RUN_ID>/actions?api-version=2016-06-01" \
+  --query "value[].{action:name,status:properties.status}" -o table
+```
+
+Un run sain se termine `Succeeded` avec `Fail_the_run_when_a_runner_is_not_running` en
+`Skipped`. Si cette action est `Succeeded`, la reprise a **échoué volontairement** : au moins
+une VM n'était pas `running`.
+
+### Déclencher la reprise à la main
+
+```bash
+az rest --method post --subscription "$SUB" \
+  --uri "https://management.azure.com${WF}/triggers/Daily_after_the_governance_teardown_window/run?api-version=2016-06-01"
+```
+
+> 📌 **Un premier run en échec juste après un déploiement neuf est normal.** Le déclencheur
+> `Recurrence` se déclenche immédiatement à la création, avant propagation de l'assignation
+> de rôle : ce run échoue en `ActionFailed`. Rejouer manuellement une minute plus tard.
+
+### Comment on est prévenu d'un échec
+
+Alerte `alert-certigo-ci-runner-recovery-failed` (sévérité 1) sur `RunsFailed > 0`, routée
+vers l'action group `ag-certigo-ci-recovery`. Le destinataire e-mail vient de la variable
+non secrète `ALERT_EMAIL` au déploiement; sans elle l'alerte existe mais n'envoie rien.
+
+```bash
+az monitor metrics alert show -g rg-certigo-ci -n alert-certigo-ci-runner-recovery-failed \
+  --subscription "$SUB" --query "{enabled:enabled,severity:severity}" -o json
+```
+
+**Angle mort connu :** si le Logic App ne tourne **pas du tout**, `RunsFailed` reste vide et
+l'alerte ne part pas. Le filet est `runner-health.yml`, qui s'exécute **sur un runner
+trusted** : son échec à trouver un runner est la preuve que la reprise n'a pas eu lieu.
+
+### Rollback
+
+```bash
+# 1. Désactiver sans rien supprimer (réversible immédiatement).
+az resource update --ids "$WF" --subscription "$SUB" --set properties.state=Disabled
+az resource update --ids "$WF" --subscription "$SUB" --set properties.state=Enabled   # ré-activer
+
+# 2. Suppression complète (workflow + alerte + action group + RBAC + rôle).
+az logic workflow delete -g rg-certigo-ci -n logic-certigo-ci-runner-recovery --subscription "$SUB" --yes
+az monitor metrics alert delete -g rg-certigo-ci -n alert-certigo-ci-runner-recovery-failed --subscription "$SUB"
+az monitor action-group delete -g rg-certigo-ci -n ag-certigo-ci-recovery --subscription "$SUB"
+az role assignment delete --assignee <principalId> \
+  --scope "/subscriptions/$SUB/resourceGroups/rg-certigo-ci" --subscription "$SUB"
+az role definition delete --name "Certigo CI Runner Recovery <suffixe>" --subscription "$SUB"
+```
+
+Le retrait rétablit l'état antérieur : rallumage manuel du §4. Rien d'autre n'en dépend.
+
+### Prérequis de redéploiement
+
+`Microsoft.Logic` doit être enregistré sur la subscription (il ne l'était pas avant ce
+livrable) :
+
+```bash
+az provider register --namespace Microsoft.Logic --subscription "$SUB" --wait
+```
+
+---
+
+## 12. Verrou `CanNotDelete` sur `rg-certigo-ci`
+
+Le resource group porte un verrou `certigo-ci-cannot-delete`, décrit dans
+[`infra/ci-runner/modules/resourceGroupDeletionLock.bicep`](../../infra/ci-runner/modules/resourceGroupDeletionLock.bicep).
+
+**Pourquoi.** Plusieurs templates ciblent ce RG. Un déploiement en mode `Complete` depuis
+l'un d'eux supprimerait ce que les autres ont créé — dont la zone
+`privatelink.blob.core.windows.net`, qui porte les enregistrements A de **dev, staging, prod
+et content**. Le verrou transforme cette destruction silencieuse en échec immédiat.
+
+> ⚠️ **Toujours déployer en `--mode Incremental` (défaut) sur ce RG. Jamais `Complete`.**
+> Lancer systématiquement `az deployment group what-if` d'abord et lire la section des
+> suppressions.
+
+**Effet de bord attendu, pas un bug.** Les verrous sont hérités. Supprimer le private
+endpoint de contenu (`pe-stcertigocntz3wqbdww-blob`, dans `rg-certigo-content`) tente de
+supprimer son enregistrement A dans la zone verrouillée et **échoue** avec
+`ScopeLocked`. C'est voulu.
+
+```bash
+# Lever temporairement (opération délibérée).
+az lock delete --name certigo-ci-cannot-delete -g rg-certigo-ci --subscription "$SUB"
+
+# Remettre — préférer un redéploiement Bicep pour que l'IaC reste la source de vérité.
+az deployment sub create --location westeurope \
+  --parameters infra/params/ci-runner-auto-recovery.bicepparam --subscription "$SUB"
+
+# Vérifier.
+az lock list -g rg-certigo-ci --subscription "$SUB" -o table
+```
+
+---
+
 ## Références (chemins relatifs)
 
 - Preuve du blocage EMU : run [`28782170300`](https://github.com/gchambaud_microsoft/Certigo/actions/runs/28782170300).
@@ -275,8 +477,9 @@ validations PR ne peut donc être restauré sur le pool trusted.
 - Doc GitHub self-hosted runners : <https://docs.github.com/actions/hosting-your-own-runners/managing-self-hosted-runners>.
 - Autres runbooks : [`docs/runbooks/README.md`](./README.md).
 
-> **Paramètres confirmés** : RG `RG-CERTIGO-CI` · VMSS
-> `vmss-certigo-runner-zonal` · subscription
-> `b8952c8c-8f72-469d-99cd-ac906da4e2fc` · f55 + bbf gérés ·
+> **Paramètres confirmés (4 septembre 2026)** : RG `RG-CERTIGO-CI` · VMSS trusted
+> `vmss-certigo-runner-zonal` (capacité 2, zones 1 et 2) · VMSS PR
+> `vmss-certigo-pr-pilot-z1` (capacité 1, zone 1) · subscription
+> `b8952c8c-8f72-469d-99cd-ac906da4e2fc` · f55 + be5 + bbf liés explicitement ·
 > `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit ·
-> label double f55 à corriger.
+> **labels disjoints, aucun chevauchement**.

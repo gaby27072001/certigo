@@ -120,14 +120,153 @@ az ad app credential list --id df42c145 \
 
 ---
 
-## Mise en place de l'alerte d'expiration (J-30)
+## Alerte d'expiration — ✅ automatisée (déployée le 2026-09-04)
 
-Objectif : ne plus jamais découvrir l'expiration après coup. Deux dispositifs **complémentaires**.
+> **Ce volet ne demande plus aucune action.** L'alerte, qui était auparavant fournie « à titre de
+> modèle », est désormais **réellement déployée** dans ce dépôt.
 
-### Dispositif 1 — Owner de l'app avec e-mail (notifications natives Entra)
+### Dispositif déployé — workflow planifié `ciam-posture-monitor`
 
-Entra envoie automatiquement des e-mails d'expiration de credentials **aux owners de l'application**.
-Vérifiez / ajoutez un owner disposant d'une boîte surveillée :
+| Élément | Valeur |
+|---|---|
+| Workflow | [`.github/workflows/ciam-posture-monitor.yml`](../../.github/workflows/ciam-posture-monitor.yml) |
+| Logique | [`.github/scripts/ciam-posture-report.mjs`](../../.github/scripts/ciam-posture-report.mjs) (couverte par `ciam-posture-report.test.mjs`) |
+| Fréquence | Quotidienne (`cron: "23 6 * * *"`), plus `repository_dispatch: [ciam-posture]` |
+| **Seuil d'alerte** | **90 jours** avant expiration (plus large que le J-30 initial : laisse le temps de planifier la rotation) |
+| Effet | Écrit un résumé, **ouvre (ou commente) une issue GitHub**, puis **fait échouer le job** — et **referme l'issue** quand la posture redevient saine (voir « Le front descendant » ci-dessous) |
+| Runner | `certigo-trusted` (aucun déclencheur PR ⇒ inatteignable par du code de fork) |
+
+Le workflow couvre **tous** les secrets et certificats de **toutes** les app registrations du tenant
+CIAM — donc les trois secrets du finding R-05, mais aussi tout secret créé plus tard, sans
+maintenance de liste :
+
+| App | Secret | Expiration |
+|---|---|---|
+| `Certigo MSA Login` (`df42c145`) | `certigo-ciam-oidc-2026-07` | 2027-07-01 |
+| `Certigo Account Deletion Graph` (`0400e855`) | `Certigo account deletion prod` | 2027-08-19 |
+| `Certigo Account Deletion Graph` (`0400e855`) | `Certigo account deletion staging` | 2027-08-19 |
+
+### 🔑 Principe : **un moniteur qui partage le mode de défaillance de ce qu'il surveille n'est pas un moniteur**
+
+Le modèle initialement proposé dans ce runbook reposait sur un service principal avec un **secret**
+(`AZURE_CIAM_CREDENTIALS`). C'était un **raisonnement circulaire** :
+
+> Le dispositif chargé de **détecter l'expiration des secrets** reposait lui-même sur **un secret qui
+> expirerait**. À son expiration, le détecteur se serait tu — **silencieusement**, sans alerte, car
+> plus rien ne le surveillait — et il se serait tu **au moment précis où il aurait été le plus
+> utile**, c'est-à-dire quand des secrets approchent de leur fin de vie.
+
+Une panne de ce type est particulièrement pernicieuse parce qu'elle est **silencieuse** : un
+moniteur mort et un moniteur qui ne trouve rien à signaler produisent exactement le même résultat
+observable — rien.
+
+**Règle générale à retenir, au-delà de ce projet** : lorsqu'on outille une surveillance, vérifier
+que le dispositif **ne partage aucun mode de défaillance avec son sujet**. Un moniteur de certificats
+ne doit pas dépendre d'un certificat ; un moniteur de quota ne doit pas consommer le quota surveillé ;
+un moniteur d'expiration ne doit pas détenir de credential qui expire. Et lorsque ce partage est
+inévitable, le moniteur doit **échouer bruyamment** plutôt que silencieusement.
+
+Le dispositif déployé applique cette règle de trois façons :
+
+| Propriété | Mise en œuvre |
+|---|---|
+| **Aucun credential propre** | Federated identity credential GitHub OIDC — 0 secret, 0 certificat (vérifiable ci-dessous). Rien à faire tourner. |
+| **Aucune liste à maintenir** | Interroge **toutes** les app registrations du tenant, pas une liste figée de trois. Un secret créé demain est couvert sans modification. |
+| **Échec fermé** | Si Graph est illisible, le job **échoue** (`SECURITY_DEFAULTS_UNREADABLE`, `BREAK_GLASS_UNREADABLE`) au lieu de conclure à tort que tout va bien. |
+
+### Identité du moniteur
+
+| Élément | Valeur |
+|---|---|
+| App registration (tenant CIAM) | `certigo-ciam-posture-monitor` — `8856827e-4e91-4b14-9d4a-3ca4d9586f8e` |
+| Credential | **Aucun secret ni certificat** — fédération OIDC uniquement |
+| Issuer | `https://token.actions.githubusercontent.com` |
+| Subject | `repo:gchambaud_microsoft/Certigo:environment:ciam-posture-monitor` |
+| Audience | `api://AzureADTokenExchange` |
+| Permissions Graph (application, **lecture seule**) | `Application.Read.All`, `Policy.Read.All`, `UserAuthenticationMethod.Read.All` |
+| Environment GitHub | `ciam-posture-monitor` (vars `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `CIAM_BREAK_GLASS_UPN`) |
+
+Vérifier à tout moment que le moniteur reste sans credential :
+
+```bash
+az rest --url "https://graph.microsoft.com/v1.0/applications(appId='8856827e-4e91-4b14-9d4a-3ca4d9586f8e')" \
+  --query "{secrets: length(passwordCredentials), certs: length(keyCredentials)}" -o json
+# Attendu : {"secrets": 0, "certs": 0}. Toute autre valeur signale une régression vers le modèle circulaire.
+```
+
+### Contrôles supplémentaires assurés par le même workflow
+
+Le job ne se limite pas à l'expiration des secrets ; il garde aussi deux invariants de posture
+confirmés le 2026-09-04 :
+
+| Code | Contrôle |
+|---|---|
+| `CREDENTIAL_EXPIRING` / `CREDENTIAL_EXPIRED` | Un secret ou certificat approche (≤ 90 j) ou a dépassé son expiration → lancer ce runbook. |
+| `SECURITY_DEFAULTS_DISABLED` | Les security defaults ont été désactivés : le MFA des administrateurs n'est plus imposé et rien ne l'a remplacé. |
+| `BREAK_GLASS_NO_STRONG_METHOD` | Le compte break-glass n'a plus de méthode d'authentification forte (voir `R-04`). |
+| `APPLICATION_LIST_EMPTY` | Graph a renvoyé **zéro** application — état non crédible pour un annuaire, donc traité comme une **lecture ratée**, jamais comme « aucun secret à signaler ». |
+
+### 🔒 Garantie d'échec fermé — chemin de code vérifié
+
+Un moniteur doit distinguer « rien à signaler » de « je n'ai pas réussi à regarder ». **Les deux
+produisent exactement la même sortie visible** : rien. Voici les quatre chemins qui garantissent que
+ce moniteur ne peut pas confondre les deux.
+
+| Situation | Mécanisme | Résultat |
+|---|---|---|
+| **Erreur HTTP Graph** (401/403/5xx) | `requestJson()` lève une exception dès que `response.ok` est faux — le corps n'est jamais interprété | Job en **échec** |
+| **Lecture des applications en échec** | L'appel n'est **pas** enveloppé dans un `try` : l'exception remonte à `main()`, puis au `.catch()` final qui pose `process.exitCode = 1` | Job en **échec** |
+| **Security defaults / break-glass illisibles** | La variable reste `null` → `SECURITY_DEFAULTS_UNREADABLE` / `BREAK_GLASS_UNREADABLE`, sévérité `error` | Job en **échec** |
+| **Liste d'applications vide** | `APPLICATION_LIST_EMPTY` — un annuaire contient toujours au moins une application ; zéro signale une permission réduite, une réponse filtrée ou le mauvais tenant | Job en **échec** |
+
+> ⚠️ **La règle générale : une commande qui a ÉCHOUÉ peut s'afficher comme une VALEUR.**
+> Un résultat vide n'est une mesure que si l'on a vérifié le code de sortie. C'est exactement ainsi
+> qu'un `az storage blob list` refusé par une règle réseau s'est affiché « 0 blob » ailleurs dans ce
+> projet, et a été propagé comme un fait. Le tableau ci-dessus existe pour que ce moniteur ne puisse
+> pas commettre la même erreur.
+
+**Pagination.** Graph pagine ses collections. Ne lire que la première page laisserait des
+credentials **non examinés tout en rapportant un succès** — la même classe de bug. `requestAllPages()`
+suit chaque `@odata.nextLink`, propage toute erreur survenue en cours de parcours au lieu de renvoyer
+une liste partielle, refuse une réponse sans collection `value`, et s'arrête au-delà de 100 pages
+pour ne pas boucler indéfiniment sur un lien auto-référentiel.
+
+Ces quatre chemins sont **couverts par des tests** dans
+`.github/scripts/ciam-posture-report.test.mjs` (23 tests), dont un qui vérifie explicitement qu'une
+liste vide **échoue** au lieu de passer pour « aucun secret expirant ».
+
+### Le front descendant — comment le moniteur sait dire « c'est réglé »
+
+Jusqu'au 2026-09-07, ce moniteur savait **ouvrir** son issue de suivi et jamais la refermer. Son
+état convergeait donc vers « cassé » et y restait, quelle que soit la réalité du tenant : un
+instrument dont la sortie finit par ne plus dépendre de son entrée. La conséquence pratique est
+qu'une alerte réelle suivante se serait fondue dans un ticket déjà ouvert et cessé d'être lu.
+
+La fermeture automatique introduit le **risque inverse**, plus grave : annoncer « résolu » parce que
+l'audit n'a pas su regarder. La condition de fermeture est donc choisie pour l'exclure :
+
+| Situation | `steps.audit.outcome` | `steps.audit.outputs.failed` | Effet |
+|---|---|---|---|
+| Audit conclu, finding de sévérité `error` | `failure` | `true` | Ouvre / commente, échoue |
+| Audit conclu, aucun finding `error` | `success` | `false` | **Ferme** l'issue |
+| Audit **planté** (config, token, Graph) | `failure` | *(non écrite)* | Ouvre / commente, échoue |
+
+Le script n'écrit `failed` **qu'après avoir atteint son verdict**. Un `false` est donc une
+**affirmation positive de santé**, alors que `outcome == 'success'` ne serait que l'absence d'erreur
+constatée — et un refactor qui avalerait une exception transformerait ce silence en feu vert. Les
+deux signaux sont exigés conjointement ; s'ils divergeaient un jour, rien n'est fermé. Une issue
+laissée ouverte à tort se rattrape, un moniteur qui se tait à tort ne se rattrape pas.
+
+Trois tests verrouillent ce raisonnement : un audit sain publie bien `failed=false` (sans quoi la
+porte ne s'ouvrirait jamais), un audit planté ne publie **rien** (vérifié en le faisant échouer pour
+de bon, sortie `GITHUB_OUTPUT` restée vide), et le texte du workflow est comparé au marqueur exact
+de la condition — avec un contrôle positif sur la condition d'ouverture, pour qu'une absence de
+correspondance signifie une porte absente et non un fichier illisible.
+
+### Dispositif complémentaire — owner de l'app avec e-mail
+
+Entra envoie aussi des e-mails d'expiration **aux owners de l'application**. C'est un filet
+secondaire, indépendant de GitHub Actions :
 
 ```bash
 # Lister les owners actuels
@@ -136,49 +275,6 @@ az ad app owner list --id df42c145 --query "[].{upn:userPrincipalName, id:id}" -
 # Ajouter un owner (objectId d'un utilisateur avec e-mail surveillé)
 az ad app owner add --id df42c145 --owner-object-id <OWNER_OBJECT_ID>
 ```
-
-### Dispositif 2 — Alerte planifiée (GitHub Action cron)
-
-Interroge Graph chaque jour, calcule les jours restants et notifie à **J-30**. Script prêt à copier
-(placeholders à compléter). À placer dans un dépôt **outillage/ops** — **pas** dans ce dépôt applicatif
-si le périmètre l'exclut ; ici il est fourni **à titre de modèle**.
-
-```yaml
-# .github/workflows/ciam-secret-expiry-alert.yml  (MODÈLE — à déployer côté ops)
-name: Alerte expiration secret IdP CIAM
-on:
-  schedule:
-    - cron: "0 7 * * *"   # tous les jours 07:00 UTC
-  workflow_dispatch: {}
-jobs:
-  check:
-    runs-on: [self-hosted, Linux, X64, certigo-trusted]
-    steps:
-      - name: Login Azure (service principal dédié, lecture seule sur l'app)
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CIAM_CREDENTIALS }}
-      - name: Vérifier l'expiration du secret df42c145
-        shell: bash
-        run: |
-          APP_ID="df42c145"
-          THRESHOLD_DAYS=30
-          END=$(az ad app credential list --id "$APP_ID" \
-                --query "sort_by([], &endDateTime)[-1].endDateTime" -o tsv)
-          NOW=$(date -u +%s); EXP=$(date -u -d "$END" +%s)
-          DAYS=$(( (EXP - NOW) / 86400 ))
-          echo "Secret df42c145 expire dans $DAYS jours ($END)"
-          if [ "$DAYS" -le "$THRESHOLD_DAYS" ]; then
-            curl -H 'Content-Type: application/json' \
-                 -d "{\"text\":\"⚠️ Secret IdP CIAM (df42c145) expire dans $DAYS jours ($END). Lancer le runbook R-05.\"}" \
-                 "${{ secrets.TEAMS_WEBHOOK_URL }}"
-            exit 1
-          fi
-```
-
-> 🔑 Le service principal `AZURE_CIAM_CREDENTIALS` doit être **en lecture seule** sur l'app
-> (`Application.Read.All` suffit). Notification : webhook Teams **ou** e-mail via Azure Communication
-> Services (déjà présent dans l'écosystème du projet).
 
 ---
 

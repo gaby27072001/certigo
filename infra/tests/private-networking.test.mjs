@@ -732,6 +732,7 @@ test('Function deployment waits for the complete private network deployment', ()
   const functionDeployment = template.resources.api;
 
   assert.ok(networkDeployment.dependsOn.includes('storage'));
+  assert.ok(!networkDeployment.dependsOn.includes('contentStorage'));
   assert.ok(networkDeployment.dependsOn.includes('vault'));
   assert.ok(networkDeployment.dependsOn.includes('data'));
   assert.ok(networkDeployment.dependsOn.includes('sharedPrivateDns'));

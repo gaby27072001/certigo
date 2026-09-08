@@ -122,4 +122,39 @@ void main() {
 
     expect(fake.reports, isEmpty);
   });
+
+  test('le sink local ne journalise ni message d’erreur ni secret de pile', () {
+    final List<String> logs = <String>[];
+    final LoggingCrashReporter reporter = LoggingCrashReporter(sink: logs.add);
+
+    reporter.report(
+      CrashReport(
+        error: StateError('user@example.com Bearer secret-token'),
+        stackTrace: StackTrace.fromString(
+          'frame https://api.example.test/path?token=secret user@example.com',
+        ),
+        source: CrashSource.zone,
+      ),
+    );
+
+    final String output = logs.join('\n');
+    expect(output, contains('errorType: StateError'));
+    expect(output, isNot(contains('secret-token')));
+    expect(output, isNot(contains('user@example.com')));
+    expect(output, contains('<redacted>'));
+  });
+
+  test('le scrubber retire URL, paramètres, identifiants et adresses IP', () {
+    final String sanitized = CrashPrivacy.text(
+      'https://api.example.test/users/123?email=user@example.com&token=secret '
+      '10.20.30.40 2001:db8::1 550e8400-e29b-41d4-a716-446655440000',
+    );
+
+    expect(sanitized, isNot(contains('user@example.com')));
+    expect(sanitized, isNot(contains('secret')));
+    expect(sanitized, isNot(contains('10.20.30.40')));
+    expect(sanitized, isNot(contains('2001:db8::1')));
+    expect(sanitized, isNot(contains('550e8400')));
+    expect(sanitized, contains('https://api.example.test/<redacted>'));
+  });
 }

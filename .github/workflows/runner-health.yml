@@ -33,7 +33,7 @@ jobs:
           CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
         run: |
           set -euo pipefail
-          if ! jq -e 'type == "object" and length == 0' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+          if ! jq -e 'type == "null" or (type == "object" and length == 0)' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
             echo "::error::runner-health does not accept client_payload fields."
             exit 1
           fi
@@ -42,6 +42,16 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
+
+      - name: Assert this runner is in the versioned inventory
+        shell: bash
+        env:
+          CURRENT_RUNNER_NAME: ${{ runner.name }}
+        run: |
+          set -euo pipefail
+          node .github/scripts/assert-runner-inventoried.mjs \
+            "$CURRENT_RUNNER_NAME" \
+            infra/ci-runner/capacity-controller.config.json
 
       - name: Measure current workflow queue wait
         shell: bash

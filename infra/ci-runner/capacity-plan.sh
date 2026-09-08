@@ -22,7 +22,7 @@ AZURE_SUBSCRIPTION_ID="${subscription_id}" \
 node "${root}/infra/ci-runner/reconcile-drift.mjs" \
   --config "${root}/infra/ci-runner/capacity-controller.config.json" \
   --inventory "${inventory_file}" \
-  --runner-template "${root}/infra/ci-runner/runner.bicep"
+  --capacity-template "${root}/infra/ci-runner/capacity.bicep"
 
 arguments=(
   --config "${root}/infra/ci-runner/capacity-controller.config.json"

@@ -20,6 +20,15 @@ const publicDomainConfiguration = {
   publicDomainVerified: 'true',
   appleCiamDomainReconfigured: 'true',
 };
+const contentConfiguration = {
+  contentBlobEndpoint: 'https://stcertigocontent.blob.core.windows.net/',
+  contentReaderClientId: '55555555-5555-5555-5555-555555555555',
+  contentReaderResourceId:
+    '/subscriptions/66666666-6666-6666-6666-666666666666/resourceGroups/rg-certigo-content/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader',
+  contentDescriptorContainerName: 'content-release-descriptors',
+  contentPublicContainerName: 'content-public-releases',
+  contentPrivateContainerName: 'content-private-releases',
+};
 
 function outputPath() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-bicep-params-'));
@@ -107,6 +116,7 @@ test('injects active and previous rotation pairs into a private parameter docume
     jwtPreviousSigningKeyExpiresOn: expiration,
     ...accountDeletionIdentityConfiguration,
   });
+
   const parameters = JSON.parse(fs.readFileSync(outputFile, 'utf8')).parameters;
 
   assert.deepEqual(result, { hasActiveKey: true, hasPreviousKey: true });
@@ -132,6 +142,76 @@ test('injects active and previous rotation pairs into a private parameter docume
   assert.deepEqual(
     parameters.authJwtPreviousSigningKeyExpiresOn,
     { value: expiration },
+  );
+});
+
+test('injects the complete PR 290 content outputs and rejects partial wiring', () => {
+  const { outputFile } = write({
+    ...contentConfiguration,
+    contentRepositoryMode: 'versioned',
+  });
+  const parameters = JSON.parse(fs.readFileSync(outputFile, 'utf8')).parameters;
+  for (const [name, value] of Object.entries(contentConfiguration)) {
+    assert.deepEqual(parameters[name], { value });
+  }
+  assert.deepEqual(parameters.contentRepositoryMode, { value: 'versioned' });
+
+  assert.throws(
+    () => write({ contentBlobEndpoint: contentConfiguration.contentBlobEndpoint }),
+    /All immutable content outputs from PR #290 must be configured together/,
+  );
+
+  // The measured real-world case, 2026-09-07: exactly ONE of the six is set, and it is set at
+  // REPOSITORY scope, so every environment inherits it and reads a partial set even though none of
+  // them configured content. The message must name which value is present, which are absent, and
+  // that repository scope is visible everywhere - otherwise the reader searches the environment,
+  // finds all six unset there, and has no path to the cause.
+  assert.throws(
+    () => write({ contentReaderClientId: contentConfiguration.contentReaderClientId }),
+    (error) => {
+      assert.match(error.message, /Configured \(1 of 6\): AZURE_CONTENT_READER_CLIENT_ID\./);
+      assert.match(
+        error.message,
+        /Missing: AZURE_BLOB_ENDPOINT, AZURE_CONTENT_READER_RESOURCE_ID, AZURE_DESCRIPTOR_CONTAINER, AZURE_PUBLIC_CONTAINER, AZURE_PRIVATE_CONTAINER\./,
+      );
+      assert.match(error.message, /repository scope counts as configured here/);
+      // Measured 2026-09-07: GitHub answers 422 "Variable value cannot be empty" to both creating
+      // and updating an Actions variable with an empty value (control chain on a neutral
+      // environment: absent 404 -> create non-empty succeeds -> PATCH to empty 422 -> value
+      // unchanged). So "clear all six" is not reachable by blanking; it requires DELETING the
+      // value at the scope that defines it. The message must not offer clearing as the easy
+      // default, because an operator who follows that advice at repository scope also removes the
+      // value from every other environment and workflow that reads it.
+      assert.match(error.message, /Absent is not the same as blank/);
+      assert.match(error.message, /422 Variable value cannot be empty/);
+      assert.doesNotMatch(error.message, /safe default/);
+      return true;
+    },
+  );
+
+  // A padded value is "set" but still rejected. It must be reported as padded rather than missing,
+  // because the two have opposite fixes and the untrimmed case is invisible in a variables list.
+  assert.throws(
+    () => write({
+      ...contentConfiguration,
+      contentBlobEndpoint: ` ${contentConfiguration.contentBlobEndpoint} `,
+    }),
+    /Set but padded with whitespace: AZURE_BLOB_ENDPOINT\./,
+  );
+  assert.throws(
+    () => write({
+      ...contentConfiguration,
+      contentReaderResourceId: '/subscriptions/not-an-identity',
+    }),
+    /must identify a user-assigned managed identity/,
+  );
+  assert.throws(
+    () => write({ contentRepositoryMode: 'versioned' }),
+    /requires the complete PR #290 outputs/,
+  );
+  assert.throws(
+    () => write({ ...contentConfiguration, contentRepositoryMode: 'invalid' }),
+    /must be legacy or versioned/,
   );
 });
 

@@ -47,6 +47,11 @@ jobs:
             relevant:
               - 'backend/**'
               - '.github/workflows/ci-backend.yml'
+              # Les golden vectors cross-langage sont lus par les tests .NET ET Dart
+              # depuis docs/contracts/. Sans ce filtre, une PR ne modifiant que le
+              # vecteur n'executerait aucun des deux cotes : le garde-fou serait
+              # affaibli en vert. Meme filtre dans ci-mobile.yml.
+              - 'docs/contracts/**/*.golden.json'
 
   build-test:
     name: Build & test

@@ -6,6 +6,9 @@
 
 **ADR :** [ADR-016](../../../adr/ADR-016-enterprise-learning-metrics.md)
 
+**Garde-fous avant pilote :**
+[contrat B2B conformité V1](../../b2b-compliance/v1/README.md)
+
 - `openapi.json` décrit les routes compilées mais non activables ;
 - `cosmos.schema.json` décrit les documents additifs de `organizations` ;
 - les tests Domain/Application/Infrastructure/API couvrent minimisation, replay concurrent,
@@ -30,3 +33,4 @@
 - offboarding révoque d'abord, worker/retry API reprend la purge depuis tombstone ;
 - tombstone attend l'outbox drainé et purge au plus 30 partitions receipt directes ;
 - `ENTERPRISE_LEARNING_METRICS_V1=off` est la seule valeur valide.
+- toute activation reste bloquée par ADR-017, ses questions juridiques et sa gate humaine.

@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { evaluateLifecycle } from './evaluate-lifecycle.mjs';
+import {
+  evaluateLifecycle,
+  isIgnorableSystemDependabotRun,
+} from './evaluate-lifecycle.mjs';
 
 const repositoryConfig = JSON.parse(
   readFileSync(
@@ -15,6 +18,7 @@ const config = {
   inventory: {
     ...repositoryConfig.inventory,
     managedRunnerBindings: [],
+    observedRunnerBindings: [],
   },
 };
 const f55VmName = 'vmss-certigo-runner-zonal_f55d176e';
@@ -294,5 +298,284 @@ test('unknown lifecycle operations fail closed', () => {
         vmScaleSets: [],
       }),
     /Unsupported lifecycle operation/,
+  );
+});
+
+test('only an enriched GitHub-system Dependabot run is ignored', () => {
+  assert.equal(
+    isIgnorableSystemDependabotRun({
+      actor: { login: 'dependabot[bot]' },
+      event: 'dynamic',
+      jobs: [
+        {
+          labels: ['dependabot'],
+          runner_name: '',
+        },
+      ],
+    }),
+    true,
+  );
+  assert.equal(
+    isIgnorableSystemDependabotRun({
+      actor: { login: 'dependabot[bot]' },
+      event: 'dynamic',
+      jobs: [
+        {
+          labels: ['self-hosted', 'certigo-pr'],
+          runner_name: '',
+        },
+      ],
+    }),
+    false,
+  );
+  assert.equal(
+    isIgnorableSystemDependabotRun({
+      actor: { login: 'dependabot[bot]' },
+      event: 'dynamic',
+    }),
+    false,
+  );
+});
+
+function liveTerminalInput() {
+  return {
+    config: repositoryConfig,
+    operation: 'deallocate',
+    runners: {
+      runners: [
+        {
+          ...runner(
+            'vmss-certigo-runner-zonal_f55d176e-Certigo',
+            ['certigo-pr', 'certigo-trusted'],
+            { id: 27, status: 'offline' },
+          ),
+          repository: 'gchambaud_microsoft/Certigo',
+        },
+        {
+          ...runner(
+            'vmss-certigo-runner-zonal_f55d176e-certigo-content',
+            ['certigo-ci'],
+            { id: 25, status: 'offline' },
+          ),
+          repository: 'gchambaud_microsoft/certigo-content',
+        },
+        {
+          ...runner(
+            'certigo-prIVJAN8',
+            ['certigo-pr', 'certigo-pr-pilot'],
+            { id: 28, status: 'offline' },
+          ),
+          repository: 'gchambaud_microsoft/Certigo',
+        },
+        {
+          ...runner(
+            'vmss-certigo-runner-zonal_22f7fb52-Certigo',
+            ['certigo-pr', 'certigo-trusted'],
+            { id: 26, status: 'offline' },
+          ),
+          repository: 'gchambaud_microsoft/Certigo',
+        },
+        {
+          ...runner(
+            'vmss-certigo-runner-zonal_be505fa1-Certigo',
+            ['certigo-pr', 'certigo-trusted'],
+            { id: 29, status: 'offline' },
+          ),
+          repository: 'gchambaud_microsoft/Certigo',
+        },
+        {
+          ...runner(
+            'certigo-prQA5OWT',
+            ['certigo-pr', 'certigo-pr-pilot'],
+            { id: 30, status: 'offline' },
+          ),
+          repository: 'gchambaud_microsoft/Certigo',
+        },
+      ],
+    },
+    queuedRuns: {
+      total_count: 1,
+      workflow_runs: [
+        {
+          id: 32340562381,
+          actor: { login: 'dependabot[bot]' },
+          event: 'dynamic',
+          jobs: [
+            {
+              labels: ['dependabot'],
+              runner_name: '',
+            },
+          ],
+        },
+      ],
+    },
+    activeRuns: { total_count: 0, workflow_runs: [] },
+    autoscale: {
+      enabled: true,
+      profiles: [
+        {
+          rules: [{ scaleAction: { direction: 'Decrease' } }],
+        },
+      ],
+    },
+    virtualMachines: [
+      {
+        id: f55VmId,
+        name: f55VmName,
+        powerState: 'VM deallocated',
+        virtualMachineScaleSet: {
+          id: '/vmss/vmss-certigo-runner-zonal',
+        },
+      },
+      {
+        id:
+          '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
+          'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
+          'virtualMachines/vmss-certigo-pr-pilot-z1_bbf83c5c',
+        name: 'vmss-certigo-pr-pilot-z1_bbf83c5c',
+        powerState: 'VM deallocated',
+        virtualMachineScaleSet: {
+          id: '/vmss/vmss-certigo-pr-pilot-z1',
+        },
+      },
+      {
+        id:
+          '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
+          'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
+          'virtualMachines/vmss-certigo-runner-zonal_be505fa1',
+        name: 'vmss-certigo-runner-zonal_be505fa1',
+        powerState: 'VM deallocated',
+        virtualMachineScaleSet: {
+          id: '/vmss/vmss-certigo-runner-zonal',
+        },
+      },
+      {
+        id:
+          '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
+          'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
+          'virtualMachines/vmss-certigo-pr-pilot-z1_a14700a3',
+        name: 'vmss-certigo-pr-pilot-z1_a14700a3',
+        powerState: 'VM deallocated',
+        virtualMachineScaleSet: {
+          id: '/vmss/vmss-certigo-pr-pilot-z1',
+        },
+      },
+      {
+        name: 'vmss-certigo-runner-zonal_4153d1dd',
+        powerState: 'VM deallocated',
+      },
+    ],
+    vmScaleSets: [
+      scaleSet(
+        'vmss-certigo-runner-zonal',
+        '/networks/trusted/subnets/runners',
+      ),
+      scaleSet(
+        'vmss-certigo-pr-pilot-z1',
+        '/networks/pr/subnets/runners',
+        null,
+      ),
+    ],
+  };
+}
+
+test('already-deallocated managed targets are terminal-safe without requesting a change', () => {
+  const result = evaluateLifecycle(liveTerminalInput());
+
+  assert.equal(result.terminalSafe, true);
+  assert.equal(result.terminalAlreadyDeallocated, true);
+  assert.equal(result.safeToRequestChange, false);
+  assert.equal(result.requestedChange, 'none');
+  assert.equal(result.safety, null);
+  assert.deepEqual(result.observed.ignoredSystemDependabotRunIds, [
+    32340562381,
+  ]);
+  assert.ok(
+    result.reasons.includes('capacity controller feature flag is off'),
+  );
+  assert.ok(result.reasons.some((reason) => reason.startsWith('dual trust labels')));
+  assert.ok(
+    result.reasons.includes('CPU autoscale contains an unsafe scale-in rule'),
+  );
+});
+
+test('valid work prevents an already-deallocated state from being terminal-safe', () => {
+  const input = liveTerminalInput();
+  input.queuedRuns.workflow_runs.push({
+    id: 42,
+    actor: { login: 'developer' },
+    event: 'push',
+    jobs: [],
+  });
+  input.queuedRuns.total_count = 2;
+
+  const result = evaluateLifecycle(input);
+
+  assert.equal(result.terminalSafe, false);
+  assert.equal(result.safeToRequestChange, false);
+  assert.ok(result.reasons.includes('queued workflow runs: 1'));
+});
+
+test('Dependabot work targeting self-hosted labels remains blocking', () => {
+  const input = liveTerminalInput();
+  input.queuedRuns.workflow_runs[0].jobs = [
+    {
+      labels: ['self-hosted', 'certigo-pr'],
+      runner_name: '',
+    },
+  ];
+
+  const result = evaluateLifecycle(input);
+
+  assert.equal(result.terminalSafe, false);
+  assert.ok(result.reasons.includes('queued workflow runs: 1'));
+  assert.deepEqual(result.observed.ignoredSystemDependabotRunIds, []);
+});
+
+test('managed capacity without complete observed bindings fails closed', () => {
+  const input = liveTerminalInput();
+  input.config = {
+    ...input.config,
+    inventory: {
+      ...input.config.inventory,
+      observedRunnerBindings:
+        input.config.inventory.observedRunnerBindings.slice(0, 1),
+    },
+  };
+
+  assert.throws(
+    () => evaluateLifecycle(input),
+    /every managed machine requires an observed runner binding/,
+  );
+});
+
+test('terminal-safe requires every observed registration to be explicitly non-busy', () => {
+  const input = liveTerminalInput();
+  delete input.runners.runners[1].busy;
+
+  const result = evaluateLifecycle(input);
+
+  assert.equal(result.terminalSafe, false);
+  assert.ok(
+    result.reasons.includes(
+      'runner busy state is not explicit: vmss-certigo-runner-zonal_f55d176e-certigo-content',
+    ),
+  );
+});
+
+test('a forbidden VM blocks terminal-safe even when managed targets are deallocated', () => {
+  const input = liveTerminalInput();
+  input.virtualMachines.push({
+    name: 'vmss-certigo-runner-zonal_22f7fb52',
+    powerState: 'VM deallocated',
+  });
+
+  const result = evaluateLifecycle(input);
+
+  assert.equal(result.terminalSafe, false);
+  assert.ok(
+    result.reasons.includes(
+      'forbidden Azure VMs are present: vmss-certigo-runner-zonal_22f7fb52',
+    ),
   );
 });

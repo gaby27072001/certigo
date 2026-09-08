@@ -43,8 +43,27 @@ répond pas aux contraintes de compatibilité et de confiance des jobs opératio
   slots. Le contrôleur reste `enabled=false` tant que les frontières ne sont pas saines.
 - Le live documenté comporte deux bindings gérés et versionnés :
   `f55d176e`/runner 27 sur le VMSS legacy et `bbf83c5c`/runner 28 sur le VMSS PR isolé.
-  Le premier conserve encore des labels doubles ; aucune automation mutable n'est donc
-  autorisée.
+  Au snapshot du 20 août, le premier conservait encore des labels doubles.
+
+### Addendum live du 4 septembre 2026
+
+L'inventaire Azure/GitHub read-only remplace le dernier constat opérationnel, sans
+changer la décision d'architecture :
+
+- `f55d176e` est désormais exclusivement `certigo-trusted` et `bbf83c5c`
+  exclusivement PR (`certigo-pr,certigo-pr-pilot`) ; les deux VM ont été
+  redémarrées le 3 septembre et sont running/online ;
+- `vmss-certigo-runner-zonal_be505fa1` est restée `deallocated`, sans runner
+  GitHub ni ownership démontré. Elle n'est ni adoptée ni ajoutée aux exclusions :
+  une instance non classifiée doit continuer à bloquer ;
+- l'autoscale legacy est toujours actif en 2/2/4, avec scale-out CPU
+  `> 70 % / 10 min` et scale-in `< 20 % / 45 min`. Le contrat
+  `infra/ci-runner/capacity.bicep` conserve seulement le scale-out ;
+- les deux VMSS sont référencés `existing`; `network.bicep` référence aussi
+  l'IP, la NAT, le NSG et le VNet `existing`, puis gère uniquement le
+  sous-réseau enfant et des extensions de tags isolées ;
+- le contrôleur queue-driven reste `enabled=false`. La correction IaC ne vaut ni
+  activation du contrôleur, ni autorisation de drill, ni décision sur ACA.
 
 ### Baseline 30 jours
 

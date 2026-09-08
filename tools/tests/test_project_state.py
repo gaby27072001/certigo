@@ -4,6 +4,8 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -463,10 +465,24 @@ class ProjectStateTests(unittest.TestCase):
             active_fixture.git("config", "user.name", "Active Content Tests")
 
             manifest_references: dict[str, dict[str, object]] = {}
+            # Entries are built for whichever schema is currently active, so the
+            # fixture keeps exercising the real shape after a contract bump.
+            active_shape = project_state.PACKAGE_MANIFEST_SHAPES[
+                project_state.PACKAGE_MANIFEST_SCHEMA
+            ]
             for name, channel, artifact in (
                 ("public", "public", "public"),
                 ("private", "answerKey", "private"),
             ):
+                rule = active_shape.channels[channel][0]
+                entry: dict[str, object] = {
+                    "id": "lesson",
+                    "path": f"{rule.prefix}/lesson.json",
+                    "hash": "6" * 64,
+                    "size": 123,
+                }
+                if "resourceType" in active_shape.required_fields:
+                    entry["resourceType"] = sorted(rule.resource_types)[0]
                 manifest: dict[str, object] = {
                     "schema": project_state.PACKAGE_MANIFEST_SCHEMA,
                     "channel": channel,
@@ -474,18 +490,7 @@ class ProjectStateTests(unittest.TestCase):
                     "algorithm": project_state.PACKAGE_MANIFEST_ALGORITHM,
                     "serialization": project_state.PACKAGE_MANIFEST_SERIALIZATION,
                     "fileCount": 1,
-                    "files": [
-                        {
-                            "id": "lesson",
-                            "path": (
-                                "questions/lesson.json"
-                                if channel == "public"
-                                else "solutions/lesson.json"
-                            ),
-                            "hash": "6" * 64,
-                            "size": 123,
-                        }
-                    ],
+                    "files": [entry],
                     "manifestId": "",
                     "rootHash": "",
                 }
@@ -563,6 +568,245 @@ class ProjectStateTests(unittest.TestCase):
         ).encode("utf-8")
         expected = f"sha256:{hashlib.sha256(canonical).hexdigest()}"
         self.assertEqual(expected, project_state._canonical_manifest_id(manifest))
+
+    def _validate_entry(
+        self, schema: str, channel: str, entry: dict[str, object]
+    ) -> None:
+        """Validate one manifest entry against a specific declared schema."""
+        artifact = "public" if channel == "public" else "private"
+        manifest: dict[str, object] = {
+            "schema": schema,
+            "channel": channel,
+            "artifact": artifact,
+            "algorithm": project_state.PACKAGE_MANIFEST_ALGORITHM,
+            "serialization": project_state.PACKAGE_MANIFEST_SERIALIZATION,
+            "fileCount": 1,
+            "files": [entry],
+            "manifestId": "",
+            "rootHash": "",
+        }
+        manifest["manifestId"] = project_state._canonical_manifest_id(manifest)
+        manifest["rootHash"] = str(manifest["manifestId"]).removeprefix("sha256:")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            relative = f"dist/{artifact}/manifest.json"
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            raw = (json.dumps(manifest, indent=2) + "\n").encode("utf-8")
+            path.write_bytes(raw)
+            reference = project_state.ActiveManifestReference(
+                relative,
+                channel,
+                artifact,
+                str(manifest["manifestId"]),
+                1,
+                hashlib.sha256(raw).hexdigest(),
+            )
+            project_state._validate_manifest(root, reference)
+
+    def test_only_v3_is_accepted_after_the_migration(self) -> None:
+        self.assertEqual(
+            {"certigo.content.package-manifest/v3"},
+            set(project_state.PACKAGE_MANIFEST_SCHEMAS),
+        )
+        self.assertEqual(
+            "certigo.content.package-manifest/v3",
+            project_state.PACKAGE_MANIFEST_SCHEMA,
+        )
+
+    def test_v3_accepts_every_declared_public_prefix(self) -> None:
+        for path, resource_type in (
+            ("catalog/certifications.json", "certificationCatalog"),
+            ("coverage/aws/aif-c01.json", "coverageMatrix"),
+            ("questions/lesson.json", "question"),
+            ("questions/aws/aif-c01/aws.aif-c01.domain-1.001.json", "question"),
+            ("runtime/concepts/aws/aif-c01/aws.concept.json", "concept"),
+            ("runtime/domains/aws/aif-c01/aws.domain-1.json", "domain"),
+            ("runtime/tracks/aws/aif-c01/aws.track.json", "track"),
+        ):
+            with self.subTest(path=path):
+                self._validate_entry(
+                    "certigo.content.package-manifest/v3",
+                    "public",
+                    {
+                        "id": "item",
+                        "path": path,
+                        "hash": "6" * 64,
+                        "size": 1,
+                        "resourceType": resource_type,
+                    },
+                )
+
+    def test_v3_accepts_declared_optional_entry_fields(self) -> None:
+        self._validate_entry(
+            "certigo.content.package-manifest/v3",
+            "public",
+            {
+                "id": "aws.aif-c01.domain-1.001",
+                "path": "questions/aws/aif-c01/aws.aif-c01.domain-1.001.json",
+                "hash": "6" * 64,
+                "size": 1,
+                "resourceType": "question",
+                "blueprintVersion": "2026-08-17",
+                "certification": "aws:aif-c01",
+                "objective": "domain-1",
+                "provider": "aws",
+            },
+        )
+
+    def test_v3_rejects_malformed_entries(self) -> None:
+        base: dict[str, object] = {
+            "id": "certification-catalog",
+            "path": "catalog/certifications.json",
+            "hash": "6" * 64,
+            "size": 1,
+            "resourceType": "certificationCatalog",
+        }
+        cases: tuple[tuple[str, dict[str, object], str], ...] = (
+            # The answer key must never be reachable through the public channel.
+            (
+                "answer key leaked into the public channel",
+                {"path": "solutions/lesson.json", "resourceType": "solution"},
+                "unexpected path for public",
+            ),
+            (
+                "path traversal",
+                {"path": "questions/../../secret/leak.json"},
+                "unexpected path for public",
+            ),
+            (
+                "undeclared prefix",
+                {"path": "secrets/leak.json"},
+                "unexpected path for public",
+            ),
+            (
+                "undeclared nesting depth",
+                {"path": "runtime/concepts/shallow.json", "resourceType": "concept"},
+                "unexpected path for public",
+            ),
+            (
+                "non-json artifact",
+                {"path": "catalog/certifications.yaml"},
+                "unexpected path for public",
+            ),
+            (
+                "resourceType foreign to its prefix",
+                {"resourceType": "question"},
+                "expected one of",
+            ),
+            (
+                "unknown entry field",
+                {"surprise": "x"},
+                "expected required fields",
+            ),
+            (
+                "empty declared optional field",
+                {"provider": ""},
+                "expected a non-empty string",
+            ),
+        )
+        for label, override, message in cases:
+            with self.subTest(case=label):
+                entry = dict(base)
+                entry.update(override)
+                with self.assertRaisesRegex(project_state.ProjectStateError, message):
+                    self._validate_entry(
+                        "certigo.content.package-manifest/v3", "public", entry
+                    )
+
+    def test_v3_rejects_an_entry_missing_a_required_field(self) -> None:
+        shape = project_state.PACKAGE_MANIFEST_SHAPES[
+            "certigo.content.package-manifest/v3"
+        ]
+        for field in sorted(shape.required_fields):
+            with self.subTest(missing=field):
+                entry: dict[str, object] = {
+                    "id": "certification-catalog",
+                    "path": "catalog/certifications.json",
+                    "hash": "6" * 64,
+                    "size": 1,
+                    "resourceType": "certificationCatalog",
+                }
+                del entry[field]
+                with self.assertRaisesRegex(
+                    project_state.ProjectStateError, "expected required fields"
+                ):
+                    self._validate_entry(
+                        "certigo.content.package-manifest/v3", "public", entry
+                    )
+
+    def test_a_regression_to_the_superseded_schema_is_rejected(self) -> None:
+        """The migration scaffolding is gone, so v1 must now fail loudly.
+
+        A validator that still accepted the superseded shape could not detect a
+        regression from v3 back to v1, which is the whole point of pinning one
+        schema rather than a set.
+        """
+        self.assertNotIn(
+            "certigo.content.package-manifest/v1",
+            project_state.PACKAGE_MANIFEST_SHAPES,
+        )
+        with self.assertRaisesRegex(
+            project_state.ProjectStateError, "unexpected package manifest schema"
+        ):
+            self._validate_entry(
+                "certigo.content.package-manifest/v1",
+                "public",
+                {
+                    "id": "lesson",
+                    "path": "questions/lesson.json",
+                    "hash": "6" * 64,
+                    "size": 1,
+                },
+            )
+
+    def test_answer_key_channel_stays_solutions_only_in_every_shape(self) -> None:
+        for schema, shape in project_state.PACKAGE_MANIFEST_SHAPES.items():
+            with self.subTest(schema=schema):
+                self.assertEqual(
+                    ["solutions"],
+                    [rule.prefix for rule in shape.channels["answerKey"]],
+                )
+                self.assertEqual(["public", "answerKey"], list(shape.channels))
+
+    def test_unknown_manifest_schema_is_rejected(self) -> None:
+        with self.assertRaisesRegex(
+            project_state.ProjectStateError, "unexpected package manifest schema"
+        ):
+            self._validate_entry(
+                "certigo.content.package-manifest/v2",
+                "public",
+                {
+                    "id": "lesson",
+                    "path": "questions/lesson.json",
+                    "hash": "6" * 64,
+                    "size": 1,
+                },
+            )
+
+    def test_artifact_path_contract_rejects_unusable_segment_counts(self) -> None:
+        """A count below 2 would render `{-1}`, which Python treats as a literal.
+
+        Left unguarded that yields a pattern silently matching nothing, in a tool
+        whose whole purpose is to fail loudly.
+        """
+        for counts in ([1], [], [2, 0]):
+            with self.subTest(segmentCounts=counts):
+                with self.assertRaisesRegex(ValueError, "segmentCounts"):
+                    project_state._compile_channel_rules(
+                        {
+                            "public": [
+                                {
+                                    "prefix": "catalog",
+                                    "segmentCounts": counts,
+                                    "resourceTypes": ["certificationCatalog"],
+                                }
+                            ]
+                        },
+                        "[A-Za-z0-9._-]+",
+                        ".json",
+                        "certigo.content.package-manifest/v3",
+                    )
 
     def test_manifest_reference_rejects_paths_outside_active_content(self) -> None:
         reference_path = self.root / project_state.ACTIVE_CONTENT_REFERENCE_FILE
@@ -691,6 +935,85 @@ class ProjectStateTests(unittest.TestCase):
             REPO_ROOT / ".github/scripts/enforce-codeql-sarif.mjs"
         ).read_text(encoding="utf-8")
         self.assertIn("GITHUB_STEP_SUMMARY", enforcer)
+
+    def test_trusted_control_references_are_revision_local_and_sealed(self) -> None:
+        preflight = (REPO_ROOT / ".github/workflows/ci-preflight.yml").read_text(
+            encoding="utf-8"
+        )
+        install_start = preflight.index(
+            "      - name: Install trusted validator dependencies"
+        )
+        step_start = preflight.index(
+            "      - name: Run adversarial selector and security-policy tests"
+        )
+        step_end = preflight.index(
+            "      - name: Validate project-state source", step_start
+        )
+        install_step = preflight[install_start:step_start]
+        self.assertIn("working-directory: .trusted-control", install_step)
+        self.assertIn("run: npm ci --ignore-scripts", install_step)
+        self.assertNotIn("UNTRUSTED_SOURCE_DIR", install_step)
+        self.assertNotIn("--prefix", install_step)
+        policy_step = preflight[step_start:step_end]
+        self.assertIn("working-directory: .trusted-control", policy_step)
+        self.assertIn("npm --ignore-scripts run test:ci-impact", policy_step)
+        self.assertNotIn("node --test", policy_step)
+        self.assertNotRegex(
+            policy_step,
+            r"\$(?:\{TRUSTED_CONTROL_DIR\}|TRUSTED_CONTROL_DIR)"
+            r"/[A-Za-z0-9._/-]+\.test\.mjs",
+        )
+
+        package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
+        self.assertNotIn("pretest:ci-impact", package["scripts"])
+        self.assertNotIn("posttest:ci-impact", package["scripts"])
+        manifest = shlex.split(package["scripts"]["test:ci-impact"])
+        self.assertEqual(["node", "--test"], manifest[:2])
+        test_paths = manifest[2:]
+        self.assertTrue(
+            {
+                ".github/scripts/backend-deploy-gate.test.mjs",
+                ".github/scripts/ci-impact.test.mjs",
+                ".github/scripts/workflow-concurrency-policy.test.mjs",
+                ".github/scripts/workflow-security-cache-policy.test.mjs",
+            }.issubset(test_paths)
+        )
+        for test_path in test_paths:
+            self.assertRegex(
+                test_path,
+                r"^\.github/scripts/[A-Za-z0-9._-]+\.test\.mjs$",
+            )
+
+        references = set(test_paths)
+        for workflow_path in (REPO_ROOT / ".github/workflows").glob("*.y*ml"):
+            references.update(
+                re.findall(
+                    r"\$(?:\{TRUSTED_CONTROL_DIR\}|TRUSTED_CONTROL_DIR)"
+                    r"/([A-Za-z0-9._/-]+)",
+                    workflow_path.read_text(encoding="utf-8"),
+                )
+            )
+
+        canonical_root = REPO_ROOT.resolve(strict=True)
+        for relative in sorted(references):
+            with self.subTest(relative=relative):
+                relative_path = Path(relative)
+                self.assertFalse(relative_path.is_absolute())
+                self.assertNotIn("..", relative_path.parts)
+                control_file = REPO_ROOT / relative_path
+                self.assertFalse(control_file.is_symlink())
+                self.assertTrue(control_file.is_file())
+                self.assertTrue(
+                    control_file.resolve(strict=True).is_relative_to(canonical_root)
+                )
+                tracked = subprocess.run(
+                    ["git", "ls-files", "--error-unmatch", "--", relative],
+                    cwd=REPO_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(0, tracked.returncode, tracked.stderr)
 
     def test_trusted_workflows_use_default_branch_dispatch_only(self) -> None:
         workflows = REPO_ROOT / ".github/workflows"

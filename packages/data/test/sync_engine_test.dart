@@ -127,6 +127,51 @@ void main() {
       await engine.dispose();
     });
 
+    test('discardOwner removes only the confirmed person and preserves queue order', () async {
+      final InMemorySyncQueueStore store = InMemorySyncQueueStore();
+      var owner = 'person-a';
+      final SyncEngine engine = SyncEngine(
+        store: store,
+        sender: (_) async => SyncDispatch.success,
+        ownerIdProvider: () => owner,
+      );
+      await _enqueue(engine, 'a-1');
+      owner = 'person-b';
+      await _enqueue(engine, 'b-1');
+      owner = 'person-a';
+      await _enqueue(engine, 'a-2');
+      owner = 'person-b';
+      await _enqueue(engine, 'b-2');
+
+      await engine.discardOwner('person-a');
+
+      await expectLater(
+        engine.enqueue(
+          kind: 'quizSubmit',
+          endpoint: '/quiz/deleted/submit',
+          payload: const <String, dynamic>{},
+          idempotencyKey: 'a-after-delete',
+          ownerId: 'person-a',
+        ),
+        throwsStateError,
+      );
+      await engine.enqueue(
+        kind: 'quizSubmit',
+        endpoint: '/quiz/active/submit',
+        payload: const <String, dynamic>{},
+        idempotencyKey: 'b-after-delete',
+        ownerId: 'person-b',
+      );
+      expect(
+        engine.actions.map((SyncAction action) => action.idempotencyKey),
+        <String>['b-1', 'b-2', 'b-after-delete'],
+      );
+      expect((await store.load()).map((SyncAction action) => action.ownerId).toSet(), <String?>{
+        'person-b',
+      });
+      await engine.dispose();
+    });
+
     test(
       'a completed action blocks re-enqueue until its retention elapses',
       () async {

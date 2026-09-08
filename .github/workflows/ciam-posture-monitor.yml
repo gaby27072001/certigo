@@ -1,0 +1,177 @@
+# Detection layer for finding R-05. The rotation procedure already exists in
+# docs/runbooks/R-05_rotation-secret-idp-msa.md; what was missing was noticing an
+# expiry before it broke production sign-in. This job also guards the two posture
+# invariants confirmed on 2026-09-04: security defaults enforce administrator MFA in
+# the CIAM tenant, and the break-glass account must keep a strong method registered
+# because security defaults accept no exclusions.
+#
+# The CIAM identity authenticates with a GitHub OIDC federated credential, so this
+# monitor holds no stored secret that could itself expire unnoticed.
+#
+# The job has both edges: it opens a tracking issue when the posture breaks and closes
+# it when the posture is proven healthy again. Without the falling edge its state
+# converged on "broken" and stayed there, so a later real alert would have landed in a
+# ticket already open and no longer read. See docs/runbooks/R-05, "Le front descendant".
+name: CIAM posture monitor
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  repository_dispatch:
+    types: [ciam-posture]
+
+permissions: {}
+
+concurrency:
+  group: ciam-posture-monitor
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: CIAM credential expiry and posture audit
+    # Scheduled workflows are loaded from the default branch.
+    if: ${{ github.ref == 'refs/heads/main' }}
+    timeout-minutes: 15
+    environment: ciam-posture-monitor
+    # No PR trigger exists, so untrusted fork code cannot reach this persistent runner.
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+    steps:
+      - name: Reject unexpected payload fields
+        if: ${{ github.event_name == 'repository_dispatch' }}
+        shell: bash
+        env:
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          if ! jq -e 'type == "null" or (type == "object" and length == 0)' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+            echo "::error::ciam-posture does not accept client_payload fields."
+            exit 1
+          fi
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+
+      - name: Verify monitor identity configuration
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          CIAM_BREAK_GLASS_UPN: ${{ vars.CIAM_BREAK_GLASS_UPN }}
+        run: |
+          set -euo pipefail
+          : "${AZURE_CLIENT_ID:?Configure AZURE_CLIENT_ID in ciam-posture-monitor}"
+          : "${AZURE_TENANT_ID:?Configure AZURE_TENANT_ID in ciam-posture-monitor}"
+          : "${CIAM_BREAK_GLASS_UPN:?Configure CIAM_BREAK_GLASS_UPN in ciam-posture-monitor}"
+
+      - name: Audit CIAM credentials and posture
+        id: audit
+        continue-on-error: true
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          CIAM_BREAK_GLASS_UPN: ${{ vars.CIAM_BREAK_GLASS_UPN }}
+          THRESHOLD_DAYS: "90"
+        run: node .github/scripts/ciam-posture-report.mjs
+
+      - name: Open or refresh the tracking issue
+        if: ${{ steps.audit.outcome == 'failure' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          FINDINGS: ${{ steps.audit.outputs.findings }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const title = 'CIAM posture monitor: action required';
+            const findings = process.env.FINDINGS || '_See the workflow run for detail._';
+            const body = [
+              findings,
+              '',
+              'Runbooks: `docs/runbooks/R-05_rotation-secret-idp-msa.md` (secret rotation),',
+              '`docs/runbooks/R-04_compte-break-glass-ciam.md` (break-glass).',
+              '',
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+            const existing = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open in:title "${title}"`,
+            });
+            const match = existing.data.items.find((issue) => issue.title === title);
+            if (match) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+              });
+            }
+
+      - name: Close the tracking issue when the audit proves the posture healthy
+        # Deliberately gated on `outputs.failed == 'false'`, never on
+        # `outcome == 'success'` alone. The audit script writes `failed` only once it
+        # has reached its conclusion, so `false` is a *positive assertion of health*;
+        # a crash leaves the output unset and must never read as an all-clear. Both
+        # signals are required, and if they ever disagree nothing is closed. An issue
+        # left open wrongly is recoverable; a monitor announcing "resolved" because it
+        # could not look is the same silent failure this step exists to end.
+        if: ${{ steps.audit.outcome == 'success' && steps.audit.outputs.failed == 'false' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const title = 'CIAM posture monitor: action required';
+            // Same lookup as the open path on purpose: an asymmetric match would let an
+            // issue be refreshed forever while never becoming closable.
+            const existing = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open in:title "${title}"`,
+            });
+            const match = existing.data.items.find((issue) => issue.title === title);
+            if (!match) {
+              core.info('Posture healthy and no open tracking issue — nothing to close.');
+              return;
+            }
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: match.number,
+              body: [
+                'Posture healthy again: the audit ran to completion and reported no',
+                'error-severity finding. Closing automatically.',
+                '',
+                `Run: ${run}`,
+                '',
+                'Before treating this as a resolution, read the journal of the previous',
+                'failing run. A green obtained by repairing the monitor itself would look',
+                'exactly like this one — only the pair of runs distinguishes them.',
+              ].join('\n'),
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: match.number,
+              state: 'closed',
+              state_reason: 'completed',
+            });
+
+      - name: Fail when the audit reported an error
+        if: ${{ steps.audit.outcome == 'failure' }}
+        shell: bash
+        run: |
+          echo "::error::CIAM posture audit reported at least one error-severity finding."
+          exit 1

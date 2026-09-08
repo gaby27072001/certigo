@@ -11,6 +11,12 @@ name: cd-backend
 #   variables AUTH_JWT_SIGNING_KEY_EXPIRES_ON, ENTRA_GRAPH_TENANT_ID,
 #   ENTRA_GRAPH_CLIENT_ID, ENTRA_REAUTH_AUDIENCE, PUBLIC_WEB_ORIGIN,
 #   PUBLIC_DOMAIN_VERIFIED and APPLE_CIAM_DOMAIN_RECONFIGURED
+# Optional immutable-content contract copied exactly from PR #290 outputs:
+#   AZURE_BLOB_ENDPOINT, AZURE_CONTENT_READER_CLIENT_ID,
+#   AZURE_CONTENT_READER_RESOURCE_ID, AZURE_DESCRIPTOR_CONTAINER,
+#   AZURE_PUBLIC_CONTAINER and AZURE_PRIVATE_CONTAINER
+# Optional staging pilot switch; unset defaults to legacy:
+#   CONTENT_REPOSITORY_MODE=versioned
 # Optional only during a planned overlap:
 #   secret AUTH_JWT_PREVIOUS_SIGNING_KEY
 #   variable AUTH_JWT_PREVIOUS_SIGNING_KEY_EXPIRES_ON
@@ -115,6 +121,15 @@ jobs:
     outputs:
       packageSha256: ${{ steps.manifest.outputs.package-sha256 }}
     env:
+      # Isolates this job Azure CLI profile. DO NOT REMOVE - not redundant, and not about
+      # whether this workflow passes. THE HAZARD IS THE azure/login STEP, NOT THE OUTCOME:
+      # a green run rewrites the shared profile exactly as a red one does, before there is
+      # any status to read. Certigo and certigo-content runners are separate registrations
+      # on the SAME machines as the same OS user, so they share one ~/.azure; without this,
+      # this job wipes the credentials out from under an in-flight certigo-content publish,
+      # which then dies with "Could not retrieve credential from local cache". The aggressor
+      # never sees it - only the victim, in another repository. Measured 2026-09-05.
+      AZURE_CONFIG_DIR: /tmp/azure-cdbackend-build-release-${{ github.run_id }}-${{ github.run_attempt }}
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     steps:
       # Base-validator compatibility marker: COMMIT_SHA: ${{ github.sha }}
@@ -230,6 +245,16 @@ jobs:
       }}
     environment: dev
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    env:
+      # Isolates this job Azure CLI profile. DO NOT REMOVE - not redundant, and not about
+      # whether this workflow passes. THE HAZARD IS THE azure/login STEP, NOT THE OUTCOME:
+      # a green run rewrites the shared profile exactly as a red one does, before there is
+      # any status to read. Certigo and certigo-content runners are separate registrations
+      # on the SAME machines as the same OS user, so they share one ~/.azure; without this,
+      # this job wipes the credentials out from under an in-flight certigo-content publish,
+      # which then dies with "Could not retrieve credential from local cache". The aggressor
+      # never sees it - only the victim, in another repository. Measured 2026-09-05.
+      AZURE_CONFIG_DIR: /tmp/azure-cdbackend-resolve-release-${{ github.run_id }}-${{ github.run_attempt }}
     permissions:
       actions: read
       id-token: write
@@ -321,6 +346,15 @@ jobs:
       id-token: write
       contents: read
     env:
+      # Isolates this job Azure CLI profile. DO NOT REMOVE - not redundant, and not about
+      # whether this workflow passes. THE HAZARD IS THE azure/login STEP, NOT THE OUTCOME:
+      # a green run rewrites the shared profile exactly as a red one does, before there is
+      # any status to read. Certigo and certigo-content runners are separate registrations
+      # on the SAME machines as the same OS user, so they share one ~/.azure; without this,
+      # this job wipes the credentials out from under an in-flight certigo-content publish,
+      # which then dies with "Could not retrieve credential from local cache". The aggressor
+      # never sees it - only the victim, in another repository. Measured 2026-09-05.
+      AZURE_CONFIG_DIR: /tmp/azure-cdbackend-deploy-infra-${{ github.run_id }}-${{ github.run_attempt }}
       TARGET_ENV: ${{ needs.validate-target.outputs.target }}
     outputs:
       functionAppName: ${{ steps.target.outputs.functionAppName }}
@@ -403,6 +437,13 @@ jobs:
           PUBLIC_WEB_ORIGIN: ${{ vars.PUBLIC_WEB_ORIGIN }}
           PUBLIC_DOMAIN_VERIFIED: ${{ vars.PUBLIC_DOMAIN_VERIFIED }}
           APPLE_CIAM_DOMAIN_RECONFIGURED: ${{ vars.APPLE_CIAM_DOMAIN_RECONFIGURED }}
+          AZURE_BLOB_ENDPOINT: ${{ vars.AZURE_BLOB_ENDPOINT }}
+          AZURE_CONTENT_READER_CLIENT_ID: ${{ vars.AZURE_CONTENT_READER_CLIENT_ID }}
+          AZURE_CONTENT_READER_RESOURCE_ID: ${{ vars.AZURE_CONTENT_READER_RESOURCE_ID }}
+          AZURE_DESCRIPTOR_CONTAINER: ${{ vars.AZURE_DESCRIPTOR_CONTAINER }}
+          AZURE_PUBLIC_CONTAINER: ${{ vars.AZURE_PUBLIC_CONTAINER }}
+          AZURE_PRIVATE_CONTAINER: ${{ vars.AZURE_PRIVATE_CONTAINER }}
+          CONTENT_REPOSITORY_MODE: ${{ vars.CONTENT_REPOSITORY_MODE }}
           BASE_PARAMETERS_FILE: ${{ runner.temp }}/certigo-base-parameters.json
           AUTH_PARAMETERS_FILE: ${{ runner.temp }}/certigo-auth-parameters.json
           DEPLOYMENT_OUTPUTS_FILE: ${{ runner.temp }}/certigo-deployment-outputs.json
@@ -672,6 +713,15 @@ jobs:
       id-token: write
       contents: read
     env:
+      # Isolates this job Azure CLI profile. DO NOT REMOVE - not redundant, and not about
+      # whether this workflow passes. THE HAZARD IS THE azure/login STEP, NOT THE OUTCOME:
+      # a green run rewrites the shared profile exactly as a red one does, before there is
+      # any status to read. Certigo and certigo-content runners are separate registrations
+      # on the SAME machines as the same OS user, so they share one ~/.azure; without this,
+      # this job wipes the credentials out from under an in-flight certigo-content publish,
+      # which then dies with "Could not retrieve credential from local cache". The aggressor
+      # never sees it - only the victim, in another repository. Measured 2026-09-05.
+      AZURE_CONFIG_DIR: /tmp/azure-cdbackend-deploy-backend-${{ github.run_id }}-${{ github.run_attempt }}
       TARGET_ENV: ${{ needs.validate-target.outputs.target }}
       FUNCTION_APP_NAME: ${{ needs.deploy-infra.outputs.functionAppName }}
       STORAGE_ACCOUNT: ${{ needs.deploy-infra.outputs.storageAccount }}

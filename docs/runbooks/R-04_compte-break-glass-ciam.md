@@ -149,12 +149,86 @@ connexion interactive réussie.
 
 ## Exclusions Conditional Access / MFA
 
+> ⚠️ **Section mise à jour le 2026-09-04** — l'état des security defaults, auparavant inconnu, a été
+> **mesuré**. Les conclusions ci-dessous remplacent les recommandations conditionnelles précédentes.
+
 | Recommandation | Détail |
 |---|---|
-| **Exclure des futures policies CA** | Le tenant a actuellement **0 policy Conditional Access** (audité). Dès qu'une policy sera créée, **exclure le compte break-glass** pour éviter tout lock-out par une règle mal configurée. |
-| **MFA distinct et résilient** | Idéalement une **clé FIDO2** dédiée (stockée avec le secret), **différente** du MFA du compte gmail — pour ne pas partager un facteur avec le compte à risque. |
-| **Security defaults** | L'état des *security defaults* n'a pas pu être confirmé lors de l'audit (endpoint `Forbidden` avec le compte délégué). Une fois connecté avec un GA **natif**, vérifiez : `az rest --url "https://graph.microsoft.com/v1.0/policies/identitySecurityDefaultsEnforcementPolicy"`. Si activés **et** qu'aucun CA n'existe, le compte break-glass devra satisfaire le MFA des security defaults → enregistrer sa méthode MFA à l'avance. |
-| **Surveillance** | Créer une alerte sur toute connexion du compte break-glass (usage = exceptionnel). |
+| **Security defaults** | ✅ **ACTIVÉS — confirmé le 2026-09-04.** `GET /policies/identitySecurityDefaultsEnforcementPolicy` renvoie `"isEnabled": true`. L'audit de juillet n'avait pas pu le lire (`Forbidden` avec un jeton délégué, qui ne porte pas `Policy.Read.All`) ; la lecture a été obtenue via un **jeton applicatif** dédié. |
+| **MFA des administrateurs** | ✅ **Déjà imposé** par les security defaults, qui exigent le MFA pour le rôle Global Administrator. Le finding `CIAM-2` est donc **couvert** — voir l'encadré ci-dessous. |
+| **Ne PAS créer de policy Conditional Access** | ❌ Security defaults et Conditional Access sont **mutuellement exclusifs** : créer une policy CA obligerait à **désactiver** les security defaults, ce qui ferait perdre le blocage de l'authentification héritée, le blocage du device code flow et l'inscription MFA généralisée. Ce serait une **régression nette**. |
+| **✅ MFA du compte break-glass — écart clos le 2026-09-07** | Microsoft Authenticator enregistré sur le compte. L'écart, ouvert depuis le 2026-09-04, est refermé. Voir l'encadré ci-dessous : la procédure qui a fonctionné n'est **pas** celle que ce runbook prescrivait. |
+| **Surveillance** | ✅ **Automatisée** : `.github/workflows/ciam-posture-monitor.yml` vérifie chaque jour que les security defaults restent activés et que le compte break-glass conserve une méthode forte. |
+
+### ✅ Écart clos le 2026-09-07 — et la procédure prescrite ne marchait pas
+
+La note conditionnelle de la version précédente de ce runbook (« *si les security defaults sont
+activés et qu'aucun CA n'existe, le compte break-glass devra satisfaire le MFA → enregistrer sa
+méthode MFA à l'avance* ») s'est **vérifiée**. Les trois conditions étaient réunies au 2026-09-04 :
+
+1. Security defaults **activés** (`isEnabled: true`) ;
+2. **0 policy Conditional Access** dans le tenant — donc **aucune exclusion possible**, les security
+   defaults n'en supportant pas ;
+3. Compte break-glass avec **une seule** méthode : `#microsoft.graph.passwordAuthenticationMethod`.
+
+**Conséquence** : le compte de secours aurait dû **inscrire un MFA dans l'urgence**, au moment même
+où il est censé débloquer la situation.
+
+**Remédiation appliquée le 2026-09-07** : **Microsoft Authenticator** enregistré sur le compte.
+
+> ⚠️ **Le bootstrap par Temporary Access Pass décrit ailleurs dans cette documentation n'est pas
+> praticable dans ce tenant.** La policy de méthodes affiche « Droit d'accès temporaire : Oui, tous
+> les utilisateurs », mais le menu **Ajouter une méthode d'authentification** de la fiche
+> utilisateur ne propose que **E-mail / Numéro de téléphone / Code QR** — le TAP en est absent
+> (constaté le 2026-09-07). Une capacité **déclarée** dans la policy n'est pas une capacité
+> **exposée** par la surface d'administration : ce tenant est un tenant externe (CIAM), dont
+> l'interface d'administration est réduite. Ne pas remettre la procédure TAP en se fiant à la policy.
+
+**Voie qui a fonctionné, et qui ne dépend d'aucune surface d'administration** :
+
+1. Se connecter à `https://login.microsoftonline.com` avec `breakglass@certigoapp.onmicrosoft.com`
+   et le mot de passe du coffre, dans une fenêtre **distincte** de la session administrateur.
+2. Les security defaults déclenchent d'eux-mêmes l'écran **« Informations supplémentaires
+   requises »**, qui conduit à l'inscription de la méthode. C'est l'exigence MFA elle-même qui
+   ouvre la porte — aucun facteur préexistant, aucun TAP, aucun écran d'administration.
+3. Si l'interruption n'apparaît pas, aller directement sur
+   `https://mysignins.microsoft.com/security-info` → **Ajouter une méthode**.
+
+**Vérification — ne pas se fier à l'absence d'erreur.** `GET /users/<id>/authentication/methods`
+renvoie `403` avec un jeton `az` délégué (portée `UserAuthenticationMethod.Read.All` absente), et ce
+`403` se lit à tort comme « aucune méthode ». Le contrôle qui tranche est
+`.github/workflows/ciam-posture-monitor.yml`, déclenchable à la demande :
+
+```bash
+gh api -X POST repos/gchambaud_microsoft/Certigo/dispatches -f event_type=ciam-posture
+```
+
+Comparer alors **deux** runs, avant et après : celui du 2026-09-07 12:47 UTC portait
+`BREAK_GLASS_NO_STRONG_METHOD` et sortait en `exit 1` ; celui de 16:00 UTC, après remédiation,
+ne rapportait aucun finding. Un vert seul ne prouve rien — il faut avoir lu le journal du rouge
+précédent pour établir que l'échec venait du **constat** et non d'une panne de l'instrument.
+
+> **Ce fait redevient faux si** la méthode forte est retirée du compte, ou si les security defaults
+> sont désactivés. Le monitor ci-dessus vérifie les deux quotidiennement, et sait désormais
+> **refermer** l'issue de suivi quand la posture redevient saine — ce qui n'était pas le cas le
+> 2026-09-07 : l'issue #388 a dû être fermée à la main. La fermeture est conditionnée à
+> `steps.audit.outputs.failed == 'false'`, c'est-à-dire à un **verdict de santé explicitement
+> écrit** par l'audit, et non à `outcome == 'success'` : un plantage du script laisse la sortie
+> vide, et une sortie vide n'est délibérément pas « false ». Un moniteur qui annonce « c'est
+> réglé » parce qu'il n'a pas su regarder serait exactement le défaut inverse.
+
+L'action reste **délibérément laissée à l'humain** : établir un credential sur un compte d'urgence
+exige une décision explicite et la possession du facteur.
+
+### Si Conditional Access devenait un jour la bonne réponse
+
+CA **est** disponible dans un tenant externe, mais avec des limites : les affectations se réduisent à
+« inclure tous les utilisateurs, exclure des utilisateurs/groupes » — **on ne peut pas cibler un
+rôle d'annuaire**. CA ne deviendrait préférable que si l'on avait besoin de granularité impossible
+avec les security defaults, par exemple des exclusions par emplacement nommé, ou justement une
+**exclusion du compte break-glass**. Dans ce cas il faudrait, **dans cet ordre** : créer la policy CA
+en mode *report-only* avec l'exclusion break-glass, vérifier son évaluation, l'activer, **puis
+seulement** désactiver les security defaults.
 
 ---
 

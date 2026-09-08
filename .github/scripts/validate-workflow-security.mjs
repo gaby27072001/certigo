@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
+import { validateBackendDeployWorkspace } from './backend-deploy-workflow-policy.mjs';
 import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
 import { validateWorkflowConcurrency } from './workflow-concurrency-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
@@ -31,6 +32,17 @@ const versionPattern = /^v[0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z.-]+)?$/;
 const usesPattern =
   /^\s*(?:-\s+)?uses:\s*(?<value>[^#\s]+)(?:\s+#\s*(?<version>\S+))?\s*$/;
 const runPattern = /^(?<indent>\s*)(?:-\s+)?run:\s*(?<value>.*)$/;
+const trustedControlReferencePattern =
+  /\$(?:\{TRUSTED_CONTROL_DIR\}|TRUSTED_CONTROL_DIR)\/(?<relative>[A-Za-z0-9._/-]+)/g;
+const trustedImpactTestPattern =
+  /^\.github\/scripts\/[A-Za-z0-9._-]+\.test\.mjs$/;
+const requiredTrustedImpactTests = new Set([
+  '.github/scripts/backend-deploy-gate.test.mjs',
+  '.github/scripts/ci-impact.test.mjs',
+  '.github/scripts/codeql-gate-policy.test.mjs',
+  '.github/scripts/workflow-concurrency-policy.test.mjs',
+  '.github/scripts/workflow-security-cache-policy.test.mjs',
+]);
 const prLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-pr]';
 const trustedLinuxRunner = 'runs-on: [self-hosted, Linux, X64, certigo-trusted]';
 const cosmosLinuxRunner =
@@ -59,6 +71,7 @@ const reusableScannerFiles = new Set([
 ]);
 const trustedOnlyWorkflowFiles = new Set([
   'cd-backend.yml',
+  'content-infra-apply.yml',
   'deploy-privacy-policy.yml',
   'governance-bootstrap-phase-a-what-if.yml',
   'governance-bootstrap-phase-b-what-if.yml',
@@ -77,6 +90,7 @@ const trustedAggregateJobs = new Map([
 ]);
 const privilegedDispatchTypes = new Map([
   ['cd-backend.yml', 'promote-backend'],
+  ['content-infra-apply.yml', 'content-infra-apply'],
   ['deploy-privacy-policy.yml', 'deploy-privacy-policy'],
   [
     'governance-bootstrap-phase-a-what-if.yml',
@@ -94,6 +108,110 @@ const privilegedDispatchTypes = new Map([
   ['runner-resilience-drill.yml', 'runner-resilience-drill'],
   ['sync-ios-certs.yml', 'sync-ios-certs-legacy'],
 ]);
+
+function sealedControlFileError(repositoryRoot, relativePath, source) {
+  const normalized = path.posix.normalize(relativePath);
+  if (
+    normalized !== relativePath
+    || normalized === '..'
+    || normalized.startsWith('../')
+    || path.posix.isAbsolute(normalized)
+  ) {
+    return `${source}: trusted-control path must stay within the repository: ${relativePath}`;
+  }
+
+  const candidate = path.resolve(repositoryRoot, ...normalized.split('/'));
+  let declaredStats;
+  let canonicalRoot;
+  let canonicalCandidate;
+  try {
+    declaredStats = fs.lstatSync(candidate);
+    canonicalRoot = fs.realpathSync(repositoryRoot);
+    canonicalCandidate = fs.realpathSync(candidate);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return `${source}: trusted-control file is missing: ${relativePath} (${detail})`;
+  }
+
+  if (declaredStats.isSymbolicLink() || !declaredStats.isFile()) {
+    return `${source}: trusted-control path must be a regular non-symlink file: ${relativePath}`;
+  }
+
+  const relation = path.relative(canonicalRoot, canonicalCandidate);
+  if (
+    relation === '..'
+    || relation.startsWith(`..${path.sep}`)
+    || path.isAbsolute(relation)
+  ) {
+    return `${source}: trusted-control file escapes the repository: ${relativePath}`;
+  }
+  return null;
+}
+
+function validateTrustedControlReferences(text, source) {
+  const errors = [];
+  const references = new Set(
+    [...text.matchAll(trustedControlReferencePattern)]
+      .map((match) => match.groups.relative),
+  );
+  for (const relativePath of references) {
+    const error = sealedControlFileError(root, relativePath, source);
+    if (error) {
+      errors.push(error);
+    }
+  }
+  return errors;
+}
+
+function validateTrustedImpactTestManifest() {
+  const source = 'package.json#scripts.test:ci-impact';
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return [`${source}: cannot read the trusted test manifest (${detail})`];
+  }
+
+  const command = manifest?.scripts?.['test:ci-impact'];
+  if (typeof command !== 'string') {
+    return [`${source}: trusted test manifest is missing`];
+  }
+  for (const lifecycleScript of ['pretest:ci-impact', 'posttest:ci-impact']) {
+    if (Object.hasOwn(manifest.scripts, lifecycleScript)) {
+      return [`${source}: lifecycle hook ${lifecycleScript} is forbidden`];
+    }
+  }
+  const tokens = command.trim().split(/\s+/);
+  const tests = tokens.slice(2);
+  const errors = [];
+  if (
+    tokens[0] !== 'node'
+    || tokens[1] !== '--test'
+    || tests.length === 0
+    || tests.some((test) => !trustedImpactTestPattern.test(test))
+  ) {
+    errors.push(
+      `${source}: command must be node --test followed only by trusted .github/scripts tests`,
+    );
+    return errors;
+  }
+  if (new Set(tests).size !== tests.length) {
+    errors.push(`${source}: trusted test paths must not be duplicated`);
+  }
+  for (const requiredTest of requiredTrustedImpactTests) {
+    if (!tests.includes(requiredTest)) {
+      errors.push(`${source}: missing required trusted test ${requiredTest}`);
+    }
+  }
+  for (const test of tests) {
+    const error = sealedControlFileError(root, test, source);
+    if (error) {
+      errors.push(error);
+    }
+  }
+  return errors;
+}
 
 function shellExpressions(lines) {
   const findings = [];
@@ -136,13 +254,27 @@ function shellExpressions(lines) {
   return findings;
 }
 
+// Refuses to report an empty result. Every rule below that inspects a job is
+// silent when this returns nothing, so a parser that loses its grip reads as a
+// clean workflow rather than as an unreadable one. Measured: a CRLF file makes
+// the '\njobs:\n' probe miss and the validator exits 0 with the job rules never
+// applied. Raising here closes the class - CRLF, a BOM, an indented `jobs:`, an
+// unexpected encoding - instead of the one cause. No workflow in this
+// repository has zero jobs, and GitHub rejects one that does.
 function jobBlocks(text) {
   const jobsStart = text.indexOf('\njobs:\n');
-  if (jobsStart < 0) {
-    return [];
+  const jobsText = jobsStart < 0 ? '' : text.slice(jobsStart + 1);
+  const matches = jobsText
+    ? [...jobsText.matchAll(/^ {2}(?<id>[A-Za-z0-9_-]+):\s*$/gm)]
+    : [];
+  if (matches.length === 0) {
+    throw new Error(
+      'the job parser found no jobs, so every job-level rule below would be '
+      + 'skipped silently; the file is unreadable to this parser rather than '
+      + 'free of jobs (CRLF line endings, a byte order mark, or an indented '
+      + '`jobs:` each produce this)',
+    );
   }
-  const jobsText = text.slice(jobsStart + 1);
-  const matches = [...jobsText.matchAll(/^  (?<id>[A-Za-z0-9_-]+):\s*$/gm)];
   return matches.map((match, index) => ({
     id: match.groups.id,
     text: jobsText.slice(
@@ -162,6 +294,7 @@ function validateWorkflow(file) {
   const hasPrTrigger =
     /^ {2}pull_request(?:_target)?:\s*$/m.test(text);
 
+  errors.push(...validateTrustedControlReferences(text, file));
   if (!lines.some((line) => /^permissions:\s*(?:\{\})?\s*$/.test(line))) {
     errors.push(`${file}: missing explicit top-level permissions`);
   }
@@ -264,7 +397,14 @@ function validateWorkflow(file) {
   ) {
     errors.push(`${file}: repository_dispatch must use one explicit event type`);
   }
-  for (const job of jobBlocks(text)) {
+  let jobs;
+  try {
+    jobs = jobBlocks(text);
+  } catch (error) {
+    errors.push(`${file}: ${error.message}`);
+    jobs = [];
+  }
+  for (const job of jobs) {
     if (
       trustedOnlyWorkflowFiles.has(fileName)
       && job.text.includes('runs-on:')
@@ -451,6 +591,8 @@ function validateWorkflow(file) {
 
 function validateRepositoryInvariants() {
   const errors = [];
+  errors.push(...validateTrustedImpactTestManifest());
+  errors.push(...validateBackendDeployWorkspace(root, controlRoot));
   const android = fs.readFileSync(path.join(workflowsDir, 'release-android.yml'), 'utf8');
   const iosRelease = fs.readFileSync(path.join(workflowsDir, 'release-ios.yml'), 'utf8');
   const codemagic = fs.readFileSync(path.join(root, 'codemagic.yaml'), 'utf8');
@@ -984,6 +1126,21 @@ function validateRepositoryInvariants() {
       errors.push(`codeql.yml: missing SARIF enforcement invariant ${marker}`);
     }
   }
+  for (const marker of [
+    'EVENT_NAME: ${{ github.event_name }}',
+    'FRESHNESS_CURRENT: ${{ needs.freshness.outputs.current }}',
+    'pull_request|pull_request_target)',
+    'push|schedule)',
+    'expected_freshness="success"',
+    'expected_freshness="skipped"',
+    'if [ "$FRESHNESS_RESULT" != "$expected_freshness" ]; then',
+    'case "$HAS_CHANGES" in',
+    'if [ "$ANALYZE_RESULT" != "$expected_analysis" ]; then',
+  ]) {
+    if (!codeql.includes(marker)) {
+      errors.push(`codeql.yml: missing event-aware aggregate gate invariant ${marker}`);
+    }
+  }
   if (codeql.includes('actions/upload-artifact@')) {
     errors.push('codeql.yml: local SARIF enforcement must not depend on artifact storage');
   }
@@ -1040,6 +1197,60 @@ function validateRepositoryInvariants() {
   ]) {
     if (!preflight.includes(marker)) {
       errors.push(`ci-preflight.yml: missing trusted Python launcher invariant ${marker}`);
+    }
+  }
+  const policyTestsStart = preflight.indexOf(
+    '      - name: Run adversarial selector and security-policy tests',
+  );
+  const dependencyInstallStart = preflight.indexOf(
+    '      - name: Install trusted validator dependencies',
+  );
+  const projectStateStart = preflight.indexOf(
+    '      - name: Validate project-state source',
+    policyTestsStart,
+  );
+  if (
+    dependencyInstallStart < 0
+    || policyTestsStart < 0
+    || dependencyInstallStart > policyTestsStart
+    || projectStateStart < 0
+  ) {
+    errors.push('ci-preflight.yml: trusted security-policy test step is missing');
+  } else {
+    const dependencyInstall = preflight.slice(dependencyInstallStart, policyTestsStart);
+    for (const marker of [
+      'working-directory: .trusted-control',
+      'run: npm ci --ignore-scripts',
+    ]) {
+      if (!dependencyInstall.includes(marker)) {
+        errors.push(`ci-preflight.yml: missing trusted dependency invariant ${marker}`);
+      }
+    }
+    if (
+      dependencyInstall.includes('UNTRUSTED_SOURCE_DIR')
+      || dependencyInstall.includes('--prefix')
+    ) {
+      errors.push('ci-preflight.yml: trusted npm resolution must not use PR-controlled paths');
+    }
+    const policyTests = preflight.slice(policyTestsStart, projectStateStart);
+    for (const marker of [
+      'working-directory: .trusted-control',
+      'npm --ignore-scripts run test:ci-impact',
+      'node "$TRUSTED_CONTROL_DIR/.github/scripts/validate-workflow-security.mjs"',
+    ]) {
+      if (!policyTests.includes(marker)) {
+        errors.push(`ci-preflight.yml: missing revision-local test invariant ${marker}`);
+      }
+    }
+    if (
+      policyTests.includes('node --test')
+      || /\$(?:\{TRUSTED_CONTROL_DIR\}|TRUSTED_CONTROL_DIR)\/[A-Za-z0-9._/-]+\.test\.mjs/.test(
+        policyTests,
+      )
+    ) {
+      errors.push(
+        'ci-preflight.yml: trusted tests must come from the revision-local package manifest',
+      );
     }
   }
   const pythonBootstrap = preflight.indexOf('uses: actions/setup-python@');

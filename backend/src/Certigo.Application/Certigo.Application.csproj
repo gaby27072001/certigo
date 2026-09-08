@@ -7,4 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Certigo.Domain\Certigo.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Certigo.Application.Tests" />
+  </ItemGroup>
 </Project>

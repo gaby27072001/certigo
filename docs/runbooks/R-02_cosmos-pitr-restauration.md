@@ -7,13 +7,18 @@
 | **Remédiation IaC** | `cosmosBackupMode` est explicite par environnement : staging/prod `Continuous` + `Continuous7Days`, dev `Periodic` avec intervalle, rétention et redondance déclarés. |
 | **Objet de ce runbook** | Documenter la **procédure de restauration** PITR (gate audit : « preuve d'un restore Cosmos »). |
 | **Cible** | Compte `cosmos-certigo-<env>-<suffixe>`, base `certigo`, RG `rg-certigo-<env>` (staging/prod). |
+| **Statut du gate** | ✅ **Satisfait le 2026-09-04** — restauration réelle exécutée sur **staging**. Voir [Preuve de restauration](#preuve-de-restauration-exécutée-le-2026-09-04). |
 
-> **Pourquoi ce runbook ?** Le PITR est désormais **actif en IaC** sur staging/prod, mais l'audit
-> (`AUDIT_Certigo.md`, section G) exige une **preuve de restauration** pour valider la stratégie de
-> reprise après corruption ou suppression accidentelle de données. La restauration Cosmos PITR
-> (`az cosmosdb restore`) nécessite des **credentials Azure** que **seul l'opérateur humain possède**.
-> L'agent Copilot **n'a lancé aucune commande Azure** : il a **préparé** les commandes `az` exactes,
-> la procédure pas-à-pas, les vérifications et le nettoyage. **C'est vous qui exécutez** chaque commande.
+> **Pourquoi ce runbook ?** Le PITR est désormais **actif en IaC** sur staging/prod, mais le
+> registre de risques (`docs/ETAT_DU_PROJET.md` §14, finding R-02) exige une **preuve de
+> restauration** pour valider la stratégie de reprise après corruption ou suppression accidentelle
+> de données.
+>
+> ✅ **Cette preuve existe désormais** : une restauration réelle a été exécutée sur **staging** le
+> **2026-09-04** (durée 708 s, 8 containers vérifiés, compte temporaire supprimé). Voir
+> [Preuve de restauration](#preuve-de-restauration-exécutée-le-2026-09-04). La procédure ci-dessous
+> reste la référence pour une reprise réelle, notamment sur **production**, où elle doit être
+> exécutée par un opérateur humain.
 
 ---
 
@@ -145,8 +150,35 @@ la stratégie de reprise »).
 Le restore crée un compte **séparé** : aucun impact sur la prod. Après validation de la preuve, **supprimez
 le compte de restauration test** pour éviter tout coût et toute confusion.
 
+> 🛡️ **Garde-fou obligatoire avant toute suppression — à reprendre tel quel.**
+> Les noms du compte source et du compte restauré ne diffèrent que par un suffixe. Une faute de
+> frappe supprimerait la base réelle. **Ne vous fiez pas à la relecture du nom** : faites vérifier
+> par la machine une propriété que **seul** le compte restauré possède.
+>
+> Un compte issu d'un restore porte `createMode = Restore`. Un compte normal porte `createMode = Default`.
+> Cette assertion rend la suppression du source **structurellement impossible**, et pas seulement
+> improbable :
+
 ```bash
-az cosmosdb delete --resource-group "$RG" --name "$TARGET_ACCT" --yes
+SUB="<SUBSCRIPTION_ID>"
+RG="rg-certigo-staging"
+TARGET="cosmos-certigo-staging-pitrtest"   # le compte TEMPORAIRE, jamais le source
+
+# Garde-fou 1 : le compte cible DOIT être un compte restauré.
+MODE=$(az cosmosdb show --subscription "$SUB" -g "$RG" -n "$TARGET" --query "createMode" -o tsv)
+[ "$MODE" = "Restore" ] || { echo "ABORT: $TARGET n'est pas un compte restauré (createMode=$MODE)"; exit 1; }
+
+# Garde-fou 2 : le compte cible ne doit jamais être le compte source.
+[ "$TARGET" != "cosmos-certigo-staging-hwbsyiwa7tqnw" ] || { echo "ABORT: cible == source"; exit 1; }
+
+az cosmosdb delete --subscription "$SUB" -g "$RG" -n "$TARGET" --yes
+```
+
+Vérification après suppression — il ne doit rester que le compte source, en `createMode = Default` :
+
+```bash
+az cosmosdb list --subscription "$SUB" -g "$RG" \
+  --query "[].{name:name, mode:createMode, state:provisioningState}" -o table
 ```
 
 > En cas de restauration **réelle** (incident), ne supprimez pas : basculez l'application vers le compte
@@ -168,6 +200,74 @@ az cosmosdb delete --resource-group "$RG" --name "$TARGET_ACCT" --yes
   Continuous est **supporté**.
 - **Idempotence de la remédiation** : les trois fichiers `.bicepparam` fixent la politique ; le
   validateur `infra/validate.sh` compile les templates et refuse une posture implicite.
-- **Réserve d'exécution** : l'agent ne dispose **pas** de credentials Azure → le test de restore réel n'a pas
-  été exécuté ici. La remédiation IaC est validée statiquement par le build Bicep ; ce runbook fournit la
-  procédure **vérifiable par l'opérateur** pour clore le volet « restauration test » du DoD.
+- **Réserve d'exécution** : ~~l'agent ne dispose pas de credentials Azure~~ — **levée le 2026-09-04**.
+  La restauration a été **réellement exécutée** sur staging (voir la section « Preuve de restauration »
+  ci-dessous). La remédiation IaC reste validée statiquement par le build Bicep.
+
+---
+
+## Preuve de restauration (exécutée le 2026-09-04)
+
+Le gate audit R-02 exigeait une **preuve** de restauration, pas seulement une procédure. Cette
+restauration a été réalisée de bout en bout sur **staging uniquement** (jamais la production), puis
+le compte temporaire a été supprimé.
+
+### Paramètres réels de l'opération
+
+| Élément | Valeur mesurée |
+|---|---|
+| Date d'exécution | **2026-09-04** |
+| Environnement | **staging** (production non touchée) |
+| Compte source | `cosmos-certigo-staging-hwbsyiwa7tqnw` (RG `rg-certigo-staging`) |
+| Politique du source | `backupPolicy.type = Continuous`, `tier = Continuous7Days` |
+| `instanceId` restaurable | `8c121a29-e94a-4ed4-a838-4fc61e516786` |
+| Région | North Europe |
+| **`--restore-timestamp` utilisé** | **`2026-09-04T16:30:00Z`** (dans la fenêtre 7 jours) |
+| Compte cible temporaire | `cosmos-certigo-staging-pitrtest` |
+| **Durée de la restauration** | **708 s (≈ 11 min 48 s)** |
+| **Durée de la suppression** | **725 s (≈ 12 min 5 s)** |
+
+### Résultat vérifié
+
+Le compte restauré s'est provisionné avec `provisioningState = Succeeded`, en mode
+`createMode = Restore` / `restoreMode = PointInTime`, avec
+`restoreTimestampInUtc = 2026-09-04T16:30:00+00:00`.
+
+La base `certigo` et ses **8 containers** ont été restaurés, **identiques au compte source** :
+
+```text
+progress, leaderboard, friends, attempts, events, users, content, economy
+```
+
+Le compte source est resté `Succeeded` et `Continuous` pendant toute l'opération — confirmant le
+caractère **non destructif** de la restauration PITR.
+
+### Nettoyage vérifié
+
+Le compte temporaire a été supprimé, avec un garde-fou explicite avant suppression : la commande a
+vérifié que `createMode = Restore` (le compte source est `Default`), ce qui rend impossible la
+suppression accidentelle du compte source par confusion de nom.
+
+Après suppression, `az cosmosdb list -g rg-certigo-staging` ne renvoie plus que le compte source :
+
+```json
+[ { "name": "cosmos-certigo-staging-hwbsyiwa7tqnw", "mode": "Default", "state": "Succeeded" } ]
+```
+
+### Note sur les verrous `CanNotDelete`
+
+Les cinq ressources staging (Function App, Cosmos, Key Vault, Storage, Log Analytics) portent un
+verrou `CanNotDelete`. Ces verrous protègent les **ressources sources** et **n'ont pas gêné**
+l'opération : un compte restauré est une **nouvelle** ressource, créée sans verrou. Aucun verrou
+n'a été retiré ni modifié.
+
+### Enseignements pour une reprise réelle
+
+- **Budget temps** : compter **~12 minutes** pour qu'un compte restauré soit exploitable
+  (mesure réelle sur un compte serverless de petite taille). À ajouter au RTO.
+- La restauration **hérite** de la configuration réseau du source : le compte restauré est sorti
+  avec `publicNetworkAccess = Disabled` et `disableLocalAuth = true`. Un accès data-plane depuis
+  l'extérieur du VNet n'est donc **pas** possible immédiatement — le prévoir dans le plan de reprise.
+- La restauration **ne crée pas** d'endpoint privé : lors d'une reprise réelle, il faudra créer le
+  private endpoint et le repointage applicatif avant que l'application puisse joindre le compte.
+

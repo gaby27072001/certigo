@@ -15,9 +15,27 @@ public sealed class LessonFunctions(IContentService content)
         FunctionContext context)
     {
         context.GetUser();
-        var lesson = await content.GetLessonAsync(trackId, lessonId, context.CancellationToken);
-        return lesson is null
-            ? await request.NotFound("Lesson not found.", context.CancellationToken)
-            : await request.JsonAsync(lesson, cancellationToken: context.CancellationToken);
+        var result = await content.GetLessonWithSnapshotAsync(
+            trackId,
+            lessonId,
+            context.CancellationToken);
+        if (result is null)
+        {
+            return await request.NotFound("Lesson not found.", context.CancellationToken);
+        }
+
+        var response = await request.JsonAsync(
+            result.Lesson,
+            cancellationToken: context.CancellationToken);
+        if (result.PublicManifestId is not null)
+        {
+            response.Headers.Add("X-Content-Manifest-Id", result.PublicManifestId);
+            response.Headers.Add("ETag", $"\"{result.PublicManifestId}\"");
+            response.Headers.Add(
+                "Access-Control-Expose-Headers",
+                "ETag, X-Content-Manifest-Id");
+        }
+
+        return response;
     }
 }

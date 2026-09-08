@@ -1,0 +1,261 @@
+name: Detect content drift
+
+# The `Generated state equals committed state` gate is deliberately secret-free and reaches no
+# external repository (docs/GOVERNANCE.md), so it cannot notice that docs/active-content-reference.json
+# has stopped tracking certigo-content. This workflow closes that loop without weakening that gate:
+# it never runs for pull requests, so no PR-class runner ever sees a credential.
+#
+# It compares the pin against what was actually *published* to immutable storage rather than against
+# a Git branch, because published manifest identities are what reaches users. certigo-content writes
+# releases/<releaseId>/release.json LAST, after both manifest trees, so a partial publish never
+# becomes the active release — which is why the descriptor is the source of truth here.
+#
+# Scope, stated precisely: this asks "has the pin drifted from the most recently PUBLISHED release?",
+# not "does the pin match what users are SERVED?". The container is append-only by design — releaseId
+# is content-addressed, nothing is ever deleted — and the active-release pointer lives in the Cosmos
+# content-control container. ADR-020 is explicit that a rollback moves only that pointer and never
+# moves or rewrites a blob, so after a rollback the newest descriptor is no longer the serving one.
+# Blob is the only source that exists today; the naming here must not overstate what it proves.
+#
+# The blob endpoint is private-endpoint only and its DNS zone is linked to vnet-certigo-ci, so this
+# must stay on certigo-trusted: on certigo-pr it would fail on DNS, not on authorisation.
+#
+# STATUS 2026-09-07: the prerequisites listed in the error below are now SATISFIED and this
+# workflow compares for real. The content storage account stcertigocntz3wqbdww exists (created
+# 2026-09-04), a release has been published, and AZURE_RELEASE_STORAGE_TARGET is set. Established
+# not from the run conclusion - a green run and an executed comparison are different facts wearing
+# the same name - but from the step list of scheduled run 34112906910, where "Compare the newest
+# published release with the pinned reference" reports `success` rather than `skipped`. That step's
+# conclusion is the discriminator to re-check; the previous text here asserted the storage did not
+# exist and survived in the file for three days after it did. This gate could now be promoted to a
+# required status check; that has not been done. The 05:41 UTC schedule deliberately avoids the
+# nightly 00:46-00:49 UTC deallocation window of the runner resource group.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "41 5 * * *"
+
+concurrency:
+  group: ci-content-drift-${{ github.event_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  detect-content-drift:
+    name: Pinned content reference tracks published content
+    # This job MUST NOT carry a job-level `if:`, MUST NOT be split into a job that another job
+    # `needs:`, and this workflow MUST NOT gain a `paths:` filter.
+    #
+    # Once this check is promoted to required, a SKIPPED required check counts as SATISFIED in
+    # branch protection — so a job that did not run would report as a pass. The single-job shape is
+    # deliberate and load-bearing: it cannot be skipped, therefore it can only ever be green because
+    # it RAN, never because it was absent. That is why the "nothing to compare" case is handled by a
+    # step-level `if:` on the comparison instead of by skipping a job.
+    #
+    # The author's original note in this file says it directly: a drift check that skipped itself is
+    # the exact bug it exists to prevent.
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PYTHONSAFEPATH: "1"
+      DESCRIPTOR_PATH: ${{ github.workspace }}/.content-release/release.json
+      # Isolates this job's Azure CLI profile. DO NOT REMOVE — it is not redundant, and it is not
+      # about this workflow succeeding or failing.
+      #
+      # THE HAZARD IS THE `azure/login` STEP ITSELF, NOT THE OUTCOME. A green run rewrites the
+      # shared profile exactly as a red one does, and the damage is done before there is any status
+      # to read. Do not reason "this gate passes now, so it is safe" — that inference is backwards.
+      #
+      # Why it is shared: the Certigo and certigo-content runners are separate registrations on the
+      # SAME physical machines, running as the same OS user, so they share one `~/.azure`.
+      # `azure/login` clears and rewrites that directory. Without this variable, a push to main
+      # starts this gate, which wipes the profile out from under any certigo-content publish job in
+      # flight on the same VM; that job then dies ~18s later with "Could not retrieve credential
+      # from local cache", naming a foreign service principal it never chose.
+      #
+      # Measured, not theorised: publish-answer-key died 10:52:26Z and publish-public died
+      # 11:19:39Z on 2026-09-05, each seconds after a merge to main started this workflow.
+      #
+      # THE AGGRESSOR NEVER SEES IT. Only the job that is NOT logging in observes a failure, and it
+      # observes it in a different repository. No check status, run conclusion or PR page in this
+      # repo can surface it, and testing this workflow in isolation will never reproduce it.
+      #
+      # The 05:41 cron makes this unattended and daily. Per-run path so two runs of this same
+      # workflow cannot collide with each other either.
+      AZURE_CONFIG_DIR: /tmp/azure-drift-${{ github.run_id }}-${{ github.run_attempt }}
+      # Bounds the window in which "no descriptor" is an acceptable green.
+      #
+      # Before the first publication, an empty container is the expected state and failing on it
+      # is noise -- eight consecutive red runs on main taught every reader to skip this check,
+      # which is how a correct diagnosis sat unread in these logs for a day.
+      #
+      # After the first publication, the SAME observation means a published release has vanished
+      # from an append-only container, which is an incident. The two are indistinguishable from
+      # here, so the expectation is declared rather than inferred, and the gate compares what we
+      # SAY we expect against what the container REPORTS. A single source is always silently
+      # consistent with itself.
+      #
+      # FLIPPED TO "true" on 2026-09-05, the day of the first successful publication.
+      #
+      # The condition for flipping was deliberately NOT "a release was published" -- that is a fact
+      # about the storage, verified by the publisher and inspector identities. It was "THE GATE can
+      # see a published release", which is a fact about the reader identity's view and had never
+      # been true: id-certigo-content-reader was federated at ~11:00Z and every run until now took
+      # the empty-container path. Confirmed RBAC and a successful read are different claims.
+      #
+      # Evidence, from this workflow itself rather than relayed: run 33969562794 took the comparison
+      # branch (DRIFT_COMPARABLE=true, the Compare step ran rather than being guarded off) and
+      # reported "Pinned content reference matches the newest published release
+      # sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035" -- the gate's first
+      # ever execution of its comparison path.
+      #
+      # From here, "readable container, no descriptor" is an ERROR, not a notice: the container is
+      # append-only and content-addressed, so a descriptor that existed and no longer does means it
+      # was deleted or the container replaced. Do not flip this back to silence a red square.
+      EXPECT_PUBLISHED_RELEASE: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      # Runs with no credential at all, so this half keeps working even while the published
+      # source below is unavailable. It cannot observe upstream; it only proves that somebody
+      # re-ran the documented bump recently.
+      - name: Assert the pinned content reference was refreshed recently
+        run: python -P tools/check_active_content_age.py
+
+      - name: Resolve the published release descriptor location
+        shell: bash
+        env:
+          RELEASE_STORAGE_TARGET: ${{ vars.AZURE_RELEASE_STORAGE_TARGET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RELEASE_STORAGE_TARGET:-}" ]; then
+            echo "::error::The immutable content storage is not deployed yet, so there is no \
+          published release to compare against and this gate cannot yet prove that \
+          docs/active-content-reference.json still tracks the content that reaches users. \
+          This is expected today and is owned by the content-chain infrastructure workstream, \
+          which deploys infra/content/main.bicep. Prerequisites, in order: (1) that deployment \
+          creates the content storage account and the content-release-descriptors container \
+          (rg-certigo-content was empty until 2026-09-04); (2) the irreversible WORM lock that \
+          tools/publish_blob_artifact.sh requires before it will upload must be decided; \
+          (3) certigo-content must actually publish a release; (4) this workflow's identity needs \
+          Storage Blob Data Reader on that container, within the ABAC condition of \
+          infra/governance/modules/contentPlanExecutorAssignment.bicep; (5) set the repository \
+          variable AZURE_RELEASE_STORAGE_TARGET to <storageAccount>/content-release-descriptors. \
+          Until then this workflow fails on purpose and must NOT be added to the required status \
+          checks on main: a drift check that skipped itself is the exact bug it exists to prevent, \
+          and a required check with no data source would deadlock every merge."
+            exit 1
+          fi
+          if ! [[ "${RELEASE_STORAGE_TARGET}" =~ ^[a-z0-9]{3,24}/content-release-descriptors$ ]]; then
+            echo "::error::AZURE_RELEASE_STORAGE_TARGET must be <storageAccount>/content-release-descriptors."
+            exit 1
+          fi
+
+      - name: Azure login (OIDC)
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          # id-certigo-content-reader, not the general-purpose deployment identity. It holds
+          # Storage Blob Data Reader at container scope on content-release-descriptors and
+          # nothing else, so this gate cannot read or write anything beyond what it compares.
+          # Granting the blob role to the shared secrets.AZURE_CLIENT_ID instead would have been
+          # one fewer moving part and a much wider data-plane blast radius.
+          client-id: ${{ vars.AZURE_CONTENT_READER_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Download the newest published release descriptor
+        shell: bash
+        env:
+          RELEASE_STORAGE_TARGET: ${{ vars.AZURE_RELEASE_STORAGE_TARGET }}
+        run: |
+          set -euo pipefail
+          account="${RELEASE_STORAGE_TARGET%%/*}"
+          container="${RELEASE_STORAGE_TARGET##*/}"
+          mkdir -p "$(dirname "${DESCRIPTOR_PATH}")"
+          # The container is append-only: releaseId is content-addressed, uploads use
+          # --overwrite false and the containers are immutable, so a blob's content can never
+          # change and lastModified is a stable creation time. Sorting by it is therefore sound.
+          # Do not sort by releaseId: it is a content hash with no temporal order.
+          list_stderr="$(mktemp)"
+          trap 'rm -f "${list_stderr}"' EXIT
+          if ! newest="$(az storage blob list \
+            --account-name "${account}" \
+            --container-name "${container}" \
+            --auth-mode login \
+            --prefix releases/ \
+            --query "sort_by([?ends_with(name, 'release.json')], &properties.lastModified)[-1].name" \
+            --output tsv 2>"${list_stderr}")"; then
+            echo "::error::Cannot list ${RELEASE_STORAGE_TARGET}, so nothing is known about \
+          drift. This is NOT the same as 'no release published' - the listing itself failed. Three \
+          causes are possible and this gate deliberately does not guess between them, but they are \
+          listed in descending order of likelihood: the private endpoint is unreachable, which is \
+          what a misconfigured runs-on produces - the account is publicNetworkAccess Disabled, so \
+          off the certigo-trusted pool the host name does not resolve and this appears as a DNS or \
+          connectivity failure rather than a 403; or this workflow's identity cannot read the \
+          container, which from inside the VNet is a genuine RBAC 403 \
+          (id-certigo-content-reader holds Storage Blob Data Reader at container scope, but a \
+          Certigo workflow also needs a federated credential to assume that identity); or the \
+          container does not exist. Azure CLI reported: $(tr '\n' ' ' <"${list_stderr}")"
+            exit 1
+          fi
+          if [ -z "${newest}" ] || [ "${newest}" = "None" ]; then
+            if [ "${EXPECT_PUBLISHED_RELEASE}" = "true" ]; then
+              echo "::error::Container ${RELEASE_STORAGE_TARGET} is readable and holds NO release \
+          descriptor, but EXPECT_PUBLISHED_RELEASE is true - a release has been published before. \
+          The container is append-only and content-addressed, so a descriptor that existed and no \
+          longer does means it was deleted or the container was replaced. Treat this as an \
+          incident, not as 'publication has not run yet'. Verify against the immutability policy \
+          and the storage account's change feed before republishing."
+              exit 1
+            fi
+            echo "::notice::Container ${RELEASE_STORAGE_TARGET} is readable and holds no release \
+          descriptor. The listing SUCCEEDED, which proves the container exists and this identity \
+          can read it - the gap is content, not infrastructure or access. This is the expected \
+          state before the first publication (EXPECT_PUBLISHED_RELEASE=false), so this gate passes \
+          without having compared anything. certigo-content writes releases/<releaseId>/release.json \
+          LAST, after the manifest trees, so there is a multi-hour window in which some blobs exist \
+          but no descriptor does; descriptor-last ordering is deliberate so this gate sees no \
+          release rather than a half-published one."
+            {
+              echo "## Content drift: not compared"
+              echo
+              echo "The container was **readable** and held **no release descriptor**."
+              echo "Access and infrastructure are therefore working; only the content is absent."
+              echo
+              echo "This passes because \`EXPECT_PUBLISHED_RELEASE=false\` - the expected state"
+              echo "before the first publication. Flip that flag to \`true\` in the PR recording"
+              echo "the first successful publication, after which this same observation becomes"
+              echo "an error rather than a notice."
+            } >> "${GITHUB_STEP_SUMMARY}"
+            echo "DRIFT_COMPARABLE=false" >> "${GITHUB_ENV}"
+            exit 0
+          fi
+          echo "DRIFT_COMPARABLE=true" >> "${GITHUB_ENV}"
+          az storage blob download \
+            --account-name "${account}" \
+            --container-name "${container}" \
+            --auth-mode login \
+            --name "${newest}" \
+            --file "${DESCRIPTOR_PATH}" \
+            --no-progress \
+            --output none
+
+      - name: Compare the newest published release with the pinned reference
+        # Guarded rather than skipped as a job: the author's own note records that "a drift check
+        # that skipped itself is the exact bug it exists to prevent", and a skipped JOB counts as
+        # satisfied once this gate is promoted to required. Keeping one job means the check can
+        # only ever be green because it ran, never because it was absent.
+        if: ${{ env.DRIFT_COMPARABLE == 'true' }}
+        run: python -P tools/check_published_content_release.py --release-descriptor "$DESCRIPTOR_PATH"

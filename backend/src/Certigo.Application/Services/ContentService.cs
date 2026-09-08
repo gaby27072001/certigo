@@ -18,10 +18,21 @@ public interface IContentService
 {
     Task<Lesson?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default);
 
+    async Task<ContentLessonResult?> GetLessonWithSnapshotAsync(
+        string trackId,
+        string lessonId,
+        CancellationToken cancellationToken = default)
+    {
+        var lesson = await GetLessonAsync(trackId, lessonId, cancellationToken);
+        return lesson is null ? null : new ContentLessonResult(lesson, null);
+    }
+
     // Lightweight multi-cloud certification metadata and content availability,
     // without lesson bodies.
     Task<CatalogDto> GetCatalogAsync(CancellationToken cancellationToken = default);
 }
+
+public sealed record ContentLessonResult(Lesson Lesson, string? PublicManifestId);
 
 public sealed class ContentService : IContentService
 {
@@ -39,21 +50,46 @@ public sealed class ContentService : IContentService
         _certifications = certifications;
     }
 
-    public Task<Lesson?> GetLessonAsync(string trackId, string lessonId, CancellationToken cancellationToken = default)
-        => _content.GetLessonAsync(trackId, lessonId, cancellationToken);
+    public async Task<Lesson?> GetLessonAsync(
+        string trackId,
+        string lessonId,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _content.ResolveActiveSnapshotAsync(cancellationToken);
+        return await _content.GetLessonAsync(snapshot, trackId, lessonId, cancellationToken);
+    }
+
+    public async Task<ContentLessonResult?> GetLessonWithSnapshotAsync(
+        string trackId,
+        string lessonId,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _content.ResolveActiveSnapshotAsync(cancellationToken);
+        var lesson = await _content.GetLessonAsync(snapshot, trackId, lessonId, cancellationToken);
+        return lesson is null
+            ? null
+            : new ContentLessonResult(lesson, snapshot.PublicManifestId);
+    }
 
     public async Task<CatalogDto> GetCatalogAsync(CancellationToken cancellationToken = default)
     {
-        var tracks = await _content.ListTracksAsync(cancellationToken);
-        if (!tracks.Any() && _certifications.Entries.Count == 0)
+        var snapshot = await _content.ResolveActiveSnapshotAsync(cancellationToken);
+        var tracks = await _content.ListTracksAsync(snapshot, cancellationToken);
+        var importedCatalog = await _content.GetCertificationCatalogAsync(snapshot, cancellationToken);
+        var certifications = importedCatalog is null
+            ? _certifications
+            : new CertificationCatalogAdapter(importedCatalog);
+        if (!tracks.Any() && certifications.Entries.Count == 0)
             throw new EmptyCatalogException();
 
-        var registryById = _certifications.Entries.ToDictionary(entry => entry.Id, StringComparer.Ordinal);
-        var contentIds = tracks.Select(track => track.Id).ToHashSet(StringComparer.Ordinal);
+        var registryById = certifications.Entries.ToDictionary(entry => entry.Id, StringComparer.Ordinal);
+        var contentIds = tracks
+            .Select(track => track.CertificationId ?? track.Id)
+            .ToHashSet(StringComparer.Ordinal);
         var summaries = tracks.Select(track =>
         {
-            registryById.TryGetValue(track.Id, out var metadata);
-            return ToSummary(track, metadata);
+            registryById.TryGetValue(track.CertificationId ?? track.Id, out var metadata);
+            return ToSummary(track, metadata, certifications);
         }).ToList();
 
         summaries.AddRange(
@@ -61,10 +97,10 @@ public sealed class ContentService : IContentService
 
         var summaryIds = summaries.Select(summary => summary.Id).ToHashSet(StringComparer.Ordinal);
         summaries.AddRange(
-            _certifications.Entries
+            certifications.Entries
                 .Where(entry => !contentIds.Contains(entry.Id) && !summaryIds.Contains(entry.Id))
                 .Where(entry => entry.Status is not ("retired" or "replaced"))
-                .Select(ToPlannedSummary));
+                .Select(entry => ToPlannedSummary(entry, certifications)));
 
         var ordered = summaries
             .OrderBy(summary => ProviderRank(summary.Provider))
@@ -75,14 +111,14 @@ public sealed class ContentService : IContentService
             .ToArray();
         return new CatalogDto(
             Schema: CertificationCatalogSchemas.AppV2,
-            SourceSchema: _certifications.SourceSchema,
-            SourceAsOf: _certifications.AsOf,
-            Freshness: _certifications.Freshness is null
+            SourceSchema: certifications.SourceSchema,
+            SourceAsOf: certifications.AsOf,
+            Freshness: certifications.Freshness is null
                 ? null
                 : new CatalogFreshnessDto(
-                    _certifications.Freshness.MaxAgeDays,
-                    _certifications.Freshness.ReviewDueOn),
-            Providers: _certifications.Providers
+                    certifications.Freshness.MaxAgeDays,
+                    certifications.Freshness.ReviewDueOn),
+            Providers: certifications.Providers
                 .Select(provider => new CertificationProviderDto(
                     provider.Id,
                     provider.Name,
@@ -94,8 +130,13 @@ public sealed class ContentService : IContentService
             Tracks: ordered);
     }
 
-    private TrackSummaryDto ToSummary(Track track, CertificationCatalogEntry? metadata)
-        => metadata is null ? ToAuthoredSummary(track) : ToExternalSummary(track, metadata);
+    private TrackSummaryDto ToSummary(
+        Track track,
+        CertificationCatalogEntry? metadata,
+        ICertificationRegistry certifications)
+        => metadata is null
+            ? ToAuthoredSummary(track)
+            : ToExternalSummary(track, metadata, certifications);
 
     private static TrackSummaryDto ToAuthoredSummary(Track track)
     {
@@ -133,30 +174,40 @@ public sealed class ContentService : IContentService
             BlueprintPublishedOn: official?.BlueprintDate);
     }
 
-    private TrackSummaryDto ToExternalSummary(Track track, CertificationCatalogEntry metadata)
+    private TrackSummaryDto ToExternalSummary(
+        Track track,
+        CertificationCatalogEntry metadata,
+        ICertificationRegistry certifications)
         => ToExternalDto(
             metadata,
             summary: track.Summary,
             unitCount: track.Units.Count,
             lessonCount: track.Units.Sum(unit => unit.Lessons.Count),
-            contentStatus: "available");
+            contentStatus: "available",
+            certifications: certifications,
+            contentTrackId: track.Id);
 
-    private TrackSummaryDto ToPlannedSummary(CertificationCatalogEntry entry)
+    private TrackSummaryDto ToPlannedSummary(
+        CertificationCatalogEntry entry,
+        ICertificationRegistry certifications)
         => ToExternalDto(
             entry,
             summary: string.Empty,
             unitCount: 0,
             lessonCount: 0,
-            contentStatus: "planned");
+            contentStatus: "planned",
+            certifications: certifications);
 
     private TrackSummaryDto ToExternalDto(
         CertificationCatalogEntry entry,
         string summary,
         int unitCount,
         int lessonCount,
-        string contentStatus)
+        string contentStatus,
+        ICertificationRegistry certifications,
+        string? contentTrackId = null)
         => new(
-            Id: entry.Id,
+            Id: contentTrackId ?? entry.Id,
             Code: entry.OfficialCode ?? string.Empty,
             Title: entry.Title,
             Level: entry.Level,
@@ -178,7 +229,7 @@ public sealed class ContentService : IContentService
             ContentStatus: contentStatus,
             OfficialUrl: entry.OfficialUrl,
             ExamGuideUrl: entry.Guide.Url,
-            CatalogVersion: _certifications.Version,
+            CatalogVersion: certifications.Version,
             BlueprintVersion: entry.Blueprint.Version,
             OfficialCode: entry.OfficialCode,
             Slug: entry.Slug,

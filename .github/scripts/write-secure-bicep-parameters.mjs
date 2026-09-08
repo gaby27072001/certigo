@@ -11,6 +11,10 @@ const guidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const alertEmailPattern =
   /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/;
+const blobEndpointPattern = /^https:\/\/[a-z0-9]{3,24}\.blob\.core\.windows\.net\/$/;
+const containerNamePattern = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/;
+const readerResourceIdPattern =
+  /^\/subscriptions\/[0-9a-f-]{36}\/resourceGroups\/[^/]+\/providers\/Microsoft\.ManagedIdentity\/userAssignedIdentities\/[^/]+$/i;
 const refreshOverlapMilliseconds = (90 * 24 * 60 + 2) * 60 * 1000;
 
 function requirePair(value, expiresOn, valueName, expiresOnName) {
@@ -113,6 +117,107 @@ function validateAccountDeletionIdentityConfiguration({
   };
 }
 
+function validateContentConfiguration({
+  blobEndpoint,
+  readerClientId,
+  readerResourceId,
+  descriptorContainer,
+  publicContainer,
+  privateContainer,
+}) {
+  const values = [
+    blobEndpoint,
+    readerClientId,
+    readerResourceId,
+    descriptorContainer,
+    publicContainer,
+    privateContainer,
+  ].map((value) => (typeof value === 'string' ? value : ''));
+  if (values.every((value) => value.length === 0)) {
+    return null;
+  }
+  if (values.some((value) => value.length === 0 || value !== value.trim())) {
+    // The names are listed in the same order as `values` above. Naming which side of the
+    // all-or-nothing rule each value fell on is not cosmetic: the usual cause is a single value
+    // defined at REPOSITORY scope, which every environment inherits, so an environment that never
+    // configured content still reads a partial set. Without that hint the reader has no path from
+    // this message back to the cause.
+    const names = [
+      'AZURE_BLOB_ENDPOINT',
+      'AZURE_CONTENT_READER_CLIENT_ID',
+      'AZURE_CONTENT_READER_RESOURCE_ID',
+      'AZURE_DESCRIPTOR_CONTAINER',
+      'AZURE_PUBLIC_CONTAINER',
+      'AZURE_PRIVATE_CONTAINER',
+    ];
+    const configured = names.filter((_, index) => values[index].length > 0);
+    const missing = names.filter((_, index) => values[index].length === 0);
+    const untrimmed = names.filter(
+      (_, index) => values[index].length > 0 && values[index] !== values[index].trim(),
+    );
+    const details = [
+      `Configured (${configured.length} of 6): ${configured.join(', ') || 'none'}.`,
+      `Missing: ${missing.join(', ') || 'none'}.`,
+    ];
+    if (untrimmed.length > 0) {
+      details.push(`Set but padded with whitespace: ${untrimmed.join(', ')}.`);
+    }
+    details.push(
+      'Either configure all six for this environment, or leave all six ABSENT. Absent is not the'
+      + ' same as blank: GitHub rejects an empty Actions variable value (422 Variable value cannot'
+      + ' be empty), so a value cannot be neutralised by blanking it at environment scope. When a'
+      + ' value is inherited from repository scope, the only way to reach the absent state is to'
+      + ' DELETE it at repository scope, which removes it from every environment and every workflow'
+      + ' that reads it. Completing all six is therefore usually the reachable outcome, not'
+      + ' clearing them.',
+      'Note that repository-scope Actions variables are visible to EVERY environment, so a value'
+      + ' defined at repository scope counts as configured here even if this environment never set'
+      + ' it. Check repository scope as well as this environment before concluding a value is unset.',
+    );
+    throw new Error(
+      `All immutable content outputs from PR #290 must be configured together without surrounding whitespace. ${details.join(' ')}`,
+    );
+  }
+  if (!blobEndpointPattern.test(values[0])) {
+    throw new Error('AZURE_BLOB_ENDPOINT must be a canonical Azure Blob endpoint ending in /.');
+  }
+  validateGuid(values[1], 'AZURE_CONTENT_READER_CLIENT_ID');
+  if (!readerResourceIdPattern.test(values[2])) {
+    throw new Error('AZURE_CONTENT_READER_RESOURCE_ID must identify a user-assigned managed identity.');
+  }
+  for (const [name, value] of [
+    ['AZURE_DESCRIPTOR_CONTAINER', values[3]],
+    ['AZURE_PUBLIC_CONTAINER', values[4]],
+    ['AZURE_PRIVATE_CONTAINER', values[5]],
+  ]) {
+    if (!containerNamePattern.test(value)) {
+      throw new Error(`${name} must be a canonical Azure Blob container name.`);
+    }
+  }
+  return {
+    contentBlobEndpoint: values[0],
+    contentReaderClientId: values[1],
+    contentReaderResourceId: values[2],
+    contentDescriptorContainerName: values[3],
+    contentPublicContainerName: values[4],
+    contentPrivateContainerName: values[5],
+  };
+}
+
+function validateContentRepositoryMode(value, contentConfiguration) {
+  const mode = typeof value === 'string' ? value : '';
+  if (mode.length === 0) {
+    return null;
+  }
+  if (!['legacy', 'versioned'].includes(mode)) {
+    throw new Error('CONTENT_REPOSITORY_MODE must be legacy or versioned.');
+  }
+  if (mode === 'versioned' && contentConfiguration === null) {
+    throw new Error('CONTENT_REPOSITORY_MODE=versioned requires the complete PR #290 outputs.');
+  }
+  return mode;
+}
+
 export function writeSecureParameters({
   environment,
   alertEmail,
@@ -128,6 +233,13 @@ export function writeSecureParameters({
   publicWebOrigin,
   publicDomainVerified,
   appleCiamDomainReconfigured,
+  contentBlobEndpoint,
+  contentReaderClientId,
+  contentReaderResourceId,
+  contentDescriptorContainerName,
+  contentPublicContainerName,
+  contentPrivateContainerName,
+  contentRepositoryMode,
   inputFile,
   outputFile,
   now = new Date(),
@@ -168,6 +280,18 @@ export function writeSecureParameters({
     appleCiamDomainReconfigured,
     activationRequested: environment !== 'dev',
   });
+  const contentConfiguration = validateContentConfiguration({
+    blobEndpoint: contentBlobEndpoint,
+    readerClientId: contentReaderClientId,
+    readerResourceId: contentReaderResourceId,
+    descriptorContainer: contentDescriptorContainerName,
+    publicContainer: contentPublicContainerName,
+    privateContainer: contentPrivateContainerName,
+  });
+  const validatedContentRepositoryMode = validateContentRepositoryMode(
+    contentRepositoryMode,
+    contentConfiguration,
+  );
 
   const hasActiveKey = requirePair(
     jwtSigningKey,
@@ -250,6 +374,16 @@ export function writeSecureParameters({
       value: accountDeletionIdentityConfiguration.entraReauthAudience,
     };
   }
+  if (contentConfiguration !== null) {
+    for (const [name, value] of Object.entries(contentConfiguration)) {
+      compiled.parameters[name] = { value };
+    }
+    if (validatedContentRepositoryMode !== null) {
+      compiled.parameters.contentRepositoryMode = {
+        value: validatedContentRepositoryMode,
+      };
+    }
+  }
 
   fs.writeFileSync(
     outputFile,
@@ -278,6 +412,13 @@ function main() {
       publicWebOrigin: process.env.PUBLIC_WEB_ORIGIN,
       publicDomainVerified: process.env.PUBLIC_DOMAIN_VERIFIED,
       appleCiamDomainReconfigured: process.env.APPLE_CIAM_DOMAIN_RECONFIGURED,
+      contentBlobEndpoint: process.env.AZURE_BLOB_ENDPOINT,
+      contentReaderClientId: process.env.AZURE_CONTENT_READER_CLIENT_ID,
+      contentReaderResourceId: process.env.AZURE_CONTENT_READER_RESOURCE_ID,
+      contentDescriptorContainerName: process.env.AZURE_DESCRIPTOR_CONTAINER,
+      contentPublicContainerName: process.env.AZURE_PUBLIC_CONTAINER,
+      contentPrivateContainerName: process.env.AZURE_PRIVATE_CONTAINER,
+      contentRepositoryMode: process.env.CONTENT_REPOSITORY_MODE,
       inputFile: process.env.BASE_PARAMETERS_FILE,
       outputFile: process.env.AUTH_PARAMETERS_FILE,
     });

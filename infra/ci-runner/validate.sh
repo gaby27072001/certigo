@@ -16,6 +16,7 @@ capacity_plan="${root}/infra/ci-runner/capacity-plan.sh"
 validate="${root}/infra/ci-runner/validate.sh"
 runner_bicep="${root}/infra/ci-runner/runner.bicep"
 pilot_bicep="${root}/infra/ci-runner/pilot.bicep"
+capacity_bicep="${root}/infra/ci-runner/capacity.bicep"
 image_dir="${root}/infra/ci-runner/image"
 
 for script in \
@@ -114,6 +115,15 @@ grep -F "runnerLabels string = 'certigo-pr,certigo-pr-pilot'" "${pilot_bicep}" >
 grep -F "export CERTIGO_BLOCK_IMDS=\\'true\\'" "${pilot_bicep}" >/dev/null
 if grep -Fq 'certigo-trusted' "${pilot_bicep}"; then
   echo "The PR-only pilot must not carry a trusted label." >&2
+  exit 1
+fi
+grep -F "resource legacyVmScaleSet 'Microsoft.Compute/virtualMachineScaleSets@2024-11-01' existing" \
+  "${capacity_bicep}" >/dev/null
+grep -F "resource pilotVmScaleSet 'Microsoft.Compute/virtualMachineScaleSets@2024-11-01' existing" \
+  "${capacity_bicep}" >/dev/null
+grep -F "direction: 'Increase'" "${capacity_bicep}" >/dev/null
+if grep -Fq "direction: 'Decrease'" "${capacity_bicep}"; then
+  echo "The reconciled autoscale contract must not scale in on CPU." >&2
   exit 1
 fi
 if grep -Eq '^[[:space:]]*identity:' "${pilot_bicep}"; then

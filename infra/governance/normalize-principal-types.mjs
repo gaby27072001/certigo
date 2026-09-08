@@ -17,6 +17,9 @@ function compiledAssignmentKey(description) {
   if (description === "[parameters('assignmentDescription')]") {
     return 'shared-network';
   }
+  if (description === "[parameters('readerAssignmentDescription')]") {
+    return 'content-reader-attach';
+  }
   return description;
 }
 
@@ -26,6 +29,13 @@ function planAssignmentKey(description) {
   }
   if (/^Allows (dev|staging|prod) to reconcile only shared DNS/.test(description)) {
     return 'shared-network';
+  }
+  if (
+    /^Allows (dev|staging|prod) deployment to attach only the immutable content reader identity\.$/.test(
+      description,
+    )
+  ) {
+    return 'content-reader-attach';
   }
   return description;
 }

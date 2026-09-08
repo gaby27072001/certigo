@@ -44,6 +44,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | Smoke test live + ready | ✅ Automatique et bloquant après OneDeploy | `deploy-flex-onedeploy.sh` |
 | ZIP/manifest/SBOM de release | ✅ Build unique, hashes revérifiés à chaque environnement | `cd-backend.yml` |
 | Rollback applicatif | ✅ Dispatch protégé vers un run `main` antérieur, sans Bicep | §Release récupérable |
+| Releases de contenu | ✅ Procédure séparée, Blob WORM + ETag + rollback N-1 | `docs/runbooks/CONTENT_RELEASES.md` |
 
 ### Check-list d'exploitation (utilisateur non-admin)
 
@@ -73,6 +74,12 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 ### Release récupérable
 
 Le workflow sépare désormais strictement la construction et la promotion :
+
+Le déploiement backend et la promotion de contenu sont deux opérations
+indépendantes. Le déploiement conserve `CONTENT_REPOSITORY_MODE=legacy`; une
+release éditoriale n'est importée/activée qu'avec le runbook
+`docs/runbooks/CONTENT_RELEASES.md`, après validation staging et avec l'app role
+administrateur.
 
 1. un push `main` produit `backend-release` une seule fois ;
 2. le bundle contient `publish.zip`, `release-manifest.json` et le SBOM CycloneDX ;
@@ -649,6 +656,65 @@ curl -s -o /dev/null -w "avec token: %{http_code}\n" \
 Nécessite un environnement avec `authMode='prod'` et de **vraies** valeurs
 `ENTRA_AUTHORITY` / `ENTRA_AUDIENCE`, puis un token obtenu du tenant CIAM Certigo. En `dev`,
 Entra n'est **pas** appliqué (`DevTokenValidator`), donc tout bearer non vide est accepté.
+
+### Chemin 3 — Tutor IA LLM réel (`dev` uniquement) — ⛔ humain avec accès Azure requis
+
+> **Ne s'applique pas aujourd'hui** : `TUTOR_LLM_ENABLED=false` en `dev` **et** en
+> prod (voir `docs/adr/ADR-O-01-ai-tutor-prod.md` et `infra/params/dev.bicepparam`).
+> Cette procédure sert à **valider** une future réactivation en `dev` — elle ne
+> doit être suivie que par une personne disposant d'un accès réel à
+> l'abonnement/tenant Azure Certigo (un agent CLI/IA sans cet accès ne peut ni
+> l'exécuter ni la simuler).
+
+Historique du blocage : #99 a activé le flag en dev ; #178 a ajouté le module
+IaC d'adoption `infra/modules/openai.bicep` (compte `certigo-openai`,
+kind `AIServices`, attribution du rôle **Cognitive Services OpenAI User** —
+`5e0bd9bd-7b93-4f28-af87-19fc36ad61bd` — à l'identité managée de la Function
+App) ; #181 a **repassé le flag à `false`** suite à un échec réel de
+déploiement (`DeploymentModelNotSupported` sur le modèle `gpt-5.4-mini`), pour
+débloquer un correctif de sécurité sans rapport. Le module `tutor` est gated
+par `if (tutorLlmEnabled)` (`infra/main.bicep`) : il n'a **plus été déployé
+depuis** #181, donc ni le grant RBAC ni la compatibilité du déploiement de
+modèle ne sont revérifiés dans la forme IaC actuelle.
+
+1. **What-if avant tout** — confirmer que le déploiement ne rejoue pas
+   l'échec de #181 :
+   ```bash
+   az deployment sub what-if \
+     --location westeurope \
+     --template-file infra/main.bicep \
+     --parameters infra/params/dev.bicepparam \
+     --parameters tutorLlmEnabled=true
+   ```
+   Si `DeploymentModelNotSupported` (ou toute erreur sur la ressource
+   `Microsoft.CognitiveServices/accounts/deployments`) réapparaît, **ne pas
+   déployer** — le blocage persiste, documenter et escalader.
+2. **Déployer** seulement si le what-if est propre, puis vérifier
+   l'attribution de rôle réelle :
+   ```bash
+   az role assignment list --scope "$(az cognitiveservices account show \
+     -g rg-certigo-dev -n certigo-openai --query id -o tsv)" \
+     --query "[].{principal:principalId,role:roleDefinitionName}" -o table
+   ```
+   Attendu : le principal de la managed identity `func-certigo-dev` avec le
+   rôle **Cognitive Services OpenAI User**.
+3. **Valider l'appel réel** avec le test gated dédié (register → login → JWT →
+   `POST /api/tutor/explain` → 200 + `source:"ai"`, c'est-à-dire **pas** un
+   repli `"grounded"`) :
+   ```powershell
+   $env:CERTIGO_TUTOR_LLM_LIVE_TESTS = '1'
+   $env:CERTIGO_TUTOR_API_BASE_URL = 'https://<functionAppName>.azurewebsites.net'
+   $env:CERTIGO_TUTOR_TEST_TRACK_ID = '<trackId seedé dans cet environnement>'
+   $env:CERTIGO_TUTOR_TEST_LESSON_ID = '<lessonId de ce track>'
+   $env:CERTIGO_TUTOR_TEST_ITEM_ID = '<itemId de quiz de cette leçon>'
+   backend\run-tutor-llm-live-gate.ps1
+   ```
+   Le test échoue explicitement (assertion sur `source`) si la réponse est un
+   repli déterministe plutôt qu'une vraie complétion LLM — voir
+   `backend/tests/Certigo.Api.Tests/TutorLlmLiveEndToEndTests.cs`.
+4. **Seulement après un 3. vert**, envisager de fixer `tutorLlmEnabled = true`
+   dans `infra/params/dev.bicepparam` (et de corriger son commentaire), avec
+   revue normale (PR).
 
 ---
 

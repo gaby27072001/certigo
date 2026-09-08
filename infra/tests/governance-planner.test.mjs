@@ -756,9 +756,9 @@ test('A0 and B1b templates are human-only nonconditionable operations', () => {
     resources(template).filter(
       ({ type }) => type === 'Microsoft.Authorization/roleAssignments',
     ).length,
-    3,
+    4,
   );
-  assert.equal(template.outputs.assignmentCount.value, 8);
+  assert.equal(template.outputs.assignmentCount.value, 11);
 });
 
 test('subscription launcher adds only the reads required by Phase A binding', () => {

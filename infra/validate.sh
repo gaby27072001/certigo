@@ -90,6 +90,8 @@ BICEP_CLI="${bicep_bin}" node --test \
   "${root}/infra/tests/governance-evidence.test.mjs"
 BICEP_CLI="${bicep_bin}" node --test \
   "${root}/infra/tests/governance-planner.test.mjs"
+BICEP_CLI="${bicep_bin}" node --test \
+  "${root}/infra/tests/ci-runner-auto-recovery.test.mjs"
 node --test "${root}/infra/tests/governance-tooling.test.mjs"
 
 for environment in dev staging prod; do
@@ -202,7 +204,12 @@ grep -F 'secretUriWithVersion' \
   "${root}/infra/modules/keyvaultGraphClientSecret.bicep" >/dev/null
 grep -F "type: 'UserAssignedIdentity'" "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F 'userAssignedIdentityResourceId:' "${root}/infra/modules/functionApp.bicep" >/dev/null
-grep -F "b7e6dc6d-f1e8-4753-8033-0f276bb0955b" "${root}/infra/modules/functionApp.bicep" >/dev/null
+if grep -F "b7e6dc6d-f1e8-4753-8033-0f276bb0955b" \
+  "${root}/infra/modules/functionApp.bicep" >/dev/null; then
+  echo "Storage Blob Data Owner must not be assigned to the Function App host identity (least privilege — see AUDIT_Certigo.md R-03)." >&2
+  exit 1
+fi
+grep -F "ba92f5b4-2d11-453d-a403-e96b0029c9fe" "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3" "${root}/infra/modules/functionApp.bicep" >/dev/null
 grep -F "ba92f5b4-2d11-453d-a403-e96b0029c9fe" "${root}/infra/modules/storage.bicep" >/dev/null
 grep -F "db58b8e5-c6ad-4a2a-8342-4190687cbf4a" "${root}/infra/modules/storage.bicep" >/dev/null

@@ -59,30 +59,21 @@ class CrashReport {
   String toString() {
     final StringBuffer buffer = StringBuffer('CrashReport(')
       ..write('source: ${source.name}, ')
-      ..write('fatal: $fatal');
-    if (library != null) buffer.write(', library: $library');
-    if (context != null) buffer.write(', context: $context');
-    buffer.write(', error: $error)');
+      ..write('fatal: $fatal, ')
+      ..write('errorType: ${CrashPrivacy.errorType(error)})');
     return buffer.toString();
   }
 }
 
 /// Puits de crash abstrait.
 ///
-/// Implémentation par défaut : [LoggingCrashReporter]. On garde l'intégration
-/// branchable (Crashlytics / Sentry / Application Insights ultérieurs) sans
-/// dépendre d'un SDK tiers ici.
+/// L'interface garde les hooks Flutter indépendants du fournisseur distant.
 abstract class CrashReporter {
   /// Route un [CrashReport] vers le backend de crash concret.
   void report(CrashReport report);
 }
 
-/// Implémentation par défaut : journal structuré + point d'extension pour la
-/// symbolisation aval.
-///
-/// Le [sink] est injectable (défaut : [debugPrint]) pour rester testable et
-/// pour permettre de brancher un transport réel (Application Insights…) sans
-/// modifier les appelants.
+/// Sink local de développement. Le texte et la pile sont nettoyés avant log.
 class LoggingCrashReporter implements CrashReporter {
   LoggingCrashReporter({void Function(String message)? sink}) : _sink = sink ?? _defaultSink;
 
@@ -92,10 +83,105 @@ class LoggingCrashReporter implements CrashReporter {
 
   @override
   void report(CrashReport report) {
-    // Ligne d'en-tête structurée, repérable dans les logs agrégés.
     _sink('[crash] $report');
-    // Pile brute émise séparément : point d'ancrage pour la symbolisation.
-    _sink('[crash] stackTrace:\n${report.stackTrace}');
+    _sink('[crash] stackTrace:\n${CrashPrivacy.stackTrace(report.stackTrace)}');
+  }
+}
+
+/// Privacy boundary shared by local logs and the remote payload.
+class CrashPrivacy {
+  const CrashPrivacy._();
+
+  static const int maxStackCharacters = 12000;
+
+  static final RegExp _bearer = RegExp(r'\bBearer\s+[^\s,;]+', caseSensitive: false);
+  static final RegExp _email = RegExp(
+    r'\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
+    caseSensitive: false,
+  );
+  static final RegExp _jwt = RegExp(
+    r'\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b',
+  );
+  static final RegExp _querySecret = RegExp(
+    r'([?&](?:access_token|token|code|secret|api_key)=)[^&#\s]+',
+    caseSensitive: false,
+  );
+  static final RegExp _urlQueryValue = RegExp(r'([?&][^=\s&#]{1,80}=)[^&#\s]+');
+  static final RegExp _secretAssignment = RegExp(
+    r'\b(?:token|secret|password|authorization|api[-_]?key)\b\s*[:=]\s*[^\s,;]+',
+    caseSensitive: false,
+  );
+  static final RegExp _url = RegExp(r'''https?://[^\s)\]}>"']+''', caseSensitive: false);
+  static final RegExp _ipv4 = RegExp(
+    r'\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}\b',
+  );
+  static final RegExp _ipv6 = RegExp(
+    r'(?<![A-Za-z0-9])(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}(?![A-Za-z0-9])',
+    caseSensitive: false,
+  );
+  static final RegExp _userPath = RegExp(
+    r'((?:[A-Za-z]:\\Users\\|/Users/))[^/\\\s]+',
+    caseSensitive: false,
+  );
+  static final RegExp _uuid = RegExp(
+    r'\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b',
+    caseSensitive: false,
+  );
+  static final RegExp _safeErrorType = RegExp(r'^[A-Za-z0-9_.$<>-]{1,120}$');
+
+  static String errorType(Object error) {
+    final String type = error.runtimeType.toString();
+    return _safeErrorType.hasMatch(type) ? type : 'UnknownError';
+  }
+
+  static String stackTrace(StackTrace stackTrace) => sanitizeStack(stackTrace.toString());
+
+  static String text(String raw, {int maxCharacters = 2048}) {
+    String value = raw
+        .replaceAll(_bearer, '<redacted>')
+        .replaceAll(_email, '<redacted>')
+        .replaceAll(_jwt, '<redacted>')
+        .replaceAllMapped(_querySecret, (Match match) => '${match.group(1)}<redacted>')
+        .replaceAllMapped(_urlQueryValue, (Match match) => '${match.group(1)}<redacted>')
+        .replaceAll(_secretAssignment, '<redacted>')
+        .replaceAllMapped(_userPath, (Match match) => '${match.group(1)}<redacted>')
+        .replaceAll(_uuid, '<redacted>')
+        .replaceAll(_ipv4, '<redacted>')
+        .replaceAll(_ipv6, '<redacted>')
+        .replaceAllMapped(_url, (Match match) {
+      final Uri? uri = Uri.tryParse(match.group(0)!);
+      return uri == null ? '<redacted-url>' : '${uri.scheme}://${uri.host}/<redacted>';
+    }).trim();
+    if (value.isEmpty) return '<unavailable>';
+    if (value.length > maxCharacters) {
+      value = '${value.substring(0, maxCharacters)}<truncated>';
+    }
+    return value;
+  }
+
+  @visibleForTesting
+  static String sanitizeStack(String raw) {
+    String value = raw
+        .replaceAll(_bearer, 'Bearer <redacted>')
+        .replaceAll(_email, '<redacted>')
+        .replaceAll(_jwt, '<redacted>')
+        .replaceAllMapped(_querySecret, (Match match) => '${match.group(1)}<redacted>')
+        .replaceAllMapped(_urlQueryValue, (Match match) => '${match.group(1)}<redacted>')
+        .replaceAll(_secretAssignment, '<redacted>')
+        .replaceAllMapped(_userPath, (Match match) => '${match.group(1)}<redacted>')
+        .replaceAll(_uuid, '<redacted>')
+        .replaceAll(_ipv4, '<redacted>')
+        .replaceAll(_ipv6, '<redacted>')
+        .replaceAllMapped(_url, (Match match) {
+      final Uri? uri = Uri.tryParse(match.group(0)!);
+      return uri == null ? '<redacted-url>' : '${uri.scheme}://${uri.host}/<redacted>';
+    }).trim();
+
+    if (value.isEmpty) return '<unavailable>';
+    if (value.length > maxStackCharacters) {
+      value = '${value.substring(0, maxStackCharacters)}\n<truncated>';
+    }
+    return value;
   }
 }
 

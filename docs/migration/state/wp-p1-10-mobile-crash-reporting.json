@@ -1,14 +1,21 @@
 {
   "id": "wp-p1-10-mobile-crash-reporting",
-  "status": "in_review",
+  "status": "done",
   "session_id": "3dee5e42-1c4d-464a-a9e3-4dff3dbea5e7",
   "branch": "gchambaud-microsoft-wp-p1-10-mobile-crash-reporting",
   "pr": 213,
   "checkpoint": {
-    "step": "ci-fix-applied",
-    "note": "PR #213 couvre la capture locale, mais la DoD reste incomplète : sink production, upload des symboles et crash visible dans le tableau de bord non prouvés.",
-    "at": "2026-07-07T10:52:10+01:00"
+    "step": "done-alpha-release-gate-recorded",
+    "note": "PR #213 fusionnée (2026-07-07T09:48:13Z, merge commit 4df79ee3), sans conflit ni revue/commentaire non résolu. Clôture actée sur décision explicite de la session orchestratrice (2026-09-03) malgré un écart DoD résiduel documenté : LoggingCrashReporter par défaut = debugPrint uniquement, aucune intégration de sink production (Crashlytics/Sentry/App Insights), aucun upload de symboles, aucun crash de test vérifié dans un tableau de bord. Décision de release du 2026-09-04 : le statut du lot reste done, mais sink distant + symboles + crash test visible deviennent une gate bloquante distincte avant l'Alpha iOS TestFlight ; voir docs/RELEASE_MOBILE.md.",
+    "at": "2026-09-04T00:00:00+01:00"
   },
-  "updated_at": "2026-08-05T20:52:00+01:00",
+  "follow_up": {
+    "status": "in_progress",
+    "session_id": "fe458884-a1fa-41da-a20f-68ff92d9c6ee",
+    "branch": "gchambaud-microsoft-alpha-remote-crash-reporting",
+    "pr": 374,
+    "note": "Le suivi Alpha iOS remplace le sink debugPrint seul par Sentry Flutter/Cocoa, ajoute la capture native fatale persistée puis rejouée au redémarrage, le scrubbing privacy-first, les dSYM Codemagic fail-closed et un smoke TestFlight volontaire. Seule l'exécution du setup/dashboard externe documenté reste manuelle."
+  },
+  "updated_at": "2026-09-04T13:44:00+01:00",
   "history_ref": "log.jsonl"
 }

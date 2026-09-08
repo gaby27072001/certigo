@@ -1,6 +1,6 @@
 # Politique de confidentialité — Certigo
 
-Dernière mise à jour : 19 août 2026
+Dernière mise à jour : 4 septembre 2026
 
 ## Données traitées
 
@@ -37,7 +37,14 @@ techniques nécessaires au produit :
   fournisseur d’identité fédéré Microsoft, Google ou Apple ;
 - Azure Communication Services pour les e-mails transactionnels lorsqu’il est
   configuré ;
-- Application Insights pour la télémétrie technique du backend.
+- Application Insights pour la télémétrie technique du backend ;
+- Sentry pour les erreurs et crashs techniques de l’application mobile. Les
+  rapports sont limités au type d’erreur, à une pile nettoyée, à la version de
+  l’application et aux caractéristiques techniques nécessaires au diagnostic
+  et à la symbolication. L’identifiant de compte, l’e-mail, les tokens, les
+  corps de requête et l’adresse IP brute ne sont pas collectés à cette fin.
+  L’enregistrement de session, le tracing, le profiling, les captures d’écran
+  et la hiérarchie visuelle sont désactivés.
 
 Les communications réseau de production utilisent HTTPS. Les secrets
 d’authentification et mots de passe en clair ne sont pas journalisés.
@@ -48,7 +55,7 @@ Les données actives sont conservées tant que le compte existe. L’utilisateur
 peut lancer la suppression depuis **Profil > Mon compte > Supprimer le compte**,
 ou utiliser la page publique :
 
-https://gchambaud_microsoft.github.io/Certigo/account-deletion/
+https://www.certigo-app.com/account-deletion/
 
 Le flux supprime les données actives associées au compte et les identifiants
 gérés par Certigo immédiatement après la vérification et l’exécution de la

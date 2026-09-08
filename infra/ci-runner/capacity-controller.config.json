@@ -10,6 +10,14 @@
   "quietPeriodSeconds": 300,
   "requiredPostQuietGuards": 2,
   "leaseRequired": true,
+  "repositories": [
+    "gchambaud_microsoft/Certigo",
+    "gchambaud_microsoft/certigo-content"
+  ],
+  "minimumOnlineByTrust": {
+    "certigo-pr": 2,
+    "certigo-trusted": 2
+  },
   "scaleInOrder": [
     "certigo-pr",
     "certigo-trusted"
@@ -33,10 +41,54 @@
         "virtualMachineName": "vmss-certigo-runner-zonal_f55d176e"
       },
       {
+        "githubRunnerId": 29,
+        "runnerName": "vmss-certigo-runner-zonal_be505fa1-Certigo",
+        "virtualMachineId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/virtualMachines/vmss-certigo-runner-zonal_be505fa1",
+        "virtualMachineName": "vmss-certigo-runner-zonal_be505fa1"
+      },
+      {
         "githubRunnerId": 28,
         "runnerName": "certigo-prIVJAN8",
         "virtualMachineId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/virtualMachines/vmss-certigo-pr-pilot-z1_bbf83c5c",
         "virtualMachineName": "vmss-certigo-pr-pilot-z1_bbf83c5c"
+      },
+      {
+        "githubRunnerId": 30,
+        "runnerName": "certigo-prQA5OWT",
+        "virtualMachineId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/virtualMachines/vmss-certigo-pr-pilot-z1_a14700a3",
+        "virtualMachineName": "vmss-certigo-pr-pilot-z1_a14700a3"
+      }
+    ],
+    "observedRunnerBindings": [
+      {
+        "repository": "gchambaud_microsoft/Certigo",
+        "githubRunnerId": 27,
+        "runnerName": "vmss-certigo-runner-zonal_f55d176e-Certigo",
+        "virtualMachineName": "vmss-certigo-runner-zonal_f55d176e"
+      },
+      {
+        "repository": "gchambaud_microsoft/certigo-content",
+        "githubRunnerId": 25,
+        "runnerName": "vmss-certigo-runner-zonal_f55d176e-certigo-content",
+        "virtualMachineName": "vmss-certigo-runner-zonal_f55d176e"
+      },
+      {
+        "repository": "gchambaud_microsoft/Certigo",
+        "githubRunnerId": 29,
+        "runnerName": "vmss-certigo-runner-zonal_be505fa1-Certigo",
+        "virtualMachineName": "vmss-certigo-runner-zonal_be505fa1"
+      },
+      {
+        "repository": "gchambaud_microsoft/Certigo",
+        "githubRunnerId": 28,
+        "runnerName": "certigo-prIVJAN8",
+        "virtualMachineName": "vmss-certigo-pr-pilot-z1_bbf83c5c"
+      },
+      {
+        "repository": "gchambaud_microsoft/Certigo",
+        "githubRunnerId": 30,
+        "runnerName": "certigo-prQA5OWT",
+        "virtualMachineName": "vmss-certigo-pr-pilot-z1_a14700a3"
       }
     ]
   },

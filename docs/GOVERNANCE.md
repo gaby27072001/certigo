@@ -40,6 +40,29 @@ Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/bra
 | `Generated state equals committed state` | [`.github/workflows/ci-project-state.yml`](../.github/workflows/ci-project-state.yml) | `Generated state equals committed state` |
 | `Validate workflow YAML` | [`.github/workflows/lint-workflows.yml`](../.github/workflows/lint-workflows.yml) | `Validate workflow YAML` |
 | `CodeQL / Security gate` | [`.github/workflows/codeql.yml`](../.github/workflows/codeql.yml) | `CodeQL / Security gate` |
+
+> ℹ️ **Portée de `Validate workflow YAML` : large sur les PR, nulle sans PR.**
+>
+> Cette gate lint **tous** les workflows à chaque PR vers `main` — pas seulement ceux modifiés : son
+> déclencheur n'a aucun filtre `paths` et le script passe `.github/workflows/*.yml` en bloc à
+> `actionlint`. Un fichier que personne n'édite, y compris un workflow **désactivé**, est donc revérifié
+> à chaque PR.
+>
+> En revanche, **un simple push de branche sans PR ouverte n'est pas linté du tout.** C'est inhérent à
+> une gate déclenchée par PR, pas un défaut : rien ne s'exécute tant qu'aucune PR n'existe. Un workflow
+> invalide poussé sur une branche ne se manifeste que par des runs en échec nommés d'après le *chemin
+> du fichier* (`.github/workflows/<nom>.yml`, `jobs=0`) — la signature d'un fichier que GitHub n'a pas
+> pu parser. Constaté le 2026-09-05 : six workflows cassés poussés sur une branche, cinq runs de ce
+> type, et aucune gate franchie puisqu'aucune PR n'existait encore.
+>
+> **Pré-contrôle local**, avec la version que la CI épingle déjà :
+>
+> ```bash
+> actionlint .github/workflows/*.yml   # v1.7.12, cf. lint-workflows.yml
+> ```
+>
+> `actionlint` connaît les règles de **disponibilité des contextes** — il rejette par exemple
+> `runner.*` dans un `env:` de job — ce qu'aucun parseur YAML ne peut voir.
 | `Security / Required gate` | [`.github/workflows/security-gate.yml`](../.github/workflows/security-gate.yml) | `Security / Required gate` |
 | `Fork PR policy / Required gate` | [`.github/workflows/fork-pr-policy.yml`](../.github/workflows/fork-pr-policy.yml) | `Fork PR policy / Required gate` |
 
@@ -108,13 +131,20 @@ ensuite restauré par une opération de signature ou de publication.
 La gate `Generated state equals committed state` n'accède à aucun dépôt externe et ne reçoit
 aucun secret. Son contrôle source rapide exécute d'abord
 `python tools/generated_contracts.py --check`. Les contrats canoniques
-`contracts/content-package-v1.json` et `contracts/cosmos-containers.json` pilotent respectivement
+`contracts/content-package-v2.json` et `contracts/cosmos-containers.json` pilotent respectivement
 le contrat de package intégré à `docs/active-content-reference.json` et la topologie partagée par
 Bicep et `CosmosContainers.cs`. Le générateur du SHA immuable valide ensuite la référence locale
 (SHA de révision complet, identifiants et SHA-256 des manifestes), puis vérifie que l'état généré
 de la PR est commité.
 La fraîcheur de `certigo-content/main` relève de la CI et de la protection de ce dépôt, pas d'un
-checkout cross-repository sur un runner PR persistant.
+checkout cross-repository sur un runner PR persistant. Le workflow séparé `ci-content-drift.yml`
+surveille néanmoins le pin sans affaiblir cette règle : il ne tourne **jamais** sur PR (seulement
+`push` sur `main` et planification), reste sur `certigo-trusted`, ne checkout pas `certigo-content`
+et compare le pin à la *release publiée* dans le stockage immuable. Il échoue explicitement tant
+que cette source n'existe pas, plutôt que de se désactiver silencieusement. Sa moitié sans
+credential — `tools/check_active_content_age.py` — vérifie dès aujourd'hui que le bump manuel a
+bien été rejoué récemment ; elle ne prouve pas l'absence de dérive amont, seulement que la
+procédure n'a pas été oubliée.
 
 Le bump de contenu actif est donc volontairement manuel et vérifié : après fusion protégée dans
 `certigo-content`, un mainteneur checkout le SHA exact, exécute `npm ci --ignore-scripts` puis
@@ -124,6 +154,428 @@ Le bump de contenu actif est donc volontairement manuel et vérifié : après fu
 `python tools/project_state.py --validate-active-content <checkout-certigo-content>` et
 `python tools/project_state.py --refresh-reference`. La PR du bump doit commiter la référence et
 l'état projet régénéré.
+
+### Faire évoluer le contrat de package : expand / migrate / contract
+
+> **D'abord, une seule question : changez-vous la *forme* du contrat, ou seulement les *données*
+> qu'il décrit ?**
+>
+> | Votre changement | Procédure |
+> |---|---|
+> | **Données seules** — rafraîchir le pin : révision, horodatage, `manifestId`, `fileCount`, `fileSha256` | **Une seule PR**, la procédure de bump ci-dessus. Rien de spécial. |
+> | **Forme du contrat** — schéma du manifeste, champs d'entrée, préfixes ou profondeurs de chemins, enveloppe du fichier de contrat | **Trois PR**, la séquence ci-dessous. Un basculement atomique est impossible. |
+>
+> Le rafraîchissement périodique du pin appartient à la **première** ligne. Ne payez pas le coût
+> de trois PR pour un bump de contenu ordinaire.
+
+**Règle générale qui explique les deux cas.** La contrainte de la gate se traverse dans les deux
+sens **à condition de ne jamais changer le code et les données dans la même PR**. Le validateur de
+la base juge les données du candidat : si les données ne bougent pas, le code peut bouger ; si le
+code ne bouge pas, les données peuvent bouger — pourvu que le code déjà sur `main` les accepte.
+
+**Symptôme.** Une PR qui modifie `contracts/content-package-*.json` ou
+`docs/active-content-reference.json` échoue sur `Validate project-state source` et
+`Generated state equals committed state` avec l'un de ces messages :
+
+```
+docs/active-content-reference.json.packageContract: contract does not match certigo.content.package-manifest/v1.
+contracts/content-package-v1.json: unexpected fields.
+contracts/content-package-v1.json: cannot load canonical JSON: [Errno 2] No such file or directory
+generated contracts are stale: docs/active-content-reference.json.
+```
+
+**Ce n'est pas une donnée malformée, et un rebase n'y change rien.** `ci-project-state.yml`
+exécute délibérément le validateur *de la branche de base* contre les *données de la PR*
+(`working-directory: .trusted-control`, `--root "$PROJECT_WORKSPACE"` pointant sur
+`.untrusted-source`). C'est une propriété de sécurité voulue : une PR ne peut pas réécrire le
+validateur qui la juge. La conséquence est que le validateur et les données qu'il valide sont
+versionnés ensemble, donc **toute évolution du contrat est jugée par le validateur d'avant
+l'évolution**. Le message ci-dessus attribue les données du candidat au schéma de la base : il
+signifie « le juge est périmé », pas « tes données sont invalides ».
+
+**Conséquence pratique : un basculement atomique est impossible.** Il faut trois PR :
+
+1. **expand** — code seul. Le validateur apprend à accepter l'ancienne *et* la nouvelle forme.
+   Ne toucher ni `docs/active-content-reference.json` ni le fichier de contrat existant, afin
+   que la base (qui ne connaît que l'ancienne forme) voie des données inchangées.
+2. **migrate** — données seules. Basculer la référence sur la nouvelle forme. `main` porte
+   désormais le code bi-compatible et l'accepte.
+3. **contract** — code seul à nouveau : retirer l'ancienne forme. La base porte déjà la nouvelle
+   et voit des données inchangées, d'où le passage. L'état final redevient strict et
+   mono-schéma.
+
+La bi-compatibilité de l'étape 1 est un **échafaudage transitoire, pas la cible** : un validateur
+qui accepte à la fois la forme courante et la forme supersédée ne peut pas détecter une
+régression de l'une vers l'autre. L'étape 3 n'est pas optionnelle.
+
+Chaque forme reste validée **séparément et strictement** : les règles d'entrées et de chemins sont
+déclarées par schéma dans `manifestShapes`, jamais fusionnées en une union permissive.
+
+> **Migration v1 → v3 : terminée le 2026-09-05** (PR #379 *expand*, #382 *migrate*, puis
+> l'étape *contract*). `contracts/content-package-v2.json` ne déclare plus qu'une seule forme,
+> `certigo.content.package-manifest/v3`, et un manifeste v1 est désormais **rejeté**. Les
+> messages d'erreur cités plus haut mentionnent des fichiers qui n'existent plus : ils sont
+> conservés tels quels parce que c'est le texte que l'on rencontre encore sur une branche
+> antérieure à la migration, et qu'il doit rester trouvable par recherche.
+>
+> Cette procédure resservira : l'essentiel du corpus amont porte `provenance.checkedOn`
+> 2026-08-17 et arrive à échéance en bloc à la mi-septembre 2026. **Ce rafraîchissement-là est un
+> changement de données seules : une PR, pas trois.**
+
+### Workflow privilégié : ni ajout, ni modification — la règle est scellée
+
+> **Avant de concevoir quoi que ce soit : un workflow qui parle à Azure ne peut plus être ajouté
+> ni modifié dans ce dépôt, et cette contrainte ne peut être levée par aucune PR.** Mesuré le
+> 2026-09-08 sur `main` = `9c438660`. **Invalidé si** `backend-deploy-workflow-policy.mjs`
+> disparaît de `backendDeployTrustedFiles`, si `Validate workflow YAML` cesse d'être un contexte
+> requis, ou si `enforce_admins` repasse à `false`.
+
+**Symptôme.** Une PR qui ajoute un workflow, ou qui modifie d'une seule ligne l'un des cinq
+workflows utilisant `azure/login@`, échoue sur `Validate workflow YAML` avec :
+
+```
+.github/workflows/<nom>.yml: changed or new privileged capability is forbidden outside cd-backend.yml
+```
+
+Un commentaire suffit à le déclencher : la comparaison porte sur les **octets** du fichier, pas
+sur les capacités qu'il ajoute. Les cinq workflows concernés — `ci-content-drift.yml`,
+`content-infra-apply.yml`, `content-infra-what-if.yml`,
+`governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml` — sont
+donc figés à l'octet.
+
+**Ce qui déclenche.** `privilegedWorkflow` dans
+`.github/scripts/backend-deploy-workflow-policy.mjs` signale un workflow dès qu'il porte une
+permission `write` ou `write-all`, un `id-token: write`, un `environment:`, un `secrets:` de job,
+ou l'un de dix-sept marqueurs textuels (`azure/login@`, `secrets.`, `az deployment`,
+`management.azure.com`, …). L'unique exemption est le nom de fichier `cd-backend.yml`, en dur.
+
+**La règle ne peut pas être amendée.** `validateBackendDeployWorkspace` exige que trois fichiers
+soient **byte-identiques entre la PR et sa révision de base** :
+
+```
+.github/scripts/backend-deploy-workflow-policy.mjs
+.github/scripts/backend-deploy-gate.test.mjs
+.github/scripts/validate-backend-deploy-dispatch.mjs
+```
+
+Toute modification, fût-elle d'un commentaire, produit :
+
+```
+candidate trusted control: <chemin> must match the immutable base revision
+```
+
+Ajouter une liste d'exemptions, exempter un workflow nommément, ou remplacer la comparaison
+d'octets par une comparaison de capacités exigent tous d'éditer ces fichiers. **Aucune PR ne le
+peut.** Et il n'existe pas de contournement : `Validate workflow YAML` est un contexte requis sur
+`main`, `enforce_admins` vaut `true`, `allow_force_pushes` vaut `false`.
+
+**Comment le scellé a pu être posé.** `validate-workflow-security.mjs` importe la politique et
+l'appelle sans condition. Lorsque la PR #357 l'a introduite, la révision de base ne contenait pas
+le module : le validateur de la base n'a donc jamais appliqué la règle à la PR qui l'apportait.
+
+> **Une PR n'est jamais soumise à la règle qu'elle introduit.** C'est la même propriété que celle
+> décrite plus haut pour le contrat de package — le validateur de la base juge les données du
+> candidat — mais elle a ici un effet à sens unique : #357 a pu poser un scellé qu'elle-même ne
+> pourrait plus poser aujourd'hui, et que personne ne peut retirer.
+
+**Le scellé n'est pas le défaut.** Son intention est déclarée par son propre test
+(`backend-deploy-gate.test.mjs`, `workspace rejects a symlink trust root and privileged shadow
+workflows`), qui construit le cas visé en copiant `cd-backend.yml` vers `cd-backend-shadow.yml` :
+empêcher qu'un workflow fantôme contourne les scellés du pipeline de déploiement. Sceller la garde
+contre son propre désarmement est cohérent avec ce but. **C'est la règle scellée qui est plus large
+que son intention — et le scellé est précisément ce qui interdit de la resserrer.**
+
+**Ce qui reste possible.** Un workflow qui n'utilise que le jeton GitHub automatique ne déclenche
+aucun des marqueurs : ni `github.token`, ni `permissions: contents: read` n'y figurent. Mesuré le
+2026-09-08 en écrivant deux workflows neufs dans le même répertoire et la même seconde — celui qui
+ne lit que l'API GitHub n'est pas signalé, celui qui porte `azure/login@` l'est. La surveillance
+qui ne demande que des données GitHub (vivacité des runners, états de jobs) est donc constructible ;
+celle qui exige une lecture Azure ne l'est pas.
+
+### Un test ajouté sous `.github/scripts/` ne s'exécute jamais sur sa propre PR
+
+**Symptôme.** Il n'y en a aucun. C'est tout le problème : la PR qui introduit le test passe au
+vert sans que le test ait tourné une seule fois. La panne se déclare **après la fusion**, sur les
+PR de tout le monde — et l'auteur, lui, n'a rien vu.
+
+**Mécanisme.** `lint-workflows.yml` monte deux checkouts : `.untrusted-source` (le head de la PR)
+et `.trusted-control` (la **base**, donc `main`). L'étape `Test workflow security scripts`
+s'exécute avec `working-directory: .trusted-control` :
+
+```yaml
+- name: Test workflow security scripts
+  working-directory: .trusted-control
+  run: node --test .github/scripts/*.test.mjs
+```
+
+Le glob est donc résolu **dans l'arbre de `main`**. Un fichier de test qui n'existe que dans la
+branche n'est pas ramassé, et le validateur exécuté est celui de `main`, pas celui de la PR.
+
+**Pourquoi on ne le corrige pas.** C'est la même frontière de sécurité que pour la gate d'état
+projet : une PR ne doit jamais faire exécuter son propre code par la CI de confiance. Basculer
+cette étape sur `.untrusted-source` supprimerait l'angle mort en rouvrant une faille bien pire —
+n'importe quelle PR pourrait alors réécrire le juge qui la juge. **L'angle mort est inhérent au
+choix, pas un défaut d'implémentation : seule une procédure peut le combler.**
+
+**La conséquence est asymétrique**, et c'est ce qui la rend coûteuse. Un test faux ou un pin
+périmé ne casse pas la PR qui l'introduit ; il casse `main`, donc le vert de toutes les autres
+PR, après coup. Le coût est payé par ceux qui n'ont rien écrit.
+
+**Procédure — exécuter la suite contre le head *fusionné*, à la main, avant de fusionner.**
+
+```bash
+gh pr update-branch <n>          # ou `git merge origin/main` dans la branche
+node --test .github/scripts/*.test.mjs
+```
+
+Le head fusionné est le seul arbre qui porte à la fois le code de `main` et celui de la branche :
+c'est exactement l'état que `main` aura après la fusion, et le seul endroit où la combinaison peut
+être observée avant qu'elle ne devienne le problème de tout le monde. Reporter le compte de tests
+dans le corps de la PR.
+
+**Sur la version épinglée, et dans l'environnement du runner.** `lint-workflows.yml` épingle
+`node-version` à une version précise ; un poste de développement en porte presque toujours une
+plus récente, et n'exporte pas `GITHUB_OUTPUT`. Ces deux écarts suffisent à eux seuls à rendre une
+suite verte hors CI et rouge en CI. Le correctif #413 en donne la mesure croisée — quatre
+combinaisons, un seul et même arbre :
+
+```
+Node 24, sans GITHUB_OUTPUT   0 échec                    <- poste de développement
+Node 24, avec GITHUB_OUTPUT   test 11 échoue
+Node 20, sans GITHUB_OUTPUT   test 3 échoue
+Node 20, avec GITHUB_OUTPUT   tests 3 et 11 échouent     <- le runner
+```
+
+**La seule ligne qui compte est la dernière, et c'est la seule qu'un poste ne produit jamais
+spontanément.** Lancer la suite sur la version du poste vérifie un environnement que la CI
+n'exécutera pas : le vert obtenu est réel, mais il ne répond pas à la question posée. La procédure
+ci-dessus n'a donc de valeur que si `node --version` affiche la version épinglée par
+`lint-workflows.yml` et si `GITHUB_OUTPUT` est positionné comme sur le runner.
+
+> **Deux précédents, tous deux mesurés, tous deux auraient cassé `main`.** #327 posait un
+> manifeste sémantique périmé — son head non modifié échouait sur une vingtaine d'écarts,
+> invisibles à la CI. #357 introduisait `backend-deploy-workflow-policy.mjs` avec un pin d'octets
+> sur `cd-backend.yml` désaccordé du fichier réel : plus de cent erreurs, toutes issues de la même
+> cause. Témoin qui exclut une autre explication : `main` seule ne produisait aucun échec, et
+> `main` + #357 seule en produisait un. Les deux ont été corrigées avant fusion parce que la suite
+> avait été lancée à la main sur le head fusionné.
+
+> **Et le précédent où la procédure n'a pas été appliquée — celui-là a cassé `main`.** Le train
+> #407 (*merge #328, #357 and #369 as one CI train*) a fusionné le 2026-09-08 à 11 h 51 UTC en
+> emportant `backend-deploy-gate.test.mjs`, apporté par #357. Deux défauts indépendants y
+> dormaient : une *aide d'itérateur* — `Map.prototype.keys().map()`, disponible à partir de
+> Node 22 seulement — dans un workflow épinglé à Node 20.20.2 ; et un processus enfant qui
+> héritait `GITHUB_OUTPUT` du runner, si bien que la sortie attendue partait dans le fichier au
+> lieu de `stdout`. **Aucun des deux n'était observable sur la PR qui les introduisait**, pour la
+> raison exposée en tête de section. À partir de cette fusion, toute PR dont la base était ce
+> `main` échouait sur `Validate workflow YAML` — un contexte requis : **le dépôt entier devenait
+> infusionnable.** Le correctif #413 a fusionné à 12 h 47 UTC, soit 56 minutes plus tard.
+
+**Deux corollaires pour lire les sorties.**
+
+- Le volume d'une sortie d'erreur est un artefact de propagation, jamais une mesure du nombre de
+  causes. Cent erreurs peuvent n'en avoir qu'une seule.
+- Un échec isolé n'est pas une régression tant qu'il n'a pas été rejoué.
+  `deploy-flex-onedeploy.test.mjs` échoue par intermittence sous charge et passe au rejeu :
+  rejouer avant de conclure, et ne jamais attribuer à sa propre modification un échec qu'on n'a
+  pas su reproduire.
+
+### Un vert peut décrire une base qui n'existe plus
+
+> **Un contrôle vert atteste d'un couple (head, base) mesuré à l'instant du run — jamais de l'état
+> présent de `main`.** Mesuré le 2026-09-08. **Invalidé si** `strict` repasse à `false` dans la
+> protection de `main`.
+
+**Symptôme.** Une PR affiche des contrôles entièrement verts et refuse pourtant de fusionner ; ou,
+bien plus coûteux, on se fie à ce vert.
+
+**Mécanisme.** La protection de `main` porte `strict: true` : une branche doit être à jour avec
+`main` pour être fusionnable. Un vert acquis avant que `main` n'avance décrit donc une base
+révolue, et **la seule action qui rend la PR fusionnable — mettre la branche à jour — est aussi
+celle qui rejoue les contrôles contre la nouvelle base.** Aucune manœuvre ne conserve le vert *et*
+rend la PR fusionnable : un vert périmé n'est pas rattrapable, il est seulement remplaçable.
+
+**Le cas dégénéré, mesuré.** Pendant les 56 minutes où `main` portait la suite cassée décrite par
+la section « Un test ajouté sous `.github/scripts/` ne s'exécute jamais sur sa propre PR », 14 PR
+étaient ouvertes et **9 affichaient un vert complet** — non parce qu'elles étaient saines, mais
+parce qu'elles n'avaient pas encore été rejouées contre cette base. Leur vert était exact et sans
+valeur. Mettre l'une d'elles à jour la faisait rougir aussitôt, **sans qu'une seule ligne de la
+branche ait changé.** L'ensemble des PR vertes et l'ensemble des PR fusionnables étaient alors
+disjoints, et la couleur affichée mesurait exactement une chose : l'absence de contact avec le
+problème.
+
+**Pourquoi cela ne se lit pas dans les workflows.** Aucun fichier de `.github/workflows/` ne porte
+l'information. Le discriminant est la comparaison entre la base **enregistrée** d'une PR et la tête
+courante de `main` — deux valeurs qui ne figurent ensemble sur aucune page de PR :
+
+```bash
+gh api repos/<owner>/<repo>/pulls/<n> --jq .base.sha   # base à laquelle la PR a été mesurée
+git rev-parse origin/main                              # tête courante
+```
+
+Si les deux diffèrent, les contrôles affichés décrivent un `main` révolu, quelle que soit leur
+couleur. **C'est le régime ordinaire, pas l'exception** : relevé le 2026-09-08 à 14 h UTC, les
+9 PR ouvertes du dépôt portaient **toutes** une base distincte de la tête de `main`.
+
+**Conséquence pratique — armer l'auto-fusion plutôt que courir après le vert.** Sous
+`strict: true`, résoudre un conflit puis attendre le vert à la main est une course perdue dès que
+le dépôt est actif : chaque fusion sur `main` périme la résolution avant la fin du cycle de
+contrôles, et un pool de runners réduit allonge ce cycle. Armer `gh pr merge <n> --auto --squash`
+retire l'exigence d'être présent à l'instant précis où les conditions s'alignent.
+
+### Snapshot d'état projet périmé : la branche, ou `main` ?
+
+**Symptôme.** Une PR échoue sur `Validate project-state source` et `Generated state equals
+committed state` avec :
+
+```
+project-state: Observable sources differ from the captured source snapshot
+sha256:<attendu> (current sha256:<obtenu>). Commit the source changes, then run
+`python tools/project_state.py --refresh-reference`.
+```
+
+> ⚠️ **Ces deux checks portent le même nom que ceux de la section précédente, mais la cause est
+> différente.** C'est la source de confusion la plus fréquente sur cette gate : `expand / migrate /
+> contract` concerne le *validateur de base jugeant les données de la PR* ; la présente section
+> concerne le *contenu de la branche elle-même*. Le message d'erreur les distingue —
+> « Observable sources differ » désigne toujours le second cas.
+>
+> 🔎 **Limitation connue de l'outillage.** L'information discriminante n'existe **que dans le texte
+> du log**. Le *nom* du check est identique dans les deux cas, et c'est lui qui s'affiche partout où
+> l'on regarde par défaut : page de PR, résumé de run, notifications, messages entre équipes. Un
+> lecteur qui se fie au résumé ne peut pas distinguer les deux causes — il ne lui manque pas
+> seulement du détail, il reçoit une information **activement trompeuse**, puisqu'un nom identique
+> suggère une cause identique.
+>
+> *Piste pour qui reprendra cet outillage* (hors périmètre ici) : faire émettre aux deux causes des
+> noms de check distincts, ou à défaut une première ligne discriminante en tête de log. Tant que le
+> nom du check sert de proxy pour la panne, il ne peut pas distinguer ce qu'il représente.
+
+**Ce n'est presque jamais « `main` a bougé », et un rebase seul ne corrige rien.** `OBSERVABLE_PATHS`
+(`tools/project_state.py`) hache le **contenu** d'une liste de chemins. Dès que la branche modifie
+l'un d'eux, l'empreinte change et le snapshot committé devient faux — **indépendamment de toute
+avance de `main`**. Modifier un fichier existant suffit : il n'est pas nécessaire d'en ajouter ou
+d'en supprimer un.
+
+Chemins observables (source de vérité : `tools/project_state.py`) :
+
+```
+.github/workflows                                     docs/active-content-reference.json
+codemagic.yaml                                        tools/project_state.py
+README.md                                             tools/tests
+package.json                                          backend/tests
+content                                               apps/mobile/test
+backend/src/Certigo.Domain/Content/ContentModels.cs   apps/mobile/integration_test
+                                                      packages/*/test/**
+```
+
+> 📌 `backend/tests`, `apps/mobile/test` et `packages/*/test/**` en font partie : **toute PR qui
+> ajoute un test déclenche ce cas**, tout comme une PR qui ne modifie que `README.md` ou
+> `package.json`. C'est le fonctionnement voulu, pas un défaut.
+
+**Diagnostic — une seule commande, sans rebase**, sur une branche à jour avec `main` :
+
+```bash
+python tools/project_state.py --check
+```
+
+| Résultat | Cause | Correction |
+|---|---|---|
+| **Échoue en local** | Le contenu **de la branche** — un chemin observable a été modifié. | `--refresh-reference`. **Aucun rebase nécessaire.** |
+| **Passe en local, échoue en CI** | `main` a réellement avancé sur un chemin observable. | Rebase, **puis** `--refresh-reference`. |
+
+**Correction.** Committer d'abord les sources observables (l'outil refuse de tourner sur un arbre
+sale), puis :
+
+```bash
+python tools/project_state.py --refresh-reference   # met à jour la référence ET le document
+python tools/project_state.py --check               # doit répondre « Project state is current. »
+```
+
+Committer `docs/project-state-reference.json` et `docs/ETAT_DU_PROJET.md` **séparément** des sources
+observables : ni l'un ni l'autre n'est observable, donc ce commit ne réinvalide pas l'empreinte —
+c'est ce qui évite l'auto-référence. Après un rebase, régénérer **après** le rebase, jamais avant,
+pour que le snapshot reflète l'arbre final.
+
+> 🕳️ **Piège après un rebase : `--check` peut passer alors que le champ `commit` est périmé.**
+>
+> Un rebase réécrit les commits : l'ancien SHA capturé devient **orphelin**, irrésolvable dans
+> l'historique de la branche. Or `--check` ne compare **que** `observableSha256`, qui est stable au
+> rebase par conception (il hache le *contenu*, pas l'historique — cf. le champ `semantics` de la
+> référence). **La gate ne signalera donc jamais ce décalage.**
+>
+> Le champ n'est pas seulement muet, il est **faux** : quiconque fait `git show <commit>` obtient une
+> erreur, sans pouvoir distinguer « la référence est périmée » de « mon clone est incomplet ».
+>
+> ```bash
+> # Après tout rebase, vérifier que le commit capturé appartient encore à l'historique :
+> CAPTURED=$(jq -r .commit docs/project-state-reference.json)
+> git merge-base --is-ancestor "$CAPTURED" HEAD \
+>   && echo "commit capturé présent dans l'historique" \
+>   || echo "ORPHELIN -> relancer --refresh-reference"
+> ```
+>
+> ⚠️ **N'utilisez pas `git cat-file -e` pour ce test.** Il répond « existe » pour un commit orphelin,
+> parce que le reflog local le maintient vivant plusieurs semaines : le test **passe sur la machine
+> de l'auteur** et échoue sur un clone frais, où l'objet n'a jamais été transféré. C'est un faux
+> positif qui ne se manifeste que chez les autres. Seul `merge-base --is-ancestor` teste
+> l'appartenance à l'historique plutôt que la simple présence de l'objet.
+>
+> `--refresh-reference` le repointe. Le faire **systématiquement après un rebase**, même si
+> `--check` est déjà vert : « la CI ne le vérifie pas » est une raison de le corriger à la main, pas
+> de l'ignorer — un champ que rien ne contrôle est précisément un champ qui pourrit.
+>
+> 🔬 **Ce test vaut pour une branche, jamais pour `main`.** Mesuré le 2026-09-05 sur les douze
+> derniers commits de `main` : le commit capturé y est **orphelin dans 12 cas sur 12**, sans
+> exception. Ce n'est pas une anomalie, c'est mécanique — le dépôt fusionne en *squash*, donc le
+> commit de branche que `--refresh-reference` a capturé cesse d'exister à l'instant de la fusion,
+> remplacé par le commit de squash. Le champ `commit` de `docs/project-state-reference.json` n'a
+> donc, sur `main`, **jamais** désigné un commit atteignable et ne le peut pas.
+>
+> Conséquences pratiques, à ne pas confondre :
+>
+> - **Rien n'est cassé.** `observableSha256` est le contrôle réel et il est stable au squash *par
+>   conception* — le champ `semantics` de la référence le dit explicitement. La gate reste juste.
+> - **Le champ `commit` est de la provenance, pas une garantie.** Sur `main` il indique « la
+>   branche qui a produit ce relevé », dans une forme qui ne survit pas au squash.
+> - **N'appliquez donc pas la commande ci-dessus à `main`** en concluant à un défaut : elle y
+>   échouera toujours. Elle sert à vérifier *votre branche avant de pousser*, où un orphelin est
+>   réellement de votre fait et réellement corrigeable.
+>
+> Le contrôle est correct ; c'est son domaine d'application qui devait être borné. Un contrôle
+> dont on ignore le domaine produit un faux positif permanent, et un faux positif permanent finit
+> par être ignoré — y compris le jour où il dit vrai.
+>
+> 🎯 **Corollaire : quand `--amend` est-il sûr ?** `--refresh-reference` capture *le dernier commit
+> touchant un chemin observable*. Amender **ce commit-là** réécrit le SHA qu'on vient de capturer :
+> c'est un **point fixe inatteignable par amendement**, chaque tentative de faire coïncider le
+> relevé avec l'historique déplaçant l'historique.
+>
+> > **Amender est sûr si et seulement si le commit amendé n'est pas celui que la référence a
+> > capturé.**
+>
+> Exemple : si la capture porte sur un commit *workflow* et que l'on amende un commit *docs*, la
+> capture survit (`is-ancestor` reste vrai). Amender le commit workflow l'orpheline à tous les
+> coups. Cette formulation remplace la consigne plus grossière « toujours commiter l'état projet
+> séparément » : elle dit **où passe la frontière**, donc un lecteur peut déterminer de quel côté
+> il se trouve, au lieu de suivre une interdiction qui paraît arbitraire et qu'il abandonnera à la
+> première gêne.
+>
+> À noter sur la provenance de cette règle : le test `merge-base --is-ancestor` documenté ci-dessus
+> **a pris son propre auteur en défaut**, quelques heures après avoir été écrit. C'est la seule
+> preuve réelle qu'un contrôle fonctionne — toute autre confirmation revient à ce que l'auteur se
+> donne raison à lui-même.
+
+> ✅ **Vérifiez cette affirmation vous-même, en une commande.** Le présent fichier
+> (`docs/GOVERNANCE.md`) n'est pas un chemin observable. Modifiez-le, puis lancez :
+>
+> ```bash
+> python tools/project_state.py --check   # attendu : « Project state is current. »
+> ```
+>
+> S'il passe alors que le fichier est modifié, c'est la preuve directe que `docs/` est hors
+> périmètre observable. La même manipulation sur un fichier de `backend/tests` échouera. Ne croyez
+> pas la liste ci-dessus sur parole : dix secondes suffisent à la tester.
 
 ### Conclusion DoD
 
@@ -149,6 +601,39 @@ Le push direct sur `main` est bloqué par la combinaison :
 
 > Pour un blocage total y compris pour les administrateurs, activer `enforce_admins = true`
 > (voir §4, réserve admin).
+
+### Fusionner une PR appartenant à une pile (*stack*)
+
+Lorsqu'une PR est empilée sur une autre (base = branche d'une PR ouverte), **tous les
+chemins de fusion documentés refusent**, sans indiquer qu'il en existe un autre :
+
+| Chemin | Résultat |
+| --- | --- |
+| `gh pr merge <n>` | refus — *« part of a stack »* |
+| `PUT /repos/{owner}/{repo}/pulls/{n}/merge` | refus — même message |
+| Changer la base d'une PR enfant | refus — *« Cannot change the base branch because the pull request is part of a stack »* |
+
+Le seul chemin fonctionnel est l'API asynchrone :
+
+```bash
+gh api --method PUT "repos/{owner}/{repo}/pulls/{n}/merge-async" \
+  -f merge_method=squash -f merge_action=default
+# -> {"status":"pending","uuid":"..."}
+```
+
+Deux pièges :
+
+1. **Le suivi documenté ne fonctionne pas.** `GET /pulls/merge-async/{uuid}` renvoie `404`.
+   Interroger l'état de la PR elle-même (`gh pr view <n> --json state,mergedAt`).
+2. **La fusion porte sur la pile jusqu'à la PR ciblée incluse.** Fusionner la PR du bas
+   ne fusionne donc qu'elle. Les enfants restent ouverts et sont **rebasés
+   automatiquement** sur la nouvelle base.
+
+> **Vérifié le 2026-09-05** sur la PR #363 (bas de pile) : #363 fusionnée seule, #372
+> (enfant) restée ouverte et re-basée automatiquement sur `main`.
+> **Ce qui invaliderait ce constat** : GitHub rendant `merge-async` inutile en levant le
+> refus sur `gh pr merge` / `PUT …/merge` pour les piles, ou corrigeant le `404` du suivi
+> par `uuid`. Revérifier si l'un des deux chemins refusés cesse de refuser.
 
 ---
 

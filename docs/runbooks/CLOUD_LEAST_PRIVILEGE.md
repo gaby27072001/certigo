@@ -30,7 +30,7 @@ puis confirmer que les RG, identités et scopes attendus y existent. En leur abs
 qu'une déallocation serait dangereuse et, dans cette PR, pour toute demande puisque le
 feature flag reste `off`.
 
-## Inventaire read-only consolidé au 20 août 2026
+## Inventaire read-only consolidé au 4 septembre 2026
 
 Périmètre observé : subscription
 `b8952c8c-8f72-469d-99cd-ac906da4e2fc`, groupes `rg-certigo-dev`,
@@ -60,19 +60,27 @@ L'état live ne correspond plus aux anciennes VM autonomes documentées :
 
 | Élément | État observé |
 |---|---|
-| Compute géré | `f55d176e` dans `vmss-certigo-runner-zonal` zone 2; pilote `bbf83c5c` dans `vmss-certigo-pr-pilot-z1` zone 1 |
-| Inventaire Azure courant | `f55d176e` et `bbf83c5c` running; `4153d1dd` externe/deallocated; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
+| Compute géré | `f55d176e` (zone 2) **et `be505fa1` (zone 1)** dans `vmss-certigo-runner-zonal`; pilote `bbf83c5c` dans `vmss-certigo-pr-pilot-z1` zone 1 |
+| Inventaire Azure courant | `f55d176e`, `be505fa1` et `bbf83c5c` running; `4153d1dd` externe/deallocated; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
 | Autoscale | activé, minimum `2`, défaut `2`, maximum `4` |
 | Scale-out | CPU moyenne > 70 % pendant 10 min |
 | Scale-in | CPU moyenne < 20 % pendant 45 min — **non conscient des jobs GitHub** |
-| Inventaire GitHub | runner `27` `f55d176e-Certigo` online/labels doubles; runner `28` `certigo-prIVJAN8` online, PR-only; runner `26` `22f7fb52-Certigo` offline/stale et hors scope |
-| Cloisonnement | le pilote est sans identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; `f55d176e` conserve UAMI + `snet-runners` mais ses labels doubles restent **bloquants** |
-| Capacité réellement réconciliée | **2 instances gérées/online** : `f55d176e` et `bbf83c5c`; `4153d1dd` reste externe |
+| Inventaire GitHub | runner `27` `f55d176e-Certigo` online **trusted**; runner `29` `be505fa1-Certigo` online **trusted**; runner `28` `certigo-prIVJAN8` online, PR-only; runner `26` `22f7fb52-Certigo` offline/stale et hors scope |
+| Cloisonnement | le pilote est sans identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; `f55d176e` et `be505fa1` conservent UAMI + `snet-runners`. **Les labels sont désormais strictement disjoints** — plus aucun label double bloquant |
+| Capacité réellement réconciliée | **3 instances gérées/online** : `f55d176e`, `be505fa1` et `bbf83c5c`; `4153d1dd` reste externe |
+| Plancher de redondance | `minimumOnlineByTrust` = `certigo-pr: 1`, `certigo-trusted: 2` |
+
+> ⚠️ **`be505fa1` était absente de cet inventaire jusqu'au 4 septembre 2026.** C'est
+> exactement ce trou qui a permis à l'instance zone 1 de rester éteinte assez longtemps pour
+> que GitHub supprime son enregistrement runner. Un inventaire qui peut omettre un membre
+> est un inventaire faux : toute instance du VMSS doit y figurer. La cause racine complète
+> est dans [`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md).
 
 Le premier snapshot avait vu trois VM, avant le scale-in CPU. L'état consolidé prouve qu'un
 simple comptage « VM Azure / runners GitHub » est faux. La réconciliation explicite classe
 le runner 26 (`22f7fb52-Certigo`) et la VM `4153d1dd` comme **externes**, et les bindings
-exacts `f55d176e`/runner `27` et `bbf83c5c`/runner `28` comme **gérés**. Externe ne
+exacts `f55d176e`/runner `27`, `be505fa1`/runner `29` et `bbf83c5c`/runner `28` comme
+**gérés**. Externe ne
 signifie ni orphelin ni adoptable : ces ressources sont
 exclue de `currentCapacity`, de toute sélection de cible et de toute opération future par
 une classification exacte dans `inventory.externalVirtualMachines`. Toute autre VM sans
@@ -112,8 +120,8 @@ réinventoriées avant toute décision :
 - l'UAMI `id-vm-certigo-runner-2-vmss` est liée au VMSS et possède uniquement
   `Key Vault Secrets User` sur `kv-certigo-ci-081423`.
 
-`4153d1dd` est explicitement externe et gelée. Ne pas la démarrer, déallouer, supprimer,
-réenregistrer, relabelliser ou adopter depuis cette PR.
+`be505fa1` est non classifiée et gelée. Ne pas la démarrer, déallouer,
+supprimer, réenregistrer, relabelliser ou adopter depuis cette PR.
 
 `kv-certigo-ci-pub814` et tout autre artefact sans chaîne d'usage complète restent
 **non classés**, jamais « orphelins par intuition ». Une suppression n'est envisageable que si
@@ -251,8 +259,9 @@ par le moteur de what-if. Le bootstrap est donc séparé et fail-closed :
   dev/staging/prod et réseau partagé sur CI. Elle ne contient ni launcher subscription,
   rôle accordant `roleAssignments/write`, ni policyAssignment.
 - **Phase B1b humain PIM — `bootstrap-rbac-admin`** : planifie séparément les trois launchers,
-  les trois runtime writers conditionnés, l'exécuteur contenu conditionné et l'unique
-  policyAssignment en `Audit`. Aucun workload ne peut créer ces attributions délégatrices.
+  les trois runtime writers conditionnés, l'exécuteur contenu conditionné, trois
+  `Managed Identity Operator` limités à l'unique UAMI reader et l'unique policyAssignment
+  en `Audit`. Aucun workload ne peut créer ces attributions délégatrices.
 - **Phase B2 — `contentPlanExternalJoinAssignments`** : cible directement `rg-certigo-ci` et
   planifie séparément les deux attributions externes sur le subnet et la zone DNS exacts.
 
@@ -390,9 +399,10 @@ principals. Seul un replay partiel conforme à B1/B2 est accepté; tout assignme
 bloque. B1 passe l'objet Phase A validé comme
 paramètre littéral : aucun `principalId` d'assignment ne dépend d'un `reference()`. Son manifeste
 indépendant B1a couvre les six roleAssignments RG sans délégation. Le manifeste B1b couvre les
-trois launchers, les quatre attributions délégatrices conditionnées et
+trois launchers, les quatre attributions délégatrices conditionnées, les trois droits
+d'attachement limités à l'UAMI reader et
 `certigo-privileged-ci-rbac` en `Audit`, sous identité humaine PIM.
-Si ARM omet `principalType` (`null`) dans le payload what-if, B1 ne l'infère qu'après avoir prouvé
+Si ARM omet `principalType` (`null`) dans le payload what-if, B1a/B1b ne l'infèrent qu'après avoir prouvé
 que la déclaration correspondante du template ARM compilé contient le littéral
 `ServicePrincipal` et que le `principalId` littéral correspond exactement à une UAMI Phase A live.
 Le plan normalisé et la provenance `compiled-template+live-uami` sont hashés dans le manifeste;
@@ -533,6 +543,63 @@ Après les deux phases :
 2. **Protection de l'Environment.** Limiter
    `azure-content-infra-plan` à la branche `main` et exiger un reviewer. Cette configuration
    GitHub est une opération séparée, non réalisée par la PR.
+
+### État constaté le 2026-09-07 : `content-infra-what-if` est cassé sur trois niveaux
+
+Le point 1 ci-dessus **n'a jamais été exécuté**, et ce n'est que le premier de trois blocages
+indépendants. Corriger un seul niveau **déplace** l'erreur au lieu de la lever. Le workflow
+`.github/workflows/content-infra-what-if.yml` est en conséquence **parké** (job désactivé par une
+condition d'opt-in `vars.CERTIGO_CONTENT_INFRA_WHAT_IF_ENABLED == 'true'`, variable jamais
+définie — et non `if: false`, qu'actionlint rejette comme expression constante) : son
+en-tête porte le détail, les conditions de réactivation, et l'avertissement de ne pas le promouvoir
+en check requis tant qu'il est parké — un check requis *skipped* compte comme *satisfait*.
+
+| Niveau | Nature | Constat | Statut de la mesure |
+| --- | --- | --- | --- |
+| 1 | Configuration | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` absentes de l'Environment `azure-content-infra-plan` | **mesuré** |
+| 2 | RBAC | `id-certigo-content-infra-plan` (`d849ecb0-…`, principal `d0f76908-…`) porte **zéro** attribution de rôle | **mesuré**, avec témoin positif |
+| 3 | Modèle de moindre privilège | Le jeu canonique de trois attributions ne couvre pas `rg-certigo-identities` | **raisonné, non mesuré** |
+
+**Niveau 1 — `vars.` est correct par conception.** Ce n'est pas une confusion `vars.`/`secrets.` :
+le point 1 ci-dessus prescrit ces variables non secrètes sur cet Environment précis, délibérément
+et non le principal CI partagé. Le message du garde-fou (`Configure AZURE_CLIENT_ID in
+azure-content-infra-plan`) est donc **exact** et désigne déjà le bon endroit.
+
+**Niveau 2 — la Phase A est appliquée, les attributions manquent.** Les deux définitions de rôles
+personnalisés existent (créées le 2026-08-30) ; seules les *attributions* manquent. Le credential
+fédéré correspond déjà exactement à l'environnement du workflow, donc aucune mutation Entra n'est
+requise. Le zéro est réel : la même requête contre le principal content-reader renvoie ses trois
+attributions au scope conteneur. Ces attributions proviennent de
+`infra/governance/bootstrap-rbac-admin.bicep` via `modules/contentPlanExecutorAssignment.bicep`,
+c'est-à-dire la **Phase B**, que ce runbook classe **NO-GO** en l'absence d'un tiers indépendant.
+Poser le niveau 1 sans le niveau 2 ferait échouer `azure/login` avec un message
+*subscription not found* **strictement moins informatif** que le garde-fou actuel.
+
+**Niveau 3 — prédiction, à falsifier.** `infra/content/main.bicep` déclare quatre identités
+`existing` au scope `rg-certigo-identities` et lit `.properties.principalId` sur chacune ; ARM doit
+donc pouvoir les lire. Or le jeu canonique (`infra/governance/validate-what-if.mjs`, et la ligne
+« Plan contenu post-#290 » du tableau de ce document) comporte exactement trois attributions :
+exécuteur sur `rg-certigo-content`, deux joins externes sur `rg-certigo-ci`. Aucune ne couvre
+`rg-certigo-identities`. **Prédiction : même la Phase B complète laisserait le what-if en
+`AuthorizationFailed` sur une lecture `Microsoft.ManagedIdentity`.** Non vérifié : l'identité est
+fédérée OIDC sans secret client et ne peut pas être empruntée localement. Si la prédiction se
+confirme, le modèle de moindre privilège omet une attribution que sa propre conception exige, et
+`infra/tests/least-privilege.test.mjs` resterait vert pendant que le système réel diverge.
+
+**Ce qui n'est pas en cause.** Le template et les garde-fous de périmètre du workflow sont sains :
+un `az deployment group what-if` exécuté en Owner sur `rg-certigo-content` renvoie 19 changements,
+zéro ressource hors périmètre autorisé et zéro suppression. Le blocage est le RBAC, pas le Bicep.
+
+**Portée.** Les trois workflows voisins (`content-infra-apply`,
+`governance-bootstrap-phase-a-what-if`, `governance-bootstrap-phase-b-what-if`) sont cassés de la
+même façon mais déclenchés uniquement par `repository_dispatch` : ils ne produisent aucun rouge
+spontané. Les deux workflows de gouvernance sont bloqués plus profondément encore — aucune identité
+de planification de gouvernance n'existe parmi les douze UAMI de la souscription, et l'Environment
+`azure-governance-bootstrap-phase-b` n'existe pas.
+
+**Condition d'invalidation de cette section** : elle cesse d'être vraie dès qu'une attribution de
+rôle est créée sur `d0f76908-f7c1-4fcc-aecf-07326e1f940d`, ou que les trois variables sont posées
+sur `azure-content-infra-plan`. Vérifier alors les trois niveaux, pas seulement celui qui a bougé.
 
 Après ce bootstrap, `infra/content/main.bicep` s'exécute au scope resource group. Le workflow
 utilise exclusivement `az deployment group what-if --resource-group rg-certigo-content` et
@@ -722,7 +789,8 @@ Les éléments versionnés restent tous read-only :
 - `capacity-controller.config.json` fixe `enabled=false`, le trigger `workflow_job`, la
   quiet period de 300 s, les deux gardes et la cible de pilote ultérieur
   `6 certigo-pr + 2 certigo-trusted`; son état v3 lie les IDs exacts f55/pilote, garde le
-  runner 26 et la VM `4153d1dd` hors scope et interdit les VMs `22f7fb52`/`4596a9d5`,
+  runner 26 et la VM `4153d1dd` hors scope et interdit les VMs `22f7fb52`/`4596a9d5`.
+  `be505fa1` reste volontairement absente de ces listes afin de demeurer bloquante,
   sans règle générique qui masquerait une
   nouvelle VM non réconciliée ;
 - `capacity-controller.mjs` réduit un snapshot d'événements et produit uniquement le
@@ -768,9 +836,9 @@ impose une nouvelle quiet period complète. Seule une future PR d'activation pou
 la persistance, l'acquittement du réarmement et le chemin mutable. Tant que `enabled=false`,
 `lifecycle-preflight.sh` bloque aussi bien `start` que `deallocate` et n'arme aucune action.
 
-La passation opérationnelle externe v3 possède temporairement uniquement les IDs exacts
-`f55d176e` et `bbf83c5c`; le runner 26 et la VM 415 restent hors scope. Elle maintient les
-deux pendant l'activité, applique une quiet period coordonnée de 5 minutes resettable,
+La passation opérationnelle externe v3 possède les IDs exacts
+`f55d176e`, `be505fa1` et `bbf83c5c`; le runner 26 et la VM 415 restent hors scope. Elle
+maintient ces instances pendant l'activité, applique une quiet period coordonnée de 5 minutes resettable,
 contrôle 2 + garde finale sous la même génération de lease, désalloue le pilote puis le
 primaire et réarme les capacités exactes supprimées si une activité apparaît. Ce processus
 hors dépôt n'active pas le contrôleur versionné : `enabled=false` reste le contrat de cette PR.
@@ -780,8 +848,8 @@ hors dépôt n'active pas le contrôleur versionné : `enabled=false` reste le c
 1. conserver `enabled=false` et suspendre tout scale-in CPU ;
 2. archiver les inventaires Azure, VMSS, GitHub, disques/NIC et l'erreur
    `ResourceNotFound` de `22f7fb52` ;
-3. ne supprimer ni le runner stale `22f7fb52-Certigo`, ni la VM intacte `4153d1dd` pendant
-   l'analyse de cause et la décision d'adoption/reconstruction ;
+3. ne supprimer ni le runner historique `22f7fb52-Certigo`, ni la VM
+   `be505fa1` pendant l'analyse de cause et la décision d'adoption/reconstruction ;
 4. faire approuver le modèle cible : deux pools/VMSS, frontières d'identité distinctes,
    sous-réseaux distincts, un label exclusif par pool et au moins deux zones ;
 5. reconstruire ou adopter une seconde instance via une fenêtre opérateur, puis

@@ -3,11 +3,8 @@
 // storage, locked CORS) but is a safe pre-production target. Hardening turns on
 // automatically for any non-dev env (main.bicep), so staging is hardened by default.
 //
-// Deploy (ready to run once the two Entra values below are filled):
-//   az deployment sub create \
-//     --location westeurope \
-//     --template-file infra/main.bicep \
-//     --parameters infra/params/staging.bicepparam
+// The certigo-staging subscription deployment succeeded on 2026-08-16. Treat this
+// file as the reconciliation input for what-if; never recreate the populated RG.
 using '../main.bicep'
 
 param env = 'staging'
@@ -50,16 +47,14 @@ param cosmosLocation = 'northeurope'
 // authMode is 'prod' for any non-dev env (main.bicep), so the backend runs the
 // real EntraTokenValidator against these values: the unauthenticated dev bypass
 // (AUTH_ALLOW_DEV) is NOT available here. The two placeholders below are therefore
-// the ONLY blockers before staging can be deployed — every social/Entra login is
-// rejected (401 aud/issuer mismatch) until they are set. Do NOT invent GUIDs: fill
-// them from a dedicated staging app registration (preferred), or temporarily reuse
-// the prod values (see prod.bicepparam) knowing that staging logins then
-// authenticate against the production tenant.
+// these values remain an explicit authentication contract. The current staging
+// deployment reuses the documented tenant/application values; changing them requires
+// a dedicated auth review and a Provider-level what-if.
 // Use the tenant-GUID subdomain (<tenant-guid>.ciamlogin.com), NOT a vanity domain:
 // flutter_appauth validates the issuer strictly against the OIDC discovery document.
 // ============================================================================
 param entraAuthority = 'https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0'
-// Audience = Application ID URI of the staging backend app registration.
+// Audience = Application ID URI currently used by staging.
 param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
 param personLinkedIdentityV1 = 'off'
 
@@ -80,6 +75,17 @@ param manageDefenderPlans = false
 // Staging validates the same PITR contract as production.
 param cosmosBackupMode = 'Continuous'
 param cosmosContinuousBackupTier = 'Continuous7Days'
+
+// ============================================================================
+// Immutable content stack (rg-certigo-content). These three values are the
+// outputs of the content infrastructure and are all-or-nothing: main.bicep
+// fail()s if only some are set. contentRepositoryMode is deliberately NOT set
+// here — it defaults to 'legacy' in main.bicep, and infra/tests asserts that no
+// committed environment pins it.
+// ============================================================================
+param contentBlobEndpoint = 'https://stcertigocntz3wqbdww.blob.core.windows.net/'
+param contentReaderClientId = 'cabec54e-0536-4c0b-9ddb-f8b951725bcb'
+param contentReaderResourceId = '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader'
 
 // Subscription security controls are owned by the PIM-approved governance stack.
 param deployMcsbPolicyAssignment = false

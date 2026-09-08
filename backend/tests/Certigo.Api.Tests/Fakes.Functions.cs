@@ -438,6 +438,7 @@ internal sealed class FakeNotificationService : INotificationService
 internal sealed class FakeContentService : IContentService
 {
     public Lesson? LessonResult { get; set; } = DefaultLesson();
+    public string? PublicManifestId { get; set; }
 
     public CatalogDto CatalogResult { get; set; } = DefaultCatalog();
 
@@ -455,6 +456,15 @@ internal sealed class FakeContentService : IContentService
         LastLessonId = lessonId;
         LessonCallCount++;
         return Task.FromResult(LessonResult);
+    }
+
+    public async Task<ContentLessonResult?> GetLessonWithSnapshotAsync(
+        string trackId,
+        string lessonId,
+        CancellationToken cancellationToken = default)
+    {
+        var lesson = await GetLessonAsync(trackId, lessonId, cancellationToken);
+        return lesson is null ? null : new ContentLessonResult(lesson, PublicManifestId);
     }
 
     public Task<CatalogDto> GetCatalogAsync(CancellationToken cancellationToken = default)

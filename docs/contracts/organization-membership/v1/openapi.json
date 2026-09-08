@@ -2,15 +2,15 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Certigo Organization Membership",
-    "version": "1.1.0",
-    "description": "Dormant B2B API contract with fail-closed tenant authorization. Runtime mode supports off only; legacy remains authoritative."
+    "version": "1.2.0",
+    "description": "Dormant B2B API contract with fail-closed tenant authorization. Runtime modes off and shadow both keep the HTTP surface at 404; shadow additionally runs a strictly read-only background observation (non-PII telemetry). Legacy remains authoritative."
   },
   "servers": [{ "url": "/api" }],
   "security": [{ "bearerAuth": [] }],
   "x-certigo-feature-mode": {
     "setting": "ORGANIZATION_MEMBERSHIP_V1",
     "default": "off",
-    "implementedValues": ["off"],
+    "implementedValues": ["off", "shadow"],
     "offHttpStatus": 404
   },
   "x-certigo-person-contract": {

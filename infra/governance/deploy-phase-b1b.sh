@@ -27,6 +27,7 @@ cp "${PHASE_B_WORK_DIR}/b1-parameters.json" "${work_dir}/parameters.json"
 chmod 400 "${work_dir}/template.json" "${work_dir}/parameters.json"
 cmp "${work_dir}/fresh-template.json" "${work_dir}/template.json"
 node "${root}/infra/governance/validate-evidence.mjs" deployment-approval \
+  --phase B1b \
   --approval "${approval_file}" \
   --manifest "${evidence_dir}/manifest.json" \
   --plan "${evidence_dir}/plan.json" \

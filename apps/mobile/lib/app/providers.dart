@@ -6,6 +6,7 @@ import 'package:core/core.dart';
 import 'package:data/data.dart';
 
 import 'active_track_store.dart';
+import 'content/runtime_content_dependencies.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/application/auth_state.dart';
 import '../features/lesson/application/lesson_feedback.dart';
@@ -78,12 +79,23 @@ final contentManifestVersionProvider = Provider<String>(
 final lessonStoreProvider = Provider<LessonCacheStore>((Ref ref) => InMemoryLessonCacheStore());
 
 final lessonRepositoryProvider = Provider<LessonRepository>((Ref ref) {
-  final LessonRepository remote = RemoteLessonRepository(ref.watch(apiClientProvider));
-  if (!ref.watch(offlineStudyCacheEnabledProvider)) return remote;
-  return OfflineLessonRepository(
-    remote,
-    ref.watch(lessonStoreProvider),
-    ref.watch(contentManifestVersionProvider),
+  LessonRepository repository = RemoteLessonRepository(ref.watch(apiClientProvider));
+  if (ref.watch(offlineStudyCacheEnabledProvider)) {
+    repository = OfflineLessonRepository(
+      repository,
+      ref.watch(lessonStoreProvider),
+      ref.watch(contentManifestVersionProvider),
+    );
+  }
+  if (!ref.watch(runtimeContentSyncEnabledProvider)) return repository;
+  return RuntimeContentLessonRepository(
+    inner: repository,
+    store: ref.watch(runtimeContentStoreProvider),
+    pins: ref.watch(runtimeContentPinRegistryProvider),
+    ownerIdProvider: () {
+      final AuthState auth = ref.read(authControllerProvider);
+      return auth is Authenticated ? auth.session.userId : null;
+    },
   );
 });
 

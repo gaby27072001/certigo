@@ -74,6 +74,19 @@ Le validateur parse les quatre représentations, compare leurs statuts, vérifie
 `state/`, les dépendances et l'absence de cycle. La gate
 `.github/workflows/ci-migration-registry.yml` rejoue ce contrôle à chaque changement du registre.
 
+**Ce que ce validateur ne peut pas voir** : il garantit que le registre est *cohérent avec
+lui-même*, pas qu'il reflète l'état *réel* de GitHub (une PR peut fusionner sans que personne ne
+mette à jour son lot). Pour ce second contrôle, à la demande (pas un gate CI) :
+
+```bash
+python tools/check_migration_pr_status.py
+```
+
+Ce script relit le `pr` de chaque `state/<id>.json`, interroge `gh pr view`, et signale toute
+incohérence entre le statut déclaré et l'état réel de la PR — sans jamais corriger seul. Voir
+`docs/ETAT_DU_PROJET.md` §15 pour le contexte (deux dérives de ce type trouvées et corrigées le
+2026-09-03).
+
 ## Suivi GitHub (optionnel)
 
 Une **issue de suivi** « Migration Certigo — suivi des lots » peut lister les lots et leur statut.

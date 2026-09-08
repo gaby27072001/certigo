@@ -10,7 +10,7 @@
     "test": "npm run test:content",
     "contracts:refresh": "python tools/generated_contracts.py --refresh",
     "contracts:check": "python tools/generated_contracts.py --check",
-    "test:ci-impact": "node --test .github/scripts/ci-impact.test.mjs .github/scripts/workflow-concurrency-policy.test.mjs .github/scripts/workflow-security-cache-policy.test.mjs",
+    "test:ci-impact": "node --test .github/scripts/backend-deploy-gate.test.mjs .github/scripts/ci-impact.test.mjs .github/scripts/codeql-gate-policy.test.mjs .github/scripts/workflow-concurrency-policy.test.mjs .github/scripts/workflow-security-cache-policy.test.mjs",
     "test:content": "node --test tools/tests/*.test.mjs",
     "validate:content": "node tools/validate_content.mjs"
   },

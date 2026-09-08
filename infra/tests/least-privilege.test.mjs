@@ -12,6 +12,7 @@ import {
   validatePhaseAProof,
   validateWhatIf,
 } from '../governance/validate-what-if.mjs';
+import { normalizePrincipalTypes } from '../governance/normalize-principal-types.mjs';
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -54,7 +55,9 @@ function allResources(template) {
 }
 
 function resourcesOfType(template, type) {
-  return allResources(template).filter((resource) => resource.type === type);
+  return allResources(template).filter(
+    (resource) => resource.type.toLowerCase() === type.toLowerCase(),
+  );
 }
 
 function makePhaseAProof() {
@@ -416,6 +419,9 @@ function makeCompletePhaseBPlans(proof) {
   const contributor =
     `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
     'roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c';
+  const managedIdentityOperator =
+    `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
+    'roleDefinitions/f1a07417-d97a-45cb-824c-7a7467783830';
   for (const environment of ['dev', 'staging', 'prod']) {
     const key = `deploy${environment[0].toUpperCase()}${environment.slice(1)}`;
     const principalId = proof.identities[key].principalId;
@@ -467,6 +473,17 @@ function makeCompletePhaseBPlans(proof) {
           principalType: 'ServicePrincipal',
           roleDefinitionId:
             proof.roleDefinitionIds.runtimeRoleAssignmentWriter,
+        },
+      ),
+      roleAssignmentChange(
+        proof.identities.contentReader.resourceId,
+        proof.identities[key].name,
+        {
+          description:
+            `Allows ${environment} deployment to attach only the immutable content reader identity.`,
+          principalId,
+          principalType: 'ServicePrincipal',
+          roleDefinitionId: managedIdentityOperator,
         },
       ),
     );
@@ -600,6 +617,19 @@ test('Phase A custom roles contain no wildcard or delete action', () => {
   const template = compileTemplate(
     'infra/governance/bootstrap-identities.bicep',
   );
+  // Only the immutable content publisher may hold data-plane actions, and only
+  // the two needed to create a blob and read it back for hash verification.
+  // Everything else must stay control-plane only.
+  const contentPublisherRoleName = 'c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de';
+  const allowedDataActions = new Map([
+    [
+      contentPublisherRoleName,
+      [
+        'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read',
+        'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write',
+      ],
+    ],
+  ]);
   for (const role of resourcesOfType(
     template,
     'Microsoft.Authorization/roleDefinitions',
@@ -612,7 +642,7 @@ test('Phase A custom roles contain no wildcard or delete action', () => {
     assert.ok(permissions.every((permission) => !/delete/i.test(permission)));
     assert.deepEqual(
       role.properties.permissions.flatMap((value) => value.dataActions ?? []),
-      [],
+      allowedDataActions.get(role.name) ?? [],
     );
   }
 });
@@ -980,7 +1010,7 @@ test('Phase B1a B1b and B2 accept only their exact assignment contracts', () => 
   );
   assert.equal(
     validateWhatIf(b1b, subscription, { phase: 'B1b', phaseA: proof }).total,
-    8,
+    11,
   );
   assert.equal(
     validateWhatIf(b2, subscription, { phase: 'B2', phaseA: proof }).total,
@@ -993,6 +1023,52 @@ test('Phase B1a B1b and B2 accept only their exact assignment contracts', () => 
   assert.throws(
     () => validateWhatIf(b1a, subscription, { phase: 'B2', phaseA: proof }),
     /outside the exact Phase B2 contract|Phase B2 plan is incomplete/,
+  );
+});
+
+test('human B1b normalizes only proven Phase A service principals', () => {
+  const proof = makePhaseAProof();
+  const raw = structuredClone(makeCompletePhaseBPlans(proof).b1b);
+  for (const change of raw.changes) {
+    if (change.resourceId.includes('/Microsoft.Authorization/roleAssignments/')) {
+      change.after.type = 'Microsoft.Authorization/roleAssignments';
+      change.after.properties.principalType = null;
+    }
+  }
+  const compiled = compileTemplate('infra/governance/bootstrap-rbac-admin.bicep');
+  const normalized = normalizePrincipalTypes(raw, compiled, proof);
+  assert.equal(normalized.provenance.normalizedCount, 10);
+  assert.equal(
+    validateWhatIf(normalized.plan, subscription, {
+      phase: 'B1b',
+      phaseA: proof,
+    }).total,
+    11,
+  );
+
+  const nonUami = structuredClone(raw);
+  nonUami.changes.find(
+    ({ after }) => after?.type === 'Microsoft.Authorization/roleAssignments',
+  ).after.properties.principalId =
+    '90000000-0000-0000-0000-000000000001';
+  assert.throws(
+    () => normalizePrincipalTypes(nonUami, compiled, proof),
+    /does not match a Phase A UAMI/,
+  );
+
+  const tampered = structuredClone(compiled);
+  const readerAssignment = resourcesOfType(
+    tampered,
+    'Microsoft.Authorization/roleAssignments',
+  ).find(
+    ({ properties }) =>
+      properties.description ===
+      "[parameters('readerAssignmentDescription')]",
+  );
+  readerAssignment.properties.principalType = "[parameters('principalType')]";
+  assert.throws(
+    () => normalizePrincipalTypes(raw, tampered, proof),
+    /not literal ServicePrincipal/,
   );
 });
 
@@ -1044,7 +1120,7 @@ test('Phase B validators accept exact NoChange retries only', () => {
   const proof = makePhaseAProof();
   for (const [key, phase, total] of [
     ['b1a', 'B1a', 6],
-    ['b1b', 'B1b', 8],
+    ['b1b', 'B1b', 11],
     ['b2', 'B2', 2],
   ]) {
     const create = makeCompletePhaseBPlans(proof)[key];
@@ -1201,7 +1277,277 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
     'vmss-certigo-runner-zonal_22f7fb52',
     'vmss-certigo-pr-pilot-z1_4596a9d5',
   ]);
-  assert.equal(config.inventory.managedRunnerBindings.length, 2);
+  // Pin the exact managed set, not just its size. A bare length check is what let the
+  // zone-1 trusted instance stay absent from the inventory until GitHub garbage-collected
+  // its runner registration.
+  assert.deepEqual(
+    config.inventory.managedRunnerBindings.map(
+      ({ githubRunnerId, runnerName, virtualMachineName }) => ({
+        githubRunnerId,
+        runnerName,
+        virtualMachineName,
+      }),
+    ),
+    [
+      {
+        githubRunnerId: 27,
+        runnerName: 'vmss-certigo-runner-zonal_f55d176e-Certigo',
+        virtualMachineName: 'vmss-certigo-runner-zonal_f55d176e',
+      },
+      {
+        githubRunnerId: 29,
+        runnerName: 'vmss-certigo-runner-zonal_be505fa1-Certigo',
+        virtualMachineName: 'vmss-certigo-runner-zonal_be505fa1',
+      },
+      {
+        githubRunnerId: 28,
+        runnerName: 'certigo-prIVJAN8',
+        virtualMachineName: 'vmss-certigo-pr-pilot-z1_bbf83c5c',
+      },
+      {
+        githubRunnerId: 30,
+        runnerName: 'certigo-prQA5OWT',
+        virtualMachineName: 'vmss-certigo-pr-pilot-z1_a14700a3',
+      },
+    ],
+  );
+  // Both trusted zones must stay bound: the redundancy floor is meaningless if the
+  // inventory it is counted against can silently omit a member.
+  // certigo-pr is 2 because PR capacity was raised from 1 to 2 in #402. A floor
+  // left at the pre-scale-out value emits nothing when the second runner is lost,
+  // which is how the 2026-09-08 deallocation went unreported for twelve hours.
+  assert.deepEqual(config.minimumOnlineByTrust, {
+    'certigo-pr': 2,
+    'certigo-trusted': 2,
+  });
+});
+
+test('CI drift IaC manages only bounded network and autoscale surfaces', () => {
+  const network = compileTemplate('infra/ci-runner/network.bicep');
+  const networkSource = readFileSync(
+    path.join(repositoryRoot, 'infra', 'ci-runner', 'network.bicep'),
+    'utf8',
+  );
+  const [subnet] = resourcesOfType(
+    network,
+    'Microsoft.Network/virtualNetworks/subnets',
+  );
+  assert.match(
+    networkSource,
+    /resource vnet 'Microsoft\.Network\/virtualNetworks@[^']+' existing/,
+  );
+  assert.match(
+    networkSource,
+    /resource publicIp 'Microsoft\.Network\/publicIPAddresses@[^']+' existing/,
+  );
+  assert.match(
+    networkSource,
+    /resource natGateway 'Microsoft\.Network\/natGateways@[^']+' existing/,
+  );
+  assert.match(
+    networkSource,
+    /resource nsg 'Microsoft\.Network\/networkSecurityGroups@[^']+' existing/,
+  );
+  assert.equal(
+    resourcesOfType(network, 'Microsoft.Network/virtualNetworks').length,
+    0,
+  );
+  assert.ok(subnet);
+  assert.equal(
+    resourcesOfType(network, 'Microsoft.Network/publicIPAddresses').length,
+    0,
+  );
+  assert.equal(
+    resourcesOfType(network, 'Microsoft.Network/natGateways').length,
+    0,
+  );
+  assert.equal(
+    resourcesOfType(network, 'Microsoft.Network/networkSecurityGroups').length,
+    0,
+  );
+  assert.equal(
+    resourcesOfType(network, 'Microsoft.Resources/tags').length,
+    3,
+  );
+
+  const capacity = compileTemplate('infra/ci-runner/capacity.bicep');
+  const capacitySource = readFileSync(
+    path.join(repositoryRoot, 'infra', 'ci-runner', 'capacity.bicep'),
+    'utf8',
+  );
+  const scaleSets = resourcesOfType(
+    capacity,
+    'Microsoft.Compute/virtualMachineScaleSets',
+  );
+  const [autoscale] = resourcesOfType(
+    capacity,
+    'Microsoft.Insights/autoscaleSettings',
+  );
+  assert.equal(scaleSets.length, 0);
+  assert.equal(
+    (
+      capacitySource.match(
+        /resource \w+ 'Microsoft\.Compute\/virtualMachineScaleSets@[^']+' existing/g,
+      ) ?? []
+    ).length,
+    2,
+  );
+  assert.equal(
+    resourcesOfType(capacity, 'Microsoft.Compute/virtualMachines').length,
+    0,
+  );
+  const rules = autoscale.properties.profiles[0].rules;
+  assert.equal(rules.length, 1);
+  assert.equal(autoscale.properties.enabled, true);
+  assert.equal(
+    autoscale.properties.profiles[0].capacity.minimum,
+    "[string(parameters('legacyMinimumCapacity'))]",
+  );
+  assert.equal(
+    autoscale.properties.profiles[0].capacity.default,
+    "[string(parameters('legacyMinimumCapacity'))]",
+  );
+  assert.equal(
+    autoscale.properties.profiles[0].capacity.maximum,
+    "[string(parameters('legacyMaximumCapacity'))]",
+  );
+  assert.equal(rules[0].metricTrigger.metricName, 'Percentage CPU');
+  assert.equal(rules[0].metricTrigger.operator, 'GreaterThan');
+  assert.equal(rules[0].metricTrigger.threshold, 70);
+  assert.equal(rules[0].metricTrigger.timeWindow, 'PT10M');
+  assert.equal(rules[0].scaleAction.direction, 'Increase');
+  assert.equal(rules[0].scaleAction.value, '1');
+
+  const plan = readFileSync(
+    path.join(repositoryRoot, 'infra', 'ci-runner', 'capacity-plan.sh'),
+    'utf8',
+  );
+  assert.match(plan, /--capacity-template/);
+  assert.match(plan, /capacity\.bicep/);
+  assert.doesNotMatch(plan, /--runner-template/);
+});
+
+test('OpenAI IaC remains private, keyless, and independent from runtime activation', () => {
+  const openAi = compileTemplate('infra/modules/openai.bicep');
+  const openAiSource = readFileSync(
+    path.join(repositoryRoot, 'infra', 'modules', 'openai.bicep'),
+    'utf8',
+  );
+  const [account] = resourcesOfType(
+    openAi,
+    'Microsoft.CognitiveServices/accounts',
+  );
+  const [deployment] = resourcesOfType(
+    openAi,
+    'Microsoft.CognitiveServices/accounts/deployments',
+  );
+  const [roleAssignment] = resourcesOfType(
+    openAi,
+    'Microsoft.Authorization/roleAssignments',
+  );
+  assert.equal(account.properties.publicNetworkAccess, 'Disabled');
+  assert.equal(account.properties.disableLocalAuth, true);
+  assert.equal(
+    deployment.properties.model.version,
+    "[parameters('modelVersion')]",
+  );
+  assert.equal(
+    openAi.parameters.openAiUserRoleAssignmentName.defaultValue,
+    'f2f408f8-6106-4435-980c-a4d178e67fd2',
+  );
+  assert.equal(
+    roleAssignment.name,
+    "[parameters('openAiUserRoleAssignmentName')]",
+  );
+  assert.match(
+    openAiSource,
+    /resource project 'Microsoft\.CognitiveServices\/accounts\/projects@[^']+' existing/,
+  );
+  assert.match(
+    openAiSource,
+    /resource privateEndpoint 'Microsoft\.Network\/privateEndpoints@[^']+' existing/,
+  );
+  assert.doesNotMatch(openAiSource, /Microsoft\.Network\/privateDnsZones/);
+  assert.equal(
+    resourcesOfType(
+      openAi,
+      'Microsoft.CognitiveServices/accounts/projects',
+    ).length,
+    0,
+  );
+  assert.equal(
+    resourcesOfType(openAi, 'Microsoft.Network/privateEndpoints').length,
+    0,
+  );
+  assert.equal(
+    resourcesOfType(openAi, 'Microsoft.Network/privateDnsZones').length,
+    0,
+  );
+
+  const main = readFileSync(
+    path.join(repositoryRoot, 'infra', 'main.bicep'),
+    'utf8',
+  );
+  assert.match(
+    main,
+    /module tutor .* = if \(env == 'dev' && !empty\(tutorLlmDeployment\)\)/,
+  );
+  assert.doesNotMatch(main, /module tutor .* = if \(tutorLlmEnabled\)/);
+});
+
+test('every managed runner is restarted after the nightly teardown', () => {
+  const config = JSON.parse(
+    readFileSync(
+      path.join(
+        repositoryRoot,
+        'infra',
+        'ci-runner',
+        'capacity-controller.config.json',
+      ),
+      'utf8',
+    ),
+  );
+  const bicepparam = readFileSync(
+    path.join(
+      repositoryRoot,
+      'infra',
+      'params',
+      'ci-runner-auto-recovery.bicepparam',
+    ),
+    'utf8',
+  );
+
+  const block = /param virtualMachineNames = \[([^\]]*)\]/.exec(bicepparam);
+  assert.ok(block, 'the recovery parameters must declare virtualMachineNames');
+  const recovered = [...block[1].matchAll(/'([^']+)'/g)].map(([, name]) => name);
+  // A parser that silently yields nothing would make every membership assertion below
+  // vacuously true, which is the failure mode this whole test exists to prevent.
+  assert.ok(recovered.length > 0, 'the parsed recovery list must not be empty');
+
+  const managed = config.inventory.managedRunnerBindings.map(
+    ({ virtualMachineName }) => virtualMachineName,
+  );
+
+  // The subscription-wide teardown deallocates every instance; one absent from this
+  // list simply stays off, and a runner that never comes back online is invisible
+  // until a job queues behind the survivors. Capacity is only real if it restarts.
+  assert.deepEqual(
+    managed.filter((name) => !recovered.includes(name)),
+    [],
+    'each managed runner instance must appear in the recovery parameters',
+  );
+  assert.deepEqual(
+    recovered.filter((name) => !managed.includes(name)),
+    [],
+    'the recovery job must not restart an instance the inventory does not manage',
+  );
+  assert.deepEqual(
+    recovered.filter((name) =>
+      config.inventory.forbiddenVirtualMachines.includes(name),
+    ),
+    [],
+    'a forbidden instance must never be restarted',
+  );
 });
 
 test('infra validation bootstraps pinned Node for bare Linux runners', () => {

@@ -56,9 +56,9 @@ La réconciliation de #304 doit supprimer, dans une même modification :
 #304 reçoit à la place l'endpoint, les trois noms de conteneur, le resource ID
 et le client ID de l'UAMI externe. Il attache cette UAMI à la Function App sans
 recréer son RBAC. Les paramètres déployés restent `legacy` dans dev, staging et
-prod, et `CONTENT_ALLOW_MUTABLE_BLOBS=false`. La valeur `true` éventuellement
-utilisée avec un émulateur local n'est pas un default Azure et ne doit entrer
-dans aucun fichier de paramètres ou Environment de déploiement.
+prod, et `CONTENT_ALLOW_MUTABLE_BLOBS=false`. Une dérogation locale éventuelle
+doit être explicite et non committée; aucun exemple, fichier de paramètres ou
+Environment de déploiement ne l'active par défaut.
 
 ## Matrice d'environnements et activation
 
@@ -100,24 +100,38 @@ Private Link et éventuel egress à partir des tarifs Azure du jour. Une alerte 
 budget est portée par le stack FinOps existant, pas par #290, afin de ne pas
 étendre le scope de ce déploiement de contenu.
 
-## Gap publisher hors #290
+## Gap publisher hors #290 — résolu
 
-Le workflow actuel de `certigo-content` ne publie que deux paquets sous
-`releases/sha256/<rootHash>/`. Il doit être corrigé séparément pour :
+> Mise à jour 2026-09-04. Cette section listait cinq corrections restantes.
+> Vérifié sur `certigo-content@07ab6b04` : les cinq sont implémentées dans
+> `.github/workflows/publish-content-azure.yml` et
+> `tools/publish_blob_artifact.sh`.
 
-1. publier le public sous
-   `content-public-releases/manifests/<publicManifestId>/...` ;
-2. publier le privé sous
-   `content-private-releases/manifests/<privateManifestId>/...` ;
-3. vérifier les deux arbres distants ;
-4. publier en dernier
+Le workflow publie :
+
+1. le public sous `content-public-releases/manifests/<publicManifestId>/` ;
+2. le privé sous `content-private-releases/manifests/<privateManifestId>/` ;
+3. avec relecture et comparaison SHA-256 de chaque blob distant ;
+4. puis en dernier
    `content-release-descriptors/releases/<releaseId>/release.json` avec
    l'Environment `azure-content-release` ;
-5. relire et vérifier le descripteur distant, sans overwrite, delete ou alias
-   mutable.
+5. sans overwrite (`--overwrite false`), sans delete et sans alias mutable.
 
-Le descripteur ne doit pas être confié au publisher public ou privé : sa
-publication atteste que les deux artefacts sont présents et vérifiés.
+Le descripteur n'est pas confié au publisher public ou privé : sa publication
+atteste que les deux artefacts sont présents et vérifiés.
+
+## Verrou WORM et publication
+
+Le script exigeait initialement une policy `Locked` avant tout upload, alors que
+Bicep crée les policies `Unlocked` et que ce runbook interdit le lock avant la
+preuve complète. Publier exigeait donc le lock, et le lock exigeait d'avoir
+publié.
+
+`tools/publish_blob_artifact.sh` accepte désormais `Locked` ou `Unlocked` et
+exige dans les deux cas une rétention réelle, non expirée et sans append
+protégé — c'est cette rétention qui empêche l'écrasement. `Locked` n'est exigé
+que lorsque `CONTENT_REQUIRE_LOCKED_WORM=true`, valeur attendue en production
+après la preuve staging. Le pilote laisse la variable à `false`.
 
 ## Validation strictement read-only
 
@@ -136,17 +150,23 @@ Le workflow `Content infrastructure what-if` :
 
 - est déclenché uniquement après un push sur `main` ;
 - checkout explicitement `refs/heads/main` ;
-- utilise uniquement `az deployment sub what-if` ;
+- utilise uniquement `az deployment group what-if` sur `rg-certigo-content` ;
 - refuse toute suppression ;
-- refuse toute cible hors `rg-certigo-content`, à l'exception de la définition
-  de rôle dédiée et identifiée exactement par
-  `c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de` au scope subscription ;
+- refuse toute cible hors `rg-certigo-content` ;
 - publie le diff complet dans le job summary.
 
-Il n'existe volontairement aucun trigger PR ou dispatch Azure privilégié.
-Avant que le workflow soit présent sur la branche par défaut, un opérateur
-autorisé peut rejouer la même commande read-only depuis un checkout propre de
-`main` puis du HEAD candidat, sans `create`, `validate` ou déploiement.
+Le workflow `Content infrastructure apply` applique le même template :
+
+- déclenché uniquement par `repository_dispatch` de type `content-infra-apply`,
+  car `validate-workflow-security.mjs` interdit `workflow_dispatch` sur un
+  workflow `certigo-trusted` ;
+- refuse toute exécution hors `refs/heads/main` ;
+- exige dans son payload le SHA-256 exact de `infra/content/main.bicep`, ce qui
+  interdit d'appliquer autre chose que le template approuvé ;
+- vérifie le tenant et la subscription réellement obtenus après login ;
+- rejoue le what-if et ses garde-fous avant d'appliquer, et échoue en plus si le
+  plan verrouillerait une policy d'immuabilité ;
+- ne verrouille jamais une policy WORM.
 
 Refuser le plan s'il annonce :
 
@@ -241,6 +261,42 @@ pas approbation compliance. Bicep crée uniquement des policies `Unlocked`.
 Le lock ne peut pas être annulé et la durée ne peut ensuite qu'augmenter. Il est
 hors périmètre de #290 et du pilote staging. Aucune commande de lock ne doit
 être ajoutée à un workflow.
+
+`tools/publish_blob_artifact.sh` n'exige donc pas `Locked` par défaut. Voir
+« Verrou WORM et publication » ci-dessus.
+
+## Fenêtre de dérive du rôle publisher
+
+> À supprimer une fois la PR #377 fusionnée dans `main`.
+
+Le 2026-09-04, le rôle `c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de` a été corrigé
+impérativement par `az role definition update` pour ajouter les deux
+`dataActions` `blobs/read` et `blobs/write`, sans lesquelles chaque upload
+retournait 403. La correction IaC correspondante est dans
+`infra/governance/bootstrap-identities.bicep` sur la branche de la PR #377.
+
+**Tant que #377 n'est pas fusionnée, `main` contient encore l'ancienne
+définition.** Rejouer Phase A depuis `main` pendant cette fenêtre écrase
+silencieusement les `dataActions` et toute publication recommence à échouer en
+403, sans cause évidente : le rôle existe, l'attribution existe, seul le
+data-plane est muet.
+
+Ne pas exécuter `infra/governance/deploy-phase-a.sh` depuis `main` avant la
+fusion. En cas de doute, vérifier avant publication :
+
+```bash
+az role definition list \
+  --name c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de \
+  --subscription b8952c8c-8f72-469d-99cd-ac906da4e2fc \
+  --query "[0].permissions[0].dataActions" --output json
+```
+
+Attendu : les deux actions `blobs/read` et `blobs/write`. Une liste vide
+signifie que la dérive s'est produite.
+
+Note : `az role definition update` ignore silencieusement une charge utile
+dépourvue du champ `id` et retourne un succès sans rien modifier. Toujours
+relire la définition après mise à jour.
 
 ## Rollback infrastructure
 

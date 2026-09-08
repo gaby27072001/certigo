@@ -71,6 +71,8 @@ Détail complet : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 > [!TIP]
 > 🧭 **Pour voir l'état réel et à jour du projet** (ce qui est *réellement* construit, fonctionnalité
 > par fonctionnalité), consultez le tableau de bord vivant : [`docs/ETAT_DU_PROJET.md`](docs/ETAT_DU_PROJET.md).
+> Ce document est aussi, depuis le 2026-09-03, le **registre canonique unique** des risques de
+> sécurité/fiabilité (§14) et du plan de migration restant (§15).
 
 Les faits techniques observables (versions, workflows, tests, corpus historique, types
 pédagogiques, référence Git analysée et packages actifs de `certigo-content`) y sont générés
@@ -284,10 +286,10 @@ Pour ajouter les intégrations réelles, démarrer l'émulateur puis définir
 > défaut d'Azure (septembre 2025), une VM sans IP publique explicite n'a **aucune
 > connectivité sortante** — le runner ne peut alors ni joindre GitHub ni restaurer
 > les paquets NuGet/pub.dev, et tous les jobs échouent. La connectivité est assurée
-> par une **NAT Gateway** (`nat-certigo`) associée au sous-réseau `snet-runners`,
+> par une **NAT Gateway** (`nat-vm-certigo-runner-2`) associée au sous-réseau `snet-runners`,
 > avec une IP publique Standard dédiée. Si l'egress retombe, vérifier :
 > ```bash
-> az network nat gateway show -g rg-certigo-ci -n nat-certigo
+> az network nat gateway show -g rg-certigo-ci -n nat-vm-certigo-runner-2
 > az network vnet subnet show -g rg-certigo-ci --vnet-name vnet-certigo-ci \
 >   -n snet-runners --query natGateway.id
 > ```

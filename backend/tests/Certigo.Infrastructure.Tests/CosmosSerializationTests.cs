@@ -247,6 +247,54 @@ public sealed class CosmosSerializationTests
     }
 
     [Fact]
+    public void Legacy_attempts_remain_readable_and_new_attempts_pin_content_release()
+    {
+        const string legacyJson = """
+            {
+              "id": "attempt::legacy",
+              "userId": "user-1",
+              "clientAttemptId": "legacy",
+              "trackId": "az-900",
+              "lessonId": "lesson-1",
+              "startedAt": "2026-08-19T10:00:00+00:00",
+              "submittedAt": "2026-08-19T10:01:00+00:00",
+              "result": {
+                "attemptId": "result-1",
+                "scorePct": 100,
+                "results": [],
+                "rewards": {
+                  "xpEarned": 0,
+                  "newXp": 0,
+                  "levelUp": false,
+                  "streakExtended": false,
+                  "gemsEarned": 0,
+                  "achievementsUnlocked": []
+                },
+                "weakConcepts": [],
+                "nextReviewDueAt": null
+              }
+            }
+            """;
+        var legacy = JsonSerializer.Deserialize<AttemptRecord>(legacyJson, SerializerOptions());
+        legacy!.ReleaseId.Should().BeNull();
+        legacy.PublicManifestId.Should().BeNull();
+
+        var pinned = legacy with
+        {
+            ReleaseId =
+                "sha256:6094410ae57637d55681fdeec3eae50fbfd69ba953741d069c95a478bee73f7f",
+            PublicManifestId =
+                "sha256:e5663734ac88ac916cff3b6e1206dc03bacf7f6d530e8b115e3f198a1e6304ee",
+        };
+        var json = JsonSerializer.Serialize(pinned, SerializerOptions());
+
+        json.Should().Contain("\"releaseId\"");
+        json.Should().Contain("\"publicManifestId\"");
+        JsonSerializer.Deserialize<AttemptRecord>(json, SerializerOptions())
+            .Should().BeEquivalentTo(pinned);
+    }
+
+    [Fact]
     public void Durable_operation_round_trips_steps_status_and_etag()
     {
         var now = new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero);

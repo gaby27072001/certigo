@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:core/core.dart';
 
@@ -14,6 +16,19 @@ typedef UnauthorizedHandler = Future<void> Function();
 /// `debugPrint`) so `data` stays Flutter-free while still surfacing logs in
 /// `flutter run` / `adb logcat`. Null in production paths that don't opt in.
 typedef DebugLogger = void Function(String message);
+
+class ApiResponse<T> {
+  const ApiResponse({required this.statusCode, required this.headers, this.data});
+
+  final int statusCode;
+  final Map<String, List<String>> headers;
+  final T? data;
+
+  String? header(String name) {
+    final List<String>? values = headers[name.toLowerCase()];
+    return values == null || values.isEmpty ? null : values.first;
+  }
+}
 
 /// Thin, configured Dio wrapper for the Certigo API.
 ///
@@ -104,6 +119,76 @@ class ApiClient {
     return _guard(() async {
       final Response<dynamic> res = await _dio.get<dynamic>(path, queryParameters: query);
       return parse(_asMap(res.data));
+    });
+  }
+
+  Future<Result<T>> getJsonWithHeaders<T>(
+    String path,
+    T Function(Map<String, dynamic> json, Headers headers) parse, {
+    Map<String, dynamic>? query,
+  }) async {
+    return _guard(() async {
+      final Response<dynamic> res = await _dio.get<dynamic>(path, queryParameters: query);
+      return parse(_asMap(res.data), res.headers);
+    });
+  }
+
+  Future<Result<ApiResponse<T>>> getJsonResponse<T>(
+    String path,
+    T Function(Map<String, dynamic> json) parse, {
+    Map<String, dynamic>? query,
+    Map<String, dynamic>? headers,
+  }) async {
+    return _guard(() async {
+      final Response<dynamic> res = await _dio.get<dynamic>(
+        path,
+        queryParameters: query,
+        options: Options(
+          headers: headers,
+          followRedirects: false,
+          validateStatus: (int? status) => status == 200 || status == 304,
+        ),
+      );
+      final int statusCode = res.statusCode ?? 0;
+      return ApiResponse<T>(
+        statusCode: statusCode,
+        headers: res.headers.map.map(
+          (String key, List<String> value) =>
+              MapEntry<String, List<String>>(key.toLowerCase(), List<String>.unmodifiable(value)),
+        ),
+        data: statusCode == 304 ? null : parse(_asMap(res.data)),
+      );
+    });
+  }
+
+  Future<Result<ApiResponse<Uint8List>>> getBytesResponse(
+    String path, {
+    Map<String, dynamic>? headers,
+  }) async {
+    return _guard(() async {
+      final Response<dynamic> res = await _dio.get<dynamic>(
+        path,
+        options: Options(
+          headers: headers,
+          responseType: ResponseType.bytes,
+          followRedirects: false,
+          validateStatus: (int? status) => status == 200 || status == 304,
+        ),
+      );
+      final int statusCode = res.statusCode ?? 0;
+      final dynamic data = res.data;
+      return ApiResponse<Uint8List>(
+        statusCode: statusCode,
+        headers: res.headers.map.map(
+          (String key, List<String> value) =>
+              MapEntry<String, List<String>>(key.toLowerCase(), List<String>.unmodifiable(value)),
+        ),
+        data: statusCode == 304
+            ? null
+            : data is Uint8List
+                ? data
+                : Uint8List.fromList((data as List<dynamic>).cast<int>()),
+      );
     });
   }
 

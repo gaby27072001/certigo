@@ -14,6 +14,7 @@ class TutorExplainRequest {
     required this.lessonId,
     required this.itemId,
     required this.selected,
+    this.publicManifestId,
   });
 
   final String trackId;
@@ -22,12 +23,14 @@ class TutorExplainRequest {
 
   /// The option ids the learner picked for this item.
   final List<String> selected;
+  final String? publicManifestId;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'trackId': trackId,
         'lessonId': lessonId,
         'itemId': itemId,
         'selected': selected,
+        if (publicManifestId != null) 'publicManifestId': publicManifestId,
       };
 }
 

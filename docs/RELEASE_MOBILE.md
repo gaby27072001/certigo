@@ -1,12 +1,18 @@
 # Release mobile — Pipeline & runbooks
 
 Documentation opérationnelle pour publier les bêtas Certigo.
-**Priorité : Android d'abord, puis iOS.** Pipeline reproductible :
-`code → build signée → upload beta store`.
+**Décision active : Alpha iOS interne uniquement.** Le pipeline cible est :
+`code figé → gates → build signée → TestFlight Internal Testers`.
+
+> [!IMPORTANT]
+> L'Alpha reste limitée à la boucle coeur existante et au Tuteur IA déterministe.
+> Android, les tests externes et toute nouvelle feature sont hors périmètre. Cette
+> documentation ne déclenche aucun tag, build, upload ou changement de store.
 
 > 🔐 **Aucun secret n'est committé.** Toutes les valeurs sensibles vivent dans
-> les secrets GitHub Actions (ou en local dans des fichiers ignorés par git).
-> Ce document ne contient que des **noms** de secrets et des **commandes**.
+> Azure Key Vault, GitHub Actions ou les variables sécurisées Codemagic (ou en
+> local dans des fichiers ignorés par git). Ce document ne contient que des
+> **noms** de secrets et des **commandes**.
 
 ---
 
@@ -14,14 +20,13 @@ Documentation opérationnelle pour publier les bêtas Certigo.
 
 ```
                     ┌─────────────────────────────────────────────────────┐
-  repo dispatch ───▶│  GitHub Actions (runner self-hosted Linux)          │
-  depuis main       │  release-android.yml                                │
-                    │   1. JDK 17 + SDK Android + Flutter 3.44.4 vérifié  │
-                    │   2. gates BLOQUANTS : flutter analyze + test        │
-                    │   3. secrets via Key Vault / GitHub → key.properties │
-                    │   4. flutter build appbundle (signé, versionné)      │
-                    │   5. upload Google Play (piste internal/closed/…)    │
-                    │   6. nettoyage du matériel de signature              │
+  lancement manuel ▶│  Codemagic (Mac M2) — Alpha iOS                    │
+  sur SHA candidat  │  ios-release-dry puis ios-release                  │
+                    │   1. Flutter 3.44.4 + analyze + test               │
+                    │   2. intégration AppStoreConnect + variables        │
+                    │   3. signature + IPA versionnée                     │
+                    │   4. dry-run sans upload                            │
+                    │   5. upload TestFlight → Internal Testers           │
                     └─────────────────────────────────────────────────────┘
 ```
 
@@ -31,8 +36,8 @@ Documentation opérationnelle pour publier les bêtas Certigo.
 | applicationId Android / bundle id iOS | `com.certigo.mobileapp` (identique sur les deux plateformes) — ⚠️ identifiants store stables |
 | Nom affiché | Certigo |
 | versionName | lu depuis `apps/mobile/pubspec.yaml` (`version:` → partie avant `+`) |
-| versionCode / build number | `github.run_number` (auto-incrémenté), override possible |
-| Workflows | `release-android.yml` (actif), `release-ios.yml` + `sync-ios-certs.yml` (legacy, opt-in par types `repository_dispatch` dédiés) ; iOS actif géré par Codemagic |
+| versionCode / build number | Android : `github.run_number` ; iOS : `PROJECT_BUILD_NUMBER` Codemagic ; override possible |
+| Workflows | `release-android.yml` (techniquement actif, hors Alpha), `release-ios.yml` + `sync-ios-certs.yml` (legacy, opt-in par types `repository_dispatch` dédiés) ; iOS actif géré par Codemagic |
 | CI inchangée | `ci-mobile.yml` (format/analyze/test) — aucune régression |
 
 Les workflows GitHub de release n'utilisent aucune action de cache Flutter/Pub. Ils téléchargent
@@ -47,6 +52,68 @@ par une analyse de PR ne peut donc jamais entrer dans une build signée.
 > les `PRODUCT_BUNDLE_IDENTIFIER` de `apps/mobile/ios/Runner.xcodeproj/project.pbxproj`,
 > `codemagic.yaml` (`bundle_identifier` + `BUNDLE_ID` + clé `provisioningProfiles`),
 > et les fiches store (Play + App Store Connect).
+
+### 1.1 Vérité opérationnelle au 4 septembre 2026
+
+Les statuts ci-dessous séparent strictement :
+
+- **historique prouvé** : un état externe a été observé à une date donnée ;
+- **vérifié aujourd'hui** : vérifiable sans secret dans le dépôt ou sur GitHub ;
+- **manuel restant** : l'état live doit être revérifié par un opérateur avant l'Alpha.
+
+| Surface | Historique prouvé | Vérifié le 2026-09-04 | Manuel restant / décision |
+|---|---|---|---|
+| App iOS | App Certigo existante dans App Store Connect, bundle `com.certigo.mobileapp` | Bundle toujours aligné dans le projet Xcode et `codemagic.yaml` ; tag [`v1.0.1`](https://github.com/gchambaud_microsoft/Certigo/commit/38132bda3e60f54bb4cb2c12542accb364792e74) présent | Ouvrir **l'app existante** et confirmer contrats/accès ; ne pas recréer l'app |
+| TestFlight | Capture opérateur du 2026-08-17 : groupe `Internal Testers`, build `1.0.1 (8)` du 2026-07-03 traité, au moins une installation et cinq sessions | Le workflow versionné publie toujours vers `Internal Testers` | Un nouveau build candidat doit être traité puis installé ; l'ancien build n'est pas le candidat Alpha |
+| Codemagic + ASC | Les builds ont réellement atteint successivement la signature puis l'upload Apple : [#161](https://github.com/gchambaud_microsoft/Certigo/pull/161), [#163](https://github.com/gchambaud_microsoft/Certigo/pull/163), puis build TestFlight traité | `codemagic.yaml` référence encore l'intégration `AppStoreConnect` et le groupe `certigo_mobile_config` | Confirmer dans le dashboard que l'app, la clé ASC et le groupe existent encore et sont valides ; ne pas les recréer/faire tourner par défaut |
+| Google Play | Preuve opérateur du 2026-08-17 : app encore en brouillon et liste `Certigo - Test interne` créée/sélectionnée avec des testeurs | Workflow Android et package toujours présents dans le dépôt | **Hors Alpha.** Aucun AAB final ni release interne n'est prouvé ; ne pas présenter Google Play comme publié ou entièrement opérationnel |
+| Crash mobile | Capture locale des erreurs livrée par [#213](https://github.com/gchambaud_microsoft/Certigo/pull/213) | `LoggingCrashReporter` utilise encore `debugPrint` ; aucun sink distant ni upload de symboles dans les pipelines | **Bloquant Alpha** : sink distant, symboles et crash de test visible dans le dashboard |
+
+La capture App Store Connect et les confirmations Google Play sont des attestations
+opérateur datées conservées dans l'historique de travail. Elles prouvent un usage
+antérieur, pas la validité actuelle des credentials, contrats ou intégrations. Les
+PR #161/#163 documentent les erreurs renvoyées par de vrais runs Codemagic ; le build
+TestFlight traité établit que la chaîne Codemagic → App Store Connect a ensuite
+fonctionné. Aucune de ces preuves historiques ne ferme une gate live de l'Alpha.
+
+### 1.2 Scope gelé de l'Alpha iOS
+
+**Inclus :**
+
+- iOS via **TestFlight interne** uniquement, sur l'identifiant existant
+  `com.certigo.mobileapp` ;
+- boucle coeur déjà implémentée : authentification, catalogue/parcours, leçon,
+  quiz, score/progression et retour d'explication ;
+- Tuteur IA en mode **déterministe** : `TUTOR_LLM_ENABLED=false`, donc
+  `NullTutorCompletion` et réponses ancrées sur le contenu existant ;
+- correctifs strictement nécessaires pour fermer une gate de qualité, crash,
+  release ou authentification.
+
+**Exclus jusqu'à la clôture de l'Alpha :**
+
+- Android/Google Play, TestFlight externe et publication App Store publique ;
+- Azure OpenAI/Foundry live pour le Tuteur, nouvelle feature, nouveau type de
+  contenu, extension de la gamification ou refonte UI ;
+- création d'une nouvelle app Codemagic, App Store Connect ou Play Console,
+  rotation préventive de clés et changement de bundle/package.
+
+### 1.3 Gates bloquantes — ordre de fermeture
+
+Toutes les gates doivent porter une preuve datée sur le **même commit candidat**.
+Une preuve de juillet/août ne peut pas remplacer une exécution actuelle.
+
+| Gate | Critère de sortie | Preuve à consigner |
+|---|---|---|
+| G0 — Scope et CI | Diff candidat sans nouvelle feature ; `ci-mobile` vert | SHA candidat + URL du run |
+| G1 — Crash distant | Exceptions Flutter/moteur/zone envoyées vers un sink distant ; symboles dSYM uploadés ; crash de test lisible | URL/ID du dashboard, horodatage UTC, stack symboliquée |
+| G2 — Intégrations live | App Codemagic existante connectée au repo ; intégration `AppStoreConnect`, clé ASC, groupe `certigo_mobile_config`, contrat de domaine public, app ASC et `Internal Testers` valides | Contrôle opérateur daté, sans valeur secrète |
+| G3 — Dry-run | `ios-release-dry` réussit depuis le SHA candidat, produit une IPA signée et n'uploade rien | URL/ID du build Codemagic + SHA |
+| G4 — Build TestFlight | `ios-release` produit un nouveau build traité et affecté à `Internal Testers` | URL/ID Codemagic + version/build ASC |
+| G5 — Auth/E2E appareil | Build G4 installé sur iPhone physique ; auth réelle puis catalogue → leçon → quiz → progression → Tuteur déterministe ; crash distant vérifié | Appareil/iOS, testeur, date UTC, résultats et IDs de corrélation non sensibles |
+| G6 — Go/No-Go | G0 à G5 closes, aucun crash bloquant, rollback identifié | Décision humaine datée |
+
+Pour cette PR documentaire : **ne créer aucun tag, ne démarrer aucun workflow de
+release/dry-run, ne faire aucun upload et ne modifier aucun store**.
 
 ---
 
@@ -190,9 +257,12 @@ noms sont référencés dans le code.
 Codemagic n'a pas accès au Key Vault : créer dans le dashboard Codemagic
 (**Settings → Environment variables**) un **groupe** nommé `certigo_mobile_config`
 contenant `PROD_API_BASE_URL`, `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`,
-`ENTRA_API_SCOPE` (mêmes formats que le tableau ci-dessus). `codemagic.yaml`
-référence ce groupe et injecte les `--dart-define` ; `CERTIGO_ENV` est fixé
-inline (`prod` pour `ios-release`, `dev` pour `ios-release-dry`).
+`ENTRA_API_SCOPE`, `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`,
+`SENTRY_AUTH_TOKEN` et `CERTIFICATE_PRIVATE_KEY`. `codemagic.yaml` référence ce
+groupe et injecte uniquement les valeurs publiques utiles à l'app en
+`--dart-define` ; `CERTIGO_ENV` est fixé inline (`prod` pour `ios-release`,
+`dev` pour `ios-release-dry`, `staging` pour `ios-crash-smoke`). Le token Sentry
+et la clé privée de signature ne sont jamais injectés dans le binaire.
 
 ---
 
@@ -248,11 +318,21 @@ gh secret set ANDROID_KEY_PASSWORD      --body '<mot_de_passe_cle>'
 > Supprimez ensuite `keystore.b64` du disque. Ne committez jamais le `.jks`
 > (déjà couvert par `.gitignore`).
 
-### 3.4 Configurer Google Play (one-time)
+### 3.4 Réconcilier Google Play existant (hors Alpha iOS)
 
-1. **Créer l'application** dans la [Google Play Console](https://play.google.com/console)
-   avec le package `com.certigo.mobileapp`.
-2. **Activer Play App Signing** (proposé au 1er upload).
+> [!NOTE]
+> État historique prouvé le 2026-08-17 : l'app existait encore en brouillon et la
+> liste `Certigo - Test interne` était créée/sélectionnée. Aucune preuve ne ferme
+> aujourd'hui Play App Signing, le compte de service ou une première release AAB.
+> Ne pas créer de doublon ; ouvrir l'app existante et reprendre au premier contrôle
+> manquant uniquement lors d'une future release Android.
+
+1. **Ouvrir l'application existante** dans la
+   [Google Play Console](https://play.google.com/console) et confirmer le package
+   `com.certigo.mobileapp`. Si elle est introuvable, arrêter et faire réconcilier
+   le compte propriétaire au lieu d'en créer une autre.
+2. **Vérifier Play App Signing** (à activer au 1er upload seulement si la console
+   confirme qu'il ne l'est pas).
 3. **Compte de service** : dans Google Cloud, créez un compte de service, générez
    une **clé JSON**. Dans la Play Console → *Configuration → accès à l'API* →
    liez le compte de service et accordez-lui au minimum le rôle permettant de
@@ -261,9 +341,9 @@ gh secret set ANDROID_KEY_PASSWORD      --body '<mot_de_passe_cle>'
    ```bash
    gh secret set PLAY_SERVICE_ACCOUNT_JSON < service-account.json
    ```
-5. **Créer la piste "Test interne"** et y ajouter au moins une fois une release
-   (la première peut devoir être faite manuellement depuis la console selon
-   l'état d'enrôlement ; les suivantes passent par le workflow).
+5. **Réutiliser la liste "Certigo - Test interne"** et vérifier la piste. La
+   première release n'est pas prouvée et peut devoir être ajoutée manuellement
+   selon l'état d'enrôlement ; les suivantes passent par le workflow.
 
 ### 3.5 Runbook — Lancer une beta Android (manuel) ✅
 
@@ -320,35 +400,41 @@ approbation et sa restriction à `main`.
 > automatique via l'API App Store Connect. Voir `codemagic.yaml` à la racine
 > du repo.
 
-### 4.0 Codemagic — Setup initial (one-time)
+### 4.0 Codemagic — réconcilier l'installation existante
 
-> 🔄 **Repartir de zéro** (app Codemagic supprimée / clé ASC révoquée) : suivre
-> ces étapes dans l'ordre. Le pipeline vit dans `codemagic.yaml` à la racine.
+> [!IMPORTANT]
+> Codemagic, l'intégration App Store Connect et le groupe de variables ont déjà
+> servi à produire un build TestFlight. L'objectif est de **vérifier et réutiliser**
+> ces objets, pas de repartir de zéro. Une recréation/rotation n'est autorisée
+> qu'après preuve explicite que l'objet est absent ou révoqué, hors de cette PR.
 
-1. Créer/reconnecter un compte sur <https://codemagic.io> et **connecter le repo
-   GitHub** `gchambaud_microsoft/Certigo` (installer l'app GitHub Codemagic).
+1. Ouvrir l'app Certigo existante sur <https://codemagic.io> et vérifier qu'elle
+   pointe toujours vers `gchambaud_microsoft/Certigo`.
 2. **Intégration App Store Connect** : dashboard → **Teams > Integrations > App
-   Store Connect** → **Add integration** → saisir **Key ID**, **Issuer ID**,
-   uploader le **`.p8`** (nouvelle clé API, rôle App Manager) → nommer
-   l'intégration **exactement `AppStoreConnect`** (le `codemagic.yaml` la
-   référence sous ce nom).
+   Store Connect** → ouvrir **`AppStoreConnect`** et lancer le contrôle de
+   validité disponible. Ne créer une nouvelle clé API (rôle App Manager) que si
+   l'intégration existante est explicitement invalide/révoquée.
 3. **Signature (pilotée par `codemagic.yaml`, aucune action UI)** : la signature
    est entièrement définie dans `codemagic.yaml`. À chaque build, l'étape « Set up
    code signing » exécute, via l'intégration `AppStoreConnect` :
    `app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create --certificate-key @env:CERTIFICATE_PRIVATE_KEY`
-   → **crée** le certificat de distribution + le profil App Store au **1er build**
-   (puis les réutilise, idempotent), suivi de `keychain add-certificates` +
+   → **crée uniquement s'ils manquent** le certificat de distribution + le profil
+   App Store (puis les réutilise, idempotent), suivi de `keychain add-certificates` +
    `xcode-project use-profiles`. ⚠️ La création du certificat exige une **clé privée**
-   (compte Apple neuf, aucun certificat existant) : elle est fournie via la variable
+   et sa reconstruction de signature la réutilise : elle est fournie via la variable
    sécurisée **`CERTIFICATE_PRIVATE_KEY`** (§4, ci-dessous) — Codemagic ne la
-   fournit **pas** automatiquement pour un compte from-scratch. Plus de fastlane
+   fournit **pas** automatiquement. Plus de fastlane
    match, de `.p12` ni de profil manuel à uploader. ⚠️ Ne PAS activer « App > Code
    signing → Automatic » dans l'UI : inutile (et sans effet) pour un build piloté
    par `codemagic.yaml`.
 4. **Groupe de variables `certigo_mobile_config`** : dashboard → **App >
-   Environment variables** → créer le groupe **`certigo_mobile_config`** et y
-   poser ces **4 variables NON secrètes** (injectées en `--dart-define`) **+ 1
-   variable SÉCURISÉE** (signature, jamais un `--dart-define`) :
+   Environment variables** → ouvrir le groupe existant
+   **`certigo_mobile_config`** (ou le créer s'il n'existe pas) et vérifier ces
+   **11 variables NON secrètes + 2 variables SÉCURISÉES**. Certaines valeurs
+   sont injectées en
+   `--dart-define`; les variables de domaine public alimentent la gate
+   fail-closed avant le build. Seuls les champs marqués Secure contiennent un
+   secret ; le DSN Sentry est public mais reste configurable et non commité :
 
    | Variable | Valeur | Secure ? | Utilisée par |
    |---|---|---|---|
@@ -356,7 +442,15 @@ approbation et sa restriction à `main`.
    | `ENTRA_CLIENT_ID` | `4d1f1075-7bc5-4764-947b-701435a85f8c` | non | `ios-release` + `ios-release-dry` |
    | `ENTRA_AUTHORITY` | `https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0` | non | idem |
    | `ENTRA_API_SCOPE` | `api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation` | non | idem |
-   | `CERTIFICATE_PRIVATE_KEY` | clé privée **RSA 2048 PEM non chiffrée** (`openssl genrsa 2048`), sans passphrase. Sert à créer le certificat de distribution iOS au 1er build. | **OUI (Secure)** | les 3 workflows iOS |
+   | `SENTRY_DSN` | DSN HTTPS public du projet Flutter Sentry | non | binaire des 3 workflows IPA |
+   | `SENTRY_ORG` | slug d'organisation Sentry | non | upload dSYM Codemagic |
+   | `SENTRY_PROJECT` | slug du projet Sentry | non | upload dSYM Codemagic |
+   | `SENTRY_AUTH_TOKEN` | token dédié, moindre privilège, pour upload de debug files/releases | **OUI (Secure)** | Codemagic uniquement, jamais `--dart-define` |
+   | `ACCOUNT_DELETION_ENABLED` | `false` tant que la gate destructive Cosmos n'est pas close | non | `ios-release` + `ios-release-dry` |
+   | `PUBLIC_WEB_ORIGIN` | origine HTTPS canonique d'un domaine Certigo possédé et vérifié | non | gate `ios-release` |
+   | `PUBLIC_DOMAIN_VERIFIED` | `true` uniquement après vérification humaine du domaine public | non | gate `ios-release` |
+   | `APPLE_CIAM_DOMAIN_RECONFIGURED` | `true` uniquement après reconfiguration Apple/CIAM vérifiée | non | gate `ios-release` |
+   | `CERTIFICATE_PRIVATE_KEY` | clé privée **RSA 2048 PEM non chiffrée** (`openssl genrsa 2048`), sans passphrase. Sert à créer le certificat de distribution iOS au 1er build. | **OUI (Secure)** | les 4 workflows iOS |
 
    > Sans les 4 premières : boutons sociaux masqués et/ou login e-mail cassé. Mêmes
    > valeurs que côté Android (Key Vault `mobile-*` / `vars.MOBILE_*`). Le
@@ -366,18 +460,29 @@ approbation et sa restriction à `main`.
    > « Cannot save Signing Certificates without certificate private key ». La clé
    > n'a **pas** de passphrase → aucun `--certificate-key-password` requis. Cochez
    > **Secure** pour cette variable (elle est masquée dans les logs).
+   > Sans l'une des quatre variables Sentry, sans dSYM ou si l'upload est refusé,
+   > les workflows IPA échouent avant publication. Le setup confidentialité,
+   > quotas et smoke test est détaillé dans
+   > [`runbooks/MOBILE_CRASH_REPORTING.md`](./runbooks/MOBILE_CRASH_REPORTING.md).
+   >
+   > Les trois variables `PUBLIC_*`/`APPLE_CIAM_*` ne sont pas présentes dans le
+   > scope GitHub `beta` observé le 2026-09-04, et ce scope ne prouve de toute
+   > façon pas le contenu du dashboard Codemagic. Elles restent donc une **gate
+   > humaine live**, pas un setup à recréer. Ne pas inventer de domaine ni passer
+   > les booléens à `true` pour débloquer un build : en leur absence, conserver G2
+   > ouverte et laisser `ios-release` échouer fermé.
 
-### 4.1 Pré-requis Apple (one-time)
+### 4.1 Inventaire Apple à vérifier live
 
-1. Compte **Apple Developer Program** (payant) pour l'équipe.
-2. **App ID** `com.certigo.mobileapp` (portail Apple Developer ou App Store Connect).
-3. **App** créée dans **App Store Connect** : bundle id **`com.certigo.mobileapp`**,
-   nom **Certigo**.
-4. **Certificat de distribution** (Apple Distribution) + **profil d'approvisionnement
-   App Store** pour `com.certigo.mobileapp` (gérés automatiquement par Codemagic
-   une fois l'intégration en place ; le nom de profil attendu par
-   `codemagic.yaml` est **`Certigo AppStore`**).
-5. **Clé API App Store Connect** (rôle App Manager) : Key ID, Issuer ID, fichier `.p8`.
+1. Adhésion **Apple Developer Program** toujours active pour l'équipe.
+2. **App ID existant** `com.certigo.mobileapp` dans le portail Apple Developer.
+3. **App existante** dans **App Store Connect** : bundle id
+   **`com.certigo.mobileapp`**, nom **Certigo**.
+4. **Certificat de distribution** (Apple Distribution) + **profil
+   d'approvisionnement App Store** pour `com.certigo.mobileapp`, récupérables par
+   Codemagic ; le nom de profil attendu est **`Certigo AppStore`**.
+5. **Clé API App Store Connect** de l'intégration `AppStoreConnect` toujours
+   valide avec le rôle App Manager.
 
 ### 4.2 (Legacy) Secrets iOS GitHub Actions — NON requis avec Codemagic
 
@@ -423,35 +528,57 @@ gh secret set ASC_KEY_P8_BASE64               < authkey.b64
 1. Se connecter sur <https://codemagic.io> → sélectionner le repo Certigo.
 2. Cliquer **Start new build** → choisir le workflow **`ios-release`**.
    - Pour un dry run (IPA sans upload) : choisir **`ios-release-dry`**.
-   - Pour distribuer aux testeurs externes : modifier `beta_groups` dans
-     `codemagic.yaml` avant de lancer.
+   - Pour la validation destructive du crash reporting : choisir
+     **`ios-crash-smoke`** (TestFlight interne uniquement).
+   - Hors Alpha seulement : pour distribuer aux testeurs externes, modifier
+     `beta_groups` dans `codemagic.yaml` avant de lancer.
 3. Ou pousser un **tag git `v*`** (ex: `git tag -a v1.2.3 -m "Release v1.2.3" && git push --tags`) ;
    cela déclenche automatiquement `ios-release`.
 4. Le workflow : `analyze`/`test` → signature automatique via App Store Connect
-   API → `flutter build ipa` → upload TestFlight.
+   API → gate Sentry → `flutter build ipa` → vérification/upload bloquant des
+   dSYM → upload TestFlight.
 5. Dans **App Store Connect → TestFlight**, la build apparaît après traitement
    Apple (quelques minutes).
 
-### 4.4 TestFlight interne puis externe
+### 4.4 Crash reporting et symbolication iOS
+
+Les builds IPA imposent `CRASH_REPORTING_REQUIRED=true`. La release Sentry est
+stable (`com.certigo.mobileapp@<version>+<build>`), la distribution est le numéro
+de build Codemagic et l'environnement suit `CERTIGO_ENV`. Le pipeline archive
+les dSYM et exécute un upload Sentry direct avec `--wait`; aucun symbole n'est
+uploadé par la CI de pull request.
+
+Avant l'Alpha, exécuter l'action manuelle de setup et les deux crashs volontaires
+Dart/natif du runbook
+[`runbooks/MOBILE_CRASH_REPORTING.md`](./runbooks/MOBILE_CRASH_REPORTING.md).
+Après le crash natif, relancer impérativement la build afin que Sentry Cocoa
+rejoue l'enveloppe persistée, puis vérifier les frames symboliquées.
+
+Xcode Organizer reste un complément TestFlight opt-in dépendant du partage des
+diagnostics Apple ; Sentry est le système principal et bloquant.
+
+### 4.5 TestFlight interne puis externe
+
+État historique : `Internal Testers` existait et le build `1.0.1 (8)` avait été
+traité et installé au moins une fois. Pour l'Alpha, réutiliser ce groupe avec un
+**nouveau** build candidat ; ne pas créer de groupe externe.
 
 - **Interne** (immédiat, ≤ 100 testeurs internes) : ajouter les testeurs internes
   dans App Store Connect ; ils reçoivent la build dès la fin du traitement
   (aucune revue Apple).
-- **Externe** (≤ 10 000) : créer un **groupe externe**, soumettre la **première**
-  build à la **revue bêta Apple**, puis distribuer. Relancer le workflow avec
-  **external=`true`** (et définir le secret/variable `TF_EXTERNAL_GROUP` si le
-  groupe ne s'appelle pas « Beta »).
+- **Externe — post-Alpha uniquement** (≤ 10 000) : créer un **groupe externe**,
+  soumettre la **première** build à la **revue bêta Apple**, puis distribuer.
 
-### 4.5 Détails de signature
+### 4.6 Détails de signature
 
-- **Signature manuelle** : le certificat de distribution et le profil
-  d'approvisionnement sont injectés via secrets, importés dans un **keychain
-  temporaire** détruit en fin de job. `fastlane build_app` force
-  `CODE_SIGN_STYLE=Manual`, `DEVELOPMENT_TEAM` et `PROVISIONING_PROFILE_SPECIFIER`.
+- **Signature Codemagic** : `fetch-signing-files` récupère le certificat et le
+  profil via l'intégration `AppStoreConnect`, puis les importe dans un
+  **keychain temporaire**. `xcode-project use-profiles` applique le profil et
+  produit l'`export_options.plist` consommé par `flutter build ipa`.
 - **Authentification upload** : clé **API App Store Connect** (`.p8`) → pas
   d'Apple ID ni de 2FA en CI.
 
-### 4.6 ~~fastlane match~~ — Remplacé par Codemagic automatic signing
+### 4.7 ~~fastlane match~~ — Remplacé par Codemagic automatic signing
 
 > ⛔ **fastlane match n'est plus utilisé.** Codemagic gère les certificats et
 > profils iOS nativement via l'**App Store Connect API** (signature automatique).
@@ -481,8 +608,9 @@ profil App Store.
 
 | Champ | Source | Règle |
 |---|---|---|
-| versionName | `pubspec.yaml` ou payload du dispatch | Sémantique (`MAJEUR.MINEUR.CORRECTIF`) |
+| versionName | `pubspec.yaml`, payload Android ou tag/entrée Codemagic | Sémantique (`MAJEUR.MINEUR.CORRECTIF`) |
 | versionCode (Android) | `github.run_number` ou input | **Strictement croissant** (exigé par Play) |
+| build number (iOS) | `PROJECT_BUILD_NUMBER` Codemagic ou suffixe `+N` du tag | **Strictement croissant** (exigé par ASC) |
 
 - Pour une nouvelle version publique, bumper `version:` dans
   `apps/mobile/pubspec.yaml` (ex. `0.1.0+1` → `0.2.0+1`).
@@ -514,9 +642,9 @@ code : on **arrête** la diffusion fautive et on **republie** une build saine.
 1. **TestFlight** : dans App Store Connect, **expirer** la build fautive
    (TestFlight → build → *Expirer*) pour qu'elle ne soit plus distribuée ; la
    build précédente reste disponible aux testeurs.
-2. **Republier** une version saine : relancer `release-ios` depuis le commit/tag
-   connu-bon (le `build_number` issu du run sera supérieur — exigé par App Store
-   Connect).
+2. **Republier** une version saine : relancer `ios-release` depuis le commit/tag
+   connu-bon avec un `PROJECT_BUILD_NUMBER` supérieur — exigé par App Store
+   Connect.
 3. Si un groupe **externe** était concerné, vérifier l'état de la revue Apple
    avant de redistribuer.
 
@@ -578,32 +706,43 @@ fixe et revenir à `flutter.ndkVersion` (vérifier avec `flutter doctor -v`).
 
 ---
 
-## 8. Checklist pré-release
+## 8. Checklist de preuve pré-Alpha iOS
 
-- [ ] `ci-mobile` au vert sur la branche à publier (format/analyze/test).
-- [ ] `version:` de `pubspec.yaml` à jour si nouvelle version publique.
-- [ ] Notes de version `apps/mobile/distribution/android/whatsnew/*` actualisées.
-- [ ] Secrets présents : `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
-      `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`.
-- [ ] **Config app (§2.3)** : `API_BASE_URL`, `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`,
-      `ENTRA_API_SCOPE`, `CERTIGO_ENV` renseignés — via Key Vault (`mobile-app-*` /
-      `mobile-entra-*`) ou variables GitHub `vars.MOBILE_*` — sinon social/login KO.
-- [ ] (1ère fois) App créée dans Play Console + piste de test interne existante.
-- [ ] identifiant `com.certigo.mobileapp` **confirmé** (Android + iOS, définitif après 1er upload).
-- [ ] Run de validation `dry_run=true` réussi (AAB/IPA signé produit).
-- [ ] **iOS** : intégration Codemagic configurée (§4.0) ; clé API App Store Connect
-      ajoutée dans le dashboard Codemagic (intégration `AppStoreConnect`) ; code
-      signing automatique activé ; app créée dans App Store Connect.
-- [ ] `docs/RELEASE_MOBILE.md` à jour.
+- [x] Scope gelé : iOS interne, boucle coeur existante, Tuteur déterministe,
+      aucune nouvelle feature.
+- [ ] SHA candidat identifié et `ci-mobile` vert.
+- [ ] Toute modification du cache ou du contrat de contenu runtime a passé
+      `flutter test integration_test -d <device>` sur un appareil ou émulateur
+      **Android**, puis sur un simulateur ou appareil **iOS**. Un device web ou
+      desktop ne remplace pas cette preuve. Si l'un des deux environnements
+      physiques manque, conserver la PR en draft et enregistrer ce blocker ;
+      ne pas installer un émulateur lourd uniquement pour contourner ce gate.
+- [ ] Sink de crash distant actif, dSYM uploadés et crash de test symboliqué.
+- [ ] App Codemagic existante et repo vérifiés.
+- [ ] Intégration `AppStoreConnect` et clé ASC vérifiées live.
+- [ ] Groupe `certigo_mobile_config` existant et complet, sans exposer ses valeurs.
+- [ ] Contrat de domaine public vérifié live (`PUBLIC_WEB_ORIGIN`,
+      `PUBLIC_DOMAIN_VERIFIED`, `APPLE_CIAM_DOMAIN_RECONFIGURED`) ; aucune valeur
+      déduite du scope GitHub `beta`.
+- [ ] App ASC `com.certigo.mobileapp` et groupe `Internal Testers` vérifiés live.
+- [ ] `ios-release-dry` vert sur le SHA candidat, IPA signée, aucun upload.
+- [ ] Nouveau build `ios-release` traité dans TestFlight et affecté au groupe interne.
+- [ ] Build installé sur iPhone physique ; auth + E2E boucle coeur verts.
+- [ ] Tuteur confirmé déterministe (`TUTOR_LLM_ENABLED=false`).
+- [ ] Décision Go/No-Go et preuves datées consignées.
 
 ---
 
-## Déploiement progressif & rollback auth
+## Déploiement progressif post-Alpha & rollback auth
 
 Objectif : détecter une régression d'authentification (échec de login, boucle,
 config invalide) **avant** qu'elle n'atteigne 100 % des utilisateurs.
 
-### Rollout progressif (Android → iOS)
+> [!NOTE]
+> Cette section décrit l'après-Alpha. Elle n'autorise ni Android, ni TestFlight
+> externe, ni publication publique pendant le scope gelé.
+
+### Rollout progressif futur (Android → iOS)
 
 | Étape | Piste | Audience | Durée d'observation | Passage à l'étape suivante |
 |---|---|---|---|---|

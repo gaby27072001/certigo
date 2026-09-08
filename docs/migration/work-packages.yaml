@@ -259,8 +259,8 @@ work_packages:
     precondition: "Vérifier l'existence d'une remontée de crash côté mobile. Idempotent : si le crash reporting est déjà intégré et actif, le lot est déjà fait."
     dod: "Les exceptions non gérées et erreurs de zone Flutter sont capturées et remontées ; les symboles sont uploadés pour symbolisation ; un crash de test apparaît dans le tableau de bord."
     rollback: "Abandon de la branche ; désactivation de l'intégration (aucune donnée applicative touchée)."
-    status: in_review
-    notes: "Vague V1 · voie Flutter."
+    status: done
+    notes: "Vague V1 · voie Flutter. PR #213 fusionnée 2026-07-07 (merge commit 4df79ee3). Écart DoD résiduel documenté et accepté pour la clôture du lot sur décision explicite de la session orchestratrice (9af33c67) le 2026-09-03 (voir PR #359). Le suivi Alpha iOS PR #374 remplace le sink `debugPrint` seul : Sentry Flutter/Cocoa initialise le handler natif avant le bootstrap, persiste/rejoue les crashs fatals au prochain lancement et reçoit les dSYM via un gate Codemagic fail-closed. Le sink local reste le fallback des builds non officiels. La preuve dashboard finale dépend de l'action opérateur unique documentée dans `docs/runbooks/MOBILE_CRASH_REPORTING.md`."
 
   - id: wp-p1-11-ci-spof-runners
     phase: 1
@@ -283,8 +283,8 @@ work_packages:
     precondition: "Comparer les ressources Azure live au code Bicep pour identifier le drift et les ressources non gérées. Idempotent : si tout est déjà géré en IaC sans drift, le lot est déjà fait."
     dod: "Les ressources hors-Bicep sont importées/décrites en IaC ; un what-if Bicep ne montre aucun drift non intentionnel ; procédure de détection de drift documentée et exécutable."
     rollback: "Abandon de la branche ; aucune modification appliquée aux ressources live (import descriptif uniquement)."
-    status: todo
-    notes: "Vague V5 · voie ops/live Azure."
+    status: in_review
+    notes: "Vague V5 · voie ops/live Azure · PR #371. Inventaire et what-if Provider read-only du 2026-09-04 : staging déjà Bicep/healthy ; réseau CI et autoscale bornés, OpenAI privé/keyless ; aucune création/suppression. be505fa1 reste non classifiée, contrôleur désactivé et R-03 exclu. Apply racine bloqué jusqu'à configuration vérifiée du domaine public staging exigée depuis #364 ; activation OpenAI bloquée séparément car le DNS privé Foundry `privatelink.services.ai.azure.com` n'est pas établi."
 
   - id: wp-p1-13-staging-environment
     phase: 1
@@ -294,9 +294,9 @@ work_packages:
     depends_on: [wp-p1-12-iac-drift-import]
     precondition: "Vérifier l'existence d'un environnement de staging isolé de la prod. Idempotent : si le staging existe déjà et est provisionné par IaC, le lot est déjà fait."
     dod: "Un environnement de staging est provisionnable par IaC (paramètres dédiés) et isolé de la prod ; un déploiement de staging réussit + /health vert."
-    rollback: "Abandon de la branche ; suppression de l'environnement de staging (le cas échéant), prod inchangée."
+    rollback: "Abandon de la modification ; si un changement approuvé a été appliqué, restaurer le template et les paramètres précédents en mode Incremental. Ne jamais supprimer le RG staging actif comme rollback générique ; prod inchangée."
     status: todo
-    notes: "Vague V5 · voie ops/live."
+    notes: "Vague V5 · voie ops/live. Précondition et DoD live observées le 2026-09-04 : déploiement subscription Bicep réussi le 2026-08-16, RG peuplé et health vert. Statut conservé todo tant que wp-p1-12 n'est pas done."
 
   - id: wp-p1-14-opentelemetry-correlation
     phase: 1
@@ -393,8 +393,8 @@ work_packages:
       - "Instrumenter import, promotion, rejet et rollback dans Application Insights."
     dod: "Import répété sans doublon ; hash invalide rejeté avant mutation ; rollback N-1 testé en staging ; tests HTTP anti-fuite verts ; le backend expose le manifestId public actif."
     rollback: "Réactiver le manifeste précédent ; conserver les artefacts immuables et ne supprimer aucune version pendant le lot."
-    status: in_progress
-    notes: "Source : gchambaud_microsoft/Certigo#244. Implémentation active dans la session dédiée 5cf299a4-4f53-453a-8d1d-671f70f54913."
+    status: in_review
+    notes: "Source : gchambaud_microsoft/Certigo#244. PR #363 ouverte (session ec84447b-5c18-4c12-be65-9cdf8f0f8b27) : code content-release porté depuis la PR draft #304 (superseded, alignée sur certigo-content ADR-0005) vers une branche neuve basée sur main, en excluant son diff de gouvernance/CI sans rapport. PRs #257, #259, #304 fermées au profit de #363. Backend (831 tests)/IaC (bicep + 36 tests)/mobile (84 Dart + 435 Flutter + 11 golden) validés verts. Reste en in_review : la DoD exige un rollback N-1 prouvé en staging (hors périmètre de la PR)."
 
   - id: wp-p2-05
     phase: 2
@@ -448,7 +448,7 @@ work_packages:
     dod: "La perte d'un runner ne bloque pas les gates critiques ; un runner est reconstruisible depuis la définition versionnée ; l'exercice de reprise est consigné avec durée et preuves ; permissions, fork guards et environnements restent actifs."
     rollback: "Conserver l'ancien runner pendant la validation ; revenir aux labels précédents sans changement applicatif."
     status: in_progress
-    notes: "Source : gchambaud_microsoft/Certigo#249. PR #250 fusionnée ; failover validé, mais bootstrap/IaC versionné et reconstruction depuis zéro restent requis. Ce lot est indépendant de la chaîne de contenu."
+    notes: "Source : gchambaud_microsoft/Certigo#249. PR #250 et PR #253 fusionnées (2026-08-06) : IaC versionnée, sonde quotidienne et drill de reconstruction (run 31090379901) exécutés et verts. Vérification live du 2026-09-03 (API GitHub Actions) : un seul runner par classe (certigo-pr-pilot, certigo-trusted) après une migration ultérieure et hors périmètre vers des pools VMSS (PR #301/#302/#308/#309, issue #302) ; la redondance intra-classe n'est plus démontrée, la DoD reste ouverte. Ce lot est indépendant de la chaîne de contenu."
 
   - id: wp-p2-08
     phase: 2
@@ -465,8 +465,8 @@ work_packages:
       - "Séparer les faits générés des affirmations narratives et exiger une preuve pour tout statut opérationnel."
     dod: "Les métriques techniques de ETAT_DU_PROJET.md sont générées ; une modification de version ou corpus sans régénération échoue en CI ; aucun compteur majeur n'est maintenu manuellement ; date et commit de référence sont exacts."
     rollback: "Revert de la génération et conservation du document précédent ; aucun impact runtime."
-    status: in_review
-    notes: "Source : gchambaud_microsoft/Certigo#247. Générateur stdlib, tests unitaires et gate generated==committed implémentés ; validations vertes, référence exacte sur le commit source 33b34a64ae2f6de2de73679328cee49881207794 et PR #254 ouverte."
+    status: done
+    notes: "Source : gchambaud_microsoft/Certigo#247 (closed 2026-08-07). Générateur stdlib, tests unitaires et gate generated==committed implémentés ; validations vertes, référence exacte sur le commit source 33b34a64ae2f6de2de73679328cee49881207794. PR #254 fusionnée 2026-08-07 (vérifié `gh pr view 254` le 2026-09-03 ; registre corrigé, était resté `in_review`/« ouverte » ~1 mois — voir aussi PR #360 qui tentait la même correction sans être mergée)."
 
   - id: wp-p2-09
     phase: 2
@@ -484,7 +484,7 @@ work_packages:
     dod: "Une PR ne mélange pas plusieurs migrations majeures sans lien ; Flutter est identique dans les environnements supportés ; tests CI, staging et appareils réels verts ; PR Dependabot obsolètes fusionnées, remplacées ou fermées avec justification."
     rollback: "Pins et lockfiles antérieurs conservés par lot ; rollback indépendant pour chaque groupe fonctionnel."
     status: in_progress
-    notes: "Source : gchambaud_microsoft/Certigo#248. PR #252 ouverte et en correction. Ce lot est indépendant de la chaîne de contenu."
+    notes: "Source : gchambaud_microsoft/Certigo#248 (ouverte) + #155 (ouverte, migration font_awesome_flutter/google_fonts). PR #252 fusionnée 2026-08-06 : sous-lot explicitement scopé (vendoring icônes/polices Prism) livré ; le corps de la PR déclare lui-même « belongs to #248/#155 » et liste les lots restants (validation réelle Android/iOS, disposition des PR Dependabot obsolètes) — #248/#155 restent donc ouvertes à raison, `in_progress` est le statut correct (vérifié `gh pr view 252` + `gh issue view 155` le 2026-09-03)."
 
   # --- Phases 1–5 — placeholders (à décomposer au lancement) ---------------
   # Chaîne séquentielle. Chaque placeholder sera éclaté en lots XS–M au démarrage

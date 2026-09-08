@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Azure.Communication.Email;
 using Azure.Core;
 using Azure.Identity;
+using Azure.Storage.Blobs;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.ApplicationInsights;
@@ -16,10 +17,15 @@ using Certigo.Api.Middleware;
 using Certigo.Api.Observability;
 using Certigo.Application.Abstractions;
 using Certigo.Application.Services;
+using Certigo.Domain.Content;
 using Certigo.Infrastructure.Ai;
+using Certigo.Infrastructure.Blob;
+using Certigo.Infrastructure.Content;
+using Certigo.Infrastructure.ContentContracts;
 using Certigo.Infrastructure.Cosmos;
 using Certigo.Infrastructure.Email;
 using Certigo.Infrastructure.Identity;
+using Certigo.Infrastructure.Learning;
 using Certigo.Infrastructure.Observability;
 
 var host = new HostBuilder()
@@ -32,6 +38,7 @@ var host = new HostBuilder()
         worker.UseMiddleware<SecurityHeadersMiddleware>();
         worker.UseMiddleware<ExceptionMiddleware>();
         worker.UseMiddleware<EnterpriseLearningMetricsFeatureMiddleware>();
+        worker.UseMiddleware<VivaLearningFeatureMiddleware>();
         worker.UseMiddleware<OrganizationFeatureMiddleware>();
         worker.UseMiddleware<EnterpriseIdentityFeatureMiddleware>();
         worker.UseMiddleware<JwtAuthMiddleware>();
@@ -43,6 +50,9 @@ var host = new HostBuilder()
             configuration["PERSON_LINKED_IDENTITY_V1"]);
         var organizationFeatureOptions = OrganizationFeatureOptions.Parse(
             configuration["ORGANIZATION_MEMBERSHIP_V1"]);
+        var vivaLearningOptions = VivaLearningFeatureOptions.Parse(
+            configuration["VIVA_LEARNING_V1"],
+            configuration["PUBLIC_WEB_ORIGIN"]);
         var enterpriseIdentityFeatureOptions = EnterpriseIdentityFeatureOptions.Parse(
             configuration["ENTERPRISE_IDENTITY_V1"]);
         var enterpriseLearningMetricsFeatureOptions =
@@ -68,6 +78,88 @@ var host = new HostBuilder()
         services.AddSingleton(sp => new CosmosContext(
             sp.GetRequiredService<CosmosClient>(),
             configuration["COSMOS_DATABASE"] ?? CosmosContainers.DatabaseName));
+        var maxContentFiles = int.TryParse(configuration["CONTENT_IMPORT_MAX_FILES"], out var configuredMaxFiles)
+            && configuredMaxFiles > 0
+            ? configuredMaxFiles
+            : ContentReleaseLimits.Default.MaxFiles;
+        var maxContentFileBytes = int.TryParse(
+            configuration["CONTENT_IMPORT_MAX_FILE_BYTES"],
+            out var configuredMaxFileBytes)
+            && configuredMaxFileBytes > 0
+            ? configuredMaxFileBytes
+            : ContentReleaseLimits.Default.MaxFileBytes;
+        var maxContentReleaseBytes = long.TryParse(
+            configuration["CONTENT_IMPORT_MAX_RELEASE_BYTES"],
+            out var configuredMaxReleaseBytes)
+            && configuredMaxReleaseBytes > 0
+            ? configuredMaxReleaseBytes
+            : ContentReleaseLimits.Default.MaxReleaseBytes;
+        var maxCosmosItemBytes = int.TryParse(
+            configuration["CONTENT_IMPORT_MAX_COSMOS_ITEM_BYTES"],
+            out var configuredMaxCosmosItemBytes)
+            && configuredMaxCosmosItemBytes > 0
+            ? configuredMaxCosmosItemBytes
+            : ContentReleaseLimits.Default.MaxCosmosItemBytes;
+        services.AddSingleton(new ContentReleaseLimits(
+            maxContentFiles,
+            maxContentFileBytes,
+            maxContentReleaseBytes,
+            maxCosmosItemBytes));
+        services.AddSingleton(new BlobContentReleaseOptions(
+            configuration[ConfigurationKeys.ContentDescriptorContainer]
+                ?? "content-release-descriptors",
+            configuration[ConfigurationKeys.ContentPublicContainer]
+                ?? "content-public-releases",
+            configuration[ConfigurationKeys.ContentPrivateContainer]
+                ?? "content-private-releases",
+            maxContentFileBytes,
+            AllowMutableBlobsForDevelopment:
+                string.Equals(configuration["AUTH_MODE"], "dev", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(
+                    configuration["CONTENT_ALLOW_MUTABLE_BLOBS"],
+                    "true",
+                    StringComparison.OrdinalIgnoreCase)));
+        services.AddSingleton(sp =>
+        {
+            var endpoint = configuration[ConfigurationKeys.ContentBlobEndpoint];
+            if (string.IsNullOrWhiteSpace(endpoint))
+            {
+                throw new InvalidOperationException(
+                    "CONTENT_BLOB_ENDPOINT is required for content release operations.");
+            }
+
+            var clientId = configuration[ConfigurationKeys.ContentStorageClientId];
+            TokenCredential credential = string.IsNullOrWhiteSpace(clientId)
+                ? sp.GetRequiredService<TokenCredential>()
+                : new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(clientId));
+            return new BlobServiceClient(new Uri(endpoint, UriKind.Absolute), credential);
+        });
+        services.AddSingleton<IContentReleaseSource, BlobContentReleaseSource>();
+        services.AddSingleton<IContentSchemaValidator, JsonSchemaContentContractValidator>();
+        services.AddSingleton<RuntimeContentProjector>();
+        services.AddScoped<ContentContractVerifier>();
+        services.AddScoped<IContentReleaseStore, CosmosContentReleaseStore>();
+        services.AddScoped<IContentReleaseService, ContentReleaseService>();
+        var versionedContentEnabled = string.Equals(
+            configuration[ConfigurationKeys.ContentRepositoryMode],
+            ContentReleaseContracts.VersionedSource,
+            StringComparison.Ordinal);
+        services.AddSingleton(new PublicContentDeliveryOptions(versionedContentEnabled));
+        if (versionedContentEnabled)
+        {
+            services.AddScoped<IPublicContentFileService, PublicContentFileService>();
+        }
+        else
+        {
+            services.AddSingleton<IPublicContentFileService, DisabledPublicContentFileService>();
+        }
+        services.AddSingleton<IContentReleaseTelemetry, ApplicationInsightsContentReleaseTelemetry>();
+        services.AddSingleton(new ContentAdminAuthorization(
+            configuration[ConfigurationKeys.ContentAdminRole] ?? "Content.Release.Admin",
+            string.Equals(
+                configuration[ConfigurationKeys.ContentAdminAllowDev],
+                "true",
+                StringComparison.OrdinalIgnoreCase)));
         services.AddHttpClient("HealthProbe", client => client.Timeout = Timeout.InfiniteTimeSpan);
         services.AddHttpClient("MicrosoftGraph", client =>
         {
@@ -241,6 +333,7 @@ var host = new HostBuilder()
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(personLinkedIdentityOptions);
         services.AddSingleton(organizationFeatureOptions);
+        services.AddSingleton(vivaLearningOptions);
         services.AddSingleton(enterpriseIdentityFeatureOptions);
         services.AddSingleton(enterpriseLearningMetricsFeatureOptions);
         services.AddSingleton<IIdentitySubjectGenerator, CryptographicIdentitySubjectGenerator>();
@@ -257,11 +350,16 @@ var host = new HostBuilder()
                 sp.GetRequiredService<IPersonLinkedIdentityShadowRuntime>(),
                 sp.GetRequiredService<ILegacyIdentityObservationSource>()));
         services.AddSingleton<IOrganizationTokenGenerator, CryptographicOrganizationTokenGenerator>();
+        services.AddSingleton<IOrganizationTelemetry, ApplicationInsightsOrganizationTelemetry>();
         services.AddScoped<IOrganizationRepository, CosmosOrganizationRepository>();
+        services.AddScoped<IOrganizationShadowObservationReader>(
+            sp => (IOrganizationShadowObservationReader)sp.GetRequiredService<IOrganizationRepository>());
         services.AddScoped<IOrganizationPersonResolver, OrganizationPersonResolver>();
         services.AddScoped<IOrganizationMembershipResolver, OrganizationMembershipResolver>();
         services.AddScoped<IOrganizationAuthorizationHandler, OrganizationAuthorizationHandler>();
         services.AddScoped<IOrganizationService, OrganizationService>();
+        services.AddSingleton<IVivaLearningFixtureCatalog, EmbeddedVivaLearningFixtureCatalog>();
+        services.AddScoped<IVivaLearningService, VivaLearningService>();
         services.AddScoped<
             IOrganizationOffboardingRecoveryWorker,
             OrganizationOffboardingRecoveryWorker>();
@@ -325,7 +423,12 @@ var host = new HostBuilder()
         {
             services.AddSingleton<IExternalIdentityDeletion, DevelopmentExternalIdentityDeletion>();
         }
-        services.AddScoped<IContentRepository, CosmosContentRepository>();
+        services.AddScoped<CosmosContentRepository>();
+        services.AddScoped<CosmosVersionedContentRepository>();
+        services.AddScoped<IContentRepository>(sp => new ContentRepositoryRouter(
+            sp.GetRequiredService<CosmosContentRepository>(),
+            sp.GetRequiredService<CosmosVersionedContentRepository>(),
+            configuration[ConfigurationKeys.ContentRepositoryMode] ?? "legacy"));
         services.AddScoped<IProgressRepository, CosmosProgressRepository>();
         services.AddScoped<IAttemptRepository, CosmosAttemptRepository>();
         services.AddScoped<IExamAttemptRepository, CosmosExamAttemptRepository>();
