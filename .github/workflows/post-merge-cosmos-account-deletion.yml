@@ -1,6 +1,6 @@
-# FEATURE-OFF: this file is intentionally outside .github/workflows.
-# Activation is a separate reviewed change after PR #296, runner provisioning,
-# registration, and rollback evidence are complete.
+# ACTIVATION-GATED: this workflow is available but cannot run unless the repository
+# variable CERTIGO_COSMOS_EMULATOR_ENABLED is explicitly set to the string "true".
+# Publishing this workflow provisions no resources and runs no tests.
 name: post-merge-cosmos-account-deletion
 
 on:

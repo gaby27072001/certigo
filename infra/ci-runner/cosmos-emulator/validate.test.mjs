@@ -16,12 +16,6 @@ const registration = fs.readFileSync(
   path.join(directory, 'register-runner.ps1'),
   'utf8',
 );
-const workflowPath = path.join(
-  root,
-  '.github',
-  'workflows-disabled',
-  'post-merge-cosmos-account-deletion.yml',
-);
 const activeWorkflowPath = path.join(
   root,
   '.github',
@@ -40,7 +34,7 @@ const legacyDisabledWorkflowPath = path.join(
   'workflows-disabled',
   'test-account-deletion-cosmos.yml',
 );
-const workflow = fs.readFileSync(workflowPath, 'utf8');
+const workflow = fs.readFileSync(activeWorkflowPath, 'utf8');
 const runbook = fs.readFileSync(
   path.join(root, 'docs', 'runbooks', 'COSMOS_EMULATOR_RUNNER.md'),
   'utf8',
@@ -201,14 +195,14 @@ test('emulator gate uses only the pinned local image and account-deletion test',
   assert.doesNotMatch(gate, /docker logs/);
 });
 
-test('workflow remains inactive and can only consume merged main when activated', () => {
-  assert.ok(fs.existsSync(workflowPath));
-  assert.equal(fs.existsSync(activeWorkflowPath), false);
+test('workflow is available, activation-gated, and can consume only merged main', () => {
+  assert.ok(fs.existsSync(activeWorkflowPath));
   assert.equal(fs.existsSync(legacyActiveWorkflowPath), false);
   assert.ok(fs.existsSync(legacyDisabledWorkflowPath));
   requireMarkers(
     workflow,
     [
+      '# ACTIVATION-GATED:',
       'workflow_dispatch:',
       "github.event_name == 'workflow_dispatch'",
       "github.repository == 'gchambaud_microsoft/Certigo'",
@@ -223,7 +217,7 @@ test('workflow remains inactive and can only consume merged main when activated'
       'bash infra/ci-runner/cosmos-emulator/run-account-deletion.sh --cleanup-only',
       '$GITHUB_STEP_SUMMARY',
     ],
-    'disabled workflow',
+    'active workflow',
   );
   assert.doesNotMatch(workflow, /^\s{2}push:/m);
   assert.doesNotMatch(workflow, /pull_request(?:_target)?:/);
@@ -244,7 +238,7 @@ test('runbook keeps deployment, activation, registration, and rollback explicit'
       '8a4f3be99b5d7cf97eb870d85e8481be24ceb1bc',
       '8cd955faa790aa69a2f330a8f57781e8856d624b',
       'what-if',
-      'feature-off',
+      'La PR qui déplace uniquement le workflow vers son chemin actif ne provisionne',
       '`gchambaud_microsoft` est un compte utilisateur',
       'certigo-cosmos-emulator',
       'register-runner.ps1',
@@ -259,7 +253,7 @@ test('runbook keeps deployment, activation, registration, and rollback explicit'
       'az vm deallocate',
       'az group delete',
       'aucun déploiement',
-      'workflow qui reste dans `.github/workflows-disabled/`',
+      '`.github/workflows/post-merge-cosmos-account-deletion.yml`',
     ],
     'COSMOS_EMULATOR_RUNNER.md',
   );

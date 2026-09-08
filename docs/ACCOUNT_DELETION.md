@@ -105,13 +105,14 @@ expiration est appliquée au secret Key Vault et contrôlée par Checkov.
 
 Le gate historique `test-account-deletion-cosmos.yml` est retiré de
 `.github/workflows/` : il ciblait le pool `certigo-trusted` et ne constitue pas
-une preuve d’isolement suffisante. Son remplacement one-shot reste **feature-off**
-dans `.github/workflows-disabled/post-merge-cosmos-account-deletion.yml`.
+une preuve d’isolement suffisante. Il reste archivé dans
+`.github/workflows-disabled/`. Son remplacement one-shot est disponible dans
+`.github/workflows/post-merge-cosmos-account-deletion.yml`.
 
 Le validateur trusted accepte uniquement les trois états atomiques de migration :
 A avec le legacy seul actif, B avec les deux workflows archivés, et C avec le
-one-shot seul actif et le legacy archivé. Le dépôt reste actuellement en B ; tout
-état partiel ou mixte est rejeté.
+one-shot seul actif et le legacy archivé. Le dépôt est en C depuis cette PR
+d'activation ; tout état partiel ou mixte est rejeté.
 
 L'ensemble actif de chaque état est épinglé dans le manifeste versionné
 `.github/scripts/workflow-semantic-manifest.json`. Les empreintes SHA-256 portent
@@ -128,9 +129,11 @@ de baseline doit être fusionnée comme contrôle trusted avant la modification
 sémantique correspondante ; `--check` vérifie ensuite que la génération revue est
 reproductible.
 
-Il ne peut être déplacé sous `.github/workflows/` que par une PR d’activation
-séparée, variable `CERTIGO_COSMOS_EMULATOR_ENABLED=false`. Le test post-merge
-requiert ensuite une VM jetable sans identité managée, le label exclusif
+Cette PR d’activation ne provisionne aucune ressource et ne lance aucun test :
+elle déplace le one-shot sous `.github/workflows/` tandis que la variable
+`CERTIGO_COSMOS_EMULATOR_ENABLED` demeure non définie ou `false`. Le workflow
+reste donc bloqué tant qu’elle n’est pas explicitement égale à `true`. Le test
+post-merge requiert ensuite une VM jetable sans identité managée, le label exclusif
 `certigo-cosmos-emulator`, un checkout vérifié de `main`, puis un unique
 `workflow_dispatch` avec la variable temporairement à `true`. Les prérequis,
 permissions, bornes et preuves de destruction sont détaillés dans

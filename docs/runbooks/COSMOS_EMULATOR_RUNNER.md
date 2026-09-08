@@ -190,6 +190,12 @@ identité managée et aucune role assignment.
 
 ## Activation séparée
 
+La PR qui déplace uniquement le workflow vers son chemin actif ne provisionne
+aucune ressource et ne lance aucun test : elle laisse le gate et la feature off.
+Les étapes 3 à 5 ci-dessous sont accomplies par cette PR d'activation, qui porte
+le dossier de l'état B à l'état C ; la variable `CERTIGO_COSMOS_EMULATOR_ENABLED`
+reste non définie ou `false`.
+
 Après fusion de la présente PR, alors que le gate et la feature restent off :
 
 1. vérifier que `main` contient les merges #296, #302, #311, #313 et celui de

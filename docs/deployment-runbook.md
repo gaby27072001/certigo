@@ -358,11 +358,12 @@ puis à vérifier la disparition ou la révocation de l’association Apple.
 
 `ACCOUNT_DELETION_ENABLED` reste `false` par défaut. Avant toute activation,
 le gate historique sur `certigo-trusted` reste retiré de `.github/workflows/`.
-Activer séparément le workflow one-shot décrit dans
-`docs/runbooks/COSMOS_EMULATOR_RUNNER.md`, puis exécuter un unique
+Le workflow one-shot décrit dans `docs/runbooks/COSMOS_EMULATOR_RUNNER.md` est
+disponible, mais sa PR de disponibilité ne provisionne aucune ressource et ne
+lance aucun test. Pour l’activation opérationnelle, exécuter un unique
 `workflow_dispatch` depuis `main` sur une VM jetable sans identité managée et
 portant seulement le label `certigo-cosmos-emulator`. La variable
-`CERTIGO_COSMOS_EMULATOR_ENABLED` reste `false` hors de cette fenêtre. Un test
+`CERTIGO_COSMOS_EMULATOR_ENABLED` reste non définie ou `false` hors de cette fenêtre. Un test
 skippé, absent, non unique ou non réussi ne permet jamais d’activer la feature.
 
 ### Gate Person / LinkedIdentity

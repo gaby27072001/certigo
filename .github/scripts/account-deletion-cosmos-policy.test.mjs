@@ -9,9 +9,17 @@ import { fingerprintWorkflow } from './workflow-semantic-fingerprint.mjs';
 
 const repositoryRoot = path.resolve('.');
 const manifestGoldenDigest = '15368377aaeedd23ad4c25b6201f0c88cdc11e9c4a2cdc6dfba0d1cca5830b67';
+// Les workflows Cosmos de suppression de compte sont fournis explicitement par chaque
+// layout testé. Les hériter du dépôt rendrait les fixtures dépendantes de l'état de
+// migration courant : une fois le dépôt en état C, toute fixture porterait un one-shot
+// actif en plus du layout demandé, et les états A et B deviendraient introuvables.
+const layoutWorkflowNames = new Set([
+  'test-account-deletion-cosmos.yml',
+  'post-merge-cosmos-account-deletion.yml',
+]);
 const baselineWorkflowNames = fs.readdirSync(
   path.join(repositoryRoot, '.github', 'workflows'),
-).filter((name) => /\.ya?ml$/.test(name));
+).filter((name) => /\.ya?ml$/.test(name) && !layoutWorkflowNames.has(name));
 
 const legacyContent = `
 name: test-account-deletion-cosmos
