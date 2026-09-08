@@ -171,6 +171,16 @@ gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" \
 Le dispatch historique `deploy-privacy-policy` reste neutralisé et ne doit pas
 être utilisé comme chemin d'activation.
 
+**Ce dispatch ne met pas à jour la production.** Depuis
+[#406](https://github.com/gchambaud_microsoft/Certigo/pull/406),
+`https://www.certigo-app.com` est servi par Azure Static Web Apps, alors que les
+deux workflows ci-dessus déploient vers GitHub Pages — non activé sur le dépôt
+(`GET repos/.../pages` rend 404, mesuré le 2026-09-08). La publication en
+production est donc **manuelle**, et le scellé des workflows privilégiés interdit
+d'automatiser : voir [`legal/README.md`](./legal/README.md), qui porte le contrat
+de publication, la raison du blocage et le contrôle de dérive
+`npm run check:public-pages`.
+
 Staging et production reçoivent en plus
 `APPLE_CIAM_DOMAIN_RECONFIGURED=true` depuis leur GitHub Environment avant toute
 opération de déploiement ou rollback. L'Environment `beta` et le groupe
