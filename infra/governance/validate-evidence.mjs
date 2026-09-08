@@ -55,6 +55,38 @@ function requireSha256(value, label) {
   }
 }
 
+const deploymentPhases = new Set(['A', 'B1a', 'B1b', 'B2']);
+
+export function validateExpectedDeploymentPhase(
+  manifest,
+  approval,
+  phaseABinding,
+  expectedPhase,
+) {
+  if (
+    typeof expectedPhase !== 'string' ||
+    !deploymentPhases.has(expectedPhase)
+  ) {
+    throw new Error('expected deployment phase is missing or invalid');
+  }
+  requireEqual(manifest.phase, expectedPhase, 'evidence manifest phase mismatch');
+  requireEqual(approval.phase, expectedPhase, 'approval phase mismatch');
+  if (expectedPhase === 'A') {
+    if (phaseABinding !== null) {
+      throw new Error('Phase A deployment must not use a Phase B binding');
+    }
+    return;
+  }
+  if (!phaseABinding) {
+    throw new Error('fresh Phase B deployment binding is required');
+  }
+  requireEqual(
+    phaseABinding.phase,
+    expectedPhase,
+    'fresh deployment binding phase mismatch',
+  );
+}
+
 function validateManifestSchema(manifest) {
   const topLevelFields = [
     'artifacts',
@@ -401,6 +433,9 @@ export function validatePhaseBTransition(
   proof,
   stage,
 ) {
+  if (!['B1a', 'B1b', 'B2'].includes(stage)) {
+    throw new Error('Phase B stage must be B1a, B1b, or B2');
+  }
   const observed = new Set(existingContracts);
   const b1a = expectedPhaseBContracts(subscriptionId, proof, 'B1a');
   const b1b = expectedPhaseBContracts(subscriptionId, proof, 'B1b');
@@ -560,10 +595,17 @@ export function verifyDeploymentApproval(input) {
     subscriptionId,
     tenantId,
     legacyTransitionPath,
+    expectedPhase,
   } = input;
+  const phaseABinding = phaseABindingPath ? readJson(phaseABindingPath) : null;
+  validateExpectedDeploymentPhase(
+    manifest,
+    approval,
+    phaseABinding,
+    expectedPhase,
+  );
   requireEqual(approval.schemaVersion, 1, 'unsupported approval schema');
   requireEqual(approval.approved, true, 'evidence is not approved');
-  requireEqual(approval.phase, manifest.phase, 'approval phase mismatch');
   requireEqual(
     approval.manifestSha256,
     sha256File(manifestPath),
@@ -767,6 +809,7 @@ function main() {
       `${JSON.stringify(
         {
           schemaVersion: 1,
+          phase: args['--stage'],
           deploymentId: deployment.id,
           deploymentName: deployment.name,
           deploymentTemplateHash: deployment.properties.templateHash,
@@ -805,6 +848,7 @@ function main() {
       sourceRoot: path.resolve(args['--source-root']),
       subscriptionId: args['--subscription'],
       tenantId: args['--tenant'],
+      expectedPhase: args['--phase'],
       legacyTransitionPath: args['--legacy-transition']
         ? path.resolve(args['--legacy-transition'])
         : null,

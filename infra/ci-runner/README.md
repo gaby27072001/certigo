@@ -319,6 +319,64 @@ postérieure. Le baseline 30 jours est
 242,06 USD pour 413 jobs, 18,84 runner-heures, 3,78 % CPU moyen, avec une file P95 de
 5 108 s et P99 de 12 628 s.
 
+### Ajouter une instance au pilote PR
+
+> **Prérequis : la règle NSG `deny-imds-outbound` doit être retirée pendant le
+> provisionnement, puis reposée.** Ce n'est pas un détail d'exécution — sans ce
+> retrait, l'opération échoue par `OSProvisioningInternalError` après une
+> trentaine de minutes, et le symptôme ne nomme jamais l'IMDS. L'opérateur qui
+> l'ignore conclut que le VMSS est cassé.
+
+La cause est que l'agent invité Azure interroge l'IMDS pour terminer le
+provisionnement. La règle fait donc exactement ce qu'elle annonce, y compris
+contre l'agent. Le contraste a été mesuré dans les deux sens sur ce VMSS : avec
+la règle, échec ; sans la règle, `Succeeded` en une poignée de secondes.
+
+Le blocage OS installé par `bootstrap.sh` (`certigo-block-imds.service`,
+`iptables -j REJECT` sur `169.254.169.254/32`) ne couvre pas ce moment : il est
+posé *par* le bootstrap, donc après que le réseau du premier démarrage est déjà
+monté. C'est précisément le trou que la règle NSG existe pour couvrir, et c'est
+celui qu'on rouvre en la retirant.
+
+Ce que l'exposition ne peut pas atteindre, et qu'il faut vérifier avant d'ouvrir
+la fenêtre plutôt que de le supposer :
+
+- le VMSS pilote **ne déclare aucune identité gérée**, donc l'IMDS n'y délivre
+  aucun jeton — le contrôle est `az vmss list ... --query "[].identity.type"`,
+  à lire face au pool trusted qui, lui, en déclare une ; deux valeurs
+  différentes dans la même sortie prouvent que la requête discrimine ;
+- aucun runner n'est encore enregistré sur l'instance neuve, donc aucun code de
+  PR ne s'exécute pendant la fenêtre ;
+- `pilot-register.sh` refuse l'enregistrement tant que l'IMDS répond, donc la
+  règle reposée est une condition d'entrée et pas une formalité de sortie.
+
+Mesurer la fenêtre réelle après coup, plutôt que l'estimer, en lisant le journal
+d'activité — la durée d'une commande `az` n'est **pas** la durée d'absence de la
+règle, les deux se lisent différemment :
+
+```bash
+az monitor activity-log list \
+  --subscription <SUBSCRIPTION_ID> \
+  --start-time <ISO8601> --end-time <ISO8601> \
+  --max-events 1000 -o json |
+  jq -r '.[] | select(.operationName.value | test("securityRules"))
+         | [.eventTimestamp, .status.value, .operationName.value] | @tsv'
+```
+
+Ne pas passer `--offset` avec `--start-time` : la plage est alors annulée et la
+commande rend zéro événement pour toute requête, ce qui se lit comme une absence.
+
+> **`az vmss scale` peut sortir en échec alors que l'instance a été créée et
+> qu'elle est facturée.** Relancer sans vérifier crée une instance fantôme de
+> plus, absente de l'inventaire et de la liste de rallumage nocturne. Toujours
+> relire `sku.capacity` et `az vm list` avant toute relance.
+
+**Dette de conception, à ne pas entreprendre dans une opération de capacité.**
+Le correctif propre n'est pas de lever la règle à chaque ajout, mais de la
+restreindre pour laisser passer l'agent invité pendant la seule phase de
+provisionnement. C'est un chantier de conception réseau — portée, source
+autorisée, durée — pas une correction ponctuelle.
+
 > À noter : le compte **Azure OpenAI** (`certigo-openai`), autre ressource en drift citée
 > par le finding G, est lui **réintégré en IaC** dans ce livrable via
 > `infra/modules/openai.bicep` (câblé dans `infra/main.bicep`, module `tutor`).

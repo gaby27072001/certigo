@@ -11,7 +11,10 @@ enum AppFlavor { dev, staging, prod }
 class AppEnv {
   const AppEnv._();
 
-  static const String _rawEnv = String.fromEnvironment('CERTIGO_ENV', defaultValue: 'dev');
+  static const String _rawEnv = String.fromEnvironment(
+    'CERTIGO_ENV',
+    defaultValue: 'dev',
+  );
 
   static AppFlavor get flavor => switch (_rawEnv) {
         'prod' => AppFlavor.prod,
@@ -39,11 +42,20 @@ class AppEnv {
   /// dev token validator resolves any non-empty value to a stable userId, so the
   /// app works end-to-end against a dev API. Production must inject a real Entra
   /// access token (see [tokenProvider]) and never relies on this.
-  static const String devAuthToken = String.fromEnvironment('DEV_AUTH_TOKEN', defaultValue: 'dev');
+  static const String devAuthToken = String.fromEnvironment(
+    'DEV_AUTH_TOKEN',
+    defaultValue: 'dev',
+  );
 
   /// Microsoft Entra External ID — public client configuration.
-  static const String entraClientId = String.fromEnvironment('ENTRA_CLIENT_ID', defaultValue: '');
-  static const String entraAuthority = String.fromEnvironment('ENTRA_AUTHORITY', defaultValue: '');
+  static const String entraClientId = String.fromEnvironment(
+    'ENTRA_CLIENT_ID',
+    defaultValue: '',
+  );
+  static const String entraAuthority = String.fromEnvironment(
+    'ENTRA_AUTHORITY',
+    defaultValue: '',
+  );
 
   /// URI de redirection OIDC de l'app.
   ///
@@ -80,7 +92,10 @@ class AppEnv {
   /// Scope d'API protégée (ex. `api://<api-client-id>/.default`). Quand il est
   /// renseigné, Entra émet un access_token dont l'`aud` correspond à
   /// `ENTRA_AUDIENCE` côté backend, ce qui permet de l'envoyer en Bearer.
-  static const String entraApiScope = String.fromEnvironment('ENTRA_API_SCOPE', defaultValue: '');
+  static const String entraApiScope = String.fromEnvironment(
+    'ENTRA_API_SCOPE',
+    defaultValue: '',
+  );
 
   /// Indices de domaine (`domain_hint`) pour pré-orienter Entra vers le bon
   /// fournisseur fédéré. Configurables car le nom exact du fournisseur Google /
@@ -111,11 +126,21 @@ class AppEnv {
 
   /// Force l'affichage de l'écran de connexion même sans Entra configuré, pour
   /// prévisualiser/tester l'UI en dev (`--dart-define=FORCE_AUTH_UI=true`).
-  static const bool forceAuthUi = bool.fromEnvironment('FORCE_AUTH_UI', defaultValue: false);
+  static const bool forceAuthUi = bool.fromEnvironment(
+    'FORCE_AUTH_UI',
+    defaultValue: false,
+  );
 
   /// Keeps account deletion hidden until the destructive Cosmos gate passes.
   static const bool accountDeletionEnabled = bool.fromEnvironment(
     'ACCOUNT_DELETION_ENABLED',
+    defaultValue: false,
+  );
+
+  /// Keeps the B2B manager portal completely absent from navigation and routing
+  /// until its server contracts are ready. Local previews use provider overrides.
+  static const bool managerPortalEnabled = bool.fromEnvironment(
+    'MANAGER_PORTAL_ENABLED',
     defaultValue: false,
   );
 
@@ -125,7 +150,10 @@ class AppEnv {
   /// **e-mail/mot de passe uniquement** assumé (`--dart-define=ENTRA_OPTIONAL=true`).
   /// Par défaut `false` : un build prod/staging DOIT fournir Entra pour offrir
   /// les 4 méthodes de connexion.
-  static const bool entraOptional = bool.fromEnvironment('ENTRA_OPTIONAL', defaultValue: false);
+  static const bool entraOptional = bool.fromEnvironment(
+    'ENTRA_OPTIONAL',
+    defaultValue: false,
+  );
 
   static bool get isProd => flavor == AppFlavor.prod;
   static bool get analyticsEnabled => isProd || flavor == AppFlavor.staging;

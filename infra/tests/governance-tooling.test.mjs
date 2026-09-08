@@ -23,6 +23,7 @@ import {
   writeManifestSeal,
 } from '../governance/evidence-files.mjs';
 import {
+  validateIndependentAdminLiveSchedule,
   validateLegacyLiveAssignments,
   validateLegacyTransition,
 } from '../governance/legacy-transition-contract.mjs';
@@ -38,8 +39,14 @@ import {
 import { createManifest } from '../governance/write-what-if-manifest.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const subscription = '00000000-0000-0000-0000-000000000001';
-const tenant = '00000000-0000-0000-0000-000000000002';
+const subscription = 'a0000000-0000-0000-0000-000000000001';
+const tenant = 'b0000000-0000-0000-0000-000000000002';
+const malformedArtifactUuids = [
+  null,
+  {},
+  '00000000-0000-0000-0000-000000000000',
+  '30000000-0000-0000-0000-00000000000A',
+];
 const parameterSchema =
   'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#';
 
@@ -228,9 +235,16 @@ function validTransition() {
           '30000000-0000-0000-0000-000000000002',
         operatorOwner: 'certigo-sole-owner',
         independentAdminOwner: 'temporary-governance-msp',
+        independentAdminTenantId: tenant,
+        independentAdminScope: `/subscriptions/${subscription}`,
+        independentAdminPrincipalId:
+          '30000000-0000-0000-0000-000000000002',
         independentAdminRoleDefinitionId:
           `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
           'roleDefinitions/18d7d88d-d35e-4fb5-a5c3-7773c20a72d9',
+        independentAdminScheduleInstanceId:
+          `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
+          'roleAssignmentScheduleInstances/50000000-0000-0000-0000-000000000099',
         independentAdminExpiresAt: '2026-09-08T10:00:00Z',
         soloModeControls: null,
         emergencyPrincipalIds: [
@@ -240,6 +254,32 @@ function validTransition() {
         evidenceSha256: 'f'.repeat(64),
       },
       soakEndsAt: '2026-09-08T10:00:00Z',
+    },
+  };
+}
+
+function independentAdminSchedule(transition) {
+  return {
+    id: transition.changeControl.independentAdminScheduleInstanceId,
+    properties: {
+      scope: transition.changeControl.independentAdminScope,
+      principalId: transition.changeControl.independentAdminPrincipalId,
+      principalType: 'ServicePrincipal',
+      roleDefinitionId:
+        transition.changeControl.independentAdminRoleDefinitionId,
+      roleAssignmentScheduleId:
+        `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
+        'roleAssignmentSchedules/50000000-0000-0000-0000-000000000099',
+      originRoleAssignmentId:
+        `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
+        'roleAssignments/50000000-0000-0000-0000-000000000099',
+      startDateTime: '2026-09-01T10:00:00Z',
+      endDateTime: transition.changeControl.independentAdminExpiresAt,
+      assignmentType: 'Assigned',
+      memberType: 'Direct',
+      status: 'Provisioned',
+      condition: null,
+      conditionVersion: null,
     },
   };
 }
@@ -757,6 +797,43 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
     nonLockoutVerified: true,
     temporaryAssignmentCount: 8,
   });
+  const principalMutations = [
+    [
+      'legacy principal',
+      (candidate, invalid) => {
+        candidate.legacyPrincipalId = invalid;
+      },
+    ],
+    [
+      'temporary assignment principal',
+      (candidate, invalid) => {
+        candidate.temporaryAssignments[0].principalId = invalid;
+      },
+    ],
+    [
+      'safety principal',
+      (candidate, invalid) => {
+        candidate.changeControl.safetyAdminPrincipalId = invalid;
+      },
+    ],
+    [
+      'emergency principal',
+      (candidate, invalid) => {
+        candidate.changeControl.emergencyPrincipalIds[0] = invalid;
+      },
+    ],
+  ];
+  for (const [label, mutate] of principalMutations) {
+    for (const invalid of malformedArtifactUuids) {
+      const candidate = structuredClone(transition);
+      mutate(candidate, invalid);
+      assert.throws(
+        () => validate(candidate),
+        /non-nil canonical lowercase UUID string/,
+        label,
+      );
+    }
+  }
 
   const staleProfessionalProof = structuredClone(transition);
   staleProfessionalProof.subscriptionId =
@@ -814,6 +891,7 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
       },
     }),
   );
+  const liveIndependentAdminSchedules = [independentAdminSchedule(transition)];
   assert.doesNotThrow(() =>
     validateLegacyLiveAssignments(
       liveAssignments,
@@ -821,8 +899,54 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
       transition,
       proof,
       Date.parse('2026-09-02T10:00:00Z'),
+      [],
+      [],
+      liveIndependentAdminSchedules,
     ),
   );
+  const equivalentAzureSchedules = structuredClone(liveScheduleInstances);
+  equivalentAzureSchedules[0].properties.startDateTime =
+    '2026-09-01T12:00:00.0000000+02:00';
+  equivalentAzureSchedules[0].properties.endDateTime =
+    '2026-09-08T11:00:00.000+01:00';
+  assert.doesNotThrow(() =>
+    validateLegacyLiveAssignments(
+      liveAssignments,
+      equivalentAzureSchedules,
+      transition,
+      proof,
+      Date.parse('2026-09-02T10:00:00Z'),
+      [],
+      [],
+      liveIndependentAdminSchedules,
+    ),
+  );
+  for (const [label, timestampValue, pattern] of [
+    ['impossible date', '2026-09-31T10:00:00Z', /schedule start .* is invalid/],
+    [
+      'sub-millisecond mismatch',
+      '2026-09-01T10:00:00.0000001Z',
+      /does not match the approved transition/,
+    ],
+  ]) {
+    const invalidSchedules = structuredClone(liveScheduleInstances);
+    invalidSchedules[0].properties.startDateTime = timestampValue;
+    assert.throws(
+      () =>
+        validateLegacyLiveAssignments(
+          liveAssignments,
+          invalidSchedules,
+          transition,
+          proof,
+          Date.parse('2026-09-02T10:00:00Z'),
+          [],
+          [],
+          liveIndependentAdminSchedules,
+        ),
+      pattern,
+      label,
+    );
+  }
 
   const premature = structuredClone(transition);
   premature.replacementJit.activationTests[1].testedAt =
@@ -866,7 +990,11 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
   approvedSolo.changeControl.administrationMode =
     'approved-solo-compensating-controls';
   approvedSolo.changeControl.independentAdminOwner = null;
+  approvedSolo.changeControl.independentAdminTenantId = null;
+  approvedSolo.changeControl.independentAdminScope = null;
+  approvedSolo.changeControl.independentAdminPrincipalId = null;
   approvedSolo.changeControl.independentAdminRoleDefinitionId = null;
+  approvedSolo.changeControl.independentAdminScheduleInstanceId = null;
   approvedSolo.changeControl.independentAdminExpiresAt = null;
   approvedSolo.changeControl.soloModeControls = {
     riskAcceptance: {
@@ -933,6 +1061,56 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
     rollbackEvidenceSha256: 'c'.repeat(64),
   };
   assert.doesNotThrow(() => validate(approvedSolo));
+  const soloIdentifierMutations = [
+    [
+      'management tenant',
+      (candidate, invalid) => {
+        candidate.changeControl.soloModeControls.managementTenantId = invalid;
+      },
+    ],
+    [
+      'break-glass tenant',
+      (candidate, invalid) => {
+        candidate.changeControl.soloModeControls.breakGlassAccounts[0].tenantId =
+          invalid;
+      },
+    ],
+    [
+      'break-glass principal',
+      (candidate, invalid) => {
+        candidate.changeControl.soloModeControls.breakGlassAccounts[0].objectId =
+          invalid;
+      },
+    ],
+  ];
+  for (const [label, mutate] of soloIdentifierMutations) {
+    for (const invalid of malformedArtifactUuids) {
+      const candidate = structuredClone(approvedSolo);
+      mutate(candidate, invalid);
+      assert.throws(
+        () => validate(candidate),
+        /non-nil canonical lowercase UUID string/,
+        label,
+      );
+    }
+  }
+  for (const invalidAaguid of [
+    null,
+    [],
+    {},
+    'UNKNOWN',
+    '00000000-0000-0000-0000-000000000000',
+    '10000000000000000000000000000001',
+    '10000000-0000-0000-0000-00000000000A',
+  ]) {
+    const malformedCredential = structuredClone(approvedSolo);
+    malformedCredential.changeControl.soloModeControls
+      .credentialAttestationAaguids[0] = invalidAaguid;
+    assert.throws(
+      () => validate(malformedCredential),
+      /canonical lowercase UUID string/,
+    );
+  }
   const unrelatedEmergencyEvidence = structuredClone(approvedSolo);
   unrelatedEmergencyEvidence.changeControl.soloModeControls
     .breakGlassAccounts[0].objectId =
@@ -1124,6 +1302,10 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
         liveScheduleInstances,
         transition,
         proof,
+        Date.parse('2026-09-02T10:00:00Z'),
+        [],
+        [],
+        liveIndependentAdminSchedules,
       ),
     /Owner, Contributor, or UAA access remains live/,
   );
@@ -1145,6 +1327,8 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
         proof,
         Date.parse('2026-09-02T10:00:00Z'),
         [transitiveGroupId],
+        [],
+        liveIndependentAdminSchedules,
       ),
     /transitive group assignment remains live/,
   );
@@ -1167,6 +1351,7 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
             },
           },
         ],
+        liveIndependentAdminSchedules,
       ),
     /retains a PIM eligibility schedule/,
   );
@@ -1181,11 +1366,281 @@ test('legacy transition prevents lockout and removes broad roles before Phase B'
         transition,
         proof,
         Date.parse('2026-09-02T10:00:00Z'),
+        [],
+        [],
+        liveIndependentAdminSchedules,
       ),
     /schedule expiry/,
   );
 });
 
+test('independent admin evidence exactly matches one live active UAA schedule', () => {
+  const { proof, transition } = validTransition();
+  const now = Date.parse('2026-09-02T10:00:00Z');
+  const live = independentAdminSchedule(transition);
+  const validate = (candidateTransition, candidateLive = live) =>
+    validateIndependentAdminLiveSchedule(
+      candidateLive === null ? [] : [candidateLive],
+      candidateTransition,
+      proof,
+      now,
+    );
+  assert.doesNotThrow(() => validate(transition));
+  for (const [label, field] of [
+    ['tenant', 'independentAdminTenantId'],
+    ['principal', 'independentAdminPrincipalId'],
+    ['safety principal', 'safetyAdminPrincipalId'],
+  ]) {
+    for (const invalid of malformedArtifactUuids) {
+      const candidate = structuredClone(transition);
+      candidate.changeControl[field] = invalid;
+      assert.throws(
+        () => validate(candidate, independentAdminSchedule(candidate)),
+        /non-nil canonical lowercase UUID string/,
+        label,
+      );
+    }
+  }
+  for (const field of ['tenantId', 'subscriptionId']) {
+    const candidateProof = structuredClone(proof);
+    candidateProof[field] = candidateProof[field].toUpperCase();
+    assert.throws(
+      () =>
+        validateIndependentAdminLiveSchedule(
+          [independentAdminSchedule(transition)],
+          transition,
+          candidateProof,
+          now,
+        ),
+      /non-nil canonical lowercase UUID string/,
+      `Phase A ${field}`,
+    );
+  }
+  const azureResponseShape = independentAdminSchedule(transition);
+  azureResponseShape.properties.startDateTime = '2026-09-01T12:00:00.91+02:00';
+  azureResponseShape.properties.endDateTime =
+    '2026-09-08T12:00:00.0000000+02:00';
+  delete azureResponseShape.properties.condition;
+  delete azureResponseShape.properties.conditionVersion;
+  assert.doesNotThrow(() => validate(transition, azureResponseShape));
+  const leapDay = structuredClone(transition);
+  leapDay.changeControl.independentAdminExpiresAt = '2028-02-29T10:00:00Z';
+  assert.doesNotThrow(() =>
+    validate(leapDay, independentAdminSchedule(leapDay)),
+  );
+
+  const cases = [
+    [
+      'tenant',
+      (candidate) => {
+        candidate.changeControl.independentAdminTenantId =
+          '00000000-0000-0000-0000-000000000099';
+      },
+      /target tenant/,
+    ],
+    [
+      'scope',
+      (candidate) => {
+        candidate.changeControl.independentAdminScope += '/';
+      },
+      /canonical subscription scope/,
+    ],
+    [
+      'live scope',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.scope += '/resourceGroups/rg-certigo-ci';
+      },
+      /does not match approved evidence/,
+    ],
+    [
+      'principal',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.principalId =
+          '30000000-0000-0000-0000-000000000099';
+      },
+      /does not match approved evidence/,
+    ],
+    [
+      'schedule',
+      (_candidate, candidateLive) => {
+        candidateLive.id =
+          `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
+          'roleAssignmentScheduleInstances/50000000-0000-0000-0000-000000000098';
+      },
+      /does not match approved evidence/,
+    ],
+    [
+      'role',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.roleDefinitionId =
+          `/subscriptions/${subscription}/providers/Microsoft.Authorization/` +
+          'roleDefinitions/70000000-0000-0000-0000-000000000001';
+      },
+      /does not match approved evidence/,
+    ],
+    [
+      'window',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.startDateTime = '2026-09-03T10:00:00Z';
+      },
+      /outside its active window/,
+    ],
+    [
+      'expiry',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.endDateTime = '2026-09-07T10:00:00Z';
+      },
+      /does not match approved evidence/,
+    ],
+    [
+      'condition',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.condition =
+          "@Resource[Microsoft.Storage/storageAccounts:name] StringEquals 'restricted'";
+      },
+      /does not match approved evidence/,
+    ],
+    [
+      'condition version',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.conditionVersion = '2.0';
+      },
+      /does not match approved evidence/,
+    ],
+    [
+      'empty condition',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.condition = '';
+      },
+      /does not match approved evidence/,
+    ],
+    [
+      'empty condition version',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.conditionVersion = '';
+      },
+      /does not match approved evidence/,
+    ],
+    [
+      'malformed live timestamp',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.startDateTime = '2026-09-01T10:00:00.12345678Z';
+      },
+      /explicit UTC timestamp/,
+    ],
+    [
+      'impossible live date',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.startDateTime = '2026-09-31T10:00:00Z';
+      },
+      /schedule start is invalid/,
+    ],
+    [
+      'unknown zero offset',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.startDateTime = '2026-09-01T10:00:00-00:00';
+      },
+      /schedule start is invalid/,
+    ],
+    [
+      'out-of-range offset',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.startDateTime = '2026-09-01T10:00:00+14:01';
+      },
+      /schedule start is invalid/,
+    ],
+    [
+      'sub-millisecond expiry mismatch',
+      (_candidate, candidateLive) => {
+        candidateLive.properties.endDateTime = '2026-09-08T10:00:00.0000001Z';
+      },
+      /does not match approved evidence/,
+    ],
+  ];
+  for (const [label, mutate, pattern] of cases) {
+    const candidate = structuredClone(transition);
+    const candidateLive = independentAdminSchedule(candidate);
+    mutate(candidate, candidateLive);
+    assert.throws(() => validate(candidate, candidateLive), pattern, label);
+  }
+  assert.throws(() => validate(transition, null), /exactly one schedule instance/);
+  const missingExpiry = structuredClone(transition);
+  delete missingExpiry.changeControl.independentAdminExpiresAt;
+  assert.throws(
+    () => validate(missingExpiry, independentAdminSchedule(missingExpiry)),
+    /expiresAt must be an explicit UTC timestamp/,
+  );
+  const expired = structuredClone(transition);
+  expired.changeControl.independentAdminExpiresAt = '2026-09-02T10:00:00Z';
+  const expiredLive = independentAdminSchedule(expired);
+  assert.throws(
+    () => validate(expired, expiredLive),
+    /expiry must be strictly later than now/,
+  );
+  const fractionalApprovedExpiry = structuredClone(transition);
+  fractionalApprovedExpiry.changeControl.independentAdminExpiresAt =
+    '2026-09-08T10:00:00.000Z';
+  assert.throws(
+    () =>
+      validate(
+        fractionalApprovedExpiry,
+        independentAdminSchedule(fractionalApprovedExpiry),
+      ),
+    /expiresAt must be an explicit UTC timestamp/,
+  );
+  for (const invalidExpiry of [
+    '2026-09-31T10:00:00Z',
+    '2025-02-29T10:00:00Z',
+  ]) {
+    const invalidCalendar = structuredClone(transition);
+    invalidCalendar.changeControl.independentAdminExpiresAt = invalidExpiry;
+    assert.throws(
+      () =>
+        validate(
+          invalidCalendar,
+          independentAdminSchedule(invalidCalendar),
+        ),
+      /independent admin expiresAt is invalid/,
+    );
+  }
+});
+
+test('assignment IDs require canonical UUID strings before comparison', () => {
+  const invalidIdentifiers = [
+    null,
+    [],
+    {},
+    'UNKNOWN',
+    '00000000-0000-0000-0000-000000000000',
+    '40000000000000000000000000000001',
+    '40000000-0000-0000-0000-00000000000A',
+  ];
+  for (const invalid of invalidIdentifiers) {
+    const { proof, transition } = validTransition();
+    transition.inventory.assignmentIds[0] = invalid;
+    assert.throws(
+      () => validateLegacyTransition(transition, proof),
+      /canonical lowercase UUID string/,
+    );
+  }
+  {
+    const { proof, transition } = validTransition();
+    transition.inventory.assignmentIds[1] =
+      transition.inventory.assignmentIds[0];
+    assert.throws(
+      () => validateLegacyTransition(transition, proof),
+      /inventory assignment IDs are invalid/,
+    );
+  }
+  for (const invalid of invalidIdentifiers) {
+    const { proof, transition } = validTransition();
+    transition.broadRemoval.contributorAssignmentId = invalid;
+    assert.throws(
+      () => validateLegacyTransition(transition, proof),
+      /canonical lowercase UUID string/,
+    );
+  }
+});
 test('runbook fixes planner count, transition ordering, and Phase A repair proof', () => {
   const runbook = fs.readFileSync(
     path.join(root, 'docs/runbooks/CLOUD_LEAST_PRIVILEGE.md'),

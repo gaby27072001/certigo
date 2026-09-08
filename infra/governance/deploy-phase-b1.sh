@@ -28,6 +28,7 @@ chmod 400 "${work_dir}/template.json" "${work_dir}/parameters.json"
 cmp "${work_dir}/fresh-compiled-template.json" "${work_dir}/template.json"
 
 node "${root}/infra/governance/validate-evidence.mjs" deployment-approval \
+  --phase B1a \
   --approval "${approval_file}" \
   --manifest "${evidence_dir}/manifest.json" \
   --plan "${evidence_dir}/plan.json" \

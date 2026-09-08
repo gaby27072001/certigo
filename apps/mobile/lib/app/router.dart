@@ -30,6 +30,8 @@ import '../features/auth/presentation/register_password_screen.dart';
 import '../features/auth/presentation/register_profile_created_screen.dart';
 import '../features/auth/presentation/splash_screen.dart' as auth;
 import '../features/account_deletion/presentation/account_deletion_screen.dart';
+import '../features/manager/application/manager_route_codec.dart';
+import '../features/manager/presentation/manager_portal_screen.dart';
 import '../features/onboarding/application/onboarding_controller.dart';
 import '../features/onboarding/presentation/certification_screen.dart';
 import '../features/onboarding/presentation/onboarding_common.dart';
@@ -67,6 +69,7 @@ abstract class Routes {
   static const String dailyShare = '/share-daily';
   static const String accountDeletion = '/account/delete';
   static const String accountDeleted = '/account/deleted';
+  static const String manager = '/enterprise';
 }
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -96,7 +99,10 @@ CustomTransitionPage<void> _stepPage({
       return FadeTransition(
         opacity: curved,
         child: SlideTransition(
-          position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
+          position: Tween<Offset>(
+            begin: begin,
+            end: Offset.zero,
+          ).animate(curved),
           child: child,
         ),
       );
@@ -110,8 +116,14 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   // Garde de synchronisation : les constantes du garde d'auth (fichier feuille
   // testable) doivent rester alignées sur le table de routes et l'onboarding.
   // En debug, tout écart casse tôt plutôt que de laisser passer une régression.
-  assert(Routes.splash == AuthShellRoutes.splash, 'Routes.splash désynchronisé');
-  assert(Routes.landing == AuthShellRoutes.landing, 'Routes.landing désynchronisé');
+  assert(
+    Routes.splash == AuthShellRoutes.splash,
+    'Routes.splash désynchronisé',
+  );
+  assert(
+    Routes.landing == AuthShellRoutes.landing,
+    'Routes.landing désynchronisé',
+  );
   assert(Routes.auth == AuthShellRoutes.auth, 'Routes.auth désynchronisé');
   assert(Routes.home == AuthShellRoutes.home, 'Routes.home désynchronisé');
   assert(
@@ -130,14 +142,19 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
 
   // Bridge auth-state changes into a [Listenable] so GoRouter re-runs redirects
   // as soon as session restore / sign-in / sign-out happens.
-  final OnboardingController onboardingCtrl = ref.read(onboardingControllerProvider);
+  final OnboardingController onboardingCtrl = ref.read(
+    onboardingControllerProvider,
+  );
   final ValueNotifier<int> authRefresh = ValueNotifier<int>(0);
   ref.listen<AuthState>(authControllerProvider, (_, AuthState next) {
     authRefresh.value++;
   });
   ref.onDispose(authRefresh.dispose);
 
-  final Listenable refresh = Listenable.merge(<Listenable>[authRefresh, onboardingCtrl]);
+  final Listenable refresh = Listenable.merge(<Listenable>[
+    authRefresh,
+    onboardingCtrl,
+  ]);
 
   return GoRouter(
     navigatorKey: _rootKey,
@@ -166,8 +183,11 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         path: Routes.landing,
         name: 'landing',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (_, GoRouterState state) =>
-            _stepPage(state: state, child: const LandingScreen(), begin: const Offset(0, 0.03)),
+        pageBuilder: (_, GoRouterState state) => _stepPage(
+          state: state,
+          child: const LandingScreen(),
+          begin: const Offset(0, 0.03),
+        ),
       ),
       GoRoute(
         path: Routes.auth,
@@ -190,6 +210,15 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         parentNavigatorKey: _rootKey,
         builder: (_, __) => const AccountDeletionCompletedScreen(),
       ),
+      if (AppEnv.managerPortalEnabled)
+        GoRoute(
+          path: '${Routes.manager}/:organizationId',
+          name: 'manager',
+          parentNavigatorKey: _rootKey,
+          builder: (BuildContext context, GoRouterState state) => ManagerPortalScreen(
+            organizationId: managerOrganizationIdFromUri(state.uri),
+          ),
+        ),
 
       // Real account creation: name → email → password → confirmation.
       GoRoute(
@@ -244,7 +273,11 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       ),
       // Bottom-nav shell: persistent state per tab via StatefulShellRoute.
       StatefulShellRoute.indexedStack(
-        builder: (BuildContext context, GoRouterState state, StatefulNavigationShell shell) {
+        builder: (
+          BuildContext context,
+          GoRouterState state,
+          StatefulNavigationShell shell,
+        ) {
           return AppShell(shell: shell);
         },
         branches: <StatefulShellBranch>[
@@ -252,7 +285,11 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           StatefulShellBranch(
             navigatorKey: _shellKey,
             routes: <RouteBase>[
-              GoRoute(path: Routes.home, name: 'home', builder: (_, __) => const HomeScreen()),
+              GoRoute(
+                path: Routes.home,
+                name: 'home',
+                builder: (_, __) => const HomeScreen(),
+              ),
             ],
           ),
           StatefulShellBranch(
@@ -359,43 +396,61 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         path: Routes.seasons,
         name: 'seasons',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) =>
-            _stepPage(state: state, begin: const Offset(0, 0.04), child: const SeasonsScreen()),
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const SeasonsScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.quests,
         name: 'quests',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) =>
-            _stepPage(state: state, begin: const Offset(0, 0.04), child: const QuestsScreen()),
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const QuestsScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.shop,
         name: 'shop',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) =>
-            _stepPage(state: state, begin: const Offset(0, 0.04), child: const ShopScreen()),
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const ShopScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.friends,
         name: 'friends',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) =>
-            _stepPage(state: state, begin: const Offset(0, 0.04), child: const FriendsScreen()),
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const FriendsScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.exam,
         name: 'exam',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) =>
-            _stepPage(state: state, begin: const Offset(0, 0.04), child: const ExamScreen()),
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const ExamScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.dailyShare,
         name: 'daily-share',
         parentNavigatorKey: _rootKey,
-        pageBuilder: (BuildContext context, GoRouterState state) =>
-            _stepPage(state: state, begin: const Offset(0, 0.04), child: const DailyShareScreen()),
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const DailyShareScreen(),
+        ),
       ),
     ],
   );

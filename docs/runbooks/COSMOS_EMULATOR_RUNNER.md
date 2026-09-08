@@ -200,8 +200,10 @@ Après fusion de la présente PR, alors que le gate et la feature restent off :
    `.github/workflows/post-merge-cosmos-account-deletion.yml` dans une PR dédiée ;
 4. conserver le workflow historique `test-account-deletion-cosmos.yml` hors de
    `.github/workflows/` ;
-5. adapter dans la même PR `validate.test.mjs` et le présent runbook pour retirer
-   leurs assertions/mentions feature-off et exiger le workflow à son chemin actif ;
+5. vérifier que le validateur trusted reconnaît l'état C atomique — one-shot actif,
+   legacy archivé et archive one-shot absente — puis adapter dans la même PR
+   `infra/ci-runner/cosmos-emulator/validate.test.mjs` et le présent runbook pour
+   retirer leurs assertions et mentions feature-off ;
 6. fusionner cette PR d'activation sur `main` tandis que la variable reste
    `false` ;
 7. dans la fenêtre approuvée, valider le `what-if`, créer uniquement le groupe
@@ -225,6 +227,13 @@ Azure. Il checkout explicitement `refs/heads/main`, vérifie `HEAD == origin/mai
 exécute uniquement le test de suppression de compte, écrit le résultat dans
 `GITHUB_STEP_SUMMARY`, exige exactement un résultat TRX exécuté et réussi, ne
 publie aucun artifact et nettoie conteneur, clé et résultat local.
+
+Le passage de B à C doit conserver exactement la baseline active B et ajouter le
+seul workflow one-shot décrit ci-dessus. Le manifeste sémantique trusted épingle
+les ensembles A, B et C par chemin canonique et SHA-256 ; le générateur manuel ne
+fait partie d'aucun workflow et le validateur ne régénère jamais les empreintes.
+Toute rotation de baseline est revue et fusionnée séparément avant le changement
+de workflow qu'elle autorise.
 
 ## Fin d'un job et destruction obligatoire
 

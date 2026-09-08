@@ -35,11 +35,27 @@ function requireUuid(value, label) {
     typeof value !== 'string' ||
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       value,
-    )
+    ) ||
+    normalize(value) === '00000000-0000-0000-0000-000000000000'
   ) {
-    throw new Error(`${label} must be a UUID`);
+    throw new Error(`${label} must be a non-nil UUID`);
   }
   return normalize(value);
+}
+
+function requireCanonicalUuid(value, label) {
+  if (
+    typeof value !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+      value,
+    ) ||
+    value === '00000000-0000-0000-0000-000000000000'
+  ) {
+    throw new Error(
+      `${label} must be a non-nil canonical lowercase UUID string`,
+    );
+  }
+  return value;
 }
 
 function requireNonEmptyString(value, label) {
@@ -48,18 +64,79 @@ function requireNonEmptyString(value, label) {
   }
 }
 
-function timestamp(value, label) {
-  if (
-    typeof value !== 'string' ||
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)
-  ) {
+const strictTimestampPattern =
+  /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T(?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})Z$/;
+const liveTimestampPattern =
+  /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T(?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})(?:\.(?<fraction>\d{1,7}))?(?:Z|(?<offsetSign>[+-])(?<offsetHour>\d{2}):(?<offsetMinute>\d{2}))$/;
+
+function parseTimestamp(value, label, pattern) {
+  const match = typeof value === 'string' ? pattern.exec(value) : null;
+  if (!match) {
     throw new Error(`${label} must be an explicit UTC timestamp`);
   }
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) {
+  const year = Number(match.groups.year);
+  const month = Number(match.groups.month);
+  const day = Number(match.groups.day);
+  const hour = Number(match.groups.hour);
+  const minute = Number(match.groups.minute);
+  const second = Number(match.groups.second);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [
+    31,
+    leapYear ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+  const offsetHour = Number(match.groups.offsetHour ?? 0);
+  const offsetMinute = Number(match.groups.offsetMinute ?? 0);
+  const offsetSign = match.groups.offsetSign ?? null;
+  if (
+    year === 0 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > daysInMonth[month - 1] ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59 ||
+    offsetHour > 14 ||
+    offsetMinute > 59 ||
+    (offsetHour === 14 && offsetMinute !== 0) ||
+    (offsetSign === '-' && offsetHour === 0 && offsetMinute === 0)
+  ) {
     throw new Error(`${label} is invalid`);
   }
-  return parsed;
+  const fraction = match.groups.fraction ?? '';
+  const millisecond = Number(fraction.padEnd(3, '0').slice(0, 3));
+  const local = new Date(0);
+  local.setUTCFullYear(year, month - 1, day);
+  local.setUTCHours(hour, minute, second, millisecond);
+  const offset =
+    (offsetSign === '-' ? -1 : 1) * (offsetHour * 60 + offsetMinute);
+  const parsed = local.getTime() - offset * 60 * 1000;
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error(`${label} is invalid`);
+  }
+  return {
+    milliseconds: parsed,
+    subMillisecondNonZero: /[1-9]/.test(fraction.slice(3)),
+  };
+}
+
+function timestamp(value, label) {
+  return parseTimestamp(value, label, strictTimestampPattern).milliseconds;
+}
+
+function liveTimestamp(value, label) {
+  return parseTimestamp(value, label, liveTimestampPattern);
 }
 
 function normalize(value) {
@@ -139,20 +216,47 @@ function comparableLiveAssignment(assignment) {
   };
 }
 
-function requireResourceId(value, resourceType, label) {
-  if (
-    typeof value !== 'string' ||
-    !normalize(value).includes(`/providers/microsoft.authorization/${resourceType}/`)
+function requireResourceId(
+  value,
+  resourceType,
+  label,
+  canonicalIdentifier = true,
+) {
+  if (typeof value !== 'string') {
+    throw new Error(`${label} is invalid`);
+  }
+  const marker = `/providers/Microsoft.Authorization/${resourceType}/`;
+  const normalizedMarker = marker.toLowerCase();
+  const normalizedValue = normalize(value);
+  const markerIndex = normalizedValue.lastIndexOf(normalizedMarker);
+  if (markerIndex <= 0) {
+    throw new Error(`${label} is invalid`);
+  }
+  const identifier = value.slice(markerIndex + marker.length);
+  if (canonicalIdentifier) {
+    requireCanonicalUuid(identifier, `${label} identifier`);
+  } else if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      identifier,
+    )
   ) {
+    throw new Error(`${label} identifier must be a UUID`);
+  }
+  if (identifier.includes('/')) {
     throw new Error(`${label} is invalid`);
   }
   return normalize(value);
 }
 
 function requireSameTimestamp(actual, expected, label) {
-  if (Date.parse(actual) !== Date.parse(expected)) {
+  const live = liveTimestamp(actual, label);
+  if (
+    live.milliseconds !== timestamp(expected, `${label} approved value`) ||
+    live.subMillisecondNonZero
+  ) {
     throw new Error(`${label} does not match the approved transition`);
   }
+  return live;
 }
 
 export function validateLegacyLiveAssignments(
@@ -163,6 +267,7 @@ export function validateLegacyLiveAssignments(
   now = Date.now(),
   groupIds = [],
   eligibilityScheduleInstances = [],
+  independentAdminScheduleInstances,
 ) {
   if (!Array.isArray(assignments)) {
     throw new Error('live legacy assignment inventory must be an array');
@@ -177,7 +282,15 @@ export function validateLegacyLiveAssignments(
     throw new Error('live legacy eligibility inventory must be an array');
   }
   const proof = validatePhaseAProof(phaseA, transition.subscriptionId);
-  const legacyPrincipalId = requireUuid(
+  requireCanonicalUuid(proof.subscriptionId, 'Phase A subscription ID');
+  requireCanonicalUuid(proof.tenantId, 'Phase A tenant ID');
+  validateIndependentAdminLiveSchedule(
+    independentAdminScheduleInstances,
+    transition,
+    proof,
+    now,
+  );
+  const legacyPrincipalId = requireCanonicalUuid(
     transition.legacyPrincipalId,
     'legacy principal ID',
   );
@@ -274,12 +387,26 @@ export function validateLegacyLiveAssignments(
     throw new Error('legacy transitive group assignment schedule remains live');
   }
   const observedScheduleIds = new Set();
+  const liveSchedulesById = new Map();
+  for (const schedule of scheduleInstances) {
+    const scheduleId = requireResourceId(
+      schedule?.id,
+      'roleAssignmentScheduleInstances',
+      'live legacy schedule instance ID',
+    );
+    if (liveSchedulesById.has(scheduleId)) {
+      throw new Error('live legacy schedule instance IDs must be unique');
+    }
+    liveSchedulesById.set(scheduleId, schedule);
+  }
   const scheduledRoleAssignmentIds = new Set();
   for (const declared of transition.temporaryAssignments) {
-    const scheduleId = normalize(declared.scheduleInstanceId);
-    const live = scheduleInstances.find(
-      (candidate) => normalize(candidate.id) === scheduleId,
+    const scheduleId = requireResourceId(
+      declared.scheduleInstanceId,
+      'roleAssignmentScheduleInstances',
+      `approved schedule instance for ${declared.purpose}`,
     );
+    const live = liveSchedulesById.get(scheduleId);
     if (!live || observedScheduleIds.has(scheduleId)) {
       throw new Error(`approved schedule instance is not live: ${declared.purpose}`);
     }
@@ -314,12 +441,12 @@ export function validateLegacyLiveAssignments(
     ) {
       throw new Error(`schedule instance contract mismatch: ${declared.purpose}`);
     }
-    requireSameTimestamp(
+    const start = requireSameTimestamp(
       properties.startDateTime,
       declared.createdAt,
       `schedule start for ${declared.purpose}`,
     );
-    requireSameTimestamp(
+    const end = requireSameTimestamp(
       properties.endDateTime,
       declared.expiresAt,
       `schedule expiry for ${declared.purpose}`,
@@ -334,14 +461,158 @@ export function validateLegacyLiveAssignments(
       throw new Error(`schedule instance is not active and direct: ${declared.purpose}`);
     }
     if (
-      Date.parse(properties.startDateTime) > now ||
-      Date.parse(properties.endDateTime) <= now
+      start.milliseconds > now ||
+      (start.milliseconds === now && start.subMillisecondNonZero) ||
+      end.milliseconds < now ||
+      (end.milliseconds === now && !end.subMillisecondNonZero)
     ) {
       throw new Error(`schedule instance is outside its active window: ${declared.purpose}`);
     }
   }
   if (scheduledRoleAssignmentIds.size !== liveAssignmentsById.size) {
     throw new Error('an unbounded legacy role assignment remains live');
+  }
+}
+
+function independentAdminContract(transition, phaseA, now) {
+  const expectedTenantId = requireCanonicalUuid(
+    transition.changeControl.independentAdminTenantId,
+    'independent admin tenant ID',
+  );
+  const proofTenantId = requireCanonicalUuid(phaseA.tenantId, 'Phase A tenant ID');
+  if (expectedTenantId !== proofTenantId) {
+    throw new Error('independent admin tenant does not match the live target tenant');
+  }
+  const expectedScope = `/subscriptions/${requireCanonicalUuid(
+    phaseA.subscriptionId,
+    'Phase A subscription ID',
+  )}`;
+  if (transition.changeControl.independentAdminScope !== expectedScope) {
+    throw new Error('independent admin scope is not the canonical subscription scope');
+  }
+  const expectedPrincipalId = requireCanonicalUuid(
+    transition.changeControl.independentAdminPrincipalId,
+    'independent admin principal ID',
+  );
+  const safetyAdminPrincipalId = requireCanonicalUuid(
+    transition.changeControl.safetyAdminPrincipalId,
+    'safety admin principal ID',
+  );
+  if (expectedPrincipalId !== safetyAdminPrincipalId) {
+    throw new Error('independent admin principal does not match the safety admin');
+  }
+  const expectedRoleDefinitionId =
+    `${expectedScope}/providers/Microsoft.Authorization/roleDefinitions/` +
+    userAccessAdministratorRoleDefinitionId;
+  if (
+    transition.changeControl.independentAdminRoleDefinitionId !==
+    expectedRoleDefinitionId
+  ) {
+    throw new Error('independent admin role must be exact User Access Administrator');
+  }
+  const expectedScheduleInstanceId = requireResourceId(
+    transition.changeControl.independentAdminScheduleInstanceId,
+    'roleAssignmentScheduleInstances',
+    'independent admin schedule instance ID',
+  );
+  const expectedExpiry = timestamp(
+    transition.changeControl.independentAdminExpiresAt,
+    'independent admin expiresAt',
+  );
+  if (expectedExpiry <= now) {
+    throw new Error('independent admin expiry must be strictly later than now');
+  }
+  return {
+    expectedExpiry,
+    expectedPrincipalId,
+    expectedRoleDefinitionId,
+    expectedScheduleInstanceId,
+    expectedScope,
+  };
+}
+
+export function validateIndependentAdminLiveSchedule(
+  scheduleInstances,
+  transition,
+  phaseA,
+  now = Date.now(),
+) {
+  const mode = transition.changeControl?.administrationMode;
+  if (mode === 'approved-solo-compensating-controls') {
+    if (!Array.isArray(scheduleInstances) || scheduleInstances.length !== 0) {
+      throw new Error('solo mode must not supply independent-admin live evidence');
+    }
+    return;
+  }
+  if (mode !== 'independent-third-party') {
+    throw new Error('independent-admin live evidence has an unknown administration mode');
+  }
+  if (!Array.isArray(scheduleInstances) || scheduleInstances.length !== 1) {
+    throw new Error(
+      'independent-admin live evidence must contain exactly one schedule instance',
+    );
+  }
+  const {
+    expectedExpiry,
+    expectedPrincipalId,
+    expectedRoleDefinitionId,
+    expectedScheduleInstanceId,
+    expectedScope,
+  } = independentAdminContract(transition, phaseA, now);
+
+  const schedule = scheduleInstances[0];
+  const actualScheduleInstanceId = requireResourceId(
+    schedule?.id,
+    'roleAssignmentScheduleInstances',
+    'live independent admin schedule instance ID',
+  );
+  const properties = schedule?.properties;
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+    throw new Error('live independent admin schedule properties are missing');
+  }
+  const actualScope = normalize(properties.scope);
+  const actualPrincipalId = requireUuid(
+    properties.principalId,
+    'live independent admin principal ID',
+  );
+  const actualRoleDefinitionId = requireResourceId(
+    properties.roleDefinitionId,
+    'roleDefinitions',
+    'live independent admin role definition ID',
+    false,
+  );
+  const start = liveTimestamp(
+    properties.startDateTime,
+    'live independent admin schedule start',
+  );
+  const end = liveTimestamp(
+    properties.endDateTime,
+    'live independent admin schedule expiry',
+  );
+  if (
+    actualScheduleInstanceId !== expectedScheduleInstanceId ||
+    actualScope !== normalize(expectedScope) ||
+    actualPrincipalId !== expectedPrincipalId ||
+    actualRoleDefinitionId !== normalize(expectedRoleDefinitionId) ||
+    end.milliseconds !== expectedExpiry ||
+    end.subMillisecondNonZero ||
+    (properties.condition ?? null) !== null ||
+    (properties.conditionVersion ?? null) !== null
+  ) {
+    throw new Error('live independent admin schedule does not match approved evidence');
+  }
+  if (
+    start.milliseconds > now ||
+    (start.milliseconds === now && start.subMillisecondNonZero) ||
+    end.milliseconds < now ||
+    (end.milliseconds === now && !end.subMillisecondNonZero) ||
+    properties.assignmentType !== 'Assigned' ||
+    properties.memberType !== 'Direct' ||
+    !['Accepted', 'Granted', 'Provisioned', 'ScheduleCreated'].includes(
+      properties.status,
+    )
+  ) {
+    throw new Error('live independent admin schedule is outside its active window');
   }
 }
 
@@ -370,9 +641,10 @@ export function validateLegacyTransition(
     throw new Error('legacy transition schemaVersion must be 1');
   }
   const proof = validatePhaseAProof(phaseA, transition.subscriptionId);
-  if (normalize(transition.legacyPrincipalId) === '') {
-    throw new Error('legacy principal ID is required');
-  }
+  requireCanonicalUuid(transition.subscriptionId, 'legacy transition subscription ID');
+  requireCanonicalUuid(proof.subscriptionId, 'Phase A subscription ID');
+  requireCanonicalUuid(proof.tenantId, 'Phase A tenant ID');
+  requireCanonicalUuid(transition.legacyPrincipalId, 'legacy principal ID');
   requireExactFields(
     transition.inventory,
     ['assignmentIds', 'capturedAt', 'evidenceSha256'],
@@ -408,7 +680,11 @@ export function validateLegacyTransition(
       'evidenceSha256',
       'independentAdminExpiresAt',
       'independentAdminOwner',
+      'independentAdminPrincipalId',
       'independentAdminRoleDefinitionId',
+      'independentAdminScheduleInstanceId',
+      'independentAdminScope',
+      'independentAdminTenantId',
       'operatorOwner',
       'safetyAdminPrincipalId',
       'soloModeControls',
@@ -423,28 +699,39 @@ export function validateLegacyTransition(
   ]) {
     requireSha256(value, label);
   }
+  if (!Array.isArray(transition.inventory.assignmentIds)) {
+    throw new Error('legacy transition inventory assignment IDs are invalid');
+  }
+  const inventoryAssignmentIds = transition.inventory.assignmentIds.map(
+    (assignmentId, index) =>
+      requireCanonicalUuid(
+        assignmentId,
+        `legacy transition inventory assignmentIds[${index}]`,
+      ),
+  );
   if (
-    !Array.isArray(transition.inventory.assignmentIds) ||
-    transition.inventory.assignmentIds.length === 0 ||
-    new Set(transition.inventory.assignmentIds.map(normalize)).size !==
-      transition.inventory.assignmentIds.length
+    inventoryAssignmentIds.length === 0 ||
+    new Set(inventoryAssignmentIds).size !== inventoryAssignmentIds.length
   ) {
     throw new Error('legacy transition inventory assignment IDs are invalid');
   }
   const broadAssignmentIds = [
-    transition.broadRemoval.contributorAssignmentId,
-    transition.broadRemoval.userAccessAdministratorAssignmentId,
+    requireCanonicalUuid(
+      transition.broadRemoval.contributorAssignmentId,
+      'broad removal Contributor assignment ID',
+    ),
+    requireCanonicalUuid(
+      transition.broadRemoval.userAccessAdministratorAssignmentId,
+      'broad removal UAA assignment ID',
+    ),
   ];
   if (
-    new Set(broadAssignmentIds.map(normalize)).size !== 2 ||
+    new Set(broadAssignmentIds).size !== 2 ||
     broadAssignmentIds.some(
-      (assignmentId) =>
-        !transition.inventory.assignmentIds.map(normalize).includes(
-          normalize(assignmentId),
-        ),
+      (assignmentId) => !inventoryAssignmentIds.includes(assignmentId),
     )
   ) {
-    throw new Error('broad role removals must identify two inventoried assignments'    );
+    throw new Error('broad role removals must identify two inventoried assignments');
   }
   if (transition.changeControl.assignmentChangesSerialized !== true) {
     throw new Error('legacy assignment changes must be performed one at a time');
@@ -472,6 +759,7 @@ export function validateLegacyTransition(
       transition.changeControl.independentAdminExpiresAt,
       'independent admin expiresAt',
     );
+    independentAdminContract(transition, proof, now);
   } else if (
     transition.changeControl.administrationMode ===
     'approved-solo-compensating-controls'
@@ -479,7 +767,11 @@ export function validateLegacyTransition(
     if (
       transition.changeControl.independentAdminOwner !== null ||
       transition.changeControl.independentAdminExpiresAt !== null ||
-      transition.changeControl.independentAdminRoleDefinitionId !== null
+      transition.changeControl.independentAdminPrincipalId !== null ||
+      transition.changeControl.independentAdminRoleDefinitionId !== null ||
+      transition.changeControl.independentAdminScheduleInstanceId !== null ||
+      transition.changeControl.independentAdminScope !== null ||
+      transition.changeControl.independentAdminTenantId !== null
     ) {
       throw new Error('solo mode cannot claim an independent admin contract');
     }
@@ -567,7 +859,7 @@ export function validateLegacyTransition(
     const tenantIssuerDomain = normalize(
       transition.changeControl.soloModeControls.tenantIssuerDomain,
     );
-    const managementTenantId = requireUuid(
+    const managementTenantId = requireCanonicalUuid(
       transition.changeControl.soloModeControls.managementTenantId,
       'solo-mode management tenant ID',
     );
@@ -579,7 +871,7 @@ export function validateLegacyTransition(
       );
     }
     qualifiedEmergencyPrincipalIds = breakGlassAccounts.map((account, index) =>
-      requireUuid(
+      requireCanonicalUuid(
         account.objectId,
         `solo-mode break-glass account[${index}] object ID`,
       ),
@@ -588,6 +880,14 @@ export function validateLegacyTransition(
       transition.changeControl.soloModeControls.credentialMode;
     const attestationAaguids =
       transition.changeControl.soloModeControls.credentialAttestationAaguids;
+    const canonicalAttestationAaguids = Array.isArray(attestationAaguids)
+      ? attestationAaguids.map((aaguid, index) =>
+          requireCanonicalUuid(
+            aaguid,
+            `credential attestation AAGUIDs[${index}]`,
+          ),
+        )
+      : null;
     const validCredentialMode =
       credentialMode === 'fido2-or-cba' ||
       credentialMode === 'authenticator-device-bound-passkeys' ||
@@ -620,9 +920,9 @@ export function validateLegacyTransition(
         return (
           account.accountEnabled !== true ||
           account.userType !== 'Member' ||
-          requireUuid(account.tenantId, 'break-glass account tenant ID') !==
-            normalize(proof.tenantId) ||
-          requireUuid(account.objectId, 'break-glass account object ID') ===
+          requireCanonicalUuid(account.tenantId, 'break-glass account tenant ID') !==
+            proof.tenantId ||
+          requireCanonicalUuid(account.objectId, 'break-glass account object ID') ===
             managementTenantId ||
           account.managementAccessVerified !== true ||
           !Number.isInteger(account.authenticationMethodCount) ||
@@ -663,9 +963,9 @@ export function validateLegacyTransition(
       (credentialMode === 'authenticator-device-bound-passkeys' &&
         (transition.changeControl.soloModeControls
           .credentialDevicesDistinct !== true ||
-          !Array.isArray(attestationAaguids) ||
-          attestationAaguids.length !== 2 ||
-          new Set(attestationAaguids.map(normalize)).size !== 2)) ||
+          canonicalAttestationAaguids === null ||
+          canonicalAttestationAaguids.length !== 2 ||
+          new Set(canonicalAttestationAaguids).size !== 2)) ||
       (credentialMode !== 'authenticator-device-bound-passkeys' &&
         (transition.changeControl.soloModeControls.credentialDevicesDistinct !==
           null ||
@@ -709,11 +1009,11 @@ export function validateLegacyTransition(
     );
   }
   const safetyPrincipals = [
-    requireUuid(
+    requireCanonicalUuid(
       transition.changeControl.safetyAdminPrincipalId,
       'safety admin principal ID',
     ),
-    requireUuid(transition.legacyPrincipalId, 'legacy principal ID'),
+    requireCanonicalUuid(transition.legacyPrincipalId, 'legacy principal ID'),
   ];
   if (
     !Array.isArray(transition.changeControl.emergencyPrincipalIds) ||
@@ -723,7 +1023,7 @@ export function validateLegacyTransition(
   }
   const emergencyPrincipalIds =
     transition.changeControl.emergencyPrincipalIds.map((principalId, index) =>
-      requireUuid(principalId, `emergency principal IDs[${index}]`),
+      requireCanonicalUuid(principalId, `emergency principal IDs[${index}]`),
     );
   safetyPrincipals.push(...emergencyPrincipalIds);
   if (new Set(safetyPrincipals).size !== safetyPrincipals.length) {
@@ -887,23 +1187,26 @@ export function validateLegacyTransition(
         assignment.rollbackProcedure,
         `temporaryAssignments[${index}].rollbackProcedure`,
       );
-      if (
-        typeof assignment.scheduleInstanceId !== 'string' ||
-        !normalize(assignment.scheduleInstanceId).includes(
-          '/providers/microsoft.authorization/roleassignmentscheduleinstances/',
-        )
-      ) {
-        throw new Error(
-          `temporaryAssignments[${index}].scheduleInstanceId is invalid`,
-        );
-      }
+      requireResourceId(
+        assignment.scheduleInstanceId,
+        'roleAssignmentScheduleInstances',
+        `temporaryAssignments[${index}].scheduleInstanceId`,
+      );
+      requireCanonicalUuid(
+        assignment.principalId,
+        `temporaryAssignments[${index}].principalId`,
+      );
       return comparableAssignment(assignment);
     },
   );
   if (
     new Set(
       transition.temporaryAssignments.map(({ scheduleInstanceId }) =>
-        normalize(scheduleInstanceId),
+        requireResourceId(
+          scheduleInstanceId,
+          'roleAssignmentScheduleInstances',
+          'temporary assignment schedule instance ID',
+        ),
       ),
     ).size !== transition.temporaryAssignments.length
   ) {
@@ -950,6 +1253,7 @@ function main() {
     liveScheduleInstancesPath,
     groupIdsPath,
     eligibilityScheduleInstancesPath,
+    independentAdminScheduleInstancesPath,
   ] = process.argv.slice(2);
   if (!transitionPath || !phaseAPath) {
     throw new Error(
@@ -985,6 +1289,14 @@ function main() {
             ),
           )
         : [],
+      independentAdminScheduleInstancesPath
+        ? JSON.parse(
+            fs.readFileSync(
+              path.resolve(independentAdminScheduleInstancesPath),
+              'utf8',
+            ),
+          )
+        : undefined,
     );
   }
 }

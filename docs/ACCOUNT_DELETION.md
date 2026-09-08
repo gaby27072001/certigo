@@ -108,6 +108,26 @@ Le gate historique `test-account-deletion-cosmos.yml` est retiré de
 une preuve d’isolement suffisante. Son remplacement one-shot reste **feature-off**
 dans `.github/workflows-disabled/post-merge-cosmos-account-deletion.yml`.
 
+Le validateur trusted accepte uniquement les trois états atomiques de migration :
+A avec le legacy seul actif, B avec les deux workflows archivés, et C avec le
+one-shot seul actif et le legacy archivé. Le dépôt reste actuellement en B ; tout
+état partiel ou mixte est rejeté.
+
+L'ensemble actif de chaque état est épinglé dans le manifeste versionné
+`.github/scripts/workflow-semantic-manifest.json`. Les empreintes SHA-256 portent
+sur le chemin canonique et l'arbre YAML décodé, avec clés triées, chaînes NFC et
+commentaires ignorés. Le parseur rejette les clés dupliquées, alias, merge keys,
+anchors, tags et clés dynamiques. Le validateur charge toujours le manifeste du
+contrôle trusted, jamais celui du checkout de PR : une PR ne peut donc pas
+s'auto-approuver en modifiant simultanément un workflow et son empreinte.
+
+La commande manuelle
+`node .github/scripts/generate-workflow-semantic-manifest.mjs --write` est réservée
+à une revue explicite de baseline. Le validateur ne l'appelle jamais. Une rotation
+de baseline doit être fusionnée comme contrôle trusted avant la modification
+sémantique correspondante ; `--check` vérifie ensuite que la génération revue est
+reproductible.
+
 Il ne peut être déplacé sous `.github/workflows/` que par une PR d’activation
 séparée, variable `CERTIGO_COSMOS_EMULATOR_ENABLED=false`. Le test post-merge
 requiert ensuite une VM jetable sans identité managée, le label exclusif
