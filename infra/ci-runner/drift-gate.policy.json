@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "purpose": "Partition reconcile-drift.mjs findings so the scheduled gate fails on a real declared-versus-actual gap and stays quiet on findings that are artefacts of how the detector is wired. reconcile-drift.mjs never exits non-zero; it prints a report. This policy is what turns that report into a verdict.",
+  "failClosed": "Every finding with severity 'blocking' fails the gate unless its code appears below. A code the detector gains later therefore blocks by default instead of being ignored silently. This is deliberately stricter than an allow-list of blocking codes.",
+  "staleAcknowledgement": "An entry whose code is absent from the report also fails the gate. Without that rule an acknowledgement could never become false, and a tolerated finding that stops being a false positive would be silently swallowed for good. Each entry below therefore states the condition that ends it.",
+  "acknowledgedFindings": [
+    {
+      "code": "COMPUTE_MODEL_DRIFT",
+      "reason": "infra/ci-runner/capacity-plan.sh passes infra/ci-runner/runner.bicep as --runner-template, and that template models standalone Microsoft.Compute/virtualMachines while Azure runs virtualMachineScaleSets. infra/ci-runner/README.md documents runner.bicep as a versioned historical model that no longer matches the live VMSS/NAT/LB. The finding reports the template that was handed to the detector, not a change in Azure.",
+      "invalidatedWhen": "capacity-plan.sh stops passing runner.bicep as --runner-template, or runner.bicep starts modelling scale sets. Remove this entry then: from that point the same code would be reporting a real compute-model change."
+    },
+    {
+      "code": "VM_SIZE_DRIFT",
+      "reason": "runner.bicep declares Standard_D4s_v5 while the live PR pilot runs Standard_D2ads_v6 - which is exactly what infra/ci-runner/pilot.bicep declares. The detector compares the live pilot against the historical template instead of against the template that provisioned it, so the mismatch is produced by the wiring rather than observed in Azure.",
+      "invalidatedWhen": "the detector is pointed at pilot.bicep for the PR pool, or runner.bicep and pilot.bicep converge on one size. Remove this entry then: the code would start reporting a genuine size change."
+    },
+    {
+      "code": "CPU_SCALE_IN_DRIFT",
+      "reason": "The live scale sets carry a CPU autoscale profile with a Decrease rule that the versioned template does not model, so autoscale could in principle remove an instance without consulting GitHub queue or busy state. Today it cannot: the managed runner VMs carry a CanNotDelete lock, documented in infra/ci-runner/README.md, which blocks the deletion that a scale-in would need.",
+      "invalidatedWhen": "the CanNotDelete lock is removed from the managed runner VMs, or the Decrease rule is removed from the live autoscale profile. The first makes scale-in reachable and this finding actionable; the second makes the finding disappear. Either way this entry must go."
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+name: Runner drift reconciliation
+
+# Compares the versioned runner inventory against what Azure and GitHub actually
+# hold. Every other runner control in this repository compares configuration to
+# configuration; this one is the only path that would notice a deleted VM, a
+# deregistered runner, or an instance that never came back after the nightly
+# teardown.
+#
+# Read-only: inventory.sh performs list/show calls only, reconcile-drift.mjs
+# hard-codes readOnly, and drift-gate.mjs just reads the report. Nothing here
+# provisions, starts, stops, or deletes anything.
+
+on:
+  schedule:
+    # 06:53 UTC. The managed runners are torn down 00:46-00:49 UTC and restarted
+    # at 01:30 UTC by infra/params/ci-runner-auto-recovery.bicepparam, so an
+    # earlier slot would report a redundancy gap that is only the teardown.
+    - cron: "53 6 * * *"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: runner-drift-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Compare declared runner inventory against Azure and GitHub
+    # Scheduled workflows are loaded from the default branch.
+    if: ${{ github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
+    # Queries Azure and holds a cloud identity, so it must never run on the PR
+    # pool. certigo-pr receives no environment, no secret and no cloud identity.
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    env:
+      # Isolates this job's Azure CLI profile. DO NOT REMOVE - not redundant, and
+      # not about whether this workflow passes. THE HAZARD IS THE azure/login
+      # STEP, NOT THE OUTCOME: a green run rewrites the shared profile exactly as
+      # a red one does. Certigo and certigo-content runners are separate
+      # registrations on the SAME machines as the same OS user, so they share one
+      # ~/.azure; without this, this job wipes the credentials out from under an
+      # in-flight certigo-content publish, which then dies with "Could not
+      # retrieve credential from local cache". The aggressor never sees it.
+      AZURE_CONFIG_DIR: /tmp/azure-runner-drift-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+
+      - name: Azure login for read-only inventory (OIDC)
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Collect the live Azure and GitHub inventory
+        shell: bash
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          WORK_DIR="$(mktemp -d)"
+          chmod 700 "$WORK_DIR"
+          echo "DRIFT_WORK_DIR=$WORK_DIR" >> "$GITHUB_ENV"
+          bash infra/governance/inventory.sh > "$WORK_DIR/inventory.json"
+
+      - name: Reconcile the declared inventory against the live one
+        shell: bash
+        run: |
+          set -euo pipefail
+          node infra/ci-runner/reconcile-drift.mjs \
+            --config infra/ci-runner/capacity-controller.config.json \
+            --inventory "$DRIFT_WORK_DIR/inventory.json" \
+            --runner-template infra/ci-runner/runner.bicep \
+            > "$DRIFT_WORK_DIR/drift.json"
+
+      - name: Fail on drift that is not an acknowledged wiring artefact
+        shell: bash
+        run: |
+          set -euo pipefail
+          node infra/ci-runner/drift-gate.mjs \
+            --report "$DRIFT_WORK_DIR/drift.json" \
+            --policy infra/ci-runner/drift-gate.policy.json
+
+      - name: Remove the inventory snapshot
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf -- "${DRIFT_WORK_DIR:-}"

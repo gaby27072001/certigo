@@ -160,6 +160,7 @@ fi
 bash "${test_health}"
 node --test "${root}/infra/ci-runner/evaluate-lifecycle.test.mjs"
 node --test "${root}/infra/ci-runner/capacity-controller.test.mjs"
+node --test "${root}/infra/ci-runner/drift-gate.test.mjs"
 node --check "${root}/infra/ci-runner/scale-in-safety.mjs"
 node "${image_dir}/generate-toolchain-sbom.mjs" --check
 bash "${image_dir}/validate-toolchain.sh" --contract

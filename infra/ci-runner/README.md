@@ -305,6 +305,17 @@ présence d'un label double, d'un job actif/en file, d'un scale-in CPU ou d'un �
 et runners. La cible sérialisée et son rollback sont dans
 [`docs/runbooks/CLOUD_LEAST_PRIVILEGE.md`](../../docs/runbooks/CLOUD_LEAST_PRIVILEGE.md).
 
+> **Dette nommée : ce garde n'est appelé par rien, et ce qui le compense est accidentel.**
+> Aucun workflow n'invoque `lifecycle-preflight.sh` ; la boucle de validation ne fait qu'un
+> `bash -n` dessus, qui établit que le fichier se lit et jamais qu'il s'exécute. Le risque est
+> aujourd'hui neutralisé non par ce garde mais par le verrou `CanNotDelete` posé sur le groupe
+> de ressources, qui rend tout scale-in impossible. Les deux protections sont donc
+> **couplées par accident et non par conception** : le jour où quelqu'un lèvera le verrou pour
+> une opération légitime, il retirera du même geste la seule chose qui compense l'absence de ce
+> garde, et le scale-in redeviendra possible sans qu'aucun contrôle ne relise `busy`.
+> **Condition de sortie de la dette :** avant toute levée du verrou, `lifecycle-preflight.sh`
+> doit avoir été exécuté au moins une fois pour de vrai, puis câblé en amont de la déallocation.
+
 Le planificateur `capacity-plan.sh` ajoute une réconciliation de drift et un modèle
 queue-driven `workflow_job` avec trois modes par classe (`idle=0+0`, `normal=1+1`,
 `boost=6 PR + 2 trusted`). Cette cible est celle d'un pilote ultérieur, pas un plafond
@@ -380,6 +391,29 @@ autorisée, durée — pas une correction ponctuelle.
 > À noter : le compte **Azure OpenAI** (`certigo-openai`), autre ressource en drift citée
 > par le finding G, est lui **réintégré en IaC** dans ce livrable via
 > `infra/modules/openai.bicep` (câblé dans `infra/main.bicep`, module `tutor`).
+
+## Détection de dérive planifiée
+
+`.github/workflows/runner-drift.yml` exécute chaque jour à 06:53 UTC, sur `certigo-trusted`
+uniquement, la chaîne `inventory.sh` → `reconcile-drift.mjs` → `drift-gate.mjs`. Le détecteur
+n'a jamais décidé de rien — `reconcile-drift.mjs` écrit son rapport et sort toujours `0` — donc
+la décision vit dans `drift-gate.mjs`, à l'extérieur, sans toucher au contrat de sévérité que
+les tests épinglent.
+
+La gate est **fail-closed** : toute constatation de sévérité `blocking` fait échouer le
+workflow, **sauf** celles nommées dans [`drift-gate.policy.json`](drift-gate.policy.json). Ce
+fichier est la seule liste de tolérance, et chaque entrée y porte obligatoirement sa `reason`
+et son `invalidatedWhen` — `readPolicy()` refuse à l'exécution une entrée à laquelle il manque
+l'une ou l'autre. Une exception sans condition de sortie est une exception éternelle ; ici elle
+ne peut pas être écrite.
+
+Symétriquement, un acquittement **périmé** fait aussi passer la gate au rouge : si un code
+toléré cesse d'être rapporté, le workflow échoue en demandant de retirer l'entrée devenue
+sans objet. C'est ce qui empêche la liste de survivre à sa propre raison d'être.
+
+> **Ce que la gate ne voit pas.** `reconcile-drift.mjs` ne lit ni `customData`, ni
+> `osProfile`, ni `bootstrapSha256` — la dérive du script d'amorçage lui est structurellement
+> invisible et aucune tolérance ne la masque. Voir le bloc dérive bootstrap plus haut.
 
 ## Nettoyage
 
