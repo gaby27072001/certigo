@@ -32,6 +32,14 @@ const pilotVmId =
   '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
   'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
   `virtualMachines/${pilotVmName}`;
+// The second PR runner bought in #402. The fixture carries it because the
+// redundancy floor is now two per trust class: a fixture stuck on the
+// pre-scale-out fleet would make a satisfied floor look like a shortfall.
+const pilot2VmName = 'vmss-certigo-pr-pilot-z1_a14700a3';
+const pilot2VmId =
+  '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
+  'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
+  `virtualMachines/${pilot2VmName}`;
 
 function runner(
   name,
@@ -764,6 +772,10 @@ test('drift reconciliation reports live VMSS, SKU, CPU scale-in, and labels', ()
       'POOL_SUBNET_DRIFT',
       'POOL_TRUST_BOUNDARY_DRIFT',
       'REDUNDANCY_DRIFT',
+      // The only managed runner here carries both trust labels, so it counts
+      // for neither class and both floors are unmet.
+      'TRUST_CLASS_REDUNDANCY_DRIFT',
+      'TRUST_CLASS_REDUNDANCY_DRIFT',
       'TRUST_LABEL_DRIFT',
       'VM_SIZE_DRIFT',
     ],
@@ -841,6 +853,7 @@ function zonalInventory({ zone1Powered = true, zone1Online = true } = {}) {
             'certigo-trusted',
           ], { id: 29, status: zone1Online ? 'online' : 'offline' }),
           runner('certigo-prIVJAN8', ['certigo-pr'], { id: 28 }),
+          runner('certigo-prQA5OWT', ['certigo-pr'], { id: 30 }),
         ],
       },
       virtualMachines: [
@@ -865,6 +878,13 @@ function zonalInventory({ zone1Powered = true, zone1Online = true } = {}) {
           virtualMachineScaleSet: { id: '/vmss/vmss-certigo-pr-pilot-z1' },
           zones: ['1'],
         },
+        {
+          id: pilot2VmId,
+          name: pilot2VmName,
+          powerState: 'VM running',
+          virtualMachineScaleSet: { id: '/vmss/vmss-certigo-pr-pilot-z1' },
+          zones: ['1'],
+        },
       ],
       vmScaleSets: [
         scaleSet('vmss-certigo-runner-zonal', 0),
@@ -883,6 +903,7 @@ test('the versioned inventory binds both trusted zones so neither can go missing
 
   assert.deepEqual(result.unclassifiedVirtualMachines, []);
   assert.deepEqual(result.managedMachineNames, [
+    pilot2VmName,
     pilotVmName,
     be505VmName,
     f55VmName,

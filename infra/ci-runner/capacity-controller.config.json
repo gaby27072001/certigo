@@ -11,7 +11,7 @@
   "requiredPostQuietGuards": 2,
   "leaseRequired": true,
   "minimumOnlineByTrust": {
-    "certigo-pr": 1,
+    "certigo-pr": 2,
     "certigo-trusted": 2
   },
   "scaleInOrder": [

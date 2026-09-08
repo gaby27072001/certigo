@@ -7,6 +7,7 @@ import {
   labelsOf,
   reconcileRunnerInstances,
   summarizePoolBoundaries,
+  trustClassOfRunner,
 } from './runner-inventory.mjs';
 
 function scaleInRules(autoscaleSettings) {
@@ -120,6 +121,42 @@ export function reconcileRunnerDrift(inventory, runnerTemplate, config) {
       code: 'REDUNDANCY_DRIFT',
       detail: `Usable managed capacity is ${usableCapacity}; normal target is ${normalTarget}.`,
     });
+  }
+  // The aggregate above cannot see a trust class collapsing on its own: a
+  // surplus in one class hides a shortfall in the other, and each class carries
+  // required checks the other cannot run. On 2026-09-08 one of the two
+  // certigo-pr runners stayed deallocated after the nightly teardown; usable
+  // capacity was still 3 against an aggregate target of 2, so nothing fired.
+  const usableCapacityByTrust = { 'certigo-pr': 0, 'certigo-trusted': 0 };
+  for (const { runner } of poweredManagedInstances) {
+    if (runner.status !== 'online') {
+      continue;
+    }
+    const trustClass = trustClassOfRunner(runner);
+    if (trustClass in usableCapacityByTrust) {
+      usableCapacityByTrust[trustClass] += 1;
+    }
+  }
+  for (const trustClass of ['certigo-pr', 'certigo-trusted']) {
+    const required = config.minimumOnlineByTrust?.[trustClass];
+    // A missing floor must not read as a satisfied floor: without it this check
+    // would silently cover nothing.
+    if (!Number.isInteger(required)) {
+      findings.push({
+        severity: 'blocking',
+        code: 'TRUST_CLASS_FLOOR_MISSING',
+        detail: `minimumOnlineByTrust.${trustClass} is absent from the capacity controller config, so its redundancy cannot be checked.`,
+      });
+      continue;
+    }
+    const online = usableCapacityByTrust[trustClass];
+    if (online < required) {
+      findings.push({
+        severity: 'blocking',
+        code: 'TRUST_CLASS_REDUNDANCY_DRIFT',
+        detail: `Usable ${trustClass} capacity is ${online}; minimumOnlineByTrust requires ${required}.`,
+      });
+    }
   }
   if (
     expectedVmSize &&

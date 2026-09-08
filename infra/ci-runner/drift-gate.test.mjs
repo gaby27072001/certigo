@@ -142,6 +142,81 @@ test('removing one managed VM turns the gate red', () => {
   );
 });
 
+// The 2026-09-08 incident, replayed: vmss-certigo-pr-pilot-z1_a14700a3 stayed
+// deallocated after the nightly teardown and its runner went offline, leaving a
+// single certigo-pr runner for fifteen queued jobs. The gate was green.
+test('losing one certigo-pr runner turns the gate red', () => {
+  const incident = liveInventory();
+  const bindings = config.inventory.managedRunnerBindings;
+  const lostIndex = bindings.findIndex(
+    (binding) => trustOf(binding) === 'certigo-pr',
+  );
+  assert.notEqual(lostIndex, -1, 'the fixture must contain a certigo-pr runner');
+  const lost = bindings[lostIndex];
+  incident.runners.virtualMachines.find(
+    (vm) => vm.name === lost.virtualMachineName,
+  ).powerState = 'VM deallocated';
+  incident.runners.github.runners.find(
+    (runner) => runner.id === lost.githubRunnerId,
+  ).status = 'offline';
+
+  const report = reconcileRunnerDrift(incident, runnerTemplate, config);
+  const verdict = evaluateDriftGate(report, policy);
+
+  assert.equal(verdict.ok, false);
+  const finding = verdict.blocking.find(
+    (entry) => entry.code === 'TRUST_CLASS_REDUNDANCY_DRIFT',
+  );
+  assert.ok(finding, 'the per-class shortfall must be reported');
+  assert.match(finding.detail, /certigo-pr capacity is 1/);
+  assert.match(finding.detail, /requires 2/);
+
+  // Why the per-class check had to exist: the aggregate target is 2 and three
+  // runners are still usable, so REDUNDANCY_DRIFT stays silent on the very
+  // failure that took PR capacity down to one.
+  assert.equal(
+    report.findings.some((entry) => entry.code === 'REDUNDANCY_DRIFT'),
+    false,
+  );
+
+  // The control that makes the red meaningful: restoring the runner is green,
+  // so the red comes from the lost availability and not from the fixture.
+  incident.runners.virtualMachines.find(
+    (vm) => vm.name === lost.virtualMachineName,
+  ).powerState = 'VM running';
+  incident.runners.github.runners.find(
+    (runner) => runner.id === lost.githubRunnerId,
+  ).status = 'online';
+  assert.equal(
+    evaluateDriftGate(
+      reconcileRunnerDrift(incident, runnerTemplate, config),
+      policy,
+    ).ok,
+    true,
+  );
+});
+
+test('a missing trust-class floor is reported instead of passing silently', () => {
+  const withoutFloor = {
+    ...config,
+    minimumOnlineByTrust: { 'certigo-trusted': 2 },
+  };
+  const report = reconcileRunnerDrift(
+    liveInventory(),
+    runnerTemplate,
+    withoutFloor,
+  );
+
+  assert.ok(
+    report.findings.some(
+      (entry) =>
+        entry.code === 'TRUST_CLASS_FLOOR_MISSING' &&
+        entry.detail.includes('certigo-pr'),
+    ),
+  );
+  assert.equal(evaluateDriftGate(report, policy).ok, false);
+});
+
 test('a blocking code the policy does not name fails closed', () => {
   const verdict = evaluateDriftGate(
     { findings: [{ severity: 'blocking', code: 'CODE_ADDED_LATER', detail: 'x' }] },

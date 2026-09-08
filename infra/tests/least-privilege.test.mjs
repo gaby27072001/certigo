@@ -1311,8 +1311,11 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
   );
   // Both trusted zones must stay bound: the redundancy floor is meaningless if the
   // inventory it is counted against can silently omit a member.
+  // certigo-pr is 2 because PR capacity was raised from 1 to 2 in #402. A floor
+  // left at the pre-scale-out value emits nothing when the second runner is lost,
+  // which is how the 2026-09-08 deallocation went unreported for twelve hours.
   assert.deepEqual(config.minimumOnlineByTrust, {
-    'certigo-pr': 1,
+    'certigo-pr': 2,
     'certigo-trusted': 2,
   });
 });
