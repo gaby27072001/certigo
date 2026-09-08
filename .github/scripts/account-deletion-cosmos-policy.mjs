@@ -15,6 +15,14 @@ const trustedManifestPath = path.join(
   manifestName,
 );
 
+// Le validateur lit toujours le manifeste du contrôle trusted, jamais celui du checkout de PR.
+// Régénérer dans la branche est donc sans effet sur la gate : le remède doit nommer les deux PR.
+const baselineRotationRemedy = 'Regenerating inside this branch does NOT unblock this pull '
+  + 'request: the validator always reads the manifest of the trusted control (the base branch), '
+  + 'never the one in this checkout. The regenerated manifest must land on `main` as its own '
+  + 'baseline-rotation pull request first; the workflow change follows in a second one. See '
+  + 'docs/ACCOUNT_DELETION.md, section "Gate d\'intégration Cosmos".';
+
 const oneShotCondition = [
   "github.event_name == 'workflow_dispatch'",
   "github.repository == 'gchambaud_microsoft/Certigo'",
@@ -591,7 +599,8 @@ function validateActiveWorkflowSet(root, workflows, state, errors) {
   if (JSON.stringify(actualNames) !== JSON.stringify(expectedNames)) {
     errors.push(
       `.github/workflows must contain the exact reviewed state ${state} set; `
-      + `expected ${expectedNames.join(', ') || 'none'}; found ${actualNames.join(', ') || 'none'}`,
+      + `expected ${expectedNames.join(', ') || 'none'}; found ${actualNames.join(', ') || 'none'}. `
+      + baselineRotationRemedy,
     );
   }
 
@@ -624,7 +633,8 @@ function validateActiveWorkflowSet(root, workflows, state, errors) {
       errors.push(
         `${canonicalPath}: differs from reviewed semantic manifest; `
         + 'review the workflow change, then regenerate with '
-        + '`node .github/scripts/generate-workflow-semantic-manifest.mjs --write`',
+        + '`node .github/scripts/generate-workflow-semantic-manifest.mjs --write`. '
+        + baselineRotationRemedy,
       );
     }
     if (

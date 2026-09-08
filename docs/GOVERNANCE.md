@@ -291,6 +291,138 @@ aucun des marqueurs : ni `github.token`, ni `permissions: contents: read` n'y fi
 ne lit que l'API GitHub n'est pas signalé, celui qui porte `azure/login@` l'est. La surveillance
 qui ne demande que des données GitHub (vivacité des runners, états de jobs) est donc constructible ;
 celle qui exige une lecture Azure ne l'est pas.
+
+### Un test ajouté sous `.github/scripts/` ne s'exécute jamais sur sa propre PR
+
+**Symptôme.** Il n'y en a aucun. C'est tout le problème : la PR qui introduit le test passe au
+vert sans que le test ait tourné une seule fois. La panne se déclare **après la fusion**, sur les
+PR de tout le monde — et l'auteur, lui, n'a rien vu.
+
+**Mécanisme.** `lint-workflows.yml` monte deux checkouts : `.untrusted-source` (le head de la PR)
+et `.trusted-control` (la **base**, donc `main`). L'étape `Test workflow security scripts`
+s'exécute avec `working-directory: .trusted-control` :
+
+```yaml
+- name: Test workflow security scripts
+  working-directory: .trusted-control
+  run: node --test .github/scripts/*.test.mjs
+```
+
+Le glob est donc résolu **dans l'arbre de `main`**. Un fichier de test qui n'existe que dans la
+branche n'est pas ramassé, et le validateur exécuté est celui de `main`, pas celui de la PR.
+
+**Pourquoi on ne le corrige pas.** C'est la même frontière de sécurité que pour la gate d'état
+projet : une PR ne doit jamais faire exécuter son propre code par la CI de confiance. Basculer
+cette étape sur `.untrusted-source` supprimerait l'angle mort en rouvrant une faille bien pire —
+n'importe quelle PR pourrait alors réécrire le juge qui la juge. **L'angle mort est inhérent au
+choix, pas un défaut d'implémentation : seule une procédure peut le combler.**
+
+**La conséquence est asymétrique**, et c'est ce qui la rend coûteuse. Un test faux ou un pin
+périmé ne casse pas la PR qui l'introduit ; il casse `main`, donc le vert de toutes les autres
+PR, après coup. Le coût est payé par ceux qui n'ont rien écrit.
+
+**Procédure — exécuter la suite contre le head *fusionné*, à la main, avant de fusionner.**
+
+```bash
+gh pr update-branch <n>          # ou `git merge origin/main` dans la branche
+node --test .github/scripts/*.test.mjs
+```
+
+Le head fusionné est le seul arbre qui porte à la fois le code de `main` et celui de la branche :
+c'est exactement l'état que `main` aura après la fusion, et le seul endroit où la combinaison peut
+être observée avant qu'elle ne devienne le problème de tout le monde. Reporter le compte de tests
+dans le corps de la PR.
+
+**Sur la version épinglée, et dans l'environnement du runner.** `lint-workflows.yml` épingle
+`node-version` à une version précise ; un poste de développement en porte presque toujours une
+plus récente, et n'exporte pas `GITHUB_OUTPUT`. Ces deux écarts suffisent à eux seuls à rendre une
+suite verte hors CI et rouge en CI. Le correctif #413 en donne la mesure croisée — quatre
+combinaisons, un seul et même arbre :
+
+```
+Node 24, sans GITHUB_OUTPUT   0 échec                    <- poste de développement
+Node 24, avec GITHUB_OUTPUT   test 11 échoue
+Node 20, sans GITHUB_OUTPUT   test 3 échoue
+Node 20, avec GITHUB_OUTPUT   tests 3 et 11 échouent     <- le runner
+```
+
+**La seule ligne qui compte est la dernière, et c'est la seule qu'un poste ne produit jamais
+spontanément.** Lancer la suite sur la version du poste vérifie un environnement que la CI
+n'exécutera pas : le vert obtenu est réel, mais il ne répond pas à la question posée. La procédure
+ci-dessus n'a donc de valeur que si `node --version` affiche la version épinglée par
+`lint-workflows.yml` et si `GITHUB_OUTPUT` est positionné comme sur le runner.
+
+> **Deux précédents, tous deux mesurés, tous deux auraient cassé `main`.** #327 posait un
+> manifeste sémantique périmé — son head non modifié échouait sur une vingtaine d'écarts,
+> invisibles à la CI. #357 introduisait `backend-deploy-workflow-policy.mjs` avec un pin d'octets
+> sur `cd-backend.yml` désaccordé du fichier réel : plus de cent erreurs, toutes issues de la même
+> cause. Témoin qui exclut une autre explication : `main` seule ne produisait aucun échec, et
+> `main` + #357 seule en produisait un. Les deux ont été corrigées avant fusion parce que la suite
+> avait été lancée à la main sur le head fusionné.
+
+> **Et le précédent où la procédure n'a pas été appliquée — celui-là a cassé `main`.** Le train
+> #407 (*merge #328, #357 and #369 as one CI train*) a fusionné le 2026-09-08 à 11 h 51 UTC en
+> emportant `backend-deploy-gate.test.mjs`, apporté par #357. Deux défauts indépendants y
+> dormaient : une *aide d'itérateur* — `Map.prototype.keys().map()`, disponible à partir de
+> Node 22 seulement — dans un workflow épinglé à Node 20.20.2 ; et un processus enfant qui
+> héritait `GITHUB_OUTPUT` du runner, si bien que la sortie attendue partait dans le fichier au
+> lieu de `stdout`. **Aucun des deux n'était observable sur la PR qui les introduisait**, pour la
+> raison exposée en tête de section. À partir de cette fusion, toute PR dont la base était ce
+> `main` échouait sur `Validate workflow YAML` — un contexte requis : **le dépôt entier devenait
+> infusionnable.** Le correctif #413 a fusionné à 12 h 47 UTC, soit 56 minutes plus tard.
+
+**Deux corollaires pour lire les sorties.**
+
+- Le volume d'une sortie d'erreur est un artefact de propagation, jamais une mesure du nombre de
+  causes. Cent erreurs peuvent n'en avoir qu'une seule.
+- Un échec isolé n'est pas une régression tant qu'il n'a pas été rejoué.
+  `deploy-flex-onedeploy.test.mjs` échoue par intermittence sous charge et passe au rejeu :
+  rejouer avant de conclure, et ne jamais attribuer à sa propre modification un échec qu'on n'a
+  pas su reproduire.
+
+### Un vert peut décrire une base qui n'existe plus
+
+> **Un contrôle vert atteste d'un couple (head, base) mesuré à l'instant du run — jamais de l'état
+> présent de `main`.** Mesuré le 2026-09-08. **Invalidé si** `strict` repasse à `false` dans la
+> protection de `main`.
+
+**Symptôme.** Une PR affiche des contrôles entièrement verts et refuse pourtant de fusionner ; ou,
+bien plus coûteux, on se fie à ce vert.
+
+**Mécanisme.** La protection de `main` porte `strict: true` : une branche doit être à jour avec
+`main` pour être fusionnable. Un vert acquis avant que `main` n'avance décrit donc une base
+révolue, et **la seule action qui rend la PR fusionnable — mettre la branche à jour — est aussi
+celle qui rejoue les contrôles contre la nouvelle base.** Aucune manœuvre ne conserve le vert *et*
+rend la PR fusionnable : un vert périmé n'est pas rattrapable, il est seulement remplaçable.
+
+**Le cas dégénéré, mesuré.** Pendant les 56 minutes où `main` portait la suite cassée décrite par
+la section « Un test ajouté sous `.github/scripts/` ne s'exécute jamais sur sa propre PR », 14 PR
+étaient ouvertes et **9 affichaient un vert complet** — non parce qu'elles étaient saines, mais
+parce qu'elles n'avaient pas encore été rejouées contre cette base. Leur vert était exact et sans
+valeur. Mettre l'une d'elles à jour la faisait rougir aussitôt, **sans qu'une seule ligne de la
+branche ait changé.** L'ensemble des PR vertes et l'ensemble des PR fusionnables étaient alors
+disjoints, et la couleur affichée mesurait exactement une chose : l'absence de contact avec le
+problème.
+
+**Pourquoi cela ne se lit pas dans les workflows.** Aucun fichier de `.github/workflows/` ne porte
+l'information. Le discriminant est la comparaison entre la base **enregistrée** d'une PR et la tête
+courante de `main` — deux valeurs qui ne figurent ensemble sur aucune page de PR :
+
+```bash
+gh api repos/<owner>/<repo>/pulls/<n> --jq .base.sha   # base à laquelle la PR a été mesurée
+git rev-parse origin/main                              # tête courante
+```
+
+Si les deux diffèrent, les contrôles affichés décrivent un `main` révolu, quelle que soit leur
+couleur. **C'est le régime ordinaire, pas l'exception** : relevé le 2026-09-08 à 14 h UTC, les
+9 PR ouvertes du dépôt portaient **toutes** une base distincte de la tête de `main`.
+
+**Conséquence pratique — armer l'auto-fusion plutôt que courir après le vert.** Sous
+`strict: true`, résoudre un conflit puis attendre le vert à la main est une course perdue dès que
+le dépôt est actif : chaque fusion sur `main` périme la résolution avant la fin du cycle de
+contrôles, et un pool de runners réduit allonge ce cycle. Armer `gh pr merge <n> --auto --squash`
+retire l'exigence d'être présent à l'instant précis où les conditions s'alignent.
+
 ### Snapshot d'état projet périmé : la branche, ou `main` ?
 
 **Symptôme.** Une PR échoue sur `Validate project-state source` et `Generated state equals

@@ -597,6 +597,12 @@ test('rejects a generic executable job added to a known active workflow', () => 
       validateAccountDeletionCosmosLayout(root)
         .some((error) => error.includes('ci-infra.yml: differs from reviewed semantic manifest')),
     );
+    // Le remède doit nommer la rotation de baseline en deux PR : régénérer dans la branche est
+    // sans effet, la gate lisant toujours le manifeste du contrôle trusted.
+    assert.ok(
+      validateAccountDeletionCosmosLayout(root)
+        .some((error) => error.includes('must land on `main` as its own baseline-rotation')),
+    );
   });
 });
 
