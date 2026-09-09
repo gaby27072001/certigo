@@ -78,13 +78,33 @@ String? resolveAuthRedirect({
     return location == AuthShellRoutes.accountDeleted ? null : AuthShellRoutes.accountDeleted;
   }
 
-  // Restauration de session : rester sur le splash d'auth. Exception : les
-  // écrans d'inscription affichent leur propre chargement inline (CTA en
-  // loading pendant l'appel `registerWithEmail`) — on ne les éjecte PAS vers le
-  // splash, sinon l'écran de mot de passe serait démonté puis la réussite
-  // court-circuiterait les écrans post-création (piège du garde de la P1).
+  // Restauration de session : rester sur le splash d'auth. Exceptions : les
+  // surfaces qui affichent leur propre chargement inline (CTA en loading
+  // pendant l'appel `signIn` / `signInWithEmail` / `registerWithEmail`) — on
+  // ne les éjecte PAS vers le splash, sinon la surface qui a déclenché
+  // l'action serait démontée sous les doigts de l'utilisateur (feuille
+  // fermée, formulaire vidé de sa saisie).
+  //  - `/register/*` : écrans d'inscription progressive (piège du garde de la
+  //    P1 : sinon l'écran de mot de passe serait démonté puis la réussite
+  //    court-circuiterait les écrans post-création).
+  //  - `/landing` : la bottom sheet « Commencer » (get_started_sheet) monte
+  //    sur `useRootNavigator: true` et affiche le spinner par bouton via
+  //    `_pending` ; sans exception, la 1ère émission `AuthLoading` de `signIn`
+  //    démonte la feuille avant que l'utilisateur ne voie sa propre action.
+  //  - `/auth` : l'écran de connexion e-mail affiche un chargement inline sur
+  //    son bouton principal (`_emailSubmitting`) et sur les boutons sociaux
+  //    (`_pending`, même mécanisme que la sheet) ; sans exception, la 1ère
+  //    émission `AuthLoading` de `signInWithEmail` démonte le formulaire ET
+  //    ses `TextEditingController`s — la saisie de l'utilisateur est perdue
+  //    au moment précis où il vient de se tromper de mot de passe.
+  //  Note : ces exceptions n'ont pas d'effet au démarrage à froid parce que
+  //  `router.dart` démarre sur `/splash` (jamais sur `/landing` ni sur
+  //  `/auth`) et que ces deux surfaces ne sont atteignables qu'après un
+  //  `Unauthenticated`.
+  //  Voir aussi le commit `f3fe90c7 test(mobile): retirer le test-mémorial`
+  //  qui documente la chaîne de démontage racine → sheet.
   if (auth is AuthLoading || auth is AuthSigningOut) {
-    return (atAuthSplash || atRegister) ? null : AuthShellRoutes.splash;
+    return (atAuthSplash || atLanding || atAuth || atRegister) ? null : AuthShellRoutes.splash;
   }
   // Non authentifié : présenter l'écran d'ouverture (landing) par défaut, tout
   // en autorisant l'écran de connexion e-mail atteint depuis la sheet et les

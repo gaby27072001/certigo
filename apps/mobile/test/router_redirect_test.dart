@@ -46,6 +46,62 @@ void main() {
         AuthShellRoutes.splash,
       );
     });
+
+    // #WIL — Sans exception, `AuthLoading` sur `/landing` renverrait vers
+    // `/splash` sur le navigateur racine. La bottom sheet « Commencer »
+    // (get_started_sheet, `useRootNavigator: true`) serait démontée avant
+    // que l'utilisateur voie sa propre action. `/landing` satisfait le même
+    // critère que `/register` : chargement inline par bouton (`_pending`).
+    test('sur /landing → reste (la bottom sheet affiche son propre spinner)', () {
+      expect(
+        resolveAuthRedirect(
+          auth: const AuthLoading(),
+          location: AuthShellRoutes.landing,
+          onboardingCompleted: false,
+        ),
+        isNull,
+      );
+    });
+
+    test('AuthSigningOut sur /landing → reste (même critère)', () {
+      expect(
+        resolveAuthRedirect(
+          auth: const AuthSigningOut(),
+          location: AuthShellRoutes.landing,
+          onboardingCompleted: false,
+        ),
+        isNull,
+      );
+    });
+
+    // #WIL — Sans exception, `AuthLoading` sur `/auth` renverrait vers
+    // `/splash` sur le navigateur racine, démontant le formulaire e-mail ET
+    // sa saisie (`TextEditingController` disposé) au moment précis où
+    // l'utilisateur vient de se tromper. `/auth` satisfait le même critère
+    // que `/register` et `/landing` : chargement inline par bouton
+    // (`_emailSubmitting` pour le bouton principal, `_pending` pour les
+    // boutons sociaux — même mécanisme que la sheet).
+    test('sur /auth → reste (le formulaire affiche son propre spinner)', () {
+      expect(
+        resolveAuthRedirect(
+          auth: const AuthLoading(),
+          location: AuthShellRoutes.auth,
+          onboardingCompleted: false,
+        ),
+        isNull,
+      );
+    });
+
+    test('AuthSigningOut sur /auth → reste (même critère)', () {
+      expect(
+        resolveAuthRedirect(
+          auth: const AuthSigningOut(),
+          location: AuthShellRoutes.auth,
+          onboardingCompleted: false,
+        ),
+        isNull,
+      );
+    });
   });
 
   group('resolveAuthRedirect — non authentifié', () {
