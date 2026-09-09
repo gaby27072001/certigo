@@ -1031,6 +1031,33 @@ réelle use un détecteur qui n'a rien d'autre à sa place. **Toute mesure trans
 sa convention** — au même titre qu'un nombre relayé porte son objet et sa date — sous peine de
 déclencher un détecteur légitime sur un faux positif, et de l'user.
 
+### La limite de la parade de dernier recours : deux mesures qui disent vrai sur des objets différents
+
+> Ajouté le **2026-09-09**. Première limite documentée d'une des parades de ce §7 — non pas une
+> brèche qu'on peut colmater en aval, mais une **frontière de conception**. **Invalidée** le jour
+> où l'on adopte une convention explicite qui exige de nommer l'objet mesuré avant de rendre la
+> mesure.
+
+La parade précédente cherche laquelle de deux mesures ment ; elle suppose qu'au moins l'une des
+deux ment — c'est-à-dire qu'un rapprochement est possible entre elles. **Elle échoue en silence
+dès que deux mesures disent vrai sur des objets différents portant le même nom.**
+
+**Le motif.** Un même mot désigne, dans le dépôt, deux objets distincts — par exemple un champ
+persisté qui entre dans une clé d'idempotence, et un champ homonyme seulement transmis à l'appel.
+On pose une question sur « le champ » ; l'outil répond sur l'un des deux, la réponse est vraie, et
+la conclusion — que la lecture tire sur l'autre — est fausse. **Aucune mesure ne se contredit
+elle-même.** La contradiction, si on savait la voir, serait entre l'**objet** posé par la question
+et l'**objet** rendu par la réponse.
+
+**Pourquoi la parade ne l'attrape pas.** Elle compare deux mesures, non deux objets. Elle regarde
+en aval de la question ; c'est la question qui, en amont, a fusionné deux objets sous un mot.
+
+**Contre-mesure — gratuite, mais avant la mesure.** Nommer l'objet avant de mesurer : *« sur quel
+champ précis ce nom renvoie-t-il ici — la ligne persistée, ou la valeur transmise ? »* puis mesurer
+ce champ-là. C'est un geste **d'avant lecture**, pas de vérification.
+
+> **Aucune parade *aval* ne rattrape une question qui a fusionné deux objets sous un mot.**
+
 ### Le dispositif de secours n'est éprouvé que hors incident
 
 > Ajouté le **2026-09-09**. **Invalidée** le jour où chaque workflow présenté chez nous comme filet
@@ -1140,6 +1167,51 @@ ne la demande pas**, faute d'avoir déclaré le groupe qui la porte. Le message 
 pourtant à l'opposé de la cause. **Une sortie exacte peut désigner une cause fausse dès qu'un
 intermédiaire n'a pas été nommé** — ici : le groupe. À ranger avec les instruments qui mentent
 sans mentir.
+
+**Corollaire — un contrat de sérialisation nomme des clés, jamais des valeurs.** Un attribut qui
+décrit comment se transforment les **noms** d'un objet (`camelCase`, snake ↔ camel, etc.) ne dit
+rien sur les **valeurs** qu'ils portent. Les confondre fait diagnostiquer une incohérence de
+contenu — « la valeur n'a pas la casse annoncée » — là où il n'y a que la lecture d'un contrat
+côté clé comme s'il portait sur ce qu'il ne recouvre pas. La sortie est exacte et documentée ;
+l'ensemble qu'elle décrit n'est pas celui qu'on interrogeait. **Avant d'accuser une valeur de ne
+pas respecter une convention, vérifier que la convention porte bien sur des valeurs.**
+
+### Un succès exact peut clôturer l'examen sur une cause fausse
+
+> Ajouté le **2026-09-09**, à propos de la fusion de la PR #425 elle-même. Variante de « Un message
+> d'erreur exact peut désigner une cause fausse » (ci-dessus), **plus difficile** : une erreur
+> attire l'examen, un succès le clôt. **Invalidée** le jour où l'auto-merge de ce dépôt rebasse
+> proactivement une PR passée en `BEHIND` sur `main`, ou porte un signal explicite lorsqu'il ne le
+> fait pas.
+
+**Le cas mesuré.** PR **#425** créée à `2026-09-09T11:30:18Z`, auto-merge **squash** armé à
+`11:30:34Z`. Sur le premier HEAD, le rollup des checks requis est passé au vert dans les deux
+minutes. **Aucune fusion n'a suivi.** La PR est restée `BEHIND` **34 min 6 s**. Un
+`gh pr update-branch` manuel a fusionné `main` dans la branche (commit `423e3924` à `12:04:40Z`) ;
+la CI a re-passé sur le nouveau HEAD (20 SUCCESS, 8 SKIPPED, 0 FAILURE), et la fusion a eu lieu à
+`12:08:17Z` — 3 min 37 s après le rebase.
+
+**Ce que le vert ne disait pas.** Le verdict « rollup requis vert » était une mesure **exacte**. Il
+ne disait rien de la fraîcheur de la base sur laquelle la CI venait de tourner : `main` bougeait
+pendant que la PR attendait. Sous `strict = true` — voir §1 « Un vert peut décrire une base qui
+n'existe plus » — **chaque fusion sur `main` invalide silencieusement la base de toute PR non
+fusionnée**. L'auto-merge n'a pas rebasé de lui-même ; rien n'a signalé que le vert affiché ne
+portait plus rien de fusionnable.
+
+**La différence avec le constat sur le message d'erreur.** Une erreur exacte pointe à côté, **mais
+elle alerte**. Un succès exact ne déclenche aucun examen — il **clôt** la question, et il la clôt
+d'autant mieux qu'il est vrai. C'est cette clôture qui rend la variante plus coûteuse : personne ne
+va « vérifier le vert » ; le pont non nommé entre le vert et l'effet — ici, `strict = true` — reste
+invisible aussi longtemps que l'effet est attendu et qu'il ne vient pas.
+
+> **Quand un état vert n'aboutit pas à l'effet attendu, ne pas re-vérifier le vert — chercher
+> l'étape que personne n'a nommée entre le vert et l'effet.**
+
+**Corollaire opérationnel, à faible coût.** Après l'armement d'un auto-merge, `gh pr update-branch`
+n'est pas un dépannage ; c'est une action de routine à prévoir dès qu'une PR reste `BEHIND` sans
+progression, et à surveiller soi-même. Une PR verte avec auto-merge armé peut rester
+**indéfiniment** en `BEHIND` sans que rien ne signale l'attente : l'inaction du fournisseur
+ressemble à de la patience.
 
 ### Ce qui a réellement corrigé
 
