@@ -128,6 +128,33 @@ fichiers `infra/params/{dev,staging,prod}.bicepparam` ne sont pas modifiés : au
 `organizationMembershipV1`, qui reste donc résolu à `off` dans les trois environnements. Aucune
 ressource live n'est modifiée ou activée par cette PR.
 
+> **Note correctrice — 2026-09-09 : cadence portée de `0 */5 * * * *` à `0 */15 * * * *`.**
+> Les mentions « même cadence que le recovery Enterprise Learning Metrics » (§3) et le patron
+> décrit ci-dessus restent exacts — les deux réglages bougent ensemble — mais la valeur n'est
+> plus cinq minutes.
+>
+> **Motif.** Les deux timers sortent immédiatement (`off` partout), mais réveillent l'hôte
+> Functions à chaque déclenchement. Mesuré le 2026-09-09 sur `func-certigo-dev` : 1 558
+> démarrages d'hôte en 7 jours, contre 129 sur staging et 131 sur prod — deux environnements
+> identiques dont le build déployé ne contient pas encore ces timers. La modale des écarts entre
+> démarrages consécutifs vaut 300 s (n=375), soit exactement la cadence. Ces démarrages émettent
+> environ 58 Ko de traces chacun et représentent 87,8 % de tout `AppTraces` sur dev, où ils
+> masqueraient une véritable tempête de redémarrages. Le coût financier, lui, est négligeable et
+> ne justifie rien : l'ingestion imputable vaut environ 0,4 Go/mois et le compute reste dans
+> l'octroi gratuit du plan Flex Consumption.
+>
+> **Pourquoi quinze minutes et pas une heure.** Ces fonctions étant inertes, la cadence choisie
+> aujourd'hui ne pourra être validée par aucune exécution réelle avant l'activation : la valeur
+> retenue doit survivre à cet état futur plutôt qu'optimiser l'état présent. ADR-016 borne la
+> cadence du recovery par un lease de claim de deux minutes et une expiration d'intent d'une
+> heure ; quinze minutes laissent quatre tentatives de reprise dans cette fenêtre. Une cadence
+> horaire tombe pile sur la borne d'expiration et une cadence quotidienne la dépasse : toutes
+> deux casseraient la garantie de reprise sans erreur visible, et seulement une fois
+> `ENTERPRISE_LEARNING_METRICS_V1` activé. Cette contrainte est désormais écrite à côté de la
+> valeur dans `infra/modules/functionApp.bicep`, et non dans ce seul document.
+>
+> Aucun déclencheur ni aucune fonction n'est retiré ; aucun environnement n'est activé.
+
 ## Preuve — aucune donnée utilisateur créée, modifiée ou supprimée en `shadow`
 
 1. **Structurelle** : `OrganizationShadowObservationFunctions` ne peut pas être compilé avec un

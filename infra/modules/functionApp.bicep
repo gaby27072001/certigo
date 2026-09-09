@@ -352,9 +352,27 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     ACCOUNT_DELETION_ENABLED: string(accountDeletionEnabled)
     PERSON_LINKED_IDENTITY_V1: personLinkedIdentityV1
     ORGANIZATION_MEMBERSHIP_V1: organizationMembershipV1
-    ORGANIZATION_SHADOW_OBSERVATION_SCHEDULE: '0 */5 * * * *'
+    // Cadence d'échantillonnage de deux lectures Cosmos (ObserveOrganizationMembershipShadowV1).
+    // Aucune borne fonctionnelle : contrairement au recovery ci-dessous, l'espacer ne dégrade
+    // qu'une résolution d'observation. Alignée sur ENTERPRISE_LEARNING_RECOVERY_SCHEDULE parce
+    // que les deux timers partagent le même hôte Functions : la cadence effective des réveils
+    // est le PGCD des deux, donc espacer une seule des deux ne réduit rien.
+    ORGANIZATION_SHADOW_OBSERVATION_SCHEDULE: '0 */15 * * * *'
     ENTERPRISE_LEARNING_METRICS_V1: 'off'
-    ENTERPRISE_LEARNING_RECOVERY_SCHEDULE: '0 */5 * * * *'
+    // CONTRAINTE — ne pas espacer au-delà de 15 min sans relire ADR-016.
+    // ADR-016 (« Cosmos et exactly-once ») borne cette cadence par deux durées :
+    //   * lease de claim d'un intent outbox : 2 min  -> borne BASSE (en deçà, les tentatives
+    //     se chevauchent sans pouvoir claim, sans bénéfice) ;
+    //   * expiration d'un intent après matérialisation : 1 h -> borne HAUTE STRICTE. Un intent
+    //     laissé par un worker crashé doit être re-claimé APRÈS l'expiration du lease et AVANT
+    //     l'expiration de l'intent, sinon la reprise est définitivement perdue.
+    // 15 min laisse 4 tentatives dans la fenêtre d'1 h. Une cadence horaire tombe pile sur la
+    // borne (0 tentative garantie) et une cadence quotidienne la dépasse : les deux CASSENT la
+    // garantie de reprise SANS AUCUNE ERREUR VISIBLE, et seulement une fois
+    // ENTERPRISE_LEARNING_METRICS_V1 activé — c'est-à-dire jamais pendant les tests.
+    // La fonction sort immédiatement tant que le mode vaut 'off' : la justesse de cette valeur
+    // n'est donc vérifiable par aucune exécution réelle avant l'activation.
+    ENTERPRISE_LEARNING_RECOVERY_SCHEDULE: '0 */15 * * * *'
     TUTOR_LLM_ENABLED: string(tutorLlmEnabled)
     TUTOR_LLM_ENDPOINT: tutorLlmEndpoint
     TUTOR_LLM_DEPLOYMENT: tutorLlmDeployment
