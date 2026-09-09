@@ -29,8 +29,8 @@ Future<void> showGetStartedSheet(BuildContext context) {
 ///
 /// Câble les fournisseurs sociaux sur [authControllerProvider] avec un état de
 /// chargement par bouton, exactement comme `SignInScreen`. Le bouton e-mail
-/// **ferme la feuille** puis route vers l'écran e-mail (`/auth?emailOnly=1`),
-/// pour éviter le doublon de boutons sociaux avec la feuille.
+/// **ferme la feuille** puis ouvre le flux d'inscription progressive
+/// (`/register/name`), qui expose aussi la connexion à un compte existant.
 class GetStartedSheet extends ConsumerStatefulWidget {
   const GetStartedSheet({super.key});
 
