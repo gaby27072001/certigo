@@ -41,7 +41,15 @@
 #   ios-crash-smoke     : manual -> destructive internal TestFlight crash test
 #   ios-refresh-signing : manual only -> refresh signing profiles via ASC API
 #
-# Build status is reported to GitHub automatically by the Codemagic GitHub App
+# Build status does NOT reach GitHub - the Codemagic dashboard is the only
+# place these builds report. Measured 2026-09-09 on three commits (main HEAD
+# dee33476, the v1.0.2 beta 67bfeb4c of 2026-07-03, and its eve 258d5de4):
+# every check-run carries app.slug "github-actions" and commit statuses are
+# empty. Verified on dates when the iOS pipeline demonstrably shipped a beta,
+# so this is not a recent outage - the capability never existed here.
+# Invalidated if Codemagic's GitHub App is installed and authorised on this
+# repo; re-test with
+#   gh api repos/<owner>/<repo>/commits/<sha>/check-runs --jq '[.check_runs[].app.slug]|unique'
 # (no publishing.github block - that is unsupported and fails validation).
 # =============================================================================
 
