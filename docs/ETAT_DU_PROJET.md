@@ -473,7 +473,7 @@ flowchart LR
 | **Leçons & exercices** | 🟢 | 🟢 | Leçon paginée façon Duolingo : QCM, multi‑réponses, scénario, texte à trous, **appariement**, **remise en ordre**, spot‑the‑issue. Son + haptique. |
 | **Quiz & scoring** | 🟢 | 🟢 | `POST /quiz/{lessonId}/submit` → score, XP, paliers, feedback. |
 | **Parcours « skill‑path »** | 🟢 | 🟢 | Écran vivant façon Duolingo, règles de progression pures. |
-| **Streak (série)** | 🟢 | 🟡 | `GET /streak` + `POST /streak/repair` (réparation). |
+| **Streak (série)** | 🟢 | 🔴 | `GET /streak` + `POST /streak/repair` : **aucun client mobile** — voir « Réparation de série : backend seul » ci‑dessous. |
 | **Ligues hebdo** | 🟢 | 🟡 | Tournoi XP hebdomadaire serveur‑autoritaire + `GET /me/league/resolution`. |
 | **Saisons** | 🟢 | 🟢 | Défi mensuel thématisé : `GET /season`, `POST /season/claim` — écran `seasons` (thème, paliers, réclamation). |
 | **Quêtes & succès** | 🟢 | 🟢 | `GET /quests` + `claim`, `GET /achievements` — écrans `quests` & `achievements`. |
@@ -490,9 +490,24 @@ flowchart LR
 | **Person / LinkedIdentity** | 🟡 (`off|shadow`) | — | Overlay Person et miroirs locaux/Entra idempotents, collisions fail-closed, télémétrie sans PII et tombstones de suppression ; aucune résolution autoritaire ni liaison utilisateur. |
 | **Organization / Membership** | 🟡 (`off`) | — | Contexte tenant explicite, résolution Person/Membership active, matrice owner/admin/manager/learner, anti-IDOR invitations/teams/offboarding et policies réservées aux futures assignations ; aucun endpoint live. |
 
-> **Lecture clé :** l'écart backend ↔ UI est désormais **comblé pour la gamification** : saisons, quêtes,
-> succès, boutique, amis et examens disposent d'un **écran mobile + test widget**. Restent à exposer le
-> **partage quotidien** et la **validation E2E sur appareil**.
+> **Lecture clé :** l'écart backend ↔ UI est **comblé pour l'économie de gemmes** : saisons, quêtes,
+> succès, boutique, amis et examens disposent d'un **écran mobile + test widget**. Restent à exposer la
+> **validation E2E sur appareil** et la réparation de série ci‑dessous.
+
+> **Réparation de série : backend seul.** Mesuré le **2026-09-09** sur `64dcc22b` : `POST /streak/repair`
+> est **atteignable** (`Certigo.Api/Program.cs` enregistre `IStreakRepairService`, et `StreakFunctions`
+> n'a **aucun** middleware de feature — contrairement aux fonctions `Organization`, `VivaLearning`,
+> `EnterpriseIdentity` et `EnterpriseLearningMetrics`, qui lèvent toutes un
+> `…FeatureDisabledException`). Côté client, **rien** : ni modèle `StreakStatus`, ni `StreakRepository`
+> dans `packages/data`, ni appel à `/streak` — `repair` est **absent** de `apps/mobile/lib`. Le statut
+> est donc 🔴 (absent) et non 🟡 (partiel) : il n'y a pas de client partiel à compléter, il n'y en a
+> aucun. **Ce constat devient faux dès qu'un client `/streak` existe dans `packages/data` et qu'un
+> point d'entrée mobile l'appelle** — c'est la seule condition qui l'invalide.
+>
+> À ne pas confondre avec le **gel de série** (`streak-freeze`, 200 gemmes), qui lui **fonctionne** :
+> le jeton est crédité par la boutique puis consommé automatiquement par `StreakService.UpdateStreak`,
+> sans aucune UI. Le gel protège une série ; la réparation en rachète une déjà rompue, pour 50 gemmes,
+> et c'est elle qui n'est pas exposée.
 
 ---
 
@@ -716,7 +731,8 @@ déclarée est dans `codemagic.yaml`.
 
 **Écarts backend ↔ mobile (à brancher en UI) :**
 - 🟢 Saisons, quêtes, succès, boutique, amis, examens blancs, partage quotidien : **écrans livrés** (+ tests widget) — reste la **validation E2E sur appareil**.
-- 🟡 Streak‑repair, ligues, notifications : partiellement exposés.
+- 🟡 Ligues, notifications : partiellement exposés.
+- 🔴 **Réparation de série** : backend atteignable, **aucun client mobile** — voir « Réparation de série : backend seul » (§4).
 
 **Chantiers techniques :**
 - 🏗️ **Provisionner `staging`** par Bicep et valider `/health` ; `dev`, `prod` et CI sont déjà déployés.
