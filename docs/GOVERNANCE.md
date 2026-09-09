@@ -885,6 +885,14 @@ pas une propriété du monde, mais du critère lui-même. Le détail chiffré ap
 contenu où la mesure a été faite ; ici, seul importe le geste — **exiger d'un critère qu'il
 démontre, avant d'être utilisé, qu'il peut trancher dans l'autre sens**.
 
+**Corollaire — la non-discrimination existe aussi côté parade.** Une contre-mesure qui se
+déclenche toujours n'est pas une contre-mesure : c'est un rituel. Elle coûte à chaque passage et
+n'informe à aucun. De même qu'un critère qui produit toujours la même réponse ne mesure rien, une
+parade qui s'applique quelle que soit la situation ne protège plus rien — la non-discrimination
+prend deux formes, l'une côté critère, l'autre côté parade. **Une parade bien écrite se déclenche
+quand son motif se produit, et se tait quand il ne se produit pas** ; son silence, quand il est
+attendu, est un signe qu'elle vit, pas qu'elle dort.
+
 ### Le détecteur qui normalise ce qu'il cherche
 
 > Ajouté le **2026-09-09**. Variante d'entrée de ce que la sous-section « Les dix instruments
@@ -927,6 +935,45 @@ formats désigne la panne ; leur accord ferme la question.
 > **Un affichage vide est un instrument qui ment sans mentir : il ne fabrique rien de faux, il
 > soustrait ce qu'il devait montrer. Un négatif silencieux dont seule la comparaison avec un
 > témoin d'un autre format le fait apparaître.**
+
+### Le nom qui contredit l'état — troisième mensonge de la couche de présentation
+
+> Ajouté le **2026-09-09**. Trois occurrences mesurées le même jour, dont deux sont apparues
+> **indépendamment**, sans communication entre leurs auteurs. **Invalidée** le jour où le dépôt
+> refuse d'écrire un mot d'état dans un identifiant, ou signale explicitement ceux qui en
+> contiennent un.
+
+**Trois façons dont une couche de présentation trahit l'objet qu'elle présente**, à lire ensemble :
+le **format** (voir « Le rendu peut mentir sur la présence des données » : la couche d'affichage
+soustrait ce qu'elle devait montrer), le **libellé** (voir « Un message d'erreur exact peut
+désigner une cause fausse » dans « Citer sans envoyer... » : la sortie exacte pointe à côté quand
+un intermédiaire n'a pas été nommé), et le **nom** — cette sous-section : l'identifiant lui-même
+porte un mot qui contredit l'état.
+
+**Trois occurrences.** Un travail de CI dont le nom contient le mot de l'échec, mais qui a
+**réussi** : filtre textuel sur ce mot, décision « rouge » — **deux opérateurs différents, aucun
+contact, le même jour**. Un workflow dont le nom porte le mot « désactivé » alors que son état
+structuré est **actif**. Un identifiant cité dans un document comme désactivé, réactivé depuis
+sans mise à jour du document.
+
+**Ce n'est pas de l'inattention — c'est structurel.** Deux instruments, deux auteurs, aucun
+contact, le même défaut le même jour ne signent pas une distraction ; ils signent une propriété
+du support. **Un nom qui contient un mot d'état est un piège pour tout filtre textuel et pour
+tout lecteur pressé.**
+
+**Deux contre-mesures, de coûts très différents.**
+
+- **À la lecture — bon marché, défensive.** Ne jamais déduire un état d'un nom. Lire le champ
+  d'état. Un zéro sur un filtre textuel ne prouve rien ; un champ structuré, si.
+- **À l'écriture — génératrice.** Ne jamais écrire un mot d'état dans un nom. **Un nom est
+  permanent ; un état ne l'est pas.** Encoder un état dans un nom garantit qu'il deviendra faux —
+  la seule question est quand.
+
+> **La règle d'écriture est la vraie règle** : elle explique les trois cas et prévient les
+> suivants. La règle de lecture ne fait que s'en défendre.
+
+Le pattern commun aux trois façons — format, libellé, nom : **l'objet est correct ; sa
+présentation ne l'est pas ; le lecteur lit la présentation.**
 
 ### L'instrument aveugle à son propre passé
 
