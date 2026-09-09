@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
@@ -9,10 +11,12 @@ import '../../../shared/widgets/inline_error.dart';
 import '../../../shared/widgets/screen_header.dart';
 
 /// Shop — spend hard-earned gems on boosters and streak freezes. Fed by
-/// `shopCatalogProvider`. Each purchase carries a client-generated id for
-/// idempotency; we disable items the learner cannot afford and, on a successful
-/// purchase, invalidate the catalog so the gem balance and any token counts
-/// refresh from the server.
+/// `shopCatalogProvider`. Each purchase carries a client-generated idempotency
+/// key that is **held across retries** so a tap replayed after a transport
+/// failure resolves to the same server-side purchase instead of debiting the
+/// learner twice; we disable items the learner cannot afford and, on a
+/// successful purchase, invalidate the catalog so the gem balance and any token
+/// counts refresh from the server.
 class ShopScreen extends ConsumerWidget {
   const ShopScreen({super.key});
 
@@ -54,15 +58,23 @@ class _ShopContentState extends ConsumerState<_ShopContent> {
   String? _buyingId;
   String? _error;
 
+  /// Idempotency keys, held per item for as long as the purchase outcome is
+  /// unknown. The server dedupes on `clientPurchaseId` (ledger id
+  /// `purchase::{clientPurchaseId}`), so a retry after a transport failure —
+  /// where the debit may already have been applied — must carry the *same*
+  /// key or the learner is charged twice for one item.
+  final Map<String, String> _purchaseIds = <String, String>{};
+
   Future<void> _buy(ShopItem item) async {
     setState(() {
       _buyingId = item.id;
       _error = null;
     });
+    final String clientPurchaseId = _purchaseIds.putIfAbsent(item.id, _newPurchaseId);
     final Result<PurchaseResult> result = await ref.read(shopRepositoryProvider).purchase(
           PurchaseRequest(
             itemId: item.id,
-            clientPurchaseId: DateTime.now().microsecondsSinceEpoch.toString(),
+            clientPurchaseId: clientPurchaseId,
           ),
         );
     if (!mounted) {
@@ -70,6 +82,9 @@ class _ShopContentState extends ConsumerState<_ShopContent> {
     }
     result.when(
       success: (PurchaseResult r) {
+        // The server ruled on this key — granted or refused, the outcome is
+        // final — so the next purchase of the same item starts a fresh key.
+        _purchaseIds.remove(item.id);
         setState(() {
           _buyingId = null;
           _error = r.success ? null : (r.error ?? 'L\'achat n\'a pas pu être finalisé.');
@@ -79,12 +94,20 @@ class _ShopContentState extends ConsumerState<_ShopContent> {
         }
       },
       failure: (Failure f) {
+        // Transport failure: the purchase may or may not have been applied.
+        // Keep the key so a retry resolves to that same server-side operation.
         setState(() {
           _buyingId = null;
           _error = f.message;
         });
       },
     );
+  }
+
+  static String _newPurchaseId() {
+    final int micros = DateTime.now().microsecondsSinceEpoch;
+    final int rand = Random().nextInt(0x7fffffff);
+    return '${micros.toRadixString(16)}-${rand.toRadixString(16)}';
   }
 
   @override
