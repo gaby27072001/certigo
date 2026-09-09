@@ -1524,6 +1524,40 @@ test('every managed runner is restarted after the nightly teardown', () => {
   // vacuously true, which is the failure mode this whole test exists to prevent.
   assert.ok(recovered.length > 0, 'the parsed recovery list must not be empty');
 
+  // The same list exists twice: in this parameter file, and as the default of
+  // `auto-recovery.bicep`. The recovery stack is deployed by hand — no workflow may hold
+  // Azure credentials — so an operator who omits `--parameters` silently deploys the
+  // default instead. On 2026-09-08 the default still held three instances while the
+  // parameter file held four; the omitted instance stayed deallocated for 7h48 and no
+  // alarm fired, because the workflow's own assertion only covered the instances it knew.
+  // Guarding one copy and not the other is what let them diverge, so both are pinned here.
+  const template = readFileSync(
+    path.join(repositoryRoot, 'infra', 'ci-runner', 'auto-recovery.bicep'),
+    'utf8',
+  );
+  const defaultBlock = /param virtualMachineNames array = \[([^\]]*)\]/.exec(
+    template,
+  );
+  assert.ok(
+    defaultBlock,
+    'auto-recovery.bicep must declare a default for virtualMachineNames',
+  );
+  const defaulted = [...defaultBlock[1].matchAll(/'([^']+)'/g)].map(
+    ([, name]) => name,
+  );
+  assert.ok(
+    defaulted.length > 0,
+    'the parsed auto-recovery.bicep default must not be empty',
+  );
+  // Every start action carries `runAfter: {}` and therefore runs in parallel, so ordering
+  // carries no meaning: set equality is the real invariant, and it survives a reordering
+  // that would make a positional comparison fail for no operational reason.
+  assert.deepEqual(
+    [...defaulted].sort(),
+    [...recovered].sort(),
+    'the auto-recovery.bicep default must restart exactly the instances the parameter file does',
+  );
+
   const managed = config.inventory.managedRunnerBindings.map(
     ({ virtualMachineName }) => virtualMachineName,
   );

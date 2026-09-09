@@ -254,7 +254,7 @@ depuis un workflow.
    `capacity-controller.config.json`. Une instance du VMSS absente de l'inventaire est
    classée `unclassifiedVirtualMachines` et bloque le plan.
 2. **Plancher de redondance.** Le contrôleur de capacité applique
-   `minimumOnlineByTrust` (`certigo-pr: 1`, `certigo-trusted: 2`). Un déficit produit un
+   `minimumOnlineByTrust` (`certigo-pr: 2`, `certigo-trusted: 2`). Un déficit produit un
    blocker explicite. Le décompte utilise la capacité **utilisable** — VM sous tension
    **et** runner GitHub `online` — de sorte que le cas « VM running / runner absent »
    observé ici est bien compté comme un déficit.
@@ -355,6 +355,55 @@ soit un **contrôle** et non un rapport.
 
 Le mode dégradé manuel reste valable et documenté dans
 [`docs/runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md) §4.
+
+#### La liste d'instances existe en deux exemplaires — invariant scellé par test
+
+`virtualMachineNames` est écrit **deux fois** : comme défaut dans `auto-recovery.bicep` et
+comme valeur dans `infra/params/ci-runner-auto-recovery.bicepparam`. Aucun workflow ne peut
+déployer cette pile — un workflow porteur de credentials Azure est interdit par le scellé du
+dépôt — donc **le seul déployeur possible est un opérateur humain**, et un `--parameters`
+oublié applique le défaut. Les deux copies sont donc opérationnelles, pas l'une principale et
+l'autre décorative.
+
+Elles ont divergé : le 2026-09-07 la PR #402 a porté le pool PR à deux instances et ajouté
+`a14700a3` au bicepparam **sans l'ajouter au défaut**, qui est resté à trois. Le test
+« every managed runner is restarted after the nightly teardown » ne lisait que le bicepparam
+et n'a rien vu ; un second test épinglait même le défaut à `assert.equal(recovered.length, 3)`,
+c'est-à-dire qu'il **certifiait le défaut**. Les deux tests exigent désormais l'égalité
+ensembliste entre le défaut, le bicepparam et `inventory.managedRunnerBindings` : toute
+divergence future échoue des deux côtés indépendamment.
+
+#### Énumération dynamique — mesurée faisable, ajournée
+
+Rendre l'énumération dynamique (interroger le scale set plutôt que lister des noms figés)
+supprimerait cette duplication. **Mesuré le 2026-09-09, c'est faisable sans nouveau
+privilège**, mais la décision est de **ne pas le faire** : le graphe déplié est une propriété
+revendiquée du module — « un relecteur voit exactement quelles ressources sont touchées » — et
+sur un mécanisme déployé à la main, cette lisibilité vaut davantage que l'auto-mise à jour.
+Ce constat est consigné pour ne pas être remesuré :
+
+- **Droit déjà accordé.** `checkAccess` sur le principal de la Logic App
+  (`logic-certigo-ci-runner-recovery`) au scope `rg-certigo-ci` rend `Allowed` pour
+  `virtualMachines/read`, `start/action` et `instanceView/read`, et `NotAllowed` pour
+  `virtualMachineScaleSets/read`, `deallocate/action`, `runCommand/action` et `delete`.
+  L'énumération par VM est donc autorisée ; **passer par l'API du scale set ne l'est pas**.
+- **Un seul appel remplace énumération *et* vérification** :
+  `GET .../virtualMachines?$filter='virtualMachineScaleSet/id' eq '{id}'&$expand=instanceView`
+  rend les instances **avec** leur `PowerState`. Le nom de propriété doit être **quoté** :
+  sans les apostrophes, ARM rend `The request URL is not valid`. `$expand=instanceView` sans
+  ce `$filter` est refusé (`Expand Instance View is only supported when Virtual Machine Scale
+  Set resource filter is applied`).
+- **`Terminate` resterait au niveau supérieur.** Un seul appel rendant un tableau, l'assertion
+  s'écrit par agrégation sans `Foreach`, donc l'objection documentée dans le module tombe.
+- **⚠️ Ne jamais discriminer par tag.** Les tags sont asymétriques : les instances
+  `pr-pilot` portent `workload=github-actions-runner` et `trustBoundary`, les instances
+  `runner-zonal` ne portent que `VirtualMachineProfileTimeCreated`. Un filtre sur
+  `workload` **perdrait les deux runners trusted**, recréant exactement la classe de défaut
+  que l'on cherche à fermer. Le seul discriminant fiable est
+  `properties.virtualMachineScaleSet.id`, présent sur les quatre instances.
+- **⚠️ La casse varie.** La référence VMSS d'une instance porte `RG-CERTIGO-CI`, les autres
+  `rg-certigo-ci`. Toute comparaison locale doit être insensible à la casse ; le `$filter`
+  côté ARM, lui, l'est déjà.
 
 ### Verrou de suppression sur `rg-certigo-ci`
 
@@ -561,7 +610,7 @@ Le code fournit désormais :
 - `.github/scripts/assert-runner-inventoried.mjs` pour interdire qu'une instance exécute
   un job trusted sans figurer dans l'inventaire versionné ;
 - `infra/ci-runner/capacity-controller.config.json` comme **inventaire de référence** :
-  les trois instances live y sont liées explicitement, et `minimumOnlineByTrust` y fixe le
+  les quatre instances live y sont liées explicitement, et `minimumOnlineByTrust` y fixe le
   plancher de redondance.
 
 Preuve **historique** à conserver sans la réinterpréter comme l'état live actuel : le drill

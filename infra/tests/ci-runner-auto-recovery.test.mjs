@@ -265,16 +265,28 @@ test('the versioned inventory covers every VM the recovery starts', async () => 
     ),
   );
 
-  assert.equal(recovered.length, 3, 'exactly the three deallocated instances');
+  const managed = config.inventory.managedRunnerBindings.map(
+    ({ virtualMachineName }) => virtualMachineName,
+  );
+  // A hardcoded count froze this expectation at three while the pool had already grown to
+  // four. The instance added on 2026-09-07 was therefore never restarted after the nightly
+  // teardown, stayed deallocated for 7h48 on 2026-09-08, and the assertion meant to catch
+  // that asserted the defect instead. The size is derived from the inventory now, so adding
+  // a runner moves the expectation with it rather than pinning yesterday's fleet.
+  assert.ok(managed.length > 0, 'the inventory must declare managed runner bindings');
+  assert.deepEqual(
+    [...recovered].sort(),
+    [...managed].sort(),
+    'the recovery default must start exactly the managed runner instances',
+  );
 
-  // An instance the recovery starts but the controller does not know about is
-  // classified unclassifiedVirtualMachines and blocks the capacity plan. The
-  // two lists must not drift apart.
-  const inventory = JSON.stringify(config);
-  for (const name of recovered) {
-    assert.ok(
-      inventory.includes(name),
-      `${name} is started by the recovery but absent from the versioned inventory`,
-    );
-  }
+  // A substring probe across the whole serialized config was also satisfied by a name that
+  // appears only in forbiddenVirtualMachines, which is the exact opposite of the intent.
+  assert.deepEqual(
+    recovered.filter((name) =>
+      config.inventory.forbiddenVirtualMachines.includes(name),
+    ),
+    [],
+    'a forbidden instance must never be started by the recovery',
+  );
 });

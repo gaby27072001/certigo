@@ -60,15 +60,20 @@ L'état live ne correspond plus aux anciennes VM autonomes documentées :
 
 | Élément | État observé |
 |---|---|
-| Compute géré | `f55d176e` (zone 2) **et `be505fa1` (zone 1)** dans `vmss-certigo-runner-zonal`; pilote `bbf83c5c` dans `vmss-certigo-pr-pilot-z1` zone 1 |
-| Inventaire Azure courant | `f55d176e`, `be505fa1` et `bbf83c5c` running; `4153d1dd` externe/deallocated; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
+| Compute géré | `f55d176e` (zone 2) **et `be505fa1` (zone 1)** dans `vmss-certigo-runner-zonal`; pilotes `bbf83c5c` **et `a14700a3`** dans `vmss-certigo-pr-pilot-z1` zone 1 |
+| Inventaire Azure courant | `f55d176e`, `be505fa1`, `bbf83c5c` **et `a14700a3`** running; `4153d1dd` externe/deallocated; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
 | Autoscale | activé, minimum `2`, défaut `2`, maximum `4` |
 | Scale-out | CPU moyenne > 70 % pendant 10 min |
 | Scale-in | CPU moyenne < 20 % pendant 45 min — **non conscient des jobs GitHub** |
-| Inventaire GitHub | runner `27` `f55d176e-Certigo` online **trusted**; runner `29` `be505fa1-Certigo` online **trusted**; runner `28` `certigo-prIVJAN8` online, PR-only; runner `26` `22f7fb52-Certigo` offline/stale et hors scope |
+| Inventaire GitHub | runner `27` `f55d176e-Certigo` online **trusted**; runner `29` `be505fa1-Certigo` online **trusted**; runner `28` `certigo-prIVJAN8` online, PR-only; runner `30` `certigo-prQA5OWT` online, PR-only; runner `26` `22f7fb52-Certigo` offline/stale et hors scope |
 | Cloisonnement | le pilote est sans identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; `f55d176e` et `be505fa1` conservent UAMI + `snet-runners`. **Les labels sont désormais strictement disjoints** — plus aucun label double bloquant |
-| Capacité réellement réconciliée | **3 instances gérées/online** : `f55d176e`, `be505fa1` et `bbf83c5c`; `4153d1dd` reste externe |
-| Plancher de redondance | `minimumOnlineByTrust` = `certigo-pr: 1`, `certigo-trusted: 2` |
+| Capacité réellement réconciliée | **4 instances gérées/online** : `f55d176e`, `be505fa1`, `bbf83c5c` et `a14700a3`; `4153d1dd` reste externe |
+| Plancher de redondance | `minimumOnlineByTrust` = `certigo-pr: 2`, `certigo-trusted: 2` |
+
+> Inventaire mesuré le 2026-09-09 à 07:47 UTC (`gh api .../actions/runners` et
+> `az vm list -d -g rg-certigo-ci`). Invalidé par tout ajout ou retrait d'instance dans
+> l'un des deux scale sets, ou par un changement de `minimumOnlineByTrust` dans
+> `infra/ci-runner/capacity-controller.config.json`.
 
 > ⚠️ **`be505fa1` était absente de cet inventaire jusqu'au 4 septembre 2026.** C'est
 > exactement ce trou qui a permis à l'instance zone 1 de rester éteinte assez longtemps pour

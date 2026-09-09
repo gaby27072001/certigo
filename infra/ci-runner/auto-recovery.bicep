@@ -35,12 +35,13 @@ targetScope = 'subscription'
 @minLength(1)
 param resourceGroupName string = 'rg-certigo-ci'
 
-@description('Instances exactes du VMSS Flexible à rallumer chaque matin.')
+@description('Instances exactes du VMSS Flexible à rallumer chaque matin. Doit rester identique à `infra/params/ci-runner-auto-recovery.bicepparam` : le déploiement est manuel, donc un `--parameters` oublié applique CE défaut. Invariant vérifié par « every managed runner is restarted after the nightly teardown ».')
 @minLength(1)
 param virtualMachineNames array = [
   'vmss-certigo-runner-zonal_f55d176e'
   'vmss-certigo-runner-zonal_be505fa1'
   'vmss-certigo-pr-pilot-z1_bbf83c5c'
+  'vmss-certigo-pr-pilot-z1_a14700a3'
 ]
 
 @description('Heure UTC du déclenchement. 01:30 UTC laisse ~41 min de marge après la fin de la fenêtre de teardown 00:46-00:49 UTC, sans course avec elle.')

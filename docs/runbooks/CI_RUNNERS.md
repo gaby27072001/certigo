@@ -121,12 +121,13 @@ contrôleur `workflow_job` queue-driven, pas un seuil CPU. Son feature flag rest
 Le plan réconcilie les bindings Azure/GitHub exacts et exige simultanément power Azure
 **et** runner GitHub online. La séparation des labels est **acquise**; le contrôleur
 impose désormais aussi un plancher de redondance (`minimumOnlineByTrust`) de
-**2 runners `certigo-trusted` online**. La cible du pilote ultérieur est **6 PR + 2 trusted**;
+**2 runners `certigo-pr` et 2 runners `certigo-trusted` online**, comparé **par classe de
+confiance** et non sur l'agrégat. La cible du pilote ultérieur est **6 PR + 2 trusted**;
 ce n'est ni le plafond live actuel de 4, ni un maximum de production définitif.
 
 | Situation | État requis | Décision opérateur |
 |---|---|---|
-| Avant une session CI | un runner exclusif `certigo-pr` et **deux** exclusifs `certigo-trusted`, `online` | Vérifier côté GitHub, pas seulement le power state Azure. |
+| Avant une session CI | **deux** runners exclusifs `certigo-pr` et **deux** exclusifs `certigo-trusted`, `online` | Vérifier côté GitHub, pas seulement le power state Azure. |
 | Pendant une session | zéro scale-in CPU | Ne jamais laisser Azure retirer une instance sur simple faible CPU. |
 | Après la session | 5 min continues à zéro, reset sur toute activité, puis deux gardes | Prévol seulement; changement sous lease, un pool à la fois, avec réarmement sur nouvelle activité. |
 | Panne/maintenance | autre classe préservée | Ne jamais déplacer son label pour contourner la panne. |
