@@ -21,6 +21,19 @@ bool isValidEmail(String? value) {
 /// Vrai si [value] contient au moins 8 caractères (règle de `SignInScreen`).
 bool isValidPassword(String? value) => (value ?? '').length >= 8;
 
+/// Vrai si le mot de passe et sa confirmation sont **exactement** égaux, sur
+/// une confirmation non vide (comparaison octet-à-octet — pas de trim, pas de
+/// normalisation Unicode).
+///
+/// Sert à casser la composition « une seule saisie + pas de réinitialisation »
+/// qui rendrait une faute de frappe à l'inscription irréversible : sans
+/// confirmation, l'utilisateur ne peut ni deviner ce qu'il a tapé, ni réinitialiser.
+bool doPasswordsMatch(String? password, String? confirmation) {
+  final String a = password ?? '';
+  final String b = confirmation ?? '';
+  return b.isNotEmpty && a == b;
+}
+
 /// Fautes de frappe fréquentes sur le domaine, mappées vers leur correction.
 const Map<String, String> _commonDomainTypos = <String, String>{
   'gmial.com': 'gmail.com',

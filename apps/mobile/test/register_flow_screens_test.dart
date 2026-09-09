@@ -69,6 +69,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 60));
     await tester.enterText(find.byKey(const Key('register-password')), 'password123');
+    await tester.enterText(find.byKey(const Key('register-password-confirm')), 'password123');
     await tester.pump();
     await tester.tap(find.text('CONTINUER'));
     await tester.pump();
