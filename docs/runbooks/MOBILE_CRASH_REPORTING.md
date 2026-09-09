@@ -105,6 +105,17 @@ Configuration SDK :
 - screenshots, view hierarchy, pièces jointes automatiques, logs et métriques
   désactivés ;
 - session replay à `0`, tracing et profiling désactivés ;
+- release health (`enableAutoSessionTracking`) désactivé : une session est
+  émise à chaque passage avant/arrière-plan, **sans erreur ni crash**, alors que
+  la politique de confidentialité publiée cadre Sentry sur les seuls « erreurs
+  et crashs techniques ». Sur iOS elle est produite entièrement par Cocoa, donc
+  elle échappe à l'allowlist, au scrubber et au limiteur de débit, et elle porte
+  un `distinctId` persistant. C'était le seul flux Sentry qu'aucun code Certigo
+  ne filtrait. Vérifié dans sentry-cocoa 8.58.4 : la capture watchdog/OOM n'en
+  dépend pas (`SentryWatchdogTerminationTrackingIntegration.integrationOptions`
+  ne combine que `EnableWatchdogTerminationTracking` et `EnableCrashHandler`).
+  Contrepartie assumée : pas de taux de sessions sans plantage côté Sentry ;
+  les événements de crash, eux, restent envoyés ;
 - détection d'app hang désactivée hors périmètre ; terminaisons watchdog/OOM
   conservées comme crashs natifs pertinents ;
 - collecte des requêtes échouées et breadcrumbs réseau désactivée ;

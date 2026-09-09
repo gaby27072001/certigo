@@ -427,7 +427,13 @@ void configureSentryOptions(
     ..enableNativeCrashHandling = true
     ..enableWatchdogTerminationTracking = true
     ..enableAppHangTracking = false
-    ..enableAutoSessionTracking = true
+    // Release health emits a session envelope on every foreground/background
+    // transition, outside any crash. It is produced natively, so it bypasses
+    // the Dart allowlist, scrubber and rate limiter, and it carries a
+    // persistent distinctId. The published privacy policy scopes Sentry to
+    // technical errors and crashes only; keep this off so the code collects no
+    // more than the policy declares.
+    ..enableAutoSessionTracking = false
     ..enableAutoNativeBreadcrumbs = false
     ..enableAppLifecycleBreadcrumbs = false
     ..enableWindowMetricBreadcrumbs = false

@@ -301,6 +301,9 @@ void main() {
     expect(options.replay.onErrorSampleRate, 0);
     expect(options.enableNativeCrashHandling, isTrue);
     expect(options.enableWatchdogTerminationTracking, isTrue);
+    // Release health is the only Sentry stream no Certigo code can filter: it
+    // is emitted natively, without a crash, so it escapes beforeSend entirely.
+    expect(options.enableAutoSessionTracking, isFalse);
     expect(options.enableAppHangTracking, isFalse);
     expect(options.enableAutoPerformanceTracing, isFalse);
     expect(options.enableUserInteractionTracing, isFalse);
