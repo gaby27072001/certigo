@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:core/core.dart';
 import 'package:data/data.dart';
@@ -70,6 +71,15 @@ class QuizController extends ChangeNotifier {
   final Map<String, int> _latencyByItem = <String, int>{};
   String? _publicManifestId;
   RuntimeContentPin? _contentPin;
+
+  /// Server-dedup key for the current submission. Held for as long as the
+  /// outcome is unknown — a retry after a transport failure (where the
+  /// server may already have applied the attempt) has to carry the SAME key,
+  /// or a duplicate attempt is created and the readiness score is inflated.
+  /// Released once the server has ruled (success or permanent refusal) so a
+  /// genuinely new attempt from the same controller instance is not swallowed
+  /// as a replay of the previous one.
+  String? _pendingAttemptId;
 
   List<QuizEntry> get items => _items;
   bool get loading => _loading;
@@ -173,12 +183,14 @@ class QuizController extends ChangeNotifier {
     await Future<void>.value();
     if (_disposed) return null;
 
-    final String clientAttemptId = DateTime.now().microsecondsSinceEpoch.toString();
+    final String clientAttemptId = _pendingAttemptId ??= _newAttemptId();
     if (_isDemo) {
       final SubmitQuizResult result = _localDemoResult(
         clientAttemptId: clientAttemptId,
         total: _items.length,
       );
+      // Demo runs are locally resolved — a final outcome, so release the key.
+      _pendingAttemptId = null;
       _submitting = false;
       notifyListeners();
       return QuizSubmission(
@@ -215,6 +227,9 @@ class QuizController extends ChangeNotifier {
       );
     } on Object catch (error, stackTrace) {
       if (_disposed) return null;
+      // Transport failure at the client layer: the request may or may not
+      // have reached the server, so we keep _pendingAttemptId — the next tap
+      // has to resolve to the same server-side operation, if any.
       _submitting = false;
       notifyListeners();
       FlutterError.reportError(
@@ -241,6 +256,13 @@ class QuizController extends ChangeNotifier {
     );
     final bool pendingSync = failure != null && classifyFailure(failure) == SyncDispatch.retryable;
     final bool submissionFailed = failure != null && !pendingSync;
+    // Retryable failures (network/5xx/429/auth) leave the server outcome
+    // unknown — hold the key so the retry dedupes. A success or a permanent
+    // refusal is a final server ruling, so the key is released and a
+    // deliberate next attempt gets a fresh one.
+    if (!pendingSync) {
+      _pendingAttemptId = null;
+    }
     final SubmitQuizResult result =
         submission.valueOrNull ?? _pendingResult(clientAttemptId: clientAttemptId);
 
@@ -279,6 +301,12 @@ class QuizController extends ChangeNotifier {
       ),
       weakConcepts: const <String>[],
     );
+  }
+
+  static String _newAttemptId() {
+    final int micros = DateTime.now().microsecondsSinceEpoch;
+    final int rand = Random().nextInt(0x7fffffff);
+    return '${micros.toRadixString(16)}-${rand.toRadixString(16)}';
   }
 
   SubmitQuizResult _pendingResult({required String clientAttemptId}) {

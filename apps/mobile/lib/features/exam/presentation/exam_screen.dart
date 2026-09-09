@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
@@ -83,6 +85,14 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
   String? _error;
   MockExamResult? _result;
 
+  /// Server-dedup key for the current submission. Held for as long as the
+  /// outcome is unknown so a retry after a transport failure — where the
+  /// server may already have counted the exam — resolves to the same
+  /// operation instead of doubling the attempt (which would then twice
+  /// feed the readiness score). Released once the server has ruled
+  /// (success or permanent refusal).
+  String? _pendingAttemptId;
+
   @override
   void initState() {
     super.initState();
@@ -145,7 +155,7 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
     ];
 
     final SubmitMockExamRequest request = SubmitMockExamRequest(
-      clientAttemptId: DateTime.now().microsecondsSinceEpoch.toString(),
+      clientAttemptId: _pendingAttemptId ??= _newAttemptId(),
       trackId: trackId,
       examId: exam.examId,
       startedAt: _startedAt,
@@ -160,12 +170,25 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
       success: (MockExamResult value) => setState(() {
         _submitting = false;
         _result = value;
+        // Final outcome — release the key so a fresh attempt gets a fresh one.
+        _pendingAttemptId = null;
       }),
       failure: (Failure failure) => setState(() {
         _submitting = false;
         _error = failure.message;
+        // Retryable failures leave the server outcome unknown, so we HOLD
+        // the key; a permanent failure is a server ruling, so we release it.
+        if (classifyFailure(failure) != SyncDispatch.retryable) {
+          _pendingAttemptId = null;
+        }
       }),
     );
+  }
+
+  static String _newAttemptId() {
+    final int micros = DateTime.now().microsecondsSinceEpoch;
+    final int rand = Random().nextInt(0x7fffffff);
+    return '${micros.toRadixString(16)}-${rand.toRadixString(16)}';
   }
 
   @override
