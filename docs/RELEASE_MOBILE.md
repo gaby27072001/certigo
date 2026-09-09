@@ -530,8 +530,18 @@ gh secret set ASC_KEY_P8_BASE64               < authkey.b64
    - Pour un dry run (IPA sans upload) : choisir **`ios-release-dry`**.
    - Pour la validation destructive du crash reporting : choisir
      **`ios-crash-smoke`** (TestFlight interne uniquement).
-   - Hors Alpha seulement : pour distribuer aux testeurs externes, modifier
-     `beta_groups` dans `codemagic.yaml` avant de lancer.
+   - Hors Alpha seulement : pour distribuer aux testeurs **externes**, ajouter
+     un bloc `external_groups:` (et non `beta_groups:`) sous
+     `publishing.app_store_connect` dans `codemagic.yaml`, puis lancer une
+     build de la même façon. Cette distribution requiert au préalable la
+     **revue bêta Apple** — cf. §4.5.
+     `beta_groups:` a été retiré de `codemagic.yaml` (PR #432) : cette clé
+     désigne des groupes **internes**, qui reçoivent automatiquement chaque
+     build via `submit_to_testflight: true`. L'API App Store Connect refuse
+     toute assignation explicite d'un groupe interne
+     (`Cannot add internal group to a build`), et l'échec survenait **après**
+     un upload TestFlight réussi — transformant une publication réussie en
+     build rouge, incitant à relancer une opération déjà aboutie.
 3. Ou pousser un **tag git `v*`** (ex: `git tag -a v1.2.3 -m "Release v1.2.3" && git push --tags`) ;
    cela déclenche automatiquement `ios-release`.
 4. Le workflow : `analyze`/`test` → signature automatique via App Store Connect
