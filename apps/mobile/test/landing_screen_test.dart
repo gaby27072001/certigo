@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:certigo/features/auth/application/auth_controller.dart';
+import 'package:certigo/features/auth/application/auth_state.dart' show AuthState, Unauthenticated;
 import 'package:certigo/features/auth/presentation/landing_screen.dart';
 import 'package:certigo/features/auth/presentation/widgets/auth_provider_button.dart';
 import 'package:prism_ui/prism_ui.dart';
@@ -101,4 +102,84 @@ void main() {
 
     expect(find.text('Continuer avec Microsoft'), findsOneWidget);
   });
+
+  testWidgets(
+      "affiche le message quand l'écran est monté APRÈS l'échec "
+      "(cas réel iOS : /landing → /splash → /landing renaissante)", (WidgetTester tester) async {
+    // Sur iOS en production, la séquence mesurée est :
+    //   1. tap Microsoft/Google/Apple → `state = AuthLoading` (synchrone).
+    //   2. `authControllerProvider` change → `authRefresh.value++`
+    //      (router.dart:150-151) → `refreshListenable` de `GoRouter` notifie.
+    //   3. `resolveAuthRedirect` (auth_redirect.dart:82-89) éjecte
+    //      `AuthLoading` sur `/landing` vers `/splash`, sur le navigateur
+    //      RACINE — celui qui porte la bottom sheet (`useRootNavigator: true`
+    //      dans get_started_sheet.dart:20).
+    //   4. La sheet ET l'instance courante de `LandingScreen` sont
+    //      démontées ; leur `ref.listen` disparaît avec elles.
+    //   5. Le gateway échoue → `state = Unauthenticated(message)`.
+    //   6. Le routeur remonte une NOUVELLE instance de `LandingScreen`, qui
+    //      n'a rien observé — son `ref.listen` a été enregistré APRÈS
+    //      l'émission.
+    //
+    // Le seul mécanisme fiable pour porter le message dans ce cas est le
+    // REPLI sur `state.message` calculé dans `build`. Ce test simule le
+    // point 6 : landing est instanciée alors que l'état est DÉJÀ
+    // `Unauthenticated(message)`, sans passer par une transition observable.
+    // C'est le chemin réel — pas une hypothèse. Cf. session d'enquête
+    // « investigate-ios-login-loopback » et le message n°436.
+    //
+    // Sciemment SANS test compagnon qui monte la sheet et lance signIn : un
+    // tel test devrait rejouer la vraie logique de redirection (GoRouter +
+    // `resolveAuthRedirect` + navigation racine) pour que le mécanisme
+    // observé soit celui qui panne en production. Sinon il verrouille un
+    // système qui n'existe pas, exactement le motif « test-mémorial » qui a
+    // mordu ce dépôt aujourd'hui.
+    const String errorMessage = 'Message pré-existant — mesure du remontage après échec';
+
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          // Force l'état initial du contrôleur à Unauthenticated(message)
+          // SANS passer par la transition AuthLoading → Unauthenticated —
+          // cela simule exactement le cas où LandingScreen est montée APRÈS
+          // que l'état soit déjà à Unauthenticated(message).
+          authControllerProvider.overrideWith(
+            () => _StaticUnauthController(const Unauthenticated(errorMessage)),
+          ),
+          authGatewayProvider.overrideWithValue(FakeAuthGateway()),
+          credentialsGatewayProvider.overrideWithValue(FakeCredentialsGateway()),
+          sessionStoreProvider.overrideWithValue(FakeSessionStore()),
+          authConfiguredProvider.overrideWithValue(true),
+          authRequiredProvider.overrideWithValue(true),
+        ],
+        child: MaterialApp(theme: PrismTheme.light(), home: const LandingScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // Le message DOIT être visible dès le premier frame utile — sans
+    // qu'aucune transition d'état n'ait été observée par le `ref.listen`.
+    expect(find.byKey(const Key('landing-auth-error')), findsOneWidget);
+    expect(find.textContaining(errorMessage), findsOneWidget);
+  });
+}
+
+/// Contrôleur d'auth factice qui retourne un état **fixé** au montage, sans
+/// exécuter la restauration réelle. Sert exclusivement à simuler le cas où
+/// `LandingScreen` est instanciée APRÈS que l'état soit déjà `Unauthenticated`
+/// — c'est-à-dire APRÈS que la transition observée par un `ref.listen` ait eu
+/// lieu. Il n'appelle jamais `super.build`, donc les gateways ne sont pas
+/// initialisées : les tests ne doivent PAS déclencher `signIn`.
+class _StaticUnauthController extends AuthController {
+  _StaticUnauthController(this._initial);
+
+  final AuthState _initial;
+
+  @override
+  AuthState build() => _initial;
 }

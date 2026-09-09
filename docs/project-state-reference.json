@@ -1,6 +1,6 @@
 {
-  "commit": "76cd0b8e82894415472daec9eee1e08fd46c336c",
+  "commit": "8f136c15f1704a1a040f844b2ae13b7f46afc4a9",
   "date": "2026-09-09",
-  "observableSha256": "sha256:d1b505aad9f98cfcbf50dab614fd9098a9da8bdc3ce5bd343601a74335766197",
+  "observableSha256": "sha256:4a30bb0faa02e349c28b8442ea4415cbea739cf5c69c91ca82df4bd6751c73d8",
   "semantics": "Captured source commit/date plus SHA-256 of stable-sorted observable UTF-8 path names and Git-canonical file bytes after declared text/eol normalization, framed by unsigned 64-bit big-endian path/content lengths. The generated document and this excluded reference are committed separately, avoiding self-reference while remaining valid after an equivalent squash or root commit."
 }

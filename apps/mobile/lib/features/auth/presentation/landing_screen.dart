@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import '../application/auth_controller.dart';
+import '../application/auth_state.dart';
 import 'widgets/get_started_sheet.dart';
 
 // ---------------------------------------------------------------------------
@@ -51,20 +54,34 @@ const LinearGradient _kBrandGradient = LinearGradient(
 /// disques glass glossy, léger flottement (Liquid-Glass). L'entrée (fade+scale
 /// du centre puis apparition staggerée des items) respecte « réduire les
 /// animations ».
-class LandingScreen extends StatefulWidget {
+class LandingScreen extends ConsumerStatefulWidget {
   const LandingScreen({super.key});
 
   @override
-  State<LandingScreen> createState() => _LandingScreenState();
+  ConsumerState<LandingScreen> createState() => _LandingScreenState();
 }
 
-class _LandingScreenState extends State<LandingScreen> with SingleTickerProviderStateMixin {
+class _LandingScreenState extends ConsumerState<LandingScreen> with SingleTickerProviderStateMixin {
   late final AnimationController _reveal = AnimationController(
     vsync: this,
     duration: PrismMotion.celebrate,
   );
 
   bool _started = false;
+
+  /// Dernier message d'échec d'authentification, capturé à la transition vers
+  /// [Unauthenticated] et affiché de façon **persistante** au-dessus du CTA
+  /// « Commencer ». Sans cela, toute panne de connexion déclenchée depuis la
+  /// **bottom sheet** « Commencer » serait totalement silencieuse : la sheet
+  /// est démontée par le garde d'auth (`AuthLoading → /splash`) avant que
+  /// l'état `Unauthenticated(message)` ne soit publié, et son listener local
+  /// disparaît avec elle — le message écrit par le contrôleur n'a AUCUN
+  /// destinataire (bug rapporté sur TestFlight 1.1.0). Le repli sur
+  /// `state.message` (voir `build`) couvre le second temps : le routeur remonte
+  /// une **nouvelle** instance de landing après `Unauthenticated → /landing`,
+  /// dont le `_authError` local est vide et dont le `ref.listen` a manqué
+  /// l'émission ; c'est le même repli documenté par `sign_in_screen.dart`.
+  String? _authError;
 
   @override
   void dispose() {
@@ -196,6 +213,22 @@ class _LandingScreenState extends State<LandingScreen> with SingleTickerProvider
     final TextTheme text = Theme.of(context).textTheme;
     final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
+    // Capture du message d'échec du dernier flux d'authentification. Voir la
+    // documentation de [_authError] pour la raison exacte : la sheet « Commencer »
+    // meurt avec l'écran quand le garde d'auth pousse `/splash`, donc l'unique
+    // destinataire viable du message est **cette landing** — qui est le
+    // premier écran où l'utilisateur retombe après l'échec.
+    ref.listen<AuthState>(authControllerProvider, (AuthState? prev, AuthState next) {
+      if (next is! Unauthenticated) return;
+      final String? message = next.message;
+      if (message == null || message.isEmpty) return;
+      setState(() => _authError = message);
+    });
+    final AuthState authState = ref.watch(authControllerProvider);
+    final String? stateMessage = authState is Unauthenticated ? authState.message : null;
+    final String? shownError =
+        _authError ?? (stateMessage != null && stateMessage.isNotEmpty ? stateMessage : null);
+
     // Entrée : joue une fois. En reduced-motion, on saute directement à la fin.
     if (!_started) {
       _started = true;
@@ -283,6 +316,13 @@ class _LandingScreenState extends State<LandingScreen> with SingleTickerProvider
                             ),
                           ),
                           const SizedBox(height: PrismSpacing.lg),
+                          if (shownError != null) ...<Widget>[
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 420),
+                              child: _LandingErrorCard(message: shownError),
+                            ),
+                            const SizedBox(height: PrismSpacing.md),
+                          ],
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 420),
                             child: _CommencerButton(onPressed: () => showGetStartedSheet(context)),
@@ -479,6 +519,64 @@ class _HeroAnchor extends StatelessWidget {
 }
 
 /// Étoile à 4 branches remplie du dégradé de marque (alternative d'ancre).
+/// Carte d'erreur d'authentification affichée sur la landing quand une
+/// tentative de connexion depuis la sheet « Commencer » a échoué. Cohérente
+/// avec la carte `auth-error` de `sign_in_screen.dart` (même palette, même
+/// mention de copie/capture pour le diagnostic), mais **distincte** :
+///
+/// - clé `landing-auth-error` (le test widget de landing la localise sans
+///   collision avec la carte de l'écran e-mail, qui a la clé `auth-error`) ;
+/// - locale à ce fichier pour garder le fix isolé — la déduplication éventuelle
+///   avec `sign_in_screen.dart` appartient à un correctif suivant.
+class _LandingErrorCard extends StatelessWidget {
+  const _LandingErrorCard({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    final TextTheme text = Theme.of(context).textTheme;
+    return Container(
+      key: const Key('landing-auth-error'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(PrismSpacing.md),
+      decoration: BoxDecoration(
+        color: p.error.withOpacity(0.12),
+        borderRadius: const BorderRadius.all(Radius.circular(14)),
+        border: Border.all(color: p.error.withOpacity(0.55)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(Icons.error_outline, color: p.error, size: 20),
+              const SizedBox(width: PrismSpacing.xs),
+              Expanded(
+                child: Text(
+                  'Échec de la connexion',
+                  style: text.titleSmall?.copyWith(color: p.error, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: PrismSpacing.xs),
+          SelectableText(
+            message,
+            style: text.bodySmall?.copyWith(color: p.textPrimary, height: 1.35),
+          ),
+          const SizedBox(height: PrismSpacing.xs),
+          Text(
+            'Copie ou capture ce message pour le diagnostic.',
+            style: text.bodySmall?.copyWith(color: p.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StarPainter extends CustomPainter {
   const _StarPainter();
 
