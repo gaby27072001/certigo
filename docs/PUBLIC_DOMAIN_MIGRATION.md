@@ -466,15 +466,17 @@ grâce au court-circuit `dev` du contrat : mesuré sur le run `34146273853`, où
 `Validate public-domain deployment gate` est `completed/success` alors qu'aucune des trois
 variables n'est posée.
 
-**Conséquence de séquencement pour `staging` et `prod`.** Le job appelle le contrat avec la
-fonctionnalité `infrastructure`, qui fait partie des fonctionnalités exigeant Apple. Poser
-`PUBLIC_WEB_ORIGIN` et `PUBLIC_DOMAIN_VERIFIED` sans `APPLE_CIAM_DOMAIN_RECONFIGURED=true` ne
-débloque donc rien : la gate refusera. **La reconfiguration Apple/Entra n'est pas une étape
-ultérieure, c'est un prérequis du tout premier déploiement `staging`.**
+**Conséquence de séquencement pour `staging` et `prod`.** ~~Le job appelle le contrat avec la
+fonctionnalité `infrastructure`, qui fait partie des fonctionnalités exigeant Apple.~~
+**Corrigé le 2026-09-09** — voir « La garde refusait le déploiement, pas l'activation ». Le job
+appelle toujours le contrat avec `infrastructure`, mais l'exigence Apple n'y est active que si le
+déploiement active réellement une URL app-facing (`accountDeletionEnabled`). La reconfiguration
+Apple/Entra n'est donc plus un prérequis du premier déploiement `staging` ; elle redevient un
+prérequis dès que la suppression de compte est activée.
 
 **Condition d'invalidation** : cette section cesse d'être vraie si `resolve-release` cesse
-d'exiger `validate-public-domain`, ou si `infrastructure` sort de l'ensemble des fonctionnalités
-exigeant Apple dans `public-domain-contract.mjs`.
+d'exiger `validate-public-domain`, ou si l'exigence Apple pour `infrastructure` cesse d'être
+conditionnée à `accountDeletionEnabled` dans `public-domain-contract.mjs`.
 
 ## L'origine sera absente du code : c'est voulu, pas un oubli
 
@@ -574,6 +576,11 @@ mais c'est une inférence de motif, pas une lecture.
 
 ### Périmètre : ne pas généraliser cette correction à `cd-backend.yml`
 
+> **Révisé le 2026-09-09.** La prémisse de cette section était fausse, et sa conclusion a été
+> corrigée. Elle est conservée telle quelle parce que son raisonnement — une garde ne vaut que là
+> où son objet existe — reste juste, et parce qu'elle montre comment une borne prudente peut se
+> tromper d'objet. Lire « La garde refusait le déploiement, pas l'activation » avant de s'en servir.
+
 `cd-backend.yml` appelle le contrat avec `infrastructure`, et **ce n'est pas la même anomalie**.
 Un déploiement d'infrastructure ne produit pas de binaire : il produit `accountDeletionUrl` et
 `appleAppSiteAssociationUrl`. La garde y a son objet. Voir « `validate-public-domain` est une gate
@@ -583,6 +590,14 @@ bloquante, pas une simple validation de forme ».
 stricte, on l'a alignée » voudra appliquer le même geste aux quatre sites d'appel. Sur
 `cd-backend.yml`, ce serait un affaiblissement réel. La correction ne vaut que là où un **binaire**
 est produit.
+
+**Ce que la mesure du 2026-09-09 a corrigé.** « Il produit `accountDeletionUrl` et
+`appleAppSiteAssociationUrl` » est vrai au pied de la lettre et faux dans ce qu'il conclut : ce
+sont des **sorties**, vides tant que l'activation n'est pas prête, et **aucune ressource ne les
+consomme**. Le fichier `apple-app-site-association` est publié par `tools/build_public_pages.mjs`,
+sous la fonctionnalité `legal-pages`, qui **n'exige pas** Apple. L'exigence était posée sur le côté
+qui ne publie rien, et absente du côté qui publie. La borne visait le bon principe et le mauvais
+fichier.
 
 ### Les deux lignes de normalisation sont dupliquées délibérément
 
@@ -657,3 +672,66 @@ Actions, **fermerait la dernière porte** — et le scellé qui l'impose ne peut
 CIAM contient un domaine Certigo — contrôle : réénumérer les inscriptions d'application du
 locataire ; si `account-deletion-url` sort de `featuresRequiringApple` dans
 `public-domain-contract.mjs` ; ou si `codemagic.yaml` cesse d'être à la racine du dépôt.
+
+## La garde refusait le déploiement, pas l'activation
+
+**Mesuré le 2026-09-09.** La garde ajoutée le 2026-08-20 (commit `2a7f49d7`) rendait **tout**
+déploiement durci impossible, correctifs de sécurité compris. Le dernier déploiement de production
+réussi date du 2026-08-16, quatre jours avant. Personne n'a heurté la porte parce que le
+déploiement continu ne cible que `dev`, où le contrat court-circuite.
+
+**Le défaut, à deux endroits symétriques.** `main()` de `public-domain-contract.mjs` ne passe
+jamais `activationRequested`, qui vaut donc `true` par défaut : la branche `if (!requested)`, seule
+sortie sans levée, était inatteignable depuis la ligne de commande. `infra/main.bicep` portait la
+même forme avec `publicDomainActivationRequested = hardened`, alors que l'état « non activé » était
+déjà écrit et utilisé juste en dessous (`effectivePublicWebOrigin = ready ? publicWebOrigin : ''`).
+Il n'y avait rien à construire : un état existant avait été rendu inaccessible.
+
+**La contradiction visible dans le fichier.** `main.bicep:66-67` documente « Empty keeps every
+public-domain feature disabled ». Le code faisait l'inverse : origine vide → `fail()` → aucun
+déploiement.
+
+**Ce qui a changé.** L'activation est désormais **demandée par la présence d'une origine
+configurée**, jamais par défaut ; et l'exigence Apple pour `infrastructure` est active quand le
+déploiement active réellement une URL app-facing, ce que gouverne `accountDeletionEnabled`. Les
+trois `fail()` gardent leur contenu, mot pour mot. **La garde cesse de s'appliquer à ceux qui ne
+demandent rien** : c'est la différence entre « tu ne peux pas activer sans preuve » et « tu ne peux
+pas déployer ».
+
+**Ce que la garde refuse encore**, chaque ligne portée par un test qui rougit si on la désarme :
+
+| Cas | Résultat |
+| --- | --- |
+| origine renseignée, `publicDomainVerified` faux | refus |
+| origine renseignée, suppression de compte activée, Apple non reconfiguré | refus (rallumage) |
+| origine placeholder, non-HTTPS, IP, ou hôte légataire non contrôlé (`unownedLegacyDomain`) | refus |
+| booléen ambigu (`TRUE`, `1`, `yes`) | refus |
+| fonctionnalités app-facing (`account-deletion-url`, `apple-ciam`, `link-associations`, `redirects`) | Apple exigé **sans condition** |
+| origine vide avec un drapeau posé | refus — durcissement, commit séparé |
+| origine vide, aucun drapeau | déploiement possible, six sorties vides |
+
+**Le rallumage automatique est préservé et prouvé aux trois barrières** qui peuvent l'observer :
+le contrat, `write-secure-bicep-parameters.mjs` — la seule qui lise le fichier de paramètres
+compilé, donc la barrière autoritative — et le modèle Bicep. Activer la suppression de compte
+rallume l'exigence Apple sans dépendre de la mémoire de quelqu'un, ni de celle d'une seule barrière.
+
+**`APPLE_CIAM_DOMAIN_RECONFIGURED` reste à `false`, et c'est la vérité.** La section « Ce que le
+drapeau atteste aujourd'hui : rien » n'est pas périmée : elle explique pourquoi poser le drapeau à
+`true` aurait été un mensonge, et la correction évite d'avoir à le poser.
+
+**Ce qui n'a pas été exercé** : le `what-if` Bicep sur la production. Les six sorties sont prouvées
+par évaluation du modèle ARM compilé — `infra/tests/public-domain-contract.test.mjs` lit et évalue
+les expressions au lieu de les relire — mais l'exécution du chemin réel contre Azure est une preuve
+distincte, et c'est elle qui fait foi.
+
+**Le quatrième site d'appel ne dérive pas, il exige.** `tools/build_public_pages.mjs` écrit les
+pages du domaine ; pour lui, une origine absente est une erreur, pas un déploiement qui laisse la
+fonctionnalité désactivée. `activationRequested` est donc un **tri-état** : laissé indéfini,
+l'activation se dérive de l'origine configurée — ce que veut tout appelant de déploiement ; `true`
+la rend obligatoire, pour l'appelant qui publie le domaine ; `false` est un renoncement explicite.
+Ce site a été trouvé par la CI, pas par la lecture : `tools/tests/` n'était pas dans la première
+passe de validation locale.
+
+**Condition d'invalidation** : cette section cesse d'être vraie si `publicDomainActivationRequested`
+cesse de dériver de `publicWebOrigin`, ou si l'exigence Apple pour `infrastructure` cesse d'être
+conditionnée à `accountDeletionEnabled`.

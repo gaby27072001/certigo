@@ -259,27 +259,31 @@ test('requires complete account deletion identity configuration outside dev', ()
   );
 });
 
-test('feature-off hardened deployment still requires the verified public domain', () => {
-  const inputFile = compiledParameters(false);
-  assert.throws(
-    () => write({
-      environment: 'prod',
-      alertEmail: 'alerts@example.invalid',
-      jwtSigningKey: 'new-test-secret',
-      jwtSigningKeyExpiresOn: expiration,
-      publicWebOrigin: '',
-      publicDomainVerified: '',
-      appleCiamDomainReconfigured: '',
-      inputFile,
-    }),
-    /PUBLIC_WEB_ORIGIN is required/,
-  );
+test('feature-off hardened deployment writes the domain disabled instead of refusing', () => {
+  // An empty origin is not a missing configuration: it is the absence of an activation
+  // request. The writer must persist the disabled state so the deployment can proceed,
+  // and `infra/main.bicep` then keeps every public-domain output empty.
+  const { outputFile: disabledFile } = write({
+    environment: 'prod',
+    alertEmail: 'alerts@example.invalid',
+    jwtSigningKey: 'new-test-secret',
+    jwtSigningKeyExpiresOn: expiration,
+    publicWebOrigin: '',
+    publicDomainVerified: '',
+    appleCiamDomainReconfigured: '',
+    inputFile: compiledParameters(false),
+  });
+  const disabled = JSON.parse(fs.readFileSync(disabledFile, 'utf8')).parameters;
+  assert.deepEqual(disabled.publicWebOrigin, { value: '' });
+  assert.deepEqual(disabled.publicDomainVerified, { value: false });
+  assert.deepEqual(disabled.appleCiamDomainReconfigured, { value: false });
+
   const { outputFile } = write({
     environment: 'prod',
     alertEmail: 'alerts@example.invalid',
     jwtSigningKey: 'new-test-secret',
     jwtSigningKeyExpiresOn: expiration,
-    inputFile,
+    inputFile: compiledParameters(false),
   });
   const parameters = JSON.parse(fs.readFileSync(outputFile, 'utf8')).parameters;
 
@@ -291,6 +295,29 @@ test('feature-off hardened deployment still requires the verified public domain'
   assert.deepEqual(parameters.publicWebOrigin, { value: 'https://github.com' });
   assert.deepEqual(parameters.publicDomainVerified, { value: true });
   assert.deepEqual(parameters.appleCiamDomainReconfigured, { value: true });
+});
+
+test('account deletion re-arms the Apple requirement in the written parameters', () => {
+  // This is the only barrier that reads the compiled parameter file, so it is the one
+  // where the re-arm is authoritative. Both directions are asserted so that neutralising
+  // the condition reddens this test on its own.
+  const required = {
+    environment: 'prod',
+    alertEmail: 'alerts@example.invalid',
+    jwtSigningKey: 'new-test-secret',
+    jwtSigningKeyExpiresOn: expiration,
+    ...accountDeletionIdentityConfiguration,
+    appleCiamDomainReconfigured: 'false',
+  };
+  const { outputFile } = write({ ...required, inputFile: compiledParameters(false) });
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(outputFile, 'utf8')).parameters.appleCiamDomainReconfigured,
+    { value: false },
+  );
+  assert.throws(
+    () => write({ ...required, inputFile: compiledParameters(true) }),
+    /APPLE_CIAM_DOMAIN_RECONFIGURED must be explicitly true/,
+  );
 });
 
 test('requires the verified public-domain contract before hardened activation', () => {

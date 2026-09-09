@@ -50,6 +50,9 @@ export async function buildPublicPages({
     publicWebOrigin,
     publicDomainVerified,
     appleCiamDomainReconfigured,
+    // This builder writes the domain's own pages, so activation is mandatory here: an
+    // unconfigured domain must stop the build instead of producing pages with no home.
+    activationRequested: true,
   });
   const privacy = await readFile(resolve(root, 'docs/legal/privacy-policy.md'), 'utf8');
   const deletion = await readFile(resolve(root, 'docs/legal/account-deletion.md'), 'utf8');

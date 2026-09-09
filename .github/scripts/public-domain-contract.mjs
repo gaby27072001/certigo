@@ -82,13 +82,19 @@ function canonicalHttpsOrigin(value) {
   return parsed.origin;
 }
 
+// Activation is requested by the presence of a configured origin, never by default.
+// `infra/main.bicep` documents the same contract on `publicWebOrigin`: an empty origin
+// keeps every public-domain feature disabled. Deriving the request instead of assuming
+// it keeps the "nothing asked for" state reachable, so the guard refuses activation
+// without proof rather than refusing deployment.
 export function validatePublicDomainConfiguration({
   environment,
   feature,
   publicWebOrigin,
   publicDomainVerified,
   appleCiamDomainReconfigured,
-  activationRequested = true,
+  accountDeletionEnabled,
+  activationRequested,
 }) {
   if (!['dev', 'staging', 'prod'].includes(environment)) {
     throw new Error('Public-domain environment must be dev, staging or prod.');
@@ -105,14 +111,35 @@ export function validatePublicDomainConfiguration({
     appleCiamDomainReconfigured,
     'APPLE_CIAM_DOMAIN_RECONFIGURED',
   );
+  const accountDeletionActivated = explicitBoolean(
+    accountDeletionEnabled,
+    'ACCOUNT_DELETION_ENABLED',
+  );
   const configuredOrigin = typeof publicWebOrigin === 'string' ? publicWebOrigin : '';
+  // `activationRequested` is a tri-state. Left undefined, activation is derived from the
+  // configured origin, which is what every deployment caller wants. `true` makes it
+  // mandatory, for a caller that exists only to publish the domain: `tools/build_public_pages.mjs`
+  // writes the pages themselves, so an unconfigured domain there is an error, not a
+  // deployment that leaves the feature disabled. `false` is an explicit opt-out.
   const requested = environment !== 'dev' && (
-    activationRequested
-    || configuredOrigin.length > 0
-    || verified
-    || appleReconfigured
+    activationRequested === undefined
+      ? configuredOrigin.length > 0
+      : activationRequested
   );
   if (!requested) {
+    // Optional hardening, isolated so it can be dropped on its own: a proof without an
+    // origin is a half-configuration that attests a domain no deployment will use.
+    // Refusing it loudly is preferable to silently ignoring it.
+    if (
+      environment !== 'dev'
+      && activationRequested === undefined
+      && (verified || appleReconfigured)
+    ) {
+      throw new Error(
+        'PUBLIC_WEB_ORIGIN is required when PUBLIC_DOMAIN_VERIFIED or '
+        + 'APPLE_CIAM_DOMAIN_RECONFIGURED is set.',
+      );
+    }
     return {
       appleCiamDomainReconfigured: false,
       publicDomainVerified: false,
@@ -125,7 +152,15 @@ export function validatePublicDomainConfiguration({
   if (!verified) {
     throw new Error('PUBLIC_DOMAIN_VERIFIED must be explicitly true before activation.');
   }
-  if (featuresRequiringApple.has(feature) && !appleReconfigured) {
+  // An infrastructure deployment publishes no Apple artifact: its public-domain surface is
+  // six outputs that no resource consumes, and the apple-app-site-association file is
+  // published by `tools/build_public_pages.mjs` under `legal-pages`. The Apple proof
+  // therefore has an object here only once the deployment activates an app-facing URL,
+  // which is exactly what `accountDeletionEnabled` governs. Enabling account deletion
+  // re-arms the requirement without depending on anyone's memory.
+  const appleRequired = featuresRequiringApple.has(feature)
+    && (feature !== 'infrastructure' || accountDeletionActivated);
+  if (appleRequired && !appleReconfigured) {
     throw new Error(
       'APPLE_CIAM_DOMAIN_RECONFIGURED must be explicitly true for this feature.',
     );
@@ -147,6 +182,7 @@ function main() {
     publicWebOrigin: process.env.PUBLIC_WEB_ORIGIN,
     publicDomainVerified: process.env.PUBLIC_DOMAIN_VERIFIED,
     appleCiamDomainReconfigured: process.env.APPLE_CIAM_DOMAIN_RECONFIGURED,
+    accountDeletionEnabled: process.env.ACCOUNT_DELETION_ENABLED,
   });
   console.log(`Public-domain gate passed for ${feature}.`);
 }

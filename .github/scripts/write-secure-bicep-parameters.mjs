@@ -278,7 +278,10 @@ export function writeSecureParameters({
     publicWebOrigin,
     publicDomainVerified,
     appleCiamDomainReconfigured,
-    activationRequested: environment !== 'dev',
+    // Authoritative re-arm: this is the only barrier that reads the compiled parameter
+    // file, so it is where the Apple requirement can honestly observe whether the
+    // deployment actually activates an app-facing URL.
+    accountDeletionEnabled: compiled.parameters.accountDeletionEnabled?.value === true,
   });
   const contentConfiguration = validateContentConfiguration({
     blobEndpoint: contentBlobEndpoint,

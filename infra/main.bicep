@@ -347,14 +347,26 @@ var publicWebOriginIsPlaceholder = publicWebOriginAuthority == 'localhost' || pu
 var unownedLegacyDomain = join([ 'certigo', 'app' ], '.')
 var publicWebOriginIsUnownedLegacy = publicWebOriginAuthority == unownedLegacyDomain || endsWith(publicWebOriginAuthority, '.${unownedLegacyDomain}')
 var publicWebOriginIsCanonicalHttps = startsWith(publicWebOrigin, 'https://') && publicWebOrigin == trim(publicWebOrigin) && publicWebOrigin == publicWebOriginLower && length(publicWebOriginAuthority) <= 253 && contains(publicWebOriginAuthority, '.') && empty(publicWebOriginAuthorityRemainder) && publicWebOriginLabelsAreValid && !publicWebOriginIsPlaceholder && !publicWebOriginIsUnownedLegacy
-var publicDomainActivationRequested = hardened
+// An empty origin keeps every public-domain feature disabled, exactly as `publicWebOrigin`
+// is documented above. Deriving the request from the origin instead of from `hardened`
+// keeps the non-activated state below reachable: the guard refuses activation without
+// proof, it does not refuse deployment.
+// Optional hardening, isolated so it can be dropped on its own: a proof without an origin
+// is a half-configuration that attests a domain no deployment will use.
+var publicDomainProofWithoutOrigin = hardened && empty(publicWebOrigin) && (publicDomainVerified || appleCiamDomainReconfigured)
+var publicDomainActivationRequested = publicDomainProofWithoutOrigin
+  ? fail('publicWebOrigin is required when publicDomainVerified or appleCiamDomainReconfigured is set.')
+  : (hardened && !empty(publicWebOrigin))
+// The Apple proof gains an object only once the deployment activates an app-facing URL,
+// which `accountDeletionEnabled` governs. Enabling account deletion re-arms the
+// requirement on its own. Mirrors `.github/scripts/public-domain-contract.mjs`.
 var publicDomainActivationReady = !publicDomainActivationRequested
   ? false
   : (!publicWebOriginIsCanonicalHttps
     ? fail('publicWebOrigin must be a canonical HTTPS origin on a non-placeholder domain controlled by Certigo.')
     : (!publicDomainVerified
       ? fail('publicDomainVerified must be explicitly true before public-domain activation.')
-      : (!appleCiamDomainReconfigured
+      : ((accountDeletionEnabled && !appleCiamDomainReconfigured)
         ? fail('appleCiamDomainReconfigured must be explicitly true before app-facing public-domain activation.')
         : true)))
 var effectivePublicWebOrigin = publicDomainActivationReady ? publicWebOrigin : ''
