@@ -1,4 +1,4 @@
-name: promote-backend-staging-prod (legacy disabled)
+name: promote-backend-staging-prod
 
 on:
   repository_dispatch:
