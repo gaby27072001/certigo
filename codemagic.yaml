@@ -465,6 +465,8 @@ workflows:
       app_store_connect: AppStoreConnect
     environment:
       xcode: latest
+      groups:
+        - certigo_mobile_config   # CERTIFICATE_PRIVATE_KEY required by step_setup_signing.
       vars:
         BUNDLE_ID: com.certigo.mobileapp
     scripts:
