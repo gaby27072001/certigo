@@ -107,7 +107,7 @@ class _HomeContent extends StatelessWidget {
         _DailyShareEntryCard(
           goalMet: me.dailyGoalXp > 0 && me.dailyXpEarned >= me.dailyGoalXp,
           trackCode: path.exam,
-          onTap: () => context.go(Routes.dailyShare),
+          onTap: () => context.push(Routes.dailyShare),
         ),
         const SizedBox(height: 16),
 
@@ -474,7 +474,11 @@ class _ExploreCard extends StatelessWidget {
     final TextTheme t = Theme.of(context).textTheme;
     final PrismColorScheme p = context.prism;
     return GestureDetector(
-      onTap: () => context.go(item.route),
+      // Les explorations s'ouvrent au-dessus du shell : on empile pour que le
+      // geste iOS de retour par balayage ramène à Home. Exception : l'examen
+      // blanc reste en `go` — sa progression n'a pas de sauvegarde par étape,
+      // et un geste retour perdrait l'attempt en cours (à revoir séparément).
+      onTap: () => item.route == Routes.exam ? context.go(item.route) : context.push(item.route),
       child: PrismCard(
         borderRadius: PrismRadii.cardLg,
         padding: const EdgeInsets.symmetric(

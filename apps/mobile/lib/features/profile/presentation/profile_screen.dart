@@ -146,13 +146,13 @@ class _ProfileContent extends ConsumerWidget {
         PrismButton.secondary(
           label: 'Tous les succès',
           icon: Icons.chevron_right_rounded,
-          onPressed: () => context.go(Routes.achievements),
+          onPressed: () => context.push(Routes.achievements),
         ),
         const SizedBox(height: 12),
         PrismButton.secondary(
           label: 'Partager le score du jour',
           icon: Icons.share_rounded,
-          onPressed: () => context.go(Routes.dailyShare),
+          onPressed: () => context.push(Routes.dailyShare),
         ),
         const SizedBox(height: 24),
 

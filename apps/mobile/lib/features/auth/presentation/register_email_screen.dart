@@ -46,7 +46,7 @@ class _RegisterEmailScreenState extends ConsumerState<RegisterEmailScreen> {
 
   void _next() {
     ref.read(registerDraftProvider.notifier).setEmail(_email.text);
-    context.go('/register/password');
+    context.push('/register/password');
   }
 
   @override
@@ -60,7 +60,9 @@ class _RegisterEmailScreenState extends ConsumerState<RegisterEmailScreen> {
 
     return OnboardingScaffold(
       progress: 0.4,
-      onBack: () => context.go('/register/name'),
+      // Cohérent avec le geste iOS de retour par balayage : on dépile si la pile
+      // le permet, sinon on retombe sur la navigation logique (cas deep link).
+      onBack: () => context.canPop() ? context.pop() : context.go('/register/name'),
       primaryLabel: 'CONTINUER',
       onPrimary: _valid ? _next : null,
       child: Column(

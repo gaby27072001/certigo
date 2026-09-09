@@ -74,7 +74,11 @@ class _CertificationScreenState extends ConsumerState<CertificationScreen> {
 
     return OnboardingScaffold(
       progress: 1,
-      onBack: _saving ? null : () => context.go(OnboardingRoutes.welcome),
+      // Cohérent avec le geste iOS de retour par balayage : on dépile si la pile
+      // le permet, sinon on retombe sur la navigation logique.
+      onBack: _saving
+          ? null
+          : () => context.canPop() ? context.pop() : context.go(OnboardingRoutes.welcome),
       primaryLabel: 'COMMENCER CE PARCOURS',
       primaryLoading: _saving,
       onPrimary: selectedTrackIsPublished && !_saving ? () => _continue(target) : null,

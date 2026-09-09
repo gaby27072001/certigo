@@ -96,6 +96,9 @@ class _RegisterPasswordScreenState extends ConsumerState<RegisterPasswordScreen>
     ref.listen<AuthState>(authControllerProvider, (AuthState? prev, AuthState next) {
       if (!mounted || !_submitting) return;
       if (next is Authenticated) {
+        // Ecran terminal du sous-flux : on remplace la pile pour empecher un
+        // retour vers l'ecran de mot de passe (qui viderait les champs, cf.
+        // note dans la description de PR sur la persistance du brouillon).
         context.go('/register/profile-created');
       } else if (next is Unauthenticated) {
         setState(() => _submitting = false);
@@ -120,7 +123,11 @@ class _RegisterPasswordScreenState extends ConsumerState<RegisterPasswordScreen>
 
     return OnboardingScaffold(
       progress: 0.55,
-      onBack: _submitting ? null : () => context.go('/register/email'),
+      // Cohérent avec le geste iOS de retour par balayage : on dépile si la pile
+      // le permet, sinon on retombe sur la navigation logique (cas deep link).
+      onBack: _submitting
+          ? null
+          : () => context.canPop() ? context.pop() : context.go('/register/email'),
       primaryLabel: 'CONTINUER',
       primaryLoading: _submitting,
       onPrimary: _canSubmit ? _submit : null,

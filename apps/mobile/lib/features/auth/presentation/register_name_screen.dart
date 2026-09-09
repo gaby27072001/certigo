@@ -53,7 +53,7 @@ class _RegisterNameScreenState extends ConsumerState<RegisterNameScreen> {
     ref
         .read(registerDraftProvider.notifier)
         .setName(firstName: _firstName.text, lastName: _lastName.text);
-    context.go('/register/email');
+    context.push('/register/email');
   }
 
   void _signInSocial(AuthProvider provider) {

@@ -40,6 +40,7 @@ import '../features/onboarding/presentation/welcome_screen.dart';
 import 'app_shell.dart';
 import 'auth_redirect.dart';
 import 'providers.dart';
+import 'step_page.dart';
 
 /// Centralized, named route table. Using constants avoids stringly-typed
 /// navigation scattered across the codebase.
@@ -75,39 +76,30 @@ abstract class Routes {
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
-CustomTransitionPage<void> _stepPage({
+/// Page Prism pour une étape hors coquille.
+///
+/// Sur **iOS** on renvoie un [CupertinoPage] : il installe la transition
+/// horizontale native ET le détecteur de geste de retour par balayage depuis le
+/// bord gauche. Le paramètre [begin] est alors ignoré (la transition Cupertino
+/// est fixe).
+///
+/// Sur les **autres plateformes** on garde la transition Prism
+/// ([CustomTransitionPage] avec fade + slide) : le mandat produit veut préserver
+/// l'identité visuelle Prism sur Android, quitte à ne pas brancher le
+/// « predictive back gesture » (à revoir dans une PR séparée si souhaité).
+///
+/// Le [context.canPop()] côté appelant reste la condition d'activation du
+/// geste — c'est pourquoi les navigations d'entrée dans un sous-flux (register,
+/// onboarding, explorations) doivent utiliser `context.push(...)` plutôt que
+/// `.go(...)` pour empiler. Les écrans « en cours » (`/lesson`, `/quiz`,
+/// `/exam`) restent atteints par `.go(...)` : la pile est vidée, le geste
+/// devient naturellement inerte et rien n'est perdu silencieusement.
+Page<void> _stepPage({
   required GoRouterState state,
   required Widget child,
   Offset begin = const Offset(0.06, 0),
 }) {
-  return CustomTransitionPage<void>(
-    key: state.pageKey,
-    child: child,
-    transitionDuration: PrismMotion.base,
-    reverseTransitionDuration: PrismMotion.fast,
-    transitionsBuilder: (
-      BuildContext context,
-      Animation<double> animation,
-      Animation<double> secondaryAnimation,
-      Widget child,
-    ) {
-      final CurvedAnimation curved = CurvedAnimation(
-        parent: animation,
-        curve: PrismMotion.decelerate,
-        reverseCurve: PrismMotion.standard,
-      );
-      return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: begin,
-            end: Offset.zero,
-          ).animate(curved),
-          child: child,
-        ),
-      );
-    },
-  );
+  return stepPage(state: state, child: child, begin: begin);
 }
 
 /// The app router. Exposed as a provider so auth/session/onboarding guards can
