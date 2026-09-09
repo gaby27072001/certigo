@@ -307,8 +307,13 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
-        beta_groups:
-          - Internal Testers
+        # No beta_groups: TestFlight internal groups receive every build
+        # automatically, and the App Store Connect API rejects any explicit
+        # assignment with "Cannot add internal group to a build". Keeping the
+        # key here turned a successful TestFlight publish into a red build
+        # (false negative that invited re-runs and duplicated uploads on
+        # Apple's side). To distribute to an external group, add an
+        # `external_groups:` entry instead - never re-add `beta_groups:`.
       email:
         recipients:
           - gabriel.chambaud@gmail.com
@@ -443,8 +448,13 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
-        beta_groups:
-          - Internal Testers
+        # No beta_groups: TestFlight internal groups receive every build
+        # automatically, and the App Store Connect API rejects any explicit
+        # assignment with "Cannot add internal group to a build". Keeping the
+        # key here turned a successful TestFlight publish into a red build
+        # (false negative that invited re-runs and duplicated uploads on
+        # Apple's side). To distribute to an external group, add an
+        # `external_groups:` entry instead - never re-add `beta_groups:`.
       email:
         recipients:
           - gabriel.chambaud@gmail.com
