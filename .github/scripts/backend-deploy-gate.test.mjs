@@ -279,6 +279,144 @@ test('accepts only the byte-identical legacy exception and the exact strict obje
   );
 });
 
+test('accepts the hardened legacy variant byte-identically and rejects every mutation', () => {
+  // The hardened legacy variant carries an explicit `if:` on deploy-infra and
+  // deploy-backend that gates each deploy on `needs.<parent>.result == 'success'`.
+  // Without this, a promote-backend dispatch that skips build-release silently
+  // propagates that skip to both deploy jobs (measured on run 34383168567).
+  //
+  // The allow-list is byte-strict: this test rejects any other `if:` shape by
+  // rejecting any other byte content. Widening the allow-list requires updating
+  // hardenedLegacyWorkflowSize / hardenedLegacyWorkflowSha256 in the policy,
+  // which is visible in review and rejects every other candidate.
+  const hardenedBytes = fs.readFileSync(workflowPath);
+  assert.equal(hardenedBytes.length, 38066);
+  assert.equal(
+    createHash('sha256').update(hardenedBytes).digest('hex'),
+    '586addcce22fbbc86d660e601f5e331cd267c334edf4947bc490a5ba3b68a541',
+  );
+
+  // Candidate == trusted == hardened: accepted with no errors.
+  assert.deepEqual(
+    validateBackendDeployWorkflow(hardenedBytes, hardenedBytes),
+    [],
+  );
+
+  // Single-byte mutation on the hardened variant: rejected (sha mismatch pushes
+  // it into the strict-B validator which then rejects the reviewed-B check).
+  const mutatedHardened = Buffer.concat([hardenedBytes, Buffer.from('\n# tail\n', 'utf8')]);
+  assert.notDeepEqual(
+    validateBackendDeployWorkflow(mutatedHardened, mutatedHardened),
+    [],
+  );
+
+  // A candidate that looks hardened but whose trusted twin is the legacy
+  // variant is rejected: the hardened early-return requires candidate==trusted.
+  assert.notDeepEqual(
+    validateBackendDeployWorkflow(hardenedBytes, supersededWorkflow),
+    [],
+  );
+
+  // A hardened variant whose `if:` on deploy-infra is stripped (any other
+  // deploy-infra `if:` shape) yields a different sha and is byte-rejected.
+  const strippedIfDeployInfra = hardenedBytes
+    .toString('utf8')
+    .replace(
+      "    if: >-\n      ${{\n        always()\n"
+      + "        && needs.validate-target.result == 'success'\n"
+      + "        && needs.resolve-release.result == 'success'\n"
+      + '      }}\n',
+      '',
+    );
+  assert.notEqual(strippedIfDeployInfra, hardenedBytes.toString('utf8'));
+  assert.notDeepEqual(
+    validateBackendDeployWorkflow(strippedIfDeployInfra, strippedIfDeployInfra),
+    [],
+  );
+
+  // A hardened variant whose `if:` omits the `needs.resolve-release.result == 'success'`
+  // check would let a resolve-release failure through: not accepted (sha mismatch).
+  const weakenedGate = hardenedBytes
+    .toString('utf8')
+    .replace(
+      "        && needs.resolve-release.result == 'success'\n      }}",
+      '      }}',
+    );
+  assert.notEqual(weakenedGate, hardenedBytes.toString('utf8'));
+  assert.notDeepEqual(
+    validateBackendDeployWorkflow(weakenedGate, weakenedGate),
+    [],
+  );
+});
+
+test('the hardened variant gates every deploy on explicit success of every needed job', () => {
+  // Behavioral proof: the exact `if:` in the sealed hardened bytes must require
+  // `success` explicitly for every declared `needs`, and `always()` alone (with
+  // no explicit success check) must not appear on deploy-infra or deploy-backend.
+  const workflow = YAML.parse(baselineWorkflow);
+  const deployInfra = workflow.jobs['deploy-infra'];
+  const deployBackend = workflow.jobs['deploy-backend'];
+
+  const normalized = (s) => String(s ?? '').replace(/\s+/gu, ' ').trim();
+  const expectedInfra = normalized(`
+    \${{
+      always()
+      && needs.validate-target.result == 'success'
+      && needs.resolve-release.result == 'success'
+    }}
+  `);
+  const expectedBackend = normalized(`
+    \${{
+      always()
+      && needs.validate-target.result == 'success'
+      && needs.resolve-release.result == 'success'
+      && needs.deploy-infra.result == 'success'
+    }}
+  `);
+  assert.equal(normalized(deployInfra.if), expectedInfra);
+  assert.equal(normalized(deployBackend.if), expectedBackend);
+
+  // Every `needs` entry must be gated by an explicit `<name>.result == 'success'`.
+  for (const need of deployInfra.needs) {
+    assert.match(
+      normalized(deployInfra.if),
+      new RegExp(`needs\\.${need}\\.result == 'success'`, 'u'),
+      `deploy-infra must explicitly gate on needs.${need}.result == 'success'`,
+    );
+  }
+  for (const need of deployBackend.needs) {
+    assert.match(
+      normalized(deployBackend.if),
+      new RegExp(`needs\\.${need}\\.result == 'success'`, 'u'),
+      `deploy-backend must explicitly gate on needs.${need}.result == 'success'`,
+    );
+  }
+
+  // `always()` on its own without any success check is the shape that would
+  // let a failed gate through: reject it structurally as an anti-form.
+  const deployInfraIfLiteral = [
+    '    if: >-',
+    '      ${{',
+    '        always()',
+    "        && needs.validate-target.result == 'success'",
+    "        && needs.resolve-release.result == 'success'",
+    '      }}',
+  ].join('\n');
+  assert.ok(
+    baselineWorkflow.includes(deployInfraIfLiteral),
+    'baseline must contain the exact literal `if:` block on deploy-infra',
+  );
+  const mutated = baselineWorkflow.replace(
+    deployInfraIfLiteral,
+    '    if: ${{ always() }}',
+  );
+  assert.notEqual(mutated, baselineWorkflow);
+  assert.notDeepEqual(
+    validateBackendDeployWorkflow(mutated, mutated),
+    [],
+  );
+});
+
 test('embedded strict and supporting fixtures preserve committed LF bytes', () => {
   assert.equal(strictWorkflowFixture, strictWorkflow);
   assert.equal(strictWorkflowBytes.length, 62593);

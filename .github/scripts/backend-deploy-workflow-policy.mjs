@@ -14,6 +14,14 @@ const capacityDocumentPath = 'docs/deployment-runbook.md';
 const legacyWorkflowSize = 37710;
 const legacyWorkflowSha256 =
   '48738b01264e33f1f15d8b358e5a5feaad35a09808d8838ec96c8336821fab9b';
+// Legacy A hardened with explicit `if:` on deploy-infra and deploy-backend
+// so a promotion dispatch (repository_dispatch promote-backend) cannot silently
+// skip both deploy jobs when build-release is skipped. The exact bytes below
+// pin the only accepted hardened variant; any other content still triggers
+// the strict B checks. See `docs/adr/` if you plan to widen the allow-list.
+const hardenedLegacyWorkflowSize = 38066;
+const hardenedLegacyWorkflowSha256 =
+  '586addcce22fbbc86d660e601f5e331cd267c334edf4947bc490a5ba3b68a541';
 const strictWorkflowSize = 62593;
 const strictWorkflowSha256 =
   '1fac1d96d892080af55348b4253bd319a33cdbbec4ac1575e6dde28c4924e28d';
@@ -835,6 +843,13 @@ export function validateBackendDeployWorkflow(candidateInput, trustedInput, cont
   ) {
     return [];
   }
+  if (
+    candidateBytes.equals(trustedBytes)
+    && candidateBytes.length === hardenedLegacyWorkflowSize
+    && candidateDigest === hardenedLegacyWorkflowSha256
+  ) {
+    return [];
+  }
   const parsed = parseWorkflow(candidateText, 'cd-backend.yml');
   if (parsed.error) {
     return [parsed.error];
@@ -1387,8 +1402,11 @@ export function validateBackendDeployWorkspace(candidateRoot, trustedRoot) {
     const isLegacy = bytes.length === legacyWorkflowSize
       && sha256(bytes) === legacyWorkflowSha256
       && candidateBytes.equals(trustedBytes);
+    const isHardenedLegacy = bytes.length === hardenedLegacyWorkflowSize
+      && sha256(bytes) === hardenedLegacyWorkflowSha256
+      && candidateBytes.equals(trustedBytes);
     let controls;
-    if (!isLegacy) {
+    if (!isLegacy && !isHardenedLegacy) {
       errors.push(...validateRevisionLocalPrivilegedInputs(candidateRoot, trustedRoot));
       controls = new Map();
       for (const relativePath of supportingControls.keys()) {

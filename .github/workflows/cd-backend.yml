@@ -340,6 +340,12 @@ jobs:
   deploy-infra:
     name: Prepare infrastructure (${{ needs.validate-target.outputs.target }})
     needs: [validate-target, resolve-release]
+    if: >-
+      ${{
+        always()
+        && needs.validate-target.result == 'success'
+        && needs.resolve-release.result == 'success'
+      }}
     environment: ${{ needs.validate-target.outputs.target }}
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     permissions:
@@ -709,6 +715,13 @@ jobs:
     environment: ${{ needs.validate-target.outputs.target }}
     runs-on: [self-hosted, Linux, X64, certigo-trusted]
     needs: [validate-target, resolve-release, deploy-infra]
+    if: >-
+      ${{
+        always()
+        && needs.validate-target.result == 'success'
+        && needs.resolve-release.result == 'success'
+        && needs.deploy-infra.result == 'success'
+      }}
     permissions:
       id-token: write
       contents: read
