@@ -1074,6 +1074,43 @@ là où la soustraction de deux horodatages donne **56** — les deux valeurs ju
 sous « Un vert peut décrire une base qui n'existe plus ». Une note bien datée reste vraie **à sa
 date** ; la recycler sans la redater la transforme en mesure fausse.
 
+### L'exemple n'est pas la classe
+
+> Ajouté le **2026-09-09**, à ranger avec « Trois règles d'inférence, chacune payée deux fois » —
+> quatrième règle du même registre, portant sur la **réception d'un témoignage** plutôt que sur
+> une inférence tirée d'une mesure déjà faite. **Invalidée** le jour où tout signalement d'un
+> défaut se ferme par une question de portée avant qu'aucune hypothèse propre au cas cité ne
+> soit examinée.
+
+**Le motif.** Un utilisateur a signalé qu'un bouton d'authentification ne fonctionnait pas, en
+nommant **un** fournisseur. Une longue enquête a porté sur ce qui était **spécifique** à ce
+fournisseur — sa configuration, son enregistrement, ses portails, ses jetons. L'utilisateur a
+ensuite précisé spontanément que **tous** les boutons de la même famille échouaient de façon
+identique. **Cela éliminait d'un coup toute hypothèse propre à un fournisseur et désignait le
+code partagé**, où la cause a été trouvée aussitôt.
+
+> **Un utilisateur rapporte un cas, jamais une classe.** Prendre son exemple pour la portée du
+> défaut n'est pas son erreur — **c'est celle de qui l'écoute**, et elle coûte le temps passé à
+> chercher ce qui **distingue** l'exemple au lieu de ce qu'il **partage**.
+
+**Contre-mesure — à la réception, une phrase.** *Est-ce que ça le fait aussi avec …?* Posée tôt,
+elle délimite le défaut avant que l'enquête ne s'engage dans une direction. Elle coûte le temps
+de l'écrire ; l'hypothèse qu'elle évite coûte le temps d'une enquête entière. **La règle porte
+sur la question posée, pas sur la réponse attendue** : tant que la portée n'a pas été délimitée,
+l'enquête ne s'engage pas dans la direction spécifique au cas cité.
+
+**Corollaire — ce qui rend le constat opérationnel.** Cette observation ne pouvait être produite
+par **aucun** instrument de ce dépôt : il fallait quelqu'un pour appuyer sur les autres boutons.
+Quand la seule source d'une mesure est une personne, aucun contrôle en aval ne peut délimiter à
+sa place ce qu'elle rapporte. **Le coût de la question est alors négligeable devant le coût de
+l'hypothèse qu'elle évite** — et la question est le seul instrument qui ait le bon accès.
+
+**Le lien avec « Trois règles d'inférence, chacune payée deux fois ».** Comme les trois
+précédentes, cette règle attrape un raisonnement qui a tiré d'une donnée juste une conclusion qui
+ne la suivait pas : *le volume dit combien, il ne dit pas si* ; *un état décrit un passé* ; *une
+mémoire correctement datée n'est pas une mesure courante* ; **et : *l'exemple donné par un
+témoin décrit un cas, il ne décrit pas la classe*.**
+
 ### Un contrôle nécessaire n'est pas un contrôle suffisant
 
 > Ajouté le **2026-09-09**.
@@ -1251,6 +1288,48 @@ mécanisme.* Ensemble, elles ne laissent que deux formes acceptables à un nombr
 décide et il porte son mécanisme, soit il ne décide pas et il n'est pas écrit. **Tout nombre
 présent sans mécanisme adossé est présumé être une préférence — et les préférences se
 simplifient.**
+
+### Une contrainte sans périmètre se comporte comme une règle universelle
+
+> Ajouté le **2026-09-09**, à lire en miroir direct de la sous-section précédente : les deux
+> règles décrivent le même geste, appliqué à deux objets. **Invalidée** le jour où toute
+> contrainte énoncée dans le dépôt porte le domaine où elle s'applique, et où toute contrainte
+> sans domaine explicite est refusée à la lecture plutôt qu'appliquée hors périmètre.
+
+**Le motif.** Une contrainte permanente a été énoncée sur ce qu'il était impossible d'obtenir
+d'une autorité administrative. **La contrainte était vraie — et formulée sans nommer le domaine
+où elle s'applique.** Elle a donc été appliquée **partout**, y compris à un domaine dont la
+mesure a montré, des heures plus tard, que l'énonciateur y détenait lui-même cette autorité.
+**Plusieurs options ont été écartées sur une limite qui n'existait pas dans ce périmètre.**
+
+**Le mécanisme n'est pas un transport hors périmètre — c'est une absence de périmètre.** Personne
+n'a besoin de déformer une règle incomplète : **il suffit de l'appliquer là où elle se tait.**
+C'est pourquoi elle survit à des heures de vérification — elle n'est pas fausse, **il lui manque
+sa borne, et une règle sans borne se comporte comme une règle universelle.**
+
+> **Son coût est d'une nature particulière : une fausse limite ne produit pas une erreur, elle
+> produit un renoncement.** Un chiffre faux finit par produire un symptôme qu'on remarque ;
+> **une option jamais explorée n'en produit aucun**, et personne ne la conteste puisqu'elle a
+> l'air prudente.
+
+**Contre-mesure — à l'écriture, gratuite. Et ce n'est *pas* « vérifier le périmètre avant
+d'appliquer », qui arrive trop tard et que personne ne fait sur une règle qui paraît évidente.**
+La règle utilisable est en amont :
+
+> **Écrire le périmètre dans la contrainte, au moment où on la note.** Une contrainte énoncée par
+> une personne porte un domaine implicite — quel compte, quel système, quel dépôt, quelle
+> période. **Ce domaine disparaît au premier report si on ne l'écrit pas avec elle.**
+
+**La paire avec « Un nombre qui décide s'écrit avec le mécanisme qui le contraint ».** Les deux
+règles se lisent d'un même trait, comme le même geste porté sur deux objets :
+
+> **Un nombre qui décide s'écrit avec le mécanisme qui le contraint. Une règle qui interdit
+> s'écrit avec le domaine où elle interdit.**
+
+Un nombre nu et une interdiction sans borne sont la même faute sur deux objets. Dans les deux
+cas, ce qui manque n'est pas la mesure ou l'énoncé — c'est **ce qui les rend utilisables sans
+l'auteur**. Un nombre sans mécanisme redevient une préférence sous la main d'un lecteur qui ne
+le savait pas ; une contrainte sans domaine redevient une règle universelle sous la même main.
 
 ### La parade de dernier recours : deux mesures qui se contredisent
 
