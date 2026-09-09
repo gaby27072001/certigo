@@ -59,7 +59,18 @@ public sealed record UserCredentialRecord(
     DateTimeOffset? ProvisioningLeaseExpiresAt = null,
     // Random, opaque local subject used by LinkedIdentity. It is generated once
     // in shadow mode and is never derived from the credential email.
-    string? IdentitySubject = null)
+    string? IdentitySubject = null,
+    // SHA-256 (Base64) hash of the outstanding password-reset token. Same
+    // storage discipline as VerificationTokenHash: never the raw value, so a
+    // database reader cannot harvest a live reset link. Cleared on a successful
+    // reset (single-use).
+    string? PasswordResetTokenHash = null,
+    DateTimeOffset? PasswordResetTokenExpiresAt = null,
+    // Watermark used to invalidate sessions issued before the password changed.
+    // Compared in RefreshAsync against the refresh token's auth_time claim: a
+    // refresh whose authentication predates this watermark is rejected. Null on
+    // pre-feature credentials (nothing to compare against).
+    DateTimeOffset? PasswordChangedAt = null)
 {
     /// Discriminator persisted alongside the document; combined with the id
     /// prefix it keeps credential docs unambiguously separate from profiles.
@@ -176,10 +187,12 @@ public interface IEmailSender
 /// Configuration for the email-verification link and token lifetime, supplied
 /// from app settings (see Program.cs). <see cref="VerifyBaseUrl"/> is the public
 /// URL of the GET verify endpoint (e.g. https://host/api/auth/verify-email); the
-/// service appends <c>?code=…</c>.
-public sealed record AuthEmailOptions(string VerifyBaseUrl, TimeSpan TokenLifetime)
+/// service appends <c>?code=…</c>. <see cref="ResetBaseUrl"/> is the public URL
+/// of the password-reset landing page (or the POST reset endpoint's mirror on
+/// the client); empty is tolerated (the link is still logged/emailed).
+public sealed record AuthEmailOptions(string VerifyBaseUrl, TimeSpan TokenLifetime, string ResetBaseUrl = "")
 {
-    public static AuthEmailOptions Default { get; } = new(string.Empty, TimeSpan.FromHours(24));
+    public static AuthEmailOptions Default { get; } = new(string.Empty, TimeSpan.FromHours(24), string.Empty);
 }
 
 /// Confirms an email address from the code carried by the verification link, and
@@ -196,3 +209,25 @@ public interface IEmailVerificationService
 }
 
 public sealed record EmailVerificationResult(bool Success, string Message);
+
+/// Confirms an outstanding password-reset code and applies the new password, and
+/// initiates a reset by emailing a single-use link. Kept separate from
+/// <see cref="IAuthService"/> so the token-issuing surface stays small and the
+/// existing auth fakes are unaffected — the same shape used by
+/// <see cref="IEmailVerificationService"/>.
+public interface IPasswordResetService
+{
+    /// Best-effort initiation. Always completes without revealing whether the
+    /// address exists or is verified (no account enumeration). A provisioning
+    /// reservation is treated as "no such account" so the recovery of an
+    /// interrupted sign-up is never side-tracked into a reset.
+    Task RequestAsync(string email, CancellationToken cancellationToken = default);
+
+    /// Applies a new password when the code is valid, unexpired, and matches an
+    /// active credential; single-use (the token hash is cleared on success).
+    /// Rejections carry a generic message so the endpoint never distinguishes an
+    /// unknown code from an expired one or one belonging to another account.
+    Task<PasswordResetResult> ResetAsync(string code, string newPassword, CancellationToken cancellationToken = default);
+}
+
+public sealed record PasswordResetResult(bool Success, string Message);

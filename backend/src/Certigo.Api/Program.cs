@@ -298,7 +298,8 @@ var host = new HostBuilder()
         // verify endpoint; empty is tolerated (the link is still logged/emailed).
         var verifyBaseUrl = configuration["EMAIL_VERIFY_BASE_URL"] ?? string.Empty;
         var verifyTtlHours = int.TryParse(configuration["EMAIL_VERIFY_TOKEN_TTL_HOURS"], out var ttl) && ttl > 0 ? ttl : 24;
-        services.AddSingleton(new AuthEmailOptions(verifyBaseUrl, TimeSpan.FromHours(verifyTtlHours)));
+        var resetBaseUrl = configuration["EMAIL_RESET_BASE_URL"] ?? string.Empty;
+        services.AddSingleton(new AuthEmailOptions(verifyBaseUrl, TimeSpan.FromHours(verifyTtlHours), resetBaseUrl));
 
         var acsConnectionString = configuration["ACS_EMAIL_CONNECTION_STRING"];
         var acsEndpoint = configuration["ACS_EMAIL_ENDPOINT"];
@@ -327,6 +328,7 @@ var host = new HostBuilder()
         services.AddScoped<AuthService>();
         services.AddScoped<IAuthService>(sp => sp.GetRequiredService<AuthService>());
         services.AddScoped<IEmailVerificationService>(sp => sp.GetRequiredService<AuthService>());
+        services.AddScoped<IPasswordResetService>(sp => sp.GetRequiredService<AuthService>());
 
         services.AddScoped<FunctionUserContext>();
         services.AddScoped<IUserContext>(sp => sp.GetRequiredService<FunctionUserContext>());

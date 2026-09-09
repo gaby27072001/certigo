@@ -91,7 +91,7 @@ public sealed class AuthService(
     IEmailSender emailSender,
     AuthEmailOptions emailOptions,
     IPersonLinkedIdentityShadowRuntime? personIdentity = null)
-    : IAuthService, IEmailVerificationService
+    : IAuthService, IEmailVerificationService, IPasswordResetService
 {
     /// Failed logins allowed before an account is temporarily locked.
     private const int MaxFailedAttempts = 5;
@@ -347,6 +347,18 @@ public sealed class AuthService(
             throw new AuthFailedException("Session expirée, veuillez vous reconnecter.");
         }
 
+        // Session invalidation on password change: any refresh whose
+        // authentication instant predates the last password change is refused,
+        // so a reset also revokes every session that was live at the time. The
+        // JWT is stateless, so an outstanding access token remains valid for
+        // its (short) remaining lifetime; the refresh path is the recurring
+        // choke point that enforces the invariant.
+        if (credential.PasswordChangedAt is { } changedAt
+            && principal.AuthenticatedAt < changedAt)
+        {
+            throw new AuthFailedException("Session expirée, veuillez vous reconnecter.");
+        }
+
         var profile = await users.GetAsync(principal.UserId, cancellationToken)
             ?? await users.UpsertAsync(ProfileDefaults.New(principal.UserId, principal.DisplayName), cancellationToken);
         await TryMirrorLocalIdentityAsync(
@@ -457,6 +469,141 @@ public sealed class AuthService(
             cancellationToken);
 
         await TrySendVerificationEmailAsync(normalized, credential.DisplayName, rawToken, cancellationToken);
+    }
+
+    // --- Password reset -----------------------------------------------------
+
+    public async Task RequestAsync(string email, CancellationToken cancellationToken = default)
+    {
+        var normalized = AuthRules.NormalizeEmail(email);
+        // Exact lookup first, then canonical fallback: mirrors LoginAsync so a
+        // learner who typed a different dot/"+tag" variant of their own address
+        // still reaches their credential.
+        var credential = await credentials.FindByEmailAsync(normalized, cancellationToken)
+            ?? await credentials.FindByCanonicalEmailAsync(AuthRules.CanonicalizeEmail(normalized), cancellationToken);
+
+        // No account, or a provisioning reservation: do nothing, but never reveal
+        // which — the endpoint always answers the same generic message. Same
+        // discipline as ResendAsync (anti-enumeration).
+        if (credential is null || credential.IsProvisioning)
+        {
+            return;
+        }
+
+        var (rawToken, tokenHash) = NewVerificationToken();
+        try
+        {
+            await credentials.UpdateAsync(
+                credential with
+                {
+                    PasswordResetTokenHash = tokenHash,
+                    PasswordResetTokenExpiresAt = clock.UtcNow + emailOptions.TokenLifetime,
+                },
+                cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            // A concurrent update already staged a reset (or a lockout tick); the
+            // learner will see the earlier link and can request another. Never
+            // surface this to the caller so the response stays uniform.
+            return;
+        }
+
+        await TrySendPasswordResetEmailAsync(credential.Email, credential.DisplayName, rawToken, cancellationToken);
+    }
+
+    public async Task<PasswordResetResult> ResetAsync(string code, string newPassword, CancellationToken cancellationToken = default)
+    {
+        // Same generic message on every failure path — never distinguish an
+        // unknown code from an expired one or one belonging to another account.
+        const string InvalidLinkMessage = "Lien de réinitialisation expiré ou invalide. Demandez un nouvel e-mail.";
+
+        if (!TryDecodeVerificationCode(code, out var email, out var rawToken))
+        {
+            return new PasswordResetResult(false, InvalidLinkMessage);
+        }
+
+        if (!AuthRules.IsValidPassword(newPassword))
+        {
+            return new PasswordResetResult(
+                false,
+                $"Le mot de passe doit contenir au moins {AuthRules.MinPasswordLength} caractères.");
+        }
+
+        // The link's email is the credential's identity, so this is a point
+        // read — no cross-partition scan is required to bind a token to an
+        // account.
+        var credential = await credentials.FindByEmailAsync(email, cancellationToken);
+        if (credential is null || credential.IsProvisioning)
+        {
+            return new PasswordResetResult(false, InvalidLinkMessage);
+        }
+
+        if (credential.PasswordResetTokenHash is null
+            || credential.PasswordResetTokenExpiresAt is not { } expiresAt
+            || expiresAt <= clock.UtcNow
+            || !FixedTimeTokenEquals(rawToken, credential.PasswordResetTokenHash))
+        {
+            return new PasswordResetResult(false, InvalidLinkMessage);
+        }
+
+        var newHash = passwordHasher.Hash(newPassword);
+        try
+        {
+            await credentials.UpdateAsync(
+                credential with
+                {
+                    PasswordHash = newHash,
+                    // Single-use: clear the outstanding token so a second submit
+                    // of the same link is refused as invalid.
+                    PasswordResetTokenHash = null,
+                    PasswordResetTokenExpiresAt = null,
+                    // Clear any accumulated lockout — the reset itself is proof
+                    // enough of ownership, and the learner should be able to sign
+                    // in immediately once the new password is set.
+                    FailedAttempts = 0,
+                    LockoutUntil = null,
+                    // Watermark used by RefreshAsync to revoke every session that
+                    // was live before the reset.
+                    PasswordChangedAt = clock.UtcNow,
+                },
+                cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            // A concurrent write consumed or replaced the same token; treat the
+            // race as an invalid link so we never double-apply a reset.
+            return new PasswordResetResult(false, InvalidLinkMessage);
+        }
+
+        return new PasswordResetResult(true, "Mot de passe mis à jour. Vous pouvez vous reconnecter.");
+    }
+
+    private async Task TrySendPasswordResetEmailAsync(string email, string displayName, string rawToken, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var link = BuildPasswordResetLink(email, rawToken);
+            var message = PasswordResetEmail.Build(email, displayName, link);
+            await emailSender.SendAsync(message, cancellationToken);
+        }
+        catch
+        {
+            // Non-blocking by design (same shape as verification): a mail-provider
+            // hiccup must not fail the request. The learner can retry from the
+            // sign-in screen. The endpoint's response stays uniform either way,
+            // preserving anti-enumeration.
+        }
+    }
+
+    private string BuildPasswordResetLink(string email, string rawToken)
+    {
+        var code = EncodeVerificationCode(email, rawToken);
+        var baseUrl = string.IsNullOrWhiteSpace(emailOptions.ResetBaseUrl)
+            ? emailOptions.VerifyBaseUrl
+            : emailOptions.ResetBaseUrl;
+        var separator = baseUrl.Contains('?') ? '&' : '?';
+        return $"{baseUrl}{separator}code={Uri.EscapeDataString(code)}";
     }
 
     private async Task TrySendVerificationEmailAsync(string email, string displayName, string rawToken, CancellationToken cancellationToken)
@@ -582,6 +729,38 @@ internal static class VerificationEmail
             $"<p><a href=\"{safeLink}\" style=\"background:#4f46e5;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block\">Confirmer mon e-mail</a></p>" +
             $"<p style=\"color:#6b7280;font-size:13px\">Ou copiez ce lien&nbsp;: {safeLink}</p>" +
             "<p style=\"color:#6b7280;font-size:13px\">Ce lien expire dans 24&nbsp;heures. Si vous n'êtes pas à l'origine de cette inscription, ignorez cet e-mail.</p>" +
+            "<p>— L'équipe Certigo</p></div>";
+
+        return new EmailMessage(email, string.IsNullOrWhiteSpace(displayName) ? null : displayName, subject, html, text);
+    }
+}
+
+/// Pure builder for the password-reset email (French). Host- and provider-agnostic
+/// so the copy is unit-testable and identical across every <see cref="IEmailSender"/>.
+internal static class PasswordResetEmail
+{
+    public static EmailMessage Build(string email, string displayName, string link)
+    {
+        var greetingName = string.IsNullOrWhiteSpace(displayName) ? string.Empty : $" {displayName.Trim()}";
+        const string subject = "Réinitialisez votre mot de passe — Certigo";
+
+        var text =
+            $"Bonjour{greetingName},\n\n" +
+            "Vous avez demandé la réinitialisation de votre mot de passe Certigo. Ouvrez le lien suivant pour choisir un nouveau mot de passe :\n" +
+            link + "\n\n" +
+            "Ce lien expire dans 24 heures et ne peut être utilisé qu'une seule fois. " +
+            "Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail — votre mot de passe actuel reste valide.\n\n" +
+            "— L'équipe Certigo";
+
+        var safeName = System.Net.WebUtility.HtmlEncode(greetingName);
+        var safeLink = System.Net.WebUtility.HtmlEncode(link);
+        var html =
+            "<div style=\"font-family:Segoe UI,Arial,sans-serif;font-size:15px;color:#1b1b1f\">" +
+            $"<p>Bonjour{safeName},</p>" +
+            "<p>Vous avez demandé la réinitialisation de votre mot de passe Certigo. Choisissez un nouveau mot de passe&nbsp;:</p>" +
+            $"<p><a href=\"{safeLink}\" style=\"background:#4f46e5;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block\">Réinitialiser mon mot de passe</a></p>" +
+            $"<p style=\"color:#6b7280;font-size:13px\">Ou copiez ce lien&nbsp;: {safeLink}</p>" +
+            "<p style=\"color:#6b7280;font-size:13px\">Ce lien expire dans 24&nbsp;heures et ne peut être utilisé qu'une seule fois. Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail — votre mot de passe actuel reste valide.</p>" +
             "<p>— L'équipe Certigo</p></div>";
 
         return new EmailMessage(email, string.IsNullOrWhiteSpace(displayName) ? null : displayName, subject, html, text);

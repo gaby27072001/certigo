@@ -10,7 +10,10 @@ namespace Certigo.Api.Functions;
 /// Anonymous email/password endpoints. These are the only write endpoints that
 /// bypass the bearer-token middleware (see <c>JwtAuthMiddleware.AnonymousFunctions</c>);
 /// they hand back locally-signed tokens the rest of the API then requires.
-public sealed class AuthFunctions(IAuthService auth, IEmailVerificationService? verification = null)
+public sealed class AuthFunctions(
+    IAuthService auth,
+    IEmailVerificationService? verification = null,
+    IPasswordResetService? passwordReset = null)
 {
     [Function("Register")]
     public async Task<HttpResponseData> Register(
@@ -94,6 +97,43 @@ public sealed class AuthFunctions(IAuthService auth, IEmailVerificationService? 
         return await request.JsonAsync(
             new { message = "Si un compte existe pour cette adresse, un e-mail de vérification vient d'être envoyé." },
             cancellationToken: context.CancellationToken);
+    }
+
+    [Function("RequestPasswordReset")]
+    public async Task<HttpResponseData> RequestPasswordReset(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "auth/request-password-reset")] HttpRequestData request,
+        FunctionContext context)
+    {
+        var service = passwordReset ?? throw new InvalidOperationException("Password reset service is not configured.");
+        var body = await request.ReadJsonAsync<PasswordResetRequestDto>(context.CancellationToken);
+        await service.RequestAsync(body.Email ?? string.Empty, context.CancellationToken);
+
+        // Always the same generic answer, byte-for-byte, whether an account
+        // exists or not (anti-enumeration). Mirrors ResendVerification.
+        return await request.JsonAsync(
+            new { message = "Si un compte existe pour cette adresse, un e-mail de réinitialisation vient d'être envoyé." },
+            cancellationToken: context.CancellationToken);
+    }
+
+    [Function("ResetPassword")]
+    public async Task<HttpResponseData> ResetPassword(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "auth/reset-password")] HttpRequestData request,
+        FunctionContext context)
+    {
+        var service = passwordReset ?? throw new InvalidOperationException("Password reset service is not configured.");
+        var body = await request.ReadJsonAsync<PasswordResetConfirmRequest>(context.CancellationToken);
+        var result = await service.ResetAsync(
+            body.Code ?? string.Empty,
+            body.NewPassword ?? string.Empty,
+            context.CancellationToken);
+
+        // Called from the mobile client (not a browser click-through), so answer
+        // in JSON. Failures are 400 with the generic message; the client shows
+        // "Lien expiré ou invalide" without distinguishing failure modes.
+        return await request.JsonAsync(
+            new { success = result.Success, message = result.Message },
+            result.Success ? System.Net.HttpStatusCode.OK : System.Net.HttpStatusCode.BadRequest,
+            context.CancellationToken);
     }
 
     private static string? ReadQueryParam(HttpRequestData request, string key)

@@ -217,7 +217,13 @@ internal sealed class FakeTokenIssuer : ITokenIssuer
         string displayName,
         string email,
         DateTimeOffset? authenticatedAt = null)
-        => new($"access:{userId}", $"refresh:{userId}|{displayName}|{email}", DateTimeOffset.UtcNow.AddDays(1));
+    {
+        var authTime = authenticatedAt ?? DateTimeOffset.UtcNow;
+        return new IssuedTokens(
+            $"access:{userId}",
+            $"refresh:{userId}|{displayName}|{email}|{authTime.ToUnixTimeSeconds()}",
+            DateTimeOffset.UtcNow.AddDays(1));
+    }
 
     public RefreshTokenPrincipal? ValidateRefreshToken(string refreshToken)
     {
@@ -227,11 +233,17 @@ internal sealed class FakeTokenIssuer : ITokenIssuer
         }
 
         var parts = refreshToken["refresh:".Length..].Split('|');
+        // Older/hand-crafted fake tokens without an embedded auth_time land in
+        // the wall-clock branch; new ones carry the exact instant Issue() saw.
+        var authenticatedAt = parts.Length >= 4
+            && long.TryParse(parts[3], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var unix)
+                ? DateTimeOffset.FromUnixTimeSeconds(unix)
+                : DateTimeOffset.UtcNow;
         return new RefreshTokenPrincipal(
             parts[0],
             parts.ElementAtOrDefault(1) ?? string.Empty,
             parts.ElementAtOrDefault(2) ?? string.Empty,
-            DateTimeOffset.UtcNow);
+            authenticatedAt);
     }
 }
 
@@ -363,7 +375,7 @@ public sealed class AuthRulesTests
 public sealed class AuthServiceTests
 {
     private static readonly AuthEmailOptions TestEmailOptions =
-        new("https://verify.test/api/auth/verify-email", TimeSpan.FromHours(24));
+        new("https://verify.test/api/auth/verify-email", TimeSpan.FromHours(24), "https://reset.test/reset");
 
     private static (AuthService Service, InMemoryUserRepository Users, InMemoryUserCredentialRepository Credentials) Build()
     {
@@ -957,4 +969,287 @@ public sealed class AuthServiceTests
 
         login.Profile.DisplayName.Should().Be("Gab");
     }
+
+    // --- Password reset -----------------------------------------------------
+    //
+    // The reset flow is the decal of resend-verification + verify-email that
+    // AuthService already ships. These tests are DISCRIMINATIVE — every one of
+    // them refuses to pass unless the corresponding refusal is enforced. Grep
+    // any of "REFUSE" comments below to see what is being tested against.
+
+    private static (AuthService Service, InMemoryUserCredentialRepository Credentials, CapturingEmailSender Email, FakeClock Clock) BuildWithEmailAndClock()
+    {
+        var credentials = new InMemoryUserCredentialRepository();
+        var email = new CapturingEmailSender();
+        var clock = new FakeClock(new DateTimeOffset(2026, 9, 9, 12, 0, 0, TimeSpan.Zero));
+        var service = new AuthService(
+            credentials,
+            new FakePasswordHasher(),
+            new FakeTokenIssuer(),
+            new InMemoryUserRepository(),
+            clock,
+            email,
+            TestEmailOptions);
+        return (service, credentials, email, clock);
+    }
+
+    private static string ExtractPasswordResetCode(CapturingEmailSender email)
+    {
+        // Find the reset email (last message whose body carries a reset link).
+        var body = email.Sent.Last(m => m.PlainTextBody.Contains("réinitialisation")).PlainTextBody;
+        var marker = body.IndexOf("code=", StringComparison.Ordinal);
+        marker.Should().BeGreaterThan(-1);
+        var raw = body[(marker + "code=".Length)..];
+        var end = raw.IndexOfAny(new[] { ' ', '\r', '\n', '\t' });
+        if (end >= 0)
+        {
+            raw = raw[..end];
+        }
+
+        return Uri.UnescapeDataString(raw);
+    }
+
+    [Fact]
+    public async Task Reset_request_replies_identically_for_a_known_and_an_unknown_email()
+    {
+        // The public message is emitted by the HTTP endpoint (RequestPasswordReset),
+        // but the SERVICE contract behind it must not throw and must not touch the
+        // repository asymmetrically. Both calls therefore run to completion; only
+        // the presence/absence of an emailed link discriminates them.
+        var (service, _, email, _) = BuildWithEmailAndClock();
+        await service.RegisterAsync(new RegisterRequest("known@example.com", "password123", null));
+        email.Sent.Clear();
+
+        await service.RequestAsync("known@example.com");
+        var sentAfterKnown = email.Sent.Count;
+        email.Sent.Clear();
+
+        await service.RequestAsync("nobody@example.com");
+        var sentAfterUnknown = email.Sent.Count;
+
+        // Anti-enumeration: the caller-visible surface (no exception, uniform
+        // response wrapper on the HTTP side) is identical. Only the underlying
+        // email delivery differs — which the enumerator cannot observe.
+        sentAfterKnown.Should().Be(1);
+        sentAfterUnknown.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Reset_with_a_valid_code_changes_the_password_and_lets_the_owner_sign_in()
+    {
+        var (service, _, email, _) = BuildWithEmailAndClock();
+        await service.RegisterAsync(new RegisterRequest("owner@example.com", "old-password", null));
+        email.Sent.Clear();
+
+        await service.RequestAsync("owner@example.com");
+        var code = ExtractPasswordResetCode(email);
+
+        var result = await service.ResetAsync(code, "brand-new-secret");
+
+        result.Success.Should().BeTrue();
+
+        // Old password: REFUSE
+        var withOld = async () => await service.LoginAsync(new LoginRequest("owner@example.com", "old-password"));
+        await withOld.Should().ThrowAsync<AuthFailedException>();
+
+        // New password: ACCEPT
+        var withNew = await service.LoginAsync(new LoginRequest("owner@example.com", "brand-new-secret"));
+        withNew.AccessToken.Should().StartWith("access:");
+    }
+
+    [Fact]
+    public async Task Reset_with_an_expired_code_is_refused()
+    {
+        var (service, _, email, clock) = BuildWithEmailAndClock();
+        await service.RegisterAsync(new RegisterRequest("expire@example.com", "old-password", null));
+        email.Sent.Clear();
+
+        await service.RequestAsync("expire@example.com");
+        var code = ExtractPasswordResetCode(email);
+
+        // Advance past the 24 h token lifetime.
+        clock.UtcNow = clock.UtcNow.AddHours(25);
+
+        var result = await service.ResetAsync(code, "brand-new-secret");
+
+        // REFUSE — and the password is unchanged.
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("expiré").And.Contain("invalide");
+
+        var stillOld = await service.LoginAsync(new LoginRequest("expire@example.com", "old-password"));
+        stillOld.AccessToken.Should().StartWith("access:");
+    }
+
+    [Fact]
+    public async Task Reset_of_an_already_consumed_code_is_refused_on_the_second_use()
+    {
+        var (service, _, email, _) = BuildWithEmailAndClock();
+        await service.RegisterAsync(new RegisterRequest("once@example.com", "old-password", null));
+        email.Sent.Clear();
+
+        await service.RequestAsync("once@example.com");
+        var code = ExtractPasswordResetCode(email);
+
+        var first = await service.ResetAsync(code, "first-secret");
+        first.Success.Should().BeTrue();
+
+        // REFUSE — single-use, the token was cleared on success.
+        var second = await service.ResetAsync(code, "second-secret");
+        second.Success.Should().BeFalse();
+
+        // And "second-secret" must NOT be accepted at login (the second reset
+        // was refused, so the password remains "first-secret").
+        var withFirst = await service.LoginAsync(new LoginRequest("once@example.com", "first-secret"));
+        withFirst.AccessToken.Should().StartWith("access:");
+
+        var withSecond = async () => await service.LoginAsync(new LoginRequest("once@example.com", "second-secret"));
+        await withSecond.Should().ThrowAsync<AuthFailedException>();
+    }
+
+    [Fact]
+    public async Task Reset_code_issued_for_another_account_is_refused_after_email_swap()
+    {
+        // A tampered link forgery: the attacker takes their own valid reset
+        // token and re-encodes it against a victim's email. The token hash on
+        // disk is bound to the attacker's credential, so the point read for the
+        // victim's credential finds NO matching hash. REFUSE.
+        var (service, credentials, email, _) = BuildWithEmailAndClock();
+        await service.RegisterAsync(new RegisterRequest("victim@example.com", "victim-password", null));
+        await service.RegisterAsync(new RegisterRequest("attacker@example.com", "attacker-password", null));
+        email.Sent.Clear();
+
+        await service.RequestAsync("attacker@example.com");
+        var attackerCode = ExtractPasswordResetCode(email);
+        // Decode + rebind to victim's address.
+        var decoded = System.Text.Encoding.UTF8.GetString(
+            Base64UrlDecodeForTest(attackerCode));
+        var separator = decoded.IndexOf('|');
+        var rawToken = decoded[(separator + 1)..];
+        var forged = Base64UrlEncodeForTest(
+            System.Text.Encoding.UTF8.GetBytes($"victim@example.com|{rawToken}"));
+
+        var result = await service.ResetAsync(forged, "attacker-picked-secret");
+
+        result.Success.Should().BeFalse();
+
+        // Victim can still sign in with the original password.
+        var login = await service.LoginAsync(new LoginRequest("victim@example.com", "victim-password"));
+        login.AccessToken.Should().StartWith("access:");
+
+        // And no reset watermark was written on the victim's credential.
+        var victimCred = await credentials.FindByEmailAsync("victim@example.com");
+        victimCred!.PasswordChangedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Reset_of_a_tampered_code_is_refused()
+    {
+        var (service, _, _, _) = BuildWithEmailAndClock();
+        await service.RegisterAsync(new RegisterRequest("tamper@example.com", "password123", null));
+
+        var result = await service.ResetAsync("not-a-real-code", "brand-new-secret");
+
+        // REFUSE, and — critical — the generic wording matches the expired /
+        // unknown / wrong-account cases so a caller cannot distinguish failures.
+        result.Success.Should().BeFalse();
+        result.Message.Should().Be("Lien de réinitialisation expiré ou invalide. Demandez un nouvel e-mail.");
+    }
+
+    [Fact]
+    public async Task Reset_rejects_a_too_short_new_password()
+    {
+        var (service, _, email, _) = BuildWithEmailAndClock();
+        await service.RegisterAsync(new RegisterRequest("short@example.com", "old-password", null));
+        email.Sent.Clear();
+
+        await service.RequestAsync("short@example.com");
+        var code = ExtractPasswordResetCode(email);
+
+        var result = await service.ResetAsync(code, "abc");
+
+        // REFUSE — and the token is still consumable so a legit follow-up with a
+        // strong password succeeds on the same link.
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain(AuthRules.MinPasswordLength.ToString());
+
+        var retry = await service.ResetAsync(code, "strong-enough-1");
+        retry.Success.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Reset_invalidates_a_refresh_token_issued_before_the_reset()
+    {
+        // Session invalidation: an outstanding refresh whose auth_time is
+        // strictly before PasswordChangedAt must be REFUSED. The refresh path
+        // is the recurring choke point that enforces the invariant.
+        var (service, _, email, clock) = BuildWithEmailAndClock();
+        var registered = await service.RegisterAsync(new RegisterRequest("session@example.com", "old-password", null));
+        var oldRefresh = registered.RefreshToken;
+
+        // Advance time so PasswordChangedAt sits STRICTLY after the token's
+        // AuthenticatedAt (FakeTokenIssuer stamps AuthenticatedAt = UtcNow at
+        // issue time; without this advance the two are equal and the < check
+        // does not fire).
+        clock.UtcNow = clock.UtcNow.AddMinutes(5);
+
+        email.Sent.Clear();
+        await service.RequestAsync("session@example.com");
+        var code = ExtractPasswordResetCode(email);
+        var reset = await service.ResetAsync(code, "new-password");
+        reset.Success.Should().BeTrue();
+
+        // REFUSE — the refresh token was minted before the reset.
+        var stale = async () => await service.RefreshAsync(new RefreshTokenRequest(oldRefresh));
+        await stale.Should().ThrowAsync<AuthFailedException>().WithMessage("*Session expirée*");
+
+        // And a NEW login mints a refresh whose auth_time sits after the reset.
+        var reissued = await service.LoginAsync(new LoginRequest("session@example.com", "new-password"));
+        var refreshedAgain = await service.RefreshAsync(new RefreshTokenRequest(reissued.RefreshToken));
+        refreshedAgain.AccessToken.Should().StartWith("access:");
+    }
+
+    [Fact]
+    public async Task Reset_clears_an_existing_lockout_so_the_owner_can_sign_in()
+    {
+        var (service, credentials, email, _) = BuildWithEmailAndClock();
+        await service.RegisterAsync(new RegisterRequest("locked@example.com", "old-password", null));
+
+        // Drive the account to a locked state via five failed logins.
+        for (var i = 0; i < 5; i++)
+        {
+            var bad = async () => await service.LoginAsync(new LoginRequest("locked@example.com", "wrong-password"));
+            await bad.Should().ThrowAsync<AuthFailedException>();
+        }
+
+        // Even the correct password is now refused while the lockout window holds.
+        var lockedBefore = await credentials.FindByEmailAsync("locked@example.com");
+        lockedBefore!.LockoutUntil.Should().NotBeNull();
+
+        email.Sent.Clear();
+        await service.RequestAsync("locked@example.com");
+        var code = ExtractPasswordResetCode(email);
+        var reset = await service.ResetAsync(code, "brand-new-secret");
+        reset.Success.Should().BeTrue();
+
+        // ACCEPT — reset clears the lockout, so the learner is not left stranded.
+        var login = await service.LoginAsync(new LoginRequest("locked@example.com", "brand-new-secret"));
+        login.AccessToken.Should().StartWith("access:");
+    }
+
+    // --- Base64Url helpers duplicated locally so the tests never depend on
+    // AuthService's private encoding surface. Kept minimal.
+    private static byte[] Base64UrlDecodeForTest(string value)
+    {
+        var padded = value.Replace('-', '+').Replace('_', '/');
+        padded = (padded.Length % 4) switch
+        {
+            2 => padded + "==",
+            3 => padded + "=",
+            _ => padded,
+        };
+        return Convert.FromBase64String(padded);
+    }
+
+    private static string Base64UrlEncodeForTest(byte[] bytes)
+        => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }

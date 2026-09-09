@@ -22,7 +22,9 @@ public sealed class JwtAuthMiddleware(
         "/api/auth/login",
         "/api/auth/refresh",
         "/api/auth/verify-email",
-        "/api/auth/resend-verification"
+        "/api/auth/resend-verification",
+        "/api/auth/request-password-reset",
+        "/api/auth/reset-password"
     };
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)

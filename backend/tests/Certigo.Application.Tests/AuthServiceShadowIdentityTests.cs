@@ -23,7 +23,8 @@ public sealed class AuthServiceShadowIdentityTests
             new CapturingEmailSender(),
             new AuthEmailOptions(
                 "https://verify.test/api/auth/verify-email",
-                TimeSpan.FromHours(24)),
+                TimeSpan.FromHours(24),
+                "https://reset.test/reset"),
             shadow);
 
         var registered = await service.RegisterAsync(
