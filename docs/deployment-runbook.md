@@ -6,9 +6,12 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 > **Pourquoi ce runbook ?** Le pipeline `.github/workflows/cd-backend.yml` est un pipeline de
 > déploiement complet (infra Bicep + code Functions). Le chemin critique est désormais
 > **compatible EMU (self-hosted obligatoire)** :
-> 1. les jobs critiques backend restent sur le runner Azure `certigo-trusted` ;
-> 2. toute source PR reste confinée au runner sans identité `certigo-pr` ;
-> 3. l'auth Azure reste via OIDC (`azure/login@v2`) avec permissions minimales.
+> 1. `build-release` utilise exclusivement `certigo-backend-builder`, sans identité,
+>    Environment, secret Azure ni disque partagé ;
+> 2. les jobs de signature, rétention et déploiement utilisent exclusivement
+>    `certigo-backend-deployer`, sur une instance fraîche qui n'exécute jamais le build ;
+> 3. toute source PR reste confinée au runner sans identité `certigo-pr` ;
+> 4. l'auth Azure reste via OIDC (`azure/login@v3`) avec permissions minimales.
 >
 > Les actions humaines restantes concernent surtout la gouvernance (OIDC Azure AD, environments,
 > branch protection), pas l'édition des workflows runners.
@@ -25,7 +28,7 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 
 | Élément | Statut | Où |
 |---|---|---|
-| Chemin critique backend self-hosted (`certigo-trusted`) | ✅ Fait | `cd-backend.yml` |
+| Séparation builder/deployer (`certigo-backend-builder` / `certigo-backend-deployer`) | ⚠️ **UNKNOWN/NO-GO tant que les pools physiques ne sont pas attestés** | `cd-backend.yml` + preuve externe à établir |
 | Jobs rattachés à un `environment:` | ✅ Fait (cette PR) | `cd-backend.yml` |
 | Clarification placeholders Entra en dev | ✅ Fait (cette PR) | `infra/params/dev.bicepparam` |
 | App registration + federated credentials OIDC | ✅ **Fait (session)** — app `microlingo-github-actions` déjà existante + 3 FC `environment:<env>` ajoutées | §T0.1 |
@@ -44,51 +47,131 @@ amorcer le **premier déploiement de l'environnement `dev`** et valider l'authen
 | Smoke test live + ready | ✅ Automatique et bloquant après OneDeploy | `deploy-flex-onedeploy.sh` |
 | ZIP/manifest/SBOM de release | ✅ Build unique, hashes revérifiés à chaque environnement | `cd-backend.yml` |
 | Rollback applicatif | ✅ Dispatch protégé vers un run `main` antérieur, sans Bicep | §Release récupérable |
-| Releases de contenu | ✅ Procédure séparée, Blob WORM + ETag + rollback N-1 | `docs/runbooks/CONTENT_RELEASES.md` |
+
+### Réactivation contrôlée après l'incident de déploiement
+
+Le workflow `cd-backend` est volontairement dans l'état GitHub
+`disabled_manually`. Un merge ou un push sur `main` ne constitue plus une
+autorisation de déploiement et ne déclenche aucun job de ce workflow.
+
+Conserver cet état jusqu'à ce que toutes les conditions suivantes soient réunies :
+
+1. le correctif fail-closed est fusionné sur `main` et son SHA de merge est relevé ;
+2. le bootstrap du validateur trusted est d'abord fusionné seul ; son contrôle
+   post-merge sur `main` est vert, puis la PR de déploiement est resynchronisée et
+   effectivement validée par cette copie trusted avant sa fusion ;
+3. après fusion du correctif, la politique trusted **courante** est réexécutée sur le
+   SHA de merge et fournit une preuve post-merge verte ; l'absence de cette preuve
+   interdit toute activation et impose de conserver `disabled_manually` ;
+4. les checks obligatoires de ce SHA sont verts, notamment actionlint, la politique
+   de sécurité des workflows et project-state ;
+5. une rerevue indépendante confirme que `cd-backend.yml` n'expose que
+   `repository_dispatch: promote-backend`, que le payload est strict et que tous les
+   jobs Azure dépendent du gate et d'un GitHub Environment ;
+6. la variable dépôt non secrète `BACKEND_DEPLOY_OPERATORS` est créée dans
+   **Settings > Secrets and variables > Actions > Variables** sous forme d'un tableau
+   JSON non vide de logins GitHub humains autorisés, sans doublon ;
+7. chacun des Environments `dev`, `staging` et `prod` possède des required reviewers,
+   active **Prevent self-review** et permet l'approbation par au moins un second humain,
+   directement ou via une équipe ; au moment du correctif, ces trois protections sont
+   absentes et constituent donc un NO-GO explicite ;
+8. les protections et reviewers sont audités en lecture seule depuis le pipeline :
+   toute réponse API absente, 403/404, ambiguë ou mal formée doit bloquer ;
+9. les préconditions capacité définies dans la section canonique ci-dessous sont
+   satisfaites et leur preuve externe a reçu l'approbation indépendante requise ;
+10. un opérateur habilité consigne un **GO explicite** puis réactive uniquement
+   `cd-backend` depuis l'interface GitHub Actions.
+
+La réactivation ne doit être effectuée ni par cette PR, ni par un workflow, ni
+avant le GO. Elle ne lance aucun déploiement à elle seule : une seconde action
+opérateur, le dispatch strict décrit ci-dessous, reste obligatoire.
+
+<!-- BEGIN BACKEND CAPACITY PRECONDITION -->
+### Précondition capacité backend canonique
+
+État de capacité : **UNKNOWN/NO-GO**.
+
+Les pools doivent porter exclusivement les labels `certigo-backend-builder` et
+`certigo-backend-deployer`, sans alias, suffixe, fallback ni double label. Ils
+doivent être physiquement distincts, mono-job et éphémères, sans hôte, disque,
+utilisateur de service, cache de projet, état Docker ou segment réseau partagé.
+
+Aucun digest, fichier session-local ou texte de cette PR ne constitue une preuve
+de ces propriétés. Avant toute activation ou planification, un artefact de preuve
+séparément approuvé, immutable et versionné doit définir son schéma, son chemin
+canonique, la canonicalisation de ses octets, sa provenance et son approbation
+indépendante. Jusqu'à l'existence et la validation trusted de cet artefact, les
+jobs non planifiables constituent le comportement fail-closed attendu.
+<!-- END BACKEND CAPACITY PRECONDITION -->
 
 ### Check-list d'exploitation (utilisateur non-admin)
 
-1. Pour `dev`, merger sur `main` afin de déclencher le build unique et le
-   déploiement `cd-backend.yml`. Noter l'identifiant numérique de ce run.
-2. Pour `staging` puis `prod`, envoyer séparément `promote-backend` avec
-   `client_payload.operation=promotion`, `client_payload.environment` et le même
-   `client_payload.source_run_id`.
-3. Vérifier que les jobs `deploy-infra` puis `deploy-backend` démarrent sur un runner portant `certigo-trusted`.
-4. En cas d'échec Azure login, contrôler la présence de `AZURE_CLIENT_ID`,
+1. Confirmer que le compte opérateur est un `User` présent exactement dans
+   `BACKEND_DEPLOY_OPERATORS`, et qu'un second approbateur humain est disponible dans
+   les required reviewers de l'Environment cible.
+2. Après la réactivation contrôlée, choisir un run `ci-backend` réussi, issu d'un
+   push `main`, dont le commit est celui à livrer.
+3. Pour `dev`, envoyer `promote-backend` avec exactement
+   `operation=release`, `environment=dev` et le `source_run_id` du run CI choisi.
+   Tout champ absent, supplémentaire ou mal typé, tout bot/App/acteur hors allowlist,
+   ou toute protection Environment insuffisante est rejeté avant l'accès Azure.
+4. Approuver le job Environment avec un compte distinct du sender. Après succès,
+   noter l'identifiant du run `cd-backend` de release. Pour
+   `staging` puis `prod`, envoyer séparément `promote-backend` avec
+   `operation=promotion`, l'environnement cible et cet identifiant de release.
+5. Vérifier que `build-release` s'exécute sur une instance fraîche portant uniquement
+   `certigo-backend-builder`, puis que `attest-release`,
+   `verify-release-attestation`, `retain-release`, `resolve-release`,
+   `deploy-infra` et `deploy-backend` utilisent des instances fraîches portant
+   uniquement `certigo-backend-deployer`. Ne jamais ajouter `certigo-trusted` comme
+   fallback.
+6. En cas d'échec Azure login, contrôler la présence de `AZURE_CLIENT_ID`,
    `AZURE_TENANT_ID` et `AZURE_SUBSCRIPTION_ID` dans leurs scopes GitHub
    opérationnels actuels. Ne pas les recréer ou les déplacer sans preuve du scope
    effectivement consommé.
-5. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
+7. En cas d'échec du prévol JWT staging/prod, contrôler la paire Environment
    `AUTH_JWT_SIGNING_KEY` / `AUTH_JWT_SIGNING_KEY_EXPIRES_ON`, sans afficher sa valeur.
-6. En cas d'échec du prévol de suppression de compte, contrôler le jeu complet
+8. En cas d'échec du prévol de suppression de compte, contrôler le jeu complet
    du secret `ENTRA_GRAPH_CLIENT_SECRET` et des variables
    `ENTRA_GRAPH_TENANT_ID`, `ENTRA_GRAPH_CLIENT_ID` et
    `ENTRA_REAUTH_AUDIENCE`. Ne jamais afficher le secret.
-7. Contrôler que la variable non secrète `ALERT_EMAIL` de chaque Environment
+9. Contrôler que la variable non secrète `ALERT_EMAIL` de chaque Environment
    `staging`/`prod` désigne une boîte réellement supervisée ; aucune valeur par
    défaut n'est committée.
-8. Pour un rollback, relever le `sourceRunId` de `previous` dans l'état de
+10. Pour un rollback, relever le `sourceRunId` de `previous` dans l'état de
    déploiement et utiliser `promote-backend` avec `operation=rollback`. Le chemin
    rollback refuse tout autre artefact et ne redéploie pas Bicep.
 
 ### Release récupérable
 
-Le workflow sépare désormais strictement la construction et la promotion :
+Le workflow sépare strictement l'autorisation, la construction et la promotion :
 
-Le déploiement backend et la promotion de contenu sont deux opérations
-indépendantes. Le déploiement conserve `CONTENT_REPOSITORY_MODE=legacy`; une
-release éditoriale n'est importée/activée qu'avec le runbook
-`docs/runbooks/CONTENT_RELEASES.md`, après validation staging et avec l'app role
-administrateur.
-
-1. un push `main` produit `backend-release` une seule fois ;
-2. le bundle contient `publish.zip`, `release-manifest.json` et le SBOM CycloneDX ;
-3. le manifeste lie le commit, le run source et les SHA-256 du ZIP et du SBOM ;
-4. `dev`, `staging` et `prod` téléchargent et revérifient le même artefact ;
+1. un push `main` exécute uniquement la CI locale et ne déclenche pas `cd-backend` ;
+2. le validator confirme le sender humain allowlisté et la protection d'approbation
+   indépendante de l'Environment cible via l'API GitHub ; ses octets sont vérifiés
+   contre une empreinte trusted-base avant exécution ;
+3. un dispatch `promote-backend` `release:dev` sélectionne un run `ci-backend`
+   réussi de `main` et construit exactement son commit sur le pool builder sans
+   identité ;
+4. le canal GitHub Artifact transporte exactement un fichier tar brut immuable,
+   résolu par son identifiant API et son SHA-256 ; le bundle contient uniquement
+   `publish.zip`, `release-manifest.json` et le SBOM CycloneDX ;
+5. un job deployer frais recalcule tous les hashes, vérifie le manifeste et signe une
+   attestation liée à l'identifiant/digest d'artefact, repository, workflow ref/SHA,
+   run/attempt, job producteur, commit source, ZIP et SBOM ;
+6. un second job deployer sans Environment ni OIDC vérifie cryptographiquement
+   l'attestation et toutes ses liaisons ; `retain-release` recommence ensuite la
+   résolution, le téléchargement et les vérifications avant `azure/login` ;
+7. le manifeste lie le commit source, le SHA du workflow, les runs/attempts et les
+   SHA-256 recalculés du ZIP et du SBOM ;
+8. `dev`, `staging` et `prod` téléchargent et revérifient le même artefact ;
    `prod` exige qu'il soit déjà le `current` sain de staging ;
-5. OneDeploy conserve le ZIP immuable sous `deployments/<commit>.zip` et ne met à
+9. OneDeploy conserve le ZIP immuable sous `deployments/<commit>.zip` et ne met à
    jour `state/backend-release.json` qu'après succès de `health/live` et
-   `health/ready`.
+   `health/ready` ;
+10. la policy trusted-base scelle l'ordre et le contenu complets des steps de chaque
+    job ; les résolveurs interrogent uniquement l'API GitHub canonique et n'acceptent
+    aucun chemin de fixture fourni par l'environnement runtime.
 
 Le bundle source est conservé 90 jours sous
 `app-package/releases/<source_run_id>/` dans le Storage privé `dev`, via OIDC et
@@ -171,16 +254,6 @@ gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" \
 Le dispatch historique `deploy-privacy-policy` reste neutralisé et ne doit pas
 être utilisé comme chemin d'activation.
 
-**Ce dispatch ne met pas à jour la production.** Depuis
-[#406](https://github.com/gchambaud_microsoft/Certigo/pull/406),
-`https://www.certigo-app.com` est servi par Azure Static Web Apps, alors que les
-deux workflows ci-dessus déploient vers GitHub Pages — non activé sur le dépôt
-(`GET repos/.../pages` rend 404, mesuré le 2026-09-08). La publication en
-production est donc **manuelle**, et le scellé des workflows privilégiés interdit
-d'automatiser : voir [`legal/README.md`](./legal/README.md), qui porte le contrat
-de publication, la raison du blocage et le contrôle de dérive
-`npm run check:public-pages`.
-
 Staging et production reçoivent en plus
 `APPLE_CIAM_DOMAIN_RECONFIGURED=true` depuis leur GitHub Environment avant toute
 opération de déploiement ou rollback. L'Environment `beta` et le groupe
@@ -201,8 +274,9 @@ vérité opérationnelle est portée par Azure pour limiter la dépendance aux d
 | Configuration runtime app | Azure Functions/App Service settings + ressources Azure | Les changements d'exploitation sont opérables dans Azure même si GitHub admin est indisponible. |
 | Gouvernance production | GitHub environments (approvals) + garde-fous Azure | Le gate GitHub reste utile, mais la sécurité critique est déjà enforce côté Azure. |
 
-Limites connues : ce modèle suppose des permissions Azure correctement déléguées (OIDC + RBAC),
-et la disponibilité du runner self-hosted online avec le label `certigo-trusted`.
+Limites connues : ce modèle suppose des permissions Azure correctement déléguées (OIDC + RBAC)
+et, pour le backend, une preuve externe encore absente des pools physiques
+`certigo-backend-builder` et `certigo-backend-deployer`.
 
 ### Réconciliation des labels runners
 
@@ -286,10 +360,10 @@ au scope souscription, sinon `deploy-infra` échoue.
 
 ### Sujets OIDC
 
-Comme les jobs portent désormais `environment: <env>`, le **sujet** du token OIDC émis par GitHub
+Comme tous les jobs Azure portent `environment: <env>`, le **sujet** du token OIDC émis par GitHub
 devient `repo:<org>/<repo>:environment:<env>`. On crée donc **une federated credential par
-environnement** (dev/staging/prod). Une FC supplémentaire pour `push` sur `main` est optionnelle
-(le push déclenche l'environnement `dev`, déjà couvert par la FC `dev`).
+environnement** (dev/staging/prod). Aucune fédération OIDC de branche pour un simple push `main`
+n'est requise ni autorisée par `cd-backend`.
 
 ### Secret de signature JWT par environnement
 
@@ -358,12 +432,11 @@ puis à vérifier la disparition ou la révocation de l’association Apple.
 
 `ACCOUNT_DELETION_ENABLED` reste `false` par défaut. Avant toute activation,
 le gate historique sur `certigo-trusted` reste retiré de `.github/workflows/`.
-Le workflow one-shot décrit dans `docs/runbooks/COSMOS_EMULATOR_RUNNER.md` est
-disponible, mais sa PR de disponibilité ne provisionne aucune ressource et ne
-lance aucun test. Pour l’activation opérationnelle, exécuter un unique
+Activer séparément le workflow one-shot décrit dans
+`docs/runbooks/COSMOS_EMULATOR_RUNNER.md`, puis exécuter un unique
 `workflow_dispatch` depuis `main` sur une VM jetable sans identité managée et
 portant seulement le label `certigo-cosmos-emulator`. La variable
-`CERTIGO_COSMOS_EMULATOR_ENABLED` reste non définie ou `false` hors de cette fenêtre. Un test
+`CERTIGO_COSMOS_EMULATOR_ENABLED` reste `false` hors de cette fenêtre. Un test
 skippé, absent, non unique ou non réussi ne permet jamais d’activer la feature.
 
 ### Gate Person / LinkedIdentity
@@ -395,8 +468,10 @@ actions humaines PIM hors de cette PR.
 ## T0.2 — Débloquer le runner (déjà fait côté repo) + amorçage
 
 **Côté repo :**
-- les jobs critiques de `cd-backend.yml` (`deploy-infra`, `deploy-backend`) ciblent
-  `[self-hosted, Linux, X64, certigo-trusted]` ;
+- tous les jobs de `cd-backend.yml`, sauf `build-release`, ciblent uniquement
+  `[self-hosted, Linux, X64, certigo-backend-deployer]` ;
+- `build-release` cible uniquement
+  `[self-hosted, Linux, X64, certigo-backend-builder]` ;
 - `ci-backend.yml` cible le même pool Azure pour `main` et les PR internes ;
 - le chemin critique reste compatible avec la contrainte EMU (self-hosted obligatoire).
 
@@ -555,11 +630,16 @@ par examen soit actif sans expirer les tentatives existantes.
 **Option B — via le pipeline** (une fois T0.1 + T0.3 prêts) :
 
 ```bash
-# dev : merge/push protégé sur main déclenche cd-backend automatiquement.
-# staging, puis répéter avec "prod" après validation.
-SOURCE_RUN_ID="<run push main ayant déployé dev>"
+# Après réactivation contrôlée et GO explicite : release dev depuis un run CI main réussi.
+SOURCE_CI_RUN_ID="<run ci-backend push main réussi du commit à livrer>"
 printf '%s' \
-  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"staging\",\"operation\":\"promotion\",\"source_run_id\":\"$SOURCE_RUN_ID\"}}" |
+  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"dev\",\"operation\":\"release\",\"source_run_id\":\"$SOURCE_CI_RUN_ID\"}}" |
+  gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" --input -
+
+# Après succès dev, utiliser l'identifiant du run cd-backend explicite.
+RELEASE_RUN_ID="<run cd-backend release dev réussi>"
+printf '%s' \
+  "{\"event_type\":\"promote-backend\",\"client_payload\":{\"environment\":\"staging\",\"operation\":\"promotion\",\"source_run_id\":\"$RELEASE_RUN_ID\"}}" |
   gh api --method POST "repos/$GH_ORG/$GH_REPO/dispatches" --input -
 ```
 
@@ -662,89 +742,6 @@ Nécessite un environnement avec `authMode='prod'` et de **vraies** valeurs
 `ENTRA_AUTHORITY` / `ENTRA_AUDIENCE`, puis un token obtenu du tenant CIAM Certigo. En `dev`,
 Entra n'est **pas** appliqué (`DevTokenValidator`), donc tout bearer non vide est accepté.
 
-### Chemin 3 — Tutor IA LLM réel (`dev` uniquement) — ⛔ humain avec accès Azure requis
-
-> **État au 2026-09-09** : `TUTOR_LLM_ENABLED=false` en `dev` **et** en prod
-> (voir `docs/adr/ADR-O-01-ai-tutor-prod.md` — la prod reste sur le repli
-> déterministe, décision inchangée — et `infra/params/dev.bicepparam`).
-> Cette procédure est la **seule** façon de prouver que le modèle répond
-> réellement en `dev`, et l'étape 3 ci-dessous n'a **jamais** été exécutée verte.
-> Elle ne peut l'être que par une personne disposant d'un accès réel à
-> l'abonnement/tenant Azure Certigo (un agent CLI/IA sans cet accès ne peut ni
-> l'exécuter ni la simuler).
->
-> **Il n'y a pas de dépendance circulaire ici.** Prouver l'appel n'exige *pas* de
-> committer `tutorLlmEnabled = true` au préalable : l'étape 2 déploie le flag par
-> un **override explicite** `--parameters tutorLlmEnabled=true`, sans toucher au
-> fichier de paramètres. L'ordre est donc : override → preuve → commit.
-
-Historique du blocage : #99 a activé le flag en dev ; #178 a ajouté le module
-IaC d'adoption `infra/modules/openai.bicep` (compte `certigo-openai`,
-kind `AIServices`, attribution du rôle **Cognitive Services OpenAI User** —
-`5e0bd9bd-7b93-4f28-af87-19fc36ad61bd` — à l'identité managée de la Function
-App) ; #181 a **repassé le flag à `false`** suite à un échec réel de
-déploiement (`DeploymentModelNotSupported` sur le modèle `gpt-5.4-mini`), pour
-débloquer un correctif de sécurité sans rapport.
-
-Ce blocage est **levé**. Le module `tutor` n'est plus gated par le flag : il l'est
-par `if (env == 'dev' && !empty(tutorLlmDeployment))` (`infra/main.bicep`), scellé
-par `infra/tests/least-privilege.test.mjs`. Il est donc redéployé à **chaque** CD
-`dev`, et le run `34334286423` du 2026-09-09 (job « Prepare infrastructure (dev) »,
-`az deployment sub create`) est **success** — le grant RBAC et le déploiement de
-modèle `gpt-5.4-mini` passent désormais. Ce qui reste non vérifié est l'**appel
-lui-même** (étape 3).
-
-1. **What-if avant tout** — confirmer que le déploiement ne rejoue pas
-   l'échec de #181 :
-   ```bash
-   az deployment sub what-if \
-     --location westeurope \
-     --template-file infra/main.bicep \
-     --parameters infra/params/dev.bicepparam \
-     --parameters tutorLlmEnabled=true
-   ```
-   Si `DeploymentModelNotSupported` (ou toute erreur sur la ressource
-   `Microsoft.CognitiveServices/accounts/deployments`) réapparaît, **ne pas
-   déployer** — le blocage persiste, documenter et escalader.
-2. **Déployer par override** seulement si le what-if est propre. L'override est
-   ce qui évite de committer le flag avant d'avoir la preuve — le fichier de
-   paramètres reste à `false` :
-   ```bash
-   az deployment sub create \
-     --name certigo-dev \
-     --location westeurope \
-     --template-file infra/main.bicep \
-     --parameters infra/params/dev.bicepparam \
-     --parameters tutorLlmEnabled=true
-   ```
-   Puis vérifier l'attribution de rôle réelle :
-   ```bash
-   az role assignment list --scope "$(az cognitiveservices account show \
-     -g rg-certigo-dev -n certigo-openai --query id -o tsv)" \
-     --query "[].{principal:principalId,role:roleDefinitionName}" -o table
-   ```
-   Attendu : le principal de la managed identity `func-certigo-dev` avec le
-   rôle **Cognitive Services OpenAI User**.
-3. **Valider l'appel réel** avec le test gated dédié (register → login → JWT →
-   `POST /api/tutor/explain` → 200 + `source:"ai"`, c'est-à-dire **pas** un
-   repli `"grounded"`) :
-   ```powershell
-   $env:CERTIGO_TUTOR_LLM_LIVE_TESTS = '1'
-   $env:CERTIGO_TUTOR_API_BASE_URL = 'https://<functionAppName>.azurewebsites.net'
-   $env:CERTIGO_TUTOR_TEST_TRACK_ID = '<trackId seedé dans cet environnement>'
-   $env:CERTIGO_TUTOR_TEST_LESSON_ID = '<lessonId de ce track>'
-   $env:CERTIGO_TUTOR_TEST_ITEM_ID = '<itemId de quiz de cette leçon>'
-   backend\run-tutor-llm-live-gate.ps1
-   ```
-   Le test échoue explicitement (assertion sur `source`) si la réponse est un
-   repli déterministe plutôt qu'une vraie complétion LLM — voir
-   `backend/tests/Certigo.Api.Tests/TutorLlmLiveEndToEndTests.cs`.
-4. **Seulement après un 3. vert**, fixer `tutorLlmEnabled = true` dans
-   `infra/params/dev.bicepparam` (et corriger son commentaire), avec revue
-   normale (PR). Si 3. est **rouge** — `source:"grounded"` au lieu de `"ai"`, ou
-   un 5xx — **ne pas committer le flag** : le repli déterministe est déjà l'état
-   par défaut, il n'y a rien à annuler. Documenter l'échec et escalader.
-
 ---
 
 ## T0.6 — Smoke test
@@ -788,10 +785,10 @@ documentation), et le **résiduel strict** qui nécessite une action hors périm
   `staging`/`prod` limités aux branches protégées. **Reviewer gate `prod` non
   posé** (billing GitHub 422, voir §T0.3). `ALERT_EMAIL` est configuré dans
   `staging` et `prod` sans valeur divulguée. Branch protection `main` = résiduel admin.
-- **T0.2 — Runner : ✅ prémisse hosted réfutée en live.** Le run `28381092423` a été rejeté
+- **T0.2 — Runner : ⚠️ prémisse hosted réfutée, capacité backend UNKNOWN/NO-GO.** Le run `28381092423` a été rejeté
   immédiatement car les runners GitHub-hosted sont désactivés pour ce dépôt.
-  Aucune validation Enterprise ne sera sollicitée : le chemin critique reste le pool Azure
-  self-hosted (`certigo-trusted`).
+  Le chemin backend exige désormais deux pools physiques self-hosted distincts, builder et
+  deployer. Leur conformité reste une précondition externe non prouvée.
 
 ### État live avant cette modification
 
@@ -843,7 +840,7 @@ Avant toute application, exécuter le `what-if` et vérifier que l'ordre ARM est
 
 - **Ne pas utiliser `config-zip`** avec le conteneur de déploiement privé : Kudu échoue au
   `StorageAccessibleCheck` avant OneDeploy.
-- Le runner `certigo-trusted` charge `deployments/<commit-sha>.zip` avec
+- Le runner `certigo-backend-deployer` charge `deployments/<commit-sha>.zip` avec
   `az storage blob upload --auth-mode login --overwrite false`. Le principal OIDC
   `15d2b34a-c0a0-4b5d-8360-b895a8164706` reçoit `Storage Blob Data Contributor` uniquement sur le
   conteneur `app-package` et `Storage Blob Delegator` sur le compte, nécessaire à la clé de
@@ -954,18 +951,13 @@ az role assignment create \
   --role "Cognitive Services OpenAI User" --scope "$OPENAI_ID"
 ```
 
-> **État actuel (mise à jour 2026-09-09).** **RBAC accordé en `dev`** (rôle
-> `Cognitive Services OpenAI User` sur `certigo-openai` pour l'identité managée de
-> `func-certigo-dev`), et le module `infra/modules/openai.bicep` qui le porte est
-> redéployé à **chaque** CD `dev` — il est gated sur
-> `env == 'dev' && !empty(tutorLlmDeployment)`, **pas** sur le flag runtime.
-> En revanche le **tuteur n'est PAS activé** : `tutorLlmEnabled = false` dans
-> `infra/params/dev.bicepparam`, donc `TUTOR_LLM_ENABLED=false` et le backend sert
-> le composeur déterministe (`NullTutorCompletion`). Code Foundry v1 / GPT‑5
-> compilé et **couvert par tests unitaires** (Infra + Application verts).
-> **Résiduel : un seul appel réel de validation** (voir § « Validation live »
-> ci-dessous) doit renvoyer **200 + `source:"ai"`** avant de basculer le flag puis
-> le statut du tuteur en 🟢 (cf. `docs/ETAT_DU_PROJET.md` §13).
+> **État actuel (mise à jour).** **RBAC accordé en `dev`** (rôle `Cognitive Services OpenAI User`
+> sur `certigo-openai` pour l'identité managée de `func-certigo-dev`) et **tuteur activé en
+> `dev`** : les app settings `TUTOR_LLM_*` sont décommentés dans `infra/params/dev.bicepparam` et
+> déployés par `cd-backend`. Code Foundry v1 / GPT‑5 compilé et **couvert par tests unitaires**
+> (Infra + Application verts). **Résiduel : un seul appel réel de validation** (voir §
+> « Validation live » ci-dessous) doit renvoyer **200 + une explication LLM authentique** avant de
+> basculer le statut du tuteur en 🟢 (cf. `docs/ETAT_DU_PROJET.md` §13).
 
 ### Validation live (1 appel réel)
 

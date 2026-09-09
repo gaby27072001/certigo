@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import process from 'node:process';
 
+const canonicalApiUrl = 'https://api.github.com';
+const canonicalRepository = 'gchambaud_microsoft/Certigo';
 const shaPattern = /^[0-9a-f]{40}$/;
 
 function fail(message) {
@@ -16,22 +18,26 @@ function writeOutput(name, value) {
 }
 
 async function loadRunMetadata(sourceRunId) {
-  if (process.env.SOURCE_RUN_METADATA_FILE) {
-    return JSON.parse(fs.readFileSync(process.env.SOURCE_RUN_METADATA_FILE, 'utf8'));
-  }
   const token = process.env.GITHUB_TOKEN;
   const apiUrl = process.env.GITHUB_API_URL;
   const repository = process.env.GITHUB_REPOSITORY;
-  if (!token || !apiUrl || !repository) {
-    fail('GITHUB_TOKEN, GITHUB_API_URL and GITHUB_REPOSITORY are required.');
+  if (
+    !token
+    || apiUrl !== canonicalApiUrl
+    || repository !== canonicalRepository
+  ) {
+    fail('Canonical GITHUB_TOKEN, GITHUB_API_URL and GITHUB_REPOSITORY are required.');
   }
-  const response = await fetch(`${apiUrl}/repos/${repository}/actions/runs/${sourceRunId}`, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
+  const response = await fetch(
+    `${canonicalApiUrl}/repos/${canonicalRepository}/actions/runs/${sourceRunId}`,
+    {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
     },
-  });
+  );
   if (!response.ok) {
     fail(`Cannot resolve source workflow run ${sourceRunId}: GitHub returned ${response.status}.`);
   }
@@ -44,16 +50,21 @@ async function main() {
     fail('SOURCE_RUN_ID must be a positive GitHub Actions run id.');
   }
 
-  if (
-    sourceRunId === process.env.GITHUB_RUN_ID
-    && process.env.GITHUB_EVENT_NAME === 'push'
-    && process.env.GITHUB_REF === 'refs/heads/main'
-  ) {
-    if (!shaPattern.test(process.env.GITHUB_SHA ?? '')) {
-      fail('GITHUB_SHA must be a lowercase 40-character Git SHA.');
-    }
-    writeOutput('commit-sha', process.env.GITHUB_SHA);
-    return;
+  const sourceKind = process.env.SOURCE_RUN_KIND ?? 'release';
+  const expected = {
+    build: {
+      path: '.github/workflows/ci-backend.yml',
+      event: 'push',
+      label: 'successful main backend CI',
+    },
+    release: {
+      path: '.github/workflows/cd-backend.yml',
+      event: 'repository_dispatch',
+      label: 'successful explicit backend release',
+    },
+  }[sourceKind];
+  if (!expected) {
+    fail('SOURCE_RUN_KIND must be build or release.');
   }
 
   const metadata = await loadRunMetadata(sourceRunId);
@@ -62,11 +73,11 @@ async function main() {
   if (metadata.repository?.full_name !== repository) {
     errors.push('repository');
   }
-  if (metadata.path !== '.github/workflows/cd-backend.yml') {
+  if (metadata.path !== expected.path) {
     errors.push('workflow path');
   }
-  if (metadata.event !== 'push' || metadata.head_branch !== 'main') {
-    errors.push('main push provenance');
+  if (metadata.event !== expected.event || metadata.head_branch !== 'main') {
+    errors.push(`${expected.label} provenance`);
   }
   if (metadata.conclusion !== 'success') {
     errors.push('successful conclusion');
@@ -74,10 +85,14 @@ async function main() {
   if (!shaPattern.test(metadata.head_sha ?? '')) {
     errors.push('commit SHA');
   }
+  if (!Number.isSafeInteger(metadata.run_attempt) || metadata.run_attempt < 1) {
+    errors.push('run attempt');
+  }
   if (errors.length > 0) {
     fail(`Source workflow run ${sourceRunId} failed validation: ${errors.join(', ')}.`);
   }
   writeOutput('commit-sha', metadata.head_sha);
+  writeOutput('run-attempt', String(metadata.run_attempt));
 }
 
 try {
