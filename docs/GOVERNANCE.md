@@ -805,6 +805,35 @@ par un contrôle différent, improvisé sur le moment, et les traces se trouvaie
 de PR et des messages appelés à disparaître. Ce qui suit ne conserve pas les incidents pour eux-mêmes :
 il conserve **ce qui les a attrapés**.
 
+### Un critère de relecture pour tout le §7 — chaque règle doit être exécutable par un lecteur seul
+
+> Ajouté le **2026-09-09**. Cette sous-section ne relève pas un incident : elle fixe la forme que
+> chaque règle ci-dessous doit prendre pour survivre à ceux qui les écrivent. **Invalidée** le
+> jour où toute règle du §7 se relit et se ferme sans nommer un rôle, une équipe ou une personne.
+
+Nous avons vu une contre-mesure passer, dans une même conversation, d'une forme locale à une
+forme qui nommait un rôle — *demander à tel rôle avant d'agir*. La reformulation ressemblait à un
+durcissement, et se dégradait en trois temps : elle dépend d'un acteur ; sous saturation, elle
+devient attente ; sous pression, l'attente devient action non demandée — c'est-à-dire exactement
+ce que la règle interdisait.
+
+**La version robuste est locale.** *Sous ambiguïté, ne rien faire est le comportement par défaut*
+se relit sur place et se vérifie sans personne.
+
+> **Une règle qui nomme un rôle n'est plus une règle — c'est une dépendance.** Elle meurt le jour
+> où le rôle n'existe plus, et elle meurt silencieusement : le lecteur ne saura pas à qui
+> s'adresser, et fera le geste.
+
+**Critère de relecture pour tout le §7** — chaque règle doit être exécutable par un lecteur seul.
+Aucun nom d'acteur, aucun rôle à joindre, aucune procédure qui suppose une réponse venue
+d'ailleurs. Ce document est destiné à survivre à ceux qui l'écrivent ; ce critère est ce qui rend
+cette survie possible.
+
+**Contre-mesure — à l'écriture, gratuite.** Toute formulation qui contient *demander à*, *faire
+valider par*, *sous accord de* se réécrit en une conduite locale — attendre, s'abstenir, consigner
+— vérifiable là où elle s'applique. Ce que le rôle apportait à la règle, la règle doit le porter
+elle-même.
+
 ### Les dix instruments vides
 
 | # | Instrument | Ce qu'il rendait | Pourquoi c'était vide |
@@ -975,6 +1004,38 @@ tout lecteur pressé.**
 Le pattern commun aux trois façons — format, libellé, nom : **l'objet est correct ; sa
 présentation ne l'est pas ; le lecteur lit la présentation.**
 
+### La limite structurelle de la ressource transitoire — ce que le nom ne peut pas porter
+
+> Ajouté le **2026-09-09**, à lire immédiatement après « Le nom qui contredit l'état ».
+> **Invalidée** le jour où toute lecture sur une ressource transitoire s'écrit avec le processus
+> concurrent connu, ou signale explicitement qu'aucun processus concurrent n'a été identifié.
+
+**Le motif.** Un relevé frais, exact, pris à la seconde, a supporté **deux conclusions opposées** :
+résidu d'un nettoyage avorté, ou ressource d'une opération en cours. Rien dans le relevé ne
+permettait de trancher, et la lecture alarmante — celle vers laquelle l'instinct penche —
+détruisait une opération en vol.
+
+**Remésurer protège contre un état périmé** (voir « La parade de dernier recours : deux mesures
+qui se contredisent »). **Cela ne protège pas contre une lecture ambiguë d'un état frais quand un
+autre acteur agit sur le même objet.** La mesure est vraie ; c'est la lecture qui invente un
+processus — celui qu'on cherche à confirmer — au lieu de constater qu'aucun processus n'est
+nommé.
+
+**Le lien avec « Le nom qui contredit l'état ».** Ce constat établit qu'un nom ne peut pas porter
+un état, parce que le nom est permanent et l'état ne l'est pas. La conséquence, à écrire ici, est
+plus lourde :
+
+> **Puisqu'un nom ne peut pas porter un état, l'état d'une ressource transitoire n'est lisible
+> nulle part sur la ressource. Il n'existe que dans le processus qui la manipule.** Ce n'est donc
+> pas un défaut de nommage corrigible — c'est une **limite structurelle**, et c'est ce qui rend la
+> règle d'abstention (voir « L'asymétrie de l'incertitude — le défaut, par règle, est l'attente »)
+> **nécessaire plutôt que prudente**.
+
+**Contre-mesure — gratuite, mais avant la lecture.** Avant de conclure sur une ressource
+transitoire à partir d'un relevé, nommer le processus qui pourrait être en cours dessus. Si aucun
+processus concurrent n'est nommable, la conclusion n'est pas *rien ne se passe* — c'est *on ne
+sait pas*, et la règle d'abstention s'applique.
+
 ### L'instrument aveugle à son propre passé
 
 > Ajouté le **2026-09-09**. Nouvelle forme de la famille des instruments qui mentent, la plus
@@ -1029,6 +1090,80 @@ distingue une valeur valide d'une valeur qui *commence bien*.
 
 Séparer les deux contrôles dans le temps rend la confusion structurelle : entre les deux, un lecteur
 qui a vu passer le premier conclut au pire moment que le second n'était pas censé échouer.
+
+### Une sonde en amont est une garde déguisée
+
+> Ajouté le **2026-09-09**. Famille **distincte** de celle des instruments qui mentent : cet
+> instrument était exact et a détruit l'opération qu'il devait observer. **Invalidée** le jour où
+> toute vérification placée avant une boucle de travail est examinée sur la question *son échec
+> doit-il arrêter cette opération ?* avant d'être écrite.
+
+**Le motif.** Une opération de chargement de données a échoué sans jamais commencer : une sonde
+de vérification, placée avant la boucle de travail, a levé une exception parce que sa requête
+était invalide. La sonde ne chargeait rien — elle observait.
+
+**C'est une famille distincte de celle des instruments qui mentent.** Ceux-là rendent un faux
+résultat ; celui-ci rendait un résultat **exact** — la requête était réellement invalide — et
+**a détruit l'opération au lieu de la décrire**. Le défaut n'est pas dans le verdict, il est dans
+la place.
+
+> **Un contrôle placé avant ce qu'il mesure ne peut rien mesurer — il ne peut que bloquer.** Sa
+> place était après la boucle de travail, où il aurait décrit un résultat au lieu d'empêcher une
+> cause.
+
+**Deux parades, l'une faible, l'autre juste.**
+
+- **Parade faible** — envelopper la sonde pour qu'elle ne lève plus. Le contrôle reste au mauvais
+  endroit et ne mesure toujours rien ; on a acheté du silence, pas de la lecture.
+- **Parade juste** — **déplacer** la sonde après l'opération qu'elle observe ; ou assumer que
+  c'est une **garde**, et le dire. Ce sont deux gestes de conception, pas deux styles de code.
+
+**Le test qui tranche est bon marché — une question.** *Si ce contrôle échoue, l'opération
+doit-elle s'arrêter ?*
+
+- **Oui** — c'est une **garde**. Sa place en amont est légitime, et son échec doit bloquer, sans
+  enveloppe.
+- **Non** — c'est une **sonde**. Sa place est en **aval**, et sa présence en amont est un défaut
+  de **conception**, pas un défaut de robustesse. Absorber son échec dans une garde ne corrige
+  que le symptôme.
+
+> **Une sonde en amont est une garde déguisée. Le lecteur doit pouvoir classer son propre
+> contrôle en une question.**
+
+**Corollaire de coût.** Quand une sonde bloque, le correctif le moins cher n'est pas toujours de
+la réparer : c'est parfois de la retirer. Une sonde qui ne peut pas mesurer doit dire qu'elle n'a
+pas pu mesurer, jamais interrompre ce qu'elle observe — et si l'écrire coûte plus que ce que la
+sonde apporte, l'absence de sonde est plus honnête que sa présence.
+
+### L'asymétrie de l'incertitude — le défaut, par règle, est l'attente
+
+> Ajouté le **2026-09-09**, à lire ensemble avec « Une sonde en amont est une garde déguisée » :
+> l'un cadre le geste de conception, l'autre cadre le geste de décision. **Invalidée** le jour où
+> toute action sur un objet partagé ou irréversible se relit sous la question *l'inaction
+> coûte-t-elle du temps, ou un état ?* avant d'être exécutée.
+
+**Le motif.** Trois gestes de nature différente ont partagé le même réflexe : élargir une règle
+de filtrage qui ne correspondait pas, régénérer un secret quand une opération échouait, supprimer
+une ressource qui semblait abandonnée. **Dans les trois cas, l'action était le seul chemin vers
+le dégât ; l'inaction ne coûtait qu'un délai.**
+
+**L'attente et l'action ne sont pas symétriques quand l'objet est partagé ou irréversible.**
+L'attente coûte du temps, mesurable, revenu à zéro dès qu'on obtient l'information manquante.
+L'action, sur un tel objet, coûte un état que personne n'a décrit — et cet état, une fois posé,
+ne revient pas au précédent sur la simple constatation qu'il était prématuré.
+
+> **Sous incertitude sur un objet partagé ou irréversible, le défaut est l'attente — et il doit
+> l'être par règle**, parce que l'instinct va dans l'autre sens. Une règle prudente laisse le
+> réflexe gagner ; seule la règle **par défaut** l'arrête.
+
+**Cette règle ne se lit pas comme une invitation à la prudence.** C'est une **règle
+d'abstention** — locale, exécutable sans arbitrage extérieur (voir « Un critère de relecture pour
+tout le §7 »). Elle ne demande à personne *faut-il agir ?* — elle statue : *sans certitude sur ce
+que l'action produira, on attend*.
+
+**Contre-mesure — à la décision, gratuite.** Avant tout geste sur un objet partagé ou
+irréversible, demander : *l'inaction coûte-t-elle du temps, ou un état ?* Si elle ne coûte que du
+temps, elle est le défaut.
 
 ### Le transport ampute la portée avant le chiffre
 
@@ -1223,6 +1358,50 @@ où il servira réellement se comporte, à l'usage, comme un filet non testé : 
 qu'on découvrira qu'il ne tenait pas — au pire moment, comme le dispositif principal de cette
 sous-section.
 
+### Une contrainte bien posée n'interdit pas, elle oriente — premier constat positif du §7
+
+> Ajouté le **2026-09-09**. **Premier constat positif de ce §7** — non pas ce qui a trompé, mais
+> ce qui a fonctionné, et qu'il faut savoir choisir. Un document qui ne recense que des échecs
+> apprend la méfiance et jamais le choix. **Invalidée** le jour où le dépôt écrit ses
+> autorisations d'opérations risquées sans budget de temps, sans exigence de stabilité, sans
+> ordre de démantèlement, et sans relecture après coup.
+
+**Le motif.** Une opération sur des ressources de production semblait exiger l'ouverture
+temporaire d'un accès réseau. Nous l'avons autorisée, mais encadrée : budget de temps borné,
+exigence de stabilité de l'adresse source, interdiction explicite d'élargir la règle si elle ne
+correspondait pas, ordre de démantèlement imposé, relecture obligatoire après coup.
+**L'opération a finalement réussi sans que l'accès réseau soit ouvert une seule seconde** — la
+voie retenue écrivait depuis l'intérieur du périmètre.
+
+> **Le résultat n'est pas « zéro exposition malgré les contraintes ». C'est « zéro exposition
+> grâce à elles ».** En rendant l'ouverture coûteuse à obtenir et à tenir, nous ne l'avons pas
+> rendue plus sûre : nous l'avons rendue assez chère pour qu'une meilleure voie soit cherchée —
+> et trouvée.
+
+**Contre-mesure — à la conception, et c'est là qu'elle se paie.**
+
+> **Quand on autorise une opération risquée, encadrer n'est pas seulement se protéger de son
+> échec — c'est en augmenter le prix, et donc financer la recherche d'une alternative qui n'en a
+> pas besoin.** Une autorisation sans contrainte n'obtient jamais cette recherche : elle rend le
+> chemin risqué gratuit, donc premier.
+
+**Le rapport avec « Le dispositif de secours n'est éprouvé que hors incident » — deux faces d'un
+même axe.** Là, un dispositif rassurait sans protéger : sa présence éteignait l'examen, et sa
+première épreuve réelle ne devait avoir lieu qu'en situation dégradée. Ici, une contrainte a
+protégé sans jamais être exercée : son coût a déclenché la recherche d'une voie qu'elle n'avait
+pas besoin d'autoriser.
+
+> **Ce qui distingue les deux n'est pas la prudence, c'est de savoir ce qu'un dispositif fait
+> quand personne ne le regarde.** Un filet non testé fait moins que zéro — il finance une
+> inaction ailleurs. Une contrainte bien posée fait davantage que ce qu'elle interdit — elle
+> finance une recherche que rien d'autre ne rendait rentable.
+
+**Corollaire — comment se mesure une contrainte bien posée.** Une contrainte qui n'est jamais
+exercée n'est pas une contrainte inutile ; elle est au contraire le régime qu'on doit chercher.
+Sa présence a modifié le calcul en amont, et ce qu'elle rend coûteux n'a pas été tenté. **On la
+mesure non à ses interventions, mais à leur absence sur un chemin où l'on s'attendait à en
+compter.**
+
 ### Un motif correct présent ne protège pas ses voisins — il les expose
 
 > Ajouté le **2026-09-09**, dernier constat du lot. Famille **distincte** de celle des mécanismes
@@ -1331,6 +1510,71 @@ n'est pas un dépannage ; c'est une action de routine à prévoir dès qu'une PR
 progression, et à surveiller soi-même. Une PR verte avec auto-merge armé peut rester
 **indéfiniment** en `BEHIND` sans que rien ne signale l'attente : l'inaction du fournisseur
 ressemble à de la patience.
+
+### Le cas limite des instruments qui mentent — un succès rendu par un canal qui ne mesure pas l'effet
+
+> Ajouté le **2026-09-09**. À lire comme cas limite de la famille inventoriée sous « Les dix
+> instruments vides », « Le rendu peut mentir sur la présence des données », « Le nom qui
+> contredit l'état » et « Un succès exact peut clôturer l'examen sur une cause fausse ».
+> **Invalidée** le jour où toute opération de configuration se conclut par une relecture de la
+> valeur posée, et où le code de retour du canal d'écriture ne fait pas foi seul.
+
+**Le motif.** Deux appels successifs, par deux voies différentes, ont modifié un réglage
+d'infrastructure et **rendu un succès** — code de retour nul, réponse positive. Une relecture
+immédiate a montré que la valeur n'avait pas changé : une politique d'organisation la réécrivait,
+**après avoir accusé réception**.
+
+**Ce cas constitue la limite de la famille.** Les instruments qui mentent, dans ce §7, se
+trompent, se taisent, ou observent le mauvais objet. **Celui-ci confirme.** Ce n'est ni un refus,
+ni un verrou, ni une erreur, ni un silence : l'instrument atteste une opération qui n'a pas eu
+lieu.
+
+> **Un succès rendu par un canal qui ne mesure pas l'effet n'est pas un succès de l'effet — il
+> est un succès du canal.** Deux entités séparent l'appel de sa conséquence : la couche qui
+> accuse réception, et la couche qui applique. Un succès n'atteste que la première ; croire qu'il
+> atteste la seconde revient à demander à un instrument de mesurer un objet auquel il n'a pas
+> accès.
+
+**Ce qui a sauvé le script — la contre-mesure la moins chère du §7, appliquée à de
+l'infrastructure.** Le script n'a survécu que parce qu'il **relisait** au lieu de croire le code
+de retour. Le coût tient en un appel de plus.
+
+**Corollaire.** Une opération qui a besoin d'un succès pour continuer doit relire elle-même
+l'effet qu'elle attend, ou l'écrire dans une couche qui ne peut pas être réécrite après coup.
+Sans l'un des deux, le succès reçu est un succès du canal, pas de l'effet.
+
+### Trois obstacles se déclarent, un seul ment — et le quatrième est physique
+
+> Ajouté le **2026-09-09**. **Invalidée** le jour où tout catalogue d'obstacles rencontrés
+> distingue les catégories déclarantes des catégories mensongères, et nomme à part la catégorie
+> physique.
+
+**Le motif.** Une même opération a buté successivement sur quatre obstacles de natures
+différentes : un pare-feu réseau, une politique à effet de réécriture, un verrou de suppression,
+et une **indisponibilité de capacité dans la région**.
+
+**La ventilation.** Trois des quatre ont refusé franchement — chacun avec un message qui nommait
+la cause, ou du moins sa catégorie. **Une seule a menti** — la politique à effet de réécriture,
+qui accuse réception avant de défaire. C'est le motif consigné sous « Le cas limite des
+instruments qui mentent — un succès rendu par un canal qui ne mesure pas l'effet ».
+
+> **La plupart des obstacles se déclarent, et c'est l'exception qui coûte cher.** Le §7 est
+> tellement écrit autour des instruments qui mentent qu'il fait oublier ce rappel utile : la
+> majorité des refus, on les lit.
+
+**La quatrième catégorie est à part.** Un pare-feu se change, une politique se relit, un verrou
+se lève. **Une indisponibilité de capacité dans la région n'est ni un droit, ni une
+configuration, ni une politique — c'est une contrainte physique**, et aucune contre-mesure de ce
+§7 ne la couvre parce qu'elle ne dépend de rien qu'on écrive.
+
+> **Trois catégories d'obstacles se corrigent en modifiant ce qui est écrit ; la quatrième ne se
+> corrige qu'en attendant, en changeant de région, ou en changeant de plan.** Elle n'appartient
+> pas au même registre, et le confondre avec les précédentes fait chercher un correctif là où il
+> n'y en a pas.
+
+**Contre-mesure — à la lecture d'un incident, gratuite.** Avant de chercher ce qu'il faut
+modifier, se demander si l'obstacle appartient aux trois catégories qui se déclarent, ou à la
+quatrième. Si c'est la quatrième, aucune modification locale ne le lève.
 
 ### Ce qui a réellement corrigé
 
