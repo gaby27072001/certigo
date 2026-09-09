@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:certigo/features/auth/application/auth_controller.dart';
 import 'package:certigo/features/auth/application/auth_state.dart' show AuthState, Unauthenticated;
 import 'package:certigo/features/auth/presentation/landing_screen.dart';
@@ -93,14 +94,70 @@ void main() {
     expect(find.text('Continuer avec un e-mail'), findsOneWidget);
   });
 
-  testWidgets('le lien « J’ai déjà un compte » ouvre aussi la sheet', (WidgetTester tester) async {
-    await pumpLanding(tester);
+  // Réécrit : ce test assertait auparavant le comportement fautif — il se
+  // contentait de vérifier que « J'ai déjà un compte » ouvrait « aussi » la
+  // même feuille, ce qui verrouillait justement le défaut signalé (un compte
+  // existant était envoyé sur le premier écran d'inscription). Il vérifie
+  // désormais que l'intention est distincte, et surtout où mène le bouton
+  // e-mail. Harnais routé local : `pumpLanding` reste inchangé pour les autres.
+  testWidgets(
+      'le lien « J’ai déjà un compte » ouvre la feuille en intention connexion, '
+      'et son bouton e-mail mène au formulaire de connexion — pas à l’inscription',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final GoRouter router = GoRouter(
+      initialLocation: '/landing',
+      routes: <RouteBase>[
+        GoRoute(path: '/landing', builder: (_, __) => const LandingScreen()),
+        GoRoute(
+          path: '/register/name',
+          builder: (_, __) => const Scaffold(body: Center(child: Text('CIBLE inscription'))),
+        ),
+        GoRoute(
+          path: '/auth',
+          builder: (_, __) => const Scaffold(body: Center(child: Text('CIBLE connexion'))),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          authGatewayProvider.overrideWithValue(FakeAuthGateway()),
+          credentialsGatewayProvider.overrideWithValue(FakeCredentialsGateway()),
+          sessionStoreProvider.overrideWithValue(FakeSessionStore()),
+          authConfiguredProvider.overrideWithValue(true),
+          authRequiredProvider.overrideWithValue(true),
+        ],
+        child: MaterialApp.router(theme: PrismTheme.light(), routerConfig: router),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
     await tester.tap(find.byKey(const Key('landing-existing-account')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('Continuer avec Microsoft'), findsOneWidget);
+    // Cadrage « connexion » : la feuille ne dit plus « Commencer » à quelqu'un
+    // qui possède déjà un compte, et ne lui recommande plus un fournisseur.
+    expect(find.text('Content de te revoir'), findsOneWidget);
+    expect(find.text('Recommandé'), findsNothing);
+
+    // Mais les quatre fournisseurs restent proposés : un compte existant a pu
+    // être créé avec n'importe lequel d'entre eux.
+    expect(find.byType(AuthProviderButton), findsNWidgets(4));
+
+    await tester.tap(find.text('Continuer avec un e-mail'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('CIBLE connexion'), findsOneWidget);
+    expect(find.text('CIBLE inscription'), findsNothing);
   });
 
   testWidgets(

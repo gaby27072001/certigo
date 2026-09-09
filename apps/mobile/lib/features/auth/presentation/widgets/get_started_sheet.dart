@@ -7,21 +7,47 @@ import '../../application/auth_controller.dart';
 import '../../application/auth_state.dart';
 import 'auth_provider_button.dart';
 
-/// Ouvre la **bottom sheet « Commencer »** façon Luma : propose les modes de
-/// connexion (Microsoft en tête, puis Google/Apple si Entra est configuré, et
-/// « Continuer avec un e-mail »).
+/// Pourquoi l'utilisateur ouvre la feuille : créer un compte, ou en retrouver un.
+///
+/// L'écran d'accueil propose deux entrées (« Commencer » et « J'ai déjà un
+/// compte ») qui menaient à une feuille **strictement identique** : le bouton
+/// e-mail envoyait alors un utilisateur possédant déjà un compte sur le premier
+/// écran d'inscription, barre de progression à 25 % comprise. Cette intention
+/// est ce qui distingue enfin les deux entrées.
+enum GetStartedIntent {
+  /// « Commencer » : création de compte (flux progressif nom → e-mail → mdp).
+  signUp,
+
+  /// « J'ai déjà un compte » : retrouver un compte existant.
+  signIn,
+}
+
+/// Ouvre la **bottom sheet d'authentification** façon Luma : propose les modes
+/// de connexion (Microsoft en tête, puis Google et Apple, et « Continuer avec
+/// un e-mail »).
+///
+/// Les quatre boutons sont proposés **quelle que soit** l'intention : quelqu'un
+/// qui revient a pu créer son compte avec n'importe lequel d'entre eux. C'est la
+/// raison pour laquelle [GetStartedIntent.signIn] n'est **pas** routé
+/// directement vers `/auth?emailOnly=1` — cet écran masque les fournisseurs
+/// sociaux (`sign_in_screen.dart`, `socialEnabled`), ce qui laisserait un compte
+/// Microsoft/Google/Apple devant un formulaire de mot de passe qu'il ne possède
+/// pas.
 ///
 /// Modale glass, présentée au-dessus de la racine pour couvrir tout l'écran de
 /// landing. Retourne quand la feuille est fermée (par la croix, un tap dehors,
 /// ou une navigation e-mail).
-Future<void> showGetStartedSheet(BuildContext context) {
+Future<void> showGetStartedSheet(
+  BuildContext context, {
+  GetStartedIntent intent = GetStartedIntent.signUp,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withOpacity(0.45),
-    builder: (BuildContext context) => const GetStartedSheet(),
+    builder: (BuildContext context) => GetStartedSheet(intent: intent),
   );
 }
 
@@ -29,10 +55,16 @@ Future<void> showGetStartedSheet(BuildContext context) {
 ///
 /// Câble les fournisseurs sociaux sur [authControllerProvider] avec un état de
 /// chargement par bouton, exactement comme `SignInScreen`. Le bouton e-mail
-/// **ferme la feuille** puis ouvre le flux d'inscription progressive
-/// (`/register/name`), qui expose aussi la connexion à un compte existant.
+/// **ferme la feuille** puis route selon [intent] : vers le flux d'inscription
+/// progressif (`/register/name`) pour [GetStartedIntent.signUp], vers le
+/// formulaire de connexion (`/auth?emailOnly=1`) pour [GetStartedIntent.signIn]
+/// — cet écran masque ses propres boutons sociaux, déjà proposés ici.
 class GetStartedSheet extends ConsumerStatefulWidget {
-  const GetStartedSheet({super.key});
+  const GetStartedSheet({super.key, this.intent = GetStartedIntent.signUp});
+
+  /// Pourquoi la feuille a été ouverte. Pilote le titre, le sous-titre, la
+  /// présence du badge « Recommandé » et la destination du bouton e-mail.
+  final GetStartedIntent intent;
 
   @override
   ConsumerState<GetStartedSheet> createState() => _GetStartedSheetState();
@@ -42,16 +74,23 @@ class _GetStartedSheetState extends ConsumerState<GetStartedSheet> {
   /// Fournisseur social dont la connexion est en cours (spinner du bouton).
   AuthProvider? _pending;
 
+  bool get _isSignIn => widget.intent == GetStartedIntent.signIn;
+
   void _signInSocial(AuthProvider provider) {
     setState(() => _pending = provider);
     ref.read(authControllerProvider.notifier).signIn(provider);
   }
 
   void _continueWithEmail() {
-    // Ferme la feuille avant de lancer le flux d'inscription progressif (façon
-    // Duo) : nom → e-mail → mot de passe → écrans post-création. La connexion à
-    // un compte existant reste accessible depuis le 1er écran de ce flux.
     Navigator.of(context).pop();
+    if (_isSignIn) {
+      // Compte existant : droit au formulaire de connexion. `emailOnly=1` y
+      // masque les fournisseurs sociaux, que cette feuille vient de proposer.
+      context.go('/auth?emailOnly=1');
+      return;
+    }
+    // Création : flux d'inscription progressif (façon Duo) nom → e-mail → mot
+    // de passe → écrans post-création.
     context.go('/register/name');
   }
 
@@ -137,7 +176,7 @@ class _GetStartedSheetState extends ConsumerState<GetStartedSheet> {
               ],
             ),
             Text(
-              'Commencer',
+              _isSignIn ? 'Content de te revoir' : 'Commencer',
               style: text.headlineSmall?.copyWith(
                 color: p.textPrimary,
                 fontWeight: FontWeight.w800,
@@ -145,14 +184,24 @@ class _GetStartedSheetState extends ConsumerState<GetStartedSheet> {
             ),
             const SizedBox(height: PrismSpacing.xxs),
             Text(
-              'Choisis comment te connecter pour lancer ta progression.',
+              _isSignIn
+                  // Guide vers le bon bouton : choisir un autre fournisseur
+                  // qu'à l'inscription ouvrirait un second compte, pas le sien.
+                  ? 'Choisis le mode que tu as utilisé à l’inscription.'
+                  : 'Choisis comment te connecter pour lancer ta progression.',
               style: text.titleMedium?.copyWith(color: p.textSecondary),
             ),
             const SizedBox(height: PrismSpacing.lg),
-            // Fournisseurs sociaux — toujours proposés depuis l'écran
-            // d'ouverture (Microsoft mis en avant, puis Google et Apple).
-            _RecommendedTag(color: p.primary),
-            const SizedBox(height: PrismSpacing.xs),
+            // Fournisseurs sociaux — toujours proposés, quelle que soit
+            // l'intention (Microsoft mis en avant, puis Google et Apple) : un
+            // compte existant a pu être créé avec n'importe lequel.
+            if (!_isSignIn) ...<Widget>[
+              // « Recommandé » n'a de sens qu'à la création : quelqu'un qui
+              // revient a déjà un fournisseur, lui en suggérer un induirait
+              // en erreur.
+              _RecommendedTag(color: p.primary),
+              const SizedBox(height: PrismSpacing.xs),
+            ],
             AuthProviderButton(
               provider: AuthProvider.microsoft,
               loading: _pending == AuthProvider.microsoft,

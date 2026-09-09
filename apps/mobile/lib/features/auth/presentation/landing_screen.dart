@@ -330,7 +330,10 @@ class _LandingScreenState extends ConsumerState<LandingScreen> with SingleTicker
                           const SizedBox(height: PrismSpacing.xs),
                           TextButton(
                             key: const Key('landing-existing-account'),
-                            onPressed: () => showGetStartedSheet(context),
+                            onPressed: () => showGetStartedSheet(
+                              context,
+                              intent: GetStartedIntent.signIn,
+                            ),
                             child: Text(
                               'J’ai déjà un compte',
                               style: text.titleSmall?.copyWith(
