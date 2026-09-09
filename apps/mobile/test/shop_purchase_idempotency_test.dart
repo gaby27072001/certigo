@@ -8,6 +8,8 @@ import 'package:certigo/app/providers.dart';
 import 'package:certigo/features/shop/presentation/shop_screen.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import 'support/fake_user_repository.dart';
+
 /// Purchase idempotency for [ShopScreen].
 ///
 /// The server dedupes a purchase on `clientPurchaseId` (ledger id
@@ -67,7 +69,10 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[shopRepositoryProvider.overrideWith((Ref ref) => repo)],
+        overrides: <Override>[
+          shopRepositoryProvider.overrideWith((Ref ref) => repo),
+          meProvider.overrideWith((Ref ref) async => testUserProfile()),
+        ],
         child: MaterialApp.router(theme: PrismTheme.light(), routerConfig: router),
       ),
     );

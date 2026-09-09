@@ -91,6 +91,9 @@ class _ShopContentState extends ConsumerState<_ShopContent> {
         });
         if (r.success) {
           ref.invalidate(shopCatalogProvider);
+          // The purchase granted tokens; refresh the profile so the reserve
+          // shown on the balance card matches what the server just recorded.
+          ref.invalidate(meProvider);
         }
       },
       failure: (Failure f) {
@@ -115,6 +118,9 @@ class _ShopContentState extends ConsumerState<_ShopContent> {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
     final ShopCatalog catalog = widget.catalog;
+    // Owned tokens live on the profile, not on the shop payload. Absent while
+    // the profile loads (or if it fails) — the shop stays usable either way.
+    final int? freezeTokens = ref.watch(meProvider).asData?.value.freezeTokens;
 
     if (catalog.items.isEmpty) {
       return const PrismStatusView(
@@ -144,6 +150,22 @@ class _ShopContentState extends ConsumerState<_ShopContent> {
                       'Dépense tes gemmes intelligemment.',
                       style: t.bodySmall?.copyWith(color: p.textSecondary),
                     ),
+                    if (freezeTokens != null) ...<Widget>[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: <Widget>[
+                          Icon(Icons.ac_unit_rounded, size: 14, color: p.info),
+                          const SizedBox(width: 4),
+                          Text(
+                            _freezeLabel(freezeTokens),
+                            style: t.labelMedium?.copyWith(
+                              color: p.textSecondary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -203,7 +225,7 @@ class _ShopItemCard extends StatelessWidget {
                   color: p.primary.withOpacity(0.14),
                   borderRadius: PrismRadii.cardMd,
                 ),
-                child: Icon(_kindIcon(item.kind), color: p.primary, size: 22),
+                child: Icon(shopKindIcon(item.kind), color: p.primary, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -291,13 +313,30 @@ class _ShopLoading extends StatelessWidget {
   }
 }
 
-IconData _kindIcon(String kind) {
-  return switch (kind) {
-    'streak_freeze' || 'freeze' => Icons.ac_unit_rounded,
-    'xp_boost' || 'xp' => Icons.bolt_rounded,
+/// Maps a server `kind` to its icon.
+///
+/// The value arrives as the .NET enum member name — `StreakFreeze` for
+/// `ShopItemKind.StreakFreeze` (`GamificationServices.cs:37` calls
+/// `i.Kind.ToString()`). Four spellings of that single concept have already
+/// existed in this repository at once, so we match a case- and
+/// separator-insensitive form instead of an exact literal.
+///
+/// This protects against a change of *form*, not a change of *name*: if the
+/// server ever renamed `StreakFreeze` to `StreakProtection`, the item would
+/// fall back to the generic icon — which is the intended behaviour, since a
+/// rename is a real change and should be visible rather than absorbed.
+IconData shopKindIcon(String kind) {
+  return switch (_normalizeKind(kind)) {
+    'streakfreeze' || 'freeze' => Icons.ac_unit_rounded,
+    'xpboost' || 'xp' => Icons.bolt_rounded,
     'heart' || 'hearts' => Icons.favorite_rounded,
     'gems' => Icons.diamond_rounded,
     'cosmetic' || 'theme' => Icons.palette_rounded,
     _ => Icons.shopping_bag_rounded,
   };
 }
+
+String _normalizeKind(String kind) => kind.toLowerCase().replaceAll(RegExp('[^a-z0-9]'), '');
+
+String _freezeLabel(int tokens) =>
+    tokens > 1 ? '$tokens gels de série en réserve' : '$tokens gel de série en réserve';
