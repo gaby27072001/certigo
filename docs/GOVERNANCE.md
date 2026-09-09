@@ -903,6 +903,31 @@ mesure.
 comparaison détruite par la transformation mesurée), l'autre côté entrée (le défaut normalisé
 avant d'atteindre le comparateur).
 
+### Le rendu peut mentir sur la présence des données
+
+> Ajouté le **2026-09-09**. Nouvelle variante de la famille des instruments qui mentent, la plus
+> insidieuse pour un opérateur humain : **un affichage vide se lit comme une absence, jamais comme
+> une panne d'affichage**. **Invalidée** le jour où l'outil rend le même résultat quel que soit le
+> format demandé, ou signale explicitement lorsqu'un rendu tabulaire a soustrait des lignes.
+
+**Le motif mesuré.** Une même requête, sur le même corpus, à la même seconde : rendue en tableau,
+elle affiche **zéro ligne** ; rendue en format structuré, elle affiche **seize**. Ni la requête ni
+la donnée n'ont menti — **c'est la couche d'affichage qui a soustrait, silencieusement**.
+
+**Ce qui rend cette variante plus dangereuse que les précédentes.** Un tableau vide **ne demande
+pas à être expliqué** : il est cohérent avec lui-même, il ressemble à une réponse, il clôt la
+question comme un vert (voir « Un succès exact peut clôturer l'examen »). Un opérateur qui voit
+zéro ligne conclut à l'absence — c'est la lecture attendue d'un tableau vide. **La panne de rendu
+ne se trahit qu'en changeant de format**, jamais dans le rendu lui-même.
+
+**Contre-mesure — gratuite, mais avant la conclusion.** Quand un affichage rend zéro, **redemander
+la même requête dans un autre format** avant de conclure à l'absence. Un écart entre les deux
+formats désigne la panne ; leur accord ferme la question.
+
+> **Un affichage vide est un instrument qui ment sans mentir : il ne fabrique rien de faux, il
+> soustrait ce qu'il devait montrer. Un négatif silencieux dont seule la comparaison avec un
+> témoin d'un autre format le fait apparaître.**
+
 ### L'instrument aveugle à son propre passé
 
 > Ajouté le **2026-09-09**. Nouvelle forme de la famille des instruments qui mentent, la plus
@@ -1009,6 +1034,42 @@ il n'apportait que du risque.
 était autre**. Si aucune : ne pas l'écrire. Cette règle est plus stricte que la précédente : elle
 ne dit pas seulement *comment* transmettre un chiffre, elle dit *quand ne pas l'écrire du tout*.
 
+### Un nombre qui décide s'écrit avec le mécanisme qui le contraint
+
+> Ajouté le **2026-09-09**, à lire en miroir immédiat de la sous-section précédente.
+> **Invalidée** le jour où toute valeur numérique portant une garantie apparaît, au point où elle
+> est écrite, à côté du mécanisme qui l'a contrainte — et où toute modification de la valeur est
+> refusée quand le mécanisme n'a pas été relu.
+
+**Le symétrique de « le chiffre qui ne décide pas ne s'écrit pas ».** La règle précédente attrape
+le chiffre inscrit **sans décision**. Celle-ci attrape le chiffre inscrit **sans son mécanisme
+contraignant**. Les deux se lisent ensemble : **un nombre du dépôt sans mécanisme adossé n'est pas
+une mesure — c'est une préférence.**
+
+**Le motif.** Une cadence, un délai, un intervalle est fixé non pour son coût propre mais pour
+**rester en deçà d'une borne d'expiration définie ailleurs** — sur un jeton, un lock, une session,
+une fenêtre de validité. Écrite seule, la valeur ressemble à un choix économique. Un lecteur
+ultérieur qui cherche à la simplifier — rehausser pour économiser des appels, arrondir à une
+valeur plus « propre » — ne voit pas la contrainte : il agit sur ce qui ressemble à une préférence,
+et **franchit la borne** — silencieusement, et seulement plus tard, quand le jeton expirera plus
+vite que la boucle ne le rafraîchit.
+
+> **Une préférence se simplifie ; une contrainte se relit. Écrire un nombre sans son mécanisme,
+> c'est le faire passer de contrainte à préférence sous la main d'un lecteur qui ne le savait
+> pas.**
+
+**Contre-mesure — bon marché, au moment d'écrire.** Toute valeur numérique portant une garantie
+s'écrit avec sa contrainte **au même endroit**, en trois éléments suffisants : la borne qu'elle
+respecte, la marge conservée sous cette borne, et le fichier ou paramètre où la borne est
+définie. Sans ces trois éléments, la modification suivante de la valeur se fera à l'aveugle.
+
+**Corollaire — comment lire les deux règles ensemble.** L cadre l'**omission** : *ne pas écrire un
+chiffre qui ne décide pas.* Q cadre l'**écriture** : *ne pas écrire un chiffre utile sans son
+mécanisme.* Ensemble, elles ne laissent que deux formes acceptables à un nombre du dépôt : soit il
+décide et il porte son mécanisme, soit il ne décide pas et il n'est pas écrit. **Tout nombre
+présent sans mécanisme adossé est présumé être une préférence — et les préférences se
+simplifient.**
+
 ### La parade de dernier recours : deux mesures qui se contredisent
 
 Aucune parade de ce §7 n'aurait attrapé le cas ci-dessus. **Ce qui l'a fait tomber, c'est un `404`
@@ -1103,6 +1164,17 @@ Vérifier qu'un test emprunte **la branche du service**, pas seulement qu'il pas
 dans un champ Secure du fournisseur est masqué dès l'enregistrement ; toute confirmation ultérieure
 ne peut plus porter que sur l'**existence de la ligne**, jamais sur son **contenu**. **Vérifier
 avant que l'objet devienne invérifiable, ou ne pas prétendre vérifier.**
+
+**Corollaire — choisir une valeur dont la justesse ne dépend pas de l'état où l'on est.** Ce
+corollaire porte sur les **paramètres**, non sur les dispositifs. Il partage avec la règle
+principale la structure du filet non testé, transposée : une valeur numérique dont la **justesse
+n'est vérifiable que dans un état où l'on n'est pas** — l'état actif, l'état chargé, l'état
+d'incident — est un paramètre qu'on ne peut pas éprouver au moment de l'écrire. Il n'interdit pas
+d'agir : **il commande de choisir la valeur qui survit à l'activation future, et non celle qui
+optimise l'état présent.** Un paramètre optimal pour l'état actuel qui deviendra faux au moment
+où il servira réellement se comporte, à l'usage, comme un filet non testé : c'est en service
+qu'on découvrira qu'il ne tenait pas — au pire moment, comme le dispositif principal de cette
+sous-section.
 
 ### Un motif correct présent ne protège pas ses voisins — il les expose
 
