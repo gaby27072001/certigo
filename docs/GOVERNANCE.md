@@ -876,6 +876,52 @@ Aux n°3, 4 et 9, **des entrées différentes rendaient exactement la même sort
 C'est le seul symptôme commun à plusieurs de ces incidents, et il se teste **sans comprendre la
 panne** : faire varier l'entrée, regarder si la sortie bouge.
 
+**Corollaire côté règle de décision.** Sur deux corpus de questions relayés le **2026-09-09**, la
+même règle a commandé **deux décisions opposées** — ne pas réécrire sur l'un, réécrire sur l'autre
+— parce que les axes qu'elle examinait n'avaient pas le même poids dans chaque corpus. **C'est
+cette capacité à trancher dans les deux sens qui valide un critère** : un critère qui ne peut
+produire qu'une seule réponse ne mesure rien, et l'uniformité qu'il présente dans ses sorties n'est
+pas une propriété du monde, mais du critère lui-même. Le détail chiffré appartient au dépôt de
+contenu où la mesure a été faite ; ici, seul importe le geste — **exiger d'un critère qu'il
+démontre, avant d'être utilisé, qu'il peut trancher dans l'autre sens**.
+
+### Le détecteur qui normalise ce qu'il cherche
+
+> Ajouté le **2026-09-09**. Variante d'entrée de ce que la sous-section « Les dix instruments
+> vides » nommait « réponse vraie par construction » (n°7).
+
+Un contrôle du presse-papiers appliquait `.Trim()` sur la première ligne **avant** de tester le
+préfixe attendu, alors que l'hypothèse examinée était précisément « un caractère invisible en
+tête ». **L'instrument normalisait le défaut qu'il devait détecter** — il ne pouvait pas le
+trouver, non parce qu'il était absent, mais parce que la chaîne de mesure l'avait retiré avant la
+mesure.
+
+> **Un détecteur qui transforme son entrée avant de la comparer ne détecte plus qu'après cette
+> transformation ; si le défaut cherché est dans la transformation, il n'apparaît jamais.**
+
+À ranger avec le n°7 de la table : deux formes du même piège, l'un côté sortie (la clé de
+comparaison détruite par la transformation mesurée), l'autre côté entrée (le défaut normalisé
+avant d'atteindre le comparateur).
+
+### L'instrument aveugle à son propre passé
+
+> Ajouté le **2026-09-09**. Nouvelle forme de la famille des instruments qui mentent, la plus
+> retorse rencontrée jusqu'ici — elle échappe à la parade d'uniformité, parce que l'instrument
+> **ne varie pas** : il ne voit pas.
+
+Un outil que nous appelions liste les ressources existantes **en les filtrant par la clé qu'on lui
+fournit**, puis crée si la liste rendue est vide. **Son filtre est donc aussi son critère
+d'existence.** Conséquence : une ressource créée par ce même outil sous une clé antérieure
+**n'apparaît dans aucune liste qu'il consulte**. Il ne peut structurellement pas signaler qu'on
+approche d'un plafond fournisseur — il verra `0`, créera, et l'échec viendra de plus loin, dans
+un message qui ne nommera pas la cause.
+
+> **Un instrument dont le filtre sert de critère d'existence est aveugle à tout ce qui existe hors
+> du filtre — y compris à ce qu'il a lui-même produit.**
+
+**Contre-mesure.** Quand un outil décide « ça n'existe pas », demander **sur quel critère** — et
+compter la ressource **hors de l'outil** quand ce critère est fourni par l'appelant.
+
 ### Trois règles d'inférence, chacune payée deux fois
 
 **1. Le volume dit combien, il ne dit pas si.** Deux fois, une session a mesuré une composition exacte
@@ -894,6 +940,23 @@ puis recyclé comme frais a donné **« 28 PR ouvertes »** là où il y en avai
 là où la soustraction de deux horodatages donne **56** — les deux valeurs justes figurant, mesurées,
 sous « Un vert peut décrire une base qui n'existe plus ». Une note bien datée reste vraie **à sa
 date** ; la recycler sans la redater la transforme en mesure fausse.
+
+### Un contrôle nécessaire n'est pas un contrôle suffisant
+
+> Ajouté le **2026-09-09**.
+
+La validation d'une clé PEM traverse deux portes distinctes, **éloignées dans le temps** : d'abord
+`value.startswith("-----BEGIN ")` à l'analyse des arguments, puis `load_pem_private_key` bien plus
+tard, à l'usage réel. **Une valeur aplatie sur une seule ligne franchit la première et échoue à la
+seconde.** Le premier contrôle est nécessaire ; il n'est pas suffisant, et rien dans son succès ne
+distingue une valeur valide d'une valeur qui *commence bien*.
+
+> **Le franchissement d'un contrôle nécessaire ne prouve pas la validité — il prouve que la valeur
+> a la forme qui fait franchir ce contrôle.** Lire l'un pour l'autre, c'est ranger un instrument
+> partiel comme instrument complet.
+
+Séparer les deux contrôles dans le temps rend la confusion structurelle : entre les deux, un lecteur
+qui a vu passer le premier conclut au pire moment que le second n'était pas censé échouer.
 
 ### Le transport ampute la portée avant le chiffre
 
@@ -924,6 +987,28 @@ celui-ci est un défaut de **transport**.
    chiffre avait circulé huit heures **parce qu'il n'était pas contesté**, ce qui n'est pas une
    propriété de la mesure.
 
+### Le chiffre qui ne décide pas ne s'écrit pas
+
+> Ajouté le **2026-09-09**, immédiatement après avoir failli inscrire nous-mêmes une valeur
+> incorrecte dans un commentaire. Le mécanisme est écrit sans valeur numérique ; l'incident précis
+> qui a produit ce constat n'appartient pas au dépôt — c'est ce que ce constat prescrit.
+
+Ce prolongement attrape ce que la sous-section précédente ne couvre pas. « Le transport ampute la
+portée avant le chiffre » attrape le nombre relayé sans objet ni date ; celui-ci attrape le nombre
+**écrit sans décision**. Un plafond fournisseur allait être inscrit dans un commentaire.
+Vérification faite, la valeur retenue portait sur un programme voisin, et la valeur réelle était
+différente — l'une comme l'autre venant de sources tierces, donc **non mesurées**. Et surtout, **la
+règle qui en dépendait était identique pour les deux valeurs.** Le chiffre n'a jamais rien décidé ;
+il n'apportait que du risque.
+
+> **Quand le mécanisme décide et que le chiffre ne décide pas : écrire le mécanisme, omettre le
+> chiffre.** Un nombre attire l'œil, se périme, et se transporte hors de son contexte ; c'est lui
+> qui deviendra faux, et il sera cru **parce qu'il est précis**.
+
+**Contre-mesure.** Avant d'inscrire une valeur, se demander **quelle décision changerait si elle
+était autre**. Si aucune : ne pas l'écrire. Cette règle est plus stricte que la précédente : elle
+ne dit pas seulement *comment* transmettre un chiffre, elle dit *quand ne pas l'écrire du tout*.
+
 ### La parade de dernier recours : deux mesures qui se contredisent
 
 Aucune parade de ce §7 n'aurait attrapé le cas ci-dessus. **Ce qui l'a fait tomber, c'est un `404`
@@ -938,6 +1023,91 @@ Elle ne se planifie pas — on ne décide pas de rencontrer une contradiction. M
 qu'on la connaît, et elle est gratuite : elle ne demande qu'un second regard sur deux résultats
 qu'on possède déjà.
 
+**Attention aux fausses contradictions par convention inversée.** Deux mesures **identiques**
+exprimées dans deux conventions opposées — par exemple `rang 0 = la plus courte` côté outil,
+`rang 0 = la plus longue` côté rapport — se lisent comme un désaccord. **C'est exactement le
+signal qu'on utilise pour détecter les vraies erreurs** ; le confondre avec une contradiction
+réelle use un détecteur qui n'a rien d'autre à sa place. **Toute mesure transmise doit donc porter
+sa convention** — au même titre qu'un nombre relayé porte son objet et sa date — sous peine de
+déclencher un détecteur légitime sur un faux positif, et de l'user.
+
+### Le dispositif de secours n'est éprouvé que hors incident
+
+> Ajouté le **2026-09-09**. **Invalidée** le jour où chaque workflow présenté chez nous comme filet
+> de sécurité porte, dans un cycle plus court que sa condition d'invocation, la preuve datée d'un
+> lancement délibéré hors incident, **sur le chemin qu'il empruntera en service**.
+
+**Le cas, chez nous.** `codemagic.yaml`, workflow `ios-refresh-signing` : il ne déclare aucun bloc
+`groups:` sous `environment:`, alors que les trois autres workflows iOS de ce dépôt (`ios-release`,
+`ios-release-dry`, `ios-crash-smoke`) déclarent tous `groups: - certigo_mobile_config`. L'ancre
+`step_setup_signing` qu'il invoque utilise `--certificate-key @env:CERTIFICATE_PRIVATE_KEY`,
+variable Secure de ce groupe. Il échoue donc à 100 %, dès sa première seconde. Il est `manual-only`
+— aucun push ne l'a jamais déclenché, personne ne l'a jamais lancé — et il a été présenté à
+plusieurs reprises, par nous-mêmes, comme le filet à utiliser en cas de problème de signature iOS.
+
+Un dispositif de secours n'est éprouvé que par le chemin qu'on n'emprunte qu'en cas d'incident.
+Sans lancement délibéré **hors** incident, son premier essai réel a lieu au pire moment — en
+situation déjà dégradée, où il empile une seconde erreur trompeuse sur la première.
+
+> **« On remplacera un filet cassé par un filet non testé. »**
+
+**Corollaire.** Un filet non testé est **plus dangereux** qu'un filet absent, parce qu'on renonce
+à d'autres protections en comptant dessus.
+
+**Corollaire de coût — le moment change ce que le test coûte.** L'outil de signature
+(`fetch-signing-files --create`) est idempotent : il crée ce qui manque, réutilise ce qui existe.
+Lancer le filet **avant** que le certificat Apple n'existe le **crée** — et consomme le quota qu'il
+sert à protéger ; le lancer **après** le réutilise, et le test est gratuit. **Le moment d'un test
+peut changer son coût du tout au rien** ; le régime de vérification doit choisir ce moment, pas le
+subir.
+
+**Corollaire de validité — le moment change *ce* qui est testé.** Le même outil suit deux chemins
+distincts : **créer** la ressource si elle manque, **réutiliser** celle qui existe. Un filet réel
+n'est emprunté, en service, que sur le chemin de **réutilisation**. Le tester avant que la
+ressource n'existe valide donc le chemin de **création** — l'autre branche.
+
+> **Un filet non testé n'inspire aucune confiance. Un filet testé sur une branche qu'il
+> n'empruntera jamais en service en inspire une fausse** — et une fausse assurance est plus
+> coûteuse qu'une absence d'assurance, parce qu'elle **clôt l'examen**.
+
+Vérifier qu'un test emprunte **la branche du service**, pas seulement qu'il passe au vert.
+
+**Corollaire d'ordre — vérifier avant que l'objet devienne invérifiable.** Un secret enregistré
+dans un champ Secure du fournisseur est masqué dès l'enregistrement ; toute confirmation ultérieure
+ne peut plus porter que sur l'**existence de la ligne**, jamais sur son **contenu**. **Vérifier
+avant que l'objet devienne invérifiable, ou ne pas prétendre vérifier.**
+
+### Un motif correct présent ne protège pas ses voisins — il les expose
+
+> Ajouté le **2026-09-09**, dernier constat du lot. Famille **distincte** de celle des mécanismes
+> dormants qui précède (les dix instruments vides, le filet non testé) : là où ceux-là sont
+> **construits et jamais empruntés**, celui-ci est **construit, emprunté à un endroit, et non imité
+> aux endroits qui ont le même besoin**. Sans cette distinction, un lecteur du §7 conclurait que
+> « tout est construit mais éteint », alors qu'une part est **construite, allumée, et contredite
+> ailleurs**.
+
+**Le cas mesuré chez nous ce matin.** Une clé d'idempotence est fabriquée **correctement** dans un
+contrôleur du dépôt — stable, réutilisée entre deux tentatives. Le même besoin est traité de
+travers dans plusieurs fichiers voisins, où la clé est régénérée à chaque envoi. La bonne
+implémentation n'a pas été **imitée** ; elle n'a pas non plus **appelé** l'examen qui l'aurait
+révélé.
+
+Les deux familles se distinguent par où se trouve le défaut :
+
+- **Mécanisme dormant** — la bonne implémentation existe et **n'est pas appelée**.
+- **Motif non suivi** — la bonne implémentation existe, **est appelée** ailleurs, et **n'a pas été
+  imitée** au voisinage.
+
+> **Un motif correct présent dans un fichier voisin ne protège pas les autres : il les expose.** Sa
+> présence donne l'impression que le sujet est traité, **et éteint l'examen au lieu de l'appeler**.
+> Un dépôt sans aucune implémentation correcte aurait été audité ; celui-ci ne l'a pas été **parce
+> qu'il en avait une**.
+
+**Contre-mesure, bon marché.** Quand on corrige une occurrence d'un motif, chercher ses frères
+**par le besoin, pas par le symbole**. Un `grep` sur le nom de la variable trouve les copies ; il
+ne trouve pas les endroits qui résolvent le même problème sous un autre nom. **La question utile
+n'est pas « où ce symbole apparaît-il », mais « quels autres endroits ont ce besoin ».**
+
 ### Citer sans envoyer le lecteur au mauvais endroit
 
 **Citez par titre de section et courte phrase entre guillemets, jamais par numéro de ligne.** Une
@@ -948,6 +1118,28 @@ réelle qui dit autre chose, et le lecteur en conclut que l'auteur s'est trompé
 fonction de `.github/scripts/backend-deploy-workflow-policy.mjs` s'appelle
 **`validateNoncanonicalWorkflows`**. Un nom inventé mais plausible envoie chercher une modification
 qui n'a jamais eu lieu — un coût qu'aucune relecture ne rattrape, puisque rien ne paraît faux.
+
+**Ne pas croire les commentaires qui affirment une équivalence — les vérifier sur le code.** Le
+2026-09-09, dans `codemagic.yaml`, deux traces écrites contredisent le YAML dans le **même
+fichier** : le commentaire de l'ancre `step_setup_signing` **nomme explicitement le groupe requis**
+— « stored as a SECURE variable in the `certigo_mobile_config` group » — à environ 340 lignes de
+distance du workflow `ios-refresh-signing` qui l'ignore ; le commentaire de ce workflow affirme
+« Same idempotent recipe as the build workflows » — faux, puisqu'il lui manque le bloc `groups:`
+que les trois autres déclarent. C'est le **deuxième** commentaire faux relevé dans ce fichier en
+24 h ; le premier concernait le reporting de statut GitHub par Codemagic et a été remplacé au
+commit `36b5b873`.
+
+> **Un commentaire décrit l'intention de son auteur, le code décrit l'exécution.** Quand un
+> commentaire affirme une équivalence entre deux blocs — « même recette », « idempotent comme
+> l'autre » — la vérifier sur le code plutôt que la croire.
+
+**Un message d'erreur exact peut désigner une cause fausse.** Quand la variable n'est pas injectée,
+l'outil Codemagic lève `Environment variable "X" is not defined`. Un lecteur cherche alors une
+variable manquante côté fournisseur — **alors que la variable existe et que c'est le workflow qui
+ne la demande pas**, faute d'avoir déclaré le groupe qui la porte. Le message est exact, et pointe
+pourtant à l'opposé de la cause. **Une sortie exacte peut désigner une cause fausse dès qu'un
+intermédiaire n'a pas été nommé** — ici : le groupe. À ranger avec les instruments qui mentent
+sans mentir.
 
 ### Ce qui a réellement corrigé
 
