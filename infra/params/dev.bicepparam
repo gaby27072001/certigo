@@ -73,13 +73,32 @@ param appleCiamDomainReconfigured = false
 // Its expiration is fixed and reviewable: deployments do not extend it implicitly.
 param authJwtSigningKeyExpiresOn = '2027-08-31T00:00:00Z'
 
-// AI tutor infrastructure is managed independently from runtime activation.
-// The live read-only audit confirms the private/keyless AIServices account,
-// gpt-5.4-mini deployment and existing OpenAI User role assignment. Runtime
-// remains disabled because the Foundry private DNS path is incomplete.
-// Do not flip this flag until that DNS adoption has its own approved Provider
-// what-if and backend/run-tutor-llm-live-gate.ps1 proves a real LLM response.
-// See docs/deployment-runbook.md §T0.5 "Chemin 3".
+// AI tutor infrastructure is managed independently from runtime activation:
+// `module tutor` in main.bicep is gated on `env == 'dev' && !empty(tutorLlmDeployment)`,
+// never on this flag — infra/tests/least-privilege.test.mjs asserts both halves. So the
+// AIServices account, the gpt-5.4-mini deployment and the OpenAI User role assignment
+// are redeployed on EVERY dev CD run, whether this flag is true or false. Dev therefore
+// already pays for that account today.
+//
+// Two conditions were required before flipping this. Status as measured 2026-09-09:
+//
+//   (1) private DNS adoption — LIFTED. adoptOpenAiPrivateDns (below) landed 2026-09-07
+//       and was really deployed, not what-if'd, by cd-backend run 34334286423 on
+//       2026-09-09: its "Prepare infrastructure (dev)" job runs `az deployment sub
+//       create` (.github/workflows/cd-backend.yml:457) and succeeded. The earlier
+//       "the Foundry private DNS path is incomplete" note was already stale when it
+//       was written, one day after the adoption had been committed.
+//
+//   (2) a real LLM round-trip — STILL PENDING. backend/run-tutor-llm-live-gate.ps1 has
+//       never run green. This is NOT a formality: it is the only check that proves the
+//       private network path, the keyless RBAC grant and the model deployment actually
+//       answer. None of those three can be read from a file. Without it, flipping this
+//       buys a silent permanent "grounded" fallback while still paying for the account.
+//
+// Do not flip until (2) is green. It does not require committing this flag first:
+// deploy with an explicit override instead — `az deployment sub create ... --parameters
+// tutorLlmEnabled=true` — then run the gate, then commit the flip.
+// Full procedure and the exact command: docs/deployment-runbook.md §T0.5 "Chemin 3".
 param tutorLlmEnabled = false
 param tutorLlmEndpoint = 'https://certigo-openai.services.ai.azure.com/api/projects/certigo-dev/openai/v1/'
 param tutorLlmDeployment = 'gpt-5.4-mini'

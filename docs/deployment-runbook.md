@@ -664,12 +664,19 @@ Entra n'est **pas** appliqué (`DevTokenValidator`), donc tout bearer non vide e
 
 ### Chemin 3 — Tutor IA LLM réel (`dev` uniquement) — ⛔ humain avec accès Azure requis
 
-> **Ne s'applique pas aujourd'hui** : `TUTOR_LLM_ENABLED=false` en `dev` **et** en
-> prod (voir `docs/adr/ADR-O-01-ai-tutor-prod.md` et `infra/params/dev.bicepparam`).
-> Cette procédure sert à **valider** une future réactivation en `dev` — elle ne
-> doit être suivie que par une personne disposant d'un accès réel à
+> **État au 2026-09-09** : `TUTOR_LLM_ENABLED=false` en `dev` **et** en prod
+> (voir `docs/adr/ADR-O-01-ai-tutor-prod.md` — la prod reste sur le repli
+> déterministe, décision inchangée — et `infra/params/dev.bicepparam`).
+> Cette procédure est la **seule** façon de prouver que le modèle répond
+> réellement en `dev`, et l'étape 3 ci-dessous n'a **jamais** été exécutée verte.
+> Elle ne peut l'être que par une personne disposant d'un accès réel à
 > l'abonnement/tenant Azure Certigo (un agent CLI/IA sans cet accès ne peut ni
 > l'exécuter ni la simuler).
+>
+> **Il n'y a pas de dépendance circulaire ici.** Prouver l'appel n'exige *pas* de
+> committer `tutorLlmEnabled = true` au préalable : l'étape 2 déploie le flag par
+> un **override explicite** `--parameters tutorLlmEnabled=true`, sans toucher au
+> fichier de paramètres. L'ordre est donc : override → preuve → commit.
 
 Historique du blocage : #99 a activé le flag en dev ; #178 a ajouté le module
 IaC d'adoption `infra/modules/openai.bicep` (compte `certigo-openai`,
@@ -677,10 +684,15 @@ kind `AIServices`, attribution du rôle **Cognitive Services OpenAI User** —
 `5e0bd9bd-7b93-4f28-af87-19fc36ad61bd` — à l'identité managée de la Function
 App) ; #181 a **repassé le flag à `false`** suite à un échec réel de
 déploiement (`DeploymentModelNotSupported` sur le modèle `gpt-5.4-mini`), pour
-débloquer un correctif de sécurité sans rapport. Le module `tutor` est gated
-par `if (tutorLlmEnabled)` (`infra/main.bicep`) : il n'a **plus été déployé
-depuis** #181, donc ni le grant RBAC ni la compatibilité du déploiement de
-modèle ne sont revérifiés dans la forme IaC actuelle.
+débloquer un correctif de sécurité sans rapport.
+
+Ce blocage est **levé**. Le module `tutor` n'est plus gated par le flag : il l'est
+par `if (env == 'dev' && !empty(tutorLlmDeployment))` (`infra/main.bicep`), scellé
+par `infra/tests/least-privilege.test.mjs`. Il est donc redéployé à **chaque** CD
+`dev`, et le run `34334286423` du 2026-09-09 (job « Prepare infrastructure (dev) »,
+`az deployment sub create`) est **success** — le grant RBAC et le déploiement de
+modèle `gpt-5.4-mini` passent désormais. Ce qui reste non vérifié est l'**appel
+lui-même** (étape 3).
 
 1. **What-if avant tout** — confirmer que le déploiement ne rejoue pas
    l'échec de #181 :
@@ -694,8 +706,18 @@ modèle ne sont revérifiés dans la forme IaC actuelle.
    Si `DeploymentModelNotSupported` (ou toute erreur sur la ressource
    `Microsoft.CognitiveServices/accounts/deployments`) réapparaît, **ne pas
    déployer** — le blocage persiste, documenter et escalader.
-2. **Déployer** seulement si le what-if est propre, puis vérifier
-   l'attribution de rôle réelle :
+2. **Déployer par override** seulement si le what-if est propre. L'override est
+   ce qui évite de committer le flag avant d'avoir la preuve — le fichier de
+   paramètres reste à `false` :
+   ```bash
+   az deployment sub create \
+     --name certigo-dev \
+     --location westeurope \
+     --template-file infra/main.bicep \
+     --parameters infra/params/dev.bicepparam \
+     --parameters tutorLlmEnabled=true
+   ```
+   Puis vérifier l'attribution de rôle réelle :
    ```bash
    az role assignment list --scope "$(az cognitiveservices account show \
      -g rg-certigo-dev -n certigo-openai --query id -o tsv)" \
@@ -717,9 +739,11 @@ modèle ne sont revérifiés dans la forme IaC actuelle.
    Le test échoue explicitement (assertion sur `source`) si la réponse est un
    repli déterministe plutôt qu'une vraie complétion LLM — voir
    `backend/tests/Certigo.Api.Tests/TutorLlmLiveEndToEndTests.cs`.
-4. **Seulement après un 3. vert**, envisager de fixer `tutorLlmEnabled = true`
-   dans `infra/params/dev.bicepparam` (et de corriger son commentaire), avec
-   revue normale (PR).
+4. **Seulement après un 3. vert**, fixer `tutorLlmEnabled = true` dans
+   `infra/params/dev.bicepparam` (et corriger son commentaire), avec revue
+   normale (PR). Si 3. est **rouge** — `source:"grounded"` au lieu de `"ai"`, ou
+   un 5xx — **ne pas committer le flag** : le repli déterministe est déjà l'état
+   par défaut, il n'y a rien à annuler. Documenter l'échec et escalader.
 
 ---
 
@@ -930,13 +954,18 @@ az role assignment create \
   --role "Cognitive Services OpenAI User" --scope "$OPENAI_ID"
 ```
 
-> **État actuel (mise à jour).** **RBAC accordé en `dev`** (rôle `Cognitive Services OpenAI User`
-> sur `certigo-openai` pour l'identité managée de `func-certigo-dev`) et **tuteur activé en
-> `dev`** : les app settings `TUTOR_LLM_*` sont décommentés dans `infra/params/dev.bicepparam` et
-> déployés par `cd-backend`. Code Foundry v1 / GPT‑5 compilé et **couvert par tests unitaires**
-> (Infra + Application verts). **Résiduel : un seul appel réel de validation** (voir §
-> « Validation live » ci-dessous) doit renvoyer **200 + une explication LLM authentique** avant de
-> basculer le statut du tuteur en 🟢 (cf. `docs/ETAT_DU_PROJET.md` §13).
+> **État actuel (mise à jour 2026-09-09).** **RBAC accordé en `dev`** (rôle
+> `Cognitive Services OpenAI User` sur `certigo-openai` pour l'identité managée de
+> `func-certigo-dev`), et le module `infra/modules/openai.bicep` qui le porte est
+> redéployé à **chaque** CD `dev` — il est gated sur
+> `env == 'dev' && !empty(tutorLlmDeployment)`, **pas** sur le flag runtime.
+> En revanche le **tuteur n'est PAS activé** : `tutorLlmEnabled = false` dans
+> `infra/params/dev.bicepparam`, donc `TUTOR_LLM_ENABLED=false` et le backend sert
+> le composeur déterministe (`NullTutorCompletion`). Code Foundry v1 / GPT‑5
+> compilé et **couvert par tests unitaires** (Infra + Application verts).
+> **Résiduel : un seul appel réel de validation** (voir § « Validation live »
+> ci-dessous) doit renvoyer **200 + `source:"ai"`** avant de basculer le flag puis
+> le statut du tuteur en 🟢 (cf. `docs/ETAT_DU_PROJET.md` §13).
 
 ### Validation live (1 appel réel)
 
