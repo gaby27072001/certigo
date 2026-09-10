@@ -68,9 +68,7 @@ class OnboardingScaffold extends StatelessWidget {
 
     final Widget body = Padding(
       padding: padding,
-      child: scrollable
-          ? SingleChildScrollView(physics: const BouncingScrollPhysics(), child: child)
-          : child,
+      child: scrollable ? SingleChildScrollView(child: child) : child,
     );
 
     return Scaffold(

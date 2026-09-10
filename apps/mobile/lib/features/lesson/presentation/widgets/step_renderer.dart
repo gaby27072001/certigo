@@ -59,7 +59,6 @@ class StepRenderer extends StatelessWidget {
 
     return ListView(
       padding: PrismSpacing.screen,
-      physics: const BouncingScrollPhysics(),
       children: <Widget>[content],
     );
   }

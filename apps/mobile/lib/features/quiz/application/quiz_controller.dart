@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import 'quiz_entry.dart';
 import 'sample_quiz.dart';
+import '../../lesson/application/lesson_feedback.dart';
 
 /// Immutable bundle carrying the outcome of a quiz submission back to the UI.
 class QuizSubmission {
@@ -39,7 +40,8 @@ class QuizController extends ChangeNotifier {
     required this.lessonId,
     RuntimeContentPinRegistry? contentPins,
     String? contentOwnerId,
-  })  :
+    LessonFeedback feedback = const SilentLessonFeedback(),
+  })  : _feedback = feedback,
         // Keep the optional dependency source-compatible with direct controller tests.
         // ignore: prefer_initializing_formals
         _contentPins = contentPins,
@@ -54,6 +56,10 @@ class QuizController extends ChangeNotifier {
   final String lessonId;
   final RuntimeContentPinRegistry? _contentPins;
   final String? _contentOwnerId;
+
+  /// Retour audio-haptique partagé avec les leçons. Muet par défaut pour que les
+  /// tests qui construisent le contrôleur directement restent déterministes.
+  final LessonFeedback _feedback;
 
   List<QuizEntry> _items = <QuizEntry>[];
   bool _loading = true;
@@ -164,6 +170,10 @@ class QuizController extends ChangeNotifier {
       final bool ok = pickedId == current.correctOptionId;
       current.lastAnswerCorrect = ok;
       if (ok) _correctCount++;
+      // Émis ici seulement : sans correction locale, `lastAnswerCorrect` reste à
+      // sa valeur par défaut `false` et l'appareil annoncerait « faux » même sur
+      // une bonne réponse corrigée par le serveur.
+      _feedback.graded(correct: ok);
     }
     notifyListeners();
   }
