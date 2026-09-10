@@ -129,10 +129,23 @@ class HttpCredentialsGateway implements CredentialsGateway {
   /// déjà des messages en français ; on reste robuste en se basant sur le code.
   ({String message, AuthFailureCause cause}) _describeFor(Failure failure) {
     if (failure is NetworkFailure) {
-      return (
-        message: 'Pas de connexion. Vérifiez votre réseau puis réessayez.',
-        cause: AuthFailureCause.network,
-      );
+      // Chaque cause n'affirme que ce qu'elle a établi. Sur un délai de
+      // réponse, la connexion a abouti : accuser le réseau de l'utilisateur
+      // l'enverrait réparer ce qui n'est pas cassé.
+      return switch (failure.kind) {
+        NetworkFailureKind.unreachable => (
+            message: 'Pas de connexion. Vérifiez votre réseau puis réessayez.',
+            cause: AuthFailureCause.network,
+          ),
+        NetworkFailureKind.connectTimeout => (
+            message: 'La connexion a expiré. Vérifiez votre réseau, ou réessayez dans un instant.',
+            cause: AuthFailureCause.timeout,
+          ),
+        NetworkFailureKind.responseTimeout => (
+            message: 'Le serveur met trop de temps à répondre. Réessayez dans un instant.',
+            cause: AuthFailureCause.timeout,
+          ),
+      };
     }
     if (failure is AuthFailure) {
       return (

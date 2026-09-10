@@ -13,9 +13,50 @@ sealed class Failure {
   String toString() => 'Failure(${code ?? runtimeType}, $message)';
 }
 
+/// Pourquoi une requête a échoué au niveau du transport.
+///
+/// Ces trois cas étaient auparavant confondus en un seul [NetworkFailure], ce
+/// qui faisait afficher « vérifiez votre réseau » à un utilisateur dont la
+/// connexion venait précisément d'aboutir. La distinction existe côté client
+/// HTTP ; elle est conservée jusqu'à l'interface.
+enum NetworkFailureKind {
+  /// Aucune connexion n'a pu être établie : hors ligne, DNS, pas de route.
+  /// C'est le seul cas où demander à l'utilisateur de vérifier son réseau est
+  /// justifié.
+  unreachable,
+
+  /// La connexion n'a pas pu être établie dans le délai imparti. La cause est
+  /// **ambiguë** — réseau lent ou serveur injoignable — et ne doit être
+  /// imputée à aucun des deux.
+  connectTimeout,
+
+  /// Connexion établie, puis silence du serveur au-delà du délai imparti.
+  /// **Le réseau a prouvé qu'il fonctionne** : ne jamais demander de le
+  /// vérifier ici.
+  responseTimeout,
+}
+
 /// No connectivity / request timed out. UI offers a retry and offline content.
+///
+/// [kind] précise laquelle des trois causes s'est produite, sans changer le
+/// type : tout code qui teste `is NetworkFailure` ou qui filtre sur le code
+/// `network` continue de se comporter à l'identique.
 final class NetworkFailure extends Failure {
-  const NetworkFailure([super.message = 'Connexion indisponible']) : super(code: 'network');
+  const NetworkFailure([super.message = 'Connexion indisponible'])
+      : kind = NetworkFailureKind.unreachable,
+        super(code: 'network');
+
+  /// Délai dépassé avant d'avoir pu établir la connexion.
+  const NetworkFailure.connectTimeout([super.message = 'Connexion indisponible'])
+      : kind = NetworkFailureKind.connectTimeout,
+        super(code: 'network');
+
+  /// Connexion établie, mais le serveur n'a pas répondu à temps.
+  const NetworkFailure.responseTimeout([super.message = 'Connexion indisponible'])
+      : kind = NetworkFailureKind.responseTimeout,
+        super(code: 'network');
+
+  final NetworkFailureKind kind;
 }
 
 /// Server responded with an error status (5xx, or unexpected 4xx).

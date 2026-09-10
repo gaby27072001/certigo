@@ -243,10 +243,17 @@ class ApiClient {
   }
 
   Failure _mapDioError(DioException e) {
-    if (e.type == DioExceptionType.connectionError ||
-        e.type == DioExceptionType.connectionTimeout ||
-        e.type == DioExceptionType.receiveTimeout) {
-      return const NetworkFailure();
+    // Trois causes distinctes, trois diagnostics. Les confondre faisait dire
+    // « vérifiez votre réseau » à quelqu'un dont la connexion venait d'aboutir.
+    switch (e.type) {
+      case DioExceptionType.connectionError:
+        return const NetworkFailure();
+      case DioExceptionType.connectionTimeout:
+        return const NetworkFailure.connectTimeout();
+      case DioExceptionType.receiveTimeout:
+        return const NetworkFailure.responseTimeout();
+      default:
+        break;
     }
     final int? status = e.response?.statusCode;
     if (status == 401 || status == 403) return const AuthFailure();
