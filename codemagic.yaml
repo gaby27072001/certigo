@@ -252,7 +252,22 @@ workflows:
       app_store_connect: AppStoreConnect
     environment:
       flutter: 3.44.4          # Aligned with .github/workflows/ci-mobile.yml (test<->release parity).
-      xcode: latest
+      # Xcode epingle a 26.6 -- ne PAS remettre `latest`. C'est deja la version
+      # que `latest` resout aujourd'hui (defaut Codemagic depuis le 2026-09-06,
+      # https://codemagic.io/whats-new/), donc cet epinglage ne change rien a la
+      # chaine d'outils courante : il ferme seulement la fenetre ou Codemagic
+      # promeut `latest` vers Xcode 27, deja disponible sur leurs machines.
+      # Sous Xcode 27 le cycle de vie UIScene devient obligatoire (WWDC 2026,
+      # session 278 : « Without it, your application will no longer launch »).
+      # Or SceneDelegate.swift et UIApplicationSceneManifest sont tous deux
+      # absents de apps/mobile/ios/Runner/ : la compilation reussirait et l'app
+      # ne se lancerait plus sur aucun iPhone. Aucun commit de notre part ne
+      # declencherait cette bascule et rien en CI ne lance l'app -- le premier
+      # signal serait un testeur devant une application morte.
+      # Invalide par la migration UIScene, et par elle seule : lever cet
+      # epinglage uniquement une fois l'issue #461 close.
+      # https://github.com/gchambaud_microsoft/Certigo/issues/461
+      xcode: "26.6"
       cocoapods: default
       groups:
         - certigo_mobile_config   # PROD_API_BASE_URL, ENTRA_CLIENT_ID/AUTHORITY/API_SCOPE
@@ -333,7 +348,9 @@ workflows:
       app_store_connect: AppStoreConnect
     environment:
       flutter: 3.44.4
-      xcode: latest
+      # Epingle a 26.6 : voir la note Xcode complete du workflow ios-release
+      # ci-dessus (issue #461). Ne PAS remettre `latest` avant sa cloture.
+      xcode: "26.6"
       cocoapods: default
       groups:
         - certigo_mobile_config   # ENTRA_* reused; API_BASE_URL is dev-inline below.
@@ -403,7 +420,9 @@ workflows:
       app_store_connect: AppStoreConnect
     environment:
       flutter: 3.44.4
-      xcode: latest
+      # Epingle a 26.6 : voir la note Xcode complete du workflow ios-release
+      # ci-dessus (issue #461). Ne PAS remettre `latest` avant sa cloture.
+      xcode: "26.6"
       cocoapods: default
       groups:
         - certigo_mobile_config
@@ -474,7 +493,9 @@ workflows:
     integrations:
       app_store_connect: AppStoreConnect
     environment:
-      xcode: latest
+      # Epingle a 26.6 : voir la note Xcode complete du workflow ios-release
+      # ci-dessus (issue #461). Ne PAS remettre `latest` avant sa cloture.
+      xcode: "26.6"
       groups:
         - certigo_mobile_config   # CERTIFICATE_PRIVATE_KEY required by step_setup_signing.
       vars:
