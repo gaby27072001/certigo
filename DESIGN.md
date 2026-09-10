@@ -62,15 +62,49 @@ quadruple.
 > Chroma poussé au plafond de chaque teinte → couleur et joie.**
 > Les deux mots du brief, satisfaits par une seule règle.
 
-### Trois rôles, parce qu'une couleur ne fait pas trois métiers
+### Trois clartés, quatre rôles
 
-| Rôle | L | Emploi | Garantie mesurée |
+Les bandes sont produites à trois clartés :
+
+| Clarté | L | Emploi | Garantie mesurée |
 |---|---|---|---|
-| **ink** | 0.515 | Texte, aplats pleins | ≥ 4.5:1 sur le fond clair **et** sous du texte blanc |
-| **vivid** | 0.62 | Progression, anneaux, pastilles, halos, grands titres | ≥ 3:1 sous texte blanc ; ≥ 1.5:1 visible sur le fond |
-| **glow** | 0.68 | Texte et icônes sur chrome sombre | ≥ 4.5:1 sur le fond sombre |
+| **ink** | 0.49 | Texte sur chrome clair ; **aplats pleins** dans les deux thèmes | ≥ 4.5:1 sur le fond clair **et** sous du texte blanc |
+| **vivid** | 0.62 | Progression, anneaux, pastilles, halos | ≥ 3:1 sous texte blanc ; visible comme aplat sur le fond |
+| **glow** | 0.70 | Texte et icônes sur chrome sombre | ≥ 4.5:1 sur le fond sombre |
 
 Les six bandes : violet (la marque), magenta, rose, ambre, vert, cyan.
+
+Ces clartés sont **résolues** en quatre rôles sémantiques. C'est la partie qui
+compte, parce que c'est celle qu'un site d'appel choisit :
+
+| Rôle | Ce qu'il vaut | Pour quoi |
+|---|---|---|
+| **le nom nu** — `p.error` | **s'adapte** : ink en clair, glow en sombre | texte, icône, filet, bordure |
+| **`*Fill`** — `p.errorFill` | ink dans les deux thèmes | un aplat qui porte du texte blanc |
+| **`*OnSurface`** | identique au nom nu | quand on veut nommer l'intention |
+| **`*Soft`** | lavis | teinter une région entière |
+
+> **La règle derrière la règle : le défaut doit être sûr, l'exception doit être
+> nommée.** Un site d'appel qui écrit `color: p.error` sans réfléchir doit
+> obtenir un résultat lisible dans les deux apparences.
+
+**Pourquoi le nom nu s'adapte.** Le premier plan est le cas courant, dans un
+rapport mesuré de **108 contre 6** sur cet arbre. Une teinte interactive doit
+donc changer d'apparence, exactement comme `systemBlue` chez Apple. La première
+version tenait `light.primary == dark.primary` : six accents sur sept sont
+tombés entre 2.6 et 3.1:1 en sombre, sous le seuil des icônes, sur l'apparence
+livrée par défaut.
+
+**Pourquoi l'aplat ne s'adapte pas.** Un aplat se pose *par-dessus* le chrome
+et porte son propre texte blanc ; s'il s'éclaircissait en sombre, le blanc
+tomberait avec lui. C'est arrivé au CTA de l'écran d'ouverture : **2.73:1** là
+où le rôle d'aplat donne 7.05:1.
+
+Ces deux erreurs sont opposées et il faut les tenir ensemble : corriger l'une
+sans énumérer l'autre déplace le défaut au lieu de le supprimer. Deux gardes
+les couvrent — `prism_contrast_contract_test` vérifie que chaque *rôle* est
+lisible, `prism_fill_role_guard_test` vérifie que chaque *site d'appel* choisit
+le bon. Le contraste seul ne peut pas attraper une erreur de sélection.
 
 ### Le bleu Microsoft
 
@@ -268,6 +302,14 @@ Honnêteté sur les limites de cette livraison.
   dessinée à la main et Flutter ne rend aucun composant UIKit. Ce n'est pas une
   casse, c'est un écart de convention, et l'abstraire sans appareil pour juger
   produirait une abstraction non vérifiée.
+- **L'écart entre onglet sélectionné et non sélectionné est faible en clarté** :
+  1.28:1 en sombre, 1.03:1 en clair. Les deux états se distinguent surtout par
+  la teinte. Ce n'est pas un défaut : l'icône change de **forme** (pleine /
+  contour), le libellé change de graisse, et la pastille de fond bouge de
+  1.37:1 — trois signaux sur quatre survivent au niveau de gris. iOS lui-même
+  tient sa barre d'onglets autour de 1.2:1 avec le même motif. Forcer un écart
+  de clarté ferait descendre `textSecondary` sous son plancher sur le verre,
+  là où se trouvent quatre onglets sur cinq. Mesure connue, pas dette.
 - **Neuf valeurs d'espacement hors grille**, 38 usages, documentées comme dette
   dans `prism_spacing.dart`.
 - **85 widgets Material bruts**, dont 32 sur le seul écran Profil.
@@ -286,9 +328,27 @@ Honnêteté sur les limites de cette livraison.
 5. La clarté organise ; le chroma réjouit.
 6. Le mouvement informe ; il ne décore pas.
 7. Le clair et le sombre sont tenus à égalité — le sombre est un défaut livré.
+8. **Le défaut doit être sûr, l'exception doit être nommée.** Un premier plan
+   s'adapte au thème ; un aplat ne s'adapte pas. Confondre les deux ne casse
+   ni la compilation ni le mode clair, où les rôles coïncident.
 
-Ces règles sont des tests, pas des vœux. Elles vivent dans
-`packages/prism_ui/test/tokens/prism_colors_test.dart` et
-`prism_typography_test.dart`, et elles re-dérivent leurs seuils au lieu de figer
-des valeurs hexadécimales — pour qu'une modification future qui *paraît* bonne
-mais détruit la lisibilité échoue ici plutôt qu'en production.
+Ces règles sont des **tests**, pas des vœux, et elles re-dérivent leurs seuils
+au lieu de figer des valeurs hexadécimales — pour qu'une modification qui
+*paraît* bonne mais détruit la lisibilité échoue en CI plutôt qu'en production.
+
+| Garde | Ce qu'elle empêche |
+|---|---|
+| `tokens/prism_colors_test.dart` | une primitive qui cesse de tenir son plancher |
+| `theme/prism_contrast_contract_test.dart` | un **rôle** sémantique illisible sur carte / page / surface alternative / verre |
+| `theme/prism_fill_role_guard_test.dart` | un **site d'appel** qui choisit le mauvais rôle |
+| `theme/prism_typography_contract_test.dart` | un créneau de `TextTheme` qui retombe sur la police plateforme |
+
+Les trois dernières existent parce que les trois défauts correspondants ont
+réellement été livrés, puis mesurés. Chacune a été vérifiée **en cassant
+délibérément le code pour la voir rougir** : une garde qui ne peut pas échouer
+est une décoration.
+
+Et une leçon de méthode, payée deux fois : **un correctif qui déplace un défaut
+d'un endroit à un autre n'est pas un correctif tant qu'on n'a pas énuméré les
+deux côtés.** Le contraste sombre a été corrigé pour 108 sites de premier plan
+en cassant 6 sites d'aplat, parce que seul le premier groupe avait été traité.
