@@ -96,6 +96,13 @@ class _PathContent extends StatelessWidget {
     return p.accentFor(di >= 0 ? di : unitIndex);
   }
 
+  /// Same domain accent, in the solid-fill role — for the CTA tone, which
+  /// carries white text and must not take the adaptive foreground colour.
+  Color _accentFillFor(PrismColorScheme p, PathUnit unit, int unitIndex) {
+    final int di = path.domains.indexWhere((DomainProgress d) => d.id == unit.domainId);
+    return p.accentFillFor(di >= 0 ? di : unitIndex);
+  }
+
   void _openLesson(BuildContext context, String lessonId) => context.go(
         '${Routes.lesson}/${Uri.encodeComponent(trackId)}/${Uri.encodeComponent(lessonId)}',
       );
@@ -124,12 +131,12 @@ class _PathContent extends StatelessWidget {
       }
     }
 
-    Color ctaAccent = p.primary;
+    Color ctaAccent = p.primaryFill;
     int chapterIndex = 0;
     if (active != null) {
       for (int i = 0; i < path.units.length; i++) {
         if (path.units[i].lessons.any((PathLesson l) => l.id == active!.id)) {
-          ctaAccent = _accentFor(p, path.units[i], i);
+          ctaAccent = _accentFillFor(p, path.units[i], i);
           chapterIndex = i;
           break;
         }

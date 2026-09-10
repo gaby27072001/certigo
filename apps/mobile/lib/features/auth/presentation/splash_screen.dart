@@ -22,7 +22,7 @@ class SplashScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: const BorderRadius.all(Radius.circular(20)),
                   gradient: LinearGradient(
-                    colors: <Color>[p.primary, p.ember],
+                    colors: <Color>[p.primaryFill, p.emberFill],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),

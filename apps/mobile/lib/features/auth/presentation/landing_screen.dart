@@ -480,7 +480,7 @@ class _HeroAnchor extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(outer * 0.18),
             gradient: LinearGradient(
-              colors: <Color>[p.primary, p.ember],
+              colors: <Color>[p.primaryFill, p.emberFill],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -629,7 +629,10 @@ class _CommencerButtonState extends State<_CommencerButton> {
     // Switch (plutôt qu'un booléen) pour référencer les deux styles → bascule
     // triviale entre Azure et encre via [_kCtaStyle].
     final Color base = switch (_kCtaStyle) {
-      _CtaStyle.azure => p.primary,
+      // Le CTA est un APLAT qui porte du texte blanc : il prend le rôle
+      // `*Fill`, stable entre les thèmes, et non le rôle de premier plan qui
+      // s'éclaircit en sombre (blanc sur glow mesure 2.73:1).
+      _CtaStyle.azure => p.primaryFill,
       _CtaStyle.ink => p.textPrimary,
     };
     final Color baseDark = switch (_kCtaStyle) {

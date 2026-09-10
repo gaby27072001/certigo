@@ -655,7 +655,7 @@ class _BrandBadge extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(outer * 0.18),
             gradient: LinearGradient(
-              colors: <Color>[p.primary, p.ember],
+              colors: <Color>[p.primaryFill, p.emberFill],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

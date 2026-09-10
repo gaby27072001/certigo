@@ -80,6 +80,7 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     required this.glassStroke,
     required this.litEdge,
     required this.domainAccents,
+    required this.domainAccentsFill,
     required this.domainAccentsVivid,
     required this.domainAccentsOnSurface,
     required this.domainAccentsSoft,
@@ -159,6 +160,11 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
   /// Ink role per exam domain — body-text legible.
   final List<Color> domainAccents;
 
+  /// Solid-fill role per exam domain: carries [onPrimary] text. Identical in
+  /// both themes, because a fill sits on top of the chrome. Use this whenever
+  /// a domain accent becomes a button tone or any block that text sits on.
+  final List<Color> domainAccentsFill;
+
   /// Vivid role per exam domain — rings, progress, fills.
   final List<Color> domainAccentsVivid;
 
@@ -170,6 +176,10 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
 
   /// Deterministic accent for an exam domain by index.
   Color accentFor(int domainIndex) => domainAccents[domainIndex % domainAccents.length];
+
+  /// Solid-fill accent for an exam domain — carries [onPrimary] text. Use this
+  /// for a button tone or any block that text sits on.
+  Color accentFillFor(int domainIndex) => domainAccentsFill[domainIndex % domainAccentsFill.length];
 
   /// Vivid accent for an exam domain — fills, rings, progress.
   Color accentVividFor(int domainIndex) =>
@@ -256,6 +266,7 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     glassStroke: PrismColors.glassLightStroke,
     litEdge: Color(0x00FFFFFF),
     domainAccents: PrismColors.spectrumInk,
+    domainAccentsFill: PrismColors.spectrumInk,
     domainAccentsVivid: PrismColors.spectrumVivid,
     domainAccentsOnSurface: PrismColors.spectrumInk,
     domainAccentsSoft: PrismColors.spectrumSoftLight,
@@ -309,6 +320,7 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     glassStroke: PrismColors.glassDarkStroke,
     litEdge: PrismColors.glassDarkLitEdge,
     domainAccents: PrismColors.spectrumGlow,
+    domainAccentsFill: PrismColors.spectrumInk,
     domainAccentsVivid: PrismColors.spectrumVivid,
     domainAccentsOnSurface: PrismColors.spectrumGlow,
     domainAccentsSoft: PrismColors.spectrumSoftDark,
@@ -360,6 +372,7 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     Color? glassStroke,
     Color? litEdge,
     List<Color>? domainAccents,
+    List<Color>? domainAccentsFill,
     List<Color>? domainAccentsVivid,
     List<Color>? domainAccentsOnSurface,
     List<Color>? domainAccentsSoft,
@@ -409,6 +422,7 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
       glassStroke: glassStroke ?? this.glassStroke,
       litEdge: litEdge ?? this.litEdge,
       domainAccents: domainAccents ?? this.domainAccents,
+      domainAccentsFill: domainAccentsFill ?? this.domainAccentsFill,
       domainAccentsVivid: domainAccentsVivid ?? this.domainAccentsVivid,
       domainAccentsOnSurface: domainAccentsOnSurface ?? this.domainAccentsOnSurface,
       domainAccentsSoft: domainAccentsSoft ?? this.domainAccentsSoft,
@@ -464,6 +478,7 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
       glassStroke: c(glassStroke, other.glassStroke),
       litEdge: c(litEdge, other.litEdge),
       domainAccents: t < 0.5 ? domainAccents : other.domainAccents,
+      domainAccentsFill: t < 0.5 ? domainAccentsFill : other.domainAccentsFill,
       domainAccentsVivid: t < 0.5 ? domainAccentsVivid : other.domainAccentsVivid,
       domainAccentsOnSurface: t < 0.5 ? domainAccentsOnSurface : other.domainAccentsOnSurface,
       domainAccentsSoft: t < 0.5 ? domainAccentsSoft : other.domainAccentsSoft,

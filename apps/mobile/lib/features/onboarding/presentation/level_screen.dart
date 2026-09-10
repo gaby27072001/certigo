@@ -151,7 +151,13 @@ class _LevelTileState extends State<_LevelTile> {
                 ),
               ),
               const SizedBox(width: 12),
-              _Checkbox(selected: sel, accent: accent, border: p.border, duration: duration),
+              _Checkbox(
+                selected: sel,
+                accent: accent,
+                accentFill: p.primaryFill,
+                border: p.border,
+                duration: duration,
+              ),
             ],
           ),
         ),
@@ -169,12 +175,14 @@ class _Checkbox extends StatelessWidget {
   const _Checkbox({
     required this.selected,
     required this.accent,
+    required this.accentFill,
     required this.border,
     required this.duration,
   });
 
   final bool selected;
   final Color accent;
+  final Color accentFill;
   final Color border;
   final Duration duration;
 
@@ -185,7 +193,10 @@ class _Checkbox extends StatelessWidget {
       width: 26,
       height: 26,
       decoration: BoxDecoration(
-        color: selected ? accent : Colors.transparent,
+        // The fill carries a white check, so it takes the FILL role; the
+        // border is a foreground and keeps the adaptive one (measured on the
+        // dark card: 6.01:1 for the adaptive role against 2.33:1 for ink).
+        color: selected ? accentFill : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: selected ? accent : border, width: 2),
       ),
