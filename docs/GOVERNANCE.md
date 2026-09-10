@@ -891,6 +891,26 @@ liste ci-dessus sur parole : dix secondes suffisent à la tester. »
 > `True` un `-Quiet` mal composé. **Deux minutes de témoin ont évité de publier, dans une note sur la
 > mesure, une citation fausse et un symbole inventé.**
 
+> **Deux cas du 2026-09-10 — un témoin peut passer au vert et ne rien certifier.** Le témoin du
+> onzième cas a rendu `True` et **révélé** la panne. Ceux-ci sont passés au vert **en la masquant**,
+> parce qu'ils ne traversaient pas les conditions de la mesure qu'ils gardaient.
+>
+> - Une recherche `Select-String` portant un motif à alternatives `|` **et** l'option `-SimpleMatch`
+>   rend zéro : l'option rend les `|` littéraux, et le motif entier devient une chaîne unique qui
+>   n'existe nulle part. Le témoin, lancé **dans une invocation séparée sans `-SimpleMatch`**, a
+>   trouvé ses occurrences et certifié un instrument qui n'avait pas le défaut du premier.
+>   Conclusion évitée : une dérive d'infrastructure inventée, sur le point d'être rapportée.
+> - Un relevé de tarifs rendait `0,00` sur tous les compteurs cherchés — un arrondi d'affichage à
+>   deux décimales sur des prix libellés en millionièmes. Le témoin de non-nullité, pris **sur une
+>   unité mille fois plus grande** dans la même réponse, affichait `0,17` : l'arrondi ne pouvait pas
+>   s'y manifester. Conclusion évitée : « cette option est gratuite ».
+>
+> **Un témoin n'atteste que des conditions qu'il traverse.** S'il emprunte une autre option, un
+> autre ordre de grandeur ou un autre appel que la mesure qu'il garde, il éprouve un autre
+> instrument, et son vert est une assurance portée sur le mauvais objet. **Un témoin doit passer par
+> la même invocation, les mêmes options et la même échelle que la mesure, et n'en différer que par
+> l'entrée dont on attend qu'elle fasse changer la sortie.**
+
 **d. L'assertion sur l'ACTION, pas sur son résultat.** Pour le n°9, la ligne qui manquait est
 `substitution effective : True`. **Le résultat ne distingue pas « j'ai mesuré » de « je n'ai rien
 mesuré » ; l'action, si.**
@@ -1400,6 +1420,28 @@ champ précis ce nom renvoie-t-il ici — la ligne persistée, ou la valeur tran
 ce champ-là. C'est un geste **d'avant lecture**, pas de vérification.
 
 > **Aucune parade *aval* ne rattrape une question qui a fusionné deux objets sous un mot.**
+
+**Deuxième motif, mesuré le 2026-09-10 — l'environnement porte le mot.** Le mot n'est pas toujours
+un champ. Ici, « le backend » a désigné tour à tour la production et le développement, et une
+latence mesurée sur le second a été portée au premier jusque dans la description d'une pull request
+déjà fusionnée. Même code, même référence de plan, même région : la seule différence était une sonde
+de disponibilité HTTP toutes les 300 secondes, appliquée à tous les environnements **sauf** celui de
+développement — voir `infra/main.bicep`, `module diagnostics ... = if (env != 'dev')`, et les deux
+sondes déclarées dans `infra/modules/diagnostics.bicep` sur `/api/health/ready` et
+`/api/health/live`. Premier appel mesuré le même jour sur `/api/health/live` : **169 à 267 ms** en
+production, **3 137 ms** en développement.
+
+> **L'environnement le moins cher à mesurer est celui qui diffère le plus de la production,
+> précisément parce qu'il est le moins cher.** Ce qu'on lui retire pour l'alléger — sondes, alertes,
+> diagnostics, redondance — est exactement ce qui fait sa différence de comportement, et cette
+> différence est **invisible depuis lui** : rien, dans l'environnement allégé, ne signale ce qu'il
+> ne paie pas.
+
+Ce corollaire ajoute une **prédiction** à la contre-mesure qui précède. « Nommer l'objet avant de
+mesurer » demande une discipline à chaque mesure ; celui-ci dit **où** le piège se trouve. Avant de
+porter à la production une latence, un délai, un coût ou un taux d'échec mesuré ailleurs, chercher
+d'abord ce que l'environnement de mesure **ne paie pas** — et le chercher dans la déclaration
+d'infrastructure, seul endroit où l'écart soit visible depuis l'un ou l'autre côté.
 
 ### Le dispositif de secours n'est éprouvé que hors incident
 
