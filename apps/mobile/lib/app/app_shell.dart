@@ -68,14 +68,25 @@ class AppShell extends ConsumerWidget {
                   ),
                 ),
               ),
-            Expanded(child: shell),
+            // The body is what needs bounding, not just the bar. On a phone
+            // this is a no-op (the frame takes min(maxWidth, constraints)); it
+            // only bites on iPad, in landscape and in Split View, where an
+            // unbounded body would stretch a line of prose past readability.
+            Expanded(child: PrismContentFrame(child: shell)),
           ],
         ),
       ),
       bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        // Was a bare 16, which left the bar out of step with the content
+        // gutter of 20.
+        minimum: const EdgeInsets.fromLTRB(
+          PrismSpacing.gutter,
+          0,
+          PrismSpacing.gutter,
+          PrismSpacing.sm,
+        ),
         child: PrismContentFrame(
-          maxWidth: 640,
+          maxWidth: PrismLayout.controlBar,
           expandHeight: false,
           child: GlassSurface(
             elevation: 2,

@@ -186,7 +186,45 @@ passer la police de la plateforme.
 
 ---
 
-## 7. Le mouvement — registre continu
+## 7. La largeur — l'axe qui manquait
+
+`tokens/` contenait couleur, élévation, mouvement, rayons, espacement et
+typographie. **Rien pour la largeur.** Chaque écran qui en avait besoin
+inventait donc son littéral : 320, 340, 420, 480, 640, 760, 840 et 1120 étaient
+tous en circulation, aucun derrière un token — et un seul corps d'écran de
+l'application était borné.
+
+Ce n'est pas une anticipation matérielle. Un corps non borné s'étire à la
+largeur qu'on lui donne, ce qui est déjà le cas quotidien sur iPad, en paysage
+et en Split View. Une ligne de texte large de 1100 px est illisible quel que
+soit l'appareil qui l'a produite.
+
+`PrismLayout` nomme donc l'axe **par rôle, pas par taille** : `compact` (320),
+`form` (420), `panel` (480), `controlBar` (640), `reading` (760), `canvas`
+(840), `workspace` (1120).
+
+Ce sont des **mesures de lecture, pas des points de rupture**. Prism ne branche
+pas sur une classe d'appareil : il plafonne la mesure et laisse la mise en page
+se centrer, ce qui reste juste à n'importe quelle taille. C'est exactement ce
+que demandent les recommandations d'Apple — *« Avoid fixed widths and
+display-specific dependencies »* et *« Don't reinvent your app when it resizes;
+allow the existing layout to expand based on the available space instead »*. Un
+plafond de mesure applique ce principe ; un `if (appareil)` le viole.
+
+La granularité utile n'est d'ailleurs pas « téléphone / tablette » mais
+**compact / regular** au sens des size classes iOS : écran externe compact,
+écran interne regular.
+
+**Aucune primitive de charnière n'est introduite.** Non parce qu'Apple n'en
+aurait pas — les *reserved regions* existent — mais parce que Flutter ne les
+relaie pas : `MediaQuery.displayFeatures` est documenté *« populated only on
+Android »*. Le jour où cela vaudra le coup, ce sera un canal de plateforme
+écrit à la main, pas une attente de Flutter. La distinction compte : ce n'est
+pas une impasse, c'est un travail non commencé.
+
+---
+
+## 8. Le mouvement — registre continu
 
 Un élément **s'étire vers son état suivant** au lieu de disparaître et d'être
 remplacé. D'où des courbes d'ease-out asymétriques : le mouvement part vite et
@@ -203,7 +241,7 @@ demande un mouvement réduit.
 
 ---
 
-## 8. Ce qui reste ouvert
+## 9. Ce qui reste ouvert
 
 Honnêteté sur les limites de cette livraison.
 
@@ -218,13 +256,28 @@ Honnêteté sur les limites de cette livraison.
 - **Cinq écrans n'ont pas pu être capturés** (Accueil, Parcours, Ligue, Profil,
   Boutique) : le backend de développement ne publie aucun parcours avec leçons,
   donc l'onboarding ne peut pas se terminer.
+- **Les 37 corps d'écran ne sont pas convertis.** `PrismLayout` livre l'axe ;
+  faire passer chaque écran par `PrismContentFrame` est une PR de suite,
+  mécanique et vérifiable, délibérément séparée pour ne pas mélanger une
+  décision de système et son application mécanique. Seul `app_shell` est
+  corrigé ici, parce que la primitive y existait déjà et visait la barre de
+  navigation au lieu du corps.
+- **La barre d'onglets reste horizontale en bas.** Apple place barres d'outils
+  et d'onglets sur le côté de l'écran externe d'un appareil pliant, mais
+  seulement *« if you use standard system components »* — or la nôtre est
+  dessinée à la main et Flutter ne rend aucun composant UIKit. Ce n'est pas une
+  casse, c'est un écart de convention, et l'abstraire sans appareil pour juger
+  produirait une abstraction non vérifiée.
 - **Neuf valeurs d'espacement hors grille**, 38 usages, documentées comme dette
   dans `prism_spacing.dart`.
 - **85 widgets Material bruts**, dont 32 sur le seul écran Profil.
+- **Le bloc « à retenir » garde une barre latérale colorée épaisse**
+  (`key_takeaway_block.dart`), ce que le plancher de craft refuse au-delà d'un
+  pixel. Défaut d'écran préexistant, non corrigé ici.
 
 ---
 
-## 9. Les règles qui ne se négocient pas
+## 10. Les règles qui ne se négocient pas
 
 1. Une arête doit contraster avec ce qu'elle borde, **dans le bon sens**.
 2. Un état qui ne se voit pas n'existe pas. Un seul anneau de focus, partout.

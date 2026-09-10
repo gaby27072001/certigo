@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/prism_color_scheme.dart';
+import '../tokens/prism_layout.dart';
 import 'prism_content_frame.dart';
 
 /// The signature Certigo backdrop: a soft "aurora" bloom of the region's own
@@ -22,7 +23,7 @@ class AuroraBackground extends StatelessWidget {
     super.key,
     required this.child,
     this.animate = false,
-    this.maxContentWidth = 840,
+    this.maxContentWidth = PrismLayout.canvas,
     this.tint,
   });
 
