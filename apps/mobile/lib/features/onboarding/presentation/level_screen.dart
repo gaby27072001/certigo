@@ -29,7 +29,7 @@ class LevelScreen extends ConsumerWidget {
     return OnboardingScaffold(
       progress: 0.38,
       onBack: () => context.go(OnboardingRoutes.attribution),
-      primaryLabel: 'CONTINUER',
+      primaryLabel: 'Continuer',
       onPrimary: c.level == null ? null : () => context.go(OnboardingRoutes.levelReaction),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

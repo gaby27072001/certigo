@@ -89,7 +89,7 @@ class _RegisterNameScreenState extends ConsumerState<RegisterNameScreen> {
     return OnboardingScaffold(
       progress: 0.25,
       onClose: () => context.go('/landing'),
-      primaryLabel: 'CONTINUER',
+      primaryLabel: 'Continuer',
       onPrimary: (_valid && !busy) ? _next : null,
       secondary: TextButton(
         key: const Key('register-have-account'),

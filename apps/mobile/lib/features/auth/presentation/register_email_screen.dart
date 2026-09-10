@@ -63,7 +63,7 @@ class _RegisterEmailScreenState extends ConsumerState<RegisterEmailScreen> {
       // Cohérent avec le geste iOS de retour par balayage : on dépile si la pile
       // le permet, sinon on retombe sur la navigation logique (cas deep link).
       onBack: () => context.canPop() ? context.pop() : context.go('/register/name'),
-      primaryLabel: 'CONTINUER',
+      primaryLabel: 'Continuer',
       onPrimary: _valid ? _next : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

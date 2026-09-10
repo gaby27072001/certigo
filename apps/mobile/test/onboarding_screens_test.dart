@@ -101,8 +101,8 @@ void main() {
       );
       await tester.tap(find.text(certification.code));
       await tester.pump();
-      await tester.ensureVisible(find.text('COMMENCER CE PARCOURS'));
-      await tester.tap(find.text('COMMENCER CE PARCOURS'));
+      await tester.ensureVisible(find.text('Commencer ce parcours'));
+      await tester.tap(find.text('Commencer ce parcours'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 60));
 

@@ -41,7 +41,7 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const Spacer(flex: 3),
               PrismButton(
-                label: 'CHOISIR MA CERTIFICATION',
+                label: 'Choisir ma certification',
                 onPressed: () => context.push(OnboardingRoutes.certification),
               ),
               const SizedBox(height: 8),

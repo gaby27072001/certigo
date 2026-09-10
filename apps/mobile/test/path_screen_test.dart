@@ -119,14 +119,14 @@ void main() {
     expect(find.text('Concepts du cloud'), findsOneWidget);
     expect(find.text('Le cloud'), findsOneWidget);
     // CTA reflects the in-progress active lesson.
-    expect(find.text('CONTINUER'), findsOneWidget);
+    expect(find.text('Continuer'), findsOneWidget);
     expect(find.byType(PathNode), findsWidgets);
   });
 
   testWidgets('the CONTINUER CTA routes to the active lesson', (tester) async {
     await pumpPath(tester);
 
-    await tester.tap(find.text('CONTINUER'));
+    await tester.tap(find.text('Continuer'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 

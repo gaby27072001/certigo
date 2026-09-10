@@ -100,7 +100,7 @@ void main() {
       // Le tap sur CONTINUER ne fait rien : `onPrimary` est `null` tant que
       // la confirmation ne correspond pas. Aucun appel backend, aucun
       // basculement d'`AuthState`, on reste sur l'ecran.
-      await tester.tap(find.text('CONTINUER'));
+      await tester.tap(find.text('Continuer'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
@@ -131,7 +131,7 @@ void main() {
 
       expect(find.text('Les mots de passe correspondent.'), findsOneWidget);
 
-      await tester.tap(find.text('CONTINUER'));
+      await tester.tap(find.text('Continuer'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
@@ -156,7 +156,7 @@ void main() {
       // La confirmation reste vide.
       await tester.pump();
 
-      await tester.tap(find.text('CONTINUER'));
+      await tester.tap(find.text('Continuer'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 

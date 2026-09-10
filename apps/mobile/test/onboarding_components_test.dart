@@ -42,14 +42,14 @@ void main() {
       host(
         const OnboardingScaffold(
           progress: 0.5,
-          primaryLabel: 'CONTINUER',
+          primaryLabel: 'Continuer',
           onPrimary: null,
           child: Text('Question'),
         ),
       ),
     );
-    expect(find.text('CONTINUER'), findsOneWidget);
-    await tester.tap(find.text('CONTINUER'));
+    expect(find.text('Continuer'), findsOneWidget);
+    await tester.tap(find.text('Continuer'));
     await tester.pump();
     expect(fired, isFalse); // null handler ⇒ no-op
   });

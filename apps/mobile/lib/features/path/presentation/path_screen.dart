@@ -164,7 +164,7 @@ class _PathContent extends StatelessWidget {
         SliverPersistentHeader(
           pinned: true,
           delegate: _ContinueCtaDelegate(
-            label: activeInProgress ? 'CONTINUER' : 'COMMENCER',
+            label: activeInProgress ? 'Continuer' : 'Commencer',
             accent: ctaAccent,
             onTap: () => _openLesson(context, active!.id),
           ),
@@ -307,7 +307,7 @@ class _UnitTrail extends StatelessWidget {
                 label: l.title,
                 progress: l.masteryPct / 100,
                 current: isActive,
-                startLabel: isActive ? (activeInProgress ? 'REPRENDRE' : 'COMMENCER') : null,
+                startLabel: isActive ? (activeInProgress ? 'Reprendre' : 'Commencer') : null,
                 onTap: () => onLesson(l.id),
               ),
             ),

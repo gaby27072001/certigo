@@ -17,7 +17,7 @@ class MascotReactionScreen extends StatefulWidget {
     required this.message,
     required this.onPrimary,
     this.onBack,
-    this.primaryLabel = 'CONTINUER',
+    this.primaryLabel = 'Continuer',
     this.mood = MascotMood.celebrate,
     this.mascot = AuroraMascot.nimbus,
     this.highlight,

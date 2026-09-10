@@ -79,7 +79,7 @@ class _CertificationScreenState extends ConsumerState<CertificationScreen> {
       onBack: _saving
           ? null
           : () => context.canPop() ? context.pop() : context.go(OnboardingRoutes.welcome),
-      primaryLabel: 'COMMENCER CE PARCOURS',
+      primaryLabel: 'Commencer ce parcours',
       primaryLoading: _saving,
       onPrimary: selectedTrackIsPublished && !_saving ? () => _continue(target) : null,
       child: catalog.when(

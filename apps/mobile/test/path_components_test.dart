@@ -70,13 +70,13 @@ void main() {
             status: PathNodeStatus.inProgress,
             label: 'Réseau',
             current: true,
-            startLabel: 'REPRENDRE',
+            startLabel: 'Reprendre',
           ),
         ),
       );
       await tester.pump(const Duration(milliseconds: 200));
 
-      expect(find.text('REPRENDRE'), findsOneWidget);
+      expect(find.text('Reprendre'), findsOneWidget);
       expect(find.byIcon(Icons.bolt_rounded), findsOneWidget);
     });
 

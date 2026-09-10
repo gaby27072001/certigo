@@ -60,7 +60,7 @@ class _BirthYearScreenState extends ConsumerState<BirthYearScreen> {
     return OnboardingScaffold(
       progress: 0.10,
       onBack: () => context.go(OnboardingRoutes.intro),
-      primaryLabel: 'CONTINUER',
+      primaryLabel: 'Continuer',
       onPrimary: _confirm,
       scrollable: false,
       child: Column(

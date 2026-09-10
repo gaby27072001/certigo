@@ -28,7 +28,7 @@ class RegisterProfileCreatedScreen extends ConsumerWidget {
     }
 
     return OnboardingScaffold(
-      primaryLabel: 'CONTINUER',
+      primaryLabel: 'Continuer',
       onPrimary: onContinue,
       scrollable: false,
       child: Column(

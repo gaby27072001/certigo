@@ -128,7 +128,7 @@ class _RegisterPasswordScreenState extends ConsumerState<RegisterPasswordScreen>
       onBack: _submitting
           ? null
           : () => context.canPop() ? context.pop() : context.go('/register/email'),
-      primaryLabel: 'CONTINUER',
+      primaryLabel: 'Continuer',
       primaryLoading: _submitting,
       onPrimary: _canSubmit ? _submit : null,
       child: Column(
