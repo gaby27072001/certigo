@@ -1036,6 +1036,13 @@ transitoire à partir d'un relevé, nommer le processus qui pourrait être en co
 processus concurrent n'est nommable, la conclusion n'est pas *rien ne se passe* — c'est *on ne
 sait pas*, et la règle d'abstention s'applique.
 
+**Où lire le cas qui a produit ce constat.** Un sous-réseau transitoire, observé subsistant dans un
+réseau de production, était celui d'une tentative **encore en vol** ; le supprimer aurait détruit la
+machine et l'interface réseau actives. Le relevé, les deux lectures qu'il supportait et la
+vérification qui a tranché sont dans
+[« Seed d'urgence du conteneur `content` de production »](./runbooks/SEED_URGENCE_COSMOS_PROD.md),
+section « Démontage ».
+
 ### L'instrument aveugle à son propre passé
 
 > Ajouté le **2026-09-09**. Nouvelle forme de la famille des instruments qui mentent, la plus
@@ -1171,6 +1178,20 @@ doit-elle s'arrêter ?*
 la réparer : c'est parfois de la retirer. Une sonde qui ne peut pas mesurer doit dire qu'elle n'a
 pas pu mesurer, jamais interrompre ce qu'elle observe — et si l'écrire coûte plus que ce que la
 sonde apporte, l'absence de sonde est plus honnête que sa présence.
+
+**Ce que ce cas a coûté, mesuré — et c'est ce qui rend la règle lisible.** L'incident qui a produit
+cette règle n'a pas perdu une requête : il a perdu **une exécution complète, pour zéro document
+écrit**, alors que **tout le chemin difficile fonctionnait déjà** — machine créée dans le bon
+réseau, jeton d'identité managée obtenu, résolution de nom forcée, TLS valide, rôle de données
+attribué et propagé. La sonde levait juste avant la boucle de travail, et l'échec ressemblait donc
+à un échec du chemin difficile. **Un contrôle mal placé ne coûte pas son propre prix ; il coûte
+celui de tout ce qui a réussi avant lui.**
+
+Le correctif retenu a été **le retrait**, pas la réparation — le corollaire de coût ci-dessus,
+confirmé par l'incident qui l'a produit. Les commandes, les messages d'erreur bruts et la séquence
+complète sont consignés dans
+[« Seed d'urgence du conteneur `content` de production »](./runbooks/SEED_URGENCE_COSMOS_PROD.md),
+section « La méthode retenue ».
 
 ### L'asymétrie de l'incertitude — le défaut, par règle, est l'attente
 
@@ -1622,6 +1643,13 @@ de retour. Le coût tient en un appel de plus.
 l'effet qu'elle attend, ou l'écrire dans une couche qui ne peut pas être réécrite après coup.
 Sans l'un des deux, le succès reçu est un succès du canal, pas de l'effet.
 
+**Où lire les appels bruts.** Les deux voies, leurs codes de retour verts et la relecture qui les
+contredit sont transcrits dans
+[« Seed d'urgence du conteneur `content` de production »](./runbooks/SEED_URGENCE_COSMOS_PROD.md),
+section « L'Azure Policy à effet `modify` ». **Le mécanisme n'y est identifié que par son effet** :
+la politique elle-même n'a jamais été lue, et ce trou est écrit comme tel plutôt que comblé par une
+hypothèse.
+
 ### Trois obstacles se déclarent, un seul ment — et le quatrième est physique
 
 > Ajouté le **2026-09-09**. **Invalidée** le jour où tout catalogue d'obstacles rencontrés
@@ -1654,6 +1682,19 @@ configuration, ni une politique — c'est une contrainte physique**, et aucune c
 **Contre-mesure — à la lecture d'un incident, gratuite.** Avant de chercher ce qu'il faut
 modifier, se demander si l'obstacle appartient aux trois catégories qui se déclarent, ou à la
 quatrième. Si c'est la quatrième, aucune modification locale ne le lève.
+
+**Le cinquième obstacle, et il n'entre dans aucune des quatre catégories.** La même opération a
+buté une dernière fois — sur **son propre contrôle**, une sonde exacte et mal placée (voir « Une
+sonde en amont est une garde déguisée »). Il ne se corrige ni en modifiant ce qui est écrit chez le
+fournisseur, ni en attendant : **il se corrige en déplaçant ou en retirant ce qu'on a écrit
+soi-même.**
+
+> **Sur cinq obstacles de cinq natures, un seul a menti — et il restait un obstacle de plus,
+> le nôtre.** La leçon de ventilation tient donc en deux temps : la plupart des refus se lisent,
+> et le dernier candidat, quand tous les refus externes sont épuisés, est le code qu'on a écrit.
+
+Le catalogue complet des cinq, avec la cause brute de chacun, est dans
+[« Seed d'urgence du conteneur `content` de production »](./runbooks/SEED_URGENCE_COSMOS_PROD.md).
 
 ### Ce qui a réellement corrigé
 

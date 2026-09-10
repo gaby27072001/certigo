@@ -119,7 +119,9 @@ Cette règle est une instance de la discipline générale du dépôt — voir
 échouer, pas rendre zéro ». Les dix instruments qu'elle recense rendaient un verdict sans avoir rien
 lu. Celui-ci est d'une famille plus dure : **il a lu, il a répondu juste, et la réponse décrit un
 état que la demande n'a pas produit.** Aucun autotest de l'appelant ne l'attrape ; seule la
-relecture le fait.
+relecture le fait. La règle générale, dégagée de tout contexte Azure, est écrite sous
+**« Le cas limite des instruments qui mentent — un succès rendu par un canal qui ne mesure pas
+l'effet »**.
 
 ### Ce qui n'a pas été établi
 
@@ -328,10 +330,17 @@ L'échec n°2 mérite sa règle, parce qu'il n'était pas un défaut de robustes
 > place est en aval.** Ici la réponse était non, et une sonde mal placée a coûté une exécution
 > complète.
 
+Cette règle ne concerne ni Cosmos, ni Azure, ni le seed : elle est générale et vit dans
+[`docs/GOVERNANCE.md`](../GOVERNANCE.md), sous **« Une sonde en amont est une garde déguisée »**,
+avec le coût mesuré de ce cas. **C'est là qu'il faut la lire et la citer** ; la présente page n'en
+garde que les circonstances.
+
 **Cinq causes d'échec sur cette journée, de cinq natures différentes : pare-feu (refus franc), policy
 `modify` (succès attesté, valeur réécrite), verrou `CanNotDelete` (refus franc), `SkuNotAvailable`
 (capacité), et notre propre sonde (exacte, et mal placée). Une seule sur cinq a menti — et la
-cinquième venait de notre code.**
+cinquième venait de notre code.** La ventilation générale de ces natures — celles qui se déclarent,
+celle qui ment, celle qui est physique, et la nôtre — est dans `GOVERNANCE.md` sous **« Trois
+obstacles se déclarent, un seul ment — et le quatrième est physique »**.
 
 ---
 
@@ -362,6 +371,11 @@ introuvable à chaque fois.
 > une ressource transitoire dont l'état est ambigu, **ne rien faire est le comportement par défaut** :
 > la supprimer aurait cassé la VM et la NIC d'une exécution active. L'instinct pousse vers l'action
 > corrective, et c'est exactement celle qui casse.
+
+Là encore, la règle est générale et n'appartient pas à cette page : voir
+[`docs/GOVERNANCE.md`](../GOVERNANCE.md), **« La limite structurelle de la ressource transitoire —
+ce que le nom ne peut pas porter »** et **« L'asymétrie de l'incertitude — le défaut, par règle, est
+l'attente »**.
 
 ### Les pièges de nettoyage rencontrés
 
