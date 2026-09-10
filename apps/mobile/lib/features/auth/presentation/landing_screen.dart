@@ -278,15 +278,10 @@ class _LandingScreenState extends ConsumerState<LandingScreen> with SingleTicker
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: <Widget>[
-                          Text(
-                            'Certigo',
-                            style: text.titleMedium?.copyWith(
-                              color: p.textSecondary,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 2,
-                            ),
-                          ),
-                          const SizedBox(height: PrismSpacing.sm),
+                          // Pas de sur-titre « Certigo » ici : la marque est
+                          // déjà portée par l'ancre de l'orbite juste
+                          // au-dessus, et un sur-titre au-dessus d'un titre
+                          // ne fait que retarder la phrase qui porte le sens.
                           Text(
                             'Tes certifs cloud & IT',
                             textAlign: TextAlign.center,
@@ -296,11 +291,16 @@ class _LandingScreenState extends ConsumerState<LandingScreen> with SingleTicker
                               height: 1.05,
                             ),
                           ),
-                          GradientText(
+                          Text(
                             'commencent ici',
-                            gradient: _kBrandGradient,
                             textAlign: TextAlign.center,
+                            // Une seule teinte de marque, pas un dégradé
+                            // arc-en-ciel : l'emphase vient de la graisse et
+                            // de la taille, la couleur ne fait que désigner
+                            // la chute de la phrase. `p.primary` s'adapte au
+                            // thème — 6.08:1 en clair, 6.97:1 en sombre.
                             style: text.displaySmall?.copyWith(
+                              color: p.primary,
                               fontWeight: FontWeight.w800,
                               height: 1.05,
                             ),

@@ -56,7 +56,7 @@ void main() {
   testWidgets('présente le formulaire e-mail (Se connecter par défaut)', (tester) async {
     await pumpSignIn(tester, gateway: FakeAuthGateway(), store: FakeSessionStore());
 
-    expect(find.text('Certigo'), findsOneWidget);
+    expect(find.text('Content de te revoir'), findsOneWidget);
     expect(find.byKey(const Key('email-field')), findsOneWidget);
     expect(find.byKey(const Key('password-field')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Se connecter'), findsOneWidget);

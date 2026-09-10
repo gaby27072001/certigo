@@ -45,9 +45,9 @@ void main() {
     final SemanticsHandle semantics = tester.ensureSemantics();
     await pumpLanding(tester);
 
-    expect(find.text('Certigo'), findsOneWidget);
     expect(find.text('Tes certifs cloud & IT'), findsOneWidget);
-    expect(find.text('commencent ici'), findsOneWidget); // 2ᵉ ligne en dégradé
+    // Deuxième ligne de la même phrase, teintée mais sans dégradé.
+    expect(find.text('commencent ici'), findsOneWidget);
     expect(find.text('Commencer'), findsOneWidget);
     expect(find.bySemanticsLabel('Commencer'), findsOneWidget);
     expect(find.byKey(const Key('landing-existing-account')), findsOneWidget);

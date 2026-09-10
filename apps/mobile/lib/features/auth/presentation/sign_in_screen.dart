@@ -188,16 +188,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                           children: <Widget>[
                             const _BrandBadge(),
                             const SizedBox(height: PrismSpacing.md),
-                            Text(
-                              'Certigo',
-                              textAlign: TextAlign.center,
-                              style: text.titleMedium?.copyWith(
-                                color: p.textSecondary,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 2,
-                              ),
-                            ),
-                            const SizedBox(height: PrismSpacing.xs),
+                            // Pas de sur-titre « Certigo » : le badge de
+                            // marque est juste au-dessus et le dit déjà.
                             Text(
                               registering ? 'Crée ton compte' : 'Content de te revoir',
                               textAlign: TextAlign.center,
