@@ -22,11 +22,13 @@ class PrismTheme {
 
     final ColorScheme scheme = ColorScheme(
       brightness: p.brightness,
-      primary: p.primary,
+      // `primary` here is paired with `onPrimary` white, so it must be the
+      // FILL role — Material paints text on top of it.
+      primary: p.primaryFill,
       onPrimary: p.onPrimary,
       secondary: p.primaryVivid,
       onSecondary: p.onPrimary,
-      error: p.error,
+      error: p.errorFill,
       onError: p.onPrimary,
       surface: p.surface,
       onSurface: p.textPrimary,

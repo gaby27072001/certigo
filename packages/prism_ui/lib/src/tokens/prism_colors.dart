@@ -50,7 +50,7 @@ class PrismColors {
   /// vendor's console rather than as itself, and it is the single change most
   /// responsible for the interface feeling corporate. The Azure blue is not
   /// gone — it survives as [azureTrack], where a vendor color belongs.
-  static const Color primary = Color(0xFF4046F3);
+  static const Color primary = Color(0xFF3B35F2);
 
   /// Pressed / gradient-bottom variant.
   static const Color primaryDark = Color(0xFF2B1AC4);
@@ -65,43 +65,43 @@ class PrismColors {
   static const Color primaryVivid = Color(0xFF6178F6);
 
   /// Brand tone for dark chrome (text and icons).
-  static const Color primaryGlow = Color(0xFF788FF7);
+  static const Color primaryGlow = Color(0xFF8097F8);
 
   /// Ember — energy, streaks, "you're on fire" moments.
-  static const Color ember = Color(0xFFBC2315);
+  static const Color ember = Color(0xFFB02013);
   static const Color emberVivid = Color(0xFFF12F1E);
-  static const Color emberGlow = Color(0xFFF85E4B);
+  static const Color emberGlow = Color(0xFFF86C59);
   static const Color emberSoft = Color(0xFFF8E9E6);
 
   /// XP gold — reward, mastery, celebration.
-  static const Color xpGold = Color(0xFF9C5015);
+  static const Color xpGold = Color(0xFF924A13);
   static const Color xpGoldVivid = Color(0xFFC9681F);
-  static const Color xpGoldGlow = Color(0xFFE37624);
+  static const Color xpGoldGlow = Color(0xFFEC7B26);
   static const Color xpGoldSoft = Color(0xFFF8EAE2);
 
   // ---- Semantic feedback -------------------------------------------------
   // Same constant-lightness law, so status color never outshouts track color.
-  static const Color success = Color(0xFF1A7C36);
+  static const Color success = Color(0xFF177331);
   static const Color successVivid = Color(0xFF24A047);
-  static const Color successGlow = Color(0xFF2AB552);
+  static const Color successGlow = Color(0xFF2DBC55);
   static const Color successSoft = Color(0xFFD4F8D8);
   static const Color successSoftDark = Color(0xFF17311B);
 
-  static const Color warning = Color(0xFF895E16);
+  static const Color warning = Color(0xFF805713);
   static const Color warningVivid = Color(0xFFB07A1F);
-  static const Color warningGlow = Color(0xFFC78B24);
+  static const Color warningGlow = Color(0xFFCF9026);
   static const Color warningSoft = Color(0xFFF8EBDA);
   static const Color warningSoftDark = Color(0xFF352714);
 
-  static const Color error = Color(0xFFBC1D31);
+  static const Color error = Color(0xFFB01B2D);
   static const Color errorVivid = Color(0xFFF12941);
-  static const Color errorGlow = Color(0xFFF85B60);
+  static const Color errorGlow = Color(0xFFF8696B);
   static const Color errorSoft = Color(0xFFF8E9E8);
   static const Color errorSoftDark = Color(0xFF471919);
 
-  static const Color info = Color(0xFF1769B5);
+  static const Color info = Color(0xFF1562AA);
   static const Color infoVivid = Color(0xFF2188E8);
-  static const Color infoGlow = Color(0xFF439BF7);
+  static const Color infoGlow = Color(0xFF52A2F8);
   static const Color infoSoft = Color(0xFFE5EEF8);
   static const Color infoSoftDark = Color(0xFF152B44);
 
@@ -153,12 +153,12 @@ class PrismColors {
   // ---- The refracted spectrum -------------------------------------------
   /// Text / solid-fill role (L≈0.515). Body-text safe on the light canvas.
   static const List<Color> spectrumInk = <Color>[
-    Color(0xFF4046F3), // violet — the brand band
-    Color(0xFF9A1EBA), // magenta
-    Color(0xFFB51C6D), // rose
-    Color(0xFF9C5015), // amber
-    Color(0xFF1A7C36), // green
-    Color(0xFF1A7483), // cyan
+    Color(0xFF3B35F2), // violet — the brand band
+    Color(0xFF901BAE), // magenta
+    Color(0xFFA91A66), // rose
+    Color(0xFF924A13), // amber
+    Color(0xFF177331), // green
+    Color(0xFF176C7A), // cyan
   ];
 
   /// Vivid fill role (L≈0.62). Rings, progress, chips, glows, large type.
@@ -173,12 +173,12 @@ class PrismColors {
 
   /// Dark-chrome role (L≈0.68). Text and icons on dark surfaces.
   static const List<Color> spectrumGlow = <Color>[
-    Color(0xFF788FF7),
-    Color(0xFFD456F7),
-    Color(0xFFF84C9F),
-    Color(0xFFE37624),
-    Color(0xFF2AB552),
-    Color(0xFF2AAABF),
+    Color(0xFF8097F8),
+    Color(0xFFD764F8),
+    Color(0xFFF95DA5),
+    Color(0xFFEC7B26),
+    Color(0xFF2DBC55),
+    Color(0xFF2CB0C7),
   ];
 
   /// Whisper tint of each band, for light-mode region fills.

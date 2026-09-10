@@ -233,7 +233,9 @@ class _PrismButtonState extends State<PrismButton> {
   }
 
   BoxDecoration _topDecoration(PrismColorScheme p) {
-    final Color tone = widget.tone ?? p.primary;
+    // A button's tone paints a solid block that carries [onPrimary] text, so
+    // it takes the FILL role, not the adaptive foreground one.
+    final Color tone = widget.tone ?? p.primaryFill;
 
     // Disabled is a flat, inert plane with a real edge, not a ghost of the
     // enabled control. `surface` is used rather than `surfaceAlt` because the
@@ -291,7 +293,7 @@ class _PrismButtonState extends State<PrismButton> {
   }
 
   BoxDecoration _baseDecoration(PrismColorScheme p) {
-    final Color tone = widget.tone ?? p.primary;
+    final Color tone = widget.tone ?? p.primaryFill;
     if (!_enabled) {
       return BoxDecoration(borderRadius: PrismRadii.buttonAll, color: p.surfaceAlt);
     }

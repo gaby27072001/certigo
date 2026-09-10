@@ -14,8 +14,16 @@ void main() {
       expect(PrismColorScheme.dark.background, PrismColors.darkBg);
     });
 
-    test('light and dark differ by background, not brand primary', () {
-      expect(PrismColorScheme.light.primary, PrismColorScheme.dark.primary);
+    test('the interactive tint adapts between appearances, the fill does not', () {
+      // This assertion used to read "light and dark differ by background, not
+      // brand primary" — and it was encoding the bug. A tint used as a
+      // foreground *must* change between appearances, exactly as `systemBlue`
+      // does on Apple platforms; holding it identical drove six of seven
+      // accents to 2.6–3.1:1 on dark chrome. What legitimately stays stable is
+      // the *fill*, since a fill sits on top of the chrome and carries its own
+      // white text.
+      expect(PrismColorScheme.light.primary, isNot(PrismColorScheme.dark.primary));
+      expect(PrismColorScheme.light.primaryFill, PrismColorScheme.dark.primaryFill);
       expect(PrismColorScheme.light.background, isNot(PrismColorScheme.dark.background));
     });
 

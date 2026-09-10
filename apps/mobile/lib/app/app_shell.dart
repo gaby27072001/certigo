@@ -146,7 +146,11 @@ class _NavItem extends StatelessWidget {
           curve: PrismMotion.standard,
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: selected ? color.primarySoft : Colors.transparent,
+            // The measured selected-state layer, not a wash. `primarySoft` is
+            // a region tint: over the dark glass it measured 1.004:1, i.e.
+            // invisible. `selectedOn` is the layer built for exactly this and
+            // is verified to move the surface (1.20:1 light, 1.36:1 dark).
+            color: selected ? color.selectedOn(color.glassFill) : Colors.transparent,
             borderRadius: PrismRadii.pillAll,
           ),
           child: Column(
@@ -154,14 +158,14 @@ class _NavItem extends StatelessWidget {
             children: <Widget>[
               Icon(
                 selected ? tab.activeIcon : tab.icon,
-                color: selected ? color.primary : color.textSecondary,
+                color: selected ? color.primaryOnSurface : color.textSecondary,
                 size: 24,
               ),
               const SizedBox(height: 2),
               Text(
                 tab.label,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: selected ? color.primary : color.textSecondary,
+                      color: selected ? color.primaryOnSurface : color.textSecondary,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     ),
               ),

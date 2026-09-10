@@ -8,47 +8,64 @@ import '../tokens/prism_state.dart';
 ///
 /// This is the layer UI code should depend on — never the raw [PrismColors].
 ///
-/// ## Three roles, not one colour
+/// ## Trois rôles, pas une couleur
 ///
 /// A single colour cannot be a fill, a label and a wash at once; pretending it
 /// can is what forces a palette to compromise until nothing is quite legible.
-/// Every accent here therefore appears in three roles:
+/// Every accent here therefore appears in several roles:
 ///
-/// * **fill** ([primary], [success], …) — a solid block that carries white
-///   text. Identical in light and dark, because a fill sits on top of the
-///   chrome rather than inside it.
-/// * **onSurface** ([primaryOnSurface], [successOnSurface], …) — the same
-///   accent as *text or icon* directly on the chrome. This one must flip
-///   between modes: the ink that reads on a light canvas disappears on a dark
-///   one.
-/// * **soft** ([primarySoft], [successSoft], …) — a wash for tinting a whole
-///   region in the accent's hue, which is how a track colours its own area.
+/// * **the bare name** ([primary], [success], …) — the accent as a
+///   **foreground**: text, icon, divider, border. This is the default because
+///   it is overwhelmingly the common case (measured: 108 foreground uses
+///   against 6 solid fills). It therefore **adapts between themes** — ink on
+///   light chrome, glow on dark — exactly as `systemBlue` differs between
+///   Apple's appearances. Making it identical in both was a real regression:
+///   six of seven accents fell to 2.6–3.1:1 on dark chrome.
+/// * **fill** ([primaryFill], [successFill], …) — a solid block that carries
+///   white text. Identical in light and dark, because a fill sits on top of
+///   the chrome rather than inside it.
+/// * **onSurface** ([primaryOnSurface], …) — the explicit foreground role.
+///   Same value as the bare name; kept because naming the intent is worth more
+///   than the keystrokes at a call site that cares.
+/// * **soft** ([primarySoft], …) — a wash for tinting a whole region in the
+///   accent's hue, which is how a track colours its own area.
+///
+/// The rule behind the rule: **the default must be safe, the exception must be
+/// named.** A call site that writes `color: p.error` and thinks no further
+/// should get a legible result on both appearances.
 @immutable
 class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
   const PrismColorScheme({
     required this.brightness,
     required this.primary,
+    required this.primaryFill,
     required this.primaryDark,
     required this.primarySoft,
     required this.primaryVivid,
     required this.primaryOnSurface,
     required this.onPrimary,
     required this.ember,
+    required this.emberFill,
     required this.emberOnSurface,
     required this.emberSoft,
     required this.xpGold,
+    required this.xpGoldFill,
     required this.xpGoldOnSurface,
     required this.xpGoldSoft,
     required this.success,
+    required this.successFill,
     required this.successOnSurface,
     required this.successSoft,
     required this.warning,
+    required this.warningFill,
     required this.warningOnSurface,
     required this.warningSoft,
     required this.error,
+    required this.errorFill,
     required this.errorOnSurface,
     required this.errorSoft,
     required this.info,
+    required this.infoFill,
     required this.infoOnSurface,
     required this.infoSoft,
     required this.background,
@@ -70,8 +87,11 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
 
   final Brightness brightness;
 
-  /// Solid brand fill for primary actions. Carries white text.
+  /// Brand accent as a **foreground** — text, icon, border. Adapts per theme.
   final Color primary;
+
+  /// Brand accent as a **solid fill** that carries [onPrimary] text.
+  final Color primaryFill;
 
   /// Darker brand tone: gradient bottom, pressed lip.
   final Color primaryDark;
@@ -89,21 +109,27 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
   final Color onPrimary;
 
   final Color ember;
+  final Color emberFill;
   final Color emberOnSurface;
   final Color emberSoft;
   final Color xpGold;
+  final Color xpGoldFill;
   final Color xpGoldOnSurface;
   final Color xpGoldSoft;
   final Color success;
+  final Color successFill;
   final Color successOnSurface;
   final Color successSoft;
   final Color warning;
+  final Color warningFill;
   final Color warningOnSurface;
   final Color warningSoft;
   final Color error;
+  final Color errorFill;
   final Color errorOnSurface;
   final Color errorSoft;
   final Color info;
+  final Color infoFill;
   final Color infoOnSurface;
   final Color infoSoft;
 
@@ -184,28 +210,38 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
 
   static const PrismColorScheme light = PrismColorScheme(
     brightness: Brightness.light,
+    // Light chrome: the ink role is both the foreground and the fill, because
+    // a colour dark enough to read on white is also dark enough to carry white
+    // text.
     primary: PrismColors.primary,
+    primaryFill: PrismColors.primary,
     primaryDark: PrismColors.primaryDark,
     primarySoft: PrismColors.primarySoft,
     primaryVivid: PrismColors.primaryVivid,
     primaryOnSurface: PrismColors.primary,
     onPrimary: Color(0xFFFFFFFF),
     ember: PrismColors.ember,
+    emberFill: PrismColors.ember,
     emberOnSurface: PrismColors.ember,
     emberSoft: PrismColors.emberSoft,
     xpGold: PrismColors.xpGold,
+    xpGoldFill: PrismColors.xpGold,
     xpGoldOnSurface: PrismColors.xpGold,
     xpGoldSoft: PrismColors.xpGoldSoft,
     success: PrismColors.success,
+    successFill: PrismColors.success,
     successOnSurface: PrismColors.success,
     successSoft: PrismColors.successSoft,
     warning: PrismColors.warning,
+    warningFill: PrismColors.warning,
     warningOnSurface: PrismColors.warning,
     warningSoft: PrismColors.warningSoft,
     error: PrismColors.error,
+    errorFill: PrismColors.error,
     errorOnSurface: PrismColors.error,
     errorSoft: PrismColors.errorSoft,
     info: PrismColors.info,
+    infoFill: PrismColors.info,
     infoOnSurface: PrismColors.info,
     infoSoft: PrismColors.infoSoft,
     background: PrismColors.lightBg,
@@ -227,28 +263,38 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
 
   static const PrismColorScheme dark = PrismColorScheme(
     brightness: Brightness.dark,
-    primary: PrismColors.primary,
+    // Dark chrome: the bare name resolves to the **glow** role, because on dark
+    // chrome the overwhelmingly common use of an accent is as a foreground.
+    // The fill stays on ink, where white text still reads.
+    primary: PrismColors.primaryGlow,
+    primaryFill: PrismColors.primary,
     primaryDark: PrismColors.primaryDark,
     primarySoft: PrismColors.primarySoftDark,
     primaryVivid: PrismColors.primaryVivid,
     primaryOnSurface: PrismColors.primaryGlow,
     onPrimary: Color(0xFFFFFFFF),
-    ember: PrismColors.ember,
+    ember: PrismColors.emberGlow,
+    emberFill: PrismColors.ember,
     emberOnSurface: PrismColors.emberGlow,
     emberSoft: PrismColors.errorSoftDark,
-    xpGold: PrismColors.xpGold,
+    xpGold: PrismColors.xpGoldGlow,
+    xpGoldFill: PrismColors.xpGold,
     xpGoldOnSurface: PrismColors.xpGoldGlow,
     xpGoldSoft: PrismColors.warningSoftDark,
-    success: PrismColors.success,
+    success: PrismColors.successGlow,
+    successFill: PrismColors.success,
     successOnSurface: PrismColors.successGlow,
     successSoft: PrismColors.successSoftDark,
-    warning: PrismColors.warning,
+    warning: PrismColors.warningGlow,
+    warningFill: PrismColors.warning,
     warningOnSurface: PrismColors.warningGlow,
     warningSoft: PrismColors.warningSoftDark,
-    error: PrismColors.error,
+    error: PrismColors.errorGlow,
+    errorFill: PrismColors.error,
     errorOnSurface: PrismColors.errorGlow,
     errorSoft: PrismColors.errorSoftDark,
-    info: PrismColors.info,
+    info: PrismColors.infoGlow,
+    infoFill: PrismColors.info,
     infoOnSurface: PrismColors.infoGlow,
     infoSoft: PrismColors.infoSoftDark,
     background: PrismColors.darkBg,
@@ -262,7 +308,7 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     glassFill: PrismColors.glassDarkFill,
     glassStroke: PrismColors.glassDarkStroke,
     litEdge: PrismColors.glassDarkLitEdge,
-    domainAccents: PrismColors.spectrumInk,
+    domainAccents: PrismColors.spectrumGlow,
     domainAccentsVivid: PrismColors.spectrumVivid,
     domainAccentsOnSurface: PrismColors.spectrumGlow,
     domainAccentsSoft: PrismColors.spectrumSoftDark,
@@ -272,27 +318,34 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
   PrismColorScheme copyWith({
     Brightness? brightness,
     Color? primary,
+    Color? primaryFill,
     Color? primaryDark,
     Color? primarySoft,
     Color? primaryVivid,
     Color? primaryOnSurface,
     Color? onPrimary,
     Color? ember,
+    Color? emberFill,
     Color? emberOnSurface,
     Color? emberSoft,
     Color? xpGold,
+    Color? xpGoldFill,
     Color? xpGoldOnSurface,
     Color? xpGoldSoft,
     Color? success,
+    Color? successFill,
     Color? successOnSurface,
     Color? successSoft,
     Color? warning,
+    Color? warningFill,
     Color? warningOnSurface,
     Color? warningSoft,
     Color? error,
+    Color? errorFill,
     Color? errorOnSurface,
     Color? errorSoft,
     Color? info,
+    Color? infoFill,
     Color? infoOnSurface,
     Color? infoSoft,
     Color? background,
@@ -314,27 +367,34 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     return PrismColorScheme(
       brightness: brightness ?? this.brightness,
       primary: primary ?? this.primary,
+      primaryFill: primaryFill ?? this.primaryFill,
       primaryDark: primaryDark ?? this.primaryDark,
       primarySoft: primarySoft ?? this.primarySoft,
       primaryVivid: primaryVivid ?? this.primaryVivid,
       primaryOnSurface: primaryOnSurface ?? this.primaryOnSurface,
       onPrimary: onPrimary ?? this.onPrimary,
       ember: ember ?? this.ember,
+      emberFill: emberFill ?? this.emberFill,
       emberOnSurface: emberOnSurface ?? this.emberOnSurface,
       emberSoft: emberSoft ?? this.emberSoft,
       xpGold: xpGold ?? this.xpGold,
+      xpGoldFill: xpGoldFill ?? this.xpGoldFill,
       xpGoldOnSurface: xpGoldOnSurface ?? this.xpGoldOnSurface,
       xpGoldSoft: xpGoldSoft ?? this.xpGoldSoft,
       success: success ?? this.success,
+      successFill: successFill ?? this.successFill,
       successOnSurface: successOnSurface ?? this.successOnSurface,
       successSoft: successSoft ?? this.successSoft,
       warning: warning ?? this.warning,
+      warningFill: warningFill ?? this.warningFill,
       warningOnSurface: warningOnSurface ?? this.warningOnSurface,
       warningSoft: warningSoft ?? this.warningSoft,
       error: error ?? this.error,
+      errorFill: errorFill ?? this.errorFill,
       errorOnSurface: errorOnSurface ?? this.errorOnSurface,
       errorSoft: errorSoft ?? this.errorSoft,
       info: info ?? this.info,
+      infoFill: infoFill ?? this.infoFill,
       infoOnSurface: infoOnSurface ?? this.infoOnSurface,
       infoSoft: infoSoft ?? this.infoSoft,
       background: background ?? this.background,
@@ -362,27 +422,34 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     return PrismColorScheme(
       brightness: t < 0.5 ? brightness : other.brightness,
       primary: c(primary, other.primary),
+      primaryFill: c(primaryFill, other.primaryFill),
       primaryDark: c(primaryDark, other.primaryDark),
       primarySoft: c(primarySoft, other.primarySoft),
       primaryVivid: c(primaryVivid, other.primaryVivid),
       primaryOnSurface: c(primaryOnSurface, other.primaryOnSurface),
       onPrimary: c(onPrimary, other.onPrimary),
       ember: c(ember, other.ember),
+      emberFill: c(emberFill, other.emberFill),
       emberOnSurface: c(emberOnSurface, other.emberOnSurface),
       emberSoft: c(emberSoft, other.emberSoft),
       xpGold: c(xpGold, other.xpGold),
+      xpGoldFill: c(xpGoldFill, other.xpGoldFill),
       xpGoldOnSurface: c(xpGoldOnSurface, other.xpGoldOnSurface),
       xpGoldSoft: c(xpGoldSoft, other.xpGoldSoft),
       success: c(success, other.success),
+      successFill: c(successFill, other.successFill),
       successOnSurface: c(successOnSurface, other.successOnSurface),
       successSoft: c(successSoft, other.successSoft),
       warning: c(warning, other.warning),
+      warningFill: c(warningFill, other.warningFill),
       warningOnSurface: c(warningOnSurface, other.warningOnSurface),
       warningSoft: c(warningSoft, other.warningSoft),
       error: c(error, other.error),
+      errorFill: c(errorFill, other.errorFill),
       errorOnSurface: c(errorOnSurface, other.errorOnSurface),
       errorSoft: c(errorSoft, other.errorSoft),
       info: c(info, other.info),
+      infoFill: c(infoFill, other.infoFill),
       infoOnSurface: c(infoOnSurface, other.infoOnSurface),
       infoSoft: c(infoSoft, other.infoSoft),
       background: c(background, other.background),
