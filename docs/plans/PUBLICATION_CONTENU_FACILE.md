@@ -17,6 +17,12 @@ par une Azure Policy à effet `modify` : impossible de le rouvrir. Il a donc fal
 éphémère dans le VNet de prod, un rôle data-plane, la levée d'un verrou, puis tout
 détruire — 25 minutes d'expert, infaisable depuis l'extérieur.
 
+Cette intervention a été exécutée **une seule fois**, le 2026-09-09. Sa trace complète —
+comportement exact de la policy, verrou, méthode rejouable et démontage relu — est
+consignée dans [« Seed d'urgence du conteneur `content` de production »](../runbooks/SEED_URGENCE_COSMOS_PROD.md).
+Elle n'y figure pas comme procédure à rejouer, mais comme la mesure de ce que le présent
+plan doit rendre inutile.
+
 ## Recommandation en une phrase
 
 **Activer le pipeline de contenu versionné déjà présent**, dont la moitié « publication »
