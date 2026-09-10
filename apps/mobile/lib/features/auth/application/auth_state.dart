@@ -210,8 +210,15 @@ sealed class AuthState {
 }
 
 /// Restauration de session en cours (premier démarrage) → écran de chargement.
+///
+/// [retrying] vaut vrai pendant la **seconde et dernière** tentative d'une
+/// connexion e-mail dont la première a expiré. L'interface s'en sert pour dire
+/// que l'attente continue et pourquoi : un indicateur qui tourne sans changer
+/// n'informe plus, et l'utilisateur appuie une seconde fois.
 class AuthLoading extends AuthState {
-  const AuthLoading();
+  const AuthLoading({this.retrying = false});
+
+  final bool retrying;
 }
 
 class AuthSigningOut extends AuthState {

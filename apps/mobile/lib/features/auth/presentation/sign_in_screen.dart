@@ -138,6 +138,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
     final AuthState state = ref.watch(authControllerProvider);
     final bool busy = state is AuthLoading || _pending != null || _emailSubmitting;
+    final bool retryingSignIn = state is AuthLoading && state.retrying;
     final bool registering = _mode == _AuthMode.register;
 
     // Message d'erreur affiché : on privilégie le message local (posé par le
@@ -295,6 +296,20 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                                           : Text(registering ? 'Créer un compte' : 'Se connecter'),
                                     ),
                                   ),
+                                  // Deuxième et dernière tentative en cours :
+                                  // l'indicateur seul ne change pas et cesse
+                                  // d'informer. Ce texte suit l'état, donc il
+                                  // disparaît de lui-même à l'issue — succès
+                                  // comme échec.
+                                  if (retryingSignIn) ...<Widget>[
+                                    const SizedBox(height: PrismSpacing.sm),
+                                    Text(
+                                      'Le serveur démarre, on réessaie…',
+                                      key: const Key('email-retry-notice'),
+                                      textAlign: TextAlign.center,
+                                      style: text.bodySmall?.copyWith(color: p.textSecondary),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),

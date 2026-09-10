@@ -248,8 +248,34 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthLoading();
     final Stopwatch sw = Stopwatch()..start();
     try {
-      final AuthSession session =
-          await _credentials.login(email: email, password: password).timeout(_emailTimeout);
+      AuthSession session;
+      try {
+        session = await _credentials.login(email: email, password: password).timeout(_emailTimeout);
+      } on AuthGatewayException catch (e) {
+        // Un serveur qui met trop de temps à répondre est la signature d'un
+        // backend qui démarre à froid. UNE seule reprise, et le compte de 1 est
+        // contraint, pas préféré :
+        //  * borne respectée — la première tentative échoue au délai de
+        //    connexion du client HTTP (`connectTimeout`, packages/data
+        //    api_client.dart), et cette attente dépasse à elle seule le
+        //    démarrage à froid observé : 5 161 ms mesurés le 2026-09-10 sur
+        //    `POST /auth/login` du backend dev après 15 h d'inactivité, contre
+        //    224 à 427 ms à chaud sur les trois appels suivants ;
+        //  * marge — l'échec de la première tentative réchauffe donc l'hôte
+        //    lui-même : la reprise part sur un backend déjà démarré ;
+        //  * ce qu'une seconde reprise ajouterait — une attente supplémentaire
+        //    d'un `connectTimeout` entier pour un utilisateur qui regarde son
+        //    écran, sans bénéfice mesuré, l'hôte étant déjà chaud.
+        // Relire cette mesure avant de porter le compte au-delà de 1.
+        //
+        // Bornée à la connexion : `auth/register` n'a pas de clé d'idempotence,
+        // et reprendre une inscription réussie mais expirée afficherait « adresse
+        // déjà utilisée » à quelqu'un qui vient de créer son compte.
+        if (e.cause != AuthFailureCause.timeout) rethrow;
+        if (!_isCurrent(revision)) return;
+        state = const AuthLoading(retrying: true);
+        session = await _credentials.login(email: email, password: password).timeout(_emailTimeout);
+      }
       if (!_isCurrent(revision)) return;
       if (session.accessToken.isEmpty) {
         _telemetry.authFailure(
