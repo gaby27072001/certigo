@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../tokens/prism_colors.dart';
 import '../tokens/prism_radii.dart' show PrismRadii;
+import '../tokens/prism_state.dart';
 import '../tokens/prism_typography.dart';
 import 'prism_color_scheme.dart';
 
@@ -23,15 +23,16 @@ class PrismTheme {
     final ColorScheme scheme = ColorScheme(
       brightness: p.brightness,
       primary: p.primary,
-      onPrimary: Colors.white,
-      secondary: p.ember,
-      onSecondary: Colors.white,
+      onPrimary: p.onPrimary,
+      secondary: p.primaryVivid,
+      onSecondary: p.onPrimary,
       error: p.error,
-      onError: Colors.white,
+      onError: p.onPrimary,
       surface: p.surface,
       onSurface: p.textPrimary,
       surfaceContainerHighest: p.surfaceAlt,
       outline: p.border,
+      outlineVariant: p.borderStrong,
     );
 
     return ThemeData(
@@ -42,10 +43,14 @@ class PrismTheme {
       canvasColor: p.background,
       textTheme: text,
       splashFactory: InkRipple.splashFactory,
-      hoverColor: p.primary.withValues(alpha: 0.05),
-      focusColor: p.primary.withValues(alpha: 0.12),
-      highlightColor: p.primary.withValues(alpha: 0.06),
-      splashColor: p.primary.withValues(alpha: 0.10),
+      // These are the measured state layers, not guesses. Before this change
+      // both pressables forced `overlayColor: Colors.transparent`, so hover
+      // never rendered anywhere in the app; and hover/highlight sat 1% of alpha
+      // apart (1.07:1 vs 1.08:1), which is one state wearing two names.
+      hoverColor: p.primaryVivid.withValues(alpha: PrismStateLayer.hover(p.brightness)),
+      focusColor: p.primaryVivid.withValues(alpha: PrismStateLayer.focusHalo(p.brightness)),
+      highlightColor: p.primaryVivid.withValues(alpha: PrismStateLayer.pressed(p.brightness)),
+      splashColor: p.primaryVivid.withValues(alpha: PrismStateLayer.pressed(p.brightness)),
       materialTapTargetSize: MaterialTapTargetSize.padded,
       extensions: <ThemeExtension<dynamic>>[p],
       appBarTheme: AppBarTheme(
@@ -63,13 +68,27 @@ class PrismTheme {
         style: ButtonStyle(
           minimumSize: const WidgetStatePropertyAll<Size>(Size.square(48)),
           foregroundColor: WidgetStatePropertyAll<Color>(p.textPrimary),
-          overlayColor: WidgetStatePropertyAll<Color>(p.primary.withValues(alpha: 0.08)),
+          overlayColor: WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
+            if (states.contains(WidgetState.pressed)) {
+              return p.primaryVivid.withValues(alpha: PrismStateLayer.pressed(p.brightness));
+            }
+            if (states.contains(WidgetState.hovered)) {
+              return p.primaryVivid.withValues(alpha: PrismStateLayer.hover(p.brightness));
+            }
+            if (states.contains(WidgetState.focused)) {
+              return p.primaryVivid.withValues(alpha: PrismStateLayer.focusHalo(p.brightness));
+            }
+            return const Color(0x00000000);
+          }),
         ),
       ),
       cardTheme: CardThemeData(
         color: p.surface,
         elevation: 0,
-        shape: const RoundedRectangleBorder(borderRadius: PrismRadii.cardLg),
+        shape: RoundedRectangleBorder(
+          borderRadius: PrismRadii.cardLg,
+          side: BorderSide(color: p.border),
+        ),
         margin: EdgeInsets.zero,
       ),
       chipTheme: ChipThemeData(
@@ -101,16 +120,16 @@ class PrismTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: PrismRadii.cardLg,
-          borderSide: BorderSide(color: p.primary, width: 2),
+          borderSide: BorderSide(color: p.primaryOnSurface, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: PrismRadii.cardLg,
-          borderSide: BorderSide(color: p.error),
+          borderSide: BorderSide(color: p.errorOnSurface),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: isDark ? PrismColors.darkSurfaceAlt : p.textPrimary,
-        contentTextStyle: text.bodyMedium?.copyWith(color: Colors.white),
+        backgroundColor: isDark ? p.surfaceAlt : p.textPrimary,
+        contentTextStyle: text.bodyMedium?.copyWith(color: isDark ? p.textPrimary : p.surface),
         behavior: SnackBarBehavior.floating,
         shape: const RoundedRectangleBorder(borderRadius: PrismRadii.cardMd),
       ),
@@ -137,12 +156,12 @@ class PrismTheme {
         showDuration: const Duration(seconds: 2),
       ),
       textSelectionTheme: TextSelectionThemeData(
-        cursorColor: p.primary,
-        selectionColor: p.primary.withValues(alpha: 0.22),
-        selectionHandleColor: p.primary,
+        cursorColor: p.primaryOnSurface,
+        selectionColor: p.primaryVivid.withValues(alpha: 0.28),
+        selectionHandleColor: p.primaryOnSurface,
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
-        color: p.primary,
+        color: p.primaryVivid,
         linearTrackColor: p.surfaceAlt,
         circularTrackColor: p.surfaceAlt,
       ),

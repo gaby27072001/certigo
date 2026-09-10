@@ -638,7 +638,7 @@ class _BrandBadge extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: p.glassFill,
-          border: Border.all(color: Colors.white.withOpacity(0.55), width: 1.5),
+          border: Border.all(color: p.glassStroke, width: 1.5),
           boxShadow: <BoxShadow>[
             BoxShadow(
               color: p.primary.withOpacity(0.32),

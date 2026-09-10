@@ -6,11 +6,22 @@ import '../tokens/prism_elevation.dart';
 import '../tokens/prism_spacing.dart';
 import 'prism_pressable.dart';
 
-/// The foundational "Liquid-Glass inspired" surface of Certigo.
+/// The foundational Liquid-Glass surface of Certigo.
 ///
-/// A [GlassSurface] is a translucent, blurred panel with a subtle top
-/// highlight and a hairline stroke — it reads as frosted material floating
-/// above the aurora background. It is the base for cards, sheets and nav bars.
+/// A [GlassSurface] is a translucent panel that reads as material floating
+/// above the background: a fill, a real edge, a lit top edge where the chrome
+/// can carry one, and a shadow with direction.
+///
+/// The edge is the part that matters, and it is directional. In light mode the
+/// stroke is **darker** than the fill; in dark mode it is **lighter**. The
+/// previous implementation used a white stroke in both, which measured 1.008:1
+/// against its own fill in light mode — 1.000 being literally the same colour.
+/// That is the whole of "the buttons are badly outlined", and it is why the
+/// stroke colour now comes from the scheme rather than from white.
+///
+/// For the same reason the top highlight is only painted where it can be seen:
+/// white at 0.55–0.85 over the light fill measures 1.00:1, so light mode gets
+/// no lit edge and leans on the shadow instead.
 ///
 /// Performance: backdrop blur is expensive. We expose [blurEnabled] so callers
 /// (and the global low-power path) can downgrade to a solid translucent fill on
@@ -47,9 +58,18 @@ class GlassSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final bool useBlur = blurEnabled;
+    final bool isDark = p.brightness == Brightness.dark;
 
     Color fill = p.glassFill;
-    if (tint != null) fill = Color.alphaBlend(tint!.withOpacity(0.14), fill);
+    if (tint != null) {
+      fill = Color.alphaBlend(tint!.withValues(alpha: isDark ? 0.20 : 0.12), fill);
+    }
+
+    // A tinted surface takes its edge from the tint so the region reads as one
+    // material rather than a coloured fill inside a neutral frame.
+    final Color stroke = tint == null
+        ? p.glassStroke
+        : Color.alphaBlend(tint!.withValues(alpha: isDark ? 0.45 : 0.55), p.glassStroke);
 
     final List<BoxShadow> shadow = switch (elevation) {
       0 => PrismElevation.level0,
@@ -62,16 +82,17 @@ class GlassSurface extends StatelessWidget {
       decoration: BoxDecoration(
         color: fill,
         borderRadius: borderRadius,
-        border: Border.all(color: p.glassStroke.withOpacity(strokeOpacity)),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[
-            Colors.white.withOpacity(p.brightness == Brightness.dark ? 0.07 : 0.32),
-            Colors.white.withOpacity(0),
-          ],
-          stops: const <double>[0, 0.62],
-        ),
+        border: Border.all(color: stroke.withValues(alpha: stroke.a * strokeOpacity)),
+        // The lit edge of the material. `litEdge` is fully transparent in light
+        // mode on purpose — see the class doc.
+        gradient: p.litEdge.a == 0
+            ? null
+            : LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[p.litEdge, p.litEdge.withValues(alpha: 0)],
+                stops: const <double>[0, 0.55],
+              ),
       ),
       child: Padding(padding: padding, child: child),
     );

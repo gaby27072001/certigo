@@ -16,6 +16,7 @@ export 'src/tokens/prism_spacing.dart';
 export 'src/tokens/prism_radii.dart';
 export 'src/tokens/prism_elevation.dart';
 export 'src/tokens/prism_motion.dart';
+export 'src/tokens/prism_state.dart';
 export 'src/tokens/prism_typography.dart';
 export 'src/tokens/prism_brand_icons.dart';
 

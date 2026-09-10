@@ -447,7 +447,7 @@ class _BrandChip extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: <Color>[Color.alphaBlend(Colors.white.withOpacity(0.5), body), body],
         ),
-        border: Border.all(color: Colors.white.withOpacity(0.7)),
+        border: Border.all(color: p.border),
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: tint.withOpacity(0.30),
@@ -505,7 +505,7 @@ class _HeroAnchor extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: p.glassFill,
-        border: Border.all(color: Colors.white.withOpacity(0.55), width: 1.5),
+        border: Border.all(color: p.glassStroke, width: 1.5),
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: p.primary.withOpacity(0.35),
@@ -665,7 +665,7 @@ class _CommencerButtonState extends State<_CommencerButton> {
                 foregroundDecoration: _focused
                     ? BoxDecoration(
                         borderRadius: BorderRadius.circular(PrismRadii.pill),
-                        border: Border.all(color: Colors.white, width: 2),
+                        border: Border.all(color: p.onPrimary, width: 2),
                       )
                     : null,
                 decoration: BoxDecoration(

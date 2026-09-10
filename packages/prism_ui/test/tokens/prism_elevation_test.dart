@@ -28,11 +28,39 @@ void main() {
       expect(dark, isNot(light));
     });
 
-    test('level3 shadow is tinted toward the brand primary', () {
-      final Color shadow = PrismElevation.level3(Brightness.light).first.color;
-      expect(shadow.red, PrismColors.primary.red);
-      expect(shadow.green, PrismColors.primary.green);
-      expect(shadow.blue, PrismColors.primary.blue);
+    test('every shadow has direction and softness, never a flat halo', () {
+      for (final Brightness b in Brightness.values) {
+        for (final List<BoxShadow> level in <List<BoxShadow>>[
+          PrismElevation.level1(b),
+          PrismElevation.level2(b),
+          PrismElevation.level3(b),
+        ]) {
+          expect(level, isNotEmpty);
+          // The key shadow carries the light source: it falls downward and is
+          // soft. A zero-offset shadow is decoration, not depth.
+          expect(level.first.offset.dy, greaterThan(0));
+          expect(level.first.blurRadius, greaterThan(0));
+        }
+      }
+    });
+
+    test('toned() takes its colour from the caller, not the brand', () {
+      // Previously level3 hard-coded the brand primary, so a CTA tinted with
+      // any other accent was given a blue glow that matched nothing on screen.
+      const Color rose = Color(0xFFB51C6D);
+      final Color glow = PrismElevation.toned(Brightness.light, rose).first.color;
+      expect(glow.r, rose.r);
+      expect(glow.g, rose.g);
+      expect(glow.b, rose.b);
+      expect(glow.a, lessThan(1.0));
+    });
+
+    test('toned() follows whichever accent it is given', () {
+      const Color green = Color(0xFF1A7C36);
+      const Color amber = Color(0xFF9C5015);
+      final Color a = PrismElevation.toned(Brightness.dark, green).first.color;
+      final Color b = PrismElevation.toned(Brightness.dark, amber).first.color;
+      expect(a, isNot(b));
     });
   });
 }

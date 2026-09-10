@@ -101,6 +101,7 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
 
   @override
   Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
     final _ProviderBrand brand = _brandFor(context);
     final Duration duration = PrismMotion.resolve(context, PrismMotion.fast);
     final TextStyle labelStyle = Theme.of(
@@ -118,7 +119,20 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
         child: InkWell(
           excludeFromSemantics: true,
           borderRadius: const BorderRadius.all(Radius.circular(16)),
-          overlayColor: const WidgetStatePropertyAll<Color>(Colors.transparent),
+          // A neutral state layer derived from each brand's own foreground, so
+          // hover and press read correctly on a white Google button and on a
+          // black Apple one alike. This was `Colors.transparent`, the third
+          // site in the app that switched Material's state layers off.
+          overlayColor: WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
+            if (!_interactive) return const Color(0x00000000);
+            if (states.contains(WidgetState.pressed)) {
+              return brand.foreground.withValues(alpha: PrismStateLayer.pressed(p.brightness));
+            }
+            if (states.contains(WidgetState.hovered)) {
+              return brand.foreground.withValues(alpha: PrismStateLayer.hover(p.brightness));
+            }
+            return const Color(0x00000000);
+          }),
           onFocusChange: (bool value) {
             if (_focused != value) setState(() => _focused = value);
           },
@@ -134,7 +148,9 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
               duration: duration,
               curve: PrismMotion.standard,
               child: AnimatedOpacity(
-                opacity: _interactive ? 1 : 0.55,
+                // 0.55 pushed the label under 3:1. A disabled control must read
+                // as unavailable, not as a rendering fault.
+                opacity: _interactive ? 1 : 0.72,
                 duration: duration,
                 child: Container(
                   height: 56,
@@ -178,16 +194,21 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
                               : Icon(brand.icon, size: 20, color: brand.iconColor),
                         ),
                       ),
+                      const SizedBox(width: PrismSpacing.sm),
                       Expanded(
                         child: Text(
                           brand.label,
-                          textAlign: TextAlign.center,
+                          // Start-aligned on purpose. Centring each label
+                          // inside the leftover width made the four labels
+                          // begin at x = 94 / 104 / 109 / 95 — a 15 px jagged
+                          // left edge down the stack, because the labels are
+                          // different lengths. One shared start x is what makes
+                          // a stack of buttons read as a stack.
+                          textAlign: TextAlign.start,
                           style: labelStyle,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      // Symétrie visuelle : réserve la largeur du logo à droite pour
-                      // que le libellé reste optiquement centré.
                       const SizedBox(width: 24),
                     ],
                   ),

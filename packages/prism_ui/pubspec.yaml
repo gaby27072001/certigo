@@ -19,6 +19,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   fonts:
+    - family: Archivo
+      fonts:
+        - asset: assets/fonts/Archivo-Variable.ttf
     - family: PlusJakartaSans
       fonts:
         - asset: assets/fonts/PlusJakartaSans-Variable.ttf

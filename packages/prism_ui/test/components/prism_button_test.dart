@@ -109,7 +109,10 @@ void main() {
         tester.widget<AnimatedPositioned>(find.byType(AnimatedPositioned)).duration,
         Duration.zero,
       );
-      expect(tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).duration, Duration.zero);
+      // The button no longer animates opacity: fading the whole control was
+      // how the disabled label ended up at 1.48:1. Depth and scale are what
+      // move now, so those are what reduced motion must flatten.
+      expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).duration, Duration.zero);
     });
   });
 }

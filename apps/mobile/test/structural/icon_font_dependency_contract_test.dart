@@ -10,6 +10,7 @@ void main() {
     final String prismLock = File('../../packages/prism_ui/pubspec.lock').readAsStringSync();
     final File checksums = File('../../packages/prism_ui/assets/fonts/SHA256SUMS');
     final List<File> fontAssets = <File>[
+      File('../../packages/prism_ui/assets/fonts/Archivo-Variable.ttf'),
       File('../../packages/prism_ui/assets/fonts/PlusJakartaSans-Variable.ttf'),
       File('../../packages/prism_ui/assets/fonts/Inter-Variable.ttf'),
       File('../../packages/prism_ui/assets/fonts/JetBrainsMono-Variable.ttf'),
@@ -34,7 +35,30 @@ void main() {
       expect(prismPubspec, contains(asset.uri.pathSegments.last));
     }
     expect(checksums.existsSync(), isTrue);
-    expect(checksums.readAsLinesSync(), hasLength(4));
+    // Derived from the asset list so a newly bundled face cannot slip in
+    // unchecksummed.
+    expect(checksums.readAsLinesSync(), hasLength(fontAssets.length));
+    for (final File asset in fontAssets) {
+      expect(
+        checksums.readAsStringSync(),
+        contains(asset.uri.pathSegments.last),
+        reason: '${asset.uri.pathSegments.last} must be checksummed',
+      );
+    }
+    // Every bundled face ships its licence.
+    for (final String licence in <String>[
+      'Archivo-OFL.txt',
+      'Inter-OFL.txt',
+      'JetBrainsMono-OFL.txt',
+      'PlusJakartaSans-OFL.txt',
+      'FontAwesome-Free-LICENSE.txt',
+    ]) {
+      expect(
+        File('../../packages/prism_ui/assets/fonts/licenses/$licence').existsSync(),
+        isTrue,
+        reason: '$licence must ship with the font',
+      );
+    }
   });
 
   test('Flutter and Dart pins stay aligned across CI and releases', () {
