@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_radii.dart';
+import 'prism_tap_target.dart';
 
 /// A syntax-tinted code block with a tap-to-copy affordance.
 ///
@@ -87,20 +88,22 @@ class _CopyButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(
-            copied ? Icons.check_rounded : Icons.copy_rounded,
-            size: 15,
-            color: copied ? ok : Colors.white60,
-          ),
-          const SizedBox(width: 5),
-          Text(
-            copied ? 'Copié' : 'Copier',
-            style: t.labelSmall?.copyWith(color: copied ? ok : Colors.white60),
-          ),
-        ],
+      child: PrismTapTarget(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              copied ? Icons.check_rounded : Icons.copy_rounded,
+              size: 15,
+              color: copied ? ok : Colors.white60,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              copied ? 'Copié' : 'Copier',
+              style: t.labelSmall?.copyWith(color: copied ? ok : Colors.white60),
+            ),
+          ],
+        ),
       ),
     );
   }

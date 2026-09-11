@@ -30,6 +30,7 @@ export 'src/theme/prism_theme.dart';
 export 'src/components/glass_surface.dart';
 export 'src/components/prism_card.dart';
 export 'src/components/prism_pressable.dart';
+export 'src/components/prism_tap_target.dart';
 export 'src/components/prism_content_frame.dart';
 export 'src/components/prism_section_header.dart';
 export 'src/components/prism_reveal.dart';

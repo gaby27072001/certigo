@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../tokens/prism_radii.dart';
 import 'aurora_mascot.dart';
+import 'prism_tap_target.dart';
 
 /// Colored banner that opens each unit on the skill-path — "UNITÉ {index}",
 /// the unit title, its Azure domain, a guardian mascot seated on the right and
@@ -80,10 +81,12 @@ class UnitHeader extends StatelessWidget {
                         GestureDetector(
                           onTap: onInfo,
                           behavior: HitTestBehavior.opaque,
-                          child: Icon(
-                            Icons.info_outline_rounded,
-                            size: 20,
-                            color: Colors.white.withOpacity(0.85),
+                          child: PrismTapTarget(
+                            child: Icon(
+                              Icons.info_outline_rounded,
+                              size: 20,
+                              color: Colors.white.withOpacity(0.85),
+                            ),
                           ),
                         ),
                       ],

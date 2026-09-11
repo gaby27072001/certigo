@@ -5,6 +5,7 @@ import '../tokens/prism_motion.dart';
 import 'prism_content_frame.dart';
 import 'prism_button.dart';
 import 'prism_scroll_edge.dart';
+import 'prism_tap_target.dart';
 
 /// The shared chrome for every onboarding step.
 ///
@@ -133,8 +134,7 @@ class _BackChevron extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(4),
+        child: PrismTapTarget(
           child: Icon(Icons.arrow_back_rounded, color: color, size: 26),
         ),
       ),
@@ -156,8 +156,7 @@ class _CloseCross extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(4),
+        child: PrismTapTarget(
           child: Icon(Icons.close_rounded, color: color, size: 26),
         ),
       ),
