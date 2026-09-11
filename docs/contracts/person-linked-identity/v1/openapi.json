@@ -123,6 +123,7 @@
     "/me/linked-identities": {
       "get": {
         "operationId": "listLinkedIdentities",
+        "x-certigo-implemented": false,
         "summary": "List masked identities linked to the authenticated Person",
         "responses": {
           "200": {
@@ -148,6 +149,7 @@
     "/me/identity-link-intents": {
       "post": {
         "operationId": "createIdentityLinkIntent",
+        "x-certigo-implemented": false,
         "summary": "Begin an explicit two-identity linking ceremony",
         "parameters": [
           {
@@ -200,6 +202,7 @@
     "/me/identity-link-intents/{intentId}/complete": {
       "post": {
         "operationId": "completeIdentityLinkIntent",
+        "x-certigo-implemented": false,
         "summary": "Validate the target identity and idempotently create its deterministic binding",
         "parameters": [
           {
@@ -255,6 +258,7 @@
     "/me/linked-identities/{linkedIdentityId}": {
       "delete": {
         "operationId": "revokeLinkedIdentity",
+        "x-certigo-implemented": false,
         "summary": "Revoke one linked identity without deleting the Person",
         "parameters": [
           {

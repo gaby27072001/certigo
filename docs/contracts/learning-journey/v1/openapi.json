@@ -1,0 +1,730 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Certigo Learning Journey",
+    "version": "1.0.0",
+    "description": "Parcours critique du learner : profil, chemin et readiness, lecon, quiz et examen blanc. Surface appelee en premier par une application native. Le serveur fait autorite sur la notation, la progression et les recompenses."
+  },
+  "servers": [{ "url": "/api" }],
+  "security": [{ "bearerAuth": [] }],
+  "x-certigo-authorization": {
+    "middleware": "Certigo.Api.Middleware.JwtAuthMiddleware",
+    "bearerRequired": true,
+    "ownerClaimSource": "jwt",
+    "ownerAcceptedFromRequestBody": false,
+    "note": "userId est derive du JWT valide, jamais d'un corps de requete. AuthorizationLevel.Anonymous sur le HttpTrigger ne decrit PAS la frontiere d'authentification : c'est la liste AnonymousPaths du middleware qui la porte, et aucune operation de ce contrat n'y figure."
+  },
+  "x-certigo-scoring": {
+    "authority": "server",
+    "clientCortexIsAdvisoryOnly": true,
+    "answerKeyExposedToClients": false,
+    "note": "Le Cortex client existe pour la reactivite de l'UX et doit rester equivalent en comportement a l'implementation .NET, qui seule fait foi."
+  },
+  "x-certigo-idempotency": {
+    "header": null,
+    "bodyField": "clientAttemptId",
+    "operations": ["submitQuizAttemptV1", "submitMockExamAttemptV1"],
+    "note": "Le rejeu d'une soumission avec le meme clientAttemptId rend le meme resultat sans re-crediter les recompenses."
+  },
+  "paths": {
+    "/me": {
+      "get": {
+        "operationId": "getMyProfileV1",
+        "summary": "Profil du learner, provisionne a la volee si absent.",
+        "responses": {
+          "200": {
+            "description": "Profil courant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserProfile" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "423": { "$ref": "#/components/responses/AccountDeletionInProgress" }
+        }
+      }
+    },
+    "/me/paths/{trackId}": {
+      "get": {
+        "operationId": "getMyLearningPathV1",
+        "summary": "Chemin de competences et readiness pour une certification.",
+        "parameters": [{ "$ref": "#/components/parameters/TrackId" }],
+        "responses": {
+          "200": {
+            "description": "Unites, lecons et progression par domaine.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Path" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "423": { "$ref": "#/components/responses/AccountDeletionInProgress" }
+        }
+      }
+    },
+    "/me/recommendations/{trackId}": {
+      "get": {
+        "operationId": "getMyNextBestActionsV1",
+        "summary": "Liste ordonnee des prochaines actions conseillees.",
+        "parameters": [{ "$ref": "#/components/parameters/TrackId" }],
+        "responses": {
+          "200": {
+            "description": "Cartes de coaching classees par priorite.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NextBest" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "423": { "$ref": "#/components/responses/AccountDeletionInProgress" }
+        }
+      }
+    },
+    "/tracks/{trackId}/lessons/{lessonId}": {
+      "get": {
+        "operationId": "getLessonV1",
+        "summary": "Lecon publique, sans corrige.",
+        "description": "Quand la lecon provient d'une release de contenu epinglee, la reponse porte X-Content-Manifest-Id et un ETag derive de cet identifiant.",
+        "parameters": [
+          { "$ref": "#/components/parameters/TrackId" },
+          { "$ref": "#/components/parameters/LessonId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lecon publique.",
+            "headers": {
+              "ETag": {
+                "schema": { "type": "string" },
+                "description": "Identifiant du manifeste public, entre guillemets. Absent hors release epinglee."
+              },
+              "X-Content-Manifest-Id": {
+                "schema": { "type": "string" },
+                "description": "Absent hors release epinglee."
+              },
+              "Access-Control-Expose-Headers": { "schema": { "type": "string" } }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Lesson" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "description": "Lecon inconnue pour cette certification." },
+          "423": { "$ref": "#/components/responses/AccountDeletionInProgress" }
+        }
+      }
+    },
+    "/quiz/{lessonId}/submit": {
+      "post": {
+        "operationId": "submitQuizAttemptV1",
+        "summary": "Soumet les reponses d'une lecon et recoit la notation serveur.",
+        "description": "Idempotent par clientAttemptId. Le corps ne porte aucun identifiant de learner : le proprietaire vient du JWT.",
+        "parameters": [{ "$ref": "#/components/parameters/LessonId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SubmitQuizRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultat note, recompenses appliquees et prochaine revision planifiee.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SubmitQuizResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "description": "Lecon inconnue." },
+          "423": { "$ref": "#/components/responses/AccountDeletionInProgress" }
+        }
+      }
+    },
+    "/exam/generate": {
+      "post": {
+        "operationId": "generateMockExamV1",
+        "summary": "Genere un examen blanc conforme au blueprint de la certification.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MockExamRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Items sans corrige, plus le blueprint par domaine.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MockExam" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "423": { "$ref": "#/components/responses/AccountDeletionInProgress" }
+        }
+      }
+    },
+    "/exam/submit": {
+      "post": {
+        "operationId": "submitMockExamAttemptV1",
+        "summary": "Soumet un examen blanc et recoit le score par domaine.",
+        "description": "Idempotent par clientAttemptId, comme la soumission de quiz.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SubmitMockExamRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Score mis a l'echelle, verdict de reussite et detail par domaine.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MockExamResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "description": "Examen inconnu." },
+          "423": { "$ref": "#/components/responses/AccountDeletionInProgress" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "parameters": {
+      "TrackId": {
+        "name": "trackId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      "LessonId": {
+        "name": "lessonId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Corps de requete invalide.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Jeton porteur absent, invalide ou expire."
+      },
+      "AccountDeletionInProgress": {
+        "description": "Suppression de compte en cours : toute mutation et toute lecture hors /account/deletion est refusee."
+      }
+    },
+    "schemas": {
+      "ItemType": {
+        "type": "string",
+        "description": "Serialise en camelCase pour correspondre exactement a l'enum Flutter ItemType.",
+        "enum": [
+          "mcq",
+          "multi",
+          "scenario",
+          "cloze",
+          "ordering",
+          "matchPairs",
+          "spotTheIssue",
+          "applied"
+        ]
+      },
+      "CheckOption": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "LessonCheck": {
+        "type": "object",
+        "description": "Forme PUBLIQUE d'un item. Omet deliberement la bonne reponse et l'explication : la notation est autoritaire cote serveur via LessonAnswerKey, qui n'est jamais envoye au client.",
+        "required": ["id", "conceptId", "type", "stem", "options"],
+        "properties": {
+          "id": { "type": "string" },
+          "conceptId": { "type": "string" },
+          "type": { "$ref": "#/components/schemas/ItemType" },
+          "stem": { "type": "string" },
+          "options": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CheckOption" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "LessonBlock": {
+        "type": "object",
+        "description": "Bloc aplati (non polymorphe) : les consommateurs commutent sur type.",
+        "required": ["type", "conceptId"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["hook", "concept", "example", "code", "check", "recap"]
+          },
+          "conceptId": { "type": "string" },
+          "title": { "type": ["string", "null"] },
+          "body": { "type": ["string", "null"] },
+          "code": { "type": ["string", "null"] },
+          "language": { "type": ["string", "null"] },
+          "check": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/LessonCheck" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "Lesson": {
+        "type": "object",
+        "required": [
+          "id",
+          "trackId",
+          "unitId",
+          "domainId",
+          "title",
+          "estMinutes",
+          "blocks"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "trackId": { "type": "string" },
+          "unitId": { "type": "string" },
+          "domainId": { "type": "string" },
+          "title": { "type": "string" },
+          "estMinutes": { "type": "integer" },
+          "blocks": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LessonBlock" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "Answer": {
+        "type": "object",
+        "required": ["itemId", "itemType", "selected", "latencyMs"],
+        "properties": {
+          "itemId": { "type": "string" },
+          "itemType": { "$ref": "#/components/schemas/ItemType" },
+          "selected": { "type": "array", "items": { "type": "string" } },
+          "latencyMs": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      },
+      "SubmitQuizRequest": {
+        "type": "object",
+        "required": ["clientAttemptId", "trackId", "startedAt", "answers"],
+        "properties": {
+          "clientAttemptId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cle d'idempotence choisie par le client. Rejouer la meme cle rend le meme resultat sans re-crediter les recompenses."
+          },
+          "trackId": { "type": "string" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "answers": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Answer" }
+          },
+          "publicManifestId": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "ItemResult": {
+        "type": "object",
+        "required": [
+          "itemId",
+          "correct",
+          "conceptId",
+          "explanation",
+          "masteryDelta"
+        ],
+        "properties": {
+          "itemId": { "type": "string" },
+          "correct": { "type": "boolean" },
+          "conceptId": { "type": "string" },
+          "correctAnswer": {
+            "oneOf": [
+              { "type": "array", "items": { "type": "string" } },
+              { "type": "null" }
+            ],
+            "description": "Revele APRES notation seulement, pour l'item soumis. Ce n'est pas le corrige de la lecon."
+          },
+          "explanation": { "type": "string" },
+          "masteryDelta": { "type": "number" }
+        },
+        "additionalProperties": false
+      },
+      "Rewards": {
+        "type": "object",
+        "required": [
+          "xpEarned",
+          "newXp",
+          "levelUp",
+          "streakExtended",
+          "gemsEarned",
+          "achievementsUnlocked"
+        ],
+        "properties": {
+          "xpEarned": { "type": "integer" },
+          "newXp": { "type": "integer" },
+          "levelUp": { "type": "boolean" },
+          "streakExtended": { "type": "boolean" },
+          "gemsEarned": { "type": "integer" },
+          "achievementsUnlocked": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SubmitQuizResult": {
+        "type": "object",
+        "required": ["attemptId", "scorePct", "results", "rewards", "weakConcepts"],
+        "properties": {
+          "attemptId": { "type": "string" },
+          "scorePct": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "results": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ItemResult" }
+          },
+          "rewards": { "$ref": "#/components/schemas/Rewards" },
+          "weakConcepts": { "type": "array", "items": { "type": "string" } },
+          "nextReviewDueAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "Echeance FSRS calculee par le serveur."
+          }
+        },
+        "additionalProperties": false
+      },
+      "MockExamRequest": {
+        "type": "object",
+        "required": ["trackId"],
+        "properties": {
+          "trackId": { "type": "string" },
+          "length": { "type": ["integer", "null"] },
+          "publicManifestId": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "MockExamItem": {
+        "type": "object",
+        "description": "Item public, sans corrige : enonce et options viennent du check public de la lecon.",
+        "required": ["itemId", "lessonId", "domainId", "type", "stem", "options"],
+        "properties": {
+          "itemId": { "type": "string" },
+          "lessonId": { "type": "string" },
+          "domainId": { "type": "string" },
+          "type": { "$ref": "#/components/schemas/ItemType" },
+          "stem": { "type": "string" },
+          "options": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CheckOption" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "MockExamBlueprintDomain": {
+        "type": "object",
+        "required": ["domainId", "name", "weight", "itemCount"],
+        "properties": {
+          "domainId": { "type": "string" },
+          "name": { "type": "string" },
+          "weight": { "type": "number" },
+          "itemCount": { "type": "integer" }
+        },
+        "additionalProperties": false
+      },
+      "MockExam": {
+        "type": "object",
+        "required": [
+          "examId",
+          "trackId",
+          "trackCode",
+          "trackTitle",
+          "timeLimitSeconds",
+          "passingScore",
+          "blueprint",
+          "items"
+        ],
+        "properties": {
+          "examId": { "type": "string" },
+          "trackId": { "type": "string" },
+          "trackCode": { "type": "string" },
+          "trackTitle": { "type": "string" },
+          "timeLimitSeconds": { "type": "integer" },
+          "passingScore": { "type": "integer" },
+          "blueprint": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/MockExamBlueprintDomain" }
+          },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/MockExamItem" }
+          },
+          "publicManifestId": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "SubmitMockExamRequest": {
+        "type": "object",
+        "required": [
+          "clientAttemptId",
+          "trackId",
+          "examId",
+          "startedAt",
+          "answers"
+        ],
+        "properties": {
+          "clientAttemptId": { "type": "string", "minLength": 1 },
+          "trackId": { "type": "string" },
+          "examId": { "type": "string" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "answers": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Answer" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExamDomainScore": {
+        "type": "object",
+        "required": ["domainId", "name", "weight", "correct", "total", "pct"],
+        "properties": {
+          "domainId": { "type": "string" },
+          "name": { "type": "string" },
+          "weight": { "type": "number" },
+          "correct": { "type": "integer" },
+          "total": { "type": "integer" },
+          "pct": { "type": "integer" }
+        },
+        "additionalProperties": false
+      },
+      "MockExamResult": {
+        "type": "object",
+        "required": [
+          "attemptId",
+          "examId",
+          "scaledScore",
+          "pct",
+          "passed",
+          "passingScore",
+          "correct",
+          "total",
+          "domains",
+          "results",
+          "rewards",
+          "weakConcepts"
+        ],
+        "properties": {
+          "attemptId": { "type": "string" },
+          "examId": { "type": "string" },
+          "scaledScore": { "type": "integer" },
+          "pct": { "type": "integer" },
+          "passed": { "type": "boolean" },
+          "passingScore": { "type": "integer" },
+          "correct": { "type": "integer" },
+          "total": { "type": "integer" },
+          "domains": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ExamDomainScore" }
+          },
+          "results": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ItemResult" }
+          },
+          "rewards": { "$ref": "#/components/schemas/Rewards" },
+          "weakConcepts": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      },
+      "PathLesson": {
+        "type": "object",
+        "required": ["id", "title", "status", "estMinutes", "masteryPct"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "string" },
+          "estMinutes": { "type": "integer" },
+          "masteryPct": { "type": "integer", "minimum": 0, "maximum": 100 }
+        },
+        "additionalProperties": false
+      },
+      "PathUnit": {
+        "type": "object",
+        "required": ["id", "title", "domainId", "status", "lessons"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "domainId": { "type": "string" },
+          "status": { "type": "string" },
+          "lessons": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PathLesson" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "DomainProgress": {
+        "type": "object",
+        "required": ["id", "name", "weight", "score"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "weight": { "type": "number" },
+          "score": { "type": "integer" }
+        },
+        "additionalProperties": false
+      },
+      "Path": {
+        "type": "object",
+        "required": [
+          "trackId",
+          "trackName",
+          "exam",
+          "readinessScore",
+          "readinessTrend7d",
+          "units",
+          "domains"
+        ],
+        "properties": {
+          "trackId": { "type": "string" },
+          "trackName": { "type": "string" },
+          "exam": { "type": "string" },
+          "readinessScore": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Calcule par le serveur. Le Cortex client ne fait que reproduire cette valeur pour l'affichage."
+          },
+          "readinessTrend7d": { "type": "integer" },
+          "units": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PathUnit" }
+          },
+          "domains": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DomainProgress" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecommendationItem": {
+        "type": "object",
+        "required": [
+          "kind",
+          "title",
+          "domainId",
+          "domainName",
+          "reason",
+          "estMinutes",
+          "priority",
+          "masteryPct",
+          "forgettingRiskPct"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["practice", "review", "resume", "start"]
+          },
+          "lessonId": { "type": ["string", "null"] },
+          "unitId": { "type": ["string", "null"] },
+          "conceptId": { "type": ["string", "null"] },
+          "title": { "type": "string" },
+          "domainId": { "type": "string" },
+          "domainName": { "type": "string" },
+          "reason": { "type": "string" },
+          "estMinutes": { "type": "integer" },
+          "priority": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "masteryPct": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "forgettingRiskPct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "NextBest": {
+        "type": "object",
+        "required": ["trackId", "generatedAt", "items"],
+        "properties": {
+          "trackId": { "type": "string" },
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RecommendationItem" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserProfile": {
+        "type": "object",
+        "description": "Schema autoritaire du profil. learner-auth/v1 en incorpore un sous-ensemble sous UserProfileRef.",
+        "required": [
+          "id",
+          "displayName",
+          "handle",
+          "xp",
+          "level",
+          "streakDays",
+          "freezeTokens",
+          "dailyGoalXp",
+          "dailyXpEarned",
+          "gems"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "displayName": { "type": "string" },
+          "handle": { "type": "string" },
+          "avatarUrl": { "type": ["string", "null"] },
+          "xp": { "type": "integer" },
+          "level": { "type": "integer" },
+          "streakDays": { "type": "integer" },
+          "freezeTokens": { "type": "integer" },
+          "dailyGoalXp": { "type": "integer" },
+          "dailyXpEarned": { "type": "integer" },
+          "gems": { "type": "integer" },
+          "activeTrackId": { "type": ["string", "null"] }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "integer" },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

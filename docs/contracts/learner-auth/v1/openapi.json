@@ -1,0 +1,336 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Certigo Learner Authentication",
+    "version": "1.0.0",
+    "description": "Surface e-mail/mot de passe anonyme. Ce sont les seules routes qui contournent JwtAuthMiddleware ; elles emettent la paire de jetons que tout le reste de l'API exige ensuite."
+  },
+  "servers": [{ "url": "/api" }],
+  "security": [],
+  "x-certigo-authorization": {
+    "middleware": "Certigo.Api.Middleware.JwtAuthMiddleware",
+    "bearerRequired": false,
+    "note": "AuthorizationLevel.Anonymous sur le HttpTrigger ne decrit PAS la frontiere d'authentification : toutes les fonctions de cette API la declarent. La frontiere reelle est la liste AnonymousPaths du middleware. Les operations de ce contrat en font partie."
+  },
+  "x-certigo-privacy": {
+    "accountEnumerationPossible": false,
+    "genericResponseOperations": [
+      "resendEmailVerificationV1",
+      "requestPasswordResetV1"
+    ],
+    "note": "Ces operations repondent a l'identique qu'un compte existe ou non."
+  },
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "operationId": "registerLearnerV1",
+        "summary": "Cree un compte e-mail/mot de passe et retourne une session.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Compte cree. emailVerified vaut false tant que le lien n'est pas suivi.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "description": "Une adresse e-mail identique est deja enregistree." }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "loginLearnerV1",
+        "summary": "Echange e-mail et mot de passe contre une paire de jetons.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session ouverte.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": {
+            "description": "Identifiants invalides. Le corps ne distingue jamais e-mail inconnu et mot de passe faux."
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "refreshLearnerSessionV1",
+        "summary": "Echange un jeton de rafraichissement contre une nouvelle paire.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RefreshTokenRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Nouvelle paire de jetons.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "description": "Jeton de rafraichissement inconnu, expire ou revoque." }
+        }
+      }
+    },
+    "/auth/verify-email": {
+      "get": {
+        "operationId": "verifyLearnerEmailV1",
+        "summary": "Confirme une adresse depuis le lien recu par e-mail.",
+        "description": "Suivi depuis un navigateur : la reponse est une page HTML autonome, pas du JSON.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "minLength": 1 },
+            "description": "Code opaque a usage unique emis dans le lien."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Adresse confirmee.",
+            "content": { "text/html": { "schema": { "type": "string" } } }
+          },
+          "400": {
+            "description": "Code inconnu, deja consomme ou expire.",
+            "content": { "text/html": { "schema": { "type": "string" } } }
+          }
+        }
+      }
+    },
+    "/auth/resend-verification": {
+      "post": {
+        "operationId": "resendEmailVerificationV1",
+        "summary": "Renvoie le lien de confirmation.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EmailOnlyRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reponse generique, identique que le compte existe ou non.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GenericMessage" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/request-password-reset": {
+      "post": {
+        "operationId": "requestPasswordResetV1",
+        "summary": "Demande un lien de reinitialisation.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EmailOnlyRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reponse generique, identique octet pour octet que le compte existe ou non.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GenericMessage" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "operationId": "resetPasswordV1",
+        "summary": "Consomme le code et remplace le mot de passe.",
+        "description": "Appelee par le client mobile, donc la reponse est en JSON (contrairement a verify-email).",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirmRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mot de passe remplace.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PasswordResetResult" }
+              }
+            }
+          },
+          "400": {
+            "description": "Code inconnu, expire ou mot de passe refuse. Les modes d'echec ne sont pas distingues.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PasswordResetResult" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Corps de requete invalide.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 8, "writeOnly": true },
+          "displayName": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "writeOnly": true }
+        },
+        "additionalProperties": false
+      },
+      "RefreshTokenRequest": {
+        "type": "object",
+        "required": ["refreshToken"],
+        "properties": {
+          "refreshToken": { "type": "string", "minLength": 1, "writeOnly": true }
+        },
+        "additionalProperties": false
+      },
+      "EmailOnlyRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": { "email": { "type": "string", "format": "email" } },
+        "additionalProperties": false
+      },
+      "PasswordResetConfirmRequest": {
+        "type": "object",
+        "required": ["code", "newPassword"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1, "writeOnly": true },
+          "newPassword": { "type": "string", "minLength": 8, "writeOnly": true }
+        },
+        "additionalProperties": false
+      },
+      "GenericMessage": {
+        "type": "object",
+        "required": ["message"],
+        "properties": { "message": { "type": "string" } },
+        "additionalProperties": false
+      },
+      "PasswordResetResult": {
+        "type": "object",
+        "required": ["success", "message"],
+        "properties": {
+          "success": { "type": "boolean" },
+          "message": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "AuthResult": {
+        "type": "object",
+        "description": "Paire de jetons plus le profil, pour que le client rende l'accueil sans second aller-retour.",
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "accessTokenExpiresAt",
+          "profile",
+          "emailVerified"
+        ],
+        "properties": {
+          "accessToken": { "type": "string" },
+          "refreshToken": { "type": "string" },
+          "accessTokenExpiresAt": { "type": "string", "format": "date-time" },
+          "profile": { "$ref": "#/components/schemas/UserProfileRef" },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "false uniquement pour un compte e-mail/mot de passe frais en attente de confirmation. Jamais bloquant."
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserProfileRef": {
+        "type": "object",
+        "description": "Profil du learner. Le schema complet fait autorite dans learning-journey/v1 (UserProfile).",
+        "required": ["id", "displayName", "handle"],
+        "properties": {
+          "id": { "type": "string" },
+          "displayName": { "type": "string" },
+          "handle": { "type": "string" }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "integer" },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

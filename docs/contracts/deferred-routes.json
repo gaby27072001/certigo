@@ -1,0 +1,124 @@
+{
+  "schema": "certigo.api-surface.deferred/v1",
+  "description": "Routes HTTP du backend qui n'ont pas encore de contrat OpenAPI dans docs/contracts/. Ce fichier est un cliquet, pas une decharge : ApiSurfaceContractTests echoue si une route backend n'est ni contractee ni listee ici, ET echoue si une entree listee ici ne correspond plus a aucune route backend. Ajouter une route sans la contracter oblige donc a l'inscrire ici explicitement, avec une raison.",
+  "measuredOn": "2026-09-11",
+  "measuredBy": "backend/tests/Certigo.Api.Tests/ApiSurfaceContractTests.cs (reflexion sur les attributs HttpTrigger de Certigo.Api)",
+  "deferred": [
+    {
+      "operation": "GET /health",
+      "reason": "Sonde d'exploitation, pas une surface applicative. Anonyme par JwtAuthMiddleware."
+    },
+    {
+      "operation": "GET /health/live",
+      "reason": "Sonde d'exploitation. Anonyme par JwtAuthMiddleware."
+    },
+    {
+      "operation": "GET /health/ready",
+      "reason": "Sonde d'exploitation. Anonyme par JwtAuthMiddleware."
+    },
+    {
+      "operation": "GET /achievements",
+      "reason": "Gamification. Hors parcours critique ; a contracter dans un domaine learner-gamification."
+    },
+    {
+      "operation": "GET /quests",
+      "reason": "Gamification. Hors parcours critique."
+    },
+    {
+      "operation": "POST /quests/claim",
+      "reason": "Gamification. Hors parcours critique."
+    },
+    {
+      "operation": "GET /season",
+      "reason": "Gamification. Hors parcours critique."
+    },
+    {
+      "operation": "POST /season/claim",
+      "reason": "Gamification. Hors parcours critique."
+    },
+    {
+      "operation": "GET /shop",
+      "reason": "Economie. Hors parcours critique."
+    },
+    {
+      "operation": "POST /shop/purchase",
+      "reason": "Economie. Hors parcours critique, mais mutation idempotente : a contracter avant toute seconde application native."
+    },
+    {
+      "operation": "GET /streak",
+      "reason": "Gamification. Hors parcours critique."
+    },
+    {
+      "operation": "POST /streak/repair",
+      "reason": "Economie. Hors parcours critique."
+    },
+    {
+      "operation": "GET /me/league",
+      "reason": "Classement. Hors parcours critique."
+    },
+    {
+      "operation": "GET /me/league/resolution",
+      "reason": "Classement. Hors parcours critique."
+    },
+    {
+      "operation": "GET /share/daily",
+      "reason": "Carte de partage. Hors parcours critique."
+    },
+    {
+      "operation": "GET /friends",
+      "reason": "Social. Hors parcours critique."
+    },
+    {
+      "operation": "POST /friends",
+      "reason": "Social. Hors parcours critique."
+    },
+    {
+      "operation": "DELETE /friends/{}",
+      "reason": "Social. Hors parcours critique."
+    },
+    {
+      "operation": "GET /friends/leaderboard",
+      "reason": "Social. Hors parcours critique."
+    },
+    {
+      "operation": "GET /me/notifications/settings",
+      "reason": "Reglages de notification. Hors parcours critique."
+    },
+    {
+      "operation": "POST /me/notifications/settings",
+      "reason": "Reglages de notification. Hors parcours critique."
+    },
+    {
+      "operation": "GET /me/notifications/plan",
+      "reason": "Planification de notification. Hors parcours critique."
+    },
+    {
+      "operation": "POST /tutor/explain",
+      "reason": "Tuteur LLM. Surface dependante d'un fournisseur externe ; contrat a ecrire avec la porte live (backend/run-tutor-llm-live-gate.ps1)."
+    },
+    {
+      "operation": "GET /content/admin/releases/pointer",
+      "reason": "Administration de contenu, pas une surface applicative. Complementaire de runtime-content/v1."
+    },
+    {
+      "operation": "POST /content/admin/releases/{}/import",
+      "reason": "Administration de contenu, pas une surface applicative."
+    },
+    {
+      "operation": "POST /content/admin/releases/{}/promote",
+      "reason": "Administration de contenu, pas une surface applicative."
+    },
+    {
+      "operation": "POST /content/admin/releases/rollback",
+      "reason": "Administration de contenu, pas une surface applicative."
+    },
+    {
+      "operation": "GET /v1/organizations/{}/integrations/viva-learning/provider",
+      "reason": "B2B Viva Learning. Le contrat vit cote code dans VivaLearningContractTests ; pas encore de document OpenAPI."
+    },
+    {
+      "operation": "GET /v1/organizations/{}/integrations/viva-learning/learning-content",
+      "reason": "B2B Viva Learning. Idem."
+    }
+  ]
+}
