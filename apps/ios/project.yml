@@ -1,0 +1,131 @@
+# XcodeGen — description du projet Xcode de l'application iOS native.
+#
+# LE .xcodeproj N'EST PAS VERSIONNÉ. Il est régénéré par `Scripts/demarrer.sh`.
+#
+# Pourquoi : ajouter UN seul fichier Swift à un projet Xcode classique modifie
+# `project.pbxproj` en quatre endroits, chacun avec un identifiant hexadécimal
+# de 24 caractères tiré au hasard. Deux branches qui ajoutent chacune un
+# fichier écrivent dans les mêmes tableaux. Git a alors deux issues, et les
+# deux sont mauvaises : le conflit illisible, ou — bien pire — la fusion
+# textuelle « réussie » qui produit un projet incohérent sans que rien ne
+# rougisse.
+#
+# Ce fichier-ci est du YAML : un conflit y est lisible et résoluble.
+#
+# Et surtout, presque tout le code vit dans `Packages/CertigoKit`, que SwiftPM
+# découvre par convention de répertoire : **ajouter un fichier Swift n'exige
+# aucune modification de ce fichier.** C'est ce qui rend le travail de
+# plusieurs agents en parallèle mécaniquement possible.
+
+name: Certigo
+
+options:
+  bundleIdPrefix: com.certigo
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+  # Le .xcodeproj étant jetable, aucune raison de conserver les schémas
+  # utilisateur d'une génération à l'autre.
+  xcodeVersion: "2600"
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    # Concurrence stricte dès la première ligne. L'activer après 20 000 lignes
+    # est un chantier ; l'activer à zéro ligne est gratuit.
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+    DEAD_CODE_STRIPPING: "YES"
+    # ⚠️ Squelette SIMULATEUR UNIQUEMENT : aucune signature, donc aucune
+    # équipe de développement à configurer, donc un mode de panne en moins
+    # pour le premier lancement. Pour installer sur un iPhone réel, voir
+    # DEMARRAGE.md § « Lancer sur un vrai iPhone ».
+    CODE_SIGNING_REQUIRED: "NO"
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGN_IDENTITY: ""
+    # Ce squelette NE définit PAS `UIDesignRequiresCompatibility`. C'est
+    # volontaire : cette clé sert à *sortir* de Liquid Glass, et Liquid Glass
+    # est précisément ce qu'on veut démontrer. Apple l'ignore d'ailleurs à
+    # partir d'iOS 27.
+
+packages:
+  CertigoKit:
+    path: Packages/CertigoKit
+
+targets:
+  Certigo:
+    type: application
+    platform: iOS
+    sources:
+      - path: App/Sources
+      - path: App/Resources
+    info:
+      # Généré à chaque `xcodegen generate`, donc ignoré par Git.
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Certigo
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        # Requis, sinon l'application est affichée en boîte aux lettres.
+        UILaunchScreen: {}
+        # Le cycle de vie SwiftUI `App` fournit lui-même la scène. La clé est
+        # déclarée explicitement parce qu'iOS 27 exige l'adoption d'UIScene.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # Français source, anglais cible — la localisation viendra par
+        # catalogues de chaînes (.xcstrings).
+        CFBundleDevelopmentRegion: fr_FR
+    settings:
+      base:
+        # ⚠️ PAS `com.certigo.mobileapp` : c'est l'identifiant de l'application
+        # Flutter en production. Un identifiant identique REMPLACERAIT l'app
+        # installée sur l'appareil. Il deviendra `com.certigo.mobileapp` au
+        # jalon de bascule, quand Flutter iOS sera retiré.
+        PRODUCT_BUNDLE_IDENTIFIER: com.certigo.native
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    dependencies:
+      - package: CertigoKit
+        product: DesignSystem
+      - package: CertigoKit
+        product: Navigation
+      - package: CertigoKit
+        product: APIClient
+
+  CertigoAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/CertigoAppTests
+    dependencies:
+      - target: Certigo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.certigo.native.tests
+
+schemes:
+  Certigo:
+    build:
+      targets:
+        Certigo: all
+        CertigoAppTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - CertigoAppTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

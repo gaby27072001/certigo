@@ -1,0 +1,53 @@
+# apps/ios — ce qui ne doit jamais être versionné.
+#
+# Supprimer entièrement `apps/ios/` doit laisser le dépôt exactement dans son
+# état antérieur : rien ici ne déborde sur l'application Flutter.
+
+# ---------------------------------------------------------------------------
+# Le projet Xcode est GÉNÉRÉ, jamais versionné.
+#
+# Ajouter un seul fichier Swift à un .xcodeproj versionné le modifie en quatre
+# endroits, avec des identifiants tirés au hasard. Deux branches produisent
+# alors soit un conflit illisible, soit — bien pire — une fusion « réussie »
+# qui casse le projet sans que rien ne rougisse.
+#
+# Régénérer :  ./Scripts/demarrer.sh
+# ---------------------------------------------------------------------------
+*.xcodeproj/
+*.xcworkspace/
+
+# Info.plist est produit par XcodeGen depuis project.yml.
+App/Info.plist
+
+# Sorties de compilation et de test.
+.build/
+DerivedData/
+*.xcresult
+.swiftpm/
+Package.resolved
+
+# Réglages propres à une machine.
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+.DS_Store
+
+# Témoin temporaire de Scripts/prouver-le-rouge.sh, si le script est interrompu.
+Packages/CertigoKit/Tests/NavigationTests/TemoinRougeTemporaire.swift
+
+# ---------------------------------------------------------------------------
+# Artefacts de signature et secrets — repris tels quels de
+# apps/mobile/ios/.gitignore, où ce bloc protège déjà l'application Flutter.
+# Le squelette ne signe rien, mais la garde doit exister AVANT d'en avoir
+# besoin : un secret committé ne se rattrape pas.
+# ---------------------------------------------------------------------------
+ExportOptions.plist
+*.mobileprovision
+*.p12
+*.p8
+*.cer
+*.certSigningRequest
+*.keystore
+.env
+.env.*
+local.settings.json
