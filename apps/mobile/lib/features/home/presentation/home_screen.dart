@@ -36,78 +36,89 @@ class HomeScreen extends ConsumerWidget {
       animate: true,
       child: SafeArea(
         bottom: false,
-        child: ListView(
-          padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
-          children: <Widget>[
-            // ── You ───────────────────────────────────────────────────────
-            _ResourceBar(profile: profile),
-            const SizedBox(height: 18),
-            _HomeGreeting(
-              firstName: profile.valueOrNull?.displayName.split(' ').first,
-              subtitle: _greetingSubtitle(path),
-            ),
-            const SizedBox(height: 22),
-
-            // ── Your certification ────────────────────────────────────────
-            _TrackBand(
-              state: pathState,
-              onRetry: () => ref.invalidate(homePathProvider),
-            ),
-            const SizedBox(height: 16),
-
-            // ── Your day ──────────────────────────────────────────────────
-            _DailyBand(
-              profile: profile,
-              trackCode: path?.exam ?? '',
-              onRetry: () => ref.invalidate(meProvider),
-            ),
-
-            if (path != null) ...<Widget>[
-              const SizedBox(height: 16),
-              // AI coach — server-ranked "next best action" shelf. Self-hiding:
-              // collapses to nothing while loading, on error, or when empty, so
-              // it never blocks the rest of Home.
-              CoachSection(trackId: path.trackId),
-
-              // Current lesson indicator (non-interactive — action is in Parcours).
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Text('📍', style: TextStyle(fontSize: 22)),
-                title: Text(
-                  path.nextLesson?.title ?? HomeLabels.noLessonInProgress,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
+        // The bottom edge fades while content remains below it. Home is the one
+        // surface where that matters most: the Explorer shelf sits at the fold,
+        // and five of its six destinations exist nowhere else in the app. A
+        // page that simply stops at the screen edge does not say "keep going".
+        //
+        // The scrim is the aurora's own base colour, not a flat panel: the
+        // gradient is subtle enough at this depth that the two agree, and a
+        // mismatched scrim would read as a band.
+        child: PrismScrollEdge(
+          color: context.prism.background,
+          child: ListView(
+            padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
+            children: <Widget>[
+              // ── You ───────────────────────────────────────────────────────
+              _ResourceBar(profile: profile),
+              const SizedBox(height: 18),
+              _HomeGreeting(
+                firstName: profile.valueOrNull?.displayName.split(' ').first,
+                subtitle: _greetingSubtitle(path),
               ),
-            ],
-            const SizedBox(height: 24),
+              const SizedBox(height: 22),
 
-            // ── Explorer — secondary destinations beyond the daily path ────
-            const PrismSectionHeader(
-              title: 'Explorer',
-              subtitle: 'Choisis ton prochain objectif',
-              icon: Icons.explore_rounded,
-            ),
-            const SizedBox(height: 12),
-            const _ExploreSection(),
+              // ── Your certification ────────────────────────────────────────
+              _TrackBand(
+                state: pathState,
+                onRetry: () => ref.invalidate(homePathProvider),
+              ),
+              const SizedBox(height: 16),
 
-            // ── Weakest domain ────────────────────────────────────────────
-            if (path?.weakestDomain case final DomainProgress weak) ...<Widget>[
-              const SizedBox(height: 24),
-              PrismSectionHeader(
-                title: 'À renforcer',
-                subtitle: 'Un effort ciblé fait vite progresser',
-                icon: Icons.bolt_rounded,
-                trailing: Text(
-                  '${weak.score}/100',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelMedium?.copyWith(color: context.prism.ember),
+              // ── Your day ──────────────────────────────────────────────────
+              _DailyBand(
+                profile: profile,
+                trackCode: path?.exam ?? '',
+                onRetry: () => ref.invalidate(meProvider),
+              ),
+
+              if (path != null) ...<Widget>[
+                const SizedBox(height: 16),
+                // AI coach — server-ranked "next best action" shelf. Self-hiding:
+                // collapses to nothing while loading, on error, or when empty, so
+                // it never blocks the rest of Home.
+                CoachSection(trackId: path.trackId),
+
+                // Current lesson indicator (non-interactive — action is in Parcours).
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Text('📍', style: TextStyle(fontSize: 22)),
+                  title: Text(
+                    path.nextLesson?.title ?? HomeLabels.noLessonInProgress,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
                 ),
+              ],
+              const SizedBox(height: 24),
+
+              // ── Explorer — secondary destinations beyond the daily path ────
+              const PrismSectionHeader(
+                title: 'Explorer',
+                subtitle: 'Choisis ton prochain objectif',
+                icon: Icons.explore_rounded,
               ),
               const SizedBox(height: 12),
-              _WeakDomainCard(domain: weak, onTap: () => context.go(Routes.path)),
+              const _ExploreSection(),
+
+              // ── Weakest domain ────────────────────────────────────────────
+              if (path?.weakestDomain case final DomainProgress weak) ...<Widget>[
+                const SizedBox(height: 24),
+                PrismSectionHeader(
+                  title: 'À renforcer',
+                  subtitle: 'Un effort ciblé fait vite progresser',
+                  icon: Icons.bolt_rounded,
+                  trailing: Text(
+                    '${weak.score}/100',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelMedium?.copyWith(color: context.prism.ember),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _WeakDomainCard(domain: weak, onTap: () => context.go(Routes.path)),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
