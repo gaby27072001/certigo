@@ -4,12 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import '../bootstrap/reduce_transparency_scope.dart';
 import 'providers.dart';
 import 'router.dart';
 
 /// The root widget. Wires the Prism themes, localization scaffolding and the
 /// GoRouter instance. Stateless + Riverpod: theme mode and routing come from
 /// providers so the whole app rebuilds correctly on changes.
+///
+/// `builder` porte les axes d'accessibilité. Il s'exécute **sous** le
+/// `MediaQuery` installé par `MaterialApp` — donc là où `highContrast` et
+/// `boldText` sont lisibles — et **au-dessus** de toutes les routes, donc le
+/// thème résolu descend partout sans qu'aucun écran n'ait à le savoir.
 class CertigoApp extends ConsumerWidget {
   const CertigoApp({super.key});
 
@@ -25,6 +31,9 @@ class CertigoApp extends ConsumerWidget {
       darkTheme: PrismTheme.dark(),
       themeMode: mode,
       routerConfig: router,
+      builder: (BuildContext context, Widget? child) {
+        return ReduceTransparencyScope(child: child ?? const SizedBox.shrink());
+      },
       supportedLocales: const <Locale>[Locale('fr'), Locale('en')],
       localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
         GlobalMaterialLocalizations.delegate,

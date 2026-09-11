@@ -6,6 +6,11 @@ import 'package:flutter/widgets.dart';
 /// Used as the leading art on the knowledge-level tiles so a growing knowledge
 /// reads at a glance (1 bar = beginner … 4 bars = expert), the way a signal
 /// meter conveys strength.
+///
+/// « À vue d'œil » était littéral : un `CustomPaint` ne porte aucune
+/// sémantique, donc le niveau n'existait que pour qui voyait les barres.
+/// L'annonce reprend le vocabulaire de `PrismProgressBar` — [semanticLabel]
+/// dit ce qui est mesuré, la valeur dit où cela en est.
 class SignalBars extends StatelessWidget {
   const SignalBars({
     super.key,
@@ -14,6 +19,7 @@ class SignalBars extends StatelessWidget {
     this.total = 4,
     this.inactiveColor,
     this.size = 26,
+    this.semanticLabel = 'Niveau',
   });
 
   /// Number of filled bars (1-based), clamped to [total].
@@ -28,20 +34,31 @@ class SignalBars extends StatelessWidget {
   /// Target square extent of the glyph.
   final double size;
 
+  /// Ce que les barres mesurent. Passer `null` rend le glyphe décoratif —
+  /// l'exception doit être nommée, jamais le défaut.
+  final String? semanticLabel;
+
   @override
   Widget build(BuildContext context) {
     final Color inactive = inactiveColor ?? color.withOpacity(0.22);
-    return SizedBox(
+    final int clamped = level.clamp(0, total);
+    final Widget glyph = SizedBox(
       width: size,
       height: size,
       child: CustomPaint(
         painter: _SignalBarsPainter(
-          level: level.clamp(0, total),
+          level: clamped,
           total: total,
           active: color,
           inactive: inactive,
         ),
       ),
+    );
+    if (semanticLabel == null) return ExcludeSemantics(child: glyph);
+    return Semantics(
+      label: semanticLabel,
+      value: '$clamped sur $total',
+      child: glyph,
     );
   }
 }

@@ -331,6 +331,10 @@ Honnêteté sur les limites de cette livraison.
 8. **Le défaut doit être sûr, l'exception doit être nommée.** Un premier plan
    s'adapte au thème ; un aplat ne s'adapte pas. Confondre les deux ne casse
    ni la compilation ni le mode clair, où les rôles coïncident.
+9. **Un réglage d'accessibilité du système doit atteindre la couleur.** Les
+   couleurs système d'Apple s'adaptent seules ; les nôtres sont toutes
+   personnalisées, donc elles doivent fournir leurs variantes ou le réglage ne
+   fait rien.
 
 Ces règles sont des **tests**, pas des vœux, et elles re-dérivent leurs seuils
 au lieu de figer des valeurs hexadécimales — pour qu'une modification qui
@@ -339,9 +343,11 @@ au lieu de figer des valeurs hexadécimales — pour qu'une modification qui
 | Garde | Ce qu'elle empêche |
 |---|---|
 | `tokens/prism_colors_test.dart` | une primitive qui cesse de tenir son plancher |
-| `theme/prism_contrast_contract_test.dart` | un **rôle** sémantique illisible sur carte / page / surface alternative / verre |
+| `theme/prism_contrast_contract_test.dart` | un **rôle** sémantique illisible sur carte / page / surface alternative / verre, **dans les huit combinaisons** |
 | `theme/prism_fill_role_guard_test.dart` | un **site d'appel** qui choisit le mauvais rôle |
 | `theme/prism_typography_contract_test.dart` | un créneau de `TextTheme` qui retombe sur la police plateforme |
+| `theme/prism_voiceover_contract_test.dart` | une jauge ou un compteur qui perd son annonce de valeur |
+| `theme/prism_accessibility_scope_test.dart` | un axe d'accessibilité résolu mais jamais branché |
 
 Les trois dernières existent parce que les trois défauts correspondants ont
 réellement été livrés, puis mesurés. Chacune a été vérifiée **en cassant
@@ -352,3 +358,114 @@ Et une leçon de méthode, payée deux fois : **un correctif qui déplace un dé
 d'un endroit à un autre n'est pas un correctif tant qu'on n'a pas énuméré les
 deux côtés.** Le contraste sombre a été corrigé pour 108 sites de premier plan
 en cassant 6 sites d'aplat, parce que seul le premier groupe avait été traité.
+
+---
+
+## 11. Les axes d'accessibilité — de deux apparences à huit
+
+Le système portait une dimension : clair ou sombre. Il en porte trois.
+
+### Ce que Flutter donne, et ce qu'il ne donne pas
+
+`MediaQueryData` expose `highContrast` et `boldText`. Il **n'expose pas**
+`reduceTransparency` : mesuré sur le SDK 3.44.9, le symbole est absent de tout
+`packages/flutter/lib/src`, et `AccessibilityFeatures` de `dart:ui` ne déclare
+que `accessibleNavigation`, `invertColors`, `disableAnimations`, `boldText`,
+`reduceMotion`, `highContrast` et `onOffSwitchLabels`. Le même instrument rend
+236 occurrences pour `highContrast` et 0 pour un motif inexistant : l'absence
+est réelle, pas un instrument muet.
+
+Le réglage arrive donc par un **canal de plateforme écrit à la main**
+(`com.certigo.mobileapp/accessibility`), ce que le §7 avait déjà tranché pour
+les charnières : quand Flutter ne relaie pas une information de plateforme, ce
+n'est pas une impasse, c'est un canal à écrire. Toute plateforme qui ne répond
+pas vaut `false` — le verre reste du verre, et un canal absent ne peut pas
+aplatir le matériau par accident.
+
+### Les huit combinaisons, mesurées
+
+Les valeurs sont **re-dérivées** depuis les deux bases, jamais figées : une
+table de huit jeux de valeurs hexadécimales serait exactement la dérive que
+l'export de jetons existe pour empêcher. Deux déplacements suffisent — 0.25
+pour l'encre, 0.34 pour les arêtes, la seconde plus grande parce qu'une arête
+part de 1.70:1 quand une encre part de 5.94:1.
+
+Pire cas mesuré sur chaque colonne, tous accents et domaines confondus :
+
+| Combinaison | Encre / carte | / page | / surfaceAlt | / verre | Aplat sous blanc | Désactivé | Trait du verre | Verre vs page |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| clair | 5.94 | 5.13 | 4.51 | 5.76 | 5.94 | 3.53 | 1.65 | 1.123 |
+| clair + opaque | 5.94 | 5.13 | 4.51 | 5.76 | 5.94 | 3.53 | **3.68** | 1.123 |
+| clair + contraste | **8.79** | **7.58** | **6.67** | **8.51** | **8.79** | **5.72** | **3.68** | 1.123 |
+| clair + contraste + opaque | 8.79 | 7.58 | 6.67 | 8.51 | 8.79 | 5.72 | 3.68 | 1.123 |
+| sombre | 5.52 | 6.39 | 4.55 | 4.99 | 5.94 | 3.83 | 2.33 | 1.282 |
+| sombre + opaque | 5.52 | 6.39 | 4.55 | 4.99 | 5.94 | 3.83 | **4.98** | 1.282 |
+| sombre + contraste | **7.18** | **8.31** | **5.92** | **6.48** | **8.79** | **5.93** | **4.98** | 1.282 |
+| sombre + contraste + opaque | 7.18 | 8.31 | 5.92 | 6.48 | 8.79 | 5.93 | 4.98 | 1.282 |
+
+Le verre opaque vaut `#FBFBFD` en clair et `#232736` en sombre. Ce ne sont pas
+des couleurs nouvelles : c'est **le pixel déjà affiché** quand la barre flotte
+au-dessus de la page, aplati. La séparation des plans est donc rigoureusement
+inchangée dans les huit lignes — 1.123 et 1.282, au-dessus du plancher de 1.12.
+
+### Ce qui ne bouge pas, et pourquoi c'est le sujet
+
+Énumérer les huit combinaisons a surtout servi à interdire trois déplacements
+de défaut que les quatre premières n'auraient pas montrés :
+
+- **Les plans ne bougent pas.** Pousser un lavis vers le blanc en mode clair
+  l'aurait rendu identique à `surface` (`#FFFFFF`) : un défaut de contraste
+  remplacé par une perte de hiérarchie.
+- **`litEdge` n'est jamais transformé.** En clair il vaut `0x00FFFFFF`,
+  transparent par décision mesurée ; un déplacement vers le noir lui aurait
+  donné un alpha et fait apparaître un liseré **sombre** en haut du verre
+  clair — le défaut que le §4 a supprimé, réintroduit par la porte de service.
+- **Reduce Transparency ne touche que le verre.** Renforcer au passage les
+  bordures de toutes les cartes aurait été un effet de bord que le réglage n'a
+  pas demandé.
+
+Les trois sont des tests, pas des intentions.
+
+### Increase Contrast s'arrête avant 7.0 sur deux surfaces
+
+Le plancher du texte passe de 4.5 à **7.0** sur la carte et la page. Sur la
+surface alternative et sur le verre il ne passe qu'à **5.5**, et c'est un
+arbitrage nommé : le pire rôle sur le verre sombre plafonne à 6.48. Atteindre
+7.00 y demanderait un déplacement de 0.32 au lieu de 0.25, c'est-à-dire faire
+converger les six bandes du spectre vers le blanc. La règle 5 — « la clarté
+organise ; le chroma réjouit » — coûte ici un point et demi de rapport.
+
+### Bold Text — ce qui est vrai, et ce qui reste ouvert
+
+`Text.build` fusionne `FontWeight.bold`, c'est-à-dire **w700 en dur**, dès que
+`MediaQuery.boldTextOf` est vrai (`widgets/text.dart:722`), et ne touche pas à
+`fontVariations`. Or Prism épingle son axe `wght` par `fontVariations` sur les
+quinze créneaux, et ses registres hauts sont **plus lourds que w700** : Display
+à 800, Headline à 750–780.
+
+Selon que le moteur honore l'axe variable ou le `FontWeight`, w700 est donc
+soit sans effet, soit un **amincissement** des plus gros titres. **Cette
+question n'est pas tranchée ici** : la trancher demande un rendu sur appareil
+avec la vraie fonte variable, que la police de test ne fournit pas.
+
+Le correctif est donc écrit pour être juste dans les deux cas — il fait monter
+l'axe lui-même et ne supprime rien du comportement de Flutter. Chaque créneau
+parcourt 60 % de ce qui le sépare de 900 : le corps atteint exactement 700, la
+graisse que Flutter visait, et la hiérarchie reste strictement croissante
+(700 < 780 < 800 < 820 < 840 < 852 < 860) là où un w700 uniforme l'aplatissait.
+Si l'axe gagne, tout s'alourdit ; s'il perd, le rendu est celui d'aujourd'hui.
+Aucune branche n'amincit.
+
+### La jauge était muette
+
+`ReadinessGauge` porte le score de préparation — la métrique North-Star, et
+l'information la plus dense du produit. Elle n'annonçait **rien** : un
+`CustomPaint` ne produit aucun nœud sémantique, et les deux `Text` du centre se
+lisaient comme un nombre nu suivi d'un mot, sans jamais dire que l'un est la
+valeur de l'autre. `SignalBars`, qui code le niveau de connaissance par un
+nombre de barres, ne disait rien du tout.
+
+Le modèle correct existait déjà dans le même paquet — `PrismProgressBar` annonce
+un `label` et une `value` — et il a été généralisé plutôt que réinventé. La
+valeur annoncée est le score **visé**, pas l'image de l'animation : lire la
+trame ferait parler VoiceOver à chaque frame du tween.

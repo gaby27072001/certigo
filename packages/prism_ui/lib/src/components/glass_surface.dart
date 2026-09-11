@@ -26,6 +26,20 @@ import 'prism_pressable.dart';
 /// Performance: backdrop blur is expensive. We expose [blurEnabled] so callers
 /// (and the global low-power path) can downgrade to a solid translucent fill on
 /// constrained devices or inside long scrolling lists.
+///
+/// ## Reduce Transparency
+///
+/// Quand l'utilisateur demande **Reduce Transparency** au système, il ne
+/// demande pas moins de flou : il demande qu'il n'y en ait plus. La surface
+/// cesse alors d'être du verre — aucun `BackdropFilter` n'est posé, et
+/// [PrismColorScheme.glassFill] est déjà opaque parce que le schéma résolu l'a
+/// aplati sur la page. Le réglage est donc aussi un gain de rendu : la couche
+/// la plus chère de l'application disparaît sur les deux barres qui la
+/// portent.
+///
+/// L'arête compense : sous ce réglage le trait est re-dérivé plus loin de son
+/// fond (mesuré 1.65:1 -> 3.53:1 en clair), parce que le flou était un
+/// séparateur et qu'il vient de disparaître.
 class GlassSurface extends StatelessWidget {
   const GlassSurface({
     super.key,
@@ -57,11 +71,15 @@ class GlassSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
-    final bool useBlur = blurEnabled;
+    final bool useBlur = blurEnabled && !p.reduceTransparency;
     final bool isDark = p.brightness == Brightness.dark;
 
     Color fill = p.glassFill;
     if (tint != null) {
+      // Sous Reduce Transparency la teinte doit rester une teinte, pas un
+      // voile : on la pose sur un fond déjà opaque, donc le résultat l'est
+      // aussi. `Color.alphaBlend` garantit l'opacité du composé dès lors que
+      // la couche basse est opaque.
       fill = Color.alphaBlend(tint!.withValues(alpha: isDark ? 0.20 : 0.12), fill);
     }
 

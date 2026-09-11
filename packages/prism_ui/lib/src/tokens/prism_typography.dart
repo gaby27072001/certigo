@@ -40,13 +40,40 @@ class PrismTypography {
         FontVariation('wdth', width),
       ];
 
-  static TextTheme build(Color primary, Color secondary) {
+  /// Graisse effective sous **Bold Text**.
+  ///
+  /// Ce que Flutter fait tout seul, et pourquoi cela ne suffit pas ici :
+  /// `Text.build` fusionne `FontWeight.bold` — c'est-à-dire **w700**, en dur —
+  /// dès que `MediaQuery.boldTextOf` est vrai (`widgets/text.dart:722`), et il
+  /// ne touche pas à `fontVariations`. Or Certigo épingle son axe `wght` par
+  /// `fontVariations` sur les quinze créneaux, et ses registres hauts sont
+  /// **plus lourds que w700** : Display est à 800, Headline à 750–780.
+  ///
+  /// Selon que le moteur honore l'axe variable ou le `FontWeight`, w700 est
+  /// donc soit sans effet, soit un **amincissement** des plus gros titres.
+  /// Cette fonction est écrite pour être juste dans les deux cas : elle fait
+  /// monter l'axe lui-même, sans rien supprimer du comportement de Flutter.
+  /// Si l'axe gagne, tout s'alourdit ; s'il perd, le rendu est celui
+  /// d'aujourd'hui. Aucune branche n'amincit.
+  ///
+  /// La loi : chaque créneau parcourt **60 % de ce qui le sépare de 900**. Le
+  /// corps (400) atteint exactement 700, la graisse que Flutter visait ; les
+  /// créneaux déjà lourds montent proportionnellement au lieu d'être écrasés
+  /// sur une valeur unique. La hiérarchie reste donc strictement croissante —
+  /// 700 < 780 < 800 < 820 < 840 < 852 < 860 — là où un w700 uniforme
+  /// l'aplatissait.
+  static double _emphasized(double weight, bool boldText) =>
+      boldText ? weight + (900 - weight) * 0.6 : weight;
+
+  static TextTheme build(Color primary, Color secondary, {bool boldText = false}) {
+    double w(double weight) => _emphasized(weight, boldText);
+
     TextStyle display(double size, double weight, double height, double tracking) => TextStyle(
           fontFamily: _uiFontFamily,
           package: 'prism_ui',
           fontSize: size,
-          fontWeight: _nearestWeight(weight),
-          fontVariations: _axes(weight, _displayWidth),
+          fontWeight: _nearestWeight(w(weight)),
+          fontVariations: _axes(w(weight), _displayWidth),
           height: height,
           color: primary,
           letterSpacing: tracking,
@@ -56,8 +83,8 @@ class PrismTypography {
           fontFamily: _uiFontFamily,
           package: 'prism_ui',
           fontSize: size,
-          fontWeight: _nearestWeight(weight),
-          fontVariations: _axes(weight, _titleWidth),
+          fontWeight: _nearestWeight(w(weight)),
+          fontVariations: _axes(w(weight), _titleWidth),
           height: height,
           color: primary,
           letterSpacing: tracking,
@@ -74,8 +101,8 @@ class PrismTypography {
           fontFamily: _uiFontFamily,
           package: 'prism_ui',
           fontSize: size,
-          fontWeight: _nearestWeight(weight),
-          fontVariations: _axes(weight, _uiWidth),
+          fontWeight: _nearestWeight(w(weight)),
+          fontVariations: _axes(w(weight), _uiWidth),
           height: height,
           color: color,
           letterSpacing: tracking,

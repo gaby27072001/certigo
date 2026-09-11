@@ -10,15 +10,61 @@ import 'prism_color_scheme.dart';
 /// We lean on Material 3 for accessibility plumbing (touch targets, focus,
 /// contrast) but override the surfaces, shapes and type so the result reads as
 /// the bespoke "Prism" language rather than stock Material.
+///
+/// Le thème a **huit** formes, pas deux : `brightness` croisée avec les deux
+/// réglages système `highContrast` et `reduceTransparency`. Elles sont toutes
+/// construites par [resolve] depuis un unique [PrismColorScheme] re-dérivé, de
+/// sorte qu'aucun `ThemeData` ne puisse tenir un rôle que le schéma ignore.
 class PrismTheme {
   const PrismTheme._();
 
-  static ThemeData light() => _build(PrismColorScheme.light);
-  static ThemeData dark() => _build(PrismColorScheme.dark);
+  /// Le thème d'une apparence et des réglages d'accessibilité.
+  static ThemeData resolve({
+    required Brightness brightness,
+    bool highContrast = false,
+    bool reduceTransparency = false,
+    bool boldText = false,
+  }) =>
+      _build(
+        PrismColorScheme.resolve(
+          brightness: brightness,
+          highContrast: highContrast,
+          reduceTransparency: reduceTransparency,
+        ),
+        boldText: boldText,
+      );
 
-  static ThemeData _build(PrismColorScheme p) {
+  static ThemeData light({
+    bool highContrast = false,
+    bool reduceTransparency = false,
+    bool boldText = false,
+  }) =>
+      resolve(
+        brightness: Brightness.light,
+        highContrast: highContrast,
+        reduceTransparency: reduceTransparency,
+        boldText: boldText,
+      );
+
+  static ThemeData dark({
+    bool highContrast = false,
+    bool reduceTransparency = false,
+    bool boldText = false,
+  }) =>
+      resolve(
+        brightness: Brightness.dark,
+        highContrast: highContrast,
+        reduceTransparency: reduceTransparency,
+        boldText: boldText,
+      );
+
+  static ThemeData _build(PrismColorScheme p, {bool boldText = false}) {
     final bool isDark = p.brightness == Brightness.dark;
-    final TextTheme text = PrismTypography.build(p.textPrimary, p.textSecondary);
+    final TextTheme text = PrismTypography.build(
+      p.textPrimary,
+      p.textSecondary,
+      boldText: boldText,
+    );
 
     final ColorScheme scheme = ColorScheme(
       brightness: p.brightness,

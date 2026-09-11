@@ -8,6 +8,20 @@ import '../tokens/prism_motion.dart';
 ///
 /// The arc fills with a brand gradient and animates from the previous value so
 /// progress feels earned. A center slot shows the score and an optional label.
+///
+/// ## L'annonce VoiceOver
+///
+/// La jauge est l'information la plus dense du produit, et elle était
+/// **muette** : un `CustomPaint` ne porte aucune sémantique, et les deux `Text`
+/// du centre ne se lisaient que comme deux nœuds séparés — un nombre nu, puis
+/// un mot — sans jamais dire que l'un est la valeur de l'autre.
+///
+/// Le vocabulaire est celui de [PrismProgressBar], délibérément : `label` dit
+/// ce qui progresse, `value` dit où cela en est. Généraliser le modèle déjà
+/// écrit vaut mieux qu'en inventer un second.
+///
+/// La valeur annoncée est le **score visé**, pas l'image de l'animation. Lire
+/// la trame ferait parler VoiceOver à chaque frame du tween.
 class ReadinessGauge extends StatelessWidget {
   const ReadinessGauge({
     super.key,
@@ -32,43 +46,49 @@ class ReadinessGauge extends StatelessWidget {
     final PrismColorScheme p = context.prism;
     final Color zone = _zoneColor(p, score);
 
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: (previousScore ?? score).toDouble(), end: score.toDouble()),
-      duration: PrismMotion.resolve(context, PrismMotion.celebrate),
-      curve: PrismMotion.standard,
-      builder: (BuildContext context, double value, _) {
-        return SizedBox(
-          width: size,
-          height: size,
-          child: CustomPaint(
-            painter: _GaugePainter(
-              value: value / 100,
-              track: p.surfaceAlt,
-              gradient: <Color>[p.primary, zone],
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Text(
-                    value.round().toString(),
-                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                          color: p.textPrimary,
-                          fontWeight: FontWeight.w800,
-                        ),
+    return Semantics(
+      label: label,
+      value: '$score%',
+      child: ExcludeSemantics(
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: (previousScore ?? score).toDouble(), end: score.toDouble()),
+          duration: PrismMotion.resolve(context, PrismMotion.celebrate),
+          curve: PrismMotion.standard,
+          builder: (BuildContext context, double value, _) {
+            return SizedBox(
+              width: size,
+              height: size,
+              child: CustomPaint(
+                painter: _GaugePainter(
+                  value: value / 100,
+                  track: p.surfaceAlt,
+                  gradient: <Color>[p.primary, zone],
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        value.round().toString(),
+                        style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                              color: p.textPrimary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      Text(
+                        label,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.labelMedium?.copyWith(color: p.textSecondary),
+                      ),
+                    ],
                   ),
-                  Text(
-                    label,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelMedium?.copyWith(color: p.textSecondary),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ),
     );
   }
 

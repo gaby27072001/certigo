@@ -25,6 +25,7 @@ export 'src/tokens/prism_token_export.dart';
 // Theme
 export 'src/theme/prism_color_scheme.dart';
 export 'src/theme/prism_theme.dart';
+export 'src/theme/prism_accessibility_scope.dart';
 
 // Components
 export 'src/components/glass_surface.dart';

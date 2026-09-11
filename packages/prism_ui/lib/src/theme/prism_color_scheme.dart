@@ -33,10 +33,25 @@ import '../tokens/prism_state.dart';
 /// The rule behind the rule: **the default must be safe, the exception must be
 /// named.** A call site that writes `color: p.error` and thinks no further
 /// should get a legible result on both appearances.
+///
+/// ## Quatre axes, huit combinaisons
+///
+/// Le schéma ne porte plus une seule dimension. À `brightness` s'ajoutent deux
+/// réglages système d'accessibilité, [highContrast] et [reduceTransparency],
+/// ce qui fait **huit** apparences livrées et non deux. Elles sont toutes
+/// produites par [resolve], qui **re-dérive** les rôles depuis les deux bases
+/// [light] et [dark] au lieu de figer huit tables de valeurs hexadécimales :
+/// une table figée serait exactement la dérive que `prism_token_export` existe
+/// pour empêcher.
+///
+/// Les deux bases restent la source exportée vers le natif. Ajouter un axe n'a
+/// donc ajouté **aucun** jeton.
 @immutable
 class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
   const PrismColorScheme({
     required this.brightness,
+    this.highContrast = false,
+    this.reduceTransparency = false,
     required this.primary,
     required this.primaryFill,
     required this.primaryDark,
@@ -87,6 +102,20 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
   });
 
   final Brightness brightness;
+
+  /// L'utilisateur a demandé **Increase Contrast** au système.
+  ///
+  /// Les couleurs système d'Apple s'y adaptent seules ; les couleurs
+  /// personnalisées doivent fournir leurs variantes — et Certigo est
+  /// entièrement en couleurs personnalisées. Voir [resolve].
+  final bool highContrast;
+
+  /// L'utilisateur a demandé **Reduce Transparency** au système.
+  ///
+  /// C'est une demande explicite de supprimer la translucidité, pas de
+  /// l'atténuer : sous ce réglage [GlassSurface] cesse de poser un
+  /// `BackdropFilter` et [glassFill] devient opaque.
+  final bool reduceTransparency;
 
   /// Brand accent as a **foreground** — text, icon, border. Adapts per theme.
   final Color primary;
@@ -326,9 +355,137 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     domainAccentsSoft: PrismColors.spectrumSoftDark,
   );
 
+  // ---- Les deux axes d'accessibilité ------------------------------------
+  //
+  // Déplacement appliqué aux rôles d'encre — premiers plans et aplats.
+  //
+  // Mesuré sur cet arbre (pire rôle, tous accents et domaines confondus) :
+  //
+  //   sur la carte    clair 5.94 -> 8.79   sombre 5.52 -> 7.18
+  //   sur le verre    clair 5.76 -> 8.51   sombre 4.99 -> 6.48
+  //   aplat sous blanc      5.94 -> 8.79 (identique dans les deux thèmes)
+  //
+  // 0.25 est le plus petit déplacement qui porte le pire premier plan au-delà
+  // de 7.0 (AAA) sur la carte et la page **dans les deux thèmes** — le sombre
+  // est le cas contraignant, à 7.18.
+  static const double _inkShift = 0.25;
+
+  // Déplacement appliqué aux arêtes. Plus grand que celui de l'encre parce
+  // qu'une arête part de beaucoup plus bas : 1.70:1 contre 5.94:1. Mesuré, le
+  // pire trait passe de 1.65 à 3.53, soit au-dessus du seuil non textuel de
+  // 3.0 ; à 0.25 il plafonnait à 2.91 et échouait.
+  static const double _edgeShift = 0.34;
+
+  static const Color _black = Color(0xFF000000);
+  static const Color _white = Color(0xFFFFFFFF);
+
+  /// Éloigne une couleur de son chrome : vers le noir en clair, vers le blanc
+  /// en sombre. C'est la même loi directionnelle que l'arête du verre — ce qui
+  /// sépare en clair rapproche en sombre.
+  static Color _awayFromChrome(Color c, bool isDark, double t) =>
+      Color.lerp(c, isDark ? _white : _black, t)!;
+
+  /// Le schéma résolu pour une apparence et les deux réglages d'accessibilité.
+  ///
+  /// **Ce qui bouge, et pourquoi seulement cela.** Les plans
+  /// ([background], [surface], [surfaceAlt]) et les lavis (`*Soft`) ne bougent
+  /// pas. Les déplacer aurait été le piège que §10 de `DESIGN.md` documente :
+  /// en clair, pousser le lavis vers le blanc l'aurait rendu identique à
+  /// [surface] (`#FFFFFF`), remplaçant un défaut de contraste par une perte de
+  /// hiérarchie. Les plans tiennent déjà leur plancher de 1.12:1 ; ils n'ont
+  /// rien à gagner et une distinction à perdre.
+  ///
+  /// [litEdge] n'est **jamais** transformé, pour la même raison. En clair il
+  /// vaut `0x00FFFFFF`, entièrement transparent par décision mesurée ; le
+  /// déplacer vers le noir lui donnerait un alpha et ferait apparaître un
+  /// liseré **sombre** en haut du verre clair, c'est-à-dire exactement le
+  /// défaut que §4 a supprimé.
+  static PrismColorScheme resolve({
+    required Brightness brightness,
+    bool highContrast = false,
+    bool reduceTransparency = false,
+  }) {
+    final PrismColorScheme base = brightness == Brightness.dark ? dark : light;
+    if (!highContrast && !reduceTransparency) return base;
+    return base._withAxes(
+      highContrast: highContrast,
+      reduceTransparency: reduceTransparency,
+    );
+  }
+
+  PrismColorScheme _withAxes({required bool highContrast, required bool reduceTransparency}) {
+    final bool isDark = brightness == Brightness.dark;
+
+    /// Un premier plan s'éloigne du chrome qui le porte.
+    Color ink(Color c) => highContrast ? _awayFromChrome(c, isDark, _inkShift) : c;
+
+    /// Un aplat porte du texte blanc : il s'assombrit dans les deux thèmes,
+    /// jamais l'inverse. C'est la distinction que `prism_fill_role_guard_test`
+    /// garde, transposée au nouvel axe.
+    Color fill(Color c) => highContrast ? Color.lerp(c, _black, _inkShift)! : c;
+
+    /// Une arête se renforce sous Increase Contrast.
+    Color edge(Color c) => highContrast ? _awayFromChrome(c, isDark, _edgeShift) : c;
+
+    /// L'arête **du verre** se renforce aussi sous Reduce Transparency : le
+    /// flou était un séparateur, il disparaît, l'arête reprend la charge. La
+    /// portée s'arrête là — renforcer au passage les bordures de toutes les
+    /// cartes serait un effet de bord que le réglage n'a pas demandé.
+    Color glassEdge(Color c) =>
+        highContrast || reduceTransparency ? _awayFromChrome(c, isDark, _edgeShift) : c;
+
+    List<Color> inks(List<Color> cs) => <Color>[for (final Color c in cs) ink(c)];
+    List<Color> fills(List<Color> cs) => <Color>[for (final Color c in cs) fill(c)];
+
+    return copyWith(
+      highContrast: highContrast,
+      reduceTransparency: reduceTransparency,
+      primary: ink(primary),
+      primaryFill: fill(primaryFill),
+      primaryDark: fill(primaryDark),
+      primaryVivid: ink(primaryVivid),
+      primaryOnSurface: ink(primaryOnSurface),
+      ember: ink(ember),
+      emberFill: fill(emberFill),
+      emberOnSurface: ink(emberOnSurface),
+      xpGold: ink(xpGold),
+      xpGoldFill: fill(xpGoldFill),
+      xpGoldOnSurface: ink(xpGoldOnSurface),
+      success: ink(success),
+      successFill: fill(successFill),
+      successOnSurface: ink(successOnSurface),
+      warning: ink(warning),
+      warningFill: fill(warningFill),
+      warningOnSurface: ink(warningOnSurface),
+      error: ink(error),
+      errorFill: fill(errorFill),
+      errorOnSurface: ink(errorOnSurface),
+      info: ink(info),
+      infoFill: fill(infoFill),
+      infoOnSurface: ink(infoOnSurface),
+      textPrimary: ink(textPrimary),
+      textSecondary: ink(textSecondary),
+      textDisabled: ink(textDisabled),
+      border: edge(border),
+      borderStrong: edge(borderStrong),
+      // Le verre cesse d'être du verre : on l'aplatit sur la page, ce qui rend
+      // exactement le pixel que l'utilisateur voit déjà quand la barre flotte
+      // au-dessus du fond — #FBFBFD en clair, #232736 en sombre — mais opaque,
+      // donc sans `BackdropFilter` derrière.
+      glassFill: reduceTransparency ? Color.alphaBlend(glassFill, background) : glassFill,
+      glassStroke: glassEdge(glassStroke),
+      domainAccents: inks(domainAccents),
+      domainAccentsFill: fills(domainAccentsFill),
+      domainAccentsVivid: inks(domainAccentsVivid),
+      domainAccentsOnSurface: inks(domainAccentsOnSurface),
+    );
+  }
+
   @override
   PrismColorScheme copyWith({
     Brightness? brightness,
+    bool? highContrast,
+    bool? reduceTransparency,
     Color? primary,
     Color? primaryFill,
     Color? primaryDark,
@@ -379,6 +536,8 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
   }) {
     return PrismColorScheme(
       brightness: brightness ?? this.brightness,
+      highContrast: highContrast ?? this.highContrast,
+      reduceTransparency: reduceTransparency ?? this.reduceTransparency,
       primary: primary ?? this.primary,
       primaryFill: primaryFill ?? this.primaryFill,
       primaryDark: primaryDark ?? this.primaryDark,
@@ -435,6 +594,8 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     Color c(Color a, Color b) => Color.lerp(a, b, t)!;
     return PrismColorScheme(
       brightness: t < 0.5 ? brightness : other.brightness,
+      highContrast: t < 0.5 ? highContrast : other.highContrast,
+      reduceTransparency: t < 0.5 ? reduceTransparency : other.reduceTransparency,
       primary: c(primary, other.primary),
       primaryFill: c(primaryFill, other.primaryFill),
       primaryDark: c(primaryDark, other.primaryDark),
