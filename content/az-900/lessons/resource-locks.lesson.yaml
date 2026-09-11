@@ -1,0 +1,263 @@
+# Leçon de référence pour la variété des exercices.
+#
+# Elle exerce délibérément les sept types d'item que la chaîne de contenu sait
+# aujourd'hui publier de bout en bout : mcq, multi, scenario, cloze, ordering,
+# spotTheIssue, applied. Le huitième type déclaré, `matchPairs`, est absent —
+# non par oubli : il est **inauthorable** ici (voir docs/EXERCICES.md).
+#
+# Faits vérifiés le 2026-09-11 sur Microsoft Learn
+# (« Lock your Azure resources to protect your infrastructure ») :
+#   · portail « Delete » / « Read-only » == CLI `CanNotDelete` / `ReadOnly` ;
+#   · « You can't add a lock to management groups. » ;
+#   · Owner et User Access Administrator portent `Microsoft.Authorization/locks/*` ;
+#   · un verrou n'agit que sur le plan de gestion (management.azure.com).
+id: az900-l-resource-locks
+trackId: az-900
+unitId: az900-u-identity-governance
+domainId: management-governance
+title: Verrous de ressources
+estMinutes: 9
+
+blocks:
+  - type: hook
+    conceptId: c-resource-locks
+    body: >
+      Un collègue supprime le mauvais groupe de ressources un vendredi soir. Il
+      était pourtant Propriétaire, donc il en avait parfaitement le droit. Quel
+      garde-fou aurait arrêté son geste **sans** lui retirer son rôle ?
+
+  - type: concept
+    conceptId: c-resource-locks
+    title: Deux verrous, deux promesses
+    body: >
+      Un **verrou de ressource** protège de la fausse manœuvre. Sa particularité :
+      il **prime sur les autorisations** — même un Propriétaire est arrêté.
+
+
+      Il en existe exactement deux, et le portail ne les nomme pas comme la ligne
+      de commande :
+
+
+      - **Supprimer** au portail, **`CanNotDelete`** en CLI : on peut encore lire
+        et **modifier** la ressource, mais plus la **supprimer**.
+
+      - **Lecture seule** au portail, **`ReadOnly`** en CLI : on peut seulement
+        **lire**. Ni modification, ni suppression — l'équivalent, pour tout le
+        monde, des permissions du rôle *Lecteur*.
+
+
+      C'est là toute la différence avec le **RBAC** : le RBAC décide *qui* a le
+      droit de faire quoi ; le verrou s'applique **à tous les utilisateurs et
+      tous les rôles**, sans exception.
+
+  - type: check
+    conceptId: c-resource-locks
+    check:
+      id: az900-l-resource-locks-check-cloze
+      conceptId: c-resource-locks
+      type: cloze
+      difficulty: 2
+      stem: >-
+        Un verrou ____ laisse encore modifier la ressource mais interdit de la
+        supprimer, tandis qu'un verrou ____ la fige totalement : ni modification,
+        ni suppression.
+      options:
+        - { id: o-cannotdelete, label: "CanNotDelete" }
+        - { id: o-readonly, label: "ReadOnly" }
+        - { id: o-deny, label: "Deny" }
+        - { id: o-reader, label: "Reader" }
+      correct: [o-cannotdelete, o-readonly]
+      explanation: >
+        `CanNotDelete` bloque la seule suppression ; `ReadOnly` bloque aussi
+        toute modification. Les deux intrus viennent de notions voisines :
+        **Deny** est un *effet* d'Azure Policy, pas un verrou, et **Reader** est
+        un *rôle* RBAC — `ReadOnly` produit un effet comparable, mais il
+        s'impose à tous les rôles au lieu d'être attribué à quelqu'un.
+
+  - type: concept
+    conceptId: c-mgmt-hierarchy
+    title: Où se pose un verrou — et où c'est impossible
+    body: >
+      Azure empile quatre **portées**, de la plus large à la plus étroite :
+      **groupe de gestion → abonnement → groupe de ressources → ressource**.
+      Chaque niveau hérite du niveau au-dessus.
+
+
+      Un verrou suit cette règle d'héritage : posé sur un parent, il descend sur
+      tout ce qu'il contient — **y compris les ressources créées plus tard**. Et
+      quand plusieurs verrous se superposent, **c'est le plus restrictif qui
+      l'emporte**.
+
+
+      Une exception se retient par cœur, parce qu'elle coûte cher le jour où on
+      la découvre en production : **on ne peut pas poser de verrou sur un groupe
+      de gestion.** La portée la plus large qui accepte un verrou est
+      l'**abonnement**.
+
+  - type: check
+    conceptId: c-mgmt-hierarchy
+    check:
+      id: az900-l-resource-locks-check-ordering
+      conceptId: c-mgmt-hierarchy
+      type: ordering
+      difficulty: 1
+      stem: >
+        Range les quatre portées d'Azure, de la plus large à la plus étroite.
+      options:
+        - { id: s-rg, label: "Groupe de ressources" }
+        - { id: s-res, label: "Ressource" }
+        - { id: s-mg, label: "Groupe de gestion" }
+        - { id: s-sub, label: "Abonnement" }
+      correct: [s-mg, s-sub, s-rg, s-res]
+      explanation: >
+        Groupe de gestion → abonnement → groupe de ressources → ressource. Cet
+        emboîtement est le même pour le RBAC, pour Azure Policy et pour
+        l'héritage des verrous : ce qu'on applique haut retombe sur tout ce qui
+        est en dessous.
+
+  - type: check
+    conceptId: c-resource-locks
+    check:
+      id: az900-l-resource-locks-check-scope
+      conceptId: c-resource-locks
+      type: mcq
+      difficulty: 3
+      stem: >
+        Sur laquelle de ces portées est-il **impossible** de poser un verrou de
+        ressource ?
+      options:
+        - { id: a, label: "Le groupe de gestion" }
+        - { id: b, label: "L'abonnement" }
+        - { id: c, label: "Le groupe de ressources" }
+        - { id: d, label: "Une ressource individuelle" }
+      correct: [a]
+      explanation: >
+        Les verrous s'appliquent à un abonnement, à un groupe de ressources ou à
+        une ressource — jamais à un groupe de gestion. Pour couvrir plusieurs
+        abonnements d'un même groupe de gestion, il faut donc poser un verrou
+        **dans chaque abonnement** ; c'est Azure Policy, et non le verrou, qui
+        se diffuse depuis un groupe de gestion.
+
+  - type: concept
+    conceptId: c-resource-locks
+    title: Le verrou arrête la gestion, pas les données
+    body: >
+      Un verrou n'agit que sur le **plan de gestion** — les appels envoyés à
+      `management.azure.com` pour créer, modifier ou supprimer la ressource
+      elle-même. Il **ne touche pas au plan de données**, c'est-à-dire à ce que
+      la ressource fait de son métier.
+
+
+      L'exemple canonique : un verrou `ReadOnly` sur un conteneur Azure Cosmos DB
+      empêche de supprimer ou de reconfigurer le conteneur, mais **n'empêche pas
+      d'y écrire, d'y lire ou d'y supprimer des documents**. Ces transactions ne
+      passent pas par le plan de gestion.
+
+
+      Autrement dit : un verrou protège la *forme* de votre infrastructure, pas
+      son *contenu*. Pour le contenu, ce sont les sauvegardes et le RBAC du
+      service qui travaillent.
+
+  - type: check
+    conceptId: c-resource-locks
+    check:
+      id: az900-l-resource-locks-check-scenario
+      conceptId: c-resource-locks
+      type: scenario
+      difficulty: 3
+      stem: >
+        Vous posez un verrou `ReadOnly` sur un conteneur Azure Cosmos DB. Une
+        application y écrit des documents en continu. Que se passe-t-il pour ces
+        écritures ?
+      options:
+        - { id: a, label: "Elles continuent : le verrou ne couvre que le plan de gestion" }
+        - { id: b, label: "Elles échouent : ReadOnly rend le conteneur non inscriptible" }
+        - { id: c, label: "Elles continuent seulement si l'application utilise la clé primaire" }
+        - { id: d, label: "Elles échouent, car le verrou retire le droit d'écriture à tous les rôles" }
+      correct: [a]
+      explanation: >
+        Le verrou ne filtre que les opérations envoyées à `management.azure.com`.
+        Supprimer ou reconfigurer le conteneur devient impossible ; écrire des
+        documents **dedans** reste une opération de plan de données, donc
+        autorisée. C'est exactement le piège : « lecture seule » décrit la
+        ressource, pas son trafic applicatif.
+
+  - type: check
+    conceptId: c-resource-locks
+    check:
+      id: az900-l-resource-locks-check-multi
+      conceptId: c-resource-locks
+      type: multi
+      difficulty: 2
+      stem: >
+        Quels rôles intégrés disposent, par défaut, des droits nécessaires pour
+        créer ou retirer un verrou ? Plusieurs réponses.
+      options:
+        - { id: a, label: "Propriétaire (Owner)" }
+        - { id: b, label: "Administrateur de l'accès utilisateur" }
+        - { id: c, label: "Contributeur (Contributor)" }
+        - { id: d, label: "Lecteur (Reader)" }
+      correct: [a, b]
+      explanation: >
+        Gérer un verrou exige les actions `Microsoft.Authorization/locks/*`. Seuls
+        **Propriétaire** et **Administrateur de l'accès utilisateur** les portent
+        parmi les rôles courants. Le **Contributeur** est précisément le rôle qui
+        peut tout créer et tout supprimer *sauf* toucher aux autorisations — c'est
+        ce qui rend le verrou efficace contre lui.
+
+  - type: check
+    conceptId: c-resource-locks
+    check:
+      id: az900-l-resource-locks-check-spot
+      conceptId: c-resource-locks
+      type: spotTheIssue
+      difficulty: 3
+      stem: >
+        Une équipe veut empêcher toute suppression accidentelle en production.
+        Voici son plan. Quelle décision **manque son objectif** ?
+      options:
+        - { id: a, label: "Poser un verrou CanNotDelete sur le groupe de gestion qui contient l'abonnement de production" }
+        - { id: b, label: "Poser un verrou CanNotDelete sur le groupe de ressources de production" }
+        - { id: c, label: "Limiter le rôle Propriétaire à deux personnes, seules à pouvoir retirer le verrou" }
+        - { id: d, label: "Écrire la procédure de retrait temporaire du verrou avant une maintenance" }
+      correct: [a]
+      explanation: >
+        Cette décision n'échoue pas « un peu » : elle est **irréalisable**. Azure
+        refuse tout verrou sur un groupe de gestion. L'équipe croirait ses
+        abonnements protégés alors que rien ne le serait. Les trois autres
+        décisions sont justes : verrouiller au niveau du groupe de ressources,
+        restreindre qui peut retirer le verrou, et prévoir le retrait maîtrisé.
+
+  - type: check
+    conceptId: c-resource-locks
+    check:
+      id: az900-l-resource-locks-check-applied
+      conceptId: c-resource-locks
+      type: applied
+      difficulty: 3
+      stem: >
+        Vous devez supprimer un groupe de ressources de recette, protégé par un
+        verrou dont vous ignorez l'origine. Classe les étapes dans l'ordre où
+        elles doivent être menées.
+      options:
+        - { id: p-remove, label: "Retirer le verrou à la portée où il est réellement défini" }
+        - { id: p-delete, label: "Supprimer le groupe de ressources" }
+        - { id: p-locate, label: "Localiser le verrou et la portée d'où il est hérité" }
+        - { id: p-rights, label: "Vérifier que vous détenez les droits de gestion des verrous sur cette portée" }
+      correct: [p-locate, p-rights, p-remove, p-delete]
+      explanation: >
+        Chaque étape rend la suivante possible. Localiser d'abord : un verrou
+        visible sur le groupe de ressources peut être **hérité de l'abonnement**,
+        et on ne retire pas un verrou là où il n'est pas défini. La portée une
+        fois connue, on peut vérifier ses droits **sur cette portée** — pas
+        avant, puisqu'elle détermine où les droits sont nécessaires. Puis on
+        retire le verrou, et seulement alors la suppression aboutit.
+
+  - type: recap
+    conceptId: c-resource-locks
+    body: >
+      Deux verrous : `CanNotDelete` interdit la suppression, `ReadOnly` fige
+      tout. Ils priment sur les rôles, s'héritent du parent vers l'enfant, et le
+      plus restrictif gagne. On les pose sur un abonnement, un groupe de
+      ressources ou une ressource — **jamais sur un groupe de gestion**. Et ils
+      arrêtent la gestion de la ressource, pas le trafic de ses données.

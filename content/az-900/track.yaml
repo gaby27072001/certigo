@@ -54,4 +54,5 @@ units:
     title: Identité & gouvernance
     lessons:
       - az900-l-rbac
+      - az900-l-resource-locks
       - az900-l-defender-overview
