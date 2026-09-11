@@ -4,6 +4,7 @@ import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_motion.dart';
 import 'prism_content_frame.dart';
 import 'prism_button.dart';
+import 'prism_scroll_edge.dart';
 
 /// The shared chrome for every onboarding step.
 ///
@@ -68,7 +69,7 @@ class OnboardingScaffold extends StatelessWidget {
 
     final Widget body = Padding(
       padding: padding,
-      child: scrollable ? SingleChildScrollView(child: child) : child,
+      child: scrollable ? PrismScrollEdge(child: SingleChildScrollView(child: child)) : child,
     );
 
     return Scaffold(

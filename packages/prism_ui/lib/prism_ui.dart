@@ -81,6 +81,7 @@ export 'src/components/prism_rich_text.dart';
 
 // Async / state surfaces
 export 'src/components/prism_skeleton.dart';
+export 'src/components/prism_scroll_edge.dart';
 export 'src/components/prism_status_view.dart';
 export 'src/components/prism_loading_view.dart';
 
