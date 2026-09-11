@@ -298,6 +298,32 @@ corrigées, pas l'inverse.
 
 ---
 
+## ⚠️ Des checks rouges sur GitHub ne veulent pas dire que ton squelette est cassé
+
+**Ne te laisse pas décourager par la page de la pull request.**
+
+**Aucun contrôle de CI de ce dépôt ne compile du Swift** — il n'existe aucune
+machine macOS dans la CI. Les contrôles qui tournent sur cette PR vérifient le
+Flutter, le backend, le contenu et l'infrastructure : **ils ne savent rien de
+`apps/ios/`**. Un rouge chez eux et un problème dans ton squelette sont deux
+sujets indépendants.
+
+Deux causes connues de rouge **sans aucun rapport** avec ton travail :
+
+- **`docs/active-content-reference.json` expire le 2026-09-19.** Passé cette
+  date, un contrôle rougit tout seul, sur toutes les PR ouvertes, sans que
+  personne n'ait rien changé. C'est traité en parallèle.
+- **Une PR sœur peut casser un contrôle partagé.** Les fichiers d'état générés
+  (`docs/ETAT_DU_PROJET.md`, `docs/project-state-reference.json`) sont touchés
+  par presque toutes les PR, donc un conflit y apparaît dès qu'une autre est
+  fusionnée.
+
+**Le seul verdict qui compte pour ton squelette, c'est ton Terminal.** Si
+`./Scripts/demarrer.sh` va jusqu'au bout et que l'application s'affiche, le
+squelette marche — quelle que soit la couleur de la page GitHub.
+
+---
+
 ## Ce que tu peux faire d'autre, si tu as le temps
 
 ### Ouvrir le projet dans Xcode et regarder les aperçus
@@ -371,6 +397,23 @@ L'identifiant de l'application est `com.certigo.native` — **volontairement
 différent** de `com.certigo.mobileapp`, qui est celui de l'application Flutter.
 Installer le squelette **ne remplacera pas** Certigo sur ton téléphone. Un test
 automatique vérifie que cela reste vrai.
+
+> ### ⚠️ Piège : ne suis pas ce que dit `mobile-secrets.env.example`
+>
+> Si tu cherches comment signer, tu vas tomber sur
+> `tools/secrets/mobile-secrets.env.example`, qui recommande **fastlane
+> `match`** — au présent, sans avertissement.
+>
+> **Cette recommandation est morte.** `codemagic.yaml:14` dit explicitement
+> « no fastlane match », la documentation correspondante est barrée, et les
+> deux seuls appelants de la chaîne fastlane portent « ⛔ MIGRÉ VERS
+> CODEMAGIC ». Monter `match` te ferait perdre une soirée pour rien.
+>
+> **La signature de production passe uniquement par Codemagic.** Pour un
+> simple essai sur ton propre iPhone, la signature automatique de Xcode
+> (`DEVELOPMENT_TEAM` ci-dessus) suffit et ne demande aucune de ces
+> mécaniques. Une session sœur est en train de dater ce fichier ; ce squelette
+> ne s'appuie sur rien de cette chaîne.
 
 ---
 
