@@ -10,26 +10,26 @@
     {
       "environment": "ci",
       "resourceGroupName": "rg-certigo-ci",
-      "baseline30DayUsd": 242.06,
-      "monthlyBudgetUsd": 275
+      "baseline30DayUsd": 298.2,
+      "monthlyBudgetUsd": 375
     },
     {
       "environment": "staging",
       "resourceGroupName": "rg-certigo-staging",
-      "baseline30DayUsd": 50.19,
-      "monthlyBudgetUsd": 60
+      "baseline30DayUsd": 55.87,
+      "monthlyBudgetUsd": 70
     },
     {
       "environment": "prod",
       "resourceGroupName": "rg-certigo-prod",
-      "baseline30DayUsd": 24.48,
-      "monthlyBudgetUsd": 30
+      "baseline30DayUsd": 41.11,
+      "monthlyBudgetUsd": 55
     },
     {
       "environment": "dev",
       "resourceGroupName": "rg-certigo-dev",
-      "baseline30DayUsd": 21.3,
-      "monthlyBudgetUsd": 30
+      "baseline30DayUsd": 42.84,
+      "monthlyBudgetUsd": 55
     }
   ]
 }

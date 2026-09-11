@@ -36,7 +36,7 @@ function compileParameters(relativePath) {
   return JSON.parse(output.parametersJson);
 }
 
-test('monthly budget has actual-cost alerts at 50, 80, and 100 percent', () => {
+test('monthly budget alerts on forecast acceleration and on a confirmed overrun', () => {
   const template = compileTemplate('infra/finops/budget.bicep');
   const [budget] = template.resources.filter(
     (resource) => resource.type === 'Microsoft.Consumption/budgets',
@@ -47,16 +47,30 @@ test('monthly budget has actual-cost alerts at 50, 80, and 100 percent', () => {
   assert.equal(budget.properties.timeGrain, 'Monthly');
 
   const notifications = Object.values(budget.properties.notifications);
-  assert.deepEqual(
-    notifications.map((notification) => notification.threshold).sort((a, b) => a - b),
-    [50, 80, 100],
-  );
+  assert.equal(notifications.length, 3);
+
+  const forecasted = notifications
+    .filter((notification) => notification.thresholdType === 'Forecasted')
+    .map((notification) => notification.threshold)
+    .sort((a, b) => a - b);
+  const actual = notifications
+    .filter((notification) => notification.thresholdType === 'Actual')
+    .map((notification) => notification.threshold)
+    .sort((a, b) => a - b);
+
+  assert.deepEqual(forecasted, [100, 200]);
+  assert.deepEqual(actual, [100]);
+
+  // Amounts are calibrated to 1.25x the last complete normal month, so a normal
+  // month lands at 80% of the amount. Any Actual threshold below 100 would fire
+  // every normal month by construction, which is why none is allowed.
+  assert.ok(actual.every((threshold) => threshold >= 100));
+
   assert.ok(
     notifications.every(
       (notification) =>
         notification.enabled === true &&
-        notification.operator === 'GreaterThanOrEqualTo' &&
-        notification.thresholdType === 'Actual' &&
+        ['GreaterThan', 'GreaterThanOrEqualTo'].includes(notification.operator) &&
         notification.contactEmails.length === 1,
     ),
   );
@@ -74,7 +88,7 @@ test('default preview evaluates to zero budget writes', () => {
   assert.equal(template.parameters.alertEmail.defaultValue, '');
   assert.equal(parameters.parameters.enableBudgets.value, false);
   assert.equal(parameters.parameters.alertEmail, undefined);
-  assert.equal(deployments.length, 4);
+  assert.equal(deployments.length, 5);
   assert.ok(
     deployments.every(
       (deployment) => deployment.condition === "[parameters('enableBudgets')]",
@@ -95,6 +109,11 @@ test('budget deployment is opt-in and uses the documented 30-day baselines', () 
   );
 
   assert.match(parameters, /param enableBudgets = false/);
+  // The content scope is a budget scope but not an application environment, so it
+  // is deliberately absent from scopes.json: infra/tests/azure-tag-contract.test.mjs
+  // pins scopes.json (minus ci) to the env allowedValues of infra/main.bicep.
+  assert.match(parameters, /param contentResourceGroupName = 'rg-certigo-content'/);
+  assert.match(parameters, /param contentMonthlyBudgetUsd = 25/);
   for (const scope of contract.scopes) {
     assert.ok(scope.baseline30DayUsd > 0);
     assert.ok(scope.monthlyBudgetUsd >= Math.ceil(scope.baseline30DayUsd));

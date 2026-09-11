@@ -31,21 +31,25 @@ resource monthlyBudget 'Microsoft.Consumption/budgets@2023-11-01' = {
       startDate: startDate
       endDate: endDate
     }
+    // Each amount is calibrated to 1.25x the last complete normal month, so a normal
+    // month lands at 80% of the amount. Actual thresholds below 100% would therefore
+    // fire every normal month by construction; only the three below can stay silent
+    // on observed variation and still fire on a measured acceleration.
     notifications: {
-      actual50: {
+      forecast100: {
         enabled: true
-        operator: 'GreaterThanOrEqualTo'
-        threshold: 50
-        thresholdType: 'Actual'
+        operator: 'GreaterThan'
+        threshold: 100
+        thresholdType: 'Forecasted'
         contactEmails: [
           alertEmail
         ]
       }
-      actual80: {
+      forecast200: {
         enabled: true
-        operator: 'GreaterThanOrEqualTo'
-        threshold: 80
-        thresholdType: 'Actual'
+        operator: 'GreaterThan'
+        threshold: 200
+        thresholdType: 'Forecasted'
         contactEmails: [
           alertEmail
         ]

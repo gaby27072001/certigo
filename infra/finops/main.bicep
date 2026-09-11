@@ -19,25 +19,31 @@ param alertEmail string = ''
 param ciResourceGroupName string = 'rg-certigo-ci'
 @description('CI monthly budget in the billing currency.')
 @minValue(1)
-param ciMonthlyBudgetUsd int = 275
+param ciMonthlyBudgetUsd int = 375
 
 @description('Staging resource group budget scope.')
 param stagingResourceGroupName string = 'rg-certigo-staging'
 @description('Staging monthly budget in the billing currency.')
 @minValue(1)
-param stagingMonthlyBudgetUsd int = 60
+param stagingMonthlyBudgetUsd int = 70
 
 @description('Production resource group budget scope.')
 param prodResourceGroupName string = 'rg-certigo-prod'
 @description('Production monthly budget in the billing currency.')
 @minValue(1)
-param prodMonthlyBudgetUsd int = 30
+param prodMonthlyBudgetUsd int = 55
 
 @description('Development resource group budget scope.')
 param devResourceGroupName string = 'rg-certigo-dev'
 @description('Development monthly budget in the billing currency.')
 @minValue(1)
-param devMonthlyBudgetUsd int = 30
+param devMonthlyBudgetUsd int = 55
+
+@description('Content resource group budget scope.')
+param contentResourceGroupName string = 'rg-certigo-content'
+@description('Content monthly budget in the billing currency.')
+@minValue(1)
+param contentMonthlyBudgetUsd int = 25
 
 resource ciScope 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
   name: ciResourceGroupName
@@ -53,6 +59,10 @@ resource prodScope 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
 
 resource devScope 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
   name: devResourceGroupName
+}
+
+resource contentScope 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
+  name: contentResourceGroupName
 }
 
 module ciBudget 'budget.bicep' = if (enableBudgets) {
@@ -103,5 +113,17 @@ module devBudget 'budget.bicep' = if (enableBudgets) {
   }
 }
 
+module contentBudget 'budget.bicep' = if (enableBudgets) {
+  scope: contentScope
+  name: 'finops-budget-content'
+  params: {
+    alertEmail: alertEmail
+    budgetName: 'budget-certigo-content-monthly'
+    endDate: budgetEndDate
+    monthlyBudgetAmount: contentMonthlyBudgetUsd
+    startDate: budgetStartDate
+  }
+}
+
 output budgetsEnabled bool = enableBudgets
-output configuredScopeCount int = 4
+output configuredScopeCount int = 5

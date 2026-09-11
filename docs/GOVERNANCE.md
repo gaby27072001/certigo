@@ -960,7 +960,41 @@ mesure.
 comparaison détruite par la transformation mesurée), l'autre côté entrée (le défaut normalisé
 avant d'atteindre le comparateur).
 
-### Le rendu peut mentir sur la présence des données
+### La mesure vraie par construction — le diviseur qui était la réponse
+
+> Ajouté le **2026-09-11**. Troisième variante de « réponse vraie par construction » (n°7),
+> après le détecteur qui normalise son entrée. Celle-ci ne porte pas sur un mécanisme mais
+> sur une **mesure**. **Invalidée** le jour où tout chiffre unitaire de ce dépôt cite la
+> source externe dont il provient.
+
+**Le motif mesuré.** Pour établir le coût horaire d'une machine, une session a divisé le
+coût d'une journée par une quantité **supposée** — quatre machines pendant vingt-quatre
+heures — puis s'est servie du prix ainsi obtenu pour **conclure que les machines tournaient
+en continu**. Le prix et la conclusion étaient le même énoncé, écrit deux fois. Confronté au
+tarif public, le prix réel était supérieur de 27 % : la quantité réelle n'était pas 96
+heures-machine mais 69,7, et une extinction quotidienne d'environ six heures existait déjà.
+**La conséquence aurait été d'aller éteindre des machines déjà éteintes.**
+
+> **Une grandeur dérivée de la quantité qu'elle sert ensuite à mesurer ne mesure rien : elle
+> reformule l'hypothèse.** Le calcul est juste, la donnée est réelle, et le résultat est
+> vide.
+
+**Pourquoi cette famille est plus dangereuse que les mécanismes muets.** Un mécanisme qui ne
+peut pas agir finit par se remarquer — il manque quelque chose qui aurait dû se produire.
+Une mesure circulaire, elle, **confirme** ce qu'on croyait, avec un chiffre à l'appui. Elle
+ne se signale pas comme absente : elle se présente comme une preuve.
+
+**Le symptôme, gratuit à vérifier.** Le quotient retombait **exactement** sur l'hypothèse —
+96,0 heures-machine, sans reste. Une division de mesures réelles qui tombe juste sur un
+nombre rond supposé est presque toujours une identité déguisée. **Quand un rapport confirme
+l'hypothèse au chiffre près, soupçonner l'identité avant de célébrer l'accord.**
+
+**Contre-mesure — à l'écriture, gratuite.** Prendre toute grandeur unitaire dans une source
+**indépendante de l'observation à expliquer** : tarif publié, fiche technique, documentation.
+Si aucune source indépendante n'existe, écrire que le chiffre est une hypothèse, et ne pas
+s'en servir pour conclure sur ce qu'il présuppose.
+
+
 
 > Ajouté le **2026-09-09**. Nouvelle variante de la famille des instruments qui mentent, la plus
 > insidieuse pour un opérateur humain : **un affichage vide se lit comme une absence, jamais comme
