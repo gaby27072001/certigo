@@ -11,141 +11,265 @@ import 'coach_section.dart';
 
 /// Home — the daily landing surface. Answers "what should I do today?" in one
 /// glance: current readiness, daily goal progress, the next lesson to continue,
-/// and the weakest domain to reinforce. Driven by [homeDataProvider] (real
-/// profile + path from the API), with skeleton loading and a retry error state.
+/// and the weakest domain to reinforce.
+///
+/// Home renders in three independent bands so that no single failure can empty
+/// the landing surface:
+///
+/// * **You** — streak, gems, XP, greeting and the daily goal, from [meProvider].
+/// * **Your certification** — readiness, coach, next lesson and weakest domain,
+///   from [homePathProvider]. Having selected no track yet is data, not an
+///   error, so it degrades to an invitation instead of a takeover.
+/// * **Explorer** — static, and load-bearing: of the six destinations it
+///   lists, five (Saisons, Quêtes, Boutique, Amis, Examen blanc) have no other
+///   entry point anywhere in the app. Succès is also reachable from Profil.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<HomeData> async = ref.watch(homeDataProvider);
+    final AsyncValue<UserProfile> profile = ref.watch(meProvider);
+    final AsyncValue<LearningPath?> pathState = ref.watch(homePathProvider);
+    final LearningPath? path = pathState.valueOrNull;
 
     return AuroraBackground(
       animate: true,
       child: SafeArea(
         bottom: false,
-        child: async.when(
-          data: (HomeData data) => _HomeContent(data: data),
-          loading: () => const _HomeLoading(),
-          error: (Object error, StackTrace _) => error is MissingActiveTrackException
-              ? PrismStatusView(
-                  icon: Icons.school_outlined,
-                  title: 'Aucune certification sélectionnée',
-                  message: 'Choisis un parcours publié pour afficher ton accueil.',
-                  actionLabel: 'Voir la bibliothèque',
-                  onAction: () => context.go(Routes.library),
-                )
-              : PrismStatusView.error(onRetry: () => ref.invalidate(homeDataProvider)),
+        child: ListView(
+          padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
+          children: <Widget>[
+            // ── You ───────────────────────────────────────────────────────
+            _ResourceBar(profile: profile),
+            const SizedBox(height: 18),
+            _HomeGreeting(
+              firstName: profile.valueOrNull?.displayName.split(' ').first,
+              subtitle: _greetingSubtitle(path),
+            ),
+            const SizedBox(height: 22),
+
+            // ── Your certification ────────────────────────────────────────
+            _TrackBand(
+              state: pathState,
+              onRetry: () => ref.invalidate(homePathProvider),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Your day ──────────────────────────────────────────────────
+            _DailyBand(
+              profile: profile,
+              trackCode: path?.exam ?? '',
+              onRetry: () => ref.invalidate(meProvider),
+            ),
+
+            if (path != null) ...<Widget>[
+              const SizedBox(height: 16),
+              // AI coach — server-ranked "next best action" shelf. Self-hiding:
+              // collapses to nothing while loading, on error, or when empty, so
+              // it never blocks the rest of Home.
+              CoachSection(trackId: path.trackId),
+
+              // Current lesson indicator (non-interactive — action is in Parcours).
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Text('📍', style: TextStyle(fontSize: 22)),
+                title: Text(
+                  path.nextLesson?.title ?? HomeLabels.noLessonInProgress,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+
+            // ── Explorer — secondary destinations beyond the daily path ────
+            const PrismSectionHeader(
+              title: 'Explorer',
+              subtitle: 'Choisis ton prochain objectif',
+              icon: Icons.explore_rounded,
+            ),
+            const SizedBox(height: 12),
+            const _ExploreSection(),
+
+            // ── Weakest domain ────────────────────────────────────────────
+            if (path?.weakestDomain case final DomainProgress weak) ...<Widget>[
+              const SizedBox(height: 24),
+              PrismSectionHeader(
+                title: 'À renforcer',
+                subtitle: 'Un effort ciblé fait vite progresser',
+                icon: Icons.bolt_rounded,
+                trailing: Text(
+                  '${weak.score}/100',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelMedium?.copyWith(color: context.prism.ember),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _WeakDomainCard(domain: weak, onTap: () => context.go(Routes.path)),
+            ],
+          ],
         ),
       ),
     );
   }
+
+  String _greetingSubtitle(LearningPath? path) {
+    if (path == null) {
+      return HomeLabels.noTrackGreeting;
+    }
+    return path.exam.isEmpty ? 'Prêt à progresser ?' : 'Cap sur ${path.exam}';
+  }
 }
 
-class _HomeContent extends StatelessWidget {
-  const _HomeContent({required this.data});
+/// Copy that tests assert on. Naming it keeps a wording change from silently
+/// turning a widget test red in an unrelated branch.
+abstract final class HomeLabels {
+  static const String noTrackTitle = 'Aucune certification sélectionnée';
+  static const String noTrackMessage = 'Choisis un parcours publié pour afficher ton accueil.';
+  static const String noTrackAction = 'Voir la bibliothèque';
+  static const String noTrackGreeting = 'Choisis ta certification pour commencer';
+  static const String noLessonInProgress = 'Aucune leçon en cours';
+  static const String profileUnavailable = 'Tes chiffres du jour sont indisponibles.';
+  static const String pathUnavailable = 'Impossible de charger ton parcours.';
+}
 
-  final HomeData data;
+/// The learner's economy row — streak, gems, XP. Skeletons while loading, and
+/// silently absent if the profile fails: the retry lives once, in [_DailyBand].
+class _ResourceBar extends StatelessWidget {
+  const _ResourceBar({required this.profile});
+
+  final AsyncValue<UserProfile> profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final UserProfile? me = profile.valueOrNull;
+    if (me == null) {
+      return const Row(
+        children: <Widget>[
+          PrismSkeleton(width: 72, height: 32),
+          SizedBox(width: PrismSpacing.xs),
+          PrismSkeleton(width: 64, height: 32),
+          Spacer(),
+          PrismSkeleton(width: 72, height: 32),
+        ],
+      );
+    }
+    return Row(
+      children: <Widget>[
+        StreakBadge(days: me.streakDays, active: me.dailyProgress >= 1),
+        const SizedBox(width: 8),
+        GemCounter(gems: me.gems),
+        const Spacer(),
+        XpChip(xp: me.xp),
+      ],
+    );
+  }
+}
+
+/// The certification-scoped band: readiness when a track is active, an
+/// invitation when none is, an inline retry when the path fails to load.
+///
+/// The invitation reuses [ActivePathScreen]'s vocabulary verbatim —
+/// [PrismStatusView] plus a way back to the library — because both surfaces
+/// answer the same question and should answer it the same way.
+class _TrackBand extends StatelessWidget {
+  const _TrackBand({required this.state, required this.onRetry});
+
+  final AsyncValue<LearningPath?> state;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return state.when(
+      loading: () => const PrismSkeleton(height: 220),
+      error: (Object error, StackTrace _) => PrismStatusView.error(
+        message: HomeLabels.pathUnavailable,
+        onRetry: onRetry,
+      ),
+      data: (LearningPath? path) {
+        if (path == null) {
+          return PrismStatusView(
+            icon: Icons.school_outlined,
+            title: HomeLabels.noTrackTitle,
+            message: HomeLabels.noTrackMessage,
+            actionLabel: HomeLabels.noTrackAction,
+            onAction: () => context.go(Routes.library),
+          );
+        }
+        return _ReadinessCard(path: path);
+      },
+    );
+  }
+}
+
+class _ReadinessCard extends StatelessWidget {
+  const _ReadinessCard({required this.path});
+
+  final LearningPath path;
 
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    final UserProfile me = data.profile;
-    final LearningPath path = data.path;
-    final PathLesson? next = data.nextLesson;
-    final DomainProgress? weak = data.weakestDomain;
-    final String firstName = me.displayName.split(' ').first;
     final int previous = (path.readinessScore - path.readinessTrend7d).clamp(0, 100);
-
-    return ListView(
-      padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
-      children: <Widget>[
-        // Resource bar — streak / gems / XP, the at-a-glance economy, pinned at
-        // the top like a learning app's status row.
-        Row(
-          children: <Widget>[
-            StreakBadge(days: me.streakDays, active: me.dailyProgress >= 1),
-            const SizedBox(width: 8),
-            GemCounter(gems: me.gems),
-            const Spacer(),
-            XpChip(xp: me.xp),
-          ],
-        ),
-        const SizedBox(height: 18),
-
-        // Greeting — the guide welcomes you back in a speech bubble.
-        _HomeGreeting(
-          firstName: firstName,
-          subtitle: path.exam.isEmpty ? 'Prêt à progresser ?' : 'Cap sur ${path.exam}',
-        ),
-        const SizedBox(height: 22),
-
-        // Readiness hero -------------------------------------------------
-        PrismCard(
-          elevation: 2,
-          borderRadius: PrismRadii.cardXxl,
-          padding: const EdgeInsets.symmetric(vertical: PrismSpacing.lg),
-          child: Column(
-            children: <Widget>[
-              ReadinessGauge(score: path.readinessScore, previousScore: previous),
-              const SizedBox(height: 8),
-              Text(
-                path.exam.isEmpty ? 'Score de préparation' : 'Score de préparation — ${path.exam}',
-                style: t.bodySmall?.copyWith(color: p.textSecondary),
-              ),
-              const SizedBox(height: 4),
-              _TrendLabel(trend: path.readinessTrend7d),
-            ],
+    return PrismCard(
+      elevation: 2,
+      borderRadius: PrismRadii.cardXxl,
+      padding: const EdgeInsets.symmetric(vertical: PrismSpacing.lg),
+      child: Column(
+        children: <Widget>[
+          ReadinessGauge(score: path.readinessScore, previousScore: previous),
+          const SizedBox(height: 8),
+          Text(
+            path.exam.isEmpty ? 'Score de préparation' : 'Score de préparation — ${path.exam}',
+            style: t.bodySmall?.copyWith(color: p.textSecondary),
           ),
-        ),
-        const SizedBox(height: 16),
-
-        // Daily goal -----------------------------------------------------
-        _DailyGoalCard(progress: me.dailyProgress, earned: me.dailyXpEarned, goal: me.dailyGoalXp),
-        const SizedBox(height: 16),
-        _DailyShareEntryCard(
-          goalMet: me.dailyGoalXp > 0 && me.dailyXpEarned >= me.dailyGoalXp,
-          trackCode: path.exam,
-          onTap: () => context.push(Routes.dailyShare),
-        ),
-        const SizedBox(height: 16),
-
-        // AI coach — server-ranked "next best action" shelf. Self-hiding:
-        // collapses to nothing while loading, on error, or when empty, so it
-        // never blocks the rest of Home.
-        CoachSection(trackId: path.trackId),
-
-        // Current lesson indicator (non-interactive — action is in Parcours).
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Text('📍', style: TextStyle(fontSize: 22)),
-          title: Text(next?.title ?? 'Aucune leçon en cours', style: t.bodyLarge),
-        ),
-        const SizedBox(height: 24),
-
-        // Explorer — secondary destinations beyond the daily path.
-        const PrismSectionHeader(
-          title: 'Explorer',
-          subtitle: 'Choisis ton prochain objectif',
-          icon: Icons.explore_rounded,
-        ),
-        const SizedBox(height: 12),
-        const _ExploreSection(),
-        const SizedBox(height: 24),
-
-        // Weakest domain -------------------------------------------------
-        if (weak != null) ...<Widget>[
-          PrismSectionHeader(
-            title: 'À renforcer',
-            subtitle: 'Un effort ciblé fait vite progresser',
-            icon: Icons.bolt_rounded,
-            trailing: Text('${weak.score}/100', style: t.labelMedium?.copyWith(color: p.ember)),
-          ),
-          const SizedBox(height: 12),
-          _WeakDomainCard(domain: weak, onTap: () => context.go(Routes.path)),
+          const SizedBox(height: 4),
+          _TrendLabel(trend: path.readinessTrend7d),
         ],
-      ],
+      ),
+    );
+  }
+}
+
+/// The learner's own day — goal and share. Independent of any certification,
+/// so it survives a missing or failing track.
+class _DailyBand extends StatelessWidget {
+  const _DailyBand({required this.profile, required this.trackCode, required this.onRetry});
+
+  final AsyncValue<UserProfile> profile;
+  final String trackCode;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return profile.when(
+      loading: () => const Column(
+        children: <Widget>[
+          PrismSkeleton(height: 72),
+          SizedBox(height: 16),
+          PrismSkeleton(height: 96),
+        ],
+      ),
+      error: (Object error, StackTrace _) => PrismStatusView.error(
+        message: HomeLabels.profileUnavailable,
+        onRetry: onRetry,
+      ),
+      data: (UserProfile me) => Column(
+        children: <Widget>[
+          _DailyGoalCard(
+            progress: me.dailyProgress,
+            earned: me.dailyXpEarned,
+            goal: me.dailyGoalXp,
+          ),
+          const SizedBox(height: 16),
+          _DailyShareEntryCard(
+            goalMet: me.dailyGoalXp > 0 && me.dailyXpEarned >= me.dailyGoalXp,
+            trackCode: trackCode,
+            onTap: () => context.push(Routes.dailyShare),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -153,7 +277,9 @@ class _HomeContent extends StatelessWidget {
 class _HomeGreeting extends StatefulWidget {
   const _HomeGreeting({required this.firstName, required this.subtitle});
 
-  final String firstName;
+  /// Null while the profile is still loading — the bubble greets without a name
+  /// rather than collapsing, so the band keeps its height.
+  final String? firstName;
   final String subtitle;
 
   @override
@@ -205,7 +331,9 @@ class _HomeGreetingState extends State<_HomeGreeting> {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   Text(
-                    'Bon retour, ${widget.firstName} 👋',
+                    widget.firstName == null
+                        ? 'Bon retour 👋'
+                        : 'Bon retour, ${widget.firstName} 👋',
                     style: t.bodyMedium?.copyWith(color: p.textSecondary),
                   ),
                   const SizedBox(height: 2),
@@ -316,7 +444,7 @@ class _DailyShareEntryCard extends StatelessWidget {
                 Text(
                   goalMet
                       ? 'Ton objectif est atteint — partage ta progression ${trackCode.isEmpty ? '' : trackCode}.'
-                      : 'Transforme tes progrès du jour en carte de partage prête a envoyer.',
+                      : 'Transforme tes progrès du jour en carte de partage prête à envoyer.',
                   style: t.bodySmall?.copyWith(color: p.textSecondary, height: 1.35),
                 ),
               ],
@@ -367,28 +495,6 @@ class _WeakDomainCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _HomeLoading extends StatelessWidget {
-  const _HomeLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: PrismSpacing.scrollBody(top: PrismSpacing.sm),
-      children: const <Widget>[
-        PrismSkeleton(width: 150, height: 14),
-        SizedBox(height: 12),
-        PrismSkeleton(width: 200, height: 28),
-        SizedBox(height: 24),
-        PrismSkeleton(height: 220),
-        SizedBox(height: 16),
-        PrismSkeleton(height: 72),
-        SizedBox(height: 16),
-        PrismSkeleton(height: 96),
-      ],
     );
   }
 }
