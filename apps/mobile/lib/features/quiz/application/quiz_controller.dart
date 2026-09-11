@@ -5,7 +5,9 @@ import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../app/session_resume_store.dart';
 import 'quiz_entry.dart';
+import 'quiz_resume.dart';
 import 'sample_quiz.dart';
 import '../../lesson/application/lesson_feedback.dart';
 
@@ -41,6 +43,8 @@ class QuizController extends ChangeNotifier {
     RuntimeContentPinRegistry? contentPins,
     String? contentOwnerId,
     LessonFeedback feedback = const SilentLessonFeedback(),
+    SessionResumeStore? resumeStore,
+    String? resumeOwnerId,
   })  :
         // Keep the optional dependency source-compatible with direct controller tests.
         // ignore: prefer_initializing_formals
@@ -48,7 +52,13 @@ class QuizController extends ChangeNotifier {
         // ignore: prefer_initializing_formals
         _contentPins = contentPins,
         // ignore: prefer_initializing_formals
-        _contentOwnerId = contentOwnerId {
+        _contentOwnerId = contentOwnerId,
+        // Same reason as above: the store and its owner stay ordinary named
+        // parameters so a controller test can inject them directly.
+        // ignore: prefer_initializing_formals
+        _resumeStore = resumeStore,
+        // ignore: prefer_initializing_formals
+        _resumeOwnerId = resumeOwnerId {
     unawaited(loadItems());
   }
 
@@ -63,6 +73,13 @@ class QuizController extends ChangeNotifier {
   /// tests qui construisent le contrôleur directement restent déterministes.
   final LessonFeedback _feedback;
 
+  /// Where an interrupted session is kept so it can be resumed after the app
+  /// is killed. Absent in compositions that have not opted in, in which case
+  /// the controller behaves exactly as before: nothing is written, nothing is
+  /// restored, and the attempt key is minted on first submit.
+  final SessionResumeStore? _resumeStore;
+  final String? _resumeOwnerId;
+
   List<QuizEntry> _items = <QuizEntry>[];
   bool _loading = true;
   bool _loadFailed = false;
@@ -73,7 +90,7 @@ class QuizController extends ChangeNotifier {
   String? _selectedId;
   bool _graded = false;
   int _correctCount = 0;
-  final DateTime _startedAt = DateTime.now().toUtc();
+  DateTime _startedAt = DateTime.now().toUtc();
   DateTime _shownAt = DateTime.now();
   final Map<String, List<String>> _answersByItem = <String, List<String>>{};
   final Map<String, int> _latencyByItem = <String, int>{};
@@ -135,6 +152,7 @@ class QuizController extends ChangeNotifier {
     }
     _loading = false;
     _shownAt = DateTime.now();
+    _restoreInterruptedSession();
     notifyListeners();
   }
 
@@ -153,12 +171,16 @@ class QuizController extends ChangeNotifier {
     _contentPin?.release();
     _contentPin = null;
     _shownAt = DateTime.now();
+    // Demo runs are never submitted and never rewarded, so there is nothing
+    // for the server to reconcile and nothing worth outliving the process.
+    _discardResume();
     notifyListeners();
   }
 
   void select(String optionId) {
     if (_graded) return;
     _selectedId = optionId;
+    _persistResume();
     notifyListeners();
   }
 
@@ -177,6 +199,7 @@ class QuizController extends ChangeNotifier {
       // une bonne réponse corrigée par le serveur.
       _feedback.graded(correct: ok);
     }
+    _persistResume();
     notifyListeners();
   }
 
@@ -185,6 +208,7 @@ class QuizController extends ChangeNotifier {
     _selectedId = null;
     _graded = false;
     _shownAt = DateTime.now();
+    _persistResume();
     notifyListeners();
   }
 
@@ -224,6 +248,12 @@ class QuizController extends ChangeNotifier {
           ),
         )
         .toList(growable: false);
+
+    // Put the key on disk BEFORE the request leaves. If the process dies while
+    // the submission is in flight, the server may already have counted this
+    // attempt; the next session has to be able to present the same key rather
+    // than mint a second one.
+    await _writeResume();
 
     late final Result<SubmitQuizResult> submission;
     try {
@@ -274,6 +304,11 @@ class QuizController extends ChangeNotifier {
     // deliberate next attempt gets a fresh one.
     if (!pendingSync) {
       _pendingAttemptId = null;
+      // The server has ruled: this session is over and must not be replayed
+      // into a second attempt. A queued one is deliberately kept — its key is
+      // the only thing that will collapse the replay with whatever the learner
+      // does next.
+      _discardResume();
     }
     final SubmitQuizResult result =
         submission.valueOrNull ?? _pendingResult(clientAttemptId: clientAttemptId);
@@ -295,6 +330,112 @@ class QuizController extends ChangeNotifier {
     _disposed = true;
     _contentPin?.release();
     super.dispose();
+  }
+
+  // --- interrupted-session handling -------------------------------------
+  //
+  // iOS kills a backgrounded app without notice, so an interrupted quiz is
+  // normal, not exceptional. Two things have to outlive it: the learner's
+  // progress, and the attempt key that keeps one intent from being counted
+  // twice. Only the second is a correctness concern — see
+  // [SessionResumeRecord].
+
+  ResumeSurface get _surface => ResumeSurface.quiz;
+
+  String get _sessionId => '$trackId/$lessonId';
+
+  /// Resume is account-scoped, like the active certification. Without a known
+  /// owner there is nothing to scope a record to, so nothing is written and
+  /// nothing is restored.
+  bool get _canResume =>
+      _resumeStore != null && (_resumeOwnerId != null && _resumeOwnerId.isNotEmpty);
+
+  /// Replays an interrupted session, if one was left in exactly this context.
+  ///
+  /// Called once the items are known, because a record can only be trusted
+  /// against the content it was captured on: a republished lesson may reuse
+  /// item ids for different questions.
+  void _restoreInterruptedSession() {
+    final SessionResumeStore? store = _resumeStore;
+    if (!_canResume || store == null || _isDemo || _items.isEmpty) return;
+
+    final SessionResumeRecord? record = store.read(_surface);
+    if (record == null) return;
+    if (!record.matches(
+      surface: _surface,
+      ownerId: _resumeOwnerId!,
+      sessionId: _sessionId,
+      publicManifestId: _publicManifestId,
+    )) {
+      // Another account, another lesson, or content that has been republished
+      // since. Dropping is the safe direction; adapting would be a guess.
+      _discardResume();
+      return;
+    }
+
+    final QuizResumeProgress? progress = QuizResumeProgress.fromJson(record.progress);
+    final List<String> itemIds =
+        _items.map((QuizEntry entry) => entry.item.id).toList(growable: false);
+    if (progress == null || !progress.fits(itemIds)) {
+      _discardResume();
+      return;
+    }
+
+    _index = progress.index;
+    _selectedId = progress.selectedId;
+    _graded = progress.graded;
+    _correctCount = progress.correctCount;
+    _answersByItem
+      ..clear()
+      ..addAll(progress.answers);
+    _latencyByItem
+      ..clear()
+      ..addAll(progress.latencies);
+    // The key the interrupted session had already claimed. Reusing it is what
+    // makes a resumed submission the SAME server attempt rather than a second.
+    _pendingAttemptId = record.clientAttemptId;
+    _startedAt = record.startedAt;
+    _shownAt = DateTime.now();
+  }
+
+  QuizResumeProgress get _progress => QuizResumeProgress(
+        index: _index,
+        selectedId: _selectedId,
+        graded: _graded,
+        correctCount: _correctCount,
+        answers: _answersByItem,
+        latencies: _latencyByItem,
+      );
+
+  /// Persists the session without blocking the interaction that triggered it.
+  void _persistResume() => unawaited(_writeResume());
+
+  Future<void> _writeResume() async {
+    final SessionResumeStore? store = _resumeStore;
+    if (!_canResume || store == null || _isDemo || _items.isEmpty) return;
+    final QuizResumeProgress progress = _progress;
+    if (!progress.isWorthResuming) return;
+
+    await store.write(
+      SessionResumeRecord(
+        surface: _surface,
+        ownerId: _resumeOwnerId!,
+        sessionId: _sessionId,
+        publicManifestId: _publicManifestId,
+        // Minted here when the learner first makes progress rather than at
+        // submit time, so the key exists on disk before anything can claim it
+        // server-side.
+        clientAttemptId: _pendingAttemptId ??= _newAttemptId(),
+        startedAt: _startedAt,
+        progress: progress.toJson(),
+      ),
+    );
+  }
+
+  void _discardResume() {
+    final SessionResumeStore? store = _resumeStore;
+    if (store == null) return;
+    unawaited(store.clear(_surface));
   }
 
   SubmitQuizResult _localDemoResult({required String clientAttemptId, required int total}) {

@@ -7,6 +7,7 @@ import 'package:data/data.dart';
 
 import 'active_track_store.dart';
 import 'content/runtime_content_dependencies.dart';
+import 'session_resume_store.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/application/auth_state.dart';
 import '../features/lesson/application/lesson_feedback.dart';
@@ -186,6 +187,18 @@ final lessonFeedbackProvider = Provider<LessonFeedback>((Ref ref) => const Hapti
 /// Bootstrap replaces the in-memory default with SharedPreferences.
 final activeTrackStoreProvider = Provider<ActiveTrackStore>(
   (Ref ref) => InMemoryActiveTrackStore(),
+);
+
+/// Where an interrupted learning session is kept so it can be resumed after
+/// iOS kills the app.
+///
+/// Defaults to an in-memory store so widget tests need no platform channels;
+/// [bootstrap] overrides it with a SharedPreferences-backed store, which is
+/// what actually survives a process death. The record carries the session's
+/// `clientAttemptId`, so a resumed submission resolves to the same server
+/// attempt instead of being counted as a second one.
+final sessionResumeStoreProvider = Provider<SessionResumeStore>(
+  (Ref ref) => InMemorySessionResumeStore(),
 );
 
 final activeTrackOwnerIdProvider = Provider<String?>((Ref ref) {

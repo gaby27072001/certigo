@@ -17,6 +17,7 @@ import '../app/offline/prefs_catalog_store.dart';
 import '../app/offline/prefs_lesson_cache_store.dart';
 import '../app/offline/prefs_sync_store.dart';
 import '../app/providers.dart';
+import '../app/session_resume_store.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/notifications/notification_lifecycle_scope.dart';
 import '../features/notifications/notification_service.dart';
@@ -103,6 +104,12 @@ Future<void> bootstrap({
     catalogStoreProvider.overrideWithValue(prefsCatalogCacheStore(prefs)),
     lessonStoreProvider.overrideWithValue(prefsLessonCacheStore(prefs)),
     syncStoreProvider.overrideWithValue(prefsSyncQueueStore(prefs)),
+    // An interrupted quiz only survives an iOS process kill if its record — and
+    // above all the attempt key inside it — reaches disk. The in-memory default
+    // keeps widget tests off platform channels but restores nothing.
+    sessionResumeStoreProvider.overrideWithValue(
+      SharedPreferencesSessionResumeStore(prefs),
+    ),
   ];
   if (kRuntimeContentMobileEnabled) {
     final FileRuntimeContentStore? store = await resolveFileRuntimeContentStore();

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/auth/application/auth_controller.dart';
 import '../../features/auth/application/auth_state.dart';
 import '../providers.dart';
+import '../session_resume_store.dart';
 import '../content/runtime_content_providers.dart';
 
 /// Drains the offline action queue whenever the app regains connectivity, is
@@ -91,6 +92,27 @@ class _OfflineSyncScopeState extends ConsumerState<OfflineSyncScope> with Widget
       }
     }
     await Future.wait<void>(operations);
+    await _dropResumeRecordsTheQueueHasSettled();
+  }
+
+  /// Retires a resume record once the queue has delivered the attempt it names.
+  ///
+  /// Without this, a submission that was queued offline and replayed by the
+  /// engine — while the learner never reopened the quiz — would leave its
+  /// record behind, and reopening the lesson later would resume a session the
+  /// server has already graded. No points are at stake: `QuizService` returns
+  /// the stored result for a known key, so the replayed submission is refused
+  /// as the duplicate it is. What is at stake is the learner replaying a run
+  /// for nothing.
+  Future<void> _dropResumeRecordsTheQueueHasSettled() async {
+    if (_disposed) return;
+    final SessionResumeStore store = ref.read(sessionResumeStoreProvider);
+    for (final ResumeSurface surface in resumeSurfacesSettledByQueue(
+      store: store,
+      actions: _engine.actions,
+    )) {
+      await store.clear(surface);
+    }
   }
 
   void _reportError(Object error, StackTrace stackTrace, String operation) {
@@ -122,3 +144,30 @@ class _OfflineSyncScopeState extends ConsumerState<OfflineSyncScope> with Widget
 }
 
 bool canFlushOfflineActions(AuthState auth) => auth is Authenticated;
+
+/// Which surfaces' resume records the offline queue has made obsolete.
+///
+/// A record is retired once the action carrying its `clientAttemptId` is
+/// **done**: the server accepted that attempt, so the session it describes is
+/// finished and replaying it could only produce a duplicate.
+///
+/// A **dead-lettered** action deliberately does not retire anything. It was
+/// never applied server-side, so the learner may still resume and finish — and
+/// reusing the same key is safe precisely because nothing was counted.
+///
+/// Pure and top-level so it is testable without a widget tree, like
+/// [canFlushOfflineActions].
+List<ResumeSurface> resumeSurfacesSettledByQueue({
+  required SessionResumeStore store,
+  required List<SyncAction> actions,
+}) {
+  final Set<String> delivered = <String>{
+    for (final SyncAction action in actions)
+      if (action.isDone) action.idempotencyKey,
+  };
+  if (delivered.isEmpty) return const <ResumeSurface>[];
+  return <ResumeSurface>[
+    for (final ResumeSurface surface in ResumeSurface.values)
+      if (delivered.contains(store.read(surface)?.clientAttemptId)) surface,
+  ];
+}
