@@ -39,6 +39,12 @@ abstract interface class LessonFeedback {
 class HapticLessonFeedback implements LessonFeedback {
   const HapticLessonFeedback({this._sound = const NullSoundPlayer()});
 
+  /// Écart entre les deux frappes de la fin de leçon.
+  ///
+  /// Court assez pour être perçu comme **un seul** événement, long assez pour
+  /// que les deux frappes ne se confondent pas.
+  static const Duration successBeatGap = Duration(milliseconds: 90);
+
   final SoundPlayer _sound;
 
   @override
@@ -54,7 +60,20 @@ class HapticLessonFeedback implements LessonFeedback {
 
   @override
   void completed() {
+    // Mesuré au canal de plateforme : cette fin de leçon émettait un seul
+    // `lightImpact` — soit **moins** qu'une mauvaise réponse (`heavyImpact`).
+    // Le moment le plus gratifiant de l'application était le plus faible que
+    // le téléphone produise.
+    //
+    // Flutter n'expose pas `UINotificationFeedbackGenerator.success`, dont le
+    // motif iOS est une **double frappe ascendante**. On le reconstitue avec
+    // les deux seules briques disponibles : léger, puis moyen.
+    //
+    // Deux frappes, une fois par leçon : c'est ce qui distingue une
+    // célébration d'un choc, sans tomber dans le retour haptique permanent
+    // qui finit par fatiguer.
     _safe(HapticFeedback.lightImpact);
+    Future<void>.delayed(successBeatGap, () => _safe(HapticFeedback.mediumImpact));
     _sound.play(LessonSound.complete);
   }
 
