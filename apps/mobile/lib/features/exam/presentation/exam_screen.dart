@@ -91,6 +91,16 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
   /// operation instead of doubling the attempt (which would then twice
   /// feed the readiness score). Released once the server has ruled
   /// (success or permanent refusal).
+  ///
+  /// Deliberately **not** persisted across a process death, unlike the quiz
+  /// and lesson equivalents. Those submit through `QuizService`, which dedupes
+  /// on this key alone, so it has to outlive the app. `ExamService.SubmitAsync`
+  /// additionally dedupes on the **`examId`** — `GetByExamIdAsync` returns the
+  /// stored result for an already-submitted exam — and an `examId` is issued by
+  /// the server, so no device-side value has to survive for the guarantee to
+  /// hold. `ExamServiceTests.SubmitAsync_is_single_use_even_with_a_new_client_attempt_id`
+  /// is the standing guard. Persisting this key would add a moving part that
+  /// protects nothing.
   String? _pendingAttemptId;
 
   @override

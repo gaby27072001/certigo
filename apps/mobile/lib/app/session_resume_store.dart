@@ -2,14 +2,31 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// The three learning surfaces that mint a server attempt key.
+/// The learning surfaces whose session is worth outliving a process death.
 ///
 /// Each keeps its own record, so opening a quiz does not discard a lesson left
 /// in progress.
+///
+/// **The mock exam is deliberately absent, and that is a measurement, not an
+/// omission.** The other two submit through `QuizService`, which dedupes on
+/// `clientAttemptId` and nothing else — a lesson is repeatable by design, so
+/// there is no content-scoped layer to fall back on and the client-held key is
+/// the only protection. `ExamService.SubmitAsync` instead dedupes on the
+/// **`examId`** twice over (`EconomyOperationRecord.IdFor("exam", ExamId)` and
+/// `GetByExamIdAsync`), and an `examId` is server-issued: the client cannot
+/// mint one, so the protection does not depend on anything surviving on the
+/// device. `ExamServiceTests.SubmitAsync_is_single_use_even_with_a_new_client_attempt_id`
+/// is the standing guard for exactly that property.
+///
+/// Resuming an exam is also not *expressible* today: `ExamRepository` exposes
+/// only `generateExam` and `submitExam`, `examProvider` is `autoDispose` and
+/// always generates, and an issued exam expires server-side
+/// (`ExamService.cs:203`). A record for it could be written but never
+/// restored — a decoration. Adding a surface here for it would invite exactly
+/// that.
 enum ResumeSurface {
   quiz('quiz'),
-  lesson('lesson'),
-  exam('exam');
+  lesson('lesson');
 
   const ResumeSurface(this.id);
 

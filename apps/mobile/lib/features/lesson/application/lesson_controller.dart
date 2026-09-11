@@ -9,10 +9,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/content/runtime_content_providers.dart';
+import '../../../app/session_resume_store.dart';
 import 'answer_grading.dart';
 import 'check_outcome.dart';
 import 'lesson_args.dart';
 import 'lesson_feedback.dart';
+import 'lesson_resume.dart';
 import 'lesson_session_state.dart';
 import 'lesson_step.dart';
 import 'sample_lesson.dart';
@@ -31,11 +33,19 @@ class LessonController extends StateNotifier<LessonSessionState> {
     this._feedback = const HapticLessonFeedback(),
     RuntimeContentPinRegistry? contentPins,
     String? contentOwnerId,
+    SessionResumeStore? resumeStore,
+    String? resumeOwnerId,
   })  : // Keep the optional dependency source-compatible with direct controller tests.
         // ignore: prefer_initializing_formals
         _contentPins = contentPins,
         // ignore: prefer_initializing_formals
         _contentOwnerId = contentOwnerId,
+        // Same reason: the store and its owner stay ordinary named parameters
+        // so a controller test can inject them directly.
+        // ignore: prefer_initializing_formals
+        _resumeStore = resumeStore,
+        // ignore: prefer_initializing_formals
+        _resumeOwnerId = resumeOwnerId,
         super(const LessonSessionState()) {
     unawaited(load());
   }
@@ -45,11 +55,26 @@ class LessonController extends StateNotifier<LessonSessionState> {
   final LessonFeedback _feedback;
   final RuntimeContentPinRegistry? _contentPins;
   final String? _contentOwnerId;
+
+  /// Where an interrupted session is kept so it can be resumed after the app
+  /// is killed. Absent in compositions that have not opted in, in which case
+  /// the controller behaves exactly as before.
+  final SessionResumeStore? _resumeStore;
+  final String? _resumeOwnerId;
   final LessonArgs args;
 
   LessonGrader _grader = const EmbeddedKeyGrader(<String, CheckOutcome>{});
-  final String _clientAttemptId = _generateAttemptId();
-  final DateTime _startedAt = DateTime.now().toUtc();
+
+  /// Server dedupe key for this session.
+  ///
+  /// Not `final`: a resumed session adopts the key its interrupted predecessor
+  /// had already claimed, so the submission resolves to the SAME server-side
+  /// attempt. `QuizService.cs:56` returns the first stored result for a known
+  /// key, and `SyncEngine` collapses queue replays by that key alone — so a
+  /// freshly minted key here would be counted as a second attempt, scored and
+  /// rewarded again.
+  String _clientAttemptId = _generateAttemptId();
+  DateTime _startedAt = DateTime.now().toUtc();
   DateTime _stepShownAt = DateTime.now();
   bool _disposed = false;
   RuntimeContentPin? _contentPin;
@@ -116,6 +141,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
       submissionFailed: false,
     );
     _stepShownAt = DateTime.now();
+    _restoreInterruptedSession();
   }
 
   void startDemo() {
@@ -135,6 +161,9 @@ class LessonController extends StateNotifier<LessonSessionState> {
       submissionFailed: false,
     );
     _stepShownAt = DateTime.now();
+    // Demo runs are never submitted and never rewarded, so there is nothing
+    // for the server to reconcile and nothing worth outliving the process.
+    _discardResume();
   }
 
   /// Toggle an option for the current check.
@@ -175,6 +204,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
           ..add(optionId);
     }
     state = state.copyWith(selection: next);
+    _persistResume();
   }
 
   /// Toggle a `matchPairs` connection between a left [leftId] and right
@@ -195,6 +225,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
         ..add(token);
     }
     state = state.copyWith(selection: next);
+    _persistResume();
   }
 
   /// Grade the current check and reveal feedback in place.
@@ -218,6 +249,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
       latencies: <String, int>{...state.latencies, item.id: latencyMs},
       outcomes: <String, CheckOutcome>{...state.outcomes, item.id: outcome},
     );
+    _persistResume();
   }
 
   /// Advance to the next step. When the next step is the result, submit first.
@@ -230,6 +262,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
     if (next >= state.steps.length) return;
     state = state.copyWith(status: LessonStatus.ready, index: next, selection: const <String>[]);
     _stepShownAt = DateTime.now();
+    _persistResume();
   }
 
   Future<void> _finishAndSubmit() async {
@@ -261,6 +294,12 @@ class LessonController extends StateNotifier<LessonSessionState> {
       );
       return;
     }
+
+    // Put the key on disk BEFORE the request leaves. If the process dies while
+    // the submission is in flight, the server may already have counted this
+    // attempt; the next session has to present the same key rather than mint a
+    // second one.
+    await _writeResume();
 
     late final Result<SubmitQuizResult> res;
     try {
@@ -302,6 +341,13 @@ class LessonController extends StateNotifier<LessonSessionState> {
     final bool pendingSync = failure != null && classifyFailure(failure) == SyncDispatch.retryable;
     final bool submissionFailed = failure != null && !pendingSync;
     final SubmitQuizResult result = res.valueOrNull ?? _pendingResult();
+    if (!pendingSync) {
+      // The server has ruled: this session is over and must not be replayed
+      // into a second attempt. A queued one is deliberately kept — its key is
+      // the only thing that will collapse the replay with whatever the learner
+      // does next.
+      _discardResume();
+    }
     _feedback.completed();
     state = state.copyWith(
       status: LessonStatus.finished,
@@ -395,6 +441,122 @@ class LessonController extends StateNotifier<LessonSessionState> {
     return '${micros.toRadixString(16)}-${rand.toRadixString(16)}';
   }
 
+  // --- interrupted-session handling -------------------------------------
+  //
+  // Same shape as the quiz, and deliberately the same store: iOS kills a
+  // backgrounded app without notice, and the attempt key has to outlive that
+  // or one learner intent becomes two counted attempts. See
+  // [SessionResumeRecord].
+
+  ResumeSurface get _surface => ResumeSurface.lesson;
+
+  String get _sessionId => '${args.trackId}/${args.lessonId}';
+
+  bool get _canResume =>
+      _resumeStore != null && (_resumeOwnerId != null && _resumeOwnerId.isNotEmpty);
+
+  List<String> get _checkItemIds => <String>[
+        for (final LessonStep step in state.steps)
+          if (step.isCheck && step.item != null) step.item!.id,
+      ];
+
+  /// Replays an interrupted session, if one was left in exactly this context.
+  ///
+  /// Called once the steps are known, because a record can only be trusted
+  /// against the content it was captured on: a republished lesson may reuse
+  /// item ids for different questions.
+  void _restoreInterruptedSession() {
+    final SessionResumeStore? store = _resumeStore;
+    if (!_canResume || store == null || state.isDemo || state.steps.isEmpty) return;
+
+    final SessionResumeRecord? record = store.read(_surface);
+    if (record == null) return;
+    if (!record.matches(
+      surface: _surface,
+      ownerId: _resumeOwnerId!,
+      sessionId: _sessionId,
+      publicManifestId: state.lesson?.publicManifestId,
+    )) {
+      // Another account, another lesson, or content republished since.
+      // Dropping is the safe direction; adapting would be a guess.
+      _discardResume();
+      return;
+    }
+
+    final LessonResumeProgress? progress = LessonResumeProgress.fromJson(record.progress);
+    if (progress == null || !progress.fits(itemIds: _checkItemIds, stepCount: state.steps.length)) {
+      _discardResume();
+      return;
+    }
+
+    // Outcomes are derived, not stored: replaying the restored answers through
+    // the session's own grader reproduces exactly what the interrupted session
+    // held, and cannot contradict the answer it came from.
+    final Map<String, CheckOutcome> outcomes = <String, CheckOutcome>{};
+    for (final LessonStep step in state.steps) {
+      final QuizItem? item = step.item;
+      if (!step.isCheck || item == null) continue;
+      final List<String>? selected = progress.answers[item.id];
+      if (selected == null) continue;
+      outcomes[item.id] = _grader.grade(
+        itemId: item.id,
+        selected: selected,
+        type: item.type,
+      );
+    }
+
+    state = state.copyWith(
+      // A restored step whose check is already answered is a graded step; the
+      // dock reads this to show feedback instead of an unanswered prompt.
+      status: outcomes.containsKey(state.steps[progress.index].item?.id)
+          ? LessonStatus.graded
+          : LessonStatus.ready,
+      index: progress.index,
+      selection: progress.selection,
+      answers: progress.answers,
+      latencies: progress.latencies,
+      outcomes: outcomes,
+    );
+    // The key the interrupted session had already claimed. Reusing it is what
+    // makes a resumed submission the SAME server attempt rather than a second.
+    _clientAttemptId = record.clientAttemptId;
+    _startedAt = record.startedAt;
+    _stepShownAt = DateTime.now();
+  }
+
+  /// Persists the session without blocking the interaction that triggered it.
+  void _persistResume() => unawaited(_writeResume());
+
+  Future<void> _writeResume() async {
+    final SessionResumeStore? store = _resumeStore;
+    if (!_canResume || store == null || state.isDemo || state.steps.isEmpty) return;
+    final LessonResumeProgress progress = LessonResumeProgress(
+      index: state.index,
+      selection: state.selection,
+      answers: state.answers,
+      latencies: state.latencies,
+    );
+    if (!progress.isWorthResuming) return;
+
+    await store.write(
+      SessionResumeRecord(
+        surface: _surface,
+        ownerId: _resumeOwnerId!,
+        sessionId: _sessionId,
+        publicManifestId: state.lesson?.publicManifestId,
+        clientAttemptId: _clientAttemptId,
+        startedAt: _startedAt,
+        progress: progress.toJson(),
+      ),
+    );
+  }
+
+  void _discardResume() {
+    final SessionResumeStore? store = _resumeStore;
+    if (store == null) return;
+    unawaited(store.clear(_surface));
+  }
+
   @override
   void dispose() {
     _disposed = true;
@@ -414,5 +576,7 @@ final lessonControllerProvider = StateNotifierProvider.autoDispose
     feedback: ref.watch(lessonFeedbackProvider),
     contentPins: ref.watch(runtimeContentPinRegistryProvider),
     contentOwnerId: ref.watch(activeTrackOwnerIdProvider),
+    resumeStore: ref.watch(sessionResumeStoreProvider),
+    resumeOwnerId: ref.watch(activeTrackOwnerIdProvider),
   );
 });
