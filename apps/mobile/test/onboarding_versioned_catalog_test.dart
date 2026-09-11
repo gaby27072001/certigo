@@ -117,7 +117,7 @@ void main() {
   testWidgets('a versioned catalog still offers every certification', (WidgetTester tester) async {
     await pumpCertification(tester);
 
-    expect(find.text('Aucun parcours disponible'), findsNothing);
+    expect(find.text(CertificationLabels.emptyTitle), findsNothing);
     for (final TargetCertification certification in availableTargetCertifications) {
       await tester.scrollUntilVisible(
         find.text(certification.code),
