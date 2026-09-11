@@ -18,6 +18,7 @@ class PrismStatusView extends StatelessWidget {
     this.message,
     this.actionLabel,
     this.onAction,
+    this.actionIcon,
     this.tone,
   });
 
@@ -28,6 +29,7 @@ class PrismStatusView extends StatelessWidget {
         message = message ?? 'Vérifie ta connexion puis réessaie.',
         actionLabel = onRetry == null ? null : 'Réessayer',
         onAction = onRetry,
+        actionIcon = Icons.refresh_rounded,
         tone = null;
 
   const PrismStatusView.empty({
@@ -36,6 +38,7 @@ class PrismStatusView extends StatelessWidget {
     this.message,
     this.actionLabel,
     this.onAction,
+    this.actionIcon,
     this.icon = Icons.inbox_rounded,
     this.tone,
   });
@@ -45,6 +48,14 @@ class PrismStatusView extends StatelessWidget {
   final String? message;
   final String? actionLabel;
   final VoidCallback? onAction;
+
+  /// Glyph on the action button, or null for a label-only button.
+  ///
+  /// This used to be hardcoded to [Icons.refresh_rounded] for every caller,
+  /// which meant an action like "Voir la bibliothèque" was shown next to a
+  /// refresh glyph — a control that did not name its own action. Only
+  /// [PrismStatusView.error] genuinely retries, so only it defaults to refresh.
+  final IconData? actionIcon;
   final Color? tone;
 
   @override
@@ -88,7 +99,7 @@ class PrismStatusView extends StatelessWidget {
                   PrismButton.secondary(
                     label: actionLabel!,
                     onPressed: onAction,
-                    icon: Icons.refresh_rounded,
+                    icon: actionIcon,
                     expand: false,
                   ),
                 ],

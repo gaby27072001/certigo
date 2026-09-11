@@ -172,6 +172,9 @@ class _PortalError extends StatelessWidget {
               'The local portal could not be loaded.',
             ),
       actionLabel: hidden ? null : strings.retry,
+      // This action really does retry, so it keeps the refresh glyph that
+      // PrismStatusView no longer forces on every caller.
+      actionIcon: Icons.refresh_rounded,
       onAction: hidden ? null : onRetry,
     );
   }

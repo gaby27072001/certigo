@@ -466,6 +466,7 @@ class ActivePathScreen extends ConsumerWidget {
                 title: 'Aucune certification sélectionnée',
                 message: 'Choisis un parcours publié avant d\'ouvrir le programme.',
                 actionLabel: 'Voir la bibliothèque',
+                actionIcon: Icons.local_library_rounded,
                 onAction: () => context.go(Routes.library),
               ),
             )
