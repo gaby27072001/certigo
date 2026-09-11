@@ -96,13 +96,24 @@ indépendante du langage. Le squelette **transcrit** ces valeurs en Swift plutô
 générer, parce qu'une chaîne de génération est un mode de panne de plus au premier lancement.
 
 La transcription a été **vérifiée mécaniquement** contre cette source le 2026-09-11 :
-**152 valeurs comparées** — 32 jetons de palette, 30 valeurs de spectre (6 bandes × 5 rôles),
-75 valeurs typographiques (15 créneaux × 5 dimensions) et 15 espacements et rayons — **zéro
+**154 valeurs comparées** — 32 jetons de palette, 30 valeurs de spectre (6 bandes × 5 rôles),
+75 valeurs typographiques (15 créneaux × 5 dimensions) et 17 espacements et rayons — **zéro
 écart**.
 
-**Ce n'est pas une garde permanente : c'est un contrôle ponctuel.** Rien n'empêche aujourd'hui
-les deux de diverger. La génération depuis le JSON, avec un contrôle de CI vérifiant que la
-régénération est identique à l'octet, reste à faire et appartient à la phase suivante.
+**Ce n'est pas une garde permanente : c'est un contrôle ponctuel.** Et la nuance compte, parce
+qu'une garde de dérive existe désormais sans couvrir ce cas :
+
+> `#478` a posé `apps/mobile/test/prism_tokens_contract_test.dart`, et cette garde **mord
+> réellement** — elle vit dans `apps/mobile/test/`, exécuté par `flutter test --coverage`
+> (`ci-mobile.yml:231`), et non dans `packages/prism_ui/test/`, dont la CI n'exécute **qu'un
+> fichier sur 39** (`ci-mobile.yml:331`, mesuré le 2026-09-11).
+>
+> **Mais elle compare Dart ↔ JSON. Elle ne voit pas une ligne de Swift.** La transcription
+> d'`apps/ios/` reste donc **non gardée** : rien ne rougira si elle dérive.
+
+La génération depuis le JSON, avec un contrôle de CI vérifiant que la régénération est identique
+à l'octet, reste à faire et appartient à la phase suivante — **et elle exigera d'abord un job de
+CI capable d'exécuter du Swift**, qui n'existe pas.
 
 ## Ce que cette architecture écarte, délibérément
 

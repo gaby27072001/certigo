@@ -298,9 +298,12 @@ corrigées, pas l'inverse.
 
 ---
 
-## ⚠️ Des checks rouges sur GitHub ne veulent pas dire que ton squelette est cassé
+## ⚠️ La CI en dit moins que tu ne crois — dans les deux sens
 
-**Ne te laisse pas décourager par la page de la pull request.**
+**Ne te laisse pas décourager par la page de la pull request. Et ne lui fais pas
+non plus dire ce qu'elle ne dit pas.**
+
+### Un rouge ne veut pas dire que ton squelette est cassé
 
 **Aucun contrôle de CI de ce dépôt ne compile du Swift** — il n'existe aucune
 machine macOS dans la CI. Les contrôles qui tournent sur cette PR vérifient le
@@ -318,9 +321,34 @@ Deux causes connues de rouge **sans aucun rapport** avec ton travail :
   par presque toutes les PR, donc un conflit y apparaît dès qu'une autre est
   fusionnée.
 
+### Un vert ne veut pas dire que tout est vérifié
+
+C'est le sens inverse, et il est tout aussi important à connaître.
+
+**Mesuré le 2026-09-11 dans `.github/workflows/ci-mobile.yml` :** le paquet
+`packages/prism_ui` — le système de design dont ton squelette transcrit les
+valeurs — contient **39 fichiers de tests, et la CI n'en exécute qu'un seul**
+(`test/rendering/renderer_golden_test.dart`, ligne 331). L'autre commande de
+test, `flutter test --coverage` ligne 231, tourne dans `apps/mobile` et **ne
+couvre pas ce paquet**.
+
+**38 fichiers de tests sur 39 sont donc écrits, verts en local, et incapables
+de bloquer quoi que ce soit.** Une tentative de les activer a été étudiée puis
+**annulée** : elle cassait le validateur de workflows.
+
+> **Ce que ça change pour toi, concrètement :** un vert sur la page GitHub ne
+> te dit **rien** sur le système de design, et **rien** sur le Swift. Les deux
+> sont hors de portée de la CI actuelle.
+
 **Le seul verdict qui compte pour ton squelette, c'est ton Terminal.** Si
 `./Scripts/demarrer.sh` va jusqu'au bout et que l'application s'affiche, le
 squelette marche — quelle que soit la couleur de la page GitHub.
+
+Et c'est précisément pour cette raison que `Scripts/verifier-tests.sh` **compte
+les tests exécutés** au lieu de se fier au code de retour, et que
+`Scripts/prouver-le-rouge.sh` existe : dans un dépôt où des centaines de tests
+peuvent être verts sans jamais tourner, **un lot qui ne mord pas est le défaut
+par défaut.**
 
 ---
 
