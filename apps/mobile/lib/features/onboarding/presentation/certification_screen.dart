@@ -24,13 +24,13 @@ class _CertificationScreenState extends ConsumerState<CertificationScreen> {
   bool _saving = false;
   String? _error;
 
-  Future<void> _continue(TargetCertification target) async {
+  Future<void> _continue(TargetCertification target, String catalogTrackId) async {
     setState(() {
       _saving = true;
       _error = null;
     });
     final ActiveTrackSaveResult result =
-        await ref.read(activeTrackProvider.notifier).select(target.trackId);
+        await ref.read(activeTrackProvider.notifier).select(catalogTrackId);
     if (!mounted) return;
     if (!result.accepted) {
       setState(() {
@@ -65,12 +65,12 @@ class _CertificationScreenState extends ConsumerState<CertificationScreen> {
 
     TrackSummary? trackFor(TargetCertification cert) {
       for (final TrackSummary track in published) {
-        if (track.id == cert.trackId) return track;
+        if (cert.matchesTrack(track)) return track;
       }
       return null;
     }
 
-    final bool selectedTrackIsPublished = target != null && trackFor(target) != null;
+    final TrackSummary? selectedTrack = target == null ? null : trackFor(target);
 
     return OnboardingScaffold(
       progress: 1,
@@ -81,7 +81,9 @@ class _CertificationScreenState extends ConsumerState<CertificationScreen> {
           : () => context.canPop() ? context.pop() : context.go(OnboardingRoutes.welcome),
       primaryLabel: 'Commencer ce parcours',
       primaryLoading: _saving,
-      onPrimary: selectedTrackIsPublished && !_saving ? () => _continue(target) : null,
+      onPrimary: target != null && selectedTrack != null && !_saving
+          ? () => _continue(target, selectedTrack.id)
+          : null,
       child: catalog.when(
         data: (_) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,7 +111,7 @@ class _CertificationScreenState extends ConsumerState<CertificationScreen> {
               ],
             if (published.every(
               (TrackSummary track) => !availableTargetCertifications.any(
-                (TargetCertification cert) => cert.trackId == track.id,
+                (TargetCertification cert) => cert.matchesTrack(track),
               ),
             ))
               const PrismStatusView(

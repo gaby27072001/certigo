@@ -57,8 +57,15 @@ public sealed class CosmosAttemptRepository(CosmosContext context) : IAttemptRep
     {
         // Single mono-partition aggregate (PK = /userId). SUM over an empty set is
         // undefined in Cosmos, hence the nullable projection coalesced to 0.
+        //
+        // Contrainte Cosmos : les agrégats se projettent à plat, un par élément de
+        // la liste SELECT. Les composer dans un littéral d'objet
+        // (`SELECT VALUE { "a": COUNT(1), ... }`) est rejeté à l'exécution par
+        // « Compositions of aggregates and other expressions are not allowed »,
+        // ce qui remontait en HTTP 500 sur toute soumission de quiz et toute
+        // génération d'examen — ce chemin est le garde-fou de cadence des deux.
         var query = new QueryDefinition(
-                "SELECT VALUE { \"attempts\": COUNT(1), \"xp\": SUM(c.result.rewards.xpEarned) } " +
+                "SELECT COUNT(1) AS attempts, SUM(c.result.rewards.xpEarned) AS xp " +
                 "FROM c WHERE c.userId = @userId AND c.submittedAt >= @since")
             .WithParameter("@userId", userId)
             .WithParameter("@since", since);

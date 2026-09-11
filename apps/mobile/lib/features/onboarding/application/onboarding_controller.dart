@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:data/data.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,6 +38,9 @@ const List<TargetCertification> availableTargetCertifications = <TargetCertifica
 ];
 
 extension TargetCertificationInfo on TargetCertification {
+  /// Identifiant historique (mode `legacy`) — aussi le slug du catalogue
+  /// versionné. Ne jamais l'envoyer tel quel à l'API : résoudre l'entrée réelle
+  /// du catalogue via [matchesTrack] et envoyer son `id`.
   String get trackId => switch (this) {
         TargetCertification.az900 => 'az-900',
         TargetCertification.ai900 => 'ai-900',
@@ -67,6 +71,25 @@ extension TargetCertificationInfo on TargetCertification {
       };
 
   bool get isAvailableForNewLearners => this != TargetCertification.ai900;
+
+  /// Whether [track] is this certification, whichever id namespace the backend
+  /// serves.
+  ///
+  /// Invariant de contenu : l'id de catalogue dépend de `CONTENT_REPOSITORY_MODE`.
+  /// En `legacy` le backend sert l'id nu (`az-900`) ; en `versioned` il sert un id
+  /// namespacé (`microsoft.az-900.track.main`). Comparer [trackId] à `track.id`
+  /// ne marche donc qu'en `legacy` et rend l'onboarding infranchissable partout
+  /// ailleurs. Le code d'examen et le slug sont stables dans les deux modes :
+  /// c'est sur eux qu'on résout, l'id nu ne servant plus que de repli.
+  bool matchesTrack(TrackSummary track) {
+    final String expected = trackId.toLowerCase();
+    if (track.id.toLowerCase() == expected) return true;
+    if ((track.slug ?? '').toLowerCase() == expected) return true;
+    final String examCode = code.toLowerCase();
+    if (track.code.toLowerCase() == examCode) return true;
+    if ((track.officialCode ?? '').toLowerCase() == examCode) return true;
+    return false;
+  }
 
   /// Index into `PrismColors.domainAccents` used for the leading accent chip.
   int get domainIndex => switch (this) {
