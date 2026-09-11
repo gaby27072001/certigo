@@ -8,8 +8,8 @@ import 'package:prism_ui/prism_ui.dart';
 /// Volontairement fin : il s'appuie sur le thème Prism pour les couleurs et
 /// n'ajoute qu'un habillage cohérent réutilisé par les écrans nom/e-mail/mot de
 /// passe.
-class RegisterTextField extends StatelessWidget {
-  const RegisterTextField({
+class AppTextField extends StatelessWidget {
+  const AppTextField({
     super.key,
     required this.controller,
     required this.hint,

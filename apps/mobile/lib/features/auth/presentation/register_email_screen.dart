@@ -6,7 +6,7 @@ import 'package:prism_ui/prism_ui.dart';
 import '../../onboarding/presentation/onboarding_common.dart';
 import '../application/auth_validators.dart';
 import '../application/register_draft.dart';
-import 'widgets/register_text_field.dart';
+import '../../../shared/widgets/app_text_field.dart';
 
 /// Deuxième écran du flux d'inscription progressif : « Ton adresse e-mail,
 /// {prénom} ? ». Valide l'e-mail (même règle que `SignInScreen`) et propose,
@@ -71,7 +71,7 @@ class _RegisterEmailScreenState extends ConsumerState<RegisterEmailScreen> {
           const SizedBox(height: 8),
           MascotPrompt(message: greeting),
           const SizedBox(height: 24),
-          RegisterTextField(
+          AppTextField(
             fieldKey: const Key('register-email'),
             controller: _email,
             hint: 'exemple@domaine.com',

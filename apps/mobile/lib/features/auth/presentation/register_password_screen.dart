@@ -8,7 +8,7 @@ import '../application/auth_controller.dart';
 import '../application/auth_state.dart';
 import '../application/auth_validators.dart';
 import '../application/register_draft.dart';
-import 'widgets/register_text_field.dart';
+import '../../../shared/widgets/app_text_field.dart';
 
 /// Troisième écran du flux d'inscription progressif : « Crée un mot de passe »
 /// (bascule œil unique appliquée aux deux champs, minimum 8 caractères,
@@ -137,7 +137,7 @@ class _RegisterPasswordScreenState extends ConsumerState<RegisterPasswordScreen>
           const SizedBox(height: 8),
           const MascotPrompt(message: 'Crée un mot de passe'),
           const SizedBox(height: 24),
-          RegisterTextField(
+          AppTextField(
             fieldKey: const Key('register-password'),
             controller: _password,
             hint: 'Mot de passe',
@@ -159,7 +159,7 @@ class _RegisterPasswordScreenState extends ConsumerState<RegisterPasswordScreen>
             ),
           ),
           const SizedBox(height: 16),
-          RegisterTextField(
+          AppTextField(
             fieldKey: const Key('register-password-confirm'),
             controller: _confirm,
             hint: 'Confirme le mot de passe',

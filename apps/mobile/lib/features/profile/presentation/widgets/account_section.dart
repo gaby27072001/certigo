@@ -7,6 +7,7 @@ import 'package:prism_ui/prism_ui.dart';
 
 import '../../../../app/router.dart';
 import '../../application/settings_preferences.dart';
+import 'profile_sheets.dart';
 import 'tappable_row.dart';
 
 class AccountSection extends ConsumerStatefulWidget {
@@ -21,24 +22,11 @@ class AccountSection extends ConsumerStatefulWidget {
 class _AccountSectionState extends ConsumerState<AccountSection> {
   Future<void> _editDisplayName() async {
     final String current = ref.read(displayNameOverrideProvider) ?? widget.me.displayName;
-    final TextEditingController ctrl = TextEditingController(text: current);
-    final String? result = await showDialog<String>(
+    final String? result = await showProfileTextSheet(
       context: context,
-      builder: (BuildContext ctx) => AlertDialog(
-        title: const Text('Modifier le nom d\'affichage'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Nom d\'affichage'),
-        ),
-        actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(ctrl.text),
-            child: const Text('Enregistrer'),
-          ),
-        ],
-      ),
+      title: 'Modifier le nom d\'affichage',
+      hint: 'Nom d\'affichage',
+      initial: current,
     );
     if (result != null && mounted) {
       await ref.read(displayNameOverrideProvider.notifier).set(result);
@@ -47,47 +35,13 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
 
   Future<void> _editHandle() async {
     final String current = ref.read(handleOverrideProvider) ?? widget.me.handle;
-    final TextEditingController ctrl = TextEditingController(text: current);
-    String? validationError;
-    final String? result = await showDialog<String>(
+    final String? result = await showProfileTextSheet(
       context: context,
-      builder: (BuildContext ctx) => StatefulBuilder(
-        builder: (BuildContext ctx2, StateSetter setDialogState) => AlertDialog(
-          title: const Text('Modifier le pseudo'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              TextField(
-                controller: ctrl,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Pseudo', prefixText: '@'),
-                onChanged: (String v) {
-                  final bool valid = RegExp(r'^[a-z0-9_]*$').hasMatch(v);
-                  setDialogState(() {
-                    validationError = valid ? null : 'Minuscules, chiffres et _ uniquement';
-                  });
-                },
-              ),
-              if (validationError != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: PrismSpacing.debt6),
-                  child: Text(
-                    validationError!,
-                    style: TextStyle(color: Theme.of(ctx2).colorScheme.error, fontSize: 12),
-                  ),
-                ),
-            ],
-          ),
-          actions: <Widget>[
-            TextButton(onPressed: () => Navigator.of(ctx2).pop(), child: const Text('Annuler')),
-            TextButton(
-              onPressed: validationError == null ? () => Navigator.of(ctx2).pop(ctrl.text) : null,
-              child: const Text('Enregistrer'),
-            ),
-          ],
-        ),
-      ),
+      title: 'Modifier le pseudo',
+      hint: 'Pseudo',
+      initial: current,
+      validate: (String v) =>
+          RegExp(r'^[a-z0-9_]*$').hasMatch(v) ? null : ProfileSheetLabels.handleRule,
     );
     if (result != null && mounted) {
       await ref.read(handleOverrideProvider.notifier).set(result);

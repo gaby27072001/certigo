@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../notifications/notification_service.dart';
+import 'profile_sheets.dart';
 
 class ThemeRow extends StatelessWidget {
   const ThemeRow({super.key, required this.mode, required this.onChanged});
@@ -165,7 +166,10 @@ class SwitchPrefRow extends ConsumerWidget {
         Icon(icon, color: p.textSecondary, size: 20),
         const SizedBox(width: 12),
         Expanded(child: Text(label, style: t.bodyLarge)),
-        Switch(value: value, onChanged: (bool v) => onChanged(v, ref)),
+        // `adaptive` renders the platform's own switch — a Cupertino switch on
+        // iOS, where the owner tests. A Material switch there is one of the
+        // clearest "this is not a native app" tells.
+        Switch.adaptive(value: value, onChanged: (bool v) => onChanged(v, ref)),
       ],
     );
   }
@@ -175,36 +179,28 @@ class LanguagePrefRow extends StatelessWidget {
   const LanguagePrefRow({super.key});
 
   Future<void> _showPicker(BuildContext context) async {
-    await showDialog<void>(
+    // Only French ships today, so this is a statement of availability rather
+    // than a choice. It still uses the Prism sheet so it matches every other
+    // picker in the Profile instead of a stock Material dialog.
+    await showProfileChoiceSheet<String>(
       context: context,
-      builder: (BuildContext ctx) => AlertDialog(
-        title: const Text('Langue'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ListTile(
-              leading: const Text('✅'),
-              title: const Text('Français'),
-              onTap: () => Navigator.of(ctx).pop(),
-            ),
-            ListTile(
-              leading: const Text('🔒'),
-              title: const Text('English'),
-              trailing: _ComingSoonChip(),
-              enabled: false,
-            ),
-            ListTile(
-              leading: const Text('🔒'),
-              title: const Text('Español'),
-              trailing: _ComingSoonChip(),
-              enabled: false,
-            ),
-          ],
+      title: 'Langue',
+      selected: 'fr',
+      options: const <ProfileOption<String>>[
+        ProfileOption<String>(value: 'fr', label: 'Français', leading: Text('🇫🇷')),
+        ProfileOption<String>(
+          value: 'en',
+          label: 'English',
+          leading: Text('🔒'),
+          trailing: 'Bientôt',
         ),
-        actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Fermer')),
-        ],
-      ),
+        ProfileOption<String>(
+          value: 'es',
+          label: 'Español',
+          leading: Text('🔒'),
+          trailing: 'Bientôt',
+        ),
+      ],
     );
   }
 
@@ -224,27 +220,6 @@ class LanguagePrefRow extends StatelessWidget {
           const SizedBox(width: 4),
           Icon(Icons.chevron_right_rounded, color: p.textSecondary, size: 18),
         ],
-      ),
-    );
-  }
-}
-
-class _ComingSoonChip extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final PrismColorScheme p = context.prism;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: PrismSpacing.xs,
-        vertical: PrismSpacing.debt3,
-      ),
-      decoration: BoxDecoration(
-        color: p.surfaceAlt,
-        borderRadius: BorderRadius.circular(PrismRadii.md),
-      ),
-      child: Text(
-        'Bientôt',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textSecondary),
       ),
     );
   }

@@ -8,7 +8,7 @@ import '../application/auth_controller.dart';
 import '../application/auth_state.dart';
 import '../application/register_draft.dart';
 import 'widgets/auth_provider_button.dart';
-import 'widgets/register_text_field.dart';
+import '../../../shared/widgets/app_text_field.dart';
 
 /// Premier écran du **flux d'inscription progressif** (façon Duo) : « Comment tu
 /// t'appelles ? ». Collecte prénom (requis) et nom (facultatif), puis propose,
@@ -102,7 +102,7 @@ class _RegisterNameScreenState extends ConsumerState<RegisterNameScreen> {
           const SizedBox(height: 8),
           const MascotPrompt(message: 'Comment tu t\'appelles ?'),
           const SizedBox(height: 24),
-          RegisterTextField(
+          AppTextField(
             fieldKey: const Key('register-first-name'),
             controller: _firstName,
             hint: 'Prénom',
@@ -113,7 +113,7 @@ class _RegisterNameScreenState extends ConsumerState<RegisterNameScreen> {
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 12),
-          RegisterTextField(
+          AppTextField(
             fieldKey: const Key('register-last-name'),
             controller: _lastName,
             hint: 'Nom (facultatif)',
