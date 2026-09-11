@@ -229,6 +229,28 @@ jobs:
       - name: Test (app)
         working-directory: apps/mobile
         run: flutter test --coverage
+      # Élargissement mesuré le 2026-09-11 : `packages/prism_ui/test/` contient
+      # 34 fichiers, la CI n'en exécutait qu'un (`renderer_golden_test.dart`,
+      # job `prism-goldens`). Toute garde écrite ailleurs dans prism_ui était
+      # décorative — cf. #487.
+      #
+      # Pourquoi ici et non dans `prism-goldens` : `prism-goldens` n'est PAS un
+      # contexte requis par la protection de `main` (les sept le sont, il n'en
+      # fait pas partie). Y mettre ces tests les rendrait exécutés mais toujours
+      # incapables de bloquer une fusion. Ce job-ci, `Flutter app + UI
+      # packages`, EST requis.
+      #
+      # Effet de bord voulu : le nom du job cesse de mentir parce qu'il devient
+      # VRAI, sans renommage. Renommer aurait changé le nom du contexte publié
+      # alors que la protection de branche exige encore l'ancien — toutes les PR
+      # auraient attendu indéfiniment un check que plus aucun workflow ne
+      # produit, `enforce_admins` compris.
+      - name: Pub get (prism_ui)
+        working-directory: packages/prism_ui
+        run: flutter pub get --enforce-lockfile
+      - name: Test (prism_ui)
+        working-directory: packages/prism_ui
+        run: flutter test
       - name: Upload coverage
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -8,7 +8,7 @@ import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-p
 import { fingerprintWorkflow } from './workflow-semantic-fingerprint.mjs';
 
 const repositoryRoot = path.resolve('.');
-const manifestGoldenDigest = '3c84abf5c8ecaf6aeb7e10649b15317381206a93210860579659415dedcf53ba';
+const manifestGoldenDigest = '1e7df013d1f4e979c63dc959dd1d7cddbecea1385b688783a78bd75952512a8a';
 // Les workflows Cosmos de suppression de compte sont fournis explicitement par chaque
 // layout testé. Les hériter du dépôt rendrait les fixtures dépendantes de l'état de
 // migration courant : une fois le dépôt en état C, toute fixture porterait un one-shot
