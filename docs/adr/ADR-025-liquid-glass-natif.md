@@ -66,6 +66,33 @@ et c'est ce qui évite le verre sur verre.
   teinte sur la luminosité du contenu dessous ; un aplat est opaque et « casse le caractère
   visuel de Liquid Glass ».
 
+> **Ce que cet accès direct vaut, mesuré le 2026-09-11 sur `#495`.**
+>
+> Pour obtenir le seul réglage « Réduire la transparence » côté Flutter, il a fallu **221 lignes
+> de plomberie** réparties sur trois fichiers : un `FlutterMethodChannel` dans
+> `apps/mobile/ios/Runner/AppDelegate.swift` (51 l.), un scope de propagation
+> `reduce_transparency_scope.dart` (105 l.) et un scope de thème
+> `prism_accessibility_scope.dart` (65 l.) — plus 127 lignes de test pour le seul scope de thème.
+>
+> Le canal doit faire **deux** choses, et le commentaire de `#495` l'explique : répondre à la
+> question au démarrage, **et pousser le changement** quand l'utilisateur bascule le réglage en
+> cours d'exécution, faute de quoi il ne prendrait effet qu'au lancement suivant.
+>
+> La raison est nommée dans ce même commentaire : *« Flutter n'expose pas ce réglage :
+> `MediaQueryData` déclare `highContrast`, `boldText`, `accessibleNavigation`,
+> `disableAnimations`, `invertColors` et `onOffSwitchLabels`, mais aucun équivalent de
+> `UIAccessibility.isReduceTransparencyEnabled`. »*
+>
+> L'équivalent natif est **une ligne**, disponible depuis iOS 13, dans `PrismGlass.swift` :
+>
+> ```swift
+> @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+> ```
+>
+> Et sur iOS 26, cette ligne ne sert **que** sur le chemin de repli : le matériau d'Apple
+> applique lui-même le réglage. Ce n'est pas un argument de confort — c'est un axe
+> d'accessibilité qui, en Flutter, exigeait d'écrire du Swift de toute façon.
+
 ### 4. Ne jamais poser `UIDesignRequiresCompatibility`
 
 Cette clé fait rendre l'application comme si elle était compilée contre un ancien SDK — donc
