@@ -66,7 +66,6 @@ class ResultFeedbackWidget extends StatelessWidget {
 
     return ListView(
       padding: PrismSpacing.screen,
-      physics: const BouncingScrollPhysics(),
       children: <Widget>[
         const SizedBox(height: 8),
         Center(

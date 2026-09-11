@@ -258,7 +258,6 @@ class _TutorContent extends StatelessWidget {
         PrismSpacing.debt28,
       ),
       shrinkWrap: true,
-      physics: const BouncingScrollPhysics(),
       children: <Widget>[
         Text(
           explanation.headline,

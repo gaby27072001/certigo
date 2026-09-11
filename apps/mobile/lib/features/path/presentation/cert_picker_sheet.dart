@@ -142,7 +142,6 @@ class _CertList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       shrinkWrap: true,
-      physics: const BouncingScrollPhysics(),
       itemCount: tracks.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (BuildContext context, int i) {
