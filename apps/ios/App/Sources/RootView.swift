@@ -2,8 +2,8 @@
 //
 // La coquille : cinq onglets, **une pile de navigation par onglet**.
 // C'est l'équivalent natif de `StatefulShellRoute.indexedStack`, sans
-// dépendance — et sans la classe de défauts qui l'accompagne côté Flutter, où
-// sept destinations existent sans domicile parce que rien ne le vérifie.
+// dépendance — et sans avoir à écrire un test qui lit le code source pour
+// savoir si un écran est atteignable : ici, le compilateur le sait.
 
 import DesignSystem
 import Navigation

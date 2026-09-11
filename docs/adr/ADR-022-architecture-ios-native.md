@@ -56,9 +56,14 @@ transformation en contrainte de type d'un défaut réel côté Flutter : un écr
 erreur sans aucun moyen de réessayer, et rien dans le code ne pouvait le signaler.
 
 **`home(for:)`** — un `switch` exhaustif, sans `default`, sur `Destination`. **Ajouter une
-destination sans lui donner de domicile ne compile pas.** Côté Flutter, `go_router` enregistre
-des routes par chaîne de caractères : sept destinations de premier niveau sur douze existent
-aujourd'hui sans domicile dans la coquille, et rien ne le dit.
+destination sans lui donner de domicile ne compile pas.**
+
+Côté Flutter, `go_router` enregistre les routes par chaîne de caractères, et rien dans le
+langage ne vérifie qu'une destination est atteignable. La même garantie y existe désormais —
+mesuré le 2026-09-11, les douze destinations **sont** câblées — mais elle coûte un test de
+**417 lignes** qui lit le code source, calcule la fermeture des classes réellement construites
+depuis les cinq écrans d'onglet, et rejoue le calcul sur une copie mutée pour prouver qu'il
+n'est pas muet. En Swift, c'est le compilateur, et c'est gratuit.
 
 ### 3. Un paquet SwiftPM local, plusieurs cibles
 
@@ -83,6 +88,21 @@ de projet**. Voir ADR-023.
 Ni `swift-openapi-generator`, ni `swift-snapshot-testing`, ni `sentry-cocoa`. Chacune viendra
 avec son besoin. Chaque paquet distant est un mode de panne de plus le soir où il faut que la
 chaîne démarre pour la première fois.
+
+### 5. Les jetons Prism sont transcrits à la main — provisoirement
+
+`#473` a livré `packages/prism_ui/schemas/tokens/v1/prism-tokens.json`, une source neutre
+indépendante du langage. Le squelette **transcrit** ces valeurs en Swift plutôt que de les
+générer, parce qu'une chaîne de génération est un mode de panne de plus au premier lancement.
+
+La transcription a été **vérifiée mécaniquement** contre cette source le 2026-09-11 :
+**152 valeurs comparées** — 32 jetons de palette, 30 valeurs de spectre (6 bandes × 5 rôles),
+75 valeurs typographiques (15 créneaux × 5 dimensions) et 15 espacements et rayons — **zéro
+écart**.
+
+**Ce n'est pas une garde permanente : c'est un contrôle ponctuel.** Rien n'empêche aujourd'hui
+les deux de diverger. La génération depuis le JSON, avec un contrôle de CI vérifiant que la
+régénération est identique à l'octet, reste à faire et appartient à la phase suivante.
 
 ## Ce que cette architecture écarte, délibérément
 

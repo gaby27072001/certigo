@@ -68,7 +68,8 @@ brew install xcodegen              # une fois
 signature**. Il est impossible d'afficher une erreur sans offrir la reprise.
 
 **`home(for:)`** — `switch` exhaustif sans `default`. Ajouter une destination sans lui donner de
-domicile **ne compile pas**. C'est la parade aux sept destinations orphelines du routeur Flutter.
+domicile **ne compile pas**. Côté Flutter, la même garantie coûte un test de 417 lignes qui lit
+le code source (`apps/mobile/test/navigation_reachability_guard_test.dart`).
 
 ## Visibilité
 

@@ -3,13 +3,20 @@
 // C'est le fichier qui justifie le passage au natif à lui seul.
 //
 // Le problème mesuré côté Flutter : dans `go_router`, les routes sont
-// enregistrées par chaîne de caractères, et **rien ne vérifie qu'une
-// destination est atteignable**. Sept destinations de premier niveau existent
-// sans domicile dans la coquille.
+// enregistrées par chaîne de caractères, et **rien dans le langage ne vérifie
+// qu'une destination est atteignable**.
 //
-// La parade ici n'est pas de la discipline, c'est le compilateur : `home(for:)`
-// fait un `switch` exhaustif sur `Destination`. Ajouter un cas sans lui donner
-// de domicile **ne compile pas**.
+// Mesuré le 2026-09-11 : les douze destinations de premier niveau **sont**
+// effectivement câblées côté Flutter. Mais il a fallu, pour l'établir, un test
+// de 417 lignes (`apps/mobile/test/navigation_reachability_guard_test.dart`)
+// qui **lit le code source**, calcule la fermeture des classes réellement
+// construites depuis les cinq écrans d'onglet, et rejoue le calcul sur une
+// copie mutée pour prouver qu'il n'est pas muet.
+//
+// C'est exactement ce que le `switch` exhaustif ci-dessous obtient
+// gratuitement, à la compilation : **ajouter un cas sans lui donner de
+// domicile ne compile pas.** La parade n'est pas de la discipline, et elle ne
+// coûte pas 417 lignes.
 
 /// Les douze destinations de premier niveau de Certigo.
 ///

@@ -28,6 +28,11 @@ public struct PrismBand: Sendable, Equatable {
 
 /// Les six bandes réfractées, transcrites depuis
 /// `packages/prism_ui/lib/src/tokens/prism_colors.dart`.
+///
+/// Les 30 valeurs (6 bandes × 5 rôles) ont été comparées une à une aux
+/// tableaux `color.primitiveSets.spectrum*` de
+/// `packages/prism_ui/schemas/tokens/v1/prism-tokens.json` le 2026-09-11 :
+/// zéro écart.
 public enum PrismSpectrum {
     public static let bands: [PrismBand] = [
         PrismBand(

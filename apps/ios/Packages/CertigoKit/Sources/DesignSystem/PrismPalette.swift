@@ -11,6 +11,13 @@
 /// Les littéraux sont conservés au format **ARGB** exactement comme côté Dart
 /// (`Color(0xFF3B35F2)`), pour qu'une comparaison entre les deux fichiers reste
 /// lisible à l'œil nu et automatisable plus tard.
+///
+/// **Source neutre.** Depuis `#473`, `packages/prism_ui/schemas/tokens/v1/`
+/// `prism-tokens.json` publie ces mêmes valeurs dans un format indépendant du
+/// langage. Les 32 jetons ci-dessous **ont été comparés un à un** à ce fichier
+/// le 2026-09-11 : zéro écart. À terme, cette transcription manuelle doit être
+/// remplacée par une génération depuis ce JSON, avec un contrôle de CI
+/// vérifiant que la régénération est identique à l'octet.
 public enum PrismPalette {
     // MARK: Marque
 

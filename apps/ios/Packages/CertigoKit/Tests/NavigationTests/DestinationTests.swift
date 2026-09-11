@@ -2,12 +2,15 @@
 //
 // Le test qui rougit si une destination redevient orpheline.
 //
-// Côté Flutter, sept destinations de premier niveau existent sans domicile
-// dans la coquille, et **rien ne le signale** : `go_router` enregistre des
-// chaînes de caractères. Ici, `home(for:)` est un `switch` exhaustif — une
-// destination sans domicile ne compile pas — et ces tests vérifient la partie
-// que le compilateur ne peut pas voir : le nombre d'onglets, l'unicité des
-// chemins, et le fait qu'ouvrir une destination groupée change bien d'onglet.
+// Côté Flutter, la même garantie existe — mais elle coûte un test de 417
+// lignes qui lit le code source et calcule la fermeture des écrans réellement
+// construits (`apps/mobile/test/navigation_reachability_guard_test.dart`,
+// mesuré le 2026-09-11 : les douze destinations sont bien atteignables).
+//
+// Ici, `home(for:)` est un `switch` exhaustif : une destination sans domicile
+// ne compile pas, gratuitement. Ces tests vérifient la partie que le
+// compilateur ne peut pas voir : le nombre d'onglets, l'unicité des chemins,
+// et le fait qu'ouvrir une destination groupée change bien d'onglet.
 
 import XCTest
 
