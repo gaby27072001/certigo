@@ -19,6 +19,10 @@
       "xpGoldVivid": "#FFC9681F",
       "xpGoldGlow": "#FFEC7B26",
       "xpGoldSoft": "#FFF8EAE2",
+      "medalSilver": "#FF566076",
+      "medalSilverGlow": "#FFB8C2D9",
+      "medalBronze": "#FF7E4425",
+      "medalBronzeGlow": "#FFD79367",
       "success": "#FF177331",
       "successVivid": "#FF24A047",
       "successGlow": "#FF2DBC55",
@@ -200,6 +204,11 @@
             "#FFF8EAE2",
             "#FFD4F8D8",
             "#FFD9F2F8"
+          ],
+          "medalTones": [
+            "#FF924A13",
+            "#FF566076",
+            "#FF7E4425"
           ]
         }
       },
@@ -290,6 +299,11 @@
             "#FF3C2314",
             "#FF17311B",
             "#FF162E33"
+          ],
+          "medalTones": [
+            "#FFEC7B26",
+            "#FFB8C2D9",
+            "#FFD79367"
           ]
         }
       }

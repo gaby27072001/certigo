@@ -79,6 +79,21 @@ class PrismColors {
   static const Color xpGoldGlow = Color(0xFFEC7B26);
   static const Color xpGoldSoft = Color(0xFFF8EAE2);
 
+  /// Podium medals — silver and bronze.
+  ///
+  /// Gold is not repeated here: the app already has one gold, [xpGold], and a
+  /// second one beside it would read as a mistake rather than a distinction.
+  ///
+  /// These exist as primitives because a podium is ranked, and rank must stay
+  /// legible. The literal they replace, `Color(0xFFB8C2D9)`, was written inline
+  /// in the leaderboard with no light counterpart: it scored **1.79:1** on the
+  /// white card, so second place was very nearly invisible in the light theme
+  /// while being perfect in the dark one.
+  static const Color medalSilver = Color(0xFF566076);
+  static const Color medalSilverGlow = Color(0xFFB8C2D9);
+  static const Color medalBronze = Color(0xFF7E4425);
+  static const Color medalBronzeGlow = Color(0xFFD79367);
+
   // ---- Semantic feedback -------------------------------------------------
   // Same constant-lightness law, so status color never outshouts track color.
   static const Color success = Color(0xFF177331);

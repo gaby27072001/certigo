@@ -129,6 +129,10 @@ class PrismTokenExport {
       'xpGoldVivid': hex(PrismColors.xpGoldVivid),
       'xpGoldGlow': hex(PrismColors.xpGoldGlow),
       'xpGoldSoft': hex(PrismColors.xpGoldSoft),
+      'medalSilver': hex(PrismColors.medalSilver),
+      'medalSilverGlow': hex(PrismColors.medalSilverGlow),
+      'medalBronze': hex(PrismColors.medalBronze),
+      'medalBronzeGlow': hex(PrismColors.medalBronzeGlow),
       'success': hex(PrismColors.success),
       'successVivid': hex(PrismColors.successVivid),
       'successGlow': hex(PrismColors.successGlow),
@@ -241,6 +245,7 @@ class PrismTokenExport {
         'domainAccentsVivid': _hexList(p.domainAccentsVivid),
         'domainAccentsOnSurface': _hexList(p.domainAccentsOnSurface),
         'domainAccentsSoft': _hexList(p.domainAccentsSoft),
+        'medalTones': _hexList(p.medalTones),
       },
     };
   }

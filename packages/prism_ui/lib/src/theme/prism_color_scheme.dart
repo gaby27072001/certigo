@@ -99,6 +99,7 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     required this.domainAccentsVivid,
     required this.domainAccentsOnSurface,
     required this.domainAccentsSoft,
+    required this.medalTones,
   });
 
   final Brightness brightness;
@@ -203,6 +204,24 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
   /// Per-domain wash, for a track colouring its own region.
   final List<Color> domainAccentsSoft;
 
+  /// Podium medals, in rank order: gold, silver, bronze.
+  ///
+  /// A ranked set, so it is a list rather than three fields — the same shape as
+  /// [domainAccents], for the same reason: the index *is* the meaning.
+  ///
+  /// It lives here rather than in the leaderboard because a medal is a colour
+  /// role, and a role must survive every appearance the app ships. The inline
+  /// literals it replaces did not: silver was `Color(0xFFB8C2D9)` with no light
+  /// counterpart and scored **1.79:1** on the white card, and bronze borrowed
+  /// [ember], which means "needs work" everywhere else in the app.
+  final List<Color> medalTones;
+
+  /// Medal for a 1-based rank, or null below third place.
+  ///
+  /// Null is the answer, not a fallback: a podium has three places, and ranks
+  /// four and beyond are deliberately unmarked.
+  Color? medalFor(int rank) => rank >= 1 && rank <= medalTones.length ? medalTones[rank - 1] : null;
+
   /// Deterministic accent for an exam domain by index.
   Color accentFor(int domainIndex) => domainAccents[domainIndex % domainAccents.length];
 
@@ -299,6 +318,11 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     domainAccentsVivid: PrismColors.spectrumVivid,
     domainAccentsOnSurface: PrismColors.spectrumInk,
     domainAccentsSoft: PrismColors.spectrumSoftLight,
+    medalTones: <Color>[
+      PrismColors.xpGold,
+      PrismColors.medalSilver,
+      PrismColors.medalBronze,
+    ],
   );
 
   static const PrismColorScheme dark = PrismColorScheme(
@@ -353,6 +377,11 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     domainAccentsVivid: PrismColors.spectrumVivid,
     domainAccentsOnSurface: PrismColors.spectrumGlow,
     domainAccentsSoft: PrismColors.spectrumSoftDark,
+    medalTones: <Color>[
+      PrismColors.xpGoldGlow,
+      PrismColors.medalSilverGlow,
+      PrismColors.medalBronzeGlow,
+    ],
   );
 
   // ---- Les deux axes d'accessibilité ------------------------------------
@@ -478,6 +507,9 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
       domainAccentsFill: fills(domainAccentsFill),
       domainAccentsVivid: inks(domainAccentsVivid),
       domainAccentsOnSurface: inks(domainAccentsOnSurface),
+      // A medal is a foreground: it takes the ink shift like any other, so
+      // Increase Contrast reaches the podium too.
+      medalTones: inks(medalTones),
     );
   }
 
@@ -533,6 +565,7 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
     List<Color>? domainAccentsVivid,
     List<Color>? domainAccentsOnSurface,
     List<Color>? domainAccentsSoft,
+    List<Color>? medalTones,
   }) {
     return PrismColorScheme(
       brightness: brightness ?? this.brightness,
@@ -585,6 +618,7 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
       domainAccentsVivid: domainAccentsVivid ?? this.domainAccentsVivid,
       domainAccentsOnSurface: domainAccentsOnSurface ?? this.domainAccentsOnSurface,
       domainAccentsSoft: domainAccentsSoft ?? this.domainAccentsSoft,
+      medalTones: medalTones ?? this.medalTones,
     );
   }
 
@@ -643,6 +677,7 @@ class PrismColorScheme extends ThemeExtension<PrismColorScheme> {
       domainAccentsVivid: t < 0.5 ? domainAccentsVivid : other.domainAccentsVivid,
       domainAccentsOnSurface: t < 0.5 ? domainAccentsOnSurface : other.domainAccentsOnSurface,
       domainAccentsSoft: t < 0.5 ? domainAccentsSoft : other.domainAccentsSoft,
+      medalTones: t < 0.5 ? medalTones : other.medalTones,
     );
   }
 }

@@ -308,25 +308,12 @@ class _RankMark extends StatelessWidget {
 
 /// Gold / silver / bronze for ranks 1-3, null below.
 ///
-/// These are podium medals, not brand colours, and they belong in Prism beside
-/// the other light/dark pairs — reported to the design-system owner rather than
-/// added here. Until then they are resolved locally, which at minimum replaces
-/// the bare `Color(0xFFB8C2D9)` literal that had no dark counterpart and scored
-/// **1.79:1** on the light card, far under the 4.5:1 floor.
-///
-/// Measured against the card each is drawn on (`#FFFFFF` light, `#1C1F2B`
-/// dark): gold 6.54 / 10.11, silver 5.50 / 9.18, bronze 6.73 / 6.45.
-/// `leaderboard_podium_test.dart` recomputes those ratios and fails under 4.5.
-@visibleForTesting
-Color? podiumTone(PrismColorScheme p, int rank) {
-  final bool dark = p.brightness == Brightness.dark;
-  return switch (rank) {
-    1 => p.xpGold,
-    2 => dark ? const Color(0xFFB8C2D9) : const Color(0xFF5F6980),
-    3 => dark ? const Color(0xFFD79367) : const Color(0xFF8A4B2A),
-    _ => null,
-  };
-}
+/// The medals are a colour **role** now, resolved by [PrismColorScheme] across
+/// all eight shipped appearances, rather than two literals held here. That is
+/// what puts them inside `prism_contrast_contract_test`: a value written in a
+/// screen is invisible to the design system's guards, which is precisely how
+/// silver reached **1.79:1** on the light card and stayed there.
+Color? podiumTone(PrismColorScheme p, int rank) => p.medalFor(rank);
 
 class _PromotionDivider extends StatelessWidget {
   const _PromotionDivider();
@@ -392,15 +379,14 @@ String _tierLabel(LeagueTier tier) {
 
 /// The tier's identity colour.
 ///
-/// Silver is resolved per theme for the same reason as [_podiumTone]: the bare
-/// `Color(0xFFB8C2D9)` it used to return scored 1.79:1 in the light theme, so a
-/// Silver league's own crest was the least visible thing on its own screen.
+/// Bronze, Silver and Gold tiers reuse the podium medals: a Bronze league and a
+/// third place are the same idea at two scales, and giving them two different
+/// browns would say they are unrelated.
 Color _tierColor(PrismColorScheme p, LeagueTier tier) {
-  final bool dark = p.brightness == Brightness.dark;
   return switch (tier) {
-    LeagueTier.bronze => dark ? const Color(0xFFD79367) : const Color(0xFF8A4B2A),
-    LeagueTier.silver => dark ? const Color(0xFFB8C2D9) : const Color(0xFF5F6980),
-    LeagueTier.gold => p.xpGold,
+    LeagueTier.bronze => p.medalFor(3)!,
+    LeagueTier.silver => p.medalFor(2)!,
+    LeagueTier.gold => p.medalFor(1)!,
     LeagueTier.platinum => p.info,
     LeagueTier.diamond => p.primary,
   };

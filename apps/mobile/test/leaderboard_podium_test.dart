@@ -40,9 +40,20 @@ League _league({required int count, int promote = 7}) => League(
 
 void main() {
   group('podium tones clear the contrast floor in both themes', () {
-    // The regression this pins: rank 2 was the bare literal `Color(0xFFB8C2D9)`
+    // The regression this pinned: rank 2 was the bare literal `Color(0xFFB8C2D9)`
     // with no dark counterpart, scoring 1.79:1 on the white card — the numeral
     // was very nearly invisible in the light theme, while fine in the dark one.
+    //
+    // The medals are now roles on [PrismColorScheme], so the authoritative
+    // check is `prism_contrast_contract_test` in `prism_ui`: it measures them
+    // against `surface`, `background`, `surfaceAlt` *and* the glass, across all
+    // eight shipped appearances, where this file only ever saw the card in two.
+    // Promoting them found a defect this test could not: the light silver had
+    // to move from `#5F6980` to `#566076`, because 5.50:1 on the card hid
+    // **4.18:1** on `surfaceAlt`.
+    //
+    // What remains here is what the design system cannot know — that the
+    // leaderboard reads the medals in rank order, and stops at three.
     const double floor = 4.5;
 
     for (final (String name, PrismColorScheme scheme, Color card) cases

@@ -134,6 +134,13 @@ Map<String, Color> foregrounds(PrismColorScheme p) => <String, Color>{
       'infoOnSurface': p.infoOnSurface,
       'textPrimary': p.textPrimary,
       'textSecondary': p.textSecondary,
+      // Le podium entre ici parce qu'une médaille est un premier plan comme un
+      // autre. Le littéral qu'elle remplace, `Color(0xFFB8C2D9)` écrit dans
+      // l'écran de ligue, mesurait **1.79:1** sur la carte claire : hors du
+      // système de couleurs, il était hors de portée de cette garde.
+      'medalGold': p.medalFor(1)!,
+      'medalSilver': p.medalFor(2)!,
+      'medalBronze': p.medalFor(3)!,
     };
 
 Map<String, Color> fills(PrismColorScheme p) => <String, Color>{
