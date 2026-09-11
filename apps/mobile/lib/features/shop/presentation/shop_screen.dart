@@ -178,7 +178,7 @@ class _ShopContentState extends ConsumerState<_ShopContent> {
         for (final ShopItem item in catalog.items) ...<Widget>[
           _ShopItemCard(
             item: item,
-            affordable: item.priceGems <= catalog.gems,
+            gems: catalog.gems,
             buying: _buyingId == item.id,
             buyEnabled: item.priceGems <= catalog.gems && _buyingId == null,
             onBuy: () => _buy(item),
@@ -193,17 +193,19 @@ class _ShopContentState extends ConsumerState<_ShopContent> {
 class _ShopItemCard extends StatelessWidget {
   const _ShopItemCard({
     required this.item,
-    required this.affordable,
+    required this.gems,
     required this.buying,
     required this.buyEnabled,
     required this.onBuy,
   });
 
   final ShopItem item;
-  final bool affordable;
+  final int gems;
   final bool buying;
   final bool buyEnabled;
   final VoidCallback onBuy;
+
+  bool get affordable => item.priceGems <= gems;
 
   @override
   Widget build(BuildContext context) {
@@ -274,12 +276,28 @@ class _ShopItemCard extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const Spacer(),
+              // The shortfall is stated beside the price, where the learner is
+              // already looking, and names the exact number missing. It used to
+              // be the button's label, which named a state instead of an action
+              // and did not fit: "Gemmes insuffisantes" rendered "Gemmes in…"
+              // inside a fixed 150 px button.
+              if (!affordable) ...<Widget>[
+                const SizedBox(width: PrismSpacing.xs),
+                Expanded(
+                  child: Text(
+                    ShopLabels.missing(item.priceGems - gems),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: t.labelMedium?.copyWith(color: p.textSecondary),
+                  ),
+                ),
+              ] else
+                const Spacer(),
               SizedBox(
                 width: 150,
                 child: PrismButton(
-                  label: affordable ? 'Acheter' : 'Gemmes insuffisantes',
-                  icon: affordable ? Icons.shopping_bag_rounded : null,
+                  label: ShopLabels.buy,
+                  icon: Icons.shopping_bag_rounded,
                   loading: buying,
                   expand: true,
                   onPressed: buyEnabled ? onBuy : null,
@@ -340,3 +358,13 @@ String _normalizeKind(String kind) => kind.toLowerCase().replaceAll(RegExp('[^a-
 
 String _freezeLabel(int tokens) =>
     tokens > 1 ? '$tokens gels de série en réserve' : '$tokens gel de série en réserve';
+
+/// Copy asserted by tests. Named so a wording change cannot silently turn a
+/// widget test red from an unrelated branch.
+abstract final class ShopLabels {
+  static const String buy = 'Acheter';
+
+  /// How many gems are still missing. The button names its action; this names
+  /// the obstacle, precisely, next to the price it refers to.
+  static String missing(int gems) => 'il te manque $gems';
+}
