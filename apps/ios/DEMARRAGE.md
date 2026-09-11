@@ -82,7 +82,8 @@ brew install xcodegen
 > **Pourquoi ?** Le fichier `Certigo.xcodeproj` n'est pas dans Git. Il est
 > reconstruit à partir d'un fichier texte lisible (`project.yml`). C'est ce qui
 > permet à plusieurs personnes — ou plusieurs agents — de travailler en même
-> temps sans conflits illisibles. Voir `docs/adr/ADR-023`.
+> temps sans conflits illisibles. Voir
+> [`docs/adr/ADR-023-generation-projet-xcode.md`](../../docs/adr/ADR-023-generation-projet-xcode.md).
 
 Si Homebrew n'est pas installé :
 
