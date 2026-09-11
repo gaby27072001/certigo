@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import shutil
@@ -39,9 +41,26 @@ class CheckActiveContentAgeTest(unittest.TestCase):
         return root
 
     def run_main(self, root: Path, now: str, days: str = "14") -> int:
-        return check_active_content_age.main(
-            ["--root", str(root), "--now", now, "--max-age-days", days]
-        )
+        # Capture stdout even when the assertion ignores it. A fixture here copies the
+        # REAL reference and overwrites only the dates, so its ::warning:: line carries an
+        # authentic revision SHA with synthetic timestamps — it has every marker of a
+        # production reading. Left on the console it is indistinguishable from one, and it
+        # has already been mistaken for the real pin age once. No fixture output escapes.
+        code, _ = self.run_capturing(root, now, "--max-age-days", days)
+        return code
+
+    def run_capturing(
+        self, root: Path, now: str, *extra: str
+    ) -> tuple[int, str]:
+        # Both streams: the failure path prints the same real-SHA/synthetic-date mix on
+        # stderr that the warning prints on stdout, and it is just as easy to mistake for
+        # a production reading when skimming a test log.
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+            code = check_active_content_age.main(
+                ["--root", str(root), "--now", now, *extra]
+            )
+        return code, buffer.getvalue()
 
     def test_accepts_a_pin_inside_the_refresh_budget(self) -> None:
         root = self.workspace("2026-09-01T00:00:00Z")
@@ -67,6 +86,39 @@ class CheckActiveContentAgeTest(unittest.TestCase):
         root = self.workspace()
         (root / REFERENCE).write_text("{}\n", encoding="utf-8", newline="\n")
         self.assertEqual(self.run_main(root, "2026-09-02T00:00:00Z"), 1)
+
+    def test_stays_silent_below_the_warning_threshold(self) -> None:
+        root = self.workspace("2026-09-01T00:00:00Z")
+        code, out = self.run_capturing(root, "2026-09-10T00:00:00Z")
+        self.assertEqual(code, 0)
+        self.assertNotIn("::warning::", out)
+
+    def test_warns_without_failing_inside_the_warning_band(self) -> None:
+        """The band exists so the budget degrades as a slope, not as a wall."""
+        root = self.workspace("2026-09-01T00:00:00Z")
+        code, out = self.run_capturing(root, "2026-09-13T00:00:00Z")
+        self.assertEqual(code, 0)
+        self.assertIn("::warning::", out)
+        self.assertIn("expires in 2 day(s)", out)
+
+    def test_rejects_a_warning_threshold_at_or_above_the_budget(self) -> None:
+        root = self.workspace("2026-09-01T00:00:00Z")
+        code, _ = self.run_capturing(
+            root, "2026-09-02T00:00:00Z", "--max-age-days", "14", "--warn-age-days", "14"
+        )
+        self.assertEqual(code, 1)
+
+    def test_rejects_a_non_positive_warning_threshold(self) -> None:
+        root = self.workspace("2026-09-01T00:00:00Z")
+        code, _ = self.run_capturing(
+            root, "2026-09-02T00:00:00Z", "--warn-age-days", "0"
+        )
+        self.assertEqual(code, 1)
+
+    def test_still_fails_past_the_budget_even_though_it_warned_first(self) -> None:
+        root = self.workspace("2026-09-01T00:00:00Z")
+        code, _ = self.run_capturing(root, "2026-09-16T00:00:00Z")
+        self.assertEqual(code, 1)
 
 
 if __name__ == "__main__":

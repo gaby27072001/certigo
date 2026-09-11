@@ -58,6 +58,35 @@ resource-group scopes, billing currency, budget start date, end date, and all
 four amounts before any later `create` operation. Budget creation requires an
 appropriately scoped Cost Management role; this change adds no role assignment.
 
+### Arming `enableBudgets` inside the repository protects nothing
+
+> Volatile fact, dated and bounded. Measured **2026-09-11** on `156c3117`.
+> Invalidated the day a workflow passes `--template-file infra/finops/main.bicep`,
+> or the day a non-personal alert recipient is established.
+
+Three concurring measurements, to be set against any proposal to flip
+`enableBudgets = true` in a committed parameter file:
+
+1. **No workflow deploys this template.** `git grep -- "--template-file" .github/workflows`
+   returns only `infra/main.bicep` (`cd-backend.yml`) and `infra/content/main.bicep`
+   (`content-infra-apply.yml`, `content-infra-what-if.yml`). The single `finops`
+   occurrence in the workflows is `node --test infra/tests/finops-guardrails.test.mjs`
+   (`ci-infra.yml`). Flipping the parameter in the repository therefore creates **no
+   budget in Azure**; it creates only the belief that a budget exists.
+2. **Three assertions lock it to `false`** in `infra/tests/finops-guardrails.test.mjs`
+   (template default, `.bicepparam` value, and the literal `param enableBudgets = false`
+   pattern). Flipping it turns `ci-infra` red while protecting nothing more.
+3. **No committable recipient exists.** `alertEmail` is a `securestring` defaulting to
+   the empty string, and this document forbids committing a personal address. Budgets
+   armed without a reachable contact notify into the void — the repository's dominant
+   failure mode, not a guardrail.
+
+**The gesture that actually protects money is therefore not a pull request.** It is an
+out-of-band `az deployment sub create` with `ALERT_EMAIL` injected, decided by a human
+owner, and verified by re-reading budget state rather than by trusting the return code —
+an Azure Policy with a `modify` effect can return success having rewritten the values.
+
+
 ## Cost-allocation tag contract
 
 Every resource group and taggable resource in the four scopes must expose:

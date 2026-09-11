@@ -12,6 +12,7 @@
     "CONTENT_DESCRIPTOR_CONTAINER": "content-release-descriptors",
     "CONTENT_PUBLIC_CONTAINER": "content-public-releases",
     "CONTENT_PRIVATE_CONTAINER": "content-private-releases",
+    "_NOTE_CONTENT_REPOSITORY_MODE": "⛔ PIÈGE CONNU, constaté le 2026-09-11. Ce gabarit livre 'legacy' À DESSEIN et doit le rester : infra/tests/content-storage.test.mjs vérifie que ce fichier vaut 'legacy'. Or l'environnement de DEV tourne en 'versioned' (docs/runbooks/PARCOURS_DEV_TRAVERSABLE.md, section « Activer le pipeline de contenu versionné sur dev »). Copier ce fichier tel quel donne donc un backend local qui NE SERT PAS le catalogue de dev : symptôme déjà observé une fois = « backend vide ». Pour reproduire dev en local, passer CONTENT_REPOSITORY_MODE à 'versioned' dans VOTRE local.settings.json (jamais dans ce gabarit). Cette clé _NOTE_* est de la documentation : elle n'est lue par aucun code. Invalidé le jour où dev repasse en 'legacy' ou où le gabarit cesse d'être verrouillé sur 'legacy'.",
     "CONTENT_REPOSITORY_MODE": "legacy",
     "CONTENT_ADMIN_ROLE": "Content.Release.Admin",
     "CONTENT_ADMIN_ALLOW_DEV": "true",
