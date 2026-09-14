@@ -1,32 +1,125 @@
-# Démarrer l'application iOS native — à faire lundi soir
+# Démarrer l'application iOS native sur le Mac
 
-**Temps prévu : 10 minutes si tout va bien. 30 minutes s'il faut corriger.**
-
-Ce document se suit dans l'ordre, sans réfléchir. À la fin, l'application
-Certigo native se lance dans le simulateur.
+**Les trois commandes sont juste en dessous. Tout le reste de ce document ne
+sert qu'en cas de problème.**
 
 ---
 
-## ⚠️ À lire avant de commencer (30 secondes)
+## Les 3 commandes
 
-**Tout le code Swift de ce dossier a été écrit sur un PC Windows. Il n'a jamais
-été compilé. Pas une seule ligne.**
+Ouvre le **Terminal** et tape-les dans l'ordre. Attends que chacune finisse.
 
-Ce n'est pas de la négligence : SwiftUI et UIKit n'existent pas sur Windows, et
-n'existeront jamais. Ce sont des bibliothèques d'Apple, livrées uniquement avec
-le SDK d'Apple, qui ne tourne que sur macOS.
+### ① Les outils
 
-**Conséquence concrète pour toi :** il est *normal* qu'il y ait des erreurs au
-premier lancement. Elles sont prévues, et la section « Les trois erreurs les
-plus probables » plus bas donne la correction de chacune.
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" ; brew install gh xcodegen ; gh auth login
+```
 
-**Ton Mac est le premier compilateur que ce code rencontre.** C'est pour ça que
-la pull request reste en brouillon jusqu'à ce que tu aies vu l'application se
-lancer.
+➜ Si Homebrew est déjà installé, la première partie dit juste qu'il est là :
+c'est normal, la suite s'exécute quand même. `gh auth login` ouvre ton
+navigateur pour te connecter à GitHub.
+
+### ② Le code
+
+```bash
+gh repo clone gchambaud_microsoft/Certigo ~/Certigo && cd ~/Certigo && git checkout gchambaud-microsoft-squelette-ios-natif
+```
+
+➜ Tu dois voir `Switched to branch 'gchambaud-microsoft-squelette-ios-natif'`.
+
+**Si tu as déjà le dépôt quelque part**, remplace par :
+
+```bash
+cd ~/chemin/vers/Certigo && git fetch origin && git checkout gchambaud-microsoft-squelette-ios-natif && git pull
+```
+
+### ③ Lancer
+
+```bash
+cd ~/Certigo/apps/ios && ./Scripts/demarrer.sh
+```
+
+➜ **C'est la seule commande qui compte.** Elle vérifie ta machine, lance les
+tests, fabrique le projet Xcode, compile, et ouvre l'application dans le
+simulateur. Compte 3 à 5 minutes la première fois.
+
+**Ce que tu dois voir à la fin :**
+
+```
+  ✓ 54 tests découverts (plancher : 50)
+  ✓ 54 tests exécutés, tous verts
+  ✓ Certigo.xcodeproj généré
+  ✓ Compilation réussie
+  ✓ Application lancée
+```
+
+**Puis regarde le simulateur** → section « Ce que tu dois voir » plus bas.
 
 ---
 
-## Étape 1 — Vérifier la machine (1 minute)
+## ⚠️ Trois choses à savoir avant de commencer (1 minute de lecture)
+
+### 1. Ce code n'a jamais été compilé. Pas une seule ligne.
+
+Il a été écrit sur un PC **Windows**, où SwiftUI et UIKit **ne peuvent pas
+exister** — ce sont des bibliothèques d'Apple, livrées uniquement avec son SDK,
+qui ne tourne que sur macOS. Ce n'est pas une négligence, c'est une propriété
+permanente.
+
+**Conséquence :** il est *normal* qu'il y ait des erreurs au premier lancement.
+Elles sont prévues, et la section « Les trois erreurs les plus probables »
+donne la correction de chacune. **Ton Mac est le premier compilateur que ce
+code rencontre.**
+
+### 2. Il te faut **Xcode 26.6**, et il exige **macOS Tahoe 26.6**
+
+Les deux vont ensemble : Xcode 26.6 ne s'installe pas sur un macOS plus ancien.
+Vérifie **avant** de lancer quoi que ce soit :
+
+```bash
+sw_vers -productVersion && xcodebuild -version | head -1
+```
+
+➜ Tu dois lire **`26.6`** (ou plus) sur la première ligne, et **`Xcode 26.6`**
+sur la seconde.
+
+| Ce que tu vois | Ce qu'il faut faire |
+|---|---|
+| `26.6` et `Xcode 26.6` | ✅ Parfait, passe aux 3 commandes |
+| macOS `15.x` ou moins | ⚠️ Mets à jour macOS d'abord (Réglages ▸ Général ▸ Mise à jour). **Xcode 26.6 ne s'installera pas sans ça.** |
+| `xcodebuild: command not found` | Installe Xcode depuis l'App Store, puis **ouvre-le une fois** pour accepter la licence |
+| Un autre numéro de Xcode | Le script te laissera passer outre — voir « Si tu vois un autre numéro » plus bas |
+
+> **Pourquoi 26.6 précisément ?** C'est la version épinglée dans
+> `codemagic.yaml`, la chaîne qui construit l'application publiée. Un écart
+> entre ton Mac et elle produit les pannes les plus difficiles à diagnostiquer :
+> ce qui marche ici casse là-bas.
+
+### 3. La page GitHub ne dira **rien** de ton squelette
+
+**Aucun contrôle de CI de ce dépôt ne compile du Swift** — il n'existe aucune
+machine macOS dans la CI.
+
+- **Un rouge** sur la pull request ne veut pas dire que ton squelette est
+  cassé. Il parle du Flutter, du backend ou du contenu.
+- **Un vert** ne veut pas dire qu'il marche. Ni le Swift, ni le système de
+  design ne sont vérifiés par la CI.
+
+**Le seul verdict qui compte, c'est ton Terminal.** Si `demarrer.sh` va
+jusqu'au bout et que l'application s'affiche, le squelette marche — quelle que
+soit la couleur de la page GitHub. (Le détail est en bas, section « La CI en
+dit moins que tu ne crois ».)
+
+---
+
+## Le reste de ce document
+
+Tu n'en as besoin **que si quelque chose ne marche pas**, ou si tu as du temps
+après avoir vu l'application tourner.
+
+---
+
+## Vérifier la machine plus en détail
 
 Ouvre le Terminal et tape ces deux commandes, l'une après l'autre :
 
@@ -34,7 +127,8 @@ Ouvre le Terminal et tape ces deux commandes, l'une après l'autre :
 sw_vers
 ```
 
-➜ Tu dois voir `ProductName: macOS` et un numéro de version.
+➜ Tu dois voir `ProductName: macOS` et **`ProductVersion: 26.6`** ou plus.
+C'est **macOS Tahoe**. En dessous, Xcode 26.6 ne s'installera pas.
 
 ```bash
 xcodebuild -version
@@ -50,6 +144,10 @@ puis **ouvre-le une fois** pour accepter la licence. Ensuite :
 ```bash
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ```
+
+> **Sur un Mac neuf, installer Xcode te donne aussi `git`.** Si tu tapes une
+> commande `git` avant, macOS te proposera d'installer les outils en ligne de
+> commande — accepte, c'est le même mécanisme en plus léger.
 
 ### Si tu vois un autre numéro que 26.6
 
@@ -71,33 +169,13 @@ CERTIGO_IGNORER_XCODE=1 ./Scripts/demarrer.sh
 
 ---
 
-## Étape 2 — Les deux commandes (5 minutes)
-
-### Commande 1 — installer l'outil qui fabrique le projet Xcode
+## Ce que fait la commande ③, en détail
 
 ```bash
-brew install xcodegen
+cd ~/Certigo/apps/ios && ./Scripts/demarrer.sh
 ```
 
-> **Pourquoi ?** Le fichier `Certigo.xcodeproj` n'est pas dans Git. Il est
-> reconstruit à partir d'un fichier texte lisible (`project.yml`). C'est ce qui
-> permet à plusieurs personnes — ou plusieurs agents — de travailler en même
-> temps sans conflits illisibles. Voir
-> [`docs/adr/ADR-023-generation-projet-xcode.md`](../../docs/adr/ADR-023-generation-projet-xcode.md).
-
-Si Homebrew n'est pas installé :
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-
-### Commande 2 — tout faire
-
-```bash
-cd apps/ios && ./Scripts/demarrer.sh
-```
-
-C'est tout. Cette commande fait, dans l'ordre :
+Dans l'ordre :
 
 1. vérifie macOS et Xcode ;
 2. vérifie que XcodeGen est là ;
@@ -109,9 +187,22 @@ C'est tout. Cette commande fait, dans l'ordre :
 Elle choisit toute seule un simulateur iPhone disponible. Tu n'as rien à
 configurer.
 
+> **Pourquoi faut-il installer XcodeGen ?** Le fichier `Certigo.xcodeproj`
+> n'est pas dans Git. Il est reconstruit à partir d'un fichier texte lisible
+> (`project.yml`). C'est ce qui permet à plusieurs personnes — ou plusieurs
+> agents — de travailler en même temps sans conflits illisibles. Voir
+> [`docs/adr/ADR-023-generation-projet-xcode.md`](../../docs/adr/ADR-023-generation-projet-xcode.md).
+
+Deux variantes utiles :
+
+```bash
+./Scripts/demarrer.sh --tests-seuls   # s'arrête après les tests
+./Scripts/demarrer.sh --sans-lancer   # compile mais ne lance pas
+```
+
 ---
 
-## Étape 3 — Ce que tu dois voir
+## Ce que tu dois voir
 
 ### Dans le Terminal
 
@@ -218,7 +309,7 @@ fichier et remplace `iOS 26.0, macOS 26.0` par `iOS 99.0, macOS 99.0` partout
 sûrs. L'application se lance, sans Liquid Glass.
 
 ```bash
-cd apps/ios
+cd ~/Certigo/apps/ios
 sed -i '' 's/iOS 26.0, macOS 26.0/iOS 99.0, macOS 99.0/g' \
   Packages/CertigoKit/Sources/DesignSystem/PrismGlass.swift
 ./Scripts/demarrer.sh
@@ -357,7 +448,7 @@ par défaut.**
 ### Ouvrir le projet dans Xcode et regarder les aperçus
 
 ```bash
-cd apps/ios
+cd ~/Certigo/apps/ios
 open Certigo.xcodeproj
 ```
 
@@ -367,11 +458,14 @@ Ouvre `PrismShowcaseView.swift`, puis le canevas d'aperçu (`⌥⌘↩`). Il y a
 > C'est la seule chose que je ne peux pas faire à ta place. J'écris les
 > aperçus, tu les regardes. Le mode « texte agrandi » est celui à regarder en
 > priorité : c'est là que les interfaces cassent.
+>
+> ⚠️ **Le projet doit avoir été généré au moins une fois** par
+> `demarrer.sh`, sinon `Certigo.xcodeproj` n'existe pas encore.
 
 ### Vérifier que les tests mordent vraiment
 
 ```bash
-./Scripts/prouver-le-rouge.sh
+cd ~/Certigo/apps/ios && ./Scripts/prouver-le-rouge.sh
 ```
 
 Ce script ajoute un test volontairement faux, vérifie que le lot **rougit**,
@@ -384,7 +478,7 @@ puis le retire et vérifie qu'il **reverdit**. Il ne laisse aucune trace.
 ### Lancer seulement les tests
 
 ```bash
-./Scripts/verifier-tests.sh
+cd ~/Certigo/apps/ios && ./Scripts/verifier-tests.sh
 ```
 
 ---
@@ -452,7 +546,7 @@ Envoie-moi, dans cet ordre :
 1. **La commande exacte** que tu as tapée.
 2. **Le message d'erreur complet**, copié-collé tel quel. Pas résumé — les
    erreurs Swift sont longues mais chaque ligne compte.
-3. Le contenu de **`apps/ios/.build/compilation.log`** s'il existe.
+3. Le contenu de **`~/Certigo/apps/ios/.build/compilation.log`** s'il existe.
 4. Le résultat de ces trois lignes :
 
 ```bash
@@ -473,7 +567,7 @@ une seule chose : **regarder et juger** ce que personne d'autre ne peut voir.
 Quand l'application se lance et que tu as regardé l'écran :
 
 1. Dis-le-moi.
-2. La pull request sort du brouillon et peut être fusionnée.
+2. La pull request **#482** sort du brouillon et peut être fusionnée.
 3. Le vrai travail commence : la fondation de vérification (un job de CI qui
    compile le Swift), puis les écrans, un par un.
 
