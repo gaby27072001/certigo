@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../motion/app_lifecycle_motion.dart';
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_radii.dart';
 
@@ -19,18 +20,21 @@ class PrismSkeleton extends StatefulWidget {
   State<PrismSkeleton> createState() => _PrismSkeletonState();
 }
 
-class _PrismSkeletonState extends State<PrismSkeleton> with SingleTickerProviderStateMixin {
+class _PrismSkeletonState extends State<PrismSkeleton>
+    with SingleTickerProviderStateMixin, AppLifecycleMotion<PrismSkeleton> {
   // Created lazily, and only when motion is enabled. Constructing it eagerly (or
   // from dispose via a `late` field) would spin up a ticker even in
   // reduced-motion contexts and crash on teardown with an unsafe ancestor
   // lookup. See _ensureController.
   AnimationController? _controller;
 
+  // Ne démarre rien : c'est `build` qui décide si la boucle a le droit de
+  // tourner, en composant mouvement réduit et présence à l'écran.
   AnimationController _ensureController() {
     return _controller ??= AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
+    );
   }
 
   @override
@@ -48,6 +52,9 @@ class _PrismSkeletonState extends State<PrismSkeleton> with SingleTickerProvider
     final Color highlight = p.textSecondary.withOpacity(0.22);
 
     if (reduceMotion) {
+      // Une boucle créée avant que l'utilisateur n'active le mouvement réduit
+      // continuerait de tourner derrière cet aplat statique.
+      _controller?.stop();
       return Container(
         width: widget.width,
         height: widget.height,
@@ -56,6 +63,11 @@ class _PrismSkeletonState extends State<PrismSkeleton> with SingleTickerProvider
     }
 
     final AnimationController controller = _ensureController();
+    if (motionIsVisible) {
+      if (!controller.isAnimating) controller.repeat(reverse: true);
+    } else {
+      controller.stop();
+    }
     return AnimatedBuilder(
       animation: controller,
       builder: (BuildContext context, Widget? child) {

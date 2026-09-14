@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../motion/app_lifecycle_motion.dart';
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_motion.dart';
 
@@ -57,7 +58,8 @@ class PathNode extends StatefulWidget {
   State<PathNode> createState() => _PathNodeState();
 }
 
-class _PathNodeState extends State<PathNode> with SingleTickerProviderStateMixin {
+class _PathNodeState extends State<PathNode>
+    with SingleTickerProviderStateMixin, AppLifecycleMotion<PathNode> {
   late final AnimationController _bounce = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1100),
@@ -77,7 +79,14 @@ class _PathNodeState extends State<PathNode> with SingleTickerProviderStateMixin
     final PrismColorScheme prism = context.prism;
     final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
-    if (widget.current && !reduceMotion) {
+    // `bouncing` décrit l'**intention visuelle** (ce nœud appelle-t-il l'action
+    // suivante ?), `animate` décrit ce qui a le droit de tourner maintenant.
+    // Garder la forme de l'arbre attachée à `bouncing` évite de reconstruire
+    // tout le sous-arbre à chaque aller-retour d'arrière-plan.
+    final bool bouncing = widget.current && !reduceMotion;
+    final bool animate = bouncing && motionIsVisible;
+
+    if (animate) {
       if (!_bounce.isAnimating) _bounce.repeat(reverse: true);
     } else if (_bounce.isAnimating) {
       _bounce
@@ -98,7 +107,7 @@ class _PathNodeState extends State<PathNode> with SingleTickerProviderStateMixin
       child: bubble,
     );
 
-    if (widget.current && !reduceMotion) {
+    if (bouncing) {
       bubble = AnimatedBuilder(
         animation: _bounce,
         builder: (BuildContext _, Widget? child) {

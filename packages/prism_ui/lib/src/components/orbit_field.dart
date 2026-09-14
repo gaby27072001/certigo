@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../motion/app_lifecycle_motion.dart';
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_colors.dart';
 
@@ -105,7 +106,8 @@ class OrbitField extends StatefulWidget {
   State<OrbitField> createState() => _OrbitFieldState();
 }
 
-class _OrbitFieldState extends State<OrbitField> with SingleTickerProviderStateMixin {
+class _OrbitFieldState extends State<OrbitField>
+    with SingleTickerProviderStateMixin, AppLifecycleMotion<OrbitField> {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: widget.floatPeriod,
@@ -149,10 +151,12 @@ class _OrbitFieldState extends State<OrbitField> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final bool animate = widget.float && !reduceMotion;
+    // Trois conditions qui se composent, aucune qui en remplace une autre :
+    // l'intention du composant, le mouvement réduit, et la présence à l'écran.
+    final bool animate = widget.float && !reduceMotion && motionIsVisible;
 
-    // Start/stop the loop in build so hot-reload and reduced-motion toggles
-    // stay in sync without leaking a running controller.
+    // Start/stop the loop in build so hot-reload, reduced-motion toggles and
+    // app backgrounding stay in sync without leaking a running controller.
     if (animate) {
       if (!_controller.isAnimating) _controller.repeat();
     } else {

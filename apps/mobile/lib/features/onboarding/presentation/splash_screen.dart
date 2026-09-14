@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
@@ -9,6 +7,12 @@ import 'onboarding_common.dart';
 /// Brand splash — a full-bleed primary screen with the wordmark and the guide,
 /// shown for a beat before the welcome screen. The equivalent of the colored
 /// boot screen at the very start of the app.
+///
+/// **L'écran n'a pas d'horloge à lui.** Sa destination est connue dès le
+/// montage : il n'attend aucune donnée. La seule chose qui reste à attendre est
+/// son animation d'entrée, alors c'est elle — et rien d'autre — qui porte la
+/// navigation. Quand la plateforme demande un mouvement réduit, il n'y a plus
+/// d'entrée à laisser atterrir, donc plus rien à attendre du tout.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -16,34 +20,63 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-  Timer? _timer;
-  bool _visible = false;
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _entrance;
+  late final CurvedAnimation _settle;
+  late final CurvedAnimation _pop;
+  late final Animation<Offset> _slide;
+  late final Animation<double> _scale;
+  bool _leaving = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _visible = true);
-    });
-    _timer = Timer(const Duration(milliseconds: 1500), () {
-      if (mounted) context.go(OnboardingRoutes.welcome);
-    });
+    // Durée volontairement absente ici : elle dépend de MediaQuery, qui n'est
+    // lisible qu'à partir de didChangeDependencies.
+    _entrance = AnimationController(vsync: this)..addStatusListener(_onEntranceStatus);
+    _settle = CurvedAnimation(parent: _entrance, curve: PrismMotion.decelerate);
+    _pop = CurvedAnimation(parent: _entrance, curve: PrismMotion.spring);
+    _slide = Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(_settle);
+    _scale = Tween<double>(begin: 0.9, end: 1).animate(_pop);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _entrance.duration = PrismMotion.resolve(context, PrismMotion.slow);
+    if (_entrance.status == AnimationStatus.dismissed) _entrance.forward();
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _settle.dispose();
+    _pop.dispose();
+    _entrance.dispose();
     super.dispose();
+  }
+
+  void _onEntranceStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) _leave();
+  }
+
+  void _leave() {
+    if (_leaving) return;
+    _leaving = true;
+    // Une entrée de durée nulle se termine **pendant** didChangeDependencies :
+    // naviguer sur place reviendrait à muter l'arbre en cours de construction.
+    // `ensureVisualUpdate` garantit qu'un frame viendra porter ce rappel même
+    // si l'arbre est déjà au repos (cas de l'appui après la fin de l'entrée).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.go(OnboardingRoutes.welcome);
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
-    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final Duration d = reduceMotion ? Duration.zero : PrismMotion.slow;
     return GestureDetector(
-      onTap: () => context.go(OnboardingRoutes.welcome),
+      onTap: _leave,
       child: Scaffold(
         body: DecoratedBox(
           decoration: BoxDecoration(
@@ -57,21 +90,15 @@ class _SplashScreenState extends State<SplashScreen> {
             child: Stack(
               children: <Widget>[
                 Center(
-                  child: AnimatedSlide(
-                    offset: _visible ? Offset.zero : const Offset(0, 0.05),
-                    duration: d,
-                    curve: PrismMotion.decelerate,
-                    child: AnimatedOpacity(
-                      opacity: _visible ? 1 : 0,
-                      duration: d,
-                      curve: PrismMotion.decelerate,
+                  child: SlideTransition(
+                    position: _slide,
+                    child: FadeTransition(
+                      opacity: _settle,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
-                          AnimatedScale(
-                            scale: _visible ? 1 : 0.9,
-                            duration: d,
-                            curve: PrismMotion.spring,
+                          ScaleTransition(
+                            scale: _scale,
                             child: const MascotHero(
                               mascot: AuroraMascot.nimbus,
                               mood: MascotMood.celebrate,
@@ -104,10 +131,8 @@ class _SplashScreenState extends State<SplashScreen> {
                   alignment: Alignment.bottomCenter,
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 28),
-                    child: AnimatedOpacity(
-                      opacity: _visible ? 1 : 0,
-                      duration: d,
-                      curve: PrismMotion.decelerate,
+                    child: FadeTransition(
+                      opacity: _settle,
                       child: SizedBox(
                         width: 28,
                         height: 28,
