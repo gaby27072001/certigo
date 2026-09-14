@@ -52,14 +52,23 @@ cd "$PAQUET"
 # ------------------------------------------------------ 1. tests DÉCOUVERTS --
 # Le nom de la sous-commande a changé entre les versions de SwiftPM ; on essaie
 # les deux formes avant de renoncer, plutôt que de parier sur une seule.
+#
+# Le stderr des deux tentatives est CONSERVÉ et non jeté : si les deux échouent,
+# c'est lui qui dit pourquoi. Jeter un diagnostic dans /dev/null est exactement
+# ce qui a rendu la panne du 2026-09-14 indéchiffrable.
 LISTE=""
-if LISTE="$(swift test list 2>/dev/null)"; then
-  :
-elif LISTE="$(swift test --list-tests 2>/dev/null)"; then
-  :
-else
-  LISTE=""
-fi
+DIAG_LISTE=""
+for _forme in "list" "--list-tests"; do
+  set +e
+  _sortie="$(swift test "$_forme" 2>&1)"
+  _statut=$?
+  set -e
+  if [[ "$_statut" -eq 0 ]]; then
+    LISTE="$_sortie"
+    break
+  fi
+  DIAG_LISTE="$DIAG_LISTE$_sortie"$'\n'
+done
 
 # Une ligne de test ressemble à :
 #   CertigoKitPackageTests.DesignSystemTests/PrismContrastTests/testFormulaAnchors
@@ -70,6 +79,9 @@ fi
 
 if [[ "$DECOUVERTS" -eq 0 ]]; then
   alerte "L'énumération des tests n'a rien rendu (sous-commande indisponible ?)."
+  if [[ -n "$DIAG_LISTE" ]]; then
+    printf '  %s\n' "$(printf '%s' "$DIAG_LISTE" | tail -n 3)" >&2
+  fi
   alerte "On se rabat sur le comptage des tests EXÉCUTÉS, ci-dessous."
 else
   if [[ "$DECOUVERTS" -lt "$PLANCHER" ]]; then

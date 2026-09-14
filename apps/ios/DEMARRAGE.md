@@ -7,6 +7,9 @@ sert qu'en cas de problème.**
 
 ## Les 3 commandes
 
+**Prérequis : Xcode doit être installé.** Voir juste en dessous — c'est le
+piège n° 1 et il coûte une heure si on le découvre trop tard.
+
 Ouvre le **Terminal** et tape-les dans l'ordre. Attends que chacune finisse.
 
 ### ① Les outils
@@ -55,9 +58,77 @@ simulateur. Compte 3 à 5 minutes la première fois.
 
 **Puis regarde le simulateur** → section « Ce que tu dois voir » plus bas.
 
+> **Si le script s'arrête, il te dit toujours pourquoi et quoi faire.** Il
+> distingue « Xcode absent », « Command Line Tools seuls », « Xcode ne répond
+> pas » et « mauvaise version » — quatre situations dont les remèdes diffèrent.
+> Suis ce qu'il affiche, puis relance la commande ③.
+
 ---
 
-## ⚠️ Trois choses à savoir avant de commencer (1 minute de lecture)
+## ⛔ Étape 0 — installer Xcode (à faire AVANT la commande ③)
+
+**C'est le piège n° 1, et il coûte une heure.**
+
+`demarrer.sh` a besoin de **Xcode complet**. Les « Command Line Tools » ne
+suffisent pas — et c'est ce que macOS installe tout seul quand tu tapes ta
+première commande `git`. Le piège est là : `xcodebuild` **semble** exister,
+mais il refuse de travailler.
+
+### Vérifier ce que tu as
+
+```bash
+xcodebuild -version
+```
+
+| Ce que tu lis | Ce que ça veut dire |
+|---|---|
+| `Xcode 26.6` | ✅ C'est bon, va aux 3 commandes |
+| `Xcode 16.x` ou autre | ⚠️ Mauvaise version — voir plus bas |
+| `... requires Xcode, but active developer directory ... CommandLineTools ...` | ❌ **Tu n'as que les Command Line Tools.** Installe Xcode. |
+| `command not found` | ❌ Rien d'installé. Installe Xcode. |
+
+### Installer Xcode
+
+1. **App Store** ▸ chercher **« Xcode »** ▸ **Installer**
+   → **~10 Go, 30 à 60 minutes** selon ta connexion. Lance-le maintenant et
+   fais autre chose en attendant.
+2. **Ouvre Xcode une fois** et accepte la licence. Il installera encore
+   quelques composants — laisse-le finir.
+3. Vérifie :
+   ```bash
+   xcodebuild -version
+   ```
+   ➜ doit répondre `Xcode 26.6`.
+
+### Si Xcode est installé mais que le message parle encore de CommandLineTools
+
+`xcode-select` pointe au mauvais endroit. Une commande le corrige :
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
+
+Pour voir où il pointe : `xcode-select -p`
+
+### Pourquoi macOS Tahoe 26.6 est nécessaire
+
+Xcode 26.6 **ne s'installe pas** sur un macOS plus ancien. Vérifie :
+
+```bash
+sw_vers -productVersion
+```
+
+➜ `26.6` ou plus. En dessous : Réglages ▸ Général ▸ Mise à jour logicielle,
+**avant** de lancer le téléchargement d'Xcode.
+
+> **Pourquoi 26.6 précisément ?** C'est la version épinglée dans
+> `codemagic.yaml`, la chaîne qui construit l'application publiée. Un écart
+> entre ton Mac et elle produit les pannes les plus difficiles à
+> diagnostiquer : ce qui marche ici casse là-bas.
+
+---
+
+## ⚠️ Deux autres choses à savoir (1 minute de lecture)
 
 ### 1. Ce code n'a jamais été compilé. Pas une seule ligne.
 
@@ -71,31 +142,7 @@ Elles sont prévues, et la section « Les trois erreurs les plus probables »
 donne la correction de chacune. **Ton Mac est le premier compilateur que ce
 code rencontre.**
 
-### 2. Il te faut **Xcode 26.6**, et il exige **macOS Tahoe 26.6**
-
-Les deux vont ensemble : Xcode 26.6 ne s'installe pas sur un macOS plus ancien.
-Vérifie **avant** de lancer quoi que ce soit :
-
-```bash
-sw_vers -productVersion && xcodebuild -version | head -1
-```
-
-➜ Tu dois lire **`26.6`** (ou plus) sur la première ligne, et **`Xcode 26.6`**
-sur la seconde.
-
-| Ce que tu vois | Ce qu'il faut faire |
-|---|---|
-| `26.6` et `Xcode 26.6` | ✅ Parfait, passe aux 3 commandes |
-| macOS `15.x` ou moins | ⚠️ Mets à jour macOS d'abord (Réglages ▸ Général ▸ Mise à jour). **Xcode 26.6 ne s'installera pas sans ça.** |
-| `xcodebuild: command not found` | Installe Xcode depuis l'App Store, puis **ouvre-le une fois** pour accepter la licence |
-| Un autre numéro de Xcode | Le script te laissera passer outre — voir « Si tu vois un autre numéro » plus bas |
-
-> **Pourquoi 26.6 précisément ?** C'est la version épinglée dans
-> `codemagic.yaml`, la chaîne qui construit l'application publiée. Un écart
-> entre ton Mac et elle produit les pannes les plus difficiles à diagnostiquer :
-> ce qui marche ici casse là-bas.
-
-### 3. La page GitHub ne dira **rien** de ton squelette
+### 2. La page GitHub ne dira **rien** de ton squelette
 
 **Aucun contrôle de CI de ce dépôt ne compile du Swift** — il n'existe aucune
 machine macOS dans la CI.
@@ -380,8 +427,10 @@ corrigées, pas l'inverse.
 
 | Symptôme | Correction |
 |---|---|
-| `xcodegen: command not found` | `brew install xcodegen` (étape 2) |
-| `No such module 'DesignSystem'` | Le paquet n'a pas été résolu. `cd apps/ios/Packages/CertigoKit && swift build` |
+| **Le script s'arrête après « ✓ macOS » sans rien dire** | **Ne devrait plus arriver.** Si ça se produit, c'est un défaut du script : il affiche désormais un code et une ligne. Envoie-les-moi. |
+| `... requires Xcode ... CommandLineTools ...` | Tu n'as que les Command Line Tools → **Étape 0** en haut |
+| `xcodegen: command not found` | `brew install xcodegen` (commande ①) |
+| `No such module 'DesignSystem'` | Le paquet n'a pas été résolu. `cd ~/Certigo/apps/ios/Packages/CertigoKit && swift build` |
 | `Aucun simulateur iPhone disponible` | Xcode ▸ Settings ▸ Components ▸ installer un runtime iOS |
 | L'app se lance mais l'écran est **vide et blanc** | La vue a planté au rendu. Dans le simulateur : `⌘⇧H` puis relance. Envoie-moi la console Xcode. |
 | L'app s'affiche **en petit, avec des bandes noires** | `UILaunchScreen` manquant dans le plist généré. Un test le vérifie — lance `./Scripts/demarrer.sh --tests-seuls`. |
