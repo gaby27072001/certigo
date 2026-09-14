@@ -1,15 +1,52 @@
-// NON COMPILÉ — voir apps/ios/DEMARRAGE.md.
+// NON COMPILÉ SUR WINDOWS — voir apps/ios/DEMARRAGE.md.
 //
 // ⚠️ FICHIER LE PLUS FRAGILE DU SQUELETTE, ET C'EST VOLONTAIRE.
 //
 // Toute l'API Liquid Glass d'iOS 26 est confinée ici, et nulle part ailleurs.
-// Raison : ces appels sont écrits depuis Windows, contre une documentation, et
-// n'ont jamais été compilés. Si l'un d'eux est faux, **il y a exactement un
-// fichier à corriger lundi soir**, et le reste du squelette compile quand même.
+// Raison : ces appels ont été écrits depuis Windows, contre une documentation.
+// Si l'un d'eux est faux, **il y a exactement un fichier à corriger**, et le
+// reste du squelette compile quand même.
 //
-// Les signatures ont été relevées le 2026-09-11 dans les données DocC d'Apple
-// (le flux qui rend developer.apple.com), et non de mémoire :
-//   glassEffect(_:in:)          iOS 26.0+ · défaut = .regular, DefaultGlassEffectShape()
+// ─────────────────────────────────────────────────────────────────────────────
+// POURQUOI `#if os(iOS)` ET PAS SEULEMENT `#available`
+//
+// Première erreur de compilation réelle, remontée du Mac le 2026-09-14 :
+//
+//     error: 'onScrollDown' is unavailable in macOS
+//     note: @available(macOS, unavailable)
+//
+// `#available(iOS 26.0, macOS 26.0, *)` teste une **version**. Il ne peut pas
+// couvrir une **indisponibilité de plateforme** : `.onScrollDown` n'est pas
+// « absent avant macOS 26 », il est absent de macOS, définitivement. La garde
+// portait sur le mauvais axe.
+//
+// Les deux directives ne résolvent pas le même problème et ne sont pas
+// interchangeables :
+//
+//   `#if os(iOS)`   — COMPILATION. Le code n'existe pas hors iOS. C'est ce
+//                     qu'il faut pour un symbole absent d'une plateforme.
+//   `#available`    — EXÉCUTION. Le code existe mais peut être trop récent
+//                     pour l'appareil. C'est ce qu'il faut pour iOS 17 vs 26.
+//
+// **Il faut les deux, imbriquées**, et c'est ce que fait ce fichier.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// POURQUOI macOS APPARAÎT ICI ALORS QUE CERTIGO EST UNE APP iOS
+//
+// `Package.swift` déclare `.macOS(.v14)` pour **une seule raison** : permettre
+// à `swift test` de tourner sans simulateur, ce qui donne une boucle rouge/vert
+// rapide. **macOS n'est pas une cible produit.** Aucun rendu n'y est jugé.
+//
+// Conséquence assumée : sur macOS, tout ce qui suit retombe sur les matériaux
+// standard. C'est sans importance — et c'est pourquoi ce fichier garde
+// **largement**, y compris des symboles dont la documentation annonce une
+// disponibilité macOS. Un effet visuel perdu sur une plateforme qui ne sert
+// qu'aux tests ne coûte rien ; un aller-retour avec le Mac coûte une demi-heure.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// Signatures relevées le 2026-09-11 dans les données DocC d'Apple, et non de
+// mémoire :
+//   glassEffect(_:in:)          défaut = .regular, DefaultGlassEffectShape()
 //   Glass.regular/.clear/.identity, .tint(_:), .interactive(_:)
 //   GlassEffectContainer(spacing:content:)   spacing est CGFloat? = nil
 //   glassEffectID(_:in:)        l'identifiant est Optional
@@ -20,15 +57,15 @@
 // Deux règles d'Apple que ce fichier fait respecter par construction :
 //   1. « Don't use Liquid Glass in the content layer. » → `prismGlass` est
 //      réservé à la couche de contrôle ; le contenu passe par `prismContent`.
-//   2. « Always avoid glass on glass. » → on ne empile jamais les deux.
+//   2. « Always avoid glass on glass. » → on n'empile jamais les deux.
 
 import SwiftUI
 
 /// Applique le matériau Liquid Glass, ou son repli.
 ///
-/// Ce modificateur est réservé à la **couche de contrôle** : barres flottantes,
-/// boutons, contrôles posés au-dessus du contenu. Apple demande explicitement
-/// de ne pas l'utiliser dans la couche de contenu.
+/// Réservé à la **couche de contrôle** : barres flottantes, boutons, contrôles
+/// posés au-dessus du contenu. Apple demande explicitement de ne pas
+/// l'utiliser dans la couche de contenu.
 public struct PrismGlassModifier<S: Shape>: ViewModifier {
     /// Apple gère automatiquement « Réduire la transparence » pour son propre
     /// matériau. Cette valeur ne sert donc **que** sur le chemin de repli, où
@@ -42,25 +79,41 @@ public struct PrismGlassModifier<S: Shape>: ViewModifier {
 
     @ViewBuilder
     public func body(content: Content) -> some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            // Le système applique lui-même « Réduire la transparence »,
-            // « Augmenter le contraste » et « Réduire les animations » sur le
-            // matériau natif. Le refaire à la main le dégraderait.
-            content.glassEffect(Self.glass(tint: tint, interactive: interactive), in: shape)
-        } else if reduceTransparency {
+        #if os(iOS)
+            if #available(iOS 26.0, *) {
+                // Le système applique lui-même « Réduire la transparence »,
+                // « Augmenter le contraste » et « Réduire les animations » sur
+                // le matériau natif. Le refaire à la main le dégraderait.
+                content.glassEffect(Self.verre(tint: tint, interactive: interactive), in: shape)
+            } else {
+                repli(content)
+            }
+        #else
+            repli(content)
+        #endif
+    }
+
+    /// Le chemin sans Liquid Glass : iOS antérieur à 26, et toute plateforme
+    /// hors iOS. Ici le matériau est le nôtre, donc l'accessibilité est à notre
+    /// charge.
+    @ViewBuilder
+    private func repli(_ content: Content) -> some View {
+        if reduceTransparency {
             content.background(opaqueFallback, in: shape)
         } else {
             content.background(.ultraThinMaterial, in: shape)
         }
     }
 
-    @available(iOS 26.0, macOS 26.0, *)
-    private static func glass(tint: Color?, interactive: Bool) -> Glass {
-        var value = Glass.regular
-        if let tint { value = value.tint(tint) }
-        if interactive { value = value.interactive() }
-        return value
-    }
+    #if os(iOS)
+        @available(iOS 26.0, *)
+        private static func verre(tint: Color?, interactive: Bool) -> Glass {
+            var valeur = Glass.regular
+            if let tint { valeur = valeur.tint(tint) }
+            if interactive { valeur = valeur.interactive() }
+            return valeur
+        }
+    #endif
 }
 
 extension View {
@@ -90,7 +143,8 @@ extension View {
     ///
     /// Apple : « Don't use Liquid Glass in the content layer. » Les quatre
     /// matériaux standard restent la bonne réponse, y compris sur iOS 26 — ils
-    /// ne sont pas dépréciés.
+    /// ne sont pas dépréciés. Disponibles sur toutes les plateformes depuis
+    /// iOS 15 / macOS 12, donc aucune garde n'est nécessaire ici.
     public func prismContent(in shape: some Shape) -> some View {
         background(.regularMaterial, in: shape)
     }
@@ -98,15 +152,19 @@ extension View {
     /// Identifiant de morphing, pour qu'une forme de verre s'étire vers la
     /// suivante au lieu de disparaître puis réapparaître.
     ///
-    /// Sans effet avant iOS 26, où la transition retombe sur l'animation
+    /// Sans effet hors iOS 26, où la transition retombe sur l'animation
     /// SwiftUI ordinaire.
     @ViewBuilder
     public func prismGlassID(_ id: String, in namespace: Namespace.ID) -> some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            glassEffectID(id, in: namespace)
-        } else {
+        #if os(iOS)
+            if #available(iOS 26.0, *) {
+                glassEffectID(id, in: namespace)
+            } else {
+                self
+            }
+        #else
             self
-        }
+        #endif
     }
 
     /// Le fondu du contenu qui passe sous une barre flottante.
@@ -116,29 +174,43 @@ extension View {
     /// vienne buter net contre la barre.
     @ViewBuilder
     public func prismScrollEdge(_ edges: Edge.Set = .all) -> some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            scrollEdgeEffectStyle(.soft, for: edges)
-        } else {
+        #if os(iOS)
+            if #available(iOS 26.0, *) {
+                scrollEdgeEffectStyle(.soft, for: edges)
+            } else {
+                self
+            }
+        #else
             self
-        }
+        #endif
     }
 
     /// Réduit la barre d'onglets quand l'utilisateur descend, comme Apple
-    /// Music. Sans effet avant iOS 26.
+    /// Music.
+    ///
+    /// ⚠️ **`TabBarMinimizeBehavior.onScrollDown` est marqué
+    /// `@available(macOS, unavailable)`** — pas « trop récent pour macOS » :
+    /// absent de macOS. C'est le symbole qui a produit la première erreur de
+    /// compilation réelle de ce squelette, parce que la garde d'origine testait
+    /// une version au lieu d'une plateforme.
     @ViewBuilder
     public func prismTabBarMinimize() -> some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            tabBarMinimizeBehavior(.onScrollDown)
-        } else {
+        #if os(iOS)
+            if #available(iOS 26.0, *) {
+                tabBarMinimizeBehavior(.onScrollDown)
+            } else {
+                self
+            }
+        #else
             self
-        }
+        #endif
     }
 }
 
 /// Regroupe plusieurs formes de verre pour qu'elles fusionnent en approchant.
 ///
 /// Sur iOS 26, c'est un vrai `GlassEffectContainer` — « SwiftUI rend les effets
-/// ensemble, ce qui améliore les performances de rendu ». Avant, c'est une
+/// ensemble, ce qui améliore les performances de rendu ». Ailleurs, c'est une
 /// simple pile transparente.
 public struct PrismGlassGroup<Content: View>: View {
     private let spacing: CGFloat
@@ -151,17 +223,21 @@ public struct PrismGlassGroup<Content: View>: View {
 
     @ViewBuilder
     public var body: some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            GlassEffectContainer(spacing: spacing) { content }
-        } else {
+        #if os(iOS)
+            if #available(iOS 26.0, *) {
+                GlassEffectContainer(spacing: spacing) { content }
+            } else {
+                content
+            }
+        #else
             content
-        }
+        #endif
     }
 }
 
 /// Style de bouton de la couche de contrôle.
 ///
-/// Sur iOS 26 c'est le style natif `.glass` ; avant, le bouton Prism plein.
+/// Sur iOS 26 c'est le matériau natif ; ailleurs, le bouton Prism plein.
 public struct PrismControlButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -169,28 +245,37 @@ public struct PrismControlButtonStyle: ButtonStyle {
 
     @ViewBuilder
     public func makeBody(configuration: Configuration) -> some View {
-        let label =
+        let etiquette =
             configuration.label
             .prismType("labelLarge")
             .padding(.horizontal, PrismSpace.md)
             .padding(.vertical, PrismSpace.xs)
 
-        if #available(iOS 26.0, macOS 26.0, *) {
-            // Le contenu posé sur le verre `regular` bascule clair/sombre tout
-            // seul pour maximiser son contraste. Forcer `foregroundStyle`
-            // casserait précisément ce comportement.
-            label
-                .glassEffect(.regular.interactive(), in: Capsule())
-                .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.97 : 1))
-                .animation(
-                    reduceMotion ? nil : .snappy(duration: 0.16), value: configuration.isPressed)
-        } else {
-            label
-                .foregroundStyle(Color(prism: PrismPalette.lightSurface))
-                .background(Color(prism: PrismPalette.primary), in: Capsule())
-                .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.97 : 1))
-                .animation(
-                    reduceMotion ? nil : .snappy(duration: 0.16), value: configuration.isPressed)
-        }
+        #if os(iOS)
+            if #available(iOS 26.0, *) {
+                // Le contenu posé sur le verre `regular` bascule clair/sombre
+                // tout seul pour maximiser son contraste. Forcer
+                // `foregroundStyle` casserait précisément ce comportement.
+                etiquette
+                    .glassEffect(.regular.interactive(), in: Capsule())
+                    .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.97 : 1))
+                    .animation(
+                        reduceMotion ? nil : .snappy(duration: 0.16),
+                        value: configuration.isPressed)
+            } else {
+                repli(etiquette, enfonce: configuration.isPressed)
+            }
+        #else
+            repli(etiquette, enfonce: configuration.isPressed)
+        #endif
+    }
+
+    @ViewBuilder
+    private func repli(_ etiquette: some View, enfonce: Bool) -> some View {
+        etiquette
+            .foregroundStyle(Color(prism: PrismPalette.lightSurface))
+            .background(Color(prism: PrismPalette.primary), in: Capsule())
+            .scaleEffect(reduceMotion ? 1 : (enfonce ? 0.97 : 1))
+            .animation(reduceMotion ? nil : .snappy(duration: 0.16), value: enfonce)
     }
 }

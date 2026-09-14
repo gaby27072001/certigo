@@ -36,6 +36,7 @@ relais CLT reproduit à la lettre.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -347,6 +348,123 @@ class ScriptsSansSortieMuetteTests(unittest.TestCase):
         source = (REPO_ROOT / "apps/ios/Scripts/demarrer.sh").read_text(encoding="utf-8")
         self.assertIn("lib-detection.sh", source)
         self.assertIn("certigo_detecter_xcode", source)
+
+
+class DisponibilitePlateformeTests(unittest.TestCase):
+    """Garde sur la **première erreur de compilation réelle** du squelette.
+
+    Remontée du Mac le 2026-09-14 :
+
+        error: 'onScrollDown' is unavailable in macOS
+        note: @available(macOS, unavailable)
+
+    `#available(iOS 26.0, macOS 26.0, *)` teste une **version**. Il ne peut pas
+    couvrir une **indisponibilité de plateforme** : `.onScrollDown` n'est pas
+    « absent avant macOS 26 », il est absent de macOS. La garde portait sur le
+    mauvais axe.
+
+    `swift test` compile le paquet **pour macOS** — c'est la seule façon de
+    faire tourner les tests sans simulateur. Tout symbole iOS-only casse donc à
+    l'étape 3/6, avant même que `xcodebuild` n'ait compilé pour iOS.
+
+    Ces tests lisent la source : ils ne remplacent pas un compilateur, mais ils
+    attrapent la classe de défaut sans attendre un aller-retour avec le Mac.
+    """
+
+    #: Symboles de chrome iOS 26 qui doivent vivre sous `#if os(iOS)`.
+    #: `tabBarMinimizeBehavior` est prouvé indisponible sur macOS par le
+    #: compilateur ; les autres sont gardés par précaution, parce que macOS
+    #: n'est pas une cible produit et qu'un aller-retour coûte plus cher qu'un
+    #: effet visuel perdu sur une plateforme de test.
+    SYMBOLES_IOS = (
+        "tabBarMinimizeBehavior",
+        "scrollEdgeEffectStyle",
+        "glassEffect(",
+        "glassEffectID(",
+        "GlassEffectContainer",
+    )
+
+    SOURCES = tuple(
+        sorted((REPO_ROOT / "apps/ios").rglob("*.swift"))
+    )
+
+    def test_des_sources_sont_bien_trouvees(self) -> None:
+        """Un lot vide rendrait tous les tests suivants verts pour rien."""
+        self.assertGreater(len(self.SOURCES), 10, "Aucune source Swift trouvée.")
+
+    def test_le_chrome_ios_est_garde_par_if_os(self) -> None:
+        """Chaque fichier qui utilise un symbole iOS-only doit porter `#if os(iOS)`."""
+        for chemin in self.SOURCES:
+            texte = chemin.read_text(encoding="utf-8")
+            # On ignore les commentaires : ce fichier documente les symboles.
+            code = "\n".join(
+                ligne for ligne in texte.splitlines() if not ligne.strip().startswith("//")
+            )
+            utilises = [s for s in self.SYMBOLES_IOS if s in code]
+            if not utilises:
+                continue
+            relatif = chemin.relative_to(REPO_ROOT).as_posix()
+            self.assertIn(
+                "#if os(iOS)",
+                code,
+                f"{relatif} utilise {utilises} sans `#if os(iOS)`.\n"
+                "`#available` teste une version, pas une disponibilité de plateforme :\n"
+                "sur macOS, où `swift test` compile, ces symboles n'existent pas.",
+            )
+
+    def test_aucun_available_ne_promet_macos_26(self) -> None:
+        """`#available(..., macOS 26.0, ...)` est un piège dans ce paquet.
+
+        Il laisse croire que le chrome iOS 26 existe sur macOS. Le compilateur a
+        prouvé que non, au moins pour `.onScrollDown`. La bonne forme est
+        `#if os(iOS)` autour, et `#available(iOS 26.0, *)` dedans.
+        """
+        for chemin in self.SOURCES:
+            texte = chemin.read_text(encoding="utf-8")
+            for numero, ligne in enumerate(texte.splitlines(), start=1):
+                nue = ligne.strip()
+                if nue.startswith("//"):
+                    continue
+                if "#available" in nue and "macOS 26" in nue:
+                    relatif = chemin.relative_to(REPO_ROOT).as_posix()
+                    self.fail(
+                        f"{relatif}:{numero} promet macOS 26 :\n  {nue}\n"
+                        "Le chrome iOS 26 n'est pas garanti sur macOS. Utiliser\n"
+                        "`#if os(iOS)` + `#available(iOS 26.0, *)`."
+                    )
+
+    def test_les_directives_de_compilation_sont_equilibrees(self) -> None:
+        """Un `#if` sans `#endif` ne se voit pas à la relecture."""
+        for chemin in self.SOURCES:
+            texte = chemin.read_text(encoding="utf-8")
+            ouverts = len(re.findall(r"^\s*#if\b", texte, re.M))
+            fermes = len(re.findall(r"^\s*#endif\b", texte, re.M))
+            self.assertEqual(
+                ouverts,
+                fermes,
+                f"{chemin.relative_to(REPO_ROOT).as_posix()} : "
+                f"{ouverts} #if pour {fermes} #endif.",
+            )
+
+    def test_le_repli_existe_pour_chaque_branche_ios(self) -> None:
+        """`#if os(iOS)` sans `#else` laisserait un trou hors iOS.
+
+        Une vue qui ne rend rien sur macOS ne casse pas la compilation — elle
+        casse le sens. Le squelette exige un `#else` explicite.
+        """
+        chemin = REPO_ROOT / "apps/ios/Packages/CertigoKit/Sources/DesignSystem/PrismGlass.swift"
+        texte = chemin.read_text(encoding="utf-8")
+        ouverts = len(re.findall(r"^\s*#if os\(iOS\)", texte, re.M))
+        alternatives = len(re.findall(r"^\s*#else", texte, re.M))
+        self.assertGreater(ouverts, 0, "PrismGlass.swift ne garde plus rien.")
+        # Une seule exception tolérée : le bloc qui isole une fonction
+        # `@available` n'a pas d'équivalent hors iOS et n'a donc pas de `#else`.
+        self.assertGreaterEqual(
+            alternatives,
+            ouverts - 1,
+            f"{ouverts} blocs `#if os(iOS)` pour seulement {alternatives} `#else` : "
+            "au moins un chemin ne rend rien hors iOS.",
+        )
 
 
 if __name__ == "__main__":

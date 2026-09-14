@@ -83,6 +83,39 @@ paquets distincts reste un déplacement mécanique si le besoin apparaît.
 convention de répertoire, donc ajouter un fichier Swift n'exige **aucune modification du fichier
 de projet**. Voir ADR-023.
 
+### 3 bis. Ce que `swift test` valide — et ce qu'il ne valide pas
+
+`Package.swift` déclare `.macOS(.v14)` **pour une seule raison** : permettre à `swift test` de
+tourner sans simulateur, ce qui donne une boucle rouge/vert de quelques secondes. **macOS n'est
+pas une cible produit** et aucun rendu n'y est jugé.
+
+Cette commodité a un coût, mesuré le 2026-09-14 sur la première compilation réelle :
+
+| Étape de `demarrer.sh` | Compile pour | Ce qu'elle prouve |
+|---|---|---|
+| 3/6 — `swift test` | **macOS** | La logique pure : contraste, jetons, destinations, table d'erreurs. Les tests n'importent que `XCTest`. |
+| 5/6 — `xcodebuild -destination id=<sim>` | **iOS** | Que le code destiné à l'appareil compile réellement. |
+
+**Conséquence à énoncer clairement : aucun test n'exécute quoi que ce soit sur la cible iOS.**
+L'étape 3 éprouve du Swift pur sur une plateforme qui n'est pas la cible ; l'étape 5 compile la
+cible mais n'exécute rien. Les vues SwiftUI ne sont donc **ni testées, ni rendues** par la chaîne
+automatique — elles ne le seront que par un œil humain dans le simulateur, ou par des tests
+d'instantané qui exigeront un simulateur en CI.
+
+**Et le compilateur macOS produit des échecs qui n'existent pas sur iOS.** `TabBarMinimizeBehavior`
+`.onScrollDown` est marqué `@available(macOS, unavailable)` : il a fait échouer l'étape 3 pour un
+symbole que l'application iOS n'aurait jamais rencontré. Comme l'étape 3 précède l'étape 5, un
+faux échec macOS bloque avant que la vraie cible ne soit seulement tentée.
+
+La parade retenue est double, et aucune des deux n'est un compilateur :
+
+1. **`#if os(iOS)` autour de tout le chrome iOS 26**, y compris des symboles dont la
+   documentation annonce une disponibilité macOS. Sur une plateforme qui ne sert qu'aux tests,
+   un effet visuel perdu ne coûte rien ; un aller-retour avec le Mac coûte une demi-heure.
+2. **Une garde de source** (`tools/tests/test_ios_detection.py`) qui refuse qu'un symbole
+   iOS-only vive hors d'un `#if os(iOS)`, et qu'un `#available` promette macOS 26. Elle
+   s'exécute en CI depuis Windows, là où aucun compilateur Swift ne peut exister.
+
 ### 4. Aucune dépendance externe dans le squelette
 
 Ni `swift-openapi-generator`, ni `swift-snapshot-testing`, ni `sentry-cocoa`. Chacune viendra
