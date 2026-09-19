@@ -35,15 +35,26 @@ correction de ma part — **n'écrase rien**. Crée un checkout séparé :
 
 ```bash
 cd ~/Certigo && git fetch origin
+ls -d ~/certigo-ios-essai 2>/dev/null && echo "⚠️ CHEMIN DÉJÀ PRIS — choisis un autre nom"
 git worktree add ~/certigo-ios-essai origin/gchambaud-microsoft-squelette-ios-natif
 cd ~/certigo-ios-essai && git log --oneline -1
 ```
 
-➜ Ton dossier `~/Certigo` **n'est pas touché** : ni ta branche, ni tes
-modifications en cours. Le worktree est un dossier jetable :
+➜ **Vérifie la 2ᵉ ligne avant de continuer** : si elle affiche l'avertissement,
+le dossier existe déjà — change de nom plutôt que d'écraser quoi que ce soit.
+
+**Ce que ça touche, exactement :**
+
+- ✅ Les **fichiers de travail** et la **branche** de `~/Certigo` ne sont pas
+  modifiés. Rien de ce que tu as en cours n'est perdu.
+- ⚠️ En revanche les **métadonnées Git** le sont : `git fetch` met à jour les
+  références distantes, et `git worktree add` inscrit le nouveau worktree dans
+  `.git/worktrees`. Ce n'est pas destructeur — mais ce n'est pas « rien ».
+
+Quand tu auras fini, **le nettoyage t'appartient** :
 
 ```bash
-git worktree remove ~/certigo-ios-essai     # quand tu as fini
+git worktree remove ~/certigo-ios-essai
 ```
 
 Puis lance depuis **ce** dossier :
@@ -102,31 +113,69 @@ suffisent pas — et c'est ce que macOS installe tout seul quand tu tapes ta
 première commande `git`. Le piège est là : `xcodebuild` **semble** exister,
 mais il refuse de travailler.
 
-### Vérifier ce que tu as
+### Vérifier ce que tu as — **avant tout téléchargement**
 
 ```bash
-xcodebuild -version
+sw_vers -productVersion && xcodebuild -version
 ```
 
-| Ce que tu lis | Ce que ça veut dire |
+Dix secondes, et ça tranche. **Ne télécharge rien avant d'avoir lu ce que
+ça répond.**
+
+| Ce que tu lis en 2ᵉ ligne | Ce que ça veut dire |
 |---|---|
 | `Xcode 26.6` | ✅ C'est bon, va aux 3 commandes |
-| `Xcode 16.x` ou autre | ⚠️ Mauvaise version — voir plus bas |
-| `... requires Xcode, but active developer directory ... CommandLineTools ...` | ❌ **Tu n'as que les Command Line Tools.** Installe Xcode. |
-| `command not found` | ❌ Rien d'installé. Installe Xcode. |
+| `Xcode 27.x` ou une autre version | ⚠️ Version différente de celle visée — voir « Si tu as une autre version » |
+| `... requires Xcode, but active developer directory ... CommandLineTools ...` | ❌ **Tu n'as que les Command Line Tools.** Voir « Récupérer Xcode 26.6 ». |
+| `command not found` | ❌ Rien d'installé. Voir « Récupérer Xcode 26.6 ». |
 
-### Installer Xcode
+### Les versions, et ce qu'elles sont vraiment
 
-1. **App Store** ▸ chercher **« Xcode »** ▸ **Installer**
-   → **~10 Go, 30 à 60 minutes** selon ta connexion. Lance-le maintenant et
-   fais autre chose en attendant.
-2. **Ouvre Xcode une fois** et accepte la licence. Il installera encore
+Trois choses distinctes, souvent confondues :
+
+| | Valeur | Statut |
+|---|---|---|
+| **Version d'Xcode visée** | **26.6** | **Un choix de ce projet**, pas une nécessité technique. C'est la version épinglée dans `codemagic.yaml`, la chaîne qui construit l'application publiée. Le script `demarrer.sh` l'exige pour garder la parité. |
+| **macOS minimum pour Xcode 26.6** | **macOS Tahoe 26.2** | **Exigence d'Apple**, relevée le 2026-09-19 : *« Xcode 26.6 requires a Mac running macOS Tahoe 26.2 or later. »* — [release notes Xcode 26.6](https://developer.apple.com/documentation/xcode-release-notes/xcode-26_6-release-notes) |
+| **SDK iOS livré avec Xcode 26.6** | **iOS 26.5** | Même source. Swift 6.3. Cibles de déploiement iOS 15 → 26.5, donc notre plancher iOS 17 est largement dedans. |
+
+> ⚠️ **Ne déduis jamais le minimum macOS du numéro d'Xcode.** Ils sont alignés
+> par année depuis macOS 26, mais ça ne veut pas dire qu'ils sont égaux :
+> Xcode 26.4.1, 26.5 et 26.6 partagent **tous** le plancher macOS 26.2.
+> Une version antérieure de ce document affirmait « macOS 26.6 nécessaire » —
+> **c'était faux**, et déduit de cette fausse égalité.
+
+**Ce document ne te demande aucune mise à jour ni aucun retour arrière de
+macOS.** Si `sw_vers` affiche **26.2 ou plus**, la condition d'Apple est
+remplie et il n'y a rien à faire. Si elle affiche moins, dis-le-moi : on
+décidera ensemble, ça ne se tranche pas dans une checklist.
+
+### Récupérer Xcode 26.6
+
+> 🚫 **Pas depuis le Mac App Store.**
+>
+> Relevé le **2026-09-19** : la fiche App Store d'Xcode sert la version
+> **27.0** (date de publication annoncée : 2026-09-14), et non 26.6. L'App
+> Store ne propose que la version courante. Suivre cette voie installerait
+> **une autre version que celle visée**, pour ~3 Go téléchargés.
+
+**Le portail développeur, qui permet de choisir la version :**
+
+1. Ouvre **https://developer.apple.com/download/all/**
+   → **tu devras t'authentifier** avec un compte Apple développeur (gratuit).
+   *Je ne peux ni le faire ni le vérifier à ta place.*
+2. Cherche **« Xcode 26.6 »**, télécharge le `.xip`, décompresse-le et place
+   `Xcode.app` dans `/Applications`.
+3. **Ouvre Xcode une fois** et accepte la licence. Il installera encore
    quelques composants — laisse-le finir.
-3. Vérifie :
+4. Vérifie :
    ```bash
    xcodebuild -version
    ```
-   ➜ doit répondre `Xcode 26.6`.
+
+> **[NON VÉRIFIÉ]** Je n'ai pas pu confirmer que le `.xip` d'Xcode 26.6 est
+> encore listé sur cette page : elle exige une authentification. Si tu ne l'y
+> trouves pas, dis-le-moi plutôt que de prendre la version la plus proche.
 
 ### Si Xcode est installé mais que le message parle encore de CommandLineTools
 
@@ -138,21 +187,28 @@ sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
 Pour voir où il pointe : `xcode-select -p`
 
-### Pourquoi macOS Tahoe 26.6 est nécessaire
+### Si tu as une autre version d'Xcode
 
-Xcode 26.6 **ne s'installe pas** sur un macOS plus ancien. Vérifie :
+Le script s'arrêtera en le disant. Deux possibilités :
 
-```bash
-sw_vers -productVersion
-```
+- **Tu as plusieurs Xcode installés** — pointe sur le bon :
+  ```bash
+  sudo xcode-select -s /Applications/Xcode-26.6.app/Contents/Developer
+  ```
+- **Tu veux quand même essayer avec ta version** :
+  ```bash
+  CERTIGO_IGNORER_XCODE=1 ./Scripts/demarrer.sh
+  ```
 
-➜ `26.6` ou plus. En dessous : Réglages ▸ Général ▸ Mise à jour logicielle,
-**avant** de lancer le téléchargement d'Xcode.
+  > ⚠️ **Diagnostic uniquement**, tant qu'aucune compilation n'a été observée.
+  > Ce garde-fou existe pour détecter l'écart entre ton poste et la chaîne de
+  > livraison. Le desserrer pour « passer » masquerait précisément ce qu'il
+  > sert à voir. À utiliser pour *comprendre* un échec, pas pour le contourner.
 
-> **Pourquoi 26.6 précisément ?** C'est la version épinglée dans
-> `codemagic.yaml`, la chaîne qui construit l'application publiée. Un écart
-> entre ton Mac et elle produit les pannes les plus difficiles à
-> diagnostiquer : ce qui marche ici casse là-bas.
+> **La compatibilité réelle n'est pas démontrée.** Rien de ce squelette n'a
+> jamais été compilé, avec aucune version d'Xcode. Les versions ci-dessus
+> disent ce que le projet **vise** et ce qu'Apple **exige pour installer** —
+> elles ne prouvent pas que le code compile.
 
 ---
 
@@ -202,19 +258,23 @@ Ouvre le Terminal et tape ces deux commandes, l'une après l'autre :
 sw_vers
 ```
 
-➜ Tu dois voir `ProductName: macOS` et **`ProductVersion: 26.6`** ou plus.
-C'est **macOS Tahoe**. En dessous, Xcode 26.6 ne s'installera pas.
+➜ Tu dois voir `ProductName: macOS` et **`ProductVersion: 26.2`** ou plus
+(macOS **Tahoe**). C'est le minimum qu'Apple documente pour installer
+Xcode 26.6 — voir la table de l'**Étape 0**, avec sa source et sa date.
 
 ```bash
 xcodebuild -version
 ```
 
-➜ **Tu dois voir `Xcode 26.6`.**
+➜ **Tu dois voir `Xcode 26.6`** — la version visée par ce projet.
 
 ### Si Xcode n'est pas installé
 
-Installe-le depuis l'App Store (c'est gros, compte 1 h de téléchargement),
-puis **ouvre-le une fois** pour accepter la licence. Ensuite :
+**Pas depuis le Mac App Store** — il ne propose que la version courante.
+Récupère la version exacte sur **https://developer.apple.com/download/all/**
+(authentification requise). Procédure détaillée à l'**Étape 0**.
+
+Puis **ouvre-le une fois** pour accepter la licence, et enfin :
 
 ```bash
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
@@ -274,6 +334,19 @@ Deux variantes utiles :
 ./Scripts/demarrer.sh --tests-seuls   # s'arrête après les tests
 ./Scripts/demarrer.sh --sans-lancer   # compile mais ne lance pas
 ```
+
+> ### ⚠️ `--tests-seuls` ne prouve **pas** que l'application iOS compile
+>
+> Il s'arrête à l'**étape 3/6** et ne compile que le **paquet Swift**, et
+> seulement **pour macOS** — parce que `swift test` tourne sans simulateur.
+> Il ne franchit jamais la frontière de plateforme.
+>
+> C'est utile pour savoir si le Swift pur tient debout. **Ça ne dit rien de
+> la cible iOS**, et un vert ici ne répond pas à la question posée.
+>
+> **Seule la commande complète le démontre** : l'étape **5/6** (`xcodebuild`
+> vers le simulateur) compile réellement pour iOS, et la **6/6** lance
+> l'application.
 
 ---
 
