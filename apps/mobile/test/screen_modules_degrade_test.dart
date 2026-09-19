@@ -5,6 +5,7 @@ import 'package:certigo/features/leaderboard/presentation/leaderboard_screen.dar
 import 'package:certigo/features/seasons/presentation/seasons_screen.dart';
 import 'package:certigo/features/share/presentation/daily_share_screen.dart';
 import 'package:certigo/features/shop/presentation/shop_screen.dart';
+import 'package:certigo/shared/widgets/inline_error.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import 'support/error_message.dart';
 import 'support/fake_user_repository.dart';
 
 /// The states matrix, pinned on the six secondary surfaces.
@@ -30,6 +32,10 @@ import 'support/fake_user_repository.dart';
 /// 3. **Empty state actionnable** — an empty module names a way out of itself,
 ///    and does not label that way out with a refresh glyph (the regression
 ///    [PrismStatusView.actionIcon] was introduced to prevent).
+///
+/// Cold and stale failures also share the error-message discipline probes:
+/// no rendered text may leak a technical detail, and a cold failure must
+/// retain a non-empty module message and a retry that really reloads its source.
 ///
 /// A note on what is *not* claimed: a successful refresh was already safe.
 /// `when` defaults to `skipLoadingOnRefresh: true`, and a resolved provider
@@ -153,21 +159,28 @@ void main() {
   // ── Override builders ───────────────────────────────────────────────────
 
   /// Never resolves a value: the cold-failure path.
-  Override coldFailure<T>(AutoDisposeFutureProvider<T> provider) =>
-      provider.overrideWith((Ref ref) async => throw StateError('source down'));
+  Override coldFailure<T>(
+    AutoDisposeFutureProvider<T> provider,
+    Object error,
+    VoidCallback onLoad,
+  ) =>
+      provider.overrideWith((Ref ref) async {
+        onLoad();
+        throw error;
+      });
 
   /// Resolves once, then fails: the failed-refresh path. Throwing inside the
   /// provider body (rather than completing a future with an error) keeps the
   /// failure inside Riverpod, where it becomes an `AsyncError` that still
   /// carries the previous value.
-  Override resolvesThenFails<T>(AutoDisposeFutureProvider<T> provider, T value) {
+  Override resolvesThenFails<T>(AutoDisposeFutureProvider<T> provider, T value, Object error) {
     int calls = 0;
     return provider.overrideWith((Ref ref) async {
       calls++;
       if (calls == 1) {
         return value;
       }
-      throw StateError('refresh down');
+      throw error;
     });
   }
 
@@ -197,8 +210,8 @@ void main() {
       chrome: () => find.text('Boutique'),
       content: () => find.text('Gel de série'),
       unavailable: ShopLabels.unavailable,
-      cold: () => coldFailure(shopCatalogProvider),
-      flaky: () => resolvesThenFails(shopCatalogProvider, catalog()),
+      cold: (Object error, VoidCallback onLoad) => coldFailure(shopCatalogProvider, error, onLoad),
+      flaky: (Object error) => resolvesThenFails(shopCatalogProvider, catalog(), error),
       empty: () => shopCatalogProvider.overrideWith((Ref ref) async => catalog(empty: true)),
       emptyTitle: ShopLabels.emptyTitle,
       emptyAction: ShopLabels.emptyAction,
@@ -211,8 +224,9 @@ void main() {
       chrome: () => find.text('Succès'),
       content: () => find.text('Série de feu'),
       unavailable: AchievementLabels.unavailable,
-      cold: () => coldFailure(achievementBoardProvider),
-      flaky: () => resolvesThenFails(achievementBoardProvider, board()),
+      cold: (Object error, VoidCallback onLoad) =>
+          coldFailure(achievementBoardProvider, error, onLoad),
+      flaky: (Object error) => resolvesThenFails(achievementBoardProvider, board(), error),
       empty: () => achievementBoardProvider.overrideWith((Ref ref) async => board(empty: true)),
       emptyTitle: AchievementLabels.emptyTitle,
       emptyAction: AchievementLabels.emptyAction,
@@ -228,8 +242,8 @@ void main() {
       chrome: () => find.byType(TextField),
       content: () => find.text('Alex Martin'),
       unavailable: FriendLabels.unavailable,
-      cold: () => coldFailure(friendListProvider),
-      flaky: () => resolvesThenFails(friendListProvider, friends()),
+      cold: (Object error, VoidCallback onLoad) => coldFailure(friendListProvider, error, onLoad),
+      flaky: (Object error) => resolvesThenFails(friendListProvider, friends(), error),
       empty: () => friendListProvider.overrideWith((Ref ref) async => friends(empty: true)),
       emptyTitle: FriendLabels.emptyTitle,
       emptyAction: FriendLabels.emptyAction,
@@ -242,8 +256,8 @@ void main() {
       chrome: () => find.text('Saison'),
       content: () => find.text('Forge cosmique'),
       unavailable: SeasonLabels.unavailable,
-      cold: () => coldFailure(seasonProvider),
-      flaky: () => resolvesThenFails(seasonProvider, season()),
+      cold: (Object error, VoidCallback onLoad) => coldFailure(seasonProvider, error, onLoad),
+      flaky: (Object error) => resolvesThenFails(seasonProvider, season(), error),
     ),
     _Surface(
       name: 'Partage du jour',
@@ -253,8 +267,9 @@ void main() {
       chrome: () => find.text('Partage du jour'),
       content: () => find.text('12 jours de serie'),
       unavailable: DailyShareLabels.unavailable,
-      cold: () => coldFailure(dailyShareCardProvider),
-      flaky: () => resolvesThenFails(dailyShareCardProvider, shareCard()),
+      cold: (Object error, VoidCallback onLoad) =>
+          coldFailure(dailyShareCardProvider, error, onLoad),
+      flaky: (Object error) => resolvesThenFails(dailyShareCardProvider, shareCard(), error),
     ),
     _Surface(
       // Leaderboard is a bottom-nav tab, so it carries no back bar to preserve;
@@ -267,8 +282,8 @@ void main() {
       chrome: null,
       content: () => find.text('Alex Martin'),
       unavailable: LeagueLabels.unavailable,
-      cold: () => coldFailure(leagueProvider),
-      flaky: () => resolvesThenFails(leagueProvider, league()),
+      cold: (Object error, VoidCallback onLoad) => coldFailure(leagueProvider, error, onLoad),
+      flaky: (Object error) => resolvesThenFails(leagueProvider, league(), error),
       empty: () => leagueProvider.overrideWith((Ref ref) async => league(empty: true)),
       emptyTitle: LeagueLabels.emptyTitle,
       emptyAction: LeagueLabels.emptyAction,
@@ -307,6 +322,7 @@ void main() {
         ),
       ],
     );
+    addTearDown(router.dispose);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -320,73 +336,106 @@ void main() {
     return container;
   }
 
+  final List<({String name, Object error})> failures = <({String name, Object error})>[
+    for (final probe in realisticFailures) (name: probe.name, error: probe.failure),
+    (
+      name: 'exception nue',
+      error: StateError('source down at package:data/src/api/client.dart:42')
+    ),
+  ];
+
   group('une source en échec froid ne vide que son module', () {
     for (final _Surface surface in surfaces) {
-      testWidgets('${surface.name} garde son chrome et nomme ce qui a échoué', (
-        WidgetTester tester,
-      ) async {
-        await pump(tester, surface, surface.cold());
+      for (final probe in failures) {
+        testWidgets('${surface.name} / ${probe.name} : cause et retry sans technique', (
+          WidgetTester tester,
+        ) async {
+          int loads = 0;
+          await pump(tester, surface, surface.cold(probe.error, () => loads++));
 
-        // The failure is named in this module's own words, not as a generic
-        // screen-wide takeover.
-        expect(
-          find.text(surface.unavailable),
-          findsOneWidget,
-          reason: '${surface.name}: the error must say what could not be loaded',
-        );
-        expect(find.text('Réessayer'), findsOneWidget, reason: 'the module offers its own retry');
-
-        final Finder? chrome = surface.chrome?.call();
-        if (chrome != null) {
+          expectNoTechnicalText(tester, context: '${surface.name} / ${probe.name} / froid');
+          // Check the error region itself: unrelated headings must not make a
+          // silent failure pass, even if the exported label becomes empty.
+          expect(surface.unavailable.trim(), isNotEmpty);
           expect(
-            chrome,
-            findsWidgets,
-            reason: '${surface.name}: a failing source must not take the screen chrome with it',
+            find.descendant(
+              of: find.byType(PrismStatusView),
+              matching: find.text(surface.unavailable),
+            ),
+            findsOneWidget,
+            reason: '${surface.name}: the error must say what could not be loaded',
           );
-        }
-      });
+          expect(find.text('Réessayer'), findsOneWidget, reason: 'the module offers its own retry');
+
+          final Finder? chrome = surface.chrome?.call();
+          if (chrome != null) {
+            expect(
+              chrome,
+              findsWidgets,
+              reason: '${surface.name}: a failing source must not take the screen chrome with it',
+            );
+          }
+
+          expect(loads, 1);
+          await tester.tap(find.text('Réessayer'));
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 50));
+
+          expect(loads, 2,
+              reason: '${surface.name}: retry must reload this module, not be a no-op');
+          expect(find.text(surface.unavailable), findsOneWidget);
+          expectNoTechnicalText(tester, context: '${surface.name} / ${probe.name} / retry');
+        });
+      }
     }
   });
 
   group('un rafraîchissement qui échoue conserve le contenu affiché', () {
     for (final _Surface surface in surfaces) {
-      testWidgets('${surface.name} garde ses données quand la mise à jour échoue', (
-        WidgetTester tester,
-      ) async {
-        final ProviderContainer container = await pump(tester, surface, surface.flaky());
+      for (final probe in failures) {
+        testWidgets('${surface.name} / ${probe.name} : contenu et bannière sans technique', (
+          WidgetTester tester,
+        ) async {
+          final ProviderContainer container =
+              await pump(tester, surface, surface.flaky(probe.error));
 
-        // Baseline: the content the learner is reading.
-        expect(
-          surface.content(),
-          findsWidgets,
-          reason: '${surface.name}: fixture must render before the refresh',
-        );
+          // Baseline: the content the learner is reading.
+          expect(
+            surface.content(),
+            findsWidgets,
+            reason: '${surface.name}: fixture must render before the refresh',
+          );
 
-        // Refresh — and it fails. Awaiting the provider's own future (rather
-        // than invalidating and hoping a pump lands after it) makes the failure
-        // observable at a known point.
-        await surface.refresh(container);
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 50));
+          // Refresh — and it fails. Awaiting the provider's own future (rather
+          // than invalidating and hoping a pump lands after it) makes the failure
+          // observable at a known point.
+          await surface.refresh(container);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 50));
 
-        expect(
-          surface.content(),
-          findsWidgets,
-          reason: '${surface.name}: a failed refresh must not cost the learner '
-              'the content they already had',
-        );
-        // The failure is reported beside the content, never instead of it.
-        expect(
-          find.text(AsyncModuleLabels.stale),
-          findsOneWidget,
-          reason: '${surface.name}: the stale banner reports the failed update',
-        );
-        expect(
-          find.text(surface.unavailable),
-          findsNothing,
-          reason: '${surface.name}: the module-wide error view must not take over',
-        );
-      });
+          expect(
+            surface.content(),
+            findsWidgets,
+            reason: '${surface.name}: a failed refresh must not cost the learner '
+                'the content they already had',
+          );
+          // The failure is reported beside the content, never instead of it.
+          expect(
+            find.descendant(
+              of: find.byType(InlineError),
+              matching: find.text(AsyncModuleLabels.stale),
+            ),
+            findsOneWidget,
+            reason: '${surface.name}: the stale banner reports the failed update',
+          );
+          expect(
+            find.text(surface.unavailable),
+            findsNothing,
+            reason: '${surface.name}: the module-wide error view must not take over',
+          );
+          expectNoTechnicalText(tester, context: '${surface.name} / ${probe.name} / refresh');
+        });
+      }
     }
   });
 
@@ -505,8 +554,8 @@ class _Surface {
   final Finder Function()? chrome;
   final Finder Function() content;
   final String unavailable;
-  final Override Function() cold;
-  final Override Function() flaky;
+  final Override Function(Object error, VoidCallback onLoad) cold;
+  final Override Function(Object error) flaky;
 
   /// Null where the surface has no empty state: the server always returns a
   /// season and a share card.

@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import 'auth_controller_test.dart' show FakeAuthGateway, FakeCredentialsGateway, FakeSessionStore;
+import 'support/error_message.dart';
 import 'support/technical_shape.dart';
 
 /// Garde : **aucun détail technique brut ne doit atteindre un widget**, et
@@ -37,76 +38,6 @@ import 'support/technical_shape.dart';
 ///   1. aucun texte rendu n'a la forme d'un détail technique ;
 ///   2. un message actionnable **non vide** est bien rendu.
 void main() {
-  // Des échecs réalistes : ce que les couches basses fabriquent vraiment.
-  // `ApiClient._mapDioError` met `e.message` (la chaîne de Dio) dans
-  // `ServerFailure.message` ; les caches et le parseur portent leurs propres
-  // textes. Si un écran recopie `failure.message`, l'une de ces chaînes
-  // atterrit à l'écran.
-  final List<({String name, Failure failure})> realisticFailures =
-      <({String name, Failure failure})>[
-    (
-      name: 'transport non typé par Dio',
-      failure: const ServerFailure(
-        'SocketException: Failed host lookup: \'api.certigo.invalid\' '
-        '(OS Error: nodename nor servname provided, errno = 8)',
-      ),
-    ),
-    (
-      name: 'délai Dio',
-      failure: const ServerFailure(
-        'DioException [connection timeout]: The request connection took longer '
-        'than 0:00:30.000000 and it was aborted.',
-        statusCode: null,
-      ),
-    ),
-    (
-      name: '500 avec detail technique',
-      failure: const ServerFailure(
-        'Unhandled exception: NullReferenceException at Certigo.Api.Functions',
-        statusCode: 500,
-      ),
-    ),
-    (name: '404', failure: const NotFoundFailure()),
-    (name: '401', failure: const AuthFailure()),
-    (name: 'hors ligne', failure: const NetworkFailure()),
-    (name: 'délai de réponse', failure: const NetworkFailure.responseTimeout()),
-    (name: 'contrat rompu', failure: const ParseFailure('Expected a JSON object')),
-    (name: 'non qualifié', failure: const UnknownFailure('Instance of \'_Exception\'')),
-  ];
-
-  /// Tout le texte que l'arbre rendu porte réellement.
-  List<String> renderedText(WidgetTester tester) {
-    final List<String> out = <String>[];
-    for (final Widget widget in tester.allWidgets) {
-      if (widget is Text) {
-        final String? data = widget.data;
-        if (data != null) out.add(data);
-        final InlineSpan? span = widget.textSpan;
-        if (span != null) out.add(span.toPlainText());
-      } else if (widget is SelectableText) {
-        final String? data = widget.data;
-        if (data != null) out.add(data);
-        final TextSpan? span = widget.textSpan;
-        if (span != null) out.add(span.toPlainText());
-      }
-    }
-    return out;
-  }
-
-  /// Exigence 1 : rien qui ressemble à un détail technique.
-  void expectNoTechnicalText(WidgetTester tester, {required String context}) {
-    for (final String text in renderedText(tester)) {
-      final String? shape = technicalShapeIn(text);
-      expect(
-        shape,
-        isNull,
-        reason: '$context : un détail technique atteint l\u2019écran.\n'
-            '  forme détectée : $shape\n'
-            '  texte rendu    : ${text.replaceAll('\n', ' ⏎ ')}',
-      );
-    }
-  }
-
   /// Exigence 2 : l'écran dit quand même quelque chose d'actionnable. Sans
   /// elle, supprimer le message suffirait à passer la garde.
   void expectActionableText(WidgetTester tester, {required String context}) {
