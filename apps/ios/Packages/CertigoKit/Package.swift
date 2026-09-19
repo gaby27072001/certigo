@@ -13,8 +13,22 @@ let package = Package(
     name: "CertigoKit",
     platforms: [
         // iOS 17 : plancher exigé par @Observable et NavigationStack (ADR-024).
+        //
         // macOS 14 : uniquement pour que `swift test` tourne sans simulateur,
         // ce qui donne une boucle rouge/vert sans passer par le projet Xcode.
+        //
+        // ⚠️ NE PAS ABAISSER macOS 14. Vérifié le 2026-09-19 contre les données
+        // de documentation d'Apple : toute la pile `@Observable` y est
+        // exactement — `@Observable` (macOS 14.0), `@Bindable` (14.0),
+        // `@Environment(T.self)` (14.0) et `.environment(instance)` (14.0).
+        // Zéro marge : abaisser cette ligne casse les quatre d'un coup.
+        //
+        // Le reste de la surface SwiftUI du paquet a été vérifié au même
+        // moment (40 symboles) : aucun n'est indisponible sur macOS, aucun
+        // n'exige macOS 15. Le chrome iOS 26, lui, est gardé par `#if os(iOS)`
+        // dans PrismGlass.swift — voir l'en-tête de ce fichier.
+        //
+        // `tools/tests/test_ios_detection.py` fait échouer toute baisse.
         .iOS(.v17),
         .macOS(.v14),
     ],

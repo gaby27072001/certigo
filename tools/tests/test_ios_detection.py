@@ -466,6 +466,41 @@ class DisponibilitePlateformeTests(unittest.TestCase):
             "au moins un chemin ne rend rien hors iOS.",
         )
 
+    def test_le_plancher_macos_ne_descend_pas_sous_14(self) -> None:
+        """`swift test` compile le paquet **pour macOS** : son plancher compte.
+
+        Vérifié le 2026-09-19 contre les données de documentation d'Apple :
+        toute la pile `@Observable` est exactement à macOS 14.0 — `@Observable`,
+        `@Bindable`, `@Environment(T.self)` et `.environment(instance)`. Zéro
+        marge. Abaisser cette ligne casse les quatre d'un coup, et l'erreur
+        n'apparaîtrait que sur le Mac, à l'étape 3/6.
+
+        `.v15` ou plus haut reste acceptable ; seule une baisse échoue.
+        """
+        texte = (
+            REPO_ROOT / "apps/ios/Packages/CertigoKit/Package.swift"
+        ).read_text(encoding="utf-8")
+
+        trouve = re.search(r"\.macOS\(\.v(\d+)\)", texte)
+        self.assertIsNotNone(trouve, "Package.swift ne déclare plus de plancher macOS.")
+        assert trouve is not None
+        self.assertGreaterEqual(
+            int(trouve.group(1)),
+            14,
+            "Le plancher macOS est descendu sous 14 : la pile @Observable ne "
+            "compilera plus, et `swift test` échouera avant même d'atteindre iOS.",
+        )
+
+        trouve_ios = re.search(r"\.iOS\(\.v(\d+)\)", texte)
+        self.assertIsNotNone(trouve_ios, "Package.swift ne déclare plus de plancher iOS.")
+        assert trouve_ios is not None
+        self.assertGreaterEqual(
+            int(trouve_ios.group(1)),
+            17,
+            "Le plancher iOS est descendu sous 17 : @Observable et "
+            "NavigationStack l'exigent (ADR-024).",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

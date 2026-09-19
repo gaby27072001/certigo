@@ -30,11 +30,30 @@ gh repo clone gchambaud_microsoft/Certigo ~/Certigo && cd ~/Certigo && git check
 
 ➜ Tu dois voir `Switched to branch 'gchambaud-microsoft-squelette-ios-natif'`.
 
-**Si tu as déjà le dépôt quelque part**, remplace par :
+**Si tu as déjà le dépôt quelque part** — ou si tu reviens après une
+correction de ma part — utilise **ceci et pas `git pull`** :
 
 ```bash
-cd ~/chemin/vers/Certigo && git fetch origin && git checkout gchambaud-microsoft-squelette-ios-natif && git pull
+cd ~/Certigo && git fetch origin && git reset --hard origin/gchambaud-microsoft-squelette-ios-natif
 ```
+
+➜ Puis vérifie ce que tu as vraiment :
+
+```bash
+git log --oneline -1
+```
+
+> ### ⚠️ Pourquoi pas `git pull` ?
+>
+> Cette branche est **réécrite** (rebase) chaque fois que je la remets à jour
+> sur `main`. Après une réécriture, `git pull` ne ramène pas la correction :
+> il échoue, ou pire, il fabrique une fusion qui mélange l'ancien et le
+> nouveau. **C'est déjà arrivé une fois** — tu étais resté sur une version
+> antérieure sans le savoir, et le script relancé était l'ancien.
+>
+> `git reset --hard origin/<branche>` prend toujours exactement ce qui est
+> publié. Il jette tes modifications locales, et c'est sans risque ici : le
+> script n'écrit que dans `.build/`, qui est ignoré par git.
 
 ### ③ Lancer
 
